@@ -6,7 +6,7 @@ import { onAuthStateChanged, RecaptchaVerifier, signInWithPhoneNumber } from 'fi
 import { ShoppingBag, Plus, User, PowerOff, Search, ChevronRight, X, MapPin, Phone } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
-import { useCartStore } from '../store/usecartstore';
+import { useCartStore } from '../store/useCartStore';
 
 // 1. CATEGORIES (Based on your PDF)
 const CATEGORIES = ["All", "Special Pizza", "Special Thali", "Paneer Special", "Special Mix veg", "Fast Food", "Super Cool", "Indian Bread", "Special Rice"];
