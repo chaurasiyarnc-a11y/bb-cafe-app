@@ -1,3 +1,6 @@
+
+'use client';
+
 import React, { useState, useEffect } from 'react';
 import { db, auth } from '../lib/firebase'; 
 import { collection, onSnapshot, query } from 'firebase/firestore';
@@ -8,25 +11,39 @@ import toast, { Toaster } from 'react-hot-toast';
 import { useCartStore } from '../store/useCartStore';
 
 export default function BbCafePro() {
-  const { cart, addToCart, removeFromCart, totalAmount, clearCart } = useCartStore() as any;
+  // Store se data nikalte waqt default empty values dena zaroori hai build fix karne ke liye
+  const store = useCartStore() as any;
+  const cart = store?.items || []; // Apne store ke hisab se 'items' ya 'cart' check karein
+  const addToCart = store?.addItem || (() => {});
+  const removeFromCart = store?.removeItem || (() => {});
+  const clearCart = store?.clearCart || (() => {});
+  
+  // totalAmount ko function ki tarah safely handle karein
+  const getTotal = () => {
+    if (typeof store?.totalAmount === 'function') return store.totalAmount();
+    return cart.reduce((acc: number, item: any) => acc + (item.price * item.quantity), 0);
+  };
+
   const [menu, setMenu] = useState<any[]>([]);
   const [user, setUser] = useState<any>(null);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [mounted, setMounted] = useState(false); // 👈 Hydration fix karne ke liye
 
   // Login States
   const [phoneNumber, setPhoneNumber] = useState("");
   const [otp, setOtp] = useState("");
-  const [step, setStep] = useState(1); // 1: Phone, 2: OTP
+  const [step, setStep] = useState(1); 
   const [confirmationResult, setConfirmationResult] = useState<any>(null);
 
   // Location & Checkout States
   const [address, setAddress] = useState("");
   const [location, setLocation] = useState<any>(null);
 
-  // 🟢 1. Auth Observer
+  // 🟢 Hydration Fix: Component mount hone ke baad hi render ho
   useEffect(() => {
+    setMounted(true);
     const unsub = onAuthStateChanged(auth, (u) => {
       setUser(u);
       setLoading(false);
@@ -34,17 +51,18 @@ export default function BbCafePro() {
     return () => unsub();
   }, []);
 
-  // 🟢 2. Fetch Menu
+  // 🟢 Fetch Menu
   useEffect(() => {
     const q = query(collection(db, "products"));
-    return onSnapshot(q, (snap) => {
+    const unsubscribe = onSnapshot(q, (snap) => {
       setMenu(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
+    return () => unsubscribe();
   }, []);
 
-  // 🟢 3. Phone Login Logic
+  // Recaptcha fix for build
   const setupRecaptcha = () => {
-    if (!(window as any).recaptchaVerifier) {
+    if (typeof window !== 'undefined' && !(window as any).recaptchaVerifier) {
       (window as any).recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', { size: 'invisible' });
     }
   };
@@ -69,13 +87,11 @@ export default function BbCafePro() {
     } catch (err) { toast.error("Invalid OTP!"); }
   };
 
-  // 🟢 4. GPS Geolocation
   const getLiveLocation = () => {
-    if (!navigator.geolocation) return toast.error("GPS not supported!");
+    if (typeof navigator !== 'undefined' && !navigator.geolocation) return toast.error("GPS not supported!");
     navigator.geolocation.getCurrentPosition((pos) => {
       setLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
       toast.success("Location captured!");
-      // यहाँ आप Google Maps API से एड्रेस भी निकाल सकते हैं
     });
   };
 
@@ -86,15 +102,17 @@ export default function BbCafePro() {
     const orderID = "BBC-" + Math.floor(1000 + Math.random() * 9000);
     let itemsText = "";
     cart.forEach((i: any) => {
-      itemsText += `• ${i.name} ${i.variant ? `(${i.variant.size})` : ''} x${i.qty} - ₹${i.price * i.qty}\n`;
+      itemsText += `• ${i.name} ${i.variant ? `(${i.variant.size})` : ''} x${i.quantity || i.qty} - ₹${i.price * (i.quantity || i.qty)}\n`;
     });
 
-    const msg = `🍔 *NEW ORDER - BUM BUM CAFE* 🍔\nID: #${orderID}\n\n👤 *Customer:* ${user.phoneNumber}\n📍 *Address:* ${address}\n🌐 *GPS:* ${location ? `https://maps.google.com/?q=${location.lat},${location.lng}` : 'Not shared'}\n\n*ITEMS:*\n${itemsText}\n*TOTAL: ₹${totalAmount()}*`;
+    const msg = `🍔 *NEW ORDER - BUM BUM CAFE* 🍔\nID: #${orderID}\n\n👤 *Customer:* ${user.phoneNumber}\n📍 *Address:* ${address}\n🌐 *GPS:* ${location ? `https://maps.google.com/?q=${location.lat},${location.lng}` : 'Not shared'}\n\n*ITEMS:*\n${itemsText}\n*TOTAL: ₹${getTotal()}*`;
     
     window.open(`https://wa.me/919714293759?text=${encodeURIComponent(msg)}`, '_blank');
     clearCart();
     setIsCartOpen(false);
   };
+
+  if (!mounted) return null; // 👈 Page load hone tak white screen (Build fix)
 
   return (
     <div className="bg-[#0A0A0A] min-h-screen text-white font-sans selection:bg-orange-500">
@@ -108,7 +126,11 @@ export default function BbCafePro() {
           <div className="flex gap-4 items-center">
             <button onClick={() => setIsCartOpen(true)} className="relative p-2 bg-white/5 rounded-full">
               <ShoppingBag size={22} />
-              {cart.length > 0 && <span className="absolute -top-1 -right-1 bg-[#FF6B00] text-[10px] w-5 h-5 rounded-full flex items-center justify-center font-bold">{cart.length}</span>}
+              {cart?.length > 0 && (
+                <span className="absolute -top-1 -right-1 bg-[#FF6B00] text-[10px] w-5 h-5 rounded-full flex items-center justify-center font-bold">
+                    {cart.length}
+                </span>
+              )}
             </button>
             <button onClick={() => user ? toast(`Loyalty Points: 0`) : setIsLoginOpen(true)}>
               {user ? <div className="w-10 h-10 bg-orange-500 rounded-full flex items-center justify-center font-bold text-xs uppercase">Me</div> : <User size={22} className="text-white/40"/>}
@@ -124,19 +146,17 @@ export default function BbCafePro() {
           <p className="text-white/20 text-[10px] uppercase tracking-[0.3em] font-bold mt-2">Mohandra | @bbcafe.in</p>
         </div>
 
-        {/* Menu Grid (PDF Data के लिए Loop) */}
         <div className="space-y-6">
           {menu.map((item) => (
             <div key={item.id} className="glass p-5 rounded-[2.5rem] border border-white/5 space-y-4">
               <div className="flex gap-4 items-center">
-                <img src={item.image} className="w-24 h-24 rounded-3xl object-cover" />
+                <img src={item.image} className="w-24 h-24 rounded-3xl object-cover" alt={item.name} />
                 <div className="flex-1">
                   <h4 className="font-bold text-lg">{item.name}</h4>
                   <p className="text-[#FF6B00] font-black text-xl">₹{item.price || item.variants?.[0]?.price}</p>
                 </div>
               </div>
 
-              {/* Variation Buttons (अगर Pizza है) */}
               {item.variants && (
                 <div className="flex gap-2">
                   {item.variants.map((v: any) => (
@@ -161,7 +181,6 @@ export default function BbCafePro() {
         </div>
       </main>
 
-      {/* Bottom Cart Drawer & Login Modals... (Logic remains same, adding inputs) */}
       <AnimatePresence>
         {isCartOpen && (
           <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} className="fixed inset-0 z-[100] bg-[#0A0A0A] p-8 flex flex-col">
@@ -182,14 +201,14 @@ export default function BbCafePro() {
 
              <div className="flex-1 overflow-y-auto space-y-4">
                 {cart.map((i: any) => (
-                  <div key={i.cartId} className="flex justify-between items-center bg-white/5 p-4 rounded-2xl">
+                  <div key={i.cartId || i.id} className="flex justify-between items-center bg-white/5 p-4 rounded-2xl">
                     <div>
                        <span className="font-bold block">{i.name} {i.variant ? `(${i.variant.size})` : ''}</span>
-                       <span className="text-[#FF6B00] font-bold text-sm">₹{i.price * i.qty}</span>
+                       <span className="text-[#FF6B00] font-bold text-sm">₹{i.price * (i.quantity || i.qty)}</span>
                     </div>
                     <div className="flex items-center gap-3">
-                       <button onClick={()=>removeFromCart(i.cartId)} className="p-1 bg-white/10 rounded-md"><Minus size={14}/></button>
-                       <span className="font-bold">{i.qty}</span>
+                       <button onClick={()=>removeFromCart(i.cartId || i.id)} className="p-1 bg-white/10 rounded-md"><Minus size={14}/></button>
+                       <span className="font-bold">{i.quantity || i.qty}</span>
                        <button onClick={()=>addToCart(i, i.variant)} className="p-1 bg-white/10 rounded-md"><Plus size={14}/></button>
                     </div>
                   </div>
@@ -197,7 +216,7 @@ export default function BbCafePro() {
              </div>
 
              <button onClick={sendWhatsAppOrder} className="w-full bg-[#FF6B00] py-5 rounded-[2rem] font-bold text-lg mt-6 shadow-xl shadow-orange-500/20">
-                Confirm Order (₹{totalAmount()})
+                Confirm Order (₹{getTotal()})
              </button>
           </motion.div>
         )}
