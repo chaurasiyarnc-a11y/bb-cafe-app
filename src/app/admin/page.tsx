@@ -1,197 +1,98 @@
-"use client";
+'use client';
 import React, { useState, useEffect } from 'react';
-import { db } from '../../lib/firebase';
-import { collection, addDoc, getDocs, deleteDoc, doc, updateDoc, serverTimestamp, onSnapshot, query, orderBy } from 'firebase/firestore';
-import { LayoutDashboard, Plus, Trash2, Users, ShoppingBag, Eye, EyeOff, Loader2, LogOut, CheckCircle2, XCircle } from 'lucide-react';
+import { db, auth } from '@/lib/firebase';
+import { collection, onSnapshot, updateDoc, doc, query, orderBy, setDoc } from 'firebase/firestore';
+import { onAuthStateChanged } from 'firebase/auth';
+import { Power, Eye, EyeOff, User, MapPin, Calendar, CheckCircle2 } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 
-export default function BbCafeDashboard() {
-  const [activeTab, setActiveTab] = useState('stats'); // stats, add, menu, users
-  const [loading, setLoading] = useState(false);
-  const [products, setProducts] = useState<any[]>([]);
-  const [users, setUsers] = useState<any[]>([]);
+export default function AdminDashboard() {
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [tab, setTab] = useState('orders');
+  const [orders, setOrders] = useState<any[]>([]);
+  const [menu, setMenu] = useState<any[]>([]);
+  const [storeOpen, setStoreOpen] = useState(true);
 
-  // Form State
-  const [name, setName] = useState("");
-  const [price, setPrice] = useState("");
-  const [imageUrl, setImageUrl] = useState("");
-  const [variantsJson, setVariantsJson] = useState("");
-
-  // 🟢 लाइव डेटा फेचिंग (Products & Users)
   useEffect(() => {
-    const qProd = query(collection(db, "products"), orderBy("createdAt", "desc"));
-    const unsubProd = onSnapshot(qProd, (snap) => {
-      setProducts(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    onAuthStateChanged(auth, (u) => {
+      if (u?.phoneNumber === '+919714293759') setIsAdmin(true);
     });
-
-    const qUser = query(collection(db, "users"), orderBy("createdAt", "desc"));
-    const unsubUser = onSnapshot(qUser, (snap) => {
-      setUsers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    });
-
-    return () => { unsubProd(); unsubUser(); };
   }, []);
 
-  // 🔵 डिश जोड़ने का फंक्शन
-  const handleAddDish = async (e: any) => {
-    e.preventDefault();
-    if (!name || !imageUrl) return toast.error("नाम और फोटो लिंक ज़रूरी है!");
-    setLoading(true);
-    try {
-      let variations = variantsJson.trim() !== "" ? JSON.parse(variantsJson) : null;
-      await addDoc(collection(db, "products"), {
-        name, price: price ? Number(price) : 0, image: imageUrl, variants: variations,
-        visibility: true, stockStatus: 'in-stock', createdAt: serverTimestamp()
-      });
-      toast.success("डिश पब्लिश हो गई!");
-      setName(""); setPrice(""); setImageUrl(""); setVariantsJson(""); setActiveTab('menu');
-    } catch (error) { toast.error("Error!"); }
-    setLoading(false);
+  useEffect(() => {
+    if (!isAdmin) return;
+    // Orders
+    const qO = query(collection(db, "orders"), orderBy("timestamp", "desc"));
+    onSnapshot(qO, (s) => setOrders(s.docs.map(d => ({id: d.id, ...d.data()}))));
+    // Menu
+    onSnapshot(collection(db, "products"), (s) => setMenu(s.docs.map(d => ({id: d.id, ...d.data()}))));
+    // Store
+    onSnapshot(doc(db, "settings", "store"), (d) => {
+      if(d.exists()) setStoreOpen(d.data().isOpen);
+    });
+  }, [isAdmin]);
+
+  const toggleItem = async (id: string, current: boolean) => {
+    await updateDoc(doc(db, "products", id), { isVisible: !current });
+    toast.success("Updated");
   };
 
-  // 🔴 डिश डिलीट करने का फंक्शन
-  const deleteProduct = async (id: string) => {
-    if(confirm("क्या आप वाकई इसे हटाना चाहते हैं?")) {
-      await deleteDoc(doc(db, "products", id));
-      toast.success("हटा दिया गया!");
-    }
+  const toggleStore = async () => {
+    await setDoc(doc(db, "settings", "store"), { isOpen: !storeOpen });
+    toast.success(storeOpen ? "Store Offline" : "Store Online");
   };
 
-  // 🟡 स्टॉक स्टेटस बदलने का फंक्शन
-  const toggleStock = async (id: string, currentStatus: string) => {
-    const newStatus = currentStatus === 'in-stock' ? 'out-of-stock' : 'in-stock';
-    await updateDoc(doc(db, "products", id), { stockStatus: newStatus });
-    toast.success("स्टॉक अपडेट हुआ!");
-  };
+  if (!isAdmin) return <div className="p-20 text-center text-white">Access Denied!</div>;
 
   return (
-    <div className="min-h-screen bg-[#050505] text-white font-sans pb-24">
+    <div className="bg-[#0A0A0A] min-h-screen text-white p-6">
       <Toaster />
-      
-      {/* Header */}
-      <header className="p-6 border-b border-white/5 bg-black/50 backdrop-blur-md sticky top-0 z-50 flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-black text-[#FF6B00] italic">BB ADMIN</h1>
-          <p className="text-[10px] text-white/40 uppercase tracking-widest font-bold">Control Center</p>
-        </div>
-        <button onClick={() => window.location.href='/'} className="p-2 bg-white/5 rounded-full"><LogOut size={20}/></button>
+      <header className="flex justify-between items-center mb-8">
+        <h1 className="text-2xl font-black italic text-orange-500">ADMIN PANEL</h1>
+        <button onClick={toggleStore} className={`px-4 py-2 rounded-full font-bold text-xs flex items-center gap-2 ${storeOpen ? 'bg-green-500/20 text-green-500' : 'bg-red-500/20 text-red-500'}`}>
+          <Power size={14}/> {storeOpen ? "ONLINE" : "OFFLINE"}
+        </button>
       </header>
 
-      <main className="p-6 max-w-lg mx-auto">
-        
-        {/* --- Tab 1: Quick Stats --- */}
-        {activeTab === 'stats' && (
-          <div className="space-y-6 animate-in fade-in">
-            <h2 className="text-xl font-bold flex items-center gap-2"><LayoutDashboard className="text-[#FF6B00]"/> Business Overview</h2>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="glass p-6 rounded-[2rem] border border-white/10">
-                <ShoppingBag className="text-[#FF6B00] mb-2" size={24}/>
-                <p className="text-3xl font-black">{products.length}</p>
-                <p className="text-[10px] text-white/40 uppercase font-bold">Menu Items</p>
+      <div className="flex gap-2 mb-6 bg-white/5 p-1 rounded-2xl">
+        <button onClick={()=>setTab('orders')} className={`flex-1 py-3 rounded-xl font-bold uppercase text-xs ${tab === 'orders' ? 'bg-orange-500' : 'text-white/40'}`}>Orders</button>
+        <button onClick={()=>setTab('menu')} className={`flex-1 py-3 rounded-xl font-bold uppercase text-xs ${tab === 'menu' ? 'bg-orange-500' : 'text-white/40'}`}>Menu</button>
+      </div>
+
+      {tab === 'orders' ? (
+        <div className="space-y-4">
+          {orders.map(o => (
+            <div key={o.id} className="bg-white/5 p-5 rounded-[2rem] border border-white/10 relative">
+              <div className="flex justify-between mb-4">
+                <span className="bg-orange-500 px-3 py-1 rounded-lg font-bold text-xs">TOKEN: {o.tokenNumber}</span>
+                <span className="text-orange-500 font-bold">₹{o.total}</span>
               </div>
-              <div className="glass p-6 rounded-[2rem] border border-white/10">
-                <Users className="text-[#FF6B00] mb-2" size={24}/>
-                <p className="text-3xl font-black">{users.length}</p>
-                <p className="text-[10px] text-white/40 uppercase font-bold">Customers</p>
+              <div className="space-y-1 mb-4 text-sm opacity-80 border-b border-white/5 pb-4">
+                {o.items.map((i:any, idx:number) => <p key={idx}>{i.name} x {i.quantity}</p>)}
               </div>
-            </div>
-            <div className="glass p-6 rounded-[2.5rem] border border-white/5 flex items-center justify-between">
-              <div>
-                <p className="text-white/40 text-xs font-bold uppercase">Store Status</p>
-                <p className="text-green-500 font-bold">Accepting Orders ✅</p>
-              </div>
-              <div className="w-12 h-6 bg-green-500/20 rounded-full flex items-center px-1">
-                 <div className="w-4 h-4 bg-green-500 rounded-full shadow-lg shadow-green-500/50"></div>
+              <div className="text-[10px] uppercase font-bold space-y-1 opacity-40">
+                <p className="flex items-center gap-2"><User size={10}/> {o.customerPhone}</p>
+                <p className="flex items-center gap-2"><MapPin size={10}/> {o.address}</p>
+                <p className="flex items-center gap-2"><Calendar size={10}/> {o.timestamp?.toDate().toLocaleString()}</p>
               </div>
             </div>
-          </div>
-        )}
-
-        {/* --- Tab 2: Menu Manager --- */}
-        {activeTab === 'menu' && (
-          <div className="space-y-6 animate-in fade-in">
-            <div className="flex justify-between items-center">
-              <h2 className="text-xl font-bold">Manage Menu</h2>
-              <button onClick={()=>setActiveTab('add')} className="p-2 bg-[#FF6B00] rounded-lg"><Plus size={20}/></button>
+          ))}
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {menu.map(m => (
+            <div key={m.id} className={`flex items-center justify-between p-4 rounded-2xl border ${m.isVisible !== false ? 'bg-white/5 border-white/10' : 'bg-red-500/5 border-red-500/20 opacity-50'}`}>
+              <div className="flex gap-4 items-center">
+                <img src={m.image} className="w-10 h-10 rounded-xl object-cover" />
+                <h4 className="font-bold text-sm">{m.name}</h4>
+              </div>
+              <button onClick={() => toggleItem(m.id, m.isVisible !== false)} className="p-2 bg-white/5 rounded-lg">
+                {m.isVisible !== false ? <Eye size={18} className="text-green-500"/> : <EyeOff size={18} className="text-red-500"/>}
+              </button>
             </div>
-            <div className="space-y-4">
-              {products.map(p => (
-                <div key={p.id} className="glass p-4 rounded-3xl border border-white/5 flex gap-4 items-center">
-                  <img src={p.image} className="w-16 h-16 rounded-2xl object-cover" />
-                  <div className="flex-1">
-                    <h4 className="font-bold text-sm leading-tight">{p.name}</h4>
-                    <p className="text-[#FF6B00] font-black text-sm">₹{p.price || (p.variants && p.variants[0].price)}</p>
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <button onClick={()=>toggleStock(p.id, p.stockStatus)} className={`${p.stockStatus === 'in-stock' ? 'text-green-500' : 'text-red-500'}`}>
-                      {p.stockStatus === 'in-stock' ? <CheckCircle2 size={20}/> : <XCircle size={20}/>}
-                    </button>
-                    <button onClick={()=>deleteProduct(p.id)} className="text-white/20 hover:text-red-500"><Trash2 size={20}/></button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* --- Tab 3: Add Item Form --- */}
-        {activeTab === 'add' && (
-          <div className="animate-in slide-in-from-bottom-4">
-            <h2 className="text-xl font-bold mb-6">Add New Dish</h2>
-            <form onSubmit={handleAddDish} className="space-y-4 bg-white/5 p-6 rounded-[2.5rem] border border-white/10">
-               <input value={name} onChange={(e)=>setName(e.target.value)} placeholder="Dish Name" className="w-full bg-black/40 border border-white/10 p-4 rounded-2xl outline-none focus:border-[#FF6B00]" />
-               <input type="number" value={price} onChange={(e)=>setPrice(e.target.value)} placeholder="Base Price (Optional)" className="w-full bg-black/40 border border-white/10 p-4 rounded-2xl outline-none focus:border-[#FF6B00]" />
-               <input value={imageUrl} onChange={(e)=>setImageUrl(e.target.value)} placeholder="Image Link (URL)" className="w-full bg-black/40 border border-white/10 p-4 rounded-2xl outline-none focus:border-[#FF6B00]" />
-               <textarea value={variantsJson} onChange={(e)=>setVariantsJson(e.target.value)} placeholder='Variations JSON (e.g. [{"size": "Small", "price": 80}])' className="w-full bg-black/40 border border-white/10 p-4 rounded-2xl outline-none text-xs h-24 font-mono" />
-               <button disabled={loading} className="w-full bg-[#FF6B00] py-4 rounded-2xl font-bold shadow-xl flex justify-center items-center gap-2">
-                 {loading ? <Loader2 className="animate-spin"/> : <><Plus size={20}/> Add to Website</>}
-               </button>
-            </form>
-          </div>
-        )}
-
-        {/* --- Tab 4: Customer List --- */}
-        {activeTab === 'users' && (
-          <div className="space-y-6 animate-in fade-in">
-            <h2 className="text-xl font-bold">Registered Customers</h2>
-            <div className="space-y-4">
-              {users.length === 0 && <p className="text-center text-white/20 py-10">No users yet.</p>}
-              {users.map(u => (
-                <div key={u.id} className="glass p-5 rounded-3xl border border-white/5 flex justify-between items-center">
-                  <div>
-                    <p className="font-bold text-sm">{u.phoneNumber || "Guest User"}</p>
-                    <p className="text-[10px] text-white/40 uppercase font-bold">Joined: {new Date(u.createdAt?.seconds * 1000).toLocaleDateString()}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-lg font-black text-[#FF6B00]">{u.loyaltyPoints || 0}</p>
-                    <p className="text-[8px] uppercase font-bold text-white/30">Points</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-      </main>
-
-      {/* --- Mobile Bottom Tab Bar --- */}
-      <nav className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[90%] glass border border-white/10 p-3 rounded-[2.5rem] flex justify-around items-center z-[100] max-w-md shadow-2xl">
-        <button onClick={()=>setActiveTab('stats')} className={`flex flex-col items-center gap-1 ${activeTab === 'stats' ? 'text-[#FF6B00]' : 'text-white/30'}`}>
-          <LayoutDashboard size={20} />
-          <span className="text-[8px] font-bold uppercase">Stats</span>
-        </button>
-        <button onClick={()=>setActiveTab('menu')} className={`flex flex-col items-center gap-1 ${activeTab === 'menu' ? 'text-[#FF6B00]' : 'text-white/30'}`}>
-          <ShoppingBag size={20} />
-          <span className="text-[8px] font-bold uppercase">Menu</span>
-        </button>
-        <button onClick={()=>setActiveTab('add')} className="bg-[#FF6B00] p-4 rounded-full -mt-12 border-8 border-[#050505] shadow-2xl active:scale-90 transition-all">
-          <Plus size={24} className="text-white" />
-        </button>
-        <button onClick={()=>setActiveTab('users')} className={`flex flex-col items-center gap-1 ${activeTab === 'users' ? 'text-[#FF6B00]' : 'text-white/30'}`}>
-          <Users size={20} />
-          <span className="text-[8px] font-bold uppercase">Users</span>
-        </button>
-      </nav>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
