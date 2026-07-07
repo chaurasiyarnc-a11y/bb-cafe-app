@@ -1,42 +1,38 @@
 'use client';
 import React, { useState, useEffect } from 'react';
 import { db, auth } from '../lib/firebase'; 
-import { collection, onSnapshot, query, addDoc, doc, getDoc } from 'firebase/firestore';
+import { collection, onSnapshot, query, addDoc, doc } from 'firebase/firestore';
 import { onAuthStateChanged, RecaptchaVerifier, signInWithPhoneNumber } from 'firebase/auth';
-import { ShoppingBag, Plus, Minus, X, User, Navigation, PowerOff } from 'lucide-react';
+import { ShoppingBag, Plus, User, PowerOff, Search, ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
 import { useCartStore } from '../store/usecartstore';
 
+// Categories as per your PDF Menu
+const CATEGORIES = ["All", "Special Pizza", "Special Thali", "Paneer Special", "Fast Food", "Super Cool", "Indian Bread"];
+
 export default function BbCafeHome() {
   const store = useCartStore() as any;
   const cart = store?.items || [];
-  const { addItem, removeItem, clearCart } = store;
+  const { addItem, clearCart } = store;
   
   const [menu, setMenu] = useState<any[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState("All");
+  const [searchQuery, setSearchQuery] = useState("");
   const [user, setUser] = useState<any>(null);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [storeOpen, setStoreOpen] = useState(true);
   const [mounted, setMounted] = useState(false);
-
-  // States for Checkout
   const [address, setAddress] = useState("");
-  const [location, setLocation] = useState<any>(null);
-  const [phoneNumber, setPhoneNumber] = useState("");
-  const [otp, setOtp] = useState("");
-  const [step, setStep] = useState(1);
-  const [confirmationResult, setConfirmationResult] = useState<any>(null);
 
   useEffect(() => {
     setMounted(true);
-    // Check Store Status
     onSnapshot(doc(db, "settings", "store"), (d) => {
       if(d.exists()) setStoreOpen(d.data().isOpen);
     });
-    // Auth
     onAuthStateChanged(auth, (u) => setUser(u));
-    // Menu (Only show visible items)
+    
     const q = query(collection(db, "products"));
     return onSnapshot(q, (snap) => {
       const items = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -45,6 +41,13 @@ export default function BbCafeHome() {
   }, []);
 
   const getTotal = () => cart.reduce((acc: number, i: any) => acc + (i.price * i.quantity), 0);
+
+  // Filter Logic
+  const filteredMenu = menu.filter(item => {
+    const matchesCategory = selectedCategory === "All" || item.category === selectedCategory;
+    const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesCategory && matchesSearch;
+  });
 
   const sendWhatsAppOrder = async () => {
     if (!user) return setIsLoginOpen(true);
@@ -65,123 +68,131 @@ export default function BbCafeHome() {
       await addDoc(collection(db, "orders"), orderData);
       let itemsText = "";
       cart.forEach((i: any) => itemsText += `• ${i.name} x${i.quantity} - ₹${i.price * i.quantity}\n`);
-      const msg = `🍔 *NEW ORDER #${tokenNumber}*\n\n👤 ${user.phoneNumber}\n📍 ${address}\n\n*ITEMS:*\n${itemsText}\n*TOTAL: ₹${getTotal()}*`;
+      const msg = `🍔 *BUM BUM CAFE - NEW ORDER*\n\n*Order ID:* #${tokenNumber}\n*Phone:* ${user.phoneNumber}\n*Address:* ${address}\n\n*ITEMS:*\n${itemsText}\n*TOTAL: ₹${getTotal()}*\n\n_Please confirm this order._`;
       window.open(`https://wa.me/919714293759?text=${encodeURIComponent(msg)}`, '_blank');
       clearCart();
       setIsCartOpen(false);
-      toast.success("Order Placed!");
+      toast.success("Order Placed Successfully!");
     } catch (e) { toast.error("Order Failed!"); }
-  };
-
-  // Auth Functions (sendOtp, verifyOtp) yahan pehle jaise hi rahenge...
-  const setupRecaptcha = () => {
-    if (!(window as any).recaptchaVerifier) {
-      (window as any).recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', { size: 'invisible' });
-    }
-  };
-  const sendOtp = async () => {
-    setupRecaptcha();
-    try {
-      const result = await signInWithPhoneNumber(auth, `+91${phoneNumber}`, (window as any).recaptchaVerifier);
-      setConfirmationResult(result); setStep(2); toast.success("OTP Sent");
-    } catch (e) { toast.error("Error sending OTP"); }
-  };
-  const verifyOtp = async () => {
-    try { await confirmationResult.confirm(otp); setIsLoginOpen(false); toast.success("Logged In"); }
-    catch (e) { toast.error("Invalid OTP"); }
   };
 
   if (!mounted) return null;
 
   return (
-    <div className="bg-[#0A0A0A] min-h-screen text-white pb-20">
-      <Toaster />
-      <div id="recaptcha-container"></div>
+    <div className="bg-[#050505] min-h-screen text-white pb-32 font-sans">
+      <Toaster position="top-center" />
       
-      {/* Navbar */}
-      <nav className="fixed top-0 w-full z-50 p-4">
-        <div className="glass rounded-3xl p-4 flex justify-between items-center border border-white/10 max-w-lg mx-auto">
-          <h1 className="text-2xl font-black text-orange-500 italic">BB CAFE</h1>
-          <div className="flex gap-4">
-            <button onClick={() => setIsCartOpen(true)} className="relative p-2 bg-white/5 rounded-full">
-              <ShoppingBag size={22} />
-              {cart.length > 0 && <span className="absolute -top-1 -right-1 bg-orange-500 text-[10px] w-5 h-5 rounded-full flex items-center justify-center font-bold">{cart.length}</span>}
-            </button>
-            <button onClick={() => !user && setIsLoginOpen(true)}>
-              {user ? <div className="w-10 h-10 bg-orange-500 rounded-full flex items-center justify-center font-bold text-xs uppercase">Me</div> : <User size={22}/>}
-            </button>
+      {/* --- HERO HEADER --- */}
+      <header className="relative h-64 bg-orange-600 rounded-b-[3rem] overflow-hidden flex flex-col justify-center items-center px-6 shadow-2xl">
+        <div className="absolute inset-0 opacity-20 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')]"></div>
+        <motion.h1 
+          initial={{ y: -20, opacity: 0 }} animate={{ y: 0, opacity: 1 }}
+          className="text-5xl font-black italic tracking-tighter text-yellow-400 drop-shadow-md"
+        >
+          BUM BUM CAFE
+        </motion.h1>
+        <p className="text-orange-100 font-medium tracking-widest text-sm mt-2">TASTE THE BEST FROM THE OVEN</p>
+        
+        {/* Search Bar */}
+        <div className="absolute -bottom-6 w-[90%] max-w-md">
+          <div className="relative group">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-orange-500 transition-colors" size={20} />
+            <input 
+              type="text" 
+              placeholder="Search dishes..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-white text-black py-4 px-12 rounded-2xl shadow-xl outline-none focus:ring-4 focus:ring-orange-500/20 transition-all"
+            />
           </div>
         </div>
-      </nav>
+      </header>
 
-      {/* Main Content */}
-      <main className="pt-28 px-6 max-w-lg mx-auto">
+      <main className="pt-12 px-4 max-w-lg mx-auto">
+        {/* --- CATEGORY SCROLLER --- */}
+        <div className="flex gap-3 overflow-x-auto pb-6 no-scrollbar">
+          {CATEGORIES.map((cat) => (
+            <button
+              key={cat}
+              onClick={() => setSelectedCategory(cat)}
+              className={`px-5 py-2.5 rounded-2xl whitespace-nowrap font-bold transition-all ${
+                selectedCategory === cat 
+                ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/30 scale-105' 
+                : 'bg-white/5 text-gray-400 border border-white/10'
+              }`}
+            >
+              {cat}
+            </button>
+          ))}
+        </div>
+
+        {/* Store Closed Banner */}
         {!storeOpen && (
-          <div className="bg-red-500/20 text-red-500 p-6 rounded-[2.5rem] border border-red-500/20 text-center mb-8">
+          <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} className="bg-red-500/10 text-red-500 p-5 rounded-3xl border border-red-500/20 text-center mb-8">
             <PowerOff className="mx-auto mb-2" />
-            <h3 className="font-bold">STORE IS CLOSED</h3>
-            <p className="text-xs opacity-70 uppercase tracking-widest">Wapas aaiye kal subah!</p>
-          </div>
+            <h3 className="font-bold">CAFE IS CURRENTLY CLOSED</h3>
+            <p className="text-xs opacity-70">We are not accepting orders right now.</p>
+          </motion.div>
         )}
 
-        <div className="space-y-6">
-          {menu.map((item) => (
-            <div key={item.id} className="glass p-5 rounded-[2.5rem] border border-white/5 flex gap-4 items-center">
-              <img src={item.image} className="w-20 h-20 rounded-3xl object-cover" />
+        {/* --- PRODUCT LIST --- */}
+        <div className="grid grid-cols-1 gap-4">
+          {filteredMenu.map((item) => (
+            <motion.div 
+              layout key={item.id} 
+              className="group bg-white/[0.03] p-4 rounded-[2rem] border border-white/5 flex gap-4 items-center hover:bg-white/[0.06] transition-all"
+            >
+              <div className="relative h-20 w-20 flex-shrink-0">
+                <img src={item.image} className="w-full h-full rounded-2xl object-cover shadow-lg" alt={item.name} />
+                <div className="absolute -top-1 -left-1 bg-green-500 w-3 h-3 rounded-full border-2 border-black"></div>
+              </div>
               <div className="flex-1">
-                <h4 className="font-bold">{item.name}</h4>
-                <p className="text-orange-500 font-bold">₹{item.price}</p>
+                <h4 className="font-bold text-gray-100 group-hover:text-orange-400 transition-colors">{item.name}</h4>
+                <div className="flex items-center gap-2 mt-1">
+                  <span className="text-orange-500 font-black text-lg">₹{item.price}</span>
+                  {item.oldPrice && <span className="text-gray-500 line-through text-xs">₹{item.oldPrice}</span>}
+                </div>
               </div>
               {storeOpen && (
-                <button onClick={() => addItem(item)} className="p-3 bg-orange-500 rounded-2xl"><Plus size={20}/></button>
+                <button 
+                  onClick={() => {
+                    addItem(item);
+                    toast.success(`${item.name} Added`, { icon: '🛒', style: { borderRadius: '15px', background: '#333', color: '#fff' } });
+                  }}
+                  className="p-4 bg-orange-500 text-white rounded-2xl shadow-lg shadow-orange-500/20 active:scale-90 transition-transform"
+                >
+                  <Plus size={24} strokeWidth={3} />
+                </button>
               )}
-            </div>
+            </motion.div>
           ))}
         </div>
       </main>
 
-      {/* Cart Drawer (WhatsApp logic integrated) */}
+      {/* --- FLOATING BOTTOM CART --- */}
       <AnimatePresence>
-        {isCartOpen && (
-          <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} className="fixed inset-0 z-[100] bg-[#0A0A0A] p-8 flex flex-col">
-            <div className="flex justify-between items-center mb-8"><h3 className="text-3xl font-black italic text-orange-500">Cart</h3><button onClick={() => setIsCartOpen(false)}><X size={32}/></button></div>
-            <textarea value={address} onChange={(e)=>setAddress(e.target.value)} placeholder="Full Delivery Address..." className="bg-white/5 w-full p-4 rounded-2xl outline-none mb-6 h-24" />
-            <div className="flex-1 overflow-y-auto space-y-4">
-              {cart.map((i: any) => (
-                <div key={i.id} className="flex justify-between items-center bg-white/5 p-4 rounded-2xl">
-                  <div><span className="font-bold block">{i.name}</span><span className="text-orange-500 font-bold text-sm">₹{i.price * i.quantity}</span></div>
-                  <div className="flex items-center gap-3">
-                    <button onClick={()=>removeItem(i.id)} className="p-1 bg-white/10 rounded-md"><Minus size={14}/></button>
-                    <span className="font-bold">{i.quantity}</span>
-                    <button onClick={()=>addItem(i)} className="p-1 bg-white/10 rounded-md"><Plus size={14}/></button>
-                  </div>
+        {cart.length > 0 && (
+          <motion.div 
+            initial={{ y: 100 }} animate={{ y: 0 }} exit={{ y: 100 }}
+            className="fixed bottom-6 left-0 w-full px-6 z-50"
+          >
+            <button 
+              onClick={() => setIsCartOpen(true)}
+              className="w-full max-w-md mx-auto bg-orange-500 p-4 rounded-[2rem] shadow-2xl flex justify-between items-center border border-orange-400"
+            >
+              <div className="flex items-center gap-4">
+                <div className="bg-white/20 p-2 rounded-xl">
+                  <ShoppingBag size={24} />
                 </div>
-              ))}
-            </div>
-            <button onClick={sendWhatsAppOrder} className="w-full bg-orange-500 py-5 rounded-[2rem] font-bold text-lg mt-6">Confirm Order (₹{getTotal()})</button>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Login Modal */}
-      <AnimatePresence>
-        {isLoginOpen && (
-          <motion.div initial={{ opacity:0 }} animate={{ opacity:1 }} className="fixed inset-0 z-[120] bg-black/90 flex items-center justify-center p-6 backdrop-blur-xl">
-             <div className="glass w-full max-w-sm p-8 rounded-[3rem] border border-white/10 relative">
-                <button onClick={()=>setIsLoginOpen(false)} className="absolute top-6 right-6 text-white/20"><X/></button>
-                <h2 className="text-2xl font-bold mb-8">Login</h2>
-                {step === 1 ? (
-                  <div className="space-y-4">
-                    <input type="tel" value={phoneNumber} onChange={(e)=>setPhoneNumber(e.target.value)} placeholder="Phone Number" className="w-full bg-white/5 border border-white/10 p-4 rounded-2xl outline-none" />
-                    <button onClick={sendOtp} className="w-full bg-orange-500 py-4 rounded-2xl font-bold">Send OTP</button>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    <input type="number" value={otp} onChange={(e)=>setOtp(e.target.value)} placeholder="OTP" className="w-full bg-white/5 border border-white/10 p-4 rounded-2xl outline-none text-center text-xl" />
-                    <button onClick={verifyOtp} className="w-full bg-orange-500 py-4 rounded-2xl font-bold">Verify</button>
-                  </div>
-                )}
-             </div>
+                <div className="text-left">
+                  <p className="text-[10px] uppercase font-bold opacity-80 tracking-widest">Your Cart</p>
+                  <p className="font-black text-xl leading-tight">{cart.length} Items • ₹{getTotal()}</p>
+                </div>
+              </div>
+              <div className="bg-black/20 p-2 rounded-full">
+                <ChevronRight size={24} />
+              </div>
+            </button>
           </motion.div>
         )}
       </AnimatePresence>
