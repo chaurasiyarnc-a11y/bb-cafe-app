@@ -20,7 +20,7 @@ export default function AdminDashboard() {
   }, []);
 
   useEffect(() => {
-    //if (!isAdmin) return;
+    if (!isAdmin) return;
     // Orders
     const qO = query(collection(db, "orders"), orderBy("timestamp", "desc"));
     onSnapshot(qO, (s) => setOrders(s.docs.map(d => ({id: d.id, ...d.data()}))));
