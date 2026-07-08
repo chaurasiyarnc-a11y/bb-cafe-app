@@ -1,9 +1,8 @@
- 'use client';
+'use client';
 import React, { useState, useEffect } from 'react';
 import { db, auth } from '../lib/firebase'; 
 import { collection, onSnapshot, query, addDoc, doc } from 'firebase/firestore';
-import { onAuthStateChanged, RecaptchaVerifier, signInWithPhoneNumber } from 'firebase/auth';
-import { ShoppingBag, Plus, PowerOff, Search, ChevronRight, X, MapPin, Phone } from 'lucide-react';
+import { ShoppingBag, Plus, PowerOff, Search, ChevronRight, X, MapPin, Phone, User } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
 import { useCartStore } from '../store/useCartStore';
@@ -15,7 +14,7 @@ export default function BbCafeHome() {
   const store = useCartStore() as any;
   const cart = store?.items || [];
   
-  // Safe destructuring with fallback
+  // Safe destructuring
   const addItem = store?.addItem || (() => {});
   const removeItem = store?.removeItem || (() => {});
   const clearCart = store?.clearCart || (() => {});
@@ -23,18 +22,16 @@ export default function BbCafeHome() {
   const [menu, setMenu] = useState<any[]>([]);
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
-  const [user, setUser] = useState<any>(null);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [storeOpen, setStoreOpen] = useState(true);
   const [mounted, setMounted] = useState(false);
   
-  // Checkout States
+  // Free Contact Form States (Bypassed OTP)
+  const [customerDetails, setCustomerDetails] = useState<{ name: string, phone: string } | null>(null);
+  const [tempName, setTempName] = useState("");
+  const [tempPhone, setTempPhone] = useState("");
   const [address, setAddress] = useState("");
-  const [phoneNumber, setPhoneNumber] = useState("");
-  const [otp, setOtp] = useState("");
-  const [step, setStep] = useState(1);
-  const [confirmationResult, setConfirmationResult] = useState<any>(null);
   const [selectedProduct, setSelectedProduct] = useState<any>(null); // For Half/Full popup
 
   useEffect(() => {
@@ -43,8 +40,6 @@ export default function BbCafeHome() {
     const unsubStore = onSnapshot(doc(db, "settings", "store"), (d) => {
       if(d.exists()) setStoreOpen(d.data().isOpen);
     });
-    // Auth Listener
-    const unsubAuth = onAuthStateChanged(auth, (u) => setUser(u));
     // Realtime Menu
     const q = query(collection(db, "products"));
     const unsubMenu = onSnapshot(q, (snap) => {
@@ -52,9 +47,16 @@ export default function BbCafeHome() {
       setMenu(items.filter((i: any) => i.isVisible !== false));
     });
 
+    // Mobile ke local memory se customer ki details read karein
+    const savedDetails = localStorage.getItem('bb_cafe_customer');
+    if (savedDetails) {
+      try {
+        setCustomerDetails(JSON.parse(savedDetails));
+      } catch (err) {}
+    }
+
     return () => {
       unsubStore();
-      unsubAuth();
       unsubMenu();
     };
   }, []);
@@ -70,7 +72,11 @@ export default function BbCafeHome() {
 
   // --- WHATSAPP ORDER LOGIC ---
   const sendWhatsAppOrder = async () => {
-    if (!user) return setIsLoginOpen(true);
+    // Agar customer ki name/phone details nahi hain, toh pehle details lene ke liye popup kholiye
+    if (!customerDetails) {
+      setIsLoginOpen(true);
+      return;
+    }
     if (!address || address.trim().length < 10) return toast.error("Please enter full address!");
 
     const tokenNumber = Math.floor(1000 + Math.random() * 9000);
@@ -83,7 +89,8 @@ export default function BbCafeHome() {
     try {
       await addDoc(collection(db, "orders"), {
         tokenNumber, 
-        customerPhone: user.phoneNumber, 
+        customerName: customerDetails.name,
+        customerPhone: customerDetails.phone, 
         address, 
         items: cart, 
         total: total + deliveryCharge, 
@@ -94,78 +101,32 @@ export default function BbCafeHome() {
       let itemsText = "";
       cart.forEach((i: any) => itemsText += `• ${i.name} x${i.quantity} - ₹${i.price * i.quantity}\n`);
       
-      const msg = `🔥 *BUM BUM CAFE - NEW ORDER*\n\n*Order ID:* #${tokenNumber}\n*Phone:* ${user.phoneNumber}\n*Address:* ${address}\n\n*ITEMS:*\n${itemsText}\n*Subtotal:* ₹${total}\n*Delivery:* ₹${deliveryCharge}\n*TOTAL BILL: ₹${total + deliveryCharge}*\n\n_Confirm order by replying 'YES'_`;
+      const msg = `🔥 *BUM BUM CAFE - NEW ORDER*\n\n*Order ID:* #${tokenNumber}\n*Customer:* ${customerDetails.name}\n*Phone:* ${customerDetails.phone}\n*Address:* ${address}\n\n*ITEMS:*\n${itemsText}\n*Subtotal:* ₹${total}\n*Delivery:* ₹${deliveryCharge}\n*TOTAL BILL: ₹${total + deliveryCharge}*\n\n_Confirm order by replying 'YES'_`;
       
       window.open(`https://wa.me/919714293759?text=${encodeURIComponent(msg)}`, '_blank');
       clearCart();
       setIsCartOpen(false);
       toast.success("Order Placed!");
     } catch (e) { 
-      toast.error("Failed to place order. Firestore permissions check karein."); 
+      toast.error("Failed to place order."); 
     }
   };
 
-  // --- AUTH LOGIC (ROBUST RECAPTCHA FIX) ---
-  const setupRecaptcha = () => {
-    if (typeof window !== 'undefined') {
-      if ((window as any).recaptchaVerifier) {
-        return; // Already initialized, reusing it
-      }
-      try {
-        // Clear old iframe inside DOM element to prevent 'already rendered' error
-        const container = document.getElementById('recaptcha-container');
-        if (container) {
-          container.innerHTML = '';
-        }
-        (window as any).recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', { 
-          size: 'invisible' 
-        });
-      } catch (error) {
-        console.error("Recaptcha initialization failed", error);
-      }
+  // --- SAVE CONTACT DETAILS (FREE WORKAROUND) ---
+  const handleSaveDetails = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!tempName || tempName.trim().length < 3) {
+      return toast.error("Please enter your real name");
     }
-  };
+    if (!tempPhone || tempPhone.trim().length < 10) {
+      return toast.error("Please enter 10-digit phone number");
+    }
 
-  const sendOtp = async () => {
-    if (!phoneNumber || phoneNumber.length < 10) {
-      return toast.error("Please enter a valid 10-digit number");
-    }
-    setupRecaptcha();
-    try {
-      const appVerifier = (window as any).recaptchaVerifier;
-      if (!appVerifier) {
-        throw new Error("Recaptcha verifier was not initialized properly.");
-      }
-      const result = await signInWithPhoneNumber(auth, `+91${phoneNumber}`, appVerifier);
-      setConfirmationResult(result); 
-      setStep(2); 
-      toast.success("OTP Sent");
-    } catch (e: any) { 
-      toast.error(e?.message || "Invalid phone number or verification failed."); 
-      // Reset safely on error so user can retry cleanly
-      if (typeof window !== 'undefined' && (window as any).recaptchaVerifier) {
-        try {
-          (window as any).recaptchaVerifier.clear();
-        } catch (err) {}
-        (window as any).recaptchaVerifier = null;
-      }
-    }
-  };
-
-  const verifyOtp = async () => {
-    if (!confirmationResult) {
-      return toast.error("Please send OTP first.");
-    }
-    if (!otp || otp.length < 6) {
-      return toast.error("Please enter 6-digit OTP");
-    }
-    try { 
-      await confirmationResult.confirm(otp); 
-      setIsLoginOpen(false); 
-      toast.success("Welcome to Bum Bum Cafe!"); 
-    } catch (e) { 
-      toast.error("Wrong OTP"); 
-    }
+    const details = { name: tempName, phone: `+91${tempPhone}` };
+    localStorage.setItem('bb_cafe_customer', JSON.stringify(details));
+    setCustomerDetails(details);
+    setIsLoginOpen(false);
+    toast.success(`Welcome to Bum Bum Cafe, ${tempName}!`);
   };
 
   if (!mounted) return null;
@@ -173,7 +134,6 @@ export default function BbCafeHome() {
   return (
     <div className="bg-[#080808] min-h-screen text-white pb-32 font-sans selection:bg-orange-500">
       <Toaster position="top-center" />
-      <div id="recaptcha-container"></div>
       
       {/* --- HEADER --- */}
       <header className="relative h-72 bg-gradient-to-b from-orange-600 to-orange-700 rounded-b-[3.5rem] flex flex-col justify-center items-center px-6 shadow-2xl overflow-hidden">
@@ -317,13 +277,31 @@ export default function BbCafeHome() {
               ))}
 
               <div className="mt-10 space-y-6">
+                
+                {/* Display details if already saved */}
+                {customerDetails && (
+                  <div className="bg-white/5 p-6 rounded-[2.5rem] border border-white/10 flex justify-between items-center">
+                    <div>
+                      <p className="text-xs text-gray-500 font-bold uppercase">Ordering As</p>
+                      <h4 className="font-black text-lg text-orange-500">{customerDetails.name}</h4>
+                      <p className="text-xs text-gray-400 font-bold">{customerDetails.phone}</p>
+                    </div>
+                    <button 
+                      onClick={() => { localStorage.removeItem('bb_cafe_customer'); setCustomerDetails(null); }}
+                      className="text-xs bg-red-500/10 text-red-500 px-3 py-2 rounded-xl font-bold"
+                    >
+                      Change
+                    </button>
+                  </div>
+                )}
+
                 <div className="bg-white/5 p-6 rounded-[2.5rem] border border-white/10">
                   <div className="flex items-center gap-3 mb-4 text-orange-500">
                     <MapPin size={20}/> <h3 className="font-black uppercase text-sm">Delivery Address</h3>
                   </div>
                   <textarea 
                     placeholder="Ghar ka address, Landmark ke saath..." value={address} onChange={(e) => setAddress(e.target.value)}
-                    className="w-full bg-black/40 border border-white/10 rounded-2xl p-4 outline-none focus:border-orange-500 h-24"
+                    className="w-full bg-black/40 border border-white/10 rounded-2xl p-4 outline-none focus:border-orange-500 h-24 text-sm font-medium"
                   />
                 </div>
 
@@ -343,30 +321,43 @@ export default function BbCafeHome() {
         )}
       </AnimatePresence>
 
-      {/* --- LOGIN MODAL --- */}
+      {/* --- DIRECT CONTACT FORM MODAL (100% FREE NO OTP) --- */}
       <AnimatePresence>
         {isLoginOpen && (
           <div className="fixed inset-0 bg-black/95 z-[200] flex items-center justify-center p-6">
-            <div className="bg-[#111] w-full max-w-md p-10 rounded-[3rem] border border-white/10 text-center">
-              <Phone className="mx-auto mb-6 text-orange-500" size={48} />
-              <h2 className="text-3xl font-black mb-2">Verification</h2>
-              <p className="text-gray-500 mb-8 font-medium">Please verify your number to order.</p>
+            <form onSubmit={handleSaveDetails} className="bg-[#111] w-full max-w-md p-10 rounded-[3rem] border border-white/10 text-center space-y-6">
+              <Phone className="mx-auto text-orange-500" size={48} />
+              <div>
+                <h2 className="text-3xl font-black mb-1">Your Details</h2>
+                <p className="text-gray-500 font-medium text-xs">Enter your contact info to place your order.</p>
+              </div>
               
-              {step === 1 ? (
-                <div className="space-y-4">
-                  <input type="tel" placeholder="Enter Phone Number" value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)}
-                    className="w-full bg-white/5 border border-white/10 p-5 rounded-2xl text-center text-xl font-bold" />
-                  <button onClick={sendOtp} className="w-full bg-orange-500 p-5 rounded-2xl font-black text-lg">SEND OTP</button>
+              <div className="space-y-4 text-left">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-gray-500 uppercase">Your Name</label>
+                  <input 
+                    type="text" placeholder="Apna Naam likhein..." value={tempName} onChange={(e) => setTempName(e.target.value)}
+                    className="w-full bg-white/5 border border-white/10 p-4 rounded-2xl text-center text-lg font-bold" 
+                    required 
+                  />
                 </div>
-              ) : (
-                <div className="space-y-4">
-                  <input type="text" placeholder="Enter 6-digit OTP" value={otp} onChange={(e) => setOtp(e.target.value)}
-                    className="w-full bg-white/5 border border-white/10 p-5 rounded-2xl text-center text-xl font-bold tracking-[0.5em]" />
-                  <button onClick={verifyOtp} className="w-full bg-green-500 p-5 rounded-2xl font-black text-lg">VERIFY & LOGIN</button>
+                
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-gray-500 uppercase">Mobile Number</label>
+                  <input 
+                    type="tel" maxLength={10} placeholder="10-digit Phone Number" value={tempPhone} onChange={(e) => setTempPhone(e.target.value)}
+                    className="w-full bg-white/5 border border-white/10 p-4 rounded-2xl text-center text-lg font-bold" 
+                    required 
+                  />
                 </div>
-              )}
-              <button onClick={() => setIsLoginOpen(false)} className="mt-8 text-gray-500 text-xs font-bold uppercase tracking-widest">Close</button>
-            </div>
+              </div>
+
+              <button type="submit" className="w-full bg-orange-500 p-5 rounded-2xl font-black text-lg shadow-xl shadow-orange-500/20 active:scale-95 transition-all uppercase">
+                PROCEED TO ORDER
+              </button>
+              
+              <button type="button" onClick={() => setIsLoginOpen(false)} className="mt-8 text-gray-500 text-xs font-bold uppercase tracking-widest block mx-auto">Close</button>
+            </form>
           </div>
         )}
       </AnimatePresence>
