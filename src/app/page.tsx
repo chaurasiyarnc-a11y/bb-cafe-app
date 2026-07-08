@@ -137,17 +137,40 @@ export default function BbCafeHome() {
       
       {/* --- HEADER --- */}
       <header className="relative h-72 bg-gradient-to-b from-orange-600 to-orange-700 rounded-b-[3.5rem] flex flex-col justify-center items-center px-6 shadow-2xl overflow-hidden">
-        <div className="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/food.png')]"></div>
-        <motion.h1 initial={{ scale: 0.8 }} animate={{ scale: 1 }} className="text-5xl font-black italic tracking-tighter text-yellow-400 drop-shadow-lg">BUM BUM CAFE</motion.h1>
-        <p className="text-orange-100 font-bold tracking-[0.2em] text-xs mt-2 uppercase">Mohandra's Best Taste</p>
+      {/* --- NEW PREMIUM HEADER & SEARCH --- */}
+      <header className="relative h-80 bg-gradient-to-b from-[#ff5e00] to-[#b33600] rounded-b-[4rem] flex flex-col justify-center items-center px-6 shadow-[0_15px_40px_rgba(179,54,0,0.3)] overflow-hidden">
+        {/* Subtle Background food patterns */}
+        <div className="absolute inset-0 opacity-15 bg-[url('https://www.transparenttextures.com/patterns/food.png')] bg-center"></div>
         
-        {/* Search Bar */}
-        <div className="absolute -bottom-7 w-[90%] max-w-md">
+        {/* Glowing Green Veg Badge */}
+        <div className="absolute top-4 right-4 bg-black/40 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10 flex items-center gap-1.5">
+          <span className="h-2 w-2 rounded-full bg-green-500 animate-ping"></span>
+          <span className="text-[10px] font-black uppercase tracking-widest text-green-400">100% PURE VEG</span>
+        </div>
+
+        {/* Cafe Info Header */}
+        <div className="text-center z-10 mt-[-20px]">
+          <motion.h1 
+            initial={{ scale: 0.8 }} 
+            animate={{ scale: 1 }} 
+            className="text-5xl font-black italic tracking-tighter text-yellow-300 drop-shadow-[0_4px_8px_rgba(0,0,0,0.6)]"
+          >
+            BUM BUM CAFE
+          </motion.h1>
+          <p className="text-[#ffe0cc] font-black tracking-[0.25em] text-[10px] mt-2 uppercase">Sizzle • Brew • Chill</p>
+          <p className="text-[9px] font-bold text-yellow-300 mt-1.5 uppercase tracking-wider bg-black/20 px-3 py-1 rounded-full inline-block backdrop-blur-sm border border-white/5">📍 New Bus Stand, Mohandra</p>
+        </div>
+        
+        {/* Modern Floating Search Bar */}
+        <div className="absolute -bottom-8 w-[92%] max-w-md">
           <div className="relative group">
-            <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-orange-500" size={20} />
+            <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-orange-500 transition-colors" size={20} />
             <input 
-              type="text" placeholder="Search pizza, thali, shakes..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-white text-black py-5 px-14 rounded-3xl shadow-2xl outline-none focus:ring-4 focus:ring-orange-500/20 text-lg font-medium"
+              type="text" 
+              placeholder="Search paneer, pizza, thali, shakes..." 
+              value={searchQuery} 
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-white text-black py-5 px-16 rounded-[2rem] shadow-[0_10px_35px_rgba(0,0,0,0.4)] outline-none focus:ring-4 focus:ring-orange-500/20 text-sm font-semibold transition-all"
             />
           </div>
         </div>
