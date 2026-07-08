@@ -14,7 +14,7 @@ export default function BbCafeHome() {
   const store = useCartStore() as any;
   const cart = store?.items || [];
   
-  // Safe destructuring with fallback
+  // Safe destructuring
   const addItem = store?.addItem || (() => {});
   const removeItem = store?.removeItem || (() => {});
   const clearCart = store?.clearCart || (() => {});
@@ -32,7 +32,13 @@ export default function BbCafeHome() {
   const [tempName, setTempName] = useState("");
   const [tempPhone, setTempPhone] = useState("");
   const [address, setAddress] = useState("");
-  const [selectedProduct, setSelectedProduct] = useState<any>(null); // For Half/Full popup
+  const [selectedProduct, setSelectedProduct] = useState<any>(null); 
+
+  // --- PIZZA & PORTIONS SELECTION STATES ---
+  const [chosenSize, setChosenSize] = useState<string>("");
+  const [chosenPrice, setChosenPrice] = useState<number>(0);
+  const [addonCheese, setAddonCheese] = useState(false);
+  const [addonVeg, setAddonVeg] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -47,7 +53,7 @@ export default function BbCafeHome() {
       setMenu(items.filter((i: any) => i.isVisible !== false));
     });
 
-    // Mobile ke local memory se customer ki details read karein
+    // Mobile local memory checking
     const savedDetails = localStorage.getItem('bb_cafe_customer');
     if (savedDetails) {
       try {
@@ -63,7 +69,7 @@ export default function BbCafeHome() {
 
   const getTotal = () => cart.reduce((acc: number, i: any) => acc + (i.price * i.quantity), 0);
 
-  // Filter Logic with safe string checking to prevent undefined crash
+  // Filter Logic with safe string checking
   const filteredMenu = menu.filter(item => {
     const itemName = item?.name ? String(item.name).toLowerCase() : "";
     const itemCategory = item?.category ? String(item.category) : "";
@@ -83,9 +89,7 @@ export default function BbCafeHome() {
     const tokenNumber = Math.floor(1000 + Math.random() * 9000);
     const total = getTotal();
     
-    // Delivery Logic
-    let deliveryCharge = 0;
-    if (total < 99) deliveryCharge = 20;
+    let deliveryCharge = total < 99 ? 20 : 0;
 
     try {
       await addDoc(collection(db, "orders"), {
@@ -130,7 +134,7 @@ export default function BbCafeHome() {
     toast.success(`Welcome ${tempName}!`);
   };
 
-  // Safe helper to extract and display variant price ranges dynamically without crashing
+  // Safe display price helper
   const getDisplayPrice = (item: any) => {
     if (item?.variants && typeof item.variants === 'object') {
       const prices = Object.values(item.variants).map(Number).filter(n => !isNaN(n));
@@ -143,6 +147,40 @@ export default function BbCafeHome() {
     return `₹${item?.price || 0}`;
   };
 
+  // Dynamic Add-to-cart variant trigger
+  const handleAddToCart = () => {
+    if (!chosenSize) {
+      return toast.error("Please select a size first!");
+    }
+
+    const basePrice = Number(chosenPrice);
+    const addonsTotal = (addonCheese ? 30 : 0) + (addonVeg ? 20 : 0);
+    const finalPrice = basePrice + addonsTotal;
+
+    let finalName = `${selectedProduct.name} (${chosenSize})`;
+    if (addonCheese) finalName += " + Extra Cheese";
+    if (addonVeg) finalName += " + Extra Veg";
+
+    // Unique combination ID to avoid duplicate collisions in cart
+    const uniqueCartId = `${selectedProduct.id}-${chosenSize}-${addonCheese ? 'cheese' : 'no'}-${addonVeg ? 'veg' : 'no'}`;
+
+    addItem({
+      ...selectedProduct,
+      id: uniqueCartId,
+      name: finalName,
+      price: finalPrice
+    });
+
+    toast.success(`${chosenSize} Pizza added to cart!`);
+    
+    // Reset Popup parameters
+    setSelectedProduct(null);
+    setChosenSize("");
+    setChosenPrice(0);
+    setAddonCheese(false);
+    setAddonVeg(false);
+  };
+
   if (!mounted) return null;
 
   return (
@@ -151,27 +189,14 @@ export default function BbCafeHome() {
       
       {/* --- COMPACT HEADER --- */}
       <header className="relative h-60 bg-gradient-to-b from-[#ff5e00] to-[#b33600] flex flex-col justify-center items-center px-4 shadow-[0_15px_40px_rgba(179,54,0,0.2)]">
-        {/* Background pattern */}
         <div className="absolute inset-0 opacity-15 bg-[url('https://www.transparenttextures.com/patterns/food.png')] bg-center rounded-b-[3.5rem] overflow-hidden"></div>
-        
-        {/* Pure Veg Badge */}
         <div className="absolute top-4 right-4 bg-black/40 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10 flex items-center gap-1.5 z-10">
           <span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse"></span>
           <span className="text-[9px] font-black uppercase tracking-widest text-green-400">100% PURE VEG</span>
         </div>
-
-        {/* Cafe Name & Sub-headline */}
         <div className="text-center z-10">
-          <motion.h1 
-            initial={{ scale: 0.8 }} 
-            animate={{ scale: 1 }} 
-            className="text-4xl font-black italic tracking-tighter text-yellow-300 drop-shadow-[0_3px_6px_rgba(0,0,0,0.5)]"
-          >
-            BUM BUM CAFE
-          </motion.h1>
-          <p className="text-orange-100 font-bold tracking-wider text-xs mt-1 uppercase">
-            Best Cafe in this Area
-          </p>
+          <motion.h1 initial={{ scale: 0.8 }} animate={{ scale: 1 }} className="text-4xl font-black italic tracking-tighter text-yellow-300 drop-shadow-[0_3px_6px_rgba(0,0,0,0.5)]">BUM BUM CAFE</motion.h1>
+          <p className="text-orange-100 font-bold tracking-wider text-xs mt-1 uppercase">Best Cafe in this Area</p>
         </div>
       </header>
 
@@ -191,8 +216,6 @@ export default function BbCafeHome() {
 
       {/* --- MAIN CONTENT --- */}
       <main className="pt-4 px-4 max-w-lg mx-auto">
-        
-        {/* Categories sliding menu */}
         <div className="flex gap-2 overflow-x-auto pb-6 no-scrollbar pt-2">
           {CATEGORIES.map((cat) => (
             <button 
@@ -209,7 +232,6 @@ export default function BbCafeHome() {
           ))}
         </div>
 
-        {/* Store Closed Banner */}
         {!storeOpen && (
           <div className="bg-red-500/10 text-red-400 p-6 rounded-[2.5rem] border border-red-500/20 text-center mb-8 shadow-xl">
             <PowerOff className="mx-auto mb-2 text-red-500" size={28} />
@@ -218,79 +240,46 @@ export default function BbCafeHome() {
           </div>
         )}
 
-        {/* --- PREMIUM ZOMATO STYLE FOOD GRID --- */}
+        {/* --- PREMIUM FOOD GRID --- */}
         <div className="grid grid-cols-1 gap-6">
           {filteredMenu.length === 0 ? (
             <p className="text-center text-gray-500 py-12 text-sm font-bold uppercase tracking-widest">No items found...</p>
           ) : (
             filteredMenu.map((item) => {
-              // Safe checks to avoid length reading of undefined
               const nameStr = item?.name ? String(item.name) : "Delicious Item";
               const catStr = item?.category ? String(item.category) : "Food";
-              
-              // Dynamic ratings generator (safe from undefined data)
               const mockRating = (((nameStr.length + catStr.length) % 5) * 0.1 + 4.5).toFixed(1);
 
               return (
-                <motion.div 
-                  layout 
-                  key={item.id} 
-                  className="bg-white/[0.02] rounded-[2rem] border border-white/5 overflow-hidden hover:bg-white/[0.04] transition-all duration-300 shadow-xl group flex flex-col relative"
-                >
-                  {/* Image container on TOP */}
+                <motion.div layout key={item.id} className="bg-white/[0.02] rounded-[2rem] border border-white/5 overflow-hidden hover:bg-white/[0.04] transition-all duration-300 shadow-xl group flex flex-col relative">
                   <div className="relative h-56 w-full overflow-hidden">
-                    <img 
-                      src={item.image || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=500&q=80"} 
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
-                      alt={nameStr} 
-                    />
-                    
-                    {/* Glowing Green Veg Badge Overlay */}
+                    <img src={item.image || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=500&q=80"} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" alt={nameStr} />
                     <div className="absolute top-4 left-4 bg-black/50 backdrop-blur-md px-3 py-1.5 rounded-xl border border-white/10 flex items-center gap-1.5 z-10">
                       <span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse"></span>
                       <span className="text-[9px] font-black uppercase tracking-widest text-green-400">VEG</span>
                     </div>
-
-                    {/* Fancy "Bestseller" Ribbon */}
-                    {nameStr.length % 3 === 0 && (
-                      <div className="absolute top-4 right-4 bg-gradient-to-r from-orange-600 to-amber-600 px-3 py-1 rounded-lg text-white text-[9px] font-black uppercase tracking-wider shadow-lg">
-                        ★ Bestseller
-                      </div>
-                    )}
                   </div>
                   
-                  {/* Details Container on BOTTOM */}
                   <div className="p-5 flex flex-col justify-between flex-1">
-                    {/* Title and Rating Line */}
                     <div className="flex justify-between items-start gap-4">
                       <h4 className="font-black text-lg text-gray-100 group-hover:text-orange-500 transition-colors line-clamp-1">{nameStr}</h4>
-                      
-                      {/* Rating (Zomato-style Green Star Badge) */}
                       <div className="bg-green-600 text-white font-extrabold text-[11px] px-2.5 py-0.5 rounded-lg flex items-center gap-0.5 flex-shrink-0 shadow-md">
                         <span>{mockRating}</span>
                         <span className="text-[9px]">★</span>
                       </div>
                     </div>
 
-                    {/* Category and Speed Line */}
                     <div className="flex justify-between items-center text-xs text-gray-400 font-bold mt-1">
                       <p className="uppercase tracking-wider text-[9px] text-gray-500">{catStr}</p>
                       <p className="text-[9px] tracking-wide text-gray-500">• 15-25 min</p>
                     </div>
-
-                    {/* Halka Divider */}
                     <div className="h-px bg-white/5 my-3" />
 
-                    {/* Price and Add Button Line */}
                     <div className="flex justify-between items-end mt-1">
                       <div>
                         <p className="text-gray-500 text-[9px] font-black uppercase tracking-widest leading-none mb-1">Price</p>
-                        <p className="text-orange-500 font-black text-xl leading-none">
-                          {getDisplayPrice(item)}
-                        </p>
-                        {item?.variants && (
-                          <span className="text-[9px] font-bold text-gray-400 mt-1 block">Options available</span>
-                        )}
+                        <p className="text-orange-500 font-black text-xl leading-none">{getDisplayPrice(item)}</p>
+                        {item?.variants && <span className="text-[9px] font-bold text-gray-400 mt-1 block">Options available</span>}
                       </div>
 
                       {storeOpen && (
@@ -315,10 +304,7 @@ export default function BbCafeHome() {
       <AnimatePresence>
         {cart.length > 0 && (
           <motion.div initial={{ y: 100 }} animate={{ y: 0 }} exit={{ y: 100 }} className="fixed bottom-8 left-0 w-full px-6 z-50">
-            <button 
-              onClick={() => setIsCartOpen(true)} 
-              className="w-full max-w-md mx-auto bg-gradient-to-r from-yellow-300 to-amber-400 text-black p-5 rounded-[2.2rem] shadow-2xl flex justify-between items-center border-4 border-black active:scale-95 transition-all"
-            >
+            <button onClick={() => setIsCartOpen(true)} className="w-full max-w-md mx-auto bg-gradient-to-r from-yellow-300 to-amber-400 text-black p-5 rounded-[2.2rem] shadow-2xl flex justify-between items-center border-4 border-black active:scale-95 transition-all">
               <div className="flex items-center gap-4">
                 <div className="bg-black text-white p-3 rounded-xl"><ShoppingBag size={20} strokeWidth={2.5} /></div>
                 <div className="text-left leading-tight">
@@ -332,37 +318,83 @@ export default function BbCafeHome() {
         )}
       </AnimatePresence>
 
-      {/* --- VARIANTS POPUP --- */}
+      {/* --- NEW VARIANTS POPUP WITH DYNAMIC PORTIONS AND CUSTOM PIZZA ADD-ONS --- */}
       <AnimatePresence>
         {selectedProduct && (
-          <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[100] flex items-end">
+          <div className="fixed inset-0 bg-black/95 backdrop-blur-md z-[100] flex items-end">
             <motion.div initial={{ y: 300 }} animate={{ y: 0 }} exit={{ y: 300 }} className="bg-[#111] w-full p-8 rounded-t-[3.5rem] border-t border-white/10 max-w-lg mx-auto">
               <div className="w-16 h-1.5 bg-white/15 rounded-full mx-auto mb-6" />
               <h3 className="text-3xl font-black mb-1 text-center tracking-tight">{selectedProduct?.name || "Portion option"}</h3>
-              <p className="text-orange-500 font-black mb-8 uppercase tracking-widest text-[10px] text-center">Select Portion Option</p>
+              <p className="text-orange-500 font-black mb-6 uppercase tracking-widest text-[10px] text-center">Customize Your Order</p>
               
-              <div className="space-y-4">
-                {Object.entries(selectedProduct?.variants || {}).map(([size, price]: any) => (
-                  <button 
-                    key={size} 
-                    onClick={() => { 
-                      addItem({ 
-                        ...selectedProduct, 
-                        id: `${selectedProduct.id}-${size}`, 
-                        name: `${selectedProduct.name} (${size})`, 
-                        price 
-                      }); 
-                      setSelectedProduct(null); 
-                      toast.success(`${selectedProduct.name} (${size}) added!`);
-                    }}
-                    className="w-full bg-white/[0.03] p-5 rounded-3xl flex justify-between items-center border border-white/5 hover:border-orange-500/50 hover:bg-orange-500/10 transition-all group"
-                  >
-                    <span className="capitalize text-lg font-black group-hover:text-orange-500 transition-colors">{size}</span>
-                    <span className="text-orange-500 font-black text-xl">₹{price}</span>
-                  </button>
-                ))}
+              {/* STEP 1: Select Portion Size */}
+              <div className="space-y-3 mb-6">
+                <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">1. Select Portion Size:</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {Object.entries(selectedProduct?.variants || {}).map(([size, price]: any) => (
+                    <button 
+                      type="button"
+                      key={size} 
+                      onClick={() => { setChosenSize(size); setChosenPrice(Number(price)); }}
+                      className={`p-4 rounded-2xl flex flex-col items-center justify-center border transition-all ${
+                        chosenSize === size 
+                          ? 'bg-orange-500/10 border-orange-500 text-orange-500 scale-102' 
+                          : 'bg-white/[0.03] border-white/5 text-gray-400 hover:border-white/15'
+                      }`}
+                    >
+                      <span className="capitalize text-sm font-black">{size}</span>
+                      <span className="font-extrabold text-xs mt-1 text-white">₹{price}</span>
+                    </button>
+                  ))}
+                </div>
               </div>
-              <button onClick={() => setSelectedProduct(null)} className="w-full mt-6 p-4 text-gray-500 font-black uppercase text-xs tracking-widest">Close</button>
+
+              {/* STEP 2: Optional Custom Pizza Add-ons (Triggered only for Pizza Category) */}
+              {(selectedProduct?.category === "Special Pizza" || selectedProduct?.name?.toLowerCase().includes("pizza")) && (
+                <div className="space-y-3 mb-8 border-t border-white/5 pt-4">
+                  <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">2. Optional Add-ons (Pizza Special):</p>
+                  <div className="space-y-2">
+                    {/* Addon 1: Extra Cheese */}
+                    <div 
+                      onClick={() => setAddonCheese(!addonCheese)}
+                      className={`p-4 rounded-2xl border flex justify-between items-center cursor-pointer select-none transition-all ${
+                        addonCheese ? 'bg-orange-500/5 border-orange-500/50' : 'bg-white/[0.02] border-white/5'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <input type="checkbox" checked={addonCheese} onChange={() => {}} className="h-4 w-4 rounded border-white/15 text-orange-500 focus:ring-orange-500" />
+                        <span className="text-xs font-black uppercase text-gray-300">🧀 Extra Cheese</span>
+                      </div>
+                      <span className="text-xs font-black text-orange-500">+₹30</span>
+                    </div>
+
+                    {/* Addon 2: Extra Veggies */}
+                    <div 
+                      onClick={() => setAddonVeg(!addonVeg)}
+                      className={`p-4 rounded-2xl border flex justify-between items-center cursor-pointer select-none transition-all ${
+                        addonVeg ? 'bg-orange-500/5 border-orange-500/50' : 'bg-white/[0.02] border-white/5'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <input type="checkbox" checked={addonVeg} onChange={() => {}} className="h-4 w-4 rounded border-white/15 text-orange-500 focus:ring-orange-500" />
+                        <span className="text-xs font-black uppercase text-gray-300">🥦 Extra Vegetables</span>
+                      </div>
+                      <span className="text-xs font-black text-orange-500">+₹20</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* STEP 3: Confirm addition */}
+              <button 
+                type="button"
+                onClick={handleAddToCart}
+                className="w-full bg-orange-500 hover:bg-orange-600 p-5 rounded-2xl font-black text-md shadow-xl active:scale-95 transition-all uppercase"
+              >
+                Confirm • ₹{chosenPrice + (addonCheese ? 30 : 0) + (addonVeg ? 20 : 0)}
+              </button>
+              
+              <button type="button" onClick={() => { setSelectedProduct(null); setChosenSize(""); setChosenPrice(0); setAddonCheese(false); setAddonVeg(false); }} className="w-full mt-4 p-2 text-gray-500 font-black uppercase text-xs tracking-widest">Close</button>
             </motion.div>
           </div>
         )}
@@ -394,11 +426,7 @@ export default function BbCafeHome() {
                     >
                       -
                     </button>
-                    
-                    <span className="font-black text-sm px-1.5 text-white min-w-[15px] text-center">
-                      {item.quantity}
-                    </span>
-                    
+                    <span className="font-black text-sm px-1.5 text-white min-w-[15px] text-center">{item.quantity}</span>
                     <button 
                       onClick={() => addItem(item)} 
                       type="button"
