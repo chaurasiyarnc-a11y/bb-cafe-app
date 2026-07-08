@@ -1,12 +1,13 @@
 'use client';
   
 import React, { useState, useEffect } from 'react';
-import { db } from '@/lib/firebase'; 
+// Changed to reliable relative path to avoid compile-time path resolution errors
+import { db } from '../../lib/firebase'; 
 import { collection, onSnapshot, query, orderBy, doc, updateDoc, setDoc, addDoc, deleteDoc } from 'firebase/firestore';
 import { Power, Eye, EyeOff, User, MapPin, Calendar, CheckCircle2, LogOut, Loader2, Phone, Plus, Trash, Edit, X, Lock, BarChart3, Download, Folder, Percent, ImageIcon } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 
-// Categories mapping
+// Categories default list
 const ADD_CATEGORIES = ["Special Pizza", "Special Thali", "Paneer Special", "Special Mix veg", "Fast Food", "Super Cool", "Indian Bread", "Special Rice"];
 
 export default function AdminDashboard() {
@@ -59,7 +60,7 @@ export default function AdminDashboard() {
   const [editPriceLarge, setEditPriceLarge] = useState("");
   const [editPriceXL, setEditPriceXL] = useState("");
 
-  // 1. Session load check
+  // 1. Check if Admin is logged in
   useEffect(() => {
     const adminSession = localStorage.getItem('bb_cafe_admin_verified');
     if (adminSession === 'true') {
@@ -68,43 +69,43 @@ export default function AdminDashboard() {
     setLoading(false);
   }, []);
 
-  // 2. Real-time Listeners (Triggers when unlocked)
+  // 2. Real-time Data Listeners (Triggers when unlocked)
   useEffect(() => {
     if (!isVerified) return;
 
-    // Realtime Orders
+    // Listen for Orders
     const qOrders = query(collection(db, "orders"), orderBy("timestamp", "desc"));
     const unsubOrders = onSnapshot(qOrders, (snap) => {
       setOrders(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
 
-    // Realtime Products Menu
+    // Listen for Products
     const qProducts = query(collection(db, "products"));
     const unsubProducts = onSnapshot(qProducts, (snap) => {
       setMenu(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
 
-    // Realtime Dynamic Categories
+    // Listen for Dynamic Categories
     const unsubCats = onSnapshot(collection(db, "categories"), (snap) => {
       setCategories(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
 
-    // Store Status
+    // Listen for Store Status
     const unsubStore = onSnapshot(doc(db, "settings", "store"), (d) => {
       if (d.exists()) setStoreOpen(d.data().isOpen);
     });
 
-    // Realtime Banners
+    // Listen for Banners
     const unsubBanners = onSnapshot(collection(db, "banners"), (snap) => {
       setBanners(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
 
-    // Realtime Coupons
+    // Listen for Coupons
     const unsubCoupons = onSnapshot(collection(db, "coupons"), (snap) => {
       setCoupons(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
 
-    // Realtime Reviews
+    // Listen for Reviews
     const unsubReviews = onSnapshot(collection(db, "reviews"), (snap) => {
       setReviews(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
@@ -149,14 +150,13 @@ export default function AdminDashboard() {
       const values = keys.map(key => {
         let value = item[key];
         if (value === undefined || value === null) value = '';
-        const escaped = String(value).replace(/"/g, '""'); // Escape inner double quotes
-        return `"${escaped}"`; // Wrap string in quotes for cell safety
+        const escaped = String(value).replace(/"/g, '""'); 
+        return `"${escaped}"`; 
       });
       csvRows.push(values.join(','));
     });
 
     const csvString = csvRows.join('\r\n');
-    // Add UTF-8 BOM to make Google sheets and Excel decode Indian languages perfectly
     const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csvString], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -173,23 +173,16 @@ export default function AdminDashboard() {
   const handleExportOrders = () => {
     const formattedData = orders.map(o => {
       const itemsSummary = o.items?.map((i: any) => `${i.name} (x${i.quantity})`).join(' | ') || '';
-      const formattedDate = o.timestamp?.toDate ? o.timestamp.toDate().toLocaleString() : new Date(o.timestamp).toLocaleString();
+      const orderDate = o.timestamp?.toDate ? o.timestamp.toDate().toLocaleString() : new Date(o.timestamp).toLocaleString();
       return {
-        token: o.tokenNumber || "N/A",
-        customer: o.customerName || "Customer",
-        phone: o.customerPhone || "N/A",
-        address: o.address || "N/A",
-        items: itemsSummary,
-        subtotal: o.subtotal || o.total || 0,
-        discount: o.discount || 0,
-        total: o.total || 0,
-        status: o.status || "pending",
-        date: formattedDate
+        ...o,
+        itemsSummary,
+        date: orderDate
       };
     });
 
     const headers = ['Token / Bill No', 'Customer Name', 'Phone Number', 'Delivery Address', 'Items summary', 'Subtotal (₹)', 'Discount Applied (₹)', 'Total Paid (₹)', 'Status', 'Order Date & Time'];
-    const keys = ['token', 'customer', 'phone', 'address', 'items', 'subtotal', 'discount', 'total', 'status', 'date'];
+    const keys = ['tokenNumber', 'customerName', 'customerPhone', 'address', 'itemsSummary', 'subtotal', 'discount', 'total', 'status', 'date'];
     triggerCsvDownload(formattedData, `BumBumCafe_SalesLedger_${new Date().toLocaleDateString()}`, headers, keys);
   };
 
@@ -252,6 +245,11 @@ export default function AdminDashboard() {
 
   const dailyStats = getDailyAnalytics();
   const lifetimeStats = getLifetimeMetrics();
+
+  // Dynamic dropdown helper if Firestore categories collection is empty
+  const categoryOptions = categories.length > 0 
+    ? categories.map(c => c.name)
+    : ADD_CATEGORIES;
 
   // --- DYNAMIC CATEGORY ACTIONS ---
   const handleAddCategory = async (e: React.FormEvent) => {
@@ -635,8 +633,8 @@ export default function AdminDashboard() {
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-gray-400 uppercase">Category</label>
                   <select value={newCategory} onChange={(e) => setNewCategory(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" required>
-                    {categories.filter(c => c.name !== "All").map(cat => (
-                      <option key={cat.id} value={cat.name} className="bg-[#111]">{cat.name}</option>
+                    {currentCategories.filter(c => c !== "All").map(cat => (
+                      <option key={cat} value={cat} className="bg-[#111]">{cat}</option>
                     ))}
                   </select>
                 </div>
@@ -703,8 +701,8 @@ export default function AdminDashboard() {
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-gray-400 uppercase">Category</label>
                   <select value={editCategory} onChange={(e) => setEditCategory(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" required>
-                    {categories.filter(c => c.name !== "All").map(cat => (
-                      <option key={cat.id} value={cat.name} className="bg-[#111]">{cat.name}</option>
+                    {currentCategories.filter(c => c !== "All").map(cat => (
+                      <option key={cat} value={cat} className="bg-[#111]">{cat}</option>
                     ))}
                   </select>
                 </div>
@@ -758,7 +756,7 @@ export default function AdminDashboard() {
             <div className="space-y-3 pt-2">
               {menu.map((item) => {
                 const getAdminDisplayPrice = (itm: any) => {
-                  if (itm.variants) {
+                  if (itm?.variants && typeof itm.variants === 'object') {
                     const keys = Object.keys(itm.variants);
                     if (keys.includes('Small')) {
                       return `S: ₹${itm.variants.Small} | M: ₹${itm.variants.Medium} | L: ₹${itm.variants.Large} | XL: ₹${itm.variants["Extra Large"]}`;
@@ -768,7 +766,7 @@ export default function AdminDashboard() {
                       return `Half: ₹${itm.variants.half} | Full: ₹${itm.variants.full}`;
                     }
                   }
-                  return `₹${itm.price}`;
+                  return `₹${itm.price || 0}`;
                 };
 
                 return (
@@ -829,14 +827,7 @@ export default function AdminDashboard() {
           <div className="space-y-6">
             <form onSubmit={handleAddBanner} className="bg-white/[0.02] border border-white/5 p-6 rounded-[2.5rem] space-y-4">
               <h3 className="text-lg font-black text-orange-500 italic uppercase flex items-center gap-2"><ImageIcon size={18}/> Add Banner</h3>
-              <input 
-                type="url" 
-                placeholder="Paste offer image url here..." 
-                value={newBannerUrl} 
-                onChange={(e) => setNewBannerUrl(e.target.value)} 
-                className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-xs font-bold text-white" 
-                required 
-              />
+              <input type="url" placeholder="Paste image url here..." value={newBannerUrl} onChange={(e) => setNewBannerUrl(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-xs font-bold text-white" required />
               <button type="submit" className="w-full bg-green-600 text-white p-4 rounded-xl font-black text-sm uppercase">Add Banner Image</button>
             </form>
 
@@ -862,7 +853,7 @@ export default function AdminDashboard() {
                 <input type="text" placeholder="CODE (e.g. WELCOME)" value={newCouponCode} onChange={(e) => setNewCouponCode(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-xs font-black uppercase text-white" required />
                 <input type="number" placeholder="Discount (₹)" value={newCouponValue} onChange={(e) => setNewCouponValue(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-xs font-black text-white" required />
               </div>
-              <button type="submit" className="w-full bg-green-600 text-white p-4 rounded-xl font-black text-sm uppercase">Create Coupon</button>
+              <button type="submit" className="w-full bg-green-600 text-white p-4 rounded-xl font-black text-sm uppercase animate-pulse">Create Coupon</button>
             </form>
 
             <div className="space-y-3">
