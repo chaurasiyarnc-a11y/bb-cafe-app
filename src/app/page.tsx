@@ -135,19 +135,41 @@ export default function BbCafeHome() {
     <div className="bg-[#080808] min-h-screen text-white pb-32 font-sans selection:bg-orange-500">
       <Toaster position="top-center" />
       
-      {/* --- HEADER --- */}
-      <header className="relative h-72 bg-gradient-to-b from-orange-600 to-orange-700 rounded-b-[3.5rem] flex flex-col justify-center items-center px-6 shadow-2xl overflow-hidden">
-        <div className="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/food.png')]"></div>
-        <motion.h1 initial={{ scale: 0.8 }} animate={{ scale: 1 }} className="text-5xl font-black italic tracking-tighter text-yellow-400 drop-shadow-lg">BUM BUM CAFE</motion.h1>
-        <p className="text-orange-100 font-bold tracking-[0.2em] text-xs mt-2 uppercase">Mohandra's Best Taste</p>
+      {/* --- COMPACT HEADER & SMALL SEARCH BAR --- */}
+      <header className="relative h-64 bg-gradient-to-b from-[#ff5e00] to-[#b33600] rounded-b-[3rem] flex flex-col justify-center items-center px-4 shadow-[0_10px_30px_rgba(179,54,0,0.25)] overflow-hidden">
+        {/* Halka background food pattern */}
+        <div className="absolute inset-0 opacity-15 bg-[url('https://www.transparenttextures.com/patterns/food.png')] bg-center"></div>
         
-        {/* Search Bar */}
-        <div className="absolute -bottom-7 w-[90%] max-w-md">
+        {/* Pure Veg Badge */}
+        <div className="absolute top-4 right-4 bg-black/40 backdrop-blur-md px-3 py-1 rounded-full border border-white/10 flex items-center gap-1.5">
+          <span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse"></span>
+          <span className="text-[9px] font-black uppercase tracking-widest text-green-400">100% PURE VEG</span>
+        </div>
+
+        {/* Cafe Name & Sub-headline */}
+        <div className="text-center z-10 mt-[-15px]">
+          <motion.h1 
+            initial={{ scale: 0.8, opacity: 0 }} 
+            animate={{ scale: 1, opacity: 1 }} 
+            className="text-4xl font-black italic tracking-tighter text-yellow-300 drop-shadow-[0_3px_6px_rgba(0,0,0,0.5)]"
+          >
+            BUM BUM CAFE
+          </motion.h1>
+          <p className="text-orange-100 font-bold tracking-wider text-xs mt-1 uppercase">
+            Best Cafe in this Area
+          </p>
+        </div>
+        
+        {/* Chota Sa Search Bar (Compact & Sleek) */}
+        <div className="absolute -bottom-6 w-[85%] max-w-sm z-20">
           <div className="relative group">
-            <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-orange-500" size={20} />
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-orange-500 transition-colors" size={16} />
             <input 
-              type="text" placeholder="Search pizza, thali, shakes..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-white text-black py-5 px-14 rounded-3xl shadow-2xl outline-none focus:ring-4 focus:ring-orange-500/20 text-lg font-medium"
+              type="text" 
+              placeholder="Search pizza, thali, shakes..." 
+              value={searchQuery} 
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-white text-black py-3 px-11 rounded-2xl shadow-[0_8px_25px_rgba(0,0,0,0.35)] outline-none focus:ring-4 focus:ring-orange-500/20 text-xs font-semibold transition-all"
             />
           </div>
         </div>
