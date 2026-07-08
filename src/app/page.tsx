@@ -1,8 +1,8 @@
 'use client';
 import React, { useState, useEffect } from 'react';
-import { db, auth } from '../lib/firebase'; 
+import { db } from '../lib/firebase'; 
 import { collection, onSnapshot, query, addDoc, doc } from 'firebase/firestore';
-import { ShoppingBag, Plus, PowerOff, Search, ChevronRight, X, MapPin, Phone, User } from 'lucide-react';
+import { ShoppingBag, Plus, PowerOff, Search, ChevronRight, X, MapPin, Phone, User, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
 import { useCartStore } from '../store/useCartStore';
@@ -14,7 +14,7 @@ export default function BbCafeHome() {
   const store = useCartStore() as any;
   const cart = store?.items || [];
   
-  // Safe destructuring
+  // Safe destructuring with fallback to prevent crashes
   const addItem = store?.addItem || (() => {});
   const removeItem = store?.removeItem || (() => {});
   const clearCart = store?.clearCart || (() => {});
@@ -72,12 +72,11 @@ export default function BbCafeHome() {
 
   // --- WHATSAPP ORDER LOGIC ---
   const sendWhatsAppOrder = async () => {
-    // Agar customer ki name/phone details nahi hain, toh pehle details lene ke liye popup kholiye
     if (!customerDetails) {
       setIsLoginOpen(true);
       return;
     }
-    if (!address || address.trim().length < 10) return toast.error("Please enter full address!");
+    if (!address || address.trim().length < 10) return toast.error("Please enter full address with landmark!");
 
     const tokenNumber = Math.floor(1000 + Math.random() * 9000);
     const total = getTotal();
@@ -126,13 +125,13 @@ export default function BbCafeHome() {
     localStorage.setItem('bb_cafe_customer', JSON.stringify(details));
     setCustomerDetails(details);
     setIsLoginOpen(false);
-    toast.success(`Welcome to Bum Bum Cafe, ${tempName}!`);
+    toast.success(`Welcome ${tempName}!`);
   };
 
   if (!mounted) return null;
 
   return (
-    <div className="bg-[#080808] min-h-screen text-white pb-32 font-sans selection:bg-orange-500">
+    <div className="bg-[#050505] min-h-screen text-white pb-32 font-sans selection:bg-orange-500 overflow-x-hidden">
       <Toaster position="top-center" />
       
       {/* --- COMPACT HEADER & SMALL SEARCH BAR (FIXED CLIPPING) --- */}
@@ -141,7 +140,7 @@ export default function BbCafeHome() {
         <div className="absolute inset-0 opacity-15 bg-[url('https://www.transparenttextures.com/patterns/food.png')] bg-center rounded-b-[3rem] overflow-hidden"></div>
         
         {/* Pure Veg Badge */}
-        <div className="absolute top-4 right-4 bg-black/40 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10 flex items-center gap-1.5 z-10">
+        <div className="absolute top-4 right-4 bg-black/40 backdrop-blur-md px-3 py-1 rounded-full border border-white/10 flex items-center gap-1.5 z-10">
           <span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse"></span>
           <span className="text-[9px] font-black uppercase tracking-widest text-green-400">100% PURE VEG</span>
         </div>
@@ -149,8 +148,8 @@ export default function BbCafeHome() {
         {/* Cafe Name & Sub-headline */}
         <div className="text-center z-10 mt-[-15px]">
           <motion.h1 
-            initial={{ scale: 0.8, opacity: 0 }} 
-            animate={{ scale: 1, opacity: 1 }} 
+            initial={{ scale: 0.8 }} 
+            animate={{ scale: 1 }} 
             className="text-4xl font-black italic tracking-tighter text-yellow-300 drop-shadow-[0_3px_6px_rgba(0,0,0,0.5)]"
           >
             BUM BUM CAFE
@@ -160,7 +159,7 @@ export default function BbCafeHome() {
           </p>
         </div>
         
-        {/* Small Floating Search Bar (Ab bilkul clean aur poora dikhega) */}
+        {/* Small Floating Search Bar */}
         <div className="absolute -bottom-6 w-[85%] max-w-sm z-20">
           <div className="relative group">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-orange-500 transition-colors" size={16} />
@@ -176,14 +175,18 @@ export default function BbCafeHome() {
       </header>
 
       {/* --- MAIN CONTENT --- */}
-      <main className="pt-14 px-4 max-w-lg mx-auto">
+      <main className="pt-16 px-4 max-w-lg mx-auto">
         
-        {/* Categories */}
-        <div className="flex gap-3 overflow-x-auto pb-6 no-scrollbar">
+        {/* Categories sliding menu */}
+        <div className="flex gap-2 overflow-x-auto pb-6 no-scrollbar pt-2">
           {CATEGORIES.map((cat) => (
-            <button key={cat} onClick={() => setSelectedCategory(cat)}
-              className={`px-6 py-3 rounded-2xl whitespace-nowrap font-extrabold transition-all duration-300 ${
-                selectedCategory === cat ? 'bg-orange-500 text-white shadow-xl scale-105' : 'bg-white/5 text-gray-500 border border-white/5'
+            <button 
+              key={cat} 
+              onClick={() => setSelectedCategory(cat)}
+              className={`px-5 py-3 rounded-2xl whitespace-nowrap text-xs font-black tracking-wide uppercase transition-all duration-300 border ${
+                selectedCategory === cat 
+                  ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-lg shadow-orange-500/10 border-orange-500/50 scale-105' 
+                  : 'bg-white/[0.03] text-gray-400 border-white/5 hover:bg-white/[0.06]'
               }`}
             >
               {cat}
@@ -193,112 +196,123 @@ export default function BbCafeHome() {
 
         {/* Store Closed Banner */}
         {!storeOpen && (
-          <div className="bg-red-500/10 text-red-500 p-6 rounded-[2.5rem] border border-red-500/20 text-center mb-8">
-            <PowerOff className="mx-auto mb-2" size={30} />
-            <h3 className="font-bold text-xl uppercase italic">Cafe Closed Now</h3>
-            <p className="text-xs opacity-80 mt-1">Visit us tomorrow for fresh food!</p>
+          <div className="bg-red-500/10 text-red-400 p-6 rounded-[2.5rem] border border-red-500/20 text-center mb-8 shadow-xl">
+            <PowerOff className="mx-auto mb-2 text-red-500" size={28} />
+            <h3 className="font-black text-lg uppercase italic tracking-wider">Cafe Closed Now</h3>
+            <p className="text-[11px] opacity-80 mt-1">Accepting orders tomorrow morning!</p>
           </div>
         )}
 
-        {/* Product Grid */}
+        {/* Food Items Listing Grid */}
         <div className="grid grid-cols-1 gap-5">
-          {filteredMenu.map((item) => (
-            <motion.div layout key={item.id} className="bg-white/[0.03] p-4 rounded-[2.5rem] border border-white/5 flex gap-5 items-center hover:bg-white/[0.06] transition-all group">
-              <div className="relative h-24 w-24 flex-shrink-0">
-                <img src={item.image} className="w-full h-full rounded-[2rem] object-cover shadow-xl group-hover:scale-105 transition-transform" alt={item.name} />
-              </div>
-              <div className="flex-1">
-                <h4 className="font-black text-lg text-gray-100">{item.name}</h4>
-                <p className="text-gray-500 text-xs italic mb-2 capitalize">{item.category}</p>
-                <p className="text-orange-500 font-black text-xl">₹{item.price}</p>
-              </div>
-              {storeOpen && (
-                <button 
-                  onClick={() => item.variants ? setSelectedProduct(item) : addItem(item)}
-                  className="p-4 bg-orange-500 text-white rounded-3xl shadow-lg shadow-orange-500/20 active:scale-90 transition-all"
-                >
-                  <Plus size={24} strokeWidth={4} />
-                </button>
-              )}
-            </motion.div>
-          ))}
-        </div>
-      </main>
-      
-      {/* --- CART / CHECKOUT SIDEBAR --- */}
-    <AnimatePresence>
-      {isCartOpen && (
-        <div className="fixed inset-0 bg-black z-[110] overflow-y-auto">
-          <div className="p-6 max-w-lg mx-auto">
-            <div className="flex justify-between items-center mb-8">
-              <h2 className="text-3xl font-black">Your Order</h2>
-              <button onClick={() => setIsCartOpen(false)} className="p-3 bg-white/5 rounded-full"><X size={24} /></button>
-            </div>
+          {filteredMenu.length === 0 ? (
+            <p className="text-center text-gray-500 py-12 text-sm font-bold uppercase tracking-widest">No items found...</p>
+          ) : (
+            filteredMenu.map((item) => (
+              <motion.div 
+                layout 
+                key={item.id} 
+                className="bg-white/[0.03] p-4 rounded-[2.5rem] border border-white/5 flex gap-5 items-center hover:bg-white/[0.06] transition-all group relative overflow-hidden"
+              >
+                {/* 100% Pure Veg indicator */}
+                <div className="absolute top-4 right-4 flex items-center justify-center border border-green-600 p-0.5 rounded-sm h-3.5 w-3.5">
+                  <span className="h-1.5 w-1.5 bg-green-600 rounded-full"></span>
+                </div>
 
-            {cart.map((item: any) => (
-              <div key={item.id} className="flex justify-between items-center bg-white/5 p-5 rounded-3xl mb-4 border border-white/5">
-                <div className="min-w-0 pr-3">
-                  <h4 className="font-bold text-lg text-gray-100 truncate">{item.name}</h4>
-                  <p className="text-orange-500 font-black mt-1">₹{item.price}</p>
+                <div className="relative h-24 w-24 flex-shrink-0">
+                  <img 
+                    src={item.image || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=300&q=80"} 
+                    className="w-full h-full rounded-[2rem] object-cover shadow-xl group-hover:scale-105 transition-transform duration-300" 
+                    alt={item.name} 
+                  />
                 </div>
                 
-                {/* Quantity Controller (Kam / Jyada karne ka sleek design) */}
-                <div className="flex items-center gap-2.5 bg-black/40 px-3 py-1.5 rounded-2xl border border-white/10 flex-shrink-0">
-                  {/* Minus (-) Button */}
-                  <button 
-                    onClick={() => removeItem(item.id)} 
-                    type="button"
-                    className="w-8 h-8 flex items-center justify-center bg-red-500/10 text-red-500 rounded-xl text-lg font-black active:scale-90 transition-all hover:bg-red-500/20"
-                  >
-                    -
-                  </button>
+                <div className="flex-1">
+                  <h4 className="font-black text-lg text-gray-100 group-hover:text-orange-500 transition-colors">{item.name}</h4>
+                  <p className="text-gray-500 text-xs italic mb-2 capitalize">{item.category}</p>
                   
-                  {/* Quantity Display */}
-                  <span className="font-black text-sm px-1.5 text-white min-w-[15px] text-center">
-                    {item.quantity}
-                  </span>
+                  {/* Price display with variant check */}
+                  <p className="text-orange-500 font-black text-xl mt-1">
+                    {item.variants ? (
+                      item.variants.half ? `₹${item.variants.half} - ₹${item.variants.full}` : `₹${item.variants.Plain} - ₹${item.variants.Butter}`
+                    ) : (
+                      `₹${item.price}`
+                    )}
+                  </p>
                   
-                  {/* Plus (+) Button */}
+                  {item.variants && (
+                    <span className="inline-block bg-orange-500/10 text-orange-400 text-[9px] font-extrabold px-2 py-0.5 rounded-md mt-1 uppercase tracking-widest border border-orange-500/10">
+                      Options available
+                    </span>
+                  )}
+                </div>
+
+                {storeOpen && (
                   <button 
-                    onClick={() => addItem(item)} 
-                    type="button"
-                    className="w-8 h-8 flex items-center justify-center bg-green-500/10 text-green-500 rounded-xl text-lg font-black active:scale-90 transition-all hover:bg-green-500/20"
+                    onClick={() => item.variants ? setSelectedProduct(item) : addItem(item)}
+                    className="p-4 bg-orange-500 text-white rounded-3xl shadow-lg shadow-orange-500/20 active:scale-90 transition-all border border-orange-400/20"
                   >
-                    +
+                    <Plus size={24} strokeWidth={4} />
                   </button>
+                )}
+              </motion.div>
+            ))
+          )}
+        </div>
+      </main>
+
+      {/* --- FLOATING BOTTOM CART BAR --- */}
+      <AnimatePresence>
+        {cart.length > 0 && (
+          <motion.div initial={{ y: 100 }} animate={{ y: 0 }} exit={{ y: 100 }} className="fixed bottom-8 left-0 w-full px-6 z-50">
+            <button 
+              onClick={() => setIsCartOpen(true)} 
+              className="w-full max-w-md mx-auto bg-gradient-to-r from-yellow-300 to-amber-400 text-black p-5 rounded-[2.2rem] shadow-2xl flex justify-between items-center border-4 border-black active:scale-95 transition-all"
+            >
+              <div className="flex items-center gap-4">
+                <div className="bg-black text-white p-3 rounded-xl"><ShoppingBag size={20} strokeWidth={2.5} /></div>
+                <div className="text-left leading-tight">
+                  <p className="text-[10px] font-black uppercase tracking-wider opacity-60">Ready to Order?</p>
+                  <p className="font-black text-2xl tracking-tighter">{cart.length} Items • ₹{getTotal()}</p>
                 </div>
               </div>
-            ))}
+              <div className="bg-black text-white p-2.5 rounded-full"><ChevronRight size={24} strokeWidth={3} /></div>
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-            <div className="mt-10 space-y-6">
-      {/* --- VARIANTS POPUP (Half/Full) --- */}
+      {/* --- VARIANTS POPUP --- */}
       <AnimatePresence>
         {selectedProduct && (
           <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[100] flex items-end">
             <motion.div initial={{ y: 300 }} animate={{ y: 0 }} exit={{ y: 300 }} className="bg-[#111] w-full p-8 rounded-t-[3.5rem] border-t border-white/10 max-w-lg mx-auto">
-              <div className="w-16 h-1.5 bg-white/10 rounded-full mx-auto mb-6" />
-              <h3 className="text-3xl font-black mb-1">{selectedProduct.name}</h3>
-              <p className="text-gray-500 font-bold mb-8 uppercase tracking-widest text-xs">Select Portion Size</p>
+              <div className="w-16 h-1.5 bg-white/15 rounded-full mx-auto mb-6" />
+              <h3 className="text-3xl font-black mb-1 text-center tracking-tight">{selectedProduct.name}</h3>
+              <p className="text-orange-500 font-black mb-8 uppercase tracking-widest text-[10px] text-center">Select Portion Option</p>
               
               <div className="space-y-4">
                 {Object.entries(selectedProduct.variants || {}).map(([size, price]: any) => (
-                  <button key={size} onClick={() => { 
-                    addItem({ 
-                      ...selectedProduct, 
-                      id: `${selectedProduct.id}-${size}`, 
-                      name: `${selectedProduct.name} (${size})`, 
-                      price 
-                    }); 
-                    setSelectedProduct(null); 
-                  }}
-                    className="w-full bg-white/5 p-6 rounded-3xl flex justify-between items-center border border-white/5 hover:border-orange-500 hover:bg-orange-500/10 transition-all"
+                  <button 
+                    key={size} 
+                    onClick={() => { 
+                      addItem({ 
+                        ...selectedProduct, 
+                        id: `${selectedProduct.id}-${size}`, 
+                        name: `${selectedProduct.name} (${size})`, 
+                        price 
+                      }); 
+                      setSelectedProduct(null); 
+                      toast.success(`${selectedProduct.name} (${size}) added!`);
+                    }}
+                    className="w-full bg-white/[0.03] p-5 rounded-3xl flex justify-between items-center border border-white/5 hover:border-orange-500/50 hover:bg-orange-500/10 transition-all group"
                   >
-                    <span className="capitalize text-xl font-black">{size}</span>
+                    <span className="capitalize text-lg font-black group-hover:text-orange-500 transition-colors">{size}</span>
                     <span className="text-orange-500 font-black text-xl">₹{price}</span>
                   </button>
                 ))}
               </div>
-              <button onClick={() => setSelectedProduct(null)} className="w-full mt-8 p-4 text-gray-500 font-black uppercase text-sm">Close</button>
+              <button onClick={() => setSelectedProduct(null)} className="w-full mt-6 p-4 text-gray-500 font-black uppercase text-xs tracking-widest">Close</button>
             </motion.div>
           </div>
         )}
@@ -308,56 +322,99 @@ export default function BbCafeHome() {
       <AnimatePresence>
         {isCartOpen && (
           <div className="fixed inset-0 bg-black z-[110] overflow-y-auto">
-            <div className="p-6 max-w-lg mx-auto">
+            <div className="p-6 max-w-lg mx-auto pb-32">
               <div className="flex justify-between items-center mb-8">
-                <h2 className="text-3xl font-black">Your Order</h2>
+                <h2 className="text-3xl font-black tracking-tight">Your Order</h2>
                 <button onClick={() => setIsCartOpen(false)} className="p-3 bg-white/5 rounded-full"><X size={24} /></button>
               </div>
 
               {cart.map((item: any) => (
-                <div key={item.id} className="flex justify-between items-center bg-white/5 p-5 rounded-3xl mb-4 border border-white/5">
-                  <div>
-                    <h4 className="font-bold text-lg">{item.name}</h4>
-                    <p className="text-orange-500 font-black">₹{item.price} × {item.quantity}</p>
+                <div key={item.id} className="flex justify-between items-center bg-white/[0.02] p-5 rounded-3xl mb-4 border border-white/5">
+                  <div className="min-w-0 pr-3">
+                    <h4 className="font-bold text-sm text-gray-100 truncate">{item.name}</h4>
+                    <p className="text-orange-500 font-black mt-1">₹{item.price}</p>
                   </div>
-                  <div className="flex items-center gap-4">
-                    <button onClick={() => removeItem(item.id)} className="p-2 bg-red-500/20 text-red-500 rounded-xl">Remove</button>
+                  
+                  {/* Quantity Controller (Plus/Minus digital counter) */}
+                  <div className="flex items-center gap-2.5 bg-black/40 px-3 py-1.5 rounded-2xl border border-white/10 flex-shrink-0">
+                    <button 
+                      onClick={() => removeItem(item.id)} 
+                      type="button"
+                      className="w-8 h-8 flex items-center justify-center bg-red-500/10 text-red-500 rounded-xl text-lg font-black active:scale-90 transition-all hover:bg-red-500/20"
+                    >
+                      -
+                    </button>
+                    
+                    <span className="font-black text-sm px-1.5 text-white min-w-[15px] text-center">
+                      {item.quantity}
+                    </span>
+                    
+                    <button 
+                      onClick={() => addItem(item)} 
+                      type="button"
+                      className="w-8 h-8 flex items-center justify-center bg-green-500/10 text-green-500 rounded-xl text-lg font-black active:scale-90 transition-all hover:bg-green-500/20"
+                    >
+                      +
+                    </button>
                   </div>
                 </div>
               ))}
 
               <div className="mt-10 space-y-6">
                 
-                {/* Display details if already saved */}
-                {customerDetails && (
-                  <div className="bg-white/5 p-6 rounded-[2.5rem] border border-white/10 flex justify-between items-center">
+                {/* PDF rules alert widget */}
+                <div className="bg-orange-500/10 border border-orange-500/20 rounded-[2rem] p-5 space-y-2">
+                  <div className="flex items-center gap-2 text-orange-400 font-black text-xs uppercase tracking-wider">
+                    <Sparkles size={16}/> <span>Free Delivery Rules</span>
+                  </div>
+                  <ul className="text-[11px] text-gray-400 font-bold space-y-1">
+                    <li>• Mohandra Town: Free above ₹99 <span className="text-green-500">({getTotal() >= 99 ? 'Achieved' : 'Need ₹' + (99 - getTotal()) + ' more'})</span></li>
+                    <li>• Within 5 Km: Free above ₹499</li>
+                    <li>• Within 12 Km: Free above ₹999</li>
+                  </ul>
+                </div>
+
+                {/* Local Memory Saved Details Block */}
+                {customerDetails ? (
+                  <div className="bg-white/[0.02] p-5 rounded-[2.2rem] border border-white/5 flex justify-between items-center">
                     <div>
-                      <p className="text-xs text-gray-500 font-bold uppercase">Ordering As</p>
-                      <h4 className="font-black text-lg text-orange-500">{customerDetails.name}</h4>
-                      <p className="text-xs text-gray-400 font-bold">{customerDetails.phone}</p>
+                      <p className="text-[9px] text-gray-500 font-black uppercase tracking-wider">Ordering As</p>
+                      <h4 className="font-black text-md text-orange-500">{customerDetails.name}</h4>
+                      <p className="text-xs text-gray-400 font-bold mt-0.5">{customerDetails.phone}</p>
                     </div>
                     <button 
                       onClick={() => { localStorage.removeItem('bb_cafe_customer'); setCustomerDetails(null); }}
-                      className="text-xs bg-red-500/10 text-red-500 px-3 py-2 rounded-xl font-bold"
+                      className="text-[10px] bg-red-500/10 text-red-500 px-3 py-2 rounded-xl font-black uppercase tracking-wider"
                     >
                       Change
                     </button>
                   </div>
+                ) : (
+                  <button 
+                    onClick={() => setIsLoginOpen(true)}
+                    className="w-full p-5 bg-orange-500/10 text-orange-500 border border-orange-500/20 rounded-[2.2rem] font-black text-sm uppercase tracking-widest active:scale-95 transition-all"
+                  >
+                    👤 Add Name & Phone To Order
+                  </button>
                 )}
 
-                <div className="bg-white/5 p-6 rounded-[2.5rem] border border-white/10">
-                  <div className="flex items-center gap-3 mb-4 text-orange-500">
-                    <MapPin size={20}/> <h3 className="font-black uppercase text-sm">Delivery Address</h3>
+                {/* Delivery Address */}
+                <div className="bg-white/[0.02] p-5 rounded-[2.2rem] border border-white/5">
+                  <div className="flex items-center gap-2 mb-3 text-orange-500">
+                    <MapPin size={18}/> <h3 className="font-black uppercase text-xs tracking-wider">Delivery Address</h3>
                   </div>
                   <textarea 
-                    placeholder="Ghar ka address, Landmark ke saath..." value={address} onChange={(e) => setAddress(e.target.value)}
-                    className="w-full bg-black/40 border border-white/10 rounded-2xl p-4 outline-none focus:border-orange-500 h-24 text-sm font-medium"
+                    placeholder="Ghar ka address, Landmark ke saath..." 
+                    value={address} 
+                    onChange={(e) => setAddress(e.target.value)}
+                    className="w-full bg-black/40 border border-white/10 rounded-2xl p-4 outline-none focus:border-orange-500 h-24 text-xs font-semibold text-white placeholder-gray-600 resize-none"
                   />
                 </div>
 
-                <div className="bg-orange-500 p-8 rounded-[2.5rem] text-white">
-                  <div className="flex justify-between font-bold mb-2"><span>Items Total</span> <span>₹{getTotal()}</span></div>
-                  <div className="flex justify-between font-bold mb-4 opacity-80 text-sm"><span>Delivery Charge</span> <span>{getTotal() < 99 ? "₹20" : "FREE"}</span></div>
+                {/* Bill Details */}
+                <div className="bg-gradient-to-b from-orange-600 to-orange-700 p-8 rounded-[2.5rem] text-white shadow-xl">
+                  <div className="flex justify-between font-bold mb-2 text-sm text-orange-100"><span>Items Total</span> <span>₹{getTotal()}</span></div>
+                  <div className="flex justify-between font-bold mb-4 opacity-90 text-sm text-orange-100"><span>Delivery Charge</span> <span>{getTotal() < 99 ? "₹20" : "FREE"}</span></div>
                   <div className="h-px bg-white/20 mb-4" />
                   <div className="flex justify-between font-black text-2xl"><span>To Pay</span> <span>₹{getTotal() < 99 ? getTotal() + 20 : getTotal()}</span></div>
                 </div>
@@ -374,49 +431,64 @@ export default function BbCafeHome() {
                   </svg>
                   <span>ORDER ON WHATSAPP</span>
                 </button>
-                </button>
               </div>
             </div>
           </div>
         )}
       </AnimatePresence>
 
-      {/* --- DIRECT CONTACT FORM MODAL (100% FREE NO OTP) --- */}
+      {/* --- DIRECT CONTACT DETAILS MODAL --- */}
       <AnimatePresence>
         {isLoginOpen && (
           <div className="fixed inset-0 bg-black/95 z-[200] flex items-center justify-center p-6">
             <form onSubmit={handleSaveDetails} className="bg-[#111] w-full max-w-md p-10 rounded-[3rem] border border-white/10 text-center space-y-6">
-              <Phone className="mx-auto text-orange-500" size={48} />
+              <User className="mx-auto text-orange-500" size={48} />
               <div>
                 <h2 className="text-3xl font-black mb-1">Your Details</h2>
-                <p className="text-gray-500 font-medium text-xs">Enter your contact info to place your order.</p>
+                <p className="text-gray-500 font-semibold text-xs uppercase tracking-widest">Setup Once • Order Fast</p>
               </div>
               
               <div className="space-y-4 text-left">
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-gray-500 uppercase">Your Name</label>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Your Name</label>
                   <input 
-                    type="text" placeholder="Apna Naam likhein..." value={tempName} onChange={(e) => setTempName(e.target.value)}
-                    className="w-full bg-white/5 border border-white/10 p-4 rounded-2xl text-center text-lg font-bold" 
+                    type="text" 
+                    placeholder="Enter your name..." 
+                    value={tempName} 
+                    onChange={(e) => setTempName(e.target.value)}
+                    className="w-full bg-white/5 border border-white/10 p-4 rounded-2xl text-center text-md font-bold outline-none focus:border-orange-500 text-white" 
                     required 
                   />
                 </div>
                 
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-gray-500 uppercase">Mobile Number</label>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Mobile Number</label>
                   <input 
-                    type="tel" maxLength={10} placeholder="10-digit Phone Number" value={tempPhone} onChange={(e) => setTempPhone(e.target.value)}
-                    className="w-full bg-white/5 border border-white/10 p-4 rounded-2xl text-center text-lg font-bold" 
+                    type="tel" 
+                    maxLength={10} 
+                    placeholder="10-digit Phone Number" 
+                    value={tempPhone} 
+                    onChange={(e) => setTempPhone(e.target.value)}
+                    className="w-full bg-white/5 border border-white/10 p-4 rounded-2xl text-center text-md font-bold outline-none focus:border-orange-500 text-white" 
                     required 
                   />
                 </div>
               </div>
 
-              <button type="submit" className="w-full bg-orange-500 p-5 rounded-2xl font-black text-lg shadow-xl shadow-orange-500/20 active:scale-95 transition-all uppercase">
+              <button 
+                type="submit" 
+                className="w-full bg-orange-500 hover:bg-orange-600 p-5 rounded-2xl font-black text-md shadow-xl active:scale-95 transition-all uppercase tracking-wider"
+              >
                 PROCEED TO ORDER
               </button>
               
-              <button type="button" onClick={() => setIsLoginOpen(false)} className="mt-8 text-gray-500 text-xs font-bold uppercase tracking-widest block mx-auto">Close</button>
+              <button 
+                type="button" 
+                onClick={() => setIsLoginOpen(false)} 
+                className="mt-6 text-gray-500 text-xs font-black uppercase tracking-widest block mx-auto hover:text-gray-400"
+              >
+                Close
+              </button>
             </form>
           </div>
         )}
