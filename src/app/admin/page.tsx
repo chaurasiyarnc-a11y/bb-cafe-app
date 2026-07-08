@@ -66,7 +66,7 @@ export default function AdminDashboard() {
   const [editPriceLarge, setEditPriceLarge] = useState("");
   const [editPriceXL, setEditPriceXL] = useState("");
 
-  // 1. Session verification check (session memory locks admin securely on window close)
+  // 1. Session verification check (session memory auto-locks admin on window close)
   useEffect(() => {
     const adminSession = sessionStorage.getItem('bb_cafe_admin_verified');
     if (adminSession === 'true') {
@@ -75,7 +75,7 @@ export default function AdminDashboard() {
     setLoading(false);
   }, []);
 
-  // 2. Real-time Data Listeners
+  // 2. Real-time Data Listeners (Triggers when unlocked)
   useEffect(() => {
     if (!isVerified) return;
 
@@ -169,7 +169,7 @@ export default function AdminDashboard() {
     }
   };
 
-  // --- CSV / EXCEL EXPORT ENGINE WITH UTF-8 BOM ---
+  // --- CSV / EXCEL EXPORT ENGINE WITH UTF-8 BOM FOR HINDI CHARACTER SUPPORT ---
   const triggerCsvDownload = (data: any[], filename: string, headers: string[], keys: string[]) => {
     if (data.length === 0) return toast.error("No data available to export!");
 
@@ -199,7 +199,7 @@ export default function AdminDashboard() {
     toast.success("Excel Data Exported!");
   };
 
-  // Export 1: Order Sales History
+  // Export 1: Order Sales History Data Ledger
   const handleExportOrders = () => {
     const formattedData = orders.map(o => {
       const itemsSummary = o.items?.map((i: any) => `${i.name} (x${i.quantity})`).join(' | ') || '';
@@ -241,7 +241,7 @@ export default function AdminDashboard() {
     triggerCsvDownload(formattedData, `BumBumCafe_CustomersDirectory_${new Date().toLocaleDateString()}`, headers, keys);
   };
 
-  // --- ANALYTICS METRICS CALCULATORS ---
+  // --- GET DAILY ANALYTICS METRICS ---
   const getDailyAnalytics = () => {
     const todayStr = new Date().toDateString();
     const todayOrders = orders.filter(o => {
@@ -260,6 +260,7 @@ export default function AdminDashboard() {
     };
   };
 
+  // --- GET LIFETIME DASHBOARD METRICS ---
   const getLifetimeMetrics = () => {
     const seenPhones = new Set();
     orders.forEach(o => { if (o.customerPhone) seenPhones.add(String(o.customerPhone)); });
@@ -275,7 +276,7 @@ export default function AdminDashboard() {
   const dailyStats = getDailyAnalytics();
   const lifetimeStats = getLifetimeMetrics();
 
-  // Dynamic dropdown fallback
+  // Dynamic dropdown helper if Firestore categories collection is empty
   const categoryOptions = categories.length > 0 
     ? categories.map(c => c.name)
     : ADD_CATEGORIES;
@@ -367,7 +368,15 @@ export default function AdminDashboard() {
     } catch (error) { toast.error("Error deleting coupon"); }
   };
 
-  // --- MENU ITEM ACTIONS ---
+  // --- STORE ACTIONS ---
+  const toggleStore = async () => {
+    try {
+      await setDoc(doc(db, "settings", "store"), { isOpen: !storeOpen });
+      toast.success(storeOpen ? "Cafe is now OFFLINE" : "Cafe is now ONLINE");
+    } catch (e) { toast.error("Error toggling store"); }
+  };
+
+  // --- OTHER MENU ITEM ACTIONS ---
   const toggleItemVisibility = async (id: string, currentStatus: boolean) => {
     try {
       await updateDoc(doc(db, "products", id), { isVisible: !currentStatus });
@@ -386,97 +395,11 @@ export default function AdminDashboard() {
     }
   };
 
-  // --- ADD NEW PRODUCT FUNCTION ---
-  const handleAddProduct = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newName || !newCategory || !newImage) {
-      return toast.error("Please fill all required fields!");
-    }
-
-    let productData: any = {
-      name: newName,
-      category: newCategory,
-      image: newImage,
-      isVisible: true
-    };
-
-    if (variantType === 'half_full') {
-      if (!halfPrice || !fullPrice) return toast.error("Please fill prices!");
-      productData.variants = { half: Number(halfPrice), full: Number(fullPrice) };
-      productData.price = Number(halfPrice);
-    } else if (variantType === 'plain_butter') {
-      if (!halfPrice || !fullPrice) return toast.error("Please fill prices!");
-      productData.variants = { Plain: Number(halfPrice), Butter: Number(fullPrice) };
-      productData.price = Number(halfPrice);
-    } else if (variantType === 'pizza_sizes') {
-      if (!priceSmall || !priceMedium || !priceLarge || !priceXL) return toast.error("Please fill all pizza prices!");
-      productData.variants = { Small: Number(priceSmall), Medium: Number(priceMedium), Large: Number(priceLarge), "Extra Large": Number(priceXL) };
-      productData.price = Number(priceSmall);
-    } else {
-      if (!newPrice) return toast.error("Please enter price!");
-      productData.price = Number(newPrice);
-    }
-
-    try {
-      await addDoc(collection(db, "products"), productData);
-      toast.success("New Item Added!");
-      setNewName(""); setNewPrice(""); setNewImage(""); setVariantType('none');
-      setHalfPrice(""); setFullPrice(""); setPriceSmall(""); setPriceMedium(""); setPriceLarge(""); setPriceXL("");
-      setShowAddForm(false);
-    } catch (error) {
-      toast.error("Error adding product");
-    }
-  };
-
-  // --- EDIT & UPDATE PROCESSOR ---
-  const handleUpdateProduct = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editName || !editCategory || !editImage) {
-      return toast.error("Please fill all fields!");
-    }
-
-    let updatedData: any = {
-      name: editName,
-      category: editCategory,
-      image: editImage
-    };
-
-    if (editVariantType === 'half_full') {
-      if (!editHalfPrice || !editFullPrice) return toast.error("Please enter both variant prices!");
-      updatedData.variants = { half: Number(editHalfPrice), full: Number(editFullPrice) };
-      updatedData.price = Number(editHalfPrice);
-    } else if (editVariantType === 'plain_butter') {
-      if (!editHalfPrice || !editFullPrice) return toast.error("Please enter both variant prices!");
-      updatedData.variants = { Plain: Number(editHalfPrice), Butter: Number(editFullPrice) };
-      updatedData.price = Number(editHalfPrice);
-    } else if (editVariantType === 'pizza_sizes') {
-      if (!editPriceSmall || !editPriceMedium || !editPriceLarge || !editPriceXL) return toast.error("Please enter prices for all 4 sizes!");
-      updatedData.variants = {
-        Small: Number(editPriceSmall),
-        Medium: Number(editPriceMedium),
-        Large: Number(editPriceLarge),
-        "Extra Large": Number(editPriceXL)
-      };
-      updatedData.price = Number(editPriceSmall);
-    } else {
-      if (!editPrice) return toast.error("Please enter a price!");
-      updatedData.price = Number(editPrice);
-      updatedData.variants = null;
-    }
-
-    try {
-      await updateDoc(doc(db, "products", editingProduct.id), updatedData);
-      toast.success("Product Updated successfully!");
-      setEditingProduct(null);
-    } catch (e) {
-      toast.error("Error updating product");
-    }
-  };
-
-  // --- COMPRESSED HIGH-EFFICIENCY SEEDER ENGINE ---
+  // --- BULK PDF IMPORT ---
   const handleBulkImport = async () => {
     if (!window.confirm("BUM BUM CAFE PDF ke saare 80+ items ko database mein add karein?")) return;
-    toast.loading("Importing menu items...", { id: "import" });
+    
+    toast.loading("Importing all menu items...", { id: "import" });
 
     const pz = "1513104890138-7c749659a591", th = "1626777552726-4a6b54c97e46", pa = "1631452180519-c014fe946bc7";
     const vg = "1546069901-ba9599a7e63c", br = "1589301760014-d929f3979dbc", rc = "1563379091339-03b21ab4a4f8";
@@ -604,6 +527,77 @@ export default function AdminDashboard() {
     }
   };
 
+  // --- ADD NEW PRODUCT PROCESSOR ---
+  const handleAddProduct = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newName || !newCategory || !newImage) {
+      return toast.error("Please fill all required fields!");
+    }
+
+    let productData: any = {
+      name: newName,
+      category: newCategory,
+      image: newImage,
+      isVisible: true
+    };
+
+    if (variantType === 'half_full') {
+      if (!halfPrice || !fullPrice) return toast.error("Please fill prices!");
+      productData.variants = { half: Number(halfPrice), full: Number(fullPrice) };
+      productData.price = Number(halfPrice);
+    } else if (variantType === 'plain_butter') {
+      if (!halfPrice || !fullPrice) return toast.error("Please fill prices!");
+      productData.variants = { Plain: Number(halfPrice), Butter: Number(fullPrice) };
+      productData.price = Number(halfPrice);
+    } else if (variantType === 'pizza_sizes') {
+      if (!priceSmall || !priceMedium || !priceLarge || !priceXL) return toast.error("Please fill all pizza prices!");
+      productData.variants = { Small: Number(priceSmall), Medium: Number(priceMedium), Large: Number(priceLarge), "Extra Large": Number(priceXL) };
+      productData.price = Number(priceSmall);
+    } else {
+      if (!newPrice) return toast.error("Please enter price!");
+      productData.price = Number(newPrice);
+    }
+
+    try {
+      await addDoc(collection(db, "products"), productData);
+      toast.success("New Item Added!");
+      setNewName(""); setNewPrice(""); setNewImage(""); setVariantType('none');
+      setHalfPrice(""); setFullPrice(""); setPriceSmall(""); setPriceMedium(""); setPriceLarge(""); setPriceXL("");
+      setShowAddForm(false);
+    } catch (error) {
+      toast.error("Error adding product");
+    }
+  };
+
+  // --- EDIT PRODUCT SELECTOR LOGIC ---
+  const startEditing = (item: any) => {
+    setEditingProduct(item);
+    setEditName(item.name);
+    setEditPrice(item.price || "");
+    setEditCategory(item.category);
+    setEditImage(item.image);
+    if (item.variants) {
+      const keys = Object.keys(item.variants);
+      if (keys.includes('Small')) {
+        setEditVariantType('pizza_sizes');
+        setEditPriceSmall(item.variants.Small || "");
+        setEditPriceMedium(item.variants.Medium || "");
+        setEditPriceLarge(item.variants.Large || "");
+        setEditPriceXL(item.variants["Extra Large"] || "");
+      } else if (keys.includes('Plain')) {
+        setEditVariantType('plain_butter');
+        setEditHalfPrice(item.variants.Plain || "");
+        setEditFullPrice(item.variants.Butter || "");
+      } else {
+        setEditVariantType('half_full');
+        setEditHalfPrice(item.variants.half || "");
+        setEditFullPrice(item.variants.full || "");
+      }
+    } else {
+      setEditVariantType('none');
+    }
+  };
+
   return (
     <div className="bg-[#050505] min-h-screen text-white pb-20 font-sans">
       <Toaster />
@@ -622,9 +616,9 @@ export default function AdminDashboard() {
         </div>
       </header>
 
-      {/* --- HORIZONTAL TABS --- */}
+      {/* --- RESPONSIVE HORIZONTAL TABS --- */}
       <div className="p-4 flex gap-2 overflow-x-auto no-scrollbar border-b border-white/5">
-        <button onClick={() => setTab('dashboard')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'dashboard' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>📊 Dashboard</button>
+        <button onClick={() => setTab('dashboard')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'dashboard' ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/20' : 'bg-white/5 text-gray-500'}`}>📊 Dashboard</button>
         <button onClick={() => setTab('orders')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'orders' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>📦 Orders ({orders.length})</button>
         <button onClick={() => setTab('menu')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'menu' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>🍔 Menu List</button>
         <button onClick={() => setTab('categories')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'categories' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>🗂️ Categories</button>
@@ -677,10 +671,10 @@ export default function AdminDashboard() {
 
             {/* Excel Exports Buttons */}
             <div className="grid grid-cols-2 gap-3 bg-[#111]/30 border border-white/5 p-4 rounded-[2rem] shadow-xl">
-              <button onClick={handleExportOrders} className="bg-green-600 hover:bg-green-700 text-white font-black text-xs py-4 px-3 rounded-2xl flex items-center justify-center gap-2 active:scale-95 transition-all uppercase shadow-md">
+              <button onClick={handleExportOrders} className="bg-green-600 hover:bg-green-700 text-white font-black text-xs py-4 px-3 rounded-2xl flex items-center justify-center gap-2 active:scale-95 transition-all uppercase shadow-md border border-green-500/10">
                 <Download size={14}/> Sales Ledger Excel
               </button>
-              <button onClick={handleExportCustomers} className="bg-orange-500 hover:bg-orange-600 text-black font-black text-xs py-4 px-3 rounded-2xl flex items-center justify-center gap-2 active:scale-95 transition-all uppercase shadow-md">
+              <button onClick={handleExportCustomers} className="bg-orange-500 hover:bg-orange-600 text-black font-black text-xs py-4 px-3 rounded-2xl flex items-center justify-center gap-2 active:scale-95 transition-all uppercase shadow-md border border-orange-400/10">
                 <Download size={14}/> Customer List Excel
               </button>
             </div>
@@ -728,7 +722,7 @@ export default function AdminDashboard() {
             </div>
 
             {/* Permanent Orders Ledger */}
-            <div className="space-y-4">
+            <div className="space-y-4 font-sans">
               <h4 className="text-sm font-black text-gray-400 uppercase tracking-widest pt-2">📚 Permanent Financial Ledger</h4>
               {orders.length === 0 ? (
                 <p className="text-center text-gray-600 py-12 text-xs uppercase font-bold tracking-widest">No transaction data logged...</p>
@@ -896,8 +890,8 @@ export default function AdminDashboard() {
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-gray-400 uppercase">Category</label>
                   <select value={editCategory} onChange={(e) => setEditCategory(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" required>
-                    {categoryOptions.filter(c => c !== "All").map(cat => (
-                      <option key={cat} value={cat} className="bg-[#111]">{cat}</option>
+                    {categories.filter(c => c.name !== "All").map(cat => (
+                      <option key={cat.id} value={cat.name} className="bg-[#111]">{cat.name}</option>
                     ))}
                   </select>
                 </div>
@@ -975,7 +969,7 @@ export default function AdminDashboard() {
                     <div className="flex items-center gap-2">
                       <button onClick={() => startEditing(item)} className="p-3 bg-blue-500/10 text-blue-500 rounded-xl hover:bg-blue-500/20 active:scale-90 transition-all"><Edit size={18}/></button>
                       
-                      {/* --- CORECTED ITEM HIDE UNHIDE TOGGLE (Eye/EyeOff) --- */}
+                      {/* --- CORRECTED ITEM HIDE UNHIDE TOGGLE (Eye/EyeOff) --- */}
                       <button onClick={() => toggleItemVisibility(item.id, item.isVisible !== false)} className={`p-3 rounded-xl transition-all ${item.isVisible !== false ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
                         {item.isVisible !== false ? <Eye size={18}/> : <EyeOff size={18}/>}
                       </button>
@@ -1000,6 +994,7 @@ export default function AdminDashboard() {
               <button type="submit" className="w-full bg-green-600 text-white p-4 rounded-xl font-black text-sm uppercase active:scale-95 transition-all">Add Category</button>
             </form>
 
+            {/* Dynamic Category List */}
             <div className="space-y-3">
               <p className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">Category List ({categories.length})</p>
               {categories.length === 0 ? (
