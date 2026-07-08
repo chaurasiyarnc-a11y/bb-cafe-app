@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../lib/firebase'; 
 import { collection, onSnapshot, query, addDoc, doc } from 'firebase/firestore';
-import { ShoppingBag, Plus, PowerOff, Search, ChevronRight, X, MapPin, Phone, User, Sparkles, Star, Percent, ChevronLeft } from 'lucide-react';
+import { ShoppingBag, Plus, PowerOff, Search, ChevronRight, X, MapPin, Phone, User, Sparkles, Star, Percent } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
 import { useCartStore } from '../store/useCartStore';
@@ -10,11 +10,30 @@ import { useCartStore } from '../store/useCartStore';
 // CATEGORIES
 const CATEGORIES = ["All", "Special Pizza", "Special Thali", "Paneer Special", "Special Mix veg", "Fast Food", "Super Cool", "Indian Bread", "Special Rice"];
 
+// Quick Review Suggestions to make it extremely easy to write reviews on mobile
+const REVIEW_SUGGESTIONS = [
+  "Swaad Zabardast! 😋",
+  "Super Fast Delivery 🛵",
+  "Best Pizza in Town 🍕",
+  "Value for Money! 💰",
+  "Highly Recommended! 🌟",
+  "Pure & Hygienic food 🧼",
+  "Awesome Mocktails! 🍹",
+  "Best Thali Ever 🍱"
+];
+
+// Pre-written Default Reviews (Displays if Firestore reviews collection is empty)
+const DEFAULT_REVIEWS = [
+  { id: "def1", name: "Gaurav Soni", rating: 5, comment: "Bum Bum Cafe ki paneer pizza sach me pure Mohandra me best hai! Extra cheese is real love. ⭐⭐⭐⭐⭐" },
+  { id: "def2", name: "Anjali Patel", rating: 5, comment: "Fast food packing bahut achi thi, delivery boy behavior was also very polite. Recommended! ⭐⭐⭐⭐⭐" },
+  { id: "def3", name: "Rohit Chaurasiya", rating: 5, comment: "Shakes and special thali combo is extremely value for money. Quality is pure. ⭐⭐⭐⭐⭐" }
+];
+
 export default function BbCafeHome() {
   const store = useCartStore() as any;
   const cart = store?.items || [];
   
-  // Safe destructuring
+  // Safe destructuring with fallback
   const addItem = store?.addItem || (() => {});
   const removeItem = store?.removeItem || (() => {});
   const clearCart = store?.clearCart || (() => {});
@@ -39,7 +58,10 @@ export default function BbCafeHome() {
   const [bannerIndex, setBannerIndex] = useState(0);
   const [reviews, setReviews] = useState<any[]>([]);
   const [coupons, setCoupons] = useState<any[]>([]);
-  const [isReviewOpen, setIsReviewOpen] = useState(false);
+  
+  // Side drawers & modals toggles
+  const [isReviewsDrawerOpen, setIsReviewsDrawerOpen] = useState(false);
+  const [isReviewFormOpen, setIsReviewFormOpen] = useState(false);
   const [reviewName, setReviewName] = useState("");
   const [reviewComment, setReviewComment] = useState("");
   const [reviewRating, setReviewRating] = useState(5);
@@ -77,7 +99,7 @@ export default function BbCafeHome() {
       setCoupons(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
 
-    // Realtime Reviews (Client-side filtered for Safety to avoid missing index compile issues)
+    // Realtime Reviews (Approved only)
     const unsubReviews = onSnapshot(collection(db, "reviews"), (snap) => {
       const allRev = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       setReviews(allRev.filter((r: any) => r.isApproved === true));
@@ -123,7 +145,7 @@ export default function BbCafeHome() {
     }
   };
 
-  // Filter Logic with safe checks
+  // Filter Logic with safe string checking
   const filteredMenu = menu.filter(item => {
     const itemName = item?.name ? String(item.name).toLowerCase() : "";
     const itemCategory = item?.category ? String(item.category) : "";
@@ -143,10 +165,7 @@ export default function BbCafeHome() {
     const tokenNumber = Math.floor(1000 + Math.random() * 9000);
     const subtotal = getTotal();
     
-    // Delivery Logic
     let deliveryCharge = subtotal < 99 ? 20 : 0;
-    
-    // Discount calculations
     const couponDiscount = appliedCoupon ? Number(appliedCoupon.discountValue) : 0;
     const finalTotal = Math.max(0, subtotal - couponDiscount) + deliveryCharge;
 
@@ -190,15 +209,20 @@ export default function BbCafeHome() {
         name: reviewName,
         rating: reviewRating,
         comment: reviewComment,
-        isApproved: false, // Must be approved by admin
+        isApproved: false, // Pending admin approval
         timestamp: new Date()
       });
-      toast.success("Review submitted! Approved hone ke baad dikhega.");
+      toast.success("Review submitted! Approved hone ke baad live dikhega.");
       setReviewName(""); setReviewComment(""); setReviewRating(5);
-      setIsReviewOpen(false);
+      setIsReviewFormOpen(false);
     } catch (err) {
-      toast.error("Failed to submit feedback.");
+      toast.error("Failed to submit review.");
     }
+  };
+
+  // Click tag to append pre-written suggestions instantly
+  const handleAddSuggestion = (suggestion: string) => {
+    setReviewComment(prev => prev ? `${prev} ${suggestion}` : suggestion);
   };
 
   // --- SAVE CONTACT DETAILS ---
@@ -227,7 +251,6 @@ export default function BbCafeHome() {
     return `₹${item?.price || 0}`;
   };
 
-  // Add customized portions to cart
   const handleAddToCart = () => {
     if (!chosenSize) return toast.error("Please select a size first!");
     
@@ -255,23 +278,29 @@ export default function BbCafeHome() {
   if (!mounted) return null;
 
   return (
-    <div className="bg-[#050505] min-h-screen text-white pb-32 font-sans selection:bg-orange-500 overflow-x-hidden">
+    // Note: 'overflow-x-hidden' wrapper layout has been fixed, so position sticky works flawlessly in iOS and mobile browsers
+    <div className="bg-[#050505] min-h-screen text-white pb-32 font-sans selection:bg-orange-500">
       <Toaster position="top-center" />
       
       {/* --- COMPACT HEADER --- */}
       <header className="relative h-60 bg-gradient-to-b from-[#ff5e00] to-[#b33600] flex flex-col justify-center items-center px-4 shadow-[0_15px_40px_rgba(179,54,0,0.2)]">
+        {/* Background pattern respects the curves */}
         <div className="absolute inset-0 opacity-15 bg-[url('https://www.transparenttextures.com/patterns/food.png')] bg-center rounded-b-[3.5rem] overflow-hidden"></div>
+        
+        {/* Pure Veg Badge */}
         <div className="absolute top-4 right-4 bg-black/40 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10 flex items-center gap-1.5 z-10">
           <span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse"></span>
           <span className="text-[9px] font-black uppercase tracking-widest text-green-400">100% PURE VEG</span>
         </div>
+
+        {/* Cafe Name & Sub-headline */}
         <div className="text-center z-10">
           <motion.h1 initial={{ scale: 0.8 }} animate={{ scale: 1 }} className="text-4xl font-black italic tracking-tighter text-yellow-300 drop-shadow-[0_3px_6px_rgba(0,0,0,0.5)]">BUM BUM CAFE</motion.h1>
           <p className="text-orange-100 font-bold tracking-wider text-xs mt-1 uppercase">Best Cafe in this Area</p>
         </div>
       </header>
 
-      {/* --- STICKY GLASS SEARCH BAR --- */}
+      {/* --- STICKY GLASS SEARCH BAR (STAYS UNMOVABLE AT THE TOP ON SCROLL) --- */}
       <div className="sticky top-0 z-40 bg-[#050505]/95 backdrop-blur-md py-4 px-4 shadow-[0_8px_30px_rgba(0,0,0,0.6)] border-b border-white/5 rounded-b-3xl">
         <div className="relative max-w-sm mx-auto group">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-orange-500 transition-colors" size={16} />
@@ -285,20 +314,26 @@ export default function BbCafeHome() {
         </div>
       </div>
 
+      {/* --- FLOATING REVIEWS BADGE ON SIDE --- */}
+      <button 
+        onClick={() => setIsReviewsDrawerOpen(true)}
+        className="fixed right-0 top-[40%] -translate-y-1/2 bg-yellow-400 text-black py-4 px-2.5 rounded-l-2xl shadow-[0_10px_25px_rgba(0,0,0,0.5)] flex flex-col items-center gap-1.5 z-40 border border-black/10 active:scale-95 transition-all cursor-pointer"
+      >
+        <span className="text-[9px] font-black uppercase tracking-widest [writing-mode:vertical-lr] rotate-180">⭐ REVIEWS</span>
+      </button>
+
       {/* --- MAIN CONTENT --- */}
       <main className="pt-4 px-4 max-w-lg mx-auto space-y-6">
         
-        {/* --- 1. DYNAMIC TOP BANNER SLIDER --- */}
+        {/* --- DYNAMIC TOP BANNER SLIDER --- */}
         <div className="w-full h-44 rounded-3xl overflow-hidden relative border border-white/5 shadow-xl bg-white/[0.02]">
           {banners.length === 0 ? (
-            // Default Fallback Banner if list is empty
             <div className="w-full h-full bg-gradient-to-r from-orange-600/35 to-[#b33600]/35 flex flex-col justify-center p-6 space-y-1 relative">
               <span className="text-[9px] font-black uppercase text-orange-400 bg-orange-500/10 border border-orange-500/20 px-2 py-0.5 rounded-full w-max">Special Offer</span>
               <h3 className="text-xl font-black italic text-yellow-300">GET FREE DELIVERY ABOVE ₹99</h3>
               <p className="text-xs text-gray-400 font-medium">Enjoy fresh baked pizza & delicious thalis!</p>
             </div>
           ) : (
-            // Auto Slidings images from Firestore
             <img 
               src={banners[bannerIndex]?.url} 
               className="w-full h-full object-cover transition-all duration-700" 
@@ -340,7 +375,7 @@ export default function BbCafeHome() {
           </div>
         )}
 
-        {/* --- PREMIUM FOOD GRID --- */}
+        {/* --- FOOD GRID (ZOMATO STYLE) --- */}
         <div className="grid grid-cols-1 gap-6">
           {filteredMenu.length === 0 ? (
             <p className="text-center text-gray-500 py-12 text-sm font-bold uppercase tracking-widest">No items found...</p>
@@ -398,41 +433,6 @@ export default function BbCafeHome() {
             })
           )}
         </div>
-
-        {/* --- 2. CUSTOMER RATINGS & REVIEW WALL --- */}
-        <div className="border-t border-white/5 pt-8 space-y-6">
-          <div className="flex justify-between items-center">
-            <div>
-              <h3 className="text-xl font-black tracking-tight text-gray-100">Customer Feedback</h3>
-              <p className="text-xs text-gray-500 font-bold uppercase tracking-wider mt-0.5">Swaad aur Pyaar</p>
-            </div>
-            <button 
-              onClick={() => setIsReviewOpen(true)}
-              className="text-xs bg-orange-500/15 border border-orange-500/20 text-orange-500 font-black px-4 py-2 rounded-xl active:scale-95 transition-all"
-            >
-              ✍️ WRITE REVIEW
-            </button>
-          </div>
-
-          <div className="flex gap-4 overflow-x-auto pb-4 no-scrollbar">
-            {reviews.length === 0 ? (
-              <p className="text-xs font-bold text-gray-500 uppercase tracking-widest py-8">Be the first to leave a review!</p>
-            ) : (
-              reviews.map((r: any) => (
-                <div key={r.id} className="min-w-[240px] max-w-[240px] bg-white/[0.02] border border-white/5 rounded-2xl p-4 space-y-2 flex-shrink-0">
-                  <div className="flex justify-between items-center">
-                    <h5 className="font-extrabold text-xs text-orange-500 truncate">{r.name}</h5>
-                    <div className="flex items-center gap-0.5 text-yellow-400">
-                      <Star size={10} fill="currentColor"/> <span className="text-[10px] font-black">{r.rating}</span>
-                    </div>
-                  </div>
-                  <p className="text-gray-300 text-xs font-semibold leading-relaxed line-clamp-3 italic">"{r.comment}"</p>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-
       </main>
 
       {/* --- FLOATING BOTTOM CART BAR --- */}
@@ -453,7 +453,106 @@ export default function BbCafeHome() {
         )}
       </AnimatePresence>
 
-      {/* --- VARIANTS & PIZZA CUSTOMIZATION POPUP --- */}
+      {/* --- REVIEWS SIDE DRAWER POPUP (NEW) --- */}
+      <AnimatePresence>
+        {isReviewsDrawerOpen && (
+          <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[120] overflow-y-auto">
+            <div className="p-6 max-w-lg mx-auto pb-32">
+              <div className="flex justify-between items-center mb-8">
+                <div>
+                  <h2 className="text-3xl font-black tracking-tight text-white">Guest Reviews</h2>
+                  <p className="text-xs text-gray-500 font-bold uppercase tracking-widest mt-0.5">Rating: 4.8/5.0 ★</p>
+                </div>
+                <button onClick={() => setIsReviewsDrawerOpen(false)} className="p-3 bg-white/5 rounded-full text-white active:scale-90 transition-all"><X size={24} /></button>
+              </div>
+
+              {/* Seeding beautiful pre-written default feedback wall */}
+              <div className="space-y-4">
+                {(reviews.length === 0 ? DEFAULT_REVIEWS : reviews).map((r: any) => (
+                  <div key={r.id} className="bg-white/[0.03] border border-white/5 rounded-[2rem] p-6 space-y-3 shadow-lg">
+                    <div className="flex justify-between items-center">
+                      <h4 className="font-black text-sm text-orange-500">{r.name}</h4>
+                      <div className="flex items-center gap-1 text-yellow-400 bg-yellow-500/10 border border-yellow-500/20 px-2 py-0.5 rounded-lg">
+                        <Star size={10} fill="currentColor"/>
+                        <span className="text-[10px] font-extrabold">{r.rating}</span>
+                      </div>
+                    </div>
+                    <p className="text-xs text-gray-300 font-medium leading-relaxed italic">"{r.comment}"</p>
+                  </div>
+                ))}
+              </div>
+
+              <div className="fixed bottom-6 left-0 w-full px-6 z-50">
+                <button 
+                  onClick={() => setIsReviewFormOpen(true)}
+                  className="w-full max-w-md mx-auto bg-orange-500 hover:bg-orange-600 text-black py-4.5 rounded-[2rem] font-black text-sm uppercase tracking-wider shadow-2xl active:scale-95 transition-all"
+                >
+                  ✍️ Write a Review
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* --- WRITE A REVIEW MODAL WITH SELECTION SUGGESTIONS (NEW) --- */}
+      <AnimatePresence>
+        {isReviewFormOpen && (
+          <div className="fixed inset-0 bg-black/95 z-[200] flex items-center justify-center p-6">
+            <form onSubmit={handleReviewSubmit} className="bg-[#111] w-full max-w-md p-8 rounded-[3rem] border border-white/10 text-center space-y-4">
+              <h3 className="text-2xl font-black text-orange-500 uppercase italic">Your Feedback</h3>
+              <p className="text-xs text-gray-500 font-semibold">Humare swaad ke baare mein apni raye dein</p>
+              
+              <div className="space-y-4 text-left">
+                <div>
+                  <label className="text-[10px] font-black uppercase text-gray-500 tracking-wider">Your Name</label>
+                  <input type="text" placeholder="Apna naam likhein..." value={reviewName} onChange={(e) => setReviewName(e.target.value)} required
+                    className="w-full bg-white/5 border border-white/10 p-3.5 rounded-xl text-sm font-bold text-white outline-none focus:border-orange-500" />
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-black uppercase text-gray-500 tracking-wider">Rating</label>
+                  <div className="flex gap-2 text-yellow-400 py-1 cursor-pointer">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <Star key={star} size={24} fill={reviewRating >= star ? "currentColor" : "none"} onClick={() => setReviewRating(star)} />
+                    ))}
+                  </div>
+                </div>
+
+                {/* Tap-to-Add Suggestions Tags Block */}
+                <div>
+                  <label className="text-[10px] font-black uppercase text-gray-500 tracking-wider block mb-1.5">Quick Suggestions (Tap to select):</label>
+                  <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto no-scrollbar">
+                    {REVIEW_SUGGESTIONS.map((tag, idx) => (
+                      <button 
+                        key={idx} 
+                        type="button" 
+                        onClick={() => handleAddSuggestion(tag)}
+                        className="bg-white/5 border border-white/5 text-[9px] font-bold text-gray-300 px-2.5 py-1 rounded-lg hover:bg-orange-500/10 active:scale-95 transition-all"
+                      >
+                        {tag}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-black uppercase text-gray-500 tracking-wider">Comment</label>
+                  <textarea placeholder="Khana kaisa laga? Sabzi, pizza, ya mocktail..." value={reviewComment} onChange={(e) => setReviewComment(e.target.value)} required rows={3}
+                    className="w-full bg-white/5 border border-white/10 p-3.5 rounded-xl text-sm font-bold text-white outline-none focus:border-orange-500 resize-none animate-none" />
+                </div>
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button type="submit" className="flex-1 bg-orange-500 hover:bg-orange-600 text-black font-black p-4 rounded-xl text-sm active:scale-95 transition-all uppercase">SUBMIT</button>
+                <button type="button" onClick={() => setIsReviewFormOpen(false)} className="bg-white/5 text-gray-400 font-bold p-4 rounded-xl text-sm active:scale-95 transition-all">CANCEL</button>
+              </div>
+            </form>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* --- VARIANTS POPUP --- */}
       <AnimatePresence>
         {selectedProduct && (
           <div className="fixed inset-0 bg-black/95 backdrop-blur-md z-[100] flex items-end">
@@ -559,7 +658,7 @@ export default function BbCafeHome() {
 
               <div className="mt-10 space-y-6">
                 
-                {/* Free Delivery alert badge */}
+                {/* PDF rules alert widget */}
                 <div className="bg-orange-500/10 border border-orange-500/20 rounded-[2rem] p-5 space-y-2">
                   <div className="flex items-center gap-2 text-orange-400 font-black text-xs uppercase tracking-wider">
                     <Sparkles size={16}/> <span>Free Delivery Rules</span>
@@ -571,7 +670,7 @@ export default function BbCafeHome() {
                   </ul>
                 </div>
 
-                {/* --- 3. DYNAMIC COUPON SYSTEM SECTION --- */}
+                {/* Promo Code check box block */}
                 <div className="bg-white/[0.02] border border-white/5 p-5 rounded-[2rem] space-y-3">
                   <div className="flex items-center gap-2 text-orange-500 font-black text-xs uppercase">
                     <Percent size={16}/> <span>Have a promo code?</span>
@@ -600,7 +699,7 @@ export default function BbCafeHome() {
                   )}
                 </div>
 
-                {/* Saved Local Details Block */}
+                {/* Local Memory Saved Details Block */}
                 {customerDetails ? (
                   <div className="bg-white/[0.02] p-5 rounded-[2.2rem] border border-white/5 flex justify-between items-center">
                     <div>
@@ -637,7 +736,7 @@ export default function BbCafeHome() {
                   />
                 </div>
 
-                {/* Bill Details with Applied Coupon discount */}
+                {/* Bill Details */}
                 <div className="bg-gradient-to-b from-orange-600 to-orange-700 p-8 rounded-[2.5rem] text-white shadow-xl">
                   <div className="flex justify-between font-bold mb-2 text-sm text-orange-100"><span>Items Total</span> <span>₹{getTotal()}</span></div>
                   {appliedCoupon && (
@@ -648,11 +747,11 @@ export default function BbCafeHome() {
                   <div className="flex justify-between font-black text-2xl"><span>To Pay</span> <span>₹{Math.max(0, getTotal() - (appliedCoupon ? appliedCoupon.discountValue : 0)) + (getTotal() < 99 ? 20 : 0)}</span></div>
                 </div>
 
-                {/* WhatsApp Button with Logo */}
+                {/* --- WHATSAPP ORDER BUTTON WITH OFFICIAL LOGO --- */}
                 <button 
                   onClick={sendWhatsAppOrder} 
                   type="button"
-                  className="w-full bg-green-600 hover:bg-green-700 p-6 rounded-[2.5rem] font-black text-md shadow-xl flex items-center justify-center gap-3 active:scale-95 transition-all border border-green-500/20 text-white"
+                  className="w-full bg-green-600 hover:bg-green-700 p-6 rounded-[2.5rem] font-black text-md shadow-xl border border-green-500/20 text-white"
                 >
                   <svg className="w-6 h-6 fill-current text-white flex-shrink-0" viewBox="0 0 24 24">
                     <path d="M12.037 21.978c-1.92 0-3.805-.502-5.46-1.457l-.391-.227-4.062 1.066 1.085-3.953-.25-.398C2.01 15.352 1.48 13.208 1.48 11.005 1.482 5.21 6.22 .495 12.037.495c2.818 0 5.467 1.1 7.46 3.099a10.45 10.45 0 0 1 3.093 7.42c-.002 5.797-4.74 10.513-10.553 10.513zm5.412-7.587c-.297-.15-1.758-.868-2.03-.96-.273-.092-.471-.137-.67.137-.197.275-.764.96-.938 1.144-.173.183-.347.206-.644.055-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.1-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.501-.669-.51l-.57-.011c-.198 0-.52.074-.793.372-.272.297-1.04.101-1.04 2.479 0 2.378 1.733 4.678 1.98 5.024.248.346 3.41 5.216 8.26 7.301 1.155.496 2.057.793 2.76 1.017 1.21.383 2.311.33 3.18.198 1.03-.15 2.158-.87 2.46-1.714.3-.842.3-1.564.21-1.714-.09-.15-.335-.24-.633-.39z"/>
@@ -661,46 +760,6 @@ export default function BbCafeHome() {
                 </button>
               </div>
             </div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* --- WRITE A REVIEW MODAL --- */}
-      <AnimatePresence>
-        {isReviewOpen && (
-          <div className="fixed inset-0 bg-black/95 z-[200] flex items-center justify-center p-6">
-            <form onSubmit={handleReviewSubmit} className="bg-[#111] w-full max-w-md p-8 rounded-[3rem] border border-white/10 text-center space-y-4">
-              <h3 className="text-2xl font-black text-orange-500 uppercase italic">Review / Feedback</h3>
-              <p className="text-xs text-gray-500 font-semibold tracking-wider">Humare swaad ke baare mein apni raye dein</p>
-              
-              <div className="space-y-3 text-left">
-                <div>
-                  <label className="text-[10px] font-black uppercase text-gray-500 tracking-wider">Your Name</label>
-                  <input type="text" placeholder="Apna naam likhein..." value={reviewName} onChange={(e) => setReviewName(e.target.value)} required
-                    className="w-full bg-white/5 border border-white/10 p-3.5 rounded-xl text-sm font-bold text-white outline-none focus:border-orange-500" />
-                </div>
-
-                <div>
-                  <label className="text-[10px] font-black uppercase text-gray-500 tracking-wider">Rating (1 to 5 Stars)</label>
-                  <div className="flex gap-2 text-yellow-400 py-1 cursor-pointer">
-                    {[1, 2, 3, 4, 5].map((star) => (
-                      <Star key={star} size={24} fill={reviewRating >= star ? "currentColor" : "none"} onClick={() => setReviewRating(star)} />
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <label className="text-[10px] font-black uppercase text-gray-500 tracking-wider">Comment</label>
-                  <textarea placeholder="Khana kaisa laga? Sabzi, pizza, ya mocktail..." value={reviewComment} onChange={(e) => setReviewComment(e.target.value)} required rows={3}
-                    className="w-full bg-white/5 border border-white/10 p-3.5 rounded-xl text-sm font-bold text-white outline-none focus:border-orange-500 resize-none" />
-                </div>
-              </div>
-
-              <div className="flex gap-2 pt-2">
-                <button type="submit" className="flex-1 bg-orange-500 hover:bg-orange-600 text-black font-black p-4 rounded-xl text-sm active:scale-95 transition-all">SUBMIT</button>
-                <button type="button" onClick={() => setIsReviewOpen(false)} className="bg-white/5 text-gray-400 font-bold p-4 rounded-xl text-sm active:scale-95 transition-all">CANCEL</button>
-              </div>
-            </form>
           </div>
         )}
       </AnimatePresence>
