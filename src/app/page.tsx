@@ -10,6 +10,19 @@ import { useCartStore } from '../store/useCartStore';
 // CATEGORIES
 const CATEGORIES = ["All", "Special Pizza", "Special Thali", "Paneer Special", "Special Mix veg", "Fast Food", "Super Cool", "Indian Bread", "Special Rice"];
 
+// Beautiful round category icons mapped for Zomato-style circular grid
+const CATEGORY_IMAGES: { [key: string]: string } = {
+  "All": "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=150&q=80",
+  "Special Pizza": "https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=150&q=80",
+  "Special Thali": "https://images.unsplash.com/photo-1626777552726-4a6b54c97e46?auto=format&fit=crop&w=150&q=80",
+  "Paneer Special": "https://images.unsplash.com/photo-1631452180519-c014fe946bc7?auto=format&fit=crop&w=150&q=80",
+  "Special Mix veg": "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=150&q=80",
+  "Fast Food": "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=150&q=80",
+  "Super Cool": "https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?auto=format&fit=crop&w=150&q=80",
+  "Indian Bread": "https://images.unsplash.com/photo-1589301760014-d929f3979dbc?auto=format&fit=crop&w=150&q=80",
+  "Special Rice": "https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?auto=format&fit=crop&w=150&q=80"
+};
+
 // Quick Review Suggestions to make it extremely easy to write reviews on mobile
 const REVIEW_SUGGESTIONS = [
   "Swaad Zabardast! 😋",
@@ -33,7 +46,7 @@ export default function BbCafeHome() {
   const store = useCartStore() as any;
   const cart = store?.items || [];
   
-  // Safe destructuring with fallback
+  // Safe destructuring
   const addItem = store?.addItem || (() => {});
   const removeItem = store?.removeItem || (() => {});
   const clearCart = store?.clearCart || (() => {});
@@ -56,6 +69,9 @@ export default function BbCafeHome() {
   // --- NEW FEATURES STATES ---
   const [banners, setBanners] = useState<any[]>([]);
   const [bannerIndex, setBannerIndex] = useState(0);
+  const [bannerError, setBannerError] = useState(false);
+  const [showAllCategories, setShowAllCategories] = useState(false); // See more/less toggle
+  
   const [reviews, setReviews] = useState<any[]>([]);
   const [coupons, setCoupons] = useState<any[]>([]);
   
@@ -130,6 +146,11 @@ export default function BbCafeHome() {
     }, 4000);
     return () => clearInterval(interval);
   }, [banners]);
+
+  // Reset banner error state when sliding
+  useEffect(() => {
+    setBannerError(false);
+  }, [bannerIndex]);
 
   const getTotal = () => cart.reduce((acc: number, i: any) => acc + (i.price * i.quantity), 0);
 
@@ -327,7 +348,7 @@ export default function BbCafeHome() {
         
         {/* --- DYNAMIC TOP BANNER SLIDER --- */}
         <div className="w-full h-44 rounded-3xl overflow-hidden relative border border-white/5 shadow-xl bg-white/[0.02]">
-          {banners.length === 0 ? (
+          {(banners.length === 0 || bannerError) ? (
             <div className="w-full h-full bg-gradient-to-r from-orange-600/35 to-[#b33600]/35 flex flex-col justify-center p-6 space-y-1 relative">
               <span className="text-[9px] font-black uppercase text-orange-400 bg-orange-500/10 border border-orange-500/20 px-2 py-0.5 rounded-full w-max">Special Offer</span>
               <h3 className="text-xl font-black italic text-yellow-300">GET FREE DELIVERY ABOVE ₹99</h3>
@@ -336,11 +357,12 @@ export default function BbCafeHome() {
           ) : (
             <img 
               src={banners[bannerIndex]?.url} 
+              onError={() => setBannerError(true)}
               className="w-full h-full object-cover transition-all duration-700" 
               alt="Promo Banner" 
             />
           )}
-          {banners.length > 1 && (
+          {banners.length > 1 && !bannerError && (
             <div className="absolute bottom-3 right-4 flex gap-1.5 z-10">
               {banners.map((_, i) => (
                 <span key={i} className={`h-1.5 w-1.5 rounded-full transition-all ${bannerIndex === i ? 'bg-orange-500 w-3' : 'bg-white/20'}`} />
@@ -349,34 +371,57 @@ export default function BbCafeHome() {
           )}
         </div>
 
-        {/* Categories sliding menu */}
-        <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar pt-2">
-          {CATEGORIES.map((cat) => (
-            <button 
-              key={cat} 
-              onClick={() => setSelectedCategory(cat)}
-              className={`px-5 py-3 rounded-2xl whitespace-nowrap text-xs font-black tracking-wide uppercase transition-all duration-300 border ${
-                selectedCategory === cat 
-                  ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-lg border-orange-500/50 scale-105' 
-                  : 'bg-white/[0.03] text-gray-400 border-white/5'
-              }`}
-            >
-              {cat}
-            </button>
-          ))}
+        {/* --- ZOMATO STYLE CIRCULAR CATEGORIES INSPIRATION GRID (WITH EXPANDABLE SEE MORE) --- */}
+        <div className="bg-white/[0.01] border border-white/5 p-5 rounded-[2.5rem] shadow-xl space-y-4">
+          <p className="text-[9px] font-black uppercase tracking-widest text-orange-500">Inspiration for your first order</p>
+          
+          <div className="grid grid-cols-4 gap-x-2 gap-y-5 text-center">
+            {(showAllCategories ? CATEGORIES : CATEGORIES.slice(0, 8)).map((cat) => {
+              const isActive = selectedCategory === cat;
+              return (
+                <button 
+                  key={cat} 
+                  onClick={() => setSelectedCategory(cat)}
+                  type="button"
+                  className="flex flex-col items-center group outline-none"
+                >
+                  {/* Circle Image Wrapper */}
+                  <div className={`w-16 h-16 rounded-full overflow-hidden border-2 transition-all duration-300 ${
+                    isActive 
+                      ? 'border-orange-500 scale-105 shadow-[0_4px_12px_rgba(239,68,68,0.25)]' 
+                      : 'border-white/10 group-hover:border-white/30'
+                  }`}>
+                    <img 
+                      src={CATEGORY_IMAGES[cat] || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=150&q=80"} 
+                      className="w-full h-full object-cover transition-transform group-hover:scale-110 duration-300" 
+                      alt={cat} 
+                    />
+                  </div>
+                  
+                  {/* Category Name (Shortened to fit circle perfectly) */}
+                  <span className={`text-[10px] font-black uppercase tracking-wide mt-2 max-w-full truncate px-1 transition-colors leading-tight ${
+                    isActive ? 'text-orange-500' : 'text-gray-400 group-hover:text-white'
+                  }`}>
+                    {cat === "All" ? "All" : cat.replace("Special ", "").replace(" Special", "")}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Zomato-style See More / See Less toggler button */}
+          <button 
+            type="button"
+            onClick={() => setShowAllCategories(!showAllCategories)}
+            className="w-full py-2.5 bg-white/5 hover:bg-white/10 border border-white/5 rounded-2xl text-[10px] font-black text-gray-400 uppercase active:scale-95 transition-all flex items-center justify-center gap-1.5"
+          >
+            <span>{showAllCategories ? "See Less" : "See More"}</span>
+            <span className="text-[8px]">{showAllCategories ? "▲" : "▼"}</span>
+          </button>
         </div>
 
-        {/* Store Closed Banner */}
-        {!storeOpen && (
-          <div className="bg-red-500/10 text-red-400 p-6 rounded-[2.5rem] border border-red-500/20 text-center mb-4 shadow-xl">
-            <PowerOff className="mx-auto mb-2 text-red-500" size={28} />
-            <h3 className="font-black text-lg uppercase italic tracking-wider">Cafe Closed Now</h3>
-            <p className="text-[11px] opacity-80 mt-1">Accepting orders tomorrow morning!</p>
-          </div>
-        )}
-
-        {/* --- FOOD GRID (ZOMATO STYLE) --- */}
-        <div className="grid grid-cols-1 gap-6">
+        {/* --- PREMIUM FOOD GRID --- */}
+        <div className="grid grid-cols-1 gap-6 pt-2">
           {filteredMenu.length === 0 ? (
             <p className="text-center text-gray-500 py-12 text-sm font-bold uppercase tracking-widest">No items found...</p>
           ) : (
@@ -453,7 +498,7 @@ export default function BbCafeHome() {
         )}
       </AnimatePresence>
 
-      {/* --- REVIEWS SIDE DRAWER POPUP (NEW) --- */}
+      {/* --- REVIEWS SIDE DRAWER POPUP (NEW DESIGN) --- */}
       <AnimatePresence>
         {isReviewsDrawerOpen && (
           <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[120] overflow-y-auto">
@@ -466,7 +511,7 @@ export default function BbCafeHome() {
                 <button onClick={() => setIsReviewsDrawerOpen(false)} className="p-3 bg-white/5 rounded-full text-white active:scale-90 transition-all"><X size={24} /></button>
               </div>
 
-              {/* Seeding beautiful pre-written default feedback wall */}
+              {/* Display reviews (or defaults if empty) */}
               <div className="space-y-4">
                 {(reviews.length === 0 ? DEFAULT_REVIEWS : reviews).map((r: any) => (
                   <div key={r.id} className="bg-white/[0.03] border border-white/5 rounded-[2rem] p-6 space-y-3 shadow-lg">
@@ -495,7 +540,7 @@ export default function BbCafeHome() {
         )}
       </AnimatePresence>
 
-      {/* --- WRITE A REVIEW MODAL WITH SELECTION SUGGESTIONS (NEW) --- */}
+      {/* --- WRITE A REVIEW MODAL WITH SELECTION SUGGESTIONS --- */}
       <AnimatePresence>
         {isReviewFormOpen && (
           <div className="fixed inset-0 bg-black/95 z-[200] flex items-center justify-center p-6">
@@ -519,7 +564,7 @@ export default function BbCafeHome() {
                   </div>
                 </div>
 
-                {/* Tap-to-Add Suggestions Tags Block */}
+                {/* Click suggestions to add review instantly without typing */}
                 <div>
                   <label className="text-[10px] font-black uppercase text-gray-500 tracking-wider block mb-1.5">Quick Suggestions (Tap to select):</label>
                   <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto no-scrollbar">
@@ -670,7 +715,7 @@ export default function BbCafeHome() {
                   </ul>
                 </div>
 
-                {/* Promo Code check box block */}
+                {/* Promo Code Coupon block */}
                 <div className="bg-white/[0.02] border border-white/5 p-5 rounded-[2rem] space-y-3">
                   <div className="flex items-center gap-2 text-orange-500 font-black text-xs uppercase">
                     <Percent size={16}/> <span>Have a promo code?</span>
