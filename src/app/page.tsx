@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../lib/firebase'; 
 import { collection, onSnapshot, query, addDoc, doc } from 'firebase/firestore';
-import { ShoppingBag, Plus, PowerOff, Search, ChevronRight, X, MapPin, Phone, User, Sparkles } from 'lucide-react';
+import { ShoppingBag, Plus, PowerOff, Search, ChevronRight, X, MapPin, Phone, User, Sparkles, Star, Percent, ChevronLeft } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
 import { useCartStore } from '../store/useCartStore';
@@ -34,7 +34,21 @@ export default function BbCafeHome() {
   const [address, setAddress] = useState("");
   const [selectedProduct, setSelectedProduct] = useState<any>(null); 
 
-  // --- PIZZA & PORTIONS SELECTION STATES ---
+  // --- NEW FEATURES STATES ---
+  const [banners, setBanners] = useState<any[]>([]);
+  const [bannerIndex, setBannerIndex] = useState(0);
+  const [reviews, setReviews] = useState<any[]>([]);
+  const [coupons, setCoupons] = useState<any[]>([]);
+  const [isReviewOpen, setIsReviewOpen] = useState(false);
+  const [reviewName, setReviewName] = useState("");
+  const [reviewComment, setReviewComment] = useState("");
+  const [reviewRating, setReviewRating] = useState(5);
+  
+  // Coupon checkout states
+  const [enteredCoupon, setEnteredCoupon] = useState("");
+  const [appliedCoupon, setAppliedCoupon] = useState<any>(null);
+
+  // Pizza customization states
   const [chosenSize, setChosenSize] = useState<string>("");
   const [chosenPrice, setChosenPrice] = useState<number>(0);
   const [addonCheese, setAddonCheese] = useState(false);
@@ -53,6 +67,22 @@ export default function BbCafeHome() {
       setMenu(items.filter((i: any) => i.isVisible !== false));
     });
 
+    // Realtime Banners List
+    const unsubBanners = onSnapshot(collection(db, "banners"), (snap) => {
+      setBanners(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+
+    // Realtime Coupons List
+    const unsubCoupons = onSnapshot(collection(db, "coupons"), (snap) => {
+      setCoupons(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+
+    // Realtime Reviews (Client-side filtered for Safety to avoid missing index compile issues)
+    const unsubReviews = onSnapshot(collection(db, "reviews"), (snap) => {
+      const allRev = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      setReviews(allRev.filter((r: any) => r.isApproved === true));
+    });
+
     // Mobile local memory checking
     const savedDetails = localStorage.getItem('bb_cafe_customer');
     if (savedDetails) {
@@ -64,12 +94,36 @@ export default function BbCafeHome() {
     return () => {
       unsubStore();
       unsubMenu();
+      unsubBanners();
+      unsubReviews();
+      unsubCoupons();
     };
   }, []);
 
+  // Auto Banner Slider loop
+  useEffect(() => {
+    if (banners.length <= 1) return;
+    const interval = setInterval(() => {
+      setBannerIndex((prev) => (prev + 1) % banners.length);
+    }, 4000);
+    return () => clearInterval(interval);
+  }, [banners]);
+
   const getTotal = () => cart.reduce((acc: number, i: any) => acc + (i.price * i.quantity), 0);
 
-  // Filter Logic with safe string checking
+  // Apply Coupon Logic
+  const handleApplyCoupon = () => {
+    if (!enteredCoupon) return toast.error("Please enter a coupon code");
+    const found = coupons.find(c => String(c.code).toLowerCase() === enteredCoupon.trim().toLowerCase());
+    if (found) {
+      setAppliedCoupon(found);
+      toast.success(`Coupon '${found.code}' applied! ₹${found.discountValue} OFF`);
+    } else {
+      toast.error("Invalid coupon code");
+    }
+  };
+
+  // Filter Logic with safe checks
   const filteredMenu = menu.filter(item => {
     const itemName = item?.name ? String(item.name).toLowerCase() : "";
     const itemCategory = item?.category ? String(item.category) : "";
@@ -84,12 +138,17 @@ export default function BbCafeHome() {
       setIsLoginOpen(true);
       return;
     }
-    if (!address || address.trim().length < 10) return toast.error("Please enter full address with landmark!");
+    if (!address || address.trim().length < 10) return toast.error("Please enter full address!");
 
     const tokenNumber = Math.floor(1000 + Math.random() * 9000);
-    const total = getTotal();
+    const subtotal = getTotal();
     
-    let deliveryCharge = total < 99 ? 20 : 0;
+    // Delivery Logic
+    let deliveryCharge = subtotal < 99 ? 20 : 0;
+    
+    // Discount calculations
+    const couponDiscount = appliedCoupon ? Number(appliedCoupon.discountValue) : 0;
+    const finalTotal = Math.max(0, subtotal - couponDiscount) + deliveryCharge;
 
     try {
       await addDoc(collection(db, "orders"), {
@@ -98,7 +157,9 @@ export default function BbCafeHome() {
         customerPhone: customerDetails?.phone || "No Phone", 
         address, 
         items: cart, 
-        total: total + deliveryCharge, 
+        subtotal,
+        discount: couponDiscount,
+        total: finalTotal, 
         timestamp: new Date(), 
         status: 'pending'
       });
@@ -106,10 +167,12 @@ export default function BbCafeHome() {
       let itemsText = "";
       cart.forEach((i: any) => itemsText += `• ${i.name || "Item"} x${i.quantity || 1} - ₹${(i.price || 0) * (i.quantity || 1)}\n`);
       
-      const msg = `🔥 *BUM BUM CAFE - NEW ORDER*\n\n*Order ID:* #${tokenNumber}\n*Customer:* ${customerDetails?.name || "Customer"}\n*Phone:* ${customerDetails?.phone || "No Phone"}\n*Address:* ${address}\n\n*ITEMS:*\n${itemsText}\n*Subtotal:* ₹${total}\n*Delivery:* ₹${deliveryCharge}\n*TOTAL BILL: ₹${total + deliveryCharge}*\n\n_Confirm order by replying 'YES'_`;
+      const msg = `🔥 *BUM BUM CAFE - NEW ORDER*\n\n*Order ID:* #${tokenNumber}\n*Customer:* ${customerDetails?.name || "Customer"}\n*Phone:* ${customerDetails?.phone || "No Phone"}\n*Address:* ${address}\n\n*ITEMS:*\n${itemsText}\n*Subtotal:* ₹${subtotal}\n*Coupon Discount:* -₹${couponDiscount}\n*Delivery:* ₹${deliveryCharge}\n*TOTAL BILL: ₹${finalTotal}*\n\n_Confirm order by replying 'YES'_`;
       
       window.open(`https://wa.me/919714293759?text=${encodeURIComponent(msg)}`, '_blank');
       clearCart();
+      setAppliedCoupon(null);
+      setEnteredCoupon("");
       setIsCartOpen(false);
       toast.success("Order Placed!");
     } catch (e) { 
@@ -117,15 +180,32 @@ export default function BbCafeHome() {
     }
   };
 
+  // --- SUBMIT FEEDBACK REVIEW ---
+  const handleReviewSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!reviewName || !reviewComment) return toast.error("Please fill all fields!");
+    
+    try {
+      await addDoc(collection(db, "reviews"), {
+        name: reviewName,
+        rating: reviewRating,
+        comment: reviewComment,
+        isApproved: false, // Must be approved by admin
+        timestamp: new Date()
+      });
+      toast.success("Review submitted! Approved hone ke baad dikhega.");
+      setReviewName(""); setReviewComment(""); setReviewRating(5);
+      setIsReviewOpen(false);
+    } catch (err) {
+      toast.error("Failed to submit feedback.");
+    }
+  };
+
   // --- SAVE CONTACT DETAILS ---
   const handleSaveDetails = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!tempName || tempName.trim().length < 3) {
-      return toast.error("Please enter your real name");
-    }
-    if (!tempPhone || tempPhone.trim().length < 10) {
-      return toast.error("Please enter 10-digit phone number");
-    }
+    if (!tempName || tempName.trim().length < 3) return toast.error("Please enter your real name");
+    if (!tempPhone || tempPhone.trim().length < 10) return toast.error("Please enter 10-digit number");
 
     const details = { name: tempName, phone: `+91${tempPhone}` };
     localStorage.setItem('bb_cafe_customer', JSON.stringify(details));
@@ -147,12 +227,10 @@ export default function BbCafeHome() {
     return `₹${item?.price || 0}`;
   };
 
-  // Dynamic Add-to-cart variant trigger
+  // Add customized portions to cart
   const handleAddToCart = () => {
-    if (!chosenSize) {
-      return toast.error("Please select a size first!");
-    }
-
+    if (!chosenSize) return toast.error("Please select a size first!");
+    
     const basePrice = Number(chosenPrice);
     const addonsTotal = (addonCheese ? 30 : 0) + (addonVeg ? 20 : 0);
     const finalPrice = basePrice + addonsTotal;
@@ -161,7 +239,6 @@ export default function BbCafeHome() {
     if (addonCheese) finalName += " + Extra Cheese";
     if (addonVeg) finalName += " + Extra Veg";
 
-    // Unique combination ID to avoid duplicate collisions in cart
     const uniqueCartId = `${selectedProduct.id}-${chosenSize}-${addonCheese ? 'cheese' : 'no'}-${addonVeg ? 'veg' : 'no'}`;
 
     addItem({
@@ -172,13 +249,7 @@ export default function BbCafeHome() {
     });
 
     toast.success(`${chosenSize} Pizza added to cart!`);
-    
-    // Reset Popup parameters
-    setSelectedProduct(null);
-    setChosenSize("");
-    setChosenPrice(0);
-    setAddonCheese(false);
-    setAddonVeg(false);
+    setSelectedProduct(null); setChosenSize(""); setChosenPrice(0); setAddonCheese(false); setAddonVeg(false);
   };
 
   if (!mounted) return null;
@@ -215,16 +286,44 @@ export default function BbCafeHome() {
       </div>
 
       {/* --- MAIN CONTENT --- */}
-      <main className="pt-4 px-4 max-w-lg mx-auto">
-        <div className="flex gap-2 overflow-x-auto pb-6 no-scrollbar pt-2">
+      <main className="pt-4 px-4 max-w-lg mx-auto space-y-6">
+        
+        {/* --- 1. DYNAMIC TOP BANNER SLIDER --- */}
+        <div className="w-full h-44 rounded-3xl overflow-hidden relative border border-white/5 shadow-xl bg-white/[0.02]">
+          {banners.length === 0 ? (
+            // Default Fallback Banner if list is empty
+            <div className="w-full h-full bg-gradient-to-r from-orange-600/35 to-[#b33600]/35 flex flex-col justify-center p-6 space-y-1 relative">
+              <span className="text-[9px] font-black uppercase text-orange-400 bg-orange-500/10 border border-orange-500/20 px-2 py-0.5 rounded-full w-max">Special Offer</span>
+              <h3 className="text-xl font-black italic text-yellow-300">GET FREE DELIVERY ABOVE ₹99</h3>
+              <p className="text-xs text-gray-400 font-medium">Enjoy fresh baked pizza & delicious thalis!</p>
+            </div>
+          ) : (
+            // Auto Slidings images from Firestore
+            <img 
+              src={banners[bannerIndex]?.url} 
+              className="w-full h-full object-cover transition-all duration-700" 
+              alt="Promo Banner" 
+            />
+          )}
+          {banners.length > 1 && (
+            <div className="absolute bottom-3 right-4 flex gap-1.5 z-10">
+              {banners.map((_, i) => (
+                <span key={i} className={`h-1.5 w-1.5 rounded-full transition-all ${bannerIndex === i ? 'bg-orange-500 w-3' : 'bg-white/20'}`} />
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Categories sliding menu */}
+        <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar pt-2">
           {CATEGORIES.map((cat) => (
             <button 
               key={cat} 
               onClick={() => setSelectedCategory(cat)}
               className={`px-5 py-3 rounded-2xl whitespace-nowrap text-xs font-black tracking-wide uppercase transition-all duration-300 border ${
                 selectedCategory === cat 
-                  ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-lg shadow-orange-500/10 border-orange-500/50 scale-105' 
-                  : 'bg-white/[0.03] text-gray-400 border-white/5 hover:bg-white/[0.06]'
+                  ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-lg border-orange-500/50 scale-105' 
+                  : 'bg-white/[0.03] text-gray-400 border-white/5'
               }`}
             >
               {cat}
@@ -232,8 +331,9 @@ export default function BbCafeHome() {
           ))}
         </div>
 
+        {/* Store Closed Banner */}
         {!storeOpen && (
-          <div className="bg-red-500/10 text-red-400 p-6 rounded-[2.5rem] border border-red-500/20 text-center mb-8 shadow-xl">
+          <div className="bg-red-500/10 text-red-400 p-6 rounded-[2.5rem] border border-red-500/20 text-center mb-4 shadow-xl">
             <PowerOff className="mx-auto mb-2 text-red-500" size={28} />
             <h3 className="font-black text-lg uppercase italic tracking-wider">Cafe Closed Now</h3>
             <p className="text-[11px] opacity-80 mt-1">Accepting orders tomorrow morning!</p>
@@ -251,7 +351,7 @@ export default function BbCafeHome() {
               const mockRating = (((nameStr.length + catStr.length) % 5) * 0.1 + 4.5).toFixed(1);
 
               return (
-                <motion.div layout key={item.id} className="bg-white/[0.02] rounded-[2rem] border border-white/5 overflow-hidden hover:bg-white/[0.04] transition-all duration-300 shadow-xl group flex flex-col relative">
+                <motion.div layout key={item.id} className="bg-white/[0.02] rounded-[2rem] border border-white/5 overflow-hidden hover:bg-white/[0.04] transition-all duration-300 shadow-xl flex flex-col relative">
                   <div className="relative h-56 w-full overflow-hidden">
                     <img src={item.image || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=500&q=80"} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" alt={nameStr} />
                     <div className="absolute top-4 left-4 bg-black/50 backdrop-blur-md px-3 py-1.5 rounded-xl border border-white/10 flex items-center gap-1.5 z-10">
@@ -298,6 +398,41 @@ export default function BbCafeHome() {
             })
           )}
         </div>
+
+        {/* --- 2. CUSTOMER RATINGS & REVIEW WALL --- */}
+        <div className="border-t border-white/5 pt-8 space-y-6">
+          <div className="flex justify-between items-center">
+            <div>
+              <h3 className="text-xl font-black tracking-tight text-gray-100">Customer Feedback</h3>
+              <p className="text-xs text-gray-500 font-bold uppercase tracking-wider mt-0.5">Swaad aur Pyaar</p>
+            </div>
+            <button 
+              onClick={() => setIsReviewOpen(true)}
+              className="text-xs bg-orange-500/15 border border-orange-500/20 text-orange-500 font-black px-4 py-2 rounded-xl active:scale-95 transition-all"
+            >
+              ✍️ WRITE REVIEW
+            </button>
+          </div>
+
+          <div className="flex gap-4 overflow-x-auto pb-4 no-scrollbar">
+            {reviews.length === 0 ? (
+              <p className="text-xs font-bold text-gray-500 uppercase tracking-widest py-8">Be the first to leave a review!</p>
+            ) : (
+              reviews.map((r: any) => (
+                <div key={r.id} className="min-w-[240px] max-w-[240px] bg-white/[0.02] border border-white/5 rounded-2xl p-4 space-y-2 flex-shrink-0">
+                  <div className="flex justify-between items-center">
+                    <h5 className="font-extrabold text-xs text-orange-500 truncate">{r.name}</h5>
+                    <div className="flex items-center gap-0.5 text-yellow-400">
+                      <Star size={10} fill="currentColor"/> <span className="text-[10px] font-black">{r.rating}</span>
+                    </div>
+                  </div>
+                  <p className="text-gray-300 text-xs font-semibold leading-relaxed line-clamp-3 italic">"{r.comment}"</p>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+
       </main>
 
       {/* --- FLOATING BOTTOM CART BAR --- */}
@@ -318,16 +453,15 @@ export default function BbCafeHome() {
         )}
       </AnimatePresence>
 
-      {/* --- NEW VARIANTS POPUP WITH DYNAMIC PORTIONS AND CUSTOM PIZZA ADD-ONS --- */}
+      {/* --- VARIANTS & PIZZA CUSTOMIZATION POPUP --- */}
       <AnimatePresence>
         {selectedProduct && (
           <div className="fixed inset-0 bg-black/95 backdrop-blur-md z-[100] flex items-end">
             <motion.div initial={{ y: 300 }} animate={{ y: 0 }} exit={{ y: 300 }} className="bg-[#111] w-full p-8 rounded-t-[3.5rem] border-t border-white/10 max-w-lg mx-auto">
               <div className="w-16 h-1.5 bg-white/15 rounded-full mx-auto mb-6" />
-              <h3 className="text-3xl font-black mb-1 text-center tracking-tight">{selectedProduct?.name || "Portion option"}</h3>
+              <h3 className="text-3xl font-black mb-1 text-center tracking-tight">{selectedProduct?.name}</h3>
               <p className="text-orange-500 font-black mb-6 uppercase tracking-widest text-[10px] text-center">Customize Your Order</p>
               
-              {/* STEP 1: Select Portion Size */}
               <div className="space-y-3 mb-6">
                 <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">1. Select Portion Size:</p>
                 <div className="grid grid-cols-2 gap-2">
@@ -338,7 +472,7 @@ export default function BbCafeHome() {
                       onClick={() => { setChosenSize(size); setChosenPrice(Number(price)); }}
                       className={`p-4 rounded-2xl flex flex-col items-center justify-center border transition-all ${
                         chosenSize === size 
-                          ? 'bg-orange-500/10 border-orange-500 text-orange-500 scale-102' 
+                          ? 'bg-orange-500/10 border-orange-500 text-orange-500' 
                           : 'bg-white/[0.03] border-white/5 text-gray-400 hover:border-white/15'
                       }`}
                     >
@@ -349,43 +483,29 @@ export default function BbCafeHome() {
                 </div>
               </div>
 
-              {/* STEP 2: Optional Custom Pizza Add-ons (Triggered only for Pizza Category) */}
               {(selectedProduct?.category === "Special Pizza" || selectedProduct?.name?.toLowerCase().includes("pizza")) && (
                 <div className="space-y-3 mb-8 border-t border-white/5 pt-4">
                   <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">2. Optional Add-ons (Pizza Special):</p>
                   <div className="space-y-2">
-                    {/* Addon 1: Extra Cheese */}
                     <div 
                       onClick={() => setAddonCheese(!addonCheese)}
-                      className={`p-4 rounded-2xl border flex justify-between items-center cursor-pointer select-none transition-all ${
-                        addonCheese ? 'bg-orange-500/5 border-orange-500/50' : 'bg-white/[0.02] border-white/5'
-                      }`}
+                      className={`p-5 rounded-3xl flex justify-between items-center border border-white/5 hover:border-orange-500/50 hover:bg-orange-500/10 transition-all ${addonCheese ? 'bg-orange-500/10 border-orange-500/50' : 'bg-white/[0.03]'}`}
                     >
-                      <div className="flex items-center gap-3">
-                        <input type="checkbox" checked={addonCheese} onChange={() => {}} className="h-4 w-4 rounded border-white/15 text-orange-500 focus:ring-orange-500" />
-                        <span className="text-xs font-black uppercase text-gray-300">🧀 Extra Cheese</span>
-                      </div>
+                      <span className="text-xs font-black uppercase text-gray-300">🧀 Extra Cheese (Cheese burst)</span>
                       <span className="text-xs font-black text-orange-500">+₹30</span>
                     </div>
 
-                    {/* Addon 2: Extra Veggies */}
                     <div 
                       onClick={() => setAddonVeg(!addonVeg)}
-                      className={`p-4 rounded-2xl border flex justify-between items-center cursor-pointer select-none transition-all ${
-                        addonVeg ? 'bg-orange-500/5 border-orange-500/50' : 'bg-white/[0.02] border-white/5'
-                      }`}
+                      className={`p-5 rounded-3xl flex justify-between items-center border border-white/5 hover:border-orange-500/50 hover:bg-orange-500/10 transition-all ${addonVeg ? 'bg-orange-500/10 border-orange-500/50' : 'bg-white/[0.03]'}`}
                     >
-                      <div className="flex items-center gap-3">
-                        <input type="checkbox" checked={addonVeg} onChange={() => {}} className="h-4 w-4 rounded border-white/15 text-orange-500 focus:ring-orange-500" />
-                        <span className="text-xs font-black uppercase text-gray-300">🥦 Extra Vegetables</span>
-                      </div>
+                      <span className="text-xs font-black uppercase text-gray-300">🥦 Extra Vegetables / Paneer</span>
                       <span className="text-xs font-black text-orange-500">+₹20</span>
                     </div>
                   </div>
                 </div>
               )}
 
-              {/* STEP 3: Confirm addition */}
               <button 
                 type="button"
                 onClick={handleAddToCart}
@@ -417,7 +537,6 @@ export default function BbCafeHome() {
                     <p className="text-orange-500 font-black mt-1">₹{item?.price || 0}</p>
                   </div>
                   
-                  {/* Quantity Controller (Plus/Minus) */}
                   <div className="flex items-center gap-2.5 bg-black/40 px-3 py-1.5 rounded-2xl border border-white/10 flex-shrink-0">
                     <button 
                       onClick={() => removeItem(item.id)} 
@@ -440,7 +559,7 @@ export default function BbCafeHome() {
 
               <div className="mt-10 space-y-6">
                 
-                {/* PDF rules alert widget */}
+                {/* Free Delivery alert badge */}
                 <div className="bg-orange-500/10 border border-orange-500/20 rounded-[2rem] p-5 space-y-2">
                   <div className="flex items-center gap-2 text-orange-400 font-black text-xs uppercase tracking-wider">
                     <Sparkles size={16}/> <span>Free Delivery Rules</span>
@@ -452,7 +571,36 @@ export default function BbCafeHome() {
                   </ul>
                 </div>
 
-                {/* Local Memory Saved Details Block */}
+                {/* --- 3. DYNAMIC COUPON SYSTEM SECTION --- */}
+                <div className="bg-white/[0.02] border border-white/5 p-5 rounded-[2rem] space-y-3">
+                  <div className="flex items-center gap-2 text-orange-500 font-black text-xs uppercase">
+                    <Percent size={16}/> <span>Have a promo code?</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <input 
+                      type="text" 
+                      placeholder="e.g. WELCOME" 
+                      value={enteredCoupon} 
+                      onChange={(e) => setEnteredCoupon(e.target.value)}
+                      className="flex-1 bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-xs font-bold uppercase placeholder-gray-600 text-white"
+                    />
+                    <button 
+                      type="button"
+                      onClick={handleApplyCoupon}
+                      className="bg-orange-500 hover:bg-orange-600 font-black text-xs p-3 px-5 rounded-xl text-black active:scale-95 transition-all"
+                    >
+                      APPLY
+                    </button>
+                  </div>
+                  {appliedCoupon && (
+                    <div className="flex justify-between items-center text-xs bg-green-500/10 border border-green-500/25 p-3 rounded-xl">
+                      <span className="text-green-400 font-bold uppercase">Code Applied: {appliedCoupon.code}</span>
+                      <button onClick={() => { setAppliedCoupon(null); setEnteredCoupon(""); }} className="text-red-400 font-black font-xs">Remove</button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Saved Local Details Block */}
                 {customerDetails ? (
                   <div className="bg-white/[0.02] p-5 rounded-[2.2rem] border border-white/5 flex justify-between items-center">
                     <div>
@@ -489,19 +637,22 @@ export default function BbCafeHome() {
                   />
                 </div>
 
-                {/* Bill Details */}
+                {/* Bill Details with Applied Coupon discount */}
                 <div className="bg-gradient-to-b from-orange-600 to-orange-700 p-8 rounded-[2.5rem] text-white shadow-xl">
                   <div className="flex justify-between font-bold mb-2 text-sm text-orange-100"><span>Items Total</span> <span>₹{getTotal()}</span></div>
+                  {appliedCoupon && (
+                    <div className="flex justify-between font-bold mb-2 text-sm text-green-200"><span>Coupon Discount</span> <span>-₹{appliedCoupon.discountValue}</span></div>
+                  )}
                   <div className="flex justify-between font-bold mb-4 opacity-90 text-sm text-orange-100"><span>Delivery Charge</span> <span>{getTotal() < 99 ? "₹20" : "FREE"}</span></div>
                   <div className="h-px bg-white/20 mb-4" />
-                  <div className="flex justify-between font-black text-2xl"><span>To Pay</span> <span>₹{getTotal() < 99 ? getTotal() + 20 : getTotal()}</span></div>
+                  <div className="flex justify-between font-black text-2xl"><span>To Pay</span> <span>₹{Math.max(0, getTotal() - (appliedCoupon ? appliedCoupon.discountValue : 0)) + (getTotal() < 99 ? 20 : 0)}</span></div>
                 </div>
 
-                {/* --- WHATSAPP ORDER BUTTON WITH OFFICIAL LOGO --- */}
+                {/* WhatsApp Button with Logo */}
                 <button 
                   onClick={sendWhatsAppOrder} 
                   type="button"
-                  className="w-full bg-green-600 hover:bg-green-700 p-6 rounded-[2.5rem] font-black text-md shadow-xl shadow-green-600/10 flex items-center justify-center gap-3 active:scale-95 transition-all border border-green-500/20 text-white"
+                  className="w-full bg-green-600 hover:bg-green-700 p-6 rounded-[2.5rem] font-black text-md shadow-xl flex items-center justify-center gap-3 active:scale-95 transition-all border border-green-500/20 text-white"
                 >
                   <svg className="w-6 h-6 fill-current text-white flex-shrink-0" viewBox="0 0 24 24">
                     <path d="M12.037 21.978c-1.92 0-3.805-.502-5.46-1.457l-.391-.227-4.062 1.066 1.085-3.953-.25-.398C2.01 15.352 1.48 13.208 1.48 11.005 1.482 5.21 6.22 .495 12.037.495c2.818 0 5.467 1.1 7.46 3.099a10.45 10.45 0 0 1 3.093 7.42c-.002 5.797-4.74 10.513-10.553 10.513zm5.412-7.587c-.297-.15-1.758-.868-2.03-.96-.273-.092-.471-.137-.67.137-.197.275-.764.96-.938 1.144-.173.183-.347.206-.644.055-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.1-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.501-.669-.51l-.57-.011c-.198 0-.52.074-.793.372-.272.297-1.04.101-1.04 2.479 0 2.378 1.733 4.678 1.98 5.024.248.346 3.41 5.216 8.26 7.301 1.155.496 2.057.793 2.76 1.017 1.21.383 2.311.33 3.18.198 1.03-.15 2.158-.87 2.46-1.714.3-.842.3-1.564.21-1.714-.09-.15-.335-.24-.633-.39z"/>
@@ -510,6 +661,46 @@ export default function BbCafeHome() {
                 </button>
               </div>
             </div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* --- WRITE A REVIEW MODAL --- */}
+      <AnimatePresence>
+        {isReviewOpen && (
+          <div className="fixed inset-0 bg-black/95 z-[200] flex items-center justify-center p-6">
+            <form onSubmit={handleReviewSubmit} className="bg-[#111] w-full max-w-md p-8 rounded-[3rem] border border-white/10 text-center space-y-4">
+              <h3 className="text-2xl font-black text-orange-500 uppercase italic">Review / Feedback</h3>
+              <p className="text-xs text-gray-500 font-semibold tracking-wider">Humare swaad ke baare mein apni raye dein</p>
+              
+              <div className="space-y-3 text-left">
+                <div>
+                  <label className="text-[10px] font-black uppercase text-gray-500 tracking-wider">Your Name</label>
+                  <input type="text" placeholder="Apna naam likhein..." value={reviewName} onChange={(e) => setReviewName(e.target.value)} required
+                    className="w-full bg-white/5 border border-white/10 p-3.5 rounded-xl text-sm font-bold text-white outline-none focus:border-orange-500" />
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-black uppercase text-gray-500 tracking-wider">Rating (1 to 5 Stars)</label>
+                  <div className="flex gap-2 text-yellow-400 py-1 cursor-pointer">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <Star key={star} size={24} fill={reviewRating >= star ? "currentColor" : "none"} onClick={() => setReviewRating(star)} />
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-black uppercase text-gray-500 tracking-wider">Comment</label>
+                  <textarea placeholder="Khana kaisa laga? Sabzi, pizza, ya mocktail..." value={reviewComment} onChange={(e) => setReviewComment(e.target.value)} required rows={3}
+                    className="w-full bg-white/5 border border-white/10 p-3.5 rounded-xl text-sm font-bold text-white outline-none focus:border-orange-500 resize-none" />
+                </div>
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button type="submit" className="flex-1 bg-orange-500 hover:bg-orange-600 text-black font-black p-4 rounded-xl text-sm active:scale-95 transition-all">SUBMIT</button>
+                <button type="button" onClick={() => setIsReviewOpen(false)} className="bg-white/5 text-gray-400 font-bold p-4 rounded-xl text-sm active:scale-95 transition-all">CANCEL</button>
+              </div>
+            </form>
           </div>
         )}
       </AnimatePresence>
@@ -528,44 +719,17 @@ export default function BbCafeHome() {
               <div className="space-y-4 text-left">
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-gray-500 uppercase">Your Name</label>
-                  <input 
-                    type="text" 
-                    placeholder="Enter your name..." 
-                    value={tempName} 
-                    onChange={(e) => setTempName(e.target.value)}
-                    className="w-full bg-white/5 border border-white/10 p-4 rounded-2xl text-center text-md font-bold outline-none focus:border-orange-500 text-white" 
-                    required 
-                  />
+                  <input type="text" placeholder="Enter your name..." value={tempName} onChange={(e) => setTempName(e.target.value)} className="w-full bg-white/5 border border-white/10 p-4 rounded-2xl text-center text-md font-bold outline-none focus:border-orange-500 text-white" required />
                 </div>
                 
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-gray-500 uppercase">Mobile Number</label>
-                  <input 
-                    type="tel" 
-                    maxLength={10} 
-                    placeholder="10-digit Phone Number" 
-                    value={tempPhone} 
-                    onChange={(e) => setTempPhone(e.target.value)}
-                    className="w-full bg-white/5 border border-white/10 p-4 rounded-2xl text-center text-md font-bold outline-none focus:border-orange-500 text-white" 
-                    required 
-                  />
+                  <input type="tel" maxLength={10} placeholder="10-digit Phone Number" value={tempPhone} onChange={(e) => setTempPhone(e.target.value)} className="w-full bg-white/5 border border-white/10 p-4 rounded-2xl text-center text-md font-bold outline-none focus:border-orange-500 text-white" required />
                 </div>
               </div>
 
-              <button 
-                type="submit" 
-                className="w-full bg-orange-500 hover:bg-orange-600 p-5 rounded-2xl font-black text-md shadow-xl active:scale-95 transition-all uppercase tracking-wider"
-              >
-                PROCEED TO ORDER
-              </button>
-              
-              <button 
-                type="button" 
-                onClick={() => setIsLoginOpen(false)} 
-                className="mt-6 text-gray-500 text-xs font-black uppercase tracking-widest block mx-auto hover:text-gray-400"
-              >
-                Close
-              </button>
+              <button type="submit" className="w-full bg-orange-500 hover:bg-orange-600 p-5 rounded-2xl font-black text-md shadow-xl active:scale-95 transition-all uppercase tracking-wider">PROCEED TO ORDER</button>
+              <button type="button" onClick={() => setIsLoginOpen(false)} className="mt-6 text-gray-500 text-xs font-black uppercase tracking-widest block mx-auto hover:text-gray-400">Close</button>
             </form>
           </div>
         )}
