@@ -374,19 +374,3 @@ export default function BbCafeHome() {
     </div>
   );
 }
-```
-
-Is code ko save karke commit kar dein. 
-
-### Ek zaroori tip:
-Agar login hone ke baad bhi orders page par add nahi ho rahe hain (ya `"Failed to place order"` ka error aata hai), toh apne **Firebase Console** mein jaakar **Firestore Database > Rules** tab ko check karein. Wahan likha hona chahiye ki authenticated users database mein documents write/add kar sakte hain:
-
-```javascript
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    match /{document=**} {
-      allow read, write: if request.auth != null;
-    }
-  }
-  }
