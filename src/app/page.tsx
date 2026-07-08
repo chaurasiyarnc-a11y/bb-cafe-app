@@ -7,14 +7,14 @@ import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
 import { useCartStore } from '../store/useCartStore';
 
-// 1. CATEGORIES
+// CATEGORIES
 const CATEGORIES = ["All", "Special Pizza", "Special Thali", "Paneer Special", "Special Mix veg", "Fast Food", "Super Cool", "Indian Bread", "Special Rice"];
 
 export default function BbCafeHome() {
   const store = useCartStore() as any;
   const cart = store?.items || [];
   
-  // Safe destructuring with fallback to prevent crashes
+  // Safe destructuring with fallback
   const addItem = store?.addItem || (() => {});
   const removeItem = store?.removeItem || (() => {});
   const clearCart = store?.clearCart || (() => {});
@@ -111,7 +111,7 @@ export default function BbCafeHome() {
     }
   };
 
-  // --- SAVE CONTACT DETAILS (FREE WORKAROUND) ---
+  // --- SAVE CONTACT DETAILS ---
   const handleSaveDetails = (e: React.FormEvent) => {
     e.preventDefault();
     if (!tempName || tempName.trim().length < 3) {
@@ -134,19 +134,19 @@ export default function BbCafeHome() {
     <div className="bg-[#050505] min-h-screen text-white pb-32 font-sans selection:bg-orange-500 overflow-x-hidden">
       <Toaster position="top-center" />
       
-      {/* --- COMPACT HEADER & SMALL SEARCH BAR (FIXED CLIPPING) --- */}
-      <header className="relative h-64 bg-gradient-to-b from-[#ff5e00] to-[#b33600] rounded-b-[3rem] flex flex-col justify-center items-center px-4 shadow-[0_10px_30px_rgba(179,54,0,0.25)]">
-        {/* Background pattern respects the curve with its own rounded class */}
-        <div className="absolute inset-0 opacity-15 bg-[url('https://www.transparenttextures.com/patterns/food.png')] bg-center rounded-b-[3rem] overflow-hidden"></div>
+      {/* --- COMPACT HEADER --- */}
+      <header className="relative h-60 bg-gradient-to-b from-[#ff5e00] to-[#b33600] flex flex-col justify-center items-center px-4 shadow-[0_15px_40px_rgba(179,54,0,0.2)]">
+        {/* Background pattern */}
+        <div className="absolute inset-0 opacity-15 bg-[url('https://www.transparenttextures.com/patterns/food.png')] bg-center rounded-b-[3.5rem] overflow-hidden"></div>
         
         {/* Pure Veg Badge */}
-        <div className="absolute top-4 right-4 bg-black/40 backdrop-blur-md px-3 py-1 rounded-full border border-white/10 flex items-center gap-1.5 z-10">
+        <div className="absolute top-4 right-4 bg-black/40 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10 flex items-center gap-1.5 z-10">
           <span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse"></span>
           <span className="text-[9px] font-black uppercase tracking-widest text-green-400">100% PURE VEG</span>
         </div>
 
         {/* Cafe Name & Sub-headline */}
-        <div className="text-center z-10 mt-[-15px]">
+        <div className="text-center z-10">
           <motion.h1 
             initial={{ scale: 0.8 }} 
             animate={{ scale: 1 }} 
@@ -158,24 +158,24 @@ export default function BbCafeHome() {
             Best Cafe in this Area
           </p>
         </div>
-        
-        {/* Small Floating Search Bar */}
-        <div className="absolute -bottom-6 w-[85%] max-w-sm z-20">
-          <div className="relative group">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-orange-500 transition-colors" size={16} />
-            <input 
-              type="text" 
-              placeholder="Search pizza, thali, shakes..." 
-              value={searchQuery} 
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-white text-black py-3.5 px-11 rounded-2xl shadow-[0_8px_25px_rgba(0,0,0,0.35)] outline-none focus:ring-4 focus:ring-orange-500/20 text-xs font-semibold transition-all"
-            />
-          </div>
-        </div>
       </header>
 
+      {/* --- STICKY GLASS SEARCH BAR --- */}
+      <div className="sticky top-0 z-40 bg-[#050505]/95 backdrop-blur-md py-4 px-4 shadow-[0_8px_30px_rgba(0,0,0,0.6)] border-b border-white/5 rounded-b-3xl">
+        <div className="relative max-w-sm mx-auto group">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-orange-500 transition-colors" size={16} />
+          <input 
+            type="text" 
+            placeholder="Search pizza, thali, shakes..." 
+            value={searchQuery} 
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full bg-white text-black py-3.5 px-11 rounded-2xl outline-none focus:ring-4 focus:ring-orange-500/20 text-xs font-semibold transition-all"
+          />
+        </div>
+      </div>
+
       {/* --- MAIN CONTENT --- */}
-      <main className="pt-16 px-4 max-w-lg mx-auto">
+      <main className="pt-4 px-4 max-w-lg mx-auto">
         
         {/* Categories sliding menu */}
         <div className="flex gap-2 overflow-x-auto pb-6 no-scrollbar pt-2">
@@ -203,60 +203,95 @@ export default function BbCafeHome() {
           </div>
         )}
 
-        {/* Food Items Listing Grid */}
-        <div className="grid grid-cols-1 gap-5">
+        {/* --- PREMIUM ZOMATO STYLE FOOD GRID --- */}
+        <div className="grid grid-cols-1 gap-6">
           {filteredMenu.length === 0 ? (
             <p className="text-center text-gray-500 py-12 text-sm font-bold uppercase tracking-widest">No items found...</p>
           ) : (
-            filteredMenu.map((item) => (
-              <motion.div 
-                layout 
-                key={item.id} 
-                className="bg-white/[0.03] p-4 rounded-[2.5rem] border border-white/5 flex gap-5 items-center hover:bg-white/[0.06] transition-all group relative overflow-hidden"
-              >
-                {/* 100% Pure Veg indicator */}
-                <div className="absolute top-4 right-4 flex items-center justify-center border border-green-600 p-0.5 rounded-sm h-3.5 w-3.5">
-                  <span className="h-1.5 w-1.5 bg-green-600 rounded-full"></span>
-                </div>
+            filteredMenu.map((item) => {
+              // Automatic diverse ratings generator (mimics Zomato 4.5 - 4.9 ratings)
+              const mockRating = (((item.name.length + item.category.length) % 5) * 0.1 + 4.5).toFixed(1);
 
-                <div className="relative h-24 w-24 flex-shrink-0">
-                  <img 
-                    src={item.image || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=300&q=80"} 
-                    className="w-full h-full rounded-[2rem] object-cover shadow-xl group-hover:scale-105 transition-transform duration-300" 
-                    alt={item.name} 
-                  />
-                </div>
-                
-                <div className="flex-1">
-                  <h4 className="font-black text-lg text-gray-100 group-hover:text-orange-500 transition-colors">{item.name}</h4>
-                  <p className="text-gray-500 text-xs italic mb-2 capitalize">{item.category}</p>
-                  
-                  {/* Price display with variant check */}
-                  <p className="text-orange-500 font-black text-xl mt-1">
-                    {item.variants ? (
-                      item.variants.half ? `₹${item.variants.half} - ₹${item.variants.full}` : `₹${item.variants.Plain} - ₹${item.variants.Butter}`
-                    ) : (
-                      `₹${item.price}`
+              return (
+                <motion.div 
+                  layout 
+                  key={item.id} 
+                  className="bg-white/[0.02] rounded-[2rem] border border-white/5 overflow-hidden hover:bg-white/[0.04] transition-all duration-300 shadow-xl group flex flex-col relative"
+                >
+                  {/* Image container on TOP */}
+                  <div className="relative h-56 w-full overflow-hidden">
+                    <img 
+                      src={item.image || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=500&q=80"} 
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
+                      alt={item.name} 
+                    />
+                    
+                    {/* Glowing Green Veg Badge Overlay */}
+                    <div className="absolute top-4 left-4 bg-black/50 backdrop-blur-md px-3 py-1.5 rounded-xl border border-white/10 flex items-center gap-1.5 z-10">
+                      <span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse"></span>
+                      <span className="text-[9px] font-black uppercase tracking-widest text-green-400">VEG</span>
+                    </div>
+
+                    {/* Fancy "Bestseller" Ribbon */}
+                    {item.name.length % 3 === 0 && (
+                      <div className="absolute top-4 right-4 bg-gradient-to-r from-orange-600 to-amber-600 px-3 py-1 rounded-lg text-white text-[9px] font-black uppercase tracking-wider shadow-lg">
+                        ★ Bestseller
+                      </div>
                     )}
-                  </p>
+                  </div>
                   
-                  {item.variants && (
-                    <span className="inline-block bg-orange-500/10 text-orange-400 text-[9px] font-extrabold px-2 py-0.5 rounded-md mt-1 uppercase tracking-widest border border-orange-500/10">
-                      Options available
-                    </span>
-                  )}
-                </div>
+                  {/* Details Container on BOTTOM */}
+                  <div className="p-5 flex flex-col justify-between flex-1">
+                    {/* Title and Rating Line */}
+                    <div className="flex justify-between items-start gap-4">
+                      <h4 className="font-black text-lg text-gray-100 group-hover:text-orange-500 transition-colors line-clamp-1">{item.name}</h4>
+                      
+                      {/* Rating (Zomato-style Green Star Badge) */}
+                      <div className="bg-green-600 text-white font-extrabold text-[11px] px-2.5 py-0.5 rounded-lg flex items-center gap-0.5 flex-shrink-0 shadow-md shadow-green-900/20">
+                        <span>{mockRating}</span>
+                        <span className="text-[9px]">★</span>
+                      </div>
+                    </div>
 
-                {storeOpen && (
-                  <button 
-                    onClick={() => item.variants ? setSelectedProduct(item) : addItem(item)}
-                    className="p-4 bg-orange-500 text-white rounded-3xl shadow-lg shadow-orange-500/20 active:scale-90 transition-all border border-orange-400/20"
-                  >
-                    <Plus size={24} strokeWidth={4} />
-                  </button>
-                )}
-              </motion.div>
-            ))
+                    {/* Category and Mock Speed Line */}
+                    <div className="flex justify-between items-center text-xs text-gray-400 font-bold mt-1">
+                      <p className="uppercase tracking-wider text-[9px] text-gray-500">{item.category}</p>
+                      <p className="text-[9px] tracking-wide text-gray-500">• 15-25 min</p>
+                    </div>
+
+                    {/* Halka Divider */}
+                    <div className="h-px bg-white/5 my-3" />
+
+                    {/* Price and Add Button Line */}
+                    <div className="flex justify-between items-end mt-1">
+                      <div>
+                        <p className="text-gray-500 text-[9px] font-black uppercase tracking-widest leading-none mb-1">Price</p>
+                        <p className="text-orange-500 font-black text-xl leading-none">
+                          {item.variants ? (
+                            item.variants.half ? `₹${item.variants.half}` : `₹${item.variants.Plain}`
+                          ) : (
+                            `₹${item.price}`
+                          )}
+                        </p>
+                        {item.variants && (
+                          <span className="text-[9px] font-bold text-gray-400 mt-1 block">Options available</span>
+                        )}
+                      </div>
+
+                      {storeOpen && (
+                        <button 
+                          onClick={() => item.variants ? setSelectedProduct(item) : addItem(item)}
+                          className="px-5 py-2.5 bg-orange-500/10 text-orange-400 border border-orange-500/30 hover:bg-orange-500 hover:text-white rounded-xl font-black text-xs active:scale-95 transition-all flex items-center gap-1.5 uppercase shadow-md"
+                        >
+                          <Plus size={14} strokeWidth={3} />
+                          <span>ADD</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </motion.div>
+              );
+            })
           )}
         </div>
       </main>
@@ -335,12 +370,12 @@ export default function BbCafeHome() {
                     <p className="text-orange-500 font-black mt-1">₹{item.price}</p>
                   </div>
                   
-                  {/* Quantity Controller (Plus/Minus digital counter) */}
+                  {/* Quantity Controller (Plus/Minus) */}
                   <div className="flex items-center gap-2.5 bg-black/40 px-3 py-1.5 rounded-2xl border border-white/10 flex-shrink-0">
                     <button 
                       onClick={() => removeItem(item.id)} 
                       type="button"
-                      className="w-8 h-8 flex items-center justify-center bg-red-500/10 text-red-500 rounded-xl text-lg font-black active:scale-90 transition-all hover:bg-red-500/20"
+                      className="w-8 h-8 flex items-center justify-center bg-red-500/10 text-red-500 rounded-lg text-lg font-black active:scale-90 transition-all hover:bg-red-500/20"
                     >
                       -
                     </button>
@@ -352,7 +387,7 @@ export default function BbCafeHome() {
                     <button 
                       onClick={() => addItem(item)} 
                       type="button"
-                      className="w-8 h-8 flex items-center justify-center bg-green-500/10 text-green-500 rounded-xl text-lg font-black active:scale-90 transition-all hover:bg-green-500/20"
+                      className="w-8 h-8 flex items-center justify-center bg-green-500/10 text-green-500 rounded-lg text-lg font-black active:scale-90 transition-all hover:bg-green-500/20"
                     >
                       +
                     </button>
@@ -425,7 +460,6 @@ export default function BbCafeHome() {
                   type="button"
                   className="w-full bg-green-600 hover:bg-green-700 p-6 rounded-[2.5rem] font-black text-md shadow-xl shadow-green-600/10 flex items-center justify-center gap-3 active:scale-95 transition-all border border-green-500/20 text-white"
                 >
-                  {/* Official SVG WhatsApp Logo */}
                   <svg className="w-6 h-6 fill-current text-white flex-shrink-0" viewBox="0 0 24 24">
                     <path d="M12.037 21.978c-1.92 0-3.805-.502-5.46-1.457l-.391-.227-4.062 1.066 1.085-3.953-.25-.398C2.01 15.352 1.48 13.208 1.48 11.005 1.482 5.21 6.22 .495 12.037.495c2.818 0 5.467 1.1 7.46 3.099a10.45 10.45 0 0 1 3.093 7.42c-.002 5.797-4.74 10.513-10.553 10.513zm5.412-7.587c-.297-.15-1.758-.868-2.03-.96-.273-.092-.471-.137-.67.137-.197.275-.764.96-.938 1.144-.173.183-.347.206-.644.055-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.1-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.501-.669-.51l-.57-.011c-.198 0-.52.074-.793.372-.272.297-1.04.101-1.04 2.479 0 2.378 1.733 4.678 1.98 5.024.248.346 3.41 5.216 8.26 7.301 1.155.496 2.057.793 2.76 1.017 1.21.383 2.311.33 3.18.198 1.03-.15 2.158-.87 2.46-1.714.3-.842.3-1.564.21-1.714-.09-.15-.335-.24-.633-.39z"/>
                   </svg>
@@ -449,8 +483,8 @@ export default function BbCafeHome() {
               </div>
               
               <div className="space-y-4 text-left">
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Your Name</label>
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-gray-500 uppercase">Your Name</label>
                   <input 
                     type="text" 
                     placeholder="Enter your name..." 
@@ -461,8 +495,8 @@ export default function BbCafeHome() {
                   />
                 </div>
                 
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Mobile Number</label>
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-gray-500 uppercase">Mobile Number</label>
                   <input 
                     type="tel" 
                     maxLength={10} 
