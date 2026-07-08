@@ -4,7 +4,8 @@ import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyCaVEwWnh7_-uDWcvO1Fmfymy7kiSxbyMI",
+  // Yahan humne sahi API Key likh di hai (small 'l' ke sath):
+  apiKey: "AIzaSyCaVEwWnh7_-uDWcvOlFmfymy7kiSxbyMI",
   authDomain: "gen-lang-client-0229168883.firebaseapp.com",
   projectId: "gen-lang-client-0229168883",
   storageBucket: "gen-lang-client-0229168883.firebasestorage.app",
