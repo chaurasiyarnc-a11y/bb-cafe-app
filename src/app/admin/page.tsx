@@ -3,8 +3,11 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '@/lib/firebase'; 
 import { collection, onSnapshot, query, orderBy, doc, updateDoc, setDoc, addDoc, deleteDoc } from 'firebase/firestore';
-import { Power, Eye, EyeOff, User, MapPin, Calendar, CheckCircle2, LogOut, Loader2, Phone, Plus, Trash, Edit, X, Lock, BarChart3, Download, FolderGit2, Percent, Image } from 'lucide-react';
+import { Power, Eye, EyeOff, User, MapPin, Calendar, CheckCircle2, LogOut, Loader2, Phone, Plus, Trash, Edit, X, Lock, BarChart3, Download, Folder, Percent, ImageIcon } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
+
+// Categories mapping
+const ADD_CATEGORIES = ["Special Pizza", "Special Thali", "Paneer Special", "Special Mix veg", "Fast Food", "Super Cool", "Indian Bread", "Special Rice"];
 
 export default function AdminDashboard() {
   const [isVerified, setIsVerified] = useState(false);
@@ -109,8 +112,8 @@ export default function AdminDashboard() {
     return () => {
       unsubOrders();
       unsubProducts();
-      unsubStore();
       unsubCats();
+      unsubStore();
       unsubBanners();
       unsubCoupons();
       unsubReviews();
@@ -215,23 +218,40 @@ export default function AdminDashboard() {
     triggerCsvDownload(formattedData, `BumBumCafe_CustomersDirectory_${new Date().toLocaleDateString()}`, headers, keys);
   };
 
-  // Compute Dashboard Metrics (100% Free - Calculated Client-side)
-  const getDashboardMetrics = () => {
-    // Unique Customers computed directly from Firebase Orders array
-    const seenPhones = new Set();
-    orders.forEach(o => { if (o.customerPhone) seenPhones.add(String(o.customerPhone)); });
+  // --- FIXED: GET DAILY ANALYTICS METRICS ---
+  const getDailyAnalytics = () => {
+    const todayStr = new Date().toDateString();
+    const todayOrders = orders.filter(o => {
+      if (!o.timestamp) return false;
+      const orderDate = o.timestamp?.toDate ? o.timestamp.toDate().toDateString() : new Date(o.timestamp).toDateString();
+      return orderDate === todayStr;
+    });
 
-    // Lifetime Revenue / Business (Calculated safely)
-    const totalBusiness = orders.reduce((acc, curr) => acc + (Number(curr.total) || 0), 0);
+    const totalRevenue = todayOrders.reduce((acc, curr) => acc + (Number(curr.total) || 0), 0);
+    const activeCount = orders.filter(o => o.status === 'pending' || o.status === 'preparing').length;
 
     return {
-      revenue: totalBusiness,
-      ordersCount: orders.length,
-      customersCount: seenPhones.size
+      todayRevenue: totalRevenue,
+      todayCount: todayOrders.length,
+      activePending: activeCount
     };
   };
 
-  const stats = getDashboardMetrics();
+  // --- FIXED: GET LIFETIME DASHBOARD METRICS ---
+  const getLifetimeMetrics = () => {
+    const seenPhones = new Set();
+    orders.forEach(o => { if (o.customerPhone) seenPhones.add(String(o.customerPhone)); });
+    const totalBusiness = orders.reduce((acc, curr) => acc + (Number(curr.total) || 0), 0);
+
+    return {
+      lifetimeRevenue: totalBusiness,
+      lifetimeOrdersCount: orders.length,
+      lifetimeCustomersCount: seenPhones.size
+    };
+  };
+
+  const dailyStats = getDailyAnalytics();
+  const lifetimeStats = getLifetimeMetrics();
 
   // --- DYNAMIC CATEGORY ACTIONS ---
   const handleAddCategory = async (e: React.FormEvent) => {
@@ -313,11 +333,19 @@ export default function AdminDashboard() {
     } catch (err) { toast.error("Error creating coupon"); }
   };
 
-  const handleDeleteCoupon = async (id: string) => {
+  const handleDeleteCoupon = async (couponId: string) => {
     try {
-      await deleteDoc(collection(db, "coupons", id));
+      await deleteDoc(doc(db, "coupons", couponId));
       toast.success("Coupon Deleted!");
-    } catch (id) { toast.error("Error deleting coupon"); }
+    } catch (error) { toast.error("Error deleting coupon"); }
+  };
+
+  // --- OTHER MENU ITEM ACTIONS ---
+  const toggleItemVisibility = async (id: string, currentStatus: boolean) => {
+    try {
+      await updateDoc(doc(db, "products", id), { isVisible: !currentStatus });
+      toast.success("Visibility Updated");
+    } catch (e) { toast.error("Error updating product"); }
   };
 
   // --- ADD NEW PRODUCT ---
@@ -428,120 +456,12 @@ export default function AdminDashboard() {
 
     try {
       await updateDoc(doc(db, "products", editingProduct.id), updatedData);
-      toast.success("Product Updated!");
+      toast.success("Product Updated successfully!");
       setEditingProduct(null);
     } catch (e) {
       toast.error("Error updating product");
     }
   };
-
-  const handleBulkImport = async () => {
-    if (!window.confirm("BUM BUM CAFE PDF ke saare 80+ items ko database mein add karein?")) return;
-    toast.loading("Importing all menu items...", { id: "import" });
-    // Seeding menu items lists
-    const defaultMenu = [
-      { name: "Special Tea (स्पेशल चाय)", category: "Fast Food", price: 15, image: "https://images.unsplash.com/photo-1544787219-7f47ccb76574?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Black Tea (काली चाय)", category: "Fast Food", price: 20, image: "https://images.unsplash.com/photo-1508888620463-70b53b8004c3?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Special Coffee (स्पेशल कॉफी)", category: "Fast Food", price: 20, image: "https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Black Coffee (काली कॉफी)", category: "Fast Food", price: 25, image: "https://images.unsplash.com/photo-1497515114629-f71d768fd07c?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Mix Veg Maggie (मिक्स वेज मैगी)", category: "Fast Food", price: 30, variants: { half: 30, full: 50 }, image: "https://images.unsplash.com/photo-1569718212165-3a8278d5f624?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Pasta (पास्ता)", category: "Fast Food", price: 30, variants: { half: 30, full: 50 }, image: "https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Finger Chips (फिंगर चिप्स)", category: "Fast Food", price: 30, variants: { half: 30, full: 50 }, image: "https://images.unsplash.com/photo-1573080496219-bb080dd4f877?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Momos (मोमोस्)", category: "Fast Food", price: 30, variants: { half: 30, full: 50 }, image: "https://images.unsplash.com/photo-1534422298391-e4f8c172dddb?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Bombe Bhel (बॉम्बे भेल)", category: "Fast Food", price: 30, variants: { half: 30, full: 50 }, image: "https://images.unsplash.com/photo-1589301760014-d929f3979dbc?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Indori Poha (पोहा इंदौरी)", category: "Fast Food", price: 30, image: "https://images.unsplash.com/photo-1601050690597-df056fb4ce78?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Tikki Chaat (टिक्की चाट)", category: "Fast Food", price: 30, variants: { half: 30, full: 30 }, image: "https://images.unsplash.com/photo-1601050690597-df056fb4ce78?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Kachori Chhat (कचोरी चाट)", category: "Fast Food", price: 30, variants: { half: 30, full: 30 }, image: "https://images.unsplash.com/photo-1601050690597-df056fb4ce78?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Cheese Garlic Bread (चीस गालिक ब्रेड)", category: "Fast Food", price: 60, image: "https://images.unsplash.com/photo-1573140247632-f8fd74997d5c?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Burger (बर्गर)", category: "Fast Food", price: 30, image: "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Cheese Burger (चीस बर्गर)", category: "Fast Food", price: 40, image: "https://images.unsplash.com/photo-1521305916504-4a1121188589?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Paneer Sandwich (पनीर सैंडविच)", category: "Fast Food", price: 80, image: "https://images.unsplash.com/photo-1528735602780-2552fd46c7af?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Veg Cheese Sandwich (वेज चीस सैंडविच)", category: "Fast Food", price: 60, image: "https://images.unsplash.com/photo-1528735602780-2552fd46c7af?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Veg Spring Roll (वेज स्प्रिंग रोल)", category: "Fast Food", price: 50, image: "https://images.unsplash.com/photo-1541532713592-79a0317b6b77?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Manchuriyan (मंचुरियन)", category: "Fast Food", price: 30, variants: { half: 30, full: 50 }, image: "https://images.unsplash.com/photo-1512058564366-18510be2db19?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Manchuriyan Rice (मंचुरियन फ्राय राइस)", category: "Fast Food", price: 30, variants: { half: 30, full: 50 }, image: "https://images.unsplash.com/photo-1512058564366-18510be2db19?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Chawmeen (चाउमीन)", category: "Fast Food", price: 30, variants: { half: 30, full: 50 }, image: "https://images.unsplash.com/photo-1585032226651-759b368d7246?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Chines Samosa (चायनीस समोसा)", category: "Fast Food", price: 30, image: "https://images.unsplash.com/photo-1601050690597-df056fb4ce78?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Masala Dosa (मसाला डोसा)", category: "Fast Food", price: 30, image: "https://images.unsplash.com/photo-1589301760014-d929f3979dbc?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Masala Uttapam (मसाला उत्तपम्)", category: "Fast Food", price: 50, image: "https://images.unsplash.com/photo-1589301760014-d929f3979dbc?auto=format&fit=crop&w=300&q=80", isVisible: true },
-
-      // Page 3: Cool Cool Drinks
-      { name: "Cold Coffee (कोल्ड कॉफी)", category: "Super Cool", price: 50, image: "https://images.unsplash.com/photo-1517701604599-bb29b565090c?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Chocolatey Cold Coffee", category: "Super Cool", price: 60, image: "https://images.unsplash.com/photo-1541167760496-1628856ab772?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Mango Shake (मैगो शेक)", category: "Super Cool", price: 60, image: "https://images.unsplash.com/photo-1571006831117-f582da1551a3?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Black Currant (ब्लैक करंट शेक)", category: "Super Cool", price: 60, image: "https://images.unsplash.com/photo-1571006831117-f582da1551a3?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Blueberry Shake (ब्लूवेरी शेक)", category: "Super Cool", price: 60, image: "https://images.unsplash.com/photo-1571006831117-f582da1551a3?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Strawberry Shake (स्ट्रोवेरी शेक)", category: "Super Cool", price: 60, image: "https://images.unsplash.com/photo-1571006831117-f582da1551a3?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Chocolate Shake (चॉकलेट शेक)", category: "Super Cool", price: 70, image: "https://images.unsplash.com/photo-1571006831117-f582da1551a3?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Virgin Mojito (वर्जिन मोजिटो)", category: "Super Cool", price: 60, image: "https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Blue Lagoon (ब्लू लैगून)", category: "Super Cool", price: 90, image: "https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Spiced Jaljeera (जलजीरा)", category: "Super Cool", price: 50, image: "https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Kala Khatta Fizz (काला खट्टा)", category: "Super Cool", price: 60, image: "https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Cold Drinks (कोल्ड ड्रिंक्स)", category: "Super Cool", price: 30, image: "https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Bottled Water (बोतलबंद पानी)", category: "Super Cool", price: 20, image: "https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Special Lassi (स्पेशल लस्सी)", category: "Super Cool", price: 30, image: "https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Flavored Lassi (फ्लेवर्ड लस्सी)", category: "Super Cool", price: 40, image: "https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Fruits Lassi (ड्राईफ्रूट लस्सी)", category: "Super Cool", price: 50, image: "https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?auto=format&fit=crop&w=300&q=80", isVisible: true },
-
-      // Page 4: Pizza with 4 sizes
-      { name: "Cheese Corn Pizza", category: "Special Pizza", price: 80, variants: { Small: 80, Medium: 110, Large: 140, "Extra Large": 180 }, image: "https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Cheese Onion Pizza", category: "Special Pizza", price: 80, variants: { Small: 80, Medium: 110, Large: 140, "Extra Large": 180 }, image: "https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Cheese Capsicum Pizza", category: "Special Pizza", price: 80, variants: { Small: 80, Medium: 110, Large: 140, "Extra Large": 180 }, image: "https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Mix Veg Cheese Pizza", category: "Special Pizza", price: 90, variants: { Small: 90, Medium: 120, Large: 160, "Extra Large": 200 }, image: "https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Mix Veg Paneer Pizza", category: "Special Pizza", price: 100, variants: { Small: 100, Medium: 140, Large: 180, "Extra Large": 250 }, image: "https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Paneer Makhani Pizza", category: "Special Pizza", price: 140, variants: { Medium: 140, Large: 180 }, image: "https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Super Deluxe Pizza", category: "Special Pizza", price: 180, variants: { Medium: 180, Large: 200 }, image: "https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Farmhouse Pizza", category: "Special Pizza", price: 320, variants: { Medium: 320, Large: 350 }, image: "https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Tandoori Paneer Pizza", category: "Special Pizza", price: 280, variants: { Medium: 280, Large: 300 }, image: "https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Bum Bum Cafe Special Pizza", category: "Special Pizza", price: 200, variants: { Medium: 200, Large: 250 }, image: "https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=300&q=80", isVisible: true }
-    ];
-
-    try {
-      for (const item of defaultMenu) {
-        await addDoc(collection(db, "products"), item);
-      }
-      toast.dismiss("import");
-      toast.success("Successfully Imported!");
-    } catch (e) {
-      toast.dismiss("import");
-      toast.error("Error seeding items");
-    }
-  };
-
-  // --- RENDERING LOGIC ---
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-[#0A0A0A] flex flex-col items-center justify-center text-white font-sans">
-        <Loader2 className="animate-spin text-orange-500 mb-4" size={40} />
-        <p className="font-bold tracking-widest animate-pulse uppercase">Loading Admin System...</p>
-      </div>
-    );
-  }
-
-  // PASSCODE LOCK SCREEN
-  if (!isVerified) {
-    return (
-      <div className="min-h-screen bg-[#0A0A0A] flex items-center justify-center p-6 text-center text-white">
-        <Toaster />
-        <form onSubmit={handlePasscodeLogin} className="bg-[#111] w-full max-w-sm p-10 rounded-[3rem] border border-white/10 text-center space-y-6 shadow-2xl">
-          <Lock className="mx-auto text-orange-500 animate-bounce" size={48} />
-          <div>
-            <h2 className="text-3xl font-black mb-1">Admin Panel</h2>
-            <p className="text-gray-500 font-semibold text-xs">Enter your secret PIN to access dashboard.</p>
-          </div>
-          
-          <div className="space-y-2">
-            <input type="password" placeholder="Enter 6-digit PIN" maxLength={6} value={passcode} onChange={(e) => setPasscode(e.target.value)}
-              className="w-full bg-white/5 border border-white/10 p-4 rounded-2xl text-center text-2xl font-bold tracking-[0.5em] outline-none focus:border-orange-500 text-white" required />
-          </div>
-
-          <button type="submit" className="w-full bg-orange-500 p-5 rounded-2xl font-black text-lg shadow-xl uppercase active:scale-95 transition-all">Unlock Dashboard</button>
-          <button type="button" onClick={() => window.location.href = "/"} className="mt-8 text-gray-500 text-xs font-bold uppercase tracking-widest block mx-auto">Go to Home Page</button>
-        </form>
-      </div>
-    );
-  }
 
   return (
     <div className="bg-[#050505] min-h-screen text-white pb-20 font-sans">
@@ -579,24 +499,43 @@ export default function AdminDashboard() {
           <div className="space-y-6">
             <h3 className="text-xl font-black text-orange-500 uppercase tracking-wider flex items-center gap-2"><BarChart3 size={20}/> Sales Dashboard</h3>
             
-            {/* Sales Stats KPIs */}
+            {/* Sales Stats Today Grid (Daily) */}
+            <div className="bg-[#111] border border-white/5 p-4 rounded-3xl space-y-3">
+              <p className="text-[10px] font-black uppercase text-orange-400 tracking-wider">🎯 Today's Quick Insights</p>
+              <div className="grid grid-cols-3 gap-3">
+                <div className="bg-white/[0.01] border border-white/5 p-4 rounded-2xl text-center">
+                  <p className="text-[9px] font-bold text-gray-500 uppercase">Today's Sales</p>
+                  <h3 className="text-lg font-black text-green-400 mt-1">₹{dailyStats.todayRevenue}</h3>
+                </div>
+                <div className="bg-white/[0.01] border border-white/5 p-4 rounded-2xl text-center">
+                  <p className="text-[9px] font-bold text-gray-500 uppercase">Today's Orders</p>
+                  <h3 className="text-lg font-black text-yellow-400 mt-1">{dailyStats.todayCount}</h3>
+                </div>
+                <div className="bg-white/[0.01] border border-white/5 p-4 rounded-2xl text-center">
+                  <p className="text-[9px] font-bold text-gray-500 uppercase">Active Kitchen</p>
+                  <h3 className="text-lg font-black text-orange-500 mt-1">{dailyStats.activePending}</h3>
+                </div>
+              </div>
+            </div>
+
+            {/* Sales Stats Lifetime KPIs */}
             <div className="grid grid-cols-3 gap-3">
               <div className="bg-white/[0.02] border border-white/5 p-4 rounded-3xl text-center">
                 <p className="text-[9px] font-black text-gray-500 uppercase">Lifetime Sales</p>
-                <h3 className="text-lg font-black text-green-400 mt-1">₹{stats.revenue}</h3>
+                <h3 className="text-lg font-black text-green-400 mt-1">₹{lifetimeStats.lifetimeRevenue}</h3>
               </div>
               <div className="bg-white/[0.02] border border-white/5 p-4 rounded-3xl text-center">
                 <p className="text-[9px] font-black text-gray-500 uppercase">Total Orders</p>
-                <h3 className="text-lg font-black text-yellow-400 mt-1">{stats.ordersCount}</h3>
+                <h3 className="text-lg font-black text-yellow-400 mt-1">{lifetimeStats.lifetimeOrdersCount}</h3>
               </div>
               <div className="bg-white/[0.02] border border-white/5 p-4 rounded-3xl text-center">
                 <p className="text-[9px] font-black text-gray-500 uppercase">Total Clients</p>
-                <h3 className="text-lg font-black text-orange-400 mt-1">{stats.customersCount}</h3>
+                <h3 className="text-lg font-black text-orange-400 mt-1">{lifetimeStats.lifetimeCustomersCount}</h3>
               </div>
             </div>
 
             {/* Excel Exports Buttons */}
-            <div className="grid grid-cols-2 gap-3 bg-white/[0.01] border border-white/5 p-4 rounded-[2rem] shadow-xl">
+            <div className="grid grid-cols-2 gap-3 bg-[#111]/30 border border-white/5 p-4 rounded-[2rem] shadow-xl">
               <button onClick={handleExportOrders} className="bg-green-600 hover:bg-green-700 text-white font-black text-xs py-4 px-3 rounded-2xl flex items-center justify-center gap-2 active:scale-95 transition-all uppercase shadow-md">
                 <Download size={14}/> Sales Ledger Excel
               </button>
@@ -605,7 +544,7 @@ export default function AdminDashboard() {
               </button>
             </div>
 
-            {/* Permanent Orders Ledger (No Delete Option to Preserve Financial Record) */}
+            {/* Permanent Orders Ledger */}
             <div className="space-y-4">
               <h4 className="text-sm font-black text-gray-400 uppercase tracking-widest pt-2">📚 Permanent Financial Ledger</h4>
               {orders.length === 0 ? (
@@ -696,8 +635,8 @@ export default function AdminDashboard() {
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-gray-400 uppercase">Category</label>
                   <select value={newCategory} onChange={(e) => setNewCategory(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" required>
-                    {currentCategories.filter(c => c !== "All").map(cat => (
-                      <option key={cat} value={cat} className="bg-[#111]">{cat}</option>
+                    {categories.filter(c => c.name !== "All").map(cat => (
+                      <option key={cat.id} value={cat.name} className="bg-[#111]">{cat.name}</option>
                     ))}
                   </select>
                 </div>
@@ -750,7 +689,6 @@ export default function AdminDashboard() {
               </form>
             )}
 
-            
             {/* EDIT PRODUCT FORM */}
             {editingProduct && (
               <form onSubmit={handleUpdateProduct} className="bg-[#151515] border-2 border-orange-500/50 p-6 rounded-[2.5rem] space-y-4 relative">
@@ -765,8 +703,8 @@ export default function AdminDashboard() {
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-gray-400 uppercase">Category</label>
                   <select value={editCategory} onChange={(e) => setEditCategory(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" required>
-                    {currentCategories.filter(c => c !== "All").map(cat => (
-                      <option key={cat} value={cat} className="bg-[#111]">{cat}</option>
+                    {categories.filter(c => c.name !== "All").map(cat => (
+                      <option key={cat.id} value={cat.name} className="bg-[#111]">{cat.name}</option>
                     ))}
                   </select>
                 </div>
@@ -857,7 +795,7 @@ export default function AdminDashboard() {
         {tab === 'categories' && (
           <div className="space-y-6">
             <form onSubmit={handleAddCategory} className="bg-white/[0.02] border border-white/5 p-6 rounded-[2.5rem] space-y-4">
-              <h3 className="text-lg font-black text-orange-500 italic uppercase flex items-center gap-2"><FolderGit2 size={18}/> Add Category</h3>
+              <h3 className="text-lg font-black text-orange-500 italic uppercase flex items-center gap-2"><Folder size={18}/> Add Category</h3>
               <div className="grid grid-cols-2 gap-3">
                 <input type="text" placeholder="Category Name" value={newCatName} onChange={(e) => setNewCatName(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-xs font-black text-white" required />
                 <input type="url" placeholder="Image URL link" value={newCatImage} onChange={(e) => setNewCatImage(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-xs font-black text-white" required />
@@ -873,11 +811,9 @@ export default function AdminDashboard() {
                     <h4 className="font-black text-sm text-gray-200">{c.name}</h4>
                   </div>
                   <div className="flex items-center gap-2">
-                    {/* Toggle hide/unhide */}
                     <button onClick={() => toggleCategoryVisibility(c.id, c.isVisible !== false)} className={`p-3 rounded-xl transition-all ${c.isVisible !== false ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
                       {c.isVisible !== false ? <Eye size={18}/> : <EyeOff size={18}/>}
                     </button>
-                    {/* Delete dynamic category */}
                     <button onClick={() => handleDeleteCategory(c.id)} className="p-3 bg-red-500/10 text-red-500 rounded-xl hover:bg-red-500/20 active:scale-95 transition-all">
                       <Trash size={18}/>
                     </button>
@@ -892,8 +828,15 @@ export default function AdminDashboard() {
         {tab === 'banners' && (
           <div className="space-y-6">
             <form onSubmit={handleAddBanner} className="bg-white/[0.02] border border-white/5 p-6 rounded-[2.5rem] space-y-4">
-              <h3 className="text-lg font-black text-orange-500 italic uppercase flex items-center gap-2"><Image size={18}/> Add Banner</h3>
-              <input type="url" placeholder="Paste image url here..." value={newBannerUrl} onChange={(e) => setNewBannerUrl(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-xs font-bold text-white" required />
+              <h3 className="text-lg font-black text-orange-500 italic uppercase flex items-center gap-2"><ImageIcon size={18}/> Add Banner</h3>
+              <input 
+                type="url" 
+                placeholder="Paste offer image url here..." 
+                value={newBannerUrl} 
+                onChange={(e) => setNewBannerUrl(e.target.value)} 
+                className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-xs font-bold text-white" 
+                required 
+              />
               <button type="submit" className="w-full bg-green-600 text-white p-4 rounded-xl font-black text-sm uppercase">Add Banner Image</button>
             </form>
 
@@ -910,7 +853,7 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* --- TAB 6: COUPONS TAB --- */}
+        {/* --- TAB 6: MANAGE COUPONS TAB --- */}
         {tab === 'coupons' && (
           <div className="space-y-6">
             <form onSubmit={handleAddCoupon} className="bg-white/[0.02] border border-white/5 p-6 rounded-[2.5rem] space-y-4">
@@ -919,7 +862,7 @@ export default function AdminDashboard() {
                 <input type="text" placeholder="CODE (e.g. WELCOME)" value={newCouponCode} onChange={(e) => setNewCouponCode(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-xs font-black uppercase text-white" required />
                 <input type="number" placeholder="Discount (₹)" value={newCouponValue} onChange={(e) => setNewCouponValue(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-xs font-black text-white" required />
               </div>
-              <button type="submit" className="w-full bg-green-600 text-white p-4 rounded-xl font-black text-sm uppercase animate-pulse">Create Coupon</button>
+              <button type="submit" className="w-full bg-green-600 text-white p-4 rounded-xl font-black text-sm uppercase">Create Coupon</button>
             </form>
 
             <div className="space-y-3">
@@ -938,7 +881,7 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* --- TAB 7: REVIEWS MODERATION --- */}
+        {/* --- TAB 7: APPROVE FEEDBACK REVIEWS TAB --- */}
         {tab === 'reviews' && (
           <div className="space-y-4">
             {reviews.length === 0 && <p className="text-center text-gray-600 py-16 font-bold uppercase tracking-widest">No feedback reviews yet...</p>}
