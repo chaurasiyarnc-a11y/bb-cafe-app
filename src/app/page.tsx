@@ -7,10 +7,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
 import { useCartStore } from '../store/useCartStore';
 
-// Static Fallback Categories
-const FALLBACK_CATEGORIES = ["All", "Special Pizza", "Special Thali", "Paneer Special", "Special Mix veg", "Fast Food", "Super Cool", "Indian Bread", "Special Rice"];
+// CATEGORIES
+const CATEGORIES = ["All", "Special Pizza", "Special Thali", "Paneer Special", "Special Mix veg", "Fast Food", "Super Cool", "Indian Bread", "Special Rice"];
 
-// Static Fallback Images
+// Beautiful round category icons mapped for Zomato-style circular grid
 const CATEGORY_IMAGES: { [key: string]: string } = {
   "All": "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=150&q=80",
   "Special Pizza": "https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=150&q=80",
@@ -23,6 +23,7 @@ const CATEGORY_IMAGES: { [key: string]: string } = {
   "Special Rice": "https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?auto=format&fit=crop&w=150&q=80"
 };
 
+// Quick Review Suggestions to make it extremely easy to write reviews on mobile
 const REVIEW_SUGGESTIONS = [
   "Swaad Zabardast! 😋",
   "Super Fast Delivery 🛵",
@@ -34,6 +35,7 @@ const REVIEW_SUGGESTIONS = [
   "Best Thali Ever 🍱"
 ];
 
+// Pre-written Default Reviews (Displays if Firestore reviews collection is empty)
 const DEFAULT_REVIEWS = [
   { id: "def1", name: "Gaurav Soni", rating: 5, comment: "Bum Bum Cafe ki paneer pizza sach me pure Mohandra me best hai! Extra cheese is real love. ⭐⭐⭐⭐⭐" },
   { id: "def2", name: "Anjali Patel", rating: 5, comment: "Fast food packing bahut achi thi, delivery boy behavior was also very polite. Recommended! ⭐⭐⭐⭐⭐" },
@@ -44,6 +46,7 @@ export default function BbCafeHome() {
   const store = useCartStore() as any;
   const cart = store?.items || [];
   
+  // Safe destructuring
   const addItem = store?.addItem || (() => {});
   const removeItem = store?.removeItem || (() => {});
   const clearCart = store?.clearCart || (() => {});
@@ -56,7 +59,7 @@ export default function BbCafeHome() {
   const [storeOpen, setStoreOpen] = useState(true);
   const [mounted, setMounted] = useState(false);
   
-  // Contact details
+  // Free Contact Form States (Bypassed OTP)
   const [customerDetails, setCustomerDetails] = useState<{ name: string, phone: string } | null>(null);
   const [tempName, setTempName] = useState("");
   const [tempPhone, setTempPhone] = useState("");
@@ -82,9 +85,11 @@ export default function BbCafeHome() {
   const [reviewComment, setReviewComment] = useState("");
   const [reviewRating, setReviewRating] = useState(5);
   
+  // Coupon checkout states
   const [enteredCoupon, setEnteredCoupon] = useState("");
   const [appliedCoupon, setAppliedCoupon] = useState<any>(null);
 
+  // Pizza customization states
   const [chosenSize, setChosenSize] = useState<string>("");
   const [chosenPrice, setChosenPrice] = useState<number>(0);
   const [addonCheese, setAddonCheese] = useState(false);
@@ -92,7 +97,7 @@ export default function BbCafeHome() {
 
   useEffect(() => {
     setMounted(true);
-    // Realtime Store Status
+    // Check Store Status
     const unsubStore = onSnapshot(doc(db, "settings", "store"), (d) => {
       if(d.exists()) setStoreOpen(d.data().isOpen);
     });
@@ -125,7 +130,7 @@ export default function BbCafeHome() {
       setReviews(allRev.filter((r: any) => r.isApproved === true));
     });
 
-    // Load saved customer info
+    // Mobile local memory checking
     const savedDetails = localStorage.getItem('bb_cafe_customer');
     if (savedDetails) {
       try {
@@ -162,7 +167,7 @@ export default function BbCafeHome() {
   // Compute dynamic categories cleanly
   const currentCategories = dbCategories.length > 0 
     ? ["All", ...dbCategories.map(c => c.name)]
-    : FALLBACK_CATEGORIES;
+    : CATEGORIES;
 
   const getCategoryImage = (catName: string) => {
     const found = dbCategories.find(c => c.name === catName);
@@ -206,6 +211,11 @@ export default function BbCafeHome() {
     return matchesCategory && matchesSearch;
   });
 
+  // Start tracking immediately when new order placed
+  const startOrderTracking = (orderId: string) => {
+    localStorage.setItem('bb_cafe_last_order_id', orderId);
+  };
+
   // --- WHATSAPP ORDER LOGIC ---
   const sendWhatsAppOrder = async () => {
     if (!customerDetails) {
@@ -226,7 +236,7 @@ export default function BbCafeHome() {
 
     try {
       // 1. Add order to Firestore
-      await addDoc(collection(db, "orders"), {
+      const docRef = await addDoc(collection(db, "orders"), {
         tokenNumber, 
         customerName: customerDetails?.name || "Customer",
         customerPhone: customerDetails?.phone || "No Phone", 
@@ -241,9 +251,9 @@ export default function BbCafeHome() {
 
       // 2. Increment Customer's Loyalty points securely in Firestore
       if (pointsEarned > 0) {
-        await setDoc(doc(db, "customer_points", customerDetails.phone), {
+        await setDoc(doc(db, "customer_points", customerDetails.phone.replace("+91", "")), {
           name: customerDetails.name,
-          phone: customerDetails.phone,
+          phone: customerDetails.phone.replace("+91", ""),
           points: increment(pointsEarned),
           lastActive: new Date()
         }, { merge: true });
@@ -301,6 +311,43 @@ export default function BbCafeHome() {
     setCustomerDetails(details);
     setIsLoginOpen(false);
     toast.success(`Welcome ${tempName}!`);
+  };
+
+  // Safe display price helper (Fixed placement inside scope)
+  const getDisplayPrice = (item: any) => {
+    if (item?.variants && typeof item.variants === 'object') {
+      const prices = Object.values(item.variants).map(Number).filter(n => !isNaN(n));
+      if (prices.length > 0) {
+        const minPrice = Math.min(...prices);
+        const maxPrice = Math.max(...prices);
+        return minPrice === maxPrice ? `₹${minPrice}` : `₹${minPrice} - ₹${maxPrice}`;
+      }
+    }
+    return `₹${item?.price || 0}`;
+  };
+
+  const handleAddToCart = () => {
+    if (!chosenSize) return toast.error("Please select a size first!");
+    
+    const basePrice = Number(chosenPrice);
+    const addonsTotal = (addonCheese ? 30 : 0) + (addonVeg ? 20 : 0);
+    const finalPrice = basePrice + addonsTotal;
+
+    let finalName = `${selectedProduct.name} (${chosenSize})`;
+    if (addonCheese) finalName += " + Extra Cheese";
+    if (addonVeg) finalName += " + Extra Veg";
+
+    const uniqueCartId = `${selectedProduct.id}-${chosenSize}-${addonCheese ? 'cheese' : 'no'}-${addonVeg ? 'veg' : 'no'}`;
+
+    addItem({
+      ...selectedProduct,
+      id: uniqueCartId,
+      name: finalName,
+      price: finalPrice
+    });
+
+    toast.success(`${chosenSize} Pizza added to cart!`);
+    setSelectedProduct(null); setChosenSize(""); setChosenPrice(0); setAddonCheese(false); setAddonVeg(false);
   };
 
   if (!mounted) return null;
@@ -473,312 +520,6 @@ export default function BbCafeHome() {
           )}
         </div>
       </main>
-
-      {/* --- REVIEWS DRAWER POPUP --- */}
-      <AnimatePresence>
-        {isReviewsDrawerOpen && (
-          <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[120] overflow-y-auto">
-            <div className="p-6 max-w-lg mx-auto pb-32">
-              <div className="flex justify-between items-center mb-8">
-                <div>
-                  <h2 className="text-3xl font-black tracking-tight text-white">Guest Reviews</h2>
-                  <p className="text-xs text-gray-500 font-bold uppercase tracking-widest mt-0.5">Rating: 4.8/5.0 ★</p>
-                </div>
-                <button onClick={() => setIsReviewsDrawerOpen(false)} className="p-3 bg-white/5 rounded-full text-white active:scale-90 transition-all"><X size={24} /></button>
-              </div>
-
-              <div className="space-y-4">
-                {(reviews.length === 0 ? DEFAULT_REVIEWS : reviews).map((r: any) => (
-                  <div key={r.id} className="bg-white/[0.03] border border-white/5 rounded-[2rem] p-6 space-y-3 shadow-lg">
-                    <div className="flex justify-between items-center">
-                      <h4 className="font-black text-sm text-orange-500">{r.name}</h4>
-                      <div className="flex items-center gap-1 text-yellow-400 bg-yellow-500/10 border border-yellow-500/20 px-2 py-0.5 rounded-lg">
-                        <Star size={10} fill="currentColor"/>
-                        <span className="text-[10px] font-extrabold">{r.rating}</span>
-                      </div>
-                    </div>
-                    <p className="text-xs text-gray-300 font-medium leading-relaxed italic">"{r.comment}"</p>
-                  </div>
-                ))}
-              </div>
-
-              <div className="fixed bottom-6 left-0 w-full px-6 z-50">
-                <button onClick={() => setIsReviewFormOpen(true)} className="w-full max-w-md mx-auto bg-orange-500 hover:bg-orange-600 text-black py-4.5 rounded-[2rem] font-black text-sm uppercase tracking-wider shadow-2xl active:scale-95 transition-all">✍️ Write a Review</button>
-              </div>
-            </div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* --- WRITE A REVIEW MODAL --- */}
-      <AnimatePresence>
-        {isReviewFormOpen && (
-          <div className="fixed inset-0 bg-black/95 z-[200] flex items-center justify-center p-6">
-            <form onSubmit={handleReviewSubmit} className="bg-[#111] w-full max-w-md p-8 rounded-[3rem] border border-white/10 text-center space-y-4">
-              <h3 className="text-2xl font-black text-orange-500 uppercase italic">Your Feedback</h3>
-              <p className="text-xs text-gray-500 font-semibold">Humare swaad ke baare mein apni raye dein</p>
-              
-              <div className="space-y-4 text-left">
-                <div>
-                  <label className="text-[10px] font-black uppercase text-gray-500 tracking-wider">Your Name</label>
-                  <input type="text" placeholder="Apna naam likhein..." value={reviewName} onChange={(e) => setReviewName(e.target.value)} required
-                    className="w-full bg-white/5 border border-white/10 p-3.5 rounded-xl text-sm font-bold text-white outline-none focus:border-orange-500" />
-                </div>
-
-                <div>
-                  <label className="text-[10px] font-black uppercase text-gray-500 tracking-wider">Rating</label>
-                  <div className="flex gap-2 text-yellow-400 py-1 cursor-pointer">
-                    {[1, 2, 3, 4, 5].map((star) => (
-                      <Star key={star} size={24} fill={reviewRating >= star ? "currentColor" : "none"} onClick={() => setReviewRating(star)} />
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <label className="text-[10px] font-black uppercase text-gray-500 tracking-wider block mb-1.5">Quick Suggestions:</label>
-                  <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto no-scrollbar">
-                    {REVIEW_SUGGESTIONS.map((tag, idx) => (
-                      <button key={idx} type="button" onClick={() => handleAddSuggestion(tag)} className="bg-white/5 border border-white/5 text-[9px] font-bold text-gray-300 px-2.5 py-1 rounded-lg hover:bg-orange-500/10 active:scale-95 transition-all">{tag}</button>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <label className="text-[10px] font-black uppercase text-gray-500 tracking-wider">Comment</label>
-                  <textarea placeholder="Khana kaisa laga?..." value={reviewComment} onChange={(e) => setReviewComment(e.target.value)} required rows={3}
-                    className="w-full bg-white/5 border border-white/10 p-3.5 rounded-xl text-sm font-bold text-white outline-none focus:border-orange-500 resize-none" />
-                </div>
-              </div>
-
-              <div className="flex gap-2 pt-2">
-                <button type="submit" className="flex-1 bg-orange-500 hover:bg-orange-600 text-black font-black p-4 rounded-xl text-sm active:scale-95 transition-all uppercase">SUBMIT</button>
-                <button type="button" onClick={() => setIsReviewFormOpen(false)} className="bg-white/5 text-gray-400 font-bold p-4 rounded-xl text-sm active:scale-95 transition-all">CANCEL</button>
-              </div>
-            </form>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* --- VARIANTS POPUP --- */}
-      <AnimatePresence>
-        {selectedProduct && (
-          <div className="fixed inset-0 bg-black/95 backdrop-blur-md z-[100] flex items-end">
-            <motion.div initial={{ y: 300 }} animate={{ y: 0 }} exit={{ y: 300 }} className="bg-[#111] w-full p-8 rounded-t-[3.5rem] border-t border-white/10 max-w-lg mx-auto">
-              <div className="w-16 h-1.5 bg-white/15 rounded-full mx-auto mb-6" />
-              <h3 className="text-3xl font-black mb-1 text-center tracking-tight">{selectedProduct?.name}</h3>
-              <p className="text-orange-500 font-black mb-6 uppercase tracking-widest text-[10px] text-center">Customize Your Order</p>
-              
-              <div className="space-y-3 mb-6">
-                <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">1. Select Portion Size:</p>
-                <div className="grid grid-cols-2 gap-2">
-                  {Object.entries(selectedProduct?.variants || {}).map(([size, price]: any) => (
-                    <button 
-                      type="button"
-                      key={size} 
-                      onClick={() => { setChosenSize(size); setChosenPrice(Number(price)); }}
-                      className={`p-4 rounded-2xl flex flex-col items-center justify-center border transition-all ${
-                        chosenSize === size 
-                          ? 'bg-orange-500/10 border-orange-500 text-orange-500' 
-                          : 'bg-white/[0.03] border-white/5 text-gray-400 hover:border-white/15'
-                      }`}
-                    >
-                      <span className="capitalize text-sm font-black">{size}</span>
-                      <span className="font-extrabold text-xs mt-1 text-white">₹{price}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {(selectedProduct?.category === "Special Pizza" || selectedProduct?.name?.toLowerCase().includes("pizza")) && (
-                <div className="space-y-3 mb-8 border-t border-white/5 pt-4">
-                  <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">2. Optional Add-ons:</p>
-                  <div className="space-y-2">
-                    <div 
-                      onClick={() => setAddonCheese(!addonCheese)}
-                      className={`p-5 rounded-3xl flex justify-between items-center border border-white/5 hover:border-orange-500/50 hover:bg-orange-500/10 transition-all ${addonCheese ? 'bg-orange-500/10 border-orange-500/50' : 'bg-white/[0.03]'}`}
-                    >
-                      <span className="text-xs font-black uppercase text-gray-300">🧀 Extra Cheese (Cheese burst)</span>
-                      <span className="text-xs font-black text-orange-500">+₹30</span>
-                    </div>
-
-                    <div 
-                      onClick={() => setAddonVeg(!addonVeg)}
-                      className={`p-5 rounded-3xl flex justify-between items-center border border-white/5 hover:border-orange-500/50 hover:bg-orange-500/10 transition-all ${addonVeg ? 'bg-orange-500/10 border-orange-500/50' : 'bg-white/[0.03]'}`}
-                    >
-                      <span className="text-xs font-black uppercase text-gray-300">🥦 Extra Vegetables / Paneer</span>
-                      <span className="text-xs font-black text-orange-500">+₹20</span>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              <button 
-                type="button"
-                onClick={handleAddToCart}
-                className="w-full bg-orange-500 hover:bg-orange-600 p-5 rounded-2xl font-black text-md shadow-xl active:scale-95 transition-all uppercase"
-              >
-                Confirm • ₹{chosenPrice + (addonCheese ? 30 : 0) + (addonVeg ? 20 : 0)}
-              </button>
-              
-              <button type="button" onClick={() => { setSelectedProduct(null); setChosenSize(""); setChosenPrice(0); setAddonCheese(false); setAddonVeg(false); }} className="w-full mt-4 p-2 text-gray-500 font-black uppercase text-xs tracking-widest">Close</button>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* --- CART / CHECKOUT SIDEBAR --- */}
-      <AnimatePresence>
-        {isCartOpen && (
-          <div className="fixed inset-0 bg-black z-[110] overflow-y-auto">
-            <div className="p-6 max-w-lg mx-auto pb-32">
-              <div className="flex justify-between items-center mb-8">
-                <h2 className="text-3xl font-black tracking-tight">Your Order</h2>
-                <button onClick={() => setIsCartOpen(false)} className="p-3 bg-white/5 rounded-full"><X size={24} /></button>
-              </div>
-
-              {cart.map((item: any) => (
-                <div key={item.id} className="flex justify-between items-center bg-white/[0.02] p-5 rounded-3xl mb-4 border border-white/5">
-                  <div className="min-w-0 pr-3">
-                    <h4 className="font-bold text-sm text-gray-100 truncate">{item?.name || "Item"}</h4>
-                    <p className="text-orange-500 font-black mt-1">₹{item?.price || 0}</p>
-                  </div>
-                  
-                  <div className="flex items-center gap-2.5 bg-black/40 px-3 py-1.5 rounded-2xl border border-white/10 flex-shrink-0">
-                    <button onClick={() => removeItem(item.id)} type="button" className="w-8 h-8 flex items-center justify-center bg-red-500/10 text-red-500 rounded-lg text-lg font-black active:scale-90 transition-all hover:bg-red-500/20">-</button>
-                    <span className="font-black text-sm px-1.5 text-white min-w-[15px] text-center">{item.quantity}</span>
-                    <button onClick={() => addItem(item)} type="button" className="w-8 h-8 flex items-center justify-center bg-green-500/10 text-green-500 rounded-lg text-lg font-black active:scale-90 transition-all hover:bg-green-500/20">+</button>
-                  </div>
-                </div>
-              ))}
-
-              <div className="mt-10 space-y-6">
-                
-                {/* PDF rules alert widget */}
-                <div className="bg-orange-500/10 border border-orange-500/20 rounded-[2rem] p-5 space-y-2">
-                  <div className="flex items-center gap-2 text-orange-400 font-black text-xs uppercase tracking-wider">
-                    <Sparkles size={16}/> <span>Free Delivery Rules</span>
-                  </div>
-                  <ul className="text-[11px] text-gray-400 font-bold space-y-1">
-                    <li>• Mohandra Town: Free above ₹99 <span className="text-green-500">({getTotal() >= 99 ? 'Achieved' : 'Need ₹' + (99 - getTotal()) + ' more'})</span></li>
-                    <li>• Within 5 Km: Free above ₹499</li>
-                    <li>• Within 12 Km: Free above ₹999</li>
-                  </ul>
-                </div>
-
-                {/* --- 🎁 NEW LOYALTY POINTS BOARD FOR CUSTOMERS --- */}
-                {customerDetails && (
-                  <div className="bg-yellow-400/5 border border-yellow-400/20 rounded-[2rem] p-5 space-y-3">
-                    <div className="flex items-center gap-2 text-yellow-400 font-black text-xs uppercase tracking-widest">
-                      <span>⭐ BUM BUM LOYALTY CLUB</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <div>
-                        <h4 className="text-3xl font-black text-white">{customerPoints} <span className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Points</span></h4>
-                        <p className="text-[9px] text-gray-400 font-medium mt-1">Spend ₹100 = Get 1 Point! Redeem inside Cafe.</p>
-                      </div>
-                      <div className="text-right text-[9px] text-yellow-400 font-black space-y-1 uppercase tracking-wider bg-yellow-400/5 p-3 rounded-xl border border-yellow-400/10">
-                        <p>🎁 10 Pts = Free Sandwich</p>
-                        <p>🎁 20 Pts = Free Small Pizza</p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Promo Code block */}
-                <div className="bg-white/[0.02] border border-white/5 p-5 rounded-[2rem] space-y-3">
-                  <div className="flex items-center gap-2 text-orange-500 font-black text-xs uppercase">
-                    <Percent size={16}/> <span>Have a promo code?</span>
-                  </div>
-                  <div className="flex gap-2">
-                    <input type="text" placeholder="e.g. WELCOME" value={enteredCoupon} onChange={(e) => setEnteredCoupon(e.target.value)}
-                      className="flex-1 bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-xs font-bold uppercase placeholder-gray-600 text-white" />
-                    <button type="button" onClick={handleApplyCoupon} className="bg-orange-500 hover:bg-orange-600 font-black text-xs p-3 px-5 rounded-xl text-black active:scale-95 transition-all">APPLY</button>
-                  </div>
-                  {appliedCoupon && (
-                    <div className="flex justify-between items-center text-xs bg-green-500/10 border border-green-500/25 p-3 rounded-xl">
-                      <span className="text-green-400 font-bold uppercase">Code Applied: {appliedCoupon.code}</span>
-                      <button onClick={() => { setAppliedCoupon(null); setEnteredCoupon(""); }} className="text-red-400 font-black font-xs">Remove</button>
-                    </div>
-                  )}
-                </div>
-
-                {/* Local Memory Saved Details Block */}
-                {customerDetails ? (
-                  <div className="bg-white/[0.02] p-5 rounded-[2.2rem] border border-white/5 flex justify-between items-center">
-                    <div>
-                      <p className="text-[9px] text-gray-500 font-black uppercase tracking-wider">Ordering As</p>
-                      <h4 className="font-black text-md text-orange-500">{customerDetails?.name}</h4>
-                      <p className="text-xs text-gray-400 font-bold mt-0.5">{customerDetails?.phone}</p>
-                    </div>
-                    <button onClick={() => { localStorage.removeItem('bb_cafe_customer'); setCustomerDetails(null); }} className="text-[10px] bg-red-500/10 text-red-500 px-3 py-2 rounded-xl font-black uppercase tracking-wider">Change</button>
-                  </div>
-                ) : (
-                  <button onClick={() => setIsLoginOpen(true)} className="w-full p-5 bg-orange-500/10 text-orange-500 border border-orange-500/20 rounded-[2.2rem] font-black text-sm uppercase tracking-widest active:scale-95 transition-all">👤 Add Name & Phone To Order</button>
-                )}
-
-                {/* Delivery Address */}
-                <div className="bg-white/[0.02] p-5 rounded-[2.2rem] border border-white/5">
-                  <div className="flex items-center gap-2 mb-3 text-orange-500">
-                    <MapPin size={18}/> <h3 className="font-black uppercase text-xs tracking-wider">Delivery Address</h3>
-                  </div>
-                  <textarea placeholder="Ghar ka address, Landmark ke saath..." value={address} onChange={(e) => setAddress(e.target.value)}
-                    className="w-full bg-black/40 border border-white/10 rounded-2xl p-4 outline-none focus:border-orange-500 h-24 text-xs font-semibold text-white placeholder-gray-600 resize-none" />
-                </div>
-
-                {/* Bill Details */}
-                <div className="bg-gradient-to-b from-orange-600 to-orange-700 p-8 rounded-[2.5rem] text-white shadow-xl">
-                  <div className="flex justify-between font-bold mb-2 text-sm text-orange-100"><span>Items Total</span> <span>₹{getTotal()}</span></div>
-                  {appliedCoupon && (
-                    <div className="flex justify-between font-bold mb-2 text-sm text-green-200"><span>Coupon Discount</span> <span>-₹{appliedCoupon.discountValue}</span></div>
-                  )}
-                  <div className="flex justify-between font-bold mb-4 opacity-90 text-sm text-orange-100"><span>Delivery Charge</span> <span>{getTotal() < 99 ? "₹20" : "FREE"}</span></div>
-                  <div className="h-px bg-white/20 mb-4" />
-                  <div className="flex justify-between font-black text-2xl"><span>To Pay</span> <span>₹{Math.max(0, getTotal() - (appliedCoupon ? appliedCoupon.discountValue : 0)) + (getTotal() < 99 ? 20 : 0)}</span></div>
-                </div>
-
-                {/* --- WHATSAPP ORDER BUTTON --- */}
-                <button onClick={sendWhatsAppOrder} type="button" className="w-full bg-green-600 hover:bg-green-700 p-6 rounded-[2.5rem] font-black text-md shadow-xl border border-green-500/20 text-white flex items-center justify-center gap-3">
-                  <svg className="w-6 h-6 fill-current text-white flex-shrink-0" viewBox="0 0 24 24">
-                    <path d="M12.037 21.978c-1.92 0-3.805-.502-5.46-1.457l-.391-.227-4.062 1.066 1.085-3.953-.25-.398C2.01 15.352 1.48 13.208 1.48 11.005 1.482 5.21 6.22 .495 12.037.495c2.818 0 5.467 1.1 7.46 3.099a10.45 10.45 0 0 1 3.093 7.42c-.002 5.797-4.74 10.513-10.553 10.513zm5.412-7.587c-.297-.15-1.758-.868-2.03-.96-.273-.092-.471-.137-.67.137-.197.275-.764.96-.938 1.144-.173.183-.347.206-.644.055-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.1-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.501-.669-.51l-.57-.011c-.198 0-.52.074-.793.372-.272.297-1.04.101-1.04 2.479 0 2.378 1.733 4.678 1.98 5.024.248.346 3.41 5.216 8.26 7.301 1.155.496 2.057.793 2.76 1.017 1.21.383 2.311.33 3.18.198 1.03-.15 2.158-.87 2.46-1.714.3-.842.3-1.564.21-1.714-.09-.15-.335-.24-.633-.39z"/>
-                  </svg>
-                  <span>ORDER ON WHATSAPP</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* --- DIRECT CONTACT DETAILS MODAL --- */}
-      <AnimatePresence>
-        {isLoginOpen && (
-          <div className="fixed inset-0 bg-black/95 z-[200] flex items-center justify-center p-6">
-            <form onSubmit={handleSaveDetails} className="bg-[#111] w-full max-w-md p-10 rounded-[3rem] border border-white/10 text-center space-y-6">
-              <User className="mx-auto text-orange-500" size={48} />
-              <div>
-                <h2 className="text-3xl font-black mb-1">Your Details</h2>
-                <p className="text-gray-500 font-semibold text-xs uppercase tracking-widest">Setup Once • Order Fast</p>
-              </div>
-              
-              <div className="space-y-4 text-left">
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-gray-500 uppercase">Your Name</label>
-                  <input type="text" placeholder="Enter your name..." value={tempName} onChange={(e) => setTempName(e.target.value)} className="w-full bg-white/5 border border-white/10 p-4 rounded-2xl text-center text-md font-bold outline-none focus:border-orange-500 text-white" required />
-                </div>
-                
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-gray-500 uppercase">Mobile Number</label>
-                  <input type="tel" maxLength={10} placeholder="10-digit Phone Number" value={tempPhone} onChange={(e) => setTempPhone(e.target.value)} className="w-full bg-white/5 border border-white/10 p-4 rounded-2xl text-center text-md font-bold outline-none focus:border-orange-500 text-white" required />
-                </div>
-              </div>
-
-              <button type="submit" className="w-full bg-orange-500 hover:bg-orange-600 p-5 rounded-2xl font-black text-md shadow-xl active:scale-95 transition-all uppercase tracking-wider">PROCEED TO ORDER</button>
-              <button type="button" onClick={() => setIsLoginOpen(false)} className="mt-6 text-gray-500 text-xs font-black uppercase tracking-widest block mx-auto hover:text-gray-400">Close</button>
-            </form>
-          </div>
-        )}
-      </AnimatePresence>
-
     </div>
   );
 }
