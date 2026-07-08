@@ -135,40 +135,19 @@ export default function BbCafeHome() {
     <div className="bg-[#080808] min-h-screen text-white pb-32 font-sans selection:bg-orange-500">
       <Toaster position="top-center" />
       
-       {/* --- NEW PREMIUM HEADER & SEARCH --- */}
-      <header className="relative h-80 bg-gradient-to-b from-[#ff5e00] to-[#b33600] rounded-b-[4rem] flex flex-col justify-center items-center px-6 shadow-[0_15px_40px_rgba(179,54,0,0.3)] overflow-hidden">
-        {/* Subtle Background food patterns */}
-        <div className="absolute inset-0 opacity-15 bg-[url('https://www.transparenttextures.com/patterns/food.png')] bg-center"></div>
+      {/* --- HEADER --- */}
+      <header className="relative h-72 bg-gradient-to-b from-orange-600 to-orange-700 rounded-b-[3.5rem] flex flex-col justify-center items-center px-6 shadow-2xl overflow-hidden">
+        <div className="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/food.png')]"></div>
+        <motion.h1 initial={{ scale: 0.8 }} animate={{ scale: 1 }} className="text-5xl font-black italic tracking-tighter text-yellow-400 drop-shadow-lg">BUM BUM CAFE</motion.h1>
+        <p className="text-orange-100 font-bold tracking-[0.2em] text-xs mt-2 uppercase">Mohandra's Best Taste</p>
         
-        {/* Glowing Green Veg Badge */}
-        <div className="absolute top-4 right-4 bg-black/40 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10 flex items-center gap-1.5">
-          <span className="h-2 w-2 rounded-full bg-green-500 animate-ping"></span>
-          <span className="text-[10px] font-black uppercase tracking-widest text-green-400">100% PURE VEG</span>
-        </div>
-
-        {/* Cafe Info Header */}
-        <div className="text-center z-10 mt-[-20px]">
-          <motion.h1 
-            initial={{ scale: 0.8 }} 
-            animate={{ scale: 1 }} 
-            className="text-5xl font-black italic tracking-tighter text-yellow-300 drop-shadow-[0_4px_8px_rgba(0,0,0,0.6)]"
-          >
-            BUM BUM CAFE
-          </motion.h1>
-          <p className="text-[#ffe0cc] font-black tracking-[0.25em] text-[10px] mt-2 uppercase">Sizzle • Brew • Chill</p>
-          <p className="text-[9px] font-bold text-yellow-300 mt-1.5 uppercase tracking-wider bg-black/20 px-3 py-1 rounded-full inline-block backdrop-blur-sm border border-white/5">📍 New Bus Stand, Mohandra</p>
-        </div>
-        
-        {/* Modern Floating Search Bar */}
-        <div className="absolute -bottom-8 w-[92%] max-w-md">
+        {/* Search Bar */}
+        <div className="absolute -bottom-7 w-[90%] max-w-md">
           <div className="relative group">
-            <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-orange-500 transition-colors" size={20} />
+            <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-orange-500" size={20} />
             <input 
-              type="text" 
-              placeholder="Search paneer, pizza, thali, shakes..." 
-              value={searchQuery} 
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-white text-black py-5 px-16 rounded-[2rem] shadow-[0_10px_35px_rgba(0,0,0,0.4)] outline-none focus:ring-4 focus:ring-orange-500/20 text-sm font-semibold transition-all"
+              type="text" placeholder="Search pizza, thali, shakes..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-white text-black py-5 px-14 rounded-3xl shadow-2xl outline-none focus:ring-4 focus:ring-orange-500/20 text-lg font-medium"
             />
           </div>
         </div>
@@ -226,37 +205,21 @@ export default function BbCafeHome() {
 
       {/* --- CART BAR --- */}
       <AnimatePresence>
-        {isCartOpen && (
-          <div className="fixed inset-0 bg-black z-[110] overflow-y-auto">
-            <div className="p-6 max-w-lg mx-auto pb-32">
-              <div className="flex justify-between items-center mb-8">
-                <h2 className="text-3xl font-black tracking-tight">Your Order</h2>
-                <button onClick={() => setIsCartOpen(false)} className="p-3 bg-white/5 rounded-full"><X/></button>
+        {cart.length > 0 && (
+          <motion.div initial={{ y: 100 }} animate={{ y: 0 }} exit={{ y: 100 }} className="fixed bottom-8 left-0 w-full px-6 z-50">
+            <button onClick={() => setIsCartOpen(true)} className="w-full max-w-md mx-auto bg-yellow-400 text-black p-5 rounded-[2.5rem] shadow-2xl flex justify-between items-center border-4 border-black">
+              <div className="flex items-center gap-4">
+                <div className="bg-black text-white p-2 rounded-xl"><ShoppingBag size={24} /></div>
+                <div className="text-left leading-none">
+                  <p className="text-xs font-black uppercase opacity-60">Ready to Eat?</p>
+                  <p className="font-black text-2xl tracking-tighter">{cart.length} Items • ₹{getTotal()}</p>
+                </div>
               </div>
-
-              {cart.map((item: any) => (
-                <div key={item.id} className="flex justify-between items-center bg-white/[0.02] p-5 rounded-3xl mb-4 border border-white/5">
-                  <div>
-                    <h4 className="font-bold text-sm">{item.name}</h4>
-                    <p className="text-orange-500 font-black mt-1">₹{item.price} × {item.quantity}</p>
-                  </div>
-                  <button onClick={() => removeItem(item.id)} className="px-4 py-2 bg-red-500/10 text-red-500 rounded-xl text-xs font-black uppercase border border-red-500/20 active:scale-95 transition-all">Remove</button>
-                </div>
-              ))}
-
-              <div className="mt-8 space-y-6">
-                
-                {/* PDF rules alert widget */}
-                <div className="bg-orange-500/10 border border-orange-500/20 rounded-[2rem] p-5 space-y-2">
-                  <div className="flex items-center gap-2 text-orange-400 font-black text-xs uppercase tracking-wider">
-                    <Sparkles size={16}/> <span>Free Delivery Rules (PDF)</span>
-                  </div>
-                  <ul className="text-[11px] text-gray-400 font-bold space-y-1">
-                    <li>• Mohandra Town: Free above ₹99 <span className="text-green-500">({getTotal() >= 99 ? 'Achieved' : 'Need ₹' + (99 - getTotal()) + ' more'})</span></li>
-                    <li>• Within 5 Km: Free above ₹499</li>
-                    <li>• Within 12 Km: Free above ₹999</li>
-                  </ul>
-                </div>
+              <ChevronRight size={30} strokeWidth={3} />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* --- VARIANTS POPUP (Half/Full) --- */}
       <AnimatePresence>
