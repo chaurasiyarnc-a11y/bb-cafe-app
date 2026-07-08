@@ -1,4 +1,4 @@
-'use client';
+ 'use client';
 import React, { useState, useEffect } from 'react';
 import { db, auth } from '../lib/firebase'; 
 import { collection, onSnapshot, query, addDoc, doc } from 'firebase/firestore';
@@ -15,7 +15,7 @@ export default function BbCafeHome() {
   const store = useCartStore() as any;
   const cart = store?.items || [];
   
-  // Safe destructuring with fallback to prevent hydration/loading crashes
+  // Safe destructuring with fallback
   const addItem = store?.addItem || (() => {});
   const removeItem = store?.removeItem || (() => {});
   const clearCart = store?.clearCart || (() => {});
@@ -101,14 +101,22 @@ export default function BbCafeHome() {
       setIsCartOpen(false);
       toast.success("Order Placed!");
     } catch (e) { 
-      toast.error("Failed to place order."); 
+      toast.error("Failed to place order. Firestore permissions check karein."); 
     }
   };
 
-  // --- AUTH LOGIC ---
+  // --- AUTH LOGIC (ROBUST RECAPTCHA FIX) ---
   const setupRecaptcha = () => {
-    if (typeof window !== 'undefined' && !(window as any).recaptchaVerifier) {
+    if (typeof window !== 'undefined') {
+      if ((window as any).recaptchaVerifier) {
+        return; // Already initialized, reusing it
+      }
       try {
+        // Clear old iframe inside DOM element to prevent 'already rendered' error
+        const container = document.getElementById('recaptcha-container');
+        if (container) {
+          container.innerHTML = '';
+        }
         (window as any).recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', { 
           size: 'invisible' 
         });
@@ -134,8 +142,11 @@ export default function BbCafeHome() {
       toast.success("OTP Sent");
     } catch (e: any) { 
       toast.error(e?.message || "Invalid phone number or verification failed."); 
-      // Reset recaptcha on error so the user can try again
+      // Reset safely on error so user can retry cleanly
       if (typeof window !== 'undefined' && (window as any).recaptchaVerifier) {
+        try {
+          (window as any).recaptchaVerifier.clear();
+        } catch (err) {}
         (window as any).recaptchaVerifier = null;
       }
     }
@@ -262,7 +273,6 @@ export default function BbCafeHome() {
               <div className="space-y-4">
                 {Object.entries(selectedProduct.variants || {}).map(([size, price]: any) => (
                   <button key={size} onClick={() => { 
-                    // Solved variant ID collision bug by creating a unique ID for each variant:
                     addItem({ 
                       ...selectedProduct, 
                       id: `${selectedProduct.id}-${size}`, 
@@ -364,3 +374,19 @@ export default function BbCafeHome() {
     </div>
   );
 }
+```
+
+Is code ko save karke commit kar dein. 
+
+### Ek zaroori tip:
+Agar login hone ke baad bhi orders page par add nahi ho rahe hain (ya `"Failed to place order"` ka error aata hai), toh apne **Firebase Console** mein jaakar **Firestore Database > Rules** tab ko check karein. Wahan likha hona chahiye ki authenticated users database mein documents write/add kar sakte hain:
+
+```javascript
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if request.auth != null;
+    }
+  }
+  }
