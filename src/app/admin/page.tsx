@@ -1,10 +1,11 @@
-'use client`;
+'use client';
   
 import React, { useState, useEffect } from 'react';
-import { db, auth } from '@/lib/firebase'; // Check karein path sahi hai ya nahi (@/lib/firebase ya ../lib/firebase)
+import { db, auth } from '@/lib/firebase'; // Ensure your path is correct (@/lib/firebase or ../../lib/firebase)
 import { collection, onSnapshot, query, orderBy, doc, updateDoc, setDoc } from 'firebase/firestore';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
-import { Power, Eye, EyeOff, User, MapPin, Calendar, CheckCircle2, LogOut, Loader2 } from 'lucide-react';
+// Added 'Phone' icon inside imports below
+import { Power, Eye, EyeOff, User, MapPin, Calendar, CheckCircle2, LogOut, Loader2, Phone } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 
 export default function AdminDashboard() {
@@ -51,7 +52,7 @@ export default function AdminDashboard() {
 
     return () => {
       unsubOrders();
-      unsubProducts();
+      unproducts: unsubProducts();
       unsubStore();
     };
   }, [isAdmin]);
@@ -168,7 +169,11 @@ export default function AdminDashboard() {
                 <div className="grid grid-cols-2 gap-4 text-[11px] font-bold text-gray-500 uppercase tracking-wider">
                   <div className="flex items-center gap-2"><Phone size={12}/> {o.customerPhone}</div>
                   <div className="flex items-center gap-2"><MapPin size={12}/> {o.address}</div>
-                  <div className="flex items-center gap-2 col-span-2"><Calendar size={12}/> {o.timestamp?.toDate().toLocaleString()}</div>
+                  {/* Made timestamp safe for real-time local cache */}
+                  <div className="flex items-center gap-2 col-span-2">
+                    <Calendar size={12}/> 
+                    {o.timestamp?.toDate ? o.timestamp.toDate().toLocaleString() : 'Kuch hi der pehle'}
+                  </div>
                 </div>
               </div>
             ))}
