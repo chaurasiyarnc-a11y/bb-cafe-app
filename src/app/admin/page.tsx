@@ -63,9 +63,9 @@ export default function AdminDashboard() {
   const [editPriceLarge, setEditPriceLarge] = useState("");
   const [editPriceXL, setEditPriceXL] = useState("");
 
-  // 1. Check if Admin is logged in
+  // 1. Session verification check (Session memory auto-locks admin)
   useEffect(() => {
-    const adminSession = localStorage.getItem('bb_cafe_admin_verified');
+    const adminSession = sessionStorage.getItem('bb_cafe_admin_verified');
     if (adminSession === 'true') {
       setIsVerified(true);
     }
@@ -134,7 +134,7 @@ export default function AdminDashboard() {
   const handlePasscodeLogin = (e: React.FormEvent) => {
     e.preventDefault();
     if (passcode === "971429") {
-      localStorage.setItem('bb_cafe_admin_verified', 'true');
+      sessionStorage.setItem('bb_cafe_admin_verified', 'true');
       setIsVerified(true);
       toast.success("Welcome back, Boss!");
     } else {
@@ -143,7 +143,7 @@ export default function AdminDashboard() {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('bb_cafe_admin_verified');
+    sessionStorage.removeItem('bb_cafe_admin_verified');
     setIsVerified(false);
     window.location.href = "/";
   };
@@ -520,52 +520,10 @@ export default function AdminDashboard() {
         await addDoc(collection(db, "products"), item);
       }
       toast.dismiss("import");
-      toast.success("All 80+ PDF menu items imported successfully!");
+      toast.success("All Products Seeded successfully!");
     } catch (e) {
       toast.dismiss("import");
-      toast.error("Error seeding PDF items");
-    }
-  };
-
-  // --- ADD NEW PRODUCT FUNCTION (RESTORED CLEANLY) ---
-  const handleAddProduct = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newName || !newCategory || !newImage) {
-      return toast.error("Please fill all required fields!");
-    }
-
-    let productData: any = {
-      name: newName,
-      category: newCategory,
-      image: newImage,
-      isVisible: true
-    };
-
-    if (variantType === 'half_full') {
-      if (!halfPrice || !fullPrice) return toast.error("Please fill prices!");
-      productData.variants = { half: Number(halfPrice), full: Number(fullPrice) };
-      productData.price = Number(halfPrice);
-    } else if (variantType === 'plain_butter') {
-      if (!halfPrice || !fullPrice) return toast.error("Please fill prices!");
-      productData.variants = { Plain: Number(halfPrice), Butter: Number(fullPrice) };
-      productData.price = Number(halfPrice);
-    } else if (variantType === 'pizza_sizes') {
-      if (!priceSmall || !priceMedium || !priceLarge || !priceXL) return toast.error("Please fill all pizza prices!");
-      productData.variants = { Small: Number(priceSmall), Medium: Number(priceMedium), Large: Number(priceLarge), "Extra Large": Number(priceXL) };
-      productData.price = Number(priceSmall);
-    } else {
-      if (!newPrice) return toast.error("Please enter price!");
-      productData.price = Number(newPrice);
-    }
-
-    try {
-      await addDoc(collection(db, "products"), productData);
-      toast.success("New Item Added!");
-      setNewName(""); setNewPrice(""); setNewImage(""); setVariantType('none');
-      setHalfPrice(""); setFullPrice(""); setPriceSmall(""); setPriceMedium(""); setPriceLarge(""); setPriceXL("");
-      setShowAddForm(false);
-    } catch (error) {
-      toast.error("Error adding product");
+      toast.error("Error seeding products from PDF");
     }
   };
 
@@ -602,7 +560,7 @@ export default function AdminDashboard() {
   const handleUpdateProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editName || !editCategory || !editImage) {
-      return toast.error("Please fill all fields!");
+      return toast.error("Please fill all required fields!");
     }
 
     let updatedData: any = {
@@ -643,6 +601,39 @@ export default function AdminDashboard() {
     }
   };
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#0A0A0A] flex flex-col items-center justify-center text-white font-sans">
+        <Loader2 className="animate-spin text-orange-500 mb-4" size={40} />
+        <p className="font-bold tracking-widest animate-pulse uppercase">Loading Admin System...</p>
+      </div>
+    );
+  }
+
+  // PASSCODE LOCK SCREEN
+  if (!isVerified) {
+    return (
+      <div className="min-h-screen bg-[#0A0A0A] flex items-center justify-center p-6 text-center text-white">
+        <Toaster />
+        <form onSubmit={handlePasscodeLogin} className="bg-[#111] w-full max-w-sm p-10 rounded-[3rem] border border-white/10 text-center space-y-6 shadow-2xl">
+          <Lock className="mx-auto text-orange-500 animate-bounce" size={48} />
+          <div>
+            <h2 className="text-3xl font-black mb-1 text-white">Admin Panel</h2>
+            <p className="text-gray-500 font-semibold text-xs">Enter your secret PIN to access dashboard.</p>
+          </div>
+          
+          <div className="space-y-2">
+            <input type="password" placeholder="Enter 6-digit PIN" maxLength={6} value={passcode} onChange={(e) => setPasscode(e.target.value)}
+              className="w-full bg-white/5 border border-white/10 p-4 rounded-2xl text-center text-2xl font-bold tracking-[0.5em] outline-none focus:border-orange-500 text-white" required />
+          </div>
+
+          <button type="submit" className="w-full bg-orange-500 hover:bg-orange-600 text-black p-5 rounded-2xl font-black text-lg shadow-xl uppercase active:scale-95 transition-all">Unlock Dashboard</button>
+          <button type="button" onClick={() => window.location.href = "/"} className="mt-8 text-gray-500 text-xs font-bold uppercase tracking-widest block mx-auto">Go to Home Page</button>
+        </form>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-[#050505] min-h-screen text-white pb-20 font-sans">
       <Toaster />
@@ -663,7 +654,7 @@ export default function AdminDashboard() {
 
       {/* --- RESPONSIVE HORIZONTAL TABS --- */}
       <div className="p-4 flex gap-2 overflow-x-auto no-scrollbar border-b border-white/5">
-        <button onClick={() => setTab('dashboard')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'dashboard' ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/20' : 'bg-white/5 text-gray-500'}`}>📊 Dashboard</button>
+        <button onClick={() => setTab('dashboard')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'dashboard' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>📊 Dashboard</button>
         <button onClick={() => setTab('orders')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'orders' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>📦 Orders ({orders.length})</button>
         <button onClick={() => setTab('menu')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'menu' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>🍔 Menu List</button>
         <button onClick={() => setTab('categories')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'categories' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>🗂️ Categories</button>
@@ -679,7 +670,7 @@ export default function AdminDashboard() {
           <div className="space-y-6">
             <h3 className="text-xl font-black text-orange-500 uppercase tracking-wider flex items-center gap-2"><BarChart3 size={20}/> Sales Dashboard</h3>
             
-            {/* Today Quick Insights */}
+            {/* Sales Stats Today */}
             <div className="bg-[#111] border border-white/5 p-4 rounded-3xl space-y-3">
               <p className="text-[10px] font-black uppercase text-orange-400 tracking-wider">🎯 Today's Quick Insights</p>
               <div className="grid grid-cols-3 gap-3">
@@ -698,7 +689,7 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            {/* Lifetime KPIs */}
+            {/* Lifetime metrics */}
             <div className="grid grid-cols-3 gap-3">
               <div className="bg-white/[0.02] border border-white/5 p-4 rounded-3xl text-center">
                 <p className="text-[9px] font-black text-gray-500 uppercase">Lifetime Sales</p>
@@ -714,7 +705,7 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            {/* Export buttons */}
+            {/* Excel downloaders */}
             <div className="grid grid-cols-2 gap-3 bg-[#111]/30 border border-white/5 p-4 rounded-[2rem] shadow-xl">
               <button onClick={handleExportOrders} className="bg-green-600 hover:bg-green-700 text-white font-black text-xs py-4 px-3 rounded-2xl flex items-center justify-center gap-2 active:scale-95 transition-all uppercase shadow-md">
                 <Download size={14}/> Sales Ledger Excel
@@ -724,10 +715,10 @@ export default function AdminDashboard() {
               </button>
             </div>
 
-            {/* --- 🎁 NEW: LOYALTY CLUB REDEEM BOARD FOR ADMIN --- */}
+            {/* --- LOYALTY CLUB BOARD --- */}
             <div className="bg-yellow-400/5 border border-yellow-400/25 p-6 rounded-[2rem] space-y-4">
-              <h4 className="text-sm font-black text-yellow-400 uppercase tracking-widest flex items-center gap-2">⭐ Loyalty Club Reward Redeem Board</h4>
-              <p className="text-[10px] text-gray-400 font-semibold leading-relaxed">Customers can redeem 10 points for a sandwich or 20 points for a small pizza. Deduct points cleanly using the buttons below once rewarded:</p>
+              <h4 className="text-sm font-black text-yellow-400 uppercase tracking-widest flex items-center gap-2"><Gift size={16}/> Loyalty Club Reward Redeem Board</h4>
+              <p className="text-[10px] text-gray-400 font-semibold leading-relaxed">Admin can redeem 10 points for a sandwich or 20 points for a small pizza once rewarded inside the Cafe:</p>
               
               <div className="space-y-3 max-h-72 overflow-y-auto no-scrollbar">
                 {loyaltyUsers.length === 0 ? (
@@ -745,7 +736,7 @@ export default function AdminDashboard() {
                           onClick={() => handleRedeemPoints(user.phone, user.name, user.points || 0, 10, "Sandwich 🥪")}
                           disabled={(user.points || 0) < 10}
                           className={`px-3 py-1.5 rounded-lg font-black text-[9px] uppercase tracking-wider transition-all ${
-                            (user.points || 0) >= 10 ? 'bg-orange-500 text-black active:scale-95' : 'bg-white/5 text-gray-600 cursor-not-allowed'
+                            (user.points || 0) >= 10 ? 'bg-orange-500 text-black active:scale-95 cursor-pointer' : 'bg-white/5 text-gray-600 cursor-not-allowed'
                           }`}
                         >
                           Redeem Sandwich (10 Pts)
@@ -754,7 +745,7 @@ export default function AdminDashboard() {
                           onClick={() => handleRedeemPoints(user.phone, user.name, user.points || 0, 20, "Small Pizza 🍕")}
                           disabled={(user.points || 0) < 20}
                           className={`px-3 py-1.5 rounded-lg font-black text-[9px] uppercase tracking-wider transition-all ${
-                            (user.points || 0) >= 20 ? 'bg-orange-500 text-black active:scale-95' : 'bg-white/5 text-gray-600 cursor-not-allowed'
+                            (user.points || 0) >= 20 ? 'bg-orange-500 text-black active:scale-95 cursor-pointer' : 'bg-white/5 text-gray-600 cursor-not-allowed'
                           }`}
                         >
                           Redeem Pizza (20 Pts)
@@ -766,7 +757,7 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            {/* Permanent Ledger Record list */}
+            {/* Permanent Orders Ledger */}
             <div className="space-y-4">
               <h4 className="text-sm font-black text-gray-400 uppercase tracking-widest pt-2">📚 Permanent Financial Ledger</h4>
               {orders.length === 0 ? (
@@ -774,15 +765,25 @@ export default function AdminDashboard() {
               ) : (
                 orders.map((o) => (
                   <div key={o.id} className="bg-[#111] border border-white/5 p-5 rounded-3xl flex justify-between items-center relative overflow-hidden">
-                    <div className="space-y-1">
-                      <span className="text-[9px] font-black uppercase text-gray-500">Bill No: #{o.tokenNumber}</span>
-                      <h4 className="font-extrabold text-sm text-gray-300">Customer: {o.customerName || "Customer"}</h4>
-                      <p className="text-[10px] font-bold text-orange-500">Contact: {o.customerPhone || "N/A"}</p>
-                      <p className="text-[9px] font-semibold text-gray-500">{o.timestamp?.toDate ? o.timestamp.toDate().toLocaleString() : 'Just now'}</p>
+                    <div className="space-y-1 pr-4">
+                      <span className="text-[10px] font-black uppercase text-gray-500">Bill No / Token: #{o.tokenNumber}</span>
+                      <h4 className="font-extrabold text-sm text-gray-300">Name: {o.customerName || "Customer"}</h4>
+                      <p className="text-[11px] font-bold text-orange-500">Mobile: {o.customerPhone || "N/A"}</p>
+                      <p className="text-[10px] text-gray-400 font-medium">Address: {o.address || "N/A"}</p>
+                      
+                      <div className="border-t border-white/5 pt-2 mt-2 space-y-0.5">
+                        {o.items?.map((item: any, idx: number) => (
+                          <p key={idx} className="text-[11px] font-bold text-gray-400">
+                            <span className="text-orange-500">×{item.quantity}</span> {item.name}
+                          </p>
+                        ))}
+                      </div>
+
+                      <p className="text-[9px] font-semibold text-gray-600 mt-2">{o.timestamp?.toDate ? o.timestamp.toDate().toLocaleString() : 'Just now'}</p>
                     </div>
-                    <div className="text-right">
-                      <p className="text-green-400 font-black text-lg">₹{o.total}</p>
-                      <span className="text-[9px] font-black uppercase bg-green-500/10 text-green-400 px-2 py-0.5 rounded-md mt-1 inline-block">PAID</span>
+                    <div className="text-right flex-shrink-0">
+                      <p className="text-green-400 font-black text-lg leading-none">₹{o.total}</p>
+                      <span className="text-[9px] font-black uppercase bg-green-500/10 text-green-400 px-2.5 py-1 rounded-md mt-2 inline-block">PAID</span>
                     </div>
                   </div>
                 ))
@@ -1004,7 +1005,7 @@ export default function AdminDashboard() {
                     <div className="flex items-center gap-2">
                       <button onClick={() => startEditing(item)} className="p-3 bg-blue-500/10 text-blue-500 rounded-xl hover:bg-blue-500/20 active:scale-90 transition-all"><Edit size={18}/></button>
                       
-                      {/* --- CORECTED ITEM HIDE UNHIDE TOGGLE (Eye/EyeOff) --- */}
+                      {/* --- CORRECTED ITEM HIDE UNHIDE TOGGLE (Eye/EyeOff) --- */}
                       <button onClick={() => toggleItemVisibility(item.id, item.isVisible !== false)} className={`p-3 rounded-xl transition-all ${item.isVisible !== false ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
                         {item.isVisible !== false ? <Eye size={18}/> : <EyeOff size={18}/>}
                       </button>
@@ -1017,7 +1018,7 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* --- TAB 4: DYNAMIC CATEGORY MANAGER (LIST + FORM + TOGGLE SCREEN) --- */}
+        {/* --- TAB 4: DYNAMIC CATEGORY MANAGER --- */}
         {tab === 'categories' && (
           <div className="space-y-6">
             <form onSubmit={handleAddCategory} className="bg-white/[0.02] border border-white/5 p-6 rounded-[2.5rem] space-y-4">
@@ -1061,14 +1062,7 @@ export default function AdminDashboard() {
           <div className="space-y-6">
             <form onSubmit={handleAddBanner} className="bg-white/[0.02] border border-white/5 p-6 rounded-[2.5rem] space-y-4">
               <h3 className="text-lg font-black text-orange-500 italic uppercase flex items-center gap-2"><ImageIcon size={18}/> Add Banner</h3>
-              <input 
-                type="url" 
-                placeholder="Paste offer image url here..." 
-                value={newBannerUrl} 
-                onChange={(e) => setNewBannerUrl(e.target.value)} 
-                className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-xs font-bold text-white" 
-                required 
-              />
+              <input type="url" placeholder="Paste offer image url here..." value={newBannerUrl} onChange={(e) => setNewBannerUrl(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-xs font-bold text-white" required />
               <button type="submit" className="w-full bg-green-600 text-white p-4 rounded-xl font-black text-sm uppercase">Add Banner Image</button>
             </form>
 
@@ -1113,7 +1107,7 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* --- TAB 7: APPROVE FEEDBACK REVIEWS TAB --- */}
+        {/* --- TAB 7: APPROVE REVIEWS TAB --- */}
         {tab === 'reviews' && (
           <div className="space-y-4">
             {reviews.length === 0 && <p className="text-center text-gray-600 py-16 font-bold uppercase tracking-widest">No feedback reviews yet...</p>}
