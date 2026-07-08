@@ -1,17 +1,18 @@
-'use client';  
+'use client';
+  
 import React, { useState, useEffect } from 'react';
-import { db, auth } from '@/lib/firebase'; // Ensure your path is correct (@/lib/firebase or ../../lib/firebase)
+import { db } from '@/lib/firebase'; // Ensure your path is correct (@/lib/firebase or ../../lib/firebase)
 import { collection, onSnapshot, query, orderBy, doc, updateDoc, setDoc, addDoc, deleteDoc } from 'firebase/firestore';
-import { onAuthStateChanged, signOut } from 'firebase/auth';
-import { Power, Eye, EyeOff, User, MapPin, Calendar, CheckCircle2, LogOut, Loader2, Phone, Plus, Trash, Edit, X } from 'lucide-react';
+import { Power, Eye, EyeOff, User, MapPin, Calendar, CheckCircle2, LogOut, Loader2, Phone, Plus, Trash, Edit, X, Lock } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 
 // Categories mapping
 const ADD_CATEGORIES = ["Special Pizza", "Special Thali", "Paneer Special", "Special Mix veg", "Fast Food", "Super Cool", "Indian Bread", "Special Rice"];
 
 export default function AdminDashboard() {
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [isVerified, setIsVerified] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [passcode, setPasscode] = useState("");
   const [tab, setTab] = useState<'orders' | 'menu'>('orders');
   const [orders, setOrders] = useState<any[]>([]);
   const [menu, setMenu] = useState<any[]>([]);
@@ -37,22 +38,18 @@ export default function AdminDashboard() {
   const [editHalfPrice, setEditHalfPrice] = useState("");
   const [editFullPrice, setEditFullPrice] = useState("");
 
-  // 1. Auth & Admin Check
+  // 1. Check if Admin is already logged in (Local Memory)
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (user && user.phoneNumber === '+919714293759') {
-        setIsAdmin(true);
-      } else {
-        setIsAdmin(false);
-      }
-      setLoading(false);
-    });
-    return () => unsubscribe();
+    const adminSession = localStorage.getItem('bb_cafe_admin_verified');
+    if (adminSession === 'true') {
+      setIsVerified(true);
+    }
+    setLoading(false);
   }, []);
 
-  // 2. Real-time Data Listeners
+  // 2. Real-time Data Listeners (Triggers only when verified)
   useEffect(() => {
-    if (!isAdmin) return;
+    if (!isVerified) return;
 
     // Listen for Orders
     const qOrders = query(collection(db, "orders"), orderBy("timestamp", "desc"));
@@ -76,9 +73,28 @@ export default function AdminDashboard() {
       unsubProducts();
       unsubStore();
     };
-  }, [isAdmin]);
+  }, [isVerified]);
 
-  // 3. Actions
+  // --- PASSCODE LOGIN ---
+  const handlePasscodeLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    // Aapka Secret PIN (Yahan aap isey badal bhi sakte hain)
+    if (passcode === "971429") {
+      localStorage.setItem('bb_cafe_admin_verified', 'true');
+      setIsVerified(true);
+      toast.success("Welcome back, Boss!");
+    } else {
+      toast.error("Incorrect Secret PIN!");
+    }
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('bb_cafe_admin_verified');
+    setIsVerified(false);
+    window.location.href = "/";
+  };
+
+  // --- OTHER ACTIONS ---
   const toggleItemVisibility = async (id: string, currentStatus: boolean) => {
     try {
       await updateDoc(doc(db, "products", id), { isVisible: !currentStatus });
@@ -91,11 +107,6 @@ export default function AdminDashboard() {
       await setDoc(doc(db, "settings", "store"), { isOpen: !storeOpen });
       toast.success(storeOpen ? "Cafe is now OFFLINE" : "Cafe is now ONLINE");
     } catch (e) { toast.error("Error toggling store"); }
-  };
-
-  const handleLogout = () => {
-    signOut(auth);
-    window.location.href = "/";
   };
 
   // --- ADD NEW PRODUCT ---
@@ -207,13 +218,12 @@ export default function AdminDashboard() {
     }
   };
 
-  // --- BULK PDF IMPORT (SEED DATA) ---
+  // --- BULK PDF IMPORT ---
   const handleBulkImport = async () => {
     if (!window.confirm("BUM BUM CAFE PDF ke saare 80+ items ko database mein add karein?")) return;
     
     toast.loading("Importing all menu items...", { id: "import" });
 
-    // Menu list compiled perfectly from your PDF
     const defaultMenu = [
       // Page 2: Fast Food / Hot Drinks
       { name: "Special Tea (स्पेशल चाय)", category: "Fast Food", price: 15, image: "https://images.unsplash.com/photo-1544787219-7f47ccb76574?auto=format&fit=crop&w=300&q=80", isVisible: true },
@@ -358,28 +368,46 @@ export default function AdminDashboard() {
     return (
       <div className="min-h-screen bg-[#0A0A0A] flex flex-col items-center justify-center text-white">
         <Loader2 className="animate-spin text-orange-500 mb-4" size={40} />
-        <p className="font-bold tracking-widest animate-pulse">VERIFYING ADMIN...</p>
+        <p className="font-bold tracking-widest animate-pulse">LOADING ADMIN SYSTEM...</p>
       </div>
     );
   }
 
-  if (!isAdmin) {
+  // PASSCODE LOCK SCREEN (If not verified, show passcode input)
+  if (!isVerified) {
     return (
-      <div className="min-h-screen bg-[#0A0A0A] flex flex-col items-center justify-center p-6 text-center">
-        <div className="bg-red-500/10 p-8 rounded-[3rem] border border-red-500/20 max-w-sm">
-          <h1 className="text-red-500 text-3xl font-black mb-4 italic">ACCESS DENIED</h1>
-          <p className="text-gray-400 mb-8 font-medium">Ye page sirf Cafe Owner ke liye hai. Please sahi number se login karein.</p>
-          <button 
-            onClick={() => window.location.href = "/"}
-            className="w-full bg-orange-500 text-white font-bold py-4 rounded-2xl shadow-lg shadow-orange-500/20"
-          >
-            Go to Home Page
+      <div className="min-h-screen bg-[#0A0A0A] flex items-center justify-center p-6 text-center text-white">
+        <Toaster />
+        <form onSubmit={handlePasscodeLogin} className="bg-[#111] w-full max-w-sm p-10 rounded-[3rem] border border-white/10 text-center space-y-6">
+          <Lock className="mx-auto text-orange-500" size={48} />
+          <div>
+            <h2 className="text-3xl font-black mb-1">Admin Panel</h2>
+            <p className="text-gray-500 font-medium text-xs">Enter your secret PIN to access dashboard.</p>
+          </div>
+          
+          <div className="space-y-2">
+            <input 
+              type="password" 
+              placeholder="Enter 6-digit PIN" 
+              maxLength={6}
+              value={passcode} 
+              onChange={(e) => setPasscode(e.target.value)}
+              className="w-full bg-white/5 border border-white/10 p-4 rounded-2xl text-center text-2xl font-bold tracking-[0.5em] outline-none focus:border-orange-500" 
+              required 
+            />
+          </div>
+
+          <button type="submit" className="w-full bg-orange-500 p-5 rounded-2xl font-black text-lg shadow-xl shadow-orange-500/20 active:scale-95 transition-all uppercase">
+            Unlock Dashboard
           </button>
-        </div>
+          
+          <button type="button" onClick={() => window.location.href = "/"} className="mt-8 text-gray-500 text-xs font-bold uppercase tracking-widest block mx-auto">Go to Home Page</button>
+        </form>
       </div>
     );
   }
 
+  // MAIN ADMIN PANEL (Visible once verified with passcode)
   return (
     <div className="bg-[#050505] min-h-screen text-white pb-20">
       <Toaster />
