@@ -3,18 +3,22 @@ import React, { useState, useEffect } from 'react';
 import { db, auth } from '../lib/firebase'; 
 import { collection, onSnapshot, query, addDoc, doc } from 'firebase/firestore';
 import { onAuthStateChanged, RecaptchaVerifier, signInWithPhoneNumber } from 'firebase/auth';
-import { ShoppingBag, Plus, User, PowerOff, Search, ChevronRight, X, MapPin, Phone } from 'lucide-react';
+import { ShoppingBag, Plus, PowerOff, Search, ChevronRight, X, MapPin, Phone } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
 import { useCartStore } from '../store/useCartStore';
 
-// 1. CATEGORIES (Based on your PDF)
+// 1. CATEGORIES
 const CATEGORIES = ["All", "Special Pizza", "Special Thali", "Paneer Special", "Special Mix veg", "Fast Food", "Super Cool", "Indian Bread", "Special Rice"];
 
 export default function BbCafeHome() {
   const store = useCartStore() as any;
   const cart = store?.items || [];
-  const { addItem, removeItem, clearCart } = store;
+  
+  // Safe destructuring with fallback to prevent hydration/loading crashes
+  const addItem = store?.addItem || (() => {});
+  const removeItem = store?.removeItem || (() => {});
+  const clearCart = store?.clearCart || (() => {});
   
   const [menu, setMenu] = useState<any[]>([]);
   const [selectedCategory, setSelectedCategory] = useState("All");
@@ -36,17 +40,23 @@ export default function BbCafeHome() {
   useEffect(() => {
     setMounted(true);
     // Check Store Status
-    onSnapshot(doc(db, "settings", "store"), (d) => {
+    const unsubStore = onSnapshot(doc(db, "settings", "store"), (d) => {
       if(d.exists()) setStoreOpen(d.data().isOpen);
     });
     // Auth Listener
-    onAuthStateChanged(auth, (u) => setUser(u));
+    const unsubAuth = onAuthStateChanged(auth, (u) => setUser(u));
     // Realtime Menu
     const q = query(collection(db, "products"));
-    return onSnapshot(q, (snap) => {
+    const unsubMenu = onSnapshot(q, (snap) => {
       const items = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setMenu(items.filter((i: any) => i.isVisible !== false));
     });
+
+    return () => {
+      unsubStore();
+      unsubAuth();
+      unsubMenu();
+    };
   }, []);
 
   const getTotal = () => cart.reduce((acc: number, i: any) => acc + (i.price * i.quantity), 0);
@@ -61,7 +71,7 @@ export default function BbCafeHome() {
   // --- WHATSAPP ORDER LOGIC ---
   const sendWhatsAppOrder = async () => {
     if (!user) return setIsLoginOpen(true);
-    if (!address || address.length < 10) return toast.error("Please enter full address!");
+    if (!address || address.trim().length < 10) return toast.error("Please enter full address!");
 
     const tokenNumber = Math.floor(1000 + Math.random() * 9000);
     const total = getTotal();
@@ -72,7 +82,13 @@ export default function BbCafeHome() {
 
     try {
       await addDoc(collection(db, "orders"), {
-        tokenNumber, customerPhone: user.phoneNumber, address, items: cart, total: total + deliveryCharge, timestamp: new Date(), status: 'pending'
+        tokenNumber, 
+        customerPhone: user.phoneNumber, 
+        address, 
+        items: cart, 
+        total: total + deliveryCharge, 
+        timestamp: new Date(), 
+        status: 'pending'
       });
 
       let itemsText = "";
@@ -84,25 +100,61 @@ export default function BbCafeHome() {
       clearCart();
       setIsCartOpen(false);
       toast.success("Order Placed!");
-    } catch (e) { toast.error("Failed to place order."); }
+    } catch (e) { 
+      toast.error("Failed to place order."); 
+    }
   };
 
   // --- AUTH LOGIC ---
   const setupRecaptcha = () => {
-    if (!(window as any).recaptchaVerifier) {
-      (window as any).recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', { size: 'invisible' });
+    if (typeof window !== 'undefined' && !(window as any).recaptchaVerifier) {
+      try {
+        (window as any).recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', { 
+          size: 'invisible' 
+        });
+      } catch (error) {
+        console.error("Recaptcha initialization failed", error);
+      }
     }
   };
+
   const sendOtp = async () => {
+    if (!phoneNumber || phoneNumber.length < 10) {
+      return toast.error("Please enter a valid 10-digit number");
+    }
     setupRecaptcha();
     try {
-      const result = await signInWithPhoneNumber(auth, `+91${phoneNumber}`, (window as any).recaptchaVerifier);
-      setConfirmationResult(result); setStep(2); toast.success("OTP Sent");
-    } catch (e) { toast.error("Invalid phone number"); }
+      const appVerifier = (window as any).recaptchaVerifier;
+      if (!appVerifier) {
+        throw new Error("Recaptcha verifier was not initialized properly.");
+      }
+      const result = await signInWithPhoneNumber(auth, `+91${phoneNumber}`, appVerifier);
+      setConfirmationResult(result); 
+      setStep(2); 
+      toast.success("OTP Sent");
+    } catch (e: any) { 
+      toast.error(e?.message || "Invalid phone number or verification failed."); 
+      // Reset recaptcha on error so the user can try again
+      if (typeof window !== 'undefined' && (window as any).recaptchaVerifier) {
+        (window as any).recaptchaVerifier = null;
+      }
+    }
   };
+
   const verifyOtp = async () => {
-    try { await confirmationResult.confirm(otp); setIsLoginOpen(false); toast.success("Welcome to Bum Bum Cafe!"); }
-    catch (e) { toast.error("Wrong OTP"); }
+    if (!confirmationResult) {
+      return toast.error("Please send OTP first.");
+    }
+    if (!otp || otp.length < 6) {
+      return toast.error("Please enter 6-digit OTP");
+    }
+    try { 
+      await confirmationResult.confirm(otp); 
+      setIsLoginOpen(false); 
+      toast.success("Welcome to Bum Bum Cafe!"); 
+    } catch (e) { 
+      toast.error("Wrong OTP"); 
+    }
   };
 
   if (!mounted) return null;
@@ -209,7 +261,16 @@ export default function BbCafeHome() {
               
               <div className="space-y-4">
                 {Object.entries(selectedProduct.variants || {}).map(([size, price]: any) => (
-                  <button key={size} onClick={() => { addItem({ ...selectedProduct, name: `${selectedProduct.name} (${size})`, price }); setSelectedProduct(null); }}
+                  <button key={size} onClick={() => { 
+                    // Solved variant ID collision bug by creating a unique ID for each variant:
+                    addItem({ 
+                      ...selectedProduct, 
+                      id: `${selectedProduct.id}-${size}`, 
+                      name: `${selectedProduct.name} (${size})`, 
+                      price 
+                    }); 
+                    setSelectedProduct(null); 
+                  }}
                     className="w-full bg-white/5 p-6 rounded-3xl flex justify-between items-center border border-white/5 hover:border-orange-500 hover:bg-orange-500/10 transition-all"
                   >
                     <span className="capitalize text-xl font-black">{size}</span>
@@ -230,7 +291,7 @@ export default function BbCafeHome() {
             <div className="p-6 max-w-lg mx-auto">
               <div className="flex justify-between items-center mb-8">
                 <h2 className="text-3xl font-black">Your Order</h2>
-                <button onClick={() => setIsCartOpen(false)} className="p-3 bg-white/5 rounded-full"><X/></button>
+                <button onClick={() => setIsCartOpen(false)} className="p-3 bg-white/5 rounded-full"><X size={24} /></button>
               </div>
 
               {cart.map((item: any) => (
