@@ -1,5 +1,4 @@
-'use client';
-import { Phone, MapPin, Calendar, Trash, Edit, Plus } from 'lucide-react';
+'use client`;
   
 import React, { useState, useEffect } from 'react';
 import { db, auth } from '@/lib/firebase'; // Check karein path sahi hai ya nahi (@/lib/firebase ya ../lib/firebase)
