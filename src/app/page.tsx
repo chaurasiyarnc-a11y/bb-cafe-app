@@ -63,10 +63,12 @@ export default function BbCafeHome() {
 
   const getTotal = () => cart.reduce((acc: number, i: any) => acc + (i.price * i.quantity), 0);
 
-  // Filter Logic
+  // Filter Logic with safe string checking to prevent undefined crash
   const filteredMenu = menu.filter(item => {
-    const matchesCategory = selectedCategory === "All" || item.category === selectedCategory;
-    const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase());
+    const itemName = item?.name ? String(item.name).toLowerCase() : "";
+    const itemCategory = item?.category ? String(item.category) : "";
+    const matchesCategory = selectedCategory === "All" || itemCategory === selectedCategory;
+    const matchesSearch = itemName.includes(searchQuery.toLowerCase());
     return matchesCategory && matchesSearch;
   });
 
@@ -88,8 +90,8 @@ export default function BbCafeHome() {
     try {
       await addDoc(collection(db, "orders"), {
         tokenNumber, 
-        customerName: customerDetails.name,
-        customerPhone: customerDetails.phone, 
+        customerName: customerDetails?.name || "Customer",
+        customerPhone: customerDetails?.phone || "No Phone", 
         address, 
         items: cart, 
         total: total + deliveryCharge, 
@@ -98,9 +100,9 @@ export default function BbCafeHome() {
       });
 
       let itemsText = "";
-      cart.forEach((i: any) => itemsText += `• ${i.name} x${i.quantity} - ₹${i.price * i.quantity}\n`);
+      cart.forEach((i: any) => itemsText += `• ${i.name || "Item"} x${i.quantity || 1} - ₹${(i.price || 0) * (i.quantity || 1)}\n`);
       
-      const msg = `🔥 *BUM BUM CAFE - NEW ORDER*\n\n*Order ID:* #${tokenNumber}\n*Customer:* ${customerDetails.name}\n*Phone:* ${customerDetails.phone}\n*Address:* ${address}\n\n*ITEMS:*\n${itemsText}\n*Subtotal:* ₹${total}\n*Delivery:* ₹${deliveryCharge}\n*TOTAL BILL: ₹${total + deliveryCharge}*\n\n_Confirm order by replying 'YES'_`;
+      const msg = `🔥 *BUM BUM CAFE - NEW ORDER*\n\n*Order ID:* #${tokenNumber}\n*Customer:* ${customerDetails?.name || "Customer"}\n*Phone:* ${customerDetails?.phone || "No Phone"}\n*Address:* ${address}\n\n*ITEMS:*\n${itemsText}\n*Subtotal:* ₹${total}\n*Delivery:* ₹${deliveryCharge}\n*TOTAL BILL: ₹${total + deliveryCharge}*\n\n_Confirm order by replying 'YES'_`;
       
       window.open(`https://wa.me/919714293759?text=${encodeURIComponent(msg)}`, '_blank');
       clearCart();
@@ -126,6 +128,19 @@ export default function BbCafeHome() {
     setCustomerDetails(details);
     setIsLoginOpen(false);
     toast.success(`Welcome ${tempName}!`);
+  };
+
+  // Safe helper to extract and display variant price ranges dynamically without crashing
+  const getDisplayPrice = (item: any) => {
+    if (item?.variants && typeof item.variants === 'object') {
+      const prices = Object.values(item.variants).map(Number).filter(n => !isNaN(n));
+      if (prices.length > 0) {
+        const minPrice = Math.min(...prices);
+        const maxPrice = Math.max(...prices);
+        return minPrice === maxPrice ? `₹${minPrice}` : `₹${minPrice} - ₹${maxPrice}`;
+      }
+    }
+    return `₹${item?.price || 0}`;
   };
 
   if (!mounted) return null;
@@ -209,8 +224,12 @@ export default function BbCafeHome() {
             <p className="text-center text-gray-500 py-12 text-sm font-bold uppercase tracking-widest">No items found...</p>
           ) : (
             filteredMenu.map((item) => {
-              // Automatic diverse ratings generator (mimics Zomato 4.5 - 4.9 ratings)
-              const mockRating = (((item.name.length + item.category.length) % 5) * 0.1 + 4.5).toFixed(1);
+              // Safe checks to avoid length reading of undefined
+              const nameStr = item?.name ? String(item.name) : "Delicious Item";
+              const catStr = item?.category ? String(item.category) : "Food";
+              
+              // Dynamic ratings generator (safe from undefined data)
+              const mockRating = (((nameStr.length + catStr.length) % 5) * 0.1 + 4.5).toFixed(1);
 
               return (
                 <motion.div 
@@ -223,7 +242,7 @@ export default function BbCafeHome() {
                     <img 
                       src={item.image || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=500&q=80"} 
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
-                      alt={item.name} 
+                      alt={nameStr} 
                     />
                     
                     {/* Glowing Green Veg Badge Overlay */}
@@ -233,7 +252,7 @@ export default function BbCafeHome() {
                     </div>
 
                     {/* Fancy "Bestseller" Ribbon */}
-                    {item.name.length % 3 === 0 && (
+                    {nameStr.length % 3 === 0 && (
                       <div className="absolute top-4 right-4 bg-gradient-to-r from-orange-600 to-amber-600 px-3 py-1 rounded-lg text-white text-[9px] font-black uppercase tracking-wider shadow-lg">
                         ★ Bestseller
                       </div>
@@ -244,18 +263,18 @@ export default function BbCafeHome() {
                   <div className="p-5 flex flex-col justify-between flex-1">
                     {/* Title and Rating Line */}
                     <div className="flex justify-between items-start gap-4">
-                      <h4 className="font-black text-lg text-gray-100 group-hover:text-orange-500 transition-colors line-clamp-1">{item.name}</h4>
+                      <h4 className="font-black text-lg text-gray-100 group-hover:text-orange-500 transition-colors line-clamp-1">{nameStr}</h4>
                       
                       {/* Rating (Zomato-style Green Star Badge) */}
-                      <div className="bg-green-600 text-white font-extrabold text-[11px] px-2.5 py-0.5 rounded-lg flex items-center gap-0.5 flex-shrink-0 shadow-md shadow-green-900/20">
+                      <div className="bg-green-600 text-white font-extrabold text-[11px] px-2.5 py-0.5 rounded-lg flex items-center gap-0.5 flex-shrink-0 shadow-md">
                         <span>{mockRating}</span>
                         <span className="text-[9px]">★</span>
                       </div>
                     </div>
 
-                    {/* Category and Mock Speed Line */}
+                    {/* Category and Speed Line */}
                     <div className="flex justify-between items-center text-xs text-gray-400 font-bold mt-1">
-                      <p className="uppercase tracking-wider text-[9px] text-gray-500">{item.category}</p>
+                      <p className="uppercase tracking-wider text-[9px] text-gray-500">{catStr}</p>
                       <p className="text-[9px] tracking-wide text-gray-500">• 15-25 min</p>
                     </div>
 
@@ -267,20 +286,16 @@ export default function BbCafeHome() {
                       <div>
                         <p className="text-gray-500 text-[9px] font-black uppercase tracking-widest leading-none mb-1">Price</p>
                         <p className="text-orange-500 font-black text-xl leading-none">
-                          {item.variants ? (
-                            item.variants.half ? `₹${item.variants.half}` : `₹${item.variants.Plain}`
-                          ) : (
-                            `₹${item.price}`
-                          )}
+                          {getDisplayPrice(item)}
                         </p>
-                        {item.variants && (
+                        {item?.variants && (
                           <span className="text-[9px] font-bold text-gray-400 mt-1 block">Options available</span>
                         )}
                       </div>
 
                       {storeOpen && (
                         <button 
-                          onClick={() => item.variants ? setSelectedProduct(item) : addItem(item)}
+                          onClick={() => item?.variants ? setSelectedProduct(item) : addItem(item)}
                           className="px-5 py-2.5 bg-orange-500/10 text-orange-400 border border-orange-500/30 hover:bg-orange-500 hover:text-white rounded-xl font-black text-xs active:scale-95 transition-all flex items-center gap-1.5 uppercase shadow-md"
                         >
                           <Plus size={14} strokeWidth={3} />
@@ -323,11 +338,11 @@ export default function BbCafeHome() {
           <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[100] flex items-end">
             <motion.div initial={{ y: 300 }} animate={{ y: 0 }} exit={{ y: 300 }} className="bg-[#111] w-full p-8 rounded-t-[3.5rem] border-t border-white/10 max-w-lg mx-auto">
               <div className="w-16 h-1.5 bg-white/15 rounded-full mx-auto mb-6" />
-              <h3 className="text-3xl font-black mb-1 text-center tracking-tight">{selectedProduct.name}</h3>
+              <h3 className="text-3xl font-black mb-1 text-center tracking-tight">{selectedProduct?.name || "Portion option"}</h3>
               <p className="text-orange-500 font-black mb-8 uppercase tracking-widest text-[10px] text-center">Select Portion Option</p>
               
               <div className="space-y-4">
-                {Object.entries(selectedProduct.variants || {}).map(([size, price]: any) => (
+                {Object.entries(selectedProduct?.variants || {}).map(([size, price]: any) => (
                   <button 
                     key={size} 
                     onClick={() => { 
@@ -366,8 +381,8 @@ export default function BbCafeHome() {
               {cart.map((item: any) => (
                 <div key={item.id} className="flex justify-between items-center bg-white/[0.02] p-5 rounded-3xl mb-4 border border-white/5">
                   <div className="min-w-0 pr-3">
-                    <h4 className="font-bold text-sm text-gray-100 truncate">{item.name}</h4>
-                    <p className="text-orange-500 font-black mt-1">₹{item.price}</p>
+                    <h4 className="font-bold text-sm text-gray-100 truncate">{item?.name || "Item"}</h4>
+                    <p className="text-orange-500 font-black mt-1">₹{item?.price || 0}</p>
                   </div>
                   
                   {/* Quantity Controller (Plus/Minus) */}
@@ -414,8 +429,8 @@ export default function BbCafeHome() {
                   <div className="bg-white/[0.02] p-5 rounded-[2.2rem] border border-white/5 flex justify-between items-center">
                     <div>
                       <p className="text-[9px] text-gray-500 font-black uppercase tracking-wider">Ordering As</p>
-                      <h4 className="font-black text-md text-orange-500">{customerDetails.name}</h4>
-                      <p className="text-xs text-gray-400 font-bold mt-0.5">{customerDetails.phone}</p>
+                      <h4 className="font-black text-md text-orange-500">{customerDetails?.name}</h4>
+                      <p className="text-xs text-gray-400 font-bold mt-0.5">{customerDetails?.phone}</p>
                     </div>
                     <button 
                       onClick={() => { localStorage.removeItem('bb_cafe_customer'); setCustomerDetails(null); }}
