@@ -3,8 +3,8 @@
 import React, { useState, useEffect } from 'react';
 // Changed to reliable relative path to avoid compile-time path resolution errors
 import { db } from '../../lib/firebase'; 
-import { collection, onSnapshot, query, orderBy, doc, updateDoc, setDoc, addDoc, deleteDoc } from 'firebase/firestore';
-import { Power, Eye, EyeOff, User, MapPin, Calendar, CheckCircle2, LogOut, Loader2, Phone, Plus, Trash, Edit, X, Lock, BarChart3, Download, Folder, Percent, ImageIcon } from 'lucide-react';
+import { collection, onSnapshot, query, orderBy, doc, updateDoc, setDoc, addDoc, deleteDoc, increment } from 'firebase/firestore';
+import { Power, Eye, EyeOff, User, MapPin, Calendar, CheckCircle2, LogOut, Loader2, Phone, Plus, Trash, Edit, X, Lock, BarChart3, Download, Folder, Percent, ImageIcon, Gift } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 
 // Categories default list
@@ -30,6 +30,9 @@ export default function AdminDashboard() {
   const [coupons, setCoupons] = useState<any[]>([]);
   const [newCouponCode, setNewCouponCode] = useState("");
   const [newCouponValue, setNewCouponValue] = useState("");
+
+  // --- CUSTOMER LOYALTY CLUB STATE ---
+  const [loyaltyUsers, setLoyaltyUsers] = useState<any[]>([]);
 
   // --- ADD PRODUCT STATES ---
   const [showAddForm, setShowAddForm] = useState(false);
@@ -110,6 +113,11 @@ export default function AdminDashboard() {
       setReviews(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
 
+    // Listen for Customer Loyalty Points
+    const unsubLoyalty = onSnapshot(collection(db, "customer_points"), (snap) => {
+      setLoyaltyUsers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+
     return () => {
       unsubOrders();
       unsubProducts();
@@ -118,6 +126,7 @@ export default function AdminDashboard() {
       unsubBanners();
       unsubCoupons();
       unsubReviews();
+      unsubLoyalty();
     };
   }, [isVerified]);
 
@@ -137,6 +146,24 @@ export default function AdminDashboard() {
     localStorage.removeItem('bb_cafe_admin_verified');
     setIsVerified(false);
     window.location.href = "/";
+  };
+
+  // --- LOYALTY POINTS REDEEM CONTROLLER ---
+  const handleRedeemPoints = async (phone: string, name: string, currentPoints: number, redeemCost: number, giftName: string) => {
+    if (currentPoints < redeemCost) {
+      return toast.error(`Insufficient points! Needs ${redeemCost} Pts for ${giftName}.`);
+    }
+
+    if (window.confirm(`Redeem ${redeemCost} points of ${name} (+91${phone}) to give free ${giftName}?`)) {
+      try {
+        await updateDoc(doc(db, "customer_points", phone), {
+          points: increment(-redeemCost)
+        });
+        toast.success(`Reward Unlocked: Free ${giftName}! deducted ${redeemCost} Pts.`);
+      } catch (e) {
+        toast.error("Failed to redeem points.");
+      }
+    }
   };
 
   // --- CSV / EXCEL EXPORT ENGINE WITH UTF-8 BOM FOR HINDI CHARACTER SUPPORT ---
@@ -346,6 +373,7 @@ export default function AdminDashboard() {
     } catch (e) { toast.error("Error toggling store"); }
   };
 
+  // --- OTHER MENU ITEM ACTIONS ---
   const toggleItemVisibility = async (id: string, currentStatus: boolean) => {
     try {
       await updateDoc(doc(db, "products", id), { isVisible: !currentStatus });
@@ -371,6 +399,7 @@ export default function AdminDashboard() {
     toast.loading("Importing all menu items...", { id: "import" });
 
     const defaultMenu = [
+      // Page 2: Fast Food / Hot Drinks
       { name: "Special Tea (स्पेशल चाय)", category: "Fast Food", price: 15, image: "https://images.unsplash.com/photo-1544787219-7f47ccb76574?auto=format&fit=crop&w=300&q=80", isVisible: true },
       { name: "Black Tea (काली चाय)", category: "Fast Food", price: 20, image: "https://images.unsplash.com/photo-1508888620463-70b53b8004c3?auto=format&fit=crop&w=300&q=80", isVisible: true },
       { name: "Special Coffee (स्पेशल कॉफी)", category: "Fast Food", price: 20, image: "https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?auto=format&fit=crop&w=300&q=80", isVisible: true },
@@ -540,7 +569,7 @@ export default function AdminDashboard() {
     }
   };
 
-  // --- EDIT PRODUCT SELECTOR LOGIC (RESTORED CLEANLY) ---
+  // --- EDIT PRODUCT SELECTOR LOGIC ---
   const startEditing = (item: any) => {
     setEditingProduct(item);
     setEditName(item.name);
@@ -632,9 +661,9 @@ export default function AdminDashboard() {
         </div>
       </header>
 
-      {/* --- EXTENDED RESPONSIVE HORIZONTAL TABS --- */}
+      {/* --- RESPONSIVE HORIZONTAL TABS --- */}
       <div className="p-4 flex gap-2 overflow-x-auto no-scrollbar border-b border-white/5">
-        <button onClick={() => setTab('dashboard')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'dashboard' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>📊 Dashboard</button>
+        <button onClick={() => setTab('dashboard')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'dashboard' ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/20' : 'bg-white/5 text-gray-500'}`}>📊 Dashboard</button>
         <button onClick={() => setTab('orders')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'orders' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>📦 Orders ({orders.length})</button>
         <button onClick={() => setTab('menu')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'menu' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>🍔 Menu List</button>
         <button onClick={() => setTab('categories')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'categories' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>🗂️ Categories</button>
@@ -645,12 +674,12 @@ export default function AdminDashboard() {
 
       <main className="p-4 max-w-2xl mx-auto">
         
-        {/* --- TAB 1: PREMIUM ANALYTICS DASHBOARD & PERMANENT RECORD --- */}
+        {/* --- TAB 1: DASHBOARD --- */}
         {tab === 'dashboard' && (
           <div className="space-y-6">
             <h3 className="text-xl font-black text-orange-500 uppercase tracking-wider flex items-center gap-2"><BarChart3 size={20}/> Sales Dashboard</h3>
             
-            {/* Sales Stats Today Grid (Daily) */}
+            {/* Today Quick Insights */}
             <div className="bg-[#111] border border-white/5 p-4 rounded-3xl space-y-3">
               <p className="text-[10px] font-black uppercase text-orange-400 tracking-wider">🎯 Today's Quick Insights</p>
               <div className="grid grid-cols-3 gap-3">
@@ -669,7 +698,7 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            {/* Sales Stats Lifetime KPIs */}
+            {/* Lifetime KPIs */}
             <div className="grid grid-cols-3 gap-3">
               <div className="bg-white/[0.02] border border-white/5 p-4 rounded-3xl text-center">
                 <p className="text-[9px] font-black text-gray-500 uppercase">Lifetime Sales</p>
@@ -685,7 +714,7 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            {/* Excel Exports Buttons */}
+            {/* Export buttons */}
             <div className="grid grid-cols-2 gap-3 bg-[#111]/30 border border-white/5 p-4 rounded-[2rem] shadow-xl">
               <button onClick={handleExportOrders} className="bg-green-600 hover:bg-green-700 text-white font-black text-xs py-4 px-3 rounded-2xl flex items-center justify-center gap-2 active:scale-95 transition-all uppercase shadow-md">
                 <Download size={14}/> Sales Ledger Excel
@@ -695,7 +724,49 @@ export default function AdminDashboard() {
               </button>
             </div>
 
-            {/* Permanent Orders Ledger */}
+            {/* --- 🎁 NEW: LOYALTY CLUB REDEEM BOARD FOR ADMIN --- */}
+            <div className="bg-yellow-400/5 border border-yellow-400/25 p-6 rounded-[2rem] space-y-4">
+              <h4 className="text-sm font-black text-yellow-400 uppercase tracking-widest flex items-center gap-2">⭐ Loyalty Club Reward Redeem Board</h4>
+              <p className="text-[10px] text-gray-400 font-semibold leading-relaxed">Customers can redeem 10 points for a sandwich or 20 points for a small pizza. Deduct points cleanly using the buttons below once rewarded:</p>
+              
+              <div className="space-y-3 max-h-72 overflow-y-auto no-scrollbar">
+                {loyaltyUsers.length === 0 ? (
+                  <p className="text-center text-xs font-bold text-gray-500 uppercase py-6">No loyalty customer registered yet...</p>
+                ) : (
+                  loyaltyUsers.map(user => (
+                    <div key={user.id} className="bg-black/40 border border-white/5 p-4 rounded-2xl flex justify-between items-center">
+                      <div>
+                        <h5 className="font-extrabold text-sm text-white">{user.name}</h5>
+                        <p className="text-[10px] font-bold text-orange-500 mt-0.5">+{user.phone}</p>
+                        <p className="text-xs font-black text-yellow-400 mt-1">Live Points: {user.points || 0} Pts</p>
+                      </div>
+                      <div className="flex flex-col gap-1.5">
+                        <button 
+                          onClick={() => handleRedeemPoints(user.phone, user.name, user.points || 0, 10, "Sandwich 🥪")}
+                          disabled={(user.points || 0) < 10}
+                          className={`px-3 py-1.5 rounded-lg font-black text-[9px] uppercase tracking-wider transition-all ${
+                            (user.points || 0) >= 10 ? 'bg-orange-500 text-black active:scale-95' : 'bg-white/5 text-gray-600 cursor-not-allowed'
+                          }`}
+                        >
+                          Redeem Sandwich (10 Pts)
+                        </button>
+                        <button 
+                          onClick={() => handleRedeemPoints(user.phone, user.name, user.points || 0, 20, "Small Pizza 🍕")}
+                          disabled={(user.points || 0) < 20}
+                          className={`px-3 py-1.5 rounded-lg font-black text-[9px] uppercase tracking-wider transition-all ${
+                            (user.points || 0) >= 20 ? 'bg-orange-500 text-black active:scale-95' : 'bg-white/5 text-gray-600 cursor-not-allowed'
+                          }`}
+                        >
+                          Redeem Pizza (20 Pts)
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* Permanent Ledger Record list */}
             <div className="space-y-4">
               <h4 className="text-sm font-black text-gray-400 uppercase tracking-widest pt-2">📚 Permanent Financial Ledger</h4>
               {orders.length === 0 ? (
@@ -893,7 +964,7 @@ export default function AdminDashboard() {
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Small Price (₹)</label><input type="number" placeholder="Small price" value={editPriceSmall} onChange={(e) => setEditPriceSmall(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" /></div>
                     <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Medium Price (₹)</label><input type="number" placeholder="Medium price" value={editPriceMedium} onChange={(e) => setEditPriceMedium(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" /></div>
-                    <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Large Price (₹)</label><input type="number" placeholder="Large price" value={editPriceLarge} onChange={(e) => setEditPriceLarge(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" /></div>
+                    <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Large Price (₹)</label><input type="number" placeholder="Large price" value={editPriceLarge} onChange={(e) => setEditPriceLarge(e.target.value)} className="w-full bg-[#111]/30 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" /></div>
                     <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Extra Large Price (₹)</label><input type="number" placeholder="XL price" value={editPriceXL} onChange={(e) => setEditPriceXL(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" /></div>
                   </div>
                 )}
@@ -932,7 +1003,11 @@ export default function AdminDashboard() {
                     </div>
                     <div className="flex items-center gap-2">
                       <button onClick={() => startEditing(item)} className="p-3 bg-blue-500/10 text-blue-500 rounded-xl hover:bg-blue-500/20 active:scale-90 transition-all"><Edit size={18}/></button>
-                      <button onClick={() => toggleItemVisibility(item.id, item.isVisible !== false)} className={`p-3 rounded-xl transition-all ${item.isVisible !== false ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>{item.isVisible !== false ? <Eye size={18}/> : <EyeOff size={18}/>}</button>
+                      
+                      {/* --- CORECTED ITEM HIDE UNHIDE TOGGLE (Eye/EyeOff) --- */}
+                      <button onClick={() => toggleItemVisibility(item.id, item.isVisible !== false)} className={`p-3 rounded-xl transition-all ${item.isVisible !== false ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
+                        {item.isVisible !== false ? <Eye size={18}/> : <EyeOff size={18}/>}
+                      </button>
                       <button onClick={() => handleDeleteProduct(item.id)} className="p-3 bg-red-500/10 text-red-500 rounded-xl hover:bg-red-500/20 active:scale-90 transition-all"><Trash size={18}/></button>
                     </div>
                   </div>
@@ -942,7 +1017,7 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* --- TAB 4: NEW CATEGORIES MANAGER TAB --- */}
+        {/* --- TAB 4: DYNAMIC CATEGORY MANAGER (LIST + FORM + TOGGLE SCREEN) --- */}
         {tab === 'categories' && (
           <div className="space-y-6">
             <form onSubmit={handleAddCategory} className="bg-white/[0.02] border border-white/5 p-6 rounded-[2.5rem] space-y-4">
@@ -954,23 +1029,29 @@ export default function AdminDashboard() {
               <button type="submit" className="w-full bg-green-600 text-white p-4 rounded-xl font-black text-sm uppercase active:scale-95 transition-all">Add Category</button>
             </form>
 
+            {/* Dynamic Category List */}
             <div className="space-y-3">
-              {categories.map(c => (
-                <div key={c.id} className="bg-white/[0.02] border border-white/5 p-4 rounded-3xl flex justify-between items-center hover:bg-white/[0.04] transition-all">
-                  <div className="flex items-center gap-4">
-                    <img src={c.image} className="w-12 h-12 rounded-full object-cover border border-white/10" alt="Category"/>
-                    <h4 className="font-black text-sm text-gray-200">{c.name}</h4>
+              <p className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">Category List ({categories.length})</p>
+              {categories.length === 0 ? (
+                <p className="text-center text-xs font-bold text-gray-500 py-6 uppercase">No custom categories added yet...</p>
+              ) : (
+                categories.map(c => (
+                  <div key={c.id} className="bg-white/[0.02] border border-white/5 p-4 rounded-3xl flex justify-between items-center hover:bg-white/[0.04] transition-all">
+                    <div className="flex items-center gap-4">
+                      <img src={c.image} className="w-12 h-12 rounded-full object-cover border border-white/10" alt="Category"/>
+                      <h4 className="font-black text-sm text-gray-200">{c.name}</h4>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button onClick={() => toggleCategoryVisibility(c.id, c.isVisible !== false)} className={`p-3 rounded-xl transition-all ${c.isVisible !== false ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
+                        {c.isVisible !== false ? <Eye size={18}/> : <EyeOff size={18}/>}
+                      </button>
+                      <button onClick={() => handleDeleteCategory(c.id)} className="p-3 bg-red-500/10 text-red-500 rounded-xl hover:bg-red-500/20 active:scale-95 transition-all">
+                        <Trash size={18}/>
+                      </button>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <button onClick={() => toggleCategoryVisibility(c.id, c.isVisible !== false)} className={`p-3 rounded-xl transition-all ${c.isVisible !== false ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
-                      {c.isVisible !== false ? <Eye size={18}/> : <EyeOff size={18}/>}
-                    </button>
-                    <button onClick={() => handleDeleteCategory(c.id)} className="p-3 bg-red-500/10 text-red-500 rounded-xl hover:bg-red-500/20 active:scale-95 transition-all">
-                      <Trash size={18}/>
-                    </button>
-                  </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </div>
         )}
@@ -982,7 +1063,7 @@ export default function AdminDashboard() {
               <h3 className="text-lg font-black text-orange-500 italic uppercase flex items-center gap-2"><ImageIcon size={18}/> Add Banner</h3>
               <input 
                 type="url" 
-                placeholder="Paste image url here..." 
+                placeholder="Paste offer image url here..." 
                 value={newBannerUrl} 
                 onChange={(e) => setNewBannerUrl(e.target.value)} 
                 className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-xs font-bold text-white" 
@@ -1013,7 +1094,7 @@ export default function AdminDashboard() {
                 <input type="text" placeholder="CODE (e.g. WELCOME)" value={newCouponCode} onChange={(e) => setNewCouponCode(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-xs font-black uppercase text-white" required />
                 <input type="number" placeholder="Discount (₹)" value={newCouponValue} onChange={(e) => setNewCouponValue(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-xs font-black text-white" required />
               </div>
-              <button type="submit" className="w-full bg-green-600 text-white p-4 rounded-xl font-black text-sm uppercase animate-pulse">Create Coupon</button>
+              <button type="submit" className="w-full bg-green-600 text-white p-4 rounded-xl font-black text-sm uppercase active:scale-95 transition-all">Create Coupon</button>
             </form>
 
             <div className="space-y-3">
@@ -1032,7 +1113,7 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* --- TAB 7: APPROVE REVIEWS TAB --- */}
+        {/* --- TAB 7: APPROVE FEEDBACK REVIEWS TAB --- */}
         {tab === 'reviews' && (
           <div className="space-y-4">
             {reviews.length === 0 && <p className="text-center text-gray-600 py-16 font-bold uppercase tracking-widest">No feedback reviews yet...</p>}
