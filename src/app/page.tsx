@@ -7,10 +7,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
 import { useCartStore } from '../store/useCartStore';
 
-// Static Fallback Categories
-const FALLBACK_CATEGORIES = ["All", "Special Pizza", "Special Thali", "Paneer Special", "Special Mix veg", "Fast Food", "Super Cool", "Indian Bread", "Special Rice"];
+// CATEGORIES
+const CATEGORIES = ["All", "Special Pizza", "Special Thali", "Paneer Special", "Special Mix veg", "Fast Food", "Super Cool", "Indian Bread", "Special Rice"];
 
-// Static Fallback Images
+// Beautiful round category icons mapped for Zomato-style circular grid
 const CATEGORY_IMAGES: { [key: string]: string } = {
   "All": "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=150&q=80",
   "Special Pizza": "https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=150&q=80",
@@ -23,7 +23,7 @@ const CATEGORY_IMAGES: { [key: string]: string } = {
   "Special Rice": "https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?auto=format&fit=crop&w=150&q=80"
 };
 
-// Suggestions tags
+// Quick Review Suggestions to make it extremely easy to write reviews on mobile
 const REVIEW_SUGGESTIONS = [
   "Swaad Zabardast! 😋",
   "Super Fast Delivery 🛵",
@@ -35,6 +35,7 @@ const REVIEW_SUGGESTIONS = [
   "Best Thali Ever 🍱"
 ];
 
+// Pre-written Default Reviews (Displays if Firestore reviews collection is empty)
 const DEFAULT_REVIEWS = [
   { id: "def1", name: "Gaurav Soni", rating: 5, comment: "Bum Bum Cafe ki paneer pizza sach me pure Mohandra me best hai! Extra cheese is real love. ⭐⭐⭐⭐⭐" },
   { id: "def2", name: "Anjali Patel", rating: 5, comment: "Fast food packing bahut achi thi, delivery boy behavior was also very polite. Recommended! ⭐⭐⭐⭐⭐" },
@@ -45,6 +46,7 @@ export default function BbCafeHome() {
   const store = useCartStore() as any;
   const cart = store?.items || [];
   
+  // Safe destructuring
   const addItem = store?.addItem || (() => {});
   const removeItem = store?.removeItem || (() => {});
   const clearCart = store?.clearCart || (() => {});
@@ -57,14 +59,14 @@ export default function BbCafeHome() {
   const [storeOpen, setStoreOpen] = useState(true);
   const [mounted, setMounted] = useState(false);
   
-  // Contact details
+  // Free Contact Form States (Bypassed OTP)
   const [customerDetails, setCustomerDetails] = useState<{ name: string, phone: string } | null>(null);
   const [tempName, setTempName] = useState("");
   const [tempPhone, setTempPhone] = useState("");
   const [address, setAddress] = useState("");
   const [selectedProduct, setSelectedProduct] = useState<any>(null); 
 
-  // --- DYNAMIC DATA STATES ---
+  // --- NEW FEATURES STATES ---
   const [dbCategories, setDbCategories] = useState<any[]>([]);
   const [banners, setBanners] = useState<any[]>([]);
   const [bannerIndex, setBannerIndex] = useState(0);
@@ -74,15 +76,18 @@ export default function BbCafeHome() {
   const [reviews, setReviews] = useState<any[]>([]);
   const [coupons, setCoupons] = useState<any[]>([]);
   
+  // Side drawers & modals toggles
   const [isReviewsDrawerOpen, setIsReviewsDrawerOpen] = useState(false);
   const [isReviewFormOpen, setIsReviewFormOpen] = useState(false);
   const [reviewName, setReviewName] = useState("");
   const [reviewComment, setReviewComment] = useState("");
   const [reviewRating, setReviewRating] = useState(5);
   
+  // Coupon checkout states
   const [enteredCoupon, setEnteredCoupon] = useState("");
   const [appliedCoupon, setAppliedCoupon] = useState<any>(null);
 
+  // Pizza customization states
   const [chosenSize, setChosenSize] = useState<string>("");
   const [chosenPrice, setChosenPrice] = useState<number>(0);
   const [addonCheese, setAddonCheese] = useState(false);
@@ -90,7 +95,7 @@ export default function BbCafeHome() {
 
   useEffect(() => {
     setMounted(true);
-    // Realtime Store Status
+    // Check Store Status
     const unsubStore = onSnapshot(doc(db, "settings", "store"), (d) => {
       if(d.exists()) setStoreOpen(d.data().isOpen);
     });
@@ -123,7 +128,7 @@ export default function BbCafeHome() {
       setReviews(allRev.filter((r: any) => r.isApproved === true));
     });
 
-    // Load saved customer info
+    // Mobile local memory checking
     const savedDetails = localStorage.getItem('bb_cafe_customer');
     if (savedDetails) {
       try {
@@ -141,10 +146,23 @@ export default function BbCafeHome() {
     };
   }, []);
 
+  // Safe display price helper (Fixed placement inside scope)
+  const getDisplayPrice = (item: any) => {
+    if (item?.variants && typeof item.variants === 'object') {
+      const prices = Object.values(item.variants).map(Number).filter(n => !isNaN(n));
+      if (prices.length > 0) {
+        const minPrice = Math.min(...prices);
+        const maxPrice = Math.max(...prices);
+        return minPrice === maxPrice ? `₹${minPrice}` : `₹${minPrice} - ₹${maxPrice}`;
+      }
+    }
+    return `₹${item?.price || 0}`;
+  };
+
   // Compute actual dynamic categories list cleanly
   const currentCategories = dbCategories.length > 0 
     ? ["All", ...dbCategories.map(c => c.name)]
-    : FALLBACK_CATEGORIES;
+    : CATEGORIES;
 
   const getCategoryImage = (catName: string) => {
     const found = dbCategories.find(c => c.name === catName);
@@ -254,6 +272,7 @@ export default function BbCafeHome() {
     }
   };
 
+  // Click tag to append pre-written suggestions instantly
   const handleAddSuggestion = (suggestion: string) => {
     setReviewComment(prev => prev ? `${prev} ${suggestion}` : suggestion);
   };
@@ -271,13 +290,37 @@ export default function BbCafeHome() {
     toast.success(`Welcome ${tempName}!`);
   };
 
+  const handleAddToCart = () => {
+    if (!chosenSize) return toast.error("Please select a size first!");
+    
+    const basePrice = Number(chosenPrice);
+    const addonsTotal = (addonCheese ? 30 : 0) + (addonVeg ? 20 : 0);
+    const finalPrice = basePrice + addonsTotal;
+
+    let finalName = `${selectedProduct.name} (${chosenSize})`;
+    if (addonCheese) finalName += " + Extra Cheese";
+    if (addonVeg) finalName += " + Extra Veg";
+
+    const uniqueCartId = `${selectedProduct.id}-${chosenSize}-${addonCheese ? 'cheese' : 'no'}-${addonVeg ? 'veg' : 'no'}`;
+
+    addItem({
+      ...selectedProduct,
+      id: uniqueCartId,
+      name: finalName,
+      price: finalPrice
+    });
+
+    toast.success(`${chosenSize} Pizza added to cart!`);
+    setSelectedProduct(null); setChosenSize(""); setChosenPrice(0); setAddonCheese(false); setAddonVeg(false);
+  };
+
   if (!mounted) return null;
 
   return (
     <div className="bg-[#050505] min-h-screen text-white pb-32 font-sans selection:bg-orange-500">
       <Toaster position="top-center" />
       
-      {/* --- HEADER --- */}
+      {/* --- COMPACT HEADER --- */}
       <header className="relative h-60 bg-gradient-to-b from-[#ff5e00] to-[#b33600] flex flex-col justify-center items-center px-4 shadow-[0_15px_40px_rgba(179,54,0,0.2)]">
         <div className="absolute inset-0 opacity-15 bg-[url('https://www.transparenttextures.com/patterns/food.png')] bg-center rounded-b-[3.5rem] overflow-hidden"></div>
         <div className="absolute top-4 right-4 bg-black/40 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10 flex items-center gap-1.5 z-10">
@@ -460,7 +503,7 @@ export default function BbCafeHome() {
         )}
       </AnimatePresence>
 
-      {/* --- REVIEWS DRAWER POPUP --- */}
+      {/* --- REVIEWS SIDE DRAWER POPUP --- */}
       <AnimatePresence>
         {isReviewsDrawerOpen && (
           <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[120] overflow-y-auto">
@@ -545,7 +588,7 @@ export default function BbCafeHome() {
         )}
       </AnimatePresence>
 
-      {/* --- VARIANTS & PIZZA CUSTOMIZATION POPUP --- */}
+      {/* --- VARIANTS POPUP --- */}
       <AnimatePresence>
         {selectedProduct && (
           <div className="fixed inset-0 bg-black/95 backdrop-blur-md z-[100] flex items-end">
@@ -669,7 +712,7 @@ export default function BbCafeHome() {
                   )}
                 </div>
 
-                {/* Saved Local Details Block */}
+                {/* Local Memory Saved Details Block */}
                 {customerDetails ? (
                   <div className="bg-white/[0.02] p-5 rounded-[2.2rem] border border-white/5 flex justify-between items-center">
                     <div>
@@ -703,6 +746,7 @@ export default function BbCafeHome() {
                   <div className="flex justify-between font-black text-2xl"><span>To Pay</span> <span>₹{Math.max(0, getTotal() - (appliedCoupon ? appliedCoupon.discountValue : 0)) + (getTotal() < 99 ? 20 : 0)}</span></div>
                 </div>
 
+                {/* --- WHATSAPP ORDER BUTTON --- */}
                 <button onClick={sendWhatsAppOrder} type="button" className="w-full bg-green-600 hover:bg-green-700 p-6 rounded-[2.5rem] font-black text-md shadow-xl border border-green-500/20 text-white">
                   <svg className="w-6 h-6 fill-current text-white flex-shrink-0" viewBox="0 0 24 24">
                     <path d="M12.037 21.978c-1.92 0-3.805-.502-5.46-1.457l-.391-.227-4.062 1.066 1.085-3.953-.25-.398C2.01 15.352 1.48 13.208 1.48 11.005 1.482 5.21 6.22 .495 12.037.495c2.818 0 5.467 1.1 7.46 3.099a10.45 10.45 0 0 1 3.093 7.42c-.002 5.797-4.74 10.513-10.553 10.513zm5.412-7.587c-.297-.15-1.758-.868-2.03-.96-.273-.092-.471-.137-.67.137-.197.275-.764.96-.938 1.144-.173.183-.347.206-.644.055-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.1-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.501-.669-.51l-.57-.011c-.198 0-.52.074-.793.372-.272.297-1.04.101-1.04 2.479 0 2.378 1.733 4.678 1.98 5.024.248.346 3.41 5.216 8.26 7.301 1.155.496 2.057.793 2.76 1.017 1.21.383 2.311.33 3.18.198 1.03-.15 2.158-.87 2.46-1.714.3-.842.3-1.564.21-1.714-.09-.15-.335-.24-.633-.39z"/>
