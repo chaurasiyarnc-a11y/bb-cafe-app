@@ -10,6 +10,9 @@ import toast, { Toaster } from 'react-hot-toast';
 // Categories default list
 const ADD_CATEGORIES = ["Special Pizza", "Special Thali", "Paneer Special", "Special Mix veg", "Fast Food", "Super Cool", "Indian Bread", "Special Rice"];
 
+// Dynamic Unsplash URL Builder
+const imgUrl = (id: string) => `https://images.unsplash.com/photo-${id}?auto=format&fit=crop&w=300&q=80`;
+
 export default function AdminDashboard() {
   const [isVerified, setIsVerified] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -63,7 +66,7 @@ export default function AdminDashboard() {
   const [editPriceLarge, setEditPriceLarge] = useState("");
   const [editPriceXL, setEditPriceXL] = useState("");
 
-  // 1. Session verification check (Session memory auto-locks admin)
+  // 1. Session verification check (session memory locks admin securely on window close)
   useEffect(() => {
     const adminSession = sessionStorage.getItem('bb_cafe_admin_verified');
     if (adminSession === 'true') {
@@ -72,7 +75,7 @@ export default function AdminDashboard() {
     setLoading(false);
   }, []);
 
-  // 2. Real-time Data Listeners (Triggers when unlocked)
+  // 2. Real-time Data Listeners
   useEffect(() => {
     if (!isVerified) return;
 
@@ -166,7 +169,7 @@ export default function AdminDashboard() {
     }
   };
 
-  // --- CSV / EXCEL EXPORT ENGINE WITH UTF-8 BOM FOR HINDI CHARACTER SUPPORT ---
+  // --- CSV / EXCEL EXPORT ENGINE WITH UTF-8 BOM ---
   const triggerCsvDownload = (data: any[], filename: string, headers: string[], keys: string[]) => {
     if (data.length === 0) return toast.error("No data available to export!");
 
@@ -196,7 +199,7 @@ export default function AdminDashboard() {
     toast.success("Excel Data Exported!");
   };
 
-  // Export 1: Order Sales History Data Ledger
+  // Export 1: Order Sales History
   const handleExportOrders = () => {
     const formattedData = orders.map(o => {
       const itemsSummary = o.items?.map((i: any) => `${i.name} (x${i.quantity})`).join(' | ') || '';
@@ -238,7 +241,7 @@ export default function AdminDashboard() {
     triggerCsvDownload(formattedData, `BumBumCafe_CustomersDirectory_${new Date().toLocaleDateString()}`, headers, keys);
   };
 
-  // --- GET DAILY ANALYTICS METRICS ---
+  // --- ANALYTICS METRICS CALCULATORS ---
   const getDailyAnalytics = () => {
     const todayStr = new Date().toDateString();
     const todayOrders = orders.filter(o => {
@@ -257,7 +260,6 @@ export default function AdminDashboard() {
     };
   };
 
-  // --- GET LIFETIME DASHBOARD METRICS ---
   const getLifetimeMetrics = () => {
     const seenPhones = new Set();
     orders.forEach(o => { if (o.customerPhone) seenPhones.add(String(o.customerPhone)); });
@@ -273,7 +275,7 @@ export default function AdminDashboard() {
   const dailyStats = getDailyAnalytics();
   const lifetimeStats = getLifetimeMetrics();
 
-  // Dynamic dropdown helper if Firestore categories collection is empty
+  // Dynamic dropdown fallback
   const categoryOptions = categories.length > 0 
     ? categories.map(c => c.name)
     : ADD_CATEGORIES;
@@ -365,15 +367,7 @@ export default function AdminDashboard() {
     } catch (error) { toast.error("Error deleting coupon"); }
   };
 
-  // --- STORE ACTIONS ---
-  const toggleStore = async () => {
-    try {
-      await setDoc(doc(db, "settings", "store"), { isOpen: !storeOpen });
-      toast.success(storeOpen ? "Cafe is now OFFLINE" : "Cafe is now ONLINE");
-    } catch (e) { toast.error("Error toggling store"); }
-  };
-
-  // --- OTHER MENU ITEM ACTIONS ---
+  // --- MENU ITEM ACTIONS ---
   const toggleItemVisibility = async (id: string, currentStatus: boolean) => {
     try {
       await updateDoc(doc(db, "products", id), { isVisible: !currentStatus });
@@ -392,167 +386,45 @@ export default function AdminDashboard() {
     }
   };
 
-  // --- BULK PDF IMPORT ---
-  const handleBulkImport = async () => {
-    if (!window.confirm("BUM BUM CAFE PDF ke saare 80+ items ko database mein add karein?")) return;
-    
-    toast.loading("Importing all menu items...", { id: "import" });
+  // --- ADD NEW PRODUCT FUNCTION ---
+  const handleAddProduct = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newName || !newCategory || !newImage) {
+      return toast.error("Please fill all required fields!");
+    }
 
-    const defaultMenu = [
-      // Page 2: Fast Food / Hot Drinks
-      { name: "Special Tea (स्पेशल चाय)", category: "Fast Food", price: 15, image: "https://images.unsplash.com/photo-1544787219-7f47ccb76574?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Black Tea (काली चाय)", category: "Fast Food", price: 20, image: "https://images.unsplash.com/photo-1508888620463-70b53b8004c3?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Special Coffee (स्पेशल कॉफी)", category: "Fast Food", price: 20, image: "https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Black Coffee (काली कॉफी)", category: "Fast Food", price: 25, image: "https://images.unsplash.com/photo-1497515114629-f71d768fd07c?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Mix Veg Maggie (मिक्स वेज मैगी)", category: "Fast Food", price: 30, variants: { half: 30, full: 50 }, image: "https://images.unsplash.com/photo-1569718212165-3a8278d5f624?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Pasta (पास्ता)", category: "Fast Food", price: 30, variants: { half: 30, full: 50 }, image: "https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Finger Chips (फिंगर चिप्स)", category: "Fast Food", price: 30, variants: { half: 30, full: 50 }, image: "https://images.unsplash.com/photo-1573080496219-bb080dd4f877?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Momos (मोमोस्)", category: "Fast Food", price: 30, variants: { half: 30, full: 50 }, image: "https://images.unsplash.com/photo-1534422298391-e4f8c172dddb?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Bombe Bhel (बॉम्बे भेल)", category: "Fast Food", price: 30, variants: { half: 30, full: 50 }, image: "https://images.unsplash.com/photo-1589301760014-d929f3979dbc?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Indori Poha (पोहा इंदौरी)", category: "Fast Food", price: 30, image: "https://images.unsplash.com/photo-1601050690597-df056fb4ce78?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Tikki Chaat (टिक्की चाट)", category: "Fast Food", price: 30, variants: { half: 30, full: 30 }, image: "https://images.unsplash.com/photo-1601050690597-df056fb4ce78?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Kachori Chhat (कचोरी चाट)", category: "Fast Food", price: 30, variants: { half: 30, full: 30 }, image: "https://images.unsplash.com/photo-1601050690597-df056fb4ce78?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Cheese Garlic Bread (चीस गालिक ब्रेड)", category: "Fast Food", price: 60, image: "https://images.unsplash.com/photo-1573140247632-f8fd74997d5c?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Burger (बर्गर)", category: "Fast Food", price: 30, image: "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Cheese Burger (चीस बर्गर)", category: "Fast Food", price: 40, image: "https://images.unsplash.com/photo-1521305916504-4a1121188589?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Paneer Sandwich (पनीर सैंडविच)", category: "Fast Food", price: 80, image: "https://images.unsplash.com/photo-1528735602780-2552fd46c7af?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Veg Cheese Sandwich (वेज चीस सैंडविच)", category: "Fast Food", price: 60, image: "https://images.unsplash.com/photo-1528735602780-2552fd46c7af?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Veg Spring Roll (वेज स्प्रिंग रोल)", category: "Fast Food", price: 50, image: "https://images.unsplash.com/photo-1541532713592-79a0317b6b77?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Manchuriyan (मंचुरियन)", category: "Fast Food", price: 30, variants: { half: 30, full: 50 }, image: "https://images.unsplash.com/photo-1512058564366-18510be2db19?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Manchuriyan Rice (मंचुरियन फ्राय राइस)", category: "Fast Food", price: 30, variants: { half: 30, full: 50 }, image: "https://images.unsplash.com/photo-1512058564366-18510be2db19?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Chawmeen (चाउमीन)", category: "Fast Food", price: 30, variants: { half: 30, full: 50 }, image: "https://images.unsplash.com/photo-1585032226651-759b368d7246?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Chines Samosa (चायनीस समोसा)", category: "Fast Food", price: 30, image: "https://images.unsplash.com/photo-1601050690597-df056fb4ce78?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Masala Dosa (मसाला डोसा)", category: "Fast Food", price: 30, image: "https://images.unsplash.com/photo-1589301760014-d929f3979dbc?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Masala Uttapam (मसाला उत्तपम्)", category: "Fast Food", price: 50, image: "https://images.unsplash.com/photo-1589301760014-d929f3979dbc?auto=format&fit=crop&w=300&q=80", isVisible: true },
+    let productData: any = {
+      name: newName,
+      category: newCategory,
+      image: newImage,
+      isVisible: true
+    };
 
-      // Page 3: Cool Cool Drinks
-      { name: "Cold Coffee (कोल्ड कॉफी)", category: "Super Cool", price: 50, image: "https://images.unsplash.com/photo-1517701604599-bb29b565090c?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Chocolatey Cold Coffee", category: "Super Cool", price: 60, image: "https://images.unsplash.com/photo-1541167760496-1628856ab772?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Mango Shake (मैगो शेक)", category: "Super Cool", price: 60, image: "https://images.unsplash.com/photo-1571006831117-f582da1551a3?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Black Currant (ब्लैक करंट शेक)", category: "Super Cool", price: 60, image: "https://images.unsplash.com/photo-1571006831117-f582da1551a3?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Blueberry Shake (ब्लूवेरी शेक)", category: "Super Cool", price: 60, image: "https://images.unsplash.com/photo-1571006831117-f582da1551a3?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Strawberry Shake (स्ट्रोवेरी शेक)", category: "Super Cool", price: 60, image: "https://images.unsplash.com/photo-1571006831117-f582da1551a3?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Chocolate Shake (चॉकलेट शेक)", category: "Super Cool", price: 70, image: "https://images.unsplash.com/photo-1571006831117-f582da1551a3?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Virgin Mojito (वर्जिन मोजिटो)", category: "Super Cool", price: 60, image: "https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Blue Lagoon (ब्लू लैगून)", category: "Super Cool", price: 90, image: "https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Spiced Jaljeera (जलजीरा)", category: "Super Cool", price: 50, image: "https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Kala Khatta Fizz (काला खट्टा)", category: "Super Cool", price: 60, image: "https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Cold Drinks (कोल्ड ड्रिंक्स)", category: "Super Cool", price: 30, image: "https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Bottled Water (बोतलबंद पानी)", category: "Super Cool", price: 20, image: "https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Special Lassi (स्पेशल लस्सी)", category: "Super Cool", price: 30, image: "https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Flavored Lassi (फ्लेवर्ड लस्सी)", category: "Super Cool", price: 40, image: "https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Fruits Lassi (ड्राईफ्रूट लस्सी)", category: "Super Cool", price: 50, image: "https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?auto=format&fit=crop&w=300&q=80", isVisible: true },
-
-      // Page 4: Pizza with 4 sizes
-      { name: "Cheese Corn Pizza", category: "Special Pizza", price: 80, variants: { Small: 80, Medium: 110, Large: 140, "Extra Large": 180 }, image: "https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Cheese Onion Pizza", category: "Special Pizza", price: 80, variants: { Small: 80, Medium: 110, Large: 140, "Extra Large": 180 }, image: "https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Cheese Capsicum Pizza", category: "Special Pizza", price: 80, variants: { Small: 80, Medium: 110, Large: 140, "Extra Large": 180 }, image: "https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Mix Veg Cheese Pizza", category: "Special Pizza", price: 90, variants: { Small: 90, Medium: 120, Large: 160, "Extra Large": 200 }, image: "https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Mix Veg Paneer Pizza", category: "Special Pizza", price: 100, variants: { Small: 100, Medium: 140, Large: 180, "Extra Large": 250 }, image: "https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Paneer Makhani Pizza", category: "Special Pizza", price: 140, variants: { Medium: 140, Large: 180 }, image: "https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Super Deluxe Pizza", category: "Special Pizza", price: 180, variants: { Medium: 180, Large: 200 }, image: "https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Farmhouse Pizza", category: "Special Pizza", price: 320, variants: { Medium: 320, Large: 350 }, image: "https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Tandoori Paneer Pizza", category: "Special Pizza", price: 280, variants: { Medium: 280, Large: 300 }, image: "https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Bum Bum Cafe Special Pizza", category: "Special Pizza", price: 200, variants: { Medium: 200, Large: 250 }, image: "https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=300&q=80", isVisible: true },
-
-      // Page 5: Thali
-      { name: "Bum Bum Cafe Special Thali Fix", category: "Special Thali", price: 200, image: "https://images.unsplash.com/photo-1626777552726-4a6b54c97e46?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Bum Bum Cafe Mini Thali Fix", category: "Special Thali", price: 170, image: "https://images.unsplash.com/photo-1626777552726-4a6b54c97e46?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Special Thali Fix", category: "Special Thali", price: 90, image: "https://images.unsplash.com/photo-1626777552726-4a6b54c97e46?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Special Desi Thali Fix", category: "Special Thali", price: 100, image: "https://images.unsplash.com/photo-1626777552726-4a6b54c97e46?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Desi Dal Rice Papad Combo", category: "Special Thali", price: 60, image: "https://images.unsplash.com/photo-1626777552726-4a6b54c97e46?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Jeera Rice, Dal Fry Combo", category: "Special Thali", price: 110, image: "https://images.unsplash.com/photo-1626777552726-4a6b54c97e46?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Special Khichdi - Dahi Combo", category: "Special Thali", price: 90, image: "https://images.unsplash.com/photo-1626777552726-4a6b54c97e46?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Sukhi Bhaji Puri Combo", category: "Special Thali", price: 70, image: "https://images.unsplash.com/photo-1626777552726-4a6b54c97e46?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Chole Bhature (छोले भटूरे)", category: "Special Thali", price: 60, image: "https://images.unsplash.com/photo-1626777552726-4a6b54c97e46?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Sabudana Khichdi - Dahi Combo", category: "Special Thali", price: 60, image: "https://images.unsplash.com/photo-1626777552726-4a6b54c97e46?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Sabudana Bada - Dahi Combo", category: "Special Thali", price: 60, image: "https://images.unsplash.com/photo-1626777552726-4a6b54c97e46?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "4-Thepla, Curd, Pickle Combo", category: "Special Thali", price: 80, image: "https://images.unsplash.com/photo-1626777552726-4a6b54c97e46?auto=format&fit=crop&w=300&q=80", isVisible: true },
-
-      // Page 6: Paneer Special
-      { name: "Paneer Tikka Masala", category: "Paneer Special", price: 100, variants: { half: 100, full: 150 }, image: "https://images.unsplash.com/photo-1631452180519-c014fe946bc7?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Paneer Butter Masala", category: "Paneer Special", price: 110, variants: { half: 110, full: 160 }, image: "https://images.unsplash.com/photo-1631452180519-c014fe946bc7?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Paneer Kadhai Masala", category: "Paneer Special", price: 100, variants: { half: 100, full: 150 }, image: "https://images.unsplash.com/photo-1631452180519-c014fe946bc7?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Paneer Tufani", category: "Paneer Special", price: 100, variants: { half: 100, full: 150 }, image: "https://images.unsplash.com/photo-1631452180519-c014fe946bc7?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Mutter Paneer Masala", category: "Paneer Special", price: 100, variants: { half: 100, full: 150 }, image: "https://images.unsplash.com/photo-1631452180519-c014fe946bc7?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Shahi Paneer Masala", category: "Paneer Special", price: 120, variants: { half: 120, full: 170 }, image: "https://images.unsplash.com/photo-1631452180519-c014fe946bc7?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Kaju Paneer Masala", category: "Paneer Special", price: 140, variants: { half: 140, full: 200 }, image: "https://images.unsplash.com/photo-1631452180519-c014fe946bc7?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Palak Paneer", category: "Paneer Special", price: 110, variants: { half: 110, full: 160 }, image: "https://images.unsplash.com/photo-1631452180519-c014fe946bc7?auto=format&fit=crop&w=300&q=80", isVisible: true },
-
-      // Page 6: Special Mix Veg
-      { name: "Mix Veg Masala", category: "Special Mix veg", price: 90, variants: { half: 90, full: 130 }, image: "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Veg Tufani", category: "Special Mix veg", price: 90, variants: { half: 90, full: 130 }, image: "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Veg Kadhai", category: "Special Mix veg", price: 80, variants: { half: 80, full: 120 }, image: "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Alo Gobhi Mutter", category: "Special Mix veg", price: 70, variants: { half: 70, full: 110 }, image: "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Sev Tomato", category: "Special Mix veg", price: 70, variants: { half: 70, full: 110 }, image: "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Sev Bhaji", category: "Special Mix veg", price: 80, variants: { half: 80, full: 130 }, image: "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Kaju Gathiya", category: "Special Mix veg", price: 100, variants: { half: 100, full: 150 }, image: "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Jwadi Dhokli", category: "Special Mix veg", price: 80, variants: { half: 80, full: 140 }, image: "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Baigan Bharta", category: "Special Mix veg", price: 70, variants: { half: 70, full: 100 }, image: "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Dal Fry", category: "Special Mix veg", price: 60, variants: { half: 60, full: 90 }, image: "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Dal Tadka", category: "Special Mix veg", price: 80, variants: { half: 80, full: 120 }, image: "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=300&q=80", isVisible: true },
-
-      // Page 7: Indian Bread
-      { name: "Phulka Roti", category: "Indian Bread", price: 10, variants: { Plain: 10, Butter: 10 }, image: "https://images.unsplash.com/photo-1589301760014-d929f3979dbc?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Tawa Paratha", category: "Indian Bread", price: 15, variants: { Plain: 15, Butter: 20 }, image: "https://images.unsplash.com/photo-1589301760014-d929f3979dbc?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Lachha Paratha", category: "Indian Bread", price: 25, variants: { Plain: 25, Butter: 30 }, image: "https://images.unsplash.com/photo-1589301760014-d929f3979dbc?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Thepla/Methi Paratha", category: "Indian Bread", price: 15, variants: { Plain: 15, Butter: 20 }, image: "https://images.unsplash.com/photo-1589301760014-d929f3979dbc?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Roti Tandoor", category: "Indian Bread", price: 15, variants: { Plain: 15, Butter: 20 }, image: "https://images.unsplash.com/photo-1589301760014-d929f3979dbc?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Naan Tandoor", category: "Indian Bread", price: 25, variants: { Plain: 25, Butter: 30 }, image: "https://images.unsplash.com/photo-1589301760014-d929f3979dbc?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Aloo Paratha", category: "Indian Bread", price: 30, variants: { Plain: 30, Butter: 40 }, image: "https://images.unsplash.com/photo-1589301760014-d929f3979dbc?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Aloo Gobhi Paratha", category: "Indian Bread", price: 30, variants: { Plain: 30, Butter: 40 }, image: "https://images.unsplash.com/photo-1589301760014-d929f3979dbc?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Cheese Onion Garlic", category: "Indian Bread", price: 50, variants: { Plain: 50, Butter: 60 }, image: "https://images.unsplash.com/photo-1589301760014-d929f3979dbc?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Paneer Paratha", category: "Indian Bread", price: 50, variants: { Plain: 50, Butter: 60 }, image: "https://images.unsplash.com/photo-1589301760014-d929f3979dbc?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Rosted Papad", category: "Indian Bread", price: 10, image: "https://images.unsplash.com/photo-1589301760014-d929f3979dbc?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Masala Papad", category: "Indian Bread", price: 20, image: "https://images.unsplash.com/photo-1589301760014-d929f3979dbc?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Fry Papad", category: "Indian Bread", price: 15, image: "https://images.unsplash.com/photo-1589301760014-d929f3979dbc?auto=format&fit=crop&w=300&q=80", isVisible: true },
-
-      // Page 7: Special Rice
-      { name: "Plain Rice (सादा चावल)", category: "Special Rice", price: 50, variants: { half: 50, full: 70 }, image: "https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Jeera Rice (जीरा राइस)", category: "Special Rice", price: 70, variants: { half: 70, full: 100 }, image: "https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Veg Pulao (वेज पुलाव)", category: "Special Rice", price: 100, variants: { half: 100, full: 120 }, image: "https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Veg Biryani (वेज बिरयानी)", category: "Special Rice", price: 110, variants: { half: 110, full: 130 }, image: "https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?auto=format&fit=crop&w=300&q=80", isVisible: true },
-      { name: "Masala Rice (मसाला राइस)", category: "Special Rice", price: 80, variants: { half: 80, full: 110 }, image: "https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?auto=format&fit=crop&w=300&q=80", isVisible: true }
-    ];
+    if (variantType === 'half_full') {
+      if (!halfPrice || !fullPrice) return toast.error("Please fill prices!");
+      productData.variants = { half: Number(halfPrice), full: Number(fullPrice) };
+      productData.price = Number(halfPrice);
+    } else if (variantType === 'plain_butter') {
+      if (!halfPrice || !fullPrice) return toast.error("Please fill prices!");
+      productData.variants = { Plain: Number(halfPrice), Butter: Number(fullPrice) };
+      productData.price = Number(halfPrice);
+    } else if (variantType === 'pizza_sizes') {
+      if (!priceSmall || !priceMedium || !priceLarge || !priceXL) return toast.error("Please fill all pizza prices!");
+      productData.variants = { Small: Number(priceSmall), Medium: Number(priceMedium), Large: Number(priceLarge), "Extra Large": Number(priceXL) };
+      productData.price = Number(priceSmall);
+    } else {
+      if (!newPrice) return toast.error("Please enter price!");
+      productData.price = Number(newPrice);
+    }
 
     try {
-      for (const item of defaultMenu) {
-        await addDoc(collection(db, "products"), item);
-      }
-      toast.dismiss("import");
-      toast.success("All Products Seeded successfully!");
-    } catch (e) {
-      toast.dismiss("import");
-      toast.error("Error seeding products from PDF");
-    }
-  };
-
-  // --- EDIT PRODUCT SELECTOR LOGIC ---
-  const startEditing = (item: any) => {
-    setEditingProduct(item);
-    setEditName(item.name);
-    setEditPrice(item.price || "");
-    setEditCategory(item.category);
-    setEditImage(item.image);
-    if (item.variants) {
-      const keys = Object.keys(item.variants);
-      if (keys.includes('Small')) {
-        setEditVariantType('pizza_sizes');
-        setEditPriceSmall(item.variants.Small || "");
-        setEditPriceMedium(item.variants.Medium || "");
-        setEditPriceLarge(item.variants.Large || "");
-        setEditPriceXL(item.variants["Extra Large"] || "");
-      } else if (keys.includes('Plain')) {
-        setEditVariantType('plain_butter');
-        setEditHalfPrice(item.variants.Plain || "");
-        setEditFullPrice(item.variants.Butter || "");
-      } else {
-        setEditVariantType('half_full');
-        setEditHalfPrice(item.variants.half || "");
-        setEditFullPrice(item.variants.full || "");
-      }
-    } else {
-      setEditVariantType('none');
+      await addDoc(collection(db, "products"), productData);
+      toast.success("New Item Added!");
+      setNewName(""); setNewPrice(""); setNewImage(""); setVariantType('none');
+      setHalfPrice(""); setFullPrice(""); setPriceSmall(""); setPriceMedium(""); setPriceLarge(""); setPriceXL("");
+      setShowAddForm(false);
+    } catch (error) {
+      toast.error("Error adding product");
     }
   };
 
@@ -560,7 +432,7 @@ export default function AdminDashboard() {
   const handleUpdateProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editName || !editCategory || !editImage) {
-      return toast.error("Please fill all required fields!");
+      return toast.error("Please fill all fields!");
     }
 
     let updatedData: any = {
@@ -601,38 +473,136 @@ export default function AdminDashboard() {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-[#0A0A0A] flex flex-col items-center justify-center text-white font-sans">
-        <Loader2 className="animate-spin text-orange-500 mb-4" size={40} />
-        <p className="font-bold tracking-widest animate-pulse uppercase">Loading Admin System...</p>
-      </div>
-    );
-  }
+  // --- COMPRESSED HIGH-EFFICIENCY SEEDER ENGINE ---
+  const handleBulkImport = async () => {
+    if (!window.confirm("BUM BUM CAFE PDF ke saare 80+ items ko database mein add karein?")) return;
+    toast.loading("Importing menu items...", { id: "import" });
 
-  // PASSCODE LOCK SCREEN
-  if (!isVerified) {
-    return (
-      <div className="min-h-screen bg-[#0A0A0A] flex items-center justify-center p-6 text-center text-white">
-        <Toaster />
-        <form onSubmit={handlePasscodeLogin} className="bg-[#111] w-full max-w-sm p-10 rounded-[3rem] border border-white/10 text-center space-y-6 shadow-2xl">
-          <Lock className="mx-auto text-orange-500 animate-bounce" size={48} />
-          <div>
-            <h2 className="text-3xl font-black mb-1 text-white">Admin Panel</h2>
-            <p className="text-gray-500 font-semibold text-xs">Enter your secret PIN to access dashboard.</p>
-          </div>
-          
-          <div className="space-y-2">
-            <input type="password" placeholder="Enter 6-digit PIN" maxLength={6} value={passcode} onChange={(e) => setPasscode(e.target.value)}
-              className="w-full bg-white/5 border border-white/10 p-4 rounded-2xl text-center text-2xl font-bold tracking-[0.5em] outline-none focus:border-orange-500 text-white" required />
-          </div>
+    const pz = "1513104890138-7c749659a591", th = "1626777552726-4a6b54c97e46", pa = "1631452180519-c014fe946bc7";
+    const vg = "1546069901-ba9599a7e63c", br = "1589301760014-d929f3979dbc", rc = "1563379091339-03b21ab4a4f8";
+    const cl = "1513558161293-cdaf765ed2fd";
 
-          <button type="submit" className="w-full bg-orange-500 hover:bg-orange-600 text-black p-5 rounded-2xl font-black text-lg shadow-xl uppercase active:scale-95 transition-all">Unlock Dashboard</button>
-          <button type="button" onClick={() => window.location.href = "/"} className="mt-8 text-gray-500 text-xs font-bold uppercase tracking-widest block mx-auto">Go to Home Page</button>
-        </form>
-      </div>
-    );
-  }
+    // Compact list schema to prevent payload chunk limits during output
+    const data = [
+      { n: "Special Tea (स्पेशल चाय)", c: "Fast Food", p: 15, i: "1544787219-7f47ccb76574" },
+      { n: "Black Tea (काली चाय)", c: "Fast Food", p: 20, i: "1508888620463-70b53b8004c3" },
+      { n: "Special Coffee (स्पेशल कॉफी)", c: "Fast Food", p: 20, i: "1514432324607-a09d9b4aefdd" },
+      { n: "Black Coffee (काली कॉफी)", c: "Fast Food", p: 25, i: "1497515114629-f71d768fd07c" },
+      { n: "Mix Veg Maggie (मिक्स वेज मैगी)", c: "Fast Food", p: 30, v: { half: 30, full: 50 }, i: "1569718212165-3a8278d5f624" },
+      { n: "Pasta (पास्ता)", c: "Fast Food", p: 30, v: { half: 30, full: 50 }, i: rc },
+      { n: "Finger Chips (फिंगर चिप्स)", c: "Fast Food", p: 30, v: { half: 30, full: 50 }, i: "1573080496219-bb080dd4f877" },
+      { n: "Momos (मोमोस्)", c: "Fast Food", p: 30, v: { half: 30, full: 50 }, i: "1534422298391-e4f8c172dddb" },
+      { n: "Bombe Bhel (बॉम्बे भेल)", c: "Fast Food", p: 30, v: { half: 30, full: 50 }, i: br },
+      { n: "Indori Poha (पोहा इंदौरी)", c: "Fast Food", p: 30, i: "1601050690597-df056fb4ce78" },
+      { n: "Tikki Chaat (टिक्की चाट)", c: "Fast Food", p: 30, v: { half: 30, full: 30 }, i: "1601050690597-df056fb4ce78" },
+      { n: "Kachori Chhat (कचोरी चाट)", c: "Fast Food", p: 30, v: { half: 30, full: 30 }, i: "1601050690597-df056fb4ce78" },
+      { n: "Cheese Garlic Bread (चीस गालिक ब्रेड)", c: "Fast Food", p: 60, i: "1573140247632-f8fd74997d5c" },
+      { n: "Burger (बर्गर)", c: "Fast Food", p: 30, i: "1568901346375-23c9450c58cd" },
+      { n: "Cheese Burger (चीस बर्गर)", c: "Fast Food", p: 40, i: "1521305916504-4a1121188589" },
+      { n: "Paneer Sandwich (पनीर सैंडविच)", c: "Fast Food", p: 80, i: "1528735602780-2552fd46c7af" },
+      { n: "Veg Cheese Sandwich (वेज चीस सैंडविच)", c: "Fast Food", p: 60, i: "1528735602780-2552fd46c7af" },
+      { n: "Veg Spring Roll (वेज स्प्रिंग रोल)", c: "Fast Food", p: 50, i: "1541532713592-79a0317b6b77" },
+      { n: "Manchuriyan (मंचुरियन)", c: "Fast Food", p: 30, v: { half: 30, full: 50 }, i: "1512058564366-18510be2db19" },
+      { n: "Manchuriyan Rice (मंचुरियन फ्राय राइस)", c: "Fast Food", p: 30, v: { half: 30, full: 50 }, i: "1512058564366-18510be2db19" },
+      { n: "Chawmeen (चाउमीन)", c: "Fast Food", p: 30, v: { half: 30, full: 50 }, i: "1585032226651-759b368d7246" },
+      { n: "Chines Samosa (चायनीस समोसा)", c: "Fast Food", p: 30, i: "1601050690597-df056fb4ce78" },
+      { n: "Masala Dosa (मसाला डोसा)", c: "Fast Food", p: 30, i: br },
+      { n: "Masala Uttapam (मसाला उत्तपम्)", c: "Fast Food", p: 50, i: br },
+      { n: "Cold Coffee (कोल्ड कॉफी)", c: "Super Cool", p: 50, i: "1517701604599-bb29b565090c" },
+      { n: "Chocolatey Cold Coffee", c: "Super Cool", p: 60, i: "1541167760496-1628856ab772" },
+      { n: "Mango Shake (मैगो शेक)", c: "Super Cool", p: 60, i: "1571006831117-f582da1551a3" },
+      { n: "Black Currant (ब्लैक करंट)", c: "Super Cool", p: 60, i: "1571006831117-f582da1551a3" },
+      { n: "Blueberry Shake (ब्लूवेरी शेक)", c: "Super Cool", p: 60, i: "1571006831117-f582da1551a3" },
+      { n: "Strawberry Shake (स्ट्रोवेरी शेक)", c: "Super Cool", p: 60, i: "1571006831117-f582da1551a3" },
+      { n: "Chocolate Shake (चॉकलेट शेक)", c: "Super Cool", p: 70, i: "1571006831117-f582da1551a3" },
+      { n: "Virgin Mojito (वर्जिन मोजिटो)", c: "Super Cool", p: 60, i: cl },
+      { n: "Blue Lagoon (ब्लू लैगून)", c: "Super Cool", p: 90, i: cl },
+      { n: "Spiced Jaljeera (जलजीरा)", c: "Super Cool", p: 50, i: cl },
+      { n: "Kala Khatta Fizz (काला खट्टा)", c: "Super Cool", p: 60, i: cl },
+      { n: "Cold Drinks (कोल्ड ड्रिंक्स)", c: "Super Cool", p: 30, i: cl },
+      { n: "Bottled Water (बोतलबंद पानी)", c: "Super Cool", p: 20, i: cl },
+      { n: "Special Lassi (स्पेशल लस्सी)", c: "Super Cool", p: 30, i: cl },
+      { n: "Flavored Lassi (फ्लेवर्ड लस्सी)", c: "Super Cool", p: 40, i: cl },
+      { n: "Fruits Lassi (ड्राईफ्रूट लस्सी)", c: "Super Cool", p: 50, i: cl },
+      { n: "Cheese Corn Pizza", c: "Special Pizza", p: 80, v: { Small: 80, Medium: 110, Large: 140, "Extra Large": 180 }, i: pz },
+      { n: "Cheese Onion Pizza", c: "Special Pizza", p: 80, v: { Small: 80, Medium: 110, Large: 140, "Extra Large": 180 }, i: pz },
+      { n: "Cheese Capsicum Pizza", c: "Special Pizza", p: 80, v: { Small: 80, Medium: 110, Large: 140, "Extra Large": 180 }, i: pz },
+      { n: "Mix Veg Cheese Pizza", c: "Special Pizza", p: 90, v: { Small: 90, Medium: 120, Large: 160, "Extra Large": 200 }, i: pz },
+      { n: "Mix Veg Paneer Pizza", c: "Special Pizza", p: 100, v: { Small: 100, Medium: 140, Large: 180, "Extra Large": 250 }, i: pz },
+      { n: "Paneer Makhani Pizza", c: "Special Pizza", p: 140, v: { Medium: 140, Large: 180 }, i: pz },
+      { n: "Super Deluxe Pizza", c: "Special Pizza", p: 180, v: { Medium: 180, Large: 200 }, i: pz },
+      { n: "Farmhouse Pizza", c: "Special Pizza", p: 320, v: { Medium: 320, Large: 350 }, i: pz },
+      { n: "Tandoori Paneer Pizza", c: "Special Pizza", p: 280, v: { Medium: 280, Large: 300 }, i: pz },
+      { n: "Bum Bum Cafe Special Pizza", c: "Special Pizza", p: 200, v: { Medium: 200, Large: 250 }, i: pz },
+      { n: "Bum Bum Cafe Special Thali Fix", c: "Special Thali", p: 200, i: th },
+      { n: "Bum Bum Cafe Mini Thali Fix", c: "Special Thali", p: 170, i: th },
+      { n: "Special Thali Fix", c: "Special Thali", p: 90, i: th },
+      { n: "Special Desi Thali Fix", c: "Special Thali", p: 100, i: th },
+      { n: "Desi Dal Rice Papad Combo", c: "Special Thali", p: 60, i: th },
+      { n: "Jeera Rice, Dal Fry Combo", c: "Special Thali", p: 110, i: th },
+      { n: "Special Khichdi - Dahi Combo", c: "Special Thali", p: 90, i: th },
+      { n: "Sukhi Bhaji Puri Combo", c: "Special Thali", p: 70, i: th },
+      { n: "Chole Bhature (छोले भटूरे)", c: "Special Thali", p: 60, i: th },
+      { n: "Sabudana Khichdi - Dahi Combo", c: "Special Thali", p: 60, i: th },
+      { n: "Sabudana Bada - Dahi Combo", c: "Special Thali", p: 60, i: th },
+      { n: "4-Thepla, Curd, Pickle Combo", c: "Special Thali", p: 80, i: th },
+      { n: "Paneer Tikka Masala", c: "Paneer Special", p: 100, v: { half: 100, full: 150 }, i: pa },
+      { n: "Paneer Butter Masala", c: "Paneer Special", p: 110, v: { half: 110, full: 160 }, i: pa },
+      { n: "Paneer Kadhai Masala", c: "Paneer Special", p: 100, v: { half: 100, full: 150 }, i: pa },
+      { n: "Paneer Tufani", c: "Paneer Special", p: 100, v: { half: 100, full: 150 }, i: pa },
+      { n: "Mutter Paneer Masala", c: "Paneer Special", p: 100, v: { half: 100, full: 150 }, i: pa },
+      { n: "Shahi Paneer Masala", c: "Paneer Special", p: 120, v: { half: 120, full: 170 }, i: pa },
+      { n: "Kaju Paneer Masala", c: "Paneer Special", p: 140, v: { half: 140, full: 200 }, i: pa },
+      { n: "Palak Paneer", c: "Paneer Special", p: 110, v: { half: 110, full: 160 }, i: pa },
+      { n: "Mix Veg Masala", c: "Special Mix veg", p: 90, v: { half: 90, full: 130 }, i: vg },
+      { n: "Veg Tufani", c: "Special Mix veg", p: 90, v: { half: 90, full: 130 }, i: vg },
+      { n: "Veg Kadhai", c: "Special Mix veg", p: 80, v: { half: 80, full: 120 }, i: vg },
+      { n: "Alo Gobhi Mutter", c: "Special Mix veg", p: 70, v: { half: 70, full: 110 }, i: vg },
+      { n: "Sev Tomato", c: "Special Mix veg", p: 70, v: { half: 70, full: 110 }, i: vg },
+      { n: "Sev Bhaji", c: "Special Mix veg", p: 80, v: { half: 80, full: 130 }, i: vg },
+      { n: "Kaju Gathiya", c: "Special Mix veg", p: 100, v: { half: 100, full: 150 }, i: vg },
+      { n: "Jwadi Dhokli", c: "Special Mix veg", p: 80, v: { half: 80, full: 140 }, i: vg },
+      { n: "Baigan Bharta", c: "Special Mix veg", p: 70, v: { half: 70, full: 100 }, i: vg },
+      { n: "Dal Fry", c: "Special Mix veg", p: 60, v: { half: 60, full: 90 }, i: vg },
+      { n: "Dal Tadka", c: "Special Mix veg", p: 80, v: { half: 80, full: 120 }, i: vg },
+      { n: "Phulka Roti", c: "Indian Bread", p: 10, v: { Plain: 10, Butter: 10 }, i: br },
+      { n: "Tawa Paratha", c: "Indian Bread", p: 15, v: { Plain: 15, Butter: 20 }, i: br },
+      { n: "Lachha Paratha", c: "Indian Bread", p: 25, v: { Plain: 25, Butter: 30 }, i: br },
+      { n: "Thepla/Methi Paratha", c: "Indian Bread", p: 15, v: { Plain: 15, Butter: 20 }, i: br },
+      { n: "Roti Tandoor", c: "Indian Bread", p: 15, v: { Plain: 15, Butter: 20 }, i: br },
+      { n: "Naan Tandoor", c: "Indian Bread", p: 25, v: { Plain: 25, Butter: 30 }, i: br },
+      { n: "Aloo Paratha", c: "Indian Bread", p: 30, v: { Plain: 30, Butter: 40 }, i: br },
+      { n: "Aloo Gobhi Paratha", c: "Indian Bread", p: 30, v: { Plain: 30, Butter: 40 }, i: br },
+      { n: "Cheese Onion Garlic", c: "Indian Bread", p: 50, v: { Plain: 50, Butter: 60 }, i: br },
+      { n: "Paneer Paratha", c: "Indian Bread", p: 50, v: { Plain: 50, Butter: 60 }, i: br },
+      { n: "Rosted Papad", c: "Indian Bread", p: 10, i: br },
+      { n: "Masala Papad", c: "Indian Bread", p: 20, i: br },
+      { n: "Fry Papad", c: "Indian Bread", p: 15, i: br },
+      { n: "Plain Rice (सादा चावल)", c: "Special Rice", p: 50, v: { half: 50, full: 70 }, i: rc },
+      { n: "Jeera Rice (जीरा राइस)", c: "Special Rice", p: 70, v: { half: 70, full: 100 }, i: rc },
+      { n: "Veg Pulao (वेज पुलाव)", c: "Special Rice", p: 100, v: { half: 100, full: 120 }, i: rc },
+      { n: "Veg Biryani (वेज बिरयानी)", c: "Special Rice", p: 110, v: { half: 110, full: 130 }, i: rc },
+      { n: "Masala Rice (मसाला राइस)", c: "Special Rice", p: 80, v: { half: 80, full: 110 }, i: rc }
+    ];
+
+    try {
+      for (const item of data) {
+        await addDoc(collection(db, "products"), {
+          name: item.n,
+          category: item.c,
+          price: item.p,
+          image: item.i.length < 20 ? imgUrl(item.i) : item.i,
+          variants: item.v || null,
+          isVisible: true
+        });
+      }
+      toast.dismiss("import");
+      toast.success("All 80+ PDF menu items imported successfully!");
+    } catch (e) {
+      toast.dismiss("import");
+      toast.error("Error seeding PDF items");
+    }
+  };
 
   return (
     <div className="bg-[#050505] min-h-screen text-white pb-20 font-sans">
@@ -652,7 +622,7 @@ export default function AdminDashboard() {
         </div>
       </header>
 
-      {/* --- RESPONSIVE HORIZONTAL TABS --- */}
+      {/* --- HORIZONTAL TABS --- */}
       <div className="p-4 flex gap-2 overflow-x-auto no-scrollbar border-b border-white/5">
         <button onClick={() => setTab('dashboard')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'dashboard' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>📊 Dashboard</button>
         <button onClick={() => setTab('orders')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'orders' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>📦 Orders ({orders.length})</button>
@@ -670,7 +640,7 @@ export default function AdminDashboard() {
           <div className="space-y-6">
             <h3 className="text-xl font-black text-orange-500 uppercase tracking-wider flex items-center gap-2"><BarChart3 size={20}/> Sales Dashboard</h3>
             
-            {/* Sales Stats Today */}
+            {/* Sales Stats Today Grid (Daily) */}
             <div className="bg-[#111] border border-white/5 p-4 rounded-3xl space-y-3">
               <p className="text-[10px] font-black uppercase text-orange-400 tracking-wider">🎯 Today's Quick Insights</p>
               <div className="grid grid-cols-3 gap-3">
@@ -689,7 +659,7 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            {/* Lifetime metrics */}
+            {/* Sales Stats Lifetime KPIs */}
             <div className="grid grid-cols-3 gap-3">
               <div className="bg-white/[0.02] border border-white/5 p-4 rounded-3xl text-center">
                 <p className="text-[9px] font-black text-gray-500 uppercase">Lifetime Sales</p>
@@ -705,7 +675,7 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            {/* Excel downloaders */}
+            {/* Excel Exports Buttons */}
             <div className="grid grid-cols-2 gap-3 bg-[#111]/30 border border-white/5 p-4 rounded-[2rem] shadow-xl">
               <button onClick={handleExportOrders} className="bg-green-600 hover:bg-green-700 text-white font-black text-xs py-4 px-3 rounded-2xl flex items-center justify-center gap-2 active:scale-95 transition-all uppercase shadow-md">
                 <Download size={14}/> Sales Ledger Excel
@@ -715,7 +685,7 @@ export default function AdminDashboard() {
               </button>
             </div>
 
-            {/* --- LOYALTY CLUB BOARD --- */}
+            {/* --- 🎁 LOYALTY CLUB REDEEM BOARD FOR ADMIN --- */}
             <div className="bg-yellow-400/5 border border-yellow-400/25 p-6 rounded-[2rem] space-y-4">
               <h4 className="text-sm font-black text-yellow-400 uppercase tracking-widest flex items-center gap-2"><Gift size={16}/> Loyalty Club Reward Redeem Board</h4>
               <p className="text-[10px] text-gray-400 font-semibold leading-relaxed">Admin can redeem 10 points for a sandwich or 20 points for a small pizza once rewarded inside the Cafe:</p>
@@ -965,7 +935,7 @@ export default function AdminDashboard() {
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Small Price (₹)</label><input type="number" placeholder="Small price" value={editPriceSmall} onChange={(e) => setEditPriceSmall(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" /></div>
                     <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Medium Price (₹)</label><input type="number" placeholder="Medium price" value={editPriceMedium} onChange={(e) => setEditPriceMedium(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" /></div>
-                    <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Large Price (₹)</label><input type="number" placeholder="Large price" value={editPriceLarge} onChange={(e) => setEditPriceLarge(e.target.value)} className="w-full bg-[#111]/30 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" /></div>
+                    <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Large Price (₹)</label><input type="number" placeholder="Large price" value={editPriceLarge} onChange={(e) => setEditPriceLarge(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" /></div>
                     <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Extra Large Price (₹)</label><input type="number" placeholder="XL price" value={editPriceXL} onChange={(e) => setEditPriceXL(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" /></div>
                   </div>
                 )}
@@ -1005,7 +975,7 @@ export default function AdminDashboard() {
                     <div className="flex items-center gap-2">
                       <button onClick={() => startEditing(item)} className="p-3 bg-blue-500/10 text-blue-500 rounded-xl hover:bg-blue-500/20 active:scale-90 transition-all"><Edit size={18}/></button>
                       
-                      {/* --- CORRECTED ITEM HIDE UNHIDE TOGGLE (Eye/EyeOff) --- */}
+                      {/* --- CORECTED ITEM HIDE UNHIDE TOGGLE (Eye/EyeOff) --- */}
                       <button onClick={() => toggleItemVisibility(item.id, item.isVisible !== false)} className={`p-3 rounded-xl transition-all ${item.isVisible !== false ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
                         {item.isVisible !== false ? <Eye size={18}/> : <EyeOff size={18}/>}
                       </button>
@@ -1030,7 +1000,6 @@ export default function AdminDashboard() {
               <button type="submit" className="w-full bg-green-600 text-white p-4 rounded-xl font-black text-sm uppercase active:scale-95 transition-all">Add Category</button>
             </form>
 
-            {/* Dynamic Category List */}
             <div className="space-y-3">
               <p className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">Category List ({categories.length})</p>
               {categories.length === 0 ? (
@@ -1062,7 +1031,7 @@ export default function AdminDashboard() {
           <div className="space-y-6">
             <form onSubmit={handleAddBanner} className="bg-white/[0.02] border border-white/5 p-6 rounded-[2.5rem] space-y-4">
               <h3 className="text-lg font-black text-orange-500 italic uppercase flex items-center gap-2"><ImageIcon size={18}/> Add Banner</h3>
-              <input type="url" placeholder="Paste offer image url here..." value={newBannerUrl} onChange={(e) => setNewBannerUrl(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-xs font-bold text-white" required />
+              <input type="url" placeholder="Paste image url here..." value={newBannerUrl} onChange={(e) => setNewBannerUrl(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-xs font-bold text-white" required />
               <button type="submit" className="w-full bg-green-600 text-white p-4 rounded-xl font-black text-sm uppercase">Add Banner Image</button>
             </form>
 
@@ -1088,7 +1057,7 @@ export default function AdminDashboard() {
                 <input type="text" placeholder="CODE (e.g. WELCOME)" value={newCouponCode} onChange={(e) => setNewCouponCode(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-xs font-black uppercase text-white" required />
                 <input type="number" placeholder="Discount (₹)" value={newCouponValue} onChange={(e) => setNewCouponValue(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-xs font-black text-white" required />
               </div>
-              <button type="submit" className="w-full bg-green-600 text-white p-4 rounded-xl font-black text-sm uppercase active:scale-95 transition-all">Create Coupon</button>
+              <button type="submit" className="w-full bg-green-600 text-white p-4 rounded-xl font-black text-sm uppercase">Create Coupon</button>
             </form>
 
             <div className="space-y-3">
