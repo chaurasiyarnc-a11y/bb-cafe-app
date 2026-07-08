@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { db, auth } from '@/lib/firebase'; // Ensure your path is correct (@/lib/firebase or ../../lib/firebase)
 import { collection, onSnapshot, query, orderBy, doc, updateDoc, setDoc, addDoc, deleteDoc } from 'firebase/firestore';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
-import { Power, Eye, EyeOff, User, MapPin, Calendar, CheckCircle2, LogOut, Loader2, Phone, Plus, Trash, Edit, X } from 'lucide-react';
+import { Power, Eye, EyeOff, User, MapPin, Calendar, CheckCircle2, LogOut, Loader2, Phone, Plus, Trash, Edit, X } from 'lucide-react'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 
 // Categories mapping
