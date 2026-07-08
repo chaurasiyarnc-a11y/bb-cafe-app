@@ -24,6 +24,7 @@ export default function BbCafeHome() {
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [storeOpen, setStoreOpen] = useState(true);
   const [mounted, setMounted] = useState(false);
+  
   // Checkout States
   const [address, setAddress] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
