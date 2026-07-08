@@ -225,36 +225,38 @@ export default function BbCafeHome() {
       </main>
 
       {/* --- CART BAR --- */}
-      {cart.map((item: any) => (
+      <AnimatePresence>
+        {isCartOpen && (
+          <div className="fixed inset-0 bg-black z-[110] overflow-y-auto">
+            <div className="p-6 max-w-lg mx-auto pb-32">
+              <div className="flex justify-between items-center mb-8">
+                <h2 className="text-3xl font-black tracking-tight">Your Order</h2>
+                <button onClick={() => setIsCartOpen(false)} className="p-3 bg-white/5 rounded-full"><X/></button>
+              </div>
+
+              {cart.map((item: any) => (
                 <div key={item.id} className="flex justify-between items-center bg-white/[0.02] p-5 rounded-3xl mb-4 border border-white/5">
                   <div>
-                    <h4 className="font-bold text-sm text-gray-100">{item.name}</h4>
-                    <p className="text-orange-500 font-black mt-1">₹{item.price}</p>
+                    <h4 className="font-bold text-sm">{item.name}</h4>
+                    <p className="text-orange-500 font-black mt-1">₹{item.price} × {item.quantity}</p>
                   </div>
-                  
-                  {/* Quantity Controller (Kam ya Jyada karne ka option) */}
-                  <div className="flex items-center gap-3 bg-black/40 px-3 py-2 rounded-2xl border border-white/5">
-                    {/* Minus Button (-) */}
-                    <button 
-                      onClick={() => removeItem(item.id)} 
-                      className="w-7 h-7 flex items-center justify-center bg-white/5 hover:bg-red-500/20 hover:text-red-500 rounded-lg text-lg font-bold text-gray-400 active:scale-90 transition-all"
-                    >
-                      -
-                    </button>
-                    
-                    {/* Item Quantity Number */}
-                    <span className="font-black text-sm min-w-[20px] text-center text-white">{item.quantity}</span>
-                    
-                    {/* Plus Button (+) */}
-                    <button 
-                      onClick={() => addItem(item)} 
-                      className="w-7 h-7 flex items-center justify-center bg-orange-500 hover:bg-orange-600 rounded-lg text-lg font-bold text-white active:scale-90 transition-all"
-                    >
-                      +
-                    </button>
-                  </div>
+                  <button onClick={() => removeItem(item.id)} className="px-4 py-2 bg-red-500/10 text-red-500 rounded-xl text-xs font-black uppercase border border-red-500/20 active:scale-95 transition-all">Remove</button>
                 </div>
               ))}
+
+              <div className="mt-8 space-y-6">
+                
+                {/* PDF rules alert widget */}
+                <div className="bg-orange-500/10 border border-orange-500/20 rounded-[2rem] p-5 space-y-2">
+                  <div className="flex items-center gap-2 text-orange-400 font-black text-xs uppercase tracking-wider">
+                    <Sparkles size={16}/> <span>Free Delivery Rules (PDF)</span>
+                  </div>
+                  <ul className="text-[11px] text-gray-400 font-bold space-y-1">
+                    <li>• Mohandra Town: Free above ₹99 <span className="text-green-500">({getTotal() >= 99 ? 'Achieved' : 'Need ₹' + (99 - getTotal()) + ' more'})</span></li>
+                    <li>• Within 5 Km: Free above ₹499</li>
+                    <li>• Within 12 Km: Free above ₹999</li>
+                  </ul>
+                </div>
 
       {/* --- VARIANTS POPUP (Half/Full) --- */}
       <AnimatePresence>
