@@ -135,8 +135,7 @@ export default function BbCafeHome() {
     <div className="bg-[#080808] min-h-screen text-white pb-32 font-sans selection:bg-orange-500">
       <Toaster position="top-center" />
       
-      
-      {/* --- NEW PREMIUM HEADER & SEARCH --- */}
+       {/* --- NEW PREMIUM HEADER & SEARCH --- */}
       <header className="relative h-80 bg-gradient-to-b from-[#ff5e00] to-[#b33600] rounded-b-[4rem] flex flex-col justify-center items-center px-6 shadow-[0_15px_40px_rgba(179,54,0,0.3)] overflow-hidden">
         {/* Subtle Background food patterns */}
         <div className="absolute inset-0 opacity-15 bg-[url('https://www.transparenttextures.com/patterns/food.png')] bg-center"></div>
