@@ -224,25 +224,53 @@ export default function BbCafeHome() {
           ))}
         </div>
       </main>
+      
+      {/* --- CART / CHECKOUT SIDEBAR --- */}
+    <AnimatePresence>
+      {isCartOpen && (
+        <div className="fixed inset-0 bg-black z-[110] overflow-y-auto">
+          <div className="p-6 max-w-lg mx-auto">
+            <div className="flex justify-between items-center mb-8">
+              <h2 className="text-3xl font-black">Your Order</h2>
+              <button onClick={() => setIsCartOpen(false)} className="p-3 bg-white/5 rounded-full"><X size={24} /></button>
+            </div>
 
-      {/* --- CART BAR --- */}
-      <AnimatePresence>
-        {cart.length > 0 && (
-          <motion.div initial={{ y: 100 }} animate={{ y: 0 }} exit={{ y: 100 }} className="fixed bottom-8 left-0 w-full px-6 z-50">
-            <button onClick={() => setIsCartOpen(true)} className="w-full max-w-md mx-auto bg-yellow-400 text-black p-5 rounded-[2.5rem] shadow-2xl flex justify-between items-center border-4 border-black">
-              <div className="flex items-center gap-4">
-                <div className="bg-black text-white p-2 rounded-xl"><ShoppingBag size={24} /></div>
-                <div className="text-left leading-none">
-                  <p className="text-xs font-black uppercase opacity-60">Ready to Eat?</p>
-                  <p className="font-black text-2xl tracking-tighter">{cart.length} Items • ₹{getTotal()}</p>
+            {cart.map((item: any) => (
+              <div key={item.id} className="flex justify-between items-center bg-white/5 p-5 rounded-3xl mb-4 border border-white/5">
+                <div className="min-w-0 pr-3">
+                  <h4 className="font-bold text-lg text-gray-100 truncate">{item.name}</h4>
+                  <p className="text-orange-500 font-black mt-1">₹{item.price}</p>
+                </div>
+                
+                {/* Quantity Controller (Kam / Jyada karne ka sleek design) */}
+                <div className="flex items-center gap-2.5 bg-black/40 px-3 py-1.5 rounded-2xl border border-white/10 flex-shrink-0">
+                  {/* Minus (-) Button */}
+                  <button 
+                    onClick={() => removeItem(item.id)} 
+                    type="button"
+                    className="w-8 h-8 flex items-center justify-center bg-red-500/10 text-red-500 rounded-xl text-lg font-black active:scale-90 transition-all hover:bg-red-500/20"
+                  >
+                    -
+                  </button>
+                  
+                  {/* Quantity Display */}
+                  <span className="font-black text-sm px-1.5 text-white min-w-[15px] text-center">
+                    {item.quantity}
+                  </span>
+                  
+                  {/* Plus (+) Button */}
+                  <button 
+                    onClick={() => addItem(item)} 
+                    type="button"
+                    className="w-8 h-8 flex items-center justify-center bg-green-500/10 text-green-500 rounded-xl text-lg font-black active:scale-90 transition-all hover:bg-green-500/20"
+                  >
+                    +
+                  </button>
                 </div>
               </div>
-              <ChevronRight size={30} strokeWidth={3} />
-            </button>
-          </motion.div>
-        )}
-      </AnimatePresence>
+            ))}
 
+            <div className="mt-10 space-y-6">
       {/* --- VARIANTS POPUP (Half/Full) --- */}
       <AnimatePresence>
         {selectedProduct && (
