@@ -1,16 +1,16 @@
 'use client';
 import React, { useState, useEffect } from 'react';
 import { db } from '../lib/firebase'; 
-import { collection, onSnapshot, query, addDoc, doc } from 'firebase/firestore';
+import { collection, onSnapshot, query, addDoc, doc, setDoc, increment } from 'firebase/firestore';
 import { ShoppingBag, Plus, PowerOff, Search, ChevronRight, X, MapPin, Phone, User, Sparkles, Star, Percent } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
 import { useCartStore } from '../store/useCartStore';
 
-// CATEGORIES
-const CATEGORIES = ["All", "Special Pizza", "Special Thali", "Paneer Special", "Special Mix veg", "Fast Food", "Super Cool", "Indian Bread", "Special Rice"];
+// Static Fallback Categories
+const FALLBACK_CATEGORIES = ["All", "Special Pizza", "Special Thali", "Paneer Special", "Special Mix veg", "Fast Food", "Super Cool", "Indian Bread", "Special Rice"];
 
-// Beautiful round category icons mapped for Zomato-style circular grid
+// Static Fallback Images
 const CATEGORY_IMAGES: { [key: string]: string } = {
   "All": "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=150&q=80",
   "Special Pizza": "https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=150&q=80",
@@ -23,7 +23,6 @@ const CATEGORY_IMAGES: { [key: string]: string } = {
   "Special Rice": "https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?auto=format&fit=crop&w=150&q=80"
 };
 
-// Quick Review Suggestions to make it extremely easy to write reviews on mobile
 const REVIEW_SUGGESTIONS = [
   "Swaad Zabardast! 😋",
   "Super Fast Delivery 🛵",
@@ -35,7 +34,6 @@ const REVIEW_SUGGESTIONS = [
   "Best Thali Ever 🍱"
 ];
 
-// Pre-written Default Reviews (Displays if Firestore reviews collection is empty)
 const DEFAULT_REVIEWS = [
   { id: "def1", name: "Gaurav Soni", rating: 5, comment: "Bum Bum Cafe ki paneer pizza sach me pure Mohandra me best hai! Extra cheese is real love. ⭐⭐⭐⭐⭐" },
   { id: "def2", name: "Anjali Patel", rating: 5, comment: "Fast food packing bahut achi thi, delivery boy behavior was also very polite. Recommended! ⭐⭐⭐⭐⭐" },
@@ -46,7 +44,6 @@ export default function BbCafeHome() {
   const store = useCartStore() as any;
   const cart = store?.items || [];
   
-  // Safe destructuring
   const addItem = store?.addItem || (() => {});
   const removeItem = store?.removeItem || (() => {});
   const clearCart = store?.clearCart || (() => {});
@@ -59,14 +56,17 @@ export default function BbCafeHome() {
   const [storeOpen, setStoreOpen] = useState(true);
   const [mounted, setMounted] = useState(false);
   
-  // Free Contact Form States (Bypassed OTP)
+  // Contact details
   const [customerDetails, setCustomerDetails] = useState<{ name: string, phone: string } | null>(null);
   const [tempName, setTempName] = useState("");
   const [tempPhone, setTempPhone] = useState("");
   const [address, setAddress] = useState("");
   const [selectedProduct, setSelectedProduct] = useState<any>(null); 
 
-  // --- NEW FEATURES STATES ---
+  // --- LOYALTY POINTS STATE ---
+  const [customerPoints, setCustomerPoints] = useState<number>(0);
+
+  // --- DYNAMIC DATA STATES ---
   const [dbCategories, setDbCategories] = useState<any[]>([]);
   const [banners, setBanners] = useState<any[]>([]);
   const [bannerIndex, setBannerIndex] = useState(0);
@@ -76,18 +76,15 @@ export default function BbCafeHome() {
   const [reviews, setReviews] = useState<any[]>([]);
   const [coupons, setCoupons] = useState<any[]>([]);
   
-  // Side drawers & modals toggles
   const [isReviewsDrawerOpen, setIsReviewsDrawerOpen] = useState(false);
   const [isReviewFormOpen, setIsReviewFormOpen] = useState(false);
   const [reviewName, setReviewName] = useState("");
   const [reviewComment, setReviewComment] = useState("");
   const [reviewRating, setReviewRating] = useState(5);
   
-  // Coupon checkout states
   const [enteredCoupon, setEnteredCoupon] = useState("");
   const [appliedCoupon, setAppliedCoupon] = useState<any>(null);
 
-  // Pizza customization states
   const [chosenSize, setChosenSize] = useState<string>("");
   const [chosenPrice, setChosenPrice] = useState<number>(0);
   const [addonCheese, setAddonCheese] = useState(false);
@@ -95,7 +92,7 @@ export default function BbCafeHome() {
 
   useEffect(() => {
     setMounted(true);
-    // Check Store Status
+    // Realtime Store Status
     const unsubStore = onSnapshot(doc(db, "settings", "store"), (d) => {
       if(d.exists()) setStoreOpen(d.data().isOpen);
     });
@@ -128,7 +125,7 @@ export default function BbCafeHome() {
       setReviews(allRev.filter((r: any) => r.isApproved === true));
     });
 
-    // Mobile local memory checking
+    // Load saved customer info
     const savedDetails = localStorage.getItem('bb_cafe_customer');
     if (savedDetails) {
       try {
@@ -146,23 +143,26 @@ export default function BbCafeHome() {
     };
   }, []);
 
-  // Safe display price helper (Fixed placement inside scope)
-  const getDisplayPrice = (item: any) => {
-    if (item?.variants && typeof item.variants === 'object') {
-      const prices = Object.values(item.variants).map(Number).filter(n => !isNaN(n));
-      if (prices.length > 0) {
-        const minPrice = Math.min(...prices);
-        const maxPrice = Math.max(...prices);
-        return minPrice === maxPrice ? `₹${minPrice}` : `₹${minPrice} - ₹${maxPrice}`;
-      }
+  // --- LOYALTY POINTS LIVE REALTIME LISTENER ---
+  useEffect(() => {
+    if (!customerDetails?.phone) {
+      setCustomerPoints(0);
+      return;
     }
-    return `₹${item?.price || 0}`;
-  };
+    const unsubPoints = onSnapshot(doc(db, "customer_points", customerDetails.phone), (docSnap) => {
+      if (docSnap.exists()) {
+        setCustomerPoints(docSnap.data().points || 0);
+      } else {
+        setCustomerPoints(0);
+      }
+    });
+    return () => unsubPoints();
+  }, [customerDetails]);
 
-  // Compute actual dynamic categories list cleanly
+  // Compute dynamic categories cleanly
   const currentCategories = dbCategories.length > 0 
     ? ["All", ...dbCategories.map(c => c.name)]
-    : CATEGORIES;
+    : FALLBACK_CATEGORIES;
 
   const getCategoryImage = (catName: string) => {
     const found = dbCategories.find(c => c.name === catName);
@@ -221,7 +221,11 @@ export default function BbCafeHome() {
     const couponDiscount = appliedCoupon ? Number(appliedCoupon.discountValue) : 0;
     const finalTotal = Math.max(0, subtotal - couponDiscount) + deliveryCharge;
 
+    // --- LOYALTY POINTS EARNED ON THIS BILL (₹100 = 1 Point) ---
+    const pointsEarned = Math.floor(finalTotal / 100);
+
     try {
+      // 1. Add order to Firestore
       await addDoc(collection(db, "orders"), {
         tokenNumber, 
         customerName: customerDetails?.name || "Customer",
@@ -235,17 +239,27 @@ export default function BbCafeHome() {
         status: 'pending'
       });
 
+      // 2. Increment Customer's Loyalty points securely in Firestore
+      if (pointsEarned > 0) {
+        await setDoc(doc(db, "customer_points", customerDetails.phone), {
+          name: customerDetails.name,
+          phone: customerDetails.phone,
+          points: increment(pointsEarned),
+          lastActive: new Date()
+        }, { merge: true });
+      }
+
       let itemsText = "";
       cart.forEach((i: any) => itemsText += `• ${i.name || "Item"} x${i.quantity || 1} - ₹${(i.price || 0) * (i.quantity || 1)}\n`);
       
-      const msg = `🔥 *BUM BUM CAFE - NEW ORDER*\n\n*Order ID:* #${tokenNumber}\n*Customer:* ${customerDetails?.name || "Customer"}\n*Phone:* ${customerDetails?.phone || "No Phone"}\n*Address:* ${address}\n\n*ITEMS:*\n${itemsText}\n*Subtotal:* ₹${subtotal}\n*Coupon Discount:* -₹${couponDiscount}\n*Delivery:* ₹${deliveryCharge}\n*TOTAL BILL: ₹${finalTotal}*\n\n_Confirm order by replying 'YES'_`;
+      const msg = `🔥 *BUM BUM CAFE - NEW ORDER*\n\n*Order ID:* #${tokenNumber}\n*Customer:* ${customerDetails?.name || "Customer"}\n*Phone:* ${customerDetails?.phone || "No Phone"}\n*Address:* ${address}\n\n*ITEMS:*\n${itemsText}\n*Subtotal:* ₹${subtotal}\n*Coupon Discount:* -₹${couponDiscount}\n*Delivery:* ₹${deliveryCharge}\n*TOTAL BILL: ₹${finalTotal}*\n\n*Points Earned:* +${pointsEarned} Pts\n\n_Confirm order by replying 'YES'_`;
       
       window.open(`https://wa.me/919714293759?text=${encodeURIComponent(msg)}`, '_blank');
       clearCart();
       setAppliedCoupon(null);
       setEnteredCoupon("");
       setIsCartOpen(false);
-      toast.success("Order Placed!");
+      toast.success(`Order Placed! Earned ${pointsEarned} Points!`);
     } catch (e) { 
       toast.error("Failed to place order."); 
     }
@@ -272,7 +286,6 @@ export default function BbCafeHome() {
     }
   };
 
-  // Click tag to append pre-written suggestions instantly
   const handleAddSuggestion = (suggestion: string) => {
     setReviewComment(prev => prev ? `${prev} ${suggestion}` : suggestion);
   };
@@ -288,30 +301,6 @@ export default function BbCafeHome() {
     setCustomerDetails(details);
     setIsLoginOpen(false);
     toast.success(`Welcome ${tempName}!`);
-  };
-
-  const handleAddToCart = () => {
-    if (!chosenSize) return toast.error("Please select a size first!");
-    
-    const basePrice = Number(chosenPrice);
-    const addonsTotal = (addonCheese ? 30 : 0) + (addonVeg ? 20 : 0);
-    const finalPrice = basePrice + addonsTotal;
-
-    let finalName = `${selectedProduct.name} (${chosenSize})`;
-    if (addonCheese) finalName += " + Extra Cheese";
-    if (addonVeg) finalName += " + Extra Veg";
-
-    const uniqueCartId = `${selectedProduct.id}-${chosenSize}-${addonCheese ? 'cheese' : 'no'}-${addonVeg ? 'veg' : 'no'}`;
-
-    addItem({
-      ...selectedProduct,
-      id: uniqueCartId,
-      name: finalName,
-      price: finalPrice
-    });
-
-    toast.success(`${chosenSize} Pizza added to cart!`);
-    setSelectedProduct(null); setChosenSize(""); setChosenPrice(0); setAddonCheese(false); setAddonVeg(false);
   };
 
   if (!mounted) return null;
@@ -485,25 +474,7 @@ export default function BbCafeHome() {
         </div>
       </main>
 
-      {/* --- FLOATING BOTTOM CART BAR --- */}
-      <AnimatePresence>
-        {cart.length > 0 && (
-          <motion.div initial={{ y: 100 }} animate={{ y: 0 }} exit={{ y: 100 }} className="fixed bottom-8 left-0 w-full px-6 z-50">
-            <button onClick={() => setIsCartOpen(true)} className="w-full max-w-md mx-auto bg-gradient-to-r from-yellow-300 to-amber-400 text-black p-5 rounded-[2.2rem] shadow-2xl flex justify-between items-center border-4 border-black active:scale-95 transition-all">
-              <div className="flex items-center gap-4">
-                <div className="bg-black text-white p-3 rounded-xl"><ShoppingBag size={20} strokeWidth={2.5} /></div>
-                <div className="text-left leading-tight">
-                  <p className="text-[10px] font-black uppercase tracking-wider opacity-60">Ready to Order?</p>
-                  <p className="font-black text-2xl tracking-tighter">{cart.length} Items • ₹{getTotal()}</p>
-                </div>
-              </div>
-              <div className="bg-black text-white p-2.5 rounded-full"><ChevronRight size={24} strokeWidth={3} /></div>
-            </button>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* --- REVIEWS SIDE DRAWER POPUP --- */}
+      {/* --- REVIEWS DRAWER POPUP --- */}
       <AnimatePresence>
         {isReviewsDrawerOpen && (
           <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[120] overflow-y-auto">
@@ -694,6 +665,25 @@ export default function BbCafeHome() {
                   </ul>
                 </div>
 
+                {/* --- 🎁 NEW LOYALTY POINTS BOARD FOR CUSTOMERS --- */}
+                {customerDetails && (
+                  <div className="bg-yellow-400/5 border border-yellow-400/20 rounded-[2rem] p-5 space-y-3">
+                    <div className="flex items-center gap-2 text-yellow-400 font-black text-xs uppercase tracking-widest">
+                      <span>⭐ BUM BUM LOYALTY CLUB</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <h4 className="text-3xl font-black text-white">{customerPoints} <span className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Points</span></h4>
+                        <p className="text-[9px] text-gray-400 font-medium mt-1">Spend ₹100 = Get 1 Point! Redeem inside Cafe.</p>
+                      </div>
+                      <div className="text-right text-[9px] text-yellow-400 font-black space-y-1 uppercase tracking-wider bg-yellow-400/5 p-3 rounded-xl border border-yellow-400/10">
+                        <p>🎁 10 Pts = Free Sandwich</p>
+                        <p>🎁 20 Pts = Free Small Pizza</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Promo Code block */}
                 <div className="bg-white/[0.02] border border-white/5 p-5 rounded-[2rem] space-y-3">
                   <div className="flex items-center gap-2 text-orange-500 font-black text-xs uppercase">
@@ -747,7 +737,7 @@ export default function BbCafeHome() {
                 </div>
 
                 {/* --- WHATSAPP ORDER BUTTON --- */}
-                <button onClick={sendWhatsAppOrder} type="button" className="w-full bg-green-600 hover:bg-green-700 p-6 rounded-[2.5rem] font-black text-md shadow-xl border border-green-500/20 text-white">
+                <button onClick={sendWhatsAppOrder} type="button" className="w-full bg-green-600 hover:bg-green-700 p-6 rounded-[2.5rem] font-black text-md shadow-xl border border-green-500/20 text-white flex items-center justify-center gap-3">
                   <svg className="w-6 h-6 fill-current text-white flex-shrink-0" viewBox="0 0 24 24">
                     <path d="M12.037 21.978c-1.92 0-3.805-.502-5.46-1.457l-.391-.227-4.062 1.066 1.085-3.953-.25-.398C2.01 15.352 1.48 13.208 1.48 11.005 1.482 5.21 6.22 .495 12.037.495c2.818 0 5.467 1.1 7.46 3.099a10.45 10.45 0 0 1 3.093 7.42c-.002 5.797-4.74 10.513-10.553 10.513zm5.412-7.587c-.297-.15-1.758-.868-2.03-.96-.273-.092-.471-.137-.67.137-.197.275-.764.96-.938 1.144-.173.183-.347.206-.644.055-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.1-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.501-.669-.51l-.57-.011c-.198 0-.52.074-.793.372-.272.297-1.04.101-1.04 2.479 0 2.378 1.733 4.678 1.98 5.024.248.346 3.41 5.216 8.26 7.301 1.155.496 2.057.793 2.76 1.017 1.21.383 2.311.33 3.18.198 1.03-.15 2.158-.87 2.46-1.714.3-.842.3-1.564.21-1.714-.09-.15-.335-.24-.633-.39z"/>
                   </svg>
