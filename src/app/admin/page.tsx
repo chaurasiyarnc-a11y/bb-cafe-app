@@ -52,7 +52,7 @@ export default function AdminDashboard() {
 
     return () => {
       unsubOrders();
-      unproducts: unsubProducts();
+      unsubProducts(); // Fixed typo here (removed 'unproducts:')
       unsubStore();
     };
   }, [isAdmin]);
