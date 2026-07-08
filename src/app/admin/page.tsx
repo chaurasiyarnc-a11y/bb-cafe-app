@@ -365,7 +365,7 @@ export default function AdminDashboard() {
     }
   };
 
-  // --- BULK PDF IMPORT FUNCTION (RESTORED CLEANLY) ---
+  // --- BULK PDF IMPORT ---
   const handleBulkImport = async () => {
     if (!window.confirm("BUM BUM CAFE PDF ke saare 80+ items ko database mein add karein?")) return;
     
@@ -493,55 +493,81 @@ export default function AdminDashboard() {
         await addDoc(collection(db, "products"), item);
       }
       toast.dismiss("import");
-      toast.success("All 80+ PDF menu items imported successfully!");
+      toast.success("Successfully Imported All Products!");
     } catch (e) {
       toast.dismiss("import");
-      toast.error("Error seeding PDF items");
+      toast.error("Error seeding products from PDF");
     }
   };
 
-  // --- EDIT & UPDATE PROCESSORS ---
-  const handleUpdateProduct = async (e: React.FormEvent) => {
+  // --- ADD NEW PRODUCT PROCESSOR ---
+  const handleAddProduct = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editName || !editCategory || !editImage) {
+    if (!newName || !newCategory || !newImage) {
       return toast.error("Please fill all required fields!");
     }
 
-    let updatedData: any = {
-      name: editName,
-      category: editCategory,
-      image: editImage
+    let productData: any = {
+      name: newName,
+      category: newCategory,
+      image: newImage,
+      isVisible: true
     };
 
-    if (editVariantType === 'half_full') {
-      if (!editHalfPrice || !editFullPrice) return toast.error("Please enter both variant prices!");
-      updatedData.variants = { half: Number(editHalfPrice), full: Number(editFullPrice) };
-      updatedData.price = Number(editHalfPrice);
-    } else if (editVariantType === 'plain_butter') {
-      if (!editHalfPrice || !editFullPrice) return toast.error("Please enter both variant prices!");
-      updatedData.variants = { Plain: Number(editHalfPrice), Butter: Number(editFullPrice) };
-      updatedData.price = Number(editHalfPrice);
-    } else if (editVariantType === 'pizza_sizes') {
-      if (!editPriceSmall || !editPriceMedium || !editPriceLarge || !editPriceXL) return toast.error("Please enter prices for all 4 sizes!");
-      updatedData.variants = {
-        Small: Number(editPriceSmall),
-        Medium: Number(editPriceMedium),
-        Large: Number(editPriceLarge),
-        "Extra Large": Number(editPriceXL)
-      };
-      updatedData.price = Number(editPriceSmall);
+    if (variantType === 'half_full') {
+      if (!halfPrice || !fullPrice) return toast.error("Please fill prices!");
+      productData.variants = { half: Number(halfPrice), full: Number(fullPrice) };
+      productData.price = Number(halfPrice);
+    } else if (variantType === 'plain_butter') {
+      if (!halfPrice || !fullPrice) return toast.error("Please fill prices!");
+      productData.variants = { Plain: Number(halfPrice), Butter: Number(fullPrice) };
+      productData.price = Number(halfPrice);
+    } else if (variantType === 'pizza_sizes') {
+      if (!priceSmall || !priceMedium || !priceLarge || !priceXL) return toast.error("Please fill all pizza prices!");
+      productData.variants = { Small: Number(priceSmall), Medium: Number(priceMedium), Large: Number(priceLarge), "Extra Large": Number(priceXL) };
+      productData.price = Number(priceSmall);
     } else {
-      if (!editPrice) return toast.error("Please enter a price!");
-      updatedData.price = Number(editPrice);
-      updatedData.variants = null;
+      if (!newPrice) return toast.error("Please enter price!");
+      productData.price = Number(newPrice);
     }
 
     try {
-      await updateDoc(doc(db, "products", editingProduct.id), updatedData);
-      toast.success("Product Updated successfully!");
-      setEditingProduct(null);
-    } catch (e) {
-      toast.error("Error updating product");
+      await addDoc(collection(db, "products"), productData);
+      toast.success("New Item Added!");
+      setNewName(""); setNewPrice(""); setNewImage(""); setVariantType('none');
+      setHalfPrice(""); setFullPrice(""); setPriceSmall(""); setPriceMedium(""); setPriceLarge(""); setPriceXL("");
+      setShowAddForm(false);
+    } catch (error) {
+      toast.error("Error adding product");
+    }
+  };
+
+  // --- EDIT PRODUCT SELECTOR LOGIC ---
+  const startEditing = (item: any) => {
+    setEditingProduct(item);
+    setEditName(item.name);
+    setEditPrice(item.price || "");
+    setEditCategory(item.category);
+    setEditImage(item.image);
+    if (item.variants) {
+      const keys = Object.keys(item.variants);
+      if (keys.includes('Small')) {
+        setEditVariantType('pizza_sizes');
+        setEditPriceSmall(item.variants.Small || "");
+        setEditPriceMedium(item.variants.Medium || "");
+        setEditPriceLarge(item.variants.Large || "");
+        setEditPriceXL(item.variants["Extra Large"] || "");
+      } else if (keys.includes('Plain')) {
+        setEditVariantType('plain_butter');
+        setEditHalfPrice(item.variants.Plain || "");
+        setEditFullPrice(item.variants.Butter || "");
+      } else {
+        setEditVariantType('half_full');
+        setEditHalfPrice(item.variants.half || "");
+        setEditFullPrice(item.variants.full || "");
+      }
+    } else {
+      setEditVariantType('none');
     }
   };
 
@@ -563,7 +589,7 @@ export default function AdminDashboard() {
         </div>
       </header>
 
-      {/* --- RESPONSIVE HORIZONTAL TABS --- */}
+      {/* --- EXTENDED TABS SYSTEM --- */}
       <div className="p-4 flex gap-2 overflow-x-auto no-scrollbar border-b border-white/5">
         <button onClick={() => setTab('dashboard')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'dashboard' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>📊 Dashboard</button>
         <button onClick={() => setTab('orders')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'orders' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>📦 Orders ({orders.length})</button>
@@ -576,12 +602,11 @@ export default function AdminDashboard() {
 
       <main className="p-4 max-w-2xl mx-auto">
         
-        {/* --- TAB 1: PREMIUM ANALYTICS DASHBOARD & PERMANENT RECORD --- */}
+        {/* --- TAB 1: DASHBOARD --- */}
         {tab === 'dashboard' && (
           <div className="space-y-6">
             <h3 className="text-xl font-black text-orange-500 uppercase tracking-wider flex items-center gap-2"><BarChart3 size={20}/> Sales Dashboard</h3>
             
-            {/* Sales Stats Today Grid (Daily) */}
             <div className="bg-[#111] border border-white/5 p-4 rounded-3xl space-y-3">
               <p className="text-[10px] font-black uppercase text-orange-400 tracking-wider">🎯 Today's Quick Insights</p>
               <div className="grid grid-cols-3 gap-3">
@@ -595,12 +620,11 @@ export default function AdminDashboard() {
                 </div>
                 <div className="bg-white/[0.01] border border-white/5 p-4 rounded-2xl text-center">
                   <p className="text-[9px] font-bold text-gray-500 uppercase">Active Kitchen</p>
-                  <h3 className="text-lg font-black text-orange-500 mt-1">{dailyStats.activePending}</h3>
+                  <h3 className="text-lg font-black text-orange-500 mt-1">{dailyStats.active}</h3>
                 </div>
               </div>
             </div>
 
-            {/* Sales Stats Lifetime KPIs */}
             <div className="grid grid-cols-3 gap-3">
               <div className="bg-white/[0.02] border border-white/5 p-4 rounded-3xl text-center">
                 <p className="text-[9px] font-black text-gray-500 uppercase">Lifetime Sales</p>
@@ -616,7 +640,6 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            {/* Excel Exports Buttons */}
             <div className="grid grid-cols-2 gap-3 bg-[#111]/30 border border-white/5 p-4 rounded-[2rem] shadow-xl">
               <button onClick={handleExportOrders} className="bg-green-600 hover:bg-green-700 text-white font-black text-xs py-4 px-3 rounded-2xl flex items-center justify-center gap-2 active:scale-95 transition-all uppercase shadow-md">
                 <Download size={14}/> Sales Ledger Excel
@@ -626,7 +649,6 @@ export default function AdminDashboard() {
               </button>
             </div>
 
-            {/* Permanent Orders Ledger */}
             <div className="space-y-4">
               <h4 className="text-sm font-black text-gray-400 uppercase tracking-widest pt-2">📚 Permanent Financial Ledger</h4>
               {orders.length === 0 ? (
@@ -651,7 +673,7 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* --- TAB 2: LIVE ORDERS MANAGEMENT --- */}
+        {/* --- TAB 2: LIVE ORDERS --- */}
         {tab === 'orders' && (
           <div className="space-y-4">
             {orders.length === 0 && <p className="text-center text-gray-600 py-20 font-bold uppercase tracking-widest">No active orders yet...</p>}
@@ -823,9 +845,9 @@ export default function AdminDashboard() {
                 {editVariantType === 'pizza_sizes' && (
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Small Price (₹)</label><input type="number" placeholder="Small price" value={editPriceSmall} onChange={(e) => setEditPriceSmall(e.target.value)} className="w-full bg-[#111]/30 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" /></div>
-                    <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Medium Price (₹)</label><input type="number" placeholder="Medium price" value={editPriceMedium} onChange={(e) => setEditPriceMedium(e.target.value)} className="w-full bg-[#111]/30 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" /></div>
-                    <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Large Price (₹)</label><input type="number" placeholder="Large price" value={editPriceLarge} onChange={(e) => setEditPriceLarge(e.target.value)} className="w-full bg-[#111]/30 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" /></div>
-                    <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Extra Large Price (₹)</label><input type="number" placeholder="XL price" value={editPriceXL} onChange={(e) => setEditPriceXL(e.target.value)} className="w-full bg-[#111]/30 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" /></div>
+                    <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Medium Price (₹)</label><input type="number" placeholder="Medium price" value={editPriceMedium} onChange={(e) => setEditPriceMedium(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" /></div>
+                    <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Large Price (₹)</label><input type="number" placeholder="Large price" value={editPriceLarge} onChange={(e) => setEditPriceLarge(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" /></div>
+                    <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Extra Large Price (₹)</label><input type="number" placeholder="XL price" value={editPriceXL} onChange={(e) => setEditPriceXL(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" /></div>
                   </div>
                 )}
 
@@ -937,7 +959,7 @@ export default function AdminDashboard() {
                 <input type="text" placeholder="CODE (e.g. WELCOME)" value={newCouponCode} onChange={(e) => setNewCouponCode(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-xs font-black uppercase text-white" required />
                 <input type="number" placeholder="Discount (₹)" value={newCouponValue} onChange={(e) => setNewCouponValue(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-xs font-black text-white" required />
               </div>
-              <button type="submit" className="w-full bg-green-600 text-white p-4 rounded-xl font-black text-sm uppercase">Create Coupon</button>
+              <button type="submit" className="w-full bg-green-600 text-white p-4 rounded-xl font-black text-sm uppercase animate-pulse">Create Coupon</button>
             </form>
 
             <div className="space-y-3">
@@ -956,7 +978,7 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* --- TAB 7: APPROVE FEEDBACK REVIEWS TAB --- */}
+        {/* --- TAB 7: APPROVE REVIEWS TAB --- */}
         {tab === 'reviews' && (
           <div className="space-y-4">
             {reviews.length === 0 && <p className="text-center text-gray-600 py-16 font-bold uppercase tracking-widest">No feedback reviews yet...</p>}
