@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '@/lib/firebase'; // Ensure your path is correct
 import { collection, onSnapshot, query, orderBy, doc, updateDoc, setDoc, addDoc, deleteDoc } from 'firebase/firestore';
-import { Power, Eye, EyeOff, User, MapPin, Calendar, CheckCircle2, LogOut, Loader2, Phone, Plus, Trash, Edit, X, Lock } from 'lucide-react';
+import { Power, Eye, EyeOff, User, MapPin, Calendar, CheckCircle2, LogOut, Loader2, Phone, Plus, Trash, Edit, X, Lock, Star, Percent, Image } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 
 // Categories mapping
@@ -13,10 +13,19 @@ export default function AdminDashboard() {
   const [isVerified, setIsVerified] = useState(false);
   const [loading, setLoading] = useState(true);
   const [passcode, setPasscode] = useState("");
-  const [tab, setTab] = useState<'orders' | 'menu'>('orders');
+  const [tab, setTab] = useState<'orders' | 'menu' | 'banners' | 'reviews' | 'coupons'>('orders');
+  
   const [orders, setOrders] = useState<any[]>([]);
   const [menu, setMenu] = useState<any[]>([]);
   const [storeOpen, setStoreOpen] = useState(true);
+
+  // --- NEW FEATURES ADMIN STATES ---
+  const [banners, setBanners] = useState<any[]>([]);
+  const [newBannerUrl, setNewBannerUrl] = useState("");
+  const [reviews, setReviews] = useState<any[]>([]);
+  const [coupons, setCoupons] = useState<any[]>([]);
+  const [newCouponCode, setNewCouponCode] = useState("");
+  const [newCouponValue, setNewCouponValue] = useState("");
 
   // --- ADD PRODUCT STATES ---
   const [showAddForm, setShowAddForm] = useState(false);
@@ -78,10 +87,28 @@ export default function AdminDashboard() {
       if (d.exists()) setStoreOpen(d.data().isOpen);
     });
 
+    // Listen for Banners
+    const unsubBanners = onSnapshot(collection(db, "banners"), (snap) => {
+      setBanners(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+
+    // Listen for Coupons
+    const unsubCoupons = onSnapshot(collection(db, "coupons"), (snap) => {
+      setCoupons(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+
+    // Listen for All Reviews (Pending & Approved)
+    const unsubReviews = onSnapshot(collection(db, "reviews"), (snap) => {
+      setReviews(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+
     return () => {
       unsubOrders();
       unsubProducts();
       unsubStore();
+      unsubBanners();
+      unsubCoupons();
+      unsubReviews();
     };
   }, [isVerified]);
 
@@ -103,7 +130,7 @@ export default function AdminDashboard() {
     window.location.href = "/";
   };
 
-  // --- ACTIONS ---
+  // --- OTHER ACTIONS ---
   const toggleItemVisibility = async (id: string, currentStatus: boolean) => {
     try {
       await updateDoc(doc(db, "products", id), { isVisible: !currentStatus });
@@ -116,6 +143,61 @@ export default function AdminDashboard() {
       await setDoc(doc(db, "settings", "store"), { isOpen: !storeOpen });
       toast.success(storeOpen ? "Cafe is now OFFLINE" : "Cafe is now ONLINE");
     } catch (e) { toast.error("Error toggling store"); }
+  };
+
+  // --- MANAGE BANNERS ACTIONS ---
+  const handleAddBanner = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newBannerUrl) return;
+    try {
+      await addDoc(collection(db, "banners"), { url: newBannerUrl, timestamp: new Date() });
+      setNewBannerUrl("");
+      toast.success("New Banner Added!");
+    } catch (err) { toast.error("Error adding banner"); }
+  };
+
+  const handleDeleteBanner = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, "banners", id));
+      toast.success("Banner Deleted!");
+    } catch (err) { toast.error("Error deleting banner"); }
+  };
+
+  // --- MANAGE REVIEWS ACTIONS ---
+  const handleApproveReview = async (id: string) => {
+    try {
+      await updateDoc(doc(db, "reviews", id), { isApproved: true });
+      toast.success("Review Approved!");
+    } catch (err) { toast.error("Error approving review"); }
+  };
+
+  const handleDeleteReview = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, "reviews", id));
+      toast.success("Review Deleted!");
+    } catch (err) { toast.error("Error deleting review"); }
+  };
+
+  // --- MANAGE COUPONS ACTIONS ---
+  const handleAddCoupon = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCouponCode || !newCouponValue) return;
+    try {
+      await addDoc(collection(db, "coupons"), {
+        code: newCouponCode.trim().toUpperCase(),
+        discountValue: Number(newCouponValue),
+        timestamp: new Date()
+      });
+      setNewCouponCode(""); setNewCouponValue("");
+      toast.success("New Discount Coupon Created!");
+    } catch (err) { toast.error("Error creating coupon"); }
+  };
+
+  const handleDeleteCoupon = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, "coupons", id));
+      toast.success("Coupon Deleted!");
+    } catch (err) { toast.error("Error deleting coupon"); }
   };
 
   // --- ADD NEW PRODUCT ---
@@ -141,25 +223,18 @@ export default function AdminDashboard() {
       productData.variants = { Plain: Number(halfPrice), Butter: Number(fullPrice) };
       productData.price = Number(halfPrice);
     } else if (variantType === 'pizza_sizes') {
-      if (!priceSmall || !priceMedium || !priceLarge || !priceXL) return toast.error("Please fill prices for Small, Medium, Large and Extra Large!");
-      productData.variants = {
-        Small: Number(priceSmall),
-        Medium: Number(priceMedium),
-        Large: Number(priceLarge),
-        "Extra Large": Number(priceXL)
-      };
+      if (!priceSmall || !priceMedium || !priceLarge || !priceXL) return toast.error("Please fill pizza size prices!");
+      productData.variants = { Small: Number(priceSmall), Medium: Number(priceMedium), Large: Number(priceLarge), "Extra Large": Number(priceXL) };
       productData.price = Number(priceSmall);
     } else {
       if (!newPrice) return toast.error("Please enter item price!");
       productData.price = Number(newPrice);
-      productData.variants = null;
     }
 
     try {
       await addDoc(collection(db, "products"), productData);
       toast.success("New Item Added!");
-      setNewName(""); setNewPrice(""); setNewImage(""); setVariantType('none');
-      setHalfPrice(""); setFullPrice(""); setPriceSmall(""); setPriceMedium(""); setPriceLarge(""); setPriceXL("");
+      setNewName(""); setNewPrice(""); setNewImage(""); setNewCategory("Special Pizza"); setHalfPrice(""); setFullPrice(""); setPriceSmall(""); setPriceMedium(""); setPriceLarge(""); setPriceXL(""); setVariantType('none');
       setShowAddForm(false);
     } catch (error) {
       toast.error("Error adding product");
@@ -173,7 +248,6 @@ export default function AdminDashboard() {
     setEditPrice(item.price || "");
     setEditCategory(item.category);
     setEditImage(item.image);
-    
     if (item.variants) {
       const keys = Object.keys(item.variants);
       if (keys.includes('Small')) {
@@ -240,7 +314,7 @@ export default function AdminDashboard() {
     }
   };
 
-  // --- DELETE PRODUCT ---
+  // --- DELETE PRODUCT permanent ---
   const handleDeleteProduct = async (id: string) => {
     if (window.confirm("Delete this product permanently?")) {
       try {
@@ -303,7 +377,7 @@ export default function AdminDashboard() {
       { name: "Flavored Lassi (फ्लेवर्ड लस्सी)", category: "Super Cool", price: 40, image: "https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?auto=format&fit=crop&w=300&q=80", isVisible: true },
       { name: "Fruits Lassi (ड्राईफ्रूट लस्सी)", category: "Super Cool", price: 50, image: "https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?auto=format&fit=crop&w=300&q=80", isVisible: true },
 
-      // Page 4: Pizza with 4 custom sizes
+      // Page 4: Pizza with 4 sizes
       { name: "Cheese Corn Pizza", category: "Special Pizza", price: 80, variants: { Small: 80, Medium: 110, Large: 140, "Extra Large": 180 }, image: "https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=300&q=80", isVisible: true },
       { name: "Cheese Onion Pizza", category: "Special Pizza", price: 80, variants: { Small: 80, Medium: 110, Large: 140, "Extra Large": 180 }, image: "https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=300&q=80", isVisible: true },
       { name: "Cheese Capsicum Pizza", category: "Special Pizza", price: 80, variants: { Small: 80, Medium: 110, Large: 140, "Extra Large": 180 }, image: "https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=300&q=80", isVisible: true },
@@ -454,24 +528,29 @@ export default function AdminDashboard() {
         </div>
       </header>
 
-      {/* Tabs */}
-      <div className="p-4 flex gap-2">
-        <button 
-          onClick={() => setTab('orders')}
-          className={`flex-1 py-4 rounded-2xl font-black text-sm transition-all ${tab === 'orders' ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/20' : 'bg-white/5 text-gray-500'}`}
-        >
-          ORDERS ({orders.length})
+      {/* --- EXTENDED TABS FOR NEW FEATURES --- */}
+      <div className="p-4 flex gap-2 overflow-x-auto no-scrollbar border-b border-white/5">
+        <button onClick={() => setTab('orders')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'orders' ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/20' : 'bg-white/5 text-gray-500'}`}>
+          Orders ({orders.length})
         </button>
-        <button 
-          onClick={() => setTab('menu')}
-          className={`flex-1 py-4 rounded-2xl font-black text-sm transition-all ${tab === 'menu' ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/20' : 'bg-white/5 text-gray-500'}`}
-        >
-          MANAGE MENU
+        <button onClick={() => setTab('menu')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'menu' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>
+          Menu List
+        </button>
+        <button onClick={() => setTab('banners')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'banners' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>
+          Banners ({banners.length})
+        </button>
+        <button onClick={() => setTab('coupons')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'coupons' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>
+          Coupons ({coupons.length})
+        </button>
+        <button onClick={() => setTab('reviews')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'reviews' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>
+          Reviews ({reviews.length})
         </button>
       </div>
 
       <main className="p-4 max-w-2xl mx-auto">
-        {tab === 'orders' ? (
+        
+        {/* --- ORDERS TAB --- */}
+        {tab === 'orders' && (
           <div className="space-y-4">
             {orders.length === 0 && <p className="text-center text-gray-600 py-20 font-bold uppercase tracking-widest">No orders yet...</p>}
             {orders.map((o) => (
@@ -501,41 +580,34 @@ export default function AdminDashboard() {
               </div>
             ))}
           </div>
-        ) : (
+        )}
+
+        {/* --- MENU LIST TAB --- */}
+        {tab === 'menu' && (
           <div className="space-y-4">
-            
             <div className="flex flex-col gap-2">
-              <button 
-                onClick={handleBulkImport}
-                type="button"
-                className="w-full bg-yellow-400 text-black py-4 rounded-2xl font-black text-sm flex items-center justify-center gap-2 active:scale-95 transition-all shadow-xl"
-              >
+              <button onClick={handleBulkImport} type="button" className="w-full bg-yellow-400 text-black py-4 rounded-2xl font-black text-sm flex items-center justify-center gap-2 active:scale-95 transition-all shadow-xl">
                 📥 IMPORT ALL 80+ PDF MENU ITEMS
               </button>
 
-              <button 
-                onClick={() => { setShowAddForm(!showAddForm); setEditingProduct(null); }}
-                className="w-full bg-orange-500/10 text-orange-500 border border-orange-500/20 py-4 rounded-2xl font-black text-sm flex items-center justify-center gap-2 hover:bg-orange-500/20 transition-all"
-              >
+              <button onClick={() => { setShowAddForm(!showAddForm); setEditingProduct(null); }} className="w-full bg-orange-500/10 text-orange-500 border border-orange-500/20 py-4 rounded-2xl font-black text-sm flex items-center justify-center gap-2 hover:bg-orange-500/20 transition-all">
                 <Plus size={18}/> {showAddForm ? "CLOSE FORM" : "ADD NEW ITEM"}
               </button>
             </div>
 
-            {/* --- ADD PRODUCT FORM (4 SIZES COMPATIBLE) --- */}
+            {/* ADD PRODUCT FORM */}
             {showAddForm && (
               <form onSubmit={handleAddProduct} className="bg-white/[0.02] border border-white/5 p-6 rounded-[2.5rem] space-y-4">
                 <h3 className="text-lg font-black text-orange-500 italic uppercase">Add Product Form</h3>
                 
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-gray-400 uppercase">Item Name</label>
-                  <input type="text" placeholder="e.g., Cheese Corn Pizza" value={newName} onChange={(e) => setNewName(e.target.value)}
-                    className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" required />
+                  <input type="text" placeholder="e.g., Cheese Corn Pizza" value={newName} onChange={(e) => setNewName(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" required />
                 </div>
 
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-gray-400 uppercase">Category</label>
-                  <select value={newCategory} onChange={(e) => setNewCategory(e.target.value)}
-                    className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" required>
+                  <select value={newCategory} onChange={(e) => setNewCategory(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" required>
                     {ADD_CATEGORIES.map(cat => (
                       <option key={cat} value={cat} className="bg-[#111]">{cat}</option>
                     ))}
@@ -544,15 +616,12 @@ export default function AdminDashboard() {
 
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-gray-400 uppercase">Image URL</label>
-                  <input type="url" placeholder="Paste image url link..." value={newImage} onChange={(e) => setNewImage(e.target.value)}
-                    className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" required />
+                  <input type="url" placeholder="Paste image url link..." value={newImage} onChange={(e) => setNewImage(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" required />
                 </div>
 
-                {/* --- VARIANT TYPE SELECTION --- */}
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-gray-400 uppercase">Portion Option Type</label>
-                  <select value={variantType} onChange={(e: any) => setVariantType(e.target.value)}
-                    className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white">
+                  <select value={variantType} onChange={(e: any) => setVariantType(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white">
                     <option value="none" className="bg-[#111]">None (Single Price)</option>
                     <option value="half_full" className="bg-[#111]">Half / Full</option>
                     <option value="plain_butter" className="bg-[#111]">Plain / Butter</option>
@@ -560,12 +629,10 @@ export default function AdminDashboard() {
                   </select>
                 </div>
 
-                {/* Conditional Inputs Based on Variant Selection */}
                 {variantType === 'none' && (
                   <div className="space-y-1">
                     <label className="text-xs font-bold text-gray-400 uppercase">Price (₹)</label>
-                    <input type="number" placeholder="Item Price (e.g., 150)" value={newPrice} onChange={(e) => setNewPrice(e.target.value)}
-                      className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" />
+                    <input type="number" placeholder="Item Price (e.g., 150)" value={newPrice} onChange={(e) => setNewPrice(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" />
                   </div>
                 )}
 
@@ -573,13 +640,11 @@ export default function AdminDashboard() {
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1">
                       <label className="text-xs font-bold text-gray-400 uppercase">Half / Plain Price (₹)</label>
-                      <input type="number" placeholder="Price" value={halfPrice} onChange={(e) => setHalfPrice(e.target.value)}
-                        className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" />
+                      <input type="number" placeholder="Price" value={halfPrice} onChange={(e) => setHalfPrice(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" />
                     </div>
                     <div className="space-y-1">
                       <label className="text-xs font-bold text-gray-400 uppercase">Full / Butter Price (₹)</label>
-                      <input type="number" placeholder="Price" value={fullPrice} onChange={(e) => setFullPrice(e.target.value)}
-                        className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" />
+                      <input type="number" placeholder="Price" value={fullPrice} onChange={(e) => setFullPrice(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" />
                     </div>
                   </div>
                 )}
@@ -588,34 +653,28 @@ export default function AdminDashboard() {
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1">
                       <label className="text-xs font-bold text-gray-400 uppercase">Small Price (₹)</label>
-                      <input type="number" placeholder="Small price" value={priceSmall} onChange={(e) => setPriceSmall(e.target.value)}
-                        className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" />
+                      <input type="number" placeholder="Small price" value={priceSmall} onChange={(e) => setPriceSmall(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" />
                     </div>
                     <div className="space-y-1">
                       <label className="text-xs font-bold text-gray-400 uppercase">Medium Price (₹)</label>
-                      <input type="number" placeholder="Medium price" value={priceMedium} onChange={(e) => setPriceMedium(e.target.value)}
-                        className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" />
+                      <input type="number" placeholder="Medium price" value={priceMedium} onChange={(e) => setPriceMedium(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" />
                     </div>
                     <div className="space-y-1">
                       <label className="text-xs font-bold text-gray-400 uppercase">Large Price (₹)</label>
-                      <input type="number" placeholder="Large price" value={priceLarge} onChange={(e) => setPriceLarge(e.target.value)}
-                        className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" />
+                      <input type="number" placeholder="Large price" value={priceLarge} onChange={(e) => setPriceLarge(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" />
                     </div>
                     <div className="space-y-1">
                       <label className="text-xs font-bold text-gray-400 uppercase">Extra Large Price (₹)</label>
-                      <input type="number" placeholder="Extra Large price" value={priceXL} onChange={(e) => setPriceXL(e.target.value)}
-                        className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" />
+                      <input type="number" placeholder="XL price" value={priceXL} onChange={(e) => setPriceXL(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" />
                     </div>
                   </div>
                 )}
 
-                <button type="submit" className="w-full bg-green-600 text-white p-4 rounded-xl font-black text-sm shadow-lg active:scale-95 transition-all uppercase">
-                  Save Product
-                </button>
+                <button type="submit" className="w-full bg-green-600 text-white p-4 rounded-xl font-black text-sm shadow-lg active:scale-95 transition-all uppercase">Save Product</button>
               </form>
             )}
 
-            {/* --- EDIT PRODUCT FORM (4 SIZES COMPATIBLE) --- */}
+            {/* EDIT PRODUCT FORM */}
             {editingProduct && (
               <form onSubmit={handleUpdateProduct} className="bg-[#151515] border-2 border-orange-500/50 p-6 rounded-[2.5rem] space-y-4 relative">
                 <button type="button" onClick={() => setEditingProduct(null)} className="absolute top-4 right-4 p-2 bg-white/5 rounded-full"><X size={16}/></button>
@@ -623,14 +682,12 @@ export default function AdminDashboard() {
                 
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-gray-400 uppercase">Item Name</label>
-                  <input type="text" placeholder="e.g., Paneer Pizza" value={editName} onChange={(e) => setEditName(e.target.value)}
-                    className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" required />
+                  <input type="text" placeholder="e.g., Paneer Pizza" value={editName} onChange={(e) => setEditName(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" required />
                 </div>
 
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-gray-400 uppercase">Category</label>
-                  <select value={editCategory} onChange={(e) => setEditCategory(e.target.value)}
-                    className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" required>
+                  <select value={editCategory} onChange={(e) => setEditCategory(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" required>
                     {ADD_CATEGORIES.map(cat => (
                       <option key={cat} value={cat} className="bg-[#111]">{cat}</option>
                     ))}
@@ -639,15 +696,12 @@ export default function AdminDashboard() {
 
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-gray-400 uppercase">Image URL</label>
-                  <input type="url" placeholder="Paste image url..." value={editImage} onChange={(e) => setEditImage(e.target.value)}
-                    className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" required />
+                  <input type="url" placeholder="Paste image url..." value={editImage} onChange={(e) => setEditImage(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" required />
                 </div>
 
-                {/* Edit options type select */}
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-gray-400 uppercase">Portion Option Type</label>
-                  <select value={editVariantType} onChange={(e: any) => setEditVariantType(e.target.value)}
-                    className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white">
+                  <select value={editVariantType} onChange={(e: any) => setEditVariantType(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white">
                     <option value="none" className="bg-[#111]">None (Single Price)</option>
                     <option value="half_full" className="bg-[#111]">Half / Full</option>
                     <option value="plain_butter" className="bg-[#111]">Plain / Butter</option>
@@ -658,8 +712,7 @@ export default function AdminDashboard() {
                 {editVariantType === 'none' && (
                   <div className="space-y-1">
                     <label className="text-xs font-bold text-gray-400 uppercase">Price (₹)</label>
-                    <input type="number" placeholder="Item Price" value={editPrice} onChange={(e) => setEditPrice(e.target.value)}
-                      className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" />
+                    <input type="number" placeholder="Item Price" value={editPrice} onChange={(e) => setEditPrice(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" />
                   </div>
                 )}
 
@@ -667,13 +720,11 @@ export default function AdminDashboard() {
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1">
                       <label className="text-xs font-bold text-gray-400 uppercase">Half / Plain Price (₹)</label>
-                      <input type="number" placeholder="Price" value={editHalfPrice} onChange={(e) => setEditHalfPrice(e.target.value)}
-                        className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" />
+                      <input type="number" placeholder="Price" value={editHalfPrice} onChange={(e) => setEditHalfPrice(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" />
                     </div>
                     <div className="space-y-1">
                       <label className="text-xs font-bold text-gray-400 uppercase">Full / Butter Price (₹)</label>
-                      <input type="number" placeholder="Price" value={editFullPrice} onChange={(e) => setEditFullPrice(e.target.value)}
-                        className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" />
+                      <input type="number" placeholder="Price" value={editFullPrice} onChange={(e) => setEditFullPrice(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" />
                     </div>
                   </div>
                 )}
@@ -682,34 +733,26 @@ export default function AdminDashboard() {
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1">
                       <label className="text-xs font-bold text-gray-400 uppercase">Small Price (₹)</label>
-                      <input type="number" placeholder="Small price" value={editPriceSmall} onChange={(e) => setEditPriceSmall(e.target.value)}
-                        className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" />
+                      <input type="number" placeholder="Small price" value={editPriceSmall} onChange={(e) => setEditPriceSmall(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" />
                     </div>
                     <div className="space-y-1">
                       <label className="text-xs font-bold text-gray-400 uppercase">Medium Price (₹)</label>
-                      <input type="number" placeholder="Medium price" value={editPriceMedium} onChange={(e) => setEditPriceMedium(e.target.value)}
-                        className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" />
+                      <input type="number" placeholder="Medium price" value={editPriceMedium} onChange={(e) => setEditPriceMedium(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" />
                     </div>
                     <div className="space-y-1">
                       <label className="text-xs font-bold text-gray-400 uppercase">Large Price (₹)</label>
-                      <input type="number" placeholder="Large price" value={editPriceLarge} onChange={(e) => setEditPriceLarge(e.target.value)}
-                        className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" />
+                      <input type="number" placeholder="Large price" value={editPriceLarge} onChange={(e) => setEditPriceLarge(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" />
                     </div>
                     <div className="space-y-1">
                       <label className="text-xs font-bold text-gray-400 uppercase">Extra Large Price (₹)</label>
-                      <input type="number" placeholder="XL price" value={editPriceXL} onChange={(e) => setEditPriceXL(e.target.value)}
-                        className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" />
+                      <input type="number" placeholder="XL price" value={editPriceXL} onChange={(e) => setEditPriceXL(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" />
                     </div>
                   </div>
                 )}
 
                 <div className="flex gap-2">
-                  <button type="submit" className="flex-1 bg-green-600 text-white p-4 rounded-xl font-black text-sm shadow-lg active:scale-95 transition-all uppercase">
-                    Update Item
-                  </button>
-                  <button type="button" onClick={() => setEditingProduct(null)} className="bg-white/5 text-gray-400 p-4 rounded-xl font-black text-sm active:scale-95 transition-all">
-                    CANCEL
-                  </button>
+                  <button type="submit" className="flex-1 bg-green-600 text-white p-4 rounded-xl font-black text-sm shadow-lg active:scale-95 transition-all uppercase">Update Item</button>
+                  <button type="button" onClick={() => setEditingProduct(null)} className="bg-white/5 text-gray-400 p-4 rounded-xl font-black text-sm active:scale-95 transition-all">CANCEL</button>
                 </div>
               </form>
             )}
@@ -740,15 +783,9 @@ export default function AdminDashboard() {
                       <p className="text-orange-500 font-black text-sm mt-1">{getAdminDisplayPrice(item)}</p>
                     </div>
                     <div className="flex items-center gap-2">
-                      <button onClick={() => startEditing(item)} className="p-3 bg-blue-500/10 text-blue-500 rounded-xl hover:bg-blue-500/20 transition-all">
-                        <Edit size={18}/>
-                      </button>
-                      <button onClick={() => toggleItemVisibility(item.id, item.isVisible !== false)} className={`p-3 rounded-xl transition-all ${item.isVisible !== false ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
-                        {item.isVisible !== false ? <Eye size={18}/> : <EyeOff size={18}/>}
-                      </button>
-                      <button onClick={() => handleDeleteProduct(item.id)} className="p-3 bg-red-500/10 text-red-500 rounded-xl hover:bg-red-500/20 transition-all">
-                        <Trash size={18}/>
-                      </button>
+                      <button onClick={() => startEditing(item)} className="p-3 bg-blue-500/10 text-blue-500 rounded-xl hover:bg-blue-500/20 transition-all"><Edit size={18}/></button>
+                      <button onClick={() => toggleItemVisibility(item.id, item.isVisible !== false)} className={`p-3 rounded-xl transition-all ${item.isVisible !== false ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>{item.isVisible !== false ? <Eye size={18}/> : <EyeOff size={18}/>}</button>
+                      <button onClick={() => handleDeleteProduct(item.id)} className="p-3 bg-red-500/10 text-red-500 rounded-xl hover:bg-red-500/20 transition-all"><Trash size={18}/></button>
                     </div>
                   </div>
                 );
@@ -756,7 +793,107 @@ export default function AdminDashboard() {
             </div>
           </div>
         )}
+
+        {/* --- 1. MANAGE BANNERS TAB --- */}
+        {tab === 'banners' && (
+          <div className="space-y-6">
+            <form onSubmit={handleAddBanner} className="bg-white/[0.02] border border-white/5 p-6 rounded-[2.5rem] space-y-4">
+              <h3 className="text-lg font-black text-orange-500 italic uppercase flex items-center gap-2"><Image size={18}/> Add Banner</h3>
+              <input 
+                type="url" 
+                placeholder="Paste offer image url here..." 
+                value={newBannerUrl} 
+                onChange={(e) => setNewBannerUrl(e.target.value)} 
+                className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-xs font-bold text-white" 
+                required 
+              />
+              <button type="submit" className="w-full bg-green-600 text-white p-4 rounded-xl font-black text-sm uppercase">Add Banner Image</button>
+            </form>
+
+            <div className="grid grid-cols-2 gap-4">
+              {banners.map(b => (
+                <div key={b.id} className="bg-white/[0.02] border border-white/5 p-3 rounded-2xl relative group">
+                  <img src={b.url} className="w-full h-24 object-cover rounded-xl opacity-80" alt="Banner" />
+                  <button onClick={() => handleDeleteBanner(b.id)} className="absolute top-4 right-4 p-2 bg-red-500/20 text-red-500 rounded-xl hover:bg-red-500 active:text-black transition-all">
+                    <Trash size={14}/>
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* --- 2. MANAGE COUPONS TAB --- */}
+        {tab === 'coupons' && (
+          <div className="space-y-6">
+            <form onSubmit={handleAddCoupon} className="bg-white/[0.02] border border-white/5 p-6 rounded-[2.5rem] space-y-4">
+              <h3 className="text-lg font-black text-orange-500 italic uppercase flex items-center gap-2"><Percent size={18}/> Add Coupon Code</h3>
+              <div className="grid grid-cols-2 gap-3">
+                <input type="text" placeholder="CODE (e.g. WELCOME)" value={newCouponCode} onChange={(e) => setNewCouponCode(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-xs font-black uppercase text-white" required />
+                <input type="number" placeholder="Discount (₹)" value={newCouponValue} onChange={(e) => setNewCouponValue(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-xs font-black text-white" required />
+              </div>
+              <button type="submit" className="w-full bg-green-600 text-white p-4 rounded-xl font-black text-sm uppercase">Create Coupon</button>
+            </form>
+
+            <div className="space-y-3">
+              {coupons.map(c => (
+                <div key={c.id} className="bg-white/[0.02] border border-white/5 p-5 rounded-2xl flex justify-between items-center">
+                  <div>
+                    <h4 className="text-sm font-black text-orange-500 uppercase tracking-widest">{c.code}</h4>
+                    <p className="text-xs font-bold text-gray-400 mt-1">Value: ₹{c.discountValue} FLAT OFF</p>
+                  </div>
+                  <button onClick={() => handleDeleteCoupon(c.id)} className="p-3 bg-red-500/10 text-red-500 rounded-xl hover:bg-red-500/20 active:scale-95 transition-all">
+                    <Trash size={16}/>
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* --- 3. APPROVE FEEDBACK REVIEWS TAB --- */}
+        {tab === 'reviews' && (
+          <div className="space-y-4">
+            {reviews.length === 0 && <p className="text-center text-gray-600 py-16 font-bold uppercase tracking-widest">No feedback reviews yet...</p>}
+            {reviews.map(r => (
+              <div key={r.id} className="bg-white/[0.02] border border-white/5 p-6 rounded-[2rem] space-y-3">
+                <div className="flex justify-between items-center">
+                  <h4 className="font-black text-sm text-gray-200">{r.name}</h4>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs bg-white/5 text-yellow-500 font-bold px-2 py-0.5 rounded-lg flex items-center gap-1">
+                      {r.rating || "N/A"} <span className="text-[10px]">★</span>
+                    </span>
+                    <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-lg ${r.approved !== false ? 'bg-green-500/10 text-green-500' : 'bg-yellow-500/10 text-yellow-500'}`}>
+                      {r.isApproved ? 'Live' : 'Pending Approval'}
+                    </span>
+                  </div>
+                </div>
+                <p className="text-xs text-gray-400 font-medium leading-relaxed italic">"{r.comment}"</p>
+                
+                <div className="flex gap-2 justify-end pt-2 border-t border-white/5">
+                  {!r.isApproved && (
+                    <button 
+                      onClick={async () => {
+                        try {
+                          await updateDoc(doc(db, "reviews", r.id), { isApproved: true });
+                          toast.success("Review Approved!");
+                        } catch (e) { toast.error("Error approving review"); }
+                      }}
+                      className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-xl text-xs font-black uppercase transition-all"
+                    >
+                      Approve Review
+                    </button>
+                  )}
+                  <button onClick={() => handleDeleteProduct(r.id)} className="p-2 bg-red-500/10 text-red-500 rounded-xl hover:bg-red-500 hover:text-black transition-all">
+                    <Trash size={16}/>
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </main>
     </div>
   );
 }
+ 
