@@ -135,13 +135,13 @@ export default function BbCafeHome() {
     <div className="bg-[#080808] min-h-screen text-white pb-32 font-sans selection:bg-orange-500">
       <Toaster position="top-center" />
       
-      {/* --- COMPACT HEADER & SMALL SEARCH BAR --- */}
-      <header className="relative h-64 bg-gradient-to-b from-[#ff5e00] to-[#b33600] rounded-b-[3rem] flex flex-col justify-center items-center px-4 shadow-[0_10px_30px_rgba(179,54,0,0.25)] overflow-hidden">
-        {/* Halka background food pattern */}
-        <div className="absolute inset-0 opacity-15 bg-[url('https://www.transparenttextures.com/patterns/food.png')] bg-center"></div>
+      {/* --- COMPACT HEADER & SMALL SEARCH BAR (FIXED CLIPPING) --- */}
+      <header className="relative h-64 bg-gradient-to-b from-[#ff5e00] to-[#b33600] rounded-b-[3rem] flex flex-col justify-center items-center px-4 shadow-[0_10px_30px_rgba(179,54,0,0.25)]">
+        {/* Background pattern respects the curve with its own rounded class */}
+        <div className="absolute inset-0 opacity-15 bg-[url('https://www.transparenttextures.com/patterns/food.png')] bg-center rounded-b-[3rem] overflow-hidden"></div>
         
         {/* Pure Veg Badge */}
-        <div className="absolute top-4 right-4 bg-black/40 backdrop-blur-md px-3 py-1 rounded-full border border-white/10 flex items-center gap-1.5">
+        <div className="absolute top-4 right-4 bg-black/40 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10 flex items-center gap-1.5 z-10">
           <span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse"></span>
           <span className="text-[9px] font-black uppercase tracking-widest text-green-400">100% PURE VEG</span>
         </div>
@@ -160,7 +160,7 @@ export default function BbCafeHome() {
           </p>
         </div>
         
-        {/* Chota Sa Search Bar (Compact & Sleek) */}
+        {/* Small Floating Search Bar (Ab bilkul clean aur poora dikhega) */}
         <div className="absolute -bottom-6 w-[85%] max-w-sm z-20">
           <div className="relative group">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-orange-500 transition-colors" size={16} />
@@ -169,7 +169,7 @@ export default function BbCafeHome() {
               placeholder="Search pizza, thali, shakes..." 
               value={searchQuery} 
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-white text-black py-3 px-11 rounded-2xl shadow-[0_8px_25px_rgba(0,0,0,0.35)] outline-none focus:ring-4 focus:ring-orange-500/20 text-xs font-semibold transition-all"
+              className="w-full bg-white text-black py-3.5 px-11 rounded-2xl shadow-[0_8px_25px_rgba(0,0,0,0.35)] outline-none focus:ring-4 focus:ring-orange-500/20 text-xs font-semibold transition-all"
             />
           </div>
         </div>
