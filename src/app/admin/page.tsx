@@ -338,7 +338,7 @@ export default function AdminDashboard() {
     } catch (error) { toast.error("Error deleting coupon"); }
   };
 
-  // --- OTHER STORE ACTIONS ---
+  // --- STORE ACTIONS ---
   const toggleStore = async () => {
     try {
       await setDoc(doc(db, "settings", "store"), { isOpen: !storeOpen });
@@ -346,6 +346,7 @@ export default function AdminDashboard() {
     } catch (e) { toast.error("Error toggling store"); }
   };
 
+  // --- OTHER MENU ITEM ACTIONS ---
   const toggleItemVisibility = async (id: string, currentStatus: boolean) => {
     try {
       await updateDoc(doc(db, "products", id), { isVisible: !currentStatus });
@@ -353,81 +354,157 @@ export default function AdminDashboard() {
     } catch (e) { toast.error("Error updating product"); }
   };
 
-  // --- ADD NEW PRODUCT ---
-  const handleAddProduct = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newName || !newCategory || !newImage) {
-      return toast.error("Please fill all required fields!");
+  const handleDeleteProduct = async (id: string) => {
+    if (window.confirm("Are you sure you want to delete this product permanently?")) {
+      try {
+        await deleteDoc(doc(db, "products", id));
+        toast.success("Product Deleted permanently!");
+      } catch (error) {
+        toast.error("Error deleting product");
+      }
     }
+  };
 
-    let productData: any = {
-      name: newName,
-      category: newCategory,
-      image: newImage,
-      isVisible: true
-    };
+  // --- BULK PDF IMPORT FUNCTION (RESTORED CLEANLY) ---
+  const handleBulkImport = async () => {
+    if (!window.confirm("BUM BUM CAFE PDF ke saare 80+ items ko database mein add karein?")) return;
+    
+    toast.loading("Importing all menu items...", { id: "import" });
 
-    if (variantType === 'half_full') {
-      if (!halfPrice || !fullPrice) return toast.error("Please fill prices!");
-      productData.variants = { half: Number(halfPrice), full: Number(fullPrice) };
-      productData.price = Number(halfPrice);
-    } else if (variantType === 'plain_butter') {
-      if (!halfPrice || !fullPrice) return toast.error("Please fill prices!");
-      productData.variants = { Plain: Number(halfPrice), Butter: Number(fullPrice) };
-      productData.price = Number(halfPrice);
-    } else if (variantType === 'pizza_sizes') {
-      if (!priceSmall || !priceMedium || !priceLarge || !priceXL) return toast.error("Please fill all pizza prices!");
-      productData.variants = { Small: Number(priceSmall), Medium: Number(priceMedium), Large: Number(priceLarge), "Extra Large": Number(priceXL) };
-      productData.price = Number(priceSmall);
-    } else {
-      if (!newPrice) return toast.error("Please enter price!");
-      productData.price = Number(newPrice);
-    }
+    const defaultMenu = [
+      // Page 2: Fast Food / Hot Drinks
+      { name: "Special Tea (स्पेशल चाय)", category: "Fast Food", price: 15, image: "https://images.unsplash.com/photo-1544787219-7f47ccb76574?auto=format&fit=crop&w=300&q=80", isVisible: true },
+      { name: "Black Tea (काली चाय)", category: "Fast Food", price: 20, image: "https://images.unsplash.com/photo-1508888620463-70b53b8004c3?auto=format&fit=crop&w=300&q=80", isVisible: true },
+      { name: "Special Coffee (स्पेशल कॉफी)", category: "Fast Food", price: 20, image: "https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?auto=format&fit=crop&w=300&q=80", isVisible: true },
+      { name: "Black Coffee (काली कॉफी)", category: "Fast Food", price: 25, image: "https://images.unsplash.com/photo-1497515114629-f71d768fd07c?auto=format&fit=crop&w=300&q=80", isVisible: true },
+      { name: "Mix Veg Maggie (मिक्स वेज मैगी)", category: "Fast Food", price: 30, variants: { half: 30, full: 50 }, image: "https://images.unsplash.com/photo-1569718212165-3a8278d5f624?auto=format&fit=crop&w=300&q=80", isVisible: true },
+      { name: "Pasta (पास्ता)", category: "Fast Food", price: 30, variants: { half: 30, full: 50 }, image: "https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?auto=format&fit=crop&w=300&q=80", isVisible: true },
+      { name: "Finger Chips (फिंगर चिप्स)", category: "Fast Food", price: 30, variants: { half: 30, full: 50 }, image: "https://images.unsplash.com/photo-1573080496219-bb080dd4f877?auto=format&fit=crop&w=300&q=80", isVisible: true },
+      { name: "Momos (मोमोस्)", category: "Fast Food", price: 30, variants: { half: 30, full: 50 }, image: "https://images.unsplash.com/photo-1534422298391-e4f8c172dddb?auto=format&fit=crop&w=300&q=80", isVisible: true },
+      { name: "Bombe Bhel (बॉम्बे भेल)", category: "Fast Food", price: 30, variants: { half: 30, full: 50 }, image: "https://images.unsplash.com/photo-1589301760014-d929f3979dbc?auto=format&fit=crop&w=300&q=80", isVisible: true },
+      { name: "Indori Poha (पोहा इंदौरी)", category: "Fast Food", price: 30, image: "https://images.unsplash.com/photo-1601050690597-df056fb4ce78?auto=format&fit=crop&w=300&q=80", isVisible: true },
+      { name: "Tikki Chaat (टिक्की चाट)", category: "Fast Food", price: 30, variants: { half: 30, full: 30 }, image: "https://images.unsplash.com/photo-1601050690597-df056fb4ce78?auto=format&fit=crop&w=300&q=80", isVisible: true },
+      { name: "Kachori Chhat (कचोरी चाट)", category: "Fast Food", price: 30, variants: { half: 30, full: 30 }, image: "https://images.unsplash.com/photo-1601050690597-df056fb4ce78?auto=format&fit=crop&w=300&q=80", isVisible: true },
+      { name: "Cheese Garlic Bread (चीस गालिक ब्रेड)", category: "Fast Food", price: 60, image: "https://images.unsplash.com/photo-1573140247632-f8fd74997d5c?auto=format&fit=crop&w=300&q=80", isVisible: true },
+      { name: "Burger (बर्गर)", category: "Fast Food", price: 30, image: "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=300&q=80", isVisible: true },
+      { name: "Cheese Burger (चीस बर्गर)", category: "Fast Food", price: 40, image: "https://images.unsplash.com/photo-1521305916504-4a1121188589?auto=format&fit=crop&w=300&q=80", isVisible: true },
+      { name: "Paneer Sandwich (पनीर सैंडविच)", category: "Fast Food", price: 80, image: "https://images.unsplash.com/photo-1528735602780-2552fd46c7af?auto=format&fit=crop&w=300&q=80", isVisible: true },
+      { name: "Veg Cheese Sandwich (वेज चीस सैंडविच)", category: "Fast Food", price: 60, image: "https://images.unsplash.com/photo-1528735602780-2552fd46c7af?auto=format&fit=crop&w=300&q=80", isVisible: true },
+      { name: "Veg Spring Roll (वेज स्प्रिंग रोल)", category: "Fast Food", price: 50, image: "https://images.unsplash.com/photo-1541532713592-79a0317b6b77?auto=format&fit=crop&w=300&q=80", isVisible: true },
+      { name: "Manchuriyan (मंचुरियन)", category: "Fast Food", price: 30, variants: { half: 30, full: 50 }, image: "https://images.unsplash.com/photo-1512058564366-18510be2db19?auto=format&fit=crop&w=300&q=80", isVisible: true },
+      { name: "Manchuriyan Rice (मंचुरियन फ्राय राइस)", category: "Fast Food", price: 30, variants: { half: 30, full: 50 }, image: "https://images.unsplash.com/photo-1512058564366-18510be2db19?auto=format&fit=crop&w=300&q=80", isVisible: true },
+      { name: "Chawmeen (चाउमीन)", category: "Fast Food", price: 30, variants: { half: 30, full: 50 }, image: "https://images.unsplash.com/photo-1585032226651-759b368d7246?auto=format&fit=crop&w=300&q=80", isVisible: true },
+      { name: "Chines Samosa (चायनीस समोसा)", category: "Fast Food", price: 30, image: "https://images.unsplash.com/photo-1601050690597-df056fb4ce78?auto=format&fit=crop&w=300&q=80", isVisible: true },
+      { name: "Masala Dosa (मसाला डोसा)", category: "Fast Food", price: 30, image: "https://images.unsplash.com/photo-1589301760014-d929f3979dbc?auto=format&fit=crop&w=300&q=80", isVisible: true },
+      { name: "Masala Uttapam (मसाला उत्तपम्)", category: "Fast Food", price: 50, image: "https://images.unsplash.com/photo-1589301760014-d929f3979dbc?auto=format&fit=crop&w=300&q=80", isVisible: true },
+
+      // Page 3: Cool Cool Drinks
+      { name: "Cold Coffee (कोल्ड कॉफी)", category: "Super Cool", price: 50, image: "https://images.unsplash.com/photo-1517701604599-bb29b565090c?auto=format&fit=crop&w=300&q=80", isVisible: true },
+      { name: "Chocolatey Cold Coffee", category: "Super Cool", price: 60, image: "https://images.unsplash.com/photo-1541167760496-1628856ab772?auto=format&fit=crop&w=300&q=80", isVisible: true },
+      { name: "Mango Shake (मैगो शेक)", category: "Super Cool", price: 60, image: "https://images.unsplash.com/photo-1571006831117-f582da1551a3?auto=format&fit=crop&w=300&q=80", isVisible: true },
+      { name: "Black Currant (ब्लैक करंट शेक)", category: "Super Cool", price: 60, image: "https://images.unsplash.com/photo-1571006831117-f582da1551a3?auto=format&fit=crop&w=300&q=80", isVisible: true },
+      { name: "Blueberry Shake (ब्लूवेरी शेक)", category: "Super Cool", price: 60, image: "https://images.unsplash.com/photo-1571006831117-f582da1551a3?auto=format&fit=crop&w=300&q=80", isVisible: true },
+      { name: "Strawberry Shake (स्ट्रोवेरी शेक)", category: "Super Cool", price: 60, image: "https://images.unsplash.com/photo-1571006831117-f582da1551a3?auto=format&fit=crop&w=300&q=80", isVisible: true },
+      { name: "Chocolate Shake (चॉकलेट शेक)", category: "Super Cool", price: 70, image: "https://images.unsplash.com/photo-1571006831117-f582da1551a3?auto=format&fit=crop&w=300&q=80", isVisible: true },
+      { name: "Virgin Mojito (वर्जिन मोजिटो)", category: "Super Cool", price: 60, image: "https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?auto=format&fit=crop&w=300&q=80", isVisible: true },
+      { name: "Blue Lagoon (ब्लू लैगून)", category: "Super Cool", price: 90, image: "https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?auto=format&fit=crop&w=300&q=80", isVisible: true },
+      { name: "Spiced Jaljeera (जलजीरा)", category: "Super Cool", price: 50, image: "https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?auto=format&fit=crop&w=300&q=80", isVisible: true },
+      { name: "Kala Khatta Fizz (काला खट्टा)", category: "Super Cool", price: 60, image: "https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?auto=format&fit=crop&w=300&q=80", isVisible: true },
+      { name: "Cold Drinks (कोल्ड ड्रिंक्स)", category: "Super Cool", price: 30, image: "https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?auto=format&fit=crop&w=300&q=80", isVisible: true },
+      { name: "Bottled Water (बोतलबंद पानी)", category: "Super Cool", price: 20, image: "https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?auto=format&fit=crop&w=300&q=80", isVisible: true },
+      { name: "Special Lassi (स्पेशल लस्सी)", category: "Super Cool", price: 30, image: "https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?auto=format&fit=crop&w=300&q=80", isVisible: true },
+      { name: "Flavored Lassi (फ्लेवर्ड लस्सी)", category: "Super Cool", price: 40, image: "https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?auto=format&fit=crop&w=300&q=80", isVisible: true },
+      { name: "Fruits Lassi (ड्राईफ्रूट लस्सी)", category: "Super Cool", price: 50, image: "https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?auto=format&fit=crop&w=300&q=80", isVisible: true },
+
+      // Page 4: Pizza with 4 sizes
+      { name: "Cheese Corn Pizza", category: "Special Pizza", price: 80, variants: { Small: 80, Medium: 110, Large: 140, "Extra Large": 180 }, image: "https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=300&q=80", isVisible: true },
+      { name: "Cheese Onion Pizza", category: "Special Pizza", price: 80, variants: { Small: 80, Medium: 110, Large: 140, "Extra Large": 180 }, image: "https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=300&q=80", isVisible: true },
+      { name: "Cheese Capsicum Pizza", category: "Special Pizza", price: 80, variants: { Small: 80, Medium: 110, Large: 140, "Extra Large": 180 }, image: "https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=300&q=80", isVisible: true },
+      { name: "Mix Veg Cheese Pizza", category: "Special Pizza", price: 90, variants: { Small: 90, Medium: 120, Large: 160, "Extra Large": 200 }, image: "https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=300&q=80", isVisible: true },
+      { name: "Mix Veg Paneer Pizza", category: "Special Pizza", price: 100, variants: { Small: 100, Medium: 140, Large: 180, "Extra Large": 250 }, image: "https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=300&q=80", isVisible: true },
+      { name: "Paneer Makhani Pizza", category: "Special Pizza", price: 140, variants: { Medium: 140, Large: 180 }, image: "https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=300&q=80", isVisible: true },
+      { name: "Super Deluxe Pizza", category: "Special Pizza", price: 180, variants: { Medium: 180, Large: 200 }, image: "https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=300&q=80", isVisible: true },
+      { name: "Farmhouse Pizza", category: "Special Pizza", price: 320, variants: { Medium: 320, Large: 350 }, image: "https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=300&q=80", isVisible: true },
+      { name: "Tandoori Paneer Pizza", category: "Special Pizza", price: 280, variants: { Medium: 280, Large: 300 }, image: "https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=300&q=80", isVisible: true },
+      { name: "Bum Bum Cafe Special Pizza", category: "Special Pizza", price: 200, variants: { Medium: 200, Large: 250 }, image: "https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=300&q=80", isVisible: true },
+
+      // Page 5: Thali
+      { name: "Bum Bum Cafe Special Thali Fix", category: "Special Thali", price: 200, image: "https://images.unsplash.com/photo-1626777552726-4a6b54c97e46?auto=format&fit=crop&w=300&q=80", isVisible: true },
+      { name: "Bum Bum Cafe Mini Thali Fix", category: "Special Thali", price: 170, image: "https://images.unsplash.com/photo-1626777552726-4a6b54c97e46?auto=format&fit=crop&w=300&q=80", isVisible: true },
+      { name: "Special Thali Fix", category: "Special Thali", price: 90, image: "https://images.unsplash.com/photo-1626777552726-4a6b54c97e46?auto=format&fit=crop&w=300&q=80", isVisible: true },
+      { name: "Special Desi Thali Fix", category: "Special Thali", price: 100, image: "https://images.unsplash.com/photo-1626777552726-4a6b54c97e46?auto=format&fit=crop&w=300&q=80", isVisible: true },
+      { name: "Desi Dal Rice Papad Combo", category: "Special Thali", price: 60, image: "https://images.unsplash.com/photo-1626777552726-4a6b54c97e46?auto=format&fit=crop&w=300&q=80", isVisible: true },
+      { name: "Jeera Rice, Dal Fry Combo", category: "Special Thali", price: 110, image: "https://images.unsplash.com/photo-1626777552726-4a6b54c97e46?auto=format&fit=crop&w=300&q=80", isVisible: true },
+      { name: "Special Khichdi - Dahi Combo", category: "Special Thali", price: 90, image: "https://images.unsplash.com/photo-1626777552726-4a6b54c97e46?auto=format&fit=crop&w=300&q=80", isVisible: true },
+      { name: "Sukhi Bhaji Puri Combo", category: "Special Thali", price: 70, image: "https://images.unsplash.com/photo-1626777552726-4a6b54c97e46?auto=format&fit=crop&w=300&q=80", isVisible: true },
+      { name: "Chole Bhature (छोले भटूरे)", category: "Special Thali", price: 60, image: "https://images.unsplash.com/photo-1626777552726-4a6b54c97e46?auto=format&fit=crop&w=300&q=80", isVisible: true },
+      { name: "Sabudana Khichdi - Dahi Combo", category: "Special Thali", price: 60, image: "https://images.unsplash.com/photo-1626777552726-4a6b54c97e46?auto=format&fit=crop&w=300&q=80", isVisible: true },
+      { name: "Sabudana Bada - Dahi Combo", category: "Special Thali", price: 60, image: "https://images.unsplash.com/photo-1626777552726-4a6b54c97e46?auto=format&fit=crop&w=300&q=80", isVisible: true },
+      { name: "4-Thepla, Curd, Pickle Combo", category: "Special Thali", price: 80, image: "https://images.unsplash.com/photo-1626777552726-4a6b54c97e46?auto=format&fit=crop&w=300&q=80", isVisible: true },
+
+      // Page 6: Paneer Special
+      { name: "Paneer Tikka Masala", category: "Paneer Special", price: 100, variants: { half: 100, full: 150 }, image: "https://images.unsplash.com/photo-1631452180519-c014fe946bc7?auto=format&fit=crop&w=300&q=80", isVisible: true },
+      { name: "Paneer Butter Masala", category: "Paneer Special", price: 110, variants: { half: 110, full: 160 }, image: "https://images.unsplash.com/photo-1631452180519-c014fe946bc7?auto=format&fit=crop&w=300&q=80", isVisible: true },
+      { name: "Paneer Kadhai Masala", category: "Paneer Special", price: 100, variants: { half: 100, full: 150 }, image: "https://images.unsplash.com/photo-1631452180519-c014fe946bc7?auto=format&fit=crop&w=300&q=80", isVisible: true },
+      { name: "Paneer Tufani", category: "Paneer Special", price: 100, variants: { half: 100, full: 150 }, image: "https://images.unsplash.com/photo-1631452180519-c014fe946bc7?auto=format&fit=crop&w=300&q=80", isVisible: true },
+      { name: "Mutter Paneer Masala", category: "Paneer Special", price: 100, variants: { half: 100, full: 150 }, image: "https://images.unsplash.com/photo-1631452180519-c014fe946bc7?auto=format&fit=crop&w=300&q=80", isVisible: true },
+      { name: "Shahi Paneer Masala", category: "Paneer Special", price: 120, variants: { half: 120, full: 170 }, image: "https://images.unsplash.com/photo-1631452180519-c014fe946bc7?auto=format&fit=crop&w=300&q=80", isVisible: true },
+      { name: "Kaju Paneer Masala", category: "Paneer Special", price: 140, variants: { half: 140, full: 200 }, image: "https://images.unsplash.com/photo-1631452180519-c014fe946bc7?auto=format&fit=crop&w=300&q=80", isVisible: true },
+      { name: "Palak Paneer", category: "Paneer Special", price: 110, variants: { half: 110, full: 160 }, image: "https://images.unsplash.com/photo-1631452180519-c014fe946bc7?auto=format&fit=crop&w=300&q=80", isVisible: true },
+
+      // Page 6: Special Mix Veg
+      { name: "Mix Veg Masala", category: "Special Mix veg", price: 90, variants: { half: 90, full: 130 }, image: "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=300&q=80", isVisible: true },
+      { name: "Veg Tufani", category: "Special Mix veg", price: 90, variants: { half: 90, full: 130 }, image: "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=300&q=80", isVisible: true },
+      { name: "Veg Kadhai", category: "Special Mix veg", price: 80, variants: { half: 80, full: 120 }, image: "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=300&q=80", isVisible: true },
+      { name: "Alo Gobhi Mutter", category: "Special Mix veg", price: 70, variants: { half: 70, full: 110 }, image: "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=300&q=80", isVisible: true },
+      { name: "Sev Tomato", category: "Special Mix veg", price: 70, variants: { half: 70, full: 110 }, image: "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=300&q=80", isVisible: true },
+      { name: "Sev Bhaji", category: "Special Mix veg", price: 80, variants: { half: 80, full: 130 }, image: "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=300&q=80", isVisible: true },
+      { name: "Kaju Gathiya", category: "Special Mix veg", price: 100, variants: { half: 100, full: 150 }, image: "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=300&q=80", isVisible: true },
+      { name: "Jwadi Dhokli", category: "Special Mix veg", price: 80, variants: { half: 80, full: 140 }, image: "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=300&q=80", isVisible: true },
+      { name: "Baigan Bharta", category: "Special Mix veg", price: 70, variants: { half: 70, full: 100 }, image: "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=300&q=80", isVisible: true },
+      { name: "Dal Fry", category: "Special Mix veg", price: 60, variants: { half: 60, full: 90 }, image: "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=300&q=80", isVisible: true },
+      { name: "Dal Tadka", category: "Special Mix veg", price: 80, variants: { half: 80, full: 120 }, image: "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=300&q=80", isVisible: true },
+
+      // Page 7: Indian Bread
+      { name: "Phulka Roti", category: "Indian Bread", price: 10, variants: { Plain: 10, Butter: 10 }, image: "https://images.unsplash.com/photo-1589301760014-d929f3979dbc?auto=format&fit=crop&w=300&q=80", isVisible: true },
+      { name: "Tawa Paratha", category: "Indian Bread", price: 15, variants: { Plain: 15, Butter: 20 }, image: "https://images.unsplash.com/photo-1589301760014-d929f3979dbc?auto=format&fit=crop&w=300&q=80", isVisible: true },
+      { name: "Lachha Paratha", category: "Indian Bread", price: 25, variants: { Plain: 25, Butter: 30 }, image: "https://images.unsplash.com/photo-1589301760014-d929f3979dbc?auto=format&fit=crop&w=300&q=80", isVisible: true },
+      { name: "Thepla/Methi Paratha", category: "Indian Bread", price: 15, variants: { Plain: 15, Butter: 20 }, image: "https://images.unsplash.com/photo-1589301760014-d929f3979dbc?auto=format&fit=crop&w=300&q=80", isVisible: true },
+      { name: "Roti Tandoor", category: "Indian Bread", price: 15, variants: { Plain: 15, Butter: 20 }, image: "https://images.unsplash.com/photo-1589301760014-d929f3979dbc?auto=format&fit=crop&w=300&q=80", isVisible: true },
+      { name: "Naan Tandoor", category: "Indian Bread", price: 25, variants: { Plain: 25, Butter: 30 }, image: "https://images.unsplash.com/photo-1589301760014-d929f3979dbc?auto=format&fit=crop&w=300&q=80", isVisible: true },
+      { name: "Aloo Paratha", category: "Indian Bread", price: 30, variants: { Plain: 30, Butter: 40 }, image: "https://images.unsplash.com/photo-1589301760014-d929f3979dbc?auto=format&fit=crop&w=300&q=80", isVisible: true },
+      { name: "Aloo Gobhi Paratha", category: "Indian Bread", price: 30, variants: { Plain: 30, Butter: 40 }, image: "https://images.unsplash.com/photo-1589301760014-d929f3979dbc?auto=format&fit=crop&w=300&q=80", isVisible: true },
+      { name: "Cheese Onion Garlic", category: "Indian Bread", price: 50, variants: { Plain: 50, Butter: 60 }, image: "https://images.unsplash.com/photo-1589301760014-d929f3979dbc?auto=format&fit=crop&w=300&q=80", isVisible: true },
+      { name: "Paneer Paratha", category: "Indian Bread", price: 50, variants: { Plain: 50, Butter: 60 }, image: "https://images.unsplash.com/photo-1589301760014-d929f3979dbc?auto=format&fit=crop&w=300&q=80", isVisible: true },
+      { name: "Rosted Papad", category: "Indian Bread", price: 10, image: "https://images.unsplash.com/photo-1589301760014-d929f3979dbc?auto=format&fit=crop&w=300&q=80", isVisible: true },
+      { name: "Masala Papad", category: "Indian Bread", price: 20, image: "https://images.unsplash.com/photo-1589301760014-d929f3979dbc?auto=format&fit=crop&w=300&q=80", isVisible: true },
+      { name: "Fry Papad", category: "Indian Bread", price: 15, image: "https://images.unsplash.com/photo-1589301760014-d929f3979dbc?auto=format&fit=crop&w=300&q=80", isVisible: true },
+
+      // Page 7: Special Rice
+      { name: "Plain Rice (सादा चावल)", category: "Special Rice", price: 50, variants: { half: 50, full: 70 }, image: "https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?auto=format&fit=crop&w=300&q=80", isVisible: true },
+      { name: "Jeera Rice (जीरा राइस)", category: "Special Rice", price: 70, variants: { half: 70, full: 100 }, image: "https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?auto=format&fit=crop&w=300&q=80", isVisible: true },
+      { name: "Veg Pulao (वेज पुलाव)", category: "Special Rice", price: 100, variants: { half: 100, full: 120 }, image: "https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?auto=format&fit=crop&w=300&q=80", isVisible: true },
+      { name: "Veg Biryani (वेज बिरयानी)", category: "Special Rice", price: 110, variants: { half: 110, full: 130 }, image: "https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?auto=format&fit=crop&w=300&q=80", isVisible: true },
+      { name: "Masala Rice (मसाला राइस)", category: "Special Rice", price: 80, variants: { half: 80, full: 110 }, image: "https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?auto=format&fit=crop&w=300&q=80", isVisible: true }
+    ];
 
     try {
-      await addDoc(collection(db, "products"), productData);
-      toast.success("New Item Added!");
-      setNewName(""); setNewPrice(""); setNewImage(""); setVariantType('none');
-      setHalfPrice(""); setFullPrice(""); setPriceSmall(""); setPriceMedium(""); setPriceLarge(""); setPriceXL("");
-      setShowAddForm(false);
-    } catch (error) {
-      toast.error("Error adding product");
-    }
-  };
-
-  // --- EDIT PRODUCT LOGIC ---
-  const startEditing = (item: any) => {
-    setEditingProduct(item);
-    setEditName(item.name);
-    setEditPrice(item.price || "");
-    setEditCategory(item.category);
-    setEditImage(item.image);
-    if (item.variants) {
-      const keys = Object.keys(item.variants);
-      if (keys.includes('Small')) {
-        setEditVariantType('pizza_sizes');
-        setEditPriceSmall(item.variants.Small || "");
-        setEditPriceMedium(item.variants.Medium || "");
-        setEditPriceLarge(item.variants.Large || "");
-        setEditPriceXL(item.variants["Extra Large"] || "");
-      } else if (keys.includes('Plain')) {
-        setEditVariantType('plain_butter');
-        setEditHalfPrice(item.variants.Plain || "");
-        setEditFullPrice(item.variants.Butter || "");
-      } else {
-        setEditVariantType('half_full');
-        setEditHalfPrice(item.variants.half || "");
-        setEditFullPrice(item.variants.full || "");
+      for (const item of defaultMenu) {
+        await addDoc(collection(db, "products"), item);
       }
-    } else {
-      setEditVariantType('none');
+      toast.dismiss("import");
+      toast.success("All 80+ PDF menu items imported successfully!");
+    } catch (e) {
+      toast.dismiss("import");
+      toast.error("Error seeding PDF items");
     }
   };
 
+  // --- EDIT & UPDATE PROCESSORS ---
   const handleUpdateProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editName || !editCategory || !editImage) {
-      return toast.error("Please fill all fields!");
+      return toast.error("Please fill all required fields!");
     }
 
     let updatedData: any = {
@@ -437,11 +514,11 @@ export default function AdminDashboard() {
     };
 
     if (editVariantType === 'half_full') {
-      if (!editHalfPrice || !editFullPrice) return toast.error("Please enter prices!");
+      if (!editHalfPrice || !editFullPrice) return toast.error("Please enter both variant prices!");
       updatedData.variants = { half: Number(editHalfPrice), full: Number(editFullPrice) };
       updatedData.price = Number(editHalfPrice);
     } else if (editVariantType === 'plain_butter') {
-      if (!editHalfPrice || !editFullPrice) return toast.error("Please enter prices!");
+      if (!editHalfPrice || !editFullPrice) return toast.error("Please enter both variant prices!");
       updatedData.variants = { Plain: Number(editHalfPrice), Butter: Number(editFullPrice) };
       updatedData.price = Number(editHalfPrice);
     } else if (editVariantType === 'pizza_sizes') {
@@ -486,7 +563,7 @@ export default function AdminDashboard() {
         </div>
       </header>
 
-      {/* --- EXTENDED RESPONSIVE HORIZONTAL TABS --- */}
+      {/* --- RESPONSIVE HORIZONTAL TABS --- */}
       <div className="p-4 flex gap-2 overflow-x-auto no-scrollbar border-b border-white/5">
         <button onClick={() => setTab('dashboard')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'dashboard' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>📊 Dashboard</button>
         <button onClick={() => setTab('orders')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'orders' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>📦 Orders ({orders.length})</button>
@@ -739,16 +816,16 @@ export default function AdminDashboard() {
                 {(editVariantType === 'half_full' || editVariantType === 'plain_butter') && (
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Half / Plain Price (₹)</label><input type="number" placeholder="Price" value={editHalfPrice} onChange={(e) => setEditHalfPrice(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" /></div>
-                    <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Full / Butter Price (₹)</label><input type="number" placeholder="Price" value={editFullPrice} onChange={(e) => setEditFullPrice(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" /></div>
+                    <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Full / Butter Price (₹)</label><input type="number" placeholder="Price" value={editFullPrice} onChange={(e) => setEditFullPrice(e.target.value)} className="w-full bg-[#111]/30 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" /></div>
                   </div>
                 )}
 
                 {editVariantType === 'pizza_sizes' && (
                   <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Small Price (₹)</label><input type="number" placeholder="Small price" value={editPriceSmall} onChange={(e) => setEditPriceSmall(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" /></div>
-                    <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Medium Price (₹)</label><input type="number" placeholder="Medium price" value={editPriceMedium} onChange={(e) => setEditPriceMedium(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" /></div>
-                    <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Large Price (₹)</label><input type="number" placeholder="Large price" value={editPriceLarge} onChange={(e) => setEditPriceLarge(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" /></div>
-                    <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Extra Large Price (₹)</label><input type="number" placeholder="XL price" value={editPriceXL} onChange={(e) => setEditPriceXL(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" /></div>
+                    <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Small Price (₹)</label><input type="number" placeholder="Small price" value={editPriceSmall} onChange={(e) => setEditPriceSmall(e.target.value)} className="w-full bg-[#111]/30 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" /></div>
+                    <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Medium Price (₹)</label><input type="number" placeholder="Medium price" value={editPriceMedium} onChange={(e) => setEditPriceMedium(e.target.value)} className="w-full bg-[#111]/30 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" /></div>
+                    <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Large Price (₹)</label><input type="number" placeholder="Large price" value={editPriceLarge} onChange={(e) => setEditPriceLarge(e.target.value)} className="w-full bg-[#111]/30 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" /></div>
+                    <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Extra Large Price (₹)</label><input type="number" placeholder="XL price" value={editPriceXL} onChange={(e) => setEditPriceXL(e.target.value)} className="w-full bg-[#111]/30 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" /></div>
                   </div>
                 )}
 
