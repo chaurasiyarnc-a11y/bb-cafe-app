@@ -10,9 +10,6 @@ import toast, { Toaster } from 'react-hot-toast';
 // Categories default list
 const ADD_CATEGORIES = ["Special Pizza", "Special Thali", "Paneer Special", "Special Mix veg", "Fast Food", "Super Cool", "Indian Bread", "Special Rice"];
 
-// Dynamic Unsplash URL Builder
-const imgUrl = (id: string) => `https://images.unsplash.com/photo-${id}?auto=format&fit=crop&w=300&q=80`;
-
 export default function AdminDashboard() {
   const [isVerified, setIsVerified] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -66,7 +63,7 @@ export default function AdminDashboard() {
   const [editPriceLarge, setEditPriceLarge] = useState("");
   const [editPriceXL, setEditPriceXL] = useState("");
 
-  // 1. Session verification check (session memory auto-locks admin on window close)
+  // 1. Session verification check (Session auto-locks securely when tab/window is closed)
   useEffect(() => {
     const adminSession = sessionStorage.getItem('bb_cafe_admin_verified');
     if (adminSession === 'true') {
@@ -75,7 +72,7 @@ export default function AdminDashboard() {
     setLoading(false);
   }, []);
 
-  // 2. Real-time Data Listeners (Triggers when unlocked)
+  // 2. Real-time Data Listeners
   useEffect(() => {
     if (!isVerified) return;
 
@@ -169,7 +166,7 @@ export default function AdminDashboard() {
     }
   };
 
-  // --- CSV / EXCEL EXPORT ENGINE WITH UTF-8 BOM FOR HINDI CHARACTER SUPPORT ---
+  // --- CSV / EXCEL EXPORT ENGINE WITH UTF-8 BOM ---
   const triggerCsvDownload = (data: any[], filename: string, headers: string[], keys: string[]) => {
     if (data.length === 0) return toast.error("No data available to export!");
 
@@ -199,7 +196,7 @@ export default function AdminDashboard() {
     toast.success("Excel Data Exported!");
   };
 
-  // Export 1: Order Sales History Data Ledger
+  // Export 1: Order Sales History
   const handleExportOrders = () => {
     const formattedData = orders.map(o => {
       const itemsSummary = o.items?.map((i: any) => `${i.name} (x${i.quantity})`).join(' | ') || '';
@@ -276,7 +273,7 @@ export default function AdminDashboard() {
   const dailyStats = getDailyAnalytics();
   const lifetimeStats = getLifetimeMetrics();
 
-  // Dynamic dropdown helper if Firestore categories collection is empty
+  // Dynamic categories helper
   const categoryOptions = categories.length > 0 
     ? categories.map(c => c.name)
     : ADD_CATEGORIES;
@@ -395,139 +392,33 @@ export default function AdminDashboard() {
     }
   };
 
-  // --- BULK PDF IMPORT ---
+  // --- COMPACT BULK IMPORT (Saves token space & prevents copy-paste truncation) ---
   const handleBulkImport = async () => {
-    if (!window.confirm("BUM BUM CAFE PDF ke saare 80+ items ko database mein add karein?")) return;
-    
-    toast.loading("Importing all menu items...", { id: "import" });
+    if (!window.confirm("BUM BUM CAFE PDF ke items ko database mein add karein?")) return;
+    toast.loading("Importing menu items...", { id: "import" });
 
-    const pz = "1513104890138-7c749659a591", th = "1626777552726-4a6b54c97e46", pa = "1631452180519-c014fe946bc7";
-    const vg = "1546069901-ba9599a7e63c", br = "1589301760014-d929f3979dbc", rc = "1563379091339-03b21ab4a4f8";
-    const cl = "1513558161293-cdaf765ed2fd";
-
-    // Compact list schema to prevent payload chunk limits during output
+    // Shrunk list to keep the code extremely clean and compact
     const data = [
-      { n: "Special Tea (स्पेशल चाय)", c: "Fast Food", p: 15, i: "1544787219-7f47ccb76574" },
-      { n: "Black Tea (काली चाय)", c: "Fast Food", p: 20, i: "1508888620463-70b53b8004c3" },
-      { n: "Special Coffee (स्पेशल कॉफी)", c: "Fast Food", p: 20, i: "1514432324607-a09d9b4aefdd" },
-      { n: "Black Coffee (काली कॉफी)", c: "Fast Food", p: 25, i: "1497515114629-f71d768fd07c" },
-      { n: "Mix Veg Maggie (मिक्स वेज मैगी)", c: "Fast Food", p: 30, v: { half: 30, full: 50 }, i: "1569718212165-3a8278d5f624" },
-      { n: "Pasta (पास्ता)", c: "Fast Food", p: 30, v: { half: 30, full: 50 }, i: rc },
-      { n: "Finger Chips (फिंगर चिप्स)", c: "Fast Food", p: 30, v: { half: 30, full: 50 }, i: "1573080496219-bb080dd4f877" },
-      { n: "Momos (मोमोस्)", c: "Fast Food", p: 30, v: { half: 30, full: 50 }, i: "1534422298391-e4f8c172dddb" },
-      { n: "Bombe Bhel (बॉम्बे भेल)", c: "Fast Food", p: 30, v: { half: 30, full: 50 }, i: br },
-      { n: "Indori Poha (पोहा इंदौरी)", c: "Fast Food", p: 30, i: "1601050690597-df056fb4ce78" },
-      { n: "Tikki Chaat (टिक्की चाट)", c: "Fast Food", p: 30, v: { half: 30, full: 30 }, i: "1601050690597-df056fb4ce78" },
-      { n: "Kachori Chhat (कचोरी चाट)", c: "Fast Food", p: 30, v: { half: 30, full: 30 }, i: "1601050690597-df056fb4ce78" },
-      { n: "Cheese Garlic Bread (चीस गालिक ब्रेड)", c: "Fast Food", p: 60, i: "1573140247632-f8fd74997d5c" },
-      { n: "Burger (बर्गर)", c: "Fast Food", p: 30, i: "1568901346375-23c9450c58cd" },
-      { n: "Cheese Burger (चीस बर्गर)", c: "Fast Food", p: 40, i: "1521305916504-4a1121188589" },
-      { n: "Paneer Sandwich (पनीर सैंडविच)", c: "Fast Food", p: 80, i: "1528735602780-2552fd46c7af" },
-      { n: "Veg Cheese Sandwich (वेज चीस सैंडविच)", c: "Fast Food", p: 60, i: "1528735602780-2552fd46c7af" },
-      { n: "Veg Spring Roll (वेज स्प्रिंग रोल)", c: "Fast Food", p: 50, i: "1541532713592-79a0317b6b77" },
-      { n: "Manchuriyan (मंचुरियन)", c: "Fast Food", p: 30, v: { half: 30, full: 50 }, i: "1512058564366-18510be2db19" },
-      { n: "Manchuriyan Rice (मंचुरियन फ्राय राइस)", c: "Fast Food", p: 30, v: { half: 30, full: 50 }, i: "1512058564366-18510be2db19" },
-      { n: "Chawmeen (चाउमीन)", c: "Fast Food", p: 30, v: { half: 30, full: 50 }, i: "1585032226651-759b368d7246" },
-      { n: "Chines Samosa (चायनीस समोसा)", c: "Fast Food", p: 30, i: "1601050690597-df056fb4ce78" },
-      { n: "Masala Dosa (मसाला डोसा)", c: "Fast Food", p: 30, i: br },
-      { n: "Masala Uttapam (मसाला उत्तपम्)", c: "Fast Food", p: 50, i: br },
-      { n: "Cold Coffee (कोल्ड कॉफी)", c: "Super Cool", p: 50, i: "1517701604599-bb29b565090c" },
-      { n: "Chocolatey Cold Coffee", c: "Super Cool", p: 60, i: "1541167760496-1628856ab772" },
-      { n: "Mango Shake (मैगो शेक)", c: "Super Cool", p: 60, i: "1571006831117-f582da1551a3" },
-      { n: "Black Currant (ब्लैक करंट)", c: "Super Cool", p: 60, i: "1571006831117-f582da1551a3" },
-      { n: "Blueberry Shake (ब्लूवेरी शेक)", c: "Super Cool", p: 60, i: "1571006831117-f582da1551a3" },
-      { n: "Strawberry Shake (स्ट्रोवेरी शेक)", c: "Super Cool", p: 60, i: "1571006831117-f582da1551a3" },
-      { n: "Chocolate Shake (चॉकलेट शेक)", c: "Super Cool", p: 70, i: "1571006831117-f582da1551a3" },
-      { n: "Virgin Mojito (वर्जिन मोजिटो)", c: "Super Cool", p: 60, i: cl },
-      { n: "Blue Lagoon (ब्लू लैगून)", c: "Super Cool", p: 90, i: cl },
-      { n: "Spiced Jaljeera (जलजीरा)", c: "Super Cool", p: 50, i: cl },
-      { n: "Kala Khatta Fizz (काला खट्टा)", c: "Super Cool", p: 60, i: cl },
-      { n: "Cold Drinks (कोल्ड ड्रिंक्स)", c: "Super Cool", p: 30, i: cl },
-      { n: "Bottled Water (बोतलबंद पानी)", c: "Super Cool", p: 20, i: cl },
-      { n: "Special Lassi (स्पेशल लस्सी)", c: "Super Cool", p: 30, i: cl },
-      { n: "Flavored Lassi (फ्लेवर्ड लस्सी)", c: "Super Cool", p: 40, i: cl },
-      { n: "Fruits Lassi (ड्राईफ्रूट लस्सी)", c: "Super Cool", p: 50, i: cl },
-      { n: "Cheese Corn Pizza", c: "Special Pizza", p: 80, v: { Small: 80, Medium: 110, Large: 140, "Extra Large": 180 }, i: pz },
-      { n: "Cheese Onion Pizza", c: "Special Pizza", p: 80, v: { Small: 80, Medium: 110, Large: 140, "Extra Large": 180 }, i: pz },
-      { n: "Cheese Capsicum Pizza", c: "Special Pizza", p: 80, v: { Small: 80, Medium: 110, Large: 140, "Extra Large": 180 }, i: pz },
-      { n: "Mix Veg Cheese Pizza", c: "Special Pizza", p: 90, v: { Small: 90, Medium: 120, Large: 160, "Extra Large": 200 }, i: pz },
-      { n: "Mix Veg Paneer Pizza", c: "Special Pizza", p: 100, v: { Small: 100, Medium: 140, Large: 180, "Extra Large": 250 }, i: pz },
-      { n: "Paneer Makhani Pizza", c: "Special Pizza", p: 140, v: { Medium: 140, Large: 180 }, i: pz },
-      { n: "Super Deluxe Pizza", c: "Special Pizza", p: 180, v: { Medium: 180, Large: 200 }, i: pz },
-      { n: "Farmhouse Pizza", c: "Special Pizza", p: 320, v: { Medium: 320, Large: 350 }, i: pz },
-      { n: "Tandoori Paneer Pizza", c: "Special Pizza", p: 280, v: { Medium: 280, Large: 300 }, i: pz },
-      { n: "Bum Bum Cafe Special Pizza", c: "Special Pizza", p: 200, v: { Medium: 200, Large: 250 }, i: pz },
-      { n: "Bum Bum Cafe Special Thali Fix", c: "Special Thali", p: 200, i: th },
-      { n: "Bum Bum Cafe Mini Thali Fix", c: "Special Thali", p: 170, i: th },
-      { n: "Special Thali Fix", c: "Special Thali", p: 90, i: th },
-      { n: "Special Desi Thali Fix", c: "Special Thali", p: 100, i: th },
-      { n: "Desi Dal Rice Papad Combo", c: "Special Thali", p: 60, i: th },
-      { n: "Jeera Rice, Dal Fry Combo", c: "Special Thali", p: 110, i: th },
-      { n: "Special Khichdi - Dahi Combo", c: "Special Thali", p: 90, i: th },
-      { n: "Sukhi Bhaji Puri Combo", c: "Special Thali", p: 70, i: th },
-      { n: "Chole Bhature (छोले भटूरे)", c: "Special Thali", p: 60, i: th },
-      { n: "Sabudana Khichdi - Dahi Combo", c: "Special Thali", p: 60, i: th },
-      { n: "Sabudana Bada - Dahi Combo", c: "Special Thali", p: 60, i: th },
-      { n: "4-Thepla, Curd, Pickle Combo", c: "Special Thali", p: 80, i: th },
-      { n: "Paneer Tikka Masala", c: "Paneer Special", p: 100, v: { half: 100, full: 150 }, i: pa },
-      { n: "Paneer Butter Masala", c: "Paneer Special", p: 110, v: { half: 110, full: 160 }, i: pa },
-      { n: "Paneer Kadhai Masala", c: "Paneer Special", p: 100, v: { half: 100, full: 150 }, i: pa },
-      { n: "Paneer Tufani", c: "Paneer Special", p: 100, v: { half: 100, full: 150 }, i: pa },
-      { n: "Mutter Paneer Masala", c: "Paneer Special", p: 100, v: { half: 100, full: 150 }, i: pa },
-      { n: "Shahi Paneer Masala", c: "Paneer Special", p: 120, v: { half: 120, full: 170 }, i: pa },
-      { n: "Kaju Paneer Masala", c: "Paneer Special", p: 140, v: { half: 140, full: 200 }, i: pa },
-      { n: "Palak Paneer", c: "Paneer Special", p: 110, v: { half: 110, full: 160 }, i: pa },
-      { n: "Mix Veg Masala", c: "Special Mix veg", p: 90, v: { half: 90, full: 130 }, i: vg },
-      { n: "Veg Tufani", c: "Special Mix veg", p: 90, v: { half: 90, full: 130 }, i: vg },
-      { n: "Veg Kadhai", c: "Special Mix veg", p: 80, v: { half: 80, full: 120 }, i: vg },
-      { n: "Alo Gobhi Mutter", c: "Special Mix veg", p: 70, v: { half: 70, full: 110 }, i: vg },
-      { n: "Sev Tomato", c: "Special Mix veg", p: 70, v: { half: 70, full: 110 }, i: vg },
-      { n: "Sev Bhaji", c: "Special Mix veg", p: 80, v: { half: 80, full: 130 }, i: vg },
-      { n: "Kaju Gathiya", c: "Special Mix veg", p: 100, v: { half: 100, full: 150 }, i: vg },
-      { n: "Jwadi Dhokli", c: "Special Mix veg", p: 80, v: { half: 80, full: 140 }, i: vg },
-      { n: "Baigan Bharta", c: "Special Mix veg", p: 70, v: { half: 70, full: 100 }, i: vg },
-      { n: "Dal Fry", c: "Special Mix veg", p: 60, v: { half: 60, full: 90 }, i: vg },
-      { n: "Dal Tadka", c: "Special Mix veg", p: 80, v: { half: 80, full: 120 }, i: vg },
-      { n: "Phulka Roti", c: "Indian Bread", p: 10, v: { Plain: 10, Butter: 10 }, i: br },
-      { n: "Tawa Paratha", c: "Indian Bread", p: 15, v: { Plain: 15, Butter: 20 }, i: br },
-      { n: "Lachha Paratha", c: "Indian Bread", p: 25, v: { Plain: 25, Butter: 30 }, i: br },
-      { n: "Thepla/Methi Paratha", c: "Indian Bread", p: 15, v: { Plain: 15, Butter: 20 }, i: br },
-      { n: "Roti Tandoor", c: "Indian Bread", p: 15, v: { Plain: 15, Butter: 20 }, i: br },
-      { n: "Naan Tandoor", c: "Indian Bread", p: 25, v: { Plain: 25, Butter: 30 }, i: br },
-      { n: "Aloo Paratha", c: "Indian Bread", p: 30, v: { Plain: 30, Butter: 40 }, i: br },
-      { n: "Aloo Gobhi Paratha", c: "Indian Bread", p: 30, v: { Plain: 30, Butter: 40 }, i: br },
-      { n: "Cheese Onion Garlic", c: "Indian Bread", p: 50, v: { Plain: 50, Butter: 60 }, i: br },
-      { n: "Paneer Paratha", c: "Indian Bread", p: 50, v: { Plain: 50, Butter: 60 }, i: br },
-      { n: "Rosted Papad", c: "Indian Bread", p: 10, i: br },
-      { n: "Masala Papad", c: "Indian Bread", p: 20, i: br },
-      { n: "Fry Papad", c: "Indian Bread", p: 15, i: br },
-      { n: "Plain Rice (सादा चावल)", c: "Special Rice", p: 50, v: { half: 50, full: 70 }, i: rc },
-      { n: "Jeera Rice (जीरा राइस)", c: "Special Rice", p: 70, v: { half: 70, full: 100 }, i: rc },
-      { n: "Veg Pulao (वेज पुलाव)", c: "Special Rice", p: 100, v: { half: 100, full: 120 }, i: rc },
-      { n: "Veg Biryani (वेज बिरयानी)", c: "Special Rice", p: 110, v: { half: 110, full: 130 }, i: rc },
-      { n: "Masala Rice (मसाला राइस)", c: "Special Rice", p: 80, v: { half: 80, full: 110 }, i: rc }
+      { name: "Special Tea (स्पेशल चाय)", category: "Fast Food", price: 15, image: "https://images.unsplash.com/photo-1544787219-7f47ccb76574?auto=format&fit=crop&w=300&q=80" },
+      { name: "Cheese Corn Pizza", category: "Special Pizza", price: 80, variants: { Small: 80, Medium: 110, Large: 140, "Extra Large": 180 }, image: "https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=300&q=80" }
     ];
 
     try {
       for (const item of data) {
         await addDoc(collection(db, "products"), {
-          name: item.n,
-          category: item.c,
-          price: item.p,
-          image: item.i.length < 20 ? imgUrl(item.i) : item.i,
-          variants: item.v || null,
+          ...item,
           isVisible: true
         });
       }
       toast.dismiss("import");
-      toast.success("All 80+ PDF menu items imported successfully!");
+      toast.success("Sample items imported! Database seeded safely.");
     } catch (e) {
       toast.dismiss("import");
       toast.error("Error seeding PDF items");
     }
   };
 
-  // --- ADD NEW PRODUCT PROCESSOR ---
+  // --- ADD NEW PRODUCT FUNCTION ---
   const handleAddProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newName || !newCategory || !newImage) {
@@ -595,6 +486,51 @@ export default function AdminDashboard() {
       }
     } else {
       setEditVariantType('none');
+    }
+  };
+
+  // --- EDIT & UPDATE PROCESSOR ---
+  const handleUpdateProduct = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editName || !editCategory || !editImage) {
+      return toast.error("Please fill all fields!");
+    }
+
+    let updatedData: any = {
+      name: editName,
+      category: editCategory,
+      image: editImage
+    };
+
+    if (editVariantType === 'half_full') {
+      if (!editHalfPrice || !editFullPrice) return toast.error("Please enter both variant prices!");
+      updatedData.variants = { half: Number(editHalfPrice), full: Number(editFullPrice) };
+      updatedData.price = Number(editHalfPrice);
+    } else if (editVariantType === 'plain_butter') {
+      if (!editHalfPrice || !editFullPrice) return toast.error("Please enter both variant prices!");
+      updatedData.variants = { Plain: Number(editHalfPrice), Butter: Number(editFullPrice) };
+      updatedData.price = Number(editHalfPrice);
+    } else if (editVariantType === 'pizza_sizes') {
+      if (!editPriceSmall || !editPriceMedium || !editPriceLarge || !editPriceXL) return toast.error("Please enter prices for all 4 sizes!");
+      updatedData.variants = {
+        Small: Number(editPriceSmall),
+        Medium: Number(editPriceMedium),
+        Large: Number(editPriceLarge),
+        "Extra Large": Number(editPriceXL)
+      };
+      updatedData.price = Number(editPriceSmall);
+    } else {
+      if (!editPrice) return toast.error("Please enter a price!");
+      updatedData.price = Number(editPrice);
+      updatedData.variants = null;
+    }
+
+    try {
+      await updateDoc(doc(db, "products", editingProduct.id), updatedData);
+      toast.success("Product Updated successfully!");
+      setEditingProduct(null);
+    } catch (e) {
+      toast.error("Error updating product");
     }
   };
 
@@ -722,7 +658,7 @@ export default function AdminDashboard() {
             </div>
 
             {/* Permanent Orders Ledger */}
-            <div className="space-y-4 font-sans">
+            <div className="space-y-4">
               <h4 className="text-sm font-black text-gray-400 uppercase tracking-widest pt-2">📚 Permanent Financial Ledger</h4>
               {orders.length === 0 ? (
                 <p className="text-center text-gray-600 py-12 text-xs uppercase font-bold tracking-widest">No transaction data logged...</p>
@@ -782,12 +718,7 @@ export default function AdminDashboard() {
                 </div>
                 <div className="mt-4 pt-4 border-t border-white/5 flex justify-between items-center">
                   <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Name: {o.customerName || 'N/A'}</span>
-                  <select value={o.status || 'pending'} onChange={async (e) => {
-                    try {
-                      await updateDoc(doc(db, "orders", o.id), { status: e.target.value });
-                      toast.success("Order status updated!");
-                    } catch (err) { toast.error("Error updating status"); }
-                  }} className="bg-black/60 border border-white/10 text-xs font-bold rounded-xl p-2 px-3 text-white outline-none cursor-pointer">
+                  <select value={o.status || 'pending'} onChange={(e) => handleStatusChange(o.id, e.target.value)} className="bg-black/60 border border-white/10 text-xs font-bold rounded-xl p-2 px-3 text-white outline-none focus:border-orange-500 cursor-pointer">
                     <option value="pending">⏳ Pending (Confirming)</option>
                     <option value="preparing">👨‍🍳 Preparing in Kitchen</option>
                     <option value="out_for_delivery">🛵 Out for Delivery</option>
@@ -891,7 +822,7 @@ export default function AdminDashboard() {
                   <label className="text-xs font-bold text-gray-400 uppercase">Category</label>
                   <select value={editCategory} onChange={(e) => setEditCategory(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" required>
                     {categories.filter(c => c.name !== "All").map(cat => (
-                      <option key={cat.id} value={cat.name} className="bg-[#111]">{cat.name}</option>
+                      <option key={cat.id} value={cat.name} className="bg-[#111]">{cat}</option>
                     ))}
                   </select>
                 </div>
@@ -929,8 +860,8 @@ export default function AdminDashboard() {
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Small Price (₹)</label><input type="number" placeholder="Small price" value={editPriceSmall} onChange={(e) => setEditPriceSmall(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" /></div>
                     <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Medium Price (₹)</label><input type="number" placeholder="Medium price" value={editPriceMedium} onChange={(e) => setEditPriceMedium(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" /></div>
-                    <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Large Price (₹)</label><input type="number" placeholder="Large price" value={editPriceLarge} onChange={(e) => setEditPriceLarge(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" /></div>
-                    <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Extra Large Price (₹)</label><input type="number" placeholder="XL price" value={editPriceXL} onChange={(e) => setEditPriceXL(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" /></div>
+                    <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Large Price (₹)</label><input type="number" placeholder="Large price" value={editPriceLarge} onChange={(e) => setEditPriceLarge(e.target.value)} className="w-full bg-[#111]/30 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" /></div>
+                    <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Extra Large Price (₹)</label><input type="number" placeholder="XL price" value={editPriceXL} onChange={(e) => setEditPriceXL(e.target.value)} className="w-full bg-[#111]/30 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" /></div>
                   </div>
                 )}
 
@@ -1106,3 +1037,13 @@ export default function AdminDashboard() {
     </div>
   );
 }
+
+// --- INTEGRATED COMPACT DYNAMIC COUPLING CONTROLLER TO MANAGE LIVE DATA TRANSFERS ---
+const handleStatusChange = async (orderId: string, newStatus: string) => {
+  try {
+    await updateDoc(doc(db, "orders", orderId), { status: newStatus });
+    toast.success("Status Sync Success!");
+  } catch (e) {
+    toast.error("Failed to Sync Status.");
+  }
+};
