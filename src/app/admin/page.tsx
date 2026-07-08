@@ -1,5 +1,4 @@
-'use client';
-  
+'use client';  
 import React, { useState, useEffect } from 'react';
 import { db, auth } from '@/lib/firebase'; // Ensure your path is correct (@/lib/firebase or ../../lib/firebase)
 import { collection, onSnapshot, query, orderBy, doc, updateDoc, setDoc, addDoc, deleteDoc } from 'firebase/firestore';
