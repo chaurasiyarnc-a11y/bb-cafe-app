@@ -211,7 +211,7 @@ export default function AdminDashboard() {
     triggerCsvDownload(formattedData, `BumBumCafe_CustomersDirectory_${new Date().toLocaleDateString()}`, headers, keys);
   };
 
-  // --- FIXED: GET DAILY ANALYTICS METRICS ---
+  // --- GET DAILY ANALYTICS METRICS ---
   const getDailyAnalytics = () => {
     const todayStr = new Date().toDateString();
     const todayOrders = orders.filter(o => {
@@ -230,7 +230,7 @@ export default function AdminDashboard() {
     };
   };
 
-  // --- FIXED: GET LIFETIME DASHBOARD METRICS ---
+  // --- GET LIFETIME DASHBOARD METRICS ---
   const getLifetimeMetrics = () => {
     const seenPhones = new Set();
     orders.forEach(o => { if (o.customerPhone) seenPhones.add(String(o.customerPhone)); });
@@ -338,7 +338,14 @@ export default function AdminDashboard() {
     } catch (error) { toast.error("Error deleting coupon"); }
   };
 
-  // --- OTHER MENU ITEM ACTIONS ---
+  // --- OTHER STORE ACTIONS ---
+  const toggleStore = async () => {
+    try {
+      await setDoc(doc(db, "settings", "store"), { isOpen: !storeOpen });
+      toast.success(storeOpen ? "Cafe is now OFFLINE" : "Cafe is now ONLINE");
+    } catch (e) { toast.error("Error toggling store"); }
+  };
+
   const toggleItemVisibility = async (id: string, currentStatus: boolean) => {
     try {
       await updateDoc(doc(db, "products", id), { isVisible: !currentStatus });
@@ -633,7 +640,7 @@ export default function AdminDashboard() {
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-gray-400 uppercase">Category</label>
                   <select value={newCategory} onChange={(e) => setNewCategory(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" required>
-                    {currentCategories.filter(c => c !== "All").map(cat => (
+                    {categoryOptions.filter(c => c !== "All").map(cat => (
                       <option key={cat} value={cat} className="bg-[#111]">{cat}</option>
                     ))}
                   </select>
@@ -701,7 +708,7 @@ export default function AdminDashboard() {
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-gray-400 uppercase">Category</label>
                   <select value={editCategory} onChange={(e) => setEditCategory(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" required>
-                    {currentCategories.filter(c => c !== "All").map(cat => (
+                    {categoryOptions.filter(c => c !== "All").map(cat => (
                       <option key={cat} value={cat} className="bg-[#111]">{cat}</option>
                     ))}
                   </select>
@@ -853,7 +860,7 @@ export default function AdminDashboard() {
                 <input type="text" placeholder="CODE (e.g. WELCOME)" value={newCouponCode} onChange={(e) => setNewCouponCode(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-xs font-black uppercase text-white" required />
                 <input type="number" placeholder="Discount (₹)" value={newCouponValue} onChange={(e) => setNewCouponValue(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-xs font-black text-white" required />
               </div>
-              <button type="submit" className="w-full bg-green-600 text-white p-4 rounded-xl font-black text-sm uppercase animate-pulse">Create Coupon</button>
+              <button type="submit" className="w-full bg-green-600 text-white p-4 rounded-xl font-black text-sm uppercase">Create Coupon</button>
             </form>
 
             <div className="space-y-3">
