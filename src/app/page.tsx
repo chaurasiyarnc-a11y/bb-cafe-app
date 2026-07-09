@@ -66,6 +66,12 @@ export default function BbCafeHome() {
   const [customerPoints, setCustomerPoints] = useState<number>(0);
   const [loyaltyRules, setLoyaltyRules] = useState<any[]>([]);
 
+  // --- POINT GIFTING STATES ---
+  const [giftPhone, setGiftPhone] = useState("");
+  const [giftAmount, setGiftAmount] = useState("");
+  const [isGiftingOpen, setIsGiftingOpen] = useState(false);
+  const [isGiftingLoading, setIsGiftingLoading] = useState(false);
+
   // --- DYNAMIC DATA STATES ---
   const [dbCategories, setDbCategories] = useState<any[]>([]);
   const [banners, setBanners] = useState<any[]>([]);
@@ -292,6 +298,92 @@ export default function BbCafeHome() {
       isReward: true
     });
     toast.success(`${name} Cart में जोड़ दिया गया है!`);
+  };
+
+  // --- CUSTOMER TO CUSTOMER POINT GIFTING LOGIC ---
+  const handleGiftPoints = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!customerDetails) return toast.error("Please log in first!");
+
+    const senderPhoneClean = customerDetails.phone.replace("+91", "").trim();
+    const recipientPhoneClean = giftPhone.trim().replace("+91", "").replace(/\s/g, "");
+    const pointsToGift = parseInt(giftAmount);
+
+    if (isNaN(pointsToGift) || pointsToGift <= 0) {
+      return toast.error("Please enter a valid amount of points!");
+    }
+    if (recipientPhoneClean.length !== 10) {
+      return toast.error("Please enter a valid 10-digit mobile number!");
+    }
+    if (senderPhoneClean === recipientPhoneClean) {
+      return toast.error("You cannot gift points to yourself!");
+    }
+    if (customerPoints < pointsToGift) {
+      return toast.error("You do not have enough points to gift!");
+    }
+
+    setIsGiftingLoading(true);
+
+    const senderDocRef = doc(db, "customer_points", senderPhoneClean);
+    const recipientDocRef = doc(db, "customer_points", recipientPhoneClean);
+    const transferLogRef = doc(collection(db, "point_transfers"));
+
+    try {
+      await runTransaction(db, async (transaction) => {
+        // Read Sender's account balance
+        const senderSnap = await transaction.get(senderDocRef);
+        const currentSenderPoints = senderSnap.exists() ? (senderSnap.data().points || 0) : 0;
+
+        if (currentSenderPoints < pointsToGift) {
+          throw new Error("Insufficient points in account balance!");
+        }
+
+        // Read Recipient's account balance
+        const recipientSnap = await transaction.get(recipientDocRef);
+        const currentRecipientPoints = recipientSnap.exists() ? (recipientSnap.data().points || 0) : 0;
+        const recipientName = recipientSnap.exists() ? (recipientSnap.data().name || "Cafe Friend") : "Cafe Friend";
+
+        // Deduct points from sender
+        transaction.update(senderDocRef, {
+          points: currentSenderPoints - pointsToGift,
+          lastActive: new Date()
+        });
+
+        // Add points to recipient
+        if (!recipientSnap.exists()) {
+          transaction.set(recipientDocRef, {
+            name: recipientName,
+            phone: recipientPhoneClean,
+            points: pointsToGift,
+            lastActive: new Date()
+          });
+        } else {
+          transaction.update(recipientDocRef, {
+            points: currentRecipientPoints + pointsToGift,
+            lastActive: new Date()
+          });
+        }
+
+        // Write Transfer Audit Log
+        transaction.set(transferLogRef, {
+          senderPhone: senderPhoneClean,
+          senderName: customerDetails.name,
+          recipientPhone: recipientPhoneClean,
+          points: pointsToGift,
+          timestamp: new Date()
+        });
+      });
+
+      toast.success(`Successfully gifted ${pointsToGift} Points to +91${recipientPhoneClean}! 🎁`);
+      setGiftPhone("");
+      setGiftAmount("");
+      setIsGiftingOpen(false);
+    } catch (err: any) {
+      console.error("Gifting transaction error:", err);
+      toast.error(err.message || "Failed to complete point gift transaction.");
+    } finally {
+      setIsGiftingLoading(false);
+    }
   };
 
   // --- WHATSAPP ORDER LOGIC WITH FIRESTORE TRANSACTION BILL INCREMENT ---
@@ -746,7 +838,7 @@ export default function BbCafeHome() {
                 </div>
               )}
 
-              <button type="button" onClick={handleAddToCart} className="w-full bg-orange-500 hover:bg-orange-600 p-5 rounded-2xl font-black text-md shadow-xl active:scale-95 transition-all uppercase">Confirm • ₹{chosenPrice + (addonCheese ? 30 : 0) + (addonVeg ? 20 : 0)}</button>
+              <button type="button" onClick={handleAddAddToCart} className="w-full bg-orange-500 hover:bg-orange-600 p-5 rounded-2xl font-black text-md shadow-xl active:scale-95 transition-all uppercase">Confirm • ₹{chosenPrice + (addonCheese ? 30 : 0) + (addonVeg ? 20 : 0)}</button>
               <button type="button" onClick={() => { setSelectedProduct(null); setChosenSize(""); setChosenPrice(0); setAddonCheese(false); setAddonVeg(false); }} className="w-full mt-4 p-2 text-gray-500 font-black uppercase text-xs tracking-widest">Close</button>
             </motion.div>
           </div>
@@ -875,6 +967,60 @@ export default function BbCafeHome() {
                         )}
                       </div>
                     </div>
+
+                    {/* --- DYNAMIC LOYALTY POINTS TRANSFER / GIFTING SECTION --- */}
+                    <div className="border-t border-white/5 pt-3 mt-3">
+                      <button 
+                        type="button"
+                        onClick={() => setIsGiftingOpen(!isGiftingOpen)}
+                        className="w-full py-2.5 bg-orange-500/10 hover:bg-orange-500/20 border border-orange-500/20 rounded-2xl text-[10px] font-black uppercase text-orange-400 active:scale-95 transition-all flex items-center justify-center gap-1.5"
+                      >
+                        <span>🎁 Gift Points to Friend</span>
+                        <span className="text-[8px]">{isGiftingOpen ? "▲" : "▼"}</span>
+                      </button>
+
+                      {isGiftingOpen && (
+                        <form onSubmit={handleGiftPoints} className="mt-3 bg-black/30 p-4 rounded-[1.5rem] border border-white/5 space-y-3">
+                          <div className="space-y-1 text-left">
+                            <label className="text-[9px] font-black uppercase text-gray-500 tracking-wider">Friend's 10-digit Phone</label>
+                            <input 
+                              type="tel" 
+                              maxLength={10} 
+                              placeholder="e.g. 9714293759" 
+                              value={giftPhone} 
+                              onChange={(e) => setGiftPhone(e.target.value)} 
+                              className="w-full bg-white/5 border border-white/10 p-2.5 rounded-xl text-xs font-bold text-white outline-none focus:border-orange-500 text-center" 
+                              required 
+                            />
+                          </div>
+                          <div className="space-y-1 text-left">
+                            <label className="text-[9px] font-black uppercase text-gray-500 tracking-wider">Points to Send (Max: {customerPoints})</label>
+                            <input 
+                              type="number" 
+                              placeholder={`Available: ${customerPoints}`} 
+                              value={giftAmount} 
+                              onChange={(e) => setGiftAmount(e.target.value)} 
+                              className="w-full bg-white/5 border border-white/10 p-2.5 rounded-xl text-xs font-bold text-white outline-none focus:border-orange-500 text-center" 
+                              required 
+                            />
+                          </div>
+                          <button 
+                            type="submit" 
+                            disabled={isGiftingLoading}
+                            className="w-full py-3 bg-yellow-400 text-black font-black text-xs uppercase rounded-xl tracking-wider hover:bg-yellow-500 active:scale-95 transition-all flex items-center justify-center gap-1"
+                          >
+                            {isGiftingLoading ? (
+                              <>
+                                <span className="animate-spin mr-1">⏳</span> Transferring...
+                              </>
+                            ) : (
+                              "Send Gift 🎁"
+                            )}
+                          </button>
+                        </form>
+                      )}
+                    </div>
+
                   </div>
                 )}
 
@@ -956,12 +1102,12 @@ export default function BbCafeHome() {
               
               <div className="space-y-4 text-left">
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-gray-500 uppercase">Your Name</label>
+                  <label className="text-xs font-bold text-gray-400 uppercase">Your Name</label>
                   <input type="text" placeholder="Enter your name..." value={tempName} onChange={(e) => setTempName(e.target.value)} className="w-full bg-white/5 border border-white/10 p-4 rounded-2xl text-center text-md font-bold outline-none focus:border-orange-500 text-white" required />
                 </div>
                 
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-gray-500 uppercase">Mobile Number</label>
+                  <label className="text-xs font-bold text-gray-400 uppercase">Mobile Number</label>
                   <input type="tel" maxLength={10} placeholder="10-digit Phone Number" value={tempPhone} onChange={(e) => setTempPhone(e.target.value)} className="w-full bg-white/5 border border-white/10 p-4 rounded-2xl text-center text-md font-bold outline-none focus:border-orange-500 text-white" required />
                 </div>
               </div>
