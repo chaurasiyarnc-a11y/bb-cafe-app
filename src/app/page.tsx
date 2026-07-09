@@ -103,10 +103,45 @@ export default function BbCafeHome() {
 
   useEffect(() => {
     setMounted(true);
-    // Realtime Store Status
-    const unsubStore = onSnapshot(doc(db, "settings", "store"), (d) => {
-      if(d.exists()) setStoreOpen(d.data().isOpen);
+
+    // --- PWA Setup (Service Worker & Manifest dynamic registration) ---
+    if (typeof window !== 'undefined') {
+      // 1. Service Worker को रजिस्टर करना
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js')
+            .then((reg) => console.log('BUM BUM Cafe SW Registered:', reg.scope))
+            .catch((err) => console.error('SW Registration Failed:', err));
+        });
+      }
+
+      // 2. Manifest file को HTML Head में जोड़ना
+      if (!document.querySelector('link[rel="manifest"]')) {
+        const link = document.createElement('link');
+        link.rel = 'manifest';
+        link.href = '/manifest.json';
+        document.head.appendChild(link);
+      }
+    }
+
+    // --- Firebase Listeners (पहले जैसा ही रहेगा) ---
+    const unsubStore = onSnapshot(doc(db, "settings", "store"), (d) => { if(d.exists()) setStoreOpen(d.data().isOpen); });
+    const unsubMenu = onSnapshot(query(collection(db, "products")), (snap) => {
+      setMenu(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter((i: any) => i.isVisible !== false));
     });
+    const unsubCats = onSnapshot(collection(db, "categories"), (snap) => { setDbCategories(snap.docs.map(d => ({ id: d.id, ...d.data() }))); });
+    const unsubBanners = onSnapshot(collection(db, "banners"), (snap) => { setBanners(snap.docs.map(d => ({ id: d.id, ...d.data() }))); });
+    const unsubCoupons = onSnapshot(collection(db, "coupons"), (snap) => { setCoupons(snap.docs.map(d => ({ id: d.id, ...d.data() }))); });
+    const unsubReviews = onSnapshot(collection(db, "reviews"), (snap) => {
+      setReviews(snap.docs.map(d => ({ id: d.id, ...d.data() })).filter((r: any) => r.isApproved === true));
+    });
+    const unsubRules = onSnapshot(collection(db, "loyalty_rules"), (snap) => { setLoyaltyRules(snap.docs.map(d => ({ id: d.id, ...d.data() }))); });
+
+    const savedDetails = localStorage.getItem('bb_cafe_customer');
+    if (savedDetails) { try { setCustomerDetails(JSON.parse(savedDetails)); } catch (err) {} }
+
+    return () => { unsubStore(); unsubMenu(); unsubCats(); unsubBanners(); unsubReviews(); unsubCoupons(); unsubRules(); };
+  }, []);
     // Realtime Menu
     const q = query(collection(db, "products"));
     const unsubMenu = onSnapshot(q, (snap) => {
