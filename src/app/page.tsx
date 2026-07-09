@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { db } from '../lib/firebase'; 
 import { collection, onSnapshot, query, addDoc, doc, setDoc, increment } from 'firebase/firestore';
-import { ShoppingBag, Plus, PowerOff, Search, ChevronRight, X, MapPin, Phone, User, Sparkles, Star, Percent } from 'lucide-react';
+import { ShoppingBag, Plus, PowerOff, Search, ChevronRight, X, MapPin, Phone, User, Sparkles, Star, Percent, Gift } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
 import { useCartStore } from '../store/useCartStore';
@@ -221,6 +221,25 @@ export default function BbCafeHome() {
     return matchesCategory && matchesSearch;
   });
 
+  // --- CUSTOMER-SIDE POINTS REDEEM CONTROLLER ---
+  const handleCustomerRedeem = (id: string, name: string, pointsCost: number) => {
+    const currentPointsInCart = cart.reduce((acc: number, item: any) => acc + (item.pointsCost || 0), 0);
+    
+    if (customerPoints - currentPointsInCart < pointsCost) {
+      return toast.error("आपके पास पर्याप्त पॉइंट्स उपलब्ध नहीं हैं!");
+    }
+
+    // Add reward item directly to cart store as free product (price: 0)
+    addItem({
+      id,
+      name,
+      price: 0,
+      pointsCost,
+      isReward: true
+    });
+    toast.success(`${name} Cart में जोड़ दिया गया है!`);
+  };
+
   // --- WHATSAPP ORDER LOGIC (FAULT-TOLERANT BYPASS) ---
   const sendWhatsAppOrder = async () => {
     if (!customerDetails) {
@@ -235,7 +254,10 @@ export default function BbCafeHome() {
     let deliveryCharge = subtotal < 99 ? 20 : 0;
     const couponDiscount = appliedCoupon ? Number(appliedCoupon.discountValue) : 0;
     const finalTotal = Math.max(0, subtotal - couponDiscount) + deliveryCharge;
+    
+    // Points calculations
     const pointsEarned = Math.floor(finalTotal / 100);
+    const totalPointsCost = cart.reduce((acc: number, i: any) => acc + (i.pointsCost || 0), 0);
 
     // 1. Try background write to Firebase (If fails, doesn't block WhatsApp!)
     try {
@@ -252,11 +274,12 @@ export default function BbCafeHome() {
         status: 'pending'
       });
 
-      if (pointsEarned > 0) {
+      // Update Points (Earned minus Redeemed)
+      if (pointsEarned > 0 || totalPointsCost > 0) {
         await setDoc(doc(db, "customer_points", customerDetails.phone.replace("+91", "")), {
           name: customerDetails.name,
           phone: customerDetails.phone.replace("+91", ""),
-          points: increment(pointsEarned),
+          points: increment(pointsEarned - totalPointsCost),
           lastActive: new Date()
         }, { merge: true });
       }
@@ -268,7 +291,7 @@ export default function BbCafeHome() {
     let itemsText = "";
     cart.forEach((i: any) => itemsText += `• ${i.name || "Item"} x${i.quantity || 1} - ₹${(i.price || 0) * (i.quantity || 1)}\n`);
     
-    const msg = `🔥 *BUM BUM CAFE - NEW ORDER*\n\n*Order ID:* #${tokenNumber}\n*Customer:* ${customerDetails?.name || "Customer"}\n*Phone:* ${customerDetails?.phone || "No Phone"}\n*Address:* ${address}\n\n*ITEMS:*\n${itemsText}\n*Subtotal:* ₹${subtotal}\n*Coupon Discount:* -₹${couponDiscount}\n*Delivery:* ₹${deliveryCharge}\n*TOTAL BILL: ₹${finalTotal}*\n\n*Points Earned:* +${pointsEarned} Pts\n\n_Confirm order by replying 'YES'_`;
+    const msg = `🔥 *BUM BUM CAFE - NEW ORDER*\n\n*Order ID:* #${tokenNumber}\n*Customer:* ${customerDetails?.name || "Customer"}\n*Phone:* ${customerDetails?.phone || "No Phone"}\n*Address:* ${address}\n\n*ITEMS:*\n${itemsText}\n*Subtotal:* ₹${subtotal}\n*Coupon Discount:* -₹${couponDiscount}\n*Delivery:* ₹${deliveryCharge}\n*TOTAL BILL: ₹${finalTotal}*\n\n*Points Earned:* +${pointsEarned} Pts\n${totalPointsCost > 0 ? `*Points Redeemed:* -${totalPointsCost} Pts\n` : ''}\n_Confirm order by replying 'YES'_`;
     
     window.open(`https://wa.me/919714293759?text=${encodeURIComponent(msg)}`, '_blank');
     
@@ -549,7 +572,7 @@ export default function BbCafeHome() {
             </div>
           </div>
         )}
-      </ AnimatePresence>
+      </AnimatePresence>
 
       {/* --- WRITE REVIEW MODAL --- */}
       <AnimatePresence>
@@ -661,7 +684,12 @@ export default function BbCafeHome() {
                   <div className="flex items-center gap-2.5 bg-black/40 px-3 py-1.5 rounded-2xl border border-white/10 flex-shrink-0">
                     <button onClick={() => removeItem(item.id)} type="button" className="w-8 h-8 flex items-center justify-center bg-red-500/10 text-red-500 rounded-lg text-lg font-black active:scale-90 transition-all hover:bg-red-500/20">-</button>
                     <span className="font-black text-sm px-1.5 text-white min-w-[15px] text-center">{item.quantity}</span>
-                    <button onClick={() => addItem(item)} type="button" className="w-8 h-8 flex items-center justify-center bg-green-500/10 text-green-500 rounded-lg text-lg font-black active:scale-90 transition-all hover:bg-green-500/20">+</button>
+                    {item.isReward ? (
+                      // Disable manually adding more quantity to avoid bypass checks
+                      <button disabled className="w-8 h-8 flex items-center justify-center bg-white/5 text-gray-600 rounded-lg text-lg font-black cursor-not-allowed">+</button>
+                    ) : (
+                      <button onClick={() => addItem(item)} type="button" className="w-8 h-8 flex items-center justify-center bg-green-500/10 text-green-500 rounded-lg text-lg font-black active:scale-90 transition-all hover:bg-green-500/20">+</button>
+                    )}
                   </div>
                 </div>
               ))}
@@ -680,20 +708,51 @@ export default function BbCafeHome() {
                   </ul>
                 </div>
 
-                {/* --- LOYALTY CLUB --- */}
+                {/* --- LOYALTY CLUB REDEEM BOARD FOR CUSTOMERS --- */}
                 {customerDetails && (
                   <div className="bg-yellow-400/5 border border-yellow-400/20 rounded-[2rem] p-5 space-y-3">
                     <div className="flex items-center gap-2 text-yellow-400 font-black text-xs uppercase tracking-widest">
-                      <span>⭐ BUM BUM LOYALTY CLUB</span>
+                      <Gift size={14}/> <span>⭐ BUM BUM LOYALTY CLUB</span>
                     </div>
-                    <div className="flex justify-between items-center">
+                    <div className="flex justify-between items-center border-b border-white/5 pb-3">
                       <div>
                         <h4 className="text-3xl font-black text-white">{customerPoints} <span className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Points</span></h4>
-                        <p className="text-[9px] text-gray-400 font-medium mt-1">Spend ₹100 = Get 1 Point! Redeem inside Cafe.</p>
+                        <p className="text-[9px] text-gray-400 font-medium mt-1">Spend ₹100 = Get 1 Point!</p>
                       </div>
                       <div className="text-right text-[9px] text-yellow-400 font-black space-y-1 uppercase tracking-wider bg-yellow-400/5 p-3 rounded-xl border border-yellow-400/10">
-                        <p>🎁 10 Pts = Free Sandwich</p>
-                        <p>🎁 20 Pts = Free Small Pizza</p>
+                        <p>🎁 10 Pts = Sandwich</p>
+                        <p>🎁 20 Pts = Small Pizza</p>
+                      </div>
+                    </div>
+                    
+                    {/* Customer Redemption Controls */}
+                    <div className="space-y-2 pt-1">
+                      <p className="text-[10px] text-gray-400 font-black uppercase tracking-wider">Redeem Your Points Here:</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleCustomerRedeem("reward-sandwich", "🎁 FREE Loyalty Sandwich", 10)}
+                          disabled={customerPoints - cart.reduce((acc: number, i: any) => acc + (i.pointsCost || 0), 0) < 10}
+                          className={`py-2.5 px-3 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border ${
+                            (customerPoints - cart.reduce((acc: number, i: any) => acc + (i.pointsCost || 0), 0) >= 10)
+                              ? 'bg-yellow-400 text-black border-yellow-400 active:scale-95 cursor-pointer'
+                              : 'bg-white/5 text-gray-500 border-white/5 cursor-not-allowed'
+                          }`}
+                        >
+                          🥪 Sandwich (10 Pts)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleCustomerRedeem("reward-pizza", "🎁 FREE Loyalty Small Pizza", 20)}
+                          disabled={customerPoints - cart.reduce((acc: number, i: any) => acc + (i.pointsCost || 0), 0) < 20}
+                          className={`py-2.5 px-3 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border ${
+                            (customerPoints - cart.reduce((acc: number, i: any) => acc + (i.pointsCost || 0), 0) >= 20)
+                              ? 'bg-yellow-400 text-black border-yellow-400 active:scale-95 cursor-pointer'
+                              : 'bg-white/5 text-gray-500 border-white/5 cursor-not-allowed'
+                          }`}
+                        >
+                          🍕 Small Pizza (20 Pts)
+                        </button>
                       </div>
                     </div>
                   </div>
