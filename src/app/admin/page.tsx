@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 // Changed to reliable relative path to avoid compile-time path resolution errors
 import { db } from '../../lib/firebase'; 
 import { collection, onSnapshot, query, orderBy, doc, updateDoc, setDoc, addDoc, deleteDoc, increment } from 'firebase/firestore';
-import { Power, Eye, EyeOff, User, MapPin, Calendar, CheckCircle2, LogOut, Loader2, Phone, Plus, Trash, Edit, X, Lock, BarChart3, Download, Folder, Percent, ImageIcon, Gift, Settings } from 'lucide-react';
+import { Power, Eye, EyeOff, User, MapPin, Calendar, CheckCircle2, LogOut, Loader2, Phone, Plus, Trash, Edit, X, Lock, BarChart3, Download, Folder, Percent, ImageIcon, Gift, Settings, Search } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 
 // Categories default list
@@ -29,6 +29,10 @@ export default function AdminDashboard() {
   const [orders, setOrders] = useState<any[]>([]);
   const [menu, setMenu] = useState<any[]>([]);
   const [storeOpen, setStoreOpen] = useState(true);
+
+  // --- SEARCH QUERIES STATES ---
+  const [menuSearchQuery, setMenuSearchQuery] = useState("");
+  const [categorySearchQuery, setCategorySearchQuery] = useState("");
 
   // --- EXTENDED STATES FOR NEW TABS ---
   const [categories, setCategories] = useState<any[]>([]);
@@ -664,9 +668,20 @@ export default function AdminDashboard() {
       productData.variants = { Plain: Number(halfPrice), Butter: Number(fullPrice) };
       productData.price = Number(halfPrice);
     } else if (variantType === 'pizza_sizes') {
-      if (!priceSmall || !priceMedium || !priceLarge || !priceXL) return toast.error("Please fill all pizza prices!");
-      productData.variants = { Small: Number(priceSmall), Medium: Number(priceMedium), Large: Number(priceLarge), "Extra Large": Number(priceXL) };
-      productData.price = Number(priceSmall);
+      // DYNAMIC & OPTIONAL PIZZA VARIATIONS RESOLUTION
+      const pizzaVariants: any = {};
+      if (priceSmall) pizzaVariants.Small = Number(priceSmall);
+      if (priceMedium) pizzaVariants.Medium = Number(priceMedium);
+      if (priceLarge) pizzaVariants.Large = Number(priceLarge);
+      if (priceXL) pizzaVariants["Extra Large"] = Number(priceXL);
+
+      if (Object.keys(pizzaVariants).length === 0) {
+        return toast.error("Kam se kam ek size ki price dalna zaroori hai!");
+      }
+
+      productData.variants = pizzaVariants;
+      const sortedPrices = Object.values(pizzaVariants).map(Number);
+      productData.price = Math.min(...sortedPrices); // Base price is the minimum available price
     } else {
       if (!newPrice) return toast.error("Please enter price!");
       productData.price = Number(newPrice);
@@ -693,7 +708,7 @@ export default function AdminDashboard() {
     setEditImage(item.image);
     if (item.variants) {
       const keys = Object.keys(item.variants);
-      if (keys.includes('Small')) {
+      if (keys.includes('Small') || keys.includes('Medium') || keys.includes('Large') || keys.includes('Extra Large')) {
         setEditVariantType('pizza_sizes');
         setEditPriceSmall(item.variants.Small || "");
         setEditPriceMedium(item.variants.Medium || "");
@@ -710,6 +725,8 @@ export default function AdminDashboard() {
       }
     } else {
       setEditVariantType('none');
+      setEditPriceSmall(""); setEditPriceMedium(""); setEditPriceLarge(""); setEditPriceXL("");
+      setEditHalfPrice(""); setEditFullPrice("");
     }
   };
 
@@ -735,14 +752,20 @@ export default function AdminDashboard() {
       updatedData.variants = { Plain: Number(editHalfPrice), Butter: Number(editFullPrice) };
       updatedData.price = Number(editHalfPrice);
     } else if (editVariantType === 'pizza_sizes') {
-      if (!editPriceSmall || !editPriceMedium || !editPriceLarge || !editPriceXL) return toast.error("Please enter prices for all 4 sizes!");
-      updatedData.variants = {
-        Small: Number(editPriceSmall),
-        Medium: Number(editPriceMedium),
-        Large: Number(editPriceLarge),
-        "Extra Large": Number(editPriceXL)
-      };
-      updatedData.price = Number(editPriceSmall);
+      // DYNAMIC & OPTIONAL PIZZA VARIATIONS RESOLUTION FOR EDITING
+      const pizzaVariants: any = {};
+      if (editPriceSmall) pizzaVariants.Small = Number(editPriceSmall);
+      if (editPriceMedium) pizzaVariants.Medium = Number(editPriceMedium);
+      if (editPriceLarge) pizzaVariants.Large = Number(editPriceLarge);
+      if (editPriceXL) pizzaVariants["Extra Large"] = Number(editPriceXL);
+
+      if (Object.keys(pizzaVariants).length === 0) {
+        return toast.error("Kam se kam ek size ki price dalna zaroori hai!");
+      }
+
+      updatedData.variants = pizzaVariants;
+      const sortedPrices = Object.values(pizzaVariants).map(Number);
+      updatedData.price = Math.min(...sortedPrices);
     } else {
       if (!editPrice) return toast.error("Please enter a price!");
       updatedData.price = Number(editPrice);
@@ -757,6 +780,22 @@ export default function AdminDashboard() {
       toast.error("Error updating product");
     }
   };
+
+  // --- CLIENT SIDE FILTER FOR DYNAMIC MENUS & CATEGORIES ---
+  const searchedMenu = useMemo(() => {
+    if (!menuSearchQuery.trim()) return menu;
+    return menu.filter(item => 
+      String(item.name).toLowerCase().includes(menuSearchQuery.toLowerCase()) || 
+      String(item.category).toLowerCase().includes(menuSearchQuery.toLowerCase())
+    );
+  }, [menu, menuSearchQuery]);
+
+  const searchedCategories = useMemo(() => {
+    if (!categorySearchQuery.trim()) return combinedCategories;
+    return combinedCategories.filter(cat => 
+      String(cat.name).toLowerCase().includes(categorySearchQuery.toLowerCase())
+    );
+  }, [combinedCategories, categorySearchQuery]);
 
   // --- Loading Screen ---
   if (loading) {
@@ -1000,11 +1039,27 @@ export default function AdminDashboard() {
         {/* --- TAB 3: DISHES MENU LIST TAB --- */}
         {tab === 'menu' && (
           <div className="space-y-4">
+            
+            {/* ACTION BUTTONS */}
             <div className="flex flex-col gap-2">
               <button onClick={handleBulkImport} type="button" className="w-full bg-yellow-400 text-black py-4 rounded-2xl font-black text-sm flex items-center justify-center gap-2 active:scale-95 transition-all shadow-xl">📥 IMPORT ALL 80+ PDF MENU ITEMS</button>
               <button onClick={() => { setShowAddForm(!showAddForm); setEditingProduct(null); }} className="w-full bg-orange-500/10 text-orange-500 border border-orange-500/20 py-4 rounded-2xl font-black text-sm flex items-center justify-center gap-2 hover:bg-orange-500/20 transition-all">
                 <Plus size={18}/> {showAddForm ? "CLOSE FORM" : "ADD NEW ITEM"}
               </button>
+            </div>
+
+            {/* STICKY GLASS SEARCH BAR */}
+            <div className="sticky top-[73px] z-30 bg-[#050505]/95 backdrop-blur-md py-4 border-b border-white/5 rounded-b-3xl shadow-lg">
+              <div className="relative group max-w-lg mx-auto">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-orange-500 transition-colors" size={16} />
+                <input 
+                  type="text" 
+                  placeholder="Search item name or category..." 
+                  value={menuSearchQuery} 
+                  onChange={(e) => setMenuSearchQuery(e.target.value)}
+                  className="w-full bg-white text-black py-3 px-11 rounded-xl outline-none focus:ring-4 focus:ring-orange-500/20 text-xs font-semibold transition-all"
+                />
+              </div>
             </div>
 
             {/* ADD PRODUCT FORM */}
@@ -1062,11 +1117,14 @@ export default function AdminDashboard() {
                 )}
 
                 {variantType === 'pizza_sizes' && (
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Small Price (₹)</label><input type="number" placeholder="Small price" value={priceSmall} onChange={(e) => setPriceSmall(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" /></div>
-                    <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Medium Price (₹)</label><input type="number" placeholder="Medium price" value={priceMedium} onChange={(e) => setPriceMedium(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" /></div>
-                    <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Large Price (₹)</label><input type="number" placeholder="Large price" value={priceLarge} onChange={(e) => setPriceLarge(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" /></div>
-                    <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">XL Price (₹)</label><input type="number" placeholder="Extra Large price" value={priceXL} onChange={(e) => setPriceXL(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" /></div>
+                  <div className="space-y-3 bg-[#111]/40 p-4 rounded-2xl border border-white/5">
+                    <p className="text-[10px] text-orange-400 font-extrabold uppercase tracking-wide">Enter available prices (Leave blank if unavailable):</p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Small Price (₹)</label><input type="number" placeholder="Optional" value={priceSmall} onChange={(e) => setPriceSmall(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" /></div>
+                      <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Medium Price (₹)</label><input type="number" placeholder="Optional" value={priceMedium} onChange={(e) => setPriceMedium(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" /></div>
+                      <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Large Price (₹)</label><input type="number" placeholder="Optional" value={priceLarge} onChange={(e) => setPriceLarge(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" /></div>
+                      <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">XL Price (₹)</label><input type="number" placeholder="Optional" value={priceXL} onChange={(e) => setPriceXL(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" /></div>
+                    </div>
                   </div>
                 )}
 
@@ -1074,108 +1132,127 @@ export default function AdminDashboard() {
               </form>
             )}
 
-            {/* EDIT PRODUCT FORM */}
+            {/* EDIT PRODUCT MODAL POP-UP */}
             {editingProduct && (
-              <form onSubmit={handleUpdateProduct} className="bg-[#151515] border-2 border-orange-500/50 p-6 rounded-[2.5rem] space-y-4 relative">
-                <button type="button" onClick={() => setEditingProduct(null)} className="absolute top-4 right-4 p-2 bg-white/5 rounded-full"><X size={16}/></button>
-                <h3 className="text-lg font-black text-orange-500 italic uppercase">Edit Product Form</h3>
-                
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-gray-400 uppercase">Item Name</label>
-                  <input type="text" placeholder="e.g., Paneer Pizza" value={editName} onChange={(e) => setEditName(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" required />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-gray-400 uppercase">Category</label>
-                  <select value={editCategory} onChange={(e) => setEditCategory(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" required>
-                    {categoryOptions.filter(c => c !== "All").map(cat => (
-                      <option key={cat} value={cat} className="bg-[#111]">{cat}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-gray-400 uppercase">Image URL</label>
-                  <input type="url" placeholder="Paste image url..." value={editImage} onChange={(e) => setEditImage(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" required />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-gray-400 uppercase">Portion Option Type</label>
-                  <select value={editVariantType} onChange={(e: any) => setEditVariantType(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white">
-                    <option value="none" className="bg-[#111]">None (Single Price)</option>
-                    <option value="half_full" className="bg-[#111]">Half / Full</option>
-                    <option value="plain_butter" className="bg-[#111]">Plain / Butter</option>
-                    <option value="pizza_sizes" className="bg-[#111]">Pizza Sizes (Small, Medium, Large, Extra Large)</option>
-                  </select>
-                </div>
-
-                {editVariantType === 'none' && (
+              <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[100] flex items-center justify-center p-4 overflow-y-auto">
+                <form onSubmit={handleUpdateProduct} className="bg-[#111] border-2 border-orange-500/50 p-8 rounded-[2.5rem] w-full max-w-lg relative max-h-[90vh] overflow-y-auto no-scrollbar shadow-2xl space-y-4">
+                  <button type="button" onClick={() => setEditingProduct(null)} className="absolute top-4 right-4 p-2.5 bg-white/5 text-gray-400 hover:text-white rounded-full transition-all"><X size={18}/></button>
+                  
+                  <div className="text-center pb-2">
+                    <h3 className="text-2xl font-black text-orange-500 italic uppercase">Edit Product</h3>
+                    <p className="text-[10px] text-gray-500 uppercase tracking-widest font-black mt-0.5">Customize Cafe Dish</p>
+                  </div>
+                  
                   <div className="space-y-1">
-                    <label className="text-xs font-bold text-gray-400 uppercase">Price (₹)</label>
-                    <input type="number" placeholder="Item Price" value={editPrice} onChange={(e) => setEditPrice(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" />
+                    <label className="text-xs font-bold text-gray-400 uppercase">Item Name</label>
+                    <input type="text" placeholder="e.g., Paneer Pizza" value={editName} onChange={(e) => setEditName(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" required />
                   </div>
-                )}
 
-                {(editVariantType === 'half_full' || editVariantType === 'plain_butter') && (
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Half / Plain Price (₹)</label><input type="number" placeholder="Price" value={editHalfPrice} onChange={(e) => setEditHalfPrice(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" /></div>
-                    <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Full / Butter Price (₹)</label><input type="number" placeholder="Price" value={editFullPrice} onChange={(e) => setEditFullPrice(e.target.value)} className="w-full bg-[#111]/30 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" /></div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-gray-400 uppercase">Category</label>
+                    <select value={editCategory} onChange={(e) => setEditCategory(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" required>
+                      {categoryOptions.filter(c => c !== "All").map(cat => (
+                        <option key={cat} value={cat} className="bg-[#111]">{cat}</option>
+                      ))}
+                    </select>
                   </div>
-                )}
 
-                {editVariantType === 'pizza_sizes' && (
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Small Price (₹)</label><input type="number" placeholder="Small price" value={editPriceSmall} onChange={(e) => setEditPriceSmall(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" /></div>
-                    <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Medium Price (₹)</label><input type="number" placeholder="Medium price" value={editPriceMedium} onChange={(e) => setEditPriceMedium(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" /></div>
-                    <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Large Price (₹)</label><input type="number" placeholder="Large price" value={editPriceLarge} onChange={(e) => setEditPriceLarge(e.target.value)} className="w-full bg-[#111]/30 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" /></div>
-                    <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Extra Large Price (₹)</label><input type="number" placeholder="XL price" value={editPriceXL} onChange={(e) => setEditPriceXL(e.target.value)} className="w-full bg-[#111]/30 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" /></div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-gray-400 uppercase">Image URL</label>
+                    <input type="url" placeholder="Paste image url..." value={editImage} onChange={(e) => setEditImage(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" required />
                   </div>
-                )}
 
-                <div className="flex gap-2">
-                  <button type="submit" className="flex-1 bg-green-600 text-white p-4 rounded-xl font-black text-sm shadow-lg active:scale-95 transition-all uppercase">Update Item</button>
-                  <button type="button" onClick={() => setEditingProduct(null)} className="bg-white/5 text-gray-400 p-4 rounded-xl font-black text-sm active:scale-95 transition-all">CANCEL</button>
-                </div>
-              </form>
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-gray-400 uppercase">Portion Option Type</label>
+                    <select value={editVariantType} onChange={(e: any) => setEditVariantType(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white">
+                      <option value="none" className="bg-[#111]">None (Single Price)</option>
+                      <option value="half_full" className="bg-[#111]">Half / Full</option>
+                      <option value="plain_butter" className="bg-[#111]">Plain / Butter</option>
+                      <option value="pizza_sizes" className="bg-[#111]">Pizza Sizes (Small, Medium, Large, Extra Large)</option>
+                    </select>
+                  </div>
+
+                  {editVariantType === 'none' && (
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-gray-400 uppercase">Price (₹)</label>
+                      <input type="number" placeholder="Item Price" value={editPrice} onChange={(e) => setEditPrice(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" />
+                    </div>
+                  )}
+
+                  {(editVariantType === 'half_full' || editVariantType === 'plain_butter') && (
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Half / Plain Price (₹)</label><input type="number" placeholder="Price" value={editHalfPrice} onChange={(e) => setEditHalfPrice(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" /></div>
+                      <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Full / Butter Price (₹)</label><input type="number" placeholder="Price" value={editFullPrice} onChange={(e) => setEditFullPrice(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" /></div>
+                    </div>
+                  )}
+
+                  {editVariantType === 'pizza_sizes' && (
+                    <div className="space-y-3 bg-[#111]/40 p-4 rounded-2xl border border-white/5">
+                      <p className="text-[10px] text-orange-400 font-extrabold uppercase tracking-wide">Edit available prices (Leave blank if unavailable):</p>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Small Price (₹)</label><input type="number" placeholder="Optional" value={editPriceSmall} onChange={(e) => setEditPriceSmall(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" /></div>
+                        <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Medium Price (₹)</label><input type="number" placeholder="Optional" value={editPriceMedium} onChange={(e) => setEditPriceMedium(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" /></div>
+                        <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Large Price (₹)</label><input type="number" placeholder="Optional" value={editPriceLarge} onChange={(e) => setEditPriceLarge(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" /></div>
+                        <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">XL Price (₹)</label><input type="number" placeholder="Optional" value={editPriceXL} onChange={(e) => setEditPriceXL(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" /></div>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex gap-2 pt-2">
+                    <button type="submit" className="flex-1 bg-green-600 hover:bg-green-700 text-white p-4 rounded-xl font-black text-sm shadow-lg active:scale-95 transition-all uppercase">Update Item</button>
+                    <button type="button" onClick={() => setEditingProduct(null)} className="bg-white/5 text-gray-400 p-4 rounded-xl font-black text-sm active:scale-95 transition-all">CANCEL</button>
+                  </div>
+                </form>
+              </div>
             )}
 
             {/* Menu Items List */}
             <div className="space-y-3 pt-2">
-              {menu.map((item) => {
-                const getAdminDisplayPrice = (itm: any) => {
-                  if (itm?.variants && typeof itm.variants === 'object') {
-                    const keys = Object.keys(itm.variants);
-                    if (keys.includes('Small')) {
-                      return `S: ₹${itm.variants.Small} | M: ₹${itm.variants.Medium} | L: ₹${itm.variants.Large} | XL: ₹${itm.variants["Extra Large"]}`;
-                    } else if (keys.includes('Plain')) {
-                      return `Plain: ₹${itm.variants.Plain} | Butter: ₹${itm.variants.Butter}`;
-                    } else {
-                      return `Half: ₹${itm.variants.half} | Full: ₹${itm.variants.full}`;
-                    }
-                  }
-                  return `₹${itm.price || 0}`;
-                };
-
-                return (
-                  <div key={item.id} className="bg-white/[0.02] p-4 rounded-3xl border border-white/5 flex items-center gap-4 hover:bg-white/[0.04] transition-all">
-                    <img src={item.image} className="w-16 h-16 rounded-2xl object-cover opacity-80" alt={item.name} />
-                    <div className="flex-1">
-                      <h4 className="font-bold text-sm">{item.name}</h4>
-                      <p className="text-orange-500 font-black text-xs italic capitalize">{item.category}</p>
-                      <p className="text-orange-500 font-black text-sm mt-1">{getAdminDisplayPrice(item)}</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button onClick={() => startEditing(item)} className="p-3 bg-blue-500/10 text-blue-500 rounded-xl hover:bg-blue-500/20 active:scale-90 transition-all"><Edit size={18}/></button>
+              {searchedMenu.length === 0 ? (
+                <p className="text-center text-xs font-black uppercase text-gray-500 py-10">No matching dishes found...</p>
+              ) : (
+                searchedMenu.map((item) => {
+                  const getAdminDisplayPrice = (itm: any) => {
+                    if (itm?.variants && typeof itm.variants === 'object') {
+                      const keys = Object.keys(itm.variants);
+                      const labels = [];
+                      if (itm.variants.Small !== undefined) labels.push(`S: ₹${itm.variants.Small}`);
+                      if (itm.variants.Medium !== undefined) labels.push(`M: ₹${itm.variants.Medium}`);
+                      if (itm.variants.Large !== undefined) labels.push(`L: ₹${itm.variants.Large}`);
+                      if (itm.variants["Extra Large"] !== undefined) labels.push(`XL: ₹${itm.variants["Extra Large"]}`);
                       
-                      {/* --- Item Hide/Unhide Toggle --- */}
-                      <button onClick={() => toggleItemVisibility(item.id, item.isVisible !== false)} className={`p-3 rounded-xl transition-all ${item.isVisible !== false ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
-                        {item.isVisible !== false ? <Eye size={18}/> : <EyeOff size={18}/>}
-                      </button>
-                      <button onClick={() => handleDeleteProduct(item.id)} className="p-3 bg-red-500/10 text-red-500 rounded-xl hover:bg-red-500/20 active:scale-90 transition-all"><Trash size={18}/></button>
+                      if (labels.length > 0) return labels.join(' | ');
+
+                      if (keys.includes('Plain')) {
+                        return `Plain: ₹${itm.variants.Plain} | Butter: ₹${itm.variants.Butter}`;
+                      } else {
+                        return `Half: ₹${itm.variants.half} | Full: ₹${itm.variants.full}`;
+                      }
+                    }
+                    return `₹${itm.price || 0}`;
+                  };
+
+                  return (
+                    <div key={item.id} className="bg-white/[0.02] p-4 rounded-3xl border border-white/5 flex items-center gap-4 hover:bg-white/[0.04] transition-all">
+                      <img src={item.image} className="w-16 h-16 rounded-2xl object-cover opacity-80" alt={item.name} />
+                      <div className="flex-1">
+                        <h4 className="font-bold text-sm">{item.name}</h4>
+                        <p className="text-orange-500 font-black text-xs italic capitalize">{item.category}</p>
+                        <p className="text-orange-500 font-black text-sm mt-1">{getAdminDisplayPrice(item)}</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button onClick={() => startEditing(item)} className="p-3 bg-blue-500/10 text-blue-500 rounded-xl hover:bg-blue-500/20 active:scale-90 transition-all"><Edit size={18}/></button>
+                        
+                        {/* --- Item Hide/Unhide Toggle --- */}
+                        <button onClick={() => toggleItemVisibility(item.id, item.isVisible !== false)} className={`p-3 rounded-xl transition-all ${item.isVisible !== false ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
+                          {item.isVisible !== false ? <Eye size={18}/> : <EyeOff size={18}/>}
+                        </button>
+                        <button onClick={() => handleDeleteProduct(item.id)} className="p-3 bg-red-500/10 text-red-500 rounded-xl hover:bg-red-500/20 active:scale-90 transition-all"><Trash size={18}/></button>
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })
+              )}
             </div>
           </div>
         )}
@@ -1196,46 +1273,79 @@ export default function AdminDashboard() {
               </form>
             )}
 
-            {/* EDIT CATEGORY FORM */}
+            {/* STICKY GLASS SEARCH BAR FOR CATEGORIES */}
+            <div className="sticky top-[73px] z-30 bg-[#050505]/95 backdrop-blur-md py-4 border-b border-white/5 rounded-b-3xl shadow-lg">
+              <div className="relative group max-w-lg mx-auto">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-orange-500 transition-colors" size={16} />
+                <input 
+                  type="text" 
+                  placeholder="Search categories..." 
+                  value={categorySearchQuery} 
+                  onChange={(e) => setCategorySearchQuery(e.target.value)}
+                  className="w-full bg-white text-black py-3 px-11 rounded-xl outline-none focus:ring-4 focus:ring-orange-500/20 text-xs font-semibold transition-all"
+                />
+              </div>
+            </div>
+
+            {/* EDIT CATEGORY MODAL POP-UP */}
             {editingCategory && (
-              <form onSubmit={handleUpdateCategory} className="bg-[#151515] border-2 border-orange-500 p-6 rounded-[2.5rem] space-y-4">
-                <h3 className="text-lg font-black text-orange-500 italic uppercase flex items-center gap-2"><Folder size={18}/> Edit Category</h3>
-                <div className="grid grid-cols-2 gap-3">
-                  <input type="text" placeholder="Category Name" value={editCatName} onChange={(e) => setEditCatName(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-xs font-black text-white" required />
-                  <input type="url" placeholder="Image URL link" value={editCatImage} onChange={(e) => setEditCatImage(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-xs font-black text-white" required />
-                </div>
-                <div className="flex gap-2">
-                  <button type="submit" className="flex-1 bg-green-600 text-white p-4 rounded-xl font-black text-sm uppercase">Update Category</button>
-                  <button type="button" onClick={() => setEditingCategory(null)} className="bg-white/5 text-gray-400 p-4 rounded-xl font-black text-sm uppercase">Cancel</button>
-                </div>
-              </form>
+              <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[100] flex items-center justify-center p-4 overflow-y-auto">
+                <form onSubmit={handleUpdateCategory} className="bg-[#111] border-2 border-orange-500 p-8 rounded-[2.5rem] w-full max-w-lg relative max-h-[90vh] overflow-y-auto no-scrollbar shadow-2xl space-y-4">
+                  <button type="button" onClick={() => setEditingCategory(null)} className="absolute top-4 right-4 p-2.5 bg-white/5 text-gray-400 hover:text-white rounded-full transition-all"><X size={18}/></button>
+
+                  <div className="text-center pb-2">
+                    <h3 className="text-2xl font-black text-orange-500 italic uppercase flex items-center justify-center gap-2"><Folder size={22}/> Edit Category</h3>
+                    <p className="text-[10px] text-gray-500 uppercase tracking-widest font-black mt-0.5">Modify Category Attributes</p>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-gray-400 uppercase">Category Name</label>
+                      <input type="text" placeholder="Category Name" value={editCatName} onChange={(e) => setEditCatName(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-4 outline-none focus:border-orange-500 text-sm font-bold text-white" required />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-gray-400 uppercase">Image URL Link</label>
+                      <input type="url" placeholder="Image URL link" value={editCatImage} onChange={(e) => setEditCatImage(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-4 outline-none focus:border-orange-500 text-sm font-bold text-white" required />
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2 pt-2">
+                    <button type="submit" className="flex-1 bg-green-600 text-white p-4 rounded-xl font-black text-sm uppercase transition-all hover:bg-green-700">Update Category</button>
+                    <button type="button" onClick={() => setEditingCategory(null)} className="bg-white/5 text-gray-400 p-4 rounded-xl font-black text-sm uppercase">Cancel</button>
+                  </div>
+                </form>
+              </div>
             )}
 
             {/* Dynamic Combined Category List */}
             <div className="space-y-3">
-              <p className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">Category List ({combinedCategories.length})</p>
-              {combinedCategories.map(c => (
-                <div key={c.id} className="bg-white/[0.02] border border-white/5 p-4 rounded-3xl flex justify-between items-center hover:bg-white/[0.04] transition-all">
-                  <div className="flex items-center gap-4">
-                    <img src={c.image} className="w-12 h-12 rounded-full object-cover border border-white/10" alt="Category"/>
-                    <div className="flex flex-col">
-                      <h4 className="font-black text-sm text-gray-200">{c.name}</h4>
-                      {c.isVirtual && <span className="text-[8px] text-orange-500 font-bold uppercase tracking-wider">Default Back-up</span>}
+              <p className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">Category List ({searchedCategories.length})</p>
+              {searchedCategories.length === 0 ? (
+                <p className="text-center text-xs font-black uppercase text-gray-500 py-10">No categories found...</p>
+              ) : (
+                searchedCategories.map(c => (
+                  <div key={c.id} className="bg-white/[0.02] border border-white/5 p-4 rounded-3xl flex justify-between items-center hover:bg-white/[0.04] transition-all">
+                    <div className="flex items-center gap-4">
+                      <img src={c.image} className="w-12 h-12 rounded-full object-cover border border-white/10" alt="Category"/>
+                      <div className="flex flex-col">
+                        <h4 className="font-black text-sm text-gray-200">{c.name}</h4>
+                        {c.isVirtual && <span className="text-[8px] text-orange-500 font-bold uppercase tracking-wider">Default Back-up</span>}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button onClick={() => startEditingCategory(c)} className="p-3 bg-blue-500/10 text-blue-500 rounded-xl hover:bg-blue-500/20 active:scale-95 transition-all">
+                        <Edit size={18}/>
+                      </button>
+                      <button onClick={() => toggleCategoryVisibility(c)} className={`p-3 rounded-xl transition-all ${c.isVisible !== false ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
+                        {c.isVisible !== false ? <Eye size={18}/> : <EyeOff size={18}/>}
+                      </button>
+                      <button onClick={() => handleDeleteCategory(c)} className="p-3 bg-red-500/10 text-red-500 rounded-xl hover:bg-red-500/20 active:scale-95 transition-all">
+                        <Trash size={18}/>
+                      </button>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <button onClick={() => startEditingCategory(c)} className="p-3 bg-blue-500/10 text-blue-500 rounded-xl hover:bg-blue-500/20 active:scale-95 transition-all">
-                      <Edit size={18}/>
-                    </button>
-                    <button onClick={() => toggleCategoryVisibility(c)} className={`p-3 rounded-xl transition-all ${c.isVisible !== false ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
-                      {c.isVisible !== false ? <Eye size={18}/> : <EyeOff size={18}/>}
-                    </button>
-                    <button onClick={() => handleDeleteCategory(c)} className="p-3 bg-red-500/10 text-red-500 rounded-xl hover:bg-red-500/20 active:scale-95 transition-all">
-                      <Trash size={18}/>
-                    </button>
-                  </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </div>
         )}
@@ -1423,7 +1533,7 @@ export default function AdminDashboard() {
                 <div key={c.id} className="bg-white/[0.02] border border-white/5 p-5 rounded-2xl flex justify-between items-center">
                   <div>
                     <h4 className="text-sm font-black text-orange-500 uppercase tracking-widest">{c.code}</h4>
-                    <p className="text-xs font-bold text-gray-400 mt-1">Value: ₹{c.discountValue} FLAT OFF</p>
+                    <p className="text-xs font-bold text-gray-400 mt-1">Value: Flat ₹{c.discountValue} OFF</p>
                   </div>
                   <button onClick={() => handleDeleteCoupon(c.id)} className="p-3 bg-red-500/10 text-red-500 rounded-xl hover:bg-red-500/20 active:scale-95 transition-all">
                     <Trash size={16}/>
