@@ -234,7 +234,7 @@ export default function AdminDashboard() {
     return list;
   }, [categories]);
 
-  // --- FILTER & SORT ORDERS BY SELECTED DATE AND SEQUENTIAL TOKEN NUMBER ---
+  // --- FILTER & SORT ORDERS BY SELECTED DATE AND SEQUENTIAL BILL NUMBER ---
   const filteredOrdersList = useMemo(() => {
     const targetDateStr = new Date(ordersFilterDate).toDateString();
     const matched = orders.filter(o => {
@@ -242,8 +242,8 @@ export default function AdminDashboard() {
       const orderDate = o.timestamp?.toDate ? o.timestamp.toDate().toDateString() : new Date(o.timestamp).toDateString();
       return orderDate === targetDateStr;
     });
-    // Sort sequentially by Token Number (Descending so high tokens are on top)
-    return matched.sort((a, b) => Number(b.tokenNumber) - Number(a.tokenNumber));
+    // Sort sequentially by sequential Bill Number (Descending so latest bill is on top)
+    return matched.sort((a, b) => Number(b.billNumber || 0) - Number(a.billNumber || 0));
   }, [orders, ordersFilterDate]);
 
   // --- CUSTOMER PROFILE SAVER (POINTS MANUAL OVERRIDE) ---
@@ -366,8 +366,8 @@ export default function AdminDashboard() {
       };
     });
 
-    const headers = ['Token / Bill No', 'Customer Name', 'Phone Number', 'Delivery Address', 'Items summary', 'Subtotal (₹)', 'Discount Applied (₹)', 'Total Paid (₹)', 'Status', 'Order Date & Time'];
-    const keys = ['tokenNumber', 'customerName', 'customerPhone', 'address', 'itemsSummary', 'subtotal', 'discount', 'total', 'status', 'date'];
+    const headers = ['Bill No', 'Token No', 'Customer Name', 'Phone Number', 'Delivery Address', 'Items summary', 'Subtotal (₹)', 'Discount Applied (₹)', 'Total Paid (₹)', 'Status', 'Order Date & Time'];
+    const keys = ['billNumber', 'tokenNumber', 'customerName', 'customerPhone', 'address', 'itemsSummary', 'subtotal', 'discount', 'total', 'status', 'date'];
     triggerCsvDownload(formattedData, `BumBumCafe_SalesLedger_${new Date().toLocaleDateString()}`, headers, keys);
   };
 
@@ -888,7 +888,10 @@ export default function AdminDashboard() {
                 orders.map((o) => (
                   <div key={o.id} className="bg-[#111] border border-white/5 p-5 rounded-3xl flex justify-between items-center relative overflow-hidden">
                     <div className="space-y-1 pr-4">
-                      <span className="text-[10px] font-black uppercase text-gray-500">Bill No / Token: #{o.tokenNumber}</span>
+                      <div className="flex gap-2.5">
+                        <span className="text-[10px] font-black uppercase text-gray-500">Bill No: #{o.billNumber || "N/A"}</span>
+                        <span className="text-[10px] font-black uppercase text-yellow-500">Token: #{o.tokenNumber || "N/A"}</span>
+                      </div>
                       <h4 className="font-extrabold text-sm text-gray-300">Name: {o.customerName || "Customer"}</h4>
                       <p className="text-[11px] font-bold text-orange-500">Mobile: {o.customerPhone || "N/A"}</p>
                       <p className="text-[10px] text-gray-400 font-medium">Address: {o.address || "N/A"}</p>
@@ -922,7 +925,7 @@ export default function AdminDashboard() {
             <div className="bg-[#111] border border-white/5 p-5 rounded-3xl flex justify-between items-center">
               <div>
                 <h4 className="font-black text-sm text-orange-500 uppercase tracking-wider">📦 Filter Daily Orders</h4>
-                <p className="text-[10px] text-gray-500 font-bold mt-0.5">Matching Token Sequences</p>
+                <p className="text-[10px] text-gray-500 font-bold mt-0.5">Matching Token & Bill Sequences</p>
               </div>
               <input 
                 type="date" 
@@ -938,7 +941,10 @@ export default function AdminDashboard() {
               filteredOrdersList.map((o) => (
                 <div key={o.id} className="bg-white/[0.03] p-6 rounded-[2rem] border border-white/5 relative overflow-hidden">
                   <div className="flex justify-between items-start mb-4">
-                    <span className="bg-orange-500 text-black text-[10px] px-3 py-1 rounded-full font-black">TOKEN: #{o.tokenNumber}</span>
+                    <div className="flex flex-wrap gap-1.5">
+                      <span className="bg-orange-500 text-black text-[10px] px-3 py-1 rounded-full font-black">BILL: #{o.billNumber || "N/A"}</span>
+                      <span className="bg-yellow-400 text-black text-[10px] px-3 py-1 rounded-full font-black">TOKEN: #{o.tokenNumber || "N/A"}</span>
+                    </div>
                     <span className="text-orange-500 font-black text-xl">₹{o.total}</span>
                   </div>
                   
@@ -1100,7 +1106,7 @@ export default function AdminDashboard() {
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Small Price (₹)</label><input type="number" placeholder="Small price" value={editPriceSmall} onChange={(e) => setEditPriceSmall(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" /></div>
                     <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Medium Price (₹)</label><input type="number" placeholder="Medium price" value={editPriceMedium} onChange={(e) => setEditPriceMedium(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" /></div>
-                    <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Large Price (₹)</label><input type="number" placeholder="Large price" value={editPriceLarge} onChange={(e) => setEditPriceLarge(e.target.value)} className="w-full bg-[#111]/30 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" /></div>
+                    <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Large Price (₹)</label><input type="number" placeholder="Large price" value={editPriceLarge} onChange={(e) => setEditPriceLarge(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" /></div>
                     <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Extra Large Price (₹)</label><input type="number" placeholder="XL price" value={editPriceXL} onChange={(e) => setEditPriceXL(e.target.value)} className="w-full bg-[#111]/30 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" /></div>
                   </div>
                 )}
