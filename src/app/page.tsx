@@ -346,6 +346,49 @@ export default function BbCafeHome() {
     setSelectedProduct(null); setChosenSize(""); setChosenPrice(0); setAddonCheese(false); setAddonVeg(false);
   };
 
+  // --- GAMIFIED SOCIAL POINTS CLAIM ENGINE ---
+  const handleSocialClick = async (platform: string, url: string) => {
+    // Open the social media URL in a new tab first
+    window.open(url, '_blank');
+
+    if (!customerDetails?.phone) {
+      toast.error("पॉइंट्स क्लेम करने के लिए कृपया पहले अपना Name और Phone दर्ज करें!");
+      setIsLoginOpen(true);
+      return;
+    }
+
+    const storageKey = `bb_claimed_${customerDetails.phone.replace("+91", "")}_${platform}`;
+    const alreadyClaimed = localStorage.getItem(storageKey);
+
+    if (alreadyClaimed) {
+      toast.success("आप इस प्लेटफ़ॉर्म के लिए पहले ही पॉइंट ले चुके हैं! धन्यवाद ❤️");
+      return;
+    }
+
+    try {
+      const phoneRaw = customerDetails.phone.replace("+91", "").trim();
+      const pointsRef = doc(db, "customer_points", phoneRaw);
+      
+      await setDoc(pointsRef, {
+        points: increment(1),
+        lastActive: new Date()
+      }, { merge: true });
+
+      localStorage.setItem(storageKey, "true");
+      setCustomerPoints(prev => prev + 1);
+      toast.success(`🎉 बधाई हो! ${platform.toUpperCase()} पर हमें फॉलो करने के लिए आपको +1 पॉइंट मिला है!`);
+    } catch (err) {
+      toast.error("पॉइंट्स जोड़ने में समस्या आई। कृपया बाद में प्रयास करें।");
+    }
+  };
+
+  // Helper to dynamically check claim status
+  const getClaimStatus = (platform: string) => {
+    if (!customerDetails?.phone) return "🎁 +1 Pt";
+    const storageKey = `bb_claimed_${customerDetails.phone.replace("+91", "")}_${platform}`;
+    return localStorage.getItem(storageKey) ? "✅ Claimed" : "🎁 Claim +1 Pt";
+  };
+
   if (!mounted) return null;
 
   return (
@@ -372,7 +415,23 @@ export default function BbCafeHome() {
         </div>
       </div>
 
-      <button onClick={() => setIsReviewsDrawerOpen(true)} className="fixed right-0 top-[40%] -translate-y-1/2 bg-yellow-400 text-black py-4 px-2.5 rounded-l-2xl z-40 text-[9px] font-black [writing-mode:vertical-lr] rotate-180">⭐ REVIEWS</button>
+      {/* NEW SIDE-TOGGLE BUTTON FOR SOCIAL MEDIA (LEFT SIDE - SYMMETRIC) */}
+      <button 
+        onClick={() => setIsSocialsOpen(true)} 
+        className="fixed left-0 top-[40%] -translate-y-1/2 bg-[#ff5e00] text-white py-4 px-2 rounded-r-2xl z-40 text-[9px] font-black tracking-widest uppercase flex flex-col items-center gap-1 shadow-lg"
+        style={{ writingMode: 'vertical-lr' }}
+      >
+        📱 FOLLOW & EARN
+      </button>
+
+      {/* FIXED REVIEW SIDE TOGGLE (RIGHT SIDE) */}
+      <button 
+        onClick={() => setIsReviewsDrawerOpen(true)} 
+        className="fixed right-0 top-[40%] -translate-y-1/2 bg-yellow-400 text-black py-4 px-2 rounded-l-2xl z-40 text-[9px] font-black tracking-widest uppercase flex flex-col items-center gap-1 shadow-lg"
+        style={{ writingMode: 'vertical-lr' }}
+      >
+        ⭐ REVIEWS
+      </button>
 
       <main className="pt-4 px-4 max-w-lg mx-auto space-y-6">
         <div className="w-full h-44 rounded-3xl overflow-hidden relative border border-white/5 bg-white/[0.02]">
@@ -689,6 +748,25 @@ export default function BbCafeHome() {
         )}
       </AnimatePresence>
 
+      {/* --- NEW PREMIUM FLOATING CART BUTTON (Only visible when cart has items) --- */}
+      {cart.length > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-full max-w-md px-4">
+          <button
+            onClick={() => setIsCartOpen(true)}
+            className="w-full bg-gradient-to-r from-orange-500 to-orange-600 text-white py-4.5 px-6 rounded-2xl font-black text-sm uppercase flex justify-between items-center shadow-2xl border border-white/10 active:scale-95 transition-all"
+          >
+            <div className="flex items-center gap-2.5">
+              <ShoppingBag size={18} />
+              <span>{cart.reduce((acc: number, item: any) => acc + item.quantity, 0)} Items Added</span>
+            </div>
+            <div className="flex items-center gap-1.5 bg-white/10 px-3.5 py-1.5 rounded-xl border border-white/5">
+              <span>View Cart</span>
+              <ChevronRight size={14} />
+            </div>
+          </button>
+        </div>
+      )}
+
       {/* CONTACT DETAILS MODAL */}
       <AnimatePresence>
         {isLoginOpen && (
@@ -748,59 +826,120 @@ export default function BbCafeHome() {
         )}
       </AnimatePresence>
 
-      {/* --- SOCIAL MEDIA LINKS MODAL --- */}
+      {/* --- GAMIFIED SOCIAL MEDIA MODAL --- */}
       <AnimatePresence>
         {isSocialsOpen && (
           <div className="fixed inset-0 bg-black/95 z-[250] flex items-center justify-center p-6">
             <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="bg-[#111] w-full max-w-md p-8 rounded-[3rem] border border-white/10 text-center space-y-6 relative overflow-hidden">
               <div className="absolute -top-10 -left-10 w-32 h-32 bg-orange-500/10 blur-3xl rounded-full" />
               <div>
-                <h3 className="text-2xl font-black text-orange-500 uppercase italic">Connect With Us</h3>
-                <p className="text-[10px] text-gray-500 font-bold uppercase">BUM BUM Cafe Mohandra</p>
+                <h3 className="text-2xl font-black text-orange-500 uppercase italic">Connect & Earn Points</h3>
+                <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">हर प्लेटफार्म पर फॉलो/सब्सक्राइब करने का +1 पॉइंट पाएं!</p>
               </div>
               <div className="space-y-3 text-left max-h-[22rem] overflow-y-auto no-scrollbar pr-1">
-                <a href="https://wa.me/919714293759" target="_blank" rel="noopener noreferrer" className="flex items-center gap-4 bg-green-500/10 border border-green-500/20 p-3.5 rounded-2xl active:scale-[0.98] transition-all">
-                  <span className="text-2xl">🟢</span>
-                  <div>
-                    <h4 className="text-xs font-black text-white">WhatsApp Message</h4>
-                    <p className="text-[8px] text-gray-400 font-bold uppercase mt-0.5">Contact Us: 9714293759</p>
+                
+                {/* WHATSAPP MESSAGE */}
+                <button 
+                  onClick={() => handleSocialClick('whatsapp_msg', 'https://wa.me/919714293759')}
+                  className="w-full flex items-center justify-between bg-green-500/10 border border-green-500/20 p-3.5 rounded-2xl active:scale-[0.98] transition-all text-left"
+                >
+                  <div className="flex items-center gap-4">
+                    <span className="text-2xl">🟢</span>
+                    <div>
+                      <h4 className="text-xs font-black text-white">WhatsApp Message</h4>
+                      <p className="text-[8px] text-gray-400 font-bold uppercase mt-0.5">Contact Us: 9714293759</p>
+                    </div>
                   </div>
-                </a>
-                <a href="https://whatsapp.com/channel/0029VaLhggoGE56natoQI43y" target="_blank" rel="noopener noreferrer" className="flex items-center gap-4 bg-emerald-500/10 border border-emerald-500/20 p-3.5 rounded-2xl active:scale-[0.98] transition-all">
-                  <span className="text-2xl">📢</span>
-                  <div>
-                    <h4 className="text-xs font-black text-white">WhatsApp Channel</h4>
-                    <p className="text-[8px] text-gray-400 font-bold uppercase mt-0.5">Subscribe for Offers</p>
+                  <span className={`text-[9px] font-black uppercase px-2.5 py-1 rounded-lg ${getClaimStatus('whatsapp_msg').startsWith('✅') ? 'bg-green-500/20 text-green-400' : 'bg-yellow-400 text-black animate-pulse'}`}>
+                    {getClaimStatus('whatsapp_msg')}
+                  </span>
+                </button>
+
+                {/* WHATSAPP CHANNEL */}
+                <button 
+                  onClick={() => handleSocialClick('whatsapp_channel', 'https://whatsapp.com/channel/0029VaLhggoGE56natoQI43y')}
+                  className="w-full flex items-center justify-between bg-emerald-500/10 border border-emerald-500/20 p-3.5 rounded-2xl active:scale-[0.98] transition-all text-left"
+                >
+                  <div className="flex items-center gap-4">
+                    <span className="text-2xl">📢</span>
+                    <div>
+                      <h4 className="text-xs font-black text-white">WhatsApp Channel</h4>
+                      <p className="text-[8px] text-gray-400 font-bold uppercase mt-0.5">Subscribe for Offers</p>
+                    </div>
                   </div>
-                </a>
-                <a href="https://www.youtube.com/@bbcafe.i" target="_blank" rel="noopener noreferrer" className="flex items-center gap-4 bg-red-600/10 border border-red-600/20 p-3.5 rounded-2xl active:scale-[0.98] transition-all">
-                  <span className="text-2xl">🔴</span>
-                  <div>
-                    <h4 className="text-xs font-black text-white">YouTube</h4>
-                    <p className="text-[8px] text-gray-400 font-bold uppercase mt-0.5">@bbcafe.i</p>
+                  <span className={`text-[9px] font-black uppercase px-2.5 py-1 rounded-lg ${getClaimStatus('whatsapp_channel').startsWith('✅') ? 'bg-green-500/20 text-green-400' : 'bg-yellow-400 text-black animate-pulse'}`}>
+                    {getClaimStatus('whatsapp_channel')}
+                  </span>
+                </button>
+
+                {/* YOUTUBE */}
+                <button 
+                  onClick={() => handleSocialClick('youtube', 'https://www.youtube.com/@bbcafe.i')}
+                  className="w-full flex items-center justify-between bg-red-600/10 border border-red-600/20 p-3.5 rounded-2xl active:scale-[0.98] transition-all text-left"
+                >
+                  <div className="flex items-center gap-4">
+                    <span className="text-2xl">🔴</span>
+                    <div>
+                      <h4 className="text-xs font-black text-white">YouTube Channel</h4>
+                      <p className="text-[8px] text-gray-400 font-bold uppercase mt-0.5">Subscribe @bbcafe.i</p>
+                    </div>
                   </div>
-                </a>
-                <a href="https://www.instagram.com/bbcafe.in/" target="_blank" rel="noopener noreferrer" className="flex items-center gap-4 bg-pink-500/10 border border-pink-500/20 p-3.5 rounded-2xl active:scale-[0.98] transition-all">
-                  <span className="text-2xl">📸</span>
-                  <div>
-                    <h4 className="text-xs font-black text-white">Instagram</h4>
-                    <p className="text-[8px] text-gray-400 font-bold uppercase mt-0.5">@bbcafe.in</p>
+                  <span className={`text-[9px] font-black uppercase px-2.5 py-1 rounded-lg ${getClaimStatus('youtube').startsWith('✅') ? 'bg-green-500/20 text-green-400' : 'bg-yellow-400 text-black animate-pulse'}`}>
+                    {getClaimStatus('youtube')}
+                  </span>
+                </button>
+
+                {/* INSTAGRAM */}
+                <button 
+                  onClick={() => handleSocialClick('instagram', 'https://www.instagram.com/bbcafe.in/')}
+                  className="w-full flex items-center justify-between bg-pink-500/10 border border-pink-500/20 p-3.5 rounded-2xl active:scale-[0.98] transition-all text-left"
+                >
+                  <div className="flex items-center gap-4">
+                    <span className="text-2xl">📸</span>
+                    <div>
+                      <h4 className="text-xs font-black text-white">Instagram</h4>
+                      <p className="text-[8px] text-gray-400 font-bold uppercase mt-0.5">Follow @bbcafe.in</p>
+                    </div>
                   </div>
-                </a>
-                <a href="https://www.facebook.com/bbcafe.in/" target="_blank" rel="noopener noreferrer" className="flex items-center gap-4 bg-blue-600/10 border border-blue-600/20 p-3.5 rounded-2xl active:scale-[0.98] transition-all">
-                  <span className="text-2xl">🔵</span>
-                  <div>
-                    <h4 className="text-xs font-black text-white">Facebook</h4>
-                    <p className="text-[8px] text-gray-400 font-bold uppercase mt-0.5">@bbcafe.in</p>
+                  <span className={`text-[9px] font-black uppercase px-2.5 py-1 rounded-lg ${getClaimStatus('instagram').startsWith('✅') ? 'bg-green-500/20 text-green-400' : 'bg-yellow-400 text-black animate-pulse'}`}>
+                    {getClaimStatus('instagram')}
+                  </span>
+                </button>
+
+                {/* FACEBOOK */}
+                <button 
+                  onClick={() => handleSocialClick('facebook', 'https://www.facebook.com/bbcafe.in/')}
+                  className="w-full flex items-center justify-between bg-blue-600/10 border border-blue-600/20 p-3.5 rounded-2xl active:scale-[0.98] transition-all text-left"
+                >
+                  <div className="flex items-center gap-4">
+                    <span className="text-2xl">🔵</span>
+                    <div>
+                      <h4 className="text-xs font-black text-white">Facebook</h4>
+                      <p className="text-[8px] text-gray-400 font-bold uppercase mt-0.5">Like @bbcafe.in</p>
+                    </div>
                   </div>
-                </a>
-                <a href="https://www.snapchat.com/add/bbcafe.in" target="_blank" rel="noopener noreferrer" className="flex items-center gap-4 bg-yellow-400/10 hover:bg-yellow-400/20 border border-yellow-400/20 p-3.5 rounded-2xl active:scale-[0.98] transition-all">
-                  <span className="text-2xl">🟡</span>
-                  <div>
-                    <h4 className="text-xs font-black text-white">Snapchat</h4>
-                    <p className="text-[8px] text-gray-400 font-bold uppercase mt-0.5">Add bbcafe.in</p>
+                  <span className={`text-[9px] font-black uppercase px-2.5 py-1 rounded-lg ${getClaimStatus('facebook').startsWith('✅') ? 'bg-green-500/20 text-green-400' : 'bg-yellow-400 text-black animate-pulse'}`}>
+                    {getClaimStatus('facebook')}
+                  </span>
+                </button>
+
+                {/* SNAPCHAT */}
+                <button 
+                  onClick={() => handleSocialClick('snapchat', 'https://www.snapchat.com/add/bbcafe.in')}
+                  className="w-full flex items-center justify-between bg-yellow-400/10 border border-yellow-400/20 p-3.5 rounded-2xl active:scale-[0.98] transition-all text-left"
+                >
+                  <div className="flex items-center gap-4">
+                    <span className="text-2xl">🟡</span>
+                    <div>
+                      <h4 className="text-xs font-black text-white">Snapchat</h4>
+                      <p className="text-[8px] text-gray-400 font-bold uppercase mt-0.5">Add bbcafe.in</p>
+                    </div>
                   </div>
-                </a>
+                  <span className={`text-[9px] font-black uppercase px-2.5 py-1 rounded-lg ${getClaimStatus('snapchat').startsWith('✅') ? 'bg-green-500/20 text-green-400' : 'bg-yellow-400 text-black animate-pulse'}`}>
+                    {getClaimStatus('snapchat')}
+                  </span>
+                </button>
+
               </div>
               <button type="button" onClick={() => setIsSocialsOpen(false)} className="w-full bg-orange-500 text-black font-black p-4 rounded-xl text-xs uppercase">CLOSE</button>
             </motion.div>
