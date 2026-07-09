@@ -110,7 +110,7 @@ export default function BbCafeHome() {
     return () => unsubPoints();
   }, [customerDetails]);
 
-  // Compute categories cleanly with duplicates and explicitly hidden categories removed (Circular buttons dynamically hide)
+  // Compute categories cleanly with duplicates and explicitly hidden categories removed
   const visibleCategories = useMemo(() => {
     const baseCategories = ["All", ...FALLBACK_CATEGORIES.filter(c => c !== "All")];
     const dbCatsMap = new Map();
@@ -160,7 +160,6 @@ export default function BbCafeHome() {
     }
   };
 
-  // Deduplicate and filter menu based on active category status
   const deduplicatedMenu = useMemo(() => {
     const seen = new Set();
     const hiddenCategoryNames = new Set(dbCategories.filter((c: any) => c.isVisible === false).map((c: any) => String(c.name).toLowerCase().trim()));
@@ -765,7 +764,7 @@ export default function BbCafeHome() {
                     <p className="text-[8px] text-gray-400 font-bold uppercase mt-0.5">@bbcafe.in</p>
                   </div>
                 </a>
-                <a href="https://www.snapchat.com/add/bbcafe.in" target="_blank" rel="noopener noreferrer" className="flex items-center gap-4 bg-yellow-400/10 border border-yellow-400/20 p-3.5 rounded-2xl active:scale-[0.98] transition-all">
+                <a href="https://www.snapchat.com/add/bbcafe.in" target="_blank" rel="noopener noreferrer" className="flex items-center gap-4 bg-yellow-400/10 hover:bg-yellow-400/20 border border-yellow-400/20 p-3.5 rounded-2xl active:scale-[0.98] transition-all">
                   <span className="text-2xl">🟡</span>
                   <div>
                     <h4 className="text-xs font-black text-white">Snapchat</h4>
