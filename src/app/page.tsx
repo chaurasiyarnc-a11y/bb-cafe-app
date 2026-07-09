@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { db } from '../lib/firebase'; 
 import { collection, onSnapshot, query, addDoc, doc, setDoc, increment } from 'firebase/firestore';
 import { ShoppingBag, Plus, PowerOff, Search, ChevronRight, X, MapPin, Phone, User, Sparkles, Star, Percent } from 'lucide-react';
@@ -159,10 +159,13 @@ export default function BbCafeHome() {
     return () => unsubPoints();
   }, [customerDetails]);
 
-  // Compute categories cleanly
-  const currentCategories = dbCategories.length > 0 
-    ? ["All", ...dbCategories.map(c => c.name)]
-    : FALLBACK_CATEGORIES;
+  // Compute categories cleanly with duplicates removed
+  const currentCategories = useMemo(() => {
+    const rawCategories = dbCategories.length > 0 
+      ? ["All", ...dbCategories.map(c => c.name)]
+      : FALLBACK_CATEGORIES;
+    return Array.from(new Set(rawCategories));
+  }, [dbCategories]);
 
   const getCategoryImage = (catName: string) => {
     const found = dbCategories.find(c => c.name === catName);
@@ -196,8 +199,21 @@ export default function BbCafeHome() {
     }
   };
 
-  // Filter Logic with safe string checking
-  const filteredMenu = menu.filter(item => {
+  // Deduplicate menu items by name (case-insensitive & trimmed) before filtering
+  const deduplicatedMenu = useMemo(() => {
+    const seen = new Set();
+    return menu.filter(item => {
+      const nameKey = item?.name ? String(item.name).toLowerCase().trim() : item.id;
+      if (seen.has(nameKey)) {
+        return false;
+      }
+      seen.add(nameKey);
+      return true;
+    });
+  }, [menu]);
+
+  // Filter Logic with safe string checking on the deduplicated menu
+  const filteredMenu = deduplicatedMenu.filter(item => {
     const itemName = item?.name ? String(item.name).toLowerCase() : "";
     const itemCategory = item?.category ? String(item.category) : "";
     const matchesCategory = selectedCategory === "All" || itemCategory === selectedCategory;
@@ -533,7 +549,7 @@ export default function BbCafeHome() {
             </div>
           </div>
         )}
-      </AnimatePresence>
+      </ AnimatePresence>
 
       {/* --- WRITE REVIEW MODAL --- */}
       <AnimatePresence>
