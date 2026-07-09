@@ -1,6 +1,6 @@
 'use client';
   
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 // Changed to reliable relative path to avoid compile-time path resolution errors
 import { db } from '../../lib/firebase'; 
 import { collection, onSnapshot, query, orderBy, doc, updateDoc, setDoc, addDoc, deleteDoc, increment } from 'firebase/firestore';
@@ -48,8 +48,9 @@ export default function AdminDashboard() {
   const [newRuleName, setNewRuleName] = useState("");
   const [newRulePoints, setNewRulePoints] = useState("");
 
-  // --- CALENDAR DATE FILTER FOR DASHBOARD ---
+  // --- CALENDAR DATE FILTERS ---
   const [filterDate, setFilterDate] = useState(new Date().toISOString().split('T')[0]); // YYYY-MM-DD
+  const [ordersFilterDate, setOrdersFilterDate] = useState(new Date().toISOString().split('T')[0]); // YYYY-MM-DD
 
   // --- ADD PRODUCT STATES ---
   const [showAddForm, setShowAddForm] = useState(false);
@@ -171,15 +172,81 @@ export default function AdminDashboard() {
     window.location.href = "/";
   };
 
-  // --- CUSTOMER PROFILE UPDATER (POINTS ADJUSTER) ---
+  // --- MERGE REGISTERED & HISTORICAL (OLD) CUSTOMERS ---
+  const combinedCustomers = useMemo(() => {
+    const customersMap = new Map();
+    
+    // 1. Process active loyalty database users
+    loyaltyUsers.forEach(user => {
+      const cleanPhone = String(user.id || user.phone || "").replace("+91", "").trim();
+      customersMap.set(cleanPhone, {
+        id: cleanPhone,
+        phone: cleanPhone,
+        name: user.name || "Customer",
+        points: user.points || 0,
+        isRegistered: true
+      });
+    });
+
+    // 2. Scan historical orders to fetch old customer directory safely
+    orders.forEach(order => {
+      if (!order.customerPhone) return;
+      const cleanPhone = String(order.customerPhone).replace("+91", "").trim();
+      if (!customersMap.has(cleanPhone)) {
+        customersMap.set(cleanPhone, {
+          id: cleanPhone,
+          phone: cleanPhone,
+          name: order.customerName || "Customer",
+          points: 0,
+          isRegistered: false
+        });
+      }
+    });
+
+    return Array.from(customersMap.values());
+  }, [loyaltyUsers, orders]);
+
+  // --- COMBINE DYNAMIC + FALLBACK CATEGORIES TO PREVENT EMPTY LISTS ---
+  const combinedCategories = useMemo(() => {
+    const list = [...categories];
+    ADD_CATEGORIES.forEach(fallbackName => {
+      const exists = categories.some(c => String(c.name).toLowerCase().trim() === fallbackName.toLowerCase().trim());
+      if (!exists) {
+        list.push({
+          id: `virtual-${fallbackName.replace(/\s+/g, '-')}`,
+          name: fallbackName,
+          image: "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=150&q=80",
+          isVisible: true,
+          isVirtual: true
+        });
+      }
+    });
+    return list;
+  }, [categories]);
+
+  // --- FILTER & SORT ORDERS BY SELECTED DATE AND SEQUENTIAL TOKEN NUMBER ---
+  const filteredOrdersList = useMemo(() => {
+    const targetDateStr = new Date(ordersFilterDate).toDateString();
+    const matched = orders.filter(o => {
+      if (!o.timestamp) return false;
+      const orderDate = o.timestamp?.toDate ? o.timestamp.toDate().toDateString() : new Date(o.timestamp).toDateString();
+      return orderDate === targetDateStr;
+    });
+    // Sort sequentially by Token Number (Descending so high tokens are on top)
+    return matched.sort((a, b) => Number(b.tokenNumber) - Number(a.tokenNumber));
+  }, [orders, ordersFilterDate]);
+
+  // --- CUSTOMER PROFILE SAVER (POINTS MANUAL OVERRIDE) ---
   const handleUpdateCustomer = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editCustomerName) return toast.error("Name is required!");
     try {
-      await updateDoc(doc(db, "customer_points", editingCustomer.id), {
+      await setDoc(doc(db, "customer_points", editingCustomer.phone), {
         name: editCustomerName,
-        points: Number(editCustomerPoints)
-      });
+        phone: editingCustomer.phone,
+        points: Number(editCustomerPoints),
+        lastActive: new Date()
+      }, { merge: true });
       setEditingCustomer(null);
       toast.success("Customer profile updated!");
     } catch (err) {
@@ -376,9 +443,19 @@ export default function AdminDashboard() {
     } catch (err) { toast.error("Failed to add category"); }
   };
 
-  const toggleCategoryVisibility = async (id: string, currentStatus: boolean) => {
+  const toggleCategoryVisibility = async (cat: any) => {
     try {
-      await updateDoc(doc(db, "categories", id), { isVisible: !currentStatus });
+      if (cat.isVirtual) {
+        // Automatically save virtual fallback category to DB with toggled visibility
+        await addDoc(collection(db, "categories"), {
+          name: cat.name,
+          image: cat.image,
+          isVisible: !cat.isVisible,
+          timestamp: new Date()
+        });
+      } else {
+        await updateDoc(doc(db, "categories", cat.id), { isVisible: !cat.isVisible });
+      }
       toast.success("Category status updated!");
     } catch (err) { toast.error("Failed to update status"); }
   };
@@ -393,10 +470,20 @@ export default function AdminDashboard() {
     e.preventDefault();
     if (!editCatName || !editCatImage) return toast.error("Please fill all fields!");
     try {
-      await updateDoc(doc(db, "categories", editingCategory.id), {
-        name: editCatName,
-        image: editCatImage
-      });
+      if (editingCategory.isVirtual) {
+        // Automatically persist and save virtual category to Database
+        await addDoc(collection(db, "categories"), {
+          name: editCatName,
+          image: editCatImage,
+          isVisible: true,
+          timestamp: new Date()
+        });
+      } else {
+        await updateDoc(doc(db, "categories", editingCategory.id), {
+          name: editCatName,
+          image: editCatImage
+        });
+      }
       setEditingCategory(null);
       toast.success("Category updated successfully!");
     } catch (err) {
@@ -404,10 +491,13 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleDeleteCategory = async (id: string) => {
+  const handleDeleteCategory = async (cat: any) => {
+    if (cat.isVirtual) {
+      return toast.error("यह एक डिफॉल्ट कैटेगरी है। इसे डिलीट करने के लिए पहले इसे एडिट करें।");
+    }
     if (window.confirm("Are you sure you want to delete this Category?")) {
       try {
-        await deleteDoc(doc(db, "categories", id));
+        await deleteDoc(doc(db, "categories", cat.id));
         toast.success("Category Deleted!");
       } catch (err) { toast.error("Failed to delete category"); }
     }
@@ -637,16 +727,6 @@ export default function AdminDashboard() {
     }
   };
 
-  // --- STATUS CHANGE HANDLER ---
-  const handleStatusChange = async (orderId: string, newStatus: string) => {
-    try {
-      await updateDoc(doc(db, "orders", orderId), { status: newStatus });
-      toast.success("Status Sync Success!");
-    } catch (e) {
-      toast.error("Failed to Sync Status.");
-    }
-  };
-
   // --- Loading Screen ---
   if (loading) {
     return (
@@ -722,7 +802,7 @@ export default function AdminDashboard() {
         <button onClick={() => setTab('orders')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'orders' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>📦 Orders ({orders.length})</button>
         <button onClick={() => setTab('menu')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'menu' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>🍔 Menu List</button>
         <button onClick={() => setTab('categories')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'categories' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>🗂️ Categories</button>
-        <button onClick={() => setTab('customers')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'customers' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>👥 Customers ({loyaltyUsers.length})</button>
+        <button onClick={() => setTab('customers')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'customers' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>👥 Customers ({combinedCustomers.length})</button>
         <button onClick={() => setTab('loyalty')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'loyalty' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>🎁 Loyalty Rules</button>
         <button onClick={() => setTab('banners')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'banners' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>🖼️ Banners</button>
         <button onClick={() => setTab('coupons')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'coupons' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>🎟️ Coupons</button>
@@ -824,41 +904,59 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* --- TAB 2: LIVE ORDERS --- */}
+        {/* --- TAB 2: LIVE ORDERS WITH DATE FILTER & SEQUENTIAL TOKENS --- */}
         {tab === 'orders' && (
           <div className="space-y-4">
-            {orders.length === 0 && <p className="text-center text-gray-600 py-20 font-bold uppercase tracking-widest">No active orders yet...</p>}
-            {orders.map((o) => (
-              <div key={o.id} className="bg-white/[0.03] p-6 rounded-[2rem] border border-white/5 relative overflow-hidden">
-                <div className="flex justify-between items-start mb-4">
-                  <span className="bg-orange-500 text-black text-[10px] px-3 py-1 rounded-full font-black">TOKEN: #{o.tokenNumber}</span>
-                  <span className="text-orange-500 font-black text-xl">₹{o.total}</span>
-                </div>
-                
-                <div className="space-y-2 mb-6 border-b border-white/5 pb-4">
-                  {o.items?.map((item: any, idx: number) => (
-                    <p key={idx} className="text-sm font-bold text-gray-300">
-                      <span className="text-orange-500">×{item.quantity}</span> {item.name}
-                    </p>
-                  ))}
-                </div>
-
-                <div className="grid grid-cols-2 gap-4 text-[11px] font-bold text-gray-500 uppercase tracking-wider">
-                  <div className="flex items-center gap-2"><Phone size={12}/> {o.customerPhone}</div>
-                  <div className="flex items-center gap-2"><MapPin size={12}/> {o.address}</div>
-                  <div className="flex items-center gap-2 col-span-2"><Calendar size={12}/> {o.timestamp?.toDate ? o.timestamp.toDate().toLocaleString() : 'Just now'}</div>
-                </div>
-                <div className="mt-4 pt-4 border-t border-white/5 flex justify-between items-center">
-                  <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Name: {o.customerName || 'N/A'}</span>
-                  <select value={o.status || 'pending'} onChange={(e) => handleStatusChange(o.id, e.target.value)} className="bg-black/60 border border-white/10 text-xs font-bold rounded-xl p-2 px-3 text-white outline-none focus:border-orange-500 cursor-pointer">
-                    <option value="pending">⏳ Pending (Confirming)</option>
-                    <option value="preparing">👨‍🍳 Preparing in Kitchen</option>
-                    <option value="out_for_delivery">🛵 Out for Delivery</option>
-                    <option value="delivered">✅ Delivered / Completed</option>
-                  </select>
-                </div>
+            
+            {/* Orders Calendar Filter */}
+            <div className="bg-[#111] border border-white/5 p-5 rounded-3xl flex justify-between items-center">
+              <div>
+                <h4 className="font-black text-sm text-orange-500 uppercase tracking-wider">📦 Filter Daily Orders</h4>
+                <p className="text-[10px] text-gray-500 font-bold mt-0.5">Matching Token Sequences</p>
               </div>
-            ))}
+              <input 
+                type="date" 
+                value={ordersFilterDate} 
+                onChange={(e) => setOrdersFilterDate(e.target.value)} 
+                className="bg-black/60 border border-white/10 rounded-xl p-3 text-xs font-bold text-orange-500 outline-none cursor-pointer"
+              />
+            </div>
+
+            {filteredOrdersList.length === 0 ? (
+              <p className="text-center text-gray-600 py-20 font-bold uppercase tracking-widest text-xs">No active orders found for this date...</p>
+            ) : (
+              filteredOrdersList.map((o) => (
+                <div key={o.id} className="bg-white/[0.03] p-6 rounded-[2rem] border border-white/5 relative overflow-hidden">
+                  <div className="flex justify-between items-start mb-4">
+                    <span className="bg-orange-500 text-black text-[10px] px-3 py-1 rounded-full font-black">TOKEN: #{o.tokenNumber}</span>
+                    <span className="text-orange-500 font-black text-xl">₹{o.total}</span>
+                  </div>
+                  
+                  <div className="space-y-2 mb-6 border-b border-white/5 pb-4">
+                    {o.items?.map((item: any, idx: number) => (
+                      <p key={idx} className="text-sm font-bold text-gray-300">
+                        <span className="text-orange-500">×{item.quantity}</span> {item.name}
+                      </p>
+                    ))}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4 text-[11px] font-bold text-gray-500 uppercase tracking-wider">
+                    <div className="flex items-center gap-2"><Phone size={12}/> {o.customerPhone}</div>
+                    <div className="flex items-center gap-2"><MapPin size={12}/> {o.address}</div>
+                    <div className="flex items-center gap-2 col-span-2"><Calendar size={12}/> {o.timestamp?.toDate ? o.timestamp.toDate().toLocaleString() : 'Just now'}</div>
+                  </div>
+                  <div className="mt-4 pt-4 border-t border-white/5 flex justify-between items-center">
+                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Name: {o.customerName || 'N/A'}</span>
+                    <select value={o.status || 'pending'} onChange={(e) => handleStatusChange(o.id, e.target.value)} className="bg-black/60 border border-white/10 text-xs font-bold rounded-xl p-2 px-3 text-white outline-none focus:border-orange-500 cursor-pointer">
+                      <option value="pending">⏳ Pending (Confirming)</option>
+                      <option value="preparing">👨‍🍳 Preparing in Kitchen</option>
+                      <option value="out_for_delivery">🛵 Out for Delivery</option>
+                      <option value="delivered">✅ Delivered / Completed</option>
+                    </select>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         )}
 
@@ -1076,37 +1174,36 @@ export default function AdminDashboard() {
               </form>
             )}
 
-            {/* Dynamic Category List */}
+            {/* Dynamic Combined Category List */}
             <div className="space-y-3">
-              <p className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">Category List ({categories.length})</p>
-              {categories.length === 0 ? (
-                <p className="text-center text-xs font-bold text-gray-500 py-6 uppercase">No custom categories added yet...</p>
-              ) : (
-                categories.map(c => (
-                  <div key={c.id} className="bg-white/[0.02] border border-white/5 p-4 rounded-3xl flex justify-between items-center hover:bg-white/[0.04] transition-all">
-                    <div className="flex items-center gap-4">
-                      <img src={c.image} className="w-12 h-12 rounded-full object-cover border border-white/10" alt="Category"/>
+              <p className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">Category List ({combinedCategories.length})</p>
+              {combinedCategories.map(c => (
+                <div key={c.id} className="bg-white/[0.02] border border-white/5 p-4 rounded-3xl flex justify-between items-center hover:bg-white/[0.04] transition-all">
+                  <div className="flex items-center gap-4">
+                    <img src={c.image} className="w-12 h-12 rounded-full object-cover border border-white/10" alt="Category"/>
+                    <div className="flex flex-col">
                       <h4 className="font-black text-sm text-gray-200">{c.name}</h4>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button onClick={() => startEditingCategory(c)} className="p-3 bg-blue-500/10 text-blue-500 rounded-xl hover:bg-blue-500/20 active:scale-95 transition-all">
-                        <Edit size={18}/>
-                      </button>
-                      <button onClick={() => toggleCategoryVisibility(c.id, c.isVisible !== false)} className={`p-3 rounded-xl transition-all ${c.isVisible !== false ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
-                        {c.isVisible !== false ? <Eye size={18}/> : <EyeOff size={18}/>}
-                      </button>
-                      <button onClick={() => handleDeleteCategory(c.id)} className="p-3 bg-red-500/10 text-red-500 rounded-xl hover:bg-red-500/20 active:scale-95 transition-all">
-                        <Trash size={18}/>
-                      </button>
+                      {c.isVirtual && <span className="text-[8px] text-orange-500 font-bold uppercase tracking-wider">Default Back-up</span>}
                     </div>
                   </div>
-                ))
-              )}
+                  <div className="flex items-center gap-2">
+                    <button onClick={() => startEditingCategory(c)} className="p-3 bg-blue-500/10 text-blue-500 rounded-xl hover:bg-blue-500/20 active:scale-95 transition-all">
+                      <Edit size={18}/>
+                    </button>
+                    <button onClick={() => toggleCategoryVisibility(c)} className={`p-3 rounded-xl transition-all ${c.isVisible !== false ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
+                      {c.isVisible !== false ? <Eye size={18}/> : <EyeOff size={18}/>}
+                    </button>
+                    <button onClick={() => handleDeleteCategory(c)} className="p-3 bg-red-500/10 text-red-500 rounded-xl hover:bg-red-500/20 active:scale-95 transition-all">
+                      <Trash size={18}/>
+                    </button>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         )}
 
-        {/* --- TAB 5: DEDICATED CUSTOMERS TAB --- */}
+        {/* --- TAB 5: DEDICATED CUSTOMERS TAB (COMBINED & DEDUPED) --- */}
         {tab === 'customers' && (
           <div className="space-y-6">
             <h3 className="text-xl font-black text-orange-500 uppercase tracking-wider flex items-center gap-2"><User size={20}/> Customer Management</h3>
@@ -1134,10 +1231,10 @@ export default function AdminDashboard() {
 
             {/* Customers Profile Directory */}
             <div className="space-y-4">
-              {loyaltyUsers.length === 0 ? (
+              {combinedCustomers.length === 0 ? (
                 <p className="text-center text-xs font-bold text-gray-500 py-10 uppercase">No customers registered yet...</p>
               ) : (
-                loyaltyUsers.map(user => {
+                combinedCustomers.map(user => {
                   const stats = getCustomerLoyaltyMetrics(user.phone);
                   return (
                     <div key={user.id} className="bg-[#111] border border-white/5 p-5 rounded-3xl flex justify-between items-center hover:border-white/10 transition-all">
