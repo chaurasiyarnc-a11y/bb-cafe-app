@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useEffect, useMemo } from 'react';
 import { db } from '../lib/firebase'; 
-import { collection, onSnapshot, query, addDoc, doc, setDoc, increment } from 'firebase/firestore';
+import { collection, onSnapshot, query, addDoc, doc, setDoc, increment, runTransaction } from 'firebase/firestore';
 import { ShoppingBag, Plus, PowerOff, Search, ChevronRight, X, MapPin, Phone, User, Sparkles, Star, Percent, Gift } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
@@ -101,10 +101,10 @@ export default function BbCafeHome() {
       setMenu(items.filter((i: any) => i.isVisible !== false));
     });
 
-    // Realtime Dynamic Categories
+    // Realtime Dynamic Categories (Fetch all category states to determine client visibility)
     const unsubCats = onSnapshot(collection(db, "categories"), (snap) => {
       const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      setDbCategories(list.filter((c: any) => c.isVisible !== false));
+      setDbCategories(list);
     });
 
     // Banners
@@ -159,10 +159,11 @@ export default function BbCafeHome() {
     return () => unsubPoints();
   }, [customerDetails]);
 
-  // Compute categories cleanly with duplicates removed
-  const currentCategories = useMemo(() => {
-    const rawCategories = dbCategories.length > 0 
-      ? ["All", ...dbCategories.map(c => c.name)]
+  // Compute categories cleanly with duplicates and explicitly hidden categories removed
+  const visibleCategories = useMemo(() => {
+    const visibleList = dbCategories.filter((c: any) => c.isVisible !== false);
+    const rawCategories = visibleList.length > 0 
+      ? ["All", ...visibleList.map(c => c.name)]
       : FALLBACK_CATEGORIES;
     return Array.from(new Set(rawCategories));
   }, [dbCategories]);
@@ -199,10 +200,25 @@ export default function BbCafeHome() {
     }
   };
 
-  // Deduplicate menu items by name (case-insensitive & trimmed) before filtering
+  // Deduplicate menu items by name & FILTER OUT items from hidden categories completely
   const deduplicatedMenu = useMemo(() => {
     const seen = new Set();
+    
+    // Get lowercase set of explicitly hidden categories
+    const hiddenCategoryNames = new Set(
+      dbCategories
+        .filter((c: any) => c.isVisible === false)
+        .map((c: any) => String(c.name).toLowerCase().trim())
+    );
+
     return menu.filter(item => {
+      const itemCatClean = item?.category ? String(item.category).toLowerCase().trim() : "";
+      
+      // If the category of this item is hidden, hide the item entirely
+      if (hiddenCategoryNames.has(itemCatClean)) {
+        return false;
+      }
+
       const nameKey = item?.name ? String(item.name).toLowerCase().trim() : item.id;
       if (seen.has(nameKey)) {
         return false;
@@ -210,9 +226,9 @@ export default function BbCafeHome() {
       seen.add(nameKey);
       return true;
     });
-  }, [menu]);
+  }, [menu, dbCategories]);
 
-  // Filter Logic with safe string checking on the deduplicated menu
+  // Filter Logic with safe string checking on the deduplicated & hidden-category-filtered menu
   const filteredMenu = deduplicatedMenu.filter(item => {
     const itemName = item?.name ? String(item.name).toLowerCase() : "";
     const itemCategory = item?.category ? String(item.category) : "";
@@ -240,7 +256,7 @@ export default function BbCafeHome() {
     toast.success(`${name} Cart में जोड़ दिया गया है!`);
   };
 
-  // --- WHATSAPP ORDER LOGIC (FAULT-TOLERANT BYPASS) ---
+  // --- WHATSAPP ORDER LOGIC WITH FIRESTORE TRANSACTION BILL INCREMENT ---
   const sendWhatsAppOrder = async () => {
     if (!customerDetails) {
       setIsLoginOpen(true);
@@ -248,9 +264,29 @@ export default function BbCafeHome() {
     }
     if (!address || address.trim().length < 10) return toast.error("Please enter full address!");
 
-    const tokenNumber = Math.floor(1000 + Math.random() * 9000);
-    const subtotal = getTotal();
+    const tokenNumber = Math.floor(1000 + Math.random() * 9000); // Random Token number
+    let billNumber = 1; // Sequential Bill number initial setup
     
+    const counterDocRef = doc(db, "settings", "store_bill_counter");
+
+    // Securely running a transaction to increment and fetch unique sequential bill number
+    try {
+      await runTransaction(db, async (transaction) => {
+        const counterDoc = await transaction.get(counterDocRef);
+        if (!counterDoc.exists()) {
+          transaction.set(counterDocRef, { nextBillNumber: 2 });
+          billNumber = 1;
+        } else {
+          billNumber = counterDoc.data().nextBillNumber || 1;
+          transaction.update(counterDocRef, { nextBillNumber: billNumber + 1 });
+        }
+      });
+    } catch (e) {
+      console.error("Frictionless transaction fallback active. Generating dynamic timestamp index:", e);
+      billNumber = Math.floor((Date.now() / 1000) % 100000);
+    }
+
+    const subtotal = getTotal();
     let deliveryCharge = subtotal < 99 ? 20 : 0;
     const couponDiscount = appliedCoupon ? Number(appliedCoupon.discountValue) : 0;
     const finalTotal = Math.max(0, subtotal - couponDiscount) + deliveryCharge;
@@ -262,6 +298,7 @@ export default function BbCafeHome() {
     // 1. Try background write to Firebase (If fails, doesn't block WhatsApp!)
     try {
       await addDoc(collection(db, "orders"), {
+        billNumber,
         tokenNumber, 
         customerName: customerDetails?.name || "Customer",
         customerPhone: customerDetails?.phone || "No Phone", 
@@ -284,14 +321,14 @@ export default function BbCafeHome() {
         }, { merge: true });
       }
     } catch (e) { 
-      console.error("Firestore database permission/write locked. Bypassing safely directly to WhatsApp:", e);
+      console.error("Firestore DB permission bypass safety trigger. Ordering directly to WhatsApp:", e);
     }
 
     // 2. Open WhatsApp (Always triggered!)
     let itemsText = "";
     cart.forEach((i: any) => itemsText += `• ${i.name || "Item"} x${i.quantity || 1} - ₹${(i.price || 0) * (i.quantity || 1)}\n`);
     
-    const msg = `🔥 *BUM BUM CAFE - NEW ORDER*\n\n*Order ID:* #${tokenNumber}\n*Customer:* ${customerDetails?.name || "Customer"}\n*Phone:* ${customerDetails?.phone || "No Phone"}\n*Address:* ${address}\n\n*ITEMS:*\n${itemsText}\n*Subtotal:* ₹${subtotal}\n*Coupon Discount:* -₹${couponDiscount}\n*Delivery:* ₹${deliveryCharge}\n*TOTAL BILL: ₹${finalTotal}*\n\n*Points Earned:* +${pointsEarned} Pts\n${totalPointsCost > 0 ? `*Points Redeemed:* -${totalPointsCost} Pts\n` : ''}\n_Confirm order by replying 'YES'_`;
+    const msg = `🔥 *BUM BUM CAFE - NEW ORDER*\n\n*Bill No:* #${billNumber}\n*Token No:* #${tokenNumber}\n*Customer:* ${customerDetails?.name || "Customer"}\n*Phone:* ${customerDetails?.phone || "No Phone"}\n*Address:* ${address}\n\n*ITEMS:*\n${itemsText}\n*Subtotal:* ₹${subtotal}\n*Coupon Discount:* -₹${couponDiscount}\n*Delivery:* ₹${deliveryCharge}\n*TOTAL BILL: ₹${finalTotal}*\n\n*Points Earned:* +${pointsEarned} Pts\n${totalPointsCost > 0 ? `*Points Redeemed:* -${totalPointsCost} Pts\n` : ''}\n_Confirm order by replying 'YES'_`;
     
     window.open(`https://wa.me/919714293759?text=${encodeURIComponent(msg)}`, '_blank');
     
@@ -439,11 +476,11 @@ export default function BbCafeHome() {
           )}
         </div>
 
-        {/* INSPIRATION CATEGORIES GRID */}
+        {/* INSPIRATION CATEGORIES GRID (Hides categories that are configured invisible) */}
         <div className="bg-white/[0.01] border border-white/5 p-5 rounded-[2.5rem] shadow-xl space-y-4">
           <p className="text-[9px] font-black uppercase tracking-widest text-orange-500">Inspiration for your first order</p>
           <div className="grid grid-cols-4 gap-x-2 gap-y-5 text-center">
-            {(showAllCategories ? currentCategories : currentCategories.slice(0, 8)).map((cat) => {
+            {(showAllCategories ? visibleCategories : visibleCategories.slice(0, 8)).map((cat) => {
               const isActive = selectedCategory === cat;
               return (
                 <button key={cat} onClick={() => setSelectedCategory(cat)} type="button" className="flex flex-col items-center group outline-none">
