@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 // Changed to reliable relative path to avoid compile-time path resolution errors
 import { db } from '../../lib/firebase'; 
 import { collection, onSnapshot, query, orderBy, doc, updateDoc, setDoc, addDoc, deleteDoc, increment } from 'firebase/firestore';
-import { Power, Eye, EyeOff, User, MapPin, Calendar, CheckCircle2, LogOut, Loader2, Phone, Plus, Trash, Edit, X, Lock, BarChart3, Download, Folder, Percent, ImageIcon, Gift } from 'lucide-react';
+import { Power, Eye, EyeOff, User, MapPin, Calendar, CheckCircle2, LogOut, Loader2, Phone, Plus, Trash, Edit, X, Lock, BarChart3, Download, Folder, Percent, ImageIcon, Gift, Settings } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 
 // Categories default list
@@ -14,7 +14,7 @@ export default function AdminDashboard() {
   const [isVerified, setIsVerified] = useState(false);
   const [loading, setLoading] = useState(true);
   const [passcode, setPasscode] = useState("");
-  const [tab, setTab] = useState<'dashboard' | 'orders' | 'menu' | 'categories' | 'banners' | 'reviews' | 'coupons'>('dashboard');
+  const [tab, setTab] = useState<'dashboard' | 'orders' | 'menu' | 'categories' | 'customers' | 'loyalty' | 'banners' | 'reviews' | 'coupons'>('dashboard');
   
   const [orders, setOrders] = useState<any[]>([]);
   const [menu, setMenu] = useState<any[]>([]);
@@ -24,6 +24,12 @@ export default function AdminDashboard() {
   const [categories, setCategories] = useState<any[]>([]);
   const [newCatName, setNewCatName] = useState("");
   const [newCatImage, setNewCatImage] = useState("");
+  
+  // Category Editing State
+  const [editingCategory, setEditingCategory] = useState<any>(null);
+  const [editCatName, setEditCatName] = useState("");
+  const [editCatImage, setEditCatImage] = useState("");
+
   const [banners, setBanners] = useState<any[]>([]);
   const [newBannerUrl, setNewBannerUrl] = useState("");
   const [reviews, setReviews] = useState<any[]>([]);
@@ -33,6 +39,17 @@ export default function AdminDashboard() {
 
   // --- CUSTOMER LOYALTY CLUB STATE ---
   const [loyaltyUsers, setLoyaltyUsers] = useState<any[]>([]);
+  const [editingCustomer, setEditingCustomer] = useState<any>(null);
+  const [editCustomerName, setEditCustomerName] = useState("");
+  const [editCustomerPoints, setEditCustomerPoints] = useState(0);
+
+  // --- DYNAMIC LOYALTY RULES STATE ---
+  const [loyaltyRules, setLoyaltyRules] = useState<any[]>([]);
+  const [newRuleName, setNewRuleName] = useState("");
+  const [newRulePoints, setNewRulePoints] = useState("");
+
+  // --- CALENDAR DATE FILTER FOR DASHBOARD ---
+  const [filterDate, setFilterDate] = useState(new Date().toISOString().split('T')[0]); // YYYY-MM-DD
 
   // --- ADD PRODUCT STATES ---
   const [showAddForm, setShowAddForm] = useState(false);
@@ -118,6 +135,11 @@ export default function AdminDashboard() {
       setLoyaltyUsers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
 
+    // Listen for Loyalty Rules
+    const unsubRules = onSnapshot(collection(db, "loyalty_rules"), (snap) => {
+      setLoyaltyRules(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+
     return () => {
       unsubOrders();
       unsubProducts();
@@ -127,6 +149,7 @@ export default function AdminDashboard() {
       unsubCoupons();
       unsubReviews();
       unsubLoyalty();
+      unsubRules();
     };
   }, [isVerified]);
 
@@ -148,22 +171,80 @@ export default function AdminDashboard() {
     window.location.href = "/";
   };
 
-  // --- LOYALTY POINTS REDEEM CONTROLLER ---
-  const handleRedeemPoints = async (phone: string, name: string, currentPoints: number, redeemCost: number, giftName: string) => {
-    if (currentPoints < redeemCost) {
-      return toast.error(`Insufficient points! Needs ${redeemCost} Pts for ${giftName}.`);
+  // --- CUSTOMER PROFILE UPDATER (POINTS ADJUSTER) ---
+  const handleUpdateCustomer = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editCustomerName) return toast.error("Name is required!");
+    try {
+      await updateDoc(doc(db, "customer_points", editingCustomer.id), {
+        name: editCustomerName,
+        points: Number(editCustomerPoints)
+      });
+      setEditingCustomer(null);
+      toast.success("Customer profile updated!");
+    } catch (err) {
+      toast.error("Failed to update profile.");
     }
+  };
 
-    if (window.confirm(`Redeem ${redeemCost} points of ${name} (+91${phone}) to give free ${giftName}?`)) {
+  // --- DYNAMIC LOYALTY RULES CONTROLLER ---
+  const handleAddRule = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newRuleName || !newRulePoints) return toast.error("Please fill all fields!");
+    try {
+      await addDoc(collection(db, "loyalty_rules"), {
+        rewardName: newRuleName,
+        pointsCost: Number(newRulePoints),
+        timestamp: new Date()
+      });
+      setNewRuleName(""); setNewRulePoints("");
+      toast.success("New Rule Added!");
+    } catch (err) {
+      toast.error("Failed to add rule.");
+    }
+  };
+
+  const handleDeleteRule = async (id: string) => {
+    if (window.confirm("Are you sure you want to delete this rule?")) {
       try {
-        await updateDoc(doc(db, "customer_points", phone), {
-          points: increment(-redeemCost)
-        });
-        toast.success(`Reward Unlocked: Free ${giftName}! deducted ${redeemCost} Pts.`);
-      } catch (e) {
-        toast.error("Failed to redeem points.");
+        await deleteDoc(doc(db, "loyalty_rules", id));
+        toast.success("Loyalty Rule Deleted!");
+      } catch (err) {
+        toast.error("Failed to delete rule.");
       }
     }
+  };
+
+  // --- CALCULATE CUSTOMER LOYALTY METRICS ---
+  const getCustomerLoyaltyMetrics = (phone: string) => {
+    const targetPhone = String(phone).replace("+91", "").trim();
+    const customerOrders = orders.filter(o => {
+      const oPhone = o.customerPhone ? String(o.customerPhone).replace("+91", "").trim() : "";
+      return oPhone === targetPhone;
+    });
+
+    const totalSpend = customerOrders.reduce((sum, o) => sum + (Number(o.total) || 0), 0);
+    const orderCount = customerOrders.length;
+    
+    let tier = "Bronze Customer 🥉";
+    let tierColor = "text-gray-400";
+    if (orderCount >= 25) {
+      tier = "VIP Platinum 👑";
+      tierColor = "text-indigo-400 font-extrabold";
+    } else if (orderCount >= 10) {
+      tier = "Gold Member 🥇";
+      tierColor = "text-yellow-400 font-extrabold";
+    } else if (orderCount >= 3) {
+      tier = "Silver Member 🥈";
+      tierColor = "text-gray-300 font-extrabold";
+    }
+
+    return {
+      orderCount,
+      totalSpend,
+      tier,
+      tierColor
+    };
   };
 
   // --- CSV / EXCEL EXPORT ENGINE WITH UTF-8 BOM ---
@@ -238,13 +319,14 @@ export default function AdminDashboard() {
     triggerCsvDownload(formattedData, `BumBumCafe_CustomersDirectory_${new Date().toLocaleDateString()}`, headers, keys);
   };
 
-  // --- GET DAILY ANALYTICS METRICS ---
+  // --- CALENDAR DYNAMIC SALES METRICS ---
   const getDailyAnalytics = () => {
-    const todayStr = new Date().toDateString();
+    const targetDateStr = new Date(filterDate).toDateString();
+    
     const todayOrders = orders.filter(o => {
       if (!o.timestamp) return false;
       const orderDate = o.timestamp?.toDate ? o.timestamp.toDate().toDateString() : new Date(o.timestamp).toDateString();
-      return orderDate === todayStr;
+      return orderDate === targetDateStr;
     });
 
     const totalRevenue = todayOrders.reduce((acc, curr) => acc + (Number(curr.total) || 0), 0);
@@ -299,6 +381,27 @@ export default function AdminDashboard() {
       await updateDoc(doc(db, "categories", id), { isVisible: !currentStatus });
       toast.success("Category status updated!");
     } catch (err) { toast.error("Failed to update status"); }
+  };
+
+  const startEditingCategory = (cat: any) => {
+    setEditingCategory(cat);
+    setEditCatName(cat.name);
+    setEditCatImage(cat.image);
+  };
+
+  const handleUpdateCategory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editCatName || !editCatImage) return toast.error("Please fill all fields!");
+    try {
+      await updateDoc(doc(db, "categories", editingCategory.id), {
+        name: editCatName,
+        image: editCatImage
+      });
+      setEditingCategory(null);
+      toast.success("Category updated successfully!");
+    } catch (err) {
+      toast.error("Failed to update category.");
+    }
   };
 
   const handleDeleteCategory = async (id: string) => {
@@ -619,6 +722,8 @@ export default function AdminDashboard() {
         <button onClick={() => setTab('orders')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'orders' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>📦 Orders ({orders.length})</button>
         <button onClick={() => setTab('menu')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'menu' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>🍔 Menu List</button>
         <button onClick={() => setTab('categories')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'categories' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>🗂️ Categories</button>
+        <button onClick={() => setTab('customers')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'customers' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>👥 Customers ({loyaltyUsers.length})</button>
+        <button onClick={() => setTab('loyalty')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'loyalty' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>🎁 Loyalty Rules</button>
         <button onClick={() => setTab('banners')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'banners' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>🖼️ Banners</button>
         <button onClick={() => setTab('coupons')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'coupons' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>🎟️ Coupons</button>
         <button onClick={() => setTab('reviews')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'reviews' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>⭐ Reviews</button>
@@ -631,16 +736,24 @@ export default function AdminDashboard() {
           <div className="space-y-6">
             <h3 className="text-xl font-black text-orange-500 uppercase tracking-wider flex items-center gap-2"><BarChart3 size={20}/> Sales Dashboard</h3>
             
-            {/* Sales Stats Today Grid (Daily) */}
+            {/* Sales Stats Today Grid (Daily) with Date Filter */}
             <div className="bg-[#111] border border-white/5 p-4 rounded-3xl space-y-3">
-              <p className="text-[10px] font-black uppercase text-orange-400 tracking-wider">🎯 Today's Quick Insights</p>
+              <div className="flex justify-between items-center">
+                <p className="text-[10px] font-black uppercase text-orange-400 tracking-wider">🎯 Calendar Analytics Filter</p>
+                <input 
+                  type="date" 
+                  value={filterDate} 
+                  onChange={(e) => setFilterDate(e.target.value)} 
+                  className="bg-black/60 border border-white/10 rounded-xl p-2 text-xs font-bold text-orange-500 outline-none cursor-pointer"
+                />
+              </div>
               <div className="grid grid-cols-3 gap-3">
                 <div className="bg-white/[0.01] border border-white/5 p-4 rounded-2xl text-center">
-                  <p className="text-[9px] font-bold text-gray-500 uppercase">Today's Sales</p>
+                  <p className="text-[9px] font-bold text-gray-500 uppercase">Filtered Sales</p>
                   <h3 className="text-lg font-black text-green-400 mt-1">₹{dailyStats.todayRevenue}</h3>
                 </div>
                 <div className="bg-white/[0.01] border border-white/5 p-4 rounded-2xl text-center">
-                  <p className="text-[9px] font-bold text-gray-500 uppercase">Today's Orders</p>
+                  <p className="text-[9px] font-bold text-gray-500 uppercase">Filtered Orders</p>
                   <h3 className="text-lg font-black text-yellow-400 mt-1">{dailyStats.todayCount}</h3>
                 </div>
                 <div className="bg-white/[0.01] border border-white/5 p-4 rounded-2xl text-center">
@@ -674,48 +787,6 @@ export default function AdminDashboard() {
               <button onClick={handleExportCustomers} className="bg-orange-500 hover:bg-orange-600 text-black font-black text-xs py-4 px-3 rounded-2xl flex items-center justify-center gap-2 active:scale-95 transition-all uppercase shadow-md border border-orange-400/10">
                 <Download size={14}/> Customer List Excel
               </button>
-            </div>
-
-            {/* --- 🎁 LOYALTY CLUB REDEEM BOARD FOR ADMIN --- */}
-            <div className="bg-yellow-400/5 border border-yellow-400/25 p-6 rounded-[2rem] space-y-4">
-              <h4 className="text-sm font-black text-yellow-400 uppercase tracking-widest flex items-center gap-2"><Gift size={16}/> Loyalty Club Reward Redeem Board</h4>
-              <p className="text-[10px] text-gray-400 font-semibold leading-relaxed">Admin can redeem 10 points for a sandwich or 20 points for a small pizza once rewarded inside the Cafe:</p>
-              
-              <div className="space-y-3 max-h-72 overflow-y-auto no-scrollbar">
-                {loyaltyUsers.length === 0 ? (
-                  <p className="text-center text-xs font-bold text-gray-500 uppercase py-6">No loyalty customer registered yet...</p>
-                ) : (
-                  loyaltyUsers.map(user => (
-                    <div key={user.id} className="bg-black/40 border border-white/5 p-4 rounded-2xl flex justify-between items-center">
-                      <div>
-                        <h5 className="font-extrabold text-sm text-white">{user.name}</h5>
-                        <p className="text-[10px] font-bold text-orange-500 mt-0.5">+{user.phone}</p>
-                        <p className="text-xs font-black text-yellow-400 mt-1">Live Points: {user.points || 0} Pts</p>
-                      </div>
-                      <div className="flex flex-col gap-1.5">
-                        <button 
-                          onClick={() => handleRedeemPoints(user.phone, user.name, user.points || 0, 10, "Sandwich 🥪")}
-                          disabled={(user.points || 0) < 10}
-                          className={`px-3 py-1.5 rounded-lg font-black text-[9px] uppercase tracking-wider transition-all ${
-                            (user.points || 0) >= 10 ? 'bg-orange-500 text-black active:scale-95 cursor-pointer' : 'bg-white/5 text-gray-600 cursor-not-allowed'
-                          }`}
-                        >
-                          Redeem Sandwich (10 Pts)
-                        </button>
-                        <button 
-                          onClick={() => handleRedeemPoints(user.phone, user.name, user.points || 0, 20, "Small Pizza 🍕")}
-                          disabled={(user.points || 0) < 20}
-                          className={`px-3 py-1.5 rounded-lg font-black text-[9px] uppercase tracking-wider transition-all ${
-                            (user.points || 0) >= 20 ? 'bg-orange-500 text-black active:scale-95 cursor-pointer' : 'bg-white/5 text-gray-600 cursor-not-allowed'
-                          }`}
-                        >
-                          Redeem Pizza (20 Pts)
-                        </button>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
             </div>
 
             {/* Permanent Orders Ledger */}
@@ -974,17 +1045,36 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* --- TAB 4: DYNAMIC CATEGORY MANAGER --- */}
+        {/* --- TAB 4: CATEGORY MANAGER TAB --- */}
         {tab === 'categories' && (
           <div className="space-y-6">
-            <form onSubmit={handleAddCategory} className="bg-white/[0.02] border border-white/5 p-6 rounded-[2.5rem] space-y-4">
-              <h3 className="text-lg font-black text-orange-500 italic uppercase flex items-center gap-2"><Folder size={18}/> Add Category</h3>
-              <div className="grid grid-cols-2 gap-3">
-                <input type="text" placeholder="Category Name" value={newCatName} onChange={(e) => setNewCatName(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-xs font-black text-white" required />
-                <input type="url" placeholder="Image URL link" value={newCatImage} onChange={(e) => setNewCatImage(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-xs font-black text-white" required />
-              </div>
-              <button type="submit" className="w-full bg-green-600 text-white p-4 rounded-xl font-black text-sm uppercase active:scale-95 transition-all">Add Category</button>
-            </form>
+            
+            {/* ADD CATEGORY FORM */}
+            {!editingCategory && (
+              <form onSubmit={handleAddCategory} className="bg-white/[0.02] border border-white/5 p-6 rounded-[2.5rem] space-y-4">
+                <h3 className="text-lg font-black text-orange-500 italic uppercase flex items-center gap-2"><Folder size={18}/> Add Category</h3>
+                <div className="grid grid-cols-2 gap-3">
+                  <input type="text" placeholder="Category Name" value={newCatName} onChange={(e) => setNewCatName(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-xs font-black text-white" required />
+                  <input type="url" placeholder="Image URL link" value={newCatImage} onChange={(e) => setNewCatImage(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-xs font-black text-white" required />
+                </div>
+                <button type="submit" className="w-full bg-green-600 text-white p-4 rounded-xl font-black text-sm uppercase active:scale-95 transition-all">Add Category</button>
+              </form>
+            )}
+
+            {/* EDIT CATEGORY FORM */}
+            {editingCategory && (
+              <form onSubmit={handleUpdateCategory} className="bg-[#151515] border-2 border-orange-500 p-6 rounded-[2.5rem] space-y-4">
+                <h3 className="text-lg font-black text-orange-500 italic uppercase flex items-center gap-2"><Folder size={18}/> Edit Category</h3>
+                <div className="grid grid-cols-2 gap-3">
+                  <input type="text" placeholder="Category Name" value={editCatName} onChange={(e) => setEditCatName(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-xs font-black text-white" required />
+                  <input type="url" placeholder="Image URL link" value={editCatImage} onChange={(e) => setEditCatImage(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-xs font-black text-white" required />
+                </div>
+                <div className="flex gap-2">
+                  <button type="submit" className="flex-1 bg-green-600 text-white p-4 rounded-xl font-black text-sm uppercase">Update Category</button>
+                  <button type="button" onClick={() => setEditingCategory(null)} className="bg-white/5 text-gray-400 p-4 rounded-xl font-black text-sm uppercase">Cancel</button>
+                </div>
+              </form>
+            )}
 
             {/* Dynamic Category List */}
             <div className="space-y-3">
@@ -999,6 +1089,9 @@ export default function AdminDashboard() {
                       <h4 className="font-black text-sm text-gray-200">{c.name}</h4>
                     </div>
                     <div className="flex items-center gap-2">
+                      <button onClick={() => startEditingCategory(c)} className="p-3 bg-blue-500/10 text-blue-500 rounded-xl hover:bg-blue-500/20 active:scale-95 transition-all">
+                        <Edit size={18}/>
+                      </button>
                       <button onClick={() => toggleCategoryVisibility(c.id, c.isVisible !== false)} className={`p-3 rounded-xl transition-all ${c.isVisible !== false ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
                         {c.isVisible !== false ? <Eye size={18}/> : <EyeOff size={18}/>}
                       </button>
@@ -1013,7 +1106,117 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* --- TAB 5: BANNERS TAB --- */}
+        {/* --- TAB 5: DEDICATED CUSTOMERS TAB --- */}
+        {tab === 'customers' && (
+          <div className="space-y-6">
+            <h3 className="text-xl font-black text-orange-500 uppercase tracking-wider flex items-center gap-2"><User size={20}/> Customer Management</h3>
+            
+            {/* EDIT CUSTOMER MODAL / BOX */}
+            {editingCustomer && (
+              <form onSubmit={handleUpdateCustomer} className="bg-[#151515] border-2 border-orange-500 p-6 rounded-[2.5rem] space-y-4">
+                <h4 className="text-sm font-black text-orange-500 uppercase">Edit Customer Profile</h4>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-gray-500 uppercase">Customer Name</label>
+                    <input type="text" value={editCustomerName} onChange={(e) => setEditCustomerName(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-xs font-black text-white" required />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-gray-500 uppercase">Adjust Points</label>
+                    <input type="number" value={editCustomerPoints} onChange={(e) => setEditCustomerPoints(Number(e.target.value))} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-xs font-black text-white" required />
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <button type="submit" className="flex-1 bg-green-600 text-white p-3 rounded-xl font-black text-xs uppercase">Save Changes</button>
+                  <button type="button" onClick={() => setEditingCustomer(null)} className="bg-white/5 text-gray-400 p-3 rounded-xl font-black text-xs uppercase">Cancel</button>
+                </div>
+              </form>
+            )}
+
+            {/* Customers Profile Directory */}
+            <div className="space-y-4">
+              {loyaltyUsers.length === 0 ? (
+                <p className="text-center text-xs font-bold text-gray-500 py-10 uppercase">No customers registered yet...</p>
+              ) : (
+                loyaltyUsers.map(user => {
+                  const stats = getCustomerLoyaltyMetrics(user.phone);
+                  return (
+                    <div key={user.id} className="bg-[#111] border border-white/5 p-5 rounded-3xl flex justify-between items-center hover:border-white/10 transition-all">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-extrabold text-sm text-white">{user.name}</h4>
+                          <span className={`text-[9px] font-black uppercase px-2.5 py-0.5 rounded-full bg-white/5 ${stats.tierColor}`}>
+                            {stats.tier}
+                          </span>
+                        </div>
+                        <p className="text-[10px] font-bold text-orange-500">+{user.phone}</p>
+                        
+                        <div className="flex gap-3 text-[10px] text-gray-400 font-bold pt-1.5 border-t border-white/5 mt-2">
+                          <p>Orders: <span className="text-white font-black">{stats.orderCount}</span></p>
+                          <p>Total Spend: <span className="text-green-400 font-black">₹{stats.totalSpend}</span></p>
+                        </div>
+                      </div>
+
+                      <div className="text-right flex items-center gap-4 flex-shrink-0">
+                        <div>
+                          <p className="text-[9px] font-bold text-gray-500 uppercase">Available Points</p>
+                          <h4 className="text-lg font-black text-yellow-400">{user.points || 0} Pts</h4>
+                        </div>
+                        <button 
+                          onClick={() => {
+                            setEditingCustomer(user);
+                            setEditCustomerName(user.name);
+                            setEditCustomerPoints(user.points || 0);
+                          }}
+                          className="p-3 bg-orange-500/10 text-orange-500 rounded-xl hover:bg-orange-500 hover:text-black transition-all"
+                        >
+                          <Edit size={16}/>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* --- TAB 6: DYNAMIC LOYALTY RULES MANAGER --- */}
+        {tab === 'loyalty' && (
+          <div className="space-y-6">
+            <form onSubmit={handleAddRule} className="bg-white/[0.02] border border-white/5 p-6 rounded-[2.5rem] space-y-4">
+              <h3 className="text-lg font-black text-orange-500 italic uppercase flex items-center gap-2"><Gift size={18}/> Setup Loyalty Rules</h3>
+              <p className="text-[10px] text-gray-400 font-semibold leading-relaxed">Create rewards that customers can redeem automatically on checkout when their points hit the requirement:</p>
+              
+              <div className="grid grid-cols-2 gap-3">
+                <input type="text" placeholder="Reward Name (e.g., Free Mocktail)" value={newRuleName} onChange={(e) => setNewRuleName(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-xs font-black text-white" required />
+                <input type="number" placeholder="Points Needed (e.g., 30)" value={newRulePoints} onChange={(e) => setNewRulePoints(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-xs font-black text-white" required />
+              </div>
+              <button type="submit" className="w-full bg-green-600 text-white p-4 rounded-xl font-black text-sm uppercase">Add Reward Rule</button>
+            </form>
+
+            {/* Current Active Rules */}
+            <div className="space-y-3">
+              <p className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">Active Customer Reward Rules ({loyaltyRules.length})</p>
+              {loyaltyRules.length === 0 ? (
+                <p className="text-center text-xs font-bold text-gray-500 py-6 uppercase">No custom rules configured yet...</p>
+              ) : (
+                loyaltyRules.map(rule => (
+                  <div key={rule.id} className="bg-white/[0.02] border border-white/5 p-5 rounded-3xl flex justify-between items-center hover:bg-white/[0.04] transition-all">
+                    <div>
+                      <h4 className="font-black text-sm text-gray-200">{rule.rewardName}</h4>
+                      <p className="text-xs text-yellow-400 font-extrabold mt-0.5">Cost: {rule.pointsCost} Points</p>
+                    </div>
+                    <button onClick={() => handleDeleteRule(rule.id)} className="p-3 bg-red-500/10 text-red-500 rounded-xl hover:bg-red-500/20 active:scale-95 transition-all">
+                      <Trash size={16}/>
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* --- TAB 7: BANNERS TAB --- */}
         {tab === 'banners' && (
           <div className="space-y-6">
             <form onSubmit={handleAddBanner} className="bg-white/[0.02] border border-white/5 p-6 rounded-[2.5rem] space-y-4">
@@ -1035,7 +1238,7 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* --- TAB 6: MANAGE COUPONS TAB --- */}
+        {/* --- TAB 8: MANAGE COUPONS TAB --- */}
         {tab === 'coupons' && (
           <div className="space-y-6">
             <form onSubmit={handleAddCoupon} className="bg-white/[0.02] border border-white/5 p-6 rounded-[2.5rem] space-y-4">
@@ -1063,7 +1266,7 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* --- TAB 7: APPROVE REVIEWS TAB --- */}
+        {/* --- TAB 9: APPROVE REVIEWS TAB --- */}
         {tab === 'reviews' && (
           <div className="space-y-4">
             {reviews.length === 0 && <p className="text-center text-gray-600 py-16 font-bold uppercase tracking-widest">No feedback reviews yet...</p>}
