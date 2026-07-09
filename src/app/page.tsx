@@ -178,7 +178,7 @@ export default function BbCafeHome() {
     return () => unsubPoints();
   }, [customerDetails]);
 
-  // Compute categories cleanly with duplicates and explicitly hidden categories removed (Both text and circle buttons will hide)
+  // Compute categories cleanly with duplicates and explicitly hidden categories removed
   const visibleCategories = useMemo(() => {
     const baseCategories = ["All", ...FALLBACK_CATEGORIES.filter(c => c !== "All")];
     
@@ -250,7 +250,6 @@ export default function BbCafeHome() {
   const deduplicatedMenu = useMemo(() => {
     const seen = new Set();
     
-    // Get lowercase set of explicitly hidden categories
     const hiddenCategoryNames = new Set(
       dbCategories
         .filter((c: any) => c.isVisible === false)
@@ -260,7 +259,6 @@ export default function BbCafeHome() {
     return menu.filter(item => {
       const itemCatClean = item?.category ? String(item.category).toLowerCase().trim() : "";
       
-      // If the category of this item is hidden, hide the item entirely
       if (hiddenCategoryNames.has(itemCatClean)) {
         return false;
       }
@@ -302,7 +300,7 @@ export default function BbCafeHome() {
     toast.success(`${name} Cart में जोड़ दिया गया है!`);
   };
 
-  // --- SAFE TRANSACTION ENGINE TO TRANSFER/GIFT POINTS TO A FRIEND ---
+  // --- SAFE TRANSACTION ENGINE TO TRANSFER/GIFT POINTS TO A FRIEND (FIXED READ-BEFORE-WRITE) ---
   const handleGiftPoints = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!customerDetails?.phone) {
@@ -336,20 +334,21 @@ export default function BbCafeHome() {
 
     try {
       await runTransaction(db, async (transaction) => {
+        // 1. ALL FIRESTORE READS FIRST (CRITICAL FIXED RULE)
         const senderSnap = await transaction.get(senderDocRef);
+        const receiverSnap = await transaction.get(receiverDocRef);
         
+        // 2. LOGICAL BALANCES VERIFICATION
         const currentSenderPoints = senderSnap.exists() ? (senderSnap.data().points || 0) : 0;
         if (currentSenderPoints < pointsToGift) {
           throw new Error("Insufficient points balance!");
         }
 
-        // 1. Deduct points from sender
+        // 3. ALL FIRESTORE WRITES/UPDATES AT THE VERY END
         transaction.update(senderDocRef, {
           points: increment(-pointsToGift)
         });
 
-        // 2. Add points to receiver (create receiver document if not exists)
-        const receiverSnap = await transaction.get(receiverDocRef);
         if (!receiverSnap.exists()) {
           transaction.set(receiverDocRef, {
             name: "Loyal Friend 🎁",
@@ -796,252 +795,6 @@ export default function BbCafeHome() {
                 <button type="button" onClick={() => setIsReviewFormOpen(false)} className="bg-white/5 text-gray-400 font-bold p-4 rounded-xl text-sm active:scale-95 transition-all">CANCEL</button>
               </div>
             </form>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* --- VARIANTS POPUP --- */}
-      <AnimatePresence>
-        {selectedProduct && (
-          <div className="fixed inset-0 bg-black/95 backdrop-blur-md z-[100] flex items-end">
-            <motion.div initial={{ y: 300 }} animate={{ y: 0 }} exit={{ y: 300 }} className="bg-[#111] w-full p-8 rounded-t-[3.5rem] border-t border-white/10 max-w-lg mx-auto">
-              <div className="w-16 h-1.5 bg-white/15 rounded-full mx-auto mb-6" />
-              <h3 className="text-3xl font-black mb-1 text-center tracking-tight">{selectedProduct?.name}</h3>
-              <p className="text-orange-500 font-black mb-6 uppercase tracking-widest text-[10px] text-center">Customize Your Order</p>
-              
-              <div className="space-y-3 mb-6">
-                <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">1. Select Portion Size:</p>
-                <div className="grid grid-cols-2 gap-2">
-                  {Object.entries(selectedProduct?.variants || {}).map(([size, price]: any) => (
-                    <button type="button" key={size} onClick={() => { setChosenSize(size); setChosenPrice(Number(price)); }} className={`p-4 rounded-2xl flex flex-col items-center justify-center border transition-all ${chosenSize === size ? 'bg-orange-500/10 border-orange-500 text-orange-500' : 'bg-white/[0.03] border-white/5 text-gray-400 hover:border-white/15'}`}>
-                      <span className="capitalize text-sm font-black">{size}</span>
-                      <span className="font-extrabold text-xs mt-1 text-white">₹{price}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {(selectedProduct?.category === "Special Pizza" || selectedProduct?.name?.toLowerCase().includes("pizza")) && (
-                <div className="space-y-3 mb-8 border-t border-white/5 pt-4">
-                  <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">2. Optional Add-ons:</p>
-                  <div className="space-y-2">
-                    <div onClick={() => setAddonCheese(!addonCheese)} className={`p-5 rounded-3xl flex justify-between items-center border border-white/5 hover:border-orange-500/50 hover:bg-orange-500/10 transition-all ${addonCheese ? 'bg-orange-500/10 border-orange-500/50' : 'bg-white/[0.03]'}`}>
-                      <span className="text-xs font-black uppercase text-gray-300">🧀 Extra Cheese (Cheese burst)</span>
-                      <span className="text-xs font-black text-orange-500">+₹30</span>
-                    </div>
-                    <div onClick={() => setAddonVeg(!addonVeg)} className={`p-5 rounded-3xl flex justify-between items-center border border-white/5 hover:border-orange-500/50 hover:bg-orange-500/10 transition-all ${addonVeg ? 'bg-orange-500/10 border-orange-500/50' : 'bg-white/[0.03]'}`}>
-                      <span className="text-xs font-black uppercase text-gray-300">🥦 Extra Vegetables / Paneer</span>
-                      <span className="text-xs font-black text-orange-500">+₹20</span>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              <button type="button" onClick={handleAddToCart} className="w-full bg-orange-500 hover:bg-orange-600 p-5 rounded-2xl font-black text-md shadow-xl active:scale-95 transition-all uppercase">Confirm • ₹{chosenPrice + (addonCheese ? 30 : 0) + (addonVeg ? 20 : 0)}</button>
-              <button type="button" onClick={() => { setSelectedProduct(null); setChosenSize(""); setChosenPrice(0); setAddonCheese(false); setAddonVeg(false); }} className="w-full mt-4 p-2 text-gray-500 font-black uppercase text-xs tracking-widest">Close</button>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* --- CART / CHECKOUT SIDEBAR --- */}
-      <AnimatePresence>
-        {isCartOpen && (
-          <div className="fixed inset-0 bg-black z-[110] overflow-y-auto">
-            <div className="p-6 max-w-lg mx-auto pb-32">
-              <div className="flex justify-between items-center mb-8">
-                <h2 className="text-3xl font-black tracking-tight">Your Order</h2>
-                <button onClick={() => setIsCartOpen(false)} className="p-3 bg-white/5 rounded-full"><X size={24} /></button>
-              </div>
-
-              {cart.map((item: any) => (
-                <div key={item.id} className="flex justify-between items-center bg-white/[0.02] p-5 rounded-3xl mb-4 border border-white/5">
-                  <div className="min-w-0 pr-3">
-                    <h4 className="font-bold text-sm text-gray-100 truncate">{item?.name || "Item"}</h4>
-                    <p className="text-orange-500 font-black mt-1">₹{item?.price || 0}</p>
-                  </div>
-                  <div className="flex items-center gap-2.5 bg-black/40 px-3 py-1.5 rounded-2xl border border-white/10 flex-shrink-0">
-                    <button onClick={() => removeItem(item.id)} type="button" className="w-8 h-8 flex items-center justify-center bg-red-500/10 text-red-500 rounded-lg text-lg font-black active:scale-90 transition-all hover:bg-red-500/20">-</button>
-                    <span className="font-black text-sm px-1.5 text-white min-w-[15px] text-center">{item.quantity}</span>
-                    {item.isReward ? (
-                      // Disable manually adding more quantity to avoid bypass checks
-                      <button disabled className="w-8 h-8 flex items-center justify-center bg-white/5 text-gray-600 rounded-lg text-lg font-black cursor-not-allowed">+</button>
-                    ) : (
-                      <button onClick={() => addItem(item)} type="button" className="w-8 h-8 flex items-center justify-center bg-green-500/10 text-green-500 rounded-lg text-lg font-black active:scale-90 transition-all hover:bg-green-500/20">+</button>
-                    )}
-                  </div>
-                </div>
-              ))}
-
-              <div className="mt-10 space-y-6">
-                
-                {/* PDF rules */}
-                <div className="bg-orange-500/10 border border-orange-500/20 rounded-[2rem] p-5 space-y-2">
-                  <div className="flex items-center gap-2 text-orange-400 font-black text-xs uppercase tracking-wider">
-                    <Sparkles size={16}/> <span>Free Delivery Rules</span>
-                  </div>
-                  <ul className="text-[11px] text-gray-400 font-bold space-y-1">
-                    <li>• Mohandra Town: Free above ₹99 <span className="text-green-500">({getTotal() >= 99 ? 'Achieved' : 'Need ₹' + (99 - getTotal()) + ' more'})</span></li>
-                    <li>• Within 5 Km: Free above ₹499</li>
-                    <li>• Within 12 Km: Free above ₹999</li>
-                  </ul>
-                </div>
-
-                {/* --- LOYALTY CLUB REDEEM BOARD FOR CUSTOMERS (DYNAMIC RULES FETCHED FROM DATABASE) --- */}
-                {customerDetails && (
-                  <div className="bg-yellow-400/5 border border-yellow-400/20 rounded-[2rem] p-5 space-y-3">
-                    <div className="flex items-center gap-2 text-yellow-400 font-black text-xs uppercase tracking-widest">
-                      <Gift size={14}/> <span>⭐ BUM BUM LOYALTY CLUB</span>
-                    </div>
-                    <div className="flex justify-between items-center border-b border-white/5 pb-3">
-                      <div>
-                        <h4 className="text-3xl font-black text-white">{customerPoints} <span className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Points</span></h4>
-                        <p className="text-[9px] text-gray-400 font-medium mt-1">Spend ₹100 = Get 1 Point!</p>
-                      </div>
-                      <div className="text-right text-[9px] text-yellow-400 font-black space-y-1 uppercase tracking-wider bg-yellow-400/5 p-3 rounded-xl border border-yellow-400/10 max-h-24 overflow-y-auto no-scrollbar">
-                        {loyaltyRules.length === 0 ? (
-                          <>
-                            <p>🎁 10 Pts = Sandwich</p>
-                            <p>🎁 20 Pts = Small Pizza</p>
-                          </>
-                        ) : (
-                          loyaltyRules.map(rule => (
-                            <p key={rule.id}>🎁 {rule.pointsCost} Pts = {rule.rewardName}</p>
-                          ))
-                        )}
-                      </div>
-                    </div>
-                    
-                    {/* Share points Option */}
-                    <div className="pt-2.5 border-t border-white/5 flex justify-between items-center mt-2">
-                      <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Share your happiness:</span>
-                      <button
-                        type="button"
-                        onClick={() => setIsGiftModalOpen(true)}
-                        className="bg-yellow-400/10 hover:bg-yellow-400/20 text-yellow-400 border border-yellow-400/20 px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all active:scale-95 flex items-center gap-1 cursor-pointer"
-                      >
-                        <Gift size={10} /> Gift Points to Friend
-                      </button>
-                    </div>
-
-                    {/* Customer Redemption Controls */}
-                    <div className="space-y-2 pt-1 border-t border-white/5 mt-2">
-                      <p className="text-[10px] text-gray-400 font-black uppercase tracking-wider">Redeem Your Points Here:</p>
-                      <div className="grid grid-cols-2 gap-2 max-h-32 overflow-y-auto no-scrollbar pr-1 mt-1">
-                        {loyaltyRules.length === 0 ? (
-                          <>
-                            <button
-                              type="button"
-                              onClick={() => handleCustomerRedeem("reward-sandwich", "🎁 FREE Loyalty Sandwich", 10)}
-                              disabled={customerPoints - cart.reduce((acc: number, i: any) => acc + (i.pointsCost || 0), 0) < 10}
-                              className={`py-2.5 px-3 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border ${
-                                (customerPoints - cart.reduce((acc: number, i: any) => acc + (i.pointsCost || 0), 0) >= 10)
-                                  ? 'bg-yellow-400 text-black border-yellow-400 active:scale-95 cursor-pointer'
-                                  : 'bg-white/5 text-gray-500 border-white/5 cursor-not-allowed'
-                              }`}
-                            >
-                              🥪 Sandwich (10 Pts)
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleCustomerRedeem("reward-pizza", "🎁 FREE Loyalty Small Pizza", 20)}
-                              disabled={customerPoints - cart.reduce((acc: number, i: any) => acc + (i.pointsCost || 0), 0) < 20}
-                              className={`py-2.5 px-3 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border ${
-                                (customerPoints - cart.reduce((acc: number, i: any) => acc + (i.pointsCost || 0), 0) >= 20)
-                                  ? 'bg-yellow-400 text-black border-yellow-400 active:scale-95 cursor-pointer'
-                                  : 'bg-white/5 text-gray-500 border-white/5 cursor-not-allowed'
-                              }`}
-                            >
-                              🍕 Small Pizza (20 Pts)
-                            </button>
-                          </>
-                        ) : (
-                          loyaltyRules.map(rule => {
-                            const inCartCost = cart.reduce((acc: number, i: any) => acc + (i.pointsCost || 0), 0);
-                            const isAffordable = (customerPoints - inCartCost) >= rule.pointsCost;
-                            return (
-                              <button
-                                key={rule.id}
-                                type="button"
-                                onClick={() => handleCustomerRedeem(`reward-${rule.id}`, `🎁 FREE ${rule.rewardName}`, rule.pointsCost)}
-                                disabled={!isAffordable}
-                                className={`py-2.5 px-3 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border truncate ${
-                                  isAffordable
-                                    ? 'bg-yellow-400 text-black border-yellow-400 active:scale-95 cursor-pointer'
-                                    : 'bg-white/5 text-gray-500 border-white/5 cursor-not-allowed'
-                                }`}
-                              >
-                                🎁 {rule.rewardName} ({rule.pointsCost} P)
-                              </button>
-                            );
-                          })
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Promo Code block */}
-                <div className="bg-white/[0.02] border border-white/5 p-5 rounded-[2rem] space-y-3">
-                  <div className="flex items-center gap-2 text-orange-500 font-black text-xs uppercase">
-                    <Percent size={16}/> <span>Have a promo code?</span>
-                  </div>
-                  <div className="flex gap-2">
-                    <input type="text" placeholder="e.g. WELCOME" value={enteredCoupon} onChange={(e) => setEnteredCoupon(e.target.value)}
-                      className="flex-1 bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-xs font-bold uppercase placeholder-gray-600 text-white" />
-                    <button type="button" onClick={handleApplyCoupon} className="bg-orange-500 hover:bg-orange-600 font-black text-xs p-3 px-5 rounded-xl text-black active:scale-95 transition-all">APPLY</button>
-                  </div>
-                  {appliedCoupon && (
-                    <div className="flex justify-between items-center text-xs bg-green-500/10 border border-green-500/25 p-3 rounded-xl">
-                      <span className="text-green-400 font-bold uppercase">Code Applied: {appliedCoupon.code}</span>
-                      <button onClick={() => { setAppliedCoupon(null); setEnteredCoupon(""); }} className="text-red-400 font-black font-xs">Remove</button>
-                    </div>
-                  )}
-                </div>
-
-                {/* Contact details */}
-                {customerDetails ? (
-                  <div className="bg-white/[0.02] p-5 rounded-[2.2rem] border border-white/5 flex justify-between items-center">
-                    <div>
-                      <p className="text-[9px] text-gray-500 font-black uppercase tracking-wider">Ordering As</p>
-                      <h4 className="font-black text-md text-orange-500">{customerDetails?.name}</h4>
-                      <p className="text-xs text-gray-400 font-bold mt-0.5">{customerDetails?.phone}</p>
-                    </div>
-                    <button onClick={() => { localStorage.removeItem('bb_cafe_customer'); setCustomerDetails(null); }} className="text-[10px] bg-red-500/10 text-red-500 px-3 py-2 rounded-xl font-black uppercase tracking-wider">Change</button>
-                  </div>
-                ) : (
-                  <button onClick={() => setIsLoginOpen(true)} className="w-full p-5 bg-orange-500/10 text-orange-500 border border-orange-500/20 rounded-[2.2rem] font-black text-sm uppercase tracking-widest active:scale-95 transition-all">👤 Add Name & Phone To Order</button>
-                )}
-
-                {/* Delivery Address */}
-                <div className="bg-white/[0.02] p-5 rounded-[2.2rem] border border-white/5">
-                  <div className="flex items-center gap-2 mb-3 text-orange-500">
-                    <MapPin size={18}/> <h3 className="font-black uppercase text-xs tracking-wider">Delivery Address</h3>
-                  </div>
-                  <textarea placeholder="Ghar ka address, Landmark ke saath..." value={address} onChange={(e) => setAddress(e.target.value)}
-                    className="w-full bg-black/40 border border-white/10 rounded-2xl p-4 outline-none focus:border-orange-500 h-24 text-xs font-semibold text-white placeholder-gray-600 resize-none" />
-                </div>
-
-                {/* Bill Details */}
-                <div className="bg-gradient-to-b from-orange-600 to-orange-700 p-8 rounded-[2.5rem] text-white shadow-xl">
-                  <div className="flex justify-between font-bold mb-2 text-sm text-orange-100"><span>Items Total</span> <span>₹{getTotal()}</span></div>
-                  {appliedCoupon && (
-                    <div className="flex justify-between font-bold mb-2 text-sm text-green-200"><span>Coupon Discount</span> <span>-₹{appliedCoupon.discountValue}</span></div>
-                  )}
-                  <div className="flex justify-between font-bold mb-4 opacity-90 text-sm text-orange-100"><span>Delivery Charge</span> <span>{getTotal() < 99 ? "₹20" : "FREE"}</span></div>
-                  <div className="h-px bg-white/20 mb-4" />
-                  <div className="flex justify-between font-black text-2xl"><span>To Pay</span> <span>₹{Math.max(0, getTotal() - (appliedCoupon ? appliedCoupon.discountValue : 0)) + (getTotal() < 99 ? 20 : 0)}</span></div>
-                </div>
-
-                {/* WHATSAPP ACTION BUTTON */}
-                <button onClick={sendWhatsAppOrder} type="button" className="w-full bg-green-600 hover:bg-green-700 p-6 rounded-[2.5rem] font-black text-md shadow-xl border border-green-500/20 text-white flex items-center justify-center gap-3">
-                  <svg className="w-6 h-6 fill-current text-white flex-shrink-0" viewBox="0 0 24 24">
-                    <path d="M12.037 21.978c-1.92 0-3.805-.502-5.46-1.457l-.391-.227-4.062 1.066 1.085-3.953-.25-.398C2.01 15.352 1.48 13.208 1.48 11.005 1.482 5.21 6.22 .495 12.037.495c2.818 0 5.467 1.1 7.46 3.099a10.45 10.45 0 0 1 3.093 7.42c-.002 5.797-4.74 10.513-10.553 10.513zm5.412-7.587c-.297-.15-1.758-.868-2.03-.96-.273-.092-.471-.137-.67.137-.197.275-.764.96-.938 1.144-.173.183-.347.206-.644.055-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.1-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.501-.669-.51l-.57-.011c-.198 0-.52.074-.793.372-.272.297-1.04.101-1.04 2.479 0 2.378 1.733 4.678 1.98 5.024.248.346 3.41 5.216 8.26 7.301 1.155.496 2.057.793 2.76 1.017 1.21.383 2.311.33 3.18.198 1.03-.15 2.158-.87 2.46-1.714.3-.842.3-1.564.21-1.714-.09-.15-.335-.24-.633-.39z"/>
-                  </svg>
-                  <span>ORDER ON WHATSAPP</span>
-                </button>
-              </div>
-            </div>
           </div>
         )}
       </AnimatePresence>
