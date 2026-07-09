@@ -91,6 +91,11 @@ export default function AdminDashboard() {
   const [editPriceLarge, setEditPriceLarge] = useState("");
   const [editPriceXL, setEditPriceXL] = useState("");
 
+  // Helper function to format bill number to e.g., '0015'
+  const formatBillNumber = (num: number) => {
+    return String(num).padStart(4, '0');
+  };
+
   // 1. Session verification check (Session auto-locks securely when tab/window is closed)
   useEffect(() => {
     const adminSession = sessionStorage.getItem('bb_cafe_admin_verified');
@@ -362,12 +367,13 @@ export default function AdminDashboard() {
       return {
         ...o,
         itemsSummary,
-        date: orderDate
+        date: orderDate,
+        formattedBill: formatBillNumber(o.billNumber || 0)
       };
     });
 
     const headers = ['Bill No', 'Token No', 'Customer Name', 'Phone Number', 'Delivery Address', 'Items summary', 'Subtotal (₹)', 'Discount Applied (₹)', 'Total Paid (₹)', 'Status', 'Order Date & Time'];
-    const keys = ['billNumber', 'tokenNumber', 'customerName', 'customerPhone', 'address', 'itemsSummary', 'subtotal', 'discount', 'total', 'status', 'date'];
+    const keys = ['formattedBill', 'tokenNumber', 'customerName', 'customerPhone', 'address', 'itemsSummary', 'subtotal', 'discount', 'total', 'status', 'date'];
     triggerCsvDownload(formattedData, `BumBumCafe_SalesLedger_${new Date().toLocaleDateString()}`, headers, keys);
   };
 
@@ -565,7 +571,7 @@ export default function AdminDashboard() {
     try {
       await deleteDoc(doc(db, "coupons", couponId));
       toast.success("Coupon Deleted!");
-    } catch (error) { toast.error("Error deleting coupon"); }
+    } catch (error) { parseInt("1"); toast.error("Error deleting coupon"); }
   };
 
   // --- STORE ACTIONS ---
@@ -889,7 +895,7 @@ export default function AdminDashboard() {
                   <div key={o.id} className="bg-[#111] border border-white/5 p-5 rounded-3xl flex justify-between items-center relative overflow-hidden">
                     <div className="space-y-1 pr-4">
                       <div className="flex gap-2.5">
-                        <span className="text-[10px] font-black uppercase text-gray-500">Bill No: #{o.billNumber || "N/A"}</span>
+                        <span className="text-[10px] font-black uppercase text-gray-500">Bill No: #{formatBillNumber(o.billNumber || 0)}</span>
                         <span className="text-[10px] font-black uppercase text-yellow-500">Token: #{o.tokenNumber || "N/A"}</span>
                       </div>
                       <h4 className="font-extrabold text-sm text-gray-300">Name: {o.customerName || "Customer"}</h4>
@@ -942,7 +948,7 @@ export default function AdminDashboard() {
                 <div key={o.id} className="bg-white/[0.03] p-6 rounded-[2rem] border border-white/5 relative overflow-hidden">
                   <div className="flex justify-between items-start mb-4">
                     <div className="flex flex-wrap gap-1.5">
-                      <span className="bg-orange-500 text-black text-[10px] px-3 py-1 rounded-full font-black">BILL: #{o.billNumber || "N/A"}</span>
+                      <span className="bg-orange-500 text-black text-[10px] px-3 py-1 rounded-full font-black">BILL: #{formatBillNumber(o.billNumber || 0)}</span>
                       <span className="bg-yellow-400 text-black text-[10px] px-3 py-1 rounded-full font-black">TOKEN: #{o.tokenNumber || "N/A"}</span>
                     </div>
                     <span className="text-orange-500 font-black text-xl">₹{o.total}</span>
@@ -1106,7 +1112,7 @@ export default function AdminDashboard() {
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Small Price (₹)</label><input type="number" placeholder="Small price" value={editPriceSmall} onChange={(e) => setEditPriceSmall(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" /></div>
                     <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Medium Price (₹)</label><input type="number" placeholder="Medium price" value={editPriceMedium} onChange={(e) => setEditPriceMedium(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" /></div>
-                    <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Large Price (₹)</label><input type="number" placeholder="Large price" value={editPriceLarge} onChange={(e) => setEditPriceLarge(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" /></div>
+                    <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Large Price (₹)</label><input type="number" placeholder="Large price" value={editPriceLarge} onChange={(e) => setEditPriceLarge(e.target.value)} className="w-full bg-[#111]/30 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" /></div>
                     <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Extra Large Price (₹)</label><input type="number" placeholder="XL price" value={editPriceXL} onChange={(e) => setEditPriceXL(e.target.value)} className="w-full bg-[#111]/30 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" /></div>
                   </div>
                 )}
@@ -1358,7 +1364,7 @@ export default function AdminDashboard() {
               <h3 className="text-lg font-black text-orange-500 italic uppercase flex items-center gap-2"><Percent size={18}/> Add Coupon Code</h3>
               <div className="grid grid-cols-2 gap-3">
                 <input type="text" placeholder="CODE (e.g. WELCOME)" value={newCouponCode} onChange={(e) => setNewCouponCode(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-xs font-black uppercase text-white" required />
-                <input type="number" placeholder="Discount (₹)" value={newCouponValue} onChange={(e) => setNewCouponValue(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-xs font-black text-white" required />
+                <input type="number" placeholder="Discount (₹)" value={newCouponValue} onChange={(e) => setNewCouponValue(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs font-black text-white" required />
               </div>
               <button type="submit" className="w-full bg-green-600 text-white p-4 rounded-xl font-black text-sm uppercase">Create Coupon</button>
             </form>
