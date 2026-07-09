@@ -52,6 +52,7 @@ export default function BbCafeHome() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isLoginOpen, setIsLoginOpen] = useState(false);
+  const [isSocialsOpen, setIsSocialsOpen] = useState(false); 
   const [storeOpen, setStoreOpen] = useState(true);
   const [mounted, setMounted] = useState(false);
   
@@ -61,8 +62,9 @@ export default function BbCafeHome() {
   const [address, setAddress] = useState("");
   const [selectedProduct, setSelectedProduct] = useState<any>(null); 
 
-  // --- LOYALTY POINTS STATE ---
+  // --- LOYALTY POINTS & DYNAMIC RULES STATE ---
   const [customerPoints, setCustomerPoints] = useState<number>(0);
+  const [loyaltyRules, setLoyaltyRules] = useState<any[]>([]);
 
   // --- DYNAMIC DATA STATES ---
   const [dbCategories, setDbCategories] = useState<any[]>([]);
@@ -88,6 +90,11 @@ export default function BbCafeHome() {
   const [addonCheese, setAddonCheese] = useState(false);
   const [addonVeg, setAddonVeg] = useState(false);
 
+  // --- FORMAT BILL NO TO 0001 HELPER ---
+  const formatBillNumber = (num: number) => {
+    return String(num).padStart(4, '0');
+  };
+
   useEffect(() => {
     setMounted(true);
     // Realtime Store Status
@@ -101,7 +108,7 @@ export default function BbCafeHome() {
       setMenu(items.filter((i: any) => i.isVisible !== false));
     });
 
-    // Realtime Dynamic Categories (Fetch all category states to determine client visibility)
+    // Realtime Dynamic Categories (Fetch all to determine visibility of default ones)
     const unsubCats = onSnapshot(collection(db, "categories"), (snap) => {
       const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       setDbCategories(list);
@@ -123,6 +130,11 @@ export default function BbCafeHome() {
       setReviews(allRev.filter((r: any) => r.isApproved === true));
     });
 
+    // Dynamic Loyalty Rules Listener
+    const unsubRules = onSnapshot(collection(db, "loyalty_rules"), (snap) => {
+      setLoyaltyRules(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+
     // Mobile local memory checking
     const savedDetails = localStorage.getItem('bb_cafe_customer');
     if (savedDetails) {
@@ -138,6 +150,7 @@ export default function BbCafeHome() {
       unsubBanners();
       unsubReviews();
       unsubCoupons();
+      unsubRules();
     };
   }, []);
 
@@ -161,11 +174,38 @@ export default function BbCafeHome() {
 
   // Compute categories cleanly with duplicates and explicitly hidden categories removed
   const visibleCategories = useMemo(() => {
-    const visibleList = dbCategories.filter((c: any) => c.isVisible !== false);
-    const rawCategories = visibleList.length > 0 
-      ? ["All", ...visibleList.map(c => c.name)]
-      : FALLBACK_CATEGORIES;
-    return Array.from(new Set(rawCategories));
+    const baseCategories = ["All", ...FALLBACK_CATEGORIES.filter(c => c !== "All")];
+    
+    const dbCatsMap = new Map();
+    dbCategories.forEach(c => {
+      dbCatsMap.set(String(c.name).toLowerCase().trim(), c);
+    });
+
+    const result: string[] = [];
+
+    // Filter default categories based on customized settings in Database
+    baseCategories.forEach(catName => {
+      const cleanName = catName.toLowerCase().trim();
+      if (dbCatsMap.has(cleanName)) {
+        const dbCat = dbCatsMap.get(cleanName);
+        if (dbCat.isVisible !== false) {
+          result.push(catName);
+        }
+      } else {
+        result.push(catName);
+      }
+    });
+
+    // Append custom created active categories
+    dbCategories.forEach(c => {
+      const cleanName = String(c.name).toLowerCase().trim();
+      const alreadyAdded = result.some(r => r.toLowerCase().trim() === cleanName);
+      if (!alreadyAdded && c.isVisible !== false && c.name !== "All") {
+        result.push(c.name);
+      }
+    });
+
+    return Array.from(new Set(result));
   }, [dbCategories]);
 
   const getCategoryImage = (catName: string) => {
@@ -204,7 +244,6 @@ export default function BbCafeHome() {
   const deduplicatedMenu = useMemo(() => {
     const seen = new Set();
     
-    // Get lowercase set of explicitly hidden categories
     const hiddenCategoryNames = new Set(
       dbCategories
         .filter((c: any) => c.isVisible === false)
@@ -214,7 +253,6 @@ export default function BbCafeHome() {
     return menu.filter(item => {
       const itemCatClean = item?.category ? String(item.category).toLowerCase().trim() : "";
       
-      // If the category of this item is hidden, hide the item entirely
       if (hiddenCategoryNames.has(itemCatClean)) {
         return false;
       }
@@ -286,6 +324,8 @@ export default function BbCafeHome() {
       billNumber = Math.floor((Date.now() / 1000) % 100000);
     }
 
+    const formattedBillStr = formatBillNumber(billNumber);
+
     const subtotal = getTotal();
     let deliveryCharge = subtotal < 99 ? 20 : 0;
     const couponDiscount = appliedCoupon ? Number(appliedCoupon.discountValue) : 0;
@@ -328,7 +368,7 @@ export default function BbCafeHome() {
     let itemsText = "";
     cart.forEach((i: any) => itemsText += `• ${i.name || "Item"} x${i.quantity || 1} - ₹${(i.price || 0) * (i.quantity || 1)}\n`);
     
-    const msg = `🔥 *BUM BUM CAFE - NEW ORDER*\n\n*Bill No:* #${billNumber}\n*Token No:* #${tokenNumber}\n*Customer:* ${customerDetails?.name || "Customer"}\n*Phone:* ${customerDetails?.phone || "No Phone"}\n*Address:* ${address}\n\n*ITEMS:*\n${itemsText}\n*Subtotal:* ₹${subtotal}\n*Coupon Discount:* -₹${couponDiscount}\n*Delivery:* ₹${deliveryCharge}\n*TOTAL BILL: ₹${finalTotal}*\n\n*Points Earned:* +${pointsEarned} Pts\n${totalPointsCost > 0 ? `*Points Redeemed:* -${totalPointsCost} Pts\n` : ''}\n_Confirm order by replying 'YES'_`;
+    const msg = `🔥 *BUM BUM CAFE - NEW ORDER*\n\n*Bill No:* #${formattedBillStr}\n*Token No:* #${tokenNumber}\n*Customer:* ${customerDetails?.name || "Customer"}\n*Phone:* ${customerDetails?.phone || "No Phone"}\n*Address:* ${address}\n\n*ITEMS:*\n${itemsText}\n*Subtotal:* ₹${subtotal}\n*Coupon Discount:* -₹${couponDiscount}\n*Delivery:* ₹${deliveryCharge}\n*TOTAL BILL: ₹${finalTotal}*\n\n*Points Earned:* +${pointsEarned} Pts\n${totalPointsCost > 0 ? `*Points Redeemed:* -${totalPointsCost} Pts\n` : ''}\n_Confirm order by replying 'YES'_`;
     
     window.open(`https://wa.me/919714293759?text=${encodeURIComponent(msg)}`, '_blank');
     
@@ -421,6 +461,17 @@ export default function BbCafeHome() {
       {/* HEADER */}
       <header className="relative h-60 bg-gradient-to-b from-[#ff5e00] to-[#b33600] flex flex-col justify-center items-center px-4 shadow-[0_15px_40px_rgba(179,54,0,0.2)]">
         <div className="absolute inset-0 opacity-15 bg-[url('https://www.transparenttextures.com/patterns/food.png')] bg-center rounded-b-[3.5rem] overflow-hidden"></div>
+        
+        {/* Floating Social Media Access Button */}
+        <div className="absolute top-4 left-4 flex gap-2 z-10">
+          <button 
+            onClick={() => setIsSocialsOpen(true)}
+            className="bg-black/50 hover:bg-black/70 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-white/10 flex items-center gap-1 active:scale-95 transition-all text-[9px] font-black uppercase tracking-widest text-yellow-300 cursor-pointer"
+          >
+            📱 Follow Us
+          </button>
+        </div>
+
         <div className="absolute top-4 right-4 bg-black/40 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10 flex items-center gap-1.5 z-10">
           <span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse"></span>
           <span className="text-[9px] font-black uppercase tracking-widest text-green-400">100% PURE VEG</span>
@@ -476,7 +527,7 @@ export default function BbCafeHome() {
           )}
         </div>
 
-        {/* INSPIRATION CATEGORIES GRID (Hides categories that are configured invisible) */}
+        {/* INSPIRATION CATEGORIES GRID (Synchronized with visibleCategories list) */}
         <div className="bg-white/[0.01] border border-white/5 p-5 rounded-[2.5rem] shadow-xl space-y-4">
           <p className="text-[9px] font-black uppercase tracking-widest text-orange-500">Inspiration for your first order</p>
           <div className="grid grid-cols-4 gap-x-2 gap-y-5 text-center">
@@ -745,7 +796,7 @@ export default function BbCafeHome() {
                   </ul>
                 </div>
 
-                {/* --- LOYALTY CLUB REDEEM BOARD FOR CUSTOMERS --- */}
+                {/* --- LOYALTY CLUB REDEEM BOARD FOR CUSTOMERS (DYNAMIC RULES FETCHED FROM DATABASE) --- */}
                 {customerDetails && (
                   <div className="bg-yellow-400/5 border border-yellow-400/20 rounded-[2rem] p-5 space-y-3">
                     <div className="flex items-center gap-2 text-yellow-400 font-black text-xs uppercase tracking-widest">
@@ -756,40 +807,72 @@ export default function BbCafeHome() {
                         <h4 className="text-3xl font-black text-white">{customerPoints} <span className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Points</span></h4>
                         <p className="text-[9px] text-gray-400 font-medium mt-1">Spend ₹100 = Get 1 Point!</p>
                       </div>
-                      <div className="text-right text-[9px] text-yellow-400 font-black space-y-1 uppercase tracking-wider bg-yellow-400/5 p-3 rounded-xl border border-yellow-400/10">
-                        <p>🎁 10 Pts = Sandwich</p>
-                        <p>🎁 20 Pts = Small Pizza</p>
+                      <div className="text-right text-[9px] text-yellow-400 font-black space-y-1 uppercase tracking-wider bg-yellow-400/5 p-3 rounded-xl border border-yellow-400/10 max-h-24 overflow-y-auto no-scrollbar">
+                        {loyaltyRules.length === 0 ? (
+                          <>
+                            <p>🎁 10 Pts = Sandwich</p>
+                            <p>🎁 20 Pts = Small Pizza</p>
+                          </>
+                        ) : (
+                          loyaltyRules.map(rule => (
+                            <p key={rule.id}>🎁 {rule.pointsCost} Pts = {rule.rewardName}</p>
+                          ))
+                        )}
                       </div>
                     </div>
                     
                     {/* Customer Redemption Controls */}
                     <div className="space-y-2 pt-1">
                       <p className="text-[10px] text-gray-400 font-black uppercase tracking-wider">Redeem Your Points Here:</p>
-                      <div className="grid grid-cols-2 gap-2">
-                        <button
-                          type="button"
-                          onClick={() => handleCustomerRedeem("reward-sandwich", "🎁 FREE Loyalty Sandwich", 10)}
-                          disabled={customerPoints - cart.reduce((acc: number, i: any) => acc + (i.pointsCost || 0), 0) < 10}
-                          className={`py-2.5 px-3 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border ${
-                            (customerPoints - cart.reduce((acc: number, i: any) => acc + (i.pointsCost || 0), 0) >= 10)
-                              ? 'bg-yellow-400 text-black border-yellow-400 active:scale-95 cursor-pointer'
-                              : 'bg-white/5 text-gray-500 border-white/5 cursor-not-allowed'
-                          }`}
-                        >
-                          🥪 Sandwich (10 Pts)
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleCustomerRedeem("reward-pizza", "🎁 FREE Loyalty Small Pizza", 20)}
-                          disabled={customerPoints - cart.reduce((acc: number, i: any) => acc + (i.pointsCost || 0), 0) < 20}
-                          className={`py-2.5 px-3 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border ${
-                            (customerPoints - cart.reduce((acc: number, i: any) => acc + (i.pointsCost || 0), 0) >= 20)
-                              ? 'bg-yellow-400 text-black border-yellow-400 active:scale-95 cursor-pointer'
-                              : 'bg-white/5 text-gray-500 border-white/5 cursor-not-allowed'
-                          }`}
-                        >
-                          🍕 Small Pizza (20 Pts)
-                        </button>
+                      <div className="grid grid-cols-2 gap-2 max-h-32 overflow-y-auto no-scrollbar pr-1">
+                        {loyaltyRules.length === 0 ? (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => handleCustomerRedeem("reward-sandwich", "🎁 FREE Loyalty Sandwich", 10)}
+                              disabled={customerPoints - cart.reduce((acc: number, i: any) => acc + (i.pointsCost || 0), 0) < 10}
+                              className={`py-2.5 px-3 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border ${
+                                (customerPoints - cart.reduce((acc: number, i: any) => acc + (i.pointsCost || 0), 0) >= 10)
+                                  ? 'bg-yellow-400 text-black border-yellow-400 active:scale-95 cursor-pointer'
+                                  : 'bg-white/5 text-gray-500 border-white/5 cursor-not-allowed'
+                              }`}
+                            >
+                              🥪 Sandwich (10 Pts)
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleCustomerRedeem("reward-pizza", "🎁 FREE Loyalty Small Pizza", 20)}
+                              disabled={customerPoints - cart.reduce((acc: number, i: any) => acc + (i.pointsCost || 0), 0) < 20}
+                              className={`py-2.5 px-3 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border ${
+                                (customerPoints - cart.reduce((acc: number, i: any) => acc + (i.pointsCost || 0), 0) >= 20)
+                                  ? 'bg-yellow-400 text-black border-yellow-400 active:scale-95 cursor-pointer'
+                                  : 'bg-white/5 text-gray-500 border-white/5 cursor-not-allowed'
+                              }`}
+                            >
+                              🍕 Small Pizza (20 Pts)
+                            </button>
+                          </>
+                        ) : (
+                          loyaltyRules.map(rule => {
+                            const inCartCost = cart.reduce((acc: number, i: any) => acc + (i.pointsCost || 0), 0);
+                            const isAffordable = (customerPoints - inCartCost) >= rule.pointsCost;
+                            return (
+                              <button
+                                key={rule.id}
+                                type="button"
+                                onClick={() => handleCustomerRedeem(`reward-${rule.id}`, `🎁 FREE ${rule.rewardName}`, rule.pointsCost)}
+                                disabled={!isAffordable}
+                                className={`py-2.5 px-3 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border truncate ${
+                                  isAffordable
+                                    ? 'bg-yellow-400 text-black border-yellow-400 active:scale-95 cursor-pointer'
+                                    : 'bg-white/5 text-gray-500 border-white/5 cursor-not-allowed'
+                                }`}
+                              >
+                                🎁 {rule.rewardName} ({rule.pointsCost} P)
+                              </button>
+                            );
+                          })
+                        )}
                       </div>
                     </div>
                   </div>
@@ -886,6 +969,79 @@ export default function BbCafeHome() {
               <button type="submit" className="w-full bg-orange-500 hover:bg-orange-600 p-5 rounded-2xl font-black text-md shadow-xl active:scale-95 transition-all uppercase tracking-wider">PROCEED TO ORDER</button>
               <button type="button" onClick={() => setIsLoginOpen(false)} className="mt-6 text-gray-500 text-xs font-black uppercase tracking-widest block mx-auto hover:text-gray-400">Close</button>
             </form>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* --- SOCIAL MEDIA LINKS MODAL --- */}
+      <AnimatePresence>
+        {isSocialsOpen && (
+          <div className="fixed inset-0 bg-black/95 z-[250] flex items-center justify-center p-6">
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }} 
+              animate={{ scale: 1, opacity: 1 }} 
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-[#111] w-full max-w-md p-8 rounded-[3rem] border border-white/10 text-center space-y-6 relative overflow-hidden"
+            >
+              <div className="absolute -top-10 -left-10 w-32 h-32 bg-orange-500/10 blur-3xl rounded-full"></div>
+              
+              <div>
+                <h3 className="text-2xl font-black text-orange-500 uppercase italic">Connect With Us</h3>
+                <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">BUM BUM Cafe Mohandra</p>
+              </div>
+
+              <div className="space-y-3 text-left max-h-[22rem] overflow-y-auto no-scrollbar pr-1">
+                <a href="https://wa.me/919714293759" target="_blank" rel="noopener noreferrer" className="flex items-center gap-4 bg-green-500/10 hover:bg-green-500/20 border border-green-500/20 p-3.5 rounded-2xl transition-all active:scale-[0.98]">
+                  <span className="text-2xl">🟢</span>
+                  <div>
+                    <h4 className="text-xs font-black text-white">WhatsApp Message</h4>
+                    <p className="text-[8px] text-gray-400 font-bold uppercase mt-0.5">Contact Us: 9714293759</p>
+                  </div>
+                </a>
+
+                <a href="https://whatsapp.com/channel/0029VaLhggoGE56natoQI43y" target="_blank" rel="noopener noreferrer" className="flex items-center gap-4 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 p-3.5 rounded-2xl transition-all active:scale-[0.98]">
+                  <span className="text-2xl">📢</span>
+                  <div>
+                    <h4 className="text-xs font-black text-white">WhatsApp Channel</h4>
+                    <p className="text-[8px] text-gray-400 font-bold uppercase mt-0.5">Subscribe for Offers</p>
+                  </div>
+                </a>
+
+                <a href="https://www.youtube.com/@bbcafe.i" target="_blank" rel="noopener noreferrer" className="flex items-center gap-4 bg-red-600/10 hover:bg-red-600/20 border border-red-600/20 p-3.5 rounded-2xl transition-all active:scale-[0.98]">
+                  <span className="text-2xl">🔴</span>
+                  <div>
+                    <h4 className="text-xs font-black text-white">YouTube</h4>
+                    <p className="text-[8px] text-gray-400 font-bold uppercase mt-0.5">@bbcafe.i</p>
+                  </div>
+                </a>
+
+                <a href="https://www.instagram.com/bbcafe.in/" target="_blank" rel="noopener noreferrer" className="flex items-center gap-4 bg-pink-500/10 hover:bg-pink-500/20 border border-pink-500/20 p-3.5 rounded-2xl transition-all active:scale-[0.98]">
+                  <span className="text-2xl">📸</span>
+                  <div>
+                    <h4 className="text-xs font-black text-white">Instagram</h4>
+                    <p className="text-[8px] text-gray-400 font-bold uppercase mt-0.5">@bbcafe.in</p>
+                  </div>
+                </a>
+
+                <a href="https://www.facebook.com/bbcafe.in/" target="_blank" rel="noopener noreferrer" className="flex items-center gap-4 bg-blue-600/10 hover:bg-blue-600/20 border border-blue-600/20 p-3.5 rounded-2xl transition-all active:scale-[0.98]">
+                  <span className="text-2xl">🔵</span>
+                  <div>
+                    <h4 className="text-xs font-black text-white">Facebook</h4>
+                    <p className="text-[8px] text-gray-400 font-bold uppercase mt-0.5">@bbcafe.in</p>
+                  </div>
+                </a>
+
+                <a href="https://www.snapchat.com/add/bbcafe.in" target="_blank" rel="noopener noreferrer" className="flex items-center gap-4 bg-yellow-400/10 hover:bg-yellow-400/20 border border-yellow-400/20 p-3.5 rounded-2xl transition-all active:scale-[0.98]">
+                  <span className="text-2xl">🟡</span>
+                  <div>
+                    <h4 className="text-xs font-black text-white">Snapchat</h4>
+                    <p className="text-[8px] text-gray-400 font-bold uppercase mt-0.5">Add bbcafe.in</p>
+                  </div>
+                </a>
+              </div>
+
+              <button type="button" onClick={() => setIsSocialsOpen(false)} className="w-full bg-orange-500 hover:bg-orange-600 text-black font-black p-4 rounded-xl text-xs active:scale-95 transition-all uppercase">CLOSE</button>
+            </motion.div>
           </div>
         )}
       </AnimatePresence>
