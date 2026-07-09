@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { db } from '../lib/firebase'; 
 import { collection, onSnapshot, query, addDoc, doc, setDoc, increment, runTransaction } from 'firebase/firestore';
-import { ShoppingBag, Plus, PowerOff, Search, ChevronRight, X, MapPin, Phone, User, Sparkles, Star, Percent, Gift } from 'lucide-react';
+import { ShoppingBag, Plus, PowerOff, Search, ChevronRight, X, MapPin, Phone, User, Sparkles, Star, Percent, Gift, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
 import { useCartStore } from '../store/useCartStore';
@@ -66,6 +66,12 @@ export default function BbCafeHome() {
   const [customerPoints, setCustomerPoints] = useState<number>(0);
   const [loyaltyRules, setLoyaltyRules] = useState<any[]>([]);
 
+  // --- GIFT POINTS COMPONENT STATES ---
+  const [isGiftModalOpen, setIsGiftModalOpen] = useState(false);
+  const [giftPhone, setGiftPhone] = useState("");
+  const [giftPointsAmount, setGiftPointsAmount] = useState<number | "">("");
+  const [isGiftingLoading, setIsGiftingLoading] = useState(false);
+
   // --- DYNAMIC DATA STATES ---
   const [dbCategories, setDbCategories] = useState<any[]>([]);
   const [banners, setBanners] = useState<any[]>([]);
@@ -108,7 +114,7 @@ export default function BbCafeHome() {
       setMenu(items.filter((i: any) => i.isVisible !== false));
     });
 
-    // Realtime Dynamic Categories (Fetch all to determine visibility of default ones)
+    // Realtime Dynamic Categories
     const unsubCats = onSnapshot(collection(db, "categories"), (snap) => {
       const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       setDbCategories(list);
@@ -130,7 +136,7 @@ export default function BbCafeHome() {
       setReviews(allRev.filter((r: any) => r.isApproved === true));
     });
 
-    // Dynamic Loyalty Rules Listener
+    // Live Loyalty Rules Listener
     const unsubRules = onSnapshot(collection(db, "loyalty_rules"), (snap) => {
       setLoyaltyRules(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
@@ -172,7 +178,7 @@ export default function BbCafeHome() {
     return () => unsubPoints();
   }, [customerDetails]);
 
-  // Compute categories cleanly with duplicates and explicitly hidden categories removed
+  // Compute categories cleanly with duplicates and explicitly hidden categories removed (Both text and circle buttons will hide)
   const visibleCategories = useMemo(() => {
     const baseCategories = ["All", ...FALLBACK_CATEGORIES.filter(c => c !== "All")];
     
@@ -183,7 +189,7 @@ export default function BbCafeHome() {
 
     const result: string[] = [];
 
-    // Filter default categories based on customized settings in Database
+    // Filter default fallback categories
     baseCategories.forEach(catName => {
       const cleanName = catName.toLowerCase().trim();
       if (dbCatsMap.has(cleanName)) {
@@ -244,6 +250,7 @@ export default function BbCafeHome() {
   const deduplicatedMenu = useMemo(() => {
     const seen = new Set();
     
+    // Get lowercase set of explicitly hidden categories
     const hiddenCategoryNames = new Set(
       dbCategories
         .filter((c: any) => c.isVisible === false)
@@ -253,6 +260,7 @@ export default function BbCafeHome() {
     return menu.filter(item => {
       const itemCatClean = item?.category ? String(item.category).toLowerCase().trim() : "";
       
+      // If the category of this item is hidden, hide the item entirely
       if (hiddenCategoryNames.has(itemCatClean)) {
         return false;
       }
@@ -292,6 +300,89 @@ export default function BbCafeHome() {
       isReward: true
     });
     toast.success(`${name} Cart में जोड़ दिया गया है!`);
+  };
+
+  // --- SAFE TRANSACTION ENGINE TO TRANSFER/GIFT POINTS TO A FRIEND ---
+  const handleGiftPoints = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!customerDetails?.phone) {
+      return toast.error("कृपया पहले अपनी डिटेल्स जोड़ें!");
+    }
+
+    const senderPhoneRaw = customerDetails.phone.replace("+91", "").trim();
+    const friendPhoneRaw = String(giftPhone).replace("+91", "").trim();
+    const pointsToGift = Number(giftPointsAmount);
+
+    if (!friendPhoneRaw || friendPhoneRaw.length < 10) {
+      return toast.error("कृपया अपने दोस्त का सही 10-digit मोबाइल नंबर डालें!");
+    }
+
+    if (senderPhoneRaw === friendPhoneRaw) {
+      return toast.error("आप खुद को पॉइंट्स गिफ्ट नहीं कर सकते!");
+    }
+
+    if (isNaN(pointsToGift) || pointsToGift <= 0) {
+      return toast.error("कृपया गिफ्ट करने के लिए सही पॉइंट्स की संख्या डालें!");
+    }
+
+    if (customerPoints < pointsToGift) {
+      return toast.error(`आपके पास पर्याप्त पॉइंट्स नहीं हैं! वर्तमान पॉइंट्स: ${customerPoints}`);
+    }
+
+    setIsGiftingLoading(true);
+
+    const senderDocRef = doc(db, "customer_points", senderPhoneRaw);
+    const receiverDocRef = doc(db, "customer_points", friendPhoneRaw);
+
+    try {
+      await runTransaction(db, async (transaction) => {
+        const senderSnap = await transaction.get(senderDocRef);
+        
+        const currentSenderPoints = senderSnap.exists() ? (senderSnap.data().points || 0) : 0;
+        if (currentSenderPoints < pointsToGift) {
+          throw new Error("Insufficient points balance!");
+        }
+
+        // 1. Deduct points from sender
+        transaction.update(senderDocRef, {
+          points: increment(-pointsToGift)
+        });
+
+        // 2. Add points to receiver (create receiver document if not exists)
+        const receiverSnap = await transaction.get(receiverDocRef);
+        if (!receiverSnap.exists()) {
+          transaction.set(receiverDocRef, {
+            name: "Loyal Friend 🎁",
+            phone: friendPhoneRaw,
+            points: pointsToGift,
+            lastActive: new Date()
+          });
+        } else {
+          transaction.update(receiverDocRef, {
+            points: increment(pointsToGift)
+          });
+        }
+      });
+
+      toast.success(`🎁 सफलतापूर्वक ${pointsToGift} पॉइंट्स गिफ्ट कर दिए गए हैं!`);
+      
+      const inviteMsg = `हे दोस्त! मैंने तुम्हें BUM BUM Cafe के ऐप पर 🎁 ${pointsToGift} Loyalty Points गिफ्ट किए हैं। अब हम मिलकर फ्री पिज़्ज़ा या सैंडविच मंगा सकते हैं! तुम भी अपने पॉइंट्स यहाँ चेक करो और ऑर्डर करो: ${window.location.origin}`;
+      const whatsappUrl = `https://wa.me/91${friendPhoneRaw}?text=${encodeURIComponent(inviteMsg)}`;
+      
+      setGiftPhone("");
+      setGiftPointsAmount("");
+      setIsGiftModalOpen(false);
+
+      if (window.confirm("क्या आप अपने दोस्त को व्हाट्सएप पर गिफ्ट का मैसेज भेजना चाहते हैं?")) {
+        window.open(whatsappUrl, '_blank');
+      }
+
+    } catch (err: any) {
+      console.error("Gifting failed: ", err);
+      toast.error(err.message === "Insufficient points balance!" ? "अपर्याप्त पॉइंट्स!" : "पॉइंट्स गिफ्ट करने में समस्या आई।");
+    } finally {
+      setIsGiftingLoading(false);
+    }
   };
 
   // --- WHATSAPP ORDER LOGIC WITH FIRESTORE TRANSACTION BILL INCREMENT ---
@@ -821,10 +912,22 @@ export default function BbCafeHome() {
                       </div>
                     </div>
                     
+                    {/* Share points Option */}
+                    <div className="pt-2.5 border-t border-white/5 flex justify-between items-center mt-2">
+                      <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Share your happiness:</span>
+                      <button
+                        type="button"
+                        onClick={() => setIsGiftModalOpen(true)}
+                        className="bg-yellow-400/10 hover:bg-yellow-400/20 text-yellow-400 border border-yellow-400/20 px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all active:scale-95 flex items-center gap-1 cursor-pointer"
+                      >
+                        <Gift size={10} /> Gift Points to Friend
+                      </button>
+                    </div>
+
                     {/* Customer Redemption Controls */}
-                    <div className="space-y-2 pt-1">
+                    <div className="space-y-2 pt-1 border-t border-white/5 mt-2">
                       <p className="text-[10px] text-gray-400 font-black uppercase tracking-wider">Redeem Your Points Here:</p>
-                      <div className="grid grid-cols-2 gap-2 max-h-32 overflow-y-auto no-scrollbar pr-1">
+                      <div className="grid grid-cols-2 gap-2 max-h-32 overflow-y-auto no-scrollbar pr-1 mt-1">
                         {loyaltyRules.length === 0 ? (
                           <>
                             <button
@@ -969,6 +1072,81 @@ export default function BbCafeHome() {
               <button type="submit" className="w-full bg-orange-500 hover:bg-orange-600 p-5 rounded-2xl font-black text-md shadow-xl active:scale-95 transition-all uppercase tracking-wider">PROCEED TO ORDER</button>
               <button type="button" onClick={() => setIsLoginOpen(false)} className="mt-6 text-gray-500 text-xs font-black uppercase tracking-widest block mx-auto hover:text-gray-400">Close</button>
             </form>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* --- GIFT POINTS MODAL --- */}
+      <AnimatePresence>
+        {isGiftModalOpen && (
+          <div className="fixed inset-0 bg-black/95 z-[260] flex items-center justify-center p-6">
+            <motion.form 
+              onSubmit={handleGiftPoints}
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-[#111] w-full max-w-md p-8 rounded-[3rem] border border-white/10 text-center space-y-6 relative overflow-hidden"
+            >
+              <div className="absolute -top-10 -left-10 w-32 h-32 bg-yellow-400/10 blur-3xl rounded-full"></div>
+              <div className="inline-flex p-4 bg-yellow-400/10 rounded-full text-yellow-400">
+                <Gift size={32} />
+              </div>
+              <div>
+                <h3 className="text-2xl font-black text-yellow-400 uppercase italic">Gift Loyalty Points</h3>
+                <p className="text-xs text-gray-500 font-semibold mt-1">अपने पॉइंट्स किसी दोस्त को गिफ्ट करें</p>
+              </div>
+              
+              <div className="space-y-4 text-left">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-gray-500 tracking-wider">Friend's Phone Number</label>
+                  <input 
+                    type="tel" 
+                    maxLength={10} 
+                    placeholder="e.g. 9876543210" 
+                    value={giftPhone} 
+                    onChange={(e) => setGiftPhone(e.target.value)} 
+                    required 
+                    className="w-full bg-white/5 border border-white/10 p-3.5 rounded-xl text-sm font-bold text-white outline-none focus:border-yellow-400 text-center" 
+                  />
+                </div>
+                
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-gray-500 tracking-wider">Points to Gift (Your Pts: {customerPoints})</label>
+                  <input 
+                    type="number" 
+                    placeholder="e.g. 10" 
+                    value={giftPointsAmount} 
+                    onChange={(e) => setGiftPointsAmount(e.target.value === "" ? "" : Number(e.target.value))} 
+                    required 
+                    className="w-full bg-white/5 border border-white/10 p-3.5 rounded-xl text-sm font-bold text-white outline-none focus:border-yellow-400 text-center" 
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-2">
+                <button 
+                  type="submit" 
+                  disabled={isGiftingLoading}
+                  className="flex-1 bg-yellow-400 hover:bg-yellow-500 text-black font-black p-4 rounded-xl text-sm active:scale-95 transition-all uppercase flex items-center justify-center gap-2"
+                >
+                  {isGiftingLoading ? (
+                    <>
+                      <Loader2 className="animate-spin" size={16} />
+                      <span>Sending...</span>
+                    </>
+                  ) : (
+                    <span>Gift Points 🎁</span>
+                  )}
+                </button>
+                <button 
+                  type="button" 
+                  onClick={() => { setIsGiftModalOpen(false); setGiftPhone(""); setGiftPointsAmount(""); }} 
+                  className="bg-white/5 text-gray-400 font-bold p-4 rounded-xl text-sm active:scale-95 transition-all"
+                >
+                  CANCEL
+                </button>
+              </div>
+            </motion.form>
           </div>
         )}
       </AnimatePresence>
