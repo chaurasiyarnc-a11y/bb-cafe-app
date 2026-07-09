@@ -392,12 +392,11 @@ export default function AdminDashboard() {
     }
   };
 
-  // --- COMPACT BULK IMPORT (Saves token space & prevents copy-paste truncation) ---
+  // --- COMPACT BULK IMPORT ---
   const handleBulkImport = async () => {
     if (!window.confirm("BUM BUM CAFE PDF ke items ko database mein add karein?")) return;
     toast.loading("Importing menu items...", { id: "import" });
 
-    // Shrunk list to keep the code extremely clean and compact
     const data = [
       { name: "Special Tea (स्पेशल चाय)", category: "Fast Food", price: 15, image: "https://images.unsplash.com/photo-1544787219-7f47ccb76574?auto=format&fit=crop&w=300&q=80" },
       { name: "Cheese Corn Pizza", category: "Special Pizza", price: 80, variants: { Small: 80, Medium: 110, Large: 140, "Extra Large": 180 }, image: "https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=300&q=80" }
@@ -462,6 +461,7 @@ export default function AdminDashboard() {
 
   // --- EDIT PRODUCT SELECTOR LOGIC ---
   const startEditing = (item: any) => {
+    setShowAddForm(false); // Close add form when editing
     setEditingProduct(item);
     setEditName(item.name);
     setEditPrice(item.price || "");
@@ -533,6 +533,67 @@ export default function AdminDashboard() {
       toast.error("Error updating product");
     }
   };
+
+  // --- STATUS CHANGE HANDLER ---
+  const handleStatusChange = async (orderId: string, newStatus: string) => {
+    try {
+      await updateDoc(doc(db, "orders", orderId), { status: newStatus });
+      toast.success("Status Sync Success!");
+    } catch (e) {
+      toast.error("Failed to Sync Status.");
+    }
+  };
+
+  // --- Loading Screen ---
+  if (loading) {
+    return (
+      <div className="bg-[#050505] min-h-screen text-white flex flex-col items-center justify-center font-sans">
+        <Loader2 className="animate-spin text-orange-500 mb-2" size={32} />
+        <p className="text-[10px] font-black uppercase tracking-widest text-gray-500">Securing Session...</p>
+      </div>
+    );
+  }
+
+  // --- Secure PIN Login Screen if not verified ---
+  if (!isVerified) {
+    return (
+      <div className="bg-[#050505] min-h-screen text-white flex items-center justify-center p-4 font-sans">
+        <Toaster />
+        <div className="w-full max-w-md bg-white/[0.02] border border-white/5 p-8 rounded-[2.5rem] space-y-6 shadow-2xl relative overflow-hidden">
+          <div className="absolute -top-10 -left-10 w-32 h-32 bg-orange-500/10 blur-3xl rounded-full"></div>
+          <div className="absolute -bottom-10 -right-10 w-32 h-32 bg-orange-500/10 blur-3xl rounded-full"></div>
+          
+          <div className="text-center space-y-2 relative z-10">
+            <div className="inline-flex p-4 bg-orange-500/10 rounded-full text-orange-500 mb-2">
+              <Lock size={28} />
+            </div>
+            <h2 className="text-2xl font-black text-orange-500 italic uppercase">Admin Vault</h2>
+            <p className="text-[10px] text-gray-500 font-bold tracking-widest uppercase">Bum Bum Cafe Mohandra</p>
+          </div>
+
+          <form onSubmit={handlePasscodeLogin} className="space-y-4 relative z-10">
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Secret Security PIN</label>
+              <input 
+                type="password" 
+                placeholder="Enter 6-digit passcode" 
+                value={passcode} 
+                onChange={(e) => setPasscode(e.target.value)} 
+                className="w-full bg-black/60 border border-white/10 rounded-2xl p-4 text-center outline-none focus:border-orange-500 text-sm font-bold text-white tracking-widest"
+                required 
+              />
+            </div>
+            <button 
+              type="submit" 
+              className="w-full bg-orange-500 hover:bg-orange-600 text-white p-4 rounded-2xl font-black text-xs uppercase tracking-wider transition-all duration-200 active:scale-[0.98] shadow-lg shadow-orange-500/10"
+            >
+              Authorize & Enter
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-[#050505] min-h-screen text-white pb-20 font-sans">
@@ -821,8 +882,8 @@ export default function AdminDashboard() {
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-gray-400 uppercase">Category</label>
                   <select value={editCategory} onChange={(e) => setEditCategory(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" required>
-                    {categories.filter(c => c.name !== "All").map(cat => (
-                      <option key={cat.id} value={cat.name} className="bg-[#111]">{cat}</option>
+                    {categoryOptions.filter(c => c !== "All").map(cat => (
+                      <option key={cat} value={cat} className="bg-[#111]">{cat}</option>
                     ))}
                   </select>
                 </div>
@@ -1037,13 +1098,3 @@ export default function AdminDashboard() {
     </div>
   );
 }
-
-// --- INTEGRATED COMPACT DYNAMIC COUPLING CONTROLLER TO MANAGE LIVE DATA TRANSFERS ---
-const handleStatusChange = async (orderId: string, newStatus: string) => {
-  try {
-    await updateDoc(doc(db, "orders", orderId), { status: newStatus });
-    toast.success("Status Sync Success!");
-  } catch (e) {
-    toast.error("Failed to Sync Status.");
-  }
-};
