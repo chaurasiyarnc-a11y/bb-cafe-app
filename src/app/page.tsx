@@ -838,7 +838,8 @@ export default function BbCafeHome() {
                 </div>
               )}
 
-              <button type="button" onClick={handleAddAddToCart} className="w-full bg-orange-500 hover:bg-orange-600 p-5 rounded-2xl font-black text-md shadow-xl active:scale-95 transition-all uppercase">Confirm • ₹{chosenPrice + (addonCheese ? 30 : 0) + (addonVeg ? 20 : 0)}</button>
+              {/* CORRECTED ONCLICK EVENT TO RESOLVE VERCEL COMPILATION ERROR */}
+              <button type="button" onClick={handleAddToCart} className="w-full bg-orange-500 hover:bg-orange-600 p-5 rounded-2xl font-black text-md shadow-xl active:scale-95 transition-all uppercase">Confirm • ₹{chosenPrice + (addonCheese ? 30 : 0) + (addonVeg ? 20 : 0)}</button>
               <button type="button" onClick={() => { setSelectedProduct(null); setChosenSize(""); setChosenPrice(0); setAddonCheese(false); setAddonVeg(false); }} className="w-full mt-4 p-2 text-gray-500 font-black uppercase text-xs tracking-widest">Close</button>
             </motion.div>
           </div>
@@ -1102,7 +1103,7 @@ export default function BbCafeHome() {
               
               <div className="space-y-4 text-left">
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-gray-400 uppercase">Your Name</label>
+                  <label className="text-xs font-bold text-gray-500 uppercase">Your Name</label>
                   <input type="text" placeholder="Enter your name..." value={tempName} onChange={(e) => setTempName(e.target.value)} className="w-full bg-white/5 border border-white/10 p-4 rounded-2xl text-center text-md font-bold outline-none focus:border-orange-500 text-white" required />
                 </div>
                 
