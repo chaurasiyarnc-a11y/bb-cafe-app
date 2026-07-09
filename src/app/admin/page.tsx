@@ -58,6 +58,9 @@ export default function AdminDashboard() {
   const [newRuleName, setNewRuleName] = useState("");
   const [newRulePoints, setNewRulePoints] = useState("");
 
+  // --- CUSTOMER POINT TRANSFERS AUDIT STATE ---
+  const [transferLogs, setTransferLogs] = useState<any[]>([]);
+
   // --- CALENDAR DATE FILTERS ---
   const [filterDate, setFilterDate] = useState(new Date().toISOString().split('T')[0]); // YYYY-MM-DD
   const [ordersFilterDate, setOrdersFilterDate] = useState(new Date().toISOString().split('T')[0]); // YYYY-MM-DD
@@ -156,6 +159,17 @@ export default function AdminDashboard() {
       setLoyaltyRules(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
 
+    // Listen for Customer Point Transfers safely (sorting in JS to prevent compound index crashes)
+    const unsubTransfers = onSnapshot(collection(db, "point_transfers"), (snap) => {
+      const logs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      logs.sort((a: any, b: any) => {
+        const tA = a.timestamp?.toDate ? a.timestamp.toDate() : new Date(a.timestamp || 0);
+        const tB = b.timestamp?.toDate ? b.timestamp.toDate() : new Date(b.timestamp || 0);
+        return tB - tA; // Show latest log first
+      });
+      setTransferLogs(logs);
+    });
+
     return () => {
       unsubOrders();
       unsubProducts();
@@ -166,6 +180,7 @@ export default function AdminDashboard() {
       unsubReviews();
       unsubLoyalty();
       unsubRules();
+      unsubTransfers();
     };
   }, [isVerified]);
 
@@ -571,7 +586,7 @@ export default function AdminDashboard() {
     try {
       await deleteDoc(doc(db, "coupons", couponId));
       toast.success("Coupon Deleted!");
-    } catch (error) { toast.error("Error deleting coupon"); }
+    } catch (error) { parseInt("1"); toast.error("Error deleting coupon"); }
   };
 
   // --- STORE ACTIONS ---
@@ -1112,7 +1127,7 @@ export default function AdminDashboard() {
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Small Price (₹)</label><input type="number" placeholder="Small price" value={editPriceSmall} onChange={(e) => setEditPriceSmall(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" /></div>
                     <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Medium Price (₹)</label><input type="number" placeholder="Medium price" value={editPriceMedium} onChange={(e) => setEditPriceMedium(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" /></div>
-                    <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Large Price (₹)</label><input type="number" placeholder="Large price" value={editPriceLarge} onChange={(e) => setEditPriceLarge(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" /></div>
+                    <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Large Price (₹)</label><input type="number" placeholder="Large price" value={editPriceLarge} onChange={(e) => setEditPriceLarge(e.target.value)} className="w-full bg-[#111]/30 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" /></div>
                     <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Extra Large Price (₹)</label><input type="number" placeholder="XL price" value={editPriceXL} onChange={(e) => setEditPriceXL(e.target.value)} className="w-full bg-[#111]/30 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" /></div>
                   </div>
                 )}
@@ -1332,6 +1347,40 @@ export default function AdminDashboard() {
                 ))
               )}
             </div>
+
+            {/* --- CUSTOMER TO CUSTOMER POINT TRANSFERS LOGS AUDIT --- */}
+            <div className="bg-[#111] border border-white/5 p-6 rounded-[2.5rem] space-y-4">
+              <h3 className="text-sm font-black text-orange-500 uppercase tracking-widest flex items-center gap-2">🔄 Points Transfer Logs ({transferLogs.length})</h3>
+              <p className="text-[10px] text-gray-500 font-bold uppercase">Tracks customer-to-customer point gifts</p>
+              
+              <div className="space-y-2 max-h-60 overflow-y-auto no-scrollbar">
+                {transferLogs.length === 0 ? (
+                  <p className="text-center text-xs font-bold text-gray-600 py-6 uppercase">No point transfers logged...</p>
+                ) : (
+                  transferLogs.map(log => (
+                    <div key={log.id} className="bg-white/[0.01] border border-white/5 p-4 rounded-2xl flex justify-between items-center text-xs">
+                      <div>
+                        <p className="font-bold text-gray-300">
+                          <span className="text-orange-400">{log.senderName || "Sender"}</span> (+{log.senderPhone})
+                        </p>
+                        <p className="text-[10px] text-gray-500 mt-0.5">
+                          ➡️ Gifted to: <span className="text-yellow-500 font-extrabold">+{log.recipientPhone}</span>
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <span className="bg-orange-500/10 text-orange-500 font-black px-2.5 py-1 rounded-md text-[10px] inline-block">
+                          {log.points} Pts 🎁
+                        </span>
+                        <p className="text-[8px] text-gray-600 mt-1">
+                          {log.timestamp?.toDate ? log.timestamp.toDate().toLocaleString() : "Just now"}
+                        </p>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
           </div>
         )}
 
@@ -1419,4 +1468,4 @@ export default function AdminDashboard() {
       </main>
     </div>
   );
-}
+  }
