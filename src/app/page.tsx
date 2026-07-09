@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { db } from '../lib/firebase'; 
 import { collection, onSnapshot, query, addDoc, doc, setDoc, increment, runTransaction } from 'firebase/firestore';
-import { ShoppingBag, Plus, PowerOff, Search, ChevronRight, X, MapPin, Phone, User, Sparkles, Star, Percent, Gift, Loader2 } from 'lucide-react';
+import { ShoppingBag, Plus, PowerOff, Search, ChevronRight, X, MapPin, Phone, User, Sparkles, Star, Percent, Gift, Loader2, Share2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
 import { useCartStore } from '../store/useCartStore';
@@ -80,6 +80,9 @@ export default function BbCafeHome() {
   const [addonCheese, setAddonCheese] = useState(false);
   const [addonVeg, setAddonVeg] = useState(false);
 
+  // App Sharing Tracker State
+  const [shareCount, setShareCount] = useState<number>(0);
+
   const formatBillNumber = (num: number) => String(num).padStart(4, '0');
 
   useEffect(() => {
@@ -125,6 +128,11 @@ export default function BbCafeHome() {
     const unsubPoints = onSnapshot(doc(db, "customer_points", customerDetails.phone.replace("+91", "")), (docSnap) => {
       setCustomerPoints(docSnap.exists() ? (docSnap.data().points || 0) : 0);
     }, () => { setCustomerPoints(0); });
+    
+    // Set Local Share Counter status
+    const phoneClean = customerDetails.phone.replace("+91", "");
+    setShareCount(Number(localStorage.getItem(`bb_shares_${phoneClean}`) || 0));
+
     return () => unsubPoints();
   }, [customerDetails]);
 
@@ -348,7 +356,6 @@ export default function BbCafeHome() {
 
   // --- GAMIFIED SOCIAL POINTS CLAIM ENGINE ---
   const handleSocialClick = async (platform: string, url: string) => {
-    // Open the social media URL in a new tab first
     window.open(url, '_blank');
 
     if (!customerDetails?.phone) {
@@ -378,15 +385,62 @@ export default function BbCafeHome() {
       setCustomerPoints(prev => prev + 1);
       toast.success(`🎉 बधाई हो! ${platform.toUpperCase()} पर हमें फॉलो करने के लिए आपको +1 पॉइंट मिला है!`);
     } catch (err) {
-      toast.error("पॉइंट्स जोड़ने में समस्या आई। कृपया बाद में प्रयास करें।");
+      toast.error("पॉइंट्स जोड़ने में समस्या आई।");
     }
   };
 
-  // Helper to dynamically check claim status
   const getClaimStatus = (platform: string) => {
     if (!customerDetails?.phone) return "🎁 +1 Pt";
     const storageKey = `bb_claimed_${customerDetails.phone.replace("+91", "")}_${platform}`;
     return localStorage.getItem(storageKey) ? "✅ Claimed" : "🎁 Claim +1 Pt";
+  };
+
+  // --- NEW WHATSAPP APP SHARING & REWARD POINT ENGINE ---
+  const handleShareApp = async () => {
+    if (!customerDetails?.phone) {
+      toast.error("पॉइंट्स कमाने के लिए पहले Name और Phone दर्ज करें!");
+      setIsLoginOpen(true);
+      return;
+    }
+
+    const phoneClean = customerDetails.phone.replace("+91", "").trim();
+    const shareCountKey = `bb_shares_${phoneClean}`;
+    let currentShares = Number(localStorage.getItem(shareCountKey) || 0);
+
+    // Share Invite Message
+    const shareMessage = `🔥 *BUM BUM CAFE - Mohandra* 🔥\nयहाँ से ऑर्डर करें बेहतरीन और स्वादिष्ट Pizza, Thali और Fast Food! सीधे आपके घर तक सुपर फास्ट होम डिलीवरी।\nऑर्डर करने और 🎁 फ्री लॉयल्टी पॉइंट्स पाने के लिए अभी नीचे लिंक खोलें:\n👉 ${window.location.origin}`;
+    const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(shareMessage)}`;
+
+    // Open WhatsApp to share
+    window.open(whatsappUrl, '_blank');
+
+    if (currentShares < 5) {
+      const nextShares = currentShares + 1;
+      localStorage.setItem(shareCountKey, String(nextShares));
+      setShareCount(nextShares);
+
+      if (nextShares === 5) {
+        try {
+          const pointsRef = doc(db, "customer_points", phoneClean);
+          await setDoc(pointsRef, {
+            points: increment(1),
+            lastActive: new Date()
+          }, { merge: true });
+
+          setCustomerPoints(prev => prev + 1);
+          toast.success("🎉 शानदार! आपने 5 दोस्तों के साथ ऐप शेयर करके +1 Loyalty Point कमा लिया है!");
+        } catch (e) {
+          console.error(e);
+        }
+      } else {
+        toast.success(`📤 शेयर किया गया! (${nextShares}/5 प्रोग्रेस। +1 पॉइंट के लिए ${5 - nextShares} और दोस्तों को शेयर करें!)`);
+      }
+    } else {
+      // Loop resets after 5 shares to allow earning again!
+      localStorage.setItem(shareCountKey, "1");
+      setShareCount(1);
+      toast.success("📤 नया शेयर प्रोग्रेस शुरू हुआ! (1/5 पूरा)");
+    }
   };
 
   if (!mounted) return null;
@@ -395,10 +449,8 @@ export default function BbCafeHome() {
     <div className="bg-[#050505] min-h-screen text-white pb-32 font-sans">
       <Toaster position="top-center" />
       
+      {/* HEADER (Social Media Button has been removed from here) */}
       <header className="relative h-60 bg-gradient-to-b from-[#ff5e00] to-[#b33600] flex flex-col justify-center items-center px-4">
-        <div className="absolute top-4 left-4 z-10">
-          <button onClick={() => setIsSocialsOpen(true)} className="bg-black/50 hover:bg-black/70 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-white/10 text-[9px] font-black uppercase tracking-widest text-yellow-300">📱 Follow Us</button>
-        </div>
         <div className="absolute top-4 right-4 bg-black/40 px-3 py-1.5 rounded-full border border-white/10 flex items-center gap-1.5 z-10 text-[9px] font-black uppercase tracking-widest text-green-400">
           <span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />100% PURE VEG
         </div>
@@ -415,19 +467,21 @@ export default function BbCafeHome() {
         </div>
       </div>
 
-      {/* NEW SIDE-TOGGLE BUTTON FOR SOCIAL MEDIA (LEFT SIDE - SYMMETRIC) */}
+      {/* DOUBLE SIDE-TOGGLES STACKED CLEANLY ON THE RIGHT */}
+      
+      {/* 1. SOCIAL MEDIA FOLLOW & EARN TOGGLE (Placed above reviews) */}
       <button 
         onClick={() => setIsSocialsOpen(true)} 
-        className="fixed left-0 top-[40%] -translate-y-1/2 bg-[#ff5e00] text-white py-4 px-2 rounded-r-2xl z-40 text-[9px] font-black tracking-widest uppercase flex flex-col items-center gap-1 shadow-lg"
+        className="fixed right-0 top-[31%] -translate-y-1/2 bg-[#ff5e00] text-white py-4 px-2.5 rounded-l-2xl z-40 text-[9px] font-black tracking-widest uppercase flex flex-col items-center gap-1 shadow-xl border-l border-y border-white/10"
         style={{ writingMode: 'vertical-lr' }}
       >
         📱 FOLLOW & EARN
       </button>
 
-      {/* FIXED REVIEW SIDE TOGGLE (RIGHT SIDE) */}
+      {/* 2. REVIEWS TOGGLE (Placed below socials) */}
       <button 
         onClick={() => setIsReviewsDrawerOpen(true)} 
-        className="fixed right-0 top-[40%] -translate-y-1/2 bg-yellow-400 text-black py-4 px-2 rounded-l-2xl z-40 text-[9px] font-black tracking-widest uppercase flex flex-col items-center gap-1 shadow-lg"
+        className="fixed right-0 top-[44%] -translate-y-1/2 bg-yellow-400 text-black py-4 px-2.5 rounded-l-2xl z-40 text-[9px] font-black tracking-widest uppercase flex flex-col items-center gap-1 shadow-xl"
         style={{ writingMode: 'vertical-lr' }}
       >
         ⭐ REVIEWS
@@ -618,14 +672,21 @@ export default function BbCafeHome() {
         )}
       </AnimatePresence>
 
-      {/* --- CART / CHECKOUT SIDEBAR --- */}
+      {/* --- CART / CHECKOUT SIDEBAR - PREMIUM SLIDE-UP BOTTOM SHEET --- */}
       <AnimatePresence>
         {isCartOpen && (
-          <div className="fixed inset-0 bg-black z-[110] overflow-y-auto">
-            <div className="p-6 max-w-lg mx-auto pb-32">
+          <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-[110] flex items-end">
+            <motion.div 
+              initial={{ y: "100%" }} 
+              animate={{ y: 0 }} 
+              exit={{ y: "100%" }} 
+              transition={{ type: "spring", damping: 26, stiffness: 190 }}
+              className="bg-[#0b0c10] w-full h-[92vh] rounded-t-[3rem] border-t border-white/10 overflow-y-auto pb-32 p-6 max-w-lg mx-auto relative shadow-2xl"
+            >
+              <div className="w-16 h-1.5 bg-white/15 rounded-full mx-auto mb-6" />
               <div className="flex justify-between items-center mb-8">
-                <h2 className="text-3xl font-black">Your Order</h2>
-                <button onClick={() => setIsCartOpen(false)} className="p-3 bg-white/5 rounded-full"><X size={24} /></button>
+                <h2 className="text-3xl font-black text-white">Your Order</h2>
+                <button onClick={() => setIsCartOpen(false)} className="p-3 bg-white/5 hover:bg-white/10 text-white rounded-full transition-all"><X size={24} /></button>
               </div>
 
               {cart.map((item: any) => (
@@ -658,6 +719,7 @@ export default function BbCafeHome() {
                 {customerDetails && (
                   <div className="bg-yellow-400/5 border border-yellow-400/20 rounded-[2rem] p-5 space-y-3">
                     <div className="flex items-center gap-2 text-yellow-400 font-black text-xs uppercase"><Gift size={14}/> <span>⭐ BUM BUM LOYALTY CLUB</span></div>
+                    
                     <div className="flex justify-between items-center border-b border-white/5 pb-3">
                       <div>
                         <h4 className="text-3xl font-black text-white">{customerPoints} <span className="text-[10px] text-gray-500 font-bold uppercase">Points</span></h4>
@@ -671,9 +733,25 @@ export default function BbCafeHome() {
                         )}
                       </div>
                     </div>
+
+                    {/* NEW SHARE & REFERRAL POINTS CARD */}
+                    <div className="pt-2 flex flex-col gap-2.5">
+                      <div className="flex justify-between items-center">
+                        <span className="text-[10px] text-gray-400 font-black uppercase flex items-center gap-1">📤 Share Progress:</span>
+                        <span className="text-[10px] text-yellow-400 font-black tracking-widest bg-yellow-400/10 px-2.5 py-0.5 rounded-lg border border-yellow-400/20">{shareCount}/5 Shared</span>
+                      </div>
+                      <button 
+                        type="button" 
+                        onClick={handleShareApp} 
+                        className="w-full bg-green-600 hover:bg-green-700 text-white font-black py-3 rounded-xl text-xs uppercase flex items-center justify-center gap-2 border border-green-500/20 transition-all shadow-md active:scale-95"
+                      >
+                        <Share2 size={14}/>
+                        <span>Invite 5 Friends & Get +1 Point! 🎁</span>
+                      </button>
+                    </div>
                     
                     <div className="pt-2.5 border-t border-white/5 flex justify-between items-center mt-2">
-                      <span className="text-[10px] text-gray-400 font-bold uppercase">Share your happiness:</span>
+                      <span className="text-[10px] text-gray-400 font-bold uppercase">Gift points to friend:</span>
                       <button type="button" onClick={() => setIsGiftModalOpen(true)} className="bg-yellow-400/10 hover:bg-yellow-400/20 text-yellow-400 border border-yellow-400/20 px-3 py-1.5 rounded-xl text-[9px] font-black uppercase">🎁 Gift Points</button>
                     </div>
 
@@ -743,24 +821,25 @@ export default function BbCafeHome() {
 
                 <button onClick={sendWhatsAppOrder} type="button" className="w-full bg-green-600 hover:bg-green-700 p-6 rounded-[2.5rem] font-black text-md text-white flex items-center justify-center gap-3">ORDER ON WHATSAPP</button>
               </div>
-            </div>
+            </motion.div>
           </div>
         )}
       </AnimatePresence>
 
-      {/* --- NEW PREMIUM FLOATING CART BUTTON (Only visible when cart has items) --- */}
+      {/* --- PRE-EXISTING LARGE YELLOW FLOATING CART BUTTON (Springy Slide-up) --- */}
       {cart.length > 0 && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-full max-w-md px-4">
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-full max-w-sm md:max-w-md px-4">
           <button
             onClick={() => setIsCartOpen(true)}
-            className="w-full bg-gradient-to-r from-orange-500 to-orange-600 text-white py-4.5 px-6 rounded-2xl font-black text-sm uppercase flex justify-between items-center shadow-2xl border border-white/10 active:scale-95 transition-all"
+            className="w-full bg-[#facc15] hover:bg-[#eab308] text-black py-4.5 px-6 rounded-[2rem] font-black text-sm uppercase flex justify-between items-center shadow-[0_12px_40px_rgba(250,204,21,0.25)] border border-yellow-300/30 active:scale-95 transition-all animate-bounce"
+            style={{ animationDuration: '3.5s' }}
           >
             <div className="flex items-center gap-2.5">
-              <ShoppingBag size={18} />
-              <span>{cart.reduce((acc: number, item: any) => acc + item.quantity, 0)} Items Added</span>
+              <ShoppingBag size={20} />
+              <span className="text-xs font-black tracking-wider">{cart.reduce((acc: number, item: any) => acc + item.quantity, 0)} Items Added</span>
             </div>
-            <div className="flex items-center gap-1.5 bg-white/10 px-3.5 py-1.5 rounded-xl border border-white/5">
-              <span>View Cart</span>
+            <div className="flex items-center gap-1 bg-black/10 px-3.5 py-1.5 rounded-full border border-black/5">
+              <span className="text-[10px] font-black uppercase">View Cart</span>
               <ChevronRight size={14} />
             </div>
           </button>
