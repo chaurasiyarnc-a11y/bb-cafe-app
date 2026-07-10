@@ -109,8 +109,6 @@ export default function BbCafeHome() {
 
   const [isGiftModalOpen, setIsGiftModalOpen] = useState(false);
   const [giftPhone, setGiftPhone] = useState("");
-  
-  // 1. Fully Fixed TypeScript Error Generic Definition [1.1.2]
   const [giftPointsAmount, setGiftPointsAmount] = useState<number | "">("");
   const [isGiftingLoading, setIsGiftingLoading] = useState(false);
 
@@ -149,10 +147,6 @@ export default function BbCafeHome() {
 
   // Favorite Items List
   const [favorites, setFavorites] = useState<string[]>([]);
-
-  // Custom Install Prompt Reward
-  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
-  const [pwaInstalledReward, setPwaInstalledReward] = useState(false);
 
   // Eco Digital Invoice Modal
   const [showInvoice, setShowInvoice] = useState(false);
@@ -219,6 +213,42 @@ export default function BbCafeHome() {
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
     return R * c;
   };
+
+  // 1. Correctly declared deduplicatedMenu hook to fix type compile issues [1.1.2]
+  const deduplicatedMenu = useMemo(() => {
+    const seen = new Set();
+    const hiddenCategoryNames = new Set(dbCategories.filter((c: any) => c.isVisible === false).map((c: any) => String(c.name).toLowerCase().trim()));
+
+    return menu.filter(item => {
+      const itemCatClean = item?.category ? String(item.category).toLowerCase().trim() : "";
+      if (hiddenCategoryNames.has(itemCatClean)) return false;
+      const nameKey = item?.name ? String(item.name).toLowerCase().trim() : item.id;
+      if (seen.has(nameKey)) return false;
+      seen.add(nameKey);
+      return true;
+    });
+  }, [menu, dbCategories]);
+
+  const normalizedSearchQuery = useMemo(() => {
+    const words = searchQuery.toLowerCase().trim().split(/\s+/);
+    const mappedWords = words.map(word => HINGLISH_DICT[word] || word);
+    return mappedWords.join(" ");
+  }, [searchQuery]);
+
+  // 1. Correctly declared filteredMenu hook inside compiler scope [1.1.2]
+  const filteredMenu = useMemo(() => {
+    return deduplicatedMenu.filter(item => {
+      const itemName = item?.name ? String(item.name).toLowerCase() : "";
+      const itemCategory = item?.category ? String(item.category) : "";
+      
+      const isFavoriteFilter = selectedCategory === "Favorites";
+      const matchesCategory = isFavoriteFilter 
+        ? favorites.includes(item.id) 
+        : (selectedCategory === "All" || itemCategory === selectedCategory);
+        
+      return matchesCategory && itemName.includes(normalizedSearchQuery);
+    });
+  }, [deduplicatedMenu, selectedCategory, favorites, normalizedSearchQuery]);
 
   const visibleCategories = useMemo(() => {
     const baseCategories = ["All", ...FALLBACK_CATEGORIES.filter(c => c !== "All")];
@@ -333,75 +363,34 @@ export default function BbCafeHome() {
     };
   }, []);
 
-  const getCartSubtotal = () => cart.reduce((acc: number, i: any) => acc + (i.price * i.quantity), 0);
+  // Auto-slide trigger for carousel
+  useEffect(() => {
+    if (banners.length <= 1) return;
+    const interval = setInterval(() => { setBannerIndex((prev) => (prev + 1) % banners.length); }, 4000);
+    return () => clearInterval(interval);
+  }, [banners]);
 
-  const getCartAddonsPrice = () => {
-    let total = 0;
-    if (ketchupAddon) total += 10;
-    if (oreganoAddon) total += 10;
-    if (chiliFlakesAddon) total += 10;
-    return total;
-  };
-
-  const getDeliveryCharge = () => {
-    const baseSub = getCartSubtotal();
-    if (baseSub === 0) return 0;
-    return baseSub >= selectedArea.minFree ? 0 : selectedArea.fee;
-  };
-
-  const getTotalBillPrice = () => {
-    const subtotal = getCartSubtotal();
-    const addPrice = getCartAddonsPrice();
-    const delivery = getDeliveryCharge();
-    const couponDiscount = appliedCoupon ? Number(appliedCoupon.discountValue) : 0;
-    return Math.max(0, subtotal + addPrice - couponDiscount) + delivery;
-  };
-
-  const getFreeDeliveryProgressPercent = () => {
-    const subtotal = getCartSubtotal();
-    const limit = selectedArea.minFree;
-    if (subtotal >= limit) return 100;
-    return (subtotal / limit) * 100;
-  };
-
-  const getCustomerTier = (points: number) => {
-    if (points >= 50) return { name: "Platinum Member 👑", color: "text-cyan-400 border-cyan-400/30 bg-cyan-400/10" };
-    if (points >= 20) return { name: "Gold Member 🌟", color: "text-yellow-400 border-yellow-400/30 bg-yellow-400/10" };
-    return { name: "Bronze Member 🥉", color: "text-orange-400 border-orange-400/30 bg-orange-400/10" };
-  };
-
-  const handleApplyCoupon = () => {
-    if (!enteredCoupon) return toast.error("Please enter a coupon code");
-    const found = coupons.find(c => String(c.code).toLowerCase() === enteredCoupon.trim().toLowerCase());
-    if (found) {
-      setAppliedCoupon(found);
-      toast.success(`Coupon '${found.code}' applied! ₹${found.discountValue} OFF`);
+  // Sync draft cart to local storage (52)
+  useEffect(() => {
+    if (cart.length > 0) {
+      localStorage.setItem('bb_cafe_draft_cart', JSON.stringify(cart));
     } else {
-      toast.error("Invalid coupon code");
+      localStorage.removeItem('bb_cafe_draft_cart');
     }
-  };
+  }, [cart]);
 
-  const getDisplayPrice = (item: any) => {
-    if (item?.variants && typeof item.variants === 'object') {
-      const prices = Object.values(item.variants).map(Number).filter(n => !isNaN(n));
-      if (prices.length > 0) {
-        const minPrice = Math.min(...prices);
-        const maxPrice = Math.max(...prices);
-        return minPrice === maxPrice ? `₹${minPrice}` : `₹${minPrice} - ₹${maxPrice}`;
-      }
-    }
-    return `₹${item?.price || 0}`;
-  };
+  useEffect(() => {
+    if (!customerDetails?.phone) { setCustomerPoints(0); return; }
+    const unsubPoints = onSnapshot(doc(db, "customer_points", customerDetails.phone.replace("+91", "")), (docSnap) => {
+      setCustomerPoints(docSnap.exists() ? (docSnap.data().points || 0) : 0);
+    }, () => { setCustomerPoints(0); });
+    
+    const phoneClean = customerDetails.phone.replace("+91", "");
+    setShareCount(Number(localStorage.getItem(`bb_shares_${phoneClean}`) || 0));
 
-  const handleCustomerRedeem = (id: string, name: string, pointsCost: number) => {
-    const currentPointsInCart = cart.reduce((acc: number, item: any) => acc + (item.pointsCost || 0), 0);
-    if (customerPoints - currentPointsInCart < pointsCost) return toast.error("आपके पास पर्याप्त ऑयल्टी पॉइंट्स उपलब्ध नहीं हैं!");
-    addItem({ id, name, price: 0, pointsCost, isReward: true });
-    playSoundEffect('add');
-    toast.success(`${name} Cart में जोड़ दिया गया है!`);
-  };
+    return () => unsubPoints();
+  }, [customerDetails]);
 
-  // 3. Distance-based Auto Delivery area selector & surcharge fee calculation [1.1]
   const handleDetectLocation = () => {
     if (!navigator.geolocation) {
       return toast.error("आपके ब्राउज़र में जीपीएस लोकेशन उपलब्ध नहीं है।");
@@ -426,18 +415,17 @@ export default function BbCafeHome() {
         } else {
           setIsTooFar(false);
           
-          // Auto delivery area mapped to calculated GPS distance (KM) [1.1]
           if (calculatedDistance <= 1.0) {
-            setSelectedArea(DELIVERY_AREAS[0]); // Mohandra Town
+            setSelectedArea(DELIVERY_AREAS[0]); 
             toast.success(`सटीक दूरी: ${calculatedDistance.toFixed(2)} KM। आपके लिए 'Mohandra Town' क्षेत्र चुना गया है।`);
           } else if (calculatedDistance <= 2.0) {
-            setSelectedArea(DELIVERY_AREAS[1]); // Mohandra Ward 1-5 (Within 2 KM)
+            setSelectedArea(DELIVERY_AREAS[1]); 
             toast.success(`सटीक दूरी: ${calculatedDistance.toFixed(2)} KM। आपके लिए 'Mohandra Ward 1-5' क्षेत्र चुना गया है।`);
           } else if (calculatedDistance <= 5.0) {
-            setSelectedArea(DELIVERY_AREAS[2]); // Nearby Area (Within 5 KM)
+            setSelectedArea(DELIVERY_AREAS[2]); 
             toast.success(`सटीक दूरी: ${calculatedDistance.toFixed(2)} KM। आपके लिए 'Nearby Area (Within 5 Km)' क्षेत्र चुना गया है।`);
           } else {
-            setSelectedArea(DELIVERY_AREAS[3]); // Out of Town (5 to 8 KM)
+            setSelectedArea(DELIVERY_AREAS[3]); 
             toast.success(`सटीक दूरी: ${calculatedDistance.toFixed(2)} KM। आपके लिए 'Out of Town' क्षेत्र चुना गया है।`);
           }
         }
@@ -490,206 +478,6 @@ export default function BbCafeHome() {
     } catch (err: any) {
       toast.error(err.message === "Insufficient points balance!" ? "अपर्याप्त पॉइंट्स!" : "पॉइंट्स गिफ्ट करने में समस्या आई।");
     } finally { setIsGiftingLoading(false); }
-  };
-
-  const handleInstallPWA = async () => {
-    if (!deferredPrompt) {
-      return toast.error("ऐप इंस्टॉल करने का विकल्प अभी तैयार नहीं है या पहले ही इंस्टॉल हो चुका है!");
-    }
-    deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    if (outcome === 'accepted') {
-      toast.success("बधाई हो! आपने ऐप इंस्टॉल कर लिया है।");
-      if (customerDetails?.phone && !pwaInstalledReward) {
-        try {
-          const cleanPh = customerDetails.phone.replace("+91", "").trim();
-          await setDoc(doc(db, "customer_points", cleanPh), {
-            points: increment(1),
-            lastActive: new Date()
-          }, { merge: true });
-          setPwaInstalledReward(true);
-          localStorage.setItem('pwa_installed_reward', 'true');
-          toast.success("🎁 ऐप इंस्टॉल करने का बोनस +1 लॉयल्टी पॉइंट क्रेडिट कर दिया गया है!");
-        } catch (e) {}
-      }
-    }
-    setDeferredPrompt(null);
-  };
-
-  const sendWhatsAppOrder = async () => {
-    if (isTooFar) {
-      return toast.error("आपकी दूरी 20 KM से अधिक है। आप केवल मेनू देख सकते हैं, ऑर्डर प्लेस नहीं कर सकते!");
-    }
-    if (!customerDetails) { setIsLoginOpen(true); return; }
-    if (!address || address.trim().length < 10) return toast.error("Please enter full address!");
-
-    const tokenNumber = Math.floor(1000 + Math.random() * 9000);
-    let billNumber = 1;
-    const counterDocRef = doc(db, "settings", "store_bill_counter");
-
-    try {
-      await runTransaction(db, async (transaction) => {
-        const counterDoc = await transaction.get(counterDocRef);
-        if (!counterDoc.exists()) {
-          transaction.set(counterDocRef, { nextBillNumber: 2 });
-          billNumber = 1;
-        } else {
-          billNumber = counterDoc.data().nextBillNumber || 1;
-          transaction.update(counterDocRef, { nextBillNumber: billNumber + 1 });
-        }
-      });
-    } catch (e) { billNumber = Math.floor((Date.now() / 1000) % 100000); }
-
-    const formattedBillStr = formatBillNumber(billNumber);
-    const subtotal = getCartSubtotal();
-    const addOnsCost = getCartAddonsPrice();
-    const deliveryCharge = getDeliveryCharge();
-    const couponDiscount = appliedCoupon ? Number(appliedCoupon.discountValue) : 0;
-    const finalTotal = getTotalBillPrice();
-    
-    const pointsEarned = Math.floor(finalTotal / 100);
-    const totalPointsCost = cart.reduce((acc: number, i: any) => acc + (i.pointsCost || 0), 0);
-
-    const orderObj = {
-      billNumber, tokenNumber, customerName: customerDetails.name, customerPhone: customerDetails.phone,
-      address, items: cart, subtotal, discount: couponDiscount, total: finalTotal, timestamp: new Date(), status: 'pending',
-      deliveryArea: selectedArea.name, noCutlery, ketchupAddon, oreganoAddon, chiliFlakesAddon
-    };
-
-    try {
-      await addDoc(collection(db, "orders"), orderObj);
-      if (pointsEarned > 0 || totalPointsCost > 0) {
-        await setDoc(doc(db, "customer_points", customerDetails.phone.replace("+91", "")), {
-          name: customerDetails.name, phone: customerDetails.phone.replace("+91", ""), points: increment(pointsEarned - totalPointsCost), lastActive: new Date()
-        }, { merge: true });
-      }
-    } catch (e) {}
-
-    setLastPlacedOrder(orderObj);
-
-    let itemsText = "";
-    cart.forEach((i: any) => itemsText += `• ${i.name || "Item"} x${i.quantity || 1} - ₹${(i.price || 0) * (i.quantity || 1)}\n`);
-    
-    if (ketchupAddon) itemsText += `• Extra Tomato Ketchup x1 - ₹10\n`;
-    if (oreganoAddon) itemsText += `• Extra Oregano x1 - ₹10\n`;
-    if (chiliFlakesAddon) itemsText += `• Extra Chilly Flakes x1 - ₹10\n`;
-    if (noCutlery) itemsText += `🌱 (Eco-Friendly: No plastic cutlery requested)\n`;
-
-    const msg = `🔥 *BUM BUM CAFE - NEW ORDER*\n\n*Bill No:* #${formattedBillStr}\n*Token No:* #${tokenNumber}\n*Customer:* ${customerDetails.name}\n*Phone:* ${customerDetails.phone}\n*Delivery Area:* ${selectedArea.name}\n*Address:* ${address}\n\n*ITEMS:*\n${itemsText}\n*Subtotal:* ₹${subtotal + addOnsCost}\n*Coupon Discount:* -₹${couponDiscount}\n*Delivery:* ₹${deliveryCharge}\n*TOTAL BILL: ₹${finalTotal}*\n\n*Points Earned:* +${pointsEarned} Pts\n${totalPointsCost > 0 ? `*Points Redeemed:* -${totalPointsCost} Pts\n` : ''}\n_Confirm order by replying 'YES'_`;
-    
-    playSoundEffect('success');
-    setConfettiActive(true);
-    setTimeout(() => setConfettiActive(false), 5000);
-
-    setShowUPIModal(true);
-
-    const openWA = () => {
-      window.open(`https://wa.me/919714293759?text=${encodeURIComponent(msg)}`, '_blank');
-    };
-
-    (window as any)._pendingWA = openWA;
-  };
-
-  const executeWAOpen = () => {
-    if ((window as any)._pendingWA) {
-      (window as any)._pendingWA();
-      (window as any)._pendingWA = null;
-    }
-    setShowUPIModal(false);
-    setShowInvoice(true); 
-    clearCart(); 
-    
-    // Reset specific modifiers
-    setKetchupAddon(false);
-    setOreganoAddon(false);
-    setChiliFlakesAddon(false);
-    setNoCutlery(false);
-    setAppliedCoupon(null); 
-    setEnteredCoupon(""); 
-    setIsCartOpen(false);
-  };
-
-  const handleReviewSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!reviewName || !reviewComment) return toast.error("Please fill all fields!");
-    try {
-      await addDoc(collection(db, "reviews"), { name: reviewName, rating: reviewRating, comment: reviewComment, isApproved: false, timestamp: new Date() });
-      toast.success("Review submitted! Approved hone ke baad live dikhega.");
-      setReviewName(""); setReviewComment(""); setReviewRating(5); setIsReviewFormOpen(false);
-    } catch (err) { toast.error("Failed to submit review."); }
-  };
-
-  const handleSaveDetails = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!tempName || tempName.trim().length < 3) return toast.error("Please enter your real name");
-    if (!tempPhone || tempPhone.trim().length < 10) return toast.error("Please enter 10-digit number");
-    
-    const details: any = { name: tempName, phone: `+91${tempPhone}` };
-    if (tempRefCode) {
-      details.refCode = tempRefCode;
-    }
-    
-    localStorage.setItem('bb_cafe_customer', JSON.stringify(details));
-    setCustomerDetails(details); 
-    setIsLoginOpen(false);
-    
-    if (tempRefCode) {
-      toast.success(`स्वागत है ${tempName}! रेफ़रल कूपन लागू कर दिया गया है।`);
-    } else {
-      toast.success(`Welcome ${tempName}!`);
-    }
-  };
-
-  const handleToggleFavorite = (id: string, e: any) => {
-    e.stopPropagation();
-    let updated;
-    if (favorites.includes(id)) {
-      updated = favorites.filter(f => f !== id);
-      toast.success("पसंदीदा सूची से हटाया गया।");
-    } else {
-      updated = [...favorites, id];
-      toast.success("पसंदीदा सूची में जोड़ा गया! ❤️");
-    }
-    setFavorites(updated);
-    localStorage.setItem('bb_favorites', JSON.stringify(updated));
-  };
-
-  const handleAddToCart = () => {
-    if (!chosenSize) return toast.error("Please select a size first!");
-    
-    const sizeAddons = PIZZA_ADDONS[chosenSize.toLowerCase()] || {};
-    let addonsTotal = 0;
-    const activeAddonNames: string[] = [];
-
-    Object.entries(pizzaAddons).forEach(([addonName, isSelected]) => {
-      if (isSelected) {
-        const addonCost = sizeAddons[addonName] || 0;
-        addonsTotal += addonCost;
-        activeAddonNames.push(`${addonName} (+₹${addonCost})`);
-      }
-    });
-
-    let finalName = `${selectedProduct.name} (${chosenSize})`;
-    if (activeAddonNames.length > 0) {
-      finalName += ` with [${activeAddonNames.join(", ")}]`;
-    }
-    
-    const uniqueCartId = `${selectedProduct.id}-${chosenSize}-${Object.keys(pizzaAddons).filter(k => pizzaAddons[k]).join("-")}`;
-
-    addItem({ 
-      ...selectedProduct, 
-      id: uniqueCartId, 
-      name: finalName, 
-      price: Number(chosenPrice) + addonsTotal 
-    });
-    
-    playSoundEffect('add');
-    toast.success(`${chosenSize} added to cart!`);
-    
-    setSelectedProduct(null); 
-    setChosenSize(""); 
-    setChosenPrice(0); 
-    setPizzaAddons({});
   };
 
   const upsellSuggestionItems = useMemo(() => {
@@ -788,7 +576,6 @@ export default function BbCafeHome() {
     <div className="bg-[#050505] min-h-screen text-white pb-32 font-sans relative overflow-x-hidden">
       <Toaster position="top-center" />
       
-      {/* Dynamic injection of the scrollbar CSS helper using standard dangerouslySetInnerHTML to prevent compile errors */}
       <style dangerouslySetInnerHTML={{ __html: `
         .hide-scrollbar::-webkit-scrollbar {
           display: none !important;
@@ -923,16 +710,6 @@ export default function BbCafeHome() {
           )}
         </div>
 
-        {deferredPrompt && (
-          <div className="bg-yellow-400 text-black p-3 rounded-2xl flex justify-between items-center shadow-lg">
-            <div className="space-y-0.5">
-              <h4 className="font-black text-xs uppercase tracking-tight flex items-center gap-1">📲 Home Screen पर ऐप जोड़ें!</h4>
-              <p className="text-[9px] font-bold">आसानी से आर्डर करें और पाएं +1 फ्री लॉयल्टी पॉइंट 🎁</p>
-            </div>
-            <button onClick={handleInstallPWA} className="bg-black text-white text-[9px] font-black uppercase px-3 py-1.5 rounded-xl">INSTALL</button>
-          </div>
-        )}
-
         {/* ZOOMED CATEGORY SLIDER (NO VISUAL SLIDER BAR AT ALL) */}
         <div className="space-y-1">
           <p className="text-[8px] font-black uppercase tracking-wider text-orange-500">Inspiration for your first order</p>
@@ -971,51 +748,88 @@ export default function BbCafeHome() {
           </div>
         )}
 
-        {/* PRODUCTS LISTING */}
+        {/* PRODUCTS LISTING WITH INLINE SCROLLING AD OFFERS CAROUSEL */}
         <div className="grid grid-cols-1 gap-4 pt-1">
           {filteredMenu.length === 0 ? (
             <p className="text-center text-gray-500 py-8 text-xs font-bold uppercase">No items found...</p>
           ) : (
-            filteredMenu.map((item) => (
-              <motion.div layout key={item.id} className="bg-white/[0.02] rounded-2xl border border-white/5 overflow-hidden flex flex-col relative">
-                <div className="relative h-44 w-full">
-                  <img src={item.image || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=500&q=80"} className="w-full h-full object-cover" alt={item.name} />
-                  
-                  <div className="absolute top-3 left-3 bg-black/50 backdrop-blur-md px-2 py-1 rounded-lg border border-white/10 flex items-center gap-1 text-[8px] font-black uppercase text-green-400">
-                    <span className="h-1 w-1 rounded-full bg-green-500 animate-pulse" />VEG
-                  </div>
+            filteredMenu.map((item, index) => {
+              // Automatically display a beautiful sliding banner card after the 4th item (index 3) inside the scroll list
+              const showInlineBanner = index === 3 && banners.length > 0;
+              return (
+                <React.Fragment key={item.id}>
+                  <motion.div layout className="bg-white/[0.02] rounded-2xl border border-white/5 overflow-hidden flex flex-col relative">
+                    <div className="relative h-44 w-full">
+                      <img src={item.image || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=500&q=80"} className="w-full h-full object-cover" alt={item.name} />
+                      
+                      <div className="absolute top-3 left-3 bg-black/50 backdrop-blur-md px-2 py-1 rounded-lg border border-white/10 flex items-center gap-1 text-[8px] font-black uppercase text-green-400">
+                        <span className="h-1 w-1 rounded-full bg-green-500 animate-pulse" />VEG
+                      </div>
 
-                  <button onClick={(e) => handleToggleFavorite(item.id, e)} className="absolute top-3 right-3 bg-black/60 backdrop-blur-md p-1.5 rounded-full border border-white/10 text-white hover:text-red-500 transition-colors">
-                    <Heart size={14} className={favorites.includes(item.id) ? "fill-red-500 text-red-500" : "text-white"} />
-                  </button>
-                </div>
-                <div className="p-4 flex flex-col justify-between flex-1">
-                  <div className="flex justify-between items-start gap-4">
-                    <h4 className="font-black text-sm text-gray-100 line-clamp-1">{item.name}</h4>
-                    <div className="bg-green-600 text-white font-extrabold text-[9px] px-2 py-0.5 rounded flex items-center gap-0.5">
-                      <span>4.7</span><span className="text-[8px]">★</span>
-                    </div>
-                  </div>
-                  <div className="flex justify-between items-center text-[9px] text-gray-400 font-bold mt-0.5">
-                    <p className="uppercase text-[8px] text-gray-500">{item.category}</p><p>• 15-25 min</p>
-                  </div>
-                  <div className="h-px bg-white/5 my-2.5" />
-                  <div className="flex justify-between items-end mt-0.5">
-                    <div>
-                      <p className="text-gray-500 text-[8px] font-black uppercase tracking-widest leading-none mb-1">Price</p>
-                      <p className="text-orange-500 font-black text-base leading-none">{getDisplayPrice(item)}</p>
-                      {item.variants && <span className="text-[8px] font-bold text-gray-400 mt-1 block">Options available</span>}
-                    </div>
-                    {/* ADD Button gets disabled strictly when store closed or out of range */}
-                    {storeOpen && isStoreOpenCurrently && !isTooFar && (
-                      <button onClick={() => item.variants ? setSelectedProduct(item) : addItem(item)} className="px-4 py-2 bg-orange-500/10 text-orange-400 border border-orange-500/30 hover:bg-orange-500 hover:text-white rounded-lg font-black text-[10px] active:scale-95 transition-all uppercase flex items-center gap-1 shadow">
-                        <Plus size={12} /> ADD
+                      <button onClick={(e) => handleToggleFavorite(item.id, e)} className="absolute top-3 right-3 bg-black/60 backdrop-blur-md p-1.5 rounded-full border border-white/10 text-white hover:text-red-500 transition-colors">
+                        <Heart size={14} className={favorites.includes(item.id) ? "fill-red-500 text-red-500" : "text-white"} />
                       </button>
-                    )}
-                  </div>
-                </div>
-              </motion.div>
-            ))
+                    </div>
+                    <div className="p-4 flex flex-col justify-between flex-1">
+                      <div className="flex justify-between items-start gap-4">
+                        <h4 className="font-black text-sm text-gray-100 line-clamp-1">{item.name}</h4>
+                        <div className="bg-green-600 text-white font-extrabold text-[9px] px-2 py-0.5 rounded flex items-center gap-0.5">
+                          <span>4.7</span><span className="text-[8px]">★</span>
+                        </div>
+                      </div>
+                      <div className="flex justify-between items-center text-[9px] text-gray-400 font-bold mt-0.5">
+                        <p className="uppercase text-[8px] text-gray-500">{item.category}</p><p>• 15-25 min</p>
+                      </div>
+                      <div className="h-px bg-white/5 my-2.5" />
+                      <div className="flex justify-between items-end mt-0.5">
+                        <div>
+                          <p className="text-gray-500 text-[8px] font-black uppercase tracking-widest leading-none mb-1">Price</p>
+                          <p className="text-orange-500 font-black text-base leading-none">{getDisplayPrice(item)}</p>
+                          {item.variants && <span className="text-[8px] font-bold text-gray-400 mt-1 block">Options available</span>}
+                        </div>
+                        {/* ADD Button gets disabled strictly when store closed or out of range */}
+                        {storeOpen && isStoreOpenCurrently && !isTooFar && (
+                          <button onClick={() => item.variants ? setSelectedProduct(item) : addItem(item)} className="px-4 py-2 bg-orange-500/10 text-orange-400 border border-orange-500/30 hover:bg-orange-500 hover:text-white rounded-lg font-black text-[10px] active:scale-95 transition-all uppercase flex items-center gap-1 shadow">
+                            <Plus size={12} /> ADD
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </motion.div>
+
+                  {/* Render the beautiful inline promotional banner with autolooop video support inside the item list flow */}
+                  {showInlineBanner && (
+                    <div className="bg-gradient-to-r from-orange-600/15 to-[#b33600]/15 border border-orange-500/20 rounded-2xl p-4 overflow-hidden relative min-h-[7.5rem] flex flex-col justify-center">
+                      <div className="max-w-[70%] space-y-1 z-10 relative">
+                        <span className="text-[7px] font-black uppercase text-yellow-300 bg-yellow-400/10 border border-yellow-400/20 px-2 py-0.5 rounded-full w-max">🎁 SPECIAL OFFER</span>
+                        <h4 className="text-xs font-black text-white uppercase leading-tight line-clamp-1">{banners[bannerIndex % banners.length]?.name || "BUM BUM CAFE SPECIAL"}</h4>
+                        <p className="text-[9px] text-gray-400 leading-normal font-bold">स्वादिष्ट पिज्जा और सैंडविच पर बेहतरीन डिस्काउंट। आर्डर करने के लिए नीचे स्क्रॉल करें!</p>
+                      </div>
+                      
+                      {/* Interactive slide media block on the right */}
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2 w-20 h-20 rounded-xl overflow-hidden opacity-60 shadow-lg border border-white/5">
+                        {isVideoUrl(banners[bannerIndex % banners.length]?.url) ? (
+                          <video 
+                            src={banners[bannerIndex % banners.length]?.url} 
+                            autoPlay 
+                            loop 
+                            muted 
+                            playsInline 
+                            className="w-full h-full object-cover" 
+                          />
+                        ) : (
+                          <img 
+                            src={banners[bannerIndex % banners.length]?.url} 
+                            className="w-full h-full object-cover" 
+                            alt="Festive promo block" 
+                          />
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </React.Fragment>
+              );
+            })
           )}
         </div>
 
@@ -1518,7 +1332,7 @@ export default function BbCafeHome() {
                   <span className="text-[10px] font-black text-white">🟢 WhatsApp Message</span>
                   <span className="text-[8px] font-black uppercase px-2.5 py-1 rounded bg-yellow-400 text-black">{getClaimStatus('whatsapp_msg')}</span>
                 </button>
-                <button onClick={() => handleSocialClick('whatsapp_channel', 'https://whatsapp.com/channel/0029VaLhggoGE56natoQI43y')} className="w-full flex items-center justify-between bg-[#10b981]/10 border border-[#10b981]/20 p-3 rounded-xl">
+                <button onClick={() => handleSocialClick('whatsapp_channel', 'https://whatsapp.com/channel/0029VaLhggoGE56natoQI43y')} className="w-full flex items-center justify-between bg-emerald-500/10 border border-emerald-500/20 p-3 rounded-xl">
                   <span className="text-[10px] font-black text-white">📢 WhatsApp Channel</span>
                   <span className="text-[8px] font-black uppercase px-2.5 py-1 rounded bg-yellow-400 text-black">{getClaimStatus('whatsapp_channel')}</span>
                 </button>
@@ -1545,6 +1359,7 @@ export default function BbCafeHome() {
         )}
       </AnimatePresence>
 
+      {/* Direct Deep-linking UPI Jump & Scan-To-Pay Modal */}
       <AnimatePresence>
         {showUPIModal && (
           <div className="fixed inset-0 bg-black/95 z-[250] flex items-center justify-center p-6">
@@ -1591,6 +1406,7 @@ export default function BbCafeHome() {
         )}
       </AnimatePresence>
 
+      {/* DIGITAL GREEN INVOICE */}
       <AnimatePresence>
         {showInvoice && lastPlacedOrder && (
           <div className="fixed inset-0 bg-black/95 z-[240] flex items-center justify-center p-6">
