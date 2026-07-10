@@ -85,7 +85,7 @@ export default function BbCafeHome() {
 
   const [isGiftModalOpen, setIsGiftModalOpen] = useState(false);
   const [giftPhone, setGiftPhone] = useState("");
-  const [giftPointsAmount, setGiftPointsAmount] = useState<number | "">("");
+  const [giftPointsAmount, setGiftPointsAmount] = useState<number | " text-white">("");
   const [isGiftingLoading, setIsGiftingLoading] = useState(false);
 
   const [dbCategories, setDbCategories] = useState<any[]>([]);
@@ -344,12 +344,6 @@ export default function BbCafeHome() {
     window.addEventListener('offline', updateOnlineStatus);
     setIsOnline(navigator.onLine);
 
-    const handleBeforeInstallPrompt = (e: Event) => {
-      e.preventDefault();
-      setDeferredPrompt(e);
-    };
-    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-
     const savedFavs = localStorage.getItem('bb_favorites');
     if (savedFavs) {
       try { setFavorites(JSON.parse(savedFavs)); } catch (e) {}
@@ -407,10 +401,37 @@ export default function BbCafeHome() {
     return () => { 
       window.removeEventListener('online', updateOnlineStatus);
       window.removeEventListener('offline', updateOnlineStatus);
-      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
       unsubStore(); unsubMenu(); unsubCats(); unsubBanners(); unsubReviews(); unsubCoupons(); unsubRules(); 
     };
   }, []);
+
+  // Auto-slide trigger for carousel
+  useEffect(() => {
+    if (banners.length <= 1) return;
+    const interval = setInterval(() => { setBannerIndex((prev) => (prev + 1) % banners.length); }, 4000);
+    return () => clearInterval(interval);
+  }, [banners]);
+
+  // Sync draft cart to local storage (52)
+  useEffect(() => {
+    if (cart.length > 0) {
+      localStorage.setItem('bb_cafe_draft_cart', JSON.stringify(cart));
+    } else {
+      localStorage.removeItem('bb_cafe_draft_cart');
+    }
+  }, [cart]);
+
+  useEffect(() => {
+    if (!customerDetails?.phone) { setCustomerPoints(0); return; }
+    const unsubPoints = onSnapshot(doc(db, "customer_points", customerDetails.phone.replace("+91", "")), (docSnap) => {
+      setCustomerPoints(docSnap.exists() ? (docSnap.data().points || 0) : 0);
+    }, () => { setCustomerPoints(0); });
+    
+    const phoneClean = customerDetails.phone.replace("+91", "");
+    setShareCount(Number(localStorage.getItem(`bb_shares_${phoneClean}`) || 0));
+
+    return () => unsubPoints();
+  }, [customerDetails]);
 
   // --- ACTIONS & HANDLERS ---
 
@@ -423,52 +444,6 @@ export default function BbCafeHome() {
     } else {
       toast.error("Invalid coupon code");
     }
-  };
-
-  const handleDetectLocation = () => {
-    if (!navigator.geolocation) {
-      return toast.error("आपके ब्राउज़र में जीपीएस लोकेशन उपलब्ध नहीं है।");
-    }
-    toast.loading("सटीक लोकेशन ट्रैक कर रहे हैं...");
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        toast.dismiss();
-        const { latitude, longitude } = position.coords;
-        setAddress(`My GPS Location: https://www.google.com/maps?q=${latitude},${longitude}`);
-        toast.success("जीपीएस से लोकेशन सफलतापूर्वक जोड़ी गई!");
-        
-        const mohandraLat = 24.2863;
-        const mohandraLng = 80.1245;
-        
-        const calculatedDistance = calculateDistanceInKm(latitude, longitude, mohandraLat, mohandraLng);
-        setDistanceKm(Number(calculatedDistance.toFixed(2)));
-
-        if (calculatedDistance > 20) {
-          setIsTooFar(true);
-          toast.error("ध्यान दें: आप बूम बूम कैफे से 20 किमी से अधिक दूर हैं। आप केवल हमारा शानदार मेनू देख सकते हैं, आर्डर नहीं कर सकते।", { duration: 8000 });
-        } else {
-          setIsTooFar(false);
-          
-          if (calculatedDistance <= 1.0) {
-            setSelectedArea(DELIVERY_AREAS[0]); 
-            toast.success(`सटीक दूरी: ${calculatedDistance.toFixed(2)} KM। आपके लिए 'Mohandra Town' क्षेत्र चुना गया है।`);
-          } else if (calculatedDistance <= 2.0) {
-            setSelectedArea(DELIVERY_AREAS[1]); 
-            toast.success(`सटीक दूरी: ${calculatedDistance.toFixed(2)} KM। आपके लिए 'Mohandra Ward 1-5' क्षेत्र चुना गया है।`);
-          } else if (calculatedDistance <= 5.0) {
-            setSelectedArea(DELIVERY_AREAS[2]); 
-            toast.success(`सटीक दूरी: ${calculatedDistance.toFixed(2)} KM। आपके लिए 'Nearby Area (Within 5 Km)' क्षेत्र चुना गया है।`);
-          } else {
-            setSelectedArea(DELIVERY_AREAS[3]); 
-            toast.success(`सटीक दूरी: ${calculatedDistance.toFixed(2)} KM। आपके लिए 'Out of Town' क्षेत्र चुना गया है।`);
-          }
-        }
-      },
-      () => {
-        toast.dismiss();
-        toast.error("लोकेशन की अनुमति अस्वीकार कर दी गई है या नेटवर्क त्रुटि है।");
-      }
-    );
   };
 
   const handleGiftPoints = async (e: React.FormEvent) => {
