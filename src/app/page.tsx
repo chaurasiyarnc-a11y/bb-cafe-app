@@ -166,23 +166,6 @@ export default function BbCafeHome() {
   useEffect(() => {
     setMounted(true);
 
-    // --- PWA Setup ---
-    if (typeof window !== 'undefined') {
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js')
-            .then((reg) => console.log('BUM BUM Cafe SW Registered:', reg.scope))
-            .catch((err) => console.error('SW Registration Failed:', err));
-        });
-      }
-      if (!document.querySelector('link[rel="manifest"]')) {
-        const link = document.createElement('link');
-        link.rel = 'manifest';
-        link.href = '/manifest.json';
-        document.head.appendChild(link);
-      }
-    }
-
     // --- CRASH-PROOF FIREBASE REALTIME SUBSCRIPTIONS ---
     const unsubStore = onSnapshot(doc(db, "settings", "store"), (d) => { 
       if(d.exists()) setStoreOpen(d.data().isOpen); 
@@ -321,6 +304,16 @@ export default function BbCafeHome() {
     } finally {
       setAiLoading(false);
     }
+  };
+
+  // --- DEFINED getClaimStatus HELPER ---
+  const getClaimStatus = (platform: string) => {
+    if (!customerDetails?.phone) return "🎁 +1 Pt";
+    const storageKey = `bb_claimed_${customerDetails.phone.replace("+91", "")}_${platform}`;
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem(storageKey) ? "✅ Claimed" : "🎁 Claim +1 Pt";
+    }
+    return "🎁 Claim +1 Pt";
   };
 
   // Compute categories
@@ -531,141 +524,6 @@ export default function BbCafeHome() {
     toast.success("Redirecting to WhatsApp!");
   };
 
-  const handleReviewSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!reviewName || !reviewComment) return toast.error("Please fill all fields!");
-    try {
-      await addDoc(collection(db, "reviews"), { name: reviewName, rating: reviewRating, comment: reviewComment, isApproved: false, timestamp: new Date() });
-      toast.success("Review submitted! Approved hone ke baad live dikhega.");
-      setReviewName(""); setReviewComment(""); setReviewRating(5); setIsReviewFormOpen(false);
-    } catch (err) { toast.error("Failed to submit review."); }
-  };
-
-  const handleSaveDetails = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!tempName || tempName.trim().length < 3) return toast.error("Please enter your real name");
-    if (!tempPhone || tempPhone.trim().length < 10) return toast.error("Please enter 10-digit number");
-    const details = { name: tempName, phone: `+91${tempPhone}` };
-    localStorage.setItem('bb_cafe_customer', JSON.stringify(details));
-    setCustomerDetails(details); setIsLoginOpen(false);
-    toast.success(`Welcome ${tempName}!`);
-  };
-
-  const handleAddToCart = () => {
-    if (!chosenSize) return toast.error("Please select a size first!");
-    
-    const activeAddons = Object.entries(selectedAddons)
-      .filter(([_, isSelected]) => isRunningAddonValue(isSelected))
-      .map(([addonKey, _]) => addonKey);
-
-    const addonsTotal = activeAddons.reduce((acc, currentKey) => {
-      return acc + getAddonPrice(currentKey, chosenSize);
-    }, 0);
-
-    let finalName = `${selectedProduct.name} (${chosenSize})`;
-    if (activeAddons.length > 0) {
-      finalName += " + " + activeAddons.map(k => ADDON_LABELS[k] || k).join(", ");
-    }
-    
-    if (selectedProduct.category === "Super Cool") {
-      finalName += ` (${sugarLevel}, ${iceLevel})`;
-    }
-    
-    const addonsHashString = activeAddons.sort().join("-");
-    const uniqueCartId = `${selectedProduct.id}-${chosenSize}-${addonsHashString || 'noaddons'}-${sugarLevel}-${iceLevel}`;
-
-    addItem({ ...selectedProduct, id: uniqueCartId, name: finalName, price: Number(chosenPrice) + addonsTotal });
-    toast.success(`${chosenSize} added to cart!`);
-    setSelectedProduct(null); setChosenSize(""); setChosenPrice(0); setSelectedAddons({}); setSugarLevel("Normal"); setIceLevel("Normal Ice");
-  };
-
-  const isRunningAddonValue = (val: any) => {
-    return val === true;
-  };
-
-  const handleAddonToggle = (key: string) => {
-    setSelectedAddons(prev => ({
-      ...prev,
-      [key]: !prev[key]
-    }));
-  };
-
-  const handleSocialClick = async (platform: string, url: string) => {
-    window.open(url, '_blank');
-
-    if (!customerDetails?.phone) {
-      toast.error("पॉइंट्स क्लेम करने के लिए कृपया पहले अपना Name और Phone दर्ज करें!");
-      setIsLoginOpen(true);
-      return;
-    }
-
-    const storageKey = `bb_claimed_${customerDetails.phone.replace("+91", "")}_${platform}`;
-    const alreadyClaimed = localStorage.getItem(storageKey);
-
-    if (alreadyClaimed) {
-      toast.success("आप इस प्लेटफ़ॉर्म के लिए पहले ही पॉइंट ले चुके हैं! धन्यवाद ❤️");
-      return;
-    }
-
-    try {
-      const phoneRaw = customerDetails.phone.replace("+91", "").trim();
-      const pointsRef = doc(db, "customer_points", phoneRaw);
-      
-      await setDoc(pointsRef, {
-        points: increment(1),
-        lastActive: new Date()
-      }, { merge: true });
-
-      localStorage.setItem(storageKey, "true");
-      setCustomerPoints(prev => prev + 1);
-      toast.success("🎉 बधाई हो! हमें फॉलो करने के लिए आपको +1 पॉइंट मिला है!");
-    } catch (err) {
-      toast.error("पॉइंट्स जोड़ने में समस्या आई।");
-    }
-  };
-
-  const handleShareApp = async () => {
-    if (!customerDetails?.phone) {
-      toast.error("पॉइंट्स कमाने के लिए पहले Name और Phone दर्ज करें!");
-      setIsLoginOpen(true);
-      return;
-    }
-
-    const phoneClean = customerDetails.phone.replace("+91", "").trim();
-    const shareCountKey = `bb_shares_${phoneClean}`;
-    let currentShares = Number(localStorage.getItem(shareCountKey) || 0);
-
-    const shareMessage = `🔥 *BUM BUM CAFE - Mohandra* 🔥\nयहाँ से ऑर्डर करें बेहतरीन और स्वादिष्ट Pizza, Thali और Fast Food! सीधे आपके घर तक सुपर फास्ट होम डिलीवरी।\nऑर्डर करने और 🎁 फ्री लॉयल्टी पॉइंट्स पाने के लिए अभी नीचे लिंक खोलें:\n👉 ${window.location.origin}`;
-    const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(shareMessage)}`;
-
-    window.open(whatsappUrl, '_blank');
-
-    if (currentShares < 5) {
-      const nextShares = currentShares + 1;
-      localStorage.setItem(shareCountKey, String(nextShares));
-      setShareCount(nextShares);
-
-      if (nextShares === 5) {
-        try {
-          const pointsRef = doc(db, "customer_points", phoneClean);
-          await setDoc(pointsRef, {
-            points: increment(1),
-            lastActive: new Date()
-          }, { merge: true });
-
-          setCustomerPoints(prev => prev + 1);
-          toast.success("🎉 शानदार! आपने 5 दोस्तों के साथ ऐप शेयर करके +1 Loyalty Point कमा लिया है!");
-        } catch (e) {}
-      } else {
-        toast.success(`📤 शेयर किया गया! (${nextShares}/5 प्रोग्रेस। +1 पॉइंट के लिए ${5 - nextShares} और दोस्तों को शेयर करें!)`);
-      }
-    } else {
-      localStorage.setItem(shareCountKey, "1");
-      setShareCount(1);
-      toast.success("📤 नया शेयर प्रोग्रेस शुरू हुआ! (1/5 पूरा)");
-    }
-  };
-
   if (!mounted) return null;
 
   return (
@@ -741,7 +599,7 @@ export default function BbCafeHome() {
           </motion.div>
         )}
 
-        {/* PROMO BANNER (Fallback default) */}
+        {/* PROMO BANNER (Default slider fallback) */}
         <div className="w-full h-44 rounded-3xl overflow-hidden relative border border-white/5 bg-white/[0.02] cursor-pointer">
           {(banners.length === 0 || bannerError) ? (
             <div className="w-full h-full bg-gradient-to-r from-orange-600/35 to-[#b33600]/35 flex flex-col justify-center p-6 space-y-1">
@@ -1305,7 +1163,7 @@ export default function BbCafeHome() {
                 <div className="bg-orange-500/10 border border-orange-500/20 rounded-[2rem] p-5 space-y-2">
                   <div className="flex items-center gap-2 text-orange-400 font-black text-xs uppercase"><Sparkles size={16}/> <span>Free Delivery Rules</span></div>
                   <ul className="text-[11px] text-gray-400 font-bold space-y-1 text-left">
-                    <li className={deliveryArea === 'town' ? "text-yellow-400 font-extrabold" : ""}>• मोहंद्रा टाउन: Free above ₹99 <span className="text-green-500">({getTotal() >= 99 ? 'Achieved' : 'Need ₹' + (99 - getTotal()) + ' more'})</span></li>
+                    <li className={deliveryArea === 'town' ? "text-yellow-400 font-extrabold" : ""}>•  मोहंद्रा टाउन: Free above ₹99 <span className="text-green-500">({getTotal() >= 99 ? 'Achieved' : 'Need ₹' + (99 - getTotal()) + ' more'})</span></li>
                     <li className={deliveryArea === 'outer' ? "text-yellow-400 font-extrabold" : ""}>• 5 किलोमीटर: Free above ₹499 <span className="text-green-500">({getTotal() >= 499 ? 'Achieved' : 'Need ₹' + (499 - getTotal()) + ' more'})</span></li>
                     <li className={deliveryArea === 'long' ? "text-yellow-400 font-extrabold" : ""}>• 12 किलोमीटर: Free above ₹999 <span className="text-green-500">({getTotal() >= 999 ? 'Achieved' : 'Need ₹' + (999 - getTotal()) + ' more'})</span></li>
                   </ul>
@@ -1360,7 +1218,7 @@ export default function BbCafeHome() {
                           </>
                         ) : (
                           loyaltyRules.map(rule => {
-                            const inCartCost = cart.reduce((acc: number, i: any) => acc + (i.pointsCost || 0), 0);
+                            const inCartCost = cart.reduce((acc, item) => acc + (item.pointsCost || 0), 0);
                             const isAffordable = (customerPoints - inCartCost) >= rule.pointsCost;
                             return (
                               <button key={rule.id} type="button" onClick={() => handleCustomerRedeem(`reward-${rule.id}`, `🎁 FREE ${rule.rewardName}`, rule.pointsCost)} disabled={!isAffordable} className={`py-2.5 px-3 rounded-xl text-[10px] font-black uppercase border truncate ${isAffordable ? 'bg-yellow-400 text-black border-yellow-400' : 'bg-white/5 text-gray-500 border-white/5'}`}>🎁 {rule.rewardName} ({rule.pointsCost} P)</button>
