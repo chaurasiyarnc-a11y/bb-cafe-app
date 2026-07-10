@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { db } from '../lib/firebase'; 
 import { collection, onSnapshot, query, addDoc, doc, setDoc, increment, runTransaction } from 'firebase/firestore';
-import { ShoppingBag, Plus, Search, X, MapPin, Phone, User, Sparkles, Star, Percent, Gift, Loader2, Share2, Heart, Clock, ChevronRight, PowerOff, Info, CheckCircle } from 'lucide-react';
+import { ShoppingBag, Plus, Search, X, MapPin, Phone, User, Sparkles, Star, Percent, Gift, Loader2, Share2, Heart, Clock, ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
 import { useCartStore } from '../store/useCartStore';
@@ -48,8 +48,9 @@ const SUGGESTED_REVIEWS = [
   "साफ़-सफ़ाई और शुद्धता 10/10 है! 🧼👌"
 ];
 
+// Devanagari corrected back to बुम बुम as requested
 const PERMANENT_REVIEWS = [
-  { id: "rev1", name: "Gaurav Soni", rating: 5, comment: "बम बम कैफे की पनीर पिज्जा सच में पूरे मोहांद्रा में बेस्ट है! एक्स्ट्रा चीज़ लव है। ⭐⭐⭐⭐⭐" },
+  { id: "rev1", name: "Gaurav Soni", rating: 5, comment: "बुम बुम कैफे की पनीर पिज्जा सच में पूरे मोहांद्रा में बेस्ट है! एक्स्ट्रा चीज़ लव है। ⭐⭐⭐⭐⭐" },
   { id: "rev2", name: "Anjali Patel", rating: 5, comment: "फास्ट फ़ूड की पैकिंग बहुत अच्छी थी, डिलीवरी बॉय का व्यवहार भी बहुत विनम्र था। ⭐⭐⭐⭐⭐" },
   { id: "rev3", name: "Shubham Dwivedi", rating: 5, comment: "स्पेशल थाली का स्वाद एकदम घर जैसा है। सफ़ाई और शुद्धता लाजवाब है। ⭐⭐⭐⭐⭐" },
   { id: "rev4", name: "Neha Chaurasia", rating: 5, comment: "इस क्षेत्र का सबसे अच्छा कैफे। पिज्जा टॉपिंग्स ताज़ा हैं और क्रस्ट बहुत सॉफ्ट है! ⭐⭐⭐⭐⭐" }
@@ -86,7 +87,7 @@ export default function BbCafeHome() {
   const [isGiftModalOpen, setIsGiftModalOpen] = useState(false);
   const [giftPhone, setGiftPhone] = useState("");
   
-  // Cleaned generic state typing parameters completely [1.1.2]
+  // Fixed state generic definition [1.1.2]
   const [giftPointsAmount, setGiftPointsAmount] = useState<number | "">("");
   const [isGiftingLoading, setIsGiftingLoading] = useState(false);
 
@@ -260,7 +261,7 @@ export default function BbCafeHome() {
     if (month === 8) {
       return { bg: "from-rose-600 to-amber-800", accent: "text-yellow-200", name: "रक्षाबंधन विशेष स्नेह 💖" };
     }
-    return { bg: "from-[#ff5e00] to-[#b33600]", accent: "text-yellow-300", name: "BAM BAM CAFE - Mohandra" };
+    return { bg: "from-[#ff5e00] to-[#b33600]", accent: "text-yellow-300", name: "BUM BUM CAFE - Mohandra" };
   }, []);
 
   // Real-time store open check scheduler (10:00 AM to 11:00 PM)
@@ -417,6 +418,13 @@ export default function BbCafeHome() {
     };
   }, []);
 
+  // Auto-slide trigger for carousel
+  useEffect(() => {
+    if (banners.length <= 1) return;
+    const interval = setInterval(() => { setBannerIndex((prev) => (prev + 1) % banners.length); }, 4000);
+    return () => clearInterval(interval);
+  }, [banners]);
+
   // Sync draft cart to local storage (52)
   useEffect(() => {
     if (cart.length > 0) {
@@ -471,7 +479,7 @@ export default function BbCafeHome() {
 
         if (calculatedDistance > 20) {
           setIsTooFar(true);
-          toast.error("ध्यान दें: आप बम बम कैफे से 20 किमी से अधिक दूर हैं। आप केवल हमारा शानदार मेनू देख सकते हैं, आर्डर नहीं कर सकते।", { duration: 8000 });
+          toast.error("ध्यान दें: आप बुम बुम कैफे से 20 किमी से अधिक दूर हैं। आप केवल हमारा शानदार मेनू देख सकते हैं, आर्डर नहीं कर सकते।", { duration: 8000 });
         } else {
           setIsTooFar(false);
           
@@ -498,47 +506,52 @@ export default function BbCafeHome() {
     );
   };
 
-  const handleGiftPoints = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!customerDetails?.phone) return toast.error("कृपया पहले अपनी डिटेल्स जोड़ें!");
-    const senderPhoneRaw = customerDetails.phone.replace("+91", "").trim();
-    const friendPhoneRaw = String(giftPhone).replace("+91", "").trim();
-    const pointsToGift = Number(giftPointsAmount);
+  const handleCustomerRedeem = (id: string, name: string, pointsCost: number) => {
+    const currentPointsInCart = cart.reduce((acc: number, item: any) => acc + (item.pointsCost || 0), 0);
+    if (customerPoints - currentPointsInCart < pointsCost) return toast.error("आपके पास पर्याप्त ऑयल्टी पॉइंट्स उपलब्ध नहीं हैं!");
+    addItem({ id, name, price: 0, pointsCost, isReward: true });
+    playSoundEffect('add');
+    toast.success(`${name} Cart में जोड़ दिया गया है!`);
+  };
 
-    if (!friendPhoneRaw || friendPhoneRaw.length < 10) return toast.error("कृपया सही 10-digit मोबाइल नंबर डालें!");
-    if (senderPhoneRaw === friendPhoneRaw) return toast.error("आप खुद को ऑयल्टी पॉइंट्स गिफ्ट नहीं कर सकते!");
-    if (isNaN(pointsToGift) || pointsToGift <= 0) return toast.error("कृपया सही पॉइंट्स की संख्या डालें!");
-    if (customerPoints < pointsToGift) return toast.error(`आपके पास पर्याप्त पॉइंट्स नहीं हैं! वर्तमान पॉइंट्स: ${customerPoints}`);
+  const handleSocialClick = async (platform: string, url: string) => {
+    window.open(url, '_blank');
 
-    setIsGiftingLoading(true);
-    const senderDocRef = doc(db, "customer_points", senderPhoneRaw);
-    const receiverDocRef = doc(db, "customer_points", friendPhoneRaw);
+    if (!customerDetails?.phone) {
+      toast.error("पॉइंट्स क्लेम करने के लिए कृपया पहले अपना Name और Phone दर्ज करें!");
+      setIsLoginOpen(true);
+      return;
+    }
+
+    const storageKey = `bb_claimed_${customerDetails.phone.replace("+91", "")}_${platform}`;
+    const alreadyClaimed = localStorage.getItem(storageKey);
+
+    if (alreadyClaimed) {
+      toast.success("आप इस प्लेटफ़ॉर्म के लिए पहले ही पॉइंट ले चुके हैं! धन्यवाद ❤️");
+      return;
+    }
 
     try {
-      await runTransaction(db, async (transaction) => {
-        const senderSnap = await transaction.get(senderDocRef);
-        const receiverSnap = await transaction.get(receiverDocRef);
-        
-        const currentSenderPoints = senderSnap.exists() ? (senderSnap.data().points || 0) : 0;
-        if (currentSenderPoints < pointsToGift) throw new Error("Insufficient points balance!");
-
-        transaction.update(senderDocRef, { points: increment(-pointsToGift) });
-        if (!receiverSnap.exists()) {
-          transaction.set(receiverDocRef, { name: "Loyal Friend 🎁", phone: friendPhoneRaw, points: pointsToGift, lastActive: new Date() });
-        } else {
-          transaction.update(receiverDocRef, { points: increment(pointsToGift) });
-        }
-      });
-
-      toast.success(`🎁 सफलतापूर्वक ${pointsToGift} पॉइंट्स गिफ्ट कर दिए गए हैं!`);
-      const inviteMsg = `हे दोस्त! मैंने तुम्हें BAM BAM Cafe के ऐप पर 🎁 ${pointsToGift} Loyalty Points गिफ्ट किए हैं। यहाँ से स्वादिष्ट पिज्जा और थाली आर्डर करो: ${window.location.origin}`;
-      const whatsappUrl = `https://wa.me/91${friendPhoneRaw}?text=${encodeURIComponent(inviteMsg)}`;
+      const phoneRaw = customerDetails.phone.replace("+91", "").trim();
+      const pointsRef = doc(db, "customer_points", phoneRaw);
       
-      setGiftPhone(""); setGiftPointsAmount(""); setIsGiftModalOpen(false);
-      if (window.confirm("क्या आप अपने दोस्त को व्हाट्सएप पर गिफ्ट का मैसेज भेजना चाहते हैं?")) window.open(whatsappUrl, '_blank');
-    } catch (err: any) {
-      toast.error(err.message === "Insufficient points balance!" ? "अपर्याप्त पॉइंट्स!" : "पॉइंट्स गिफ्ट करने में समस्या आई।");
-    } finally { setIsGiftingLoading(false); }
+      await setDoc(pointsRef, {
+        points: increment(1),
+        lastActive: new Date()
+      }, { merge: true });
+
+      localStorage.setItem(storageKey, "true");
+      setCustomerPoints(prev => prev + 1);
+      toast.success(`🎉 बधाई हो! ${platform.toUpperCase()} पर हमें फॉलो करने के लिए आपको +1 पॉइंट मिला है!`);
+    } catch (err) {
+      toast.error("पॉइंट्स जोड़ने में समस्या आई।");
+    }
+  };
+
+  const getClaimStatus = (platform: string) => {
+    if (!customerDetails?.phone) return "🎁 +1 Pt";
+    const storageKey = `bb_claimed_${customerDetails.phone.replace("+91", "")}_${platform}`;
+    return localStorage.getItem(storageKey) ? "✅ Claimed" : "🎁 Claim +1 Pt";
   };
 
   const sendWhatsAppOrder = async () => {
@@ -600,7 +613,7 @@ export default function BbCafeHome() {
     if (chiliFlakesAddon) itemsText += `• Extra Chilly Flakes x1 - ₹10\n`;
     if (noCutlery) itemsText += `🌱 (Eco-Friendly: No plastic cutlery requested)\n`;
 
-    const msg = `🔥 *BAM BAM CAFE - NEW ORDER*\n\n*Bill No:* #${formattedBillStr}\n*Token No:* #${tokenNumber}\n*Customer:* ${customerDetails.name}\n*Phone:* ${customerDetails.phone}\n*Delivery Area:* ${selectedArea.name}\n*Address:* ${address}\n\n*ITEMS:*\n${itemsText}\n*Subtotal:* ₹${subtotal + addOnsCost}\n*Coupon Discount:* -₹${couponDiscount}\n*Delivery:* ₹${deliveryCharge}\n*TOTAL BILL: ₹${finalTotal}*\n\n*Points Earned:* +${pointsEarned} Pts\n${totalPointsCost > 0 ? `*Points Redeemed:* -${totalPointsCost} Pts\n` : ''}\n_Confirm order by replying 'YES'_`;
+    const msg = `🔥 *BUM BUM CAFE - NEW ORDER*\n\n*Bill No:* #${formattedBillStr}\n*Token No:* #${tokenNumber}\n*Customer:* ${customerDetails.name}\n*Phone:* ${customerDetails.phone}\n*Delivery Area:* ${selectedArea.name}\n*Address:* ${address}\n\n*ITEMS:*\n${itemsText}\n*Subtotal:* ₹${subtotal + addOnsCost}\n*Coupon Discount:* -₹${couponDiscount}\n*Delivery:* ₹${deliveryCharge}\n*TOTAL BILL: ₹${finalTotal}*\n\n*Points Earned:* +${pointsEarned} Pts\n${totalPointsCost > 0 ? `*Points Redeemed:* -${totalPointsCost} Pts\n` : ''}\n_Confirm order by replying 'YES'_`;
     
     playSoundEffect('success');
     setConfettiActive(true);
@@ -634,14 +647,46 @@ export default function BbCafeHome() {
     setIsCartOpen(false);
   };
 
-  const handleReviewSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!reviewName || !reviewComment) return toast.error("Please fill all fields!");
-    try {
-      await addDoc(collection(db, "reviews"), { name: reviewName, rating: reviewRating, comment: reviewComment, isApproved: false, timestamp: new Date() });
-      toast.success("Review submitted! Approved hone ke baad live dikhega.");
-      setReviewName(""); setReviewComment(""); setReviewRating(5); setIsReviewFormOpen(false);
-    } catch (err) { toast.error("Failed to submit review."); }
+  const handleShareApp = async () => {
+    if (!customerDetails?.phone) {
+      toast.error("पॉइंट्स कमाने के लिए पहले Name और Phone दर्ज करें!");
+      setIsLoginOpen(true);
+      return;
+    }
+
+    const phoneClean = customerDetails.phone.replace("+91", "").trim();
+    const shareCountKey = `bb_shares_${phoneClean}`;
+    let currentShares = Number(localStorage.getItem(shareCountKey) || 0);
+
+    const shareMessage = `🔥 *BUM BUM CAFE - Mohandra* 🔥\nयहाँ से ऑर्डर करें बेहतरीन और स्वादिष्ट Pizza, Thali और Fast Food! सीधे आपके घर तक सुपर फास्ट होम डिलीवरी।\n👉 ${window.location.origin}`;
+    const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(shareMessage)}`;
+
+    window.open(whatsappUrl, '_blank');
+
+    if (currentShares < 5) {
+      const nextShares = currentShares + 1;
+      localStorage.setItem(shareCountKey, String(nextShares));
+      setShareCount(nextShares);
+
+      if (nextShares === 5) {
+        try {
+          const pointsRef = doc(db, "customer_points", phoneClean);
+          await setDoc(pointsRef, {
+            points: increment(1),
+            lastActive: new Date()
+          }, { merge: true });
+
+          setCustomerPoints(prev => prev + 1);
+          toast.success("🎉 शानदार! आपने 5 दोस्तों के साथ ऐप शेयर करके +1 Loyalty Point कमा लिया है!");
+        } catch (e) {}
+      } else {
+        toast.success(`📤 शेयर किया गया! (${nextShares}/5 प्रोग्रेस। +1 पॉइंट के लिए ${5 - nextShares} और दोस्तों को शेयर करें!)`);
+      }
+    } else {
+      localStorage.setItem(shareCountKey, "1");
+      setShareCount(1);
+      toast.success("📤 नया शेयर प्रोग्रेस शुरू हुआ! (1/5 पूरा)");
+    }
   };
 
   const handleSaveDetails = (e: React.FormEvent) => {
@@ -717,48 +762,6 @@ export default function BbCafeHome() {
     setPizzaAddons({});
   };
 
-  const handleShareApp = async () => {
-    if (!customerDetails?.phone) {
-      toast.error("पॉइंट्स कमाने के लिए पहले Name और Phone दर्ज करें!");
-      setIsLoginOpen(true);
-      return;
-    }
-
-    const phoneClean = customerDetails.phone.replace("+91", "").trim();
-    const shareCountKey = `bb_shares_${phoneClean}`;
-    let currentShares = Number(localStorage.getItem(shareCountKey) || 0);
-
-    const shareMessage = `🔥 *BAM BAM CAFE - Mohandra* 🔥\nयहाँ से ऑर्डर करें बेहतरीन और स्वादिष्ट Pizza, Thali और Fast Food! सीधे आपके घर तक सुपर फास्ट होम डिलीवरी।\n👉 ${window.location.origin}`;
-    const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(shareMessage)}`;
-
-    window.open(whatsappUrl, '_blank');
-
-    if (currentShares < 5) {
-      const nextShares = currentShares + 1;
-      localStorage.setItem(shareCountKey, String(nextShares));
-      setShareCount(nextShares);
-
-      if (nextShares === 5) {
-        try {
-          const pointsRef = doc(db, "customer_points", phoneClean);
-          await setDoc(pointsRef, {
-            points: increment(1),
-            lastActive: new Date()
-          }, { merge: true });
-
-          setCustomerPoints(prev => prev + 1);
-          toast.success("🎉 शानदार! आपने 5 दोस्तों के साथ ऐप शेयर करके +1 Loyalty Point कमा लिया है!");
-        } catch (e) {}
-      } else {
-        toast.success(`📤 शेयर किया गया! (${nextShares}/5 प्रोग्रेस। +1 पॉइंट के लिए ${5 - nextShares} और दोस्तों को शेयर करें!)`);
-      }
-    } else {
-      localStorage.setItem(shareCountKey, "1");
-      setShareCount(1);
-      toast.success("📤 नया शेयर प्रोग्रेस शुरू हुआ! (1/5 पूरा)");
-    }
-  };
-
   if (!mounted) return null;
 
   return (
@@ -805,7 +808,7 @@ export default function BbCafeHome() {
       {/* COMPACT COMPACT HEADER */}
       <header className={`relative py-6 px-4 bg-gradient-to-r ${activeTheme.bg} flex justify-between items-center border-b border-white/10 shadow-lg`}>
         <div>
-          <motion.h1 initial={{ scale: 0.9 }} animate={{ scale: 1 }} className="text-xl font-black italic tracking-tighter text-yellow-300">BAM BAM CAFE</motion.h1>
+          <motion.h1 initial={{ scale: 0.9 }} animate={{ scale: 1 }} className="text-xl font-black italic tracking-tighter text-yellow-300">BUM BUM CAFE</motion.h1>
           <p className="text-[10px] text-yellow-100 font-bold tracking-wider uppercase">{activeTheme.name}</p>
         </div>
         <div className="flex items-center gap-2">
@@ -836,7 +839,7 @@ export default function BbCafeHome() {
       {!isStoreOpenCurrently && (
         <div className="bg-red-600 text-white font-black py-3 px-4 text-center text-xs flex items-center justify-center gap-2 shadow-lg border-b border-red-500">
           <span className="animate-pulse">⚠️</span>
-          <span>बम बम कैफ़े अभी बंद है। हम सुबह 10:00 बजे खुलेंगे। आप केवल हमारा मेनू देख सकते हैं।</span>
+          <span>बुम बुम कैफ़े अभी बंद है। हम सुबह 10:00 बजे खुलेंगे। आप केवल हमारा मेनू देख सकते हैं।</span>
         </div>
       )}
 
@@ -892,7 +895,7 @@ export default function BbCafeHome() {
                     src={banners[bannerIndex]?.url} 
                     className="w-full h-full object-cover" 
                     onError={() => setBannerError(true)} 
-                    alt="BAM BAM CAFE Promo"
+                    alt="BUM BUM CAFE Promo"
                   />
                 )}
               </motion.div>
@@ -950,7 +953,7 @@ export default function BbCafeHome() {
                 <React.Fragment key={item.id}>
                   <motion.div layout className="bg-white/[0.02] rounded-2xl border border-white/5 overflow-hidden flex flex-col relative">
                     <div className="relative h-44 w-full">
-                      <img src={item.image || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=500&bg=80"} className="w-full h-full object-cover" alt={item.name} />
+                      <img src={item.image || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=500&q=80"} className="w-full h-full object-cover" alt={item.name} />
                       
                       <div className="absolute top-3 left-3 bg-black/50 backdrop-blur-md px-2 py-1 rounded-lg border border-white/10 flex items-center gap-1 text-[8px] font-black uppercase text-green-400">
                         <span className="h-1 w-1 rounded-full bg-green-500 animate-pulse" />VEG
@@ -992,7 +995,7 @@ export default function BbCafeHome() {
                     <div className="bg-gradient-to-r from-orange-600/15 to-[#b33600]/15 border border-orange-500/20 rounded-2xl p-4 overflow-hidden relative min-h-[7.5rem] flex flex-col justify-center">
                       <div className="max-w-[70%] space-y-1 z-10 relative">
                         <span className="text-[7px] font-black uppercase text-yellow-300 bg-yellow-400/10 border border-yellow-400/20 px-2 py-0.5 rounded-full w-max">🎁 SPECIAL OFFER</span>
-                        <h4 className="text-xs font-black text-white uppercase leading-tight line-clamp-1">{banners[bannerIndex % banners.length]?.name || "BAM BAM CAFE SPECIAL"}</h4>
+                        <h4 className="text-xs font-black text-white uppercase leading-tight line-clamp-1">{banners[bannerIndex % banners.length]?.name || "BUM BUM CAFE SPECIAL"}</h4>
                         <p className="text-[9px] text-gray-400 leading-normal font-bold">स्वादिष्ट पिज्जा और सैंडविच पर बेहतरीन डिस्काउंट। आर्डर करने के लिए नीचे स्क्रॉल करें!</p>
                       </div>
                       
@@ -1053,11 +1056,11 @@ export default function BbCafeHome() {
             
             <div className="text-center space-y-3 relative z-10">
               <span className="text-[9px] font-black uppercase tracking-widest text-green-400 bg-green-500/10 px-3 py-1 rounded-full border border-green-500/20">About Us</span>
-              <h4 className="text-xl font-black italic text-yellow-300 tracking-tight font-serif">BAM BAM CAFE</h4>
+              <h4 className="text-xl font-black italic text-yellow-300 tracking-tight font-serif">BUM BUM CAFE</h4>
               <p className="text-[11px] font-bold text-green-300">जहाँ स्वाद और सुकून मिलते हैं! ✨</p>
               
               <p className="text-[11px] text-gray-300 leading-relaxed max-w-sm mx-auto font-medium">
-                हमने BAM BAM CAFE की शुरुआत एक छोटे से सपने के साथ की थी—लोगों को घर जैसा स्वाद और कैफे वाला माहौल देने के लिए। यहाँ हर कप कॉफी और हर स्लाइस पिज्जा प्यार और शुद्धता के साथ बनाया जाता है। हमारी कोशिश है कि आप जब भी यहाँ आएँ, एक प्यारी मुस्कान के साथ वापस जाएँ। ❤️
+                हमने BUM BUM CAFE की शुरुआत एक छोटे से सपने के साथ की थी—लोगों को घर जैसा स्वाद और कैफे वाला माहौल देने के लिए। यहाँ हर कप कॉफी और हर स्लाइस पिज्जा प्यार और शुद्धता के साथ बनाया जाता है। हमारी कोशिश है कि आप जब भी यहाँ आएँ, एक प्यारी मुस्कान के साथ वापस जाएँ। ❤️
               </p>
             </div>
           </div>
@@ -1078,7 +1081,7 @@ export default function BbCafeHome() {
           </div>
 
           <div className="text-center text-[9px] text-gray-600 font-bold tracking-widest pt-2">
-            © 2026 BAM BAM CAFE - MOHANDRA. ALL RIGHTS RESERVED.
+            © 2026 BUM BUM CAFE - MOHANDRA. ALL RIGHTS RESERVED.
           </div>
         </footer>
       </main>
@@ -1201,7 +1204,7 @@ export default function BbCafeHome() {
                           type="button"
                           key={addon}
                           onClick={() => setPizzaAddons(prev => ({ ...prev, [addon]: !prev[addon] }))}
-                          className={`p-2.5 rounded-xl border flex justify-between items-center text-[9px] font-bold ${isSelected ? 'border-orange-500 bg-orange-500/5 text-orange-500' : 'border-white/5 bg-white/[0.02] text-gray-300'}`}
+                          className={`p-2.5 rounded-xl border flex justify-between items-center text-[9px] font-bold ${isSelected ? 'border-orange-500 bg-orange-500/5 text-orange-400' : 'border-white/5 bg-white/[0.02] text-gray-300'}`}
                         >
                           <span>{addon}</span>
                           <span className="text-orange-400 font-black">+₹{cost}</span>
@@ -1358,7 +1361,6 @@ export default function BbCafeHome() {
                         <span className="text-[9px] text-gray-400 font-black uppercase">Share Progress:</span>
                         <span className="text-[9px] text-yellow-400 font-black bg-yellow-400/10 px-2 py-0.5 rounded border border-yellow-400/20">{shareCount}/5 Shared</span>
                       </div>
-                      {/* Fixed share app function click [1] */}
                       <button type="button" onClick={handleShareApp} className="w-full bg-green-600 text-white font-black py-2 rounded-lg text-[9px] uppercase flex items-center justify-center gap-1 shadow-md">
                         <Share2 size={12}/>
                         <span>Share 5 Times to earn free +1 Loyalty Point! 🎁</span>
@@ -1535,7 +1537,7 @@ export default function BbCafeHome() {
                   <span className="text-[10px] font-black text-white">🟢 WhatsApp Message</span>
                   <span className="text-[8px] font-black uppercase px-2.5 py-1 rounded bg-yellow-400 text-black">{getClaimStatus('whatsapp_msg')}</span>
                 </button>
-                <button onClick={() => handleSocialClick('whatsapp_channel', 'https://whatsapp.com/channel/0029VaLhggoGE56natoQI43y')} className="w-full flex items-center justify-between bg-emerald-500/10 border border-emerald-500/20 p-3 rounded-xl">
+                <button onClick={() => handleSocialClick('whatsapp_channel', 'https://whatsapp.com/channel/0029VaLhggoGE56natoQI43y')} className="w-full flex items-center justify-between bg-[#10b981]/10 border border-[#10b981]/20 p-3 rounded-xl">
                   <span className="text-[10px] font-black text-white">📢 WhatsApp Channel</span>
                   <span className="text-[8px] font-black uppercase px-2.5 py-1 rounded bg-yellow-400 text-black">{getClaimStatus('whatsapp_channel')}</span>
                 </button>
@@ -1618,7 +1620,7 @@ export default function BbCafeHome() {
                 <span className="text-[10px] font-black text-green-400">🌱 DIGITAL GREEN INVOICE</span>
                 <button onClick={() => setShowInvoice(false)} className="text-gray-400"><X size={16} /></button>
               </div>
-              <h4 className="text-xl font-black text-yellow-400 italic">BAM BAM CAFE</h4>
+              <h4 className="text-xl font-black text-yellow-400 italic">BUM BUM CAFE</h4>
               
               <div className="text-left text-xs space-y-1.5 text-gray-300 font-mono">
                 <p>Order No: #{formatBillNumber(lastPlacedOrder.billNumber)}</p>
@@ -1644,7 +1646,7 @@ export default function BbCafeHome() {
 
               <div className="pt-2 flex flex-col gap-2">
                 <a 
-                  href={`https://wa.me/919714293759?text=${encodeURIComponent(`नमस्ते बम बम कैफ़े! कृपया मेरे आर्डर नंबर #${formatBillNumber(lastPlacedOrder.billNumber)} (टोकन नंबर: #${lastPlacedOrder.tokenNumber}) का लाइव स्टेटस बताएं।`)}`}
+                  href={`https://wa.me/919714293759?text=${encodeURIComponent(`नमस्ते बुम बुम कैफ़े! कृपया मेरे आर्डर नंबर #${formatBillNumber(lastPlacedOrder.billNumber)} (टोकन नंबर: #${lastPlacedOrder.tokenNumber}) का लाइव स्टेटस बताएं।`)}`}
                   target="_blank"
                   rel="noreferrer"
                   className="bg-yellow-400 text-black py-2.5 rounded-xl text-xs font-black uppercase tracking-wider block"
