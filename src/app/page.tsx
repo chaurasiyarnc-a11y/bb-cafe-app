@@ -334,6 +334,14 @@ export default function BbCafeHome() {
     } catch (err) { toast.error("Failed to submit review."); }
   };
 
+  // --- DEFINED handleAddonToggle HELPER ---
+  const handleAddonToggle = (key: string) => {
+    setSelectedAddons(prev => ({
+      ...prev,
+      [key]: !prev[key]
+    }));
+  };
+
   const handleShareApp = async () => {
     if (!customerDetails?.phone) {
       toast.error("पॉइंट्स कमाने के लिए पहले Name और Phone दर्ज करें!");
@@ -376,7 +384,6 @@ export default function BbCafeHome() {
     }
   };
 
-  // Compute categories
   const visibleCategories = useMemo(() => {
     const baseCategories = ["All", ...FALLBACK_CATEGORIES.filter(c => c !== "All")];
     const dbCatsMap = new Map();
@@ -406,12 +413,6 @@ export default function BbCafeHome() {
     if (found && found.image) return found.image;
     return CATEGORY_IMAGES[catName] || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=150&q=80";
   };
-
-  useEffect(() => {
-    if (banners.length <= 1) return;
-    const interval = setInterval(() => { setBannerIndex((prev) => (prev + 1) % banners.length); }, 4000);
-    return () => clearInterval(interval);
-  }, [banners]);
 
   const getTotal = () => cart.reduce((acc: number, i: any) => acc + (i.price * i.quantity), 0);
 
@@ -900,7 +901,7 @@ export default function BbCafeHome() {
                 </button>
 
               </div>
-              <button type="button" onClick={() => setIsSocialsOpen(false)} className="w-full bg-orange-500 text-black font-black p-4 rounded-xl text-xs uppercase">CLOSE</button>
+              <button type="button" onClick={() => setIsSocialsOpen(false)} className="w-full bg-orange-500 text-black font-black p-4.5 rounded-xl text-xs uppercase">CLOSE</button>
             </motion.div>
           </div>
         )}
@@ -1044,7 +1045,7 @@ export default function BbCafeHome() {
         )}
       </AnimatePresence>
 
-      {/* --- CART / CHECKOUT SIDEBAR - PREMIUM SLIDE-UP BOTTOM SHEET (ENHANCED SHARP ANIMATION) --- */}
+      {/* --- CART / CHECKOUT SIDEBAR --- */}
       <AnimatePresence>
         {isCartOpen && (
           <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[110] flex items-end">
@@ -1069,9 +1070,7 @@ export default function BbCafeHome() {
                   </div>
                   <div className="flex items-center gap-2.5 bg-black/40 px-3 py-1.5 rounded-2xl border border-white/10 flex-shrink-0">
                     <button 
-                      onClick={() => {
-                        removeItem(item.id);
-                      }} 
+                      onClick={() => removeItem(item.id)} 
                       className="w-8 h-8 flex items-center justify-center bg-red-500/10 text-red-500 rounded-lg text-lg font-black"
                     >
                       -
@@ -1081,9 +1080,7 @@ export default function BbCafeHome() {
                       <button disabled className="w-8 h-8 flex items-center justify-center bg-white/5 text-gray-600 rounded-lg text-lg font-black cursor-not-allowed">+</button>
                     ) : (
                       <button 
-                        onClick={() => {
-                          addItem(item);
-                        }} 
+                        onClick={() => addItem(item)} 
                         className="w-8 h-8 flex items-center justify-center bg-green-500/10 text-green-500 rounded-lg text-lg font-black"
                       >
                         +
