@@ -84,7 +84,7 @@ export default function BbCafeHome() {
 
   const [isGiftModalOpen, setIsGiftModalOpen] = useState(false);
   const [giftPhone, setGiftPhone] = useState("");
-  const [giftPointsAmount, setGiftPointsAmount] = useState<number | " text-white">("");
+  const [giftPointsAmount, setGiftPointsAmount] = useState<number | "">("");
   const [isGiftingLoading, setIsGiftingLoading] = useState(false);
 
   const [dbCategories, setDbCategories] = useState<any[]>([]);
@@ -223,6 +223,7 @@ export default function BbCafeHome() {
     const savedDetails = localStorage.getItem('bb_cafe_customer');
     if (savedDetails) { try { setCustomerDetails(JSON.parse(savedDetails)); } catch (err) {} }
 
+    // Smart Cart Restore on window ready
     const savedCart = localStorage.getItem('bb_cafe_draft_cart');
     if (savedCart && cart.length === 0) {
       try {
@@ -351,7 +352,7 @@ export default function BbCafeHome() {
 
   const handleCustomerRedeem = (id: string, name: string, pointsCost: number) => {
     const currentPointsInCart = cart.reduce((acc: number, item: any) => acc + (item.pointsCost || 0), 0);
-    if (customerPoints - currentPointsInCart < pointsCost) return toast.error("आपके पास पर्याप्त पॉइंट्स उपलब्ध नहीं हैं!");
+    if (customerPoints - currentPointsInCart < pointsCost) return toast.error("आपके पास पर्याप्त ऑयल्टी पॉइंट्स उपलब्ध नहीं हैं!");
     addItem({ id, name, price: 0, pointsCost, isReward: true });
     playSoundEffect('add');
     toast.success(`${name} Cart में जोड़ दिया गया है!`);
@@ -1047,7 +1048,6 @@ export default function BbCafeHome() {
                   </div>
                 </div>
 
-                {/* Clickable review templates so customers can touch & quickly write comments */}
                 <div className="space-y-1">
                   <label className="text-[9px] font-black uppercase text-gray-500">पसंदीदा रिव्यू टच करें:</label>
                   <div className="flex flex-wrap gap-1.5 py-1">
