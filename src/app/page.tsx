@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { db } from '../lib/firebase'; 
 import { collection, onSnapshot, query, addDoc, doc, setDoc, increment, runTransaction } from 'firebase/firestore';
-import { ShoppingBag, Plus, Search, ChevronRight, X, MapPin, Phone, User, Sparkles, Star, Percent, Gift, Loader2, Share2, Heart, Info, Clock } from 'lucide-react';
+import { ShoppingBag, Plus, Search, X, MapPin, Phone, User, Sparkles, Star, Percent, Gift, Loader2, Share2, Heart, Clock } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
 import { useCartStore } from '../store/useCartStore';
@@ -40,7 +40,15 @@ const PIZZA_ADDONS: { [size: string]: { [addon: string]: number } } = {
   "extra large": { "Veg Add-on": 30, "Paneer": 50, "Black Olives": 50, "Jalapeno": 50, "Extra Cheese": 60, "Mushroom": 50 }
 };
 
-// Permanent Good Reviews to show on home page
+// 2. Pre-written excellent review suggestions for customer touch input
+const SUGGESTED_REVIEWS = [
+  "पिज्जा का स्वाद लाजवाब है! मज़ा आ गया 🍕😋",
+  "मोहांद्रा में सबसे बेस्ट सर्विस और स्वाद! ⭐⭐⭐⭐⭐",
+  "सुपर फास्ट डिलीवरी और शानदार पैकेजिंग! 🛵📦",
+  "स्पेशल थाली का स्वाद एकदम घर जैसा है! 🍱❤️",
+  "साफ़-सफ़ाई और शुद्धता 10/10 है! 🧼👌"
+];
+
 const PERMANENT_REVIEWS = [
   { id: "rev1", name: "Gaurav Soni", rating: 5, comment: "Bum Bum Cafe ki paneer pizza sach me pure Mohandra me best hai! Extra cheese is real love. ⭐⭐⭐⭐⭐" },
   { id: "rev2", name: "Anjali Patel", rating: 5, comment: "Fast food packing bahut achi thi, delivery boy behavior was also very polite. Recommended! ⭐⭐⭐⭐⭐" },
@@ -137,9 +145,6 @@ export default function BbCafeHome() {
   const [isTooFar, setIsTooFar] = useState(false);
   const [distanceKm, setDistanceKm] = useState<number | null>(null);
 
-  // Bundelkhandi Welcome dialog visible
-  const [showBundelkhandiWelcome, setShowBundelkhandiWelcome] = useState(false);
-
   const formatBillNumber = (num: number) => String(num).padStart(4, '0');
 
   // Dynamic Seasonal Theme
@@ -159,9 +164,8 @@ export default function BbCafeHome() {
     return { bg: "from-[#ff5e00] to-[#b33600]", accent: "text-yellow-300", name: "BUM BUM CAFE - Mohandra" };
   }, []);
 
-  // Haversine formula to find direct distance in KM
   const calculateDistanceInKm = (lat1: number, lon1: number, lat2: number, lon2: number) => {
-    const R = 6371; // Earth's radius
+    const R = 6371; 
     const dLat = (lat2 - lat1) * Math.PI / 180;
     const dLon = (lon2 - lon1) * Math.PI / 180;
     const a = 
@@ -174,9 +178,6 @@ export default function BbCafeHome() {
 
   useEffect(() => {
     setMounted(true);
-
-    // Trigger Bundelkhandi popup on load
-    setShowBundelkhandiWelcome(true);
 
     const updateOnlineStatus = () => {
       setIsOnline(navigator.onLine);
@@ -256,86 +257,6 @@ export default function BbCafeHome() {
       unsubStore(); unsubMenu(); unsubCats(); unsubBanners(); unsubReviews(); unsubCoupons(); unsubRules(); 
     };
   }, []);
-
-  useEffect(() => {
-    if (cart.length > 0) {
-      localStorage.setItem('bb_cafe_draft_cart', JSON.stringify(cart));
-    } else {
-      localStorage.removeItem('bb_cafe_draft_cart');
-    }
-  }, [cart]);
-
-  useEffect(() => {
-    if (!customerDetails?.phone) { setCustomerPoints(0); return; }
-    const unsubPoints = onSnapshot(doc(db, "customer_points", customerDetails.phone.replace("+91", "")), (docSnap) => {
-      setCustomerPoints(docSnap.exists() ? (docSnap.data().points || 0) : 0);
-    }, () => { setCustomerPoints(0); });
-    
-    const phoneClean = customerDetails.phone.replace("+91", "");
-    setShareCount(Number(localStorage.getItem(`bb_shares_${phoneClean}`) || 0));
-
-    return () => unsubPoints();
-  }, [customerDetails]);
-
-  const visibleCategories = useMemo(() => {
-    const baseCategories = ["All", ...FALLBACK_CATEGORIES.filter(c => c !== "All")];
-    const dbCatsMap = new Map();
-    dbCategories.forEach(c => dbCatsMap.set(String(c.name).toLowerCase().trim(), c));
-    const result: string[] = [];
-
-    baseCategories.forEach(catName => {
-      const cleanName = catName.toLowerCase().trim();
-      if (dbCatsMap.has(cleanName)) {
-        if (dbCatsMap.get(cleanName).isVisible !== false) result.push(catName);
-      } else {
-        result.push(catName);
-      }
-    });
-
-    dbCategories.forEach(c => {
-      const cleanName = String(c.name).toLowerCase().trim();
-      const alreadyAdded = result.some(r => r.toLowerCase().trim() === cleanName);
-      if (!alreadyAdded && c.isVisible !== false && c.name !== "All") result.push(c.name);
-    });
-
-    return Array.from(new Set(result));
-  }, [dbCategories]);
-
-  const getCategoryImage = (catName: string) => {
-    const found = dbCategories.find(c => c.name === catName);
-    if (found && found.image) return found.image;
-    return CATEGORY_IMAGES[catName] || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=150&q=80";
-  };
-
-  useEffect(() => {
-    if (banners.length <= 1) return;
-    const interval = setInterval(() => { setBannerIndex((prev) => (prev + 1) % banners.length); }, 4000);
-    return () => clearInterval(interval);
-  }, [banners]);
-
-  const playSoundEffect = (type: 'add' | 'success') => {
-    try {
-      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
-      const osc = audioCtx.createOscillator();
-      const gain = audioCtx.createGain();
-      osc.connect(gain);
-      gain.connect(audioCtx.destination);
-      
-      if (type === 'add') {
-        osc.frequency.setValueAtTime(880, audioCtx.currentTime); 
-        gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
-        osc.start();
-        osc.stop(audioCtx.currentTime + 0.1);
-      } else if (type === 'success') {
-        osc.frequency.setValueAtTime(523.25, audioCtx.currentTime); 
-        gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
-        osc.start();
-        osc.frequency.setValueAtTime(659.25, audioCtx.currentTime + 0.1);
-        osc.frequency.setValueAtTime(783.99, audioCtx.currentTime + 0.2);
-        osc.stop(audioCtx.currentTime + 0.4);
-      }
-    } catch (e) {}
-  };
 
   const getCartSubtotal = () => cart.reduce((acc: number, i: any) => acc + (i.price * i.quantity), 0);
 
@@ -449,17 +370,15 @@ export default function BbCafeHome() {
         setAddress(`My GPS Location: https://www.google.com/maps?q=${latitude},${longitude}`);
         toast.success("जीपीएस से लोकेशन सफलतापूर्वक जोड़ी गई!");
         
-        // Mohandra Center Coordinates (Approx)
         const mohandraLat = 24.2863;
         const mohandraLng = 80.1245;
         
         const calculatedDistance = calculateDistanceInKm(latitude, longitude, mohandraLat, mohandraLng);
         setDistanceKm(Number(calculatedDistance.toFixed(2)));
 
-        // strict 20KM Cap: Customer beyond 20km from cafe cannot place order [1.1.2]
         if (calculatedDistance > 20) {
           setIsTooFar(true);
-          toast.error("ध्यान दें: आप बूम बूम कैफे से 20 किमी से अधिक दूर हैं। आप केवल हमारा मेनू देख सकते हैं, आर्डर नहीं कर सकते।", { duration: 8000 });
+          toast.error("ध्यान दें: आप बूम बूम कैफे से 20 किमी से अधिक दूर हैं। आप केवल हमारा शानदार मेनू देख सकते हैं, आर्डर नहीं कर सकते।", { duration: 8000 });
         } else {
           setIsTooFar(false);
           toast.success(`दूरी: ${calculatedDistance.toFixed(2)} KM। आप हमारे आर्डर रेंज में हैं!`);
@@ -613,6 +532,7 @@ export default function BbCafeHome() {
     (window as any)._pendingWA = openWA;
   };
 
+  // 4. Cart clears items and modifiers, but strictly preserves address & details on checkout
   const executeWAOpen = () => {
     if ((window as any)._pendingWA) {
       (window as any)._pendingWA();
@@ -621,6 +541,12 @@ export default function BbCafeHome() {
     setShowUPIModal(false);
     setShowInvoice(true); 
     clearCart(); 
+    
+    // Reset specific add-ons & modifiers
+    setKetchupAddon(false);
+    setOreganoAddon(false);
+    setChiliFlakesAddon(false);
+    setNoCutlery(false);
     setAppliedCoupon(null); 
     setEnteredCoupon(""); 
     setIsCartOpen(false);
@@ -708,14 +634,6 @@ export default function BbCafeHome() {
     setChosenPrice(0); 
     setPizzaAddons({});
   };
-
-  const upsellSuggestionItems = useMemo(() => {
-    return menu.filter(item => {
-      const isShake = item?.category === "Super Cool" || item?.category === "Fast Food";
-      const notInCart = !cart.some((c: any) => c.id === item.id);
-      return isShake && notInCart;
-    }).slice(0, 2);
-  }, [menu, cart]);
 
   const handleSocialClick = async (platform: string, url: string) => {
     window.open(url, '_blank');
@@ -805,6 +723,17 @@ export default function BbCafeHome() {
     <div className="bg-[#050505] min-h-screen text-white pb-32 font-sans relative overflow-x-hidden">
       <Toaster position="top-center" />
       
+      {/* 3. Global CSS to fully hide visual category scrollbar handles */}
+      <style>{`
+        .hide-scrollbar::-webkit-scrollbar {
+          display: none !important;
+        }
+        .hide-scrollbar {
+          -ms-overflow-style: none !important;
+          scrollbar-width: none !important;
+        }
+      `}</style>
+      
       {confettiActive && (
         <div className="fixed inset-0 pointer-events-none z-[999] overflow-hidden">
           {Array.from({ length: 100 }).map((_, i) => (
@@ -832,9 +761,9 @@ export default function BbCafeHome() {
       )}
 
       {/* COMPACT COMPACT HEADER */}
-      <header className={`relative py-5 px-4 bg-gradient-to-r ${activeTheme.bg} flex justify-between items-center border-b border-white/10 shadow-lg`}>
+      <header className={`relative py-6 px-4 bg-gradient-to-r ${activeTheme.bg} flex justify-between items-center border-b border-white/10 shadow-lg`}>
         <div>
-          <motion.h1 initial={{ scale: 0.9 }} animate={{ scale: 1 }} className="text-lg font-black italic tracking-tighter text-yellow-300">BUM BUM CAFE</motion.h1>
+          <motion.h1 initial={{ scale: 0.9 }} animate={{ scale: 1 }} className="text-xl font-black italic tracking-tighter text-yellow-300">BUM BUM CAFE</motion.h1>
           <p className="text-[10px] text-yellow-100 font-bold tracking-wider uppercase">{activeTheme.name}</p>
         </div>
         <div className="flex items-center gap-2">
@@ -879,6 +808,8 @@ export default function BbCafeHome() {
       </button>
 
       <main className="pt-3 px-3 max-w-lg mx-auto space-y-4">
+        
+        {/* 5. Animated & Sliding Promotional Banner */}
         <div className="w-full h-36 rounded-2xl overflow-hidden relative border border-white/5 bg-white/[0.02]">
           {(banners.length === 0 || bannerError) ? (
             <div className="w-full h-full bg-gradient-to-r from-orange-600/35 to-[#b33600]/35 flex flex-col justify-center p-5 space-y-1">
@@ -887,7 +818,19 @@ export default function BbCafeHome() {
               <p className="text-[10px] text-gray-400">Enjoy fresh baked pizza & delicious thalis!</p>
             </div>
           ) : (
-            <img src={banners[bannerIndex]?.url} onError={() => setBannerError(true)} className="w-full h-full object-cover" alt="Promo" />
+            <AnimatePresence mode="wait">
+              <motion.img 
+                key={bannerIndex}
+                src={banners[bannerIndex]?.url} 
+                initial={{ opacity: 0, x: 70, scale: 0.95 }}
+                animate={{ opacity: 1, x: 0, scale: 1 }}
+                exit={{ opacity: 0, x: -70, scale: 0.95 }}
+                transition={{ duration: 0.55, ease: "easeInOut" }}
+                className="w-full h-full object-cover absolute inset-0"
+                onError={() => setBannerError(true)} 
+                alt="Bum Bum Cafe Promo"
+              />
+            </AnimatePresence>
           )}
         </div>
 
@@ -901,10 +844,10 @@ export default function BbCafeHome() {
           </div>
         )}
 
-        {/* ZOOMED CATEGORY SLIDER (NO BACKGROUNDS) */}
+        {/* ZOOMED CATEGORY SLIDER (NO VISUAL SLIDER BAR AT ALL) */}
         <div className="space-y-1">
           <p className="text-[8px] font-black uppercase tracking-wider text-orange-500">Inspiration for your first order</p>
-          <div className="flex gap-5 overflow-x-auto scrollbar-none py-2 px-1">
+          <div className="flex gap-5 overflow-x-auto hide-scrollbar py-2 px-1">
             <button onClick={() => setSelectedCategory("Favorites")} className="flex flex-col items-center flex-shrink-0 group outline-none">
               <div className={`w-14 h-14 rounded-full overflow-hidden border transition-all flex items-center justify-center ${selectedCategory === "Favorites" ? 'border-red-500 scale-105' : 'border-white/10'}`}>
                 <Heart size={24} className={selectedCategory === "Favorites" ? 'text-red-500 fill-red-500' : 'text-gray-400'} />
@@ -1079,6 +1022,7 @@ export default function BbCafeHome() {
         )}
       </AnimatePresence>
 
+      {/* WRITE REVIEW FORM MODAL */}
       <AnimatePresence>
         {isReviewFormOpen && (
           <div className="fixed inset-0 bg-black/95 z-[200] flex items-center justify-center p-6">
@@ -1097,6 +1041,24 @@ export default function BbCafeHome() {
                     ))}
                   </div>
                 </div>
+
+                {/* Clickable review templates so customers can touch & quickly write comments */}
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black uppercase text-gray-500">पसंदीदा रिव्यू टच करें:</label>
+                  <div className="flex flex-wrap gap-1.5 py-1">
+                    {SUGGESTED_REVIEWS.map((suggestion) => (
+                      <button
+                        type="button"
+                        key={suggestion}
+                        onClick={() => setReviewComment(suggestion)}
+                        className="bg-white/5 border border-white/10 hover:border-orange-500/50 px-2 py-1 rounded-full text-[9px] text-gray-300 font-bold transition-all text-left"
+                      >
+                        {suggestion}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 <div>
                   <label className="text-[9px] font-black uppercase text-gray-500">Comments</label>
                   <textarea placeholder="Khana kaisa laga?..." value={reviewComment} onChange={(e) => setReviewComment(e.target.value)} required rows={3} className="w-full bg-white/5 border border-white/10 p-3 rounded-lg text-xs text-white focus:border-orange-500 outline-none resize-none" />
@@ -1468,7 +1430,7 @@ export default function BbCafeHome() {
                   <span className="text-[10px] font-black text-white">🟢 WhatsApp Message</span>
                   <span className="text-[8px] font-black uppercase px-2.5 py-1 rounded bg-yellow-400 text-black">{getClaimStatus('whatsapp_msg')}</span>
                 </button>
-                <button onClick={() => handleSocialClick('whatsapp_channel', 'https://whatsapp.com/channel/0029VaLhggoGE56natoQI43y')} className="w-full flex items-center justify-between bg-emerald-500/10 border border-emerald-500/20 p-3 rounded-xl">
+                <button onClick={() => handleSocialClick('whatsapp_channel', 'https://whatsapp.com/channel/0029VaLhggoGE56natoQI43y')} className="w-full flex items-center justify-between bg-[#10b981]/10 border border-[#10b981]/20 p-3 rounded-xl">
                   <span className="text-[10px] font-black text-white">📢 WhatsApp Channel</span>
                   <span className="text-[8px] font-black uppercase px-2.5 py-1 rounded bg-yellow-400 text-black">{getClaimStatus('whatsapp_channel')}</span>
                 </button>
@@ -1493,7 +1455,7 @@ export default function BbCafeHome() {
             </motion.div>
           </div>
         )}
-      </AnimatePresence>
+      </Presence>
 
       <AnimatePresence>
         {showUPIModal && (
@@ -1557,40 +1519,6 @@ export default function BbCafeHome() {
                 CLOSE RECEIPT
               </button>
             </div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* BUNDELKHANDI WELCOME DIALOG */}
-      <AnimatePresence>
-        {showBundelkhandiWelcome && (
-          <div className="fixed inset-0 bg-black/85 backdrop-blur-sm z-[300] flex items-center justify-center p-6">
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0 }} 
-              animate={{ scale: 1, opacity: 1 }} 
-              exit={{ scale: 0.9, opacity: 0 }} 
-              className="bg-[#111] border border-orange-500/30 w-full max-w-sm p-6 rounded-[2.5rem] text-center space-y-4 relative"
-            >
-              <div className="w-12 h-12 bg-orange-500/10 border border-orange-500/20 text-orange-400 rounded-full flex items-center justify-center mx-auto text-xl">🙏</div>
-              
-              <div className="space-y-1.5">
-                <h3 className="text-lg font-black text-yellow-300 uppercase tracking-tight">राम-राम सा! 👋</h3>
-                <p className="text-xs font-semibold text-gray-400">बुंदेलखंडी स्वागत</p>
-              </div>
-
-              <p className="text-sm font-bold text-gray-100 leading-relaxed px-2 font-serif italic">
-                "राम-राम भइया{customerDetails?.name ? ` ${customerDetails.name}` : ''}! बूम बूम कैफे में तोहाड़ो भौत-भौत स्वागत है! का खइहो आज?"
-              </p>
-
-              <div className="pt-2">
-                <button 
-                  onClick={() => setShowBundelkhandiWelcome(false)} 
-                  className="w-full bg-orange-500 text-black py-3 rounded-2xl font-black text-xs uppercase tracking-wider"
-                >
-                  चलो शुरू करें 🚀
-                </button>
-              </div>
-            </motion.div>
           </div>
         )}
       </AnimatePresence>
