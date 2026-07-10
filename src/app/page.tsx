@@ -1,8 +1,8 @@
 'use client';
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { db } from '../lib/firebase'; 
 import { collection, onSnapshot, query, addDoc, doc, setDoc, increment, runTransaction } from 'firebase/firestore';
-import { ShoppingBag, Plus, PowerOff, Search, ChevronRight, X, MapPin, Phone, User, Sparkles, Star, Percent, Gift, Loader2, Share2, Heart } from 'lucide-react';
+import { ShoppingBag, Plus, Search, ChevronRight, X, MapPin, Phone, User, Sparkles, Star, Percent, Gift, Loader2, Share2, Heart, Info, Clock } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
 import { useCartStore } from '../store/useCartStore';
@@ -21,7 +21,6 @@ const CATEGORY_IMAGES: { [key: string]: string } = {
   "Special Rice": "https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?auto=format&fit=crop&w=150&q=80"
 };
 
-// Area-wise Delivery Fees list
 const DELIVERY_AREAS = [
   { name: "Mohandra Town", fee: 0, minFree: 99 },
   { name: "Mohandra Ward 1-5 (Within 2 Km)", fee: 20, minFree: 199 },
@@ -29,19 +28,25 @@ const DELIVERY_AREAS = [
   { name: "Out of Town (5 to 8 Km)", fee: 60, minFree: 999 }
 ];
 
-// Hinglish Search Dictionary
 const HINGLISH_DICT: { [key: string]: string } = {
   "piza": "pizza", "pizaa": "pizza", "panir": "paneer", "tali": "thali", "thaly": "thali",
   "fastfud": "fast food", "rice": "rice", "bread": "bread", "veg": "veg", "chiz": "cheese"
 };
 
-// Pizza Portioned Add-on pricing structure
 const PIZZA_ADDONS: { [size: string]: { [addon: string]: number } } = {
   "small": { "Veg Add-on": 10, "Paneer": 20, "Black Olives": 20, "Jalapeno": 20, "Extra Cheese": 20, "Mushroom": 20 },
   "medium": { "Veg Add-on": 10, "Paneer": 30, "Black Olives": 30, "Jalapeno": 30, "Extra Cheese": 30, "Mushroom": 30 },
   "large": { "Veg Add-on": 20, "Paneer": 40, "Black Olives": 40, "Jalapeno": 40, "Extra Cheese": 40, "Mushroom": 40 },
   "extra large": { "Veg Add-on": 30, "Paneer": 50, "Black Olives": 50, "Jalapeno": 50, "Extra Cheese": 60, "Mushroom": 50 }
 };
+
+// Permanent Good Reviews to show on home page
+const PERMANENT_REVIEWS = [
+  { id: "rev1", name: "Gaurav Soni", rating: 5, comment: "Bum Bum Cafe ki paneer pizza sach me pure Mohandra me best hai! Extra cheese is real love. ⭐⭐⭐⭐⭐" },
+  { id: "rev2", name: "Anjali Patel", rating: 5, comment: "Fast food packing bahut achi thi, delivery boy behavior was also very polite. Recommended! ⭐⭐⭐⭐⭐" },
+  { id: "rev3", name: "Shubham Dwivedi", rating: 5, comment: "Special Thali ka swaad ekdum ghar jaisa hai. Safaai aur shuddhata lajwaab hai. ⭐⭐⭐⭐⭐" },
+  { id: "rev4", name: "Neha Chaurasia", rating: 5, comment: "Best cafe in this area. Pizza toppings are fresh and crust is super soft! ⭐⭐⭐⭐⭐" }
+];
 
 export default function BbCafeHome() {
   const store = useCartStore() as any;
@@ -58,8 +63,6 @@ export default function BbCafeHome() {
   const [isSocialsOpen, setIsSocialsOpen] = useState(false); 
   const [storeOpen, setStoreOpen] = useState(true);
   const [mounted, setMounted] = useState(false);
-  
-  // Smart Offline Mode States
   const [isOnline, setIsOnline] = useState(true);
 
   const [customerDetails, setCustomerDetails] = useState<{ name: string, phone: string, refCode?: string } | null>(null);
@@ -104,7 +107,7 @@ export default function BbCafeHome() {
   const [oreganoAddon, setOreganoAddon] = useState(false);
   const [chiliFlakesAddon, setChiliFlakesAddon] = useState(false);
 
-  // Green Toggle (No Cutlery)
+  // Green Toggle
   const [noCutlery, setNoCutlery] = useState(false);
 
   // Area Wise Delivery State
@@ -130,6 +133,13 @@ export default function BbCafeHome() {
   // App Sharing Tracker State
   const [shareCount, setShareCount] = useState<number>(0);
 
+  // Geofencing limit parameters
+  const [isTooFar, setIsTooFar] = useState(false);
+  const [distanceKm, setDistanceKm] = useState<number | null>(null);
+
+  // Bundelkhandi Welcome dialog visible
+  const [showBundelkhandiWelcome, setShowBundelkhandiWelcome] = useState(false);
+
   const formatBillNumber = (num: number) => String(num).padStart(4, '0');
 
   // Dynamic Seasonal Theme
@@ -149,8 +159,24 @@ export default function BbCafeHome() {
     return { bg: "from-[#ff5e00] to-[#b33600]", accent: "text-yellow-300", name: "BUM BUM CAFE - Mohandra" };
   }, []);
 
+  // Haversine formula to find direct distance in KM
+  const calculateDistanceInKm = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+    const R = 6371; // Earth's radius
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = 
+      Math.sin(dLat/2) * Math.sin(dLat/2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+      Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+  };
+
   useEffect(() => {
     setMounted(true);
+
+    // Trigger Bundelkhandi popup on load
+    setShowBundelkhandiWelcome(true);
 
     const updateOnlineStatus = () => {
       setIsOnline(navigator.onLine);
@@ -164,7 +190,6 @@ export default function BbCafeHome() {
     window.addEventListener('offline', updateOnlineStatus);
     setIsOnline(navigator.onLine);
 
-    // Custom before install prompt handler without trailing comment blocks
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault();
       setDeferredPrompt(e);
@@ -198,7 +223,6 @@ export default function BbCafeHome() {
     const savedDetails = localStorage.getItem('bb_cafe_customer');
     if (savedDetails) { try { setCustomerDetails(JSON.parse(savedDetails)); } catch (err) {} }
 
-    // Smart Cart Restore on window ready
     const savedCart = localStorage.getItem('bb_cafe_draft_cart');
     if (savedCart && cart.length === 0) {
       try {
@@ -425,11 +449,20 @@ export default function BbCafeHome() {
         setAddress(`My GPS Location: https://www.google.com/maps?q=${latitude},${longitude}`);
         toast.success("जीपीएस से लोकेशन सफलतापूर्वक जोड़ी गई!");
         
+        // Mohandra Center Coordinates (Approx)
         const mohandraLat = 24.2863;
         const mohandraLng = 80.1245;
-        const distDiff = Math.sqrt(Math.pow(latitude - mohandraLat, 2) + Math.pow(longitude - mohandraLng, 2));
-        if (distDiff > 0.08) {
-          toast.error("ध्यान दें: आप मोहांद्रा से काफी दूर हैं। डिलीवरी में थोड़ा समय लग सकता है।", { duration: 6000 });
+        
+        const calculatedDistance = calculateDistanceInKm(latitude, longitude, mohandraLat, mohandraLng);
+        setDistanceKm(Number(calculatedDistance.toFixed(2)));
+
+        // strict 20KM Cap: Customer beyond 20km from cafe cannot place order [1.1.2]
+        if (calculatedDistance > 20) {
+          setIsTooFar(true);
+          toast.error("ध्यान दें: आप बूम बूम कैफे से 20 किमी से अधिक दूर हैं। आप केवल हमारा मेनू देख सकते हैं, आर्डर नहीं कर सकते।", { duration: 8000 });
+        } else {
+          setIsTooFar(false);
+          toast.success(`दूरी: ${calculatedDistance.toFixed(2)} KM। आप हमारे आर्डर रेंज में हैं!`);
         }
       },
       () => {
@@ -507,6 +540,9 @@ export default function BbCafeHome() {
   };
 
   const sendWhatsAppOrder = async () => {
+    if (isTooFar) {
+      return toast.error("आपकी दूरी 20 KM से अधिक है। आप केवल मेनू देख सकते हैं, ऑर्डर प्लेस नहीं कर सकते!");
+    }
     if (!customerDetails) { setIsLoginOpen(true); return; }
     if (!address || address.trim().length < 10) return toast.error("Please enter full address!");
 
@@ -795,14 +831,15 @@ export default function BbCafeHome() {
         </div>
       )}
 
-      <header className={`relative py-6 px-4 bg-gradient-to-r ${activeTheme.bg} flex justify-between items-center border-b border-white/10 shadow-lg`}>
+      {/* COMPACT COMPACT HEADER */}
+      <header className={`relative py-5 px-4 bg-gradient-to-r ${activeTheme.bg} flex justify-between items-center border-b border-white/10 shadow-lg`}>
         <div>
-          <motion.h1 initial={{ scale: 0.9 }} animate={{ scale: 1 }} className="text-xl font-black italic tracking-tighter text-yellow-300">BUM BUM CAFE</motion.h1>
+          <motion.h1 initial={{ scale: 0.9 }} animate={{ scale: 1 }} className="text-lg font-black italic tracking-tighter text-yellow-300">BUM BUM CAFE</motion.h1>
           <p className="text-[10px] text-yellow-100 font-bold tracking-wider uppercase">{activeTheme.name}</p>
         </div>
         <div className="flex items-center gap-2">
-          <a href="tel:9714293759" className="bg-green-600 text-white p-2 rounded-full border border-white/20 flex items-center justify-center animate-pulse" title="डायरेक्ट कॉल करें">
-            <Phone size={14} />
+          <a href="tel:9714293759" className="bg-green-600 text-white p-2 rounded-full border border-white/20 flex items-center justify-center" title="डायरेक्ट कॉल करें">
+            <Phone size={13} />
           </a>
           <div className="bg-black/40 px-2 py-0.5 rounded-full border border-white/10 flex items-center gap-1 text-[8px] font-black uppercase text-green-400">
             <span className="h-1 w-1 rounded-full bg-green-500" />100% VEG
@@ -810,6 +847,7 @@ export default function BbCafeHome() {
         </div>
       </header>
 
+      {/* STICKY SEARCH BAR */}
       <div className="sticky top-0 z-40 bg-[#050505]/95 backdrop-blur-md py-3 px-4 border-b border-white/5">
         <div className="relative max-w-sm mx-auto">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
@@ -823,9 +861,10 @@ export default function BbCafeHome() {
         </div>
       </div>
 
+      {/* HIGH CONTRAST SIDE ACTION BUTTONS */}
       <button 
         onClick={() => setIsSocialsOpen(true)} 
-        className="fixed right-0 top-[28%] -translate-y-1/2 bg-[#ff5e00] text-white py-3.5 px-2 rounded-l-xl z-40 text-[8px] font-black tracking-wider uppercase flex flex-col items-center gap-1 shadow-xl border-l border-y border-white/10"
+        className="fixed right-0 top-[28%] -translate-y-1/2 bg-yellow-400 text-black border-l border-y border-yellow-500 py-3 px-1.5 rounded-l-lg z-40 text-[8px] font-black tracking-wider uppercase flex flex-col items-center gap-0.5 shadow-2xl"
         style={{ writingMode: 'vertical-lr' }}
       >
         📱 FOLLOW & EARN
@@ -833,10 +872,10 @@ export default function BbCafeHome() {
 
       <button 
         onClick={() => setIsReviewsDrawerOpen(true)} 
-        className="fixed right-0 top-[40%] -translate-y-1/2 bg-yellow-400 text-black py-3.5 px-2 rounded-l-xl z-40 text-[8px] font-black tracking-wider uppercase flex flex-col items-center gap-1 shadow-xl"
+        className="fixed right-0 top-[42%] -translate-y-1/2 bg-white text-black border-l border-y border-gray-300 py-3 px-1.5 rounded-l-lg z-40 text-[8px] font-black tracking-wider uppercase flex flex-col items-center gap-0.5 shadow-2xl"
         style={{ writingMode: 'vertical-lr' }}
       >
-        ⭐ REVIEWS
+        ⭐ WRITE REVIEW
       </button>
 
       <main className="pt-3 px-3 max-w-lg mx-auto space-y-4">
@@ -862,24 +901,25 @@ export default function BbCafeHome() {
           </div>
         )}
 
+        {/* ZOOMED CATEGORY SLIDER (NO BACKGROUNDS) */}
         <div className="space-y-1">
           <p className="text-[8px] font-black uppercase tracking-wider text-orange-500">Inspiration for your first order</p>
-          <div className="flex gap-4 overflow-x-auto scrollbar-none py-2 px-1">
+          <div className="flex gap-5 overflow-x-auto scrollbar-none py-2 px-1">
             <button onClick={() => setSelectedCategory("Favorites")} className="flex flex-col items-center flex-shrink-0 group outline-none">
-              <div className={`w-12 h-12 rounded-full overflow-hidden border transition-all flex items-center justify-center ${selectedCategory === "Favorites" ? 'border-red-500 scale-105' : 'border-white/10 bg-white/5'}`}>
-                <Heart size={20} className={selectedCategory === "Favorites" ? 'text-red-500 fill-red-500' : 'text-gray-400'} />
+              <div className={`w-14 h-14 rounded-full overflow-hidden border transition-all flex items-center justify-center ${selectedCategory === "Favorites" ? 'border-red-500 scale-105' : 'border-white/10'}`}>
+                <Heart size={24} className={selectedCategory === "Favorites" ? 'text-red-500 fill-red-500' : 'text-gray-400'} />
               </div>
-              <span className={`text-[8px] font-black uppercase mt-1.5 truncate ${selectedCategory === "Favorites" ? 'text-red-500' : 'text-gray-400'}`}>My Favorites</span>
+              <span className={`text-[9px] font-black uppercase mt-1.5 truncate ${selectedCategory === "Favorites" ? 'text-red-500' : 'text-gray-400'}`}>My Favorites</span>
             </button>
 
             {visibleCategories.map((cat) => {
               const isActive = selectedCategory === cat;
               return (
                 <button key={cat} onClick={() => setSelectedCategory(cat)} className="flex flex-col items-center flex-shrink-0 group outline-none">
-                  <div className={`w-12 h-12 rounded-full overflow-hidden border transition-all ${isActive ? 'border-orange-500 scale-105 shadow-md' : 'border-white/10'}`}>
+                  <div className={`w-14 h-14 rounded-full overflow-hidden border transition-all ${isActive ? 'border-orange-500 scale-105 shadow-md' : 'border-white/10'}`}>
                     <img src={getCategoryImage(cat)} className="w-full h-full object-cover" alt={cat} />
                   </div>
-                  <span className={`text-[8px] font-black uppercase mt-1.5 truncate max-w-[65px] text-center ${isActive ? 'text-orange-500' : 'text-gray-400'}`}>
+                  <span className={`text-[9px] font-black uppercase mt-1.5 truncate max-w-[70px] text-center ${isActive ? 'text-orange-500' : 'text-gray-400'}`}>
                     {cat === "All" ? "All" : cat.replace("Special ", "").replace(" Special", "")}
                   </span>
                 </button>
@@ -888,6 +928,18 @@ export default function BbCafeHome() {
           </div>
         </div>
 
+        {/* RANGE ZONE WARNING FOR CLIENTS > 20KM */}
+        {distanceKm !== null && isTooFar && (
+          <div className="bg-red-500/10 border border-red-500/20 p-3.5 rounded-2xl flex items-center gap-3">
+            <span className="text-xl">⚠️</span>
+            <div className="space-y-0.5">
+              <p className="text-[10px] font-black text-red-400 uppercase">आर्डर सीमा से बाहर ({distanceKm} KM)</p>
+              <p className="text-[9px] text-gray-400">आप कैफे से 20 किमी से अधिक दूर हैं। आप केवल हमारा शानदार मेनू देख सकते हैं, आर्डर नहीं कर सकते।</p>
+            </div>
+          </div>
+        )}
+
+        {/* PRODUCTS LISTING */}
         <div className="grid grid-cols-1 gap-4 pt-1">
           {filteredMenu.length === 0 ? (
             <p className="text-center text-gray-500 py-8 text-xs font-bold uppercase">No items found...</p>
@@ -922,7 +974,7 @@ export default function BbCafeHome() {
                       <p className="text-orange-500 font-black text-base leading-none">{getDisplayPrice(item)}</p>
                       {item.variants && <span className="text-[8px] font-bold text-gray-400 mt-1 block">Options available</span>}
                     </div>
-                    {storeOpen && (
+                    {storeOpen && !isTooFar && (
                       <button onClick={() => item.variants ? setSelectedProduct(item) : addItem(item)} className="px-4 py-2 bg-orange-500/10 text-orange-400 border border-orange-500/30 hover:bg-orange-500 hover:text-white rounded-lg font-black text-[10px] active:scale-95 transition-all uppercase flex items-center gap-1 shadow">
                         <Plus size={12} /> ADD
                       </button>
@@ -933,21 +985,81 @@ export default function BbCafeHome() {
             ))
           )}
         </div>
+
+        {/* PERMANENT REVIEWS SECTION - ALWAYS VISIBLE TO VISITORS */}
+        <div className="pt-6 space-y-4">
+          <div className="flex justify-between items-center">
+            <h3 className="text-sm font-black uppercase tracking-wider text-yellow-400 flex items-center gap-1">⭐ हमारे ग्राहकों के प्यारे शब्द</h3>
+            <span className="text-[9px] font-bold text-gray-400">Total Reviews ({reviews.length || 4})</span>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+            {PERMANENT_REVIEWS.map((r) => (
+              <div key={r.id} className="bg-white/[0.02] border border-white/5 p-4 rounded-2xl space-y-2">
+                <div className="flex justify-between items-center">
+                  <h4 className="font-black text-xs text-orange-500">{r.name}</h4>
+                  <div className="flex items-center gap-0.5 text-yellow-400">
+                    {Array.from({ length: r.rating }).map((_, idx) => (
+                      <Star key={idx} size={8} fill="currentColor" />
+                    ))}
+                  </div>
+                </div>
+                <p className="text-[10px] text-gray-300 italic leading-relaxed">"{r.comment}"</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* BEAUTIFUL ABOUT SECTION & CONTACT INFO IN FOOTER */}
+        <footer className="pt-8 border-t border-white/5 space-y-6">
+          <div className="bg-gradient-to-br from-green-950/20 to-emerald-900/10 p-6 rounded-[2rem] border border-green-500/10 relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-green-500/5 rounded-full blur-2xl" />
+            
+            <div className="text-center space-y-3 relative z-10">
+              <span className="text-[9px] font-black uppercase tracking-widest text-green-400 bg-green-500/10 px-3 py-1 rounded-full border border-green-500/20">About Us</span>
+              <h4 className="text-xl font-black italic text-yellow-300 tracking-tight font-serif">BUM BUM CAFE</h4>
+              <p className="text-[11px] font-bold text-green-300">जहाँ स्वाद और सुकून मिलते हैं! ✨</p>
+              
+              <p className="text-[11px] text-gray-300 leading-relaxed max-w-sm mx-auto font-medium">
+                हमने BUM BUM CAFE की शुरुआत एक छोटे से सपने के साथ की थी—लोगों को घर जैसा स्वाद और कैफे वाला माहौल देने के लिए। यहाँ हर कप कॉफी और हर स्लाइस पिज्जा प्यार और शुद्धता के साथ बनाया जाता है। हमारी कोशिश है कि आप जब भी यहाँ आएँ, एक प्यारी मुस्कान के साथ वापस जाएँ। ❤️
+              </p>
+            </div>
+          </div>
+
+          {/* Timing & Map Coordinates list */}
+          <div className="grid grid-cols-2 gap-3 text-center text-[10px] font-black uppercase">
+            <div className="bg-white/[0.02] border border-white/5 p-4 rounded-2xl flex flex-col items-center justify-center space-y-1">
+              <Clock className="text-orange-500" size={16} />
+              <p className="text-gray-400 text-[8px]">Open Timing</p>
+              <p className="text-white text-[9px]">सुबह 10:00 से रात 11:00 बजे</p>
+            </div>
+            
+            <a href="https://maps.app.goo.gl/8pj1Xby3bbMn5qxu5" target="_blank" rel="noreferrer" className="bg-white/[0.02] border border-white/5 p-4 rounded-2xl flex flex-col items-center justify-center space-y-1 hover:border-orange-500/30 transition-all">
+              <MapPin className="text-green-500 animate-bounce" size={16} />
+              <p className="text-gray-400 text-[8px]">Our Location</p>
+              <p className="text-yellow-400 text-[9px] underline">Google Map 🗺️</p>
+            </a>
+          </div>
+
+          <div className="text-center text-[9px] text-gray-600 font-bold tracking-widest pt-2">
+            © 2026 BUM BUM CAFE - MOHANDRA. ALL RIGHTS RESERVED.
+          </div>
+        </footer>
       </main>
 
+      {/* REVIEWS DRAWER MODAL */}
       <AnimatePresence>
         {isReviewsDrawerOpen && (
           <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[120] overflow-y-auto">
             <div className="p-6 max-w-lg mx-auto pb-32">
               <div className="flex justify-between items-center mb-8">
                 <div>
-                  <h2 className="text-2xl font-black text-white">Guest Reviews</h2>
+                  <h2 className="text-2xl font-black text-white">All Reviews</h2>
                   <p className="text-xs text-gray-500 font-bold">Rating: 4.8/5.0 ★</p>
                 </div>
                 <button onClick={() => setIsReviewsDrawerOpen(false)} className="p-2.5 bg-white/5 rounded-full text-white"><X size={20} /></button>
               </div>
               <div className="space-y-4">
-                {reviews.map((r: any) => (
+                {(reviews.length === 0 ? PERMANENT_REVIEWS : reviews).map((r: any) => (
                   <div key={r.id} className="bg-white/[0.03] border border-white/5 rounded-2xl p-5 space-y-2 shadow">
                     <div className="flex justify-between items-center">
                       <h4 className="font-black text-xs text-orange-500">{r.name}</h4>
@@ -1252,7 +1364,13 @@ export default function BbCafeHome() {
                   <div className="flex justify-between font-black text-xl"><span>To Pay</span> <span>₹{getTotalBillPrice()}</span></div>
                 </div>
 
-                <button onClick={sendWhatsAppOrder} type="button" className="w-full bg-green-600 hover:bg-green-700 p-4 rounded-2xl font-black text-sm text-white flex items-center justify-center gap-2 shadow-lg">ORDER ON WHATSAPP</button>
+                {isTooFar ? (
+                  <div className="bg-red-600/20 text-red-400 p-4 rounded-2xl text-center text-xs font-bold border border-red-500/20">
+                    आप 20 KM से अधिक दूर हैं। आर्डर स्वीकार नहीं किया जा सकता। ❌
+                  </div>
+                ) : (
+                  <button onClick={sendWhatsAppOrder} type="button" className="w-full bg-green-600 hover:bg-green-700 p-4 rounded-2xl font-black text-sm text-white flex items-center justify-center gap-2 shadow-lg">ORDER ON WHATSAPP</button>
+                )}
               </div>
             </motion.div>
           </div>
@@ -1345,18 +1463,30 @@ export default function BbCafeHome() {
                 <h3 className="text-xl font-black text-orange-500 uppercase italic">Connect & Earn Points</h3>
                 <p className="text-[8px] text-gray-500 font-bold uppercase tracking-wider">हर प्लेटफार्म पर फॉलो/सब्सक्राइब करने का +1 पॉइंट पाएं!</p>
               </div>
-              <div className="space-y-2 text-left max-h-[18rem] overflow-y-auto no-scrollbar pr-1">
+              <div className="space-y-2 text-left max-h-[22rem] overflow-y-auto no-scrollbar pr-1">
+                <button onClick={() => handleSocialClick('whatsapp_msg', 'https://wa.me/919714293759')} className="w-full flex items-center justify-between bg-green-500/10 border border-green-500/20 p-3 rounded-xl">
+                  <span className="text-[10px] font-black text-white">🟢 WhatsApp Message</span>
+                  <span className="text-[8px] font-black uppercase px-2.5 py-1 rounded bg-yellow-400 text-black">{getClaimStatus('whatsapp_msg')}</span>
+                </button>
                 <button onClick={() => handleSocialClick('whatsapp_channel', 'https://whatsapp.com/channel/0029VaLhggoGE56natoQI43y')} className="w-full flex items-center justify-between bg-emerald-500/10 border border-emerald-500/20 p-3 rounded-xl">
                   <span className="text-[10px] font-black text-white">📢 WhatsApp Channel</span>
-                  <span className="text-[8px] font-black uppercase px-2 py-1 rounded bg-yellow-400 text-black">{getClaimStatus('whatsapp_channel')}</span>
+                  <span className="text-[8px] font-black uppercase px-2.5 py-1 rounded bg-yellow-400 text-black">{getClaimStatus('whatsapp_channel')}</span>
                 </button>
                 <button onClick={() => handleSocialClick('youtube', 'https://www.youtube.com/@bbcafe.i')} className="w-full flex items-center justify-between bg-red-600/10 border border-red-600/20 p-3 rounded-xl">
                   <span className="text-[10px] font-black text-white">🔴 YouTube Channel</span>
-                  <span className="text-[8px] font-black uppercase px-2 py-1 rounded bg-yellow-400 text-black">{getClaimStatus('youtube')}</span>
+                  <span className="text-[8px] font-black uppercase px-2.5 py-1 rounded bg-yellow-400 text-black">{getClaimStatus('youtube')}</span>
                 </button>
                 <button onClick={() => handleSocialClick('instagram', 'https://www.instagram.com/bbcafe.in/')} className="w-full flex items-center justify-between bg-pink-500/10 border border-pink-500/20 p-3 rounded-xl">
                   <span className="text-[10px] font-black text-white">📸 Instagram</span>
-                  <span className="text-[8px] font-black uppercase px-2 py-1 rounded bg-yellow-400 text-black">{getClaimStatus('instagram')}</span>
+                  <span className="text-[8px] font-black uppercase px-2.5 py-1 rounded bg-yellow-400 text-black">{getClaimStatus('instagram')}</span>
+                </button>
+                <button onClick={() => handleSocialClick('facebook', 'https://www.facebook.com/bbcafe.in/')} className="w-full flex items-center justify-between bg-blue-600/10 border border-blue-600/20 p-3 rounded-xl">
+                  <span className="text-[10px] font-black text-white">🔵 Facebook</span>
+                  <span className="text-[8px] font-black uppercase px-2.5 py-1 rounded bg-yellow-400 text-black">{getClaimStatus('facebook')}</span>
+                </button>
+                <button onClick={() => handleSocialClick('snapchat', 'https://www.snapchat.com/add/bbcafe.in')} className="w-full flex items-center justify-between bg-yellow-400/10 border border-yellow-400/20 p-3 rounded-xl">
+                  <span className="text-[10px] font-black text-white">🟡 Snapchat</span>
+                  <span className="text-[8px] font-black uppercase px-2.5 py-1 rounded bg-yellow-400 text-black">{getClaimStatus('snapchat')}</span>
                 </button>
               </div>
               <button type="button" onClick={() => setIsSocialsOpen(false)} className="w-full bg-orange-500 text-black font-black p-3 rounded-xl text-xs uppercase">CLOSE</button>
@@ -1427,6 +1557,40 @@ export default function BbCafeHome() {
                 CLOSE RECEIPT
               </button>
             </div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* BUNDELKHANDI WELCOME DIALOG */}
+      <AnimatePresence>
+        {showBundelkhandiWelcome && (
+          <div className="fixed inset-0 bg-black/85 backdrop-blur-sm z-[300] flex items-center justify-center p-6">
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }} 
+              animate={{ scale: 1, opacity: 1 }} 
+              exit={{ scale: 0.9, opacity: 0 }} 
+              className="bg-[#111] border border-orange-500/30 w-full max-w-sm p-6 rounded-[2.5rem] text-center space-y-4 relative"
+            >
+              <div className="w-12 h-12 bg-orange-500/10 border border-orange-500/20 text-orange-400 rounded-full flex items-center justify-center mx-auto text-xl">🙏</div>
+              
+              <div className="space-y-1.5">
+                <h3 className="text-lg font-black text-yellow-300 uppercase tracking-tight">राम-राम सा! 👋</h3>
+                <p className="text-xs font-semibold text-gray-400">बुंदेलखंडी स्वागत</p>
+              </div>
+
+              <p className="text-sm font-bold text-gray-100 leading-relaxed px-2 font-serif italic">
+                "राम-राम भइया{customerDetails?.name ? ` ${customerDetails.name}` : ''}! बूम बूम कैफे में तोहाड़ो भौत-भौत स्वागत है! का खइहो आज?"
+              </p>
+
+              <div className="pt-2">
+                <button 
+                  onClick={() => setShowBundelkhandiWelcome(false)} 
+                  className="w-full bg-orange-500 text-black py-3 rounded-2xl font-black text-xs uppercase tracking-wider"
+                >
+                  चलो शुरू करें 🚀
+                </button>
+              </div>
+            </motion.div>
           </div>
         )}
       </AnimatePresence>
