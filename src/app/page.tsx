@@ -22,10 +22,10 @@ const CATEGORY_IMAGES: { [key: string]: string } = {
 };
 
 const DELIVERY_AREAS = [
-  { name: "Mohandra Town", fee: 20, minFree: 99 },
-  { name: "Mohandra Ward 1-5 (Within 2 Km)", fee: 20, minFree: 199 },
-  { name: "Nearby Area (Within 5 Km)", fee: 40, minFree: 499 },
-  { name: "Out of Town (5 to 8 Km)", fee: 60, minFree: 999 }
+  { name: "Mohandra Town", fee: 20, minFree: 99, range: "0-1 KM" },
+  { name: "Mohandra Ward 1-5 (Within 2 Km)", fee: 20, minFree: 199, range: "1-2 KM" },
+  { name: "Nearby Area (Within 5 Km)", fee: 40, minFree: 499, range: "2-5 KM" },
+  { name: "Out of Town (5 to 8 Km)", fee: 60, minFree: 999, range: "5-8 KM" }
 ];
 
 const HINGLISH_DICT: { [key: string]: string } = {
@@ -62,7 +62,8 @@ export default function BbCafeHome() {
   const removeItem = store?.removeItem || (() => {});
   const clearCart = store?.clearCart || (() => {});
 
-  // Auditory Helper
+  // --- 1. COMPONENT HELPERS & PURE CALCULATION FUNCTIONS (DECLARED FIRST IN SCOPE TO AVOID COMPILER TDZ ERRORS) [1.1] ---
+
   const playSoundEffect = (type: 'add' | 'success') => {
     try {
       const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -86,7 +87,77 @@ export default function BbCafeHome() {
       }
     } catch (e) {}
   };
-  
+
+  const getCartSubtotal = () => cart.reduce((acc: number, i: any) => acc + (i.price * i.quantity), 0);
+
+  const getCartAddonsPrice = () => {
+    let total = 0;
+    if (ketchupAddon) total += 10;
+    if (oreganoAddon) total += 10;
+    if (chiliFlakesAddon) total += 10;
+    return total;
+  };
+
+  const getDeliveryCharge = () => {
+    const baseSub = getCartSubtotal();
+    if (baseSub === 0) return 0;
+    return baseSub >= selectedArea.minFree ? 0 : selectedArea.fee;
+  };
+
+  const getTotalBillPrice = () => {
+    const subtotal = getCartSubtotal();
+    const addPrice = getCartAddonsPrice();
+    const delivery = getDeliveryCharge();
+    const couponDiscount = appliedCoupon ? Number(appliedCoupon.discountValue) : 0;
+    return Math.max(0, subtotal + addPrice - couponDiscount) + delivery;
+  };
+
+  const getFreeDeliveryProgressPercent = () => {
+    const subtotal = getCartSubtotal();
+    const limit = selectedArea.minFree;
+    if (subtotal >= limit) return 100;
+    return (subtotal / limit) * 100;
+  };
+
+  const getCustomerTier = (points: number) => {
+    if (points >= 50) return { name: "Platinum Member 👑", color: "text-cyan-400 border-cyan-400/30 bg-cyan-400/10" };
+    if (points >= 20) return { name: "Gold Member 🌟", color: "text-yellow-400 border-yellow-400/30 bg-yellow-400/10" };
+    return { name: "Bronze Member 🥉", color: "text-orange-400 border-orange-400/30 bg-orange-400/10" };
+  };
+
+  const getDisplayPrice = (item: any) => {
+    if (item?.variants && typeof item.variants === 'object') {
+      const prices = Object.values(item.variants).map(Number).filter(n => !isNaN(n));
+      if (prices.length > 0) {
+        const minPrice = Math.min(...prices);
+        const maxPrice = Math.max(...prices);
+        return minPrice === maxPrice ? `₹${minPrice}` : `₹${minPrice} - ₹${maxPrice}`;
+      }
+    }
+    return `₹${item?.price || 0}`;
+  };
+
+  const isVideoUrl = (url: string) => {
+    if (!url) return false;
+    const cleanUrl = url.toLowerCase().split('?')[0];
+    return cleanUrl.endsWith('.mp4') || cleanUrl.endsWith('.webm') || cleanUrl.includes('/video');
+  };
+
+  const calculateDistanceInKm = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+    const R = 6371; 
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = 
+      Math.sin(dLat/2) * Math.sin(dLat/2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+      Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+  };
+
+  const formatBillNumber = (num: number) => String(num).padStart(4, '0');
+
+  // --- 2. STATES ---
   const [menu, setMenu] = useState<any[]>([]);
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
@@ -110,7 +181,7 @@ export default function BbCafeHome() {
   const [isGiftModalOpen, setIsGiftModalOpen] = useState(false);
   const [giftPhone, setGiftPhone] = useState("");
   
-  // Corrected generic state parameters [1.1.2]
+  // 3. Fixed generic state typings parameter [1.1.2]
   const [giftPointsAmount, setGiftPointsAmount] = useState<number | "">("");
   const [isGiftingLoading, setIsGiftingLoading] = useState(false);
 
@@ -167,7 +238,7 @@ export default function BbCafeHome() {
   const [isTooFar, setIsTooFar] = useState(false);
   const [distanceKm, setDistanceKm] = useState<number | null>(null);
 
-  const formatBillNumber = (num: number) => String(num).padStart(4, '0');
+  // --- 3. MEMOS ---
 
   // Dynamic Seasonal Theme
   const activeTheme = useMemo(() => {
@@ -196,25 +267,6 @@ export default function BbCafeHome() {
     }
     return true;
   }, [storeOpen]);
-
-  // Video extension check function for animated looping videos in banners [1.1.2]
-  const isVideoUrl = (url: string) => {
-    if (!url) return false;
-    const cleanUrl = url.toLowerCase().split('?')[0];
-    return cleanUrl.endsWith('.mp4') || cleanUrl.endsWith('.webm') || cleanUrl.includes('/video');
-  };
-
-  const calculateDistanceInKm = (lat1: number, lon1: number, lat2: number, lon2: number) => {
-    const R = 6371; 
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = 
-      Math.sin(dLat/2) * Math.sin(dLat/2) +
-      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
-      Math.sin(dLon/2) * Math.sin(dLon/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    return R * c;
-  };
 
   const deduplicatedMenu = useMemo(() => {
     const seen = new Set();
@@ -274,13 +326,7 @@ export default function BbCafeHome() {
     return Array.from(new Set(result));
   }, [dbCategories]);
 
-  const getCategoryImage = (catName: string) => {
-    const found = dbCategories.find(c => c.name === catName);
-    if (found && found.image) return found.image;
-    return CATEGORY_IMAGES[catName] || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=150&q=80";
-  };
-
-  // --- LIFE CYCLE EFFECTS ---
+  // --- 4. LIFE CYCLE EFFECTS ---
 
   useEffect(() => {
     const updateOnlineStatus = () => {
@@ -356,35 +402,7 @@ export default function BbCafeHome() {
     };
   }, []);
 
-  // Auto-slide trigger for carousel
-  useEffect(() => {
-    if (banners.length <= 1) return;
-    const interval = setInterval(() => { setBannerIndex((prev) => (prev + 1) % banners.length); }, 4000);
-    return () => clearInterval(interval);
-  }, [banners]);
-
-  // Sync draft cart to local storage (52)
-  useEffect(() => {
-    if (cart.length > 0) {
-      localStorage.setItem('bb_cafe_draft_cart', JSON.stringify(cart));
-    } else {
-      localStorage.removeItem('bb_cafe_draft_cart');
-    }
-  }, [cart]);
-
-  useEffect(() => {
-    if (!customerDetails?.phone) { setCustomerPoints(0); return; }
-    const unsubPoints = onSnapshot(doc(db, "customer_points", customerDetails.phone.replace("+91", "")), (docSnap) => {
-      setCustomerPoints(docSnap.exists() ? (docSnap.data().points || 0) : 0);
-    }, () => { setCustomerPoints(0); });
-    
-    const phoneClean = customerDetails.phone.replace("+91", "");
-    setShareCount(Number(localStorage.getItem(`bb_shares_${phoneClean}`) || 0));
-
-    return () => unsubPoints();
-  }, [customerDetails]);
-
-  // --- ACTIONS & HANDLERS ---
+  // --- 5. EVENT HANDLERS & OPERATIONS ---
 
   const handleApplyCoupon = () => {
     if (!enteredCoupon) return toast.error("Please enter a coupon code");
@@ -421,6 +439,7 @@ export default function BbCafeHome() {
         } else {
           setIsTooFar(false);
           
+          // Auto delivery area mapped to calculated GPS distance (KM) [1.1]
           if (calculatedDistance <= 1.0) {
             setSelectedArea(DELIVERY_AREAS[0]); 
             toast.success(`सटीक दूरी: ${calculatedDistance.toFixed(2)} KM। आपके लिए 'Mohandra Town' क्षेत्र चुना गया है।`);
@@ -662,54 +681,6 @@ export default function BbCafeHome() {
     setPizzaAddons({});
   };
 
-  const upsellSuggestionItems = useMemo(() => {
-    return menu.filter(item => {
-      const isShake = item?.category === "Super Cool" || item?.category === "Fast Food";
-      const notInCart = !cart.some((c: any) => c.id === item.id);
-      return isShake && notInCart;
-    }).slice(0, 2);
-  }, [menu, cart]);
-
-  const handleSocialClick = async (platform: string, url: string) => {
-    window.open(url, '_blank');
-
-    if (!customerDetails?.phone) {
-      toast.error("पॉइंट्स क्लेम करने के लिए कृपया पहले अपना Name और Phone दर्ज करें!");
-      setIsLoginOpen(true);
-      return;
-    }
-
-    const storageKey = `bb_claimed_${customerDetails.phone.replace("+91", "")}_${platform}`;
-    const alreadyClaimed = localStorage.getItem(storageKey);
-
-    if (alreadyClaimed) {
-      toast.success("आप इस प्लेटफ़ॉर्म के लिए पहले ही पॉइंट ले चुके हैं! धन्यवाद ❤️");
-      return;
-    }
-
-    try {
-      const phoneRaw = customerDetails.phone.replace("+91", "").trim();
-      const pointsRef = doc(db, "customer_points", phoneRaw);
-      
-      await setDoc(pointsRef, {
-        points: increment(1),
-        lastActive: new Date()
-      }, { merge: true });
-
-      localStorage.setItem(storageKey, "true");
-      setCustomerPoints(prev => prev + 1);
-      toast.success(`🎉 बधाई हो! ${platform.toUpperCase()} पर हमें फॉलो करने के लिए आपको +1 पॉइंट मिला है!`);
-    } catch (err) {
-      toast.error("पॉइंट्स जोड़ने में समस्या आई।");
-    }
-  };
-
-  const getClaimStatus = (platform: string) => {
-    if (!customerDetails?.phone) return "🎁 +1 Pt";
-    const storageKey = `bb_claimed_${customerDetails.phone.replace("+91", "")}_${platform}`;
-    return localStorage.getItem(storageKey) ? "✅ Claimed" : "🎁 Claim +1 Pt";
-  };
-
   const handleShareApp = async () => {
     if (!customerDetails?.phone) {
       toast.error("पॉइंट्स कमाने के लिए पहले Name और Phone दर्ज करें!");
@@ -931,7 +902,7 @@ export default function BbCafeHome() {
           </div>
         )}
 
-        {/* PRODUCTS LISTING WITH INLINE SCROLLING AD OFFERS CAROUSEL [1.1.2] */}
+        {/* PRODUCTS LISTING WITH INLINE SCROLLING AD OFFERS CAROUSEL */}
         <div className="grid grid-cols-1 gap-4 pt-1">
           {filteredMenu.length === 0 ? (
             <p className="text-center text-gray-500 py-8 text-xs font-bold uppercase">No items found...</p>
@@ -1291,20 +1262,32 @@ export default function BbCafeHome() {
                   </div>
                 )}
 
+                {/* 1. Fully Redesigned touch-friendly, gorgeous delivery KM cards inside the Cart Sheet [1.1.2] */}
                 <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-4 space-y-2">
-                  <label className="text-[9px] font-black uppercase text-gray-400">Select Delivery Area:</label>
-                  <select 
-                    className="w-full bg-black border border-white/10 p-2.5 rounded-xl text-xs text-white"
-                    value={selectedArea.name}
-                    onChange={(e) => {
-                      const found = DELIVERY_AREAS.find(d => d.name === e.target.value);
-                      if (found) setSelectedArea(found);
-                    }}
-                  >
-                    {DELIVERY_AREAS.map(area => (
-                      <option key={area.name} value={area.name}>{area.name} (Min: ₹{area.minFree} for free delivery)</option>
-                    ))}
-                  </select>
+                  <label className="text-[9px] font-black uppercase text-gray-400">Select Delivery Zone (KM):</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {DELIVERY_AREAS.map((area) => {
+                      const isSelected = selectedArea.name === area.name;
+                      return (
+                        <button
+                          type="button"
+                          key={area.name}
+                          onClick={() => setSelectedArea(area)}
+                          className={`p-3 rounded-xl border text-left flex flex-col justify-between transition-all duration-200 active:scale-95 ${
+                            isSelected 
+                              ? 'border-orange-500 bg-orange-500/10 text-orange-400 shadow-md' 
+                              : 'border-white/5 bg-white/[0.01] text-gray-300 hover:border-white/10'
+                          }`}
+                        >
+                          <span className="text-[9px] font-black leading-tight uppercase truncate">{area.name.replace("Mohandra ", "")}</span>
+                          <div className="flex justify-between items-center w-full mt-2">
+                            <span className="text-[8px] font-black text-gray-400">शुल्क: ₹{area.fee}</span>
+                            <span className="text-[8px] font-black bg-white/5 px-1.5 py-0.5 rounded text-yellow-400">Min: ₹{area.minFree}</span>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
 
                 <div className="bg-green-950/10 border border-green-500/10 rounded-2xl p-4 flex justify-between items-center">
@@ -1424,6 +1407,7 @@ export default function BbCafeHome() {
         )}
       </AnimatePresence>
 
+      {/* FOOTER ACTION FLYING CART BANNER */}
       {cart.length > 0 && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-full max-w-sm px-4">
           <button
@@ -1515,7 +1499,7 @@ export default function BbCafeHome() {
                   <span className="text-[10px] font-black text-white">🟢 WhatsApp Message</span>
                   <span className="text-[8px] font-black uppercase px-2.5 py-1 rounded bg-yellow-400 text-black">{getClaimStatus('whatsapp_msg')}</span>
                 </button>
-                <button onClick={() => handleSocialClick('whatsapp_channel', 'https://whatsapp.com/channel/0029VaLhggoGE56natoQI43y')} className="w-full flex items-center justify-between bg-[#10b981]/10 border border-[#10b981]/20 p-3 rounded-xl">
+                <button onClick={() => handleSocialClick('whatsapp_channel', 'https://whatsapp.com/channel/0029VaLhggoGE56natoQI43y')} className="w-full flex items-center justify-between bg-emerald-500/10 border border-emerald-500/20 p-3 rounded-xl">
                   <span className="text-[10px] font-black text-white">📢 WhatsApp Channel</span>
                   <span className="text-[8px] font-black uppercase px-2.5 py-1 rounded bg-yellow-400 text-black">{getClaimStatus('whatsapp_channel')}</span>
                 </button>
