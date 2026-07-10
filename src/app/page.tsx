@@ -62,7 +62,31 @@ export default function BbCafeHome() {
   const removeItem = store?.removeItem || (() => {});
   const clearCart = store?.clearCart || (() => {});
 
-  // All State hooks declared first inside React Component scope
+  // Auditory Helper
+  const playSoundEffect = (type: 'add' | 'success') => {
+    try {
+      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      
+      if (type === 'add') {
+        osc.frequency.setValueAtTime(880, audioCtx.currentTime); 
+        gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.1);
+      } else if (type === 'success') {
+        osc.frequency.setValueAtTime(523.25, audioCtx.currentTime); 
+        gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+        osc.start();
+        osc.frequency.setValueAtTime(659.25, audioCtx.currentTime + 0.1);
+        osc.frequency.setValueAtTime(783.99, audioCtx.currentTime + 0.2);
+        osc.stop(audioCtx.currentTime + 0.4);
+      }
+    } catch (e) {}
+  };
+  
   const [menu, setMenu] = useState<any[]>([]);
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
@@ -85,7 +109,9 @@ export default function BbCafeHome() {
 
   const [isGiftModalOpen, setIsGiftModalOpen] = useState(false);
   const [giftPhone, setGiftPhone] = useState("");
-  const [giftPointsAmount, setGiftPointsAmount] = useState<number | " text-white">("");
+  
+  // Corrected generic state parameters [1.1.2]
+  const [giftPointsAmount, setGiftPointsAmount] = useState<number | "">("");
   const [isGiftingLoading, setIsGiftingLoading] = useState(false);
 
   const [dbCategories, setDbCategories] = useState<any[]>([]);
@@ -141,82 +167,7 @@ export default function BbCafeHome() {
   const [isTooFar, setIsTooFar] = useState(false);
   const [distanceKm, setDistanceKm] = useState<number | null>(null);
 
-  // --- COMPONENT HELPERS DECLARED AT THE VERY TOP TO PREVENT TDZ SCOPING ERRORS [1.1] ---
-
-  const playSoundEffect = (type: 'add' | 'success') => {
-    try {
-      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
-      const osc = audioCtx.createOscillator();
-      const gain = audioCtx.createGain();
-      osc.connect(gain);
-      gain.connect(audioCtx.destination);
-      
-      if (type === 'add') {
-        osc.frequency.setValueAtTime(880, audioCtx.currentTime); 
-        gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
-        osc.start();
-        osc.stop(audioCtx.currentTime + 0.1);
-      } else if (type === 'success') {
-        osc.frequency.setValueAtTime(523.25, audioCtx.currentTime); 
-        gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
-        osc.start();
-        osc.frequency.setValueAtTime(659.25, audioCtx.currentTime + 0.1);
-        osc.frequency.setValueAtTime(783.99, audioCtx.currentTime + 0.2);
-        osc.stop(audioCtx.currentTime + 0.4);
-      }
-    } catch (e) {}
-  };
-
-  const getCartSubtotal = () => cart.reduce((acc: number, i: any) => acc + (i.price * i.quantity), 0);
-
-  const getCartAddonsPrice = () => {
-    let total = 0;
-    if (ketchupAddon) total += 10;
-    if (oreganoAddon) total += 10;
-    if (chiliFlakesAddon) total += 10;
-    return total;
-  };
-
-  const getDeliveryCharge = () => {
-    const baseSub = getCartSubtotal();
-    if (baseSub === 0) return 0;
-    return baseSub >= selectedArea.minFree ? 0 : selectedArea.fee;
-  };
-
-  const getTotalBillPrice = () => {
-    const subtotal = getCartSubtotal();
-    const addPrice = getCartAddonsPrice();
-    const delivery = getDeliveryCharge();
-    const couponDiscount = appliedCoupon ? Number(appliedCoupon.discountValue) : 0;
-    return Math.max(0, subtotal + addPrice - couponDiscount) + delivery;
-  };
-
-  const getFreeDeliveryProgressPercent = () => {
-    const subtotal = getCartSubtotal();
-    const limit = selectedArea.minFree;
-    if (subtotal >= limit) return 100;
-    return (subtotal / limit) * 100;
-  };
-
-  const getCustomerTier = (points: number) => {
-    if (points >= 50) return { name: "Platinum Member 👑", color: "text-cyan-400 border-cyan-400/30 bg-cyan-400/10" };
-    if (points >= 20) return { name: "Gold Member 🌟", color: "text-yellow-400 border-yellow-400/30 bg-yellow-400/10" };
-    return { name: "Bronze Member 🥉", color: "text-orange-400 border-orange-400/30 bg-orange-400/10" };
-  };
-
-  const getDisplayPrice = (item: any) => {
-    if (item?.variants && typeof item.variants === 'object') {
-      const prices = Object.values(item.variants).map(Number).filter(n => !isNaN(n));
-      if (prices.length > 0) {
-        const minPrice = Math.min(...prices);
-        const maxPrice = Math.max(...prices);
-        return minPrice === maxPrice ? `₹${minPrice}` : `₹${minPrice} - ₹${maxPrice}`;
-      }
-    }
-    return `₹${item?.price || 0}`;
-  };
-
-  // --- MEMOS & SCHEDULERS ---
+  const formatBillNumber = (num: number) => String(num).padStart(4, '0');
 
   // Dynamic Seasonal Theme
   const activeTheme = useMemo(() => {
@@ -446,6 +397,52 @@ export default function BbCafeHome() {
     }
   };
 
+  const handleDetectLocation = () => {
+    if (!navigator.geolocation) {
+      return toast.error("आपके ब्राउज़र में जीपीएस लोकेशन उपलब्ध नहीं है।");
+    }
+    toast.loading("सटीक लोकेशन ट्रैक कर रहे हैं...");
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        toast.dismiss();
+        const { latitude, longitude } = position.coords;
+        setAddress(`My GPS Location: https://www.google.com/maps?q=${latitude},${longitude}`);
+        toast.success("जीपीएस से लोकेशन सफलतापूर्वक जोड़ी गई!");
+        
+        const mohandraLat = 24.2863;
+        const mohandraLng = 80.1245;
+        
+        const calculatedDistance = calculateDistanceInKm(latitude, longitude, mohandraLat, mohandraLng);
+        setDistanceKm(Number(calculatedDistance.toFixed(2)));
+
+        if (calculatedDistance > 20) {
+          setIsTooFar(true);
+          toast.error("ध्यान दें: आप बूम बूम कैफे से 20 किमी से अधिक दूर हैं। आप केवल हमारा शानदार मेनू देख सकते हैं, आर्डर नहीं कर सकते।", { duration: 8000 });
+        } else {
+          setIsTooFar(false);
+          
+          if (calculatedDistance <= 1.0) {
+            setSelectedArea(DELIVERY_AREAS[0]); 
+            toast.success(`सटीक दूरी: ${calculatedDistance.toFixed(2)} KM। आपके लिए 'Mohandra Town' क्षेत्र चुना गया है।`);
+          } else if (calculatedDistance <= 2.0) {
+            setSelectedArea(DELIVERY_AREAS[1]); 
+            toast.success(`सटीक दूरी: ${calculatedDistance.toFixed(2)} KM। आपके लिए 'Mohandra Ward 1-5' क्षेत्र चुना गया है।`);
+          } else if (calculatedDistance <= 5.0) {
+            setSelectedArea(DELIVERY_AREAS[2]); 
+            toast.success(`सटीक दूरी: ${calculatedDistance.toFixed(2)} KM। आपके लिए 'Nearby Area (Within 5 Km)' क्षेत्र चुना गया है।`);
+          } else {
+            setSelectedArea(DELIVERY_AREAS[3]); 
+            toast.success(`सटीक दूरी: ${calculatedDistance.toFixed(2)} KM। आपके लिए 'Out of Town' क्षेत्र चुना गया है।`);
+          }
+        }
+      },
+      () => {
+        toast.dismiss();
+        toast.error("लोकेशन की अनुमति अस्वीकार कर दी गई है या नेटवर्क त्रुटि है।");
+      }
+    );
+  };
+
   const handleGiftPoints = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!customerDetails?.phone) return toast.error("कृपया पहले अपनी डिटेल्स जोड़ें!");
@@ -454,7 +451,7 @@ export default function BbCafeHome() {
     const pointsToGift = Number(giftPointsAmount);
 
     if (!friendPhoneRaw || friendPhoneRaw.length < 10) return toast.error("कृपया सही 10-digit मोबाइल नंबर डालें!");
-    if (senderPhoneRaw === friendPhoneRaw) return toast.error("आप खुद को पॉइंट्स गिफ्ट नहीं कर सकते!");
+    if (senderPhoneRaw === friendPhoneRaw) return toast.error("आप खुद को ऑयल्टी पॉइंट्स गिफ्ट नहीं कर सकते!");
     if (isNaN(pointsToGift) || pointsToGift <= 0) return toast.error("कृपया सही पॉइंट्स की संख्या डालें!");
     if (customerPoints < pointsToGift) return toast.error(`आपके पास पर्याप्त पॉइंट्स नहीं हैं! वर्तमान पॉइंट्स: ${customerPoints}`);
 
@@ -664,6 +661,14 @@ export default function BbCafeHome() {
     setChosenPrice(0); 
     setPizzaAddons({});
   };
+
+  const upsellSuggestionItems = useMemo(() => {
+    return menu.filter(item => {
+      const isShake = item?.category === "Super Cool" || item?.category === "Fast Food";
+      const notInCart = !cart.some((c: any) => c.id === item.id);
+      return isShake && notInCart;
+    }).slice(0, 2);
+  }, [menu, cart]);
 
   const handleSocialClick = async (platform: string, url: string) => {
     window.open(url, '_blank');
@@ -1221,7 +1226,7 @@ export default function BbCafeHome() {
               <div className="w-12 h-1 bg-white/15 rounded-full mx-auto mb-4" />
               <div className="flex justify-between items-center mb-6">
                 <h2 className="text-2xl font-black text-white font-mono">Your Order Cart</h2>
-                <button onClick={() => setIsCartOpen(false)} className="p-2.5 bg-white/5 hover:bg-white/10 text-white rounded-full transition-all"><X size={20} /></button>
+                <button onClick={() => { setIsCartOpen(false); }} className="p-2.5 bg-white/5 hover:bg-white/10 text-white rounded-full transition-all"><X size={20} /></button>
               </div>
 
               {cart.map((item: any) => (
