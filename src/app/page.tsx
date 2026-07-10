@@ -29,6 +29,16 @@ const DEFAULT_REVIEWS = [
 
 const SEARCH_PLACEHOLDERS = ["सर्च करें स्पेशल पिज्जा... 🍕", "सर्च करें ओरियो शेक... 🥤", "सर्च करें स्पेशल थाली... 🍱", "सर्च करें बर्गर... 🍔"];
 
+const ADDON_LABELS: { [key: string]: string } = {
+  veg: "🥦 Extra Veg",
+  paneer: "🧀 Paneer",
+  oregano: "🌿 Oregano",
+  chilli_flakes: "🌶️ Chilli Flakes",
+  ketchup: "🍅 Tomato Ketchup",
+  olive: "🫒 Olive",
+  jalapeno: "🫑 Jalapeno"
+};
+
 // --- ADVANCED OFFLINE GEMINI FALLBACK REPLY ENGINE ---
 const getLocalBotReply = (queryText: string, menuItems: any[]) => {
   const q = queryText.toLowerCase().trim();
@@ -61,6 +71,37 @@ const getLocalBotReply = (queryText: string, menuItems: any[]) => {
   }
   
   return "माफ़ी चाहते हैं भैया, आपकी बात हम पूरे तरीके से समझ नहीं पाए। आप हमारे मेनू के बारे में, डिलीवरी या कैफ़े के पते के बारे में कुछ भी पूछ सकते हैं! 🙏";
+};
+
+// Size-dependent Pizza Add-on Pricing (Exact Rules applied)
+const getAddonPrice = (addonKey: string, size: string) => {
+  const s = String(size).toLowerCase().trim();
+  if (s === 'medium') {
+    if (addonKey === 'veg') return 10;
+    if (addonKey === 'paneer') return 30;
+    if (addonKey === 'oregano') return 5;
+    if (addonKey === 'chilli_flakes') return 5;
+    if (addonKey === 'ketchup') return 5;
+    if (addonKey === 'olive') return 30;
+    if (addonKey === 'jalapeno') return 30;
+  } else if (s === 'large') {
+    if (addonKey === 'veg') return 20;
+    if (addonKey === 'paneer') return 40;
+    if (addonKey === 'oregano') return 10;
+    if (addonKey === 'chilli_flakes') return 10;
+    if (addonKey === 'ketchup') return 10;
+    if (addonKey === 'olive') return 40;
+    if (addonKey === 'jalapeno') return 40;
+  } else { // Small, standard default fallback
+    if (addonKey === 'veg') return 10;
+    if (addonKey === 'paneer') return 20;
+    if (addonKey === 'oregano') return 5;
+    if (addonKey === 'chilli_flakes') return 5;
+    if (addonKey === 'ketchup') return 5;
+    if (addonKey === 'olive') return 20;
+    if (addonKey === 'jalapeno') return 20;
+  }
+  return 0;
 };
 
 export default function BbCafeHome() {
@@ -112,8 +153,7 @@ export default function BbCafeHome() {
 
   const [chosenSize, setChosenSize] = useState<string>("");
   const [chosenPrice, setChosenPrice] = useState<number>(0);
-  const [addonCheese, setAddonCheese] = useState(false);
-  const [addonVeg, setAddonVeg] = useState(false);
+  const [selectedAddons, setSelectedAddons] = useState<{ [key: string]: boolean }>({});
 
   // App Sharing Tracker State
   const [shareCount, setShareCount] = useState<number>(0);
@@ -166,7 +206,7 @@ export default function BbCafeHome() {
       }
     }
 
-    // --- CRASH-PROOF FIREBASE REALTIME SUBSCRIPTIONS (With Error Callbacks) ---
+    // --- CRASH-PROOF FIREBASE REALTIME SUBSCRIPTIONS ---
     const unsubStore = onSnapshot(doc(db, "settings", "store"), (d) => { 
       if(d.exists()) setStoreOpen(d.data().isOpen); 
     }, (err) => console.log("Firebase store rule restricted:", err));
@@ -431,7 +471,7 @@ export default function BbCafeHome() {
     const pointsToGift = Number(giftPointsAmount);
 
     if (!friendPhoneRaw || friendPhoneRaw.length < 10) return toast.error("कृपया सही 10-digit mobile नंबर डालें!");
-    if (senderPhoneRaw === friendPhoneRaw) return toast.error("आप खुद को पॉइंट्स गिफ्ट नहीं कर सकते!");
+    if (senderPhoneRaw === friendPhoneRaw) return toast.error("आप खुद को  पॉइंट्स गिफ्ट नहीं कर सकते!");
     if (isNaN(pointsToGift) || pointsToGift <= 0) return toast.error("कृपया सही पॉइंट्स की संख्या डालें!");
     if (customerPoints < pointsToGift) return toast.error(`आपके पास पर्याप्त पॉइंट्स नहीं हैं! वर्तमान पॉइंट्स: ${customerPoints}`);
 
@@ -568,18 +608,44 @@ export default function BbCafeHome() {
 
   const handleAddToCart = () => {
     if (!chosenSize) return toast.error("Please select a size first!");
-    const addonsTotal = (addonCheese ? 30 : 0) + (addonVeg ? 20 : 0);
+    
+    // Extract selected add-ons array list
+    const activeAddons = Object.entries(selectedAddons)
+      .filter(([_, isSelected]) => isRunningAddonValue(isSelected))
+      .map(([addonKey, _]) => addonKey);
+
+    // Sum up the size-dependent prices
+    const addonsTotal = activeAddons.reduce((acc, currentKey) => {
+      return acc + getAddonPrice(currentKey, chosenSize);
+    }, 0);
+
     let finalName = `${selectedProduct.name} (${chosenSize})`;
-    if (addonCheese) finalName += " + Extra Cheese";
-    if (addonVeg) finalName += " + Extra Veg";
+    if (activeAddons.length > 0) {
+      finalName += " + " + activeAddons.map(k => ADDON_LABELS[k] || k).join(", ");
+    }
+    
     if (selectedProduct.category === "Super Cool") {
       finalName += ` (${sugarLevel}, ${iceLevel})`;
     }
-    const uniqueCartId = `${selectedProduct.id}-${chosenSize}-${addonCheese ? 'cheese' : 'no'}-${addonVeg ? 'veg' : 'no'}-${sugarLevel}-${iceLevel}`;
+    
+    // Generate secure identifier string
+    const addonsHashString = activeAddons.sort().join("-");
+    const uniqueCartId = `${selectedProduct.id}-${chosenSize}-${addonsHashString || 'noaddons'}-${sugarLevel}-${iceLevel}`;
 
     addItem({ ...selectedProduct, id: uniqueCartId, name: finalName, price: Number(chosenPrice) + addonsTotal });
     toast.success(`${chosenSize} added to cart!`);
-    setSelectedProduct(null); setChosenSize(""); setChosenPrice(0); setAddonCheese(false); setAddonVeg(false); setSugarLevel("Normal"); setIceLevel("Normal Ice");
+    setSelectedProduct(null); setChosenSize(""); setChosenPrice(0); setSelectedAddons({}); setSugarLevel("Normal"); setIceLevel("Normal Ice");
+  };
+
+  const isRunningAddonValue = (val: any) => {
+    return val === true;
+  };
+
+  const handleAddonToggle = (key: string) => {
+    setSelectedAddons(prev => ({
+      ...prev,
+      [key]: !prev[key]
+    }));
   };
 
   const handleSocialClick = async (platform: string, url: string) => {
@@ -664,7 +730,7 @@ export default function BbCafeHome() {
     }
   };
 
-  // --- STOPWATCH GAME MECHANICS (Optimized to Prevent UI Freeze) ---
+  // --- STOPWATCH GAME MECHANICS (Optimized) ---
   const handleStartGame = () => {
     if (hasPlayedGame) {
       toast.error("भैया, इस आर्डर पर आप पहले ही गेम खेल चुके हैं! 🛑");
@@ -709,8 +775,8 @@ export default function BbCafeHome() {
           <span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />100% PURE VEG
         </div>
         <div className="text-center z-10">
-          <motion.h1 initial={{ scale: 0.8 }} animate={{ scale: 1 }} className="text-4xl font-black italic tracking-tighter text-yellow-300">BUM BUM CAFE</motion.h1>
-          <p className="text-orange-100 font-bold tracking-wider text-xs mt-1 uppercase">Best Cafe in this Area</p>
+          <motion.h1 initial={{ scale: 0.8 }} animate={{ scale: 1 }} className="text-4xl font-black italic tracking-tighter text-yellow-300 drop-shadow-[0_4px_12px_rgba(253,224,71,0.2)]">BUM BUM CAFE</motion.h1>
+          <p className="text-orange-100 font-bold tracking-wider text-xs mt-1 uppercase">मशहूर स्वाद, अटूट भरोसा! 🔥</p>
         </div>
       </header>
 
@@ -738,10 +804,10 @@ export default function BbCafeHome() {
         </div>
       </div>
 
-      {/* TRIPLE SIDE-TOGGLES STACKED CLEANLY ON THE RIGHT (z-[45] so they scroll cleanly behind fixed search bar) */}
+      {/* TRIPLE SIDE-TOGGLES STACKED CLEANLY ON THE LEFT (z-[45] so they scroll cleanly behind fixed search bar) */}
       <button 
         onClick={() => setIsSocialsOpen(true)} 
-        className="fixed right-0 top-[200px] -translate-y-1/2 bg-[#ff5e00] text-white py-4 px-2.5 rounded-l-2xl z-[45] text-[9px] font-black tracking-widest uppercase flex flex-col items-center gap-1 shadow-xl border-l border-y border-white/10"
+        className="fixed left-0 top-[280px] -translate-y-1/2 bg-[#ff5e00] text-white py-4 px-2.5 rounded-r-2xl z-[45] text-[9px] font-black tracking-widest uppercase flex flex-col items-center gap-1 shadow-xl border-r border-y border-white/10"
         style={{ writingMode: 'vertical-lr' }}
       >
         📱 FOLLOW & EARN
@@ -749,16 +815,16 @@ export default function BbCafeHome() {
 
       <button 
         onClick={() => setIsReviewsDrawerOpen(true)} 
-        className="fixed right-0 top-[280px] -translate-y-1/2 bg-yellow-400 text-black py-4 px-2.5 rounded-l-2xl z-[45] text-[9px] font-black tracking-widest uppercase flex flex-col items-center gap-1 shadow-xl"
+        className="fixed left-0 top-[360px] -translate-y-1/2 bg-yellow-400 text-black py-4 px-2.5 rounded-r-2xl z-[45] text-[9px] font-black tracking-widest uppercase flex flex-col items-center gap-1 shadow-xl"
         style={{ writingMode: 'vertical-lr' }}
       >
         ⭐ REVIEWS
       </button>
 
-      {/* 10-SECOND CHALLENGE FLOATING SIDEBAR TOGGLE */}
+      {/* 10-SECOND CHALLENGE FLOATING SIDEBAR TOGGLE ON LEFT */}
       <button 
         onClick={() => setIsRulesOpen(true)} 
-        className="fixed right-0 top-[360px] -translate-y-1/2 bg-gradient-to-r from-red-500 to-orange-500 text-white py-4 px-2.5 rounded-l-2xl z-[45] text-[9px] font-black tracking-widest uppercase flex flex-col items-center gap-1 shadow-xl border-l border-y border-white/10 animate-bounce"
+        className="fixed left-0 top-[440px] -translate-y-1/2 bg-gradient-to-r from-red-500 to-orange-500 text-white py-4 px-2.5 rounded-r-2xl z-[45] text-[9px] font-black tracking-widest uppercase flex flex-col items-center gap-1 shadow-xl border-r border-y border-white/10 animate-bounce"
         style={{ writingMode: 'vertical-lr', animationDuration: '4s' }}
       >
         ⏱️ 10S CHALLENGE
@@ -780,7 +846,7 @@ export default function BbCafeHome() {
           </motion.div>
         )}
 
-        {/* PROMO BANNER (Now Clickable to Open Stopwatch Game!) */}
+        {/* PROMO BANNER (Now Clickable to Open 10S Challenge Rules!) */}
         <div 
           onClick={() => setIsRulesOpen(true)}
           className="w-full h-44 rounded-3xl overflow-hidden relative border border-white/5 bg-white/[0.02] cursor-pointer group"
@@ -965,9 +1031,9 @@ export default function BbCafeHome() {
             </div>
           </div>
         )}
-      </  AnimatePresence>
+      </AnimatePresence>
 
-      {/* --- INTERACTIVE STOPWATCH GAME MODAL (10S CHALLENGE) --- */}
+      {/* --- RETRO STOPWATCH GAME MODAL (10S CHALLENGE) (With optimized performance & reliable closing) --- */}
       <AnimatePresence>
         {isGameOpen && (
           <div className="fixed inset-0 bg-black/95 z-[270] flex items-center justify-center p-4">
@@ -982,7 +1048,7 @@ export default function BbCafeHome() {
               
               <div>
                 <h3 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-yellow-500 italic uppercase">10S CHALLENGE</h3>
-                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mt-1">बम बम कैफ़े -  मोहंद्रा विशेष</p>
+                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mt-1">बम बम कैफ़े - मोहंद्रा विशेष</p>
               </div>
 
               {/* RETRO BEZEL STOPWATCH DIGITAL DISPLAY */}
@@ -1034,7 +1100,7 @@ export default function BbCafeHome() {
                     🛑 STOP
                   </button>
                 )}
-                {/* 100% RELIABLE CLOSE BUTTON WHICH FORCES TIMER TO RESET & CANCEL BG MEMORY LEAK */}
+                {/* 100% RELIABLE CLOSE BUTTON WHICH FORCES TIMER TO RESET & CANCEL BG RENDER */}
                 <button 
                   onClick={() => { setIsGameRunning(false); setIsGameOpen(false); setGameResult(null); setGameTime(0); }} 
                   className="bg-white/5 hover:bg-white/10 text-gray-400 font-bold p-4.5 rounded-2xl text-xs uppercase"
@@ -1213,9 +1279,9 @@ export default function BbCafeHome() {
             </form>
           </div>
         )}
-      </  AnimatePresence>
+      </AnimatePresence>
 
-      {/* --- VARIANTS POPUP --- */}
+      {/* --- VARIANTS POPUP (WITH CUSTOM SPECIFIC SIZE ADD-ON PRICING SPECIFIED FROM FILE) --- */}
       <AnimatePresence>
         {selectedProduct && (
           <div className="fixed inset-0 bg-black/95 z-[100] flex items-end">
@@ -1236,18 +1302,26 @@ export default function BbCafeHome() {
                 </div>
               </div>
 
-              {(selectedProduct?.category === "Special Pizza" || selectedProduct?.name?.toLowerCase().includes("pizza")) && (
+              {/* DYNAMIC SPECIFIC PIZZA SIZE ADD-ON MATRIX SECTION */}
+              {(selectedProduct?.category === "Special Pizza" || selectedProduct?.name?.toLowerCase().includes("pizza")) && chosenSize && (
                 <div className="space-y-3 mb-8 border-t border-white/5 pt-4">
-                  <p className="text-xs font-bold text-gray-500 uppercase">2. Optional Add-ons:</p>
-                  <div className="space-y-2">
-                    <div onClick={() => setAddonCheese(!addonCheese)} className={`p-4 rounded-2xl flex justify-between items-center border border-white/5 ${addonCheese ? 'bg-orange-500/10 border-orange-500/50' : 'bg-white/[0.03]'}`}>
-                      <span className="text-xs font-black uppercase text-gray-300">🧀 Extra Cheese (Cheese burst)</span>
-                      <span className="text-xs font-black text-orange-500">+₹30</span>
-                    </div>
-                    <div onClick={() => setAddonVeg(!addonVeg)} className={`p-4 rounded-2xl flex justify-between items-center border border-white/5 ${addonVeg ? 'bg-orange-500/10 border-orange-500/50' : 'bg-white/[0.03]'}`}>
-                      <span className="text-xs font-black uppercase text-gray-300">🥦 Extra Vegetables / Paneer</span>
-                      <span className="text-xs font-black text-orange-500">+₹20</span>
-                    </div>
+                  <p className="text-xs font-bold text-gray-500 uppercase">2. Optional Add-ons (Size: {chosenSize}):</p>
+                  <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto no-scrollbar pr-1">
+                    {Object.keys(ADDON_LABELS).map((addonKey) => {
+                      const isSelected = selectedAddons[addonKey] === true;
+                      const price = getAddonPrice(addonKey, chosenSize);
+                      return (
+                        <button
+                          type="button"
+                          key={addonKey}
+                          onClick={() => handleAddonToggle(addonKey)}
+                          className={`p-3.5 rounded-xl border flex justify-between items-center text-[10px] font-black uppercase transition-all ${isSelected ? 'bg-orange-500/10 border-orange-500 text-orange-400' : 'bg-white/5 border-white/5 text-gray-400'}`}
+                        >
+                          <span className="truncate">{ADDON_LABELS[addonKey]}</span>
+                          <span>+₹{price}</span>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -1287,8 +1361,8 @@ export default function BbCafeHome() {
                 </div>
               )}
 
-              <button type="button" onClick={handleAddToCart} className="w-full bg-orange-500 text-black p-5 rounded-2xl font-black uppercase">Confirm • ₹{chosenPrice + (addonCheese ? 30 : 0) + (addonVeg ? 20 : 0)}</button>
-              <button type="button" onClick={() => { setSelectedProduct(null); setChosenSize(""); setChosenPrice(0); setAddonCheese(false); setAddonVeg(false); setSugarLevel("Normal"); setIceLevel("Normal Ice"); }} className="w-full mt-4 text-gray-500 font-black text-xs text-center uppercase">Close</button>
+              <button type="button" onClick={handleAddToCart} className="w-full bg-orange-500 text-black p-5 rounded-2xl font-black uppercase">Confirm • ₹{chosenPrice + Object.keys(selectedAddons).filter(k => selectedAddons[k] === true).reduce((acc, k) => acc + getAddonPrice(k, chosenSize), 0)}</button>
+              <button type="button" onClick={() => { setSelectedProduct(null); setChosenSize(""); setChosenPrice(0); setSelectedAddons({}); setSugarLevel("Normal"); setIceLevel("Normal Ice"); }} className="w-full mt-4 text-gray-500 font-black text-xs text-center uppercase">Close</button>
             </motion.div>
           </div>
         )}
@@ -1334,7 +1408,7 @@ export default function BbCafeHome() {
                 {/* --- FREE DELIVERY VISUAL PROGRESS BAR --- */}
                 {(() => {
                   const subtotal = getTotal();
-                  const threshold = 99;
+                  const threshold = deliveryArea === 'town' ? 99 : deliveryArea === 'outer' ? 499 : 999;
                   const progress = Math.min((subtotal / threshold) * 100, 100);
                   const needed = threshold - subtotal;
 
@@ -1435,31 +1509,6 @@ export default function BbCafeHome() {
                         <span>Invite 5 Friends & Get +1 Point! 🎁</span>
                       </button>
                     </div>
-
-                    {/* --- STOPWATCH GAME CHALLENGE OPTION INSIDE CART (LOYALTY CLUB KE NEECHE) --- */}
-                    <div className="bg-gradient-to-r from-red-600/10 to-orange-600/10 border border-red-500/20 rounded-[2rem] p-5 space-y-3">
-                      <div className="flex items-center gap-2 text-red-400 font-black text-xs uppercase">
-                        <Clock size={16} /> <span>⏱️ 10S STOPWATCH CHALLENGE</span>
-                      </div>
-                      <p className="text-[10px] text-gray-400 font-bold leading-normal text-left">
-                        Stopwatch को ठीक 10.00s पर रोकें और इस आर्डर को ₹500 तक बिल्कुल मुफ्त (Free) पाएं!
-                      </p>
-                      {hasPlayedGame ? (
-                        <div className="p-3 bg-white/5 rounded-xl text-center text-[10px] font-black uppercase text-gray-500 border border-white/5">
-                          {gameResult === 'win' ? '🎉 WINNER! ₹500 FREE ORDER APPLIED' : '❌ Chance Used For This Order'}
-                        </div>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setIsGameOpen(true);
-                          }}
-                          className="w-full bg-gradient-to-r from-red-500 to-orange-500 text-white font-black py-3 rounded-xl text-xs uppercase shadow-md active:scale-95 transition-all"
-                        >
-                          🕹️ Play Challenge (1 Chance Only)
-                        </button>
-                      )}
-                    </div>
                     
                     <div className="pt-2.5 border-t border-white/5 flex justify-between items-center mt-2">
                       <span className="text-[10px] text-gray-400 font-bold uppercase">Gift points to friend:</span>
@@ -1487,6 +1536,31 @@ export default function BbCafeHome() {
                     </div>
                   </div>
                 )}
+
+                {/* --- STOPWATCH GAME CHALLENGE OPTION INSIDE CART (LOYALTY CLUB KE BAAHAR / NICHE) --- */}
+                <div className="bg-gradient-to-r from-red-600/10 to-orange-600/10 border border-red-500/20 rounded-[2rem] p-5 space-y-3">
+                  <div className="flex items-center gap-2 text-red-400 font-black text-xs uppercase">
+                    <Clock size={16} /> <span>⏱️ 10S STOPWATCH CHALLENGE</span>
+                  </div>
+                  <p className="text-[10px] text-gray-400 font-bold leading-normal text-left">
+                    Stopwatch को ठीक 10.00s पर रोकें और इस आर्डर को ₹500 तक बिल्कुल मुफ्त (Free) पाएं!
+                  </p>
+                  {hasPlayedGame ? (
+                    <div className="p-3 bg-white/5 rounded-xl text-center text-[10px] font-black uppercase text-gray-500 border border-white/5">
+                      {gameResult === 'win' ? '🎉 WINNER! ₹500 FREE ORDER APPLIED' : '❌ Chance Used For This Order'}
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsGameOpen(true);
+                      }}
+                      className="w-full bg-gradient-to-r from-red-500 to-orange-500 text-white font-black py-3 rounded-xl text-xs uppercase shadow-md active:scale-95 transition-all"
+                    >
+                      🕹️ Play Challenge (1 Chance Only)
+                    </button>
+                  )}
+                </div>
 
                 {/* GREEN CUTLERY SELECTOR */}
                 <div className="flex items-center justify-between px-5 py-4 bg-green-500/5 border border-green-500/10 rounded-3xl">
