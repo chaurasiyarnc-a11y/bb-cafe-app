@@ -35,45 +35,32 @@ const ADDON_LABELS: { [key: string]: string } = {
   oregano: "🌿 Oregano",
   chilli_flakes: "🌶️ Chilli Flakes",
   ketchup: "🍅 Tomato Ketchup",
-  olive: "🫒 Black Olives", // Updated to Black Olives
+  olive: "🫒 Black Olives",
   jalapeno: "🫑 Jalapeno"
 };
 
-// --- ADVANCED OFFLINE GEMINI FALLBACK REPLY ENGINE ---
 const getLocalBotReply = (queryText: string, menuItems: any[]) => {
   const q = queryText.toLowerCase().trim();
-  
-  if (q.includes("hi") || q.includes("hello") || q.includes("hey") || q.includes("राम राम") || q.includes("नमस्ते") || q.includes("namaste") || q.includes("हलो")) {
-    return "राम-राम भैया! 🙏 हम हैं बम बम कैफ़े की डिजिटल हेल्पडेस्क 'रिया दीदी' 💁‍♀️। आज आपका का खाबे को मन है? हमें बजट या मूड बताओ, हम बढ़िया डिश बता रहे! 🍕🥤";
+  if (q.includes("hi") || q.includes("hello") || q.includes("hey") || q.includes("राम राम") || q.includes("नमस्ते")) {
+    return "राम-राम भैया! 🙏 हम हैं बम बम कैफ़े की डिजिटल असिस्टेंट 'रिया दीदी' 💁‍♀️। आज आपका क्या खाने का मन है? बजट या मूड बताओ, हम बढ़िया डिश बता रहे! 🍕🥤";
   }
-  if (q.includes("about") || q.includes("कैफे") || q.includes("cafe") || q.includes("शुरुआत") || q.includes("कहानी") || q.includes("बारे") || q.includes("history")) {
+  if (q.includes("about") || q.includes("कैफे") || q.includes("cafe") || q.includes("शुरुआत") || q.includes("कहानी")) {
     return "भैया, हमने बम बम कैफ़े की शुरुआत एक छोटे से सपने के साथ की थी—लोगों को घर जैसा स्वाद और कैफ़े वाला माहौल देने के लिए। यहाँ हर कप कॉफ़ी और हर स्लाइस पिज्जा प्यार और शुद्धता के साथ बनाया जाता है। हमारी कोशिश है कि आप जब भी यहाँ आएँ, एक प्यारी मुस्कान के साथ वापस जाएँ। ❤️";
   }
-  if (q.includes("pizza") || q.includes("पिज्जा") || q.includes("पिज़्ज़ा")) {
+  if (q.includes("pizza") || q.includes("पिज्जा")) {
     const pizzas = menuItems.filter(i => i.category === "Special Pizza" || i.name.toLowerCase().includes("pizza"));
-    if (pizzas.length > 0) {
-      return `भैया, हमारे यहाँ ये लाजवाब पिज्जा उपलब्ध हैं:\n${pizzas.map(p => `• ${p.name} - ${p.price ? '₹'+p.price : 'कम रेट में'}`).join('\n')}\n\nसब शुद्ध अमूल चीज़ से प्यार से बनाए जाते हैं! 🍕`;
-    }
+    if (pizzas.length > 0) return `भैया, हमारे यहाँ ये लाजवाब पिज्जा हैं:\n${pizzas.map(p => `• ${p.name} - ₹${p.price}`).join('\n')}\n\nसब शुद्ध अमूल चीज़ से बने हैं! 🍕`;
     return "भैया, गरमा-गरम अमूल चीज़ वाला स्पेशल पिज़्ज़ा मिल जाएगा, अभी आर्डर करें! 🍕";
   }
-  if (q.includes("delivery") || q.includes("डिलीवरी") || q.includes("होम") || q.includes("घर") || q.includes("delivery free")) {
-    return "भैया, होम डिलीवरी बिल्कुल फ्री है (टाउन में ₹99 से ऊपर)! स्वाद सीधे आपके दरवाज़े तक आएगा। 🏠🛵\n\n• मोहंद्रा टाउन: ₹99 से ऊपर फ्री डिलीवरी\n• 5 किलोमीटर: ₹499 से ऊपर फ्री डिलीवरी\n• 12 किलोमीटर: ₹999 से ऊपर फ्री डिलीवरी";
+  if (q.includes("delivery") || q.includes("डिलीवरी")) {
+    return "भैया, होम डिलीवरी बिल्कुल फ्री है (टाउन में ₹99 से ऊपर)! स्वाद सीधे आपके दरवाज़े तक आएगा। 🏠🛵\n• मोहंद्रा टाउन: ₹99 से ऊपर फ्री\n• 5 किलोमीटर: ₹499 से ऊपर फ्री\n• 12 किलोमीटर: ₹999 से ऊपर फ्री";
   }
-  if (q.includes("address") || q.includes("पता") || q.includes("location") || q.includes("कहाँ") || q.includes("kahan") || q.includes("shop")) {
+  if (q.includes("address") || q.includes("पता") || q.includes("location")) {
     return "बम बम कैफ़े का पता है: 📍 बस स्टैंड मोहंद्रा, पीपल पेड़ के नीचे, मोहंद्रा (जिला पन्ना, मध्य प्रदेश)। आप नीचे मैप का बटन दबाकर डायरेक्ट नेविगेट कर सकते हैं! 🗺️";
   }
-  if (q.includes("budget") || q.includes("कम") || q.includes("sasta") || q.includes("सस्ता") || q.includes("100") || q.includes("50") || q.includes("150")) {
-    return "भैया, बजट की बिल्कुल टेंशन मत लो! आप ₹50 में ठंडी कोल्ड कॉफ़ी या ओरियो शेक ले सकते हैं, और ₹99 में गरमा-गरम पिज्जा। कम बजट में भी पेट भर जाएगा! 🍕🥤";
-  }
-  if (q.includes("menu") || q.includes("क्या क्या") || q.includes("khana") || q.includes("खाना") || q.includes("list")) {
-    const samples = menuItems.slice(0, 5);
-    return `भैया, हमारे यहाँ स्पेशल पिज़्ज़ा, स्पेशल थाली, पनीर स्पेशल, इंडियन ब्रेड और लाजवाब शेक्स (Super Cool) सब कुछ मिलता है।\n\nजैसे:\n${samples.map(s => `• ${s.name} - ₹${s.price || 0}`).join('\n')}\n\nऊपर दिए गए मेनू में सब कुछ रेट के साथ लिखा है! 😋`;
-  }
-  
   return "माफ़ी चाहते हैं भैया, आपकी बात हम पूरे तरीके से समझ नहीं पाए। आप हमारे मेनू के बारे में, डिलीवरी या कैफ़े के पते के बारे में कुछ भी पूछ सकते हैं! 🙏";
 };
 
-// Size-dependent Pizza Add-on Pricing (Exact Sizing Rules applied)
 const getAddonPrice = (addonKey: string, size: string) => {
   const s = String(size).toLowerCase().trim();
   if (s === 'medium') {
@@ -92,7 +79,7 @@ const getAddonPrice = (addonKey: string, size: string) => {
     if (addonKey === 'ketchup') return 10;
     if (addonKey === 'olive') return 40;
     if (addonKey === 'jalapeno') return 40;
-  } else { // Small, standard default fallback
+  } else {
     if (addonKey === 'veg') return 10;
     if (addonKey === 'paneer') return 20;
     if (addonKey === 'oregano') return 5;
@@ -104,7 +91,6 @@ const getAddonPrice = (addonKey: string, size: string) => {
   return 0;
 };
 
-// Simulated Confetti Particles array
 const CONFETTI_PARTICLES = Array.from({ length: 25 });
 
 export default function BbCafeHome() {
@@ -158,7 +144,6 @@ export default function BbCafeHome() {
   const [chosenPrice, setChosenPrice] = useState<number>(0);
   const [selectedAddons, setSelectedAddons] = useState<{ [key: string]: boolean }>({});
 
-  // App Sharing Tracker State
   const [shareCount, setShareCount] = useState<number>(0);
 
   // --- NEW INTEGRATED STATES ---
@@ -176,85 +161,57 @@ export default function BbCafeHome() {
   const [iceLevel, setIceLevel] = useState("Normal Ice");
   const [noCutlery, setNoCutlery] = useState(false);
   const [deliveryArea, setDeliveryArea] = useState<'town' | 'outer' | 'long'>('town');
-  const [isPinned, setIsPinned] = useState(false); // Dynamic Scroll Pin State
+  const [isPinned, setIsPinned] = useState(false); 
 
   // --- STOPWATCH GAME STATES ---
   const [isGameOpen, setIsGameOpen] = useState(false);
-  const [isRulesOpen, setIsRulesOpen] = useState(false); // Rules Poster Modal State
-  const [gameTime, setGameTime] = useState(0); // in centiseconds
+  const [isRulesOpen, setIsRulesOpen] = useState(false); 
+  const [gameTime, setGameTime] = useState(0); 
   const [isGameRunning, setIsGameRunning] = useState(false);
   const [gameResult, setGameResult] = useState<'win' | 'lose' | null>(null);
-  const [hasPlayedGame, setHasPlayedGame] = useState(false); // 1 Attempt lock
-  const [gameDiscount, setGameDiscount] = useState(0); // Automatic Win Discount
+  const [hasPlayedGame, setHasPlayedGame] = useState(false); 
+  const [gameDiscount, setGameDiscount] = useState(0); 
 
   const formatBillNumber = (num: number) => String(num).padStart(4, '0');
 
   useEffect(() => {
     setMounted(true);
-
-    // --- PWA Setup ---
-    if (typeof window !== 'undefined') {
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js')
-            .then((reg) => console.log('BUM BUM Cafe SW Registered:', reg.scope))
-            .catch((err) => console.error('SW Registration Failed:', err));
-        });
-      }
-      if (!document.querySelector('link[rel="manifest"]')) {
-        const link = document.createElement('link');
-        link.rel = 'manifest';
-        link.href = '/manifest.json';
-        document.head.appendChild(link);
-      }
-    }
-
-    // --- CRASH-PROOF FIREBASE REALTIME SUBSCRIPTIONS ---
     const unsubStore = onSnapshot(doc(db, "settings", "store"), (d) => { 
       if(d.exists()) setStoreOpen(d.data().isOpen); 
-    }, (err) => console.log("Firebase store rule restricted:", err));
+    }, (err) => console.log(err));
 
     const unsubMenu = onSnapshot(query(collection(db, "products")), (snap) => {
       setMenu(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter((i: any) => i.isVisible !== false));
-    }, (err) => console.log("Firebase products rule restricted:", err));
+    }, (err) => console.log(err));
 
     const unsubCats = onSnapshot(collection(db, "categories"), (snap) => { 
       setDbCategories(snap.docs.map(d => ({ id: d.id, ...d.data() }))); 
-    }, (err) => console.log("Firebase categories rule restricted:", err));
+    }, (err) => console.log(err));
 
     const unsubBanners = onSnapshot(collection(db, "banners"), (snap) => { 
       setBanners(snap.docs.map(d => ({ id: d.id, ...d.data() }))); 
-    }, (err) => console.log("Firebase banners rule restricted:", err));
+    }, (err) => console.log(err));
 
     const unsubCoupons = onSnapshot(collection(db, "coupons"), (snap) => { 
       setCoupons(snap.docs.map(d => ({ id: d.id, ...d.data() }))); 
-    }, (err) => console.log("Firebase coupons rule restricted:", err));
+    }, (err) => console.log(err));
 
     const unsubReviews = onSnapshot(collection(db, "reviews"), (snap) => {
       setReviews(snap.docs.map(d => ({ id: d.id, ...d.data() })).filter((r: any) => r.isApproved === true));
-    }, (err) => console.log("Firebase reviews rule restricted:", err));
+    }, (err) => console.log(err));
 
     const unsubRules = onSnapshot(collection(db, "loyalty_rules"), (snap) => { 
       setLoyaltyRules(snap.docs.map(d => ({ id: d.id, ...d.data() }))); 
-    }, (err) => console.log("Firebase loyalty rules restricted:", err));
+    }, (err) => console.log(err));
     
     const unsubRiders = onSnapshot(collection(db, "delivery_boys"), (snap) => {
       setDeliveryBoys(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    }, (err) => console.log("Firebase delivery boys restricted:", err));
+    }, (err) => console.log(err));
 
     const savedDetails = localStorage.getItem('bb_cafe_customer');
     if (savedDetails) { try { setCustomerDetails(JSON.parse(savedDetails)); } catch (err) {} }
 
     return () => { unsubStore(); unsubMenu(); unsubCats(); unsubBanners(); unsubReviews(); unsubCoupons(); unsubRules(); unsubRiders(); };
-  }, []);
-
-  // --- Dynamic Scroll Tracker to Pin/Unpin Search Bar ---
-  useEffect(() => {
-    const handleScroll = () => {
-      setIsPinned(window.scrollY > 240); // 240px is equal to header height (h-60)
-    };
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
   useEffect(() => {
@@ -269,58 +226,26 @@ export default function BbCafeHome() {
     return () => unsubPoints();
   }, [customerDetails]);
 
-  // --- Dynamic Greeting Timer-based Logic ---
-  useEffect(() => {
-    if (!mounted) return;
-    const getLocalGreeting = () => {
-      const hour = new Date().getHours();
-      const name = customerDetails?.name ? customerDetails.name.split(" ")[0] : "";
-      const nameStr = name ? `${name} भैया` : "भैया";
-
-      if (hour >= 5 && hour < 12) {
-        return `राम-राम ${nameStr}! आज सुबह-सुबह का खाबे को मन है? गरमा-गरम चाय और सैंडविच मँगाएँ? ☕`;
-      } else if (hour >= 12 && hour < 16) {
-        return `राम-राम जी! दोपहर की तेज भूख लगी है का? बम बम की स्पेशल थाली आज ही आज़माएं! 🍱`;
-      } else if (hour >= 16 && hour < 20) {
-        return `नमस्ते ${nameStr}! आज शाम की चाय के साथ सैंडविच या बर्गर की जोड़ी कैसी रहेगी? 🍔`;
-      } else if (hour >= 20 && hour < 23) {
-        return `राम-राम ${nameStr}! रात के खाने में गरमा-गरम स्पेशल पिज़्ज़ा का मज़ा लें? अभी आर्डर करें! 🍕`;
-      } else {
-        return `नमस्ते जी! इतनी रात को पढ़ाई या काम चल रहा है का? नींद भगाने के लिए एक कड़क कॉफ़ी मंगाई जाए? ☕`;
-      }
-    };
-    setGreetingMessage(getLocalGreeting());
-  }, [mounted, customerDetails]);
-
-  // --- Search Bar Sliding Placeholder Timer ---
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setPlaceholderIndex(prev => (prev + 1) % SEARCH_PLACEHOLDERS.length);
-    }, 3000);
-    return () => clearInterval(timer);
-  }, []);
-
-  // --- Stopwatch Game HIGH-PRECISION OPTIMIZED Timer Loop (No Mobile Lag) ---
+  // --- Stopwatch Game PRECISION Timer Loop ---
   useEffect(() => {
     let intervalId: any;
     if (isGameRunning) {
       const startTime = Date.now();
       intervalId = setInterval(() => {
         const elapsed = Date.now() - startTime;
-        setGameTime(Math.floor(elapsed / 10)); // Converts exact ms to centiseconds (giga light on React thread)
-      }, 30); // 30ms is extremely smooth but uses 70% less CPU than 10ms!
+        setGameTime(Math.floor(elapsed / 10)); 
+      }, 30); 
     } else {
       clearInterval(intervalId);
     }
     return () => clearInterval(intervalId);
   }, [isGameRunning]);
 
-  // --- Voice Search Function ---
   const handleVoiceSearch = () => {
     if (typeof window !== 'undefined' && ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
       const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
       const recognition = new SpeechRecognition();
-      recognition.lang = 'hi-IN'; // Hindi voice input
+      recognition.lang = 'hi-IN';
       recognition.interimResults = false;
       recognition.onstart = () => setIsListening(true);
       recognition.onend = () => setIsListening(false);
@@ -332,11 +257,10 @@ export default function BbCafeHome() {
       };
       recognition.start();
     } else {
-      toast.error("काफी दुःख की बात है, आपका ब्राउज़र वॉइस सर्च सपोर्ट नहीं करता है।");
+      toast.error("आपका ब्राउज़र वॉइस सर्च सपोर्ट नहीं करता है।");
     }
   };
 
-  // --- AI Chatbot Send Message Handler (With Instant Offline Fallback) ---
   const handleSendAiMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!aiInput.trim() || aiLoading) return;
@@ -353,7 +277,7 @@ export default function BbCafeHome() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ messages: updatedMessages, menuData: menu })
       });
-      if (!res.ok) throw new Error("Fallback required");
+      if (!res.ok) throw new Error("Fallback");
       const data = await res.json();
       setAiMessages([...updatedMessages, { role: "model", text: data.text }]);
     } catch (err) {
@@ -364,7 +288,6 @@ export default function BbCafeHome() {
     }
   };
 
-  // Compute categories
   const visibleCategories = useMemo(() => {
     const baseCategories = ["All", ...FALLBACK_CATEGORIES.filter(c => c !== "All")];
     const dbCatsMap = new Map();
@@ -395,24 +318,14 @@ export default function BbCafeHome() {
     return CATEGORY_IMAGES[catName] || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=150&q=80";
   };
 
-  useEffect(() => {
-    if (banners.length <= 1) return;
-    const interval = setInterval(() => { setBannerIndex((prev) => (prev + 1) % banners.length); }, 4000);
-    return () => clearInterval(interval);
-  }, [banners]);
-
   const getTotal = () => cart.reduce((acc: number, i: any) => acc + (i.price * i.quantity), 0);
 
   const handleApplyCoupon = () => {
     if (!enteredCoupon) return toast.error("Please enter a coupon code");
     const cleanCode = enteredCoupon.trim().toUpperCase();
 
-    // 10-Sec Challenge Win coupon validator!
     if (cleanCode === 'BUMBUM10SEC') {
-      setAppliedCoupon({
-        code: 'BUMBUM10SEC',
-        discountValue: 500
-      });
+      setAppliedCoupon({ code: 'BUMBUM10SEC', discountValue: 500 });
       toast.success("🎉 10-Sec Challenge Coupon Applied! ₹500 OFF!");
       return;
     }
@@ -612,12 +525,10 @@ export default function BbCafeHome() {
   const handleAddToCart = () => {
     if (!chosenSize) return toast.error("Please select a size first!");
     
-    // Extract selected add-ons array list
     const activeAddons = Object.entries(selectedAddons)
       .filter(([_, isSelected]) => isRunningAddonValue(isSelected))
       .map(([addonKey, _]) => addonKey);
 
-    // Sum up the size-dependent prices
     const addonsTotal = activeAddons.reduce((acc, currentKey) => {
       return acc + getAddonPrice(currentKey, chosenSize);
     }, 0);
@@ -631,7 +542,6 @@ export default function BbCafeHome() {
       finalName += ` (${sugarLevel}, ${iceLevel})`;
     }
     
-    // Generate secure identifier string
     const addonsHashString = activeAddons.sort().join("-");
     const uniqueCartId = `${selectedProduct.id}-${chosenSize}-${addonsHashString || 'noaddons'}-${sugarLevel}-${iceLevel}`;
 
@@ -645,6 +555,10 @@ export default function BbCafeHome() {
   };
 
   const handleAddonToggle = (key: string) => {
+    if (hasPlayedGame) {
+      toast.error("गेम खेलने के बाद कार्ट में बदलाव नहीं किया जा सकता! 🛑");
+      return;
+    }
     setSelectedAddons(prev => ({
       ...prev,
       [key]: !prev[key]
@@ -679,16 +593,10 @@ export default function BbCafeHome() {
 
       localStorage.setItem(storageKey, "true");
       setCustomerPoints(prev => prev + 1);
-      toast.success(`🎉 बधाई हो! ${platform.toUpperCase()} पर हमें फॉलो करने के लिए आपको +1 पॉइंट मिला है!`);
+      toast.success("🎉 बधाई हो! हमें फॉलो करने के लिए आपको +1 पॉइंट मिला है!");
     } catch (err) {
       toast.error("पॉइंट्स जोड़ने में समस्या आई।");
     }
-  };
-
-  const getClaimStatus = (platform: string) => {
-    if (!customerDetails?.phone) return "🎁 +1 Pt";
-    const storageKey = `bb_claimed_${customerDetails.phone.replace("+91", "")}_${platform}`;
-    return localStorage.getItem(storageKey) ? "✅ Claimed" : "🎁 Claim +1 Pt";
   };
 
   const handleShareApp = async () => {
@@ -733,7 +641,6 @@ export default function BbCafeHome() {
     }
   };
 
-  // --- STOPWATCH GAME MECHANICS (Optimized to Prevent UI Freeze) ---
   const handleStartGame = () => {
     if (hasPlayedGame) {
       toast.error("भैया, इस आर्डर पर आप पहले ही गेम खेल चुके हैं! 🛑");
@@ -746,11 +653,10 @@ export default function BbCafeHome() {
 
   const handleStopGame = () => {
     setIsGameRunning(false);
-    setHasPlayedGame(true); // Lock further play attempts for this transaction
-    const target = 1000; // 10.00 seconds is 1000 centiseconds
+    setHasPlayedGame(true); 
+    const target = 1000; 
     if (gameTime === target) {
       setGameResult('win');
-      // Direct dynamic discount logic up to ₹500
       const currentCartTotal = getTotal();
       const calculatedDiscount = Math.min(currentCartTotal, 500);
       setGameDiscount(calculatedDiscount); 
@@ -784,7 +690,7 @@ export default function BbCafeHome() {
         </div>
       </header>
 
-      {/* DYNAMIC FIXED SEARCH BAR WITH SLIDING PLACEHOLDER & VOICE SEARCH (z-[60] to prevent sidebar overlap & layout shift) */}
+      {/* DYNAMIC FIXED SEARCH BAR (z-[60] to prevent sidebar overlap) */}
       <div className="h-[80px]">
         <div className={`${isPinned ? 'fixed top-0 left-0 right-0 border-b-2 border-orange-500/25 bg-[#050505] shadow-2xl shadow-black/80' : 'relative bg-[#050505] border-b border-white/5 rounded-b-3xl'} transition-all duration-300 z-[60] py-4 px-4`}>
           <div className="relative max-w-[220px] mx-auto">
@@ -808,13 +714,13 @@ export default function BbCafeHome() {
         </div>
       </div>
 
-      {/* TRIPLE SIDE-TOGGLES STACKED CLEANLY ON THE LEFT (z-[45] so they scroll cleanly behind fixed search bar) */}
+      {/* TRIPLE SIDE-TOGGLES STACKED CLEANLY ON LEFT SIDE (z-[45] so they scroll cleanly behind fixed search bar) */}
       <button 
         onClick={() => setIsSocialsOpen(true)} 
         className="fixed left-0 top-[280px] -translate-y-1/2 bg-[#ff5e00] text-white py-4 px-2.5 rounded-r-2xl z-[45] text-[9px] font-black tracking-widest uppercase flex flex-col items-center gap-1 shadow-xl border-r border-y border-white/10"
         style={{ writingMode: 'vertical-lr' }}
       >
-        📱 FOLLOW & EARN
+        FOLLOW
       </button>
 
       <button 
@@ -822,7 +728,7 @@ export default function BbCafeHome() {
         className="fixed left-0 top-[360px] -translate-y-1/2 bg-yellow-400 text-black py-4 px-2.5 rounded-r-2xl z-[45] text-[9px] font-black tracking-widest uppercase flex flex-col items-center gap-1 shadow-xl"
         style={{ writingMode: 'vertical-lr' }}
       >
-        ⭐ REVIEWS
+        REVIEWS
       </button>
 
       <button 
@@ -830,7 +736,7 @@ export default function BbCafeHome() {
         className="fixed left-0 top-[440px] -translate-y-1/2 bg-gradient-to-r from-red-500 to-orange-500 text-white py-4 px-2.5 rounded-r-2xl z-[45] text-[9px] font-black tracking-widest uppercase flex flex-col items-center gap-1 shadow-xl border-r border-y border-white/10 animate-bounce"
         style={{ writingMode: 'vertical-lr', animationDuration: '4s' }}
       >
-        ⏱️ 10S CHALLENGE
+        GAME
       </button>
 
       <main className="pt-4 px-4 max-w-lg mx-auto space-y-6">
@@ -849,10 +755,10 @@ export default function BbCafeHome() {
           </motion.div>
         )}
 
-        {/* PROMO BANNER (Now Clickable to Open 10S Challenge Rules!) */}
+        {/* PROMO BANNER (Clickable to open Challenge Rules) */}
         <div 
           onClick={() => setIsRulesOpen(true)}
-          className="w-full h-44 rounded-3xl overflow-hidden relative border border-white/5 bg-white/[0.02]"
+          className="w-full h-44 rounded-3xl overflow-hidden relative border border-white/5 bg-white/[0.02] cursor-pointer"
         >
           {(banners.length === 0 || bannerError) ? (
             <div className="w-full h-full bg-gradient-to-r from-orange-600/35 to-[#b33600]/35 flex flex-col justify-center p-6 space-y-1">
@@ -861,12 +767,12 @@ export default function BbCafeHome() {
               <p className="text-xs text-gray-400">Enjoy fresh baked pizza & delicious thalis!</p>
             </div>
           ) : (
-            <img src={banners[bannerIndex]?.url} onError={() => setBannerError(true)} className="w-full h-full object-cover animate-fade-in group-hover:scale-105 transition-all duration-300" alt="Promo" />
+            <img src={banners[bannerIndex]?.url} onError={() => setBannerError(true)} className="w-full h-full object-cover animate-fade-in" alt="Promo" />
           )}
         </div>
 
-        {/* ZOMATO-STYLE CATEGORY HORIZONTAL SLIDER */}
-        <div className="space-y-4">
+        {/* ZOMATO-STYLE CATEGORY SLIDER (Without background card - Transparent minimal UI) */}
+        <div className="space-y-4 py-2">
           <p className="text-[9px] font-black uppercase tracking-widest text-orange-500">Inspiration for your first order</p>
           <div className="flex gap-4 overflow-x-auto no-scrollbar py-2">
             {visibleCategories.map((cat) => {
@@ -928,7 +834,16 @@ export default function BbCafeHome() {
                       {item.variants && <span className="text-[9px] font-bold text-gray-400 mt-1 block">Options available</span>}
                     </div>
                     {storeOpen ? (
-                      <button onClick={() => item.variants ? setSelectedProduct(item) : addItem(item)} className="px-5 py-2.5 bg-orange-500/10 text-orange-400 border border-orange-500/30 hover:bg-orange-500 hover:text-white rounded-xl font-black text-xs active:scale-95 transition-all uppercase shadow-md">
+                      <button 
+                        onClick={() => {
+                          if (hasPlayedGame) {
+                            toast.error("गेम खेलने के बाद कार्ट में बदलाव नहीं किया जा सकता! 🛑");
+                            return;
+                          }
+                          item.variants ? setSelectedProduct(item) : addItem(item);
+                        }} 
+                        className="px-5 py-2.5 bg-orange-500/10 text-orange-400 border border-orange-500/30 hover:bg-orange-500 hover:text-white rounded-xl font-black text-xs active:scale-95 transition-all uppercase shadow-md"
+                      >
                         <Plus size={14} /> ADD
                       </button>
                     ) : (
@@ -1036,15 +951,26 @@ export default function BbCafeHome() {
         )}
       </AnimatePresence>
 
-      {/* --- RETRO STOPWATCH GAME MODAL (10S CHALLENGE) (With optimized performance & reliable closing) --- */}
+      {/* --- RETRO STOPWATCH GAME MODAL (10S CHALLENGE) (With optimized performance, reliable close & backdrop exit) --- */}
       <AnimatePresence>
         {isGameOpen && (
-          <div className="fixed inset-0 bg-black/95 z-[270] flex items-center justify-center p-4">
+          <div 
+            onClick={(e) => {
+              if (e.target === e.currentTarget) {
+                setIsGameRunning(false);
+                setIsGameOpen(false);
+                setGameResult(null);
+                setGameTime(0);
+              }
+            }}
+            className="fixed inset-0 bg-black/95 z-[270] flex items-center justify-center p-4 cursor-pointer"
+          >
             <motion.div 
               initial={{ scale: 0.9, opacity: 0 }} 
               animate={{ scale: 1, opacity: 1 }} 
               exit={{ scale: 0.9, opacity: 0 }} 
-              className="bg-[#16161a] w-full max-w-md p-8 rounded-[3rem] border border-yellow-500/30 text-center space-y-6 relative overflow-hidden shadow-[0_0_30px_rgba(234,179,8,0.15)]"
+              onClick={(e) => e.stopPropagation()} // Prevent close on modal content click
+              className="bg-[#16161a] w-full max-w-md p-8 rounded-[3rem] border border-yellow-500/30 text-center space-y-6 relative overflow-hidden shadow-[0_0_30px_rgba(234,179,8,0.15)] cursor-default"
             >
               <div className="absolute -top-10 -left-10 w-32 h-32 bg-yellow-500/10 blur-3xl rounded-full" />
               <div className="absolute -bottom-10 -right-10 w-32 h-32 bg-orange-500/10 blur-3xl rounded-full" />
@@ -1340,7 +1266,13 @@ export default function BbCafeHome() {
                         <button
                           type="button"
                           key={addonKey}
-                          onClick={() => handleAddonToggle(addonKey)}
+                          onClick={() => {
+                            if (hasPlayedGame) {
+                              toast.error("गेम खेलने के बाद कार्ट में बदलाव नहीं किया जा सकता! 🛑");
+                              return;
+                            }
+                            handleAddonToggle(addonKey);
+                          }}
                           className={`p-3.5 rounded-xl border flex justify-between items-center text-[10px] font-black uppercase transition-all ${isSelected ? 'bg-orange-500/10 border-orange-500 text-orange-400' : 'bg-white/5 border-white/5 text-gray-400'}`}
                         >
                           <span className="truncate">{ADDON_LABELS[addonKey]}</span>
@@ -1361,7 +1293,13 @@ export default function BbCafeHome() {
                         <button 
                           type="button" 
                           key={lvl} 
-                          onClick={() => setSugarLevel(lvl)} 
+                          onClick={() => {
+                            if (hasPlayedGame) {
+                              toast.error("गेम खेलने के बाद कार्ट में बदलाव नहीं किया जा सकता! 🛑");
+                              return;
+                            }
+                            setSugarLevel(lvl);
+                          }} 
                           className={`py-2.5 rounded-xl text-[10px] font-black border transition-all ${sugarLevel === lvl ? 'bg-orange-500 text-black border-orange-500' : 'bg-white/5 text-gray-400 border-white/5'}`}
                         >
                           {lvl === "Less Sugar" ? "कम शक्कर" : lvl === "Normal" ? "नॉर्मल" : "तेज शक्कर"}
@@ -1376,7 +1314,13 @@ export default function BbCafeHome() {
                         <button 
                           type="button" 
                           key={lvl} 
-                          onClick={() => setIceLevel(lvl)} 
+                          onClick={() => {
+                            if (hasPlayedGame) {
+                              toast.error("गेम खेलने के बाद कार्ट में बदलाव नहीं किया जा सकता! 🛑");
+                              return;
+                            }
+                            setIceLevel(lvl);
+                          }} 
                           className={`py-2.5 rounded-xl text-[10px] font-black border transition-all ${iceLevel === lvl ? 'bg-orange-500 text-black border-orange-500' : 'bg-white/5 text-gray-400 border-white/5'}`}
                         >
                           {lvl === "No Ice" ? "बिना बर्फ" : lvl === "Less Ice" ? "कम बर्फ" : "नॉर्मल बर्फ"}
@@ -1387,7 +1331,19 @@ export default function BbCafeHome() {
                 </div>
               )}
 
-              <button type="button" onClick={handleAddToCart} className="w-full bg-orange-500 text-black p-5 rounded-2xl font-black uppercase">Confirm • ₹{chosenPrice + Object.keys(selectedAddons).filter(k => selectedAddons[k] === true).reduce((acc, k) => acc + getAddonPrice(k, chosenSize), 0)}</button>
+              <button 
+                type="button" 
+                onClick={() => {
+                  if (hasPlayedGame) {
+                    toast.error("गेम खेलने के बाद कार्ट में बदलाव नहीं किया जा सकता! 🛑");
+                    return;
+                  }
+                  handleAddToCart();
+                }} 
+                className="w-full bg-orange-500 text-black p-5 rounded-2xl font-black uppercase"
+              >
+                Confirm • ₹{chosenPrice + Object.keys(selectedAddons).filter(k => selectedAddons[k] === true).reduce((acc, k) => acc + getAddonPrice(k, chosenSize), 0)}
+              </button>
               <button type="button" onClick={() => { setSelectedProduct(null); setChosenSize(""); setChosenPrice(0); setSelectedAddons({}); setSugarLevel("Normal"); setIceLevel("Normal Ice"); }} className="w-full mt-4 text-gray-500 font-black text-xs text-center uppercase">Close</button>
             </motion.div>
           </div>
@@ -1418,12 +1374,34 @@ export default function BbCafeHome() {
                     <p className="text-orange-500 font-black mt-1">₹{item?.price || 0}</p>
                   </div>
                   <div className="flex items-center gap-2.5 bg-black/40 px-3 py-1.5 rounded-2xl border border-white/10 flex-shrink-0">
-                    <button onClick={() => removeItem(item.id)} className="w-8 h-8 flex items-center justify-center bg-red-500/10 text-red-500 rounded-lg text-lg font-black">-</button>
+                    <button 
+                      onClick={() => {
+                        if (hasPlayedGame) {
+                          toast.error("गेम खेलने के बाद कार्ट में बदलाव नहीं किया जा सकता! 🛑");
+                          return;
+                        }
+                        removeItem(item.id);
+                      }} 
+                      className="w-8 h-8 flex items-center justify-center bg-red-500/10 text-red-500 rounded-lg text-lg font-black"
+                    >
+                      -
+                    </button>
                     <span className="font-black text-sm px-1.5 text-white">{item.quantity}</span>
                     {item.isReward ? (
                       <button disabled className="w-8 h-8 flex items-center justify-center bg-white/5 text-gray-600 rounded-lg text-lg font-black cursor-not-allowed">+</button>
                     ) : (
-                      <button onClick={() => addItem(item)} className="w-8 h-8 flex items-center justify-center bg-green-500/10 text-green-500 rounded-lg text-lg font-black">+</button>
+                      <button 
+                        onClick={() => {
+                          if (hasPlayedGame) {
+                            toast.error("गेम खेलने के बाद कार्ट में बदलाव नहीं किया जा सकता! 🛑");
+                            return;
+                          }
+                          addItem(item);
+                        }} 
+                        className="w-8 h-8 flex items-center justify-center bg-green-500/10 text-green-500 rounded-lg text-lg font-black"
+                      >
+                        +
+                      </button>
                     )}
                   </div>
                 </div>
@@ -1471,6 +1449,7 @@ export default function BbCafeHome() {
                   <div className="grid grid-cols-3 gap-1.5">
                     <button
                       type="button"
+                      disabled={hasPlayedGame}
                       onClick={() => setDeliveryArea('town')}
                       className={`py-3 rounded-xl text-[9px] font-black uppercase border ${deliveryArea === 'town' ? 'bg-orange-500 text-black border-orange-500 shadow-md' : 'bg-white/5 text-gray-400 border-white/5'}`}
                     >
@@ -1478,6 +1457,7 @@ export default function BbCafeHome() {
                     </button>
                     <button
                       type="button"
+                      disabled={hasPlayedGame}
                       onClick={() => setDeliveryArea('outer')}
                       className={`py-3 rounded-xl text-[9px] font-black uppercase border ${deliveryArea === 'outer' ? 'bg-orange-500 text-black border-orange-500 shadow-md' : 'bg-white/5 text-gray-400 border-white/5'}`}
                     >
@@ -1485,6 +1465,7 @@ export default function BbCafeHome() {
                     </button>
                     <button
                       type="button"
+                      disabled={hasPlayedGame}
                       onClick={() => setDeliveryArea('long')}
                       className={`py-3 rounded-xl text-[9px] font-black uppercase border ${deliveryArea === 'long' ? 'bg-orange-500 text-black border-orange-500 shadow-md' : 'bg-white/5 text-gray-400 border-white/5'}`}
                     >
@@ -1496,9 +1477,9 @@ export default function BbCafeHome() {
                 <div className="bg-orange-500/10 border border-orange-500/20 rounded-[2rem] p-5 space-y-2">
                   <div className="flex items-center gap-2 text-orange-400 font-black text-xs uppercase"><Sparkles size={16}/> <span>Free Delivery Rules</span></div>
                   <ul className="text-[11px] text-gray-400 font-bold space-y-1">
-                    <li>• मोहंद्रा टाउन: Free above ₹99 <span className="text-green-500">({getTotal() >= 99 ? 'Achieved' : 'Need ₹' + (99 - getTotal()) + ' more'})</span></li>
-                    <li>• 5 किलोमीटर: Free above ₹499</li>
-                    <li>• 12 किलोमीटर: Free above ₹999</li>
+                    <li className={deliveryArea === 'town' ? "text-yellow-400 font-extrabold" : ""}>• मोहंद्रा टाउन: Free above ₹99 <span className="text-green-500">({getTotal() >= 99 ? 'Achieved' : 'Need ₹' + (99 - getTotal()) + ' more'})</span></li>
+                    <li className={deliveryArea === 'outer' ? "text-yellow-400 font-extrabold" : ""}>• 5 किलोमीटर: Free above ₹499 <span className="text-green-500">({getTotal() >= 499 ? 'Achieved' : 'Need ₹' + (499 - getTotal()) + ' more'})</span></li>
+                    <li className={deliveryArea === 'long' ? "text-yellow-400 font-extrabold" : ""}>• 12 किलोमीटर: Free above ₹999 <span className="text-green-500">({getTotal() >= 999 ? 'Achieved' : 'Need ₹' + (999 - getTotal()) + ' more'})</span></li>
                   </ul>
                 </div>
 
