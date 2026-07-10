@@ -139,6 +139,8 @@ export default function BbCafeHome() {
   const [gameTime, setGameTime] = useState(0); // in centiseconds
   const [isGameRunning, setIsGameRunning] = useState(false);
   const [gameResult, setGameResult] = useState<'win' | 'lose' | null>(null);
+  const [hasPlayedGame, setHasPlayedGame] = useState(false); // 1 Attempt lock
+  const [gameDiscount, setGameDiscount] = useState(0); // Automatic Win Discount
 
   const formatBillNumber = (num: number) => String(num).padStart(4, '0');
 
@@ -471,7 +473,7 @@ export default function BbCafeHome() {
     }
 
     const couponDiscount = appliedCoupon ? Number(appliedCoupon.discountValue) : 0;
-    const finalTotal = Math.max(0, subtotal - couponDiscount) + deliveryCharge;
+    const finalTotal = Math.max(0, subtotal - (couponDiscount + gameDiscount)) + deliveryCharge;
     
     const pointsEarned = Math.floor(finalTotal / 100);
     const totalPointsCost = cart.reduce((acc: number, i: any) => acc + (i.pointsCost || 0), 0);
@@ -479,7 +481,7 @@ export default function BbCafeHome() {
     try {
       await addDoc(collection(db, "orders"), {
         billNumber, tokenNumber, customerName: customerDetails.name, customerPhone: customerDetails.phone,
-        address, items: cart, subtotal, discount: couponDiscount, total: finalTotal, timestamp: new Date(), status: 'pending'
+        address, items: cart, subtotal, discount: couponDiscount + gameDiscount, total: finalTotal, timestamp: new Date(), status: 'pending'
       });
       if (pointsEarned > 0 || totalPointsCost > 0) {
         await setDoc(doc(db, "customer_points", customerDetails.phone.replace("+91", "")), {
@@ -491,7 +493,7 @@ export default function BbCafeHome() {
     let itemsText = "";
     cart.forEach((i: any) => itemsText += `• ${i.name || "Item"} x${i.quantity || 1} - ₹${(i.price || 0) * (i.quantity || 1)}\n`);
     
-    const msg = `🔥 *BUM BUM CAFE - NEW ORDER*\n\n*Bill No:* #${formattedBillStr}\n*Token No:* #${tokenNumber}\n*Customer:* ${customerDetails.name}\n*Phone:* ${customerDetails.phone}\n*Address:* ${address}\n*Cutlery Needed:* ${noCutlery ? 'No 🌳' : 'Yes'}\n\n*ITEMS:*\n${itemsText}\n*Subtotal:* ₹${subtotal}\n*Coupon Discount:* -₹${couponDiscount}\n*Delivery:* ₹${deliveryCharge}\n*TOTAL BILL: ₹${finalTotal}*\n\n*Points Earned:* +${pointsEarned} Pts\n${totalPointsCost > 0 ? `*Points Redeemed:* -${totalPointsCost} Pts\n` : ''}\n_Confirm order by replying 'YES'_`;
+    const msg = `🔥 *BUM BUM CAFE - NEW ORDER*\n\n*Bill No:* #${formattedBillStr}\n*Token No:* #${tokenNumber}\n*Customer:* ${customerDetails.name}\n*Phone:* ${customerDetails.phone}\n*Address:* ${address}\n*Cutlery Needed:* ${noCutlery ? 'No 🌳' : 'Yes'}\n\n*ITEMS:*\n${itemsText}\n*Subtotal:* ₹${subtotal}\n*Discount:* -₹${couponDiscount + gameDiscount}\n*Delivery:* ₹${deliveryCharge}\n*TOTAL BILL: ₹${finalTotal}*\n\n*Points Earned:* +${pointsEarned} Pts\n${totalPointsCost > 0 ? `*Points Redeemed:* -${totalPointsCost} Pts\n` : ''}\n_Confirm order by replying 'YES'_`;
     
     // --- CALLMEBOT MULTIPLE DELIVERY BOYS TRIGGER (BACKGROUND) ---
     const activeRiders = deliveryBoys.filter(b => b.isActive === true);
@@ -505,6 +507,13 @@ export default function BbCafeHome() {
     });
 
     window.open(`https://wa.me/919714293759?text=${encodeURIComponent(msg)}`, '_blank');
+    
+    // Reset Game States after checkout
+    setHasPlayedGame(false);
+    setGameDiscount(0);
+    setGameResult(null);
+    setGameTime(0);
+
     clearCart(); setAppliedCoupon(null); setEnteredCoupon(""); setIsCartOpen(false);
     toast.success("Redirecting to WhatsApp!");
   };
@@ -629,6 +638,10 @@ export default function BbCafeHome() {
 
   // --- STOPWATCH GAME MECHANICS ---
   const handleStartGame = () => {
+    if (hasPlayedGame) {
+      toast.error("भैया, इस आर्डर पर आप पहले ही गेम खेल चुके हैं! 🛑");
+      return;
+    }
     setGameTime(0);
     setGameResult(null);
     setIsGameRunning(true);
@@ -636,10 +649,15 @@ export default function BbCafeHome() {
 
   const handleStopGame = () => {
     setIsGameRunning(false);
+    setHasPlayedGame(true); // Lock further play attempts for this transaction
     const target = 1000; // 10.00 seconds is 1000 centiseconds
     if (gameTime === target) {
       setGameResult('win');
-      toast.success("🎉 अविश्वसनीय! आपने बिल्कुल 10.00 सेकंड पर स्टॉपवॉच रोकी! आप ₹500 का फ्री आर्डर जीत चुके हैं!");
+      // Direct dynamic discount logic up to ₹500
+      const currentCartTotal = getTotal();
+      const calculatedDiscount = Math.min(currentCartTotal, 500);
+      setGameDiscount(calculatedDiscount); 
+      toast.success(`🎉 अद्भुत! आपने ठीक 10.00s पर स्टॉपवॉच रोकी! आपका यह आर्डर ₹${calculatedDiscount} फ्री हो गया!`);
     } else {
       setGameResult('lose');
     }
@@ -668,7 +686,7 @@ export default function BbCafeHome() {
         </div>
       </header>
 
-      {/* STICKY SEARCH BAR WITH SLIDING PLACEHOLDER & VOICE SEARCH (z-[60] to prevent overlap) */}
+      {/* STICKY SEARCH BAR WITH SLIDING PLACEHOLDER & VOICE SEARCH (z-[60] to prevent sidebar overlap) */}
       <div className="sticky top-0 z-[60] bg-[#050505]/95 backdrop-blur-md py-4 px-4 border-b border-white/5 rounded-b-3xl">
         <div className="relative max-w-sm mx-auto">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
@@ -690,7 +708,7 @@ export default function BbCafeHome() {
         </div>
       </div>
 
-      {/* TRIPLE SIDE-TOGGLES STACKED CLEANLY ON THE RIGHT (z-[45] so they scroll behind sticky search) */}
+      {/* TRIPLE SIDE-TOGGLES STACKED CLEANLY ON THE RIGHT (z-[45] so they scroll cleanly behind search) */}
       <button 
         onClick={() => setIsSocialsOpen(true)} 
         className="fixed right-0 top-[31%] -translate-y-1/2 bg-[#ff5e00] text-white py-4 px-2.5 rounded-l-2xl z-[45] text-[9px] font-black tracking-widest uppercase flex flex-col items-center gap-1 shadow-xl border-l border-y border-white/10"
@@ -707,7 +725,6 @@ export default function BbCafeHome() {
         ⭐ REVIEWS
       </button>
 
-      {/* NEW STOPWATCH CHALLENGE FLOATING SIDEBAR TOGGLE */}
       <button 
         onClick={() => setIsGameOpen(true)} 
         className="fixed right-0 top-[57%] -translate-y-1/2 bg-gradient-to-r from-red-500 to-orange-500 text-white py-4 px-2.5 rounded-l-2xl z-[45] text-[9px] font-black tracking-widest uppercase flex flex-col items-center gap-1 shadow-xl border-l border-y border-white/10 animate-bounce"
@@ -745,7 +762,7 @@ export default function BbCafeHome() {
           )}
         </div>
 
-        {/* 10-SECOND CHALLENGE PROMO BOX/BANNER */}
+        {/* 10-SECOND CHALLENGE BANNER / PROMO */}
         <div className="bg-gradient-to-r from-red-600/15 to-orange-600/15 border border-red-500/30 p-5 rounded-[2.2rem] text-center space-y-3 relative overflow-hidden">
           <div className="absolute top-0 right-0 bg-red-600 text-white font-black uppercase text-[8px] px-3 py-1 rounded-bl-xl tracking-widest animate-pulse">CHALLENGE</div>
           <span className="text-[10px] font-black uppercase text-red-400 flex justify-center items-center gap-1">⏱️ 10 SECOND SPEED CHALLENGE</span>
@@ -759,7 +776,7 @@ export default function BbCafeHome() {
           </button>
         </div>
 
-        {/* ZOMATO-STYLE CATEGORY HORIZONTAL SLIDER (Without "See More" Button) */}
+        {/* ZOMATO-STYLE CATEGORY HORIZONTAL SLIDER */}
         <div className="bg-white/[0.01] border border-white/5 p-5 rounded-[2.5rem] space-y-4">
           <p className="text-[9px] font-black uppercase tracking-widest text-orange-500">Inspiration for your first order</p>
           <div className="flex gap-4 overflow-x-auto no-scrollbar py-2">
@@ -889,12 +906,12 @@ export default function BbCafeHome() {
 
       </main>
 
-      {/* --- FLOATING AI CHAT BUBBLE (Bottom Left) --- */}
+      {/* --- FLOATING AI CHAT BUBBLE (Bottom Left - Styled as a tiny non-disturbing Cafe Icon ☕) --- */}
       <button 
         onClick={() => setIsAiOpen(true)} 
-        className="fixed bottom-24 left-4 bg-gradient-to-r from-purple-600 to-pink-600 text-white p-3.5 rounded-full shadow-2xl z-40 transition-all active:scale-95 border border-white/10 animate-pulse"
+        className="fixed bottom-24 left-4 w-11 h-11 bg-gradient-to-tr from-[#ff5e00] to-[#b33600] rounded-full shadow-2xl z-40 transition-all active:scale-95 border border-white/10 flex items-center justify-center overflow-hidden hover:rotate-6"
       >
-        💬 AI
+        <span className="text-xl">☕</span>
       </button>
 
       {/* --- REVIEWS SIDE DRAWER --- */}
@@ -930,7 +947,7 @@ export default function BbCafeHome() {
         )}
       </AnimatePresence>
 
-      {/* --- INTERACTIVE STOPWATCH GAME MODAL --- */}
+      {/* --- INTERACTIVE STOPWATCH GAME MODAL (10S CHALLENGE) --- */}
       <AnimatePresence>
         {isGameOpen && (
           <div className="fixed inset-0 bg-black/95 z-[270] flex items-center justify-center p-6">
@@ -961,8 +978,7 @@ export default function BbCafeHome() {
               {gameResult === 'win' && (
                 <div className="p-4 bg-green-500/10 border border-green-500/25 rounded-2xl text-center space-y-1 animate-pulse">
                   <p className="text-xs font-black text-green-400 uppercase">🎉 विजेता! आपने कर दिखाया!</p>
-                  <p className="text-[9px] text-gray-300">नीचे दिया सीक्रेट कोड कॉपी करें और कार्ट में अप्लाई करें:</p>
-                  <p className="text-lg font-mono font-black text-white tracking-widest bg-black/40 py-1.5 rounded-lg border border-white/10 uppercase">BUMBUM10SEC</p>
+                  <p className="text-[10px] text-gray-300">आपका यह आर्डर (अधिकतम ₹500 तक) बिल्कुल मुफ्त (Free) हो गया है! 🎁</p>
                 </div>
               )}
 
@@ -973,12 +989,17 @@ export default function BbCafeHome() {
                 </div>
               )}
 
+              {hasPlayedGame && gameResult !== 'win' && (
+                <p className="text-[9px] text-gray-500 font-semibold uppercase italic">⚠️ इस आर्डर का चांस पूरा हो गया है। नया आर्डर बनाकर दोबारा खेलें!</p>
+              )}
+
               {/* CONTROLS */}
               <div className="flex gap-3">
                 {!isGameRunning ? (
                   <button 
                     onClick={handleStartGame} 
-                    className="flex-1 bg-green-500 hover:bg-green-600 text-black font-black p-4.5 rounded-2xl text-xs uppercase transition-all"
+                    disabled={hasPlayedGame}
+                    className={`flex-1 font-black p-4.5 rounded-2xl text-xs uppercase transition-all ${hasPlayedGame ? 'bg-white/5 text-gray-600 cursor-not-allowed border border-white/5' : 'bg-green-500 hover:bg-green-600 text-black'}`}
                   >
                     🚀 START
                   </button>
@@ -1179,241 +1200,6 @@ export default function BbCafeHome() {
 
               <button type="button" onClick={handleAddToCart} className="w-full bg-orange-500 text-black p-5 rounded-2xl font-black uppercase">Confirm • ₹{chosenPrice + (addonCheese ? 30 : 0) + (addonVeg ? 20 : 0)}</button>
               <button type="button" onClick={() => { setSelectedProduct(null); setChosenSize(""); setChosenPrice(0); setAddonCheese(false); setAddonVeg(false); setSugarLevel("Normal"); setIceLevel("Normal Ice"); }} className="w-full mt-4 text-gray-500 font-black text-xs text-center uppercase">Close</button>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* --- CART / CHECKOUT SIDEBAR - PREMIUM SLIDE-UP BOTTOM SHEET --- */}
-      <AnimatePresence>
-        {isCartOpen && (
-          <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-[110] flex items-end">
-            <motion.div 
-              initial={{ y: "100%" }} 
-              animate={{ y: 0 }} 
-              exit={{ y: "100%" }} 
-              transition={{ type: "spring", damping: 26, stiffness: 190 }}
-              className="bg-[#0b0c10] w-full h-[92vh] rounded-t-[3rem] border-t border-white/10 overflow-y-auto pb-32 p-6 max-w-lg mx-auto relative shadow-2xl"
-            >
-              <div className="w-16 h-1.5 bg-white/15 rounded-full mx-auto mb-6" />
-              <div className="flex justify-between items-center mb-8">
-                <h2 className="text-3xl font-black text-white">Your Order</h2>
-                <button onClick={() => setIsCartOpen(false)} className="p-3 bg-white/5 hover:bg-white/10 text-white rounded-full transition-all"><X size={24} /></button>
-              </div>
-
-              {cart.map((item: any) => (
-                <div key={item.id} className="flex justify-between items-center bg-white/[0.02] p-5 rounded-3xl mb-4 border border-white/5">
-                  <div className="min-w-0 pr-3">
-                    <h4 className="font-bold text-sm text-gray-100 truncate">{item?.name || "Item"}</h4>
-                    <p className="text-orange-500 font-black mt-1">₹{item?.price || 0}</p>
-                  </div>
-                  <div className="flex items-center gap-2.5 bg-black/40 px-3 py-1.5 rounded-2xl border border-white/10 flex-shrink-0">
-                    <button onClick={() => removeItem(item.id)} className="w-8 h-8 flex items-center justify-center bg-red-500/10 text-red-500 rounded-lg text-lg font-black">-</button>
-                    <span className="font-black text-sm px-1.5 text-white">{item.quantity}</span>
-                    {item.isReward ? (
-                      <button disabled className="w-8 h-8 flex items-center justify-center bg-white/5 text-gray-600 rounded-lg text-lg font-black cursor-not-allowed">+</button>
-                    ) : (
-                      <button onClick={() => addItem(item)} className="w-8 h-8 flex items-center justify-center bg-green-500/10 text-green-500 rounded-lg text-lg font-black">+</button>
-                    )}
-                  </div>
-                </div>
-              ))}
-
-              <div className="mt-10 space-y-6">
-                
-                {/* --- FREE DELIVERY VISUAL PROGRESS BAR --- */}
-                {(() => {
-                  const subtotal = getTotal();
-                  const threshold = 99;
-                  const progress = Math.min((subtotal / threshold) * 100, 100);
-                  const needed = threshold - subtotal;
-
-                  return (
-                    <div className="bg-white/[0.02] border border-white/5 rounded-3xl p-5 space-y-3">
-                      {subtotal < threshold ? (
-                        <>
-                          <div className="flex justify-between items-center text-[10px] font-black uppercase">
-                            <span className="text-orange-400">⚡ Free Delivery Progress</span>
-                            <span className="text-gray-400">Add ₹{needed} more</span>
-                          </div>
-                          <div className="w-full bg-white/5 h-2 rounded-full overflow-hidden">
-                            <div 
-                              className="bg-gradient-to-r from-orange-500 to-yellow-400 h-full rounded-full transition-all duration-500" 
-                              style={{ width: `${progress}%` }} 
-                            />
-                          </div>
-                        </>
-                      ) : (
-                        <div className="flex items-center gap-2 text-[10px] font-black uppercase text-green-400 bg-green-500/10 border border-green-500/20 p-3 rounded-2xl justify-center">
-                          🎉 Congratulations! You got FREE Delivery
-                        </div>
-                      )}
-                    </div>
-                  );
-                })()}
-
-                {/* DYNAMIC DELIVERY AREA SELECTOR (Updated for 12km) */}
-                <div className="bg-white/[0.02] p-5 rounded-[2.2rem] border border-white/5 space-y-3">
-                  <div className="flex items-center gap-2 text-orange-500">
-                    <MapPin size={18}/>
-                    <h3 className="font-black uppercase text-xs">Select Delivery Area</h3>
-                  </div>
-                  <div className="grid grid-cols-3 gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => setDeliveryArea('town')}
-                      className={`py-3 rounded-xl text-[9px] font-black uppercase border ${deliveryArea === 'town' ? 'bg-orange-500 text-black border-orange-500 shadow-md' : 'bg-white/5 text-gray-400 border-white/5'}`}
-                    >
-                      Town (Free &gt; ₹99)
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setDeliveryArea('outer')}
-                      className={`py-3 rounded-xl text-[9px] font-black uppercase border ${deliveryArea === 'outer' ? 'bg-orange-500 text-black border-orange-500 shadow-md' : 'bg-white/5 text-gray-400 border-white/5'}`}
-                    >
-                      5 Km (Free &gt; ₹499)
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setDeliveryArea('long')}
-                      className={`py-3 rounded-xl text-[9px] font-black uppercase border ${deliveryArea === 'long' ? 'bg-orange-500 text-black border-orange-500 shadow-md' : 'bg-white/5 text-gray-400 border-white/5'}`}
-                    >
-                      12 Km (Charge: ₹99)
-                    </button>
-                  </div>
-                </div>
-
-                <div className="bg-orange-500/10 border border-orange-500/20 rounded-[2rem] p-5 space-y-2">
-                  <div className="flex items-center gap-2 text-orange-400 font-black text-xs uppercase"><Sparkles size={16}/> <span>Free Delivery Rules</span></div>
-                  <ul className="text-[11px] text-gray-400 font-bold space-y-1">
-                    <li>• मोहंद्रा टाउन: Free above ₹99 <span className="text-green-500">({getTotal() >= 99 ? 'Achieved' : 'Need ₹' + (99 - getTotal()) + ' more'})</span></li>
-                    <li>• 5 किलोमीटर: Free above ₹499</li>
-                    <li>• 12 किलोमीटर: Free above ₹999</li>
-                  </ul>
-                </div>
-
-                {customerDetails && (
-                  <div className="bg-yellow-400/5 border border-yellow-400/20 rounded-[2rem] p-5 space-y-3">
-                    <div className="flex items-center gap-2 text-yellow-400 font-black text-xs uppercase"><Gift size={14}/> <span>⭐ बम बम लॉयल्टी क्लब</span></div>
-                    
-                    <div className="flex justify-between items-center border-b border-white/5 pb-3">
-                      <div>
-                        <h4 className="text-3xl font-black text-white">{customerPoints} <span className="text-[10px] text-gray-500 font-bold uppercase">Points</span></h4>
-                        <p className="text-[9px] text-gray-400">Spend ₹100 = Get 1 Point!</p>
-                      </div>
-                      <div className="text-right text-[9px] text-yellow-400 font-black space-y-1 uppercase tracking-wider bg-yellow-400/5 p-3 rounded-xl border border-yellow-400/10 max-h-24 overflow-y-auto no-scrollbar">
-                        {loyaltyRules.length === 0 ? (
-                          <><p>🎁 10 Pts = Sandwich</p><p>🎁 20 Pts = Small Pizza</p></>
-                        ) : (
-                          loyaltyRules.map(rule => (<p key={rule.id}>🎁 {rule.pointsCost} Pts = {rule.rewardName}</p>))
-                        )}
-                      </div>
-                    </div>
-
-                    {/* SHARE & REFERRAL POINTS CARD */}
-                    <div className="pt-2 flex flex-col gap-2.5">
-                      <div className="flex justify-between items-center">
-                        <span className="text-[10px] text-gray-400 font-black uppercase flex items-center gap-1">📤 Share Progress:</span>
-                        <span className="text-[10px] text-yellow-400 font-black tracking-widest bg-yellow-400/10 px-2.5 py-0.5 rounded-lg border border-yellow-400/20">{shareCount}/5 Shared</span>
-                      </div>
-                      <button 
-                        type="button" 
-                        onClick={handleShareApp} 
-                        className="w-full bg-green-600 hover:bg-green-700 text-white font-black py-3 rounded-xl text-xs uppercase flex items-center justify-center gap-2 border border-green-500/20 transition-all shadow-md active:scale-95"
-                      >
-                        <Share2 size={14}/>
-                        <span>Invite 5 Friends & Get +1 Point! 🎁</span>
-                      </button>
-                    </div>
-                    
-                    <div className="pt-2.5 border-t border-white/5 flex justify-between items-center mt-2">
-                      <span className="text-[10px] text-gray-400 font-bold uppercase">Gift points to friend:</span>
-                      <button type="button" onClick={() => setIsGiftModalOpen(true)} className="bg-yellow-400/10 hover:bg-yellow-400/20 text-yellow-400 border border-yellow-400/20 px-3 py-1.5 rounded-xl text-[9px] font-black uppercase">🎁 Gift Points</button>
-                    </div>
-
-                    <div className="space-y-2 pt-1 border-t border-white/5 mt-2">
-                      <p className="text-[10px] text-gray-400 font-black uppercase">Redeem Your Points Here:</p>
-                      <div className="grid grid-cols-2 gap-2 max-h-32 overflow-y-auto no-scrollbar pr-1 mt-1">
-                        {loyaltyRules.length === 0 ? (
-                          <>
-                            <button type="button" onClick={() => handleCustomerRedeem("reward-sandwich", "🎁 FREE Loyalty Sandwich", 10)} disabled={customerPoints - cart.reduce((acc: number, i: any) => acc + (i.pointsCost || 0), 0) < 10} className={`py-2.5 px-3 rounded-xl text-[10px] font-black uppercase border ${(customerPoints - cart.reduce((acc: number, i: any) => acc + (i.pointsCost || 0), 0) >= 10) ? 'bg-yellow-400 text-black border-yellow-400' : 'bg-white/5 text-gray-500 border-white/5'}`}>🥪 Sandwich (10 P)</button>
-                            <button type="button" onClick={() => handleCustomerRedeem("reward-pizza", "🎁 FREE Loyalty Small Pizza", 20)} disabled={customerPoints - cart.reduce((acc: number, i: any) => acc + (i.pointsCost || 0), 0) < 20} className={`py-2.5 px-3 rounded-xl text-[10px] font-black uppercase border ${(customerPoints - cart.reduce((acc: number, i: any) => acc + (i.pointsCost || 0), 0) >= 20) ? 'bg-yellow-400 text-black border-yellow-400' : 'bg-white/5 text-gray-500 border-white/5'}`}>🍕 Pizza (20 P)</button>
-                          </>
-                        ) : (
-                          loyaltyRules.map(rule => {
-                            const inCartCost = cart.reduce((acc: number, i: any) => acc + (i.pointsCost || 0), 0);
-                            const isAffordable = (customerPoints - inCartCost) >= rule.pointsCost;
-                            return (
-                              <button key={rule.id} type="button" onClick={() => handleCustomerRedeem(`reward-${rule.id}`, `🎁 FREE ${rule.rewardName}`, rule.pointsCost)} disabled={!isAffordable} className={`py-2.5 px-3 rounded-xl text-[10px] font-black uppercase border truncate ${isAffordable ? 'bg-yellow-400 text-black border-yellow-400' : 'bg-white/5 text-gray-500 border-white/5'}`}>🎁 {rule.rewardName} ({rule.pointsCost} P)</button>
-                            );
-                          })
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* GREEN CUTLERY SELECTOR */}
-                <div className="flex items-center justify-between px-5 py-4 bg-green-500/5 border border-green-500/10 rounded-3xl">
-                  <div className="flex items-center gap-3">
-                    <span className="text-lg">🌳</span>
-                    <div className="text-left">
-                      <span className="text-[10px] font-black uppercase text-green-400 block">Don't send plastic spoons (Save Earth)</span>
-                      <p className="text-[8px] text-gray-400 font-semibold">Ghar par chammach hai? Plastic kachra bachayein!</p>
-                    </div>
-                  </div>
-                  <input 
-                    type="checkbox" 
-                    checked={noCutlery} 
-                    onChange={(e) => setNoCutlery(e.target.checked)} 
-                    className="w-5 h-5 accent-green-500 cursor-pointer" 
-                  />
-                </div>
-
-                <div className="bg-white/[0.02] border border-white/5 p-5 rounded-[2rem] space-y-3">
-                  <div className="flex items-center gap-2 text-orange-500 font-black text-xs uppercase"><Percent size={16}/> <span>Have a promo code?</span></div>
-                  <div className="flex gap-2">
-                    <input type="text" placeholder="e.g. WELCOME" value={enteredCoupon} onChange={(e) => setEnteredCoupon(e.target.value)} className="flex-1 bg-black/40 border border-white/10 rounded-xl p-3 text-xs text-white uppercase" />
-                    <button type="button" onClick={handleApplyCoupon} className="bg-orange-500 text-black font-black text-xs p-3 px-5 rounded-xl">APPLY</button>
-                  </div>
-                  {appliedCoupon && (
-                    <div className="flex justify-between items-center text-xs bg-green-500/10 border border-green-500/25 p-3 rounded-xl">
-                      <span className="text-green-400 font-bold uppercase">Code Applied: {appliedCoupon.code}</span>
-                      <button onClick={() => { setAppliedCoupon(null); setEnteredCoupon(""); }} className="text-red-400 font-bold">Remove</button>
-                    </div>
-                  )}
-                </div>
-
-                {customerDetails ? (
-                  <div className="bg-white/[0.02] p-5 rounded-[2.2rem] border border-white/5 flex justify-between items-center">
-                    <div className="text-left">
-                      <p className="text-[9px] text-gray-500 font-black uppercase">Ordering As</p>
-                      <h4 className="font-black text-md text-orange-500">{customerDetails.name}</h4>
-                      <p className="text-xs text-gray-400">{customerDetails.phone}</p>
-                    </div>
-                    <button onClick={() => { localStorage.removeItem('bb_cafe_customer'); setCustomerDetails(null); }} className="text-[10px] bg-red-500/10 text-red-500 px-3 py-2 rounded-xl font-black uppercase">Change</button>
-                  </div>
-                ) : (
-                  <button onClick={() => setIsLoginOpen(true)} className="w-full p-5 bg-orange-500/10 text-orange-500 border border-orange-500/20 rounded-[2.2rem] font-black text-sm uppercase">👤 Add Name & Phone To Order</button>
-                )}
-
-                <div className="bg-white/[0.02] p-5 rounded-[2.2rem] border border-white/5">
-                  <div className="flex items-center gap-2 mb-3 text-orange-500"><MapPin size={18}/> <h3 className="font-black uppercase text-xs">Delivery Address</h3></div>
-                  <textarea placeholder="Ghar ka address, Landmark ke saath..." value={address} onChange={(e) => setAddress(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-2xl p-4 text-xs font-semibold text-white resize-none h-24 outline-none" />
-                </div>
-
-                <div className="bg-gradient-to-b from-orange-600 to-orange-700 p-8 rounded-[2.5rem] text-white">
-                  <div className="flex justify-between font-bold mb-2 text-sm"><span>Items Total</span> <span>₹{getTotal()}</span></div>
-                  {appliedCoupon && (
-                    <div className="flex justify-between font-bold mb-2 text-sm text-green-200"><span>Coupon Discount</span> <span>-₹{appliedCoupon.discountValue}</span></div>
-                  )}
-                  <div className="flex justify-between font-bold mb-4 text-sm opacity-90"><span>Delivery Charge</span> <span>{deliveryArea === 'town' ? (getTotal() < 99 ? "₹20" : "FREE") : deliveryArea === 'outer' ? (getTotal() < 499 ? "₹50" : "FREE") : (getTotal() < 999 ? "₹99" : "FREE")}</span></div>
-                  <div className="h-px bg-white/20 mb-4" />
-                  <div className="flex justify-between font-black text-2xl"><span>To Pay</span> <span>₹{Math.max(0, getTotal() - (appliedCoupon ? appliedCoupon.discountValue : 0)) + (deliveryArea === 'town' ? (getTotal() < 99 ? 20 : 0) : deliveryArea === 'outer' ? (getTotal() < 499 ? 50 : 0) : (getTotal() < 999 ? 99 : 0))}</span></div>
-                </div>
-
-                <button onClick={sendWhatsAppOrder} type="button" className="w-full bg-green-600 hover:bg-green-700 p-6 rounded-[2.5rem] font-black text-md text-white flex items-center justify-center gap-3">ORDER ON WHATSAPP</button>
-              </div>
             </motion.div>
           </div>
         )}
