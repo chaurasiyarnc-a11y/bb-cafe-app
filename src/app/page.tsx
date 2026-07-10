@@ -86,7 +86,7 @@ export default function BbCafeHome() {
   const [isGiftModalOpen, setIsGiftModalOpen] = useState(false);
   const [giftPhone, setGiftPhone] = useState("");
   
-  // Fixed state generic definition [1.1.2]
+  // Cleaned generic state typing parameters completely [1.1.2]
   const [giftPointsAmount, setGiftPointsAmount] = useState<number | "">("");
   const [isGiftingLoading, setIsGiftingLoading] = useState(false);
 
@@ -226,14 +226,13 @@ export default function BbCafeHome() {
 
   const formatBillNumber = (num: number) => String(num).padStart(4, '0');
 
-  // Correctly defined Category Image selector function at helper scope level
   const getCategoryImage = (catName: string) => {
     const found = dbCategories.find(c => c.name === catName);
     if (found && found.image) return found.image;
     return CATEGORY_IMAGES[catName] || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=150&q=80";
   };
 
-  // --- 3. MEMOS & SCHEDULERS ---
+  // --- 3. MEMOS ---
 
   // Dynamic Seasonal Theme
   const activeTheme = useMemo(() => {
@@ -321,6 +320,14 @@ export default function BbCafeHome() {
     return Array.from(new Set(result));
   }, [dbCategories]);
 
+  const upsellSuggestionItems = useMemo(() => {
+    return menu.filter(item => {
+      const isShake = item?.category === "Super Cool" || item?.category === "Fast Food";
+      const notInCart = !cart.some((c: any) => c.id === item.id);
+      return isShake && notInCart;
+    }).slice(0, 2);
+  }, [menu, cart]);
+
   // --- 4. LIFE CYCLE EFFECTS ---
 
   useEffect(() => {
@@ -343,8 +350,9 @@ export default function BbCafeHome() {
 
     const unsubStore = onSnapshot(doc(db, "settings", "store"), (d) => { if(d.exists()) setStoreOpen(d.data().isOpen); });
     
+    // Corrected the mapping separator syntax error (comma included) [1]
     const unsubMenu = onSnapshot(query(collection(db, "products")), (snap) => {
-      const items = snap.docs.map(doc => ({ id: doc.id ...doc.data() })).filter((i: any) => i.isVisible !== false);
+      const items = snap.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter((i: any) => i.isVisible !== false);
       setMenu(items);
       localStorage.setItem('bb_cached_menu', JSON.stringify(items)); 
     }, () => {
@@ -436,52 +444,6 @@ export default function BbCafeHome() {
     } else {
       toast.error("Invalid coupon code");
     }
-  };
-
-  const handleDetectLocation = () => {
-    if (!navigator.geolocation) {
-      return toast.error("आपके ब्राउज़र में जीपीएस लोकेशन उपलब्ध नहीं है।");
-    }
-    toast.loading("सटीक लोकेशन ट्रैक कर रहे हैं...");
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        toast.dismiss();
-        const { latitude, longitude } = position.coords;
-        setAddress(`My GPS Location: https://www.google.com/maps?q=${latitude},${longitude}`);
-        toast.success("जीपीएस से लोकेशन सफलतापूर्वक जोड़ी गई!");
-        
-        const mohandraLat = 24.2863;
-        const mohandraLng = 80.1245;
-        
-        const calculatedDistance = calculateDistanceInKm(latitude, longitude, mohandraLat, mohandraLng);
-        setDistanceKm(Number(calculatedDistance.toFixed(2)));
-
-        if (calculatedDistance > 20) {
-          setIsTooFar(true);
-          toast.error("ध्यान दें: आप बूम बूम कैफे से 20 किमी से अधिक दूर हैं। आप केवल हमारा शानदार मेनू देख सकते हैं, आर्डर नहीं कर सकते।", { duration: 8000 });
-        } else {
-          setIsTooFar(false);
-          
-          if (calculatedDistance <= 1.0) {
-            setSelectedArea(DELIVERY_AREAS[0]); 
-            toast.success(`सटीक दूरी: ${calculatedDistance.toFixed(2)} KM। आपके लिए 'Mohandra Town' क्षेत्र चुना गया है।`);
-          } else if (calculatedDistance <= 2.0) {
-            setSelectedArea(DELIVERY_AREAS[1]); 
-            toast.success(`सटीक दूरी: ${calculatedDistance.toFixed(2)} KM। आपके लिए 'Mohandra Ward 1-5' क्षेत्र चुना गया है।`);
-          } else if (calculatedDistance <= 5.0) {
-            setSelectedArea(DELIVERY_AREAS[2]); 
-            toast.success(`सटीक दूरी: ${calculatedDistance.toFixed(2)} KM। आपके लिए 'Nearby Area (Within 5 Km)' क्षेत्र चुना गया है।`);
-          } else {
-            setSelectedArea(DELIVERY_AREAS[3]); 
-            toast.success(`सटीक दूरी: ${calculatedDistance.toFixed(2)} KM। आपके लिए 'Out of Town' क्षेत्र चुना गया है।`);
-          }
-        }
-      },
-      () => {
-        toast.dismiss();
-        toast.error("लोकेशन की अनुमति अस्वीकार कर दी गई है या नेटवर्क त्रुटि है।");
-      }
-    );
   };
 
   const handleGiftPoints = async (e: React.FormEvent) => {
@@ -703,88 +665,6 @@ export default function BbCafeHome() {
     setPizzaAddons({});
   };
 
-  const handleSocialClick = async (platform: string, url: string) => {
-    window.open(url, '_blank');
-
-    if (!customerDetails?.phone) {
-      toast.error("पॉइंट्स क्लेम करने के लिए कृपया पहले अपना Name और Phone दर्ज करें!");
-      setIsLoginOpen(true);
-      return;
-    }
-
-    const storageKey = `bb_claimed_${customerDetails.phone.replace("+91", "")}_${platform}`;
-    const alreadyClaimed = localStorage.getItem(storageKey);
-
-    if (alreadyClaimed) {
-      toast.success("आप इस प्लेटफ़ॉर्म के लिए पहले ही पॉइंट ले चुके हैं! धन्यवाद ❤️");
-      return;
-    }
-
-    try {
-      const phoneRaw = customerDetails.phone.replace("+91", "").trim();
-      const pointsRef = doc(db, "customer_points", phoneRaw);
-      
-      await setDoc(pointsRef, {
-        points: increment(1),
-        lastActive: new Date()
-      }, { merge: true });
-
-      localStorage.setItem(storageKey, "true");
-      setCustomerPoints(prev => prev + 1);
-      toast.success(`🎉 बधाई हो! ${platform.toUpperCase()} पर हमें फॉलो करने के लिए आपको +1 पॉइंट मिला है!`);
-    } catch (err) {
-      toast.error("पॉइंट्स जोड़ने में समस्या आई।");
-    }
-  };
-
-  const getClaimStatus = (platform: string) => {
-    if (!customerDetails?.phone) return "🎁 +1 Pt";
-    const storageKey = `bb_claimed_${customerDetails.phone.replace("+91", "")}_${platform}`;
-    return localStorage.getItem(storageKey) ? "✅ Claimed" : "🎁 Claim +1 Pt";
-  };
-
-  const handleShareApp = async () => {
-    if (!customerDetails?.phone) {
-      toast.error("पॉइंट्स कमाने के लिए पहले Name और Phone दर्ज करें!");
-      setIsLoginOpen(true);
-      return;
-    }
-
-    const phoneClean = customerDetails.phone.replace("+91", "").trim();
-    const shareCountKey = `bb_shares_${phoneClean}`;
-    let currentShares = Number(localStorage.getItem(shareCountKey) || 0);
-
-    const shareMessage = `🔥 *BUM BUM CAFE - Mohandra* 🔥\nयहाँ से ऑर्डर करें बेहतरीन और स्वादिष्ट Pizza, Thali और Fast Food! सीधे आपके घर तक सुपर फास्ट होम डिलीवरी।\n👉 ${window.location.origin}`;
-    const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(shareMessage)}`;
-
-    window.open(whatsappUrl, '_blank');
-
-    if (currentShares < 5) {
-      const nextShares = currentShares + 1;
-      localStorage.setItem(shareCountKey, String(nextShares));
-      setShareCount(nextShares);
-
-      if (nextShares === 5) {
-        try {
-          const pointsRef = doc(db, "customer_points", phoneClean);
-          await setDoc(pointsRef, {
-            points: increment(1),
-            lastActive: new Date()
-          }, { merge: true });
-
-          setCustomerPoints(prev => prev + 1);
-          toast.success("🎉 शानदार! आपने 5 दोस्तों के साथ ऐप शेयर करके +1 Loyalty Point कमा लिया है!");
-        } catch (e) {}
-      } else {
-        toast.success(`📤 शेयर किया गया! (${nextShares}/5 प्रोग्रेस। +1 पॉइंट के लिए ${5 - nextShares} और दोस्तों को शेयर करें!)`);
-      }
-    } else {
-      localStorage.setItem(shareCountKey, "1");
-      setShareCount(1);
-      toast.success("📤 नया शेयर प्रोग्रेस शुरू हुआ! (1/5 पूरा)");
-    }
-  };
-
   if (!mounted) return null;
 
   return (
@@ -964,7 +844,7 @@ export default function BbCafeHome() {
           </div>
         )}
 
-        {/* PRODUCTS LISTING WITH INLINE SCROLLING AD OFFERS CAROUSEL */}
+        {/* PRODUCTS LISTING WITH INLINE SCROLLING AD OFFERS CAROUSEL [1.1.2] */}
         <div className="grid grid-cols-1 gap-4 pt-1">
           {filteredMenu.length === 0 ? (
             <p className="text-center text-gray-500 py-8 text-xs font-bold uppercase">No items found...</p>
