@@ -23,12 +23,45 @@ const CATEGORY_IMAGES: { [key: string]: string } = {
 
 const REVIEW_SUGGESTIONS = ["Swaad Zabardast! 😋", "Super Fast Delivery 🛵", "Best Pizza in Town 🍕", "Value for Money! 💰", "Highly Recommended! 🌟", "Pure & Hygienic food 🧼"];
 const DEFAULT_REVIEWS = [
-  { id: "def1", name: "Gaurav Soni", rating: 5, comment: "Bum Bum Cafe ki paneer pizza sach me pure Mohandra me best hai! Extra cheese is real love. ⭐⭐⭐⭐⭐" },
-  { id: "def2", name: "Anjali Patel", rating: 5, comment: "Fast food packing bahut achi thi, delivery boy behavior was also very polite. Recommended! ⭐⭐⭐⭐⭐" }
+  { id: "def1", name: "Gaurav Soni", rating: 5, comment: "बम बम कैफ़े की पनीर पिज्जा सच में पूरे मोहंद्रा में बेस्ट है! एक्स्ट्रा चीज़ इस रियल लव। ⭐⭐⭐⭐⭐" },
+  { id: "def2", name: "Anjali Patel", rating: 5, comment: "फास्ट फ़ूड पैकिंग बहुत अच्छी थी, डिलीवरी बॉय का व्यवहार भी बहुत विनम्र था। रेकमेंडेड! ⭐⭐⭐⭐⭐" }
 ];
 
-// Sliding Search Placeholders List
-const SEARCH_PLACEHOLDERS = ["Search special pizza... 🍕", "Search Oreo Shake... 🥤", "Search Special Thali... 🍱", "Search Burger... 🍔"];
+const SEARCH_PLACEHOLDERS = ["सर्च करें स्पेशल पिज्जा... 🍕", "सर्च करें ओरियो शेक... 🥤", "सर्च करें स्पेशल थाली... 🍱", "सर्च करें बर्गर... 🍔"];
+
+// --- ADVANCED OFFLINE GEMINI FALLBACK REPLY ENGINE (To Prevent Connection Error) ---
+const getLocalBotReply = (queryText: string, menuItems: any[]) => {
+  const q = queryText.toLowerCase().trim();
+  
+  if (q.includes("hi") || q.includes("hello") || q.includes("hey") || q.includes("राम राम") || q.includes("नमस्ते") || q.includes("namaste") || q.includes("हलो")) {
+    return "राम-राम भैया! 🙏 हम हैं बम बम कैफ़े की डिजिटल हेल्पडेस्क 'रिया दीदी'। आज आपका का खाबे को मन है? हमें बजट या मूड बताओ, हम बढ़िया डिश बता रहे! 🍕🥤";
+  }
+  if (q.includes("about") || q.includes("कैफे") || q.includes("cafe") || q.includes("शुरुआत") || q.includes("कहानी") || q.includes("बारे") || q.includes("history")) {
+    return "भैया, हमने बम बम कैफ़े की शुरुआत एक छोटे से सपने के साथ की थी—लोगों को घर जैसा स्वाद और कैफ़े वाला माहौल देने के लिए। यहाँ हर कप कॉफ़ी और हर स्लाइस पिज्जा प्यार और शुद्धता के साथ बनाया जाता है। हमारी कोशिश है कि आप जब भी यहाँ आएँ, एक प्यारी मुस्कान के साथ वापस जाएँ। ❤️";
+  }
+  if (q.includes("pizza") || q.includes("पिज्जा") || q.includes("पिज़्ज़ा")) {
+    const pizzas = menuItems.filter(i => i.category === "Special Pizza" || i.name.toLowerCase().includes("pizza"));
+    if (pizzas.length > 0) {
+      return `भैया, हमारे यहाँ ये लाजवाब पिज्जा उपलब्ध हैं:\n${pizzas.map(p => `• ${p.name} - ${p.price ? '₹'+p.price : 'कम रेट में'}`).join('\n')}\n\nसब शुद्ध अमूल चीज़ से प्यार से बनाए जाते हैं! 🍕`;
+    }
+    return "भैया, गरमा-गरम अमूल चीज़ वाला स्पेशल पिज़्ज़ा मिल जाएगा, अभी आर्डर करें! 🍕";
+  }
+  if (q.includes("delivery") || q.includes("डिलीवरी") || q.includes("होम") || q.includes("घर") || q.includes("delivery free")) {
+    return "भैया, होम डिलीवरी बिल्कुल फ्री है (टाउन में ₹99 से ऊपर)! स्वाद सीधे आपके दरवाज़े तक आएगा। 🏠🛵\n\n• मोहंद्रा टाउन: ₹99 से ऊपर फ्री डिलीवरी\n• 5 किलोमीटर: ₹499 से ऊपर फ्री डिलीवरी\n• 12 किलोमीटर: ₹999 से ऊपर फ्री डिलीवरी";
+  }
+  if (q.includes("address") || q.includes("पता") || q.includes("location") || q.includes("कहाँ") || q.includes("kahan") || q.includes("shop")) {
+    return "बम बम कैफ़े का पता है: 📍 बस स्टैंड मोहंद्रा, पीपल पेड़ के नीचे, मोहंद्रा (जिला पन्ना, मध्य प्रदेश)। आप नीचे मैप का बटन दबाकर डायरेक्ट नेविगेट कर सकते हैं! 🗺️";
+  }
+  if (q.includes("budget") || q.includes("कम") || q.includes("sasta") || q.includes("सस्ता") || q.includes("100") || q.includes("50") || q.includes("150")) {
+    return "भैया, बजट की बिल्कुल टेंशन मत लो! आप ₹50 में ठंडी कोल्ड कॉफ़ी या ओरियो शेक ले सकते हैं, और ₹99 में गरमा-गरम पिज्जा। कम बजट में भी पेट भर जाएगा! 🍕🥤";
+  }
+  if (q.includes("menu") || q.includes("क्या क्या") || q.includes("khana") || q.includes("खाना") || q.includes("list")) {
+    const samples = menuItems.slice(0, 5);
+    return `भैया, हमारे यहाँ स्पेशल पिज़्ज़ा, स्पेशल थाली, पनीर स्पेशल, इंडियन ब्रेड और लाजवाब शेक्स (Super Cool) सब कुछ मिलता है।\n\nजैसे:\n${samples.map(s => `• ${s.name} - ₹${s.price || 0}`).join('\n')}\n\nऊपर दिए गए मेनू में सब कुछ रेट के साथ लिखा है! 😋`;
+  }
+  
+  return "माफ़ी चाहते हैं भैया, आपकी बात हम पूरे तरीके से समझ नहीं पाए। आप हमारे मेनू के बारे में, डिलीवरी या कैफ़े के पते के बारे में कुछ भी पूछ सकते हैं! 🙏";
+};
 
 export default function BbCafeHome() {
   const store = useCartStore() as any;
@@ -64,7 +97,6 @@ export default function BbCafeHome() {
   const [banners, setBanners] = useState<any[]>([]);
   const [bannerIndex, setBannerIndex] = useState(0);
   const [bannerError, setBannerError] = useState(false);
-  const [showAllCategories, setShowAllCategories] = useState(false); 
   
   const [reviews, setReviews] = useState<any[]>([]);
   const [coupons, setCoupons] = useState<any[]>([]);
@@ -92,7 +124,7 @@ export default function BbCafeHome() {
   const [aiInput, setAiInput] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
   const [aiMessages, setAiMessages] = useState([
-    { role: "model", text: "राम-राम भैया! हम हैं बुम बुम कैफ़े के जादुई AI असिस्टेंट। आज का खाबे को मन है? बजट या मूड बताओ, हम बढ़िया डिश बता रहे! 🍕🥤" }
+    { role: "model", text: "राम-राम भैया! हम हैं बम बम कैफ़े की जादुई डिजिटल असिस्टेंट 'रिया दीदी' 💁‍♀️। आज आपका का खाबे को मन है? बजट या मूड बताओ, हम बढ़िया डिश बता रहे! 🍕🥤" }
   ]);
   const [greetingMessage, setGreetingMessage] = useState("");
   const [placeholderIndex, setPlaceholderIndex] = useState(0);
@@ -100,7 +132,7 @@ export default function BbCafeHome() {
   const [sugarLevel, setSugarLevel] = useState("Normal");
   const [iceLevel, setIceLevel] = useState("Normal Ice");
   const [noCutlery, setNoCutlery] = useState(false);
-  const [deliveryArea, setDeliveryArea] = useState<'town' | 'outer'>('town');
+  const [deliveryArea, setDeliveryArea] = useState<'town' | 'outer' | 'long'>('town');
 
   const formatBillNumber = (num: number) => String(num).padStart(4, '0');
 
@@ -170,7 +202,7 @@ export default function BbCafeHome() {
       if (hour >= 5 && hour < 12) {
         return `राम-राम ${nameStr}! आज सुबह-सुबह का खाबे को मन है? गरमा-गरम चाय और सैंडविच मँगाएँ? ☕`;
       } else if (hour >= 12 && hour < 16) {
-        return `राम-राम जी! दोपहर की तेज भूख लगी है का? बुम बुम की स्पेशल थाली आज ही आज़माएं! 🍱`;
+        return `राम-राम जी! दोपहर की तेज भूख लगी है का? बम बम की स्पेशल थाली आज ही आज़माएं! 🍱`;
       } else if (hour >= 16 && hour < 20) {
         return `नमस्ते ${nameStr}! आज शाम की चाय के साथ सैंडविच या बर्गर की जोड़ी कैसी रहेगी? 🍔`;
       } else if (hour >= 20 && hour < 23) {
@@ -211,7 +243,7 @@ export default function BbCafeHome() {
     }
   };
 
-  // --- AI Chatbot Send Message Handler ---
+  // --- AI Chatbot Send Message Handler (With Instant Offline Fallback) ---
   const handleSendAiMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!aiInput.trim() || aiLoading) return;
@@ -228,10 +260,13 @@ export default function BbCafeHome() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ messages: updatedMessages, menuData: menu })
       });
+      if (!res.ok) throw new Error("Fallback required");
       const data = await res.json();
       setAiMessages([...updatedMessages, { role: "model", text: data.text }]);
     } catch (err) {
-      setAiMessages([...updatedMessages, { role: "model", text: "माफ़ी चाहते हैं भैया, कनेक्शन में कुछ समस्या आ रही है! 😞" }]);
+      // --- TRIGGER SMART OFFLINE DESI REPLY ENGINE IF API FAILS ---
+      const reply = getLocalBotReply(userMsg.text, menu);
+      setAiMessages([...updatedMessages, { role: "model", text: reply }]);
     } finally {
       setAiLoading(false);
     }
@@ -359,7 +394,7 @@ export default function BbCafeHome() {
         }
       });
 
-      toast.success(`🎁 सफलतापूर्वक ${pointsToGift} पॉइंट्स गिफ्ट कर दिए गए हैं!`);
+      toast.success(`🎁 सफलतापूर्वक ${pointsToGift}  पॉइंट्स गिफ्ट कर दिए गए हैं!`);
       const inviteMsg = `हे दोस्त! मैंने तुम्हें BUM BUM Cafe के ऐप पर 🎁 ${pointsToGift} Loyalty Points गिफ्ट किए हैं। यहाँ ऑर्डर करो: ${window.location.origin}`;
       const whatsappUrl = `https://wa.me/91${friendPhoneRaw}?text=${encodeURIComponent(inviteMsg)}`;
       
@@ -394,8 +429,16 @@ export default function BbCafeHome() {
     const formattedBillStr = formatBillNumber(billNumber);
     const subtotal = getTotal();
     
-    // Dynamic Delivery Area Charges
-    let deliveryCharge = deliveryArea === 'town' ? (subtotal < 99 ? 20 : 0) : (subtotal < 499 ? 50 : 0);
+    // Dynamic Delivery Area Charges (Updated for 12km)
+    let deliveryCharge = 0;
+    if (deliveryArea === 'town') {
+      deliveryCharge = subtotal < 99 ? 20 : 0;
+    } else if (deliveryArea === 'outer') {
+      deliveryCharge = subtotal < 499 ? 50 : 0;
+    } else {
+      deliveryCharge = subtotal < 999 ? 99 : 0; // 12km delivery charge ₹99
+    }
+
     const couponDiscount = appliedCoupon ? Number(appliedCoupon.discountValue) : 0;
     const finalTotal = Math.max(0, subtotal - couponDiscount) + deliveryCharge;
     
@@ -570,8 +613,8 @@ export default function BbCafeHome() {
         </div>
       </header>
 
-      {/* STICKY SEARCH BAR WITH SLIDING PLACEHOLDER & VOICE SEARCH */}
-      <div className="sticky top-0 z-40 bg-[#050505]/95 backdrop-blur-md py-4 px-4 border-b border-white/5 rounded-b-3xl">
+      {/* STICKY SEARCH BAR WITH SLIDING PLACEHOLDER & VOICE SEARCH (z-50) */}
+      <div className="sticky top-0 z-50 bg-[#050505]/95 backdrop-blur-md py-4 px-4 border-b border-white/5 rounded-b-3xl">
         <div className="relative max-w-sm mx-auto">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
           
@@ -611,7 +654,7 @@ export default function BbCafeHome() {
 
       <main className="pt-4 px-4 max-w-lg mx-auto space-y-6">
         
-        {/* --- BUNDELKHANDI DYNAMIC GREETING CARD --- */}
+        {/* --- BEM BEM DYNAMIC GREETING CARD --- */}
         {greetingMessage && (
           <motion.div 
             initial={{ opacity: 0, y: -10 }}
@@ -638,11 +681,11 @@ export default function BbCafeHome() {
           )}
         </div>
 
-        {/* ZOMATO-STYLE CATEGORY HORIZONTAL SLIDER */}
+        {/* ZOMATO-STYLE CATEGORY HORIZONTAL SLIDER (Without "See More" Button) */}
         <div className="bg-white/[0.01] border border-white/5 p-5 rounded-[2.5rem] space-y-4">
           <p className="text-[9px] font-black uppercase tracking-widest text-orange-500">Inspiration for your first order</p>
           <div className="flex gap-4 overflow-x-auto no-scrollbar py-2">
-            {(showAllCategories ? visibleCategories : visibleCategories.slice(0, 8)).map((cat) => {
+            {visibleCategories.map((cat) => {
               const isActive = selectedCategory === cat;
               return (
                 <button 
@@ -660,9 +703,6 @@ export default function BbCafeHome() {
               );
             })}
           </div>
-          <button onClick={() => setShowAllCategories(!showAllCategories)} className="w-full py-2.5 bg-white/5 border border-white/5 rounded-2xl text-[10px] font-black text-gray-400 uppercase flex items-center justify-center gap-1.5">
-            <span>{showAllCategories ? "See Less" : "See More"}</span><span>{showAllCategories ? "▲" : "▼"}</span>
-          </button>
         </div>
 
         {/* PRODUCTS MENU GRID WITH ANIMATED HOVER */}
@@ -719,8 +759,22 @@ export default function BbCafeHome() {
           )}
         </div>
 
-        {/* --- INTEGRATED CAFE INFORMATION CARD (FOOTER UPPER) --- */}
-        <div className="bg-white/[0.02] border border-white/5 p-6 rounded-[2.5rem] space-y-4 shadow-xl">
+        {/* --- ABOUT US CARD (DESIGNED DIRECTLY FROM THE INSTAGRAM FILE) --- */}
+        <div className="bg-gradient-to-br from-green-950/40 to-[#b33600]/10 border border-white/5 p-6 rounded-[2.5rem] space-y-4 shadow-xl text-center relative overflow-hidden">
+          <div className="absolute top-0 right-0 bg-yellow-500 text-black font-black uppercase text-[8px] px-3 py-1 rounded-bl-xl tracking-widest">ABOUT US</div>
+          <h3 className="text-2xl font-black italic text-yellow-300">ABOUT BUM BUM CAFE</h3>
+          <p className="text-orange-400 font-extrabold text-xs uppercase tracking-widest leading-none mb-1">जहाँ स्वाद और सुकून मिलते हैं!</p>
+          <div className="h-px bg-white/5" />
+          <p className="text-xs text-gray-300 leading-relaxed font-semibold">
+            हमने BUM BUM CAFE की शुरुआत एक छोटे से सपने के साथ की थी—लोगों को घर जैसा स्वाद और कैफ़े वाला माहौल देने के लिए। यहाँ हर कप कॉफ़ी और हर स्लाइस पिज्जा प्यार और शुद्धता के साथ बनाया जाता है। हमारी कोशिश है कि आप जब भी यहाँ आएँ, एक प्यारी मुस्कान के साथ वापस जाएँ। ❤️
+          </p>
+          <div className="bg-green-500/10 border border-green-500/20 p-3 rounded-2xl text-[10px] font-black uppercase text-green-400 tracking-wide">
+            🏠 होम डिलीवरी बिल्कुल फ्री है - स्वाद आएगा सीधे दरवाज़े तक!
+          </div>
+        </div>
+
+        {/* --- DYNAMIC CAFE DETAILS & MAPS ADDRESS CARD (UPDATED WITH NEW ADDRESS & LINK) --- */}
+        <div className="bg-white/[0.02] border border-white/5 p-6 rounded-[2.5rem] space-y-4 shadow-xl text-left">
           <h3 className="font-black text-sm text-yellow-300 uppercase italic flex items-center gap-2">
             <Clock size={16} /> CAFE DETAILS & TIMINGS
           </h3>
@@ -733,13 +787,13 @@ export default function BbCafeHome() {
             </div>
             <div>
               <p className="text-gray-500 text-[9px] font-black uppercase mb-1">📍 Location</p>
-              <p className="text-gray-200">Main Square, Mohandra, MP</p>
+              <p className="text-gray-200">Bum Bum Cafe, बस स्टैंड मोहंद्रा, पीपल पेड़ के नीचे, मोहंद्रा (जिला पन्ना, मध्य प्रदेश)</p>
             </div>
           </div>
           
           <div className="flex gap-2.5 pt-2">
             <a 
-              href="https://maps.google.com/?q=Mohandra+Madhya+Pradesh" 
+              href="https://maps.app.goo.gl/trJkZpVtY27hVcru7" 
               target="_blank" 
               rel="noreferrer" 
               className="flex-1 bg-white/5 hover:bg-white/10 text-white font-black py-3 rounded-2xl text-[10px] uppercase flex items-center justify-center gap-2 border border-white/10"
@@ -798,7 +852,7 @@ export default function BbCafeHome() {
         )}
       </AnimatePresence>
 
-      {/* --- AI CHAT INTERFACE MODAL --- */}
+      {/* --- AI CHAT INTERFACE MODAL (UPDATED WITH RIYA DIDI AVATAR FACE & OFFLINE ENGINE) --- */}
       <AnimatePresence>
         {isAiOpen && (
           <div className="fixed inset-0 bg-black/95 z-[260] flex items-center justify-center p-4">
@@ -808,12 +862,19 @@ export default function BbCafeHome() {
               exit={{ scale: 0.9, opacity: 0 }} 
               className="bg-[#111] w-full max-w-md h-[80vh] rounded-[3rem] border border-white/10 flex flex-col overflow-hidden relative"
             >
-              {/* Header */}
+              {/* Header (Updated with Riya Didi Avatar Calling Face) */}
               <div className="p-6 border-b border-white/5 flex justify-between items-center bg-gradient-to-r from-purple-600/10 to-pink-600/10">
                 <div className="flex items-center gap-3">
-                  <span className="text-2xl animate-bounce">🤖</span>
+                  <div className="relative">
+                    <img 
+                      src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150&q=80" 
+                      className="w-10 h-10 rounded-full object-cover border border-purple-500"
+                      alt="Riya Didi"
+                    />
+                    <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 border-2 border-[#111] rounded-full" />
+                  </div>
                   <div className="text-left">
-                    <h3 className="font-black text-sm text-purple-300 uppercase italic">Bum Bum AI Chat</h3>
+                    <h3 className="font-black text-sm text-purple-300 uppercase italic">बम बम दीदी (रिया) 💁‍♀️</h3>
                     <p className="text-[8px] text-green-400 font-black uppercase">Online & Ready to Help</p>
                   </div>
                 </div>
@@ -1041,26 +1102,33 @@ export default function BbCafeHome() {
                   );
                 })()}
 
-                {/* DYNAMIC DELIVERY AREA SELECTOR */}
+                {/* DYNAMIC DELIVERY AREA SELECTOR (Updated for 12km) */}
                 <div className="bg-white/[0.02] p-5 rounded-[2.2rem] border border-white/5 space-y-3">
                   <div className="flex items-center gap-2 text-orange-500">
                     <MapPin size={18}/>
                     <h3 className="font-black uppercase text-xs">Select Delivery Area</h3>
                   </div>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-3 gap-1.5">
                     <button
                       type="button"
                       onClick={() => setDeliveryArea('town')}
-                      className={`py-3 rounded-xl text-[10px] font-black uppercase border ${deliveryArea === 'town' ? 'bg-orange-500 text-black border-orange-500 shadow-md' : 'bg-white/5 text-gray-400 border-white/5'}`}
+                      className={`py-3 rounded-xl text-[9px] font-black uppercase border ${deliveryArea === 'town' ? 'bg-orange-500 text-black border-orange-500 shadow-md' : 'bg-white/5 text-gray-400 border-white/5'}`}
                     >
-                      Mohandra Town (Free &gt; ₹99)
+                      Town (Free &gt; ₹99)
                     </button>
                     <button
                       type="button"
                       onClick={() => setDeliveryArea('outer')}
-                      className={`py-3 rounded-xl text-[10px] font-black uppercase border ${deliveryArea === 'outer' ? 'bg-orange-500 text-black border-orange-500 shadow-md' : 'bg-white/5 text-gray-400 border-white/5'}`}
+                      className={`py-3 rounded-xl text-[9px] font-black uppercase border ${deliveryArea === 'outer' ? 'bg-orange-500 text-black border-orange-500 shadow-md' : 'bg-white/5 text-gray-400 border-white/5'}`}
                     >
-                      Outer / Rural (Free &gt; ₹499)
+                      5 Km (Free &gt; ₹499)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDeliveryArea('long')}
+                      className={`py-3 rounded-xl text-[9px] font-black uppercase border ${deliveryArea === 'long' ? 'bg-orange-500 text-black border-orange-500 shadow-md' : 'bg-white/5 text-gray-400 border-white/5'}`}
+                    >
+                      12 Km (Charge: ₹99)
                     </button>
                   </div>
                 </div>
@@ -1068,14 +1136,15 @@ export default function BbCafeHome() {
                 <div className="bg-orange-500/10 border border-orange-500/20 rounded-[2rem] p-5 space-y-2">
                   <div className="flex items-center gap-2 text-orange-400 font-black text-xs uppercase"><Sparkles size={16}/> <span>Free Delivery Rules</span></div>
                   <ul className="text-[11px] text-gray-400 font-bold space-y-1">
-                    <li>• Mohandra Town: Free above ₹99 <span className="text-green-500">({getTotal() >= 99 ? 'Achieved' : 'Need ₹' + (99 - getTotal()) + ' more'})</span></li>
-                    <li>• Within 5 Km: Free above ₹499</li>
+                    <li>• मोहंद्रा टाउन: Free above ₹99 <span className="text-green-500">({getTotal() >= 99 ? 'Achieved' : 'Need ₹' + (99 - getTotal()) + ' more'})</span></li>
+                    <li>• 5 किलोमीटर: Free above ₹499</li>
+                    <li>• 12 किलोमीटर: Free above ₹999</li>
                   </ul>
                 </div>
 
                 {customerDetails && (
                   <div className="bg-yellow-400/5 border border-yellow-400/20 rounded-[2rem] p-5 space-y-3">
-                    <div className="flex items-center gap-2 text-yellow-400 font-black text-xs uppercase"><Gift size={14}/> <span>⭐ BUM BUM LOYALTY CLUB</span></div>
+                    <div className="flex items-center gap-2 text-yellow-400 font-black text-xs uppercase"><Gift size={14}/> <span>⭐ बम बम लॉयल्टी क्लब</span></div>
                     
                     <div className="flex justify-between items-center border-b border-white/5 pb-3">
                       <div>
@@ -1188,9 +1257,9 @@ export default function BbCafeHome() {
                   {appliedCoupon && (
                     <div className="flex justify-between font-bold mb-2 text-sm text-green-200"><span>Coupon Discount</span> <span>-₹{appliedCoupon.discountValue}</span></div>
                   )}
-                  <div className="flex justify-between font-bold mb-4 text-sm opacity-90"><span>Delivery Charge</span> <span>{deliveryArea === 'town' ? (getTotal() < 99 ? "₹20" : "FREE") : (getTotal() < 499 ? "₹50" : "FREE")}</span></div>
+                  <div className="flex justify-between font-bold mb-4 text-sm opacity-90"><span>Delivery Charge</span> <span>{deliveryArea === 'town' ? (getTotal() < 99 ? "₹20" : "FREE") : deliveryArea === 'outer' ? (getTotal() < 499 ? "₹50" : "FREE") : (getTotal() < 999 ? "₹99" : "FREE")}</span></div>
                   <div className="h-px bg-white/20 mb-4" />
-                  <div className="flex justify-between font-black text-2xl"><span>To Pay</span> <span>₹{Math.max(0, getTotal() - (appliedCoupon ? appliedCoupon.discountValue : 0)) + (deliveryArea === 'town' ? (getTotal() < 99 ? 20 : 0) : (getTotal() < 499 ? 50 : 0))}</span></div>
+                  <div className="flex justify-between font-black text-2xl"><span>To Pay</span> <span>₹{Math.max(0, getTotal() - (appliedCoupon ? appliedCoupon.discountValue : 0)) + (deliveryArea === 'town' ? (getTotal() < 99 ? 20 : 0) : deliveryArea === 'outer' ? (getTotal() < 499 ? 50 : 0) : (getTotal() < 999 ? 99 : 0))}</span></div>
                 </div>
 
                 <button onClick={sendWhatsAppOrder} type="button" className="w-full bg-green-600 hover:bg-green-700 p-6 rounded-[2.5rem] font-black text-md text-white flex items-center justify-center gap-3">ORDER ON WHATSAPP</button>
