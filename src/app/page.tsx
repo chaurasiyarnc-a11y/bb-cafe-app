@@ -414,9 +414,30 @@ export default function BbCafeHome() {
     return () => { 
       window.removeEventListener('online', updateOnlineStatus);
       window.removeEventListener('offline', updateOnlineStatus);
-      unsubStore(); unsubMenu(); unsubCats(); unsubBanners(); unsubReviews(); unsubCoupons(); unsubRules(); 
+      unsubStore(); unsubMenu(); unsubCats(); unsubBanners(); unsubReviews(); coupons(); unsubRules(); 
     };
   }, []);
+
+  // Sync draft cart to local storage (52)
+  useEffect(() => {
+    if (cart.length > 0) {
+      localStorage.setItem('bb_cafe_draft_cart', JSON.stringify(cart));
+    } else {
+      localStorage.removeItem('bb_cafe_draft_cart');
+    }
+  }, [cart]);
+
+  useEffect(() => {
+    if (!customerDetails?.phone) { setCustomerPoints(0); return; }
+    const unsubPoints = onSnapshot(doc(db, "customer_points", customerDetails.phone.replace("+91", "")), (docSnap) => {
+      setCustomerPoints(docSnap.exists() ? (docSnap.data().points || 0) : 0);
+    }, () => { setCustomerPoints(0); });
+    
+    const phoneClean = customerDetails.phone.replace("+91", "");
+    setShareCount(Number(localStorage.getItem(`bb_shares_${phoneClean}`) || 0));
+
+    return () => unsubPoints();
+  }, [customerDetails]);
 
   // --- 5. EVENT HANDLERS & OPERATIONS ---
 
@@ -521,7 +542,7 @@ export default function BbCafeHome() {
     } finally { setIsGiftingLoading(false); }
   };
 
-  // 1. Re-declared handleCustomerRedeem securely inside component scope [1.1.2]
+  // Re-declared complete Customer Redeem Handler safely [1.1.2]
   const handleCustomerRedeem = (id: string, name: string, pointsCost: number) => {
     const currentPointsInCart = cart.reduce((acc: number, item: any) => acc + (item.pointsCost || 0), 0);
     if (customerPoints - currentPointsInCart < pointsCost) return toast.error("आपके पास पर्याप्त ऑयल्टी पॉइंट्स उपलब्ध नहीं हैं!");
@@ -621,17 +642,6 @@ export default function BbCafeHome() {
     setAppliedCoupon(null); 
     setEnteredCoupon(""); 
     setIsCartOpen(false);
-  };
-
-  // 1. Re-declared complete Review submit handler block safely [1]
-  const handleReviewSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!reviewName || !reviewComment) return toast.error("Please fill all fields!");
-    try {
-      await addDoc(collection(db, "reviews"), { name: reviewName, rating: reviewRating, comment: reviewComment, isApproved: false, timestamp: new Date() });
-      toast.success("Review submitted! Approved hone ke baad live dikhega.");
-      setReviewName(""); setReviewComment(""); setReviewRating(5); setIsReviewFormOpen(false);
-    } catch (err) { toast.error("Failed to submit review."); }
   };
 
   const handleShareApp = async () => {
@@ -1645,7 +1655,7 @@ export default function BbCafeHome() {
       <AnimatePresence>
         {showInvoice && lastPlacedOrder && (
           <div className="fixed inset-0 bg-black/95 z-[240] flex items-center justify-center p-6">
-            <div className="bg-[#111] w-full max-w-md p-6 rounded-3xl border border-white/10 text-center space-y-4 max-h-[85vh] overflow-y-auto font-sans">
+            <div className="bg-[#111] w-full max-w-md p-6 rounded-3xl border border-white/10 text-center space-y-4 max-h-[85vh] overflow-y-auto">
               <div className="flex justify-between items-center border-b border-white/5 pb-2">
                 <span className="text-[10px] font-black text-green-400">🌱 DIGITAL GREEN INVOICE</span>
                 <button onClick={() => setShowInvoice(false)} className="text-gray-400"><X size={16} /></button>
@@ -1685,7 +1695,7 @@ export default function BbCafeHome() {
                 </a>
               </div>
 
-              <p className="text-[9px] text-green-400 bg-green-500/10 p-2.5 rounded-xl font-bold font-sans">
+              <p className="text-[9px] text-green-400 bg-green-500/10 p-2.5 rounded-xl font-bold">
                 🌱 पेपर रसीद के बिना DIGITAL इनवॉइस जनरेट किया गया है। धन्यवाद!
               </p>
               <button onClick={() => setShowInvoice(false)} className="w-full bg-white text-black p-3 rounded-xl text-xs font-black uppercase">
