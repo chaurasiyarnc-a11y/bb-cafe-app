@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { db } from '../lib/firebase'; 
 import { collection, onSnapshot, query, addDoc, doc, setDoc, increment, runTransaction } from 'firebase/firestore';
-import { ShoppingBag, Plus, Search, X, MapPin, Phone, User, Sparkles, Star, Percent, Gift, Loader2, Share2, Heart, Clock } from 'lucide-react';
+import { ShoppingBag, Plus, Search, X, MapPin, Phone, User, Sparkles, Star, Percent, Gift, Loader2, Share2, Heart, Clock, ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
 import { useCartStore } from '../store/useCartStore';
@@ -62,7 +62,6 @@ export default function BbCafeHome() {
   const removeItem = store?.removeItem || (() => {});
   const clearCart = store?.clearCart || (() => {});
 
-  // Declared at the very top of the component to prevent lexical temporal dead zone issues [1.1]
   const playSoundEffect = (type: 'add' | 'success') => {
     try {
       const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -375,14 +374,6 @@ export default function BbCafeHome() {
     return matchesCategory && itemName.includes(normalizedSearchQuery);
   });
 
-  const handleCustomerRedeem = (id: string, name: string, pointsCost: number) => {
-    const currentPointsInCart = cart.reduce((acc: number, item: any) => acc + (item.pointsCost || 0), 0);
-    if (customerPoints - currentPointsInCart < pointsCost) return toast.error("आपके पास पर्याप्त ऑयल्टी पॉइंट्स उपलब्ध नहीं हैं!");
-    addItem({ id, name, price: 0, pointsCost, isReward: true });
-    playSoundEffect('add');
-    toast.success(`${name} Cart में जोड़ दिया गया है!`);
-  };
-
   const handleDetectLocation = () => {
     if (!navigator.geolocation) {
       return toast.error("आपके ब्राउज़र में जीपीएस लोकेशन उपलब्ध नहीं है।");
@@ -658,42 +649,6 @@ export default function BbCafeHome() {
     setChosenPrice(0); 
     setPizzaAddons({});
   };
-
-  const visibleCategories = useMemo(() => {
-    const baseCategories = ["All", ...FALLBACK_CATEGORIES.filter(c => c !== "All")];
-    const dbCatsMap = new Map();
-    dbCategories.forEach(c => dbCatsMap.set(String(c.name).toLowerCase().trim(), c));
-    const result: string[] = [];
-
-    baseCategories.forEach(catName => {
-      const cleanName = catName.toLowerCase().trim();
-      if (dbCatsMap.has(cleanName)) {
-        if (dbCatsMap.get(cleanName).isVisible !== false) result.push(catName);
-      } else {
-        result.push(catName);
-      }
-    });
-
-    dbCategories.forEach(c => {
-      const cleanName = String(c.name).toLowerCase().trim();
-      const alreadyAdded = result.some(r => r.toLowerCase().trim() === cleanName);
-      if (!alreadyAdded && c.isVisible !== false && c.name !== "All") result.push(c.name);
-    });
-
-    return Array.from(new Set(result));
-  }, [dbCategories]);
-
-  const getCategoryImage = (catName: string) => {
-    const found = dbCategories.find(c => c.name === catName);
-    if (found && found.image) return found.image;
-    return CATEGORY_IMAGES[catName] || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=150&q=80";
-  };
-
-  useEffect(() => {
-    if (banners.length <= 1) return;
-    const interval = setInterval(() => { setBannerIndex((prev) => (prev + 1) % banners.length); }, 4000);
-    return () => clearInterval(interval);
-  }, [banners]);
 
   const upsellSuggestionItems = useMemo(() => {
     return menu.filter(item => {
