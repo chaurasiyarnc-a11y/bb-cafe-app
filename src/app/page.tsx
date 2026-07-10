@@ -404,7 +404,7 @@ export default function BbCafeHome() {
     const pointsToGift = Number(giftPointsAmount);
 
     if (!friendPhoneRaw || friendPhoneRaw.length < 10) return toast.error("कृपया सही 10-digit मोबाइल नंबर डालें!");
-    if (senderPhoneRaw === friendPhoneRaw) return toast.error("आप खुद को पॉइंट्स गिफ्ट नहीं कर सकते!");
+    if (senderPhoneRaw === friendPhoneRaw) return toast.error("आप खुद को  पॉइंट्स गिफ्ट नहीं कर सकते!");
     if (isNaN(pointsToGift) || pointsToGift <= 0) return toast.error("कृपया सही पॉइंट्स की संख्या डालें!");
     if (customerPoints < pointsToGift) return toast.error(`आपके पास पर्याप्त पॉइंट्स नहीं हैं! वर्तमान पॉइंट्स: ${customerPoints}`);
 
@@ -897,6 +897,32 @@ export default function BbCafeHome() {
 
       </main>
 
+      {/* --- FLOATING CART BAR (Displays when there are items in the cart) --- */}
+      {cart.length > 0 && !isCartOpen && (
+        <motion.div 
+          initial={{ y: 100 }} 
+          animate={{ y: 0 }} 
+          className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[calc(100%-2rem)] max-w-md bg-gradient-to-r from-[#ff5e00] to-[#b33600] text-white p-4 rounded-3xl flex justify-between items-center shadow-2xl z-50 border border-white/10 animate-bounce"
+          style={{ animationDuration: '3s' }}
+        >
+          <div className="flex items-center gap-3">
+            <div className="bg-black/20 p-2.5 rounded-2xl">
+              <ShoppingBag size={20} />
+            </div>
+            <div className="text-left">
+              <p className="text-xs font-black">{cart.reduce((sum: number, item: any) => sum + item.quantity, 0)} Items in Cart</p>
+              <p className="text-[10px] text-orange-200 font-bold">Total: ₹{getTotal()}</p>
+            </div>
+          </div>
+          <button 
+            onClick={() => setIsCartOpen(true)} 
+            className="bg-white text-[#b33600] font-black px-5 py-2.5 rounded-2xl text-xs uppercase transition-transform active:scale-95 flex items-center gap-1"
+          >
+            View Cart <ChevronRight size={14} />
+          </button>
+        </motion.div>
+      )}
+
       {/* --- FLOATING AI CHAT BUBBLE (Bottom Left - Styled as a tiny non-disturbing Message Icon 💬) --- */}
       <button 
         onClick={() => setIsAiOpen(true)} 
@@ -934,6 +960,161 @@ export default function BbCafeHome() {
                 <button onClick={() => setIsReviewFormOpen(true)} className="w-full max-w-md mx-auto bg-orange-500 text-black py-4.5 rounded-[2rem] font-black text-sm uppercase">✍️ Write a Review</button>
               </div>
             </div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* --- USER/CUSTOMER DETAILS LOGIN MODAL --- */}
+      <AnimatePresence>
+        {isLoginOpen && (
+          <div className="fixed inset-0 bg-black/95 z-[210] flex items-center justify-center p-6">
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }} 
+              animate={{ scale: 1, opacity: 1 }} 
+              exit={{ scale: 0.9, opacity: 0 }} 
+              className="bg-[#111] w-full max-w-md p-8 rounded-[3rem] border border-white/10 text-center space-y-4 shadow-[0_0_20px_rgba(255,94,0,0.1)]"
+            >
+              <h3 className="text-2xl font-black text-orange-500 uppercase italic">Enter Your Details</h3>
+              <p className="text-xs text-gray-400 font-semibold">ऑर्डर करने और 🎁 फ्री पॉइंट्स कमाने के लिए कृपया अपना विवरण डालें।</p>
+              
+              <form onSubmit={handleSaveDetails} className="space-y-4 text-left">
+                <div>
+                  <label className="text-[10px] font-black uppercase text-gray-500">Your Name</label>
+                  <input 
+                    type="text" 
+                    placeholder="Apna naam likhein..." 
+                    value={tempName} 
+                    onChange={(e) => setTempName(e.target.value)} 
+                    required 
+                    className="w-full bg-white/5 border border-white/10 p-3.5 rounded-xl text-sm text-white focus:border-orange-500 outline-none" 
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-black uppercase text-gray-500">Phone Number (10 Digits)</label>
+                  <div className="flex gap-2">
+                    <span className="bg-white/5 border border-white/10 p-3.5 rounded-xl text-sm text-gray-400 font-bold flex items-center">+91</span>
+                    <input 
+                      type="tel" 
+                      maxLength={10} 
+                      placeholder="98765xxxxx" 
+                      value={tempPhone} 
+                      onChange={(e) => setTempPhone(e.target.value.replace(/\D/g, ''))} 
+                      required 
+                      className="flex-1 bg-white/5 border border-white/10 p-3.5 rounded-xl text-sm text-white focus:border-orange-500 outline-none" 
+                    />
+                  </div>
+                </div>
+                
+                <div className="flex gap-2 pt-2">
+                  <button type="submit" className="flex-1 bg-orange-500 text-black font-black p-4 rounded-xl text-sm uppercase">SAVE & CONTINUE</button>
+                  <button type="button" onClick={() => setIsLoginOpen(false)} className="bg-white/5 text-gray-400 font-bold p-4 rounded-xl text-sm">CANCEL</button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* --- GIFT POINTS MODAL --- */}
+      <AnimatePresence>
+        {isGiftModalOpen && (
+          <div className="fixed inset-0 bg-black/95 z-[220] flex items-center justify-center p-6">
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }} 
+              animate={{ scale: 1, opacity: 1 }} 
+              exit={{ scale: 0.9, opacity: 0 }} 
+              className="bg-[#111] w-full max-w-md p-8 rounded-[3rem] border border-yellow-500/30 text-center space-y-4 shadow-[0_0_20px_rgba(234,179,8,0.1)]"
+            >
+              <h3 className="text-2xl font-black text-yellow-400 uppercase italic">🎁 Gift Points</h3>
+              <p className="text-xs text-gray-400 font-semibold">अपने किसी दोस्त को पॉइंट्स गिफ्ट करें! वे इनका उपयोग फ्री डिश क्लेम करने में कर सकते हैं।</p>
+              
+              <form onSubmit={handleGiftPoints} className="space-y-4 text-left">
+                <div>
+                  <label className="text-[10px] font-black uppercase text-gray-500 font-bold">Friend's Phone Number (10 Digits)</label>
+                  <div className="flex gap-2">
+                    <span className="bg-white/5 border border-white/10 p-3.5 rounded-xl text-sm text-gray-400 font-bold flex items-center">+91</span>
+                    <input 
+                      type="tel" 
+                      maxLength={10} 
+                      placeholder="98765xxxxx" 
+                      value={giftPhone} 
+                      onChange={(e) => setGiftPhone(e.target.value.replace(/\D/g, ''))} 
+                      required 
+                      className="flex-1 bg-white/5 border border-white/10 p-3.5 rounded-xl text-sm text-white focus:border-yellow-500 outline-none" 
+                    />
+                  </div>
+                </div>
+                
+                <div>
+                  <label className="text-[10px] font-black uppercase text-gray-500 font-bold">Points to Send</label>
+                  <input 
+                    type="number" 
+                    placeholder="Enter amount of points..." 
+                    value={giftPointsAmount} 
+                    onChange={(e) => setGiftPointsAmount(e.target.value === "" ? "" : Number(e.target.value))} 
+                    required 
+                    className="w-full bg-white/5 border border-white/10 p-3.5 rounded-xl text-sm text-white focus:border-yellow-500 outline-none" 
+                  />
+                  <p className="text-[10px] text-gray-500 mt-1">Available points: <span className="text-yellow-400 font-bold">{customerPoints}</span></p>
+                </div>
+                
+                <div className="flex gap-2 pt-2">
+                  <button 
+                    type="submit" 
+                    disabled={isGiftingLoading} 
+                    className="flex-1 bg-yellow-400 text-black font-black p-4 rounded-xl text-sm uppercase flex items-center justify-center gap-2"
+                  >
+                    {isGiftingLoading ? <Loader2 className="animate-spin" size={16} /> : "GIFT NOW 🎁"}
+                  </button>
+                  <button type="button" onClick={() => setIsGiftModalOpen(false)} className="bg-white/5 text-gray-400 font-bold p-4 rounded-xl text-sm">CANCEL</button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* --- SOCIAL FOLLOW AND EARN MODAL --- */}
+      <AnimatePresence>
+        {isSocialsOpen && (
+          <div className="fixed inset-0 bg-black/95 z-[230] flex items-center justify-center p-6">
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }} 
+              animate={{ scale: 1, opacity: 1 }} 
+              exit={{ scale: 0.9, opacity: 0 }} 
+              className="bg-[#111] w-full max-w-md p-8 rounded-[3rem] border border-white/10 text-center space-y-6 shadow-xl"
+            >
+              <h3 className="text-2xl font-black text-orange-500 uppercase italic">📱 FOLLOW & EARN POINTS</h3>
+              <p className="text-xs text-gray-400 font-semibold">हमारे सोशल मीडिया हैंडल्स पर हमसे जुड़ें और मुफ्त में पॉइंट्स कमाएं!</p>
+              
+              <div className="space-y-3 text-left">
+                <button 
+                  onClick={() => handleSocialClick("instagram", "https://instagram.com/bumbumcafe")} 
+                  className="w-full p-4 rounded-2xl bg-gradient-to-r from-pink-500 to-purple-600 text-white font-bold text-xs flex justify-between items-center transition-transform active:scale-95 shadow-md"
+                >
+                  <span>📸 FOLLOW ON INSTAGRAM</span>
+                  <span className="bg-black/30 px-3 py-1 rounded-full text-[10px] font-black">{getClaimStatus("instagram")}</span>
+                </button>
+                
+                <button 
+                  onClick={() => handleSocialClick("facebook", "https://facebook.com/bumbumcafe")} 
+                  className="w-full p-4 rounded-2xl bg-blue-600 text-white font-bold text-xs flex justify-between items-center transition-transform active:scale-95 shadow-md"
+                >
+                  <span>🔵 FOLLOW ON FACEBOOK</span>
+                  <span className="bg-black/30 px-3 py-1 rounded-full text-[10px] font-black">{getClaimStatus("facebook")}</span>
+                </button>
+                
+                <button 
+                  onClick={() => handleSocialClick("youtube", "https://youtube.com/bumbumcafe")} 
+                  className="w-full p-4 rounded-2xl bg-red-600 text-white font-bold text-xs flex justify-between items-center transition-transform active:scale-95 shadow-md"
+                >
+                  <span>📺 SUBSCRIBE ON YOUTUBE</span>
+                  <span className="bg-black/30 px-3 py-1 rounded-full text-[10px] font-black">{getClaimStatus("youtube")}</span>
+                </button>
+              </div>
+              
+              <button type="button" onClick={() => setIsSocialsOpen(false)} className="w-full bg-white/5 text-gray-400 font-bold p-4 rounded-xl text-xs uppercase border border-white/5">CLOSE</button>
+            </motion.div>
           </div>
         )}
       </AnimatePresence>
@@ -1316,7 +1497,7 @@ export default function BbCafeHome() {
                         <h4 className="text-3xl font-black text-white">{customerPoints} <span className="text-[10px] text-gray-500 font-bold uppercase">Points</span></h4>
                         <p className="text-[9px] text-gray-400">Spend ₹100 = Get 1 Point!</p>
                       </div>
-                      <div className="text-right text-[9px] text-yellow-400 font-black space-y-1 uppercase tracking-wider bg-yellow-400/5 p-3 rounded-xl border border-yellow-400/10 max-h-24 overflow-y-auto no-scrollbar">
+                      <div className="text-right text-[9px] text-yellow-400 font-black space-y-1 uppercase tracking-wider bg-yellow-400/5 p-3 rounded-xl border border-yellow-400/10 max-h-24 overflow-y-auto no-scrollbar animate-pulse">
                         {loyaltyRules.length === 0 ? (
                           <><p>🎁 10 Pts = Sandwich</p><p>🎁 20 Pts = Small Pizza</p></>
                         ) : (
@@ -1422,12 +1603,15 @@ export default function BbCafeHome() {
                   {appliedCoupon && (
                     <div className="flex justify-between font-bold mb-2 text-sm text-green-200"><span>Coupon Discount</span> <span>-₹{appliedCoupon.discountValue}</span></div>
                   )}
+                  {gameDiscount > 0 && (
+                    <div className="flex justify-between font-bold mb-2 text-sm text-green-200 animate-pulse"><span>10s Challenge Win</span> <span>-₹{gameDiscount}</span></div>
+                  )}
                   <div className="flex justify-between font-bold mb-4 text-sm opacity-90"><span>Delivery Charge</span> <span>{deliveryArea === 'town' ? (getTotal() < 99 ? "₹20" : "FREE") : deliveryArea === 'outer' ? (getTotal() < 499 ? "₹50" : "FREE") : (getTotal() < 999 ? "₹99" : "FREE")}</span></div>
                   <div className="h-px bg-white/20 mb-4" />
-                  <div className="flex justify-between font-black text-2xl"><span>To Pay</span> <span>₹{Math.max(0, getTotal() - (appliedCoupon ? appliedCoupon.discountValue : 0)) + (deliveryArea === 'town' ? (getTotal() < 99 ? 20 : 0) : deliveryArea === 'outer' ? (getTotal() < 499 ? 50 : 0) : (getTotal() < 999 ? 99 : 0))}</span></div>
+                  <div className="flex justify-between font-black text-2xl"><span>To Pay</span> <span>₹{Math.max(0, getTotal() - ((appliedCoupon ? appliedCoupon.discountValue : 0) + gameDiscount)) + (deliveryArea === 'town' ? (getTotal() < 99 ? 20 : 0) : deliveryArea === 'outer' ? (getTotal() < 499 ? 50 : 0) : (getTotal() < 999 ? 99 : 0))}</span></div>
                 </div>
 
-                <button onClick={sendWhatsAppOrder} type="button" className="w-full bg-green-600 hover:bg-green-700 p-6 rounded-[2.5rem] font-black text-md text-white flex items-center justify-center gap-3">ORDER ON WHATSAPP</button>
+                <button onClick={sendWhatsAppOrder} type="button" className="w-full bg-green-600 hover:bg-green-700 p-6 rounded-[2.5rem] font-black text-md text-white flex items-center justify-center gap-3 shadow-md">ORDER ON WHATSAPP</button>
               </div>
             </motion.div>
           </div>
