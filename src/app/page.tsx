@@ -21,8 +21,9 @@ const CATEGORY_IMAGES: { [key: string]: string } = {
   "Special Rice": "https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?auto=format&fit=crop&w=150&q=80"
 };
 
+// 1. Corrected Delivery Rules: For Mohandra Town, under ₹99, delivery fee is ₹20 [1.1.2]
 const DELIVERY_AREAS = [
-  { name: "Mohandra Town", fee: 0, minFree: 99 },
+  { name: "Mohandra Town", fee: 20, minFree: 99 },
   { name: "Mohandra Ward 1-5 (Within 2 Km)", fee: 20, minFree: 199 },
   { name: "Nearby Area (Within 5 Km)", fee: 40, minFree: 499 },
   { name: "Out of Town (5 to 8 Km)", fee: 60, minFree: 999 }
@@ -62,7 +63,6 @@ export default function BbCafeHome() {
   const removeItem = store?.removeItem || (() => {});
   const clearCart = store?.clearCart || (() => {});
 
-  // Auditory Helper
   const playSoundEffect = (type: 'add' | 'success') => {
     try {
       const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -109,7 +109,7 @@ export default function BbCafeHome() {
 
   const [isGiftModalOpen, setIsGiftModalOpen] = useState(false);
   const [giftPhone, setGiftPhone] = useState("");
-  const [giftPointsAmount, setGiftPointsAmount] = useState<number | "">("");
+  const [giftPointsAmount, setGiftPointsAmount] = useState<number | " text-white">("");
   const [isGiftingLoading, setIsGiftingLoading] = useState(false);
 
   const [dbCategories, setDbCategories] = useState<any[]>([]);
@@ -187,6 +187,17 @@ export default function BbCafeHome() {
     }
     return { bg: "from-[#ff5e00] to-[#b33600]", accent: "text-yellow-300", name: "BUM BUM CAFE - Mohandra" };
   }, []);
+
+  // 2. Real-time store open check scheduler (10:00 AM to 11:00 PM)
+  const isStoreOpenCurrently = useMemo(() => {
+    if (!storeOpen) return false; // respect the manual settings override
+    const now = new Date();
+    const hours = now.getHours();
+    if (hours < 10 || hours >= 23) {
+      return false;
+    }
+    return true;
+  }, [storeOpen]);
 
   const calculateDistanceInKm = (lat1: number, lon1: number, lat2: number, lon2: number) => {
     const R = 6371; 
@@ -393,38 +404,6 @@ export default function BbCafeHome() {
     return `₹${item?.price || 0}`;
   };
 
-  const deduplicatedMenu = useMemo(() => {
-    const seen = new Set();
-    const hiddenCategoryNames = new Set(dbCategories.filter((c: any) => c.isVisible === false).map((c: any) => String(c.name).toLowerCase().trim()));
-
-    return menu.filter(item => {
-      const itemCatClean = item?.category ? String(item.category).toLowerCase().trim() : "";
-      if (hiddenCategoryNames.has(itemCatClean)) return false;
-      const nameKey = item?.name ? String(item.name).toLowerCase().trim() : item.id;
-      if (seen.has(nameKey)) return false;
-      seen.add(nameKey);
-      return true;
-    });
-  }, [menu, dbCategories]);
-
-  const normalizedSearchQuery = useMemo(() => {
-    const words = searchQuery.toLowerCase().trim().split(/\s+/);
-    const mappedWords = words.map(word => HINGLISH_DICT[word] || word);
-    return mappedWords.join(" ");
-  }, [searchQuery]);
-
-  const filteredMenu = deduplicatedMenu.filter(item => {
-    const itemName = item?.name ? String(item.name).toLowerCase() : "";
-    const itemCategory = item?.category ? String(item.category) : "";
-    
-    const isFavoriteFilter = selectedCategory === "Favorites";
-    const matchesCategory = isFavoriteFilter 
-      ? favorites.includes(item.id) 
-      : (selectedCategory === "All" || itemCategory === selectedCategory);
-      
-    return matchesCategory && itemName.includes(normalizedSearchQuery);
-  });
-
   const handleCustomerRedeem = (id: string, name: string, pointsCost: number) => {
     const currentPointsInCart = cart.reduce((acc: number, item: any) => acc + (item.pointsCost || 0), 0);
     if (customerPoints - currentPointsInCart < pointsCost) return toast.error("आपके पास पर्याप्त ऑयल्टी पॉइंट्स उपलब्ध नहीं हैं!");
@@ -473,7 +452,7 @@ export default function BbCafeHome() {
     const friendPhoneRaw = String(giftPhone).replace("+91", "").trim();
     const pointsToGift = Number(giftPointsAmount);
 
-    if (!friendPhoneRaw || friendPhoneRaw.length < 10) return toast.error("कृपया सही 10-digit मोबाइल नंबर डालें!");
+    if (!friendPhoneRaw || friendPhoneRaw.length < 10) return toast.error("कृपया सही 10-digit mobile नंबर डालें!");
     if (senderPhoneRaw === friendPhoneRaw) return toast.error("आप खुद को पॉइंट्स गिफ्ट नहीं कर सकते!");
     if (isNaN(pointsToGift) || pointsToGift <= 0) return toast.error("कृपया सही पॉइंट्स की संख्या डालें!");
     if (customerPoints < pointsToGift) return toast.error(`आपके पास पर्याप्त पॉइंट्स नहीं हैं! वर्तमान पॉइंट्स: ${customerPoints}`);
@@ -534,6 +513,9 @@ export default function BbCafeHome() {
   };
 
   const sendWhatsAppOrder = async () => {
+    if (!isStoreOpenCurrently) {
+      return toast.error("कैफ़े अभी बंद है। हम सुबह 10:00 बजे खुलेंगे।");
+    }
     if (isTooFar) {
       return toast.error("आपकी दूरी 20 KM से अधिक है। आप केवल मेनू देख सकते हैं, ऑर्डर प्लेस नहीं कर सकते!");
     }
@@ -805,7 +787,6 @@ export default function BbCafeHome() {
     <div className="bg-[#050505] min-h-screen text-white pb-32 font-sans relative overflow-x-hidden">
       <Toaster position="top-center" />
       
-      {/* Dynamic injection of the scrollbar CSS helper using standard dangerouslySetInnerHTML to prevent compile errors */}
       <style dangerouslySetInnerHTML={{ __html: `
         .hide-scrollbar::-webkit-scrollbar {
           display: none !important;
@@ -849,7 +830,7 @@ export default function BbCafeHome() {
           <p className="text-[10px] text-yellow-100 font-bold tracking-wider uppercase">{activeTheme.name}</p>
         </div>
         <div className="flex items-center gap-2">
-          <a href="tel:9714293759" className="bg-green-600 text-white p-2 rounded-full border border-white/20 flex items-center justify-center" title="डायरेक्ट कॉल करें">
+          <a href="tel:9714293759" className="bg-green-600 text-white p-2 rounded-full border border-white/20 flex items-center justify-center animate-pulse" title="डायरेक्ट कॉल करें">
             <Phone size={13} />
           </a>
           <div className="bg-black/40 px-2 py-0.5 rounded-full border border-white/10 flex items-center gap-1 text-[8px] font-black uppercase text-green-400">
@@ -871,6 +852,14 @@ export default function BbCafeHome() {
           />
         </div>
       </div>
+
+      {/* DYNAMIC SHOP CLOSURE BANNER WARNING */}
+      {!isStoreOpenCurrently && (
+        <div className="bg-red-600 text-white font-black py-3 px-4 text-center text-xs flex items-center justify-center gap-2 shadow-lg border-b border-red-500">
+          <span className="animate-pulse">⚠️</span>
+          <span>बूम बूम कैफ़े अभी बंद है। हम सुबह 10:00 बजे खुलेंगे। आप केवल हमारा मेनू देख सकते हैं।</span>
+        </div>
+      )}
 
       {/* HIGH CONTRAST SIDE ACTION BUTTONS */}
       <button 
@@ -999,7 +988,8 @@ export default function BbCafeHome() {
                       <p className="text-orange-500 font-black text-base leading-none">{getDisplayPrice(item)}</p>
                       {item.variants && <span className="text-[8px] font-bold text-gray-400 mt-1 block">Options available</span>}
                     </div>
-                    {storeOpen && !isTooFar && (
+                    {/* ADD Button gets disabled strictly when store closed or out of range */}
+                    {storeOpen && isStoreOpenCurrently && !isTooFar && (
                       <button onClick={() => item.variants ? setSelectedProduct(item) : addItem(item)} className="px-4 py-2 bg-orange-500/10 text-orange-400 border border-orange-500/30 hover:bg-orange-500 hover:text-white rounded-lg font-black text-[10px] active:scale-95 transition-all uppercase flex items-center gap-1 shadow">
                         <Plus size={12} /> ADD
                       </button>
@@ -1537,22 +1527,47 @@ export default function BbCafeHome() {
         )}
       </AnimatePresence>
 
+      {/* 3. Direct Deep-linking UPI Jump & Scan-To-Pay Modal */}
       <AnimatePresence>
         {showUPIModal && (
           <div className="fixed inset-0 bg-black/95 z-[250] flex items-center justify-center p-6">
             <div className="bg-[#111] w-full max-w-sm p-6 rounded-3xl border border-white/10 text-center space-y-4">
-              <Sparkles className="mx-auto text-yellow-400" size={32} />
-              <h3 className="text-lg font-black text-white">आर्डर भुगतान सहायता 💳</h3>
-              <p className="text-[10px] text-gray-400 font-semibold leading-relaxed">
-                भुगतान करने के लिए इस QR कोड को स्कैन कर सकते हैं, फिर "PROCEED" दबाकर व्हाट्सएप पर पेमेंट स्क्रीनशॉट भेजें।
-              </p>
+              <Sparkles className="mx-auto text-yellow-400 animate-pulse" size={28} />
               
-              <div className="bg-white p-3 rounded-2xl w-40 h-40 mx-auto flex items-center justify-center border border-white/15">
-                <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=upi://pay?pa=9714293759@okbizaxis" className="w-full h-full" alt="UPI Merchant QR" />
+              <div className="space-y-1">
+                <h3 className="text-lg font-black text-white">आर्डर भुगतान सहायता 💳</h3>
+                <p className="text-[10px] text-gray-400 font-semibold leading-relaxed">
+                  नीचे दिए गए बटन पर क्लिक करके अपने फोन के पेमेंट ऐप (GPay, PhonePe, Paytm) से सीधे भुगतान करें।
+                </p>
               </div>
-              <span className="text-[9px] font-black text-yellow-400 bg-yellow-400/10 border border-yellow-400/20 px-2 py-1 rounded-full uppercase tracking-wider block">Merchant ID: 9714293759@okbizaxis</span>
 
-              <button onClick={executeWAOpen} className="w-full bg-green-600 text-white p-3.5 rounded-xl font-black text-xs uppercase">
+              {/* Dynamic mobile UPI intent payment link with precise bill amount */}
+              <div className="pt-2">
+                <a 
+                  href={`upi://pay?pa=Q231198993@ybl&pn=BUM%20BUM%20CAFE&am=${getTotalBillPrice()}&cu=INR`}
+                  className="w-full bg-yellow-400 hover:bg-yellow-500 text-black p-4 rounded-xl font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg transition-transform active:scale-95"
+                >
+                  ⚡ PAY ₹{getTotalBillPrice()} NOW VIA UPI
+                </a>
+              </div>
+
+              <div className="relative flex py-2 items-center">
+                <div className="flex-grow border-t border-white/5"></div>
+                <span className="flex-shrink mx-3 text-gray-500 text-[8px] font-black uppercase">OR (स्कैन करें)</span>
+                <div className="flex-grow border-t border-white/5"></div>
+              </div>
+
+              {/* Dynamic QR Code for Desktop/Tab users to scan easily without typing amount */}
+              <div className="bg-white p-3 rounded-2xl w-40 h-40 mx-auto flex items-center justify-center border border-white/5 shadow-inner">
+                <img 
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(`upi://pay?pa=Q231198993@ybl&pn=BUM%20BUM%20CAFE&am=${getTotalBillPrice()}&cu=INR`)}`} 
+                  className="w-full h-full" 
+                  alt="Dynamic BHIM UPI QR Code" 
+                />
+              </div>
+              <span className="text-[8px] font-black text-gray-500 uppercase tracking-wider block">Scan to Pay with any BHIM UPI App</span>
+
+              <button onClick={executeWAOpen} className="w-full bg-green-600 hover:bg-green-700 text-white p-3.5 rounded-xl font-black text-xs uppercase tracking-wider">
                 PROCEED TO WHATSAPP
               </button>
             </div>
@@ -1560,6 +1575,7 @@ export default function BbCafeHome() {
         )}
       </AnimatePresence>
 
+      {/* DIGITAL GREEN INVOICE */}
       <AnimatePresence>
         {showInvoice && lastPlacedOrder && (
           <div className="fixed inset-0 bg-black/95 z-[240] flex items-center justify-center p-6">
@@ -1590,6 +1606,18 @@ export default function BbCafeHome() {
                   <span>GRAND TOTAL</span>
                   <span>₹{lastPlacedOrder.total}</span>
                 </div>
+              </div>
+
+              {/* 3. One-click Live WhatsApp Order Status Checker */}
+              <div className="pt-2 flex flex-col gap-2">
+                <a 
+                  href={`https://wa.me/919714293759?text=${encodeURIComponent(`नमस्ते बूम बूम कैफ़े! कृपया मेरे आर्डर नंबर #${formatBillNumber(lastPlacedOrder.billNumber)} (टोकन नंबर: #${lastPlacedOrder.tokenNumber}) का लाइव स्टेटस बताएं।`)}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="bg-yellow-400 text-black py-2.5 rounded-xl text-xs font-black uppercase tracking-wider block"
+                >
+                  🔍 चेक आर्डर स्टेटस (WA)
+                </a>
               </div>
 
               <p className="text-[9px] text-green-400 bg-green-500/10 p-2.5 rounded-xl font-bold">
