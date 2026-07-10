@@ -206,6 +206,19 @@ export default function BbCafeHome() {
     return { name: "Bronze Member 🥉", color: "text-orange-400 border-orange-400/30 bg-orange-400/10" };
   };
 
+  // 1. Correctly Declared getDisplayPrice Inside Compiler Scope [1.1.2]
+  const getDisplayPrice = (item: any) => {
+    if (item?.variants && typeof item.variants === 'object') {
+      const prices = Object.values(item.variants).map(Number).filter(n => !isNaN(n));
+      if (prices.length > 0) {
+        const minPrice = Math.min(...prices);
+        const maxPrice = Math.max(...prices);
+        return minPrice === maxPrice ? `₹${minPrice}` : `₹${minPrice} - ₹${maxPrice}`;
+      }
+    }
+    return `₹${item?.price || 0}`;
+  };
+
   const isVideoUrl = (url: string) => {
     if (!url) return false;
     const cleanUrl = url.toLowerCase().split('?')[0];
@@ -350,7 +363,7 @@ export default function BbCafeHome() {
 
     const unsubStore = onSnapshot(doc(db, "settings", "store"), (d) => { if(d.exists()) setStoreOpen(d.data().isOpen); });
     
-    // Corrected the mapping separator syntax error (comma included) [1]
+    // Corrected mapping separator syntax error (comma included) [1]
     const unsubMenu = onSnapshot(query(collection(db, "products")), (snap) => {
       const items = snap.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter((i: any) => i.isVisible !== false);
       setMenu(items);
@@ -405,13 +418,6 @@ export default function BbCafeHome() {
     };
   }, []);
 
-  // Auto-slide trigger for carousel
-  useEffect(() => {
-    if (banners.length <= 1) return;
-    const interval = setInterval(() => { setBannerIndex((prev) => (prev + 1) % banners.length); }, 4000);
-    return () => clearInterval(interval);
-  }, [banners]);
-
   // Sync draft cart to local storage (52)
   useEffect(() => {
     if (cart.length > 0) {
@@ -435,58 +441,50 @@ export default function BbCafeHome() {
 
   // --- 5. EVENT HANDLERS & OPERATIONS ---
 
-  const handleApplyCoupon = () => {
-    if (!enteredCoupon) return toast.error("Please enter a coupon code");
-    const found = coupons.find(c => String(c.code).toLowerCase() === enteredCoupon.trim().toLowerCase());
-    if (found) {
-      setAppliedCoupon(found);
-      toast.success(`Coupon '${found.code}' applied! ₹${found.discountValue} OFF`);
-    } else {
-      toast.error("Invalid coupon code");
+  const handleDetectLocation = () => {
+    if (!navigator.geolocation) {
+      return toast.error("आपके ब्राउज़र में जीपीएस लोकेशन उपलब्ध नहीं है।");
     }
-  };
-
-  const handleGiftPoints = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!customerDetails?.phone) return toast.error("कृपया पहले अपनी डिटेल्स जोड़ें!");
-    const senderPhoneRaw = customerDetails.phone.replace("+91", "").trim();
-    const friendPhoneRaw = String(giftPhone).replace("+91", "").trim();
-    const pointsToGift = Number(giftPointsAmount);
-
-    if (!friendPhoneRaw || friendPhoneRaw.length < 10) return toast.error("कृपया सही 10-digit मोबाइल नंबर डालें!");
-    if (senderPhoneRaw === friendPhoneRaw) return toast.error("आप खुद को ऑयल्टी पॉइंट्स गिफ्ट नहीं कर सकते!");
-    if (isNaN(pointsToGift) || pointsToGift <= 0) return toast.error("कृपया सही पॉइंट्स की संख्या डालें!");
-    if (customerPoints < pointsToGift) return toast.error(`आपके पास पर्याप्त पॉइंट्स नहीं हैं! वर्तमान पॉइंट्स: ${customerPoints}`);
-
-    setIsGiftingLoading(true);
-    const senderDocRef = doc(db, "customer_points", senderPhoneRaw);
-    const receiverDocRef = doc(db, "customer_points", friendPhoneRaw);
-
-    try {
-      await runTransaction(db, async (transaction) => {
-        const senderSnap = await transaction.get(senderDocRef);
-        const receiverSnap = await transaction.get(receiverDocRef);
+    toast.loading("सटीक लोकेशन ट्रैक कर रहे हैं...");
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        toast.dismiss();
+        const { latitude, longitude } = position.coords;
+        setAddress(`My GPS Location: https://www.google.com/maps?q=${latitude},${longitude}`);
+        toast.success("जीपीएस से लोकेशन सफलतापूर्वक जोड़ी गई!");
         
-        const currentSenderPoints = senderSnap.exists() ? (senderSnap.data().points || 0) : 0;
-        if (currentSenderPoints < pointsToGift) throw new Error("Insufficient points balance!");
+        const mohandraLat = 24.2863;
+        const mohandraLng = 80.1245;
+        
+        const calculatedDistance = calculateDistanceInKm(latitude, longitude, mohandraLat, mohandraLng);
+        setDistanceKm(Number(calculatedDistance.toFixed(2)));
 
-        transaction.update(senderDocRef, { points: increment(-pointsToGift) });
-        if (!receiverSnap.exists()) {
-          transaction.set(receiverDocRef, { name: "Loyal Friend 🎁", phone: friendPhoneRaw, points: pointsToGift, lastActive: new Date() });
+        if (calculatedDistance > 20) {
+          setIsTooFar(true);
+          toast.error("ध्यान दें: आप बूम बूम कैफे से 20 किमी से अधिक दूर हैं। आप केवल हमारा शानदार मेनू देख सकते हैं, आर्डर नहीं कर सकते।", { duration: 8000 });
         } else {
-          transaction.update(receiverDocRef, { points: increment(pointsToGift) });
+          setIsTooFar(false);
+          
+          if (calculatedDistance <= 1.0) {
+            setSelectedArea(DELIVERY_AREAS[0]); 
+            toast.success(`सटीक दूरी: ${calculatedDistance.toFixed(2)} KM। आपके लिए 'Mohandra Town' क्षेत्र चुना गया है।`);
+          } else if (calculatedDistance <= 2.0) {
+            setSelectedArea(DELIVERY_AREAS[1]); 
+            toast.success(`सटीक दूरी: ${calculatedDistance.toFixed(2)} KM। आपके लिए 'Mohandra Ward 1-5' क्षेत्र चुना गया है।`);
+          } else if (calculatedDistance <= 5.0) {
+            setSelectedArea(DELIVERY_AREAS[2]); 
+            toast.success(`सटीक दूरी: ${calculatedDistance.toFixed(2)} KM। आपके लिए 'Nearby Area (Within 5 Km)' क्षेत्र चुना गया है।`);
+          } else {
+            setSelectedArea(DELIVERY_AREAS[3]); 
+            toast.success(`सटीक दूरी: ${calculatedDistance.toFixed(2)} KM। आपके लिए 'Out of Town' क्षेत्र चुना गया है।`);
+          }
         }
-      });
-
-      toast.success(`🎁 सफलतापूर्वक ${pointsToGift} पॉइंट्स गिफ्ट कर दिए गए हैं!`);
-      const inviteMsg = `हे दोस्त! मैंने तुम्हें BUM BUM Cafe के ऐप पर 🎁 ${pointsToGift} Loyalty Points गिफ्ट किए हैं। यहाँ से स्वादिष्ट पिज्जा और थाली आर्डर करो: ${window.location.origin}`;
-      const whatsappUrl = `https://wa.me/91${friendPhoneRaw}?text=${encodeURIComponent(inviteMsg)}`;
-      
-      setGiftPhone(""); setGiftPointsAmount(""); setIsGiftModalOpen(false);
-      if (window.confirm("क्या आप अपने दोस्त को व्हाट्सएप पर गिफ्ट का मैसेज भेजना चाहते हैं?")) window.open(whatsappUrl, '_blank');
-    } catch (err: any) {
-      toast.error(err.message === "Insufficient points balance!" ? "अपर्याप्त पॉइंट्स!" : "पॉइंट्स गिफ्ट करने में समस्या आई।");
-    } finally { setIsGiftingLoading(false); }
+      },
+      () => {
+        toast.dismiss();
+        toast.error("लोकेशन की अनुमति अस्वीकार कर दी गई है या नेटवर्क त्रुटि है।");
+      }
+    );
   };
 
   const sendWhatsAppOrder = async () => {
@@ -923,7 +921,7 @@ export default function BbCafeHome() {
                       </div>
                     </div>
                   )}
-                </React.Fragment>
+                </Fragment>
               );
             })
           )}
@@ -1107,7 +1105,7 @@ export default function BbCafeHome() {
                           type="button"
                           key={addon}
                           onClick={() => setPizzaAddons(prev => ({ ...prev, [addon]: !prev[addon] }))}
-                          className={`p-2.5 rounded-xl border flex justify-between items-center text-[9px] font-bold ${isSelected ? 'border-orange-500 bg-orange-500/5 text-orange-500' : 'border-white/5 bg-white/[0.02] text-gray-300'}`}
+                          className={`p-2.5 rounded-xl border flex justify-between items-center text-[9px] font-bold ${isSelected ? 'border-orange-500 bg-orange-500/5 text-orange-400' : 'border-white/5 bg-white/[0.02] text-gray-300'}`}
                         >
                           <span>{addon}</span>
                           <span className="text-orange-400 font-black">+₹{cost}</span>
