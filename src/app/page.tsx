@@ -48,7 +48,6 @@ const SUGGESTED_REVIEWS = [
   "साफ़-सफ़ाई और शुद्धता 10/10 है! 🧼👌"
 ];
 
-// Devanagari updated to "बम बम" as strictly requested [1.1.2]
 const PERMANENT_REVIEWS = [
   { id: "rev1", name: "Gaurav Soni", rating: 5, comment: "बम बम कैफे की पनीर पिज्जा सच में पूरे मोहांद्रा में बेस्ट है! एक्स्ट्रा चीज़ लव है। ⭐⭐⭐⭐⭐" },
   { id: "rev2", name: "Anjali Patel", rating: 5, comment: "फास्ट फ़ूड की पैकिंग बहुत अच्छी थी, डिलीवरी बॉय का व्यवहार भी बहुत विनम्र था। ⭐⭐⭐⭐⭐" },
@@ -63,7 +62,7 @@ export default function BbCafeHome() {
   const removeItem = store?.removeItem || (() => {});
   const clearCart = store?.clearCart || (() => {});
 
-  // --- 1. STATE VARIABLES (DECLARED FIRST IN COMPONENT SCOPE) [1.1] ---
+  // --- 1. STATE VARIABLES ---
   const [menu, setMenu] = useState<any[]>([]);
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
@@ -86,8 +85,6 @@ export default function BbCafeHome() {
 
   const [isGiftModalOpen, setIsGiftModalOpen] = useState(false);
   const [giftPhone, setGiftPhone] = useState("");
-  
-  // Fixed state generic definition [1.1.2]
   const [giftPointsAmount, setGiftPointsAmount] = useState<number | "">("");
   const [isGiftingLoading, setIsGiftingLoading] = useState(false);
 
@@ -144,7 +141,7 @@ export default function BbCafeHome() {
   const [isTooFar, setIsTooFar] = useState(false);
   const [distanceKm, setDistanceKm] = useState<number | null>(null);
 
-  // --- 2. COMPONENT HELPERS & CALCULATION FUNCTIONS (DECLARED BEFORE CALLS) [1.1] ---
+  // --- 2. COMPONENT HELPERS & CALCULATION FUNCTIONS ---
 
   const playSoundEffect = (type: 'add' | 'success') => {
     try {
@@ -247,7 +244,6 @@ export default function BbCafeHome() {
 
   // --- 3. MEMOS ---
 
-  // Dynamic Seasonal Theme
   const activeTheme = useMemo(() => {
     const today = new Date();
     const month = today.getMonth() + 1; 
@@ -264,7 +260,6 @@ export default function BbCafeHome() {
     return { bg: "from-[#ff5e00] to-[#b33600]", accent: "text-yellow-300", name: "BUM BUM CAFE - Mohandra" };
   }, []);
 
-  // Real-time store open check scheduler (10:00 AM to 11:00 PM)
   const isStoreOpenCurrently = useMemo(() => {
     if (!storeOpen) return false; 
     const now = new Date();
@@ -344,6 +339,7 @@ export default function BbCafeHome() {
   // --- 4. LIFE CYCLE EFFECTS ---
 
   useEffect(() => {
+    setMounted(true);
     const updateOnlineStatus = () => {
       setIsOnline(navigator.onLine);
       if (navigator.onLine) {
@@ -363,7 +359,6 @@ export default function BbCafeHome() {
 
     const unsubStore = onSnapshot(doc(db, "settings", "store"), (d) => { if(d.exists()) setStoreOpen(d.data().isOpen); });
     
-    // Corrected mapping separator syntax error (comma included) [1]
     const unsubMenu = onSnapshot(query(collection(db, "products")), (snap) => {
       const items = snap.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter((i: any) => i.isVisible !== false);
       setMenu(items);
@@ -414,11 +409,16 @@ export default function BbCafeHome() {
     return () => { 
       window.removeEventListener('online', updateOnlineStatus);
       window.removeEventListener('offline', updateOnlineStatus);
-      unsubStore(); unsubMenu(); unsubCats(); unsubBanners(); unsubReviews(); coupons(); unsubRules(); 
+      unsubStore(); 
+      unsubMenu(); 
+      unsubCats(); 
+      unsubBanners(); 
+      unsubReviews(); 
+      unsubCoupons(); 
+      unsubRules(); 
     };
   }, []);
 
-  // Sync draft cart to local storage (52)
   useEffect(() => {
     if (cart.length > 0) {
       localStorage.setItem('bb_cafe_draft_cart', JSON.stringify(cart));
@@ -476,7 +476,6 @@ export default function BbCafeHome() {
         } else {
           setIsTooFar(false);
           
-          // Auto delivery area mapped to calculated GPS distance (KM) [1.1]
           if (calculatedDistance <= 1.0) {
             setSelectedArea(DELIVERY_AREAS[0]); 
             toast.success(`सटीक दूरी: ${calculatedDistance.toFixed(2)} KM। आपके लिए 'Mohandra Town' क्षेत्र चुना गया है।`);
@@ -542,7 +541,6 @@ export default function BbCafeHome() {
     } finally { setIsGiftingLoading(false); }
   };
 
-  // Re-declared complete Customer Redeem Handler safely [1.1.2]
   const handleCustomerRedeem = (id: string, name: string, pointsCost: number) => {
     const currentPointsInCart = cart.reduce((acc: number, item: any) => acc + (item.pointsCost || 0), 0);
     if (customerPoints - currentPointsInCart < pointsCost) return toast.error("आपके पास पर्याप्त ऑयल्टी पॉइंट्स उपलब्ध नहीं हैं!");
@@ -634,7 +632,6 @@ export default function BbCafeHome() {
     setShowInvoice(true); 
     clearCart(); 
     
-    // Reset specific modifiers
     setKetchupAddon(false);
     setOreganoAddon(false);
     setChiliFlakesAddon(false);
@@ -726,7 +723,6 @@ export default function BbCafeHome() {
     return localStorage.getItem(storageKey) ? "✅ Claimed" : "🎁 Claim +1 Pt";
   };
 
-  // 1. Correctly Declared handleSaveDetails inside component scope safely [1.1.2]
   const handleSaveDetails = (e: React.FormEvent) => {
     e.preventDefault();
     if (!tempName || tempName.trim().length < 3) return toast.error("Please enter your real name");
@@ -748,7 +744,6 @@ export default function BbCafeHome() {
     }
   };
 
-  // 1. Correctly Declared handleToggleFavorite inside component scope safely [1.1.2]
   const handleToggleFavorite = (id: string, e: any) => {
     e.stopPropagation();
     let updated;
@@ -763,7 +758,6 @@ export default function BbCafeHome() {
     localStorage.setItem('bb_favorites', JSON.stringify(updated));
   };
 
-  // 1. Correctly Declared handleAddToCart inside component scope safely [1.1.2]
   const handleAddToCart = () => {
     if (!chosenSize) return toast.error("Please select a size first!");
     
@@ -802,13 +796,35 @@ export default function BbCafeHome() {
     setPizzaAddons({});
   };
 
+  const handleReviewSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!reviewName.trim() || !reviewComment.trim()) {
+      return toast.error("कृपया सभी आवश्यक फ़ील्ड भरें!");
+    }
+    try {
+      await addDoc(collection(db, "reviews"), {
+        name: reviewName,
+        comment: reviewComment,
+        rating: reviewRating,
+        isApproved: false, // Default to false for manual/admin review
+        timestamp: new Date()
+      });
+      toast.success("आपका रिव्यू सबमिट हो गया है! यह एडमिन अप्रूवल के बाद दिखेगा। ❤️");
+      setReviewName("");
+      setReviewComment("");
+      setReviewRating(5);
+      setIsReviewFormOpen(false);
+    } catch (err) {
+      toast.error("रिव्यू सबमिट करने में कोई समस्या आई।");
+    }
+  };
+
   if (!mounted) return null;
 
   return (
     <div className="bg-[#050505] min-h-screen text-white pb-32 font-sans relative overflow-x-hidden">
       <Toaster position="top-center" />
       
-      {/* Dynamic injection of the scrollbar CSS helper using standard dangerouslySetInnerHTML to prevent compile errors */}
       <style dangerouslySetInnerHTML={{ __html: `
         .hide-scrollbar::-webkit-scrollbar {
           display: none !important;
@@ -845,7 +861,7 @@ export default function BbCafeHome() {
         </div>
       )}
 
-      {/* COMPACT COMPACT HEADER */}
+      {/* COMPACT HEADER */}
       <header className={`relative py-6 px-4 bg-gradient-to-r ${activeTheme.bg} flex justify-between items-center border-b border-white/10 shadow-lg`}>
         <div>
           <motion.h1 initial={{ scale: 0.9 }} animate={{ scale: 1 }} className="text-xl font-black italic tracking-tighter text-yellow-300">BAM BAM CAFE</motion.h1>
@@ -902,7 +918,7 @@ export default function BbCafeHome() {
 
       <main className="pt-3 px-3 max-w-lg mx-auto space-y-4">
         
-        {/* Animated & Sliding Promotional Banner - Supports high fidelity video loops & static image posters */}
+        {/* Animated & Sliding Promotional Banner */}
         <div className="w-full h-36 rounded-2xl overflow-hidden relative border border-white/5 bg-white/[0.02]">
           {(banners.length === 0 || bannerError) ? (
             <div className="w-full h-full bg-gradient-to-r from-orange-600/35 to-[#b33600]/35 flex flex-col justify-center p-5 space-y-1">
@@ -943,7 +959,7 @@ export default function BbCafeHome() {
           )}
         </div>
 
-        {/* ZOOMED CATEGORY SLIDER (NO VISUAL SLIDER BAR AT ALL) */}
+        {/* CATEGORY SLIDER */}
         <div className="space-y-1">
           <p className="text-[8px] font-black uppercase tracking-wider text-orange-500">Inspiration for your first order</p>
           <div className="flex gap-5 overflow-x-auto hide-scrollbar py-2 px-1">
@@ -970,7 +986,7 @@ export default function BbCafeHome() {
           </div>
         </div>
 
-        {/* RANGE ZONE WARNING FOR CLIENTS > 20KM */}
+        {/* RANGE ZONE WARNING */}
         {distanceKm !== null && isTooFar && (
           <div className="bg-red-500/10 border border-red-500/20 p-3.5 rounded-2xl flex items-center gap-3">
             <span className="text-xl">⚠️</span>
@@ -981,13 +997,12 @@ export default function BbCafeHome() {
           </div>
         )}
 
-        {/* PRODUCTS LISTING WITH INLINE SCROLLING AD OFFERS CAROUSEL [1.1.2] */}
+        {/* PRODUCTS LISTING */}
         <div className="grid grid-cols-1 gap-4 pt-1">
           {filteredMenu.length === 0 ? (
             <p className="text-center text-gray-500 py-8 text-xs font-bold uppercase">No items found...</p>
           ) : (
             filteredMenu.map((item, index) => {
-              // Automatically display a beautiful sliding banner card after the 4th item (index 3) inside the scroll list
               const showInlineBanner = index === 3 && banners.length > 0;
               return (
                 <React.Fragment key={item.id}>
@@ -1020,7 +1035,6 @@ export default function BbCafeHome() {
                           <p className="text-orange-500 font-black text-base leading-none">{getDisplayPrice(item)}</p>
                           {item.variants && <span className="text-[8px] font-bold text-gray-400 mt-1 block">Options available</span>}
                         </div>
-                        {/* ADD Button gets disabled strictly when store closed or out of range */}
                         {storeOpen && isStoreOpenCurrently && !isTooFar && (
                           <button onClick={() => item.variants ? setSelectedProduct(item) : addItem(item)} className="px-4 py-2 bg-orange-500/10 text-orange-400 border border-orange-500/30 hover:bg-orange-500 hover:text-white rounded-lg font-black text-[10px] active:scale-95 transition-all uppercase flex items-center gap-1 shadow">
                             <Plus size={12} /> ADD
@@ -1030,7 +1044,6 @@ export default function BbCafeHome() {
                     </div>
                   </motion.div>
 
-                  {/* Render the beautiful inline promotional banner with autolooop video support inside the item list flow */}
                   {showInlineBanner && (
                     <div className="bg-gradient-to-r from-orange-600/15 to-[#b33600]/15 border border-orange-500/20 rounded-2xl p-4 overflow-hidden relative min-h-[7.5rem] flex flex-col justify-center">
                       <div className="max-w-[70%] space-y-1 z-10 relative">
@@ -1039,7 +1052,6 @@ export default function BbCafeHome() {
                         <p className="text-[9px] text-gray-400 leading-normal font-bold">स्वादिष्ट पिज्जा और सैंडविच पर बेहतरीन डिस्काउंट। आर्डर करने के लिए नीचे स्क्रॉल करें!</p>
                       </div>
                       
-                      {/* Interactive slide media block on the right */}
                       <div className="absolute right-3 top-1/2 -translate-y-1/2 w-20 h-20 rounded-xl overflow-hidden opacity-60 shadow-lg border border-white/5">
                         {isVideoUrl(banners[bannerIndex % banners.length]?.url) ? (
                           <video 
@@ -1066,7 +1078,7 @@ export default function BbCafeHome() {
           )}
         </div>
 
-        {/* PERMANENT REVIEWS SECTION - ALWAYS VISIBLE TO VISITORS */}
+        {/* PERMANENT REVIEWS SECTION */}
         <div className="pt-6 space-y-4">
           <div className="flex justify-between items-center">
             <h3 className="text-sm font-black uppercase tracking-wider text-yellow-400 flex items-center gap-1">⭐ हमारे ग्राहकों के प्यारे शब्द</h3>
@@ -1089,7 +1101,7 @@ export default function BbCafeHome() {
           </div>
         </div>
 
-        {/* BEAUTIFUL ABOUT SECTION & CONTACT INFO IN FOOTER */}
+        {/* FOOTER */}
         <footer className="pt-8 border-t border-white/5 space-y-6">
           <div className="bg-gradient-to-br from-green-950/20 to-emerald-900/10 p-6 rounded-[2rem] border border-green-500/10 relative overflow-hidden">
             <div className="absolute top-0 right-0 w-24 h-24 bg-green-500/5 rounded-full blur-2xl" />
@@ -1105,7 +1117,6 @@ export default function BbCafeHome() {
             </div>
           </div>
 
-          {/* Timing & Map Coordinates list */}
           <div className="grid grid-cols-2 gap-3 text-center text-[10px] font-black uppercase">
             <div className="bg-white/[0.02] border border-white/5 p-4 rounded-2xl flex flex-col items-center justify-center space-y-1">
               <Clock className="text-orange-500" size={16} />
@@ -1264,6 +1275,7 @@ export default function BbCafeHome() {
         )}
       </AnimatePresence>
 
+      {/* CART DRAWER MODAL */}
       <AnimatePresence>
         {isCartOpen && (
           <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-[110] flex items-end">
@@ -1341,7 +1353,6 @@ export default function BbCafeHome() {
                   </div>
                 )}
 
-                {/* Direct touchable pills grid for Delivery Zones instead of select dropdown */}
                 <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-4 space-y-2">
                   <label className="text-[9px] font-black uppercase text-gray-400">Select Delivery Zone (KM):</label>
                   <div className="grid grid-cols-2 gap-2">
@@ -1455,8 +1466,8 @@ export default function BbCafeHome() {
                 )}
 
                 <div className="bg-white/[0.02] p-4 rounded-2xl border border-white/5 space-y-2">
+                  <div className="flex items-center gap-1.5 text-orange-500"><MapPin size={14}/> <h3 className="font-black uppercase text-[10px]">Delivery Address</h3></div>
                   <div className="flex justify-between items-center mb-1">
-                    <div className="flex items-center gap-1.5 text-orange-500"><MapPin size={14}/> <h3 className="font-black uppercase text-[10px]">Delivery Address</h3></div>
                     <button type="button" onClick={handleDetectLocation} className="text-[8px] bg-green-600 text-white font-black px-2 py-1 rounded flex items-center gap-1 shadow-sm uppercase">📍 Detect Location</button>
                   </div>
                   <textarea placeholder="Ghar ka address, Landmark ke saath..." value={address} onChange={(e) => setAddress(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs font-semibold text-white resize-none h-16 outline-none" />
@@ -1604,7 +1615,7 @@ export default function BbCafeHome() {
         )}
       </AnimatePresence>
 
-      {/* Direct Deep-linking UPI Jump & Scan-To-Pay Modal */}
+      {/* UPI MODAL */}
       <AnimatePresence>
         {showUPIModal && (
           <div className="fixed inset-0 bg-black/95 z-[250] flex items-center justify-center p-6">
@@ -1618,7 +1629,6 @@ export default function BbCafeHome() {
                 </p>
               </div>
 
-              {/* Seamless dynamic UPI intent payer link with PhonePe merchant VPA */}
               <div className="pt-2">
                 <a 
                   href={`upi://pay?pa=Q231198993@ybl&pn=BUM%20BUM%20CAFE&am=${getTotalBillPrice()}&cu=INR`}
