@@ -29,12 +29,12 @@ const DEFAULT_REVIEWS = [
 
 const SEARCH_PLACEHOLDERS = ["सर्च करें स्पेशल पिज्जा... 🍕", "सर्च करें ओरियो शेक... 🥤", "सर्च करें स्पेशल थाली... 🍱", "सर्च करें बर्गर... 🍔"];
 
-// --- ADVANCED OFFLINE GEMINI FALLBACK REPLY ENGINE (To Prevent Connection Error) ---
+// --- ADVANCED OFFLINE GEMINI FALLBACK REPLY ENGINE ---
 const getLocalBotReply = (queryText: string, menuItems: any[]) => {
   const q = queryText.toLowerCase().trim();
   
   if (q.includes("hi") || q.includes("hello") || q.includes("hey") || q.includes("राम राम") || q.includes("नमस्ते") || q.includes("namaste") || q.includes("हलो")) {
-    return "राम-राम भैया! 🙏 हम हैं बम बम कैफ़े की डिजिटल हेल्पडेस्क 'रिया दीदी'। आज आपका का खाबे को मन है? हमें बजट या मूड बताओ, हम बढ़िया डिश बता रहे! 🍕🥤";
+    return "राम-राम भैया! 🙏 हम हैं बम बम कैफ़े की डिजिटल हेल्पडेस्क 'रिया दीदी' 💁‍♀️। आज आपका का खाबे को मन है? हमें बजट या मूड बताओ, हम बढ़िया डिश बता रहे! 🍕🥤";
   }
   if (q.includes("about") || q.includes("कैफे") || q.includes("cafe") || q.includes("शुरुआत") || q.includes("कहानी") || q.includes("बारे") || q.includes("history")) {
     return "भैया, हमने बम बम कैफ़े की शुरुआत एक छोटे से सपने के साथ की थी—लोगों को घर जैसा स्वाद और कैफ़े वाला माहौल देने के लिए। यहाँ हर कप कॉफ़ी और हर स्लाइस पिज्जा प्यार और शुद्धता के साथ बनाया जाता है। हमारी कोशिश है कि आप जब भी यहाँ आएँ, एक प्यारी मुस्कान के साथ वापस जाएँ। ❤️";
@@ -134,6 +134,12 @@ export default function BbCafeHome() {
   const [noCutlery, setNoCutlery] = useState(false);
   const [deliveryArea, setDeliveryArea] = useState<'town' | 'outer' | 'long'>('town');
 
+  // --- STOPWATCH GAME STATES ---
+  const [isGameOpen, setIsGameOpen] = useState(false);
+  const [gameTime, setGameTime] = useState(0); // in centiseconds
+  const [isGameRunning, setIsGameRunning] = useState(false);
+  const [gameResult, setGameResult] = useState<'win' | 'lose' | null>(null);
+
   const formatBillNumber = (num: number) => String(num).padStart(4, '0');
 
   useEffect(() => {
@@ -222,6 +228,20 @@ export default function BbCafeHome() {
     return () => clearInterval(timer);
   }, []);
 
+  // --- Stopwatch Game PRECISION Timer Loop ---
+  useEffect(() => {
+    let intervalId: any;
+    if (isGameRunning) {
+      const startTime = Date.now() - gameTime * 10;
+      intervalId = setInterval(() => {
+        setGameTime(Math.floor((Date.now() - startTime) / 10));
+      }, 10);
+    } else {
+      clearInterval(intervalId);
+    }
+    return () => clearInterval(intervalId);
+  }, [isGameRunning]);
+
   // --- Voice Search Function ---
   const handleVoiceSearch = () => {
     if (typeof window !== 'undefined' && ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
@@ -264,7 +284,6 @@ export default function BbCafeHome() {
       const data = await res.json();
       setAiMessages([...updatedMessages, { role: "model", text: data.text }]);
     } catch (err) {
-      // --- TRIGGER SMART OFFLINE DESI REPLY ENGINE IF API FAILS ---
       const reply = getLocalBotReply(userMsg.text, menu);
       setAiMessages([...updatedMessages, { role: "model", text: reply }]);
     } finally {
@@ -313,6 +332,18 @@ export default function BbCafeHome() {
 
   const handleApplyCoupon = () => {
     if (!enteredCoupon) return toast.error("Please enter a coupon code");
+    const cleanCode = enteredCoupon.trim().toUpperCase();
+
+    // 10-Sec Challenge Win coupon validator!
+    if (cleanCode === 'BUMBUM10SEC') {
+      setAppliedCoupon({
+        code: 'BUMBUM10SEC',
+        discountValue: 500
+      });
+      toast.success("🎉 10-Sec Challenge Coupon Applied! ₹500 OFF!");
+      return;
+    }
+
     const found = coupons.find(c => String(c.code).toLowerCase() === enteredCoupon.trim().toLowerCase());
     if (found) {
       setAppliedCoupon(found);
@@ -596,6 +627,30 @@ export default function BbCafeHome() {
     }
   };
 
+  // --- STOPWATCH GAME MECHANICS ---
+  const handleStartGame = () => {
+    setGameTime(0);
+    setGameResult(null);
+    setIsGameRunning(true);
+  };
+
+  const handleStopGame = () => {
+    setIsGameRunning(false);
+    const target = 1000; // 10.00 seconds is 1000 centiseconds
+    if (gameTime === target) {
+      setGameResult('win');
+      toast.success("🎉 अविश्वसनीय! आपने बिल्कुल 10.00 सेकंड पर स्टॉपवॉच रोकी! आप ₹500 का फ्री आर्डर जीत चुके हैं!");
+    } else {
+      setGameResult('lose');
+    }
+  };
+
+  const formatGameTimeDisplay = (cs: number) => {
+    const ss = Math.floor(cs / 100);
+    const cc = cs % 100;
+    return `${String(ss).padStart(2, '0')}.${String(cc).padStart(2, '0')}`;
+  };
+
   if (!mounted) return null;
 
   return (
@@ -613,8 +668,8 @@ export default function BbCafeHome() {
         </div>
       </header>
 
-      {/* STICKY SEARCH BAR WITH SLIDING PLACEHOLDER & VOICE SEARCH (z-50) */}
-      <div className="sticky top-0 z-50 bg-[#050505]/95 backdrop-blur-md py-4 px-4 border-b border-white/5 rounded-b-3xl">
+      {/* STICKY SEARCH BAR WITH SLIDING PLACEHOLDER & VOICE SEARCH (z-[60] to prevent overlap) */}
+      <div className="sticky top-0 z-[60] bg-[#050505]/95 backdrop-blur-md py-4 px-4 border-b border-white/5 rounded-b-3xl">
         <div className="relative max-w-sm mx-auto">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
           
@@ -635,10 +690,10 @@ export default function BbCafeHome() {
         </div>
       </div>
 
-      {/* DOUBLE SIDE-TOGGLES STACKED CLEANLY ON THE RIGHT */}
+      {/* TRIPLE SIDE-TOGGLES STACKED CLEANLY ON THE RIGHT (z-[45] so they scroll behind sticky search) */}
       <button 
         onClick={() => setIsSocialsOpen(true)} 
-        className="fixed right-0 top-[31%] -translate-y-1/2 bg-[#ff5e00] text-white py-4 px-2.5 rounded-l-2xl z-40 text-[9px] font-black tracking-widest uppercase flex flex-col items-center gap-1 shadow-xl border-l border-y border-white/10"
+        className="fixed right-0 top-[31%] -translate-y-1/2 bg-[#ff5e00] text-white py-4 px-2.5 rounded-l-2xl z-[45] text-[9px] font-black tracking-widest uppercase flex flex-col items-center gap-1 shadow-xl border-l border-y border-white/10"
         style={{ writingMode: 'vertical-lr' }}
       >
         📱 FOLLOW & EARN
@@ -646,10 +701,19 @@ export default function BbCafeHome() {
 
       <button 
         onClick={() => setIsReviewsDrawerOpen(true)} 
-        className="fixed right-0 top-[44%] -translate-y-1/2 bg-yellow-400 text-black py-4 px-2.5 rounded-l-2xl z-40 text-[9px] font-black tracking-widest uppercase flex flex-col items-center gap-1 shadow-xl"
+        className="fixed right-0 top-[44%] -translate-y-1/2 bg-yellow-400 text-black py-4 px-2.5 rounded-l-2xl z-[45] text-[9px] font-black tracking-widest uppercase flex flex-col items-center gap-1 shadow-xl"
         style={{ writingMode: 'vertical-lr' }}
       >
         ⭐ REVIEWS
+      </button>
+
+      {/* NEW STOPWATCH CHALLENGE FLOATING SIDEBAR TOGGLE */}
+      <button 
+        onClick={() => setIsGameOpen(true)} 
+        className="fixed right-0 top-[57%] -translate-y-1/2 bg-gradient-to-r from-red-500 to-orange-500 text-white py-4 px-2.5 rounded-l-2xl z-[45] text-[9px] font-black tracking-widest uppercase flex flex-col items-center gap-1 shadow-xl border-l border-y border-white/10 animate-bounce"
+        style={{ writingMode: 'vertical-lr', animationDuration: '4s' }}
+      >
+        ⏱️ 10S CHALLENGE
       </button>
 
       <main className="pt-4 px-4 max-w-lg mx-auto space-y-6">
@@ -679,6 +743,20 @@ export default function BbCafeHome() {
           ) : (
             <img src={banners[bannerIndex]?.url} onError={() => setBannerError(true)} className="w-full h-full object-cover animate-fade-in" alt="Promo" />
           )}
+        </div>
+
+        {/* 10-SECOND CHALLENGE PROMO BOX/BANNER */}
+        <div className="bg-gradient-to-r from-red-600/15 to-orange-600/15 border border-red-500/30 p-5 rounded-[2.2rem] text-center space-y-3 relative overflow-hidden">
+          <div className="absolute top-0 right-0 bg-red-600 text-white font-black uppercase text-[8px] px-3 py-1 rounded-bl-xl tracking-widest animate-pulse">CHALLENGE</div>
+          <span className="text-[10px] font-black uppercase text-red-400 flex justify-center items-center gap-1">⏱️ 10 SECOND SPEED CHALLENGE</span>
+          <h4 className="text-sm font-black text-white">Stopwatch को ठीक 10.00s पर रोकें और ₹500 तक का FREE आर्डर जीतें!</h4>
+          <p className="text-[9px] text-gray-400 font-semibold">नियम: थोड़ा भी कम या ज्यादा होने पर ऑफर मान्य नहीं होगा।</p>
+          <button 
+            onClick={() => setIsGameOpen(true)} 
+            className="w-full bg-gradient-to-r from-red-500 to-orange-500 text-white font-black py-2.5 rounded-2xl text-[10px] uppercase active:scale-95 transition-all shadow-md"
+          >
+            🕹️ PLAY CHALLENGE NOW
+          </button>
         </div>
 
         {/* ZOMATO-STYLE CATEGORY HORIZONTAL SLIDER (Without "See More" Button) */}
@@ -787,7 +865,7 @@ export default function BbCafeHome() {
             </div>
             <div>
               <p className="text-gray-500 text-[9px] font-black uppercase mb-1">📍 Location</p>
-              <p className="text-gray-200">Bum Bum Cafe, बस स्टैंड मोहंद्रा, पीपल पेड़ के नीचे, मोहंद्रा (जिला पन्ना, मध्य प्रदेश)</p>
+              <p className="text-gray-200">बम बम कैफ़े, बस स्टैंड मोहंद्रा, पीपल पेड़ के नीचे, मोहंद्रा (जिला पन्ना, मध्य प्रदेश)</p>
             </div>
           </div>
           
@@ -852,6 +930,78 @@ export default function BbCafeHome() {
         )}
       </AnimatePresence>
 
+      {/* --- INTERACTIVE STOPWATCH GAME MODAL --- */}
+      <AnimatePresence>
+        {isGameOpen && (
+          <div className="fixed inset-0 bg-black/95 z-[270] flex items-center justify-center p-6">
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }} 
+              animate={{ scale: 1, opacity: 1 }} 
+              exit={{ scale: 0.9, opacity: 0 }} 
+              className="bg-[#111] w-full max-w-md p-8 rounded-[3rem] border border-white/10 text-center space-y-6 relative overflow-hidden"
+            >
+              <div className="absolute -top-10 -left-10 w-32 h-32 bg-red-500/10 blur-3xl rounded-full" />
+              <div className="absolute -bottom-10 -right-10 w-32 h-32 bg-orange-500/10 blur-3xl rounded-full" />
+              
+              <div>
+                <h3 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-yellow-500 italic uppercase">10S CHALLENGE</h3>
+                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mt-1">बम बम कैफ़े - मोहंद्रा विशेष</p>
+              </div>
+
+              {/* STOPWATCH DIGITAL DISPLAY */}
+              <div className="bg-black/60 border border-white/5 p-8 rounded-[2rem] shadow-inner text-center">
+                <p className="text-xs text-gray-500 font-bold uppercase tracking-widest mb-2">Stopwatch</p>
+                <h1 className="text-6xl font-mono font-black text-yellow-300 tracking-tighter">
+                  {formatGameTimeDisplay(gameTime)}
+                </h1>
+                <p className="text-[10px] text-red-400 font-bold uppercase mt-2">Target: 10.00 Seconds Fix</p>
+              </div>
+
+              {/* GAME RESULTS DISPLAY */}
+              {gameResult === 'win' && (
+                <div className="p-4 bg-green-500/10 border border-green-500/25 rounded-2xl text-center space-y-1 animate-pulse">
+                  <p className="text-xs font-black text-green-400 uppercase">🎉 विजेता! आपने कर दिखाया!</p>
+                  <p className="text-[9px] text-gray-300">नीचे दिया सीक्रेट कोड कॉपी करें और कार्ट में अप्लाई करें:</p>
+                  <p className="text-lg font-mono font-black text-white tracking-widest bg-black/40 py-1.5 rounded-lg border border-white/10 uppercase">BUMBUM10SEC</p>
+                </div>
+              )}
+
+              {gameResult === 'lose' && (
+                <div className="p-4 bg-red-500/10 border border-red-500/25 rounded-2xl text-center space-y-1">
+                  <p className="text-xs font-black text-red-400 uppercase">❌ अरेरे! चूक गए!</p>
+                  <p className="text-[9px] text-gray-300">आपका टाइम: <span className="font-bold text-white font-mono">{formatGameTimeDisplay(gameTime)}</span> रहा। ठीक 10.00 पर रोकें!</p>
+                </div>
+              )}
+
+              {/* CONTROLS */}
+              <div className="flex gap-3">
+                {!isGameRunning ? (
+                  <button 
+                    onClick={handleStartGame} 
+                    className="flex-1 bg-green-500 hover:bg-green-600 text-black font-black p-4.5 rounded-2xl text-xs uppercase transition-all"
+                  >
+                    🚀 START
+                  </button>
+                ) : (
+                  <button 
+                    onClick={handleStopGame} 
+                    className="flex-1 bg-red-500 hover:bg-red-600 text-white font-black p-4.5 rounded-2xl text-xs uppercase animate-pulse transition-all"
+                  >
+                    🛑 STOP
+                  </button>
+                )}
+                <button 
+                  onClick={() => { setIsGameOpen(false); setGameResult(null); setGameTime(0); }} 
+                  className="bg-white/5 hover:bg-white/10 text-gray-400 font-bold p-4.5 rounded-2xl text-xs uppercase"
+                >
+                  CLOSE
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       {/* --- AI CHAT INTERFACE MODAL (UPDATED WITH RIYA DIDI AVATAR FACE & OFFLINE ENGINE) --- */}
       <AnimatePresence>
         {isAiOpen && (
@@ -862,7 +1012,7 @@ export default function BbCafeHome() {
               exit={{ scale: 0.9, opacity: 0 }} 
               className="bg-[#111] w-full max-w-md h-[80vh] rounded-[3rem] border border-white/10 flex flex-col overflow-hidden relative"
             >
-              {/* Header (Updated with Riya Didi Avatar Calling Face) */}
+              {/* Header */}
               <div className="p-6 border-b border-white/5 flex justify-between items-center bg-gradient-to-r from-purple-600/10 to-pink-600/10">
                 <div className="flex items-center gap-3">
                   <div className="relative">
@@ -1264,209 +1414,6 @@ export default function BbCafeHome() {
 
                 <button onClick={sendWhatsAppOrder} type="button" className="w-full bg-green-600 hover:bg-green-700 p-6 rounded-[2.5rem] font-black text-md text-white flex items-center justify-center gap-3">ORDER ON WHATSAPP</button>
               </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* --- LARGE YELLOW FLOATING CART BUTTON (Springy Slide-up) --- */}
-      {cart.length > 0 && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-full max-w-sm md:max-w-md px-4">
-          <motion.button
-            key={cart.reduce((acc: number, item: any) => acc + item.quantity, 0)}
-            initial={{ scale: 0.95, y: 10 }}
-            animate={{ scale: 1, y: 0 }}
-            transition={{ type: "spring", stiffness: 300, damping: 15 }}
-            onClick={() => setIsCartOpen(true)}
-            className="w-full bg-[#facc15] hover:bg-[#eab308] text-black py-4.5 px-6 rounded-[2rem] font-black text-sm uppercase flex justify-between items-center shadow-[0_12px_40px_rgba(250,204,21,0.25)] border border-yellow-300/30 active:scale-95 transition-all"
-          >
-            <div className="flex items-center gap-2.5">
-              <ShoppingBag size={20} />
-              <span className="text-xs font-black tracking-wider">{cart.reduce((acc: number, item: any) => acc + item.quantity, 0)} Items Added</span>
-            </div>
-            <div className="flex items-center gap-1 bg-black/10 px-3.5 py-1.5 rounded-full border border-black/5">
-              <span className="text-[10px] font-black uppercase">View Cart</span>
-              <ChevronRight size={14} />
-            </div>
-          </motion.button>
-        </div>
-      )}
-
-      {/* CONTACT DETAILS MODAL */}
-      <AnimatePresence>
-        {isLoginOpen && (
-          <div className="fixed inset-0 bg-black/95 z-[200] flex items-center justify-center p-6">
-            <form onSubmit={handleSaveDetails} className="bg-[#111] w-full max-w-md p-10 rounded-[3rem] border border-white/10 text-center space-y-6">
-              <User className="mx-auto text-orange-500" size={48} />
-              <div>
-                <h2 className="text-3xl font-black mb-1">Your Details</h2>
-                <p className="text-gray-500 font-semibold text-xs uppercase tracking-widest">Setup Once • Order Fast</p>
-              </div>
-              <div className="space-y-4 text-left">
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-gray-500 uppercase">Your Name</label>
-                  <input type="text" placeholder="Enter your name..." value={tempName} onChange={(e) => setTempName(e.target.value)} className="w-full bg-white/5 border border-white/10 p-4 rounded-2xl text-center font-bold text-white outline-none focus:border-orange-500" required />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-gray-500 uppercase">Mobile Number</label>
-                  <input type="tel" maxLength={10} placeholder="10-digit Phone Number" value={tempPhone} onChange={(e) => setTempPhone(e.target.value)} className="w-full bg-white/5 border border-white/10 p-4 rounded-2xl text-center font-bold text-white outline-none focus:border-orange-500" required />
-                </div>
-              </div>
-              <button type="submit" className="w-full bg-orange-500 text-black p-5 rounded-2xl font-black text-md uppercase">PROCEED TO ORDER</button>
-              <button type="button" onClick={() => setIsLoginOpen(false)} className="mt-6 text-gray-500 text-xs font-black uppercase block mx-auto">Close</button>
-            </form>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* GIFT POINTS MODAL */}
-      <AnimatePresence>
-        {isGiftModalOpen && (
-          <div className="fixed inset-0 bg-black/95 z-[260] flex items-center justify-center p-6">
-            <motion.form onSubmit={handleGiftPoints} initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="bg-[#111] w-full max-w-md p-8 rounded-[3rem] border border-white/10 text-center space-y-6 relative overflow-hidden">
-              <div className="absolute -top-10 -left-10 w-32 h-32 bg-yellow-400/10 blur-3xl rounded-full" />
-              <div className="inline-flex p-4 bg-yellow-400/10 rounded-full text-yellow-400"><Gift size={32} /></div>
-              <div>
-                <h3 className="text-2xl font-black text-yellow-400 uppercase italic">Gift Loyalty Points</h3>
-                <p className="text-xs text-gray-500 font-semibold mt-1">अपने पॉइंट्स किसी दोस्त को गिफ्ट करें</p>
-              </div>
-              <div className="space-y-4 text-left">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase text-gray-500">Friend's Phone Number</label>
-                  <input type="tel" maxLength={10} placeholder="e.g. 9876543210" value={giftPhone} onChange={(e) => setGiftPhone(e.target.value)} required className="w-full bg-white/5 border border-white/10 p-3.5 rounded-xl text-sm font-bold text-white outline-none text-center" />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase text-gray-500">Points to Gift (Your Pts: {customerPoints})</label>
-                  <input type="number" placeholder="e.g. 10" value={giftPointsAmount} onChange={(e) => setGiftPointsAmount(e.target.value === "" ? "" : Number(e.target.value))} required className="w-full bg-white/5 border border-white/10 p-3.5 rounded-xl text-sm font-bold text-white outline-none text-center" />
-                </div>
-              </div>
-              <div className="flex gap-2">
-                <button type="submit" disabled={isGiftingLoading} className="flex-1 bg-yellow-400 text-black font-black p-4 rounded-xl text-sm uppercase flex items-center justify-center gap-2">
-                  {isGiftingLoading ? <Loader2 className="animate-spin" size={16} /> : <span>Gift Points 🎁</span>}
-                </button>
-                <button type="button" onClick={() => { setIsGiftModalOpen(false); setGiftPhone(""); setGiftPointsAmount(""); }} className="bg-white/5 text-gray-400 font-bold p-4 rounded-xl text-sm">CANCEL</button>
-              </div>
-            </motion.form>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* GAMIFIED SOCIAL MEDIA MODAL */}
-      <AnimatePresence>
-        {isSocialsOpen && (
-          <div className="fixed inset-0 bg-black/95 z-[250] flex items-center justify-center p-6">
-            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="bg-[#111] w-full max-w-md p-8 rounded-[3rem] border border-white/10 text-center space-y-6 relative overflow-hidden">
-              <div className="absolute -top-10 -left-10 w-32 h-32 bg-orange-500/10 blur-3xl rounded-full" />
-              <div>
-                <h3 className="text-2xl font-black text-orange-500 uppercase italic">Connect & Earn Points</h3>
-                <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">हर प्लेटफार्म पर फॉलो/सब्सक्राइब करने का +1 पॉइंट पाएं!</p>
-              </div>
-              <div className="space-y-3 text-left max-h-[22rem] overflow-y-auto no-scrollbar pr-1">
-                
-                {/* WHATSAPP MESSAGE */}
-                <button 
-                  onClick={() => handleSocialClick('whatsapp_msg', 'https://wa.me/919714293759')}
-                  className="w-full flex items-center justify-between bg-green-500/10 border border-green-500/20 p-3.5 rounded-2xl active:scale-[0.98] transition-all text-left"
-                >
-                  <div className="flex items-center gap-4">
-                    <span className="text-2xl">🟢</span>
-                    <div>
-                      <h4 className="text-xs font-black text-white">WhatsApp Message</h4>
-                      <p className="text-[8px] text-gray-400 font-bold uppercase mt-0.5">Contact Us: 9714293759</p>
-                    </div>
-                  </div>
-                  <span className={`text-[9px] font-black uppercase px-2.5 py-1 rounded-lg ${getClaimStatus('whatsapp_msg').startsWith('✅') ? 'bg-green-500/20 text-green-400' : 'bg-yellow-400 text-black'}`}>
-                    {getClaimStatus('whatsapp_msg')}
-                  </span>
-                </button>
-
-                {/* WHATSAPP CHANNEL */}
-                <button 
-                  onClick={() => handleSocialClick('whatsapp_channel', 'https://whatsapp.com/channel/0029VaLhggoGE56natoQI43y')}
-                  className="w-full flex items-center justify-between bg-emerald-500/10 border border-emerald-500/20 p-3.5 rounded-2xl active:scale-[0.98] transition-all text-left"
-                >
-                  <div className="flex items-center gap-4">
-                    <span className="text-2xl">📢</span>
-                    <div>
-                      <h4 className="text-xs font-black text-white">WhatsApp Channel</h4>
-                      <p className="text-[8px] text-gray-400 font-bold uppercase mt-0.5">Subscribe for Offers</p>
-                    </div>
-                  </div>
-                  <span className={`text-[9px] font-black uppercase px-2.5 py-1 rounded-lg ${getClaimStatus('whatsapp_channel').startsWith('✅') ? 'bg-green-500/20 text-green-400' : 'bg-yellow-400 text-black'}`}>
-                    {getClaimStatus('whatsapp_channel')}
-                  </span>
-                </button>
-
-                {/* YOUTUBE */}
-                <button 
-                  onClick={() => handleSocialClick('youtube', 'https://www.youtube.com/@bbcafe.i')}
-                  className="w-full flex items-center justify-between bg-red-600/10 border border-red-600/20 p-3.5 rounded-2xl active:scale-[0.98] transition-all text-left"
-                >
-                  <div className="flex items-center gap-4">
-                    <span className="text-2xl">🔴</span>
-                    <div>
-                      <h4 className="text-xs font-black text-white">YouTube Channel</h4>
-                      <p className="text-[8px] text-gray-400 font-bold uppercase mt-0.5">Subscribe @bbcafe.i</p>
-                    </div>
-                  </div>
-                  <span className={`text-[9px] font-black uppercase px-2.5 py-1 rounded-lg ${getClaimStatus('youtube').startsWith('✅') ? 'bg-green-500/20 text-green-400' : 'bg-yellow-400 text-black'}`}>
-                    {getClaimStatus('youtube')}
-                  </span>
-                </button>
-
-                {/* INSTAGRAM */}
-                <button 
-                  onClick={() => handleSocialClick('instagram', 'https://www.instagram.com/bbcafe.in/')}
-                  className="w-full flex items-center justify-between bg-pink-500/10 border border-pink-500/20 p-3.5 rounded-2xl active:scale-[0.98] transition-all text-left"
-                >
-                  <div className="flex items-center gap-4">
-                    <span className="text-2xl">📸</span>
-                    <div>
-                      <h4 className="text-xs font-black text-white">Instagram</h4>
-                      <p className="text-[8px] text-gray-400 font-bold uppercase mt-0.5">Follow @bbcafe.in</p>
-                    </div>
-                  </div>
-                  <span className={`text-[9px] font-black uppercase px-2.5 py-1 rounded-lg ${getClaimStatus('instagram').startsWith('✅') ? 'bg-green-500/20 text-green-400' : 'bg-yellow-400 text-black'}`}>
-                    {getClaimStatus('instagram')}
-                  </span>
-                </button>
-
-                {/* FACEBOOK */}
-                <button 
-                  onClick={() => handleSocialClick('facebook', 'https://www.facebook.com/bbcafe.in/')}
-                  className="w-full flex items-center justify-between bg-blue-600/10 border border-blue-600/20 p-3.5 rounded-2xl active:scale-[0.98] transition-all text-left"
-                >
-                  <div className="flex items-center gap-4">
-                    <span className="text-2xl">🔵</span>
-                    <div>
-                      <h4 className="text-xs font-black text-white">Facebook</h4>
-                      <p className="text-[8px] text-gray-400 font-bold uppercase mt-0.5">Like @bbcafe.in</p>
-                    </div>
-                  </div>
-                  <span className={`text-[9px] font-black uppercase px-2.5 py-1 rounded-lg ${getClaimStatus('facebook').startsWith('✅') ? 'bg-green-500/20 text-green-400' : 'bg-yellow-400 text-black'}`}>
-                    {getClaimStatus('facebook')}
-                  </span>
-                </button>
-
-                {/* SNAPCHAT */}
-                <button 
-                  onClick={() => handleSocialClick('snapchat', 'https://www.snapchat.com/add/bbcafe.in')}
-                  className="w-full flex items-center justify-between bg-yellow-400/10 border border-yellow-400/20 p-3.5 rounded-2xl active:scale-[0.98] transition-all text-left"
-                >
-                  <div className="flex items-center gap-4">
-                    <span className="text-2xl">🟡</span>
-                    <div>
-                      <h4 className="text-xs font-black text-white">Snapchat</h4>
-                      <p className="text-[8px] text-gray-400 font-bold uppercase mt-0.5">Add bbcafe.in</p>
-                    </div>
-                  </div>
-                  <span className={`text-[9px] font-black uppercase px-2.5 py-1 rounded-lg ${getClaimStatus('snapchat').startsWith('✅') ? 'bg-green-500/20 text-green-400' : 'bg-yellow-400 text-black'}`}>
-                    {getClaimStatus('snapchat')}
-                  </span>
-                </button>
-
-              </div>
-              <button type="button" onClick={() => setIsSocialsOpen(false)} className="w-full bg-orange-500 text-black font-black p-4 rounded-xl text-xs uppercase">CLOSE</button>
             </motion.div>
           </div>
         )}
