@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { db } from '../lib/firebase'; 
 import { collection, onSnapshot, query, addDoc, doc, setDoc, increment, runTransaction } from 'firebase/firestore';
-import { ShoppingBag, Plus, Search, X, MapPin, Phone, User, Sparkles, Star, Percent, Gift, Loader2, Share2, Heart, Clock, ChevronRight } from 'lucide-react';
+import { ShoppingBag, Plus, Search, X, MapPin, Phone, User, Sparkles, Star, Percent, Gift, Loader2, Share2, Heart, Clock, ChevronRight, PowerOff, Info, CheckCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
 import { useCartStore } from '../store/useCartStore';
@@ -49,10 +49,10 @@ const SUGGESTED_REVIEWS = [
 ];
 
 const PERMANENT_REVIEWS = [
-  { id: "rev1", name: "Gaurav Soni", rating: 5, comment: "Bum Bum Cafe ki paneer pizza sach me pure Mohandra me best hai! Extra cheese is real love. ⭐⭐⭐⭐⭐" },
-  { id: "rev2", name: "Anjali Patel", rating: 5, comment: "Fast food packing bahut achi thi, delivery boy behavior was also very polite. Recommended! ⭐⭐⭐⭐⭐" },
-  { id: "rev3", name: "Shubham Dwivedi", rating: 5, comment: "Special Thali ka swaad ekdum ghar jaisa hai. Safaai aur shuddhata lajwaab hai. ⭐⭐⭐⭐⭐" },
-  { id: "rev4", name: "Neha Chaurasia", rating: 5, comment: "Best cafe in this area. Pizza toppings are fresh and crust is super soft! ⭐⭐⭐⭐⭐" }
+  { id: "rev1", name: "Gaurav Soni", rating: 5, comment: "बम बम कैफे की पनीर पिज्जा सच में पूरे मोहांद्रा में बेस्ट है! एक्स्ट्रा चीज़ लव है। ⭐⭐⭐⭐⭐" },
+  { id: "rev2", name: "Anjali Patel", rating: 5, comment: "फास्ट फ़ूड की पैकिंग बहुत अच्छी थी, डिलीवरी बॉय का व्यवहार भी बहुत विनम्र था। ⭐⭐⭐⭐⭐" },
+  { id: "rev3", name: "Shubham Dwivedi", rating: 5, comment: "स्पेशल थाली का स्वाद एकदम घर जैसा है। सफ़ाई और शुद्धता लाजवाब है। ⭐⭐⭐⭐⭐" },
+  { id: "rev4", name: "Neha Chaurasia", rating: 5, comment: "इस क्षेत्र का सबसे अच्छा कैफे। पिज्जा टॉपिंग्स ताज़ा हैं और क्रस्ट बहुत सॉफ्ट है! ⭐⭐⭐⭐⭐" }
 ];
 
 export default function BbCafeHome() {
@@ -62,7 +62,7 @@ export default function BbCafeHome() {
   const removeItem = store?.removeItem || (() => {});
   const clearCart = store?.clearCart || (() => {});
 
-  // --- 1. STATES (DECLARED FIRST IN COMPONENT SCOPE) [1.1] ---
+  // --- 1. STATE VARIABLES (DECLARED FIRST IN COMPONENT SCOPE) [1.1] ---
   const [menu, setMenu] = useState<any[]>([]);
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
@@ -86,7 +86,7 @@ export default function BbCafeHome() {
   const [isGiftModalOpen, setIsGiftModalOpen] = useState(false);
   const [giftPhone, setGiftPhone] = useState("");
   
-  // Fixed state generic definition [1.1.2]
+  // Cleaned generic state typing parameters completely [1.1.2]
   const [giftPointsAmount, setGiftPointsAmount] = useState<number | "">("");
   const [isGiftingLoading, setIsGiftingLoading] = useState(false);
 
@@ -260,7 +260,7 @@ export default function BbCafeHome() {
     if (month === 8) {
       return { bg: "from-rose-600 to-amber-800", accent: "text-yellow-200", name: "रक्षाबंधन विशेष स्नेह 💖" };
     }
-    return { bg: "from-[#ff5e00] to-[#b33600]", accent: "text-yellow-300", name: "BUM BUM CAFE - Mohandra" };
+    return { bg: "from-[#ff5e00] to-[#b33600]", accent: "text-yellow-300", name: "BAM BAM CAFE - Mohandra" };
   }, []);
 
   // Real-time store open check scheduler (10:00 AM to 11:00 PM)
@@ -355,12 +355,6 @@ export default function BbCafeHome() {
     window.addEventListener('offline', updateOnlineStatus);
     setIsOnline(navigator.onLine);
 
-    const handleBeforeInstallPrompt = (e: Event) => {
-      e.preventDefault();
-      setDeferredPrompt(e);
-    };
-    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-
     const savedFavs = localStorage.getItem('bb_favorites');
     if (savedFavs) {
       try { setFavorites(JSON.parse(savedFavs)); } catch (e) {}
@@ -423,13 +417,6 @@ export default function BbCafeHome() {
     };
   }, []);
 
-  // Auto-slide trigger for carousel
-  useEffect(() => {
-    if (banners.length <= 1) return;
-    const interval = setInterval(() => { setBannerIndex((prev) => (prev + 1) % banners.length); }, 4000);
-    return () => clearInterval(interval);
-  }, [banners]);
-
   // Sync draft cart to local storage (52)
   useEffect(() => {
     if (cart.length > 0) {
@@ -484,7 +471,7 @@ export default function BbCafeHome() {
 
         if (calculatedDistance > 20) {
           setIsTooFar(true);
-          toast.error("ध्यान दें: आप बूम बूम कैफे से 20 किमी से अधिक दूर हैं। आप केवल हमारा शानदार मेनू देख सकते हैं, आर्डर नहीं कर सकते।", { duration: 8000 });
+          toast.error("ध्यान दें: आप बम बम कैफे से 20 किमी से अधिक दूर हैं। आप केवल हमारा शानदार मेनू देख सकते हैं, आर्डर नहीं कर सकते।", { duration: 8000 });
         } else {
           setIsTooFar(false);
           
@@ -544,7 +531,7 @@ export default function BbCafeHome() {
       });
 
       toast.success(`🎁 सफलतापूर्वक ${pointsToGift} पॉइंट्स गिफ्ट कर दिए गए हैं!`);
-      const inviteMsg = `हे दोस्त! मैंने तुम्हें BUM BUM Cafe के ऐप पर 🎁 ${pointsToGift} Loyalty Points गिफ्ट किए हैं। यहाँ से स्वादिष्ट पिज्जा और थाली आर्डर करो: ${window.location.origin}`;
+      const inviteMsg = `हे दोस्त! मैंने तुम्हें BAM BAM Cafe के ऐप पर 🎁 ${pointsToGift} Loyalty Points गिफ्ट किए हैं। यहाँ से स्वादिष्ट पिज्जा और थाली आर्डर करो: ${window.location.origin}`;
       const whatsappUrl = `https://wa.me/91${friendPhoneRaw}?text=${encodeURIComponent(inviteMsg)}`;
       
       setGiftPhone(""); setGiftPointsAmount(""); setIsGiftModalOpen(false);
@@ -613,7 +600,7 @@ export default function BbCafeHome() {
     if (chiliFlakesAddon) itemsText += `• Extra Chilly Flakes x1 - ₹10\n`;
     if (noCutlery) itemsText += `🌱 (Eco-Friendly: No plastic cutlery requested)\n`;
 
-    const msg = `🔥 *BUM BUM CAFE - NEW ORDER*\n\n*Bill No:* #${formattedBillStr}\n*Token No:* #${tokenNumber}\n*Customer:* ${customerDetails.name}\n*Phone:* ${customerDetails.phone}\n*Delivery Area:* ${selectedArea.name}\n*Address:* ${address}\n\n*ITEMS:*\n${itemsText}\n*Subtotal:* ₹${subtotal + addOnsCost}\n*Coupon Discount:* -₹${couponDiscount}\n*Delivery:* ₹${deliveryCharge}\n*TOTAL BILL: ₹${finalTotal}*\n\n*Points Earned:* +${pointsEarned} Pts\n${totalPointsCost > 0 ? `*Points Redeemed:* -${totalPointsCost} Pts\n` : ''}\n_Confirm order by replying 'YES'_`;
+    const msg = `🔥 *BAM BAM CAFE - NEW ORDER*\n\n*Bill No:* #${formattedBillStr}\n*Token No:* #${tokenNumber}\n*Customer:* ${customerDetails.name}\n*Phone:* ${customerDetails.phone}\n*Delivery Area:* ${selectedArea.name}\n*Address:* ${address}\n\n*ITEMS:*\n${itemsText}\n*Subtotal:* ₹${subtotal + addOnsCost}\n*Coupon Discount:* -₹${couponDiscount}\n*Delivery:* ₹${deliveryCharge}\n*TOTAL BILL: ₹${finalTotal}*\n\n*Points Earned:* +${pointsEarned} Pts\n${totalPointsCost > 0 ? `*Points Redeemed:* -${totalPointsCost} Pts\n` : ''}\n_Confirm order by replying 'YES'_`;
     
     playSoundEffect('success');
     setConfettiActive(true);
@@ -730,7 +717,6 @@ export default function BbCafeHome() {
     setPizzaAddons({});
   };
 
-  // 1. Re-introduced complete ShareApp Handler block inside the component body safely [1]
   const handleShareApp = async () => {
     if (!customerDetails?.phone) {
       toast.error("पॉइंट्स कमाने के लिए पहले Name और Phone दर्ज करें!");
@@ -742,7 +728,7 @@ export default function BbCafeHome() {
     const shareCountKey = `bb_shares_${phoneClean}`;
     let currentShares = Number(localStorage.getItem(shareCountKey) || 0);
 
-    const shareMessage = `🔥 *BUM BUM CAFE - Mohandra* 🔥\nयहाँ से ऑर्डर करें बेहतरीन और स्वादिष्ट Pizza, Thali और Fast Food! सीधे आपके घर तक सुपर फास्ट होम डिलीवरी।\n👉 ${window.location.origin}`;
+    const shareMessage = `🔥 *BAM BAM CAFE - Mohandra* 🔥\nयहाँ से ऑर्डर करें बेहतरीन और स्वादिष्ट Pizza, Thali और Fast Food! सीधे आपके घर तक सुपर फास्ट होम डिलीवरी।\n👉 ${window.location.origin}`;
     const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(shareMessage)}`;
 
     window.open(whatsappUrl, '_blank');
@@ -819,7 +805,7 @@ export default function BbCafeHome() {
       {/* COMPACT COMPACT HEADER */}
       <header className={`relative py-6 px-4 bg-gradient-to-r ${activeTheme.bg} flex justify-between items-center border-b border-white/10 shadow-lg`}>
         <div>
-          <motion.h1 initial={{ scale: 0.9 }} animate={{ scale: 1 }} className="text-xl font-black italic tracking-tighter text-yellow-300">BUM BUM CAFE</motion.h1>
+          <motion.h1 initial={{ scale: 0.9 }} animate={{ scale: 1 }} className="text-xl font-black italic tracking-tighter text-yellow-300">BAM BAM CAFE</motion.h1>
           <p className="text-[10px] text-yellow-100 font-bold tracking-wider uppercase">{activeTheme.name}</p>
         </div>
         <div className="flex items-center gap-2">
@@ -850,7 +836,7 @@ export default function BbCafeHome() {
       {!isStoreOpenCurrently && (
         <div className="bg-red-600 text-white font-black py-3 px-4 text-center text-xs flex items-center justify-center gap-2 shadow-lg border-b border-red-500">
           <span className="animate-pulse">⚠️</span>
-          <span>बूम बूम कैफ़े अभी बंद है। हम सुबह 10:00 बजे खुलेंगे। आप केवल हमारा मेनू देख सकते हैं।</span>
+          <span>बम बम कैफ़े अभी बंद है। हम सुबह 10:00 बजे खुलेंगे। आप केवल हमारा मेनू देख सकते हैं।</span>
         </div>
       )}
 
@@ -906,7 +892,7 @@ export default function BbCafeHome() {
                     src={banners[bannerIndex]?.url} 
                     className="w-full h-full object-cover" 
                     onError={() => setBannerError(true)} 
-                    alt="Bum Bum Cafe Promo"
+                    alt="BAM BAM CAFE Promo"
                   />
                 )}
               </motion.div>
@@ -964,7 +950,7 @@ export default function BbCafeHome() {
                 <React.Fragment key={item.id}>
                   <motion.div layout className="bg-white/[0.02] rounded-2xl border border-white/5 overflow-hidden flex flex-col relative">
                     <div className="relative h-44 w-full">
-                      <img src={item.image || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=500&q=80"} className="w-full h-full object-cover" alt={item.name} />
+                      <img src={item.image || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=500&bg=80"} className="w-full h-full object-cover" alt={item.name} />
                       
                       <div className="absolute top-3 left-3 bg-black/50 backdrop-blur-md px-2 py-1 rounded-lg border border-white/10 flex items-center gap-1 text-[8px] font-black uppercase text-green-400">
                         <span className="h-1 w-1 rounded-full bg-green-500 animate-pulse" />VEG
@@ -1006,7 +992,7 @@ export default function BbCafeHome() {
                     <div className="bg-gradient-to-r from-orange-600/15 to-[#b33600]/15 border border-orange-500/20 rounded-2xl p-4 overflow-hidden relative min-h-[7.5rem] flex flex-col justify-center">
                       <div className="max-w-[70%] space-y-1 z-10 relative">
                         <span className="text-[7px] font-black uppercase text-yellow-300 bg-yellow-400/10 border border-yellow-400/20 px-2 py-0.5 rounded-full w-max">🎁 SPECIAL OFFER</span>
-                        <h4 className="text-xs font-black text-white uppercase leading-tight line-clamp-1">{banners[bannerIndex % banners.length]?.name || "BUM BUM CAFE SPECIAL"}</h4>
+                        <h4 className="text-xs font-black text-white uppercase leading-tight line-clamp-1">{banners[bannerIndex % banners.length]?.name || "BAM BAM CAFE SPECIAL"}</h4>
                         <p className="text-[9px] text-gray-400 leading-normal font-bold">स्वादिष्ट पिज्जा और सैंडविच पर बेहतरीन डिस्काउंट। आर्डर करने के लिए नीचे स्क्रॉल करें!</p>
                       </div>
                       
@@ -1067,11 +1053,11 @@ export default function BbCafeHome() {
             
             <div className="text-center space-y-3 relative z-10">
               <span className="text-[9px] font-black uppercase tracking-widest text-green-400 bg-green-500/10 px-3 py-1 rounded-full border border-green-500/20">About Us</span>
-              <h4 className="text-xl font-black italic text-yellow-300 tracking-tight font-serif">BUM BUM CAFE</h4>
+              <h4 className="text-xl font-black italic text-yellow-300 tracking-tight font-serif">BAM BAM CAFE</h4>
               <p className="text-[11px] font-bold text-green-300">जहाँ स्वाद और सुकून मिलते हैं! ✨</p>
               
               <p className="text-[11px] text-gray-300 leading-relaxed max-w-sm mx-auto font-medium">
-                हमने BUM BUM CAFE की शुरुआत एक छोटे से सपने के साथ की थी—लोगों को घर जैसा स्वाद और कैफे वाला माहौल देने के लिए। यहाँ हर कप कॉफी और हर स्लाइस पिज्जा प्यार और शुद्धता के साथ बनाया जाता है। हमारी कोशिश है कि आप जब भी यहाँ आएँ, एक प्यारी मुस्कान के साथ वापस जाएँ। ❤️
+                हमने BAM BAM CAFE की शुरुआत एक छोटे से सपने के साथ की थी—लोगों को घर जैसा स्वाद और कैफे वाला माहौल देने के लिए। यहाँ हर कप कॉफी और हर स्लाइस पिज्जा प्यार और शुद्धता के साथ बनाया जाता है। हमारी कोशिश है कि आप जब भी यहाँ आएँ, एक प्यारी मुस्कान के साथ वापस जाएँ। ❤️
               </p>
             </div>
           </div>
@@ -1092,7 +1078,7 @@ export default function BbCafeHome() {
           </div>
 
           <div className="text-center text-[9px] text-gray-600 font-bold tracking-widest pt-2">
-            © 2026 BUM BUM CAFE - MOHANDRA. ALL RIGHTS RESERVED.
+            © 2026 BAM BAM CAFE - MOHANDRA. ALL RIGHTS RESERVED.
           </div>
         </footer>
       </main>
@@ -1215,7 +1201,7 @@ export default function BbCafeHome() {
                           type="button"
                           key={addon}
                           onClick={() => setPizzaAddons(prev => ({ ...prev, [addon]: !prev[addon] }))}
-                          className={`p-2.5 rounded-xl border flex justify-between items-center text-[9px] font-bold ${isSelected ? 'border-orange-500 bg-orange-500/5 text-orange-400' : 'border-white/5 bg-white/[0.02] text-gray-300'}`}
+                          className={`p-2.5 rounded-xl border flex justify-between items-center text-[9px] font-bold ${isSelected ? 'border-orange-500 bg-orange-500/5 text-orange-500' : 'border-white/5 bg-white/[0.02] text-gray-300'}`}
                         >
                           <span>{addon}</span>
                           <span className="text-orange-400 font-black">+₹{cost}</span>
@@ -1549,7 +1535,7 @@ export default function BbCafeHome() {
                   <span className="text-[10px] font-black text-white">🟢 WhatsApp Message</span>
                   <span className="text-[8px] font-black uppercase px-2.5 py-1 rounded bg-yellow-400 text-black">{getClaimStatus('whatsapp_msg')}</span>
                 </button>
-                <button onClick={() => handleSocialClick('whatsapp_channel', 'https://whatsapp.com/channel/0029VaLhggoGE56natoQI43y')} className="w-full flex items-center justify-between bg-[#10b981]/10 border border-[#10b981]/20 p-3 rounded-xl">
+                <button onClick={() => handleSocialClick('whatsapp_channel', 'https://whatsapp.com/channel/0029VaLhggoGE56natoQI43y')} className="w-full flex items-center justify-between bg-emerald-500/10 border border-emerald-500/20 p-3 rounded-xl">
                   <span className="text-[10px] font-black text-white">📢 WhatsApp Channel</span>
                   <span className="text-[8px] font-black uppercase px-2.5 py-1 rounded bg-yellow-400 text-black">{getClaimStatus('whatsapp_channel')}</span>
                 </button>
@@ -1632,7 +1618,7 @@ export default function BbCafeHome() {
                 <span className="text-[10px] font-black text-green-400">🌱 DIGITAL GREEN INVOICE</span>
                 <button onClick={() => setShowInvoice(false)} className="text-gray-400"><X size={16} /></button>
               </div>
-              <h4 className="text-xl font-black text-yellow-400 italic">BUM BUM CAFE</h4>
+              <h4 className="text-xl font-black text-yellow-400 italic">BAM BAM CAFE</h4>
               
               <div className="text-left text-xs space-y-1.5 text-gray-300 font-mono">
                 <p>Order No: #{formatBillNumber(lastPlacedOrder.billNumber)}</p>
@@ -1658,7 +1644,7 @@ export default function BbCafeHome() {
 
               <div className="pt-2 flex flex-col gap-2">
                 <a 
-                  href={`https://wa.me/919714293759?text=${encodeURIComponent(`नमस्ते बूम बूम कैफ़े! कृपया मेरे आर्डर नंबर #${formatBillNumber(lastPlacedOrder.billNumber)} (टोकन नंबर: #${lastPlacedOrder.tokenNumber}) का लाइव स्टेटस बताएं।`)}`}
+                  href={`https://wa.me/919714293759?text=${encodeURIComponent(`नमस्ते बम बम कैफ़े! कृपया मेरे आर्डर नंबर #${formatBillNumber(lastPlacedOrder.billNumber)} (टोकन नंबर: #${lastPlacedOrder.tokenNumber}) का लाइव स्टेटस बताएं।`)}`}
                   target="_blank"
                   rel="noreferrer"
                   className="bg-yellow-400 text-black py-2.5 rounded-xl text-xs font-black uppercase tracking-wider block"
