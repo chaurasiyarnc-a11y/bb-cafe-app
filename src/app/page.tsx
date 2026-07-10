@@ -63,7 +63,7 @@ export default function BbCafeHome() {
   const removeItem = store?.removeItem || (() => {});
   const clearCart = store?.clearCart || (() => {});
 
-  // --- 1. State Variables (Must be declared first) [1.1] ---
+  // --- 1. STATE VARIABLES (DECLARED FIRST IN COMPONENT SCOPE) [1.1] ---
   const [menu, setMenu] = useState<any[]>([]);
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
@@ -542,6 +542,15 @@ export default function BbCafeHome() {
     } finally { setIsGiftingLoading(false); }
   };
 
+  // 1. Re-declared handleCustomerRedeem securely inside component scope [1.1.2]
+  const handleCustomerRedeem = (id: string, name: string, pointsCost: number) => {
+    const currentPointsInCart = cart.reduce((acc: number, item: any) => acc + (item.pointsCost || 0), 0);
+    if (customerPoints - currentPointsInCart < pointsCost) return toast.error("आपके पास पर्याप्त ऑयल्टी पॉइंट्स उपलब्ध नहीं हैं!");
+    addItem({ id, name, price: 0, pointsCost, isReward: true });
+    playSoundEffect('add');
+    toast.success(`${name} Cart में जोड़ दिया गया है!`);
+  };
+
   const sendWhatsAppOrder = async () => {
     if (isTooFar) {
       return toast.error("आपकी दूरी 20 KM से अधिक है। आप केवल मेनू देख सकते हैं, ऑर्डर प्लेस नहीं कर सकते!");
@@ -635,17 +644,6 @@ export default function BbCafeHome() {
     setIsCartOpen(false);
   };
 
-  // 1. Re-declared complete Review submit handler block safely [1]
-  const handleReviewSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!reviewName || !reviewComment) return toast.error("Please fill all fields!");
-    try {
-      await addDoc(collection(db, "reviews"), { name: reviewName, rating: reviewRating, comment: reviewComment, isApproved: false, timestamp: new Date() });
-      toast.success("Review submitted! Approved hone ke baad live dikhega.");
-      setReviewName(""); setReviewComment(""); setReviewRating(5); setIsReviewFormOpen(false);
-    } catch (err) { toast.error("Failed to submit review."); }
-  };
-
   const handleShareApp = async () => {
     if (!customerDetails?.phone) {
       toast.error("पॉइंट्स कमाने के लिए पहले Name और Phone दर्ज करें!");
@@ -688,47 +686,6 @@ export default function BbCafeHome() {
     }
   };
 
-  const handleSocialClick = async (platform: string, url: string) => {
-    window.open(url, '_blank');
-
-    if (!customerDetails?.phone) {
-      toast.error("पॉइंट्स क्लेम करने के लिए कृपया पहले अपना Name और Phone दर्ज करें!");
-      setIsLoginOpen(true);
-      return;
-    }
-
-    const storageKey = `bb_claimed_${customerDetails.phone.replace("+91", "")}_${platform}`;
-    const alreadyClaimed = localStorage.getItem(storageKey);
-
-    if (alreadyClaimed) {
-      toast.success("आप इस प्लेटफ़ॉर्म के लिए पहले ही पॉइंट ले चुके हैं! धन्यवाद ❤️");
-      return;
-    }
-
-    try {
-      const phoneRaw = customerDetails.phone.replace("+91", "").trim();
-      const pointsRef = doc(db, "customer_points", phoneRaw);
-      
-      await setDoc(pointsRef, {
-        points: increment(1),
-        lastActive: new Date()
-      }, { merge: true });
-
-      localStorage.setItem(storageKey, "true");
-      setCustomerPoints(prev => prev + 1);
-      toast.success(`🎉 बधाई हो! ${platform.toUpperCase()} पर हमें फॉलो करने के लिए आपको +1 पॉइंट मिला है!`);
-    } catch (err) {
-      toast.error("पॉइंट्स जोड़ने में समस्या आई।");
-    }
-  };
-
-  const getClaimStatus = (platform: string) => {
-    if (!customerDetails?.phone) return "🎁 +1 Pt";
-    const storageKey = `bb_claimed_${customerDetails.phone.replace("+91", "")}_${platform}`;
-    return localStorage.getItem(storageKey) ? "✅ Claimed" : "🎁 Claim +1 Pt";
-  };
-
-  // 1. Correctly Declared handleSaveDetails inside component scope safely [1.1.2]
   const handleSaveDetails = (e: React.FormEvent) => {
     e.preventDefault();
     if (!tempName || tempName.trim().length < 3) return toast.error("Please enter your real name");
@@ -750,7 +707,6 @@ export default function BbCafeHome() {
     }
   };
 
-  // 1. Correctly Declared handleToggleFavorite inside component scope safely [1.1.2]
   const handleToggleFavorite = (id: string, e: any) => {
     e.stopPropagation();
     let updated;
@@ -765,7 +721,6 @@ export default function BbCafeHome() {
     localStorage.setItem('bb_favorites', JSON.stringify(updated));
   };
 
-  // 1. Correctly Declared handleAddToCart inside component scope safely [1.1.2]
   const handleAddToCart = () => {
     if (!chosenSize) return toast.error("Please select a size first!");
     
@@ -995,7 +950,7 @@ export default function BbCafeHome() {
                 <React.Fragment key={item.id}>
                   <motion.div layout className="bg-white/[0.02] rounded-2xl border border-white/5 overflow-hidden flex flex-col relative">
                     <div className="relative h-44 w-full">
-                      <img src={item.image || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=500&q=80"} className="w-full h-full object-cover" alt={item.name} />
+                      <img src={item.image || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=500&bg=80"} className="w-full h-full object-cover" alt={item.name} />
                       
                       <div className="absolute top-3 left-3 bg-black/50 backdrop-blur-md px-2 py-1 rounded-lg border border-white/10 flex items-center gap-1 text-[8px] font-black uppercase text-green-400">
                         <span className="h-1 w-1 rounded-full bg-green-500 animate-pulse" />VEG
@@ -1246,7 +1201,7 @@ export default function BbCafeHome() {
                           type="button"
                           key={addon}
                           onClick={() => setPizzaAddons(prev => ({ ...prev, [addon]: !prev[addon] }))}
-                          className={`p-2.5 rounded-xl border flex justify-between items-center text-[9px] font-bold ${isSelected ? 'border-orange-500 bg-orange-500/5 text-orange-400' : 'border-white/5 bg-white/[0.02] text-gray-300'}`}
+                          className={`p-2.5 rounded-xl border flex justify-between items-center text-[9px] font-bold ${isSelected ? 'border-orange-500 bg-orange-500/5 text-orange-500' : 'border-white/5 bg-white/[0.02] text-gray-300'}`}
                         >
                           <span>{addon}</span>
                           <span className="text-orange-400 font-black">+₹{cost}</span>
