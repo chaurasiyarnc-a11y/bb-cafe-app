@@ -21,7 +21,6 @@ const CATEGORY_IMAGES: { [key: string]: string } = {
   "Special Rice": "https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?auto=format&fit=crop&w=150&q=80"
 };
 
-// 1. Corrected Delivery Rules: For Mohandra Town, under ₹99, delivery fee is ₹20 [1.1.2]
 const DELIVERY_AREAS = [
   { name: "Mohandra Town", fee: 20, minFree: 99 },
   { name: "Mohandra Ward 1-5 (Within 2 Km)", fee: 20, minFree: 199 },
@@ -63,6 +62,7 @@ export default function BbCafeHome() {
   const removeItem = store?.removeItem || (() => {});
   const clearCart = store?.clearCart || (() => {});
 
+  // Auditory Helper
   const playSoundEffect = (type: 'add' | 'success') => {
     try {
       const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -109,7 +109,9 @@ export default function BbCafeHome() {
 
   const [isGiftModalOpen, setIsGiftModalOpen] = useState(false);
   const [giftPhone, setGiftPhone] = useState("");
-  const [giftPointsAmount, setGiftPointsAmount] = useState<number | " text-white">("");
+  
+  // 1. Fully Fixed TypeScript Error Generic Definition [1.1.2]
+  const [giftPointsAmount, setGiftPointsAmount] = useState<number | "">("");
   const [isGiftingLoading, setIsGiftingLoading] = useState(false);
 
   const [dbCategories, setDbCategories] = useState<any[]>([]);
@@ -188,9 +190,9 @@ export default function BbCafeHome() {
     return { bg: "from-[#ff5e00] to-[#b33600]", accent: "text-yellow-300", name: "BUM BUM CAFE - Mohandra" };
   }, []);
 
-  // 2. Real-time store open check scheduler (10:00 AM to 11:00 PM)
+  // Real-time store open check scheduler (10:00 AM to 11:00 PM)
   const isStoreOpenCurrently = useMemo(() => {
-    if (!storeOpen) return false; // respect the manual settings override
+    if (!storeOpen) return false; 
     const now = new Date();
     const hours = now.getHours();
     if (hours < 10 || hours >= 23) {
@@ -198,6 +200,13 @@ export default function BbCafeHome() {
     }
     return true;
   }, [storeOpen]);
+
+  // Video extension check function for animated looping videos in banners [1.1.2]
+  const isVideoUrl = (url: string) => {
+    if (!url) return false;
+    const cleanUrl = url.toLowerCase().split('?')[0];
+    return cleanUrl.endsWith('.mp4') || cleanUrl.endsWith('.webm') || cleanUrl.includes('/video');
+  };
 
   const calculateDistanceInKm = (lat1: number, lon1: number, lat2: number, lon2: number) => {
     const R = 6371; 
@@ -324,26 +333,6 @@ export default function BbCafeHome() {
     };
   }, []);
 
-  useEffect(() => {
-    if (cart.length > 0) {
-      localStorage.setItem('bb_cafe_draft_cart', JSON.stringify(cart));
-    } else {
-      localStorage.removeItem('bb_cafe_draft_cart');
-    }
-  }, [cart]);
-
-  useEffect(() => {
-    if (!customerDetails?.phone) { setCustomerPoints(0); return; }
-    const unsubPoints = onSnapshot(doc(db, "customer_points", customerDetails.phone.replace("+91", "")), (docSnap) => {
-      setCustomerPoints(docSnap.exists() ? (docSnap.data().points || 0) : 0);
-    }, () => { setCustomerPoints(0); });
-    
-    const phoneClean = customerDetails.phone.replace("+91", "");
-    setShareCount(Number(localStorage.getItem(`bb_shares_${phoneClean}`) || 0));
-
-    return () => unsubPoints();
-  }, [customerDetails]);
-
   const getCartSubtotal = () => cart.reduce((acc: number, i: any) => acc + (i.price * i.quantity), 0);
 
   const getCartAddonsPrice = () => {
@@ -412,6 +401,7 @@ export default function BbCafeHome() {
     toast.success(`${name} Cart में जोड़ दिया गया है!`);
   };
 
+  // 3. Distance-based Auto Delivery area selector & surcharge fee calculation [1.1]
   const handleDetectLocation = () => {
     if (!navigator.geolocation) {
       return toast.error("आपके ब्राउज़र में जीपीएस लोकेशन उपलब्ध नहीं है।");
@@ -435,7 +425,21 @@ export default function BbCafeHome() {
           toast.error("ध्यान दें: आप बूम बूम कैफे से 20 किमी से अधिक दूर हैं। आप केवल हमारा शानदार मेनू देख सकते हैं, आर्डर नहीं कर सकते।", { duration: 8000 });
         } else {
           setIsTooFar(false);
-          toast.success(`दूरी: ${calculatedDistance.toFixed(2)} KM। आप हमारे आर्डर RANGE में हैं!`);
+          
+          // Auto delivery area mapped to calculated GPS distance (KM) [1.1]
+          if (calculatedDistance <= 1.0) {
+            setSelectedArea(DELIVERY_AREAS[0]); // Mohandra Town
+            toast.success(`सटीक दूरी: ${calculatedDistance.toFixed(2)} KM। आपके लिए 'Mohandra Town' क्षेत्र चुना गया है।`);
+          } else if (calculatedDistance <= 2.0) {
+            setSelectedArea(DELIVERY_AREAS[1]); // Mohandra Ward 1-5 (Within 2 KM)
+            toast.success(`सटीक दूरी: ${calculatedDistance.toFixed(2)} KM। आपके लिए 'Mohandra Ward 1-5' क्षेत्र चुना गया है।`);
+          } else if (calculatedDistance <= 5.0) {
+            setSelectedArea(DELIVERY_AREAS[2]); // Nearby Area (Within 5 KM)
+            toast.success(`सटीक दूरी: ${calculatedDistance.toFixed(2)} KM। आपके लिए 'Nearby Area (Within 5 Km)' क्षेत्र चुना गया है।`);
+          } else {
+            setSelectedArea(DELIVERY_AREAS[3]); // Out of Town (5 to 8 KM)
+            toast.success(`सटीक दूरी: ${calculatedDistance.toFixed(2)} KM। आपके लिए 'Out of Town' क्षेत्र चुना गया है।`);
+          }
         }
       },
       () => {
@@ -452,7 +456,7 @@ export default function BbCafeHome() {
     const friendPhoneRaw = String(giftPhone).replace("+91", "").trim();
     const pointsToGift = Number(giftPointsAmount);
 
-    if (!friendPhoneRaw || friendPhoneRaw.length < 10) return toast.error("कृपया सही 10-digit mobile नंबर डालें!");
+    if (!friendPhoneRaw || friendPhoneRaw.length < 10) return toast.error("कृपया सही 10-digit मोबाइल नंबर डालें!");
     if (senderPhoneRaw === friendPhoneRaw) return toast.error("आप खुद को पॉइंट्स गिफ्ट नहीं कर सकते!");
     if (isNaN(pointsToGift) || pointsToGift <= 0) return toast.error("कृपया सही पॉइंट्स की संख्या डालें!");
     if (customerPoints < pointsToGift) return toast.error(`आपके पास पर्याप्त पॉइंट्स नहीं हैं! वर्तमान पॉइंट्स: ${customerPoints}`);
@@ -513,9 +517,6 @@ export default function BbCafeHome() {
   };
 
   const sendWhatsAppOrder = async () => {
-    if (!isStoreOpenCurrently) {
-      return toast.error("कैफ़े अभी बंद है। हम सुबह 10:00 बजे खुलेंगे।");
-    }
     if (isTooFar) {
       return toast.error("आपकी दूरी 20 KM से अधिक है। आप केवल मेनू देख सकते हैं, ऑर्डर प्लेस नहीं कर सकते!");
     }
@@ -787,6 +788,7 @@ export default function BbCafeHome() {
     <div className="bg-[#050505] min-h-screen text-white pb-32 font-sans relative overflow-x-hidden">
       <Toaster position="top-center" />
       
+      {/* Dynamic injection of the scrollbar CSS helper using standard dangerouslySetInnerHTML to prevent compile errors */}
       <style dangerouslySetInnerHTML={{ __html: `
         .hide-scrollbar::-webkit-scrollbar {
           display: none !important;
@@ -880,7 +882,7 @@ export default function BbCafeHome() {
 
       <main className="pt-3 px-3 max-w-lg mx-auto space-y-4">
         
-        {/* Animated & Sliding Promotional Banner */}
+        {/* Animated & Sliding Promotional Banner - Supports high fidelity video loops & static image posters [1.1.2] */}
         <div className="w-full h-36 rounded-2xl overflow-hidden relative border border-white/5 bg-white/[0.02]">
           {(banners.length === 0 || bannerError) ? (
             <div className="w-full h-full bg-gradient-to-r from-orange-600/35 to-[#b33600]/35 flex flex-col justify-center p-5 space-y-1">
@@ -890,17 +892,33 @@ export default function BbCafeHome() {
             </div>
           ) : (
             <AnimatePresence mode="wait">
-              <motion.img 
+              <motion.div 
                 key={bannerIndex}
-                src={banners[bannerIndex]?.url} 
                 initial={{ opacity: 0, x: 70, scale: 0.95 }}
                 animate={{ opacity: 1, x: 0, scale: 1 }}
                 exit={{ opacity: 0, x: -70, scale: 0.95 }}
                 transition={{ duration: 0.55, ease: "easeInOut" }}
-                className="w-full h-full object-cover absolute inset-0"
-                onError={() => setBannerError(true)} 
-                alt="Bum Bum Cafe Promo"
-              />
+                className="w-full h-full absolute inset-0"
+              >
+                {isVideoUrl(banners[bannerIndex]?.url) ? (
+                  <video 
+                    src={banners[bannerIndex]?.url} 
+                    autoPlay 
+                    loop 
+                    muted 
+                    playsInline 
+                    className="w-full h-full object-cover"
+                    onError={() => setBannerError(true)}
+                  />
+                ) : (
+                  <img 
+                    src={banners[bannerIndex]?.url} 
+                    className="w-full h-full object-cover" 
+                    onError={() => setBannerError(true)} 
+                    alt="Bum Bum Cafe Promo"
+                  />
+                )}
+              </motion.div>
             </AnimatePresence>
           )}
         </div>
@@ -1500,7 +1518,7 @@ export default function BbCafeHome() {
                   <span className="text-[10px] font-black text-white">🟢 WhatsApp Message</span>
                   <span className="text-[8px] font-black uppercase px-2.5 py-1 rounded bg-yellow-400 text-black">{getClaimStatus('whatsapp_msg')}</span>
                 </button>
-                <button onClick={() => handleSocialClick('whatsapp_channel', 'https://whatsapp.com/channel/0029VaLhggoGE56natoQI43y')} className="w-full flex items-center justify-between bg-emerald-500/10 border border-emerald-500/20 p-3 rounded-xl">
+                <button onClick={() => handleSocialClick('whatsapp_channel', 'https://whatsapp.com/channel/0029VaLhggoGE56natoQI43y')} className="w-full flex items-center justify-between bg-[#10b981]/10 border border-[#10b981]/20 p-3 rounded-xl">
                   <span className="text-[10px] font-black text-white">📢 WhatsApp Channel</span>
                   <span className="text-[8px] font-black uppercase px-2.5 py-1 rounded bg-yellow-400 text-black">{getClaimStatus('whatsapp_channel')}</span>
                 </button>
@@ -1527,7 +1545,6 @@ export default function BbCafeHome() {
         )}
       </AnimatePresence>
 
-      {/* 3. Direct Deep-linking UPI Jump & Scan-To-Pay Modal */}
       <AnimatePresence>
         {showUPIModal && (
           <div className="fixed inset-0 bg-black/95 z-[250] flex items-center justify-center p-6">
@@ -1541,7 +1558,7 @@ export default function BbCafeHome() {
                 </p>
               </div>
 
-              {/* Dynamic mobile UPI intent payment link with precise bill amount */}
+              {/* Seamless dynamic UPI intent payer link with PhonePe merchant VPA */}
               <div className="pt-2">
                 <a 
                   href={`upi://pay?pa=Q231198993@ybl&pn=BUM%20BUM%20CAFE&am=${getTotalBillPrice()}&cu=INR`}
@@ -1557,12 +1574,11 @@ export default function BbCafeHome() {
                 <div className="flex-grow border-t border-white/5"></div>
               </div>
 
-              {/* Dynamic QR Code for Desktop/Tab users to scan easily without typing amount */}
               <div className="bg-white p-3 rounded-2xl w-40 h-40 mx-auto flex items-center justify-center border border-white/5 shadow-inner">
                 <img 
                   src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(`upi://pay?pa=Q231198993@ybl&pn=BUM%20BUM%20CAFE&am=${getTotalBillPrice()}&cu=INR`)}`} 
                   className="w-full h-full" 
-                  alt="Dynamic BHIM UPI QR Code" 
+                  alt="Merchant QR Code" 
                 />
               </div>
               <span className="text-[8px] font-black text-gray-500 uppercase tracking-wider block">Scan to Pay with any BHIM UPI App</span>
@@ -1575,7 +1591,6 @@ export default function BbCafeHome() {
         )}
       </AnimatePresence>
 
-      {/* DIGITAL GREEN INVOICE */}
       <AnimatePresence>
         {showInvoice && lastPlacedOrder && (
           <div className="fixed inset-0 bg-black/95 z-[240] flex items-center justify-center p-6">
@@ -1608,7 +1623,6 @@ export default function BbCafeHome() {
                 </div>
               </div>
 
-              {/* 3. One-click Live WhatsApp Order Status Checker */}
               <div className="pt-2 flex flex-col gap-2">
                 <a 
                   href={`https://wa.me/919714293759?text=${encodeURIComponent(`नमस्ते बूम बूम कैफ़े! कृपया मेरे आर्डर नंबर #${formatBillNumber(lastPlacedOrder.billNumber)} (टोकन नंबर: #${lastPlacedOrder.tokenNumber}) का लाइव स्टेटस बताएं।`)}`}
