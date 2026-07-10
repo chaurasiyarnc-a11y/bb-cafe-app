@@ -48,7 +48,7 @@ const SUGGESTED_REVIEWS = [
   "साफ़-सफ़ाई और शुद्धता 10/10 है! 🧼👌"
 ];
 
-// Reverted to बम बम as strictly requested [1.1.2]
+// Devanagari converted to "बम बम" as strictly requested [1.1.2]
 const PERMANENT_REVIEWS = [
   { id: "rev1", name: "Gaurav Soni", rating: 5, comment: "बम बम कैफे की पनीर पिज्जा सच में पूरे मोहांद्रा में बेस्ट है! एक्स्ट्रा चीज़ लव है। ⭐⭐⭐⭐⭐" },
   { id: "rev2", name: "Anjali Patel", rating: 5, comment: "फास्ट फ़ूड की पैकिंग बहुत अच्छी थी, डिलीवरी बॉय का व्यवहार भी बहुत विनम्र था। ⭐⭐⭐⭐⭐" },
@@ -63,7 +63,7 @@ export default function BbCafeHome() {
   const removeItem = store?.removeItem || (() => {});
   const clearCart = store?.clearCart || (() => {});
 
-  // --- 1. STATE VARIABLES (DECLARED FIRST IN COMPONENT SCOPE) [1.1] ---
+  // --- 1. State Variables (Must be declared first) [1.1] ---
   const [menu, setMenu] = useState<any[]>([]);
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
@@ -261,7 +261,7 @@ export default function BbCafeHome() {
     if (month === 8) {
       return { bg: "from-rose-600 to-amber-800", accent: "text-yellow-200", name: "रक्षाबंधन विशेष स्नेह 💖" };
     }
-    return { bg: "from-[#ff5e00] to-[#b33600]", accent: "text-yellow-300", name: "BAM BAM CAFE - Mohandra" };
+    return { bg: "from-[#ff5e00] to-[#b33600]", accent: "text-yellow-300", name: "BUM BUM CAFE - Mohandra" };
   }, []);
 
   // Real-time store open check scheduler (10:00 AM to 11:00 PM)
@@ -635,7 +635,7 @@ export default function BbCafeHome() {
     setIsCartOpen(false);
   };
 
-  // Re-declared complete Review submit handler block safely [1]
+  // 1. Re-declared complete Review submit handler block safely [1]
   const handleReviewSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!reviewName || !reviewComment) return toast.error("Please fill all fields!");
@@ -726,6 +726,82 @@ export default function BbCafeHome() {
     if (!customerDetails?.phone) return "🎁 +1 Pt";
     const storageKey = `bb_claimed_${customerDetails.phone.replace("+91", "")}_${platform}`;
     return localStorage.getItem(storageKey) ? "✅ Claimed" : "🎁 Claim +1 Pt";
+  };
+
+  // 1. Correctly Declared handleSaveDetails inside component scope safely [1.1.2]
+  const handleSaveDetails = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!tempName || tempName.trim().length < 3) return toast.error("Please enter your real name");
+    if (!tempPhone || tempPhone.trim().length < 10) return toast.error("Please enter 10-digit number");
+    
+    const details: any = { name: tempName, phone: `+91${tempPhone}` };
+    if (tempRefCode) {
+      details.refCode = tempRefCode;
+    }
+    
+    localStorage.setItem('bb_cafe_customer', JSON.stringify(details));
+    setCustomerDetails(details); 
+    setIsLoginOpen(false);
+    
+    if (tempRefCode) {
+      toast.success(`स्वागत है ${tempName}! रेफ़रल कूपन लागू कर दिया गया है।`);
+    } else {
+      toast.success(`Welcome ${tempName}!`);
+    }
+  };
+
+  // 1. Correctly Declared handleToggleFavorite inside component scope safely [1.1.2]
+  const handleToggleFavorite = (id: string, e: any) => {
+    e.stopPropagation();
+    let updated;
+    if (favorites.includes(id)) {
+      updated = favorites.filter(f => f !== id);
+      toast.success("पसंदीदा सूची से हटाया गया।");
+    } else {
+      updated = [...favorites, id];
+      toast.success("पसंदीदा सूची में जोड़ा गया! ❤️");
+    }
+    setFavorites(updated);
+    localStorage.setItem('bb_favorites', JSON.stringify(updated));
+  };
+
+  // 1. Correctly Declared handleAddToCart inside component scope safely [1.1.2]
+  const handleAddToCart = () => {
+    if (!chosenSize) return toast.error("Please select a size first!");
+    
+    const sizeAddons = PIZZA_ADDONS[chosenSize.toLowerCase()] || {};
+    let addonsTotal = 0;
+    const activeAddonNames: string[] = [];
+
+    Object.entries(pizzaAddons).forEach(([addonName, isSelected]) => {
+      if (isSelected) {
+        const addonCost = sizeAddons[addonName] || 0;
+        addonsTotal += addonCost;
+        activeAddonNames.push(`${addonName} (+₹${addonCost})`);
+      }
+    });
+
+    let finalName = `${selectedProduct.name} (${chosenSize})`;
+    if (activeAddonNames.length > 0) {
+      finalName += ` with [${activeAddonNames.join(", ")}]`;
+    }
+    
+    const uniqueCartId = `${selectedProduct.id}-${chosenSize}-${Object.keys(pizzaAddons).filter(k => pizzaAddons[k]).join("-")}`;
+
+    addItem({ 
+      ...selectedProduct, 
+      id: uniqueCartId, 
+      name: finalName, 
+      price: Number(chosenPrice) + addonsTotal 
+    });
+    
+    playSoundEffect('add');
+    toast.success(`${chosenSize} added to cart!`);
+    
+    setSelectedProduct(null); 
+    setChosenSize(""); 
+    setChosenPrice(0); 
+    setPizzaAddons({});
   };
 
   if (!mounted) return null;
@@ -1408,6 +1484,84 @@ export default function BbCafeHome() {
                 )}
               </div>
             </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {cart.length > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-full max-w-sm px-4">
+          <button
+            onClick={() => setIsCartOpen(true)}
+            className="w-full bg-yellow-400 hover:bg-yellow-500 text-black py-4 px-5 rounded-2xl font-black text-xs uppercase flex justify-between items-center shadow-2xl active:scale-95 transition-all"
+          >
+            <div className="flex items-center gap-2">
+              <ShoppingBag size={18} />
+              <span>{cart.reduce((acc: number, item: any) => acc + item.quantity, 0)} Items Added</span>
+            </div>
+            <div className="flex items-center gap-0.5 bg-black/10 px-2 py-1 rounded-lg">
+              <span>View Cart</span>
+              <ChevronRight size={12} />
+            </div>
+          </button>
+        </div>
+      )}
+
+      <AnimatePresence>
+        {isLoginOpen && (
+          <div className="fixed inset-0 bg-black/95 z-[200] flex items-center justify-center p-6">
+            <form onSubmit={handleSaveDetails} className="bg-[#111] w-full max-w-md p-6 rounded-3xl border border-white/10 text-center space-y-4">
+              <User className="mx-auto text-orange-500" size={36} />
+              <div>
+                <h2 className="text-xl font-black mb-0.5">Your Details</h2>
+                <p className="text-gray-500 font-semibold text-[8px] uppercase tracking-wider">Setup Once • Order Fast</p>
+              </div>
+              <div className="space-y-3 text-left">
+                <div className="space-y-1">
+                  <label className="text-[9px] font-bold text-gray-500 uppercase">Your Name</label>
+                  <input type="text" placeholder="Enter your name..." value={tempName} onChange={(e) => setTempName(e.target.value)} className="w-full bg-white/5 border border-white/10 p-3 rounded-xl font-bold text-white outline-none focus:border-orange-500 text-xs" required />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[9px] font-bold text-gray-500 uppercase">Mobile Number</label>
+                  <input type="tel" maxLength={10} placeholder="10-digit Phone Number" value={tempPhone} onChange={(e) => setTempPhone(e.target.value)} className="w-full bg-white/5 border border-white/10 p-3 rounded-xl font-bold text-white outline-none focus:border-orange-500 text-xs" required />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[9px] font-bold text-gray-500 uppercase">Referral Code (Optional)</label>
+                  <input type="text" placeholder="Enter invite code..." value={tempRefCode} onChange={(e) => setTempRefCode(e.target.value)} className="w-full bg-white/5 border border-white/10 p-3 rounded-xl font-bold text-white outline-none focus:border-orange-500 text-xs" />
+                </div>
+              </div>
+              <button type="submit" className="w-full bg-orange-500 text-black p-4 rounded-xl font-black text-xs uppercase">PROCEED TO ORDER</button>
+              <button type="button" onClick={() => setIsLoginOpen(false)} className="mt-2 text-gray-500 text-[9px] font-black uppercase block mx-auto">Close</button>
+            </form>
+          </div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {isGiftModalOpen && (
+          <div className="fixed inset-0 bg-black/95 z-[260] flex items-center justify-center p-6">
+            <motion.form onSubmit={handleGiftPoints} className="bg-[#111] w-full max-w-md p-6 rounded-3xl border border-white/10 text-center space-y-4">
+              <Gift className="mx-auto text-yellow-400" size={32} />
+              <div>
+                <h3 className="text-lg font-black text-yellow-400 uppercase italic">Gift Loyalty Points</h3>
+                <p className="text-[9px] text-gray-500 font-semibold mt-0.5">अपने पॉइंट्स किसी दोस्त को गिफ्ट करें</p>
+              </div>
+              <div className="space-y-3 text-left">
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black uppercase text-gray-500">Friend's Phone Number</label>
+                  <input type="tel" maxLength={10} placeholder="e.g. 9876543210" value={giftPhone} onChange={(e) => setGiftPhone(e.target.value)} required className="w-full bg-white/5 border border-white/10 p-3 rounded-xl text-xs font-bold text-white outline-none text-center" />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black uppercase text-gray-500">Points to Gift (Your Pts: {customerPoints})</label>
+                  <input type="number" placeholder="e.g. 10" value={giftPointsAmount} onChange={(e) => setGiftPointsAmount(e.target.value === "" ? "" : Number(e.target.value))} required className="w-full bg-white/5 border border-white/10 p-3 rounded-xl text-xs font-bold text-white outline-none text-center" />
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <button type="submit" disabled={isGiftingLoading} className="flex-1 bg-yellow-400 text-black font-black p-3 rounded-xl text-xs uppercase flex items-center justify-center gap-1">
+                  {isGiftingLoading ? <Loader2 className="animate-spin" size={14} /> : <span>Gift Points 🎁</span>}
+                </button>
+                <button type="button" onClick={() => { setIsGiftModalOpen(false); setGiftPhone(""); setGiftPointsAmount(""); }} className="bg-white/5 text-gray-400 font-bold p-3 rounded-xl text-xs">CANCEL</button>
+              </div>
+            </motion.form>
           </div>
         )}
       </AnimatePresence>
