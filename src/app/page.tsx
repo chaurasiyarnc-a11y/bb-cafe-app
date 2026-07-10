@@ -35,7 +35,7 @@ const ADDON_LABELS: { [key: string]: string } = {
   oregano: "🌿 Oregano",
   chilli_flakes: "🌶️ Chilli Flakes",
   ketchup: "🍅 Tomato Ketchup",
-  olive: "🫒 Olive",
+  olive: "🫒 Black Olives", // Updated to Black Olives
   jalapeno: "🫑 Jalapeno"
 };
 
@@ -73,7 +73,7 @@ const getLocalBotReply = (queryText: string, menuItems: any[]) => {
   return "माफ़ी चाहते हैं भैया, आपकी बात हम पूरे तरीके से समझ नहीं पाए। आप हमारे मेनू के बारे में, डिलीवरी या कैफ़े के पते के बारे में कुछ भी पूछ सकते हैं! 🙏";
 };
 
-// Size-dependent Pizza Add-on Pricing (Exact Rules applied)
+// Size-dependent Pizza Add-on Pricing (Exact Sizing Rules applied)
 const getAddonPrice = (addonKey: string, size: string) => {
   const s = String(size).toLowerCase().trim();
   if (s === 'medium') {
@@ -103,6 +103,9 @@ const getAddonPrice = (addonKey: string, size: string) => {
   }
   return 0;
 };
+
+// Simulated Confetti Particles array
+const CONFETTI_PARTICLES = Array.from({ length: 25 });
 
 export default function BbCafeHome() {
   const store = useCartStore() as any;
@@ -730,7 +733,7 @@ export default function BbCafeHome() {
     }
   };
 
-  // --- STOPWATCH GAME MECHANICS (Optimized) ---
+  // --- STOPWATCH GAME MECHANICS (Optimized to Prevent UI Freeze) ---
   const handleStartGame = () => {
     if (hasPlayedGame) {
       toast.error("भैया, इस आर्डर पर आप पहले ही गेम खेल चुके हैं! 🛑");
@@ -770,20 +773,21 @@ export default function BbCafeHome() {
       <Toaster position="top-center" />
       
       {/* HEADER */}
-      <header className="relative h-60 bg-gradient-to-b from-[#ff5e00] to-[#b33600] flex flex-col justify-center items-center px-4">
+      <header className="relative h-44 bg-gradient-to-b from-[#ff5e00] to-[#b33600] flex flex-col justify-center items-center px-4">
         <div className="absolute top-4 right-4 bg-black/40 px-3 py-1.5 rounded-full border border-white/10 flex items-center gap-1.5 z-10 text-[9px] font-black uppercase tracking-widest text-green-400">
           <span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />100% PURE VEG
         </div>
         <div className="text-center z-10">
           <motion.h1 initial={{ scale: 0.8 }} animate={{ scale: 1 }} className="text-4xl font-black italic tracking-tighter text-yellow-300 drop-shadow-[0_4px_12px_rgba(253,224,71,0.2)]">BUM BUM CAFE</motion.h1>
           <p className="text-orange-100 font-bold tracking-wider text-xs mt-1 uppercase">मशहूर स्वाद, अटूट भरोसा! 🔥</p>
+          <p className="text-yellow-300 font-black tracking-widest text-[10px] mt-1 uppercase flex items-center gap-1 justify-center"><MapPin size={10} /> मोहंद्रा कैफ़े</p>
         </div>
       </header>
 
       {/* DYNAMIC FIXED SEARCH BAR WITH SLIDING PLACEHOLDER & VOICE SEARCH (z-[60] to prevent sidebar overlap & layout shift) */}
       <div className="h-[80px]">
         <div className={`${isPinned ? 'fixed top-0 left-0 right-0 border-b-2 border-orange-500/25 bg-[#050505] shadow-2xl shadow-black/80' : 'relative bg-[#050505] border-b border-white/5 rounded-b-3xl'} transition-all duration-300 z-[60] py-4 px-4`}>
-          <div className="relative max-w-sm mx-auto">
+          <div className="relative max-w-[220px] mx-auto">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
             
             <input 
@@ -821,7 +825,6 @@ export default function BbCafeHome() {
         ⭐ REVIEWS
       </button>
 
-      {/* 10-SECOND CHALLENGE FLOATING SIDEBAR TOGGLE ON LEFT */}
       <button 
         onClick={() => setIsRulesOpen(true)} 
         className="fixed left-0 top-[440px] -translate-y-1/2 bg-gradient-to-r from-red-500 to-orange-500 text-white py-4 px-2.5 rounded-r-2xl z-[45] text-[9px] font-black tracking-widest uppercase flex flex-col items-center gap-1 shadow-xl border-r border-y border-white/10 animate-bounce"
@@ -849,7 +852,7 @@ export default function BbCafeHome() {
         {/* PROMO BANNER (Now Clickable to Open 10S Challenge Rules!) */}
         <div 
           onClick={() => setIsRulesOpen(true)}
-          className="w-full h-44 rounded-3xl overflow-hidden relative border border-white/5 bg-white/[0.02] cursor-pointer group"
+          className="w-full h-44 rounded-3xl overflow-hidden relative border border-white/5 bg-white/[0.02]"
         >
           {(banners.length === 0 || bannerError) ? (
             <div className="w-full h-full bg-gradient-to-r from-orange-600/35 to-[#b33600]/35 flex flex-col justify-center p-6 space-y-1">
@@ -863,7 +866,7 @@ export default function BbCafeHome() {
         </div>
 
         {/* ZOMATO-STYLE CATEGORY HORIZONTAL SLIDER */}
-        <div className="bg-white/[0.01] border border-white/5 p-5 rounded-[2.5rem] space-y-4">
+        <div className="space-y-4">
           <p className="text-[9px] font-black uppercase tracking-widest text-orange-500">Inspiration for your first order</p>
           <div className="flex gap-4 overflow-x-auto no-scrollbar py-2">
             {visibleCategories.map((cat) => {
@@ -1046,6 +1049,29 @@ export default function BbCafeHome() {
               <div className="absolute -top-10 -left-10 w-32 h-32 bg-yellow-500/10 blur-3xl rounded-full" />
               <div className="absolute -bottom-10 -right-10 w-32 h-32 bg-orange-500/10 blur-3xl rounded-full" />
               
+              {/* SHINY CONFETTI ATISBAJI CELEBRATION PARTICLES ON WIN */}
+              {gameResult === 'win' && (
+                <div className="absolute inset-0 z-10 pointer-events-none overflow-hidden">
+                  {CONFETTI_PARTICLES.map((_, idx) => {
+                    const randomX = Math.random() * 300 - 150;
+                    const randomY = Math.random() * -300 - 100;
+                    const emojiList = ["🎉", "✨", "🥳", "🍕", "🧁"];
+                    const randomEmoji = emojiList[idx % emojiList.length];
+                    return (
+                      <motion.div
+                        key={idx}
+                        initial={{ opacity: 1, x: 0, y: 100, scale: 0.8 }}
+                        animate={{ opacity: 0, x: randomX, y: randomY, scale: 1.2, rotate: 360 }}
+                        transition={{ duration: 2.5, ease: "easeOut" }}
+                        className="absolute bottom-10 left-1/2 text-2xl"
+                      >
+                        {randomEmoji}
+                      </motion.div>
+                    );
+                  })}
+                </div>
+              )}
+
               <div>
                 <h3 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-yellow-500 italic uppercase">10S CHALLENGE</h3>
                 <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mt-1">बम बम कैफ़े - मोहंद्रा विशेष</p>
@@ -1065,7 +1091,7 @@ export default function BbCafeHome() {
 
               {/* GAME RESULTS DISPLAY */}
               {gameResult === 'win' && (
-                <div className="p-4 bg-green-500/10 border border-green-500/25 rounded-2xl text-center space-y-1 animate-pulse">
+                <div className="p-4 bg-green-500/10 border border-green-500/25 rounded-2xl text-center space-y-1 animate-pulse z-20 relative">
                   <p className="text-xs font-black text-green-400 uppercase">🎉 विजेता! आपने कर दिखाया!</p>
                   <p className="text-[10px] text-gray-300">आपका यह आर्डर (अधिकतम ₹500 तक) बिल्कुल मुफ्त (Free) हो गया है! 🎁</p>
                 </div>
@@ -1405,7 +1431,7 @@ export default function BbCafeHome() {
 
               <div className="mt-10 space-y-6">
                 
-                {/* --- FREE DELIVERY VISUAL PROGRESS BAR --- */}
+                {/* --- FREE DELIVERY VISUAL PROGRESS BAR (Dynamically Calculated) --- */}
                 {(() => {
                   const subtotal = getTotal();
                   const threshold = deliveryArea === 'town' ? 99 : deliveryArea === 'outer' ? 499 : 999;
@@ -1537,7 +1563,7 @@ export default function BbCafeHome() {
                   </div>
                 )}
 
-                {/* --- STOPWATCH GAME CHALLENGE OPTION INSIDE CART (LOYALTY CLUB KE BAAHAR / NICHE) --- */}
+                {/* --- STOPWATCH GAME CHALLENGE OPTION INSIDE CART (OUTSIDE/BELOW LOYALTY CLUB BOX) --- */}
                 <div className="bg-gradient-to-r from-red-600/10 to-orange-600/10 border border-red-500/20 rounded-[2rem] p-5 space-y-3">
                   <div className="flex items-center gap-2 text-red-400 font-black text-xs uppercase">
                     <Clock size={16} /> <span>⏱️ 10S STOPWATCH CHALLENGE</span>
