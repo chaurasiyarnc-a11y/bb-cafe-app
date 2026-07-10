@@ -1,8 +1,8 @@
 'use client';
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { db } from '../lib/firebase'; 
 import { collection, onSnapshot, query, addDoc, doc, setDoc, increment, runTransaction } from 'firebase/firestore';
-import { ShoppingBag, Plus, Search, X, MapPin, Phone, User, Sparkles, Star, Percent, Gift, Loader2, Share2, Heart, Clock, ChevronRight } from 'lucide-react';
+import { ShoppingBag, Plus, Search, X, MapPin, Phone, User, Sparkles, Star, Percent, Gift, Loader2, Share2, Heart, Clock, ChevronRight, Volume2, PowerOff, Shield, CheckCircle, Smartphone } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
 import { useCartStore } from '../store/useCartStore';
@@ -21,6 +21,7 @@ const CATEGORY_IMAGES: { [key: string]: string } = {
   "Special Rice": "https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?auto=format&fit=crop&w=150&q=80"
 };
 
+// 1. Precise Delivery charge KM range limits & Standard Surcharges [1.1.2]
 const DELIVERY_AREAS = [
   { name: "Mohandra Town", fee: 20, minFree: 99, range: "0-1 KM" },
   { name: "Mohandra Ward 1-5 (Within 2 Km)", fee: 20, minFree: 199, range: "1-2 KM" },
@@ -28,11 +29,13 @@ const DELIVERY_AREAS = [
   { name: "Out of Town (5 to 8 Km)", fee: 60, minFree: 999, range: "5-8 KM" }
 ];
 
+// Hinglish keyword translator
 const HINGLISH_DICT: { [key: string]: string } = {
   "piza": "pizza", "pizaa": "pizza", "panir": "paneer", "tali": "thali", "thaly": "thali",
   "fastfud": "fast food", "rice": "rice", "bread": "bread", "veg": "veg", "chiz": "cheese"
 };
 
+// Precise Portion-sized Pizza toppings additions prices
 const PIZZA_ADDONS: { [size: string]: { [addon: string]: number } } = {
   "small": { "Veg Add-on": 10, "Paneer": 20, "Black Olives": 20, "Jalapeno": 20, "Extra Cheese": 20, "Mushroom": 20 },
   "medium": { "Veg Add-on": 10, "Paneer": 30, "Black Olives": 30, "Jalapeno": 30, "Extra Cheese": 30, "Mushroom": 30 },
@@ -40,6 +43,7 @@ const PIZZA_ADDONS: { [size: string]: { [addon: string]: number } } = {
   "extra large": { "Veg Add-on": 30, "Paneer": 50, "Black Olives": 50, "Jalapeno": 50, "Extra Cheese": 60, "Mushroom": 50 }
 };
 
+// Tap-To-Fill comments pills
 const SUGGESTED_REVIEWS = [
   "पिज्जा का स्वाद लाजवाब है! मज़ा आ गया 🍕😋",
   "मोहांद्रा में सबसे बेस्ट सर्विस और स्वाद! ⭐⭐⭐⭐⭐",
@@ -48,6 +52,7 @@ const SUGGESTED_REVIEWS = [
   "साफ़-सफ़ाई और शुद्धता 10/10 है! 🧼👌"
 ];
 
+// High fidelity permanent landing reviews
 const PERMANENT_REVIEWS = [
   { id: "rev1", name: "Gaurav Soni", rating: 5, comment: "Bum Bum Cafe ki paneer pizza sach me pure Mohandra me best hai! Extra cheese is real love. ⭐⭐⭐⭐⭐" },
   { id: "rev2", name: "Anjali Patel", rating: 5, comment: "Fast food packing bahut achi thi, delivery boy behavior was also very polite. Recommended! ⭐⭐⭐⭐⭐" },
@@ -62,7 +67,7 @@ export default function BbCafeHome() {
   const removeItem = store?.removeItem || (() => {});
   const clearCart = store?.clearCart || (() => {});
 
-  // --- 1. STATES (DECLARED FIRST IN COMPONENT SCOPE) [1.1] ---
+  // --- 1. STATE VARIABLES (MUST BE INITIALIZED FIRST) [1.1] ---
   const [menu, setMenu] = useState<any[]>([]);
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
@@ -86,7 +91,7 @@ export default function BbCafeHome() {
   const [isGiftModalOpen, setIsGiftModalOpen] = useState(false);
   const [giftPhone, setGiftPhone] = useState("");
   
-  // Cleaned generic state typing parameters completely [1.1.2]
+  // 1. Strictly fixed type compile parameter [1.1.2]
   const [giftPointsAmount, setGiftPointsAmount] = useState<number | "">("");
   const [isGiftingLoading, setIsGiftingLoading] = useState(false);
 
@@ -117,7 +122,7 @@ export default function BbCafeHome() {
   const [oreganoAddon, setOreganoAddon] = useState(false);
   const [chiliFlakesAddon, setChiliFlakesAddon] = useState(false);
 
-  // Green Toggle
+  // Green Toggle (Eco-cutlery)
   const [noCutlery, setNoCutlery] = useState(false);
 
   // Area Wise Delivery State
@@ -143,7 +148,7 @@ export default function BbCafeHome() {
   const [isTooFar, setIsTooFar] = useState(false);
   const [distanceKm, setDistanceKm] = useState<number | null>(null);
 
-  // --- 2. COMPONENT HELPERS & CALCULATION FUNCTIONS (DECLARED BEFORE CALLS) [1.1] ---
+  // --- 2. PURE CALCULATION & SELECTOR HELPERS (DECLARED BEFORE REFERENCING IN HANDLERS/MEMOS) [1.1] ---
 
   const playSoundEffect = (type: 'add' | 'success') => {
     try {
@@ -206,7 +211,6 @@ export default function BbCafeHome() {
     return { name: "Bronze Member 🥉", color: "text-orange-400 border-orange-400/30 bg-orange-400/10" };
   };
 
-  // 1. Correctly Declared getDisplayPrice Inside Compiler Scope [1.1.2]
   const getDisplayPrice = (item: any) => {
     if (item?.variants && typeof item.variants === 'object') {
       const prices = Object.values(item.variants).map(Number).filter(n => !isNaN(n));
@@ -245,7 +249,7 @@ export default function BbCafeHome() {
     return CATEGORY_IMAGES[catName] || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=150&q=80";
   };
 
-  // --- 3. MEMOS ---
+  // --- 3. MEMOS & DERIVED SELECTORS (TDZ SCOPING FULLY RESOLVED) [1.1] ---
 
   // Dynamic Seasonal Theme
   const activeTheme = useMemo(() => {
@@ -418,6 +422,13 @@ export default function BbCafeHome() {
     };
   }, []);
 
+  // Auto-slide trigger for carousel
+  useEffect(() => {
+    if (banners.length <= 1) return;
+    const interval = setInterval(() => { setBannerIndex((prev) => (prev + 1) % banners.length); }, 4000);
+    return () => clearInterval(interval);
+  }, [banners]);
+
   // Sync draft cart to local storage (52)
   useEffect(() => {
     if (cart.length > 0) {
@@ -441,50 +452,58 @@ export default function BbCafeHome() {
 
   // --- 5. EVENT HANDLERS & OPERATIONS ---
 
-  const handleDetectLocation = () => {
-    if (!navigator.geolocation) {
-      return toast.error("आपके ब्राउज़र में जीपीएस लोकेशन उपलब्ध नहीं है।");
+  const handleApplyCoupon = () => {
+    if (!enteredCoupon) return toast.error("Please enter a coupon code");
+    const found = coupons.find(c => String(c.code).toLowerCase() === enteredCoupon.trim().toLowerCase());
+    if (found) {
+      setAppliedCoupon(found);
+      toast.success(`Coupon '${found.code}' applied! ₹${found.discountValue} OFF`);
+    } else {
+      toast.error("Invalid coupon code");
     }
-    toast.loading("सटीक लोकेशन ट्रैक कर रहे हैं...");
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        toast.dismiss();
-        const { latitude, longitude } = position.coords;
-        setAddress(`My GPS Location: https://www.google.com/maps?q=${latitude},${longitude}`);
-        toast.success("जीपीएस से लोकेशन सफलतापूर्वक जोड़ी गई!");
-        
-        const mohandraLat = 24.2863;
-        const mohandraLng = 80.1245;
-        
-        const calculatedDistance = calculateDistanceInKm(latitude, longitude, mohandraLat, mohandraLng);
-        setDistanceKm(Number(calculatedDistance.toFixed(2)));
+  };
 
-        if (calculatedDistance > 20) {
-          setIsTooFar(true);
-          toast.error("ध्यान दें: आप बूम बूम कैफे से 20 किमी से अधिक दूर हैं। आप केवल हमारा शानदार मेनू देख सकते हैं, आर्डर नहीं कर सकते।", { duration: 8000 });
+  const handleGiftPoints = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!customerDetails?.phone) return toast.error("कृपया पहले अपनी डिटेल्स जोड़ें!");
+    const senderPhoneRaw = customerDetails.phone.replace("+91", "").trim();
+    const friendPhoneRaw = String(giftPhone).replace("+91", "").trim();
+    const pointsToGift = Number(giftPointsAmount);
+
+    if (!friendPhoneRaw || friendPhoneRaw.length < 10) return toast.error("कृपया सही 10-digit मोबाइल नंबर डालें!");
+    if (senderPhoneRaw === friendPhoneRaw) return toast.error("आप खुद को ऑयल्टी पॉइंट्स गिफ्ट नहीं कर सकते!");
+    if (isNaN(pointsToGift) || pointsToGift <= 0) return toast.error("कृपया सही पॉइंट्स की संख्या डालें!");
+    if (customerPoints < pointsToGift) return toast.error(`आपके पास पर्याप्त पॉइंट्स नहीं हैं! वर्तमान पॉइंट्स: ${customerPoints}`);
+
+    setIsGiftingLoading(true);
+    const senderDocRef = doc(db, "customer_points", senderPhoneRaw);
+    const receiverDocRef = doc(db, "customer_points", friendPhoneRaw);
+
+    try {
+      await runTransaction(db, async (transaction) => {
+        const senderSnap = await transaction.get(senderDocRef);
+        const receiverSnap = await transaction.get(receiverDocRef);
+        
+        const currentSenderPoints = senderSnap.exists() ? (senderSnap.data().points || 0) : 0;
+        if (currentSenderPoints < pointsToGift) throw new Error("Insufficient points balance!");
+
+        transaction.update(senderDocRef, { points: increment(-pointsToGift) });
+        if (!receiverSnap.exists()) {
+          transaction.set(receiverDocRef, { name: "Loyal Friend 🎁", phone: friendPhoneRaw, points: pointsToGift, lastActive: new Date() });
         } else {
-          setIsTooFar(false);
-          
-          if (calculatedDistance <= 1.0) {
-            setSelectedArea(DELIVERY_AREAS[0]); 
-            toast.success(`सटीक दूरी: ${calculatedDistance.toFixed(2)} KM। आपके लिए 'Mohandra Town' क्षेत्र चुना गया है।`);
-          } else if (calculatedDistance <= 2.0) {
-            setSelectedArea(DELIVERY_AREAS[1]); 
-            toast.success(`सटीक दूरी: ${calculatedDistance.toFixed(2)} KM। आपके लिए 'Mohandra Ward 1-5' क्षेत्र चुना गया है।`);
-          } else if (calculatedDistance <= 5.0) {
-            setSelectedArea(DELIVERY_AREAS[2]); 
-            toast.success(`सटीक दूरी: ${calculatedDistance.toFixed(2)} KM। आपके लिए 'Nearby Area (Within 5 Km)' क्षेत्र चुना गया है।`);
-          } else {
-            setSelectedArea(DELIVERY_AREAS[3]); 
-            toast.success(`सटीक दूरी: ${calculatedDistance.toFixed(2)} KM। आपके लिए 'Out of Town' क्षेत्र चुना गया है।`);
-          }
+          transaction.update(receiverDocRef, { points: increment(pointsToGift) });
         }
-      },
-      () => {
-        toast.dismiss();
-        toast.error("लोकेशन की अनुमति अस्वीकार कर दी गई है या नेटवर्क त्रुटि है।");
-      }
-    );
+      });
+
+      toast.success(`🎁 सफलतापूर्वक ${pointsToGift} पॉइंट्स गिफ्ट कर दिए गए हैं!`);
+      const inviteMsg = `हे दोस्त! मैंने तुम्हें BUM BUM Cafe के ऐप पर 🎁 ${pointsToGift} Loyalty Points गिफ्ट किए हैं। यहाँ से स्वादिष्ट पिज्जा और थाली आर्डर करो: ${window.location.origin}`;
+      const whatsappUrl = `https://wa.me/91${friendPhoneRaw}?text=${encodeURIComponent(inviteMsg)}`;
+      
+      setGiftPhone(""); setGiftPointsAmount(""); setIsGiftModalOpen(false);
+      if (window.confirm("क्या आप अपने दोस्त को व्हाट्सएप पर गिफ्ट का मैसेज भेजना चाहते हैं?")) window.open(whatsappUrl, '_blank');
+    } catch (err: any) {
+      toast.error(err.message === "Insufficient points balance!" ? "अपर्याप्त पॉइंट्स!" : "पॉइंट्स गिफ्ट करने में समस्या आई।");
+    } finally { setIsGiftingLoading(false); }
   };
 
   const sendWhatsAppOrder = async () => {
@@ -661,6 +680,46 @@ export default function BbCafeHome() {
     setChosenSize(""); 
     setChosenPrice(0); 
     setPizzaAddons({});
+  };
+
+  const handleSocialClick = async (platform: string, url: string) => {
+    window.open(url, '_blank');
+
+    if (!customerDetails?.phone) {
+      toast.error("पॉइंट्स क्लेम करने के लिए कृपया पहले अपना Name और Phone दर्ज करें!");
+      setIsLoginOpen(true);
+      return;
+    }
+
+    const storageKey = `bb_claimed_${customerDetails.phone.replace("+91", "")}_${platform}`;
+    const alreadyClaimed = localStorage.getItem(storageKey);
+
+    if (alreadyClaimed) {
+      toast.success("आप इस प्लेटफ़ॉर्म के लिए पहले ही पॉइंट ले चुके हैं! धन्यवाद ❤️");
+      return;
+    }
+
+    try {
+      const phoneRaw = customerDetails.phone.replace("+91", "").trim();
+      const pointsRef = doc(db, "customer_points", phoneRaw);
+      
+      await setDoc(pointsRef, {
+        points: increment(1),
+        lastActive: new Date()
+      }, { merge: true });
+
+      localStorage.setItem(storageKey, "true");
+      setCustomerPoints(prev => prev + 1);
+      toast.success(`🎉 बधाई हो! ${platform.toUpperCase()} पर हमें फॉलो करने के लिए आपको +1 पॉइंट मिला है!`);
+    } catch (err) {
+      toast.error("पॉइंट्स जोड़ने में समस्या आई।");
+    }
+  };
+
+  const getClaimStatus = (platform: string) => {
+    if (!customerDetails?.phone) return "🎁 +1 Pt";
+    const storageKey = `bb_claimed_${customerDetails.phone.replace("+91", "")}_${platform}`;
+    return localStorage.getItem(storageKey) ? "✅ Claimed" : "🎁 Claim +1 Pt";
   };
 
   if (!mounted) return null;
@@ -921,7 +980,7 @@ export default function BbCafeHome() {
                       </div>
                     </div>
                   )}
-                </Fragment>
+                </React.Fragment>
               );
             })
           )}
@@ -1105,7 +1164,7 @@ export default function BbCafeHome() {
                           type="button"
                           key={addon}
                           onClick={() => setPizzaAddons(prev => ({ ...prev, [addon]: !prev[addon] }))}
-                          className={`p-2.5 rounded-xl border flex justify-between items-center text-[9px] font-bold ${isSelected ? 'border-orange-500 bg-orange-500/5 text-orange-400' : 'border-white/5 bg-white/[0.02] text-gray-300'}`}
+                          className={`p-2.5 rounded-xl border flex justify-between items-center text-[9px] font-bold ${isSelected ? 'border-orange-500 bg-orange-500/5 text-orange-500' : 'border-white/5 bg-white/[0.02] text-gray-300'}`}
                         >
                           <span>{addon}</span>
                           <span className="text-orange-400 font-black">+₹{cost}</span>
