@@ -39,41 +39,28 @@ const ADDON_LABELS: { [key: string]: string } = {
   jalapeno: "🫑 Jalapeno"
 };
 
-// --- ADVANCED OFFLINE GEMINI FALLBACK REPLY ENGINE ---
 const getLocalBotReply = (queryText: string, menuItems: any[]) => {
   const q = queryText.toLowerCase().trim();
-  
-  if (q.includes("hi") || q.includes("hello") || q.includes("hey") || q.includes("राम राम") || q.includes("नमस्ते") || q.includes("namaste") || q.includes("हलो")) {
-    return "राम-राम भैया! 🙏 हम हैं बम बम कैफ़े की डिजिटल हेल्पडेस्क 'रिया दीदी' 💁‍♀️। आज आपका का खाबे को मन है? बजट या मूड बताओ, हम बढ़िया डिश बता रहे! 🍕🥤";
+  if (q.includes("hi") || q.includes("hello") || q.includes("hey") || q.includes("राम राम") || q.includes("नमस्ते")) {
+    return "राम-राम भैया! 🙏 हम हैं बम बम कैफ़े की डिजिटल हेल्पडेस्क 'रिया दीदी' 💁‍♀️। आज आपका क्या खाने का मन है? बजट या मूड बताओ, हम बढ़िया डिश बता रहे! 🍕🥤";
   }
-  if (q.includes("about") || q.includes("कैफे") || q.includes("cafe") || q.includes("शुरुआत") || q.includes("कहानी") || q.includes("बारे") || q.includes("history")) {
+  if (q.includes("about") || q.includes("कैफे") || q.includes("cafe") || q.includes("शुरुआत") || q.includes("कहानी")) {
     return "भैया, हमने बम बम कैफ़े की शुरुआत एक छोटे से सपने के साथ की थी—लोगों को घर जैसा स्वाद और कैफ़े वाला माहौल देने के लिए। यहाँ हर कप कॉफ़ी और हर स्लाइस पिज्जा प्यार और शुद्धता के साथ बनाया जाता है। हमारी कोशिश है कि आप जब भी यहाँ आएँ, एक प्यारी मुस्कान के साथ वापस जाएँ। ❤️";
   }
-  if (q.includes("pizza") || q.includes("पिज्जा") || q.includes("पिज़्ज़ा")) {
+  if (q.includes("pizza") || q.includes("पिज्जा")) {
     const pizzas = menuItems.filter(i => i.category === "Special Pizza" || i.name.toLowerCase().includes("pizza"));
-    if (pizzas.length > 0) {
-      return `भैया, हमारे यहाँ ये लाजवाब पिज्जा उपलब्ध हैं:\n${pizzas.map(p => `• ${p.name} - ${p.price ? '₹'+p.price : 'कम रेट में'}`).join('\n')}\n\nसब शुद्ध अमूल चीज़ से प्यार से बनाए जाते हैं! 🍕`;
-    }
+    if (pizzas.length > 0) return `भैया, हमारे यहाँ ये लाजवाब पिज्जा हैं:\n${pizzas.map(p => `• ${p.name} - ₹${p.price}`).join('\n')}\n\nसब शुद्ध अमूल चीज़ से बने हैं! 🍕`;
     return "भैया, गरमा-गरम अमूल चीज़ वाला स्पेशल पिज़्ज़ा मिल जाएगा, अभी आर्डर करें! 🍕";
   }
-  if (q.includes("delivery") || q.includes("डिलीवरी") || q.includes("होम") || q.includes("घर") || q.includes("delivery free")) {
-    return "भैया, होम डिलीवरी बिल्कुल फ्री है (टाउन में ₹99 से ऊपर)! स्वाद सीधे आपके दरवाज़े तक आएगा। 🏠🛵\n\n• मोहंद्रा टाउन: ₹99 से ऊपर फ्री डिलीवरी\n• 5 किलोमीटर: ₹499 से ऊपर फ्री डिलीवरी\n• 12 किलोमीटर: ₹999 से ऊपर फ्री डिलीवरी";
+  if (q.includes("delivery") || q.includes("डिलीवरी")) {
+    return "भैया, होम डिलीवरी बिल्कुल फ्री है (टाउन में ₹99 से ऊपर)! स्वाद सीधे आपके दरवाज़े तक आएगा। 🏠🛵\n• मोहंद्रा टाउन: ₹99 से ऊपर फ्री\n• 5 किलोमीटर: ₹499 से ऊपर फ्री\n• 12 किलोमीटर: ₹999 से ऊपर फ्री";
   }
-  if (q.includes("address") || q.includes("पता") || q.includes("location") || q.includes("कहाँ") || q.includes("kahan") || q.includes("shop")) {
+  if (q.includes("address") || q.includes("पता") || q.includes("location")) {
     return "बम बम कैफ़े का पता है: 📍 बस स्टैंड मोहंद्रा, पीपल पेड़ के नीचे, मोहंद्रा (जिला पन्ना, मध्य प्रदेश)। आप नीचे मैप का बटन दबाकर डायरेक्ट नेविगेट कर सकते हैं! 🗺️";
   }
-  if (q.includes("budget") || q.includes("कम") || q.includes("sasta") || q.includes("सस्ता") || q.includes("100") || q.includes("50") || q.includes("150")) {
-    return "भैया, बजट की बिल्कुल टेंशन मत लो! आप ₹50 में ठंडी कोल्ड कॉफ़ी या ओरियो शेक ले सकते हैं, और ₹99 में गरमा-गरम पिज्जा। कम बजट में भी पेट भर जाएगा! 🍕🥤";
-  }
-  if (q.includes("menu") || q.includes("क्या क्या") || q.includes("khana") || q.includes("खाना") || q.includes("list")) {
-    const samples = menuItems.slice(0, 5);
-    return `भैया, हमारे यहाँ स्पेशल पिज़्ज़ा, स्पेशल थाली, पनीर स्पेशल, इंडियन ब्रेड और लाजवाब शेक्स (Super Cool) सब कुछ मिलता है।\n\nजैसे:\n${samples.map(s => `• ${s.name} - ₹${s.price || 0}`).join('\n')}\n\nऊपर दिए गए मेनू में सब कुछ रेट के साथ लिखा है! 😋`;
-  }
-  
   return "माफ़ी चाहते हैं भैया, आपकी बात हम पूरे तरीके से समझ नहीं पाए। आप हमारे मेनू के बारे में, डिलीवरी या कैफ़े के पते के बारे में कुछ भी पूछ सकते हैं! 🙏";
 };
 
-// Size-dependent Pizza Add-on Pricing (Exact Sizing Rules applied)
 const getAddonPrice = (addonKey: string, size: string) => {
   const s = String(size).toLowerCase().trim();
   if (s === 'medium') {
@@ -92,7 +79,7 @@ const getAddonPrice = (addonKey: string, size: string) => {
     if (addonKey === 'ketchup') return 10;
     if (addonKey === 'olive') return 40;
     if (addonKey === 'jalapeno') return 40;
-  } else { // Small, standard default fallback
+  } else {
     if (addonKey === 'veg') return 10;
     if (addonKey === 'paneer') return 20;
     if (addonKey === 'oregano') return 5;
@@ -104,7 +91,6 @@ const getAddonPrice = (addonKey: string, size: string) => {
   return 0;
 };
 
-// Simulated Confetti Particles array
 const CONFETTI_PARTICLES = Array.from({ length: 25 });
 
 export default function BbCafeHome() {
@@ -175,15 +161,16 @@ export default function BbCafeHome() {
   const [iceLevel, setIceLevel] = useState("Normal Ice");
   const [noCutlery, setNoCutlery] = useState(false);
   const [deliveryArea, setDeliveryArea] = useState<'town' | 'outer' | 'long'>('town');
-  const [isPinned, setIsPinned] = useState(false); // Dynamic Scroll Pin State
+  const [isPinned, setIsPinned] = useState(false); 
 
   // --- STOPWATCH GAME STATES ---
   const [isGameOpen, setIsGameOpen] = useState(false);
-  const [gameTime, setGameTime] = useState(0); // in centiseconds
+  const [isRulesOpen, setIsRulesOpen] = useState(false); // Declared Rules State
+  const [gameTime, setGameTime] = useState(0); 
   const [isGameRunning, setIsGameRunning] = useState(false);
   const [gameResult, setGameResult] = useState<'win' | 'lose' | null>(null);
-  const [hasPlayedGame, setHasPlayedGame] = useState(false); // 1 Attempt lock
-  const [gameDiscount, setGameDiscount] = useState(0); // Automatic Win Discount
+  const [hasPlayedGame, setHasPlayedGame] = useState(false); 
+  const [gameDiscount, setGameDiscount] = useState(0); 
 
   const formatBillNumber = (num: number) => String(num).padStart(4, '0');
 
@@ -210,35 +197,35 @@ export default function BbCafeHome() {
     // --- CRASH-PROOF FIREBASE REALTIME SUBSCRIPTIONS ---
     const unsubStore = onSnapshot(doc(db, "settings", "store"), (d) => { 
       if(d.exists()) setStoreOpen(d.data().isOpen); 
-    }, (err) => console.log("Firebase store rule restricted:", err));
+    }, (err) => console.log(err));
 
     const unsubMenu = onSnapshot(query(collection(db, "products")), (snap) => {
       setMenu(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter((i: any) => i.isVisible !== false));
-    }, (err) => console.log("Firebase products rule restricted:", err));
+    }, (err) => console.log(err));
 
     const unsubCats = onSnapshot(collection(db, "categories"), (snap) => { 
       setDbCategories(snap.docs.map(d => ({ id: d.id, ...d.data() }))); 
-    }, (err) => console.log("Firebase categories rule restricted:", err));
+    }, (err) => console.log(err));
 
     const unsubBanners = onSnapshot(collection(db, "banners"), (snap) => { 
       setBanners(snap.docs.map(d => ({ id: d.id, ...d.data() }))); 
-    }, (err) => console.log("Firebase banners rule restricted:", err));
+    }, (err) => console.log(err));
 
     const unsubCoupons = onSnapshot(collection(db, "coupons"), (snap) => { 
       setCoupons(snap.docs.map(d => ({ id: d.id, ...d.data() }))); 
-    }, (err) => console.log("Firebase coupons rule restricted:", err));
+    }, (err) => console.log(err));
 
     const unsubReviews = onSnapshot(collection(db, "reviews"), (snap) => {
       setReviews(snap.docs.map(d => ({ id: d.id, ...d.data() })).filter((r: any) => r.isApproved === true));
-    }, (err) => console.log("Firebase reviews rule restricted:", err));
+    }, (err) => console.log(err));
 
     const unsubRules = onSnapshot(collection(db, "loyalty_rules"), (snap) => { 
       setLoyaltyRules(snap.docs.map(d => ({ id: d.id, ...d.data() }))); 
-    }, (err) => console.log("Firebase loyalty rules restricted:", err));
+    }, (err) => console.log(err));
     
     const unsubRiders = onSnapshot(collection(db, "delivery_boys"), (snap) => {
       setDeliveryBoys(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    }, (err) => console.log("Firebase delivery boys restricted:", err));
+    }, (err) => console.log(err));
 
     const savedDetails = localStorage.getItem('bb_cafe_customer');
     if (savedDetails) { try { setCustomerDetails(JSON.parse(savedDetails)); } catch (err) {} }
@@ -503,7 +490,7 @@ export default function BbCafeHome() {
       setGiftPhone(""); setGiftPointsAmount(""); setIsGiftModalOpen(false);
       if (window.confirm("क्या आप अपने दोस्त को व्हाट्सएप पर गिफ्ट का मैसेज भेजना चाहते हैं?")) window.open(whatsappUrl, '_blank');
     } catch (err: any) {
-      toast.error(err.message === "Insufficient points balance!" ? "अपर्याप्त पॉइंट्स!" : "पॉइंट्स गिफ्ट करने में समस्या आई।");
+      toast.error(err.message === "Insufficient points balance!" ? "अपर्याप्त  पॉइंट्स!" : "पॉइंट्स गिफ्ट करने में समस्या आई।");
     } finally { setIsGiftingLoading(false); }
   };
 
@@ -726,6 +713,12 @@ export default function BbCafeHome() {
     }
   };
 
+  const formatGameTimeDisplay = (cs: number) => {
+    const ss = Math.floor(cs / 100);
+    const cc = cs % 100;
+    return `${String(ss).padStart(2, '0')}.${String(cc).padStart(2, '0')}`;
+  };
+
   if (!mounted) return null;
 
   return (
@@ -809,7 +802,7 @@ export default function BbCafeHome() {
           </motion.div>
         )}
 
-        {/* PROMO BANNER (Now Clickable to Open Challenge Rules!) */}
+        {/* PROMO BANNER (Now Clickable to Open 10S Challenge Rules!) */}
         <div 
           onClick={() => setIsRulesOpen(true)}
           className="w-full h-44 rounded-3xl overflow-hidden relative border border-white/5 bg-white/[0.02] cursor-pointer"
@@ -825,7 +818,7 @@ export default function BbCafeHome() {
           )}
         </div>
 
-        {/* ZOMATO-STYLE CATEGORY SLIDER (Without background card - Transparent minimal UI) */}
+        {/* ZOMATO-STYLE CATEGORY SLIDER */}
         <div className="space-y-4 py-2">
           <p className="text-[9px] font-black uppercase tracking-widest text-orange-500">Inspiration for your first order</p>
           <div className="flex gap-4 overflow-x-auto no-scrollbar py-2">
@@ -870,7 +863,7 @@ export default function BbCafeHome() {
                     <span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />VEG
                   </div>
                 </div>
-                <div className="p-5 flex flex-col justify-between flex-1">
+                <div className="p-5 flex flex-col justify-between flex-1 text-left">
                   <div className="flex justify-between items-start gap-4">
                     <h4 className="font-black text-lg text-gray-100 line-clamp-1">{item.name}</h4>
                     <div className="bg-green-600 text-white font-extrabold text-[11px] px-2.5 py-0.5 rounded-lg flex items-center gap-0.5">
@@ -1005,7 +998,7 @@ export default function BbCafeHome() {
         )}
       </AnimatePresence>
 
-      {/* --- RETRO STOPWATCH GAME MODAL (10S CHALLENGE) (With optimized performance & reliable closing) --- */}
+      {/* --- RETRO STOPWATCH GAME MODAL (10S CHALLENGE) --- */}
       <AnimatePresence>
         {isGameOpen && (
           <div 
@@ -1023,7 +1016,7 @@ export default function BbCafeHome() {
               initial={{ scale: 0.9, opacity: 0 }} 
               animate={{ scale: 1, opacity: 1 }} 
               exit={{ scale: 0.9, opacity: 0 }} 
-              onClick={(e) => e.stopPropagation()} // Prevent close on modal content click
+              onClick={(e) => e.stopPropagation()} 
               className="bg-[#16161a] w-full max-w-md p-8 rounded-[3rem] border border-yellow-500/30 text-center space-y-6 relative overflow-hidden shadow-[0_0_30px_rgba(234,179,8,0.15)] cursor-default"
             >
               <div className="absolute -top-10 -left-10 w-32 h-32 bg-yellow-500/10 blur-3xl rounded-full" />
@@ -1054,7 +1047,7 @@ export default function BbCafeHome() {
 
               <div>
                 <h3 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-yellow-500 italic uppercase">10S CHALLENGE</h3>
-                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mt-1">बम बम कैफ़े - मोहंद्रा विशेष</p>
+                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mt-1">बम बम कैफ़े -  मोहंद्रा विशेष</p>
               </div>
 
               {/* RETRO BEZEL STOPWATCH DIGITAL DISPLAY */}
@@ -1135,7 +1128,7 @@ export default function BbCafeHome() {
               animate={{ scale: 1, opacity: 1 }} 
               exit={{ scale: 0.9, opacity: 0 }} 
               onClick={(e) => e.stopPropagation()}
-              className="bg-[#1c1d22] w-full max-w-md p-8 rounded-[3rem] border border-yellow-500/30 text-left space-y-5 relative overflow-hidden shadow-[0_0_40px_rgba(234,179,8,0.2)] cursor-default"
+              className="bg-[#1c1d22] w-full max-w-md p-8 rounded-[3rem] border border-yellow-500/30 text-left space-y-5 relative overflow-hidden shadow-[0_0_40px_rgba(234,179,8,0.2)]"
             >
               <div className="text-center pb-2 border-b border-white/5">
                 <h3 className="text-2xl font-black text-yellow-300 italic uppercase">10 SECOND CHALLENGE</h3>
@@ -1150,7 +1143,7 @@ export default function BbCafeHome() {
                 <p>3. **अवसर:** एक आर्डर पर केवल **एक ही बार** मौका दिया जाएगा।</p>
                 <p>4. **पात्रता:** इस चैलेंज में बच्चे और बड़े, दोनों भाग ले सकते हैं।</p>
                 <p>5. **पुरस्कार:** अधिकतम ₹500 तक का आर्डर बिल्कुल मुफ्त (Free) होगा।</p>
-                <p>6. **वैधता:** मुफ्त आर्डर उसी  बिल और उसी विजिट पर लागू होगा।</p>
+                <p>6. **वैधता:** मुफ्त आर्डर उसी बिल और उसी विजिट पर लागू होगा।</p>
                 <p>7. **समय सीमा:** यह ऑफर केवल सीमित समय के लिए उपलब्ध है।</p>
                 <p>8. **अंतिम निर्णय:** किसी भी विवाद की स्थिति में मैनेजमेंट का निर्णय ही अंतिम होगा।</p>
               </div>
