@@ -109,6 +109,8 @@ export default function BbCafeHome() {
 
   const [isGiftModalOpen, setIsGiftModalOpen] = useState(false);
   const [giftPhone, setGiftPhone] = useState("");
+  
+  // Fixed state generic definition [1.1.2]
   const [giftPointsAmount, setGiftPointsAmount] = useState<number | "">("");
   const [isGiftingLoading, setIsGiftingLoading] = useState(false);
 
@@ -214,7 +216,6 @@ export default function BbCafeHome() {
     return R * c;
   };
 
-  // 1. Correctly declared deduplicatedMenu hook to fix type compile issues [1.1.2]
   const deduplicatedMenu = useMemo(() => {
     const seen = new Set();
     const hiddenCategoryNames = new Set(dbCategories.filter((c: any) => c.isVisible === false).map((c: any) => String(c.name).toLowerCase().trim()));
@@ -235,7 +236,6 @@ export default function BbCafeHome() {
     return mappedWords.join(" ");
   }, [searchQuery]);
 
-  // 1. Correctly declared filteredMenu hook inside compiler scope [1.1.2]
   const filteredMenu = useMemo(() => {
     return deduplicatedMenu.filter(item => {
       const itemName = item?.name ? String(item.name).toLowerCase() : "";
@@ -295,12 +295,6 @@ export default function BbCafeHome() {
     window.addEventListener('offline', updateOnlineStatus);
     setIsOnline(navigator.onLine);
 
-    const handleBeforeInstallPrompt = (e: Event) => {
-      e.preventDefault();
-      setDeferredPrompt(e);
-    };
-    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-
     const savedFavs = localStorage.getItem('bb_favorites');
     if (savedFavs) {
       try { setFavorites(JSON.parse(savedFavs)); } catch (e) {}
@@ -358,7 +352,6 @@ export default function BbCafeHome() {
     return () => { 
       window.removeEventListener('online', updateOnlineStatus);
       window.removeEventListener('offline', updateOnlineStatus);
-      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
       unsubStore(); unsubMenu(); unsubCats(); unsubBanners(); unsubReviews(); unsubCoupons(); unsubRules(); 
     };
   }, []);
@@ -415,6 +408,7 @@ export default function BbCafeHome() {
         } else {
           setIsTooFar(false);
           
+          // Auto delivery area mapped to calculated GPS distance (KM) [1.1]
           if (calculatedDistance <= 1.0) {
             setSelectedArea(DELIVERY_AREAS[0]); 
             toast.success(`सटीक दूरी: ${calculatedDistance.toFixed(2)} KM। आपके लिए 'Mohandra Town' क्षेत्र चुना गया है।`);
@@ -480,13 +474,181 @@ export default function BbCafeHome() {
     } finally { setIsGiftingLoading(false); }
   };
 
-  const upsellSuggestionItems = useMemo(() => {
-    return menu.filter(item => {
-      const isShake = item?.category === "Super Cool" || item?.category === "Fast Food";
-      const notInCart = !cart.some((c: any) => c.id === item.id);
-      return isShake && notInCart;
-    }).slice(0, 2);
-  }, [menu, cart]);
+  const sendWhatsAppOrder = async () => {
+    if (isTooFar) {
+      return toast.error("आपकी दूरी 20 KM से अधिक है। आप केवल मेनू देख सकते हैं, ऑर्डर प्लेस नहीं कर सकते!");
+    }
+    if (!customerDetails) { setIsLoginOpen(true); return; }
+    if (!address || address.trim().length < 10) return toast.error("Please enter full address!");
+
+    const tokenNumber = Math.floor(1000 + Math.random() * 9000);
+    let billNumber = 1;
+    const counterDocRef = doc(db, "settings", "store_bill_counter");
+
+    try {
+      await runTransaction(db, async (transaction) => {
+        const counterDoc = await transaction.get(counterDocRef);
+        if (!counterDoc.exists()) {
+          transaction.set(counterDocRef, { nextBillNumber: 2 });
+          billNumber = 1;
+        } else {
+          billNumber = counterDoc.data().nextBillNumber || 1;
+          transaction.update(counterDocRef, { nextBillNumber: billNumber + 1 });
+        }
+      });
+    } catch (e) { billNumber = Math.floor((Date.now() / 1000) % 100000); }
+
+    const formattedBillStr = formatBillNumber(billNumber);
+    const subtotal = getCartSubtotal();
+    const addOnsCost = getCartAddonsPrice();
+    const deliveryCharge = getDeliveryCharge();
+    const couponDiscount = appliedCoupon ? Number(appliedCoupon.discountValue) : 0;
+    const finalTotal = getTotalBillPrice();
+    
+    const pointsEarned = Math.floor(finalTotal / 100);
+    const totalPointsCost = cart.reduce((acc: number, i: any) => acc + (i.pointsCost || 0), 0);
+
+    const orderObj = {
+      billNumber, tokenNumber, customerName: customerDetails.name, customerPhone: customerDetails.phone,
+      address, items: cart, subtotal, discount: couponDiscount, total: finalTotal, timestamp: new Date(), status: 'pending',
+      deliveryArea: selectedArea.name, noCutlery, ketchupAddon, oreganoAddon, chiliFlakesAddon
+    };
+
+    try {
+      await addDoc(collection(db, "orders"), orderObj);
+      if (pointsEarned > 0 || totalPointsCost > 0) {
+        await setDoc(doc(db, "customer_points", customerDetails.phone.replace("+91", "")), {
+          name: customerDetails.name, phone: customerDetails.phone.replace("+91", ""), points: increment(pointsEarned - totalPointsCost), lastActive: new Date()
+        }, { merge: true });
+      }
+    } catch (e) {}
+
+    setLastPlacedOrder(orderObj);
+
+    let itemsText = "";
+    cart.forEach((i: any) => itemsText += `• ${i.name || "Item"} x${i.quantity || 1} - ₹${(i.price || 0) * (i.quantity || 1)}\n`);
+    
+    if (ketchupAddon) itemsText += `• Extra Tomato Ketchup x1 - ₹10\n`;
+    if (oreganoAddon) itemsText += `• Extra Oregano x1 - ₹10\n`;
+    if (chiliFlakesAddon) itemsText += `• Extra Chilly Flakes x1 - ₹10\n`;
+    if (noCutlery) itemsText += `🌱 (Eco-Friendly: No plastic cutlery requested)\n`;
+
+    const msg = `🔥 *BUM BUM CAFE - NEW ORDER*\n\n*Bill No:* #${formattedBillStr}\n*Token No:* #${tokenNumber}\n*Customer:* ${customerDetails.name}\n*Phone:* ${customerDetails.phone}\n*Delivery Area:* ${selectedArea.name}\n*Address:* ${address}\n\n*ITEMS:*\n${itemsText}\n*Subtotal:* ₹${subtotal + addOnsCost}\n*Coupon Discount:* -₹${couponDiscount}\n*Delivery:* ₹${deliveryCharge}\n*TOTAL BILL: ₹${finalTotal}*\n\n*Points Earned:* +${pointsEarned} Pts\n${totalPointsCost > 0 ? `*Points Redeemed:* -${totalPointsCost} Pts\n` : ''}\n_Confirm order by replying 'YES'_`;
+    
+    playSoundEffect('success');
+    setConfettiActive(true);
+    setTimeout(() => setConfettiActive(false), 5000);
+
+    setShowUPIModal(true);
+
+    const openWA = () => {
+      window.open(`https://wa.me/919714293759?text=${encodeURIComponent(msg)}`, '_blank');
+    };
+
+    (window as any)._pendingWA = openWA;
+  };
+
+  const executeWAOpen = () => {
+    if ((window as any)._pendingWA) {
+      (window as any)._pendingWA();
+      (window as any)._pendingWA = null;
+    }
+    setShowUPIModal(false);
+    setShowInvoice(true); 
+    clearCart(); 
+    
+    // Reset specific modifiers
+    setKetchupAddon(false);
+    setOreganoAddon(false);
+    setChiliFlakesAddon(false);
+    setNoCutlery(false);
+    setAppliedCoupon(null); 
+    setEnteredCoupon(""); 
+    setIsCartOpen(false);
+  };
+
+  const handleReviewSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!reviewName || !reviewComment) return toast.error("Please fill all fields!");
+    try {
+      await addDoc(collection(db, "reviews"), { name: reviewName, rating: reviewRating, comment: reviewComment, isApproved: false, timestamp: new Date() });
+      toast.success("Review submitted! Approved hone ke baad live dikhega.");
+      setReviewName(""); setReviewComment(""); setReviewRating(5); setIsReviewFormOpen(false);
+    } catch (err) { toast.error("Failed to submit review."); }
+  };
+
+  const handleSaveDetails = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!tempName || tempName.trim().length < 3) return toast.error("Please enter your real name");
+    if (!tempPhone || tempPhone.trim().length < 10) return toast.error("Please enter 10-digit number");
+    
+    const details: any = { name: tempName, phone: `+91${tempPhone}` };
+    if (tempRefCode) {
+      details.refCode = tempRefCode;
+    }
+    
+    localStorage.setItem('bb_cafe_customer', JSON.stringify(details));
+    setCustomerDetails(details); 
+    setIsLoginOpen(false);
+    
+    if (tempRefCode) {
+      toast.success(`स्वागत है ${tempName}! रेफ़रल कूपन लागू कर दिया गया है।`);
+    } else {
+      toast.success(`Welcome ${tempName}!`);
+    }
+  };
+
+  const handleToggleFavorite = (id: string, e: any) => {
+    e.stopPropagation();
+    let updated;
+    if (favorites.includes(id)) {
+      updated = favorites.filter(f => f !== id);
+      toast.success("पसंदीदा सूची से हटाया गया।");
+    } else {
+      updated = [...favorites, id];
+      toast.success("पसंदीदा सूची में जोड़ा गया! ❤️");
+    }
+    setFavorites(updated);
+    localStorage.setItem('bb_favorites', JSON.stringify(updated));
+  };
+
+  const handleAddToCart = () => {
+    if (!chosenSize) return toast.error("Please select a size first!");
+    
+    const sizeAddons = PIZZA_ADDONS[chosenSize.toLowerCase()] || {};
+    let addonsTotal = 0;
+    const activeAddonNames: string[] = [];
+
+    Object.entries(pizzaAddons).forEach(([addonName, isSelected]) => {
+      if (isSelected) {
+        const addonCost = sizeAddons[addonName] || 0;
+        addonsTotal += addonCost;
+        activeAddonNames.push(`${addonName} (+₹${addonCost})`);
+      }
+    });
+
+    let finalName = `${selectedProduct.name} (${chosenSize})`;
+    if (activeAddonNames.length > 0) {
+      finalName += ` with [${activeAddonNames.join(", ")}]`;
+    }
+    
+    const uniqueCartId = `${selectedProduct.id}-${chosenSize}-${Object.keys(pizzaAddons).filter(k => pizzaAddons[k]).join("-")}`;
+
+    addItem({ 
+      ...selectedProduct, 
+      id: uniqueCartId, 
+      name: finalName, 
+      price: Number(chosenPrice) + addonsTotal 
+    });
+    
+    playSoundEffect('add');
+    toast.success(`${chosenSize} added to cart!`);
+    
+    setSelectedProduct(null); 
+    setChosenSize(""); 
+    setChosenPrice(0); 
+    setPizzaAddons({});
+  };
 
   const handleSocialClick = async (platform: string, url: string) => {
     window.open(url, '_blank');
@@ -520,12 +682,6 @@ export default function BbCafeHome() {
     } catch (err) {
       toast.error("पॉइंट्स जोड़ने में समस्या आई।");
     }
-  };
-
-  const getClaimStatus = (platform: string) => {
-    if (!customerDetails?.phone) return "🎁 +1 Pt";
-    const storageKey = `bb_claimed_${customerDetails.phone.replace("+91", "")}_${platform}`;
-    return localStorage.getItem(storageKey) ? "✅ Claimed" : "🎁 Claim +1 Pt";
   };
 
   const handleShareApp = async () => {
@@ -576,6 +732,7 @@ export default function BbCafeHome() {
     <div className="bg-[#050505] min-h-screen text-white pb-32 font-sans relative overflow-x-hidden">
       <Toaster position="top-center" />
       
+      {/* Dynamic injection of the scrollbar CSS helper using standard dangerouslySetInnerHTML to prevent compile errors */}
       <style dangerouslySetInnerHTML={{ __html: `
         .hide-scrollbar::-webkit-scrollbar {
           display: none !important;
@@ -748,7 +905,7 @@ export default function BbCafeHome() {
           </div>
         )}
 
-        {/* PRODUCTS LISTING WITH INLINE SCROLLING AD OFFERS CAROUSEL */}
+        {/* PRODUCTS LISTING WITH INLINE SCROLLING AD OFFERS CAROUSEL [1.1.2] */}
         <div className="grid grid-cols-1 gap-4 pt-1">
           {filteredMenu.length === 0 ? (
             <p className="text-center text-gray-500 py-8 text-xs font-bold uppercase">No items found...</p>
@@ -1359,7 +1516,6 @@ export default function BbCafeHome() {
         )}
       </AnimatePresence>
 
-      {/* Direct Deep-linking UPI Jump & Scan-To-Pay Modal */}
       <AnimatePresence>
         {showUPIModal && (
           <div className="fixed inset-0 bg-black/95 z-[250] flex items-center justify-center p-6">
@@ -1406,7 +1562,6 @@ export default function BbCafeHome() {
         )}
       </AnimatePresence>
 
-      {/* DIGITAL GREEN INVOICE */}
       <AnimatePresence>
         {showInvoice && lastPlacedOrder && (
           <div className="fixed inset-0 bg-black/95 z-[240] flex items-center justify-center p-6">
