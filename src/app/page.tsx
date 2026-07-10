@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { db } from '../lib/firebase'; 
 import { collection, onSnapshot, query, addDoc, doc, setDoc, increment, runTransaction } from 'firebase/firestore';
-import { ShoppingBag, Plus, PowerOff, Search, ChevronRight, X, MapPin, Phone, User, Sparkles, Star, Percent, Gift, Loader2, Share2, Mic, Clock, MessageCircle } from 'lucide-react';
+import { ShoppingBag, Plus, PowerOff, Search, ChevronRight, X, MapPin, Phone, User, Sparkles, Star, Percent, Gift, Loader2, Share2, Mic, Clock } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
 import { useCartStore } from '../store/useCartStore';
@@ -28,40 +28,6 @@ const DEFAULT_REVIEWS = [
 ];
 
 const SEARCH_PLACEHOLDERS = ["सर्च करें स्पेशल पिज्जा... 🍕", "सर्च करें ओरियो शेक... 🥤", "सर्च करें स्पेशल थाली... 🍱", "सर्च करें बर्गर... 🍔"];
-
-// --- ADVANCED OFFLINE GEMINI FALLBACK REPLY ENGINE ---
-const getLocalBotReply = (queryText: string, menuItems: any[]) => {
-  const q = queryText.toLowerCase().trim();
-  
-  if (q.includes("hi") || q.includes("hello") || q.includes("hey") || q.includes("राम राम") || q.includes("नमस्ते") || q.includes("namaste") || q.includes("हलो")) {
-    return "राम-राम भैया! 🙏 हम हैं बम बम कैफ़े की डिजिटल हेल्पडेस्क 'रिया दीदी' 💁‍♀️। आज आपका का खाबे को मन है? हमें बजट या मूड बताओ, हम बढ़िया डिश बता रहे! 🍕🥤";
-  }
-  if (q.includes("about") || q.includes("कैफे") || q.includes("cafe") || q.includes("शुरुआत") || q.includes("कहानी") || q.includes("बारे") || q.includes("history")) {
-    return "भैया, हमने बम बम कैफ़े की शुरुआत एक छोटे से सपने के साथ की थी—लोगों को घर जैसा स्वाद और कैफ़े वाला माहौल देने के लिए। यहाँ हर कप कॉफ़ी और हर स्लाइस पिज्जा प्यार और शुद्धता के साथ बनाया जाता है। हमारी कोशिश है कि आप जब भी यहाँ आएँ, एक प्यारी मुस्कान के साथ वापस जाएँ। ❤️";
-  }
-  if (q.includes("pizza") || q.includes("पिज्जा") || q.includes("पिज़्ज़ा")) {
-    const pizzas = menuItems.filter(i => i.category === "Special Pizza" || i.name.toLowerCase().includes("pizza"));
-    if (pizzas.length > 0) {
-      return `भैया, हमारे यहाँ ये लाजवाब पिज्जा उपलब्ध हैं:\n${pizzas.map(p => `• ${p.name} - ${p.price ? '₹'+p.price : 'कम रेट में'}`).join('\n')}\n\nसब शुद्ध अमूल चीज़ से प्यार से बनाए जाते हैं! 🍕`;
-    }
-    return "भैया, गरमा-गरम अमूल चीज़ वाला स्पेशल पिज़्ज़ा मिल जाएगा, अभी आर्डर करें! 🍕";
-  }
-  if (q.includes("delivery") || q.includes("डिलीवरी") || q.includes("होम") || q.includes("घर") || q.includes("delivery free")) {
-    return "भैया, होम डिलीवरी बिल्कुल फ्री है (टाउन में ₹99 से ऊपर)! स्वाद सीधे आपके दरवाज़े तक आएगा। 🏠🛵\n\n• मोहंद्रा टाउन: ₹99 से ऊपर फ्री डिलीवरी\n• 5 किलोमीटर: ₹499 से ऊपर फ्री डिलीवरी\n• 12 किलोमीटर: ₹999 से ऊपर फ्री डिलीवरी";
-  }
-  if (q.includes("address") || q.includes("पता") || q.includes("location") || q.includes("कहाँ") || q.includes("kahan") || q.includes("shop")) {
-    return "बम बम कैफ़े का पता है: 📍 बस स्टैंड मोहंद्रा, पीपल पेड़ के नीचे, मोहंद्रा (जिला पन्ना, मध्य प्रदेश)। आप नीचे मैप का बटन दबाकर डायरेक्ट नेविगेट कर सकते हैं! 🗺️";
-  }
-  if (q.includes("budget") || q.includes("कम") || q.includes("sasta") || q.includes("सस्ता") || q.includes("100") || q.includes("50") || q.includes("150")) {
-    return "भैया, बजट की बिल्कुल टेंशन मत लो! आप ₹50 में ठंडी कोल्ड कॉफ़ी या ओरियो शेक ले सकते हैं, और ₹99 में गरमा-गरम पिज्जा। कम बजट में भी पेट भर जाएगा! 🍕🥤";
-  }
-  if (q.includes("menu") || q.includes("क्या क्या") || q.includes("khana") || q.includes("खाना") || q.includes("list")) {
-    const samples = menuItems.slice(0, 5);
-    return `भैया, हमारे यहाँ स्पेशल पिज़्ज़ा, स्पेशल थाली, पनीर स्पेशल, इंडियन ब्रेड और लाजवाब शेक्स (Super Cool) सब कुछ मिलता है।\n\nजैसे:\n${samples.map(s => `• ${s.name} - ₹${s.price || 0}`).join('\n')}\n\nऊपर दिए गए मेनू में सब कुछ रेट के साथ लिखा है! 😋`;
-  }
-  
-  return "माफ़ी चाहते हैं भैया, आपकी बात हम पूरे तरीके से समझ नहीं पाए। आप हमारे मेनू के बारे में, डिलीवरी या कैफ़े के पते के बारे में कुछ भी पूछ सकते हैं! 🙏";
-};
 
 export default function BbCafeHome() {
   const store = useCartStore() as any;
@@ -120,12 +86,6 @@ export default function BbCafeHome() {
 
   // --- NEW INTEGRATED STATES ---
   const [deliveryBoys, setDeliveryBoys] = useState<any[]>([]);
-  const [isAiOpen, setIsAiOpen] = useState(false);
-  const [aiInput, setAiInput] = useState("");
-  const [aiLoading, setAiLoading] = useState(false);
-  const [aiMessages, setAiMessages] = useState([
-    { role: "model", text: "राम-राम भैया! हम हैं बम बम कैफ़े की जादुई डिजिटल असिस्टेंट 'रिया दीदी' 💁‍♀️। आज आपका का खाबे को मन है? बजट या मूड बताओ, हम बढ़िया डिश बता रहे! 🍕🥤" }
-  ]);
   const [greetingMessage, setGreetingMessage] = useState("");
   const [placeholderIndex, setPlaceholderIndex] = useState(0);
   const [isListening, setIsListening] = useState(false);
@@ -230,15 +190,15 @@ export default function BbCafeHome() {
     return () => clearInterval(timer);
   }, []);
 
-  // --- Stopwatch Game HIGH-PRECISION OPTIMIZED Timer Loop (No Mobile Lag) ---
+  // --- Stopwatch Game HIGH-PRECISION OPTIMIZED Timer Loop ---
   useEffect(() => {
     let intervalId: any;
     if (isGameRunning) {
       const startTime = Date.now();
       intervalId = setInterval(() => {
         const elapsed = Date.now() - startTime;
-        setGameTime(Math.floor(elapsed / 10)); // Converts exact ms to centiseconds (giga light on React thread)
-      }, 30); // 30ms is extremely smooth but uses 70% less CPU than 10ms!
+        setGameTime(Math.floor(elapsed / 10)); 
+      }, 30); 
     } else {
       clearInterval(intervalId);
     }
@@ -250,7 +210,7 @@ export default function BbCafeHome() {
     if (typeof window !== 'undefined' && ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
       const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
       const recognition = new SpeechRecognition();
-      recognition.lang = 'hi-IN'; // Hindi voice input
+      recognition.lang = 'hi-IN'; 
       recognition.interimResults = false;
       recognition.onstart = () => setIsListening(true);
       recognition.onend = () => setIsListening(false);
@@ -263,34 +223,6 @@ export default function BbCafeHome() {
       recognition.start();
     } else {
       toast.error("काफी दुःख की बात है, आपका ब्राउज़र वॉइस सर्च सपोर्ट नहीं करता है।");
-    }
-  };
-
-  // --- AI Chatbot Send Message Handler (With Instant Offline Fallback) ---
-  const handleSendAiMessage = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!aiInput.trim() || aiLoading) return;
-
-    const userMsg = { role: "user", text: aiInput };
-    const updatedMessages = [...aiMessages, userMsg];
-    setAiMessages(updatedMessages);
-    setAiInput("");
-    setAiLoading(true);
-
-    try {
-      const res = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: updatedMessages, menuData: menu })
-      });
-      if (!res.ok) throw new Error("Fallback required");
-      const data = await res.json();
-      setAiMessages([...updatedMessages, { role: "model", text: data.text }]);
-    } catch (err) {
-      const reply = getLocalBotReply(userMsg.text, menu);
-      setAiMessages([...updatedMessages, { role: "model", text: reply }]);
-    } finally {
-      setAiLoading(false);
     }
   };
 
@@ -470,7 +402,7 @@ export default function BbCafeHome() {
     } else if (deliveryArea === 'outer') {
       deliveryCharge = subtotal < 499 ? 50 : 0;
     } else {
-      deliveryCharge = subtotal < 999 ? 99 : 0; // 12km delivery charge ₹99
+      deliveryCharge = subtotal < 999 ? 99 : 0; 
     }
 
     const couponDiscount = appliedCoupon ? Number(appliedCoupon.discountValue) : 0;
@@ -637,7 +569,6 @@ export default function BbCafeHome() {
     }
   };
 
-  // --- STOPWATCH GAME MECHANICS (Optimized) ---
   const handleStartGame = () => {
     if (hasPlayedGame) {
       toast.error("भैया, इस आर्डर पर आप पहले ही गेम खेल चुके हैं! 🛑");
@@ -650,11 +581,10 @@ export default function BbCafeHome() {
 
   const handleStopGame = () => {
     setIsGameRunning(false);
-    setHasPlayedGame(true); // Lock further play attempts for this transaction
-    const target = 1000; // 10.00 seconds is 1000 centiseconds
+    setHasPlayedGame(true); 
+    const target = 1000; 
     if (gameTime === target) {
       setGameResult('win');
-      // Direct dynamic discount logic up to ₹500
       const currentCartTotal = getTotal();
       const calculatedDiscount = Math.min(currentCartTotal, 500);
       setGameDiscount(calculatedDiscount); 
@@ -687,11 +617,10 @@ export default function BbCafeHome() {
         </div>
       </header>
 
-      {/* STICKY SEARCH BAR WITH SLIDING PLACEHOLDER & VOICE SEARCH (z-[60] to prevent sidebar overlap) */}
-      <div className="sticky top-0 z-[60] bg-[#050505] py-4 px-4 border-b border-white/5 rounded-b-3xl shadow-lg shadow-black/50">
-        <div className="relative max-w-sm mx-auto">
+      {/* STICKY SEARCH BAR + DEDICATED HEADER CART TOGGLE */}
+      <div className="sticky top-0 z-[60] bg-[#050505]/95 backdrop-blur-md py-4 px-4 border-b border-white/5 rounded-b-3xl shadow-lg shadow-black/50 flex gap-2.5 items-center">
+        <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-          
           <input 
             type="text" 
             placeholder={SEARCH_PLACEHOLDERS[placeholderIndex]} 
@@ -699,7 +628,6 @@ export default function BbCafeHome() {
             onChange={(e) => setSearchQuery(e.target.value)} 
             className="w-full bg-white text-black py-3.5 px-11 rounded-2xl outline-none text-xs font-semibold placeholder-gray-500 transition-all duration-300" 
           />
-          
           <button 
             onClick={handleVoiceSearch} 
             className={`absolute right-4 top-1/2 -translate-y-1/2 p-1.5 rounded-full transition-all ${isListening ? 'bg-red-500 text-white animate-ping' : 'text-gray-500 hover:text-black'}`}
@@ -707,12 +635,25 @@ export default function BbCafeHome() {
             <Mic size={16} />
           </button>
         </div>
+
+        {/* ALWAYS-ON HEADER CART BUTTON */}
+        <button 
+          onClick={() => setIsCartOpen(true)} 
+          className="relative p-3.5 bg-white/5 border border-white/10 rounded-2xl hover:bg-white/10 transition-all flex items-center justify-center shrink-0"
+        >
+          <ShoppingBag size={18} className="text-yellow-300 animate-pulse" />
+          {cart.length > 0 && (
+            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[9px] font-black w-5 h-5 rounded-full flex items-center justify-center">
+              {cart.reduce((sum: number, i: any) => sum + i.quantity, 0)}
+            </span>
+          )}
+        </button>
       </div>
 
-      {/* TRIPLE SIDE-TOGGLES STACKED CLEANLY ON THE RIGHT (z-[45] so they scroll cleanly behind search) */}
+      {/* TRIPLE SIDE-TOGGLES STACKED CLEANLY (Moved lower down to prevent any search bar collision) */}
       <button 
         onClick={() => setIsSocialsOpen(true)} 
-        className="fixed right-0 top-[140px] -translate-y-1/2 bg-[#ff5e00] text-white py-4 px-2.5 rounded-l-2xl z-[45] text-[9px] font-black tracking-widest uppercase flex flex-col items-center gap-1 shadow-xl border-l border-y border-white/10"
+        className="fixed right-0 top-[240px] -translate-y-1/2 bg-[#ff5e00] text-white py-4 px-2.5 rounded-l-2xl z-[45] text-[9px] font-black tracking-widest uppercase flex flex-col items-center gap-1 shadow-xl border-l border-y border-white/10"
         style={{ writingMode: 'vertical-lr' }}
       >
         📱 FOLLOW & EARN
@@ -720,17 +661,16 @@ export default function BbCafeHome() {
 
       <button 
         onClick={() => setIsReviewsDrawerOpen(true)} 
-        className="fixed right-0 top-[220px] -translate-y-1/2 bg-yellow-400 text-black py-4 px-2.5 rounded-l-2xl z-[45] text-[9px] font-black tracking-widest uppercase flex flex-col items-center gap-1 shadow-xl"
+        className="fixed right-0 top-[320px] -translate-y-1/2 bg-yellow-400 text-black py-4 px-2.5 rounded-l-2xl z-[45] text-[9px] font-black tracking-widest uppercase flex flex-col items-center gap-1 shadow-xl"
         style={{ writingMode: 'vertical-lr' }}
       >
         ⭐ REVIEWS
       </button>
 
-      {/* 10-SECOND CHALLENGE FLOATING SIDEBAR TOGGLE */}
       <button 
         onClick={() => setIsGameOpen(true)} 
-        className="fixed right-0 top-[300px] -translate-y-1/2 bg-gradient-to-r from-red-500 to-orange-500 text-white py-4 px-2.5 rounded-l-2xl z-[45] text-[9px] font-black tracking-widest uppercase flex flex-col items-center gap-1 shadow-xl border-l border-y border-white/10 animate-bounce"
-        style={{ writingMode: 'vertical-lr', animationDuration: '4s' }}
+        className="fixed right-0 top-[400px] -translate-y-1/2 bg-gradient-to-r from-red-500 to-orange-500 text-white py-4 px-2.5 rounded-l-2xl z-[45] text-[9px] font-black tracking-widest uppercase flex flex-col items-center gap-1 shadow-xl border-l border-y border-white/10 animate-bounce animate-duration-1000"
+        style={{ writingMode: 'vertical-lr' }}
       >
         ⏱️ 10S CHALLENGE
       </button>
@@ -767,7 +707,7 @@ export default function BbCafeHome() {
           )}
         </div>
 
-        {/* ZOMATO-STYLE CATEGORY HORIZONTAL SLIDER */}
+        {/* CATEGORY SLIDER */}
         <div className="bg-white/[0.01] border border-white/5 p-5 rounded-[2.5rem] space-y-4">
           <p className="text-[9px] font-black uppercase tracking-widest text-orange-500">Inspiration for your first order</p>
           <div className="flex gap-4 overflow-x-auto no-scrollbar py-2">
@@ -791,7 +731,7 @@ export default function BbCafeHome() {
           </div>
         </div>
 
-        {/* PRODUCTS MENU GRID WITH ANIMATED HOVER */}
+        {/* PRODUCTS MENU GRID */}
         <div className="grid grid-cols-1 gap-6 pt-2">
           {filteredMenu.length === 0 ? (
             <p className="text-center text-gray-500 py-12 text-sm font-bold uppercase">No items found...</p>
@@ -845,7 +785,7 @@ export default function BbCafeHome() {
           )}
         </div>
 
-        {/* --- ABOUT US CARD (DESIGNED DIRECTLY FROM THE INSTAGRAM FILE) --- */}
+        {/* ABOUT US */}
         <div className="bg-gradient-to-br from-green-950/40 to-[#b33600]/10 border border-white/5 p-6 rounded-[2.5rem] space-y-4 shadow-xl text-center relative overflow-hidden">
           <div className="absolute top-0 right-0 bg-yellow-500 text-black font-black uppercase text-[8px] px-3 py-1 rounded-bl-xl tracking-widest">ABOUT US</div>
           <h3 className="text-2xl font-black italic text-yellow-300">ABOUT BUM BUM CAFE</h3>
@@ -859,7 +799,7 @@ export default function BbCafeHome() {
           </div>
         </div>
 
-        {/* --- DYNAMIC CAFE DETAILS & MAPS ADDRESS CARD (UPDATED WITH NEW ADDRESS & LINK) --- */}
+        {/* CAFE DETAILS */}
         <div className="bg-white/[0.02] border border-white/5 p-6 rounded-[2.5rem] space-y-4 shadow-xl text-left">
           <h3 className="font-black text-sm text-yellow-300 uppercase italic flex items-center gap-2">
             <Clock size={16} /> CAFE DETAILS & TIMINGS
@@ -896,40 +836,6 @@ export default function BbCafeHome() {
         </div>
 
       </main>
-
-      {/* --- FLOATING CART BAR (Displays when there are items in the cart) --- */}
-      {cart.length > 0 && !isCartOpen && (
-        <motion.div 
-          initial={{ y: 100 }} 
-          animate={{ y: 0 }} 
-          className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[calc(100%-2rem)] max-w-md bg-gradient-to-r from-[#ff5e00] to-[#b33600] text-white p-4 rounded-3xl flex justify-between items-center shadow-2xl z-50 border border-white/10 animate-bounce"
-          style={{ animationDuration: '3s' }}
-        >
-          <div className="flex items-center gap-3">
-            <div className="bg-black/20 p-2.5 rounded-2xl">
-              <ShoppingBag size={20} />
-            </div>
-            <div className="text-left">
-              <p className="text-xs font-black">{cart.reduce((sum: number, item: any) => sum + item.quantity, 0)} Items in Cart</p>
-              <p className="text-[10px] text-orange-200 font-bold">Total: ₹{getTotal()}</p>
-            </div>
-          </div>
-          <button 
-            onClick={() => setIsCartOpen(true)} 
-            className="bg-white text-[#b33600] font-black px-5 py-2.5 rounded-2xl text-xs uppercase transition-transform active:scale-95 flex items-center gap-1"
-          >
-            View Cart <ChevronRight size={14} />
-          </button>
-        </motion.div>
-      )}
-
-      {/* --- FLOATING AI CHAT BUBBLE (Bottom Left - Styled as a tiny non-disturbing Message Icon 💬) --- */}
-      <button 
-        onClick={() => setIsAiOpen(true)} 
-        className="fixed bottom-24 left-4 w-11 h-11 bg-gradient-to-tr from-[#ff5e00] to-[#b33600] rounded-full shadow-2xl z-40 transition-all active:scale-95 border border-white/10 flex items-center justify-center overflow-hidden hover:rotate-6"
-      >
-        <MessageCircle size={18} className="text-white" />
-      </button>
 
       {/* --- REVIEWS SIDE DRAWER --- */}
       <AnimatePresence>
@@ -1089,7 +995,7 @@ export default function BbCafeHome() {
               
               <div className="space-y-3 text-left">
                 <button 
-                  onClick={() => handleSocialClick("instagram", "https://instagram.com/bumbumcafe")} 
+                  onClick={() => handleSocialClick("instagram", "https://instagram.com/bumbumcafe_mohandra")} 
                   className="w-full p-4 rounded-2xl bg-gradient-to-r from-pink-500 to-purple-600 text-white font-bold text-xs flex justify-between items-center transition-transform active:scale-95 shadow-md"
                 >
                   <span>📸 FOLLOW ON INSTAGRAM</span>
@@ -1105,7 +1011,7 @@ export default function BbCafeHome() {
                 </button>
                 
                 <button 
-                  onClick={() => handleSocialClick("youtube", "https://youtube.com/bumbumcafe")} 
+                  onClick={() => handleSocialClick("youtube", "https://youtube.com/@bumbumcafe")} 
                   className="w-full p-4 rounded-2xl bg-red-600 text-white font-bold text-xs flex justify-between items-center transition-transform active:scale-95 shadow-md"
                 >
                   <span>📺 SUBSCRIBE ON YOUTUBE</span>
@@ -1115,188 +1021,6 @@ export default function BbCafeHome() {
               
               <button type="button" onClick={() => setIsSocialsOpen(false)} className="w-full bg-white/5 text-gray-400 font-bold p-4 rounded-xl text-xs uppercase border border-white/5">CLOSE</button>
             </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* --- RETRO STOPWATCH GAME MODAL (10S CHALLENGE) --- */}
-      <AnimatePresence>
-        {isGameOpen && (
-          <div className="fixed inset-0 bg-black/95 z-[270] flex items-center justify-center p-4">
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0 }} 
-              animate={{ scale: 1, opacity: 1 }} 
-              exit={{ scale: 0.9, opacity: 0 }} 
-              className="bg-[#16161a] w-full max-w-md p-8 rounded-[3rem] border border-yellow-500/30 text-center space-y-6 relative overflow-hidden shadow-[0_0_30px_rgba(234,179,8,0.15)]"
-            >
-              <div className="absolute -top-10 -left-10 w-32 h-32 bg-yellow-500/10 blur-3xl rounded-full" />
-              <div className="absolute -bottom-10 -right-10 w-32 h-32 bg-orange-500/10 blur-3xl rounded-full" />
-              
-              <div>
-                <h3 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-yellow-500 italic uppercase">10S CHALLENGE</h3>
-                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mt-1">बम बम कैफ़े - मोहंद्रा विशेष</p>
-              </div>
-
-              {/* RETRO BEZEL STOPWATCH DIGITAL DISPLAY */}
-              <div className="w-60 h-64 rounded-full border-[10px] border-yellow-500/20 bg-black flex flex-col justify-center items-center mx-auto shadow-2xl relative shadow-yellow-500/5">
-                <div className="absolute top-6 text-[8px] font-black text-red-500 tracking-widest">TARGET 10.00s</div>
-                
-                <h1 className="text-5xl font-mono font-black text-yellow-300 tracking-tighter drop-shadow-[0_0_10px_rgba(253,224,71,0.3)]">
-                  {formatGameTimeDisplay(gameTime)}
-                </h1>
-                
-                <p className="text-[10px] text-gray-500 font-bold uppercase mt-1 tracking-widest">Seconds</p>
-                <div className="absolute bottom-6 w-2.5 h-2.5 rounded-full bg-red-600 animate-pulse" />
-              </div>
-
-              {/* GAME RESULTS DISPLAY */}
-              {gameResult === 'win' && (
-                <div className="p-4 bg-green-500/10 border border-green-500/25 rounded-2xl text-center space-y-1 animate-pulse">
-                  <p className="text-xs font-black text-green-400 uppercase">🎉 विजेता! आपने कर दिखाया!</p>
-                  <p className="text-[10px] text-gray-300">आपका यह आर्डर (अधिकतम ₹500 तक) बिल्कुल मुफ्त (Free) हो गया है! 🎁</p>
-                </div>
-              )}
-
-              {gameResult === 'lose' && (
-                <div className="p-4 bg-red-500/10 border border-red-500/25 rounded-2xl text-center space-y-1">
-                  <p className="text-xs font-black text-red-400 uppercase">❌ अरेरे! चूक गए!</p>
-                  <p className="text-[9px] text-gray-300">आपका टाइम: <span className="font-bold text-white font-mono">{formatGameTimeDisplay(gameTime)}</span> रहा। ठीक 10.00 पर रोकें!</p>
-                </div>
-              )}
-
-              {hasPlayedGame && gameResult !== 'win' && (
-                <p className="text-[9px] text-gray-500 font-semibold uppercase italic">⚠️ इस आर्डर का चांस पूरा हो गया है। नया आर्डर बनाकर दोबारा खेलें!</p>
-              )}
-
-              {/* CONTROLS */}
-              <div className="flex gap-3">
-                {!isGameRunning ? (
-                  <button 
-                    onClick={handleStartGame} 
-                    disabled={hasPlayedGame}
-                    className={`flex-1 font-black p-4.5 rounded-2xl text-xs uppercase transition-all ${hasPlayedGame ? 'bg-white/5 text-gray-600 cursor-not-allowed border border-white/5' : 'bg-green-500 hover:bg-green-600 text-black shadow-lg shadow-green-500/15'}`}
-                  >
-                    🚀 START
-                  </button>
-                ) : (
-                  <button 
-                    onClick={handleStopGame} 
-                    className="flex-1 bg-red-500 hover:bg-red-600 text-white font-black p-4.5 rounded-2xl text-xs uppercase animate-pulse transition-all"
-                  >
-                    🛑 STOP
-                  </button>
-                )}
-                <button 
-                  onClick={() => { setIsGameRunning(false); setIsGameOpen(false); setGameResult(null); setGameTime(0); }} 
-                  className="bg-white/5 hover:bg-white/10 text-gray-400 font-bold p-4.5 rounded-2xl text-xs uppercase"
-                >
-                  CLOSE
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* --- AI CHAT INTERFACE MODAL (UPDATED WITH RIYA DIDI AVATAR FACE & OFFLINE ENGINE) --- */}
-      <AnimatePresence>
-        {isAiOpen && (
-          <div className="fixed inset-0 bg-black/95 z-[260] flex items-center justify-center p-4">
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0 }} 
-              animate={{ scale: 1, opacity: 1 }} 
-              exit={{ scale: 0.9, opacity: 0 }} 
-              className="bg-[#111] w-full max-w-md h-[80vh] rounded-[3rem] border border-white/10 flex flex-col overflow-hidden relative"
-            >
-              {/* Header */}
-              <div className="p-6 border-b border-white/5 flex justify-between items-center bg-gradient-to-r from-purple-600/10 to-pink-600/10">
-                <div className="flex items-center gap-3">
-                  <div className="relative">
-                    <img 
-                      src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150&get=80" 
-                      className="w-10 h-10 rounded-full object-cover border border-purple-500"
-                      alt="Riya Didi"
-                    />
-                    <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 border-2 border-[#111] rounded-full" />
-                  </div>
-                  <div className="text-left">
-                    <h3 className="font-black text-sm text-purple-300 uppercase italic">बम बम दीदी (रिया) 💁‍♀️</h3>
-                    <p className="text-[8px] text-green-400 font-black uppercase">Online & Ready to Help</p>
-                  </div>
-                </div>
-                <button onClick={() => { setIsAiOpen(false); }} className="p-2.5 bg-white/5 hover:bg-white/10 rounded-full text-white"><X size={18} /></button>
-              </div>
-
-              {/* Chat Messages */}
-              <div className="flex-1 p-6 overflow-y-auto space-y-4 no-scrollbar">
-                {aiMessages.map((msg, idx) => (
-                  <div key={idx} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-                    <div className={`p-4 rounded-2xl max-w-[85%] text-xs font-semibold leading-relaxed ${
-                      msg.role === "user" 
-                        ? 'bg-purple-600 text-white rounded-br-none' 
-                        : 'bg-white/5 text-gray-200 border border-white/5 rounded-bl-none'
-                    }`}>
-                      {msg.text}
-                    </div>
-                  </div>
-                ))}
-                {aiLoading && (
-                  <div className="flex justify-start">
-                    <div className="p-4 rounded-2xl bg-white/5 border border-white/5 text-xs text-gray-400 flex items-center gap-2">
-                      <Loader2 className="animate-spin" size={14} /> AI logic thinking...
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Chat Input */}
-              <form onSubmit={handleSendAiMessage} className="p-5 border-t border-white/5 bg-black/40 flex gap-2">
-                <input 
-                  type="text" 
-                  placeholder="Ask me anything (e.g. ₹150 me kya milega?)..." 
-                  value={aiInput} 
-                  onChange={(e) => setAiInput(e.target.value)} 
-                  disabled={aiLoading}
-                  className="flex-1 bg-white/5 border border-white/10 rounded-xl p-3.5 text-xs text-white outline-none focus:border-purple-500" 
-                />
-                <button type="submit" disabled={aiLoading} className="bg-purple-600 text-white font-black px-5 rounded-xl text-xs uppercase">
-                  Send
-                </button>
-              </form>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* --- WRITE REVIEW MODAL --- */}
-      <AnimatePresence>
-        {isReviewFormOpen && (
-          <div className="fixed inset-0 bg-black/95 z-[200] flex items-center justify-center p-6">
-            <form onSubmit={handleReviewSubmit} className="bg-[#111] w-full max-w-md p-8 rounded-[3rem] border border-white/10 text-center space-y-4">
-              <h3 className="text-2xl font-black text-orange-500 uppercase italic">Your Feedback</h3>
-              <div className="space-y-4 text-left">
-                <div>
-                  <label className="text-[10px] font-black uppercase text-gray-500">Your Name</label>
-                  <input type="text" placeholder="Apna naam likhein..." value={reviewName} onChange={(e) => setReviewName(e.target.value)} required className="w-full bg-white/5 border border-white/10 p-3.5 rounded-xl text-sm text-white focus:border-orange-500 outline-none" />
-                </div>
-                <div>
-                  <label className="text-[10px] font-black uppercase text-gray-500">Rating</label>
-                  <div className="flex gap-2 text-yellow-400 py-1">
-                    {[1, 2, 3, 4, 5].map((star) => (
-                      <Star key={star} size={24} fill={reviewRating >= star ? "currentColor" : "none"} onClick={() => setReviewRating(star)} className="cursor-pointer" />
-                    ))}
-                  </div>
-                </div>
-                <div>
-                  <label className="text-[10px] font-black uppercase text-gray-500">Comments</label>
-                  <textarea placeholder="Khana kaisa laga?..." value={reviewComment} onChange={(e) => setReviewComment(e.target.value)} required rows={3} className="w-full bg-white/5 border border-white/10 p-3.5 rounded-xl text-sm text-white focus:border-orange-500 outline-none resize-none" />
-                </div>
-              </div>
-              <div className="flex gap-2 pt-2">
-                <button type="submit" className="flex-1 bg-orange-500 text-black font-black p-4 rounded-xl text-sm uppercase">SUBMIT</button>
-                <button type="button" onClick={() => setIsReviewFormOpen(false)} className="bg-white/5 text-gray-400 font-bold p-4 rounded-xl text-sm">CANCEL</button>
-              </div>
-            </form>
           </div>
         )}
       </AnimatePresence>
@@ -1397,222 +1121,231 @@ export default function BbCafeHome() {
                 <button onClick={() => setIsCartOpen(false)} className="p-3 bg-white/5 hover:bg-white/10 text-white rounded-full transition-all"><X size={24} /></button>
               </div>
 
-              {cart.map((item: any) => (
-                <div key={item.id} className="flex justify-between items-center bg-white/[0.02] p-5 rounded-3xl mb-4 border border-white/5">
-                  <div className="min-w-0 pr-3">
-                    <h4 className="font-bold text-sm text-gray-100 truncate">{item?.name || "Item"}</h4>
-                    <p className="text-orange-500 font-black mt-1">₹{item?.price || 0}</p>
-                  </div>
-                  <div className="flex items-center gap-2.5 bg-black/40 px-3 py-1.5 rounded-2xl border border-white/10 flex-shrink-0">
-                    <button onClick={() => removeItem(item.id)} className="w-8 h-8 flex items-center justify-center bg-red-500/10 text-red-500 rounded-lg text-lg font-black">-</button>
-                    <span className="font-black text-sm px-1.5 text-white">{item.quantity}</span>
-                    {item.isReward ? (
-                      <button disabled className="w-8 h-8 flex items-center justify-center bg-white/5 text-gray-600 rounded-lg text-lg font-black cursor-not-allowed">+</button>
-                    ) : (
-                      <button onClick={() => addItem(item)} className="w-8 h-8 flex items-center justify-center bg-green-500/10 text-green-500 rounded-lg text-lg font-black">+</button>
-                    )}
-                  </div>
+              {cart.length === 0 ? (
+                <div className="text-center py-12 space-y-4">
+                  <p className="text-gray-400 font-bold uppercase text-xs">आपकी कार्ट अभी खाली है...</p>
+                  <button onClick={() => setIsCartOpen(false)} className="bg-orange-500 text-black font-black text-xs px-5 py-3 rounded-xl uppercase">डिश जोड़ें +</button>
                 </div>
-              ))}
-
-              <div className="mt-10 space-y-6">
-                
-                {/* --- FREE DELIVERY VISUAL PROGRESS BAR --- */}
-                {(() => {
-                  const subtotal = getTotal();
-                  const threshold = 99;
-                  const progress = Math.min((subtotal / threshold) * 100, 100);
-                  const needed = threshold - subtotal;
-
-                  return (
-                    <div className="bg-white/[0.02] border border-white/5 rounded-3xl p-5 space-y-3">
-                      {subtotal < threshold ? (
-                        <>
-                          <div className="flex justify-between items-center text-[10px] font-black uppercase">
-                            <span className="text-orange-400">⚡ Free Delivery Progress</span>
-                            <span className="text-gray-400">Add ₹{needed} more</span>
-                          </div>
-                          <div className="w-full bg-white/5 h-2 rounded-full overflow-hidden">
-                            <div 
-                              className="bg-gradient-to-r from-orange-500 to-yellow-400 h-full rounded-full transition-all duration-500" 
-                              style={{ width: `${progress}%` }} 
-                            />
-                          </div>
-                        </>
+              ) : (
+                cart.map((item: any) => (
+                  <div key={item.id} className="flex justify-between items-center bg-white/[0.02] p-5 rounded-3xl mb-4 border border-white/5">
+                    <div className="min-w-0 pr-3">
+                      <h4 className="font-bold text-sm text-gray-100 truncate">{item?.name || "Item"}</h4>
+                      <p className="text-orange-500 font-black mt-1">₹{item?.price || 0}</p>
+                    </div>
+                    <div className="flex items-center gap-2.5 bg-black/40 px-3 py-1.5 rounded-2xl border border-white/10 flex-shrink-0">
+                      <button onClick={() => removeItem(item.id)} className="w-8 h-8 flex items-center justify-center bg-red-500/10 text-red-500 rounded-lg text-lg font-black">-</button>
+                      <span className="font-black text-sm px-1.5 text-white">{item.quantity}</span>
+                      {item.isReward ? (
+                        <button disabled className="w-8 h-8 flex items-center justify-center bg-white/5 text-gray-600 rounded-lg text-lg font-black cursor-not-allowed">+</button>
                       ) : (
-                        <div className="flex items-center gap-2 text-[10px] font-black uppercase text-green-400 bg-green-500/10 border border-green-500/20 p-3 rounded-2xl justify-center">
-                          🎉 Congratulations! You got FREE Delivery
-                        </div>
+                        <button onClick={() => addItem(item)} className="w-8 h-8 flex items-center justify-center bg-green-500/10 text-green-500 rounded-lg text-lg font-black">+</button>
                       )}
                     </div>
-                  );
-                })()}
-
-                {/* DYNAMIC DELIVERY AREA SELECTOR (Updated for 12km) */}
-                <div className="bg-white/[0.02] p-5 rounded-[2.2rem] border border-white/5 space-y-3">
-                  <div className="flex items-center gap-2 text-orange-500">
-                    <MapPin size={18}/>
-                    <h3 className="font-black uppercase text-xs">Select Delivery Area</h3>
                   </div>
-                  <div className="grid grid-cols-3 gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => setDeliveryArea('town')}
-                      className={`py-3 rounded-xl text-[9px] font-black uppercase border ${deliveryArea === 'town' ? 'bg-orange-500 text-black border-orange-500 shadow-md' : 'bg-white/5 text-gray-400 border-white/5'}`}
-                    >
-                      Town (Free &gt; ₹99)
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setDeliveryArea('outer')}
-                      className={`py-3 rounded-xl text-[9px] font-black uppercase border ${deliveryArea === 'outer' ? 'bg-orange-500 text-black border-orange-500 shadow-md' : 'bg-white/5 text-gray-400 border-white/5'}`}
-                    >
-                      5 Km (Free &gt; ₹499)
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setDeliveryArea('long')}
-                      className={`py-3 rounded-xl text-[9px] font-black uppercase border ${deliveryArea === 'long' ? 'bg-orange-500 text-black border-orange-500 shadow-md' : 'bg-white/5 text-gray-400 border-white/5'}`}
-                    >
-                      12 Km (Charge: ₹99)
-                    </button>
-                  </div>
-                </div>
+                ))
+              )}
 
-                <div className="bg-orange-500/10 border border-orange-500/20 rounded-[2rem] p-5 space-y-2">
-                  <div className="flex items-center gap-2 text-orange-400 font-black text-xs uppercase"><Sparkles size={16}/> <span>Free Delivery Rules</span></div>
-                  <ul className="text-[11px] text-gray-400 font-bold space-y-1">
-                    <li>• मोहंद्रा टाउन: Free above ₹99 <span className="text-green-500">({getTotal() >= 99 ? 'Achieved' : 'Need ₹' + (99 - getTotal()) + ' more'})</span></li>
-                    <li>• 5 किलोमीटर: Free above ₹499</li>
-                    <li>• 12 किलोमीटर: Free above ₹999</li>
-                  </ul>
-                </div>
+              {cart.length > 0 && (
+                <div className="mt-10 space-y-6">
+                  
+                  {/* --- FREE DELIVERY VISUAL PROGRESS BAR --- */}
+                  {(() => {
+                    const subtotal = getTotal();
+                    const threshold = 99;
+                    const progress = Math.min((subtotal / threshold) * 100, 100);
+                    const needed = threshold - subtotal;
 
-                {customerDetails && (
-                  <div className="bg-yellow-400/5 border border-yellow-400/20 rounded-[2rem] p-5 space-y-3">
-                    <div className="flex items-center gap-2 text-yellow-400 font-black text-xs uppercase"><Gift size={14}/> <span>⭐ बम बम लॉयल्टी क्लब</span></div>
-                    
-                    <div className="flex justify-between items-center border-b border-white/5 pb-3">
-                      <div>
-                        <h4 className="text-3xl font-black text-white">{customerPoints} <span className="text-[10px] text-gray-500 font-bold uppercase">Points</span></h4>
-                        <p className="text-[9px] text-gray-400">Spend ₹100 = Get 1 Point!</p>
-                      </div>
-                      <div className="text-right text-[9px] text-yellow-400 font-black space-y-1 uppercase tracking-wider bg-yellow-400/5 p-3 rounded-xl border border-yellow-400/10 max-h-24 overflow-y-auto no-scrollbar animate-pulse">
-                        {loyaltyRules.length === 0 ? (
-                          <><p>🎁 10 Pts = Sandwich</p><p>🎁 20 Pts = Small Pizza</p></>
-                        ) : (
-                          loyaltyRules.map(rule => (<p key={rule.id}>🎁 {rule.pointsCost} Pts = {rule.rewardName}</p>))
-                        )}
-                      </div>
-                    </div>
-
-                    {/* SHARE & REFERRAL POINTS CARD */}
-                    <div className="pt-2 flex flex-col gap-2.5">
-                      <div className="flex justify-between items-center">
-                        <span className="text-[10px] text-gray-400 font-black uppercase flex items-center gap-1">📤 Share Progress:</span>
-                        <span className="text-[10px] text-yellow-400 font-black tracking-widest bg-yellow-400/10 px-2.5 py-0.5 rounded-lg border border-yellow-400/20">{shareCount}/5 Shared</span>
-                      </div>
-                      <button 
-                        type="button" 
-                        onClick={handleShareApp} 
-                        className="w-full bg-green-600 hover:bg-green-700 text-white font-black py-3 rounded-xl text-xs uppercase flex items-center justify-center gap-2 border border-green-500/20 transition-all shadow-md active:scale-95"
-                      >
-                        <Share2 size={14}/>
-                        <span>Invite 5 Friends & Get +1 Point! 🎁</span>
-                      </button>
-                    </div>
-                    
-                    <div className="pt-2.5 border-t border-white/5 flex justify-between items-center mt-2">
-                      <span className="text-[10px] text-gray-400 font-bold uppercase">Gift points to friend:</span>
-                      <button type="button" onClick={() => setIsGiftModalOpen(true)} className="bg-yellow-400/10 hover:bg-yellow-400/20 text-yellow-400 border border-yellow-400/20 px-3 py-1.5 rounded-xl text-[9px] font-black uppercase">🎁 Gift Points</button>
-                    </div>
-
-                    <div className="space-y-2 pt-1 border-t border-white/5 mt-2">
-                      <p className="text-[10px] text-gray-400 font-black uppercase">Redeem Your Points Here:</p>
-                      <div className="grid grid-cols-2 gap-2 max-h-32 overflow-y-auto no-scrollbar pr-1 mt-1">
-                        {loyaltyRules.length === 0 ? (
+                    return (
+                      <div className="bg-white/[0.02] border border-white/5 rounded-3xl p-5 space-y-3">
+                        {subtotal < threshold ? (
                           <>
-                            <button type="button" onClick={() => handleCustomerRedeem("reward-sandwich", "🎁 FREE Loyalty Sandwich", 10)} disabled={customerPoints - cart.reduce((acc: number, i: any) => acc + (i.pointsCost || 0), 0) < 10} className={`py-2.5 px-3 rounded-xl text-[10px] font-black uppercase border ${(customerPoints - cart.reduce((acc: number, i: any) => acc + (i.pointsCost || 0), 0) >= 10) ? 'bg-yellow-400 text-black border-yellow-400' : 'bg-white/5 text-gray-500 border-white/5'}`}>🥪 Sandwich (10 P)</button>
-                            <button type="button" onClick={() => handleCustomerRedeem("reward-pizza", "🎁 FREE Loyalty Small Pizza", 20)} disabled={customerPoints - cart.reduce((acc: number, i: any) => acc + (i.pointsCost || 0), 0) < 20} className={`py-2.5 px-3 rounded-xl text-[10px] font-black uppercase border ${(customerPoints - cart.reduce((acc: number, i: any) => acc + (i.pointsCost || 0), 0) >= 20) ? 'bg-yellow-400 text-black border-yellow-400' : 'bg-white/5 text-gray-500 border-white/5'}`}>🍕 Pizza (20 P)</button>
+                            <div className="flex justify-between items-center text-[10px] font-black uppercase">
+                              <span className="text-orange-400">⚡ Free Delivery Progress</span>
+                              <span className="text-gray-400">Add ₹{needed} more</span>
+                            </div>
+                            <div className="w-full bg-white/5 h-2 rounded-full overflow-hidden">
+                              <div 
+                                className="bg-gradient-to-r from-orange-500 to-yellow-400 h-full rounded-full transition-all duration-500" 
+                                style={{ width: `${progress}%` }} 
+                              />
+                            </div>
                           </>
                         ) : (
-                          loyaltyRules.map(rule => {
-                            const inCartCost = cart.reduce((acc: number, i: any) => acc + (i.pointsCost || 0), 0);
-                            const isAffordable = (customerPoints - inCartCost) >= rule.pointsCost;
-                            return (
-                              <button key={rule.id} type="button" onClick={() => handleCustomerRedeem(`reward-${rule.id}`, `🎁 FREE ${rule.rewardName}`, rule.pointsCost)} disabled={!isAffordable} className={`py-2.5 px-3 rounded-xl text-[10px] font-black uppercase border truncate ${isAffordable ? 'bg-yellow-400 text-black border-yellow-400' : 'bg-white/5 text-gray-500 border-white/5'}`}>🎁 {rule.rewardName} ({rule.pointsCost} P)</button>
-                            );
-                          })
+                          <div className="flex items-center gap-2 text-[10px] font-black uppercase text-green-400 bg-green-500/10 border border-green-500/20 p-3 rounded-2xl justify-center">
+                            🎉 Congratulations! You got FREE Delivery
+                          </div>
                         )}
                       </div>
+                    );
+                  })()}
+
+                  {/* DYNAMIC DELIVERY AREA SELECTOR */}
+                  <div className="bg-white/[0.02] p-5 rounded-[2.2rem] border border-white/5 space-y-3">
+                    <div className="flex items-center gap-2 text-orange-500">
+                      <MapPin size={18}/>
+                      <h3 className="font-black uppercase text-xs">Select Delivery Area</h3>
+                    </div>
+                    <div className="grid grid-cols-3 gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setDeliveryArea('town')}
+                        className={`py-3 rounded-xl text-[9px] font-black uppercase border ${deliveryArea === 'town' ? 'bg-orange-500 text-black border-orange-500 shadow-md' : 'bg-white/5 text-gray-400 border-white/5'}`}
+                      >
+                        Town (Free &gt; ₹99)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setDeliveryArea('outer')}
+                        className={`py-3 rounded-xl text-[9px] font-black uppercase border ${deliveryArea === 'outer' ? 'bg-orange-500 text-black border-orange-500 shadow-md' : 'bg-white/5 text-gray-400 border-white/5'}`}
+                      >
+                        5 Km (Free &gt; ₹499)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setDeliveryArea('long')}
+                        className={`py-3 rounded-xl text-[9px] font-black uppercase border ${deliveryArea === 'long' ? 'bg-orange-500 text-black border-orange-500 shadow-md' : 'bg-white/5 text-gray-400 border-white/5'}`}
+                      >
+                        12 Km (Charge: ₹99)
+                      </button>
                     </div>
                   </div>
-                )}
 
-                {/* GREEN CUTLERY SELECTOR */}
-                <div className="flex items-center justify-between px-5 py-4 bg-green-500/5 border border-green-500/10 rounded-3xl">
-                  <div className="flex items-center gap-3">
-                    <span className="text-lg">🌳</span>
-                    <div className="text-left">
-                      <span className="text-[10px] font-black uppercase text-green-400 block">Don't send plastic spoons (Save Earth)</span>
-                      <p className="text-[8px] text-gray-400 font-semibold">Ghar par chammach hai? Plastic kachra bachayein!</p>
-                    </div>
+                  <div className="bg-orange-500/10 border border-orange-500/20 rounded-[2rem] p-5 space-y-2">
+                    <div className="flex items-center gap-2 text-orange-400 font-black text-xs uppercase"><Sparkles size={16}/> <span>Free Delivery Rules</span></div>
+                    <ul className="text-[11px] text-gray-400 font-bold space-y-1">
+                      <li>• मोहंद्रा टाउन: Free above ₹99 <span className="text-green-500">({getTotal() >= 99 ? 'Achieved' : 'Need ₹' + (99 - getTotal()) + ' more'})</span></li>
+                      <li>• 5 किलोमीटर: Free above ₹499</li>
+                      <li>• 12 किलोमीटर: Free above ₹999</li>
+                    </ul>
                   </div>
-                  <input 
-                    type="checkbox" 
-                    checked={noCutlery} 
-                    onChange={(e) => setNoCutlery(e.target.checked)} 
-                    className="w-5 h-5 accent-green-500 cursor-pointer" 
-                  />
-                </div>
 
-                <div className="bg-white/[0.02] border border-white/5 p-5 rounded-[2rem] space-y-3">
-                  <div className="flex items-center gap-2 text-orange-500 font-black text-xs uppercase"><Percent size={16}/> <span>Have a promo code?</span></div>
-                  <div className="flex gap-2">
-                    <input type="text" placeholder="e.g. WELCOME" value={enteredCoupon} onChange={(e) => setEnteredCoupon(e.target.value)} className="flex-1 bg-black/40 border border-white/10 rounded-xl p-3 text-xs text-white uppercase" />
-                    <button type="button" onClick={handleApplyCoupon} className="bg-orange-500 text-black font-black text-xs p-3 px-5 rounded-xl">APPLY</button>
-                  </div>
-                  {appliedCoupon && (
-                    <div className="flex justify-between items-center text-xs bg-green-500/10 border border-green-500/25 p-3 rounded-xl">
-                      <span className="text-green-400 font-bold uppercase">Code Applied: {appliedCoupon.code}</span>
-                      <button onClick={() => { setAppliedCoupon(null); setEnteredCoupon(""); }} className="text-red-400 font-bold">Remove</button>
+                  {customerDetails && (
+                    <div className="bg-yellow-400/5 border border-yellow-400/20 rounded-[2rem] p-5 space-y-3">
+                      <div className="flex items-center gap-2 text-yellow-400 font-black text-xs uppercase"><Gift size={14}/> <span>⭐ बम बम लॉयल्टी क्लब</span></div>
+                      
+                      <div className="flex justify-between items-center border-b border-white/5 pb-3">
+                        <div>
+                          <h4 className="text-3xl font-black text-white">{customerPoints} <span className="text-[10px] text-gray-500 font-bold uppercase">Points</span></h4>
+                          <p className="text-[9px] text-gray-400">Spend ₹100 = Get 1 Point!</p>
+                        </div>
+                        <div className="text-right text-[9px] text-yellow-400 font-black space-y-1 uppercase tracking-wider bg-yellow-400/5 p-3 rounded-xl border border-yellow-400/10 max-h-24 overflow-y-auto no-scrollbar">
+                          {loyaltyRules.length === 0 ? (
+                            <><p>🎁 10 Pts = Sandwich</p><p>🎁 20 Pts = Small Pizza</p></>
+                          ) : (
+                            loyaltyRules.map(rule => (<p key={rule.id}>🎁 {rule.pointsCost} Pts = {rule.rewardName}</p>))
+                          )}
+                        </div>
+                      </div>
+
+                      {/* SHARE & REFERRAL POINTS CARD */}
+                      <div className="pt-2 flex flex-col gap-2.5">
+                        <div className="flex justify-between items-center">
+                          <span className="text-[10px] text-gray-400 font-black uppercase flex items-center gap-1">📤 Share Progress:</span>
+                          <span className="text-[10px] text-yellow-400 font-black tracking-widest bg-yellow-400/10 px-2.5 py-0.5 rounded-lg border border-yellow-400/20">{shareCount}/5 Shared</span>
+                        </div>
+                        <button 
+                          type="button" 
+                          onClick={handleShareApp} 
+                          className="w-full bg-green-600 hover:bg-green-700 text-white font-black py-3 rounded-xl text-xs uppercase flex items-center justify-center gap-2 border border-green-500/20 transition-all shadow-md active:scale-95"
+                        >
+                          <Share2 size={14}/>
+                          <span>Invite 5 Friends & Get +1 Point! 🎁</span>
+                        </button>
+                      </div>
+                      
+                      <div className="pt-2.5 border-t border-white/5 flex justify-between items-center mt-2">
+                        <span className="text-[10px] text-gray-400 font-bold uppercase">Gift points to friend:</span>
+                        <button type="button" onClick={() => setIsGiftModalOpen(true)} className="bg-yellow-400/10 hover:bg-yellow-400/20 text-yellow-400 border border-yellow-400/20 px-3 py-1.5 rounded-xl text-[9px] font-black uppercase">🎁 Gift Points</button>
+                      </div>
+
+                      <div className="space-y-2 pt-1 border-t border-white/5 mt-2">
+                        <p className="text-[10px] text-gray-400 font-black uppercase">Redeem Your Points Here:</p>
+                        <div className="grid grid-cols-2 gap-2 max-h-32 overflow-y-auto no-scrollbar pr-1 mt-1">
+                          {loyaltyRules.length === 0 ? (
+                            <>
+                              <button type="button" onClick={() => handleCustomerRedeem("reward-sandwich", "🎁 FREE Loyalty Sandwich", 10)} disabled={customerPoints - cart.reduce((acc: number, i: any) => acc + (i.pointsCost || 0), 0) < 10} className={`py-2.5 px-3 rounded-xl text-[10px] font-black uppercase border ${(customerPoints - cart.reduce((acc: number, i: any) => acc + (i.pointsCost || 0), 0) >= 10) ? 'bg-yellow-400 text-black border-yellow-400' : 'bg-white/5 text-gray-500 border-white/5'}`}>🥪 Sandwich (10 P)</button>
+                              <button type="button" onClick={() => handleCustomerRedeem("reward-pizza", "🎁 FREE Loyalty Small Pizza", 20)} disabled={customerPoints - cart.reduce((acc: number, i: any) => acc + (i.pointsCost || 0), 0) < 20} className={`py-2.5 px-3 rounded-xl text-[10px] font-black uppercase border ${(customerPoints - cart.reduce((acc: number, i: any) => acc + (i.pointsCost || 0), 0) >= 20) ? 'bg-yellow-400 text-black border-yellow-400' : 'bg-white/5 text-gray-500 border-white/5'}`}>🍕 Pizza (20 P)</button>
+                            </>
+                          ) : (
+                            loyaltyRules.map(rule => {
+                              const inCartCost = cart.reduce((acc: number, i: any) => acc + (i.pointsCost || 0), 0);
+                              const isAffordable = (customerPoints - inCartCost) >= rule.pointsCost;
+                              return (
+                                <button key={rule.id} type="button" onClick={() => handleCustomerRedeem(`reward-${rule.id}`, `🎁 FREE ${rule.rewardName}`, rule.pointsCost)} disabled={!isAffordable} className={`py-2.5 px-3 rounded-xl text-[10px] font-black uppercase border truncate ${isAffordable ? 'bg-yellow-400 text-black border-yellow-400' : 'bg-white/5 text-gray-500 border-white/5'}`}>🎁 {rule.rewardName} ({rule.pointsCost} P)</button>
+                              );
+                            })
+                          )}
+                        </div>
+                      </div>
                     </div>
                   )}
-                </div>
 
-                {customerDetails ? (
-                  <div className="bg-white/[0.02] p-5 rounded-[2.2rem] border border-white/5 flex justify-between items-center">
-                    <div className="text-left">
-                      <p className="text-[9px] text-gray-500 font-black uppercase">Ordering As</p>
-                      <h4 className="font-black text-md text-orange-500">{customerDetails.name}</h4>
-                      <p className="text-xs text-gray-400">{customerDetails.phone}</p>
+                  {/* GREEN CUTLERY SELECTOR */}
+                  <div className="flex items-center justify-between px-5 py-4 bg-green-500/5 border border-green-500/10 rounded-3xl">
+                    <div className="flex items-center gap-3">
+                      <span className="text-lg">🌳</span>
+                      <div className="text-left">
+                        <span className="text-[10px] font-black uppercase text-green-400 block">Don't send plastic spoons (Save Earth)</span>
+                        <p className="text-[8px] text-gray-400 font-semibold">Ghar par chammach hai? Plastic kachra bachayein!</p>
+                      </div>
                     </div>
-                    <button onClick={() => { localStorage.removeItem('bb_cafe_customer'); setCustomerDetails(null); }} className="text-[10px] bg-red-500/10 text-red-500 px-3 py-2 rounded-xl font-black uppercase">Change</button>
+                    <input 
+                      type="checkbox" 
+                      checked={noCutlery} 
+                      onChange={(e) => setNoCutlery(e.target.checked)} 
+                      className="w-5 h-5 accent-green-500 cursor-pointer" 
+                    />
                   </div>
-                ) : (
-                  <button onClick={() => setIsLoginOpen(true)} className="w-full p-5 bg-orange-500/10 text-orange-500 border border-orange-500/20 rounded-[2.2rem] font-black text-sm uppercase">👤 Add Name & Phone To Order</button>
-                )}
 
-                <div className="bg-white/[0.02] p-5 rounded-[2.2rem] border border-white/5">
-                  <div className="flex items-center gap-2 mb-3 text-orange-500"><MapPin size={18}/> <h3 className="font-black uppercase text-xs">Delivery Address</h3></div>
-                  <textarea placeholder="Ghar ka address, Landmark ke saath..." value={address} onChange={(e) => setAddress(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-2xl p-4 text-xs font-semibold text-white resize-none h-24 outline-none" />
-                </div>
+                  <div className="bg-white/[0.02] border border-white/5 p-5 rounded-[2rem] space-y-3">
+                    <div className="flex items-center gap-2 text-orange-500 font-black text-xs uppercase"><Percent size={16}/> <span>Have a promo code?</span></div>
+                    <div className="flex gap-2">
+                      <input type="text" placeholder="e.g. WELCOME" value={enteredCoupon} onChange={(e) => setEnteredCoupon(e.target.value)} className="flex-1 bg-black/40 border border-white/10 rounded-xl p-3 text-xs text-white uppercase" />
+                      <button type="button" onClick={handleApplyCoupon} className="bg-orange-500 text-black font-black text-xs p-3 px-5 rounded-xl">APPLY</button>
+                    </div>
+                    {appliedCoupon && (
+                      <div className="flex justify-between items-center text-xs bg-green-500/10 border border-green-500/25 p-3 rounded-xl">
+                        <span className="text-green-400 font-bold uppercase">Code Applied: {appliedCoupon.code}</span>
+                        <button onClick={() => { setAppliedCoupon(null); setEnteredCoupon(""); }} className="text-red-400 font-bold">Remove</button>
+                      </div>
+                    )}
+                  </div>
 
-                <div className="bg-gradient-to-b from-orange-600 to-orange-700 p-8 rounded-[2.5rem] text-white">
-                  <div className="flex justify-between font-bold mb-2 text-sm"><span>Items Total</span> <span>₹{getTotal()}</span></div>
-                  {appliedCoupon && (
-                    <div className="flex justify-between font-bold mb-2 text-sm text-green-200"><span>Coupon Discount</span> <span>-₹{appliedCoupon.discountValue}</span></div>
+                  {customerDetails ? (
+                    <div className="bg-white/[0.02] p-5 rounded-[2.2rem] border border-white/5 flex justify-between items-center">
+                      <div className="text-left">
+                        <p className="text-[9px] text-gray-500 font-black uppercase">Ordering As</p>
+                        <h4 className="font-black text-md text-orange-500">{customerDetails.name}</h4>
+                        <p className="text-xs text-gray-400">{customerDetails.phone}</p>
+                      </div>
+                      <button onClick={() => { localStorage.removeItem('bb_cafe_customer'); setCustomerDetails(null); }} className="text-[10px] bg-red-500/10 text-red-500 px-3 py-2 rounded-xl font-black uppercase">Change</button>
+                    </div>
+                  ) : (
+                    <button onClick={() => setIsLoginOpen(true)} className="w-full p-5 bg-orange-500/10 text-orange-500 border border-orange-500/20 rounded-[2.2rem] font-black text-sm uppercase">👤 Add Name & Phone To Order</button>
                   )}
-                  {gameDiscount > 0 && (
-                    <div className="flex justify-between font-bold mb-2 text-sm text-green-200 animate-pulse"><span>10s Challenge Win</span> <span>-₹{gameDiscount}</span></div>
-                  )}
-                  <div className="flex justify-between font-bold mb-4 text-sm opacity-90"><span>Delivery Charge</span> <span>{deliveryArea === 'town' ? (getTotal() < 99 ? "₹20" : "FREE") : deliveryArea === 'outer' ? (getTotal() < 499 ? "₹50" : "FREE") : (getTotal() < 999 ? "₹99" : "FREE")}</span></div>
-                  <div className="h-px bg-white/20 mb-4" />
-                  <div className="flex justify-between font-black text-2xl"><span>To Pay</span> <span>₹{Math.max(0, getTotal() - ((appliedCoupon ? appliedCoupon.discountValue : 0) + gameDiscount)) + (deliveryArea === 'town' ? (getTotal() < 99 ? 20 : 0) : deliveryArea === 'outer' ? (getTotal() < 499 ? 50 : 0) : (getTotal() < 999 ? 99 : 0))}</span></div>
-                </div>
 
-                <button onClick={sendWhatsAppOrder} type="button" className="w-full bg-green-600 hover:bg-green-700 p-6 rounded-[2.5rem] font-black text-md text-white flex items-center justify-center gap-3 shadow-md">ORDER ON WHATSAPP</button>
-              </div>
+                  <div className="bg-white/[0.02] p-5 rounded-[2.2rem] border border-white/5">
+                    <div className="flex items-center gap-2 mb-3 text-orange-500"><MapPin size={18}/> <h3 className="font-black uppercase text-xs">Delivery Address</h3></div>
+                    <textarea placeholder="Ghar ka address, Landmark ke saath..." value={address} onChange={(e) => setAddress(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-2xl p-4 text-xs font-semibold text-white resize-none h-24 outline-none" />
+                  </div>
+
+                  <div className="bg-gradient-to-b from-orange-600 to-orange-700 p-8 rounded-[2.5rem] text-white">
+                    <div className="flex justify-between font-bold mb-2 text-sm"><span>Items Total</span> <span>₹{getTotal()}</span></div>
+                    {appliedCoupon && (
+                      <div className="flex justify-between font-bold mb-2 text-sm text-green-200"><span>Coupon Discount</span> <span>-₹{appliedCoupon.discountValue}</span></div>
+                    )}
+                    {gameDiscount > 0 && (
+                      <div className="flex justify-between font-bold mb-2 text-sm text-green-200 animate-pulse"><span>10s Challenge Win</span> <span>-₹{gameDiscount}</span></div>
+                    )}
+                    <div className="flex justify-between font-bold mb-4 text-sm opacity-90"><span>Delivery Charge</span> <span>{deliveryArea === 'town' ? (getTotal() < 99 ? "₹20" : "FREE") : deliveryArea === 'outer' ? (getTotal() < 499 ? "₹50" : "FREE") : (getTotal() < 999 ? "₹99" : "FREE")}</span></div>
+                    <div className="h-px bg-white/20 mb-4" />
+                    <div className="flex justify-between font-black text-2xl"><span>To Pay</span> <span>₹{Math.max(0, getTotal() - ((appliedCoupon ? appliedCoupon.discountValue : 0) + gameDiscount)) + (deliveryArea === 'town' ? (getTotal() < 99 ? 20 : 0) : deliveryArea === 'outer' ? (getTotal() < 499 ? 50 : 0) : (getTotal() < 999 ? 99 : 0))}</span></div>
+                  </div>
+
+                  <button onClick={sendWhatsAppOrder} type="button" className="w-full bg-green-600 hover:bg-green-700 p-6 rounded-[2.5rem] font-black text-md text-white flex items-center justify-center gap-3">ORDER ON WHATSAPP</button>
+                </div>
+              )}
             </motion.div>
           </div>
         )}
