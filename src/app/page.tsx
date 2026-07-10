@@ -91,8 +91,6 @@ const getAddonPrice = (addonKey: string, size: string) => {
   return 0;
 };
 
-const CONFETTI_PARTICLES = Array.from({ length: 25 });
-
 export default function BbCafeHome() {
   const store = useCartStore() as any;
   const cart = store?.items || [];
@@ -162,15 +160,6 @@ export default function BbCafeHome() {
   const [noCutlery, setNoCutlery] = useState(false);
   const [deliveryArea, setDeliveryArea] = useState<'town' | 'outer' | 'long'>('town');
   const [isPinned, setIsPinned] = useState(false); 
-
-  // --- STOPWATCH GAME STATES ---
-  const [isGameOpen, setIsGameOpen] = useState(false);
-  const [isRulesOpen, setIsRulesOpen] = useState(false); // Declared Rules State
-  const [gameTime, setGameTime] = useState(0); 
-  const [isGameRunning, setIsGameRunning] = useState(false);
-  const [gameResult, setGameResult] = useState<'win' | 'lose' | null>(null);
-  const [hasPlayedGame, setHasPlayedGame] = useState(false); 
-  const [gameDiscount, setGameDiscount] = useState(0); 
 
   const formatBillNumber = (num: number) => String(num).padStart(4, '0');
 
@@ -285,21 +274,6 @@ export default function BbCafeHome() {
     return () => clearInterval(timer);
   }, []);
 
-  // --- Stopwatch Game HIGH-PRECISION OPTIMIZED Timer Loop (No Mobile Lag) ---
-  useEffect(() => {
-    let intervalId: any;
-    if (isGameRunning) {
-      const startTime = Date.now();
-      intervalId = setInterval(() => {
-        const elapsed = Date.now() - startTime;
-        setGameTime(Math.floor(elapsed / 10)); // Converts exact ms to centiseconds (giga light on React thread)
-      }, 30); // 30ms is extremely smooth but uses 70% less CPU than 10ms!
-    } else {
-      clearInterval(intervalId);
-    }
-    return () => clearInterval(intervalId);
-  }, [isGameRunning]);
-
   // --- Voice Search Function ---
   const handleVoiceSearch = () => {
     if (typeof window !== 'undefined' && ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
@@ -392,16 +366,6 @@ export default function BbCafeHome() {
     if (!enteredCoupon) return toast.error("Please enter a coupon code");
     const cleanCode = enteredCoupon.trim().toUpperCase();
 
-    // 10-Sec Challenge Win coupon validator!
-    if (cleanCode === 'BUMBUM10SEC') {
-      setAppliedCoupon({
-        code: 'BUMBUM10SEC',
-        discountValue: 500
-      });
-      toast.success("🎉 10-Sec Challenge Coupon Applied! ₹500 OFF!");
-      return;
-    }
-
     const found = coupons.find(c => String(c.code).toLowerCase() === enteredCoupon.trim().toLowerCase());
     if (found) {
       setAppliedCoupon(found);
@@ -460,8 +424,8 @@ export default function BbCafeHome() {
 
     if (!friendPhoneRaw || friendPhoneRaw.length < 10) return toast.error("कृपया सही 10-digit mobile नंबर डालें!");
     if (senderPhoneRaw === friendPhoneRaw) return toast.error("आप खुद को  पॉइंट्स गिफ्ट नहीं कर सकते!");
-    if (isNaN(pointsToGift) || pointsToGift <= 0) return toast.error("कृपया सही पॉइंट्स की संख्या डालें!");
-    if (customerPoints < pointsToGift) return toast.error(`आपके पास पर्याप्त पॉइंट्स नहीं हैं! वर्तमान पॉइंट्स: ${customerPoints}`);
+    if (isNaN(pointsToGift) || pointsToGift <= 0) return toast.error("कृपया सही  पॉइंट्स की संख्या डालें!");
+    if (customerPoints < pointsToGift) return toast.error(`आपके पास पर्याप्त  पॉइंट्स नहीं हैं! वर्तमान  पॉइंट्स: ${customerPoints}`);
 
     setIsGiftingLoading(true);
     const senderDocRef = doc(db, "customer_points", senderPhoneRaw);
@@ -529,7 +493,7 @@ export default function BbCafeHome() {
     }
 
     const couponDiscount = appliedCoupon ? Number(appliedCoupon.discountValue) : 0;
-    const finalTotal = Math.max(0, subtotal - (couponDiscount + gameDiscount)) + deliveryCharge;
+    const finalTotal = Math.max(0, subtotal - couponDiscount) + deliveryCharge;
     
     const pointsEarned = Math.floor(finalTotal / 100);
     const totalPointsCost = cart.reduce((acc: number, i: any) => acc + (i.pointsCost || 0), 0);
@@ -537,7 +501,7 @@ export default function BbCafeHome() {
     try {
       await addDoc(collection(db, "orders"), {
         billNumber, tokenNumber, customerName: customerDetails.name, customerPhone: customerDetails.phone,
-        address, items: cart, subtotal, discount: couponDiscount + gameDiscount, total: finalTotal, timestamp: new Date(), status: 'pending'
+        address, items: cart, subtotal, discount: couponDiscount, total: finalTotal, timestamp: new Date(), status: 'pending'
       });
       if (pointsEarned > 0 || totalPointsCost > 0) {
         await setDoc(doc(db, "customer_points", customerDetails.phone.replace("+91", "")), {
@@ -549,7 +513,7 @@ export default function BbCafeHome() {
     let itemsText = "";
     cart.forEach((i: any) => itemsText += `• ${i.name || "Item"} x${i.quantity || 1} - ₹${(i.price || 0) * (i.quantity || 1)}\n`);
     
-    const msg = `🔥 *BUM BUM CAFE - NEW ORDER*\n\n*Bill No:* #${formattedBillStr}\n*Token No:* #${tokenNumber}\n*Customer:* ${customerDetails.name}\n*Phone:* ${customerDetails.phone}\n*Address:* ${address}\n*Cutlery Needed:* ${noCutlery ? 'No 🌳' : 'Yes'}\n\n*ITEMS:*\n${itemsText}\n*Subtotal:* ₹${subtotal}\n*Discount:* -₹${couponDiscount + gameDiscount}\n*Delivery:* ₹${deliveryCharge}\n*TOTAL BILL: ₹${finalTotal}*\n\n*Points Earned:* +${pointsEarned} Pts\n${totalPointsCost > 0 ? `*Points Redeemed:* -${totalPointsCost} Pts\n` : ''}\n_Confirm order by replying 'YES'_`;
+    const msg = `🔥 *BUM BUM CAFE - NEW ORDER*\n\n*Bill No:* #${formattedBillStr}\n*Token No:* #${tokenNumber}\n*Customer:* ${customerDetails.name}\n*Phone:* ${customerDetails.phone}\n*Address:* ${address}\n*Cutlery Needed:* ${noCutlery ? 'No 🌳' : 'Yes'}\n\n*ITEMS:*\n${itemsText}\n*Subtotal:* ₹${subtotal}\n*Discount:* -₹${couponDiscount}\n*Delivery:* ₹${deliveryCharge}\n*TOTAL BILL: ₹${finalTotal}*\n\n*Points Earned:* +${pointsEarned} Pts\n${totalPointsCost > 0 ? `*Points Redeemed:* -${totalPointsCost} Pts\n` : ''}\n_Confirm order by replying 'YES'_`;
     
     // --- CALLMEBOT MULTIPLE DELIVERY BOYS TRIGGER (BACKGROUND) ---
     const activeRiders = deliveryBoys.filter(b => b.isActive === true);
@@ -563,13 +527,6 @@ export default function BbCafeHome() {
     });
 
     window.open(`https://wa.me/919714293759?text=${encodeURIComponent(msg)}`, '_blank');
-    
-    // Reset Game States after checkout
-    setHasPlayedGame(false);
-    setGameDiscount(0);
-    setGameResult(null);
-    setGameTime(0);
-
     clearCart(); setAppliedCoupon(null); setEnteredCoupon(""); setIsCartOpen(false);
     toast.success("Redirecting to WhatsApp!");
   };
@@ -627,10 +584,6 @@ export default function BbCafeHome() {
   };
 
   const handleAddonToggle = (key: string) => {
-    if (hasPlayedGame) {
-      toast.error("गेम खेलने के बाद कार्ट में बदलाव नहीं किया जा सकता! 🛑");
-      return;
-    }
     setSelectedAddons(prev => ({
       ...prev,
       [key]: !prev[key]
@@ -713,12 +666,6 @@ export default function BbCafeHome() {
     }
   };
 
-  const formatGameTimeDisplay = (cs: number) => {
-    const ss = Math.floor(cs / 100);
-    const cc = cs % 100;
-    return `${String(ss).padStart(2, '0')}.${String(cc).padStart(2, '0')}`;
-  };
-
   if (!mounted) return null;
 
   return (
@@ -778,14 +725,6 @@ export default function BbCafeHome() {
         REVIEWS
       </button>
 
-      <button 
-        onClick={() => setIsRulesOpen(true)} 
-        className="fixed left-0 top-[440px] -translate-y-1/2 bg-gradient-to-r from-red-500 to-orange-500 text-white py-4 px-2.5 rounded-r-2xl z-[45] text-[9px] font-black tracking-widest uppercase flex flex-col items-center gap-1 shadow-xl border-r border-y border-white/10 animate-bounce"
-        style={{ writingMode: 'vertical-lr', animationDuration: '4s' }}
-      >
-        GAME
-      </button>
-
       <main className="pt-4 px-4 max-w-lg mx-auto space-y-6">
         
         {/* --- BEM BEM DYNAMIC GREETING CARD --- */}
@@ -802,11 +741,8 @@ export default function BbCafeHome() {
           </motion.div>
         )}
 
-        {/* PROMO BANNER (Now Clickable to Open 10S Challenge Rules!) */}
-        <div 
-          onClick={() => setIsRulesOpen(true)}
-          className="w-full h-44 rounded-3xl overflow-hidden relative border border-white/5 bg-white/[0.02] cursor-pointer"
-        >
+        {/* PROMO BANNER (Fallback default) */}
+        <div className="w-full h-44 rounded-3xl overflow-hidden relative border border-white/5 bg-white/[0.02] cursor-pointer">
           {(banners.length === 0 || bannerError) ? (
             <div className="w-full h-full bg-gradient-to-r from-orange-600/35 to-[#b33600]/35 flex flex-col justify-center p-6 space-y-1">
               <span className="text-[9px] font-black uppercase text-orange-400 bg-orange-500/10 border border-orange-500/20 px-2 py-0.5 rounded-full w-max">Special Offer</span>
@@ -818,7 +754,7 @@ export default function BbCafeHome() {
           )}
         </div>
 
-        {/* ZOMATO-STYLE CATEGORY SLIDER */}
+        {/* ZOMATO-STYLE CATEGORY HORIZONTAL SLIDER */}
         <div className="space-y-4 py-2">
           <p className="text-[9px] font-black uppercase tracking-widest text-orange-500">Inspiration for your first order</p>
           <div className="flex gap-4 overflow-x-auto no-scrollbar py-2">
@@ -883,10 +819,6 @@ export default function BbCafeHome() {
                     {storeOpen ? (
                       <button 
                         onClick={() => {
-                          if (hasPlayedGame) {
-                            toast.error("गेम खेलने के बाद कार्ट में बदलाव नहीं किया जा सकता! 🛑");
-                            return;
-                          }
                           item.variants ? setSelectedProduct(item) : addItem(item);
                         }} 
                         className="px-5 py-2.5 bg-orange-500/10 text-orange-400 border border-orange-500/30 hover:bg-orange-500 hover:text-white rounded-xl font-black text-xs active:scale-95 transition-all uppercase shadow-md"
@@ -998,240 +930,122 @@ export default function BbCafeHome() {
         )}
       </AnimatePresence>
 
-      {/* --- RETRO STOPWATCH GAME MODAL (10S CHALLENGE) --- */}
+      {/* --- GAMIFIED SOCIAL MEDIA MODAL --- */}
       <AnimatePresence>
-        {isGameOpen && (
-          <div 
-            onClick={(e) => {
-              if (e.target === e.currentTarget) {
-                setIsGameRunning(false);
-                setIsGameOpen(false);
-                setGameResult(null);
-                setGameTime(0);
-              }
-            }}
-            className="fixed inset-0 bg-black/95 z-[270] flex items-center justify-center p-4 cursor-pointer"
-          >
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0 }} 
-              animate={{ scale: 1, opacity: 1 }} 
-              exit={{ scale: 0.9, opacity: 0 }} 
-              onClick={(e) => e.stopPropagation()} 
-              className="bg-[#16161a] w-full max-w-md p-8 rounded-[3rem] border border-yellow-500/30 text-center space-y-6 relative overflow-hidden shadow-[0_0_30px_rgba(234,179,8,0.15)] cursor-default"
-            >
-              <div className="absolute -top-10 -left-10 w-32 h-32 bg-yellow-500/10 blur-3xl rounded-full" />
-              <div className="absolute -bottom-10 -right-10 w-32 h-32 bg-orange-500/10 blur-3xl rounded-full" />
-              
-              {/* SHINY CONFETTI ATISBAJI CELEBRATION PARTICLES ON WIN */}
-              {gameResult === 'win' && (
-                <div className="absolute inset-0 z-10 pointer-events-none overflow-hidden">
-                  {CONFETTI_PARTICLES.map((_, idx) => {
-                    const randomX = Math.random() * 300 - 150;
-                    const randomY = Math.random() * -300 - 100;
-                    const emojiList = ["🎉", "✨", "🥳", "🍕", "🧁"];
-                    const randomEmoji = emojiList[idx % emojiList.length];
-                    return (
-                      <motion.div
-                        key={idx}
-                        initial={{ opacity: 1, x: 0, y: 100, scale: 0.8 }}
-                        animate={{ opacity: 0, x: randomX, y: randomY, scale: 1.2, rotate: 360 }}
-                        transition={{ duration: 2.5, ease: "easeOut" }}
-                        className="absolute bottom-10 left-1/2 text-2xl"
-                      >
-                        {randomEmoji}
-                      </motion.div>
-                    );
-                  })}
-                </div>
-              )}
-
+        {isSocialsOpen && (
+          <div className="fixed inset-0 bg-black/95 z-[250] flex items-center justify-center p-6">
+            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="bg-[#111] w-full max-w-md p-8 rounded-[3rem] border border-white/10 text-center space-y-6 relative overflow-hidden">
+              <div className="absolute -top-10 -left-10 w-32 h-32 bg-orange-500/10 blur-3xl rounded-full" />
               <div>
-                <h3 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-yellow-500 italic uppercase">10S CHALLENGE</h3>
-                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mt-1">बम बम कैफ़े -  मोहंद्रा विशेष</p>
+                <h3 className="text-2xl font-black text-orange-500 uppercase italic">Connect & Earn Points</h3>
+                <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">हर प्लेटफार्म पर फॉलो/सब्सक्राइब करने का +1 पॉइंट पाएं!</p>
               </div>
-
-              {/* RETRO BEZEL STOPWATCH DIGITAL DISPLAY */}
-              <div className="w-60 h-64 rounded-full border-[10px] border-yellow-500/20 bg-black flex flex-col justify-center items-center mx-auto shadow-2xl relative shadow-yellow-500/5">
-                <div className="absolute top-6 text-[8px] font-black text-red-500 tracking-widest">TARGET 10.00s</div>
+              <div className="space-y-3 text-left max-h-[22rem] overflow-y-auto no-scrollbar pr-1">
                 
-                <h1 className="text-5xl font-mono font-black text-yellow-300 tracking-tighter drop-shadow-[0_0_10px_rgba(253,224,71,0.3)]">
-                  {formatGameTimeDisplay(gameTime)}
-                </h1>
-                
-                <p className="text-[10px] text-gray-500 font-bold uppercase mt-1 tracking-widest">Seconds</p>
-                <div className="absolute bottom-6 w-2.5 h-2.5 rounded-full bg-red-600 animate-pulse" />
-              </div>
-
-              {/* GAME RESULTS DISPLAY */}
-              {gameResult === 'win' && (
-                <div className="p-4 bg-green-500/10 border border-green-500/25 rounded-2xl text-center space-y-1 animate-pulse z-20 relative">
-                  <p className="text-xs font-black text-green-400 uppercase">🎉 विजेता! आपने कर दिखाया!</p>
-                  <p className="text-[10px] text-gray-300">आपका यह आर्डर (अधिकतम ₹500 तक) बिल्कुल मुफ्त (Free) हो गया है! 🎁</p>
-                </div>
-              )}
-
-              {gameResult === 'lose' && (
-                <div className="p-4 bg-red-500/10 border border-red-500/25 rounded-2xl text-center space-y-1">
-                  <p className="text-xs font-black text-red-400 uppercase">❌ अरेरे! चूक गए!</p>
-                  <p className="text-[9px] text-gray-300">आपका टाइम: <span className="font-bold text-white font-mono">{formatGameTimeDisplay(gameTime)}</span> रहा। ठीक 10.00 पर रोकें!</p>
-                </div>
-              )}
-
-              {hasPlayedGame && gameResult !== 'win' && (
-                <p className="text-[9px] text-gray-500 font-semibold uppercase italic">⚠️ इस आर्डर का चांस पूरा हो गया है। नया आर्डर बनाकर दोबारा खेलें!</p>
-              )}
-
-              {/* CONTROLS */}
-              <div className="flex gap-3">
-                {!isGameRunning ? (
-                  <button 
-                    onClick={handleStartGame} 
-                    disabled={hasPlayedGame}
-                    className={`flex-1 font-black p-4.5 rounded-2xl text-xs uppercase transition-all ${hasPlayedGame ? 'bg-white/5 text-gray-600 cursor-not-allowed border border-white/5' : 'bg-green-500 hover:bg-green-600 text-black shadow-lg shadow-green-500/15'}`}
-                  >
-                    🚀 START
-                  </button>
-                ) : (
-                  <button 
-                    onClick={handleStopGame} 
-                    className="flex-1 bg-red-500 hover:bg-red-600 text-white font-black p-4.5 rounded-2xl text-xs uppercase animate-pulse transition-all"
-                  >
-                    🛑 STOP
-                  </button>
-                )}
-                {/* 100% RELIABLE CLOSE BUTTON WHICH FORCES TIMER TO RESET & CANCEL BG RENDER */}
+                {/* WHATSAPP MESSAGE */}
                 <button 
-                  onClick={() => { setIsGameRunning(false); setIsGameOpen(false); setGameResult(null); setGameTime(0); }} 
-                  className="bg-white/5 hover:bg-white/10 text-gray-400 font-bold p-4.5 rounded-2xl text-xs uppercase"
+                  onClick={() => handleSocialClick('whatsapp_msg', 'https://wa.me/919714293759')}
+                  className="w-full flex items-center justify-between bg-green-500/10 border border-green-500/20 p-3.5 rounded-2xl active:scale-[0.98] transition-all text-left"
                 >
-                  CLOSE
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* --- 10S CHALLENGE RULES POSTER MODAL (From Sidebar or Click) (With Backdrop Exit) --- */}
-      <AnimatePresence>
-        {isRulesOpen && (
-          <div 
-            onClick={(e) => {
-              if (e.target === e.currentTarget) {
-                setIsRulesOpen(false);
-              }
-            }}
-            className="fixed inset-0 bg-black/95 z-[270] flex items-center justify-center p-6 cursor-pointer"
-          >
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0 }} 
-              animate={{ scale: 1, opacity: 1 }} 
-              exit={{ scale: 0.9, opacity: 0 }} 
-              onClick={(e) => e.stopPropagation()}
-              className="bg-[#1c1d22] w-full max-w-md p-8 rounded-[3rem] border border-yellow-500/30 text-left space-y-5 relative overflow-hidden shadow-[0_0_40px_rgba(234,179,8,0.2)]"
-            >
-              <div className="text-center pb-2 border-b border-white/5">
-                <h3 className="text-2xl font-black text-yellow-300 italic uppercase">10 SECOND CHALLENGE</h3>
-                <p className="text-[10px] text-gray-500 font-black uppercase tracking-wider">नियम और शर्तें (Rules & Conditions)</p>
-              </div>
-
-              <div className="space-y-3 text-xs text-gray-300 max-h-[50vh] overflow-y-auto pr-1 no-scrollbar font-medium">
-                <p className="text-yellow-400 font-bold">⏱️ Stopwatch को बिल्कुल 10.00s पर रोकें और ₹500 तक का FREE आर्डर जीतें!</p>
-                <div className="h-px bg-white/5 my-2" />
-                <p>1. **चैलेंज:** ग्राहक को स्टॉपवॉच (Stopwatch) को ठीक 10.00 सेकंड पर रोकना होगा।</p>
-                <p>2. **सटीकता:** यदि समय 10.00 सेकंड से थोड़ा भी कम या ज्यादा होता है, तो ऑफर मान्य नहीं होगा।</p>
-                <p>3. **अवसर:** एक आर्डर पर केवल **एक ही बार** मौका दिया जाएगा।</p>
-                <p>4. **पात्रता:** इस चैलेंज में बच्चे और बड़े, दोनों भाग ले सकते हैं।</p>
-                <p>5. **पुरस्कार:** अधिकतम ₹500 तक का आर्डर बिल्कुल मुफ्त (Free) होगा।</p>
-                <p>6. **वैधता:** मुफ्त आर्डर उसी बिल और उसी विजिट पर लागू होगा।</p>
-                <p>7. **समय सीमा:** यह ऑफर केवल सीमित समय के लिए उपलब्ध है।</p>
-                <p>8. **अंतिम निर्णय:** किसी भी विवाद की स्थिति में मैनेजमेंट का निर्णय ही अंतिम होगा।</p>
-              </div>
-
-              <div className="flex gap-3 pt-2">
-                <button 
-                  onClick={() => { setIsRulesOpen(false); setIsCartOpen(true); }} 
-                  className="flex-1 bg-yellow-400 hover:bg-yellow-500 text-black font-black py-4 rounded-2xl text-xs uppercase active:scale-95 transition-all shadow-md"
-                >
-                  🛒 Go to Cart & Play!
-                </button>
-                <button 
-                  onClick={() => setIsRulesOpen(false)} 
-                  className="bg-white/5 hover:bg-white/10 text-gray-400 font-bold px-6 rounded-2xl text-xs uppercase"
-                >
-                  CLOSE
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* --- AI CHAT INTERFACE MODAL --- */}
-      <AnimatePresence>
-        {isAiOpen && (
-          <div className="fixed inset-0 bg-black/95 z-[260] flex items-center justify-center p-4">
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0 }} 
-              animate={{ scale: 1, opacity: 1 }} 
-              exit={{ scale: 0.9, opacity: 0 }} 
-              className="bg-[#111] w-full max-w-md h-[80vh] rounded-[3rem] border border-white/10 flex flex-col overflow-hidden relative"
-            >
-              {/* Header */}
-              <div className="p-6 border-b border-white/5 flex justify-between items-center bg-gradient-to-r from-purple-600/10 to-pink-600/10">
-                <div className="flex items-center gap-3">
-                  <div className="relative">
-                    <img 
-                      src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150&q=80" 
-                      className="w-10 h-10 rounded-full object-cover border border-purple-500"
-                      alt="Riya Didi"
-                    />
-                    <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 border-2 border-[#111] rounded-full" />
-                  </div>
-                  <div className="text-left">
-                    <h3 className="font-black text-sm text-purple-300 uppercase italic">बम बम दीदी (रिया) 💁‍♀️</h3>
-                    <p className="text-[8px] text-green-400 font-black uppercase">Online & Ready to Help</p>
-                  </div>
-                </div>
-                <button onClick={() => { setIsAiOpen(false); }} className="p-2.5 bg-white/5 hover:bg-white/10 rounded-full text-white"><X size={18} /></button>
-              </div>
-
-              {/* Chat Messages */}
-              <div className="flex-1 p-6 overflow-y-auto space-y-4 no-scrollbar">
-                {aiMessages.map((msg, idx) => (
-                  <div key={idx} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-                    <div className={`p-4 rounded-2xl max-w-[85%] text-xs font-semibold leading-relaxed ${
-                      msg.role === "user" 
-                        ? 'bg-purple-600 text-white rounded-br-none' 
-                        : 'bg-white/5 text-gray-200 border border-white/5 rounded-bl-none'
-                    }`}>
-                      {msg.text}
+                  <div className="flex items-center gap-4">
+                    <span className="text-2xl">🟢</span>
+                    <div>
+                      <h4 className="text-xs font-black text-white">WhatsApp Message</h4>
+                      <p className="text-[8px] text-gray-400 font-bold uppercase mt-0.5">Contact Us: 9714293759</p>
                     </div>
                   </div>
-                ))}
-                {aiLoading && (
-                  <div className="flex justify-start">
-                    <div className="p-4 rounded-2xl bg-white/5 border border-white/5 text-xs text-gray-400 flex items-center gap-2">
-                      <Loader2 className="animate-spin" size={14} /> AI logic thinking...
+                  <span className={`text-[9px] font-black uppercase px-2.5 py-1 rounded-lg ${getClaimStatus('whatsapp_msg').startsWith('✅') ? 'bg-green-500/20 text-green-400' : 'bg-yellow-400 text-black'}`}>
+                    {getClaimStatus('whatsapp_msg')}
+                  </span>
+                </button>
+
+                {/* WHATSAPP CHANNEL */}
+                <button 
+                  onClick={() => handleSocialClick('whatsapp_channel', 'https://whatsapp.com/channel/0029VaLhggoGE56natoQI43y')}
+                  className="w-full flex items-center justify-between bg-emerald-500/10 border border-emerald-500/20 p-3.5 rounded-2xl active:scale-[0.98] transition-all text-left"
+                >
+                  <div className="flex items-center gap-4">
+                    <span className="text-2xl">📢</span>
+                    <div>
+                      <h4 className="text-xs font-black text-white">WhatsApp Channel</h4>
+                      <p className="text-[8px] text-gray-400 font-bold uppercase mt-0.5">Subscribe for Offers</p>
                     </div>
                   </div>
-                )}
-              </div>
-
-              {/* Chat Input */}
-              <form onSubmit={handleSendAiMessage} className="p-5 border-t border-white/5 bg-black/40 flex gap-2">
-                <input 
-                  type="text" 
-                  placeholder="Ask me anything (e.g. ₹150 me kya milega?)..." 
-                  value={aiInput} 
-                  onChange={(e) => setAiInput(e.target.value)} 
-                  disabled={aiLoading}
-                  className="flex-1 bg-white/5 border border-white/10 rounded-xl p-3.5 text-xs text-white outline-none focus:border-purple-500" 
-                />
-                <button type="submit" disabled={aiLoading} className="bg-purple-600 text-white font-black px-5 rounded-xl text-xs uppercase">
-                  Send
+                  <span className={`text-[9px] font-black uppercase px-2.5 py-1 rounded-lg ${getClaimStatus('whatsapp_channel').startsWith('✅') ? 'bg-green-500/20 text-green-400' : 'bg-yellow-400 text-black'}`}>
+                    {getClaimStatus('whatsapp_channel')}
+                  </span>
                 </button>
-              </form>
+
+                {/* YOUTUBE */}
+                <button 
+                  onClick={() => handleSocialClick('youtube', 'https://www.youtube.com/@bbcafe.i')}
+                  className="w-full flex items-center justify-between bg-red-600/10 border border-red-600/20 p-3.5 rounded-2xl active:scale-[0.98] transition-all text-left"
+                >
+                  <div className="flex items-center gap-4">
+                    <span className="text-2xl">🔴</span>
+                    <div>
+                      <h4 className="text-xs font-black text-white">YouTube Channel</h4>
+                      <p className="text-[8px] text-gray-400 font-bold uppercase mt-0.5">Subscribe @bbcafe.i</p>
+                    </div>
+                  </div>
+                  <span className={`text-[9px] font-black uppercase px-2.5 py-1 rounded-lg ${getClaimStatus('youtube').startsWith('✅') ? 'bg-green-500/20 text-green-400' : 'bg-yellow-400 text-black'}`}>
+                    {getClaimStatus('youtube')}
+                  </span>
+                </button>
+
+                {/* INSTAGRAM */}
+                <button 
+                  onClick={() => handleSocialClick('instagram', 'https://www.instagram.com/bbcafe.in/')}
+                  className="w-full flex items-center justify-between bg-pink-500/10 border border-pink-500/20 p-3.5 rounded-2xl active:scale-[0.98] transition-all text-left"
+                >
+                  <div className="flex items-center gap-4">
+                    <span className="text-2xl">📸</span>
+                    <div>
+                      <h4 className="text-xs font-black text-white">Instagram</h4>
+                      <p className="text-[8px] text-gray-400 font-bold uppercase mt-0.5">Follow @bbcafe.in</p>
+                    </div>
+                  </div>
+                  <span className={`text-[9px] font-black uppercase px-2.5 py-1 rounded-lg ${getClaimStatus('instagram').startsWith('✅') ? 'bg-green-500/20 text-green-400' : 'bg-yellow-400 text-black'}`}>
+                    {getClaimStatus('instagram')}
+                  </span>
+                </button>
+
+                {/* FACEBOOK */}
+                <button 
+                  onClick={() => handleSocialClick('facebook', 'https://www.facebook.com/bbcafe.in/')}
+                  className="w-full flex items-center justify-between bg-blue-600/10 border border-blue-600/20 p-3.5 rounded-2xl active:scale-[0.98] transition-all text-left"
+                >
+                  <div className="flex items-center gap-4">
+                    <span className="text-2xl">🔵</span>
+                    <div>
+                      <h4 className="text-xs font-black text-white">Facebook</h4>
+                      <p className="text-[8px] text-gray-400 font-bold uppercase mt-0.5">Like @bbcafe.in</p>
+                    </div>
+                  </div>
+                  <span className={`text-[9px] font-black uppercase px-2.5 py-1 rounded-lg ${getClaimStatus('facebook').startsWith('✅') ? 'bg-green-500/20 text-green-400' : 'bg-yellow-400 text-black'}`}>
+                    {getClaimStatus('facebook')}
+                  </span>
+                </button>
+
+                {/* SNAPCHAT */}
+                <button 
+                  onClick={() => handleSocialClick('snapchat', 'https://www.snapchat.com/add/bbcafe.in')}
+                  className="w-full flex items-center justify-between bg-yellow-400/10 border border-yellow-400/20 p-3.5 rounded-2xl active:scale-[0.98] transition-all text-left"
+                >
+                  <div className="flex items-center gap-4">
+                    <span className="text-2xl">🟡</span>
+                    <div>
+                      <h4 className="text-xs font-black text-white">Snapchat</h4>
+                      <p className="text-[8px] text-gray-400 font-bold uppercase mt-0.5">Add bbcafe.in</p>
+                    </div>
+                  </div>
+                  <span className={`text-[9px] font-black uppercase px-2.5 py-1 rounded-lg ${getClaimStatus('snapchat').startsWith('✅') ? 'bg-green-500/20 text-green-400' : 'bg-yellow-400 text-black'}`}>
+                    {getClaimStatus('snapchat')}
+                  </span>
+                </button>
+
+              </div>
+              <button type="button" onClick={() => setIsSocialsOpen(false)} className="w-full bg-orange-500 text-black font-black p-4 rounded-xl text-xs uppercase">CLOSE</button>
             </motion.div>
           </div>
         )}
@@ -1321,13 +1135,7 @@ export default function BbCafeHome() {
                         <button
                           type="button"
                           key={addonKey}
-                          onClick={() => {
-                            if (hasPlayedGame) {
-                              toast.error("गेम खेलने के बाद कार्ट में बदलाव नहीं किया जा सकता! 🛑");
-                              return;
-                            }
-                            handleAddonToggle(addonKey);
-                          }}
+                          onClick={() => handleAddonToggle(addonKey)}
                           className={`p-3.5 rounded-xl border flex justify-between items-center text-[10px] font-black uppercase transition-all ${isSelected ? 'bg-orange-500/10 border-orange-500 text-orange-400' : 'bg-white/5 border-white/5 text-gray-400'}`}
                         >
                           <span className="truncate">{ADDON_LABELS[addonKey]}</span>
@@ -1348,13 +1156,7 @@ export default function BbCafeHome() {
                         <button 
                           type="button" 
                           key={lvl} 
-                          onClick={() => {
-                            if (hasPlayedGame) {
-                              toast.error("गेम खेलने के बाद कार्ट में बदलाव नहीं किया जा सकता! 🛑");
-                              return;
-                            }
-                            setSugarLevel(lvl);
-                          }} 
+                          onClick={() => setSugarLevel(lvl)} 
                           className={`py-2.5 rounded-xl text-[10px] font-black border transition-all ${sugarLevel === lvl ? 'bg-orange-500 text-black border-orange-500' : 'bg-white/5 text-gray-400 border-white/5'}`}
                         >
                           {lvl === "Less Sugar" ? "कम शक्कर" : lvl === "Normal" ? "नॉर्मल" : "तेज शक्कर"}
@@ -1369,13 +1171,7 @@ export default function BbCafeHome() {
                         <button 
                           type="button" 
                           key={lvl} 
-                          onClick={() => {
-                            if (hasPlayedGame) {
-                              toast.error("गेम खेलने के बाद कार्ट में बदलाव नहीं किया जा सकता! 🛑");
-                              return;
-                            }
-                            setIceLevel(lvl);
-                          }} 
+                          onClick={() => setIceLevel(lvl)} 
                           className={`py-2.5 rounded-xl text-[10px] font-black border transition-all ${iceLevel === lvl ? 'bg-orange-500 text-black border-orange-500' : 'bg-white/5 text-gray-400 border-white/5'}`}
                         >
                           {lvl === "No Ice" ? "बिना बर्फ" : lvl === "Less Ice" ? "कम बर्फ" : "नॉर्मल बर्फ"}
@@ -1386,19 +1182,7 @@ export default function BbCafeHome() {
                 </div>
               )}
 
-              <button 
-                type="button" 
-                onClick={() => {
-                  if (hasPlayedGame) {
-                    toast.error("गेम खेलने के बाद कार्ट में बदलाव नहीं किया जा सकता! 🛑");
-                    return;
-                  }
-                  handleAddToCart();
-                }} 
-                className="w-full bg-orange-500 text-black p-5 rounded-2xl font-black uppercase"
-              >
-                Confirm • ₹{chosenPrice + Object.keys(selectedAddons).filter(k => selectedAddons[k] === true).reduce((acc, k) => acc + getAddonPrice(k, chosenSize), 0)}
-              </button>
+              <button type="button" onClick={handleAddToCart} className="w-full bg-orange-500 text-black p-5 rounded-2xl font-black uppercase">Confirm • ₹{chosenPrice + Object.keys(selectedAddons).filter(k => selectedAddons[k] === true).reduce((acc, k) => acc + getAddonPrice(k, chosenSize), 0)}</button>
               <button type="button" onClick={() => { setSelectedProduct(null); setChosenSize(""); setChosenPrice(0); setSelectedAddons({}); setSugarLevel("Normal"); setIceLevel("Normal Ice"); }} className="w-full mt-4 text-gray-500 font-black text-xs text-center uppercase">Close</button>
             </motion.div>
           </div>
@@ -1431,10 +1215,6 @@ export default function BbCafeHome() {
                   <div className="flex items-center gap-2.5 bg-black/40 px-3 py-1.5 rounded-2xl border border-white/10 flex-shrink-0">
                     <button 
                       onClick={() => {
-                        if (hasPlayedGame) {
-                          toast.error("गेम खेलने के बाद कार्ट में बदलाव नहीं किया जा सकता! 🛑");
-                          return;
-                        }
                         removeItem(item.id);
                       }} 
                       className="w-8 h-8 flex items-center justify-center bg-red-500/10 text-red-500 rounded-lg text-lg font-black"
@@ -1447,10 +1227,6 @@ export default function BbCafeHome() {
                     ) : (
                       <button 
                         onClick={() => {
-                          if (hasPlayedGame) {
-                            toast.error("गेम खेलने के बाद कार्ट में बदलाव नहीं किया जा सकता! 🛑");
-                            return;
-                          }
                           addItem(item);
                         }} 
                         className="w-8 h-8 flex items-center justify-center bg-green-500/10 text-green-500 rounded-lg text-lg font-black"
@@ -1504,7 +1280,6 @@ export default function BbCafeHome() {
                   <div className="grid grid-cols-3 gap-1.5">
                     <button
                       type="button"
-                      disabled={hasPlayedGame}
                       onClick={() => setDeliveryArea('town')}
                       className={`py-3 rounded-xl text-[9px] font-black uppercase border ${deliveryArea === 'town' ? 'bg-orange-500 text-black border-orange-500 shadow-md' : 'bg-white/5 text-gray-400 border-white/5'}`}
                     >
@@ -1512,7 +1287,6 @@ export default function BbCafeHome() {
                     </button>
                     <button
                       type="button"
-                      disabled={hasPlayedGame}
                       onClick={() => setDeliveryArea('outer')}
                       className={`py-3 rounded-xl text-[9px] font-black uppercase border ${deliveryArea === 'outer' ? 'bg-orange-500 text-black border-orange-500 shadow-md' : 'bg-white/5 text-gray-400 border-white/5'}`}
                     >
@@ -1520,7 +1294,6 @@ export default function BbCafeHome() {
                     </button>
                     <button
                       type="button"
-                      disabled={hasPlayedGame}
                       onClick={() => setDeliveryArea('long')}
                       className={`py-3 rounded-xl text-[9px] font-black uppercase border ${deliveryArea === 'long' ? 'bg-orange-500 text-black border-orange-500 shadow-md' : 'bg-white/5 text-gray-400 border-white/5'}`}
                     >
@@ -1599,31 +1372,6 @@ export default function BbCafeHome() {
                   </div>
                 )}
 
-                {/* --- STOPWATCH GAME CHALLENGE OPTION INSIDE CART (OUTSIDE/BELOW LOYALTY CLUB BOX) --- */}
-                <div className="bg-gradient-to-r from-red-600/10 to-orange-600/10 border border-red-500/20 rounded-[2rem] p-5 space-y-3">
-                  <div className="flex items-center gap-2 text-red-400 font-black text-xs uppercase">
-                    <Clock size={16} /> <span>⏱️ 10S STOPWATCH CHALLENGE</span>
-                  </div>
-                  <p className="text-[10px] text-gray-400 font-bold leading-normal text-left">
-                    Stopwatch को ठीक 10.00s पर रोकें और इस आर्डर को ₹500 तक बिल्कुल मुफ्त (Free) पाएं!
-                  </p>
-                  {hasPlayedGame ? (
-                    <div className="p-3 bg-white/5 rounded-xl text-center text-[10px] font-black uppercase text-gray-500 border border-white/5">
-                      {gameResult === 'win' ? '🎉 WINNER! ₹500 FREE ORDER APPLIED' : '❌ Chance Used For This Order'}
-                    </div>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsGameOpen(true);
-                      }}
-                      className="w-full bg-gradient-to-r from-red-500 to-orange-500 text-white font-black py-3 rounded-xl text-xs uppercase shadow-md active:scale-95 transition-all"
-                    >
-                      🕹️ Play Challenge (1 Chance Only)
-                    </button>
-                  )}
-                </div>
-
                 {/* GREEN CUTLERY SELECTOR */}
                 <div className="flex items-center justify-between px-5 py-4 bg-green-500/5 border border-green-500/10 rounded-3xl">
                   <div className="flex items-center gap-3">
@@ -1680,7 +1428,7 @@ export default function BbCafeHome() {
                   )}
                   <div className="flex justify-between font-bold mb-4 text-sm opacity-90"><span>Delivery Charge</span> <span>{deliveryArea === 'town' ? (getTotal() < 99 ? "₹20" : "FREE") : deliveryArea === 'outer' ? (getTotal() < 499 ? "₹50" : "FREE") : (getTotal() < 999 ? "₹99" : "FREE")}</span></div>
                   <div className="h-px bg-white/20 mb-4" />
-                  <div className="flex justify-between font-black text-2xl"><span>To Pay</span> <span>₹{Math.max(0, getTotal() - (appliedCoupon ? appliedCoupon.discountValue : 0 + gameDiscount)) + (deliveryArea === 'town' ? (getTotal() < 99 ? 20 : 0) : deliveryArea === 'outer' ? (getTotal() < 499 ? 50 : 0) : (getTotal() < 999 ? 99 : 0))}</span></div>
+                  <div className="flex justify-between font-black text-2xl"><span>To Pay</span> <span>₹{Math.max(0, getTotal() - (appliedCoupon ? appliedCoupon.discountValue : 0))}</span></div>
                 </div>
 
                 <button onClick={sendWhatsAppOrder} type="button" className="w-full bg-green-600 hover:bg-green-700 p-6 rounded-[2.5rem] font-black text-md text-white flex items-center justify-center gap-3">ORDER ON WHATSAPP</button>
