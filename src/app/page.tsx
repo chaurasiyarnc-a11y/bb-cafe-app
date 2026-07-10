@@ -1,8 +1,8 @@
 'use client';
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { db } from '../lib/firebase'; 
 import { collection, onSnapshot, query, addDoc, doc, setDoc, increment, runTransaction } from 'firebase/firestore';
-import { ShoppingBag, Plus, Search, X, MapPin, Phone, User, Sparkles, Star, Percent, Gift, Loader2, Share2, Heart, Clock, ChevronRight, Volume2, PowerOff, Shield, CheckCircle, Smartphone } from 'lucide-react';
+import { ShoppingBag, Plus, Search, X, MapPin, Phone, User, Sparkles, Star, Percent, Gift, Loader2, Share2, Heart, Clock, ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
 import { useCartStore } from '../store/useCartStore';
@@ -21,7 +21,6 @@ const CATEGORY_IMAGES: { [key: string]: string } = {
   "Special Rice": "https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?auto=format&fit=crop&w=150&q=80"
 };
 
-// 1. Precise Delivery charge KM range limits & Standard Surcharges [1.1.2]
 const DELIVERY_AREAS = [
   { name: "Mohandra Town", fee: 20, minFree: 99, range: "0-1 KM" },
   { name: "Mohandra Ward 1-5 (Within 2 Km)", fee: 20, minFree: 199, range: "1-2 KM" },
@@ -29,13 +28,11 @@ const DELIVERY_AREAS = [
   { name: "Out of Town (5 to 8 Km)", fee: 60, minFree: 999, range: "5-8 KM" }
 ];
 
-// Hinglish keyword translator
 const HINGLISH_DICT: { [key: string]: string } = {
   "piza": "pizza", "pizaa": "pizza", "panir": "paneer", "tali": "thali", "thaly": "thali",
   "fastfud": "fast food", "rice": "rice", "bread": "bread", "veg": "veg", "chiz": "cheese"
 };
 
-// Precise Portion-sized Pizza toppings additions prices
 const PIZZA_ADDONS: { [size: string]: { [addon: string]: number } } = {
   "small": { "Veg Add-on": 10, "Paneer": 20, "Black Olives": 20, "Jalapeno": 20, "Extra Cheese": 20, "Mushroom": 20 },
   "medium": { "Veg Add-on": 10, "Paneer": 30, "Black Olives": 30, "Jalapeno": 30, "Extra Cheese": 30, "Mushroom": 30 },
@@ -43,7 +40,6 @@ const PIZZA_ADDONS: { [size: string]: { [addon: string]: number } } = {
   "extra large": { "Veg Add-on": 30, "Paneer": 50, "Black Olives": 50, "Jalapeno": 50, "Extra Cheese": 60, "Mushroom": 50 }
 };
 
-// Tap-To-Fill comments pills
 const SUGGESTED_REVIEWS = [
   "पिज्जा का स्वाद लाजवाब है! मज़ा आ गया 🍕😋",
   "मोहांद्रा में सबसे बेस्ट सर्विस और स्वाद! ⭐⭐⭐⭐⭐",
@@ -52,7 +48,6 @@ const SUGGESTED_REVIEWS = [
   "साफ़-सफ़ाई और शुद्धता 10/10 है! 🧼👌"
 ];
 
-// High fidelity permanent landing reviews
 const PERMANENT_REVIEWS = [
   { id: "rev1", name: "Gaurav Soni", rating: 5, comment: "Bum Bum Cafe ki paneer pizza sach me pure Mohandra me best hai! Extra cheese is real love. ⭐⭐⭐⭐⭐" },
   { id: "rev2", name: "Anjali Patel", rating: 5, comment: "Fast food packing bahut achi thi, delivery boy behavior was also very polite. Recommended! ⭐⭐⭐⭐⭐" },
@@ -67,7 +62,7 @@ export default function BbCafeHome() {
   const removeItem = store?.removeItem || (() => {});
   const clearCart = store?.clearCart || (() => {});
 
-  // --- 1. STATE VARIABLES (MUST BE INITIALIZED FIRST) [1.1] ---
+  // --- 1. STATES (DECLARED FIRST IN COMPONENT SCOPE) [1.1] ---
   const [menu, setMenu] = useState<any[]>([]);
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
@@ -91,7 +86,7 @@ export default function BbCafeHome() {
   const [isGiftModalOpen, setIsGiftModalOpen] = useState(false);
   const [giftPhone, setGiftPhone] = useState("");
   
-  // 1. Strictly fixed type compile parameter [1.1.2]
+  // Fixed state generic definition [1.1.2]
   const [giftPointsAmount, setGiftPointsAmount] = useState<number | "">("");
   const [isGiftingLoading, setIsGiftingLoading] = useState(false);
 
@@ -122,7 +117,7 @@ export default function BbCafeHome() {
   const [oreganoAddon, setOreganoAddon] = useState(false);
   const [chiliFlakesAddon, setChiliFlakesAddon] = useState(false);
 
-  // Green Toggle (Eco-cutlery)
+  // Green Toggle
   const [noCutlery, setNoCutlery] = useState(false);
 
   // Area Wise Delivery State
@@ -148,7 +143,7 @@ export default function BbCafeHome() {
   const [isTooFar, setIsTooFar] = useState(false);
   const [distanceKm, setDistanceKm] = useState<number | null>(null);
 
-  // --- 2. PURE CALCULATION & SELECTOR HELPERS (DECLARED BEFORE REFERENCING IN HANDLERS/MEMOS) [1.1] ---
+  // --- 2. COMPONENT HELPERS & CALCULATION FUNCTIONS (DECLARED BEFORE CALLS) [1.1] ---
 
   const playSoundEffect = (type: 'add' | 'success') => {
     try {
@@ -249,7 +244,7 @@ export default function BbCafeHome() {
     return CATEGORY_IMAGES[catName] || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=150&q=80";
   };
 
-  // --- 3. MEMOS & DERIVED SELECTORS (TDZ SCOPING FULLY RESOLVED) [1.1] ---
+  // --- 3. MEMOS ---
 
   // Dynamic Seasonal Theme
   const activeTheme = useMemo(() => {
@@ -360,6 +355,12 @@ export default function BbCafeHome() {
     window.addEventListener('offline', updateOnlineStatus);
     setIsOnline(navigator.onLine);
 
+    const handleBeforeInstallPrompt = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
     const savedFavs = localStorage.getItem('bb_favorites');
     if (savedFavs) {
       try { setFavorites(JSON.parse(savedFavs)); } catch (e) {}
@@ -461,6 +462,53 @@ export default function BbCafeHome() {
     } else {
       toast.error("Invalid coupon code");
     }
+  };
+
+  const handleDetectLocation = () => {
+    if (!navigator.geolocation) {
+      return toast.error("आपके ब्राउज़र में जीपीएस लोकेशन उपलब्ध नहीं है।");
+    }
+    toast.loading("सटीक लोकेशन ट्रैक कर रहे हैं...");
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        toast.dismiss();
+        const { latitude, longitude } = position.coords;
+        setAddress(`My GPS Location: https://www.google.com/maps?q=${latitude},${longitude}`);
+        toast.success("जीपीएस से लोकेशन सफलतापूर्वक जोड़ी गई!");
+        
+        const mohandraLat = 24.2863;
+        const mohandraLng = 80.1245;
+        
+        const calculatedDistance = calculateDistanceInKm(latitude, longitude, mohandraLat, mohandraLng);
+        setDistanceKm(Number(calculatedDistance.toFixed(2)));
+
+        if (calculatedDistance > 20) {
+          setIsTooFar(true);
+          toast.error("ध्यान दें: आप बूम बूम कैफे से 20 किमी से अधिक दूर हैं। आप केवल हमारा शानदार मेनू देख सकते हैं, आर्डर नहीं कर सकते।", { duration: 8000 });
+        } else {
+          setIsTooFar(false);
+          
+          // Auto delivery area mapped to calculated GPS distance (KM) [1.1]
+          if (calculatedDistance <= 1.0) {
+            setSelectedArea(DELIVERY_AREAS[0]); 
+            toast.success(`सटीक दूरी: ${calculatedDistance.toFixed(2)} KM। आपके लिए 'Mohandra Town' क्षेत्र चुना गया है।`);
+          } else if (calculatedDistance <= 2.0) {
+            setSelectedArea(DELIVERY_AREAS[1]); 
+            toast.success(`सटीक दूरी: ${calculatedDistance.toFixed(2)} KM। आपके लिए 'Mohandra Ward 1-5' क्षेत्र चुना गया है।`);
+          } else if (calculatedDistance <= 5.0) {
+            setSelectedArea(DELIVERY_AREAS[2]); 
+            toast.success(`सटीक दूरी: ${calculatedDistance.toFixed(2)} KM। आपके लिए 'Nearby Area (Within 5 Km)' क्षेत्र चुना गया है।`);
+          } else {
+            setSelectedArea(DELIVERY_AREAS[3]); 
+            toast.success(`सटीक दूरी: ${calculatedDistance.toFixed(2)} KM। आपके लिए 'Out of Town' क्षेत्र चुना गया है।`);
+          }
+        }
+      },
+      () => {
+        toast.dismiss();
+        toast.error("लोकेशन की अनुमति अस्वीकार कर दी गई है या नेटवर्क त्रुटि है।");
+      }
+    );
   };
 
   const handleGiftPoints = async (e: React.FormEvent) => {
@@ -682,44 +730,47 @@ export default function BbCafeHome() {
     setPizzaAddons({});
   };
 
-  const handleSocialClick = async (platform: string, url: string) => {
-    window.open(url, '_blank');
-
+  // 1. Re-introduced complete ShareApp Handler block inside the component body safely [1]
+  const handleShareApp = async () => {
     if (!customerDetails?.phone) {
-      toast.error("पॉइंट्स क्लेम करने के लिए कृपया पहले अपना Name और Phone दर्ज करें!");
+      toast.error("पॉइंट्स कमाने के लिए पहले Name और Phone दर्ज करें!");
       setIsLoginOpen(true);
       return;
     }
 
-    const storageKey = `bb_claimed_${customerDetails.phone.replace("+91", "")}_${platform}`;
-    const alreadyClaimed = localStorage.getItem(storageKey);
+    const phoneClean = customerDetails.phone.replace("+91", "").trim();
+    const shareCountKey = `bb_shares_${phoneClean}`;
+    let currentShares = Number(localStorage.getItem(shareCountKey) || 0);
 
-    if (alreadyClaimed) {
-      toast.success("आप इस प्लेटफ़ॉर्म के लिए पहले ही पॉइंट ले चुके हैं! धन्यवाद ❤️");
-      return;
+    const shareMessage = `🔥 *BUM BUM CAFE - Mohandra* 🔥\nयहाँ से ऑर्डर करें बेहतरीन और स्वादिष्ट Pizza, Thali और Fast Food! सीधे आपके घर तक सुपर फास्ट होम डिलीवरी।\n👉 ${window.location.origin}`;
+    const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(shareMessage)}`;
+
+    window.open(whatsappUrl, '_blank');
+
+    if (currentShares < 5) {
+      const nextShares = currentShares + 1;
+      localStorage.setItem(shareCountKey, String(nextShares));
+      setShareCount(nextShares);
+
+      if (nextShares === 5) {
+        try {
+          const pointsRef = doc(db, "customer_points", phoneClean);
+          await setDoc(pointsRef, {
+            points: increment(1),
+            lastActive: new Date()
+          }, { merge: true });
+
+          setCustomerPoints(prev => prev + 1);
+          toast.success("🎉 शानदार! आपने 5 दोस्तों के साथ ऐप शेयर करके +1 Loyalty Point कमा लिया है!");
+        } catch (e) {}
+      } else {
+        toast.success(`📤 शेयर किया गया! (${nextShares}/5 प्रोग्रेस। +1 पॉइंट के लिए ${5 - nextShares} और दोस्तों को शेयर करें!)`);
+      }
+    } else {
+      localStorage.setItem(shareCountKey, "1");
+      setShareCount(1);
+      toast.success("📤 नया शेयर प्रोग्रेस शुरू हुआ! (1/5 पूरा)");
     }
-
-    try {
-      const phoneRaw = customerDetails.phone.replace("+91", "").trim();
-      const pointsRef = doc(db, "customer_points", phoneRaw);
-      
-      await setDoc(pointsRef, {
-        points: increment(1),
-        lastActive: new Date()
-      }, { merge: true });
-
-      localStorage.setItem(storageKey, "true");
-      setCustomerPoints(prev => prev + 1);
-      toast.success(`🎉 बधाई हो! ${platform.toUpperCase()} पर हमें फॉलो करने के लिए आपको +1 पॉइंट मिला है!`);
-    } catch (err) {
-      toast.error("पॉइंट्स जोड़ने में समस्या आई।");
-    }
-  };
-
-  const getClaimStatus = (platform: string) => {
-    if (!customerDetails?.phone) return "🎁 +1 Pt";
-    const storageKey = `bb_claimed_${customerDetails.phone.replace("+91", "")}_${platform}`;
-    return localStorage.getItem(storageKey) ? "✅ Claimed" : "🎁 Claim +1 Pt";
   };
 
   if (!mounted) return null;
@@ -1164,7 +1215,7 @@ export default function BbCafeHome() {
                           type="button"
                           key={addon}
                           onClick={() => setPizzaAddons(prev => ({ ...prev, [addon]: !prev[addon] }))}
-                          className={`p-2.5 rounded-xl border flex justify-between items-center text-[9px] font-bold ${isSelected ? 'border-orange-500 bg-orange-500/5 text-orange-500' : 'border-white/5 bg-white/[0.02] text-gray-300'}`}
+                          className={`p-2.5 rounded-xl border flex justify-between items-center text-[9px] font-bold ${isSelected ? 'border-orange-500 bg-orange-500/5 text-orange-400' : 'border-white/5 bg-white/[0.02] text-gray-300'}`}
                         >
                           <span>{addon}</span>
                           <span className="text-orange-400 font-black">+₹{cost}</span>
@@ -1321,6 +1372,7 @@ export default function BbCafeHome() {
                         <span className="text-[9px] text-gray-400 font-black uppercase">Share Progress:</span>
                         <span className="text-[9px] text-yellow-400 font-black bg-yellow-400/10 px-2 py-0.5 rounded border border-yellow-400/20">{shareCount}/5 Shared</span>
                       </div>
+                      {/* Fixed share app function click [1] */}
                       <button type="button" onClick={handleShareApp} className="w-full bg-green-600 text-white font-black py-2 rounded-lg text-[9px] uppercase flex items-center justify-center gap-1 shadow-md">
                         <Share2 size={12}/>
                         <span>Share 5 Times to earn free +1 Loyalty Point! 🎁</span>
@@ -1406,7 +1458,6 @@ export default function BbCafeHome() {
         )}
       </AnimatePresence>
 
-      {/* FLOAT CART */}
       {cart.length > 0 && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-full max-w-sm px-4">
           <button
@@ -1498,7 +1549,7 @@ export default function BbCafeHome() {
                   <span className="text-[10px] font-black text-white">🟢 WhatsApp Message</span>
                   <span className="text-[8px] font-black uppercase px-2.5 py-1 rounded bg-yellow-400 text-black">{getClaimStatus('whatsapp_msg')}</span>
                 </button>
-                <button onClick={() => handleSocialClick('whatsapp_channel', 'https://whatsapp.com/channel/0029VaLhggoGE56natoQI43y')} className="w-full flex items-center justify-between bg-emerald-500/10 border border-emerald-500/20 p-3 rounded-xl">
+                <button onClick={() => handleSocialClick('whatsapp_channel', 'https://whatsapp.com/channel/0029VaLhggoGE56natoQI43y')} className="w-full flex items-center justify-between bg-[#10b981]/10 border border-[#10b981]/20 p-3 rounded-xl">
                   <span className="text-[10px] font-black text-white">📢 WhatsApp Channel</span>
                   <span className="text-[8px] font-black uppercase px-2.5 py-1 rounded bg-yellow-400 text-black">{getClaimStatus('whatsapp_channel')}</span>
                 </button>
