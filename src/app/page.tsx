@@ -40,7 +40,6 @@ const PIZZA_ADDONS: { [size: string]: { [addon: string]: number } } = {
   "extra large": { "Veg Add-on": 30, "Paneer": 50, "Black Olives": 50, "Jalapeno": 50, "Extra Cheese": 60, "Mushroom": 50 }
 };
 
-// 2. Pre-written excellent review suggestions for customer touch input
 const SUGGESTED_REVIEWS = [
   "पिज्जा का स्वाद लाजवाब है! मज़ा आ गया 🍕😋",
   "मोहांद्रा में सबसे बेस्ट सर्विस और स्वाद! ⭐⭐⭐⭐⭐",
@@ -85,7 +84,7 @@ export default function BbCafeHome() {
 
   const [isGiftModalOpen, setIsGiftModalOpen] = useState(false);
   const [giftPhone, setGiftPhone] = useState("");
-  const [giftPointsAmount, setGiftPointsAmount] = useState<number | "">("");
+  const [giftPointsAmount, setGiftPointsAmount] = useState<number | " text-white">("");
   const [isGiftingLoading, setIsGiftingLoading] = useState(false);
 
   const [dbCategories, setDbCategories] = useState<any[]>([]);
@@ -532,7 +531,6 @@ export default function BbCafeHome() {
     (window as any)._pendingWA = openWA;
   };
 
-  // 4. Cart clears items and modifiers, but strictly preserves address & details on checkout
   const executeWAOpen = () => {
     if ((window as any)._pendingWA) {
       (window as any)._pendingWA();
@@ -542,7 +540,7 @@ export default function BbCafeHome() {
     setShowInvoice(true); 
     clearCart(); 
     
-    // Reset specific add-ons & modifiers
+    // Reset specific modifiers
     setKetchupAddon(false);
     setOreganoAddon(false);
     setChiliFlakesAddon(false);
@@ -635,6 +633,14 @@ export default function BbCafeHome() {
     setPizzaAddons({});
   };
 
+  const upsellSuggestionItems = useMemo(() => {
+    return menu.filter(item => {
+      const isShake = item?.category === "Super Cool" || item?.category === "Fast Food";
+      const notInCart = !cart.some((c: any) => c.id === item.id);
+      return isShake && notInCart;
+    }).slice(0, 2);
+  }, [menu, cart]);
+
   const handleSocialClick = async (platform: string, url: string) => {
     window.open(url, '_blank');
 
@@ -723,8 +729,8 @@ export default function BbCafeHome() {
     <div className="bg-[#050505] min-h-screen text-white pb-32 font-sans relative overflow-x-hidden">
       <Toaster position="top-center" />
       
-      {/* 3. Global CSS to fully hide visual category scrollbar handles */}
-      <style>{`
+      {/* Dynamic injection of the scrollbar CSS helper using standard dangerouslySetInnerHTML to prevent compile errors */}
+      <style dangerouslySetInnerHTML={{ __html: `
         .hide-scrollbar::-webkit-scrollbar {
           display: none !important;
         }
@@ -732,7 +738,7 @@ export default function BbCafeHome() {
           -ms-overflow-style: none !important;
           scrollbar-width: none !important;
         }
-      `}</style>
+      `}} />
       
       {confettiActive && (
         <div className="fixed inset-0 pointer-events-none z-[999] overflow-hidden">
@@ -809,7 +815,7 @@ export default function BbCafeHome() {
 
       <main className="pt-3 px-3 max-w-lg mx-auto space-y-4">
         
-        {/* 5. Animated & Sliding Promotional Banner */}
+        {/* Animated & Sliding Promotional Banner */}
         <div className="w-full h-36 rounded-2xl overflow-hidden relative border border-white/5 bg-white/[0.02]">
           {(banners.length === 0 || bannerError) ? (
             <div className="w-full h-full bg-gradient-to-r from-orange-600/35 to-[#b33600]/35 flex flex-col justify-center p-5 space-y-1">
@@ -1022,7 +1028,6 @@ export default function BbCafeHome() {
         )}
       </AnimatePresence>
 
-      {/* WRITE REVIEW FORM MODAL */}
       <AnimatePresence>
         {isReviewFormOpen && (
           <div className="fixed inset-0 bg-black/95 z-[200] flex items-center justify-center p-6">
@@ -1430,7 +1435,7 @@ export default function BbCafeHome() {
                   <span className="text-[10px] font-black text-white">🟢 WhatsApp Message</span>
                   <span className="text-[8px] font-black uppercase px-2.5 py-1 rounded bg-yellow-400 text-black">{getClaimStatus('whatsapp_msg')}</span>
                 </button>
-                <button onClick={() => handleSocialClick('whatsapp_channel', 'https://whatsapp.com/channel/0029VaLhggoGE56natoQI43y')} className="w-full flex items-center justify-between bg-[#10b981]/10 border border-[#10b981]/20 p-3 rounded-xl">
+                <button onClick={() => handleSocialClick('whatsapp_channel', 'https://whatsapp.com/channel/0029VaLhggoGE56natoQI43y')} className="w-full flex items-center justify-between bg-emerald-500/10 border border-emerald-500/20 p-3 rounded-xl">
                   <span className="text-[10px] font-black text-white">📢 WhatsApp Channel</span>
                   <span className="text-[8px] font-black uppercase px-2.5 py-1 rounded bg-yellow-400 text-black">{getClaimStatus('whatsapp_channel')}</span>
                 </button>
@@ -1455,7 +1460,7 @@ export default function BbCafeHome() {
             </motion.div>
           </div>
         )}
-      </Presence>
+      </AnimatePresence>
 
       <AnimatePresence>
         {showUPIModal && (
