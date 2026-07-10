@@ -62,31 +62,7 @@ export default function BbCafeHome() {
   const removeItem = store?.removeItem || (() => {});
   const clearCart = store?.clearCart || (() => {});
 
-  // Auditory Helper
-  const playSoundEffect = (type: 'add' | 'success') => {
-    try {
-      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
-      const osc = audioCtx.createOscillator();
-      const gain = audioCtx.createGain();
-      osc.connect(gain);
-      gain.connect(audioCtx.destination);
-      
-      if (type === 'add') {
-        osc.frequency.setValueAtTime(880, audioCtx.currentTime); 
-        gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
-        osc.start();
-        osc.stop(audioCtx.currentTime + 0.1);
-      } else if (type === 'success') {
-        osc.frequency.setValueAtTime(523.25, audioCtx.currentTime); 
-        gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
-        osc.start();
-        osc.frequency.setValueAtTime(659.25, audioCtx.currentTime + 0.1);
-        osc.frequency.setValueAtTime(783.99, audioCtx.currentTime + 0.2);
-        osc.stop(audioCtx.currentTime + 0.4);
-      }
-    } catch (e) {}
-  };
-  
+  // All State hooks declared first inside React Component scope
   const [menu, setMenu] = useState<any[]>([]);
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
@@ -109,8 +85,6 @@ export default function BbCafeHome() {
 
   const [isGiftModalOpen, setIsGiftModalOpen] = useState(false);
   const [giftPhone, setGiftPhone] = useState("");
-  
-  // Fixed state generic definition [1.1.2]
   const [giftPointsAmount, setGiftPointsAmount] = useState<number | "">("");
   const [isGiftingLoading, setIsGiftingLoading] = useState(false);
 
@@ -167,7 +141,82 @@ export default function BbCafeHome() {
   const [isTooFar, setIsTooFar] = useState(false);
   const [distanceKm, setDistanceKm] = useState<number | null>(null);
 
-  const formatBillNumber = (num: number) => String(num).padStart(4, '0');
+  // --- COMPONENT HELPERS DECLARED AT THE VERY TOP TO PREVENT TDZ SCOPING ERRORS [1.1] ---
+
+  const playSoundEffect = (type: 'add' | 'success') => {
+    try {
+      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      
+      if (type === 'add') {
+        osc.frequency.setValueAtTime(880, audioCtx.currentTime); 
+        gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.1);
+      } else if (type === 'success') {
+        osc.frequency.setValueAtTime(523.25, audioCtx.currentTime); 
+        gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+        osc.start();
+        osc.frequency.setValueAtTime(659.25, audioCtx.currentTime + 0.1);
+        osc.frequency.setValueAtTime(783.99, audioCtx.currentTime + 0.2);
+        osc.stop(audioCtx.currentTime + 0.4);
+      }
+    } catch (e) {}
+  };
+
+  const getCartSubtotal = () => cart.reduce((acc: number, i: any) => acc + (i.price * i.quantity), 0);
+
+  const getCartAddonsPrice = () => {
+    let total = 0;
+    if (ketchupAddon) total += 10;
+    if (oreganoAddon) total += 10;
+    if (chiliFlakesAddon) total += 10;
+    return total;
+  };
+
+  const getDeliveryCharge = () => {
+    const baseSub = getCartSubtotal();
+    if (baseSub === 0) return 0;
+    return baseSub >= selectedArea.minFree ? 0 : selectedArea.fee;
+  };
+
+  const getTotalBillPrice = () => {
+    const subtotal = getCartSubtotal();
+    const addPrice = getCartAddonsPrice();
+    const delivery = getDeliveryCharge();
+    const couponDiscount = appliedCoupon ? Number(appliedCoupon.discountValue) : 0;
+    return Math.max(0, subtotal + addPrice - couponDiscount) + delivery;
+  };
+
+  const getFreeDeliveryProgressPercent = () => {
+    const subtotal = getCartSubtotal();
+    const limit = selectedArea.minFree;
+    if (subtotal >= limit) return 100;
+    return (subtotal / limit) * 100;
+  };
+
+  const getCustomerTier = (points: number) => {
+    if (points >= 50) return { name: "Platinum Member 👑", color: "text-cyan-400 border-cyan-400/30 bg-cyan-400/10" };
+    if (points >= 20) return { name: "Gold Member 🌟", color: "text-yellow-400 border-yellow-400/30 bg-yellow-400/10" };
+    return { name: "Bronze Member 🥉", color: "text-orange-400 border-orange-400/30 bg-orange-400/10" };
+  };
+
+  const getDisplayPrice = (item: any) => {
+    if (item?.variants && typeof item.variants === 'object') {
+      const prices = Object.values(item.variants).map(Number).filter(n => !isNaN(n));
+      if (prices.length > 0) {
+        const minPrice = Math.min(...prices);
+        const maxPrice = Math.max(...prices);
+        return minPrice === maxPrice ? `₹${minPrice}` : `₹${minPrice} - ₹${maxPrice}`;
+      }
+    }
+    return `₹${item?.price || 0}`;
+  };
+
+  // --- MEMOS & SCHEDULERS ---
 
   // Dynamic Seasonal Theme
   const activeTheme = useMemo(() => {
@@ -280,9 +329,9 @@ export default function BbCafeHome() {
     return CATEGORY_IMAGES[catName] || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=150&q=80";
   };
 
-  useEffect(() => {
-    setMounted(true);
+  // --- LIFE CYCLE EFFECTS ---
 
+  useEffect(() => {
     const updateOnlineStatus = () => {
       setIsOnline(navigator.onLine);
       if (navigator.onLine) {
@@ -294,6 +343,12 @@ export default function BbCafeHome() {
     window.addEventListener('online', updateOnlineStatus);
     window.addEventListener('offline', updateOnlineStatus);
     setIsOnline(navigator.onLine);
+
+    const handleBeforeInstallPrompt = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
 
     const savedFavs = localStorage.getItem('bb_favorites');
     if (savedFavs) {
@@ -352,37 +407,23 @@ export default function BbCafeHome() {
     return () => { 
       window.removeEventListener('online', updateOnlineStatus);
       window.removeEventListener('offline', updateOnlineStatus);
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
       unsubStore(); unsubMenu(); unsubCats(); unsubBanners(); unsubReviews(); unsubCoupons(); unsubRules(); 
     };
   }, []);
 
-  // Auto-slide trigger for carousel
-  useEffect(() => {
-    if (banners.length <= 1) return;
-    const interval = setInterval(() => { setBannerIndex((prev) => (prev + 1) % banners.length); }, 4000);
-    return () => clearInterval(interval);
-  }, [banners]);
+  // --- ACTIONS & HANDLERS ---
 
-  // Sync draft cart to local storage (52)
-  useEffect(() => {
-    if (cart.length > 0) {
-      localStorage.setItem('bb_cafe_draft_cart', JSON.stringify(cart));
+  const handleApplyCoupon = () => {
+    if (!enteredCoupon) return toast.error("Please enter a coupon code");
+    const found = coupons.find(c => String(c.code).toLowerCase() === enteredCoupon.trim().toLowerCase());
+    if (found) {
+      setAppliedCoupon(found);
+      toast.success(`Coupon '${found.code}' applied! ₹${found.discountValue} OFF`);
     } else {
-      localStorage.removeItem('bb_cafe_draft_cart');
+      toast.error("Invalid coupon code");
     }
-  }, [cart]);
-
-  useEffect(() => {
-    if (!customerDetails?.phone) { setCustomerPoints(0); return; }
-    const unsubPoints = onSnapshot(doc(db, "customer_points", customerDetails.phone.replace("+91", "")), (docSnap) => {
-      setCustomerPoints(docSnap.exists() ? (docSnap.data().points || 0) : 0);
-    }, () => { setCustomerPoints(0); });
-    
-    const phoneClean = customerDetails.phone.replace("+91", "");
-    setShareCount(Number(localStorage.getItem(`bb_shares_${phoneClean}`) || 0));
-
-    return () => unsubPoints();
-  }, [customerDetails]);
+  };
 
   const handleDetectLocation = () => {
     if (!navigator.geolocation) {
@@ -408,7 +449,6 @@ export default function BbCafeHome() {
         } else {
           setIsTooFar(false);
           
-          // Auto delivery area mapped to calculated GPS distance (KM) [1.1]
           if (calculatedDistance <= 1.0) {
             setSelectedArea(DELIVERY_AREAS[0]); 
             toast.success(`सटीक दूरी: ${calculatedDistance.toFixed(2)} KM। आपके लिए 'Mohandra Town' क्षेत्र चुना गया है।`);
@@ -684,6 +724,12 @@ export default function BbCafeHome() {
     }
   };
 
+  const getClaimStatus = (platform: string) => {
+    if (!customerDetails?.phone) return "🎁 +1 Pt";
+    const storageKey = `bb_claimed_${customerDetails.phone.replace("+91", "")}_${platform}`;
+    return localStorage.getItem(storageKey) ? "✅ Claimed" : "🎁 Claim +1 Pt";
+  };
+
   const handleShareApp = async () => {
     if (!customerDetails?.phone) {
       toast.error("पॉइंट्स कमाने के लिए पहले Name और Phone दर्ज करें!");
@@ -826,7 +872,7 @@ export default function BbCafeHome() {
 
       <main className="pt-3 px-3 max-w-lg mx-auto space-y-4">
         
-        {/* Animated & Sliding Promotional Banner - Supports high fidelity video loops & static image posters [1.1.2] */}
+        {/* Animated & Sliding Promotional Banner - Supports high fidelity video loops & static image posters */}
         <div className="w-full h-36 rounded-2xl overflow-hidden relative border border-white/5 bg-white/[0.02]">
           {(banners.length === 0 || bannerError) ? (
             <div className="w-full h-full bg-gradient-to-r from-orange-600/35 to-[#b33600]/35 flex flex-col justify-center p-5 space-y-1">
@@ -1489,7 +1535,7 @@ export default function BbCafeHome() {
                   <span className="text-[10px] font-black text-white">🟢 WhatsApp Message</span>
                   <span className="text-[8px] font-black uppercase px-2.5 py-1 rounded bg-yellow-400 text-black">{getClaimStatus('whatsapp_msg')}</span>
                 </button>
-                <button onClick={() => handleSocialClick('whatsapp_channel', 'https://whatsapp.com/channel/0029VaLhggoGE56natoQI43y')} className="w-full flex items-center justify-between bg-emerald-500/10 border border-emerald-500/20 p-3 rounded-xl">
+                <button onClick={() => handleSocialClick('whatsapp_channel', 'https://whatsapp.com/channel/0029VaLhggoGE56natoQI43y')} className="w-full flex items-center justify-between bg-[#10b981]/10 border border-[#10b981]/20 p-3 rounded-xl">
                   <span className="text-[10px] font-black text-white">📢 WhatsApp Channel</span>
                   <span className="text-[8px] font-black uppercase px-2.5 py-1 rounded bg-yellow-400 text-black">{getClaimStatus('whatsapp_channel')}</span>
                 </button>
@@ -1516,6 +1562,7 @@ export default function BbCafeHome() {
         )}
       </AnimatePresence>
 
+      {/* Direct Deep-linking UPI Jump & Scan-To-Pay Modal */}
       <AnimatePresence>
         {showUPIModal && (
           <div className="fixed inset-0 bg-black/95 z-[250] flex items-center justify-center p-6">
@@ -1562,6 +1609,7 @@ export default function BbCafeHome() {
         )}
       </AnimatePresence>
 
+      {/* DIGITAL GREEN INVOICE */}
       <AnimatePresence>
         {showInvoice && lastPlacedOrder && (
           <div className="fixed inset-0 bg-black/95 z-[240] flex items-center justify-center p-6">
