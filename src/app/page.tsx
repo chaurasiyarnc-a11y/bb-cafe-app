@@ -48,7 +48,7 @@ const SUGGESTED_REVIEWS = [
   "साफ़-सफ़ाई और शुद्धता 10/10 है! 🧼👌"
 ];
 
-// Devanagari converted to "बम बम" as strictly requested [1.1.2]
+// Devanagari updated to "बम बम" as strictly requested [1.1.2]
 const PERMANENT_REVIEWS = [
   { id: "rev1", name: "Gaurav Soni", rating: 5, comment: "बम बम कैफे की पनीर पिज्जा सच में पूरे मोहांद्रा में बेस्ट है! एक्स्ट्रा चीज़ लव है। ⭐⭐⭐⭐⭐" },
   { id: "rev2", name: "Anjali Patel", rating: 5, comment: "फास्ट फ़ूड की पैकिंग बहुत अच्छी थी, डिलीवरी बॉय का व्यवहार भी बहुत विनम्र था। ⭐⭐⭐⭐⭐" },
@@ -418,27 +418,6 @@ export default function BbCafeHome() {
     };
   }, []);
 
-  // Sync draft cart to local storage (52)
-  useEffect(() => {
-    if (cart.length > 0) {
-      localStorage.setItem('bb_cafe_draft_cart', JSON.stringify(cart));
-    } else {
-      localStorage.removeItem('bb_cafe_draft_cart');
-    }
-  }, [cart]);
-
-  useEffect(() => {
-    if (!customerDetails?.phone) { setCustomerPoints(0); return; }
-    const unsubPoints = onSnapshot(doc(db, "customer_points", customerDetails.phone.replace("+91", "")), (docSnap) => {
-      setCustomerPoints(docSnap.exists() ? (docSnap.data().points || 0) : 0);
-    }, () => { setCustomerPoints(0); });
-    
-    const phoneClean = customerDetails.phone.replace("+91", "");
-    setShareCount(Number(localStorage.getItem(`bb_shares_${phoneClean}`) || 0));
-
-    return () => unsubPoints();
-  }, [customerDetails]);
-
   // --- 5. EVENT HANDLERS & OPERATIONS ---
 
   const handleApplyCoupon = () => {
@@ -644,6 +623,17 @@ export default function BbCafeHome() {
     setIsCartOpen(false);
   };
 
+  // 1. Re-declared complete Review submit handler block safely [1]
+  const handleReviewSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!reviewName || !reviewComment) return toast.error("Please fill all fields!");
+    try {
+      await addDoc(collection(db, "reviews"), { name: reviewName, rating: reviewRating, comment: reviewComment, isApproved: false, timestamp: new Date() });
+      toast.success("Review submitted! Approved hone ke baad live dikhega.");
+      setReviewName(""); setReviewComment(""); setReviewRating(5); setIsReviewFormOpen(false);
+    } catch (err) { toast.error("Failed to submit review."); }
+  };
+
   const handleShareApp = async () => {
     if (!customerDetails?.phone) {
       toast.error("पॉइंट्स कमाने के लिए पहले Name और Phone दर्ज करें!");
@@ -686,6 +676,47 @@ export default function BbCafeHome() {
     }
   };
 
+  const handleSocialClick = async (platform: string, url: string) => {
+    window.open(url, '_blank');
+
+    if (!customerDetails?.phone) {
+      toast.error("पॉइंट्स क्लेम करने के लिए कृपया पहले अपना Name और Phone दर्ज करें!");
+      setIsLoginOpen(true);
+      return;
+    }
+
+    const storageKey = `bb_claimed_${customerDetails.phone.replace("+91", "")}_${platform}`;
+    const alreadyClaimed = localStorage.getItem(storageKey);
+
+    if (alreadyClaimed) {
+      toast.success("आप इस प्लेटफ़ॉर्म के लिए पहले ही पॉइंट ले चुके हैं! धन्यवाद ❤️");
+      return;
+    }
+
+    try {
+      const phoneRaw = customerDetails.phone.replace("+91", "").trim();
+      const pointsRef = doc(db, "customer_points", phoneRaw);
+      
+      await setDoc(pointsRef, {
+        points: increment(1),
+        lastActive: new Date()
+      }, { merge: true });
+
+      localStorage.setItem(storageKey, "true");
+      setCustomerPoints(prev => prev + 1);
+      toast.success(`🎉 बधाई हो! ${platform.toUpperCase()} पर हमें फॉलो करने के लिए आपको +1 पॉइंट मिला है!`);
+    } catch (err) {
+      toast.error("पॉइंट्स जोड़ने में समस्या आई।");
+    }
+  };
+
+  const getClaimStatus = (platform: string) => {
+    if (!customerDetails?.phone) return "🎁 +1 Pt";
+    const storageKey = `bb_claimed_${customerDetails.phone.replace("+91", "")}_${platform}`;
+    return localStorage.getItem(storageKey) ? "✅ Claimed" : "🎁 Claim +1 Pt";
+  };
+
+  // 1. Correctly Declared handleSaveDetails inside component scope safely [1.1.2]
   const handleSaveDetails = (e: React.FormEvent) => {
     e.preventDefault();
     if (!tempName || tempName.trim().length < 3) return toast.error("Please enter your real name");
@@ -707,6 +738,7 @@ export default function BbCafeHome() {
     }
   };
 
+  // 1. Correctly Declared handleToggleFavorite inside component scope safely [1.1.2]
   const handleToggleFavorite = (id: string, e: any) => {
     e.stopPropagation();
     let updated;
@@ -721,6 +753,7 @@ export default function BbCafeHome() {
     localStorage.setItem('bb_favorites', JSON.stringify(updated));
   };
 
+  // 1. Correctly Declared handleAddToCart inside component scope safely [1.1.2]
   const handleAddToCart = () => {
     if (!chosenSize) return toast.error("Please select a size first!");
     
@@ -1201,7 +1234,7 @@ export default function BbCafeHome() {
                           type="button"
                           key={addon}
                           onClick={() => setPizzaAddons(prev => ({ ...prev, [addon]: !prev[addon] }))}
-                          className={`p-2.5 rounded-xl border flex justify-between items-center text-[9px] font-bold ${isSelected ? 'border-orange-500 bg-orange-500/5 text-orange-500' : 'border-white/5 bg-white/[0.02] text-gray-300'}`}
+                          className={`p-2.5 rounded-xl border flex justify-between items-center text-[9px] font-bold ${isSelected ? 'border-orange-500 bg-orange-500/5 text-orange-400' : 'border-white/5 bg-white/[0.02] text-gray-300'}`}
                         >
                           <span>{addon}</span>
                           <span className="text-orange-400 font-black">+₹{cost}</span>
@@ -1612,7 +1645,7 @@ export default function BbCafeHome() {
       <AnimatePresence>
         {showInvoice && lastPlacedOrder && (
           <div className="fixed inset-0 bg-black/95 z-[240] flex items-center justify-center p-6">
-            <div className="bg-[#111] w-full max-w-md p-6 rounded-3xl border border-white/10 text-center space-y-4 max-h-[85vh] overflow-y-auto">
+            <div className="bg-[#111] w-full max-w-md p-6 rounded-3xl border border-white/10 text-center space-y-4 max-h-[85vh] overflow-y-auto font-sans">
               <div className="flex justify-between items-center border-b border-white/5 pb-2">
                 <span className="text-[10px] font-black text-green-400">🌱 DIGITAL GREEN INVOICE</span>
                 <button onClick={() => setShowInvoice(false)} className="text-gray-400"><X size={16} /></button>
@@ -1652,7 +1685,7 @@ export default function BbCafeHome() {
                 </a>
               </div>
 
-              <p className="text-[9px] text-green-400 bg-green-500/10 p-2.5 rounded-xl font-bold">
+              <p className="text-[9px] text-green-400 bg-green-500/10 p-2.5 rounded-xl font-bold font-sans">
                 🌱 पेपर रसीद के बिना DIGITAL इनवॉइस जनरेट किया गया है। धन्यवाद!
               </p>
               <button onClick={() => setShowInvoice(false)} className="w-full bg-white text-black p-3 rounded-xl text-xs font-black uppercase">
