@@ -62,6 +62,7 @@ export default function BbCafeHome() {
   const removeItem = store?.removeItem || (() => {});
   const clearCart = store?.clearCart || (() => {});
 
+  // Auditory Helper
   const playSoundEffect = (type: 'add' | 'success') => {
     try {
       const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -199,6 +200,36 @@ export default function BbCafeHome() {
     return R * c;
   };
 
+  const visibleCategories = useMemo(() => {
+    const baseCategories = ["All", ...FALLBACK_CATEGORIES.filter(c => c !== "All")];
+    const dbCatsMap = new Map();
+    dbCategories.forEach(c => dbCatsMap.set(String(c.name).toLowerCase().trim(), c));
+    const result: string[] = [];
+
+    baseCategories.forEach(catName => {
+      const cleanName = catName.toLowerCase().trim();
+      if (dbCatsMap.has(cleanName)) {
+        if (dbCatsMap.get(cleanName).isVisible !== false) result.push(catName);
+      } else {
+        result.push(catName);
+      }
+    });
+
+    dbCategories.forEach(c => {
+      const cleanName = String(c.name).toLowerCase().trim();
+      const alreadyAdded = result.some(r => r.toLowerCase().trim() === cleanName);
+      if (!alreadyAdded && c.isVisible !== false && c.name !== "All") result.push(c.name);
+    });
+
+    return Array.from(new Set(result));
+  }, [dbCategories]);
+
+  const getCategoryImage = (catName: string) => {
+    const found = dbCategories.find(c => c.name === catName);
+    if (found && found.image) return found.image;
+    return CATEGORY_IMAGES[catName] || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=150&q=80";
+  };
+
   useEffect(() => {
     setMounted(true);
 
@@ -281,6 +312,26 @@ export default function BbCafeHome() {
       unsubStore(); unsubMenu(); unsubCats(); unsubBanners(); unsubReviews(); unsubCoupons(); unsubRules(); 
     };
   }, []);
+
+  useEffect(() => {
+    if (cart.length > 0) {
+      localStorage.setItem('bb_cafe_draft_cart', JSON.stringify(cart));
+    } else {
+      localStorage.removeItem('bb_cafe_draft_cart');
+    }
+  }, [cart]);
+
+  useEffect(() => {
+    if (!customerDetails?.phone) { setCustomerPoints(0); return; }
+    const unsubPoints = onSnapshot(doc(db, "customer_points", customerDetails.phone.replace("+91", "")), (docSnap) => {
+      setCustomerPoints(docSnap.exists() ? (docSnap.data().points || 0) : 0);
+    }, () => { setCustomerPoints(0); });
+    
+    const phoneClean = customerDetails.phone.replace("+91", "");
+    setShareCount(Number(localStorage.getItem(`bb_shares_${phoneClean}`) || 0));
+
+    return () => unsubPoints();
+  }, [customerDetails]);
 
   const getCartSubtotal = () => cart.reduce((acc: number, i: any) => acc + (i.price * i.quantity), 0);
 
@@ -374,6 +425,14 @@ export default function BbCafeHome() {
     return matchesCategory && itemName.includes(normalizedSearchQuery);
   });
 
+  const handleCustomerRedeem = (id: string, name: string, pointsCost: number) => {
+    const currentPointsInCart = cart.reduce((acc: number, item: any) => acc + (item.pointsCost || 0), 0);
+    if (customerPoints - currentPointsInCart < pointsCost) return toast.error("आपके पास पर्याप्त ऑयल्टी पॉइंट्स उपलब्ध नहीं हैं!");
+    addItem({ id, name, price: 0, pointsCost, isReward: true });
+    playSoundEffect('add');
+    toast.success(`${name} Cart में जोड़ दिया गया है!`);
+  };
+
   const handleDetectLocation = () => {
     if (!navigator.geolocation) {
       return toast.error("आपके ब्राउज़र में जीपीएस लोकेशन उपलब्ध नहीं है।");
@@ -397,7 +456,7 @@ export default function BbCafeHome() {
           toast.error("ध्यान दें: आप बूम बूम कैफे से 20 किमी से अधिक दूर हैं। आप केवल हमारा शानदार मेनू देख सकते हैं, आर्डर नहीं कर सकते।", { duration: 8000 });
         } else {
           setIsTooFar(false);
-          toast.success(`दूरी: ${calculatedDistance.toFixed(2)} KM। आप हमारे आर्डर रेंज में हैं!`);
+          toast.success(`दूरी: ${calculatedDistance.toFixed(2)} KM। आप हमारे आर्डर RANGE में हैं!`);
         }
       },
       () => {
@@ -790,7 +849,7 @@ export default function BbCafeHome() {
           <p className="text-[10px] text-yellow-100 font-bold tracking-wider uppercase">{activeTheme.name}</p>
         </div>
         <div className="flex items-center gap-2">
-          <a href="tel:9714293759" className="bg-green-600 text-white p-2 rounded-full border border-white/20 flex items-center justify-center animate-pulse" title="डायरेक्ट कॉल करें">
+          <a href="tel:9714293759" className="bg-green-600 text-white p-2 rounded-full border border-white/20 flex items-center justify-center" title="डायरेक्ट कॉल करें">
             <Phone size={13} />
           </a>
           <div className="bg-black/40 px-2 py-0.5 rounded-full border border-white/10 flex items-center gap-1 text-[8px] font-black uppercase text-green-400">
@@ -1534,7 +1593,7 @@ export default function BbCafeHome() {
               </div>
 
               <p className="text-[9px] text-green-400 bg-green-500/10 p-2.5 rounded-xl font-bold">
-                🌱 पेपर रसीद के बिना डिजिटल इनवॉइस जनरेट किया गया है। धन्यवाद!
+                🌱 पेपर रसीद के बिना DIGITAL इनवॉइस जनरेट किया गया है। धन्यवाद!
               </p>
               <button onClick={() => setShowInvoice(false)} className="w-full bg-white text-black p-3 rounded-xl text-xs font-black uppercase">
                 CLOSE RECEIPT
