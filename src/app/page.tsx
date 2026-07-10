@@ -62,7 +62,88 @@ export default function BbCafeHome() {
   const removeItem = store?.removeItem || (() => {});
   const clearCart = store?.clearCart || (() => {});
 
-  // --- 1. COMPONENT HELPERS & PURE CALCULATION FUNCTIONS (DECLARED FIRST IN SCOPE TO AVOID COMPILER TDZ ERRORS) [1.1] ---
+  // --- 1. STATES (DECLARED FIRST IN COMPONENT SCOPE) [1.1] ---
+  const [menu, setMenu] = useState<any[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState("All");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isCartOpen, setIsCartOpen] = useState(false);
+  const [isLoginOpen, setIsLoginOpen] = useState(false);
+  const [isSocialsOpen, setIsSocialsOpen] = useState(false); 
+  const [storeOpen, setStoreOpen] = useState(true);
+  const [mounted, setMounted] = useState(false);
+  const [isOnline, setIsOnline] = useState(true);
+
+  const [customerDetails, setCustomerDetails] = useState<{ name: string, phone: string, refCode?: string } | null>(null);
+  const [tempName, setTempName] = useState("");
+  const [tempPhone, setTempPhone] = useState("");
+  const [tempRefCode, setTempRefCode] = useState(""); 
+  const [address, setAddress] = useState("");
+  const [selectedProduct, setSelectedProduct] = useState<any>(null); 
+
+  const [customerPoints, setCustomerPoints] = useState<number>(0);
+  const [loyaltyRules, setLoyaltyRules] = useState<any[]>([]);
+
+  const [isGiftModalOpen, setIsGiftModalOpen] = useState(false);
+  const [giftPhone, setGiftPhone] = useState("");
+  
+  // Fixed state generic definition [1.1.2]
+  const [giftPointsAmount, setGiftPointsAmount] = useState<number | "">("");
+  const [isGiftingLoading, setIsGiftingLoading] = useState(false);
+
+  const [dbCategories, setDbCategories] = useState<any[]>([]);
+  const [banners, setBanners] = useState<any[]>([]);
+  const [bannerIndex, setBannerIndex] = useState(0);
+  const [bannerError, setBannerError] = useState(false);
+  
+  const [reviews, setReviews] = useState<any[]>([]);
+  const [coupons, setCoupons] = useState<any[]>([]);
+  
+  const [isReviewsDrawerOpen, setIsReviewsDrawerOpen] = useState(false);
+  const [isReviewFormOpen, setIsReviewFormOpen] = useState(false);
+  const [reviewName, setReviewName] = useState("");
+  const [reviewComment, setReviewComment] = useState("");
+  const [reviewRating, setReviewRating] = useState(5);
+  
+  const [enteredCoupon, setEnteredCoupon] = useState("");
+  const [appliedCoupon, setAppliedCoupon] = useState<any>(null);
+
+  // Pizza Add-on States
+  const [chosenSize, setChosenSize] = useState<string>("");
+  const [chosenPrice, setChosenPrice] = useState<number>(0);
+  const [pizzaAddons, setPizzaAddons] = useState<{ [addon: string]: boolean }>({});
+
+  // Cart Specific Add-ons
+  const [ketchupAddon, setKetchupAddon] = useState(false);
+  const [oreganoAddon, setOreganoAddon] = useState(false);
+  const [chiliFlakesAddon, setChiliFlakesAddon] = useState(false);
+
+  // Green Toggle
+  const [noCutlery, setNoCutlery] = useState(false);
+
+  // Area Wise Delivery State
+  const [selectedArea, setSelectedArea] = useState(DELIVERY_AREAS[0]);
+
+  // Favorite Items List
+  const [favorites, setFavorites] = useState<string[]>([]);
+
+  // Eco Digital Invoice Modal
+  const [showInvoice, setShowInvoice] = useState(false);
+  const [lastPlacedOrder, setLastPlacedOrder] = useState<any>(null);
+
+  // UPI Payment Helper Modal
+  const [showUPIModal, setShowUPIModal] = useState(false);
+
+  // Confetti Visual Particles State
+  const [confettiActive, setConfettiActive] = useState(false);
+
+  // App Sharing Tracker State
+  const [shareCount, setShareCount] = useState<number>(0);
+
+  // Geofencing limit parameters
+  const [isTooFar, setIsTooFar] = useState(false);
+  const [distanceKm, setDistanceKm] = useState<number | null>(null);
+
+  // --- 2. COMPONENT HELPERS & CALCULATION FUNCTIONS (DECLARED BEFORE CALLS) [1.1] ---
 
   const playSoundEffect = (type: 'add' | 'success') => {
     try {
@@ -125,18 +206,6 @@ export default function BbCafeHome() {
     return { name: "Bronze Member 🥉", color: "text-orange-400 border-orange-400/30 bg-orange-400/10" };
   };
 
-  const getDisplayPrice = (item: any) => {
-    if (item?.variants && typeof item.variants === 'object') {
-      const prices = Object.values(item.variants).map(Number).filter(n => !isNaN(n));
-      if (prices.length > 0) {
-        const minPrice = Math.min(...prices);
-        const maxPrice = Math.max(...prices);
-        return minPrice === maxPrice ? `₹${minPrice}` : `₹${minPrice} - ₹${maxPrice}`;
-      }
-    }
-    return `₹${item?.price || 0}`;
-  };
-
   const isVideoUrl = (url: string) => {
     if (!url) return false;
     const cleanUrl = url.toLowerCase().split('?')[0];
@@ -157,88 +226,14 @@ export default function BbCafeHome() {
 
   const formatBillNumber = (num: number) => String(num).padStart(4, '0');
 
-  // --- 2. STATES ---
-  const [menu, setMenu] = useState<any[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState("All");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [isCartOpen, setIsCartOpen] = useState(false);
-  const [isLoginOpen, setIsLoginOpen] = useState(false);
-  const [isSocialsOpen, setIsSocialsOpen] = useState(false); 
-  const [storeOpen, setStoreOpen] = useState(true);
-  const [mounted, setMounted] = useState(false);
-  const [isOnline, setIsOnline] = useState(true);
+  // Correctly defined Category Image selector function at helper scope level
+  const getCategoryImage = (catName: string) => {
+    const found = dbCategories.find(c => c.name === catName);
+    if (found && found.image) return found.image;
+    return CATEGORY_IMAGES[catName] || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=150&q=80";
+  };
 
-  const [customerDetails, setCustomerDetails] = useState<{ name: string, phone: string, refCode?: string } | null>(null);
-  const [tempName, setTempName] = useState("");
-  const [tempPhone, setTempPhone] = useState("");
-  const [tempRefCode, setTempRefCode] = useState(""); 
-  const [address, setAddress] = useState("");
-  const [selectedProduct, setSelectedProduct] = useState<any>(null); 
-
-  const [customerPoints, setCustomerPoints] = useState<number>(0);
-  const [loyaltyRules, setLoyaltyRules] = useState<any[]>([]);
-
-  const [isGiftModalOpen, setIsGiftModalOpen] = useState(false);
-  const [giftPhone, setGiftPhone] = useState("");
-  
-  // 3. Fixed generic state typings parameter [1.1.2]
-  const [giftPointsAmount, setGiftPointsAmount] = useState<number | "">("");
-  const [isGiftingLoading, setIsGiftingLoading] = useState(false);
-
-  const [dbCategories, setDbCategories] = useState<any[]>([]);
-  const [banners, setBanners] = useState<any[]>([]);
-  const [bannerIndex, setBannerIndex] = useState(0);
-  const [bannerError, setBannerError] = useState(false);
-  
-  const [reviews, setReviews] = useState<any[]>([]);
-  const [coupons, setCoupons] = useState<any[]>([]);
-  
-  const [isReviewsDrawerOpen, setIsReviewsDrawerOpen] = useState(false);
-  const [isReviewFormOpen, setIsReviewFormOpen] = useState(false);
-  const [reviewName, setReviewName] = useState("");
-  const [reviewComment, setReviewComment] = useState("");
-  const [reviewRating, setReviewRating] = useState(5);
-  
-  const [enteredCoupon, setEnteredCoupon] = useState("");
-  const [appliedCoupon, setAppliedCoupon] = useState<any>(null);
-
-  // Pizza Add-on States
-  const [chosenSize, setChosenSize] = useState<string>("");
-  const [chosenPrice, setChosenPrice] = useState<number>(0);
-  const [pizzaAddons, setPizzaAddons] = useState<{ [addon: string]: boolean }>({});
-
-  // Cart Specific Add-ons
-  const [ketchupAddon, setKetchupAddon] = useState(false);
-  const [oreganoAddon, setOreganoAddon] = useState(false);
-  const [chiliFlakesAddon, setChiliFlakesAddon] = useState(false);
-
-  // Green Toggle
-  const [noCutlery, setNoCutlery] = useState(false);
-
-  // Area Wise Delivery State
-  const [selectedArea, setSelectedArea] = useState(DELIVERY_AREAS[0]);
-
-  // Favorite Items List
-  const [favorites, setFavorites] = useState<string[]>([]);
-
-  // Eco Digital Invoice Modal
-  const [showInvoice, setShowInvoice] = useState(false);
-  const [lastPlacedOrder, setLastPlacedOrder] = useState<any>(null);
-
-  // UPI Payment Helper Modal
-  const [showUPIModal, setShowUPIModal] = useState(false);
-
-  // Confetti Visual Particles State
-  const [confettiActive, setConfettiActive] = useState(false);
-
-  // App Sharing Tracker State
-  const [shareCount, setShareCount] = useState<number>(0);
-
-  // Geofencing limit parameters
-  const [isTooFar, setIsTooFar] = useState(false);
-  const [distanceKm, setDistanceKm] = useState<number | null>(null);
-
-  // --- 3. MEMOS ---
+  // --- 3. MEMOS & SCHEDULERS ---
 
   // Dynamic Seasonal Theme
   const activeTheme = useMemo(() => {
@@ -349,7 +344,7 @@ export default function BbCafeHome() {
     const unsubStore = onSnapshot(doc(db, "settings", "store"), (d) => { if(d.exists()) setStoreOpen(d.data().isOpen); });
     
     const unsubMenu = onSnapshot(query(collection(db, "products")), (snap) => {
-      const items = snap.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter((i: any) => i.isVisible !== false);
+      const items = snap.docs.map(doc => ({ id: doc.id ...doc.data() })).filter((i: any) => i.isVisible !== false);
       setMenu(items);
       localStorage.setItem('bb_cached_menu', JSON.stringify(items)); 
     }, () => {
@@ -402,6 +397,34 @@ export default function BbCafeHome() {
     };
   }, []);
 
+  // Auto-slide trigger for carousel
+  useEffect(() => {
+    if (banners.length <= 1) return;
+    const interval = setInterval(() => { setBannerIndex((prev) => (prev + 1) % banners.length); }, 4000);
+    return () => clearInterval(interval);
+  }, [banners]);
+
+  // Sync draft cart to local storage (52)
+  useEffect(() => {
+    if (cart.length > 0) {
+      localStorage.setItem('bb_cafe_draft_cart', JSON.stringify(cart));
+    } else {
+      localStorage.removeItem('bb_cafe_draft_cart');
+    }
+  }, [cart]);
+
+  useEffect(() => {
+    if (!customerDetails?.phone) { setCustomerPoints(0); return; }
+    const unsubPoints = onSnapshot(doc(db, "customer_points", customerDetails.phone.replace("+91", "")), (docSnap) => {
+      setCustomerPoints(docSnap.exists() ? (docSnap.data().points || 0) : 0);
+    }, () => { setCustomerPoints(0); });
+    
+    const phoneClean = customerDetails.phone.replace("+91", "");
+    setShareCount(Number(localStorage.getItem(`bb_shares_${phoneClean}`) || 0));
+
+    return () => unsubPoints();
+  }, [customerDetails]);
+
   // --- 5. EVENT HANDLERS & OPERATIONS ---
 
   const handleApplyCoupon = () => {
@@ -439,7 +462,6 @@ export default function BbCafeHome() {
         } else {
           setIsTooFar(false);
           
-          // Auto delivery area mapped to calculated GPS distance (KM) [1.1]
           if (calculatedDistance <= 1.0) {
             setSelectedArea(DELIVERY_AREAS[0]); 
             toast.success(`सटीक दूरी: ${calculatedDistance.toFixed(2)} KM। आपके लिए 'Mohandra Town' क्षेत्र चुना गया है।`);
@@ -679,6 +701,46 @@ export default function BbCafeHome() {
     setChosenSize(""); 
     setChosenPrice(0); 
     setPizzaAddons({});
+  };
+
+  const handleSocialClick = async (platform: string, url: string) => {
+    window.open(url, '_blank');
+
+    if (!customerDetails?.phone) {
+      toast.error("पॉइंट्स क्लेम करने के लिए कृपया पहले अपना Name और Phone दर्ज करें!");
+      setIsLoginOpen(true);
+      return;
+    }
+
+    const storageKey = `bb_claimed_${customerDetails.phone.replace("+91", "")}_${platform}`;
+    const alreadyClaimed = localStorage.getItem(storageKey);
+
+    if (alreadyClaimed) {
+      toast.success("आप इस प्लेटफ़ॉर्म के लिए पहले ही पॉइंट ले चुके हैं! धन्यवाद ❤️");
+      return;
+    }
+
+    try {
+      const phoneRaw = customerDetails.phone.replace("+91", "").trim();
+      const pointsRef = doc(db, "customer_points", phoneRaw);
+      
+      await setDoc(pointsRef, {
+        points: increment(1),
+        lastActive: new Date()
+      }, { merge: true });
+
+      localStorage.setItem(storageKey, "true");
+      setCustomerPoints(prev => prev + 1);
+      toast.success(`🎉 बधाई हो! ${platform.toUpperCase()} पर हमें फॉलो करने के लिए आपको +1 पॉइंट मिला है!`);
+    } catch (err) {
+      toast.error("पॉइंट्स जोड़ने में समस्या आई।");
+    }
+  };
+
+  const getClaimStatus = (platform: string) => {
+    if (!customerDetails?.phone) return "🎁 +1 Pt";
+    const storageKey = `bb_claimed_${customerDetails.phone.replace("+91", "")}_${platform}`;
+    return localStorage.getItem(storageKey) ? "✅ Claimed" : "🎁 Claim +1 Pt";
   };
 
   const handleShareApp = async () => {
@@ -1262,7 +1324,7 @@ export default function BbCafeHome() {
                   </div>
                 )}
 
-                {/* 1. Fully Redesigned touch-friendly, gorgeous delivery KM cards inside the Cart Sheet [1.1.2] */}
+                {/* Direct touchable pills grid for Delivery Zones instead of select dropdown */}
                 <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-4 space-y-2">
                   <label className="text-[9px] font-black uppercase text-gray-400">Select Delivery Zone (KM):</label>
                   <div className="grid grid-cols-2 gap-2">
@@ -1407,7 +1469,7 @@ export default function BbCafeHome() {
         )}
       </AnimatePresence>
 
-      {/* FOOTER ACTION FLYING CART BANNER */}
+      {/* FLOAT CART */}
       {cart.length > 0 && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-full max-w-sm px-4">
           <button
