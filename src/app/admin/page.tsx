@@ -139,6 +139,8 @@ const handlePrintReceipt = (order: any) => {
           </tr>
         </table>
         
+        <div class="divider"></div>
+        
         <div class="qr-container">
           <p style="margin: 0; font-size: 11px; font-weight: bold;">Scan with PhonePe / UPI to Pay</p>
           <img class="qr-image" src="/phonepe-qr.png" alt="Payment QR" />
@@ -340,9 +342,11 @@ export default function AdminDashboard() {
   const [sopProduct, setSopProduct] = useState<any>(null);
   const [sopRecipeText, setSopRecipeText] = useState("");
 
-  // --- BROADCAST MODAL STATES (39: WhatsApp Broadcast) ---
+  // --- BROADCAST MODAL STATES & FILTERS (39: WhatsApp Broadcast & Points Filter) ---
   const [showBroadcastModal, setShowBroadcastModal] = useState(false);
   const [broadcastMessage, setBroadcastMessage] = useState("Special Offer from Bum Bum Cafe! Get 10% OFF on all Special Pizzas today! 🍕🔥");
+  const [broadcastPointFilter, setBroadcastPointFilter] = useState<'all' | 'high_pts' | 'med_pts' | 'low_pts' | 'vips'>('all');
+  const [sentBroadcastPhones, setSentBroadcastPhones] = useState<string[]>([]);
 
   // --- KITCHEN ROSTER RECIPE STATES ---
   const [rosterSelectedProduct, setRosterSelectedProduct] = useState<any>(null);
@@ -810,6 +814,25 @@ export default function AdminDashboard() {
       percentage: (day.sales / maxSales) * 100
     }));
   }, [orders]);
+
+  // --- FILTER BROADCAST CUSTOMERS DYNAMICALLY (Points Range & Loyalty Categories) ---
+  const filteredBroadcastCustomers = useMemo(() => {
+    let list = searchedCustomers;
+    
+    if (broadcastPointFilter === 'high_pts') {
+      list = list.filter(c => (c.points || 0) >= 100);
+    } else if (broadcastPointFilter === 'med_pts') {
+      list = list.filter(c => (c.points || 0) >= 10 && (c.points || 0) < 100);
+    } else if (broadcastPointFilter === 'low_pts') {
+      list = list.filter(c => (c.points || 0) < 10);
+    } else if (broadcastPointFilter === 'vips') {
+      list = list.filter(c => {
+        const metrics = getCustomerLoyaltyMetrics(c.phone);
+        return metrics.tier.includes("Platinum") || metrics.tier.includes("Gold");
+      });
+    }
+    return list;
+  }, [searchedCustomers, broadcastPointFilter]);
 
   // Dynamic categories helper
   const categoryOptions = categories.length > 0 
@@ -1280,7 +1303,27 @@ Report generated automatically by Bum Bum Cafe POS.`
     window.open(`https://wa.me/919714293759?text=${message}`, '_blank');
   };
 
-  // --- SEND WHATSAPP BROADCAST MESSAGE (39: WhatsApp Broadcast) ---
+  // --- SEND WHATSAPP BROADCAST MESSAGE & MARK SENT STATUS (39: WhatsApp Broadcast Sent Tracker) ---
+  const handleSendBroadcastAndTrack = (phone: string) => {
+    const cleanPhone = String(phone).replace("+91", "").trim();
+    const encodedMsg = encodeURIComponent(broadcastMessage);
+    
+    // Trigger Native WhatsApp Redirection
+    window.open(`https://wa.me/91${cleanPhone}?text=${encodedMsg}`, '_blank');
+    
+    // Save to locally tracked state to show visual success ticks on the fly
+    if (!sentBroadcastPhones.includes(cleanPhone)) {
+      setSentBroadcastPhones(prev => [...prev, cleanPhone]);
+    }
+  };
+
+  const handleResetBroadcastTracker = () => {
+    if (window.confirm("क्या आप सेंड ट्रैकिंग को रीसेट करना चाहते हैं?")) {
+      setSentBroadcastPhones([]);
+      toast.success("Broadcast tracking has been reset!");
+    }
+  };
+
   const triggerWhatsAppBroadcast = (phone: string) => {
     const cleanPhone = String(phone).replace("+91", "").trim();
     const encodedMsg = encodeURIComponent(broadcastMessage);
@@ -2119,7 +2162,7 @@ Report generated automatically by Bum Bum Cafe POS.`
         {/* --- TAB 7: BANNERS TAB --- */}
         {tab === 'banners' && (
           <div className="space-y-6">
-            <form onSubmit={handleAddBanner} className="bg-[#020202] border border-white/5 p-6 rounded-[2.5rem] space-y-4">
+            <form onSubmit={handleAddBanner} className="bg-white/[0.02] border border-white/5 p-6 rounded-[2.5rem] space-y-4">
               <h3 className="text-lg font-black text-orange-500 italic uppercase flex items-center gap-2"><ImageIcon size={18}/> Add Banner</h3>
               <input type="url" placeholder="Paste image url here..." value={newBannerUrl} onChange={(e) => setNewBannerUrl(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-xs font-bold text-white" required />
               <button type="submit" className="w-full bg-green-600 text-white p-4 rounded-xl font-black text-sm uppercase">Add Banner Image</button>
@@ -2268,7 +2311,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                   </div>
 
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-gray-500 uppercase">Special Cooking Instruction (विशेष निर्देश)</label>
+                    <label className="text-[10px] font-bold text-gray-400 uppercase">Special Cooking Instruction (विशेष निर्देश)</label>
                     <input 
                       type="text" 
                       placeholder="e.g. ओवन में डालने से पहले अच्छे से सेकें (Optional)" 
@@ -2468,30 +2511,64 @@ Report generated automatically by Bum Bum Cafe POS.`
               <p className="text-[10px] text-gray-500 uppercase tracking-widest font-black mt-0.5">Bum Bum Cafe Promotions</p>
             </div>
 
+            {/* (39: Dynamic Points / VIP Filters inside modal) */}
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold text-gray-400 uppercase">Target Customer Filter</label>
+              <select 
+                value={broadcastPointFilter} 
+                onChange={(e: any) => setBroadcastPointFilter(e.target.value)}
+                className="w-full bg-black/40 border border-white/10 text-xs font-bold rounded-xl p-3 text-white outline-none focus:border-orange-500 cursor-pointer"
+              >
+                <option value="all">📢 All Registered Clients ({searchedCustomers.length})</option>
+                <option value="high_pts">💎 High Loyalty Points (>= 100 Pts)</option>
+                <option value="med_pts">📈 Active Mid-tier Points (10 to 99 Pts)</option>
+                <option value="low_pts">🆕 New/Low Points (< 10 Pts)</option>
+                <option value="vips">👑 Only Premium VIP (Gold & Platinum)</option>
+              </select>
+            </div>
+
             <div className="space-y-1.5">
               <label className="text-[10px] font-bold text-gray-400 uppercase">Write Promotional Message</label>
               <textarea 
                 value={broadcastMessage} 
                 onChange={(e) => setBroadcastMessage(e.target.value)} 
                 placeholder="Type your special discount offer or festive wishes here..." 
-                className="w-full bg-black/40 border border-white/10 rounded-xl p-4 outline-none focus:border-orange-500 text-xs font-bold text-white h-32 resize-none leading-relaxed"
+                className="w-full bg-black/40 border border-white/10 rounded-xl p-4 outline-none focus:border-orange-500 text-xs font-bold text-white h-24 resize-none leading-relaxed"
               />
             </div>
 
+            {/* Broadcast Status Reset */}
+            <div className="flex justify-between items-center text-[10px] font-bold text-gray-500 uppercase">
+              <span>Sent Count: {sentBroadcastPhones.length}</span>
+              <button 
+                onClick={handleResetBroadcastTracker} 
+                className="text-red-500 hover:text-red-400 transition-colors uppercase text-[9px]"
+              >
+                Clear Sent History 🔄
+              </button>
+            </div>
+
             <div className="border-t border-white/5 pt-4">
-              <p className="text-[10px] text-orange-400 font-extrabold uppercase mb-2">Send to Customers ({searchedCustomers.length})</p>
+              <p className="text-[10px] text-orange-400 font-extrabold uppercase mb-2">Targeted List ({filteredBroadcastCustomers.length})</p>
               <div className="space-y-2 max-h-40 overflow-y-auto no-scrollbar">
-                {searchedCustomers.map((user) => (
-                  <div key={user.phone} className="flex justify-between items-center bg-white/[0.01] border border-white/5 p-2 rounded-xl text-xs font-bold">
-                    <span className="text-gray-300">{user.name} (+{user.phone})</span>
-                    <button 
-                      onClick={() => triggerWhatsAppBroadcast(user.phone)}
-                      className="bg-green-600 hover:bg-green-700 text-white font-black text-[9px] px-3 py-1.5 rounded-lg flex items-center gap-1 uppercase transition-all"
-                    >
-                      <MessageSquare size={10}/> Send Msg
-                    </button>
-                  </div>
-                ))}
+                {filteredBroadcastCustomers.map((user) => {
+                  const isSent = sentBroadcastPhones.includes(String(user.phone).replace("+91", "").trim());
+                  return (
+                    <div key={user.phone} className={`flex justify-between items-center border p-2.5 rounded-xl text-xs font-bold transition-all ${isSent ? 'bg-white/[0.01] border-green-500/10 opacity-40' : 'bg-white/[0.01] border-white/5'}`}>
+                      <span className="text-gray-300">{user.name} (+{user.phone})</span>
+                      <button 
+                        onClick={() => handleSendBroadcastAndTrack(user.phone)}
+                        className={`font-black text-[9px] px-3.5 py-1.5 rounded-lg flex items-center gap-1 uppercase transition-all ${
+                          isSent 
+                            ? 'bg-green-500/20 text-green-400 border border-green-500/30' 
+                            : 'bg-green-600 hover:bg-green-700 text-white'
+                        }`}
+                      >
+                        <MessageSquare size={10}/> {isSent ? '✅ Sent' : '📲 Send'}
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
@@ -2502,4 +2579,4 @@ Report generated automatically by Bum Bum Cafe POS.`
 
     </div>
   );
-}
+      }
