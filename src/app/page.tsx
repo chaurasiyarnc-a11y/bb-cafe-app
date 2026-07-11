@@ -25,7 +25,7 @@ const DELIVERY_AREAS = [
   { name: "Mohandra Town", fee: 20, minFree: 99, range: "0-1 KM" },
   { name: "Mohandra Ward 1-5 (Within 2 Km)", fee: 20, minFree: 199, range: "1-2 KM" },
   { name: "Nearby Area (Within 5 Km)", fee: 40, minFree: 499, range: "2-5 KM" },
-  { name: "Out of Town (5 to 12 Km)", fee: 60, minFree: 999, range: "5-12 KM" } // 5 to 12 KM सीमा सेट की गई है
+  { name: "Out of Town (5 to 12 Km)", fee: 60, minFree: 999, range: "5-12 KM" }
 ];
 
 const HINGLISH_DICT: { [key: string]: string } = {
@@ -595,7 +595,8 @@ export default function BbCafeHome() {
       });
 
       toast.success(`🎁 सफलतापूर्वक ${pointsToGift} पॉइंट्स गिफ्ट कर दिए गए हैं!`);
-      const inviteMsg = `हे दोस्त! मैंने तुम्हें BAM BAM Cafe के ऐप पर 🎁 ${pointsToGift} Loyalty Points गिफ्ट किए हैं। यहाँ से स्वादिष्ट पिज्जा और थाली आर्डर करो: ${window.location.origin}`;
+      // Fixed static production share URL used here to ensure stable link
+      const inviteMsg = `हे दोस्त! मैंने तुम्हें BAM BAM Cafe के ऐप पर 🎁 ${pointsToGift} Loyalty Points गिफ्ट किए हैं। यहाँ से स्वादिष्ट पिज्जा और थाली आर्डर करो: https://bb-cafe-app.vercel.app/`;
       const whatsappUrl = `https://wa.me/91${friendPhoneRaw}?text=${encodeURIComponent(inviteMsg)}`;
       
       setGiftPhone(""); setGiftPointsAmount(""); setIsGiftModalOpen(false);
@@ -716,7 +717,8 @@ export default function BbCafeHome() {
     const shareCountKey = `bb_shares_${phoneClean}`;
     let currentShares = Number(localStorage.getItem(shareCountKey) || 0);
 
-    const shareMessage = `🔥 *BAM BAM CAFE - Mohandra* 🔥\nयहाँ से ऑर्डर करें बेहतरीन और स्वादिष्ट Pizza, Thali और Fast Food! सीधे आपके घर तक सुपर फास्ट होम डिलीवरी।\n👉 ${window.location.origin}`;
+    // Fixed static production share URL used here to ensure stable link is always shared
+    const shareMessage = `🔥 *BAM BAM CAFE - Mohandra* 🔥\nयहाँ से ऑर्डर करें बेहतरीन और स्वादिष्ट Pizza, Thali और Fast Food! सीधे आपके घर तक सुपर फास्ट होम डिलीवरी।\n👉 https://bb-cafe-app.vercel.app/`;
     const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(shareMessage)}`;
 
     window.open(whatsappUrl, '_blank');
@@ -886,7 +888,7 @@ export default function BbCafeHome() {
   if (!mounted) return null;
 
   return (
-    // overflow-x-clip prevents scroll breaks with position: sticky
+    // overflow-x-clip avoids breaking position: sticky scroll container
     <div className="bg-[#050505] min-h-screen text-white pb-32 font-sans relative overflow-x-clip">
       <Toaster position="top-center" />
       
@@ -1090,7 +1092,7 @@ export default function BbCafeHome() {
           </div>
         )}
 
-        {/* PRODUCTS LISTING */}
+        {/* PRODUCTS LISTING WITH SCROLL ENTRY ANIMATIONS */}
         <div className="grid grid-cols-1 gap-4 pt-1">
           {filteredMenu.length === 0 ? (
             <p className="text-center text-gray-500 py-8 text-xs font-bold uppercase">No items found...</p>
@@ -1619,7 +1621,7 @@ export default function BbCafeHome() {
             </form>
           </div>
         )}
-      </  AnimatePresence>
+      </AnimatePresence>
 
       <AnimatePresence>
         {isGiftModalOpen && (
@@ -1701,7 +1703,7 @@ export default function BbCafeHome() {
               <div className="space-y-1">
                 <h3 className="text-lg font-black text-white">आर्डर भुगतान सहायता 💳</h3>
                 <p className="text-[10px] text-gray-400 font-semibold leading-relaxed">
-                  नीचे दिए गए बटन पर क्लिक करके अपने फोन के पेमेंट ऐप (GPay, PhonePe, Paytm) से सीधे भुगतान करें।
+                  नीचे दिए गए बटन पर क्लिक करके अपने ... भुगतान करें।
                 </p>
               </div>
 
