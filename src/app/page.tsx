@@ -3,11 +3,12 @@
 'use client';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { db } from '../lib/firebase'; 
-import { collection, onSnapshot, query, addDoc, doc, setDoc, increment, runTransaction } from 'firebase/firestore';
-import { ShoppingBag, Plus, Search, X, MapPin, Phone, User, Sparkles, Star, Percent, Gift, Loader2, Share2, Heart, Clock, ChevronRight, Menu, ShoppingCart } from 'lucide-react';
+import { collection, onSnapshot, query, addDoc, doc, setDoc, increment, runTransaction, getDoc, getDocs, where } from 'firebase/firestore';
+import { ShoppingBag, Plus, Search, X, MapPin, Phone, User, Sparkles, Star, Percent, Gift, Loader2, Share2, Heart, Clock, ChevronRight, ShoppingCart, WifiOff } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
 import { useCartStore } from '../store/useCartStore';
+import Image from 'next/image'; // Performance Fix: Image Optimization [3]
 
 const FALLBACK_CATEGORIES = ["All", "Special Pizza", "Special Thali", "Paneer Special", "Special Mix veg", "Fast Food", "Super Cool", "Indian Bread", "Special Rice"];
 
@@ -63,7 +64,6 @@ export default function BbCafeHome() {
   const removeItem = store?.removeItem || (() => {});
   const clearCart = store?.clearCart || (() => {});
 
-  // Reference for smooth scrolling to menu
   const menuRef = useRef<HTMLDivElement | null>(null);
 
   // --- STATE VARIABLES ---
@@ -75,7 +75,22 @@ export default function BbCafeHome() {
   const [isSocialsOpen, setIsSocialsOpen] = useState(false); 
   const [storeOpen, setStoreOpen] = useState(true);
   const [mounted, setMounted] = useState(false);
+  
+  // Performance 3: Offline Handling State
   const [isOnline, setIsOnline] = useState(true);
+
+  // Dynamic WhatsApp Number State (Bug 4)
+  const [whatsappNumber, setWhatsappNumber] = useState("919714293759");
+
+  // Points Ledger/History State (UX 6)
+  const [pointsHistory, setPointsHistory] = useState<any[]>([]);
+
+  // Order History State (UX 1)
+  const [pastOrders, setPastOrders] = useState<any[]>([]);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+
+  // Closing Timer State (Marketing 6)
+  const [closingMinutesLeft, setClosingMinutesLeft] = useState<number | null>(null);
 
   const [customerDetails, setCustomerDetails] = useState<{ name: string, phone: string, refCode?: string } | null>(null);
   const [tempName, setTempName] = useState("");
@@ -98,7 +113,6 @@ export default function BbCafeHome() {
   const [bannerError, setBannerError] = useState(false);
   
   const [reviews, setReviews] = useState<any[]>([]);
-  const [coupons, setCoupons] = useState<any[]>([]);
   
   const [isReviewsDrawerOpen, setIsReviewsDrawerOpen] = useState(false);
   const [isReviewFormOpen, setIsReviewFormOpen] = useState(false);
@@ -119,30 +133,15 @@ export default function BbCafeHome() {
   const [oreganoAddon, setOreganoAddon] = useState(false);
   const [chiliFlakesAddon, setChiliFlakesAddon] = useState(false);
 
-  // Green Toggle
   const [noCutlery, setNoCutlery] = useState(false);
-
-  // Area Wise Delivery State
   const [selectedArea, setSelectedArea] = useState(DELIVERY_AREAS[0]);
-
-  // Favorite Items List
   const [favorites, setFavorites] = useState<string[]>([]);
-
-  // Eco Digital Invoice Modal
   const [showInvoice, setShowInvoice] = useState(false);
   const [lastPlacedOrder, setLastPlacedOrder] = useState<any>(null);
-
-  // Confetti Visual Particles State
   const [confettiActive, setConfettiActive] = useState(false);
-
-  // App Sharing Tracker State
   const [shareCount, setShareCount] = useState<number>(0);
-
-  // Geofencing limit parameters
   const [isTooFar, setIsTooFar] = useState(false);
   const [distanceKm, setDistanceKm] = useState<number | null>(null);
-
-  // PWA (App Install) States
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [showInstallBanner, setShowInstallBanner] = useState(false);
   const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
@@ -252,10 +251,9 @@ export default function BbCafeHome() {
     if (!customerDetails) return "WELCOME";
     const namePart = customerDetails.name.trim().split(" ")[0].substring(0, 4).toUpperCase();
     const phonePart = customerDetails.phone.slice(-4);
-    return `${namePart}${phonePart}`; // e.g. RAM3759
+    return `${namePart}${phonePart}`;
   };
 
-  // --- ARRAYS SHUFFLER FOR RANDOM LISTS ---
   const shuffleArray = (array: any[]) => {
     const shuffled = [...array];
     for (let i = shuffled.length - 1; i > 0; i--) {
@@ -414,7 +412,66 @@ export default function BbCafeHome() {
     };
   }, []);
 
-  // --- REST OF EFFECTS ---
+  // Performance 3: Network Listener for Online/Offline Status
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  // Marketing 6: "Closing Soon" Timer Calculation Loop
+  useEffect(() => {
+    const checkClosingTime = () => {
+      const now = new Date();
+      const currentHour = now.getHours();
+      const currentMinute = now.getMinutes();
+      const closingHour = 23; 
+      
+      if (currentHour === 22) { 
+        const minutesLeft = 60 - currentMinute;
+        setClosingMinutesLeft(minutesLeft);
+      } else {
+        setClosingMinutesLeft(null);
+      }
+    };
+    checkClosingTime();
+    const interval = setInterval(checkClosingTime, 60000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // UX 6: Real-time Points Ledger Listener
+  useEffect(() => {
+    if (!customerDetails?.phone) return;
+    const phoneClean = customerDetails.phone.replace("+91", "").trim();
+    const historyRef = collection(db, "customer_points", phoneClean, "history");
+    const unsubHistory = onSnapshot(historyRef, (snap) => {
+      const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      list.sort((a: any, b: any) => {
+        const timeA = a.timestamp?.seconds || 0;
+        const timeB = b.timestamp?.seconds || 0;
+        return timeB - timeA;
+      });
+      setPointsHistory(list);
+    });
+    return () => unsubHistory();
+  }, [customerDetails]);
+
+  // UX 1: Past Order History Loader
+  useEffect(() => {
+    const savedOrders = localStorage.getItem('bb_past_orders');
+    if (savedOrders) {
+      try {
+        setPastOrders(JSON.parse(savedOrders));
+      } catch (e) {}
+    }
+  }, []);
+
+  // --- INITIAL DATABASE LOAD AND SYNC ---
   useEffect(() => {
     setMounted(true);
 
@@ -432,21 +489,53 @@ export default function BbCafeHome() {
       }
     }
 
-    const unsubStore = onSnapshot(doc(db, "settings", "store"), (d) => { if(d.exists()) setStoreOpen(d.data().isOpen); });
+    // Dynamic WhatsApp Number & Closure Fetch (Bug 4)
+    const unsubStore = onSnapshot(doc(db, "settings", "store"), (d) => { 
+      if (d.exists()) {
+        setStoreOpen(d.data().isOpen);
+        if (d.data().whatsappNumber) {
+          setWhatsappNumber(d.data().whatsappNumber);
+        }
+      }
+    });
     
     const unsubMenu = onSnapshot(query(collection(db, "products")), (snap) => {
       const items = snap.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter((i: any) => i.isVisible !== false);
-      // Products shuffled randomly on snapshot load
-      setMenu(shuffleArray(items));
+      
+      // Shuffling UX bug fixed: Shuffles only once initially, does not shuffle on live updates!
+      setMenu(prev => {
+        if (prev.length === 0) {
+          return shuffleArray(items);
+        } else {
+          return items.map(newItem => {
+            const matched = prev.find(p => p.id === newItem.id);
+            return matched ? { ...matched, ...newItem } : newItem;
+          });
+        }
+      });
+
       localStorage.setItem('bb_cached_menu', JSON.stringify(items)); 
     }, () => {
       const localCached = localStorage.getItem('bb_cached_menu');
       if (localCached) setMenu(shuffleArray(JSON.parse(localCached)));
     });
 
+    // Real-time points observer to sync local state immediately
+    let unsubUserPoints: any = null;
+    if (savedDetails) {
+      try {
+        const parsed = JSON.parse(savedDetails);
+        const phoneClean = parsed.phone.replace("+91", "").trim();
+        unsubUserPoints = onSnapshot(doc(db, "customer_points", phoneClean), (snap) => {
+          if (snap.exists()) {
+            setCustomerPoints(snap.data().points || 0);
+          }
+        });
+      } catch (e) {}
+    }
+
     const unsubCats = onSnapshot(collection(db, "categories"), (snap) => { setDbCategories(snap.docs.map(d => ({ id: d.id, ...d.data() }))); });
     const unsubBanners = onSnapshot(collection(db, "banners"), (snap) => { setBanners(snap.docs.map(d => ({ id: d.id, ...d.data() }))); });
-    const unsubCoupons = onSnapshot(collection(db, "coupons"), (snap) => { setCoupons(snap.docs.map(d => ({ id: d.id, ...d.data() }))); });
     const unsubReviews = onSnapshot(collection(db, "reviews"), (snap) => {
       setReviews(snap.docs.map(d => ({ id: d.id, ...d.data() })).filter((r: any) => r.isApproved === true));
     });
@@ -458,12 +547,11 @@ export default function BbCafeHome() {
       unsubCats(); 
       unsubBanners(); 
       unsubReviews(); 
-      unsubCoupons(); 
       unsubRules(); 
+      if (unsubUserPoints) unsubUserPoints();
     };
   }, []);
 
-  // --- PWA INSTALL CLICK HANDLER ---
   const handleInstallClick = async () => {
     if (deferredPrompt) {
       deferredPrompt.prompt();
@@ -480,14 +568,27 @@ export default function BbCafeHome() {
 
   // --- ACTIONS ---
 
-  const handleApplyCoupon = () => {
+  // Security 2: Fetch specific coupon dynamically from Firestore on check
+  const handleApplyCoupon = async () => {
     if (!enteredCoupon) return toast.error("Please enter a coupon code");
-    const found = coupons.find(c => String(c.code).toLowerCase() === enteredCoupon.trim().toLowerCase());
-    if (found) {
-      setAppliedCoupon(found);
-      toast.success(`Coupon '${found.code}' applied! ₹${found.discountValue} OFF`);
-    } else {
-      toast.error("Invalid coupon code");
+    const codeClean = enteredCoupon.trim().toUpperCase();
+    const toastId = toast.loading("सत्यापन किया जा रहा है...");
+    
+    try {
+      const couponRef = doc(db, "coupons", codeClean);
+      const couponSnap = await getDoc(couponRef);
+      
+      toast.dismiss(toastId);
+      if (couponSnap.exists()) {
+        const data = couponSnap.data();
+        setAppliedCoupon({ id: couponSnap.id, code: codeClean, ...data });
+        toast.success(`Coupon '${codeClean}' applied! ₹${data.discountValue} OFF`);
+      } else {
+        toast.error("यह कूपन कोड मान्य नहीं है!");
+      }
+    } catch (err) {
+      toast.dismiss(toastId);
+      toast.error("कूपन चेक करने में समस्या आई।");
     }
   };
 
@@ -537,6 +638,7 @@ export default function BbCafeHome() {
     );
   };
 
+  // Security 1: Transaction-based secure points transferring
   const handleGiftPoints = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!customerDetails?.phone) return toast.error("कृपया पहले अपनी डिटेल्स जोड़ें!");
@@ -562,15 +664,32 @@ export default function BbCafeHome() {
         if (currentSenderPoints < pointsToGift) throw new Error("Insufficient points balance!");
 
         transaction.update(senderDocRef, { points: increment(-pointsToGift) });
+        
         if (!receiverSnap.exists()) {
           transaction.set(receiverDocRef, { name: "Loyal Friend 🎁", phone: friendPhoneRaw, points: pointsToGift, lastActive: new Date() });
         } else {
-          // Replaced 'giftPointsAmount' with compile-safe, guaranteed 'pointsToGift' variable
           transaction.update(receiverDocRef, { points: increment(pointsToGift) });
         }
+
+        // UX 6: Write to history subcollections for both sender & receiver
+        const senderHistoryRef = doc(collection(db, "customer_points", senderPhoneRaw, "history"));
+        transaction.set(senderHistoryRef, {
+          type: 'redeem',
+          points: pointsToGift,
+          description: `Gifted points to ${friendPhoneRaw} 🎁`,
+          timestamp: new Date()
+        });
+
+        const receiverHistoryRef = doc(collection(db, "customer_points", friendPhoneRaw, "history"));
+        transaction.set(receiverHistoryRef, {
+          type: 'earn',
+          points: pointsToGift,
+          description: `Received gift from ${senderPhoneRaw} 🎁`,
+          timestamp: new Date()
+        });
       });
 
-      toast.success(`🎁 सफलतापूर्वक ${pointsToGift}  पॉइंट्स गिफ्ट कर दिए गए हैं!`);
+      toast.success(`🎁 सफलतापूर्वक ${pointsToGift} पॉइंट्स गिफ्ट कर दिए गए हैं!`);
       const inviteMsg = `हे दोस्त! मैंने तुम्हें BAM BAM Cafe के ऐप पर 🎁 ${pointsToGift} Loyalty Points गिफ्ट किए हैं। यहाँ से स्वादिष्ट पिज्जा और थाली आर्डर करो: https://bb-cafe-app.vercel.app/`;
       const whatsappUrl = `https://wa.me/91${friendPhoneRaw}?text=${encodeURIComponent(inviteMsg)}`;
       
@@ -631,12 +750,36 @@ export default function BbCafeHome() {
 
     try {
       await addDoc(collection(db, "orders"), orderObj);
+      const phoneClean = customerDetails.phone.replace("+91", "");
       if (pointsEarned > 0 || totalPointsCost > 0) {
-        await setDoc(doc(db, "customer_points", customerDetails.phone.replace("+91", "")), {
-          name: customerDetails.name, phone: customerDetails.phone.replace("+91", ""), points: increment(pointsEarned - totalPointsCost), lastActive: new Date()
+        await setDoc(doc(db, "customer_points", phoneClean), {
+          name: customerDetails.name, phone: phoneClean, points: increment(pointsEarned - totalPointsCost), lastActive: new Date()
         }, { merge: true });
+
+        // UX 6: Record in Points Passbook History
+        if (pointsEarned > 0) {
+          await addDoc(collection(db, "customer_points", phoneClean, "history"), {
+            type: 'earn',
+            points: pointsEarned,
+            description: `Ordered Bill #${formattedBillStr} 🍕`,
+            timestamp: new Date()
+          });
+        }
+        if (totalPointsCost > 0) {
+          await addDoc(collection(db, "customer_points", phoneClean, "history"), {
+            type: 'redeem',
+            points: totalPointsCost,
+            description: `Redeemed rewards on Bill #${formattedBillStr} 🎁`,
+            timestamp: new Date()
+          });
+        }
       }
     } catch (e) {}
+
+    // UX 1: Add to local Storage based past orders list
+    const updatedPastOrders = [orderObj, ...pastOrders];
+    setPastOrders(updatedPastOrders);
+    localStorage.setItem('bb_past_orders', JSON.stringify(updatedPastOrders));
 
     setLastPlacedOrder(orderObj);
 
@@ -648,7 +791,6 @@ export default function BbCafeHome() {
     if (chiliFlakesAddon) itemsText += `• Extra Chili Flakes x1 - ₹10\n`;
     if (noCutlery) itemsText += `🌱 (Eco-Friendly: No plastic cutlery requested)\n`;
 
-    // Declared local 'refCode' compile-safe variable inside sendWhatsAppOrder before templating
     const refCode = getReferralCode();
     const msg = `🔥 *BAM BAM CAFE - NEW ORDER*\n\n*Bill No:* #${formattedBillStr}\n*Token No:* #${tokenNumber}\n*Customer:* ${customerDetails.name}\n*Phone:* ${customerDetails.phone}\n*Delivery Area:* ${selectedArea.name}\n*Address:* ${address}\n\n*ITEMS:*\n${itemsText}\n*Subtotal:* ₹${subtotal + addOnsCost}\n*Coupon Discount:* -₹${couponDiscount}\n*Delivery:* ₹${deliveryCharge}\n*TOTAL BILL: ₹${finalTotal}*\n\n*Invite Code:* ${refCode}\n*Points Earned:* +${pointsEarned} Pts\n${totalPointsCost > 0 ? `*Points Redeemed:* -${totalPointsCost} Pts\n` : ''}\n_Confirm order by replying 'YES'_`;
     
@@ -656,8 +798,8 @@ export default function BbCafeHome() {
     setConfettiActive(true);
     setTimeout(() => setConfettiActive(false), 5000);
 
-    // Direct WhatsApp Redirect
-    window.open(`https://wa.me/919714293759?text=${encodeURIComponent(msg)}`, '_blank');
+    // Dynamic WhatsApp Number Redirect (Bug 4)
+    window.open(`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(msg)}`, '_blank');
 
     setShowInvoice(true); 
     clearCart(); 
@@ -700,6 +842,14 @@ export default function BbCafeHome() {
             lastActive: new Date()
           }, { merge: true });
 
+          // Record in ledger history
+          await addDoc(collection(db, "customer_points", phoneClean, "history"), {
+            type: 'earn',
+            points: 1,
+            description: `Shared app 5 times! 📤`,
+            timestamp: new Date()
+          });
+
           setCustomerPoints(prev => prev + 1);
           toast.success("🎉 शानदार! आपने 5 दोस्तों के साथ ऐप शेयर करके +1 Loyalty Point कमा लिया है!");
         } catch (e) {}
@@ -739,6 +889,14 @@ export default function BbCafeHome() {
         lastActive: new Date()
       }, { merge: true });
 
+      // Record in ledger
+      await addDoc(collection(db, "customer_points", phoneRaw, "history"), {
+        type: 'earn',
+        points: 1,
+        description: `Followed us on ${platform} 📱`,
+        timestamp: new Date()
+      });
+
       localStorage.setItem(storageKey, "true");
       setCustomerPoints(prev => prev + 1);
       toast.success("🎉 बधाई हो! हमें फॉलो करने के लिए आपको +1 पॉइंट मिला है!");
@@ -753,25 +911,70 @@ export default function BbCafeHome() {
     return localStorage.getItem(storageKey) ? "✅ Claimed" : "🎁 Claim +1 Pt";
   };
 
-  const handleSaveDetails = (e: React.FormEvent) => {
+  // Bug 5: Complete Referral Code and Inviter Crediting Logic
+  const handleSaveDetails = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!tempName || tempName.trim().length < 3) return toast.error("Please enter your real name");
     if (!tempPhone || tempPhone.trim().length < 10) return toast.error("Please enter 10-digit number");
     
-    const details: any = { name: tempName, phone: `+91${tempPhone}` };
+    const phoneClean = tempPhone.trim().replace("+91", "");
+    const details: any = { name: tempName, phone: `+91${phoneClean}` };
+
     if (tempRefCode) {
-      details.refCode = tempRefCode;
+      const refCodeClean = tempRefCode.trim().toUpperCase();
+      details.refCode = refCodeClean;
+
+      try {
+        // Query database to find inviter matching referralCode
+        const q = query(collection(db, "customer_points"), where("inviteCode", "==", refCodeClean));
+        const querySnap = await getDocs(q);
+        
+        if (!querySnap.empty) {
+          const inviterDoc = querySnap.docs[0];
+          const inviterPhone = inviterDoc.id;
+
+          const myProfileSnap = await getDoc(doc(db, "customer_points", phoneClean));
+          if (!myProfileSnap.exists()) {
+            await runTransaction(db, async (transaction) => {
+              transaction.update(doc(db, "customer_points", inviterPhone), {
+                points: increment(5)
+              });
+
+              // Add history entry to referrer
+              const inviteHistoryRef = doc(collection(db, "customer_points", inviterPhone, "history"));
+              transaction.set(inviteHistoryRef, {
+                type: 'earn',
+                points: 5,
+                description: `Invited new friend: ${tempName} 🎉`,
+                timestamp: new Date()
+              });
+            });
+            toast.success("सफलतापूर्वक इनवाइट कोड लागू किया गया! आपके दोस्त को 5 पॉइंट्स मिले।");
+          }
+        }
+      } catch (err) {
+        console.error("Referral process error:", err);
+      }
     }
+
+    // Generate own referral/invite code on registration
+    const namePart = tempName.trim().split(" ")[0].substring(0, 4).toUpperCase();
+    const phonePart = phoneClean.slice(-4);
+    const computedInviteCode = `${namePart}${phonePart}`;
+
+    try {
+      await setDoc(doc(db, "customer_points", phoneClean), {
+        name: tempName,
+        phone: phoneClean,
+        inviteCode: computedInviteCode,
+        lastActive: new Date()
+      }, { merge: true });
+    } catch (err) {}
     
     localStorage.setItem('bb_cafe_customer', JSON.stringify(details));
     setCustomerDetails(details); 
     setIsLoginOpen(false);
-    
-    if (tempRefCode) {
-      toast.success(`स्वागत है ${tempName}! रेफ़रल कोड लागू कर दिया गया है।`);
-    } else {
-      toast.success(`Welcome ${tempName}!`);
-    }
+    toast.success(`Welcome ${tempName}! Your invite code: ${computedInviteCode}`);
   };
 
   const handleToggleFavorite = (id: string, e: any) => {
@@ -849,7 +1052,6 @@ export default function BbCafeHome() {
     }
   };
 
-  // Helper function to smooth scroll to the menu list
   const scrollToMenu = () => {
     if (menuRef && menuRef.current) {
       menuRef.current.scrollIntoView({ behavior: 'smooth' });
@@ -873,6 +1075,22 @@ export default function BbCafeHome() {
           }
         }} 
       />
+
+      {/* Performance 3: Network Status Banner */}
+      {!isOnline && (
+        <div className="bg-red-600 text-white font-black py-2 px-4 text-center text-xs flex items-center justify-center gap-2 shadow-lg sticky top-0 z-[150]">
+          <WifiOff size={14} className="animate-pulse" />
+          <span>आप ऑफ़लाइन हैं। कैश्ड मेनू दिखाया जा रहा है।</span>
+        </div>
+      )}
+
+      {/* Marketing 6: Closing Warning Timer Ribbon */}
+      {closingMinutesLeft !== null && storeOpen && (
+        <div className="bg-gradient-to-r from-amber-500 to-orange-600 text-white font-extrabold py-2 px-4 text-center text-[10px] flex items-center justify-center gap-1.5 shadow-md">
+          <span>⏰</span>
+          <span>आर्डर चेतावनी: बम बम कैफ़े अगले {closingMinutesLeft} मिनट में बंद होने वाला है! आर्डर जल्दी पूरा करें।</span>
+        </div>
+      )}
       
       {confettiActive && (
         <div className="fixed inset-0 pointer-events-none z-[999] overflow-hidden">
@@ -902,7 +1120,6 @@ export default function BbCafeHome() {
 
       {/* PREMIUM UPGRADED HERO HEADER */}
       <header className="relative pt-10 pb-6 px-5 overflow-hidden shadow-xl flex flex-col justify-end min-h-[160px]">
-        {/* local background video loop */}
         <video 
           autoPlay 
           loop 
@@ -910,15 +1127,12 @@ export default function BbCafeHome() {
           playsInline 
           className="absolute inset-0 w-full h-full object-cover z-0 select-none pointer-events-none"
         >
-          <source src="/header-video.mp4" type="video/mp4" />
           <source src="https://www.basewfp.com/wp-content/uploads/2024/06/Video-for-Homepage-s.mp4" type="video/mp4" />
-          <img src="https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=600&q=80" className="absolute inset-0 w-full h-full object-cover" alt="Bum Bum Cafe Header" />
+          <Image src="https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=600&q=80" fill className="object-cover" alt="Bum Bum Cafe Header" />
         </video>
 
-        {/* Semi-transparent dark overlay gradient for readability */}
         <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/55 to-black/90 z-10" />
 
-        {/* Hero Content Area with highly compact glass card */}
         <div className="relative z-20 max-w-[62%] space-y-1 mt-auto bg-black/45 backdrop-blur-md p-3 rounded-xl border border-white/10 shadow-lg">
           <motion.div
             initial={{ x: -20, opacity: 0 }}
@@ -926,7 +1140,6 @@ export default function BbCafeHome() {
             transition={{ duration: 0.4 }}
             className="space-y-0.5"
           >
-            {/* Fancy styled name above Delicious Food */}
             <span className="text-lg font-extrabold italic tracking-wide text-yellow-300 font-serif drop-shadow-md block leading-none mb-0.5">
               Bum Bum Cafe
             </span>
@@ -941,6 +1154,15 @@ export default function BbCafeHome() {
             Order Now
           </button>
         </div>
+
+        {/* Emergency Call Button (UX 9) */}
+        <a 
+          href={`tel:${whatsappNumber}`}
+          className="absolute top-4 right-4 z-20 bg-green-600 hover:bg-green-700 text-white p-2.5 rounded-full border border-white/10 flex items-center justify-center shadow-lg transition-transform hover:scale-105"
+          title="Direct call to cafe"
+        >
+          <Phone size={16} />
+        </a>
       </header>
 
       {/* FIXED STICKY SEARCH BAR */}
@@ -957,7 +1179,6 @@ export default function BbCafeHome() {
         </div>
       </div>
 
-      {/* DYNAMIC SHOP CLOSURE BANNER WARNING */}
       {!storeOpen && (
         <div className="bg-red-600 text-white font-black py-3 px-4 text-center text-xs flex items-center justify-center gap-2 shadow-lg border-b border-red-500">
           <span className="animate-pulse">⚠️</span>
@@ -968,7 +1189,6 @@ export default function BbCafeHome() {
       {/* MAIN LAYOUT WRAPPER */}
       <main ref={menuRef} className="pt-3 px-3 max-w-lg mx-auto space-y-4">
 
-        {/* PWA INSTALLATION BANNER */}
         {showInstallBanner && (
           <div className="bg-gradient-to-r from-[#ff5e00] to-amber-500 p-3.5 rounded-2xl flex items-center justify-between shadow-lg border border-white/10 mx-1">
             <div className="flex items-center gap-2.5">
@@ -987,12 +1207,20 @@ export default function BbCafeHome() {
           </div>
         )}
 
-        {/* PERSONALIZED GREETING BANNER */}
-        <div className="px-1.5 py-1">
+        <div className="px-1.5 py-1 flex justify-between items-center">
           <h3 className="text-xs font-black dark:text-gray-200 text-neutral-900 leading-normal">{greetingText}</h3>
+          
+          {/* UX 1: Show Past Orders triggers */}
+          {pastOrders.length > 0 && (
+            <button 
+              onClick={() => setIsHistoryOpen(true)}
+              className="bg-orange-500/10 text-orange-500 hover:bg-orange-500 hover:text-white border border-orange-500/20 text-[9px] font-black uppercase px-2.5 py-1.5 rounded-lg shadow-sm transition-all active:scale-95 flex items-center gap-1"
+            >
+              📜 My Orders ({pastOrders.length})
+            </button>
+          )}
         </div>
         
-        {/* Animated & Sliding Promotional Banner */}
         <div className="w-full h-36 rounded-2xl overflow-hidden relative border border-white/5 bg-white/[0.02]">
           {(banners.length === 0 || bannerError) ? (
             <div className="w-full h-full bg-gradient-to-r from-orange-600/35 to-[#b33600]/35 flex flex-col justify-center p-5 space-y-1">
@@ -1021,9 +1249,10 @@ export default function BbCafeHome() {
                     onError={() => setBannerError(true)}
                   />
                 ) : (
-                  <img 
+                  <Image 
                     src={banners[bannerIndex]?.url} 
-                    className="w-full h-full object-cover" 
+                    fill
+                    className="object-cover" 
                     onError={() => setBannerError(true)} 
                     alt="BAM BAM CAFE Promo"
                   />
@@ -1033,7 +1262,7 @@ export default function BbCafeHome() {
           )}
         </div>
 
-        {/* CATEGORY SLIDER (Horizontally Slidable without visible Scrollbar) */}
+        {/* CATEGORY SLIDER */}
         <div className="space-y-1">
           <p className="text-[8px] font-black uppercase tracking-wider text-orange-500">Inspiration for your first order</p>
           <div className="flex gap-5 overflow-x-auto py-2 px-1 scrollbar-none [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -1048,8 +1277,8 @@ export default function BbCafeHome() {
               const isActive = selectedCategory === cat;
               return (
                 <button key={cat} onClick={() => setSelectedCategory(cat)} className="flex flex-col items-center flex-shrink-0 group outline-none">
-                  <div className={`w-14 h-14 rounded-full overflow-hidden border transition-all ${isActive ? 'border-orange-500 scale-105 shadow-md' : 'dark:border-white/10 border-gray-200'}`}>
-                    <img src={getCategoryImage(cat)} className="w-full h-full object-cover" alt={cat} />
+                  <div className={`relative w-14 h-14 rounded-full overflow-hidden border transition-all ${isActive ? 'border-orange-500 scale-105 shadow-md' : 'dark:border-white/10 border-gray-200'}`}>
+                    <Image src={getCategoryImage(cat)} fill className="object-cover" alt={cat} />
                   </div>
                   <span className={`text-[9px] font-black uppercase mt-1.5 truncate max-w-[70px] text-center ${isActive ? 'dark:text-orange-500 text-orange-700' : 'dark:text-gray-400 text-neutral-800'}`}>
                     {cat === "All" ? "All" : cat.replace("Special ", "").replace(" Special", "")}
@@ -1060,7 +1289,6 @@ export default function BbCafeHome() {
           </div>
         </div>
 
-        {/* RANGE ZONE WARNING */}
         {distanceKm !== null && isTooFar && (
           <div className="bg-red-500/10 border border-red-500/20 p-3.5 rounded-2xl flex items-center gap-3">
             <span className="text-xl">⚠️</span>
@@ -1071,32 +1299,33 @@ export default function BbCafeHome() {
           </div>
         )}
 
-        {/* PRODUCTS LISTING HEADER TITLE */}
         <div className="pt-2">
           <h3 className="text-sm font-black uppercase tracking-wider text-orange-600">🍳 Our Delicious Menu</h3>
         </div>
 
-        {/* PRODUCTS LISTING WITH INTEGRATED SLIDABLE AD & THIN WRITE REVIEW STRIP */}
+        {/* PRODUCTS LISTING */}
         <div className="grid grid-cols-1 gap-4 pt-1 font-bold">
           {filteredMenu.length === 0 ? (
             <p className="text-center text-gray-500 py-8 text-xs font-bold uppercase">No items found...</p>
           ) : (
             filteredMenu.map((item, index) => {
+              const isItemAvailable = item.isAvailable !== false; // UX 4: Out of stock property
+
               return (
                 <React.Fragment key={item.id}>
-                  {/* Standard Product Card rendering */}
                   <motion.div 
                     layout 
-                    className="group dark:bg-white/[0.02] bg-white rounded-2xl border dark:border-white/5 border-gray-200 overflow-hidden flex flex-col relative shadow-md shadow-gray-200/40 dark:shadow-none transition-all duration-300 hover:shadow-lg"
+                    className={`group dark:bg-white/[0.02] bg-white rounded-2xl border dark:border-white/5 border-gray-200 overflow-hidden flex flex-col relative shadow-md shadow-gray-200/40 dark:shadow-none transition-all duration-300 hover:shadow-lg ${!isItemAvailable ? 'opacity-70' : ''}`}
                     initial={{ opacity: 0, y: 30 }}
                     whileInView={{ opacity: 1, y: 0 }}
                     viewport={{ once: true, margin: "-50px" }}
                     transition={{ duration: 0.45, ease: "easeOut" }}
                   >
                     <div className="relative h-44 w-full overflow-hidden">
-                      <img 
-                        src={item.image || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=500&bg=80"} 
-                        className="w-full h-full object-cover origin-center transition-transform duration-700 ease-out group-hover:scale-110" 
+                      <Image 
+                        src={item.image || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=500&q=80"} 
+                        fill
+                        className="object-cover origin-center transition-transform duration-700 ease-out group-hover:scale-110" 
                         alt={item.name} 
                       />
                       
@@ -1104,10 +1333,18 @@ export default function BbCafeHome() {
                         <span className="h-1 w-1 rounded-full bg-green-500 animate-pulse" />VEG
                       </div>
 
-                      {/* "FREE delivery" Bar Tag */}
                       <div className="absolute bottom-0 left-0 bg-gradient-to-r from-blue-600 to-blue-500 text-white font-black text-[9px] px-3 py-1 rounded-tr-xl flex items-center gap-1 shadow-md uppercase tracking-wider">
                         <span>🛵</span> <span>FREE delivery</span>
                       </div>
+
+                      {/* UX 4: Display Out of stock status ribbon */}
+                      {!isItemAvailable && (
+                        <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                          <span className="bg-red-600 text-white font-black text-[10px] px-3 py-1.5 rounded-lg uppercase tracking-widest shadow-md">
+                            आज उपलब्ध नहीं है (Out of Stock)
+                          </span>
+                        </div>
+                      )}
 
                       <button onClick={(e) => handleToggleFavorite(item.id, e)} className="absolute top-3 right-3 bg-black/60 backdrop-blur-md p-1.5 rounded-full border border-white/10 text-white hover:text-red-500 transition-colors">
                         <Heart size={14} className={favorites.includes(item.id) ? "fill-red-500 text-red-500" : "text-white"} />
@@ -1130,7 +1367,9 @@ export default function BbCafeHome() {
                           <p className="text-orange-700 dark:text-orange-500 font-black text-base leading-none">{getDisplayPrice(item)}</p>
                           {item.variants && <span className="text-[8px] font-bold dark:text-gray-400 text-gray-500 mt-1 block">Options available</span>}
                         </div>
-                        {storeOpen && !isTooFar && (
+                        
+                        {/* UX 4: Hide/disable ADD button if out of stock */}
+                        {storeOpen && !isTooFar && isItemAvailable && (
                           <button onClick={() => item.variants ? setSelectedProduct(item) : addItem(item)} className="px-4 py-2 bg-orange-500/10 text-orange-700 dark:text-orange-400 border border-orange-500/30 hover:bg-orange-500 hover:text-white rounded-lg font-black text-[10px] active:scale-95 transition-all uppercase flex items-center gap-1 shadow">
                             <Plus size={12} /> ADD
                           </button>
@@ -1139,7 +1378,6 @@ export default function BbCafeHome() {
                     </div>
                   </motion.div>
 
-                  {/* 4th Item check (index === 3) to show the stunning Loyalty Promo Pass card in-between */}
                   {index === 3 && (
                     <motion.div
                       initial={{ opacity: 0, y: 20 }}
@@ -1154,7 +1392,6 @@ export default function BbCafeHome() {
                       }}
                       className="cursor-pointer bg-gradient-to-r from-amber-500 via-orange-500 to-red-655 text-white p-5 rounded-2xl shadow-lg border border-white/10 my-2 relative overflow-hidden group animate-none"
                     >
-                      {/* Ambient background blob */}
                       <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full blur-xl group-hover:scale-110 transition-transform duration-500" />
                       <div className="relative z-10 flex justify-between items-center gap-4">
                         <div className="space-y-1.5">
@@ -1179,7 +1416,6 @@ export default function BbCafeHome() {
                     </motion.div>
                   )}
 
-                  {/* 6th Item check (index === 5) to render a thin, premium Write Review Promo Strip */}
                   {index === 5 && (
                     <motion.div
                       initial={{ opacity: 0, y: 15 }}
@@ -1198,7 +1434,6 @@ export default function BbCafeHome() {
                     </motion.div>
                   )}
 
-                  {/* 8th Item check (index === 7) to render a thin, premium Social Media Follow Strip */}
                   {index === 7 && (
                     <motion.div
                       initial={{ opacity: 0, y: 15 }}
@@ -1321,7 +1556,6 @@ export default function BbCafeHome() {
             <form onSubmit={handleReviewSubmit} className="dark:bg-[#111] bg-white w-full max-w-md p-6 rounded-3xl border dark:border-white/10 border-gray-200 text-center space-y-4 shadow-xl transition-colors duration-200">
               <div className="flex justify-between items-center pb-2 border-b dark:border-white/10 border-gray-100">
                 <h3 className="text-xl font-black text-orange-500 uppercase italic">Your Feedback</h3>
-                
                 <button 
                   type="button" 
                   onClick={() => setIsReviewFormOpen(false)} 
@@ -1374,7 +1608,7 @@ export default function BbCafeHome() {
             </form>
           </div>
         )}
-      </AnimatePresence>
+      </  AnimatePresence>
 
       <AnimatePresence>
         {selectedProduct && (
@@ -1480,7 +1714,7 @@ export default function BbCafeHome() {
                   <p className="text-[8px] dark:text-gray-400 text-neutral-800 font-bold">*Mohandra Town is free delivery above ₹99. Nearby Areas limit is active.</p>
                 </div>
 
-                {/* 3. SELECT DELIVERY ZONE (Shifted strictly under Free Delivery progress bar) */}
+                {/* 3. SELECT DELIVERY ZONE */}
                 <div className="dark:bg-white/[0.02] bg-gray-50 border dark:border-white/5 border-gray-200 rounded-2xl p-4 space-y-2 transition-colors duration-200">
                   <label className="text-[9px] font-black uppercase dark:text-gray-400 text-neutral-800">Select Delivery Zone (KM):</label>
                   <div className="grid grid-cols-2 gap-2">
@@ -1508,7 +1742,7 @@ export default function BbCafeHome() {
                   </div>
                 </div>
 
-                {/* 4. DELIVERY ADDRESS INPUT (Shifted strictly under Select Delivery Zone) */}
+                {/* 4. DELIVERY ADDRESS INPUT */}
                 <div className="dark:bg-white/[0.02] bg-gray-50 p-4 rounded-2xl border dark:border-white/5 border-gray-200 space-y-2 transition-colors duration-200">
                   <div className="flex items-center gap-1.5 text-orange-500"><MapPin size={14}/> <h3 className="font-black uppercase text-[10px]">Delivery Address</h3></div>
                   <div className="flex justify-between items-center mb-1">
@@ -1533,7 +1767,7 @@ export default function BbCafeHome() {
                   </div>
                 </div>
 
-                {/* 6. UPSELL / FREQUENTLY BOUGHT TOGETHER SECTION */}
+                {/* 6. UPSELL / FREQUENTLY BOUGHT TOGETHER */}
                 {upsellSuggestionItems.length > 0 && (
                   <div className="dark:bg-purple-950/20 bg-purple-50 border border-purple-500/10 rounded-2xl p-4 space-y-2">
                     <p className="text-[9px] font-black uppercase dark:text-purple-400 text-purple-800 tracking-wider">Frequently Bought Together 🥤</p>
@@ -1551,7 +1785,7 @@ export default function BbCafeHome() {
                   </div>
                 )}
 
-                {/* 7. ECO FRIENDLY PACKAGING CHECKBOX */}
+                {/* 7. ECO FRIENDLY PACKAGING */}
                 <div className="dark:bg-green-950/10 bg-green-50/50 border dark:border-green-500/10 border-green-200/50 rounded-2xl p-4 flex justify-between items-center transition-colors duration-200">
                   <div className="space-y-0.5">
                     <p className="text-[10px] font-black text-green-600 uppercase tracking-tight">🌱 Eco-Friendly Packaging</p>
@@ -1579,6 +1813,23 @@ export default function BbCafeHome() {
                         {loyaltyRules.map(rule => (<p key={rule.id}>🎁 {rule.pointsCost} Pts = {rule.rewardName}</p>))}
                       </div>
                     </div>
+
+                    {/* UX 6: Detailed Points Ledger "Passbook" view inside Loyalty Card */}
+                    {pointsHistory.length > 0 && (
+                      <div className="pt-2 border-t border-white/5 space-y-1.5">
+                        <p className="text-[9px] font-black uppercase dark:text-gray-400 text-neutral-700">📜 Points Passbook (हाल ही के लेन-देन):</p>
+                        <div className="space-y-1 max-h-24 overflow-y-auto pr-1 text-[8px] font-bold">
+                          {pointsHistory.map((h: any) => (
+                            <div key={h.id} className="flex justify-between items-center bg-black/10 dark:bg-white/5 p-1.5 rounded border dark:border-white/5 border-gray-200">
+                              <span className="truncate max-w-[170px] dark:text-gray-300 text-neutral-800">{h.description}</span>
+                              <span className={h.type === 'earn' ? 'text-green-500' : 'text-red-500'}>
+                                {h.type === 'earn' ? '+' : '-'}{h.points} Pts
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
 
                     <div className="pt-1.5 flex flex-col gap-2">
                       <div className="flex justify-between items-center text-[9px]">
@@ -1769,11 +2020,15 @@ export default function BbCafeHome() {
               <div className="space-y-3 text-left">
                 <div className="space-y-1">
                   <label className="text-[9px] font-black uppercase text-gray-500">Friend's Phone Number</label>
-                  <input type="tel" maxLength={10} placeholder="e.g. 9876543210" value={giftPhone} onChange={(e) => setGiftPhone(e.target.value)} required className="w-full dark:bg-white/5 bg-gray-50 border dark:border-white/10 border-gray-200 p-3 rounded-xl text-xs font-bold dark:text-neutral-900 outline-none text-center" />
+                  
+                  {/* Bug 1 Fix: Text visible in dark mode with dark:text-white */}
+                  <input type="tel" maxLength={10} placeholder="e.g. 9876543210" value={giftPhone} onChange={(e) => setGiftPhone(e.target.value)} required className="w-full dark:bg-white/10 bg-gray-50 border dark:border-white/10 border-gray-200 p-3 rounded-xl text-xs font-bold dark:text-white text-neutral-900 outline-none text-center" />
                 </div>
                 <div className="space-y-1">
                   <label className="text-[9px] font-black uppercase text-gray-500">Points to Gift (Your Pts: {customerPoints})</label>
-                  <input type="number" placeholder="e.g. 10" value={giftPointsAmount} onChange={(e) => setGiftPointsAmount(e.target.value === "" ? "" : Number(e.target.value))} required className="w-full dark:bg-white/5 bg-gray-50 border dark:border-white/10 border-gray-200 p-3 rounded-xl text-xs font-bold dark:text-neutral-900 outline-none text-center" />
+                  
+                  {/* Bug 1 Fix: Text visible in dark mode with dark:text-white */}
+                  <input type="number" placeholder="e.g. 10" value={giftPointsAmount} onChange={(e) => setGiftPointsAmount(e.target.value === "" ? "" : Number(e.target.value))} required className="w-full dark:bg-white/10 bg-gray-50 border dark:border-white/10 border-gray-200 p-3 rounded-xl text-xs font-bold dark:text-white text-neutral-900 outline-none text-center" />
                 </div>
               </div>
               <div className="flex gap-2">
@@ -1797,7 +2052,7 @@ export default function BbCafeHome() {
                 <p className="text-[8px] text-gray-500 font-bold uppercase tracking-wider">हर प्लेटफार्म पर फॉलो/सब्सक्राइब करने का +1 पॉइंट पाएं!</p>
               </div>
               <div className="space-y-2 text-left max-h-[22rem] overflow-y-auto no-scrollbar pr-1">
-                <button onClick={() => handleSocialClick('whatsapp_msg', 'https://wa.me/919714293759')} className="w-full flex items-center justify-between dark:bg-green-500/10 bg-green-50/50 border dark:border-green-500/20 border-green-200/50 p-3 rounded-xl">
+                <button onClick={() => handleSocialClick('whatsapp_msg', `https://wa.me/${whatsappNumber}`)} className="w-full flex items-center justify-between dark:bg-green-500/10 bg-green-50/50 border dark:border-green-500/20 border-green-200/50 p-3 rounded-xl">
                   <span className="text-[10px] font-black dark:text-white text-neutral-900">🟢 WhatsApp Message</span>
                   <span className="text-[8px] font-black uppercase px-2.5 py-1 rounded bg-yellow-400 text-black">{getClaimStatus('whatsapp_msg')}</span>
                 </button>
@@ -1824,6 +2079,55 @@ export default function BbCafeHome() {
               </div>
               <button type="button" onClick={() => setIsSocialsOpen(false)} className="w-full bg-orange-500 text-black font-black p-3 rounded-xl text-xs uppercase">CLOSE</button>
             </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* UX 1: CUSTOMER ORDER HISTORY DRAWER MODAL */}
+      <AnimatePresence>
+        {isHistoryOpen && (
+          <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[120] overflow-y-auto">
+            <div className="p-6 max-w-lg mx-auto pb-32">
+              <div className="flex justify-between items-center mb-8">
+                <div>
+                  <h2 className="text-2xl font-black text-white">My Orders</h2>
+                  <p className="text-xs text-orange-500 font-bold">Your recent bills and token status</p>
+                </div>
+                <button onClick={() => setIsHistoryOpen(false)} className="p-2.5 bg-white/10 text-white rounded-full hover:bg-white/20 transition-colors"><X size={20} /></button>
+              </div>
+              
+              <div className="space-y-4">
+                {pastOrders.map((ord: any, index: number) => (
+                  <div key={index} className="dark:bg-white/[0.03] bg-white border dark:border-white/5 border-gray-200 rounded-2xl p-5 space-y-3 transition-colors duration-200">
+                    <div className="flex justify-between items-center">
+                      <h4 className="font-black text-xs text-orange-500">Bill No: #{formatBillNumber(ord.billNumber)}</h4>
+                      <span className="text-[8px] bg-green-600/15 text-green-400 px-2 py-0.5 rounded font-black uppercase">Token: #{ord.tokenNumber}</span>
+                    </div>
+                    <div className="text-[9px] space-y-1 text-gray-400 font-semibold">
+                      {ord.items.map((it: any, i: number) => (
+                        <div key={i} className="flex justify-between">
+                          <span>{it.name} x{it.quantity}</span>
+                          <span>₹{it.price * it.quantity}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="h-px bg-white/5 my-1" />
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-gray-400">Grand Total:</span>
+                      <span className="font-black text-white">₹{ord.total}</span>
+                    </div>
+                    <a 
+                      href={`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(`नमस्ते बम बम कैफ़े! कृपया मेरे आर्डर नंबर #${formatBillNumber(ord.billNumber)} (टोकन नंबर: #${ord.tokenNumber}) का लाइव स्टेटस बताएं।`)}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="w-full bg-white/5 text-center text-[10px] font-black text-yellow-400 py-2 rounded-lg block border border-white/5"
+                    >
+                      Track Live (WhatsApp)
+                    </a>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         )}
       </AnimatePresence>
@@ -1863,7 +2167,7 @@ export default function BbCafeHome() {
 
               <div className="pt-2 flex flex-col gap-2">
                 <a 
-                  href={`https://wa.me/919714293759?text=${encodeURIComponent(`नमस्ते बम बम कैफ़े! कृपया मेरे आर्डर नंबर #${formatBillNumber(lastPlacedOrder.billNumber)} (टोकन नंबर: #${lastPlacedOrder.tokenNumber}) का लाइव स्टेटस बताएं।`)}`}
+                  href={`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(`नमस्ते बम बम कैफ़े! कृपया मेरे आर्डर नंबर #${formatBillNumber(lastPlacedOrder.billNumber)} (टोकन नंबर: #${lastPlacedOrder.tokenNumber}) का लाइव स्टेटस बताएं।`)}`}
                   target="_blank"
                   rel="noreferrer"
                   className="bg-yellow-400 text-black py-2.5 rounded-xl text-xs font-black uppercase tracking-wider block text-center"
@@ -1875,7 +2179,6 @@ export default function BbCafeHome() {
               <p className="text-[9px] text-green-500 dark:text-green-400 dark:bg-green-500/10 bg-green-50 p-2.5 rounded-xl font-bold">
                 🌱 पेपर रसीद के बिना DIGITAL इनवॉइस जनरेट किया गया है। धन्यवाद!
               </p>
-              <img src="https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=500&bg=80" alt="Bum Bum Cafe digital green invoice" className="hidden" />
               <button onClick={() => setShowInvoice(false)} className="w-full bg-white text-black p-3 rounded-xl text-xs font-black uppercase">
                 CLOSE RECEIPT
               </button>
@@ -1887,3 +2190,33 @@ export default function BbCafeHome() {
     </div>
   );
 }
+
+भाग 3: WhatsApp Share Card Preview (OpenGraph Setup Guide)
+
+जब कोई यूजर इन्वाइट लिंक व्हाट्सएप पर शेयर करेगा, तो सुंदर Image Preview Card
+दिखाने के लिए अपने प्रोजेक्ट के layout.tsx (या जिस पेज पर ऐप होस्टेड है) में
+निम्नलिखित मेटाडेटा जोड़ें:
+
+// layout.tsx या page.tsx के ऊपर Next.js में मेटाडेटा घोषित करें:
+export const metadata = {
+  title: "Bum Bum Cafe - Mohandra 🍕",
+  description: "ऑर्डर करें स्वादिष्ट ताज़ा पिज्जा, सैंडविच और स्पेशल थाली! हमारे लॉयल्टी कोड से पाएं एक्स्ट्रा पॉइंट्स।",
+  openGraph: {
+    title: "Bum Bum Cafe - Mohandra 🍕",
+    description: "स्वादिष्ट ताज़ा पनीर पिज्जा और स्पेशल थाली सीधे अपने घर मंगवाएं!",
+    url: "https://bb-cafe-app.vercel.app",
+    siteName: "Bum Bum Cafe",
+    images: [
+      {
+        url: "https://images.unsplash.com/photo-1513104890138-7c749659a591?w=800", // टेम्पटिंग पिज्जा इमेज
+        width: 800,
+        height: 600,
+        alt: "Delicious Pizza at Bum Bum Cafe",
+      },
+    ],
+    locale: "en_IN",
+    type: "website",
+  },
+};
+
+
