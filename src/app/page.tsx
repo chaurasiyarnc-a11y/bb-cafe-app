@@ -466,12 +466,26 @@ export default function BbCafeHome() {
         .catch((err) => console.log("Service Worker Registration failed", err));
     }
 
+    // 2. ऑटोमैटिक इंस्टॉल बैनर ट्रिगर लिसनर
     const handleBeforeInstallPrompt = (e: any) => {
       e.preventDefault();
       setDeferredPrompt(e);
       setShowInstallBanner(true);
     };
     window.addEventListener('beforeinstallprompt' as any, handleBeforeInstallPrompt);
+
+    // 3. यदि पहले से ही स्टैंडअलोन (PWA) में चालू नहीं है, तो सभी मोबाइल यूजर्स के लिए बैनर 3 सेकंड बाद जरूर दिखाएं
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone;
+    if (!isStandalone) {
+      const timer = setTimeout(() => {
+        setShowInstallBanner(true);
+      }, 3000);
+      return () => {
+        clearTimeout(timer);
+        window.removeEventListener('beforeinstallprompt' as any, handleBeforeInstallPrompt);
+      };
+    }
+
     return () => {
       window.removeEventListener('beforeinstallprompt' as any, handleBeforeInstallPrompt);
     };
@@ -486,6 +500,20 @@ export default function BbCafeHome() {
       }
       setDeferredPrompt(null);
       setShowInstallBanner(false);
+    } else {
+      // मैन्युअल इंस्टॉल गाइड फ़ॉलबैक (अगर ब्राउज़र ऑटोमैटिक इंस्टॉल ब्लॉक कर देता है)
+      toast((t) => (
+        <div className="flex flex-col gap-1 text-[11px] font-bold p-1">
+          <p className="text-gray-800 font-black">📲 मैन्युअल इंस्टॉल गाइड:</p>
+          <p className="text-gray-600 font-medium leading-relaxed">
+            • **Chrome (Android):** ऊपर 3 डॉट्स <span className="font-black">(⋮)</span> दबाएं और **'Install app'** चुनें।
+          </p>
+          <p className="text-gray-600 font-medium leading-relaxed">
+            • **Safari (iPhone):** नीचे **Share** आइकॉन दबाएं और **'Add to Home Screen'** चुनें।
+          </p>
+          <button onClick={() => toast.dismiss(t.id)} className="bg-orange-500 text-white px-2.5 py-1.5 rounded-lg mt-1.5 text-[9px] uppercase font-black tracking-wider shadow">समझ गया</button>
+        </div>
+      ), { duration: 12000 });
     }
   };
 
@@ -892,7 +920,6 @@ export default function BbCafeHome() {
   if (!mounted) return null;
 
   return (
-    // overflow-x-clip avoids breaking position: sticky scroll container
     // dark:bg and bg classes enable system light/dark mode support smoothly
     <div className="dark:bg-[#050505] bg-gray-50 min-h-screen dark:text-white text-gray-900 pb-32 font-sans relative overflow-x-clip transition-colors duration-200">
       <Toaster position="top-center" />
@@ -1055,25 +1082,25 @@ export default function BbCafeHome() {
           )}
         </div>
 
-        {/* CATEGORY SLIDER */}
+        {/* CATEGORY SLIDER (ZOOMED SIZE w-18 h-18) */}
         <div className="space-y-1">
           <p className="text-[8px] font-black uppercase tracking-wider text-orange-500">Inspiration for your first order</p>
           <div className="flex gap-5 overflow-x-auto hide-scrollbar py-2 px-1">
             <button onClick={() => setSelectedCategory("Favorites")} className="flex flex-col items-center flex-shrink-0 group outline-none">
-              <div className={`w-14 h-14 rounded-full overflow-hidden border transition-all flex items-center justify-center ${selectedCategory === "Favorites" ? 'border-red-500 scale-105' : 'border-white/10'}`}>
-                <Heart size={24} className={selectedCategory === "Favorites" ? 'text-red-500 fill-red-500' : 'text-gray-400'} />
+              <div className={`w-18 h-18 rounded-full overflow-hidden border transition-all flex items-center justify-center ${selectedCategory === "Favorites" ? 'border-red-500 scale-105 shadow-md' : 'dark:border-white/10 border-gray-200'}`}>
+                <Heart size={30} className={selectedCategory === "Favorites" ? 'text-red-500 fill-red-500' : 'text-gray-400'} />
               </div>
-              <span className={`text-[9px] font-black uppercase mt-1.5 truncate ${selectedCategory === "Favorites" ? 'text-red-500' : 'text-gray-400'}`}>My Favorites</span>
+              <span className={`text-[9px] font-black uppercase mt-1.5 truncate ${selectedCategory === "Favorites" ? 'text-red-500' : 'dark:text-gray-400 text-gray-500'}`}>My Favorites</span>
             </button>
 
             {visibleCategories.map((cat) => {
               const isActive = selectedCategory === cat;
               return (
                 <button key={cat} onClick={() => setSelectedCategory(cat)} className="flex flex-col items-center flex-shrink-0 group outline-none">
-                  <div className={`w-14 h-14 rounded-full overflow-hidden border transition-all ${isActive ? 'border-orange-500 scale-105 shadow-md' : 'border-white/10'}`}>
+                  <div className={`w-18 h-18 rounded-full overflow-hidden border transition-all ${isActive ? 'border-orange-500 scale-105 shadow-md' : 'dark:border-white/10 border-gray-200'}`}>
                     <img src={getCategoryImage(cat)} className="w-full h-full object-cover" alt={cat} />
                   </div>
-                  <span className={`text-[9px] font-black uppercase mt-1.5 truncate max-w-[70px] text-center ${isActive ? 'text-orange-500' : 'text-gray-400'}`}>
+                  <span className={`text-[9px] font-black uppercase mt-1.5 truncate max-w-[70px] text-center ${isActive ? 'text-orange-500' : 'dark:text-gray-400 text-gray-500'}`}>
                     {cat === "All" ? "All" : cat.replace("Special ", "").replace(" Special", "")}
                   </span>
                 </button>
@@ -1526,7 +1553,7 @@ export default function BbCafeHome() {
                   {appliedCoupon && (
                     <div className="flex justify-between items-center text-[10px] bg-green-500/10 border border-green-500/25 p-2 rounded-lg">
                       <span className="text-green-400 font-bold uppercase">Code Applied: {appliedCoupon.code}</span>
-                      <button onClick={() => {  setAppliedCoupon(null); setEnteredCoupon(""); }} className="text-red-400 font-bold">Remove</button>
+                      <button onClick={() => { setAppliedCoupon(null); setEnteredCoupon(""); }} className="text-red-400 font-bold">Remove</button>
                     </div>
                   )}
                 </div>
@@ -1793,7 +1820,7 @@ export default function BbCafeHome() {
             </div>
           </div>
         )}
-      </  AnimatePresence>
+      </AnimatePresence>
 
     </div>
   );
