@@ -1,21 +1,12 @@
-{
-  "short_name": "BumBumCafe",
-  "name": "Bum Bum Cafe | Premium Ordering",
-  "icons": [
-    {
-      "src": "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=192&q=80",
-      "type": "image/png",
-      "sizes": "192x192"
-    },
-    {
-      "src": "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=512&q=80",
-      "type": "image/png",
-      "sizes": "512x512"
-    }
-  ],
-  "start_url": "/",
-  "background_color": "#050505",
-  "theme_color": "#ff5e00",
-  "display": "standalone",
-  "orientation": "portrait"
-}
+"icons": [
+  {
+    "src": "/icon-192.png",
+    "type": "image/png",
+    "sizes": "192x192"
+  },
+  {
+    "src": "/icon-512.png",
+    "type": "image/png",
+    "sizes": "512x512"
+  }
+]
