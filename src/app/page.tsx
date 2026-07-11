@@ -8,7 +8,7 @@ import { ShoppingBag, Plus, Search, X, MapPin, Phone, User, Sparkles, Star, Perc
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
 import { useCartStore } from '../store/useCartStore';
-import Image from 'next/image'; // Performance Fix: Image Optimization [3]
+import Image from 'next/image';
 
 const FALLBACK_CATEGORIES = ["All", "Special Pizza", "Special Thali", "Paneer Special", "Special Mix veg", "Fast Food", "Super Cool", "Indian Bread", "Special Rice"];
 
@@ -430,7 +430,6 @@ export default function BbCafeHome() {
       const now = new Date();
       const currentHour = now.getHours();
       const currentMinute = now.getMinutes();
-      const closingHour = 23; 
       
       if (currentHour === 22) { 
         const minutesLeft = 60 - currentMinute;
@@ -689,7 +688,7 @@ export default function BbCafeHome() {
         });
       });
 
-      toast.success(`🎁 सफलतापूर्वक ${pointsToGift} पॉइंट्स गिफ्ट कर दिए गए हैं!`);
+      toast.success(`🎁 सफलतापूर्वक ${pointsToGift}  पॉइंट्स गिफ्ट कर दिए गए हैं!`);
       const inviteMsg = `हे दोस्त! मैंने तुम्हें BAM BAM Cafe के ऐप पर 🎁 ${pointsToGift} Loyalty Points गिफ्ट किए हैं। यहाँ से स्वादिष्ट पिज्जा और थाली आर्डर करो: https://bb-cafe-app.vercel.app/`;
       const whatsappUrl = `https://wa.me/91${friendPhoneRaw}?text=${encodeURIComponent(inviteMsg)}`;
       
@@ -949,7 +948,7 @@ export default function BbCafeHome() {
                 timestamp: new Date()
               });
             });
-            toast.success("सफलतापूर्वक इनवाइट कोड लागू किया गया! आपके दोस्त को 5 पॉइंट्स मिले।");
+            toast.success("सफलतापूर्वक इनवाइट कोड लागू किया गया! आपके दोस्त को 5 ऑयल्टी पॉइंट्स मिले।");
           }
         }
       } catch (err) {
@@ -1608,7 +1607,7 @@ export default function BbCafeHome() {
             </form>
           </div>
         )}
-      </  AnimatePresence>
+      </AnimatePresence>
 
       <AnimatePresence>
         {selectedProduct && (
@@ -2190,33 +2189,3 @@ export default function BbCafeHome() {
     </div>
   );
 }
-
-भाग 3: WhatsApp Share Card Preview (OpenGraph Setup Guide)
-
-जब कोई यूजर इन्वाइट लिंक व्हाट्सएप पर शेयर करेगा, तो सुंदर Image Preview Card
-दिखाने के लिए अपने प्रोजेक्ट के layout.tsx (या जिस पेज पर ऐप होस्टेड है) में
-निम्नलिखित मेटाडेटा जोड़ें:
-
-// layout.tsx या page.tsx के ऊपर Next.js में मेटाडेटा घोषित करें:
-export const metadata = {
-  title: "Bum Bum Cafe - Mohandra 🍕",
-  description: "ऑर्डर करें स्वादिष्ट ताज़ा पिज्जा, सैंडविच और स्पेशल थाली! हमारे लॉयल्टी कोड से पाएं एक्स्ट्रा पॉइंट्स।",
-  openGraph: {
-    title: "Bum Bum Cafe - Mohandra 🍕",
-    description: "स्वादिष्ट ताज़ा पनीर पिज्जा और स्पेशल थाली सीधे अपने घर मंगवाएं!",
-    url: "https://bb-cafe-app.vercel.app",
-    siteName: "Bum Bum Cafe",
-    images: [
-      {
-        url: "https://images.unsplash.com/photo-1513104890138-7c749659a591?w=800", // टेम्पटिंग पिज्जा इमेज
-        width: 800,
-        height: 600,
-        alt: "Delicious Pizza at Bum Bum Cafe",
-      },
-    ],
-    locale: "en_IN",
-    type: "website",
-  },
-};
-
-
