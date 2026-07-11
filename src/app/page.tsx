@@ -1,10 +1,10 @@
 
 
 'use client';
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { db } from '../lib/firebase'; 
 import { collection, onSnapshot, query, addDoc, doc, setDoc, increment, runTransaction } from 'firebase/firestore';
-import { ShoppingBag, Plus, Search, X, MapPin, Phone, User, Sparkles, Star, Percent, Gift, Loader2, Share2, Heart, Clock, ChevronRight } from 'lucide-react';
+import { ShoppingBag, Plus, Search, X, MapPin, Phone, User, Sparkles, Star, Percent, Gift, Loader2, Share2, Heart, Clock, ChevronRight, Menu, ShoppingCart } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
 import { useCartStore } from '../store/useCartStore';
@@ -62,6 +62,9 @@ export default function BbCafeHome() {
   const addItem = store?.addItem || (() => {});
   const removeItem = store?.removeItem || (() => {});
   const clearCart = store?.clearCart || (() => {});
+
+  // Reference for smooth scrolling to menu
+  const menuRef = useRef<HTMLDivElement | null>(null);
 
   // --- STATE VARIABLES ---
   const [menu, setMenu] = useState<any[]>([]);
@@ -547,7 +550,7 @@ export default function BbCafeHome() {
         if (!receiverSnap.exists()) {
           transaction.set(receiverDocRef, { name: "Loyal Friend 🎁", phone: friendPhoneRaw, points: pointsToGift, lastActive: new Date() });
         } else {
-          transaction.update(receiverDocRef, { points: increment(pointsToGift) });
+          transaction.update(receiverDocRef, { points: increment(giftPointsAmount) });
         }
       });
 
@@ -661,7 +664,6 @@ export default function BbCafeHome() {
     const shareCountKey = `bb_shares_${phoneClean}`;
     let currentShares = Number(localStorage.getItem(shareCountKey) || 0);
 
-    // Dynamic reference link created for unique invitations
     const refCode = getReferralCode();
     const shareMessage = `🔥 *BAM BAM CAFE - Mohandra* 🔥\n\nमेरे स्पेशल इन्वाइट कोड *${refCode}* से आर्डर करें और पॉइंट्स पाएं! 🎁\n👉 https://bb-cafe-app.vercel.app/?ref=${refCode}`;
     const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(shareMessage)}`;
@@ -830,6 +832,13 @@ export default function BbCafeHome() {
     }
   };
 
+  // Helper function to smooth scroll to the menu list
+  const scrollToMenu = () => {
+    if (menuRef && menuRef.current) {
+      menuRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
   if (!mounted) return null;
 
   return (
@@ -874,9 +883,9 @@ export default function BbCafeHome() {
         </div>
       )}
 
-      {/* PREMIUM VIDEO BACKGROUND HEADER */}
-      <header className="relative py-12 px-6 overflow-hidden border-b border-white/10 shadow-xl flex justify-between items-center min-h-[160px]">
-        {/* local video path is used so it never gets blocked by external server CORS blockings */}
+      {/* PREMIUM UPGRADED NAVIGATION & VIDEO BACKGROUND HERO HEADER */}
+      <header className="relative pt-6 pb-12 px-5 overflow-hidden border-b border-white/10 shadow-2xl flex flex-col justify-between min-h-[220px]">
+        {/* local background video loop */}
         <video 
           autoPlay 
           loop 
@@ -889,31 +898,61 @@ export default function BbCafeHome() {
           <img src="https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=600&q=80" className="absolute inset-0 w-full h-full object-cover" alt="Bum Bum Cafe Header" />
         </video>
 
-        {/* Semi-transparent dark overlay gradient for readability */}
-        <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/60 to-black/90 z-10" />
+        {/* Dark overlay backdrop for high-contrast visibility */}
+        <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/60 to-black/90 z-10" />
 
-        {/* Premium Header Backdrop-Blur Box Container */}
-        <div className="relative z-20 bg-black/45 backdrop-blur-md border border-white/10 px-5 py-3 rounded-2xl max-w-[70%] shadow-lg">
-          <motion.h1 
-            initial={{ scale: 0.9, opacity: 0 }} 
-            animate={{ scale: 1, opacity: 1 }} 
-            transition={{ duration: 0.4 }}
-            className="text-2xl font-black italic tracking-tighter text-yellow-300 drop-shadow-md"
-          >
-            BAM BAM CAFE
-          </motion.h1>
-          <p className="text-[9px] text-yellow-100 font-extrabold tracking-wider uppercase drop-shadow-sm mt-0.5">
-            {activeTheme.name}
-          </p>
+        {/* 1. TOP NAVIGATION BAR */}
+        <div className="relative z-20 w-full flex justify-between items-center mb-6">
+          {/* Logo with Chef Hat Icon matching Mockup */}
+          <div className="flex items-center gap-1.5">
+            <div className="flex flex-col">
+              <div className="flex items-center gap-1 leading-none">
+                <span className="text-sm">🧑‍🍳</span>
+                <span className="text-lg font-black tracking-tighter text-white font-serif">Bum Bum</span>
+              </div>
+              <span className="text-[8px] font-black tracking-[0.2em] text-yellow-300 uppercase mt-0.5 border-t border-b border-white/20 py-0.5 px-1 leading-none text-center">CAFÉ</span>
+            </div>
+          </div>
+
+          {/* Cart Icon Badge & Menu Button on Top Right */}
+          <div className="flex items-center gap-3">
+            <button 
+              onClick={() => setIsCartOpen(true)} 
+              className="relative p-2.5 bg-black/40 backdrop-blur-md border border-white/10 rounded-full text-white hover:bg-black/60 transition-all"
+            >
+              <ShoppingCart size={16} />
+              {cart.length > 0 && (
+                <span className="absolute -top-1 -right-1 bg-red-600 text-white font-black text-[9px] w-4 h-4 rounded-full flex items-center justify-center animate-bounce">
+                  {cart.reduce((acc: number, i: any) => acc + i.quantity, 0)}
+                </span>
+              )}
+            </button>
+            <button 
+              onClick={() => setIsReviewsDrawerOpen(true)}
+              className="p-2.5 bg-black/40 backdrop-blur-md border border-white/10 rounded-full text-white hover:bg-black/60 transition-all"
+            >
+              <Menu size={16} />
+            </button>
+          </div>
         </div>
 
-        <div className="relative z-20 flex items-center gap-2">
-          <a href="tel:9714293759" className="bg-green-600 hover:bg-green-700 text-white p-2.5 rounded-full border border-white/20 flex items-center justify-center animate-pulse transition-all" title="डायरेक्ट कॉल करें">
-            <Phone size={14} />
-          </a>
-          <div className="bg-black/60 backdrop-blur-md px-2.5 py-1 rounded-full border border-white/10 flex items-center gap-1.5 text-[8px] font-black uppercase text-green-400">
-            <span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />100% VEG
-          </div>
+        {/* 2. HERO CONTENT AREA (Mockup Style Left Align) */}
+        <div className="relative z-20 max-w-[75%] space-y-1.5 mt-2 bg-black/35 backdrop-blur-sm p-4 rounded-2xl border border-white/5 shadow-lg">
+          <motion.div
+            initial={{ x: -20, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            transition={{ duration: 0.4 }}
+          >
+            <h2 className="text-xl font-black text-white leading-none">Delicious Food</h2>
+            <h3 className="text-lg font-black text-orange-500 leading-tight">Delivered Fast</h3>
+            <p className="text-[9px] text-gray-300 font-semibold mt-1">Order your favorite meals now!</p>
+          </motion.div>
+          <button 
+            onClick={scrollToMenu}
+            className="mt-2.5 bg-orange-600 hover:bg-orange-700 text-white font-black text-[9px] px-3.5 py-1.5 rounded-lg uppercase tracking-wider shadow-md transition-all active:scale-95"
+          >
+            Order Now
+          </button>
         </div>
       </header>
 
@@ -956,7 +995,8 @@ export default function BbCafeHome() {
         ⭐ WRITE REVIEW
       </button>
 
-      <main className="pt-3 px-3 max-w-lg mx-auto space-y-4">
+      {/* MAIN LAYOUT WRAPPER */}
+      <main ref={menuRef} className="pt-3 px-3 max-w-lg mx-auto space-y-4">
 
         {/* PWA INSTALLATION BANNER */}
         {showInstallBanner && (
@@ -1061,6 +1101,11 @@ export default function BbCafeHome() {
           </div>
         )}
 
+        {/* PRODUCTS LISTING HEADER TITLE */}
+        <div className="pt-2">
+          <h3 className="text-sm font-black uppercase tracking-wider text-orange-600">🍳 Our Delicious Menu</h3>
+        </div>
+
         {/* PRODUCTS LISTING */}
         <div className="grid grid-cols-1 gap-4 pt-1 font-bold">
           {filteredMenu.length === 0 ? (
@@ -1130,8 +1175,14 @@ export default function BbCafeHome() {
                       initial={{ opacity: 0, y: 20 }}
                       whileInView={{ opacity: 1, y: 0 }}
                       viewport={{ once: true }}
-                      onClick={() => setIsCartOpen(true)}
-                      className="cursor-pointer bg-gradient-to-r from-amber-500 via-orange-500 to-red-600 text-white p-5 rounded-2xl shadow-lg border border-white/10 my-2 relative overflow-hidden group"
+                      onClick={() => {
+                        if (!customerDetails) {
+                          setIsLoginOpen(true);
+                        } else {
+                          setIsCartOpen(true);
+                        }
+                      }}
+                      className="cursor-pointer bg-gradient-to-r from-amber-500 via-orange-500 to-red-650 text-white p-5 rounded-2xl shadow-lg border border-white/10 my-2 relative overflow-hidden group"
                     >
                       {/* Ambient background blob */}
                       <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full blur-xl group-hover:scale-110 transition-transform duration-500" />
@@ -1144,7 +1195,11 @@ export default function BbCafeHome() {
                             Unlock Free Pizza, Thalis & Shakes!
                           </h4>
                           <p className="text-[10px] text-orange-100 font-bold leading-normal">
-                            Earn points on every order & redeem them for free food inside your Cart. Tap to view your pass ➔
+                            {customerDetails ? (
+                              "आपका प्रोमो पास एक्टिवेटेड है! ✅ हर ₹100 पर 1 पॉइंट कमाएं। कार्ट खोलकर अपने रिवॉर्ड्स देखें और रीडीम करें ➔"
+                            ) : (
+                              "अपना Name और Number दर्ज करके इस पास को एक्टिवेट करें! 🎁 हर ₹100 पर 1 पॉइंट कमाएं और फ्री पिज्जा/थाली पाएं। Tap to activate ➔"
+                            )}
                           </p>
                         </div>
                         <div className="bg-white/15 backdrop-blur-md p-3 rounded-full border border-white/20 text-yellow-300 group-hover:rotate-12 transition-transform duration-300">
@@ -1513,12 +1568,12 @@ export default function BbCafeHome() {
                       </button>
                     </div>
 
-                    <div className="pt-2 border-t dark:border-white/10 border-yellow-200 flex justify-between items-center">
+                    <div className="pt-2 border-t border-white/5 flex justify-between items-center">
                       <span className="text-[9px] dark:text-gray-400 text-neutral-700 font-bold uppercase">Gift points to friend:</span>
-                      <button type="button" onClick={() => setIsGiftModalOpen(true)} className="bg-yellow-500/10 text-yellow-600 border border-yellow-400/20 px-2.5 py-1 rounded text-[8px] font-black uppercase">🎁 Gift Points</button>
+                      <button type="button" onClick={() => setIsGiftModalOpen(true)} className="bg-yellow-500/10 text-yellow-600 border border-yellow-400/20 px-2.5 py-1 rounded text-[8px] font-black uppercase animate-none">🎁 Gift Points</button>
                     </div>
 
-                    <div className="space-y-1.5 pt-2 border-t dark:border-white/10 border-yellow-200">
+                    <div className="space-y-1.5 pt-2 border-t border-white/5">
                       <p className="text-[9px] dark:text-gray-400 text-neutral-700 font-black uppercase">Redeem Points:</p>
                       <div className="grid grid-cols-2 gap-1.5 max-h-24 overflow-y-auto no-scrollbar">
                         {loyaltyRules.map(rule => {
