@@ -1,12 +1,11 @@
 
-
 'use client';
   
 import React, { useState, useEffect, useMemo } from 'react';
 // Changed to reliable relative path to avoid compile-time path resolution errors
 import { db } from '../../lib/firebase'; 
 import { collection, onSnapshot, query, orderBy, doc, updateDoc, setDoc, addDoc, deleteDoc, increment } from 'firebase/firestore';
-import { Power, Eye, EyeOff, User, MapPin, Calendar, CheckCircle2, LogOut, Loader2, Phone, Plus, Trash, Edit, X, Lock, BarChart3, Download, Folder, Percent, ImageIcon, Gift, Settings, Search, BookOpen, Share2, MessageSquare } from 'lucide-react';
+import { Power, Eye, EyeOff, User, MapPin, Calendar, CheckCircle2, LogOut, Loader2, Phone, Plus, Trash, Edit, X, Lock, BarChart3, Download, Folder, Percent, ImageIcon, Gift, Settings, Search, BookOpen, Share2, MessageSquare, Filter, RefreshCw, Check } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 
 // Categories default list
@@ -341,9 +340,13 @@ export default function AdminDashboard() {
   const [sopProduct, setSopProduct] = useState<any>(null);
   const [sopRecipeText, setSopRecipeText] = useState("");
 
-  // --- BROADCAST MODAL STATES (39: WhatsApp Broadcast) ---
+  // --- BROADCAST MODAL STATES & FILTERS (39: WhatsApp Broadcast Enhancement) ---
   const [showBroadcastModal, setShowBroadcastModal] = useState(false);
   const [broadcastMessage, setBroadcastMessage] = useState("Special Offer from Bum Bum Cafe! Get 10% OFF on all Special Pizzas today! 🍕🔥");
+  const [broadcastTierFilter, setBroadcastTierFilter] = useState<string>('all');
+  const [broadcastMinPoints, setBroadcastMinPoints] = useState<number>(0);
+  const [broadcastMinSpend, setBroadcastMinSpend] = useState<number>(0);
+  const [sentBroadcastPhones, setSentBroadcastPhones] = useState<string[]>([]);
 
   // --- KITCHEN ROSTER RECIPE STATES ---
   const [rosterSelectedProduct, setRosterSelectedProduct] = useState<any>(null);
@@ -1281,11 +1284,16 @@ Report generated automatically by Bum Bum Cafe POS.`
     window.open(`https://wa.me/919714293759?text=${message}`, '_blank');
   };
 
-  // --- SEND WHATSAPP BROADCAST MESSAGE (39: WhatsApp Broadcast) ---
+  // --- SEND WHATSAPP BROADCAST MESSAGE (39: WhatsApp Broadcast with Sent Tracking) ---
   const triggerWhatsAppBroadcast = (phone: string) => {
     const cleanPhone = String(phone).replace("+91", "").trim();
     const encodedMsg = encodeURIComponent(broadcastMessage);
     window.open(`https://wa.me/91${cleanPhone}?text=${encodedMsg}`, '_blank');
+
+    // Add to session sent tracker
+    if (!sentBroadcastPhones.includes(cleanPhone)) {
+      setSentBroadcastPhones(prev => [...prev, cleanPhone]);
+    }
   };
 
   // --- RESET DAILY TOKEN MANUALLY (19: Daily Token Reset) ---
@@ -1311,6 +1319,42 @@ Report generated automatically by Bum Bum Cafe POS.`
       String(cat.name).toLowerCase().includes(categorySearchQuery.toLowerCase())
     );
   }, [combinedCategories, categorySearchQuery]);
+
+  // --- FILTER CUSTOMERS SPECIALLY TARGETED FOR THE MARKETING BROADCAST BLAST ---
+  const broadcastTargetedCustomers = useMemo(() => {
+    return searchedCustomers.map(user => {
+      const metrics = getCustomerLoyaltyMetrics(user.phone);
+      return { ...user, metrics };
+    }).filter(user => {
+      // Tier filter
+      if (broadcastTierFilter !== 'all') {
+        const tLower = user.metrics.tier.toLowerCase();
+        if (broadcastTierFilter === 'platinum' && !tLower.includes('platinum')) return false;
+        if (broadcastTierFilter === 'gold' && !tLower.includes('gold')) return false;
+        if (broadcastTierFilter === 'silver' && !tLower.includes('silver')) return false;
+        if (broadcastTierFilter === 'bronze' && !tLower.includes('bronze')) return false;
+      }
+
+      // Min Points filter
+      if (Number(user.points || 0) < broadcastMinPoints) return false;
+
+      // Min Spend filter
+      if (Number(user.metrics.totalSpend || 0) < broadcastMinSpend) return false;
+
+      return true;
+    });
+  }, [searchedCustomers, broadcastTierFilter, broadcastMinPoints, broadcastMinSpend]);
+
+  // --- AUTO-NEXT QUEUE ASSISTANT FOR WHATSAPP BROADCAST ---
+  const handleSendNextUnsentBroadcast = () => {
+    const unsentList = broadcastTargetedCustomers.filter(u => !sentBroadcastPhones.includes(u.phone));
+    if (unsentList.length === 0) {
+      return toast.error("All targeted customers have been messaged in this session!");
+    }
+    const nextTarget = unsentList[0];
+    triggerWhatsAppBroadcast(nextTarget.phone);
+    toast.success(`Opening WhatsApp for ${nextTarget.name}...`);
+  };
 
   // --- Loading Screen ---
   if (loading) {
@@ -2454,10 +2498,10 @@ Report generated automatically by Bum Bum Cafe POS.`
         </div>
       )}
 
-      {/* --- 39: WHATSAPP BROADCAST MODAL --- */}
+      {/* --- 39: IMPROVED WHATSAPP BROADCAST MODAL WITH DYNAMIC FILTERS & SENT TRACKING --- */}
       {showBroadcastModal && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[100] flex items-center justify-center p-4">
-          <div className="bg-[#111] border border-white/5 p-6 rounded-[2.5rem] w-full max-w-lg relative shadow-2xl space-y-4">
+          <div className="bg-[#111] border border-white/5 p-6 rounded-[2.5rem] w-full max-w-lg relative shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto no-scrollbar">
             <button 
               onClick={() => setShowBroadcastModal(false)} 
               className="absolute top-4 right-4 p-2 bg-white/5 text-gray-400 hover:text-white rounded-full transition-all"
@@ -2465,38 +2509,144 @@ Report generated automatically by Bum Bum Cafe POS.`
               <X size={18}/>
             </button>
             <div className="text-center pb-2 border-b border-white/5">
-              <h3 className="text-lg font-black text-orange-500 uppercase">WhatsApp Marketing Blast</h3>
-              <p className="text-[10px] text-gray-500 uppercase tracking-widest font-black mt-0.5">Bum Bum Cafe Promotions</p>
+              <h3 className="text-lg font-black text-orange-500 uppercase">Smart Marketing Blast</h3>
+              <p className="text-[10px] text-gray-500 uppercase tracking-widest font-black mt-0.5">Target the Right Loyal Customers</p>
             </div>
 
+            {/* --- SMART DYNAMIC TARGET FILTERS --- */}
+            <div className="bg-white/[0.02] border border-white/5 p-4 rounded-2xl space-y-3">
+              <p className="text-[10px] font-black uppercase text-orange-400 flex items-center gap-1">
+                <Filter size={12}/> Target Segment Filters
+              </p>
+              
+              <div className="grid grid-cols-3 gap-2">
+                {/* 1. Tier Filter */}
+                <div className="space-y-1">
+                  <label className="text-[9px] font-bold text-gray-500 uppercase">VIP Tier</label>
+                  <select 
+                    value={broadcastTierFilter} 
+                    onChange={(e) => setBroadcastTierFilter(e.target.value)}
+                    className="w-full bg-black/60 border border-white/10 text-[10px] font-bold rounded-lg p-2 text-white outline-none"
+                  >
+                    <option value="all">All Tiers</option>
+                    <option value="platinum">👑 Platinum</option>
+                    <option value="gold">🥇 Gold VIP</option>
+                    <option value="silver">🥈 Silver VIP</option>
+                    <option value="bronze">🥉 Regular</option>
+                  </select>
+                </div>
+
+                {/* 2. Min Points Filter */}
+                <div className="space-y-1">
+                  <label className="text-[9px] font-bold text-gray-500 uppercase">Min Points</label>
+                  <input 
+                    type="number" 
+                    placeholder="Min Points"
+                    value={broadcastMinPoints || ""}
+                    onChange={(e) => setBroadcastMinPoints(Number(e.target.value))}
+                    className="w-full bg-black/60 border border-white/10 text-[10px] font-bold rounded-lg p-2 text-white outline-none"
+                  />
+                </div>
+
+                {/* 3. Min Spend Filter */}
+                <div className="space-y-1">
+                  <label className="text-[9px] font-bold text-gray-500 uppercase">Min Spend (₹)</label>
+                  <input 
+                    type="number" 
+                    placeholder="Min Spend"
+                    value={broadcastMinSpend || ""}
+                    onChange={(e) => setBroadcastMinSpend(Number(e.target.value))}
+                    className="w-full bg-black/60 border border-white/10 text-[10px] font-bold rounded-lg p-2 text-white outline-none"
+                  />
+                </div>
+              </div>
+
+              {/* Targets Count Summary */}
+              <div className="flex justify-between items-center text-[10px] text-gray-400 font-bold border-t border-white/5 pt-2.5">
+                <span>Targets Found: <strong className="text-orange-500">{broadcastTargetedCustomers.length}</strong></span>
+                <span>Sent: <strong className="text-green-500">{broadcastTargetedCustomers.filter(c => sentBroadcastPhones.includes(c.phone)).length}</strong></span>
+                <span>Remaining: <strong className="text-yellow-500">{broadcastTargetedCustomers.filter(c => !sentBroadcastPhones.includes(c.phone)).length}</strong></span>
+              </div>
+            </div>
+
+            {/* --- MESSAGE COMPOSER --- */}
             <div className="space-y-1.5">
               <label className="text-[10px] font-bold text-gray-400 uppercase">Write Promotional Message</label>
               <textarea 
                 value={broadcastMessage} 
                 onChange={(e) => setBroadcastMessage(e.target.value)} 
                 placeholder="Type your special discount offer or festive wishes here..." 
-                className="w-full bg-black/40 border border-white/10 rounded-xl p-4 outline-none focus:border-orange-500 text-xs font-bold text-white h-32 resize-none leading-relaxed"
+                className="w-full bg-black/40 border border-white/10 rounded-xl p-4 outline-none focus:border-orange-500 text-xs font-bold text-white h-24 resize-none leading-relaxed"
               />
             </div>
 
-            <div className="border-t border-white/5 pt-4">
-              <p className="text-[10px] text-orange-400 font-extrabold uppercase mb-2">Send to Customers ({searchedCustomers.length})</p>
-              <div className="space-y-2 max-h-40 overflow-y-auto no-scrollbar">
-                {searchedCustomers.map((user) => (
-                  <div key={user.phone} className="flex justify-between items-center bg-white/[0.01] border border-white/5 p-2 rounded-xl text-xs font-bold">
-                    <span className="text-gray-300">{user.name} (+{user.phone})</span>
-                    <button 
-                      onClick={() => triggerWhatsAppBroadcast(user.phone)}
-                      className="bg-green-600 hover:bg-green-700 text-white font-black text-[9px] px-3 py-1.5 rounded-lg flex items-center gap-1 uppercase transition-all"
-                    >
-                      <MessageSquare size={10}/> Send Msg
-                    </button>
-                  </div>
-                ))}
+            {/* --- AUTO-NEXT ACTIVE SENDER ASSISTANT --- */}
+            <div className="bg-orange-500/10 border border-orange-500/20 p-4 rounded-2xl space-y-3 text-center">
+              <p className="text-[10px] text-orange-400 font-extrabold uppercase tracking-wide">⚡ One-Click Queue Sender Assistant</p>
+              <p className="text-[9px] text-gray-500">यह बटन कतार में से अगले बचे हुए कस्टमर का चैट सीधे ओपन करेगा और उसे सेंड मार्क कर देगा।</p>
+              
+              <div className="flex gap-2">
+                <button 
+                  onClick={handleSendNextUnsentBroadcast}
+                  type="button"
+                  className="flex-1 bg-orange-500 hover:bg-orange-600 text-black font-black text-xs uppercase py-3.5 px-4 rounded-xl flex items-center justify-center gap-2 active:scale-95 transition-all shadow-md"
+                >
+                  💬 Send Next (Unsent Queue)
+                </button>
+                <button 
+                  onClick={() => { setSentBroadcastPhones([]); toast.success("Sent history reset successfully!"); }}
+                  title="Reset session sent list"
+                  type="button"
+                  className="bg-white/5 hover:bg-white/10 text-gray-400 p-3 rounded-xl transition-all"
+                >
+                  <RefreshCw size={16} />
+                </button>
               </div>
             </div>
 
-            <button type="button" onClick={() => setShowBroadcastModal(false)} className="w-full bg-white/5 text-gray-400 p-3.5 rounded-xl font-black text-xs uppercase">Close</button>
+            {/* --- FILTERED TARGETS LIST WITH VERIFIED FLAGS --- */}
+            <div className="border-t border-white/5 pt-4">
+              <div className="flex justify-between items-center mb-2">
+                <p className="text-[10px] text-gray-400 font-extrabold uppercase">Target Audience List ({broadcastTargetedCustomers.length})</p>
+              </div>
+              
+              <div className="space-y-1.5 max-h-40 overflow-y-auto no-scrollbar">
+                {broadcastTargetedCustomers.length === 0 ? (
+                  <p className="text-center text-[10px] text-gray-500 py-6 uppercase font-bold">No customers match these filter parameters...</p>
+                ) : (
+                  broadcastTargetedCustomers.map((user) => {
+                    const isAlreadySent = sentBroadcastPhones.includes(user.phone);
+                    return (
+                      <div key={user.phone} className={`flex justify-between items-center p-2 rounded-xl text-xs font-bold border transition-colors ${isAlreadySent ? 'bg-green-500/[0.02] border-green-500/10' : 'bg-white/[0.01] border-white/5'}`}>
+                        <div className="flex flex-col">
+                          <span className={`${isAlreadySent ? 'text-gray-500' : 'text-gray-300'}`}>{user.name} (+{user.phone})</span>
+                          <span className="text-[8px] text-gray-500 uppercase tracking-widest">{user.metrics.tier} • {user.points || 0} Pts</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {isAlreadySent ? (
+                            <span className="text-[9px] text-green-500 font-extrabold uppercase flex items-center gap-1 bg-green-500/10 px-2 py-1 rounded-md">
+                              <Check size={10}/> Sent
+                            </span>
+                          ) : (
+                            <span className="text-[9px] text-yellow-500 font-extrabold uppercase flex items-center gap-1 bg-yellow-500/10 px-2 py-1 rounded-md">
+                              Unsent
+                            </span>
+                          )}
+                          <button 
+                            onClick={() => triggerWhatsAppBroadcast(user.phone)}
+                            className={`font-black text-[9px] px-3 py-1.5 rounded-lg flex items-center gap-1 uppercase transition-all ${isAlreadySent ? 'bg-white/5 text-gray-500' : 'bg-green-600 hover:bg-green-700 text-white'}`}
+                          >
+                            <MessageSquare size={10}/> Send
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+
+            <button type="button" onClick={() => setShowBroadcastModal(false)} className="w-full bg-white/5 text-gray-400 p-3.5 rounded-xl font-black text-xs uppercase hover:bg-white/10">Close</button>
           </div>
         </div>
       )}
