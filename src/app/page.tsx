@@ -245,7 +245,6 @@ export default function BbCafeHome() {
     return CATEGORY_IMAGES[catName] || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=150&q=80";
   };
 
-  // --- UNIQUE REFERRAL CODE GENERATOR ---
   const getReferralCode = () => {
     if (!customerDetails) return "WELCOME";
     const namePart = customerDetails.name.trim().split(" ")[0].substring(0, 4).toUpperCase();
@@ -404,10 +403,8 @@ export default function BbCafeHome() {
 
   // --- REST OF EFFECTS ---
   useEffect(() => {
-    // Restored missing mounted initialization statement!
     setMounted(true);
 
-    // Auto capture referral code from URL parameter
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       const ref = params.get('ref');
@@ -632,7 +629,6 @@ export default function BbCafeHome() {
     if (chiliFlakesAddon) itemsText += `• Extra Chilly Flakes x1 - ₹10\n`;
     if (noCutlery) itemsText += `🌱 (Eco-Friendly: No plastic cutlery requested)\n`;
 
-    // Dynamic referral code included inside WhatsApp sharing text
     const refCode = getReferralCode();
     const msg = `🔥 *BAM BAM CAFE - NEW ORDER*\n\n*Bill No:* #${formattedBillStr}\n*Token No:* #${tokenNumber}\n*Customer:* ${customerDetails.name}\n*Phone:* ${customerDetails.phone}\n*Delivery Area:* ${selectedArea.name}\n*Address:* ${address}\n\n*ITEMS:*\n${itemsText}\n*Subtotal:* ₹${subtotal + addOnsCost}\n*Coupon Discount:* -₹${couponDiscount}\n*Delivery:* ₹${deliveryCharge}\n*TOTAL BILL: ₹${finalTotal}*\n\n*Invite Code:* ${refCode}\n*Points Earned:* +${pointsEarned} Pts\n${totalPointsCost > 0 ? `*Points Redeemed:* -${totalPointsCost} Pts\n` : ''}\n_Confirm order by replying 'YES'_`;
     
@@ -656,7 +652,7 @@ export default function BbCafeHome() {
 
   const handleShareApp = async () => {
     if (!customerDetails?.phone) {
-      toast.error("पॉइंड्स कमाने के लिए पहले Name और Phone दर्ज करें!");
+      toast.error("पॉइंट्स कमाने के लिए पहले Name और Phone दर्ज करें!");
       setIsLoginOpen(true);
       return;
     }
@@ -665,7 +661,7 @@ export default function BbCafeHome() {
     const shareCountKey = `bb_shares_${phoneClean}`;
     let currentShares = Number(localStorage.getItem(shareCountKey) || 0);
 
-    // Added 100% dynamic unique referral link for every individual user
+    // Dynamic reference link created for unique invitations
     const refCode = getReferralCode();
     const shareMessage = `🔥 *BAM BAM CAFE - Mohandra* 🔥\n\nमेरे स्पेशल इन्वाइट कोड *${refCode}* से आर्डर करें और पॉइंट्स पाएं! 🎁\n👉 https://bb-cafe-app.vercel.app/?ref=${refCode}`;
     const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(shareMessage)}`;
@@ -879,7 +875,7 @@ export default function BbCafeHome() {
       )}
 
       {/* PREMIUM VIDEO BACKGROUND HEADER */}
-      <header className="relative py-8 px-4 overflow-hidden border-b border-white/10 shadow-xl flex justify-between items-center min-h-[110px]">
+      <header className="relative py-12 px-6 overflow-hidden border-b border-white/10 shadow-xl flex justify-between items-center min-h-[160px]">
         {/* local video path is used so it never gets blocked by external server CORS blockings */}
         <video 
           autoPlay 
@@ -894,10 +890,10 @@ export default function BbCafeHome() {
         </video>
 
         {/* Semi-transparent dark overlay gradient for readability */}
-        <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/55 to-black/85 z-10" />
+        <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/60 to-black/90 z-10" />
 
-        {/* Header content elements */}
-        <div className="relative z-20">
+        {/* Premium Header Backdrop-Blur Box Container */}
+        <div className="relative z-20 bg-black/45 backdrop-blur-md border border-white/10 px-5 py-3 rounded-2xl max-w-[70%] shadow-lg">
           <motion.h1 
             initial={{ scale: 0.9, opacity: 0 }} 
             animate={{ scale: 1, opacity: 1 }} 
@@ -906,7 +902,7 @@ export default function BbCafeHome() {
           >
             BAM BAM CAFE
           </motion.h1>
-          <p className="text-[10px] text-yellow-100 font-extrabold tracking-wider uppercase drop-shadow-sm">
+          <p className="text-[9px] text-yellow-100 font-extrabold tracking-wider uppercase drop-shadow-sm mt-0.5">
             {activeTheme.name}
           </p>
         </div>
@@ -921,7 +917,7 @@ export default function BbCafeHome() {
         </div>
       </header>
 
-      {/* FIXED TRANSPAREY STICKY SEARCH BAR */}
+      {/* FIXED TRANSPARENT STICKY SEARCH BAR */}
       <div className="sticky top-0 z-50 bg-transparent backdrop-blur-md py-3 px-4 shadow-none transition-colors duration-200">
         <div className="relative max-w-sm mx-auto">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
@@ -1065,152 +1061,99 @@ export default function BbCafeHome() {
           </div>
         )}
 
-        {/* DYNAMIC LOYALTY CARD RESTORED DIRECTLY TO HOME PAGE (100% visible now!) */}
-        <div className="pt-2">
-          {customerDetails ? (
-            /* Logged In Loyalty Club UI with points, share progress and redemption */
-            <div className="dark:bg-yellow-400/5 bg-yellow-100 border border-yellow-350 dark:border-yellow-400/20 rounded-2xl p-4 space-y-3 transition-colors duration-200 shadow-md">
-              <div className="flex justify-between items-center border-b dark:border-white/10 border-yellow-200 pb-2">
-                <div className="flex items-center gap-1.5 text-yellow-600 dark:text-yellow-400 font-black text-xs uppercase">
-                  <Gift size={15}/> <span>Bum Bum Loyalty Club</span>
-                </div>
-                <span className={`text-[8px] font-black border px-2 py-0.5 rounded-full ${getCustomerTier(customerPoints).color}`}>
-                  {getCustomerTier(customerPoints).name}
-                </span>
-              </div>
-              
-              <div className="flex justify-between items-center gap-4">
-                <div>
-                  <h4 className="text-3xl font-black dark:text-white text-neutral-900 leading-none">
-                    {customerPoints} <span className="text-[10px] text-neutral-500 font-black uppercase">Points</span>
-                  </h4>
-                  <p className="text-[9px] dark:text-gray-400 text-neutral-600 font-bold mt-1">₹100 खर्च करें = 1 पॉइंट पाएं!</p>
-                </div>
-                <div className="text-right text-[8px] dark:text-yellow-400 text-amber-900 font-black space-y-0.5 uppercase max-h-20 overflow-y-auto no-scrollbar">
-                  {loyaltyRules.map(rule => (<p key={rule.id}>🎁 {rule.pointsCost} Pts = {rule.rewardName}</p>))}
-                </div>
-              </div>
-
-              <div className="pt-1.5 flex flex-col gap-2">
-                <div className="flex justify-between items-center text-[9px]">
-                  <span className="dark:text-gray-400 text-neutral-700 font-black uppercase">Share Progress:</span>
-                  <span className="text-yellow-600 dark:text-yellow-400 font-black bg-yellow-100 dark:bg-yellow-400/10 px-2 py-0.5 rounded border border-yellow-350 dark:border-yellow-400/20">{shareCount}/5 Shared</span>
-                </div>
-                <button type="button" onClick={handleShareApp} className="w-full bg-green-600 hover:bg-green-700 text-white font-black py-2.5 rounded-xl text-[10px] uppercase flex items-center justify-center gap-1 shadow-md transition-all">
-                  <Share2 size={13}/>
-                  <span>Share with friends to earn free points! 🎁</span>
-                </button>
-              </div>
-
-              <div className="pt-2 border-t dark:border-white/10 border-yellow-200 flex justify-between items-center">
-                <span className="text-[9px] dark:text-gray-400 text-neutral-700 font-bold uppercase">Gift points to friend:</span>
-                <button type="button" onClick={() => setIsGiftModalOpen(true)} className="bg-yellow-500/10 text-yellow-600 border border-yellow-400/20 px-2.5 py-1 rounded text-[8px] font-black uppercase">🎁 Gift Points</button>
-              </div>
-
-              <div className="space-y-1.5 pt-2 border-t dark:border-white/10 border-yellow-200">
-                <p className="text-[9px] dark:text-gray-400 text-neutral-700 font-black uppercase">Redeem Points:</p>
-                <div className="grid grid-cols-2 gap-1.5 max-h-24 overflow-y-auto no-scrollbar">
-                  {loyaltyRules.map(rule => {
-                    const inCartCost = cart.reduce((acc: number, i: any) => acc + (i.pointsCost || 0), 0);
-                    const isAffordable = (customerPoints - inCartCost) >= rule.pointsCost;
-                    return (
-                      <button 
-                        key={rule.id} 
-                        type="button" 
-                        onClick={() => handleCustomerRedeem(`reward-${rule.id}`, `🎁 FREE ${rule.rewardName}`, rule.pointsCost)} 
-                        disabled={!isAffordable} 
-                        className={`py-2 px-2 rounded text-[9px] font-black uppercase border truncate transition-all ${isAffordable ? 'bg-yellow-400 text-black border-yellow-400 hover:bg-yellow-500' : 'bg-neutral-100 dark:bg-white/5 text-neutral-400 dark:text-gray-500 border-neutral-200 dark:border-white/5 cursor-not-allowed'}`}
-                      >
-                        🎁 {rule.rewardName} ({rule.pointsCost} P)
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          ) : (
-            /* Logged Out / Prompt to Join Loyalty Club */
-            <div className="bg-gradient-to-br from-yellow-400 to-amber-500 text-black p-4 rounded-2xl shadow-md flex justify-between items-center gap-4">
-              <div className="space-y-1">
-                <div className="flex items-center gap-1.5 font-black text-xs uppercase"><Gift size={16}/> <span>Join Loyalty Club!</span></div>
-                <p className="text-[10px] font-semibold leading-normal">लॉयल्टी क्लब जॉइन करें और हर ऑर्डर पर पॉइंट्स कमाएं। 5 दोस्तों को शेयर करने पर भी +1 पॉइंट!</p>
-              </div>
-              <button 
-                onClick={() => setIsLoginOpen(true)}
-                className="bg-black text-white font-black text-[10px] px-3.5 py-2.5 rounded-xl uppercase flex-shrink-0 active:scale-95 transition-all shadow"
-              >
-                जॉइन करें ➔
-              </button>
-            </div>
-          )}
-        </div>
-
-        {/* PRODUCTS LISTING HEADER TITLE */}
-        <div className="pt-2">
-          <h3 className="text-sm font-black uppercase tracking-wider text-orange-600">🍳 Our Delicious Menu</h3>
-        </div>
-
         {/* PRODUCTS LISTING */}
-        <div className="grid grid-cols-1 gap-4 pt-1">
+        <div className="grid grid-cols-1 gap-4 pt-1 font-bold">
           {filteredMenu.length === 0 ? (
             <p className="text-center text-gray-500 py-8 text-xs font-bold uppercase">No items found...</p>
           ) : (
-            filteredMenu.map((item) => {
+            filteredMenu.map((item, index) => {
               return (
-                <motion.div 
-                  layout 
-                  key={item.id} 
-                  className="group dark:bg-white/[0.02] bg-white rounded-2xl border dark:border-white/5 border-gray-200 overflow-hidden flex flex-col relative shadow-md shadow-gray-200/40 dark:shadow-none transition-all duration-300 hover:shadow-lg"
-                  initial={{ opacity: 0, y: 30 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true, margin: "-50px" }}
-                  transition={{ duration: 0.45, ease: "easeOut" }}
-                >
-                  <div className="relative h-44 w-full overflow-hidden">
-                    <img 
-                      src={item.image || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=500&bg=80"} 
-                      className="w-full h-full object-cover origin-center transition-transform duration-700 ease-out group-hover:scale-110" 
-                      alt={item.name} 
-                    />
-                    
-                    <div className="absolute top-3 left-3 bg-black/50 backdrop-blur-md px-2.5 py-1 rounded-lg border border-white/10 flex items-center gap-1 text-[8px] font-black uppercase text-green-400">
-                      <span className="h-1 w-1 rounded-full bg-green-500 animate-pulse" />VEG
-                    </div>
+                <React.Fragment key={item.id}>
+                  {/* Standard Product Card rendering */}
+                  <motion.div 
+                    layout 
+                    className="group dark:bg-white/[0.02] bg-white rounded-2xl border dark:border-white/5 border-gray-200 overflow-hidden flex flex-col relative shadow-md shadow-gray-200/40 dark:shadow-none transition-all duration-300 hover:shadow-lg"
+                    initial={{ opacity: 0, y: 30 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true, margin: "-50px" }}
+                    transition={{ duration: 0.45, ease: "easeOut" }}
+                  >
+                    <div className="relative h-44 w-full overflow-hidden">
+                      <img 
+                        src={item.image || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=500&bg=80"} 
+                        className="w-full h-full object-cover origin-center transition-transform duration-700 ease-out group-hover:scale-110" 
+                        alt={item.name} 
+                      />
+                      
+                      <div className="absolute top-3 left-3 bg-black/50 backdrop-blur-md px-2.5 py-1 rounded-lg border border-white/10 flex items-center gap-1 text-[8px] font-black uppercase text-green-400">
+                        <span className="h-1 w-1 rounded-full bg-green-500 animate-pulse" />VEG
+                      </div>
 
-                    {/* "FREE delivery" Bar Tag */}
-                    <div className="absolute bottom-0 left-0 bg-gradient-to-r from-blue-600 to-blue-500 text-white font-black text-[9px] px-3 py-1 rounded-tr-xl flex items-center gap-1 shadow-md uppercase tracking-wider">
-                      <span>🛵</span> <span>FREE delivery</span>
-                    </div>
+                      {/* "FREE delivery" Bar Tag */}
+                      <div className="absolute bottom-0 left-0 bg-gradient-to-r from-blue-600 to-blue-500 text-white font-black text-[9px] px-3 py-1 rounded-tr-xl flex items-center gap-1 shadow-md uppercase tracking-wider">
+                        <span>🛵</span> <span>FREE delivery</span>
+                      </div>
 
-                    <button onClick={(e) => handleToggleFavorite(item.id, e)} className="absolute top-3 right-3 bg-black/60 backdrop-blur-md p-1.5 rounded-full border border-white/10 text-white hover:text-red-500 transition-colors">
-                      <Heart size={14} className={favorites.includes(item.id) ? "fill-red-500 text-red-500" : "text-white"} />
-                    </button>
-                  </div>
-                  <div className="p-4 flex flex-col justify-between flex-1">
-                    <div className="flex justify-between items-start gap-4">
-                      <h4 className="font-black text-sm dark:text-gray-100 text-neutral-900 line-clamp-1">{item.name}</h4>
-                      <div className="bg-green-600 text-white font-extrabold text-[9px] px-2 py-0.5 rounded flex items-center gap-0.5">
-                        <span>4.9</span><span className="text-[8px]">★</span>
+                      <button onClick={(e) => handleToggleFavorite(item.id, e)} className="absolute top-3 right-3 bg-black/60 backdrop-blur-md p-1.5 rounded-full border border-white/10 text-white hover:text-red-500 transition-colors">
+                        <Heart size={14} className={favorites.includes(item.id) ? "fill-red-500 text-red-500" : "text-white"} />
+                      </button>
+                    </div>
+                    <div className="p-4 flex flex-col justify-between flex-1">
+                      <div className="flex justify-between items-start gap-4">
+                        <h4 className="font-black text-sm dark:text-gray-100 text-neutral-900 line-clamp-1">{item.name}</h4>
+                        <div className="bg-green-600 text-white font-extrabold text-[9px] px-2 py-0.5 rounded flex items-center gap-0.5">
+                          <span>4.9</span><span className="text-[8px]">★</span>
+                        </div>
+                      </div>
+                      <div className="flex justify-between items-center text-[9px] dark:text-gray-400 text-neutral-700 font-bold mt-0.5">
+                        <p className="uppercase text-[8px] dark:text-gray-500 text-gray-400">{item.category}</p><p>• 15-25 min</p>
+                      </div>
+                      <div className="h-px dark:bg-white/5 bg-gray-100 my-2.5" />
+                      <div className="flex justify-between items-end mt-0.5">
+                        <div>
+                          <p className="dark:text-gray-500 text-gray-400 text-[8px] font-black uppercase tracking-widest leading-none mb-1">Price</p>
+                          <p className="text-orange-700 dark:text-orange-500 font-black text-base leading-none">{getDisplayPrice(item)}</p>
+                          {item.variants && <span className="text-[8px] font-bold dark:text-gray-400 text-gray-500 mt-1 block">Options available</span>}
+                        </div>
+                        {storeOpen && !isTooFar && (
+                          <button onClick={() => item.variants ? setSelectedProduct(item) : addItem(item)} className="px-4 py-2 bg-orange-500/10 text-orange-700 dark:text-orange-400 border border-orange-500/30 hover:bg-orange-500 hover:text-white rounded-lg font-black text-[10px] active:scale-95 transition-all uppercase flex items-center gap-1 shadow">
+                            <Plus size={12} /> ADD
+                          </button>
+                        )}
                       </div>
                     </div>
-                    <div className="flex justify-between items-center text-[9px] dark:text-gray-400 text-neutral-700 font-bold mt-0.5">
-                      <p className="uppercase text-[8px] dark:text-gray-500 text-gray-400">{item.category}</p><p>• 15-25 min</p>
-                    </div>
-                    <div className="h-px dark:bg-white/5 bg-gray-100 my-2.5" />
-                    <div className="flex justify-between items-end mt-0.5">
-                      <div>
-                        <p className="dark:text-gray-500 text-gray-400 text-[8px] font-black uppercase tracking-widest leading-none mb-1">Price</p>
-                        <p className="text-orange-700 dark:text-orange-500 font-black text-base leading-none">{getDisplayPrice(item)}</p>
-                        {item.variants && <span className="text-[8px] font-bold dark:text-gray-400 text-gray-500 mt-1 block">Options available</span>}
+                  </motion.div>
+
+                  {/* 4th Item check (index === 3) to show the stunning Loyalty Promo Pass card in-between */}
+                  {index === 3 && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 20 }}
+                      whileInView={{ opacity: 1, y: 0 }}
+                      viewport={{ once: true }}
+                      onClick={() => setIsCartOpen(true)}
+                      className="cursor-pointer bg-gradient-to-r from-amber-500 via-orange-500 to-red-600 text-white p-5 rounded-2xl shadow-lg border border-white/10 my-2 relative overflow-hidden group"
+                    >
+                      {/* Ambient background blob */}
+                      <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full blur-xl group-hover:scale-110 transition-transform duration-500" />
+                      <div className="relative z-10 flex justify-between items-center gap-4">
+                        <div className="space-y-1.5">
+                          <span className="bg-black/30 border border-white/20 text-[8px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full text-yellow-300">
+                            🎁 LOYALTY CLUB PROMO PASS
+                          </span>
+                          <h4 className="text-sm font-black italic tracking-tight">
+                            Unlock Free Pizza, Thalis & Shakes!
+                          </h4>
+                          <p className="text-[10px] text-orange-100 font-bold leading-normal">
+                            Earn points on every order & redeem them for free food inside your Cart. Tap to view your pass ➔
+                          </p>
+                        </div>
+                        <div className="bg-white/15 backdrop-blur-md p-3 rounded-full border border-white/20 text-yellow-300 group-hover:rotate-12 transition-transform duration-300">
+                          <Gift size={24} />
+                        </div>
                       </div>
-                      {storeOpen && !isTooFar && (
-                        <button onClick={() => item.variants ? setSelectedProduct(item) : addItem(item)} className="px-4 py-2 bg-orange-500/10 text-orange-700 dark:text-orange-400 border border-orange-500/30 hover:bg-orange-500 hover:text-white rounded-lg font-black text-[10px] active:scale-95 transition-all uppercase flex items-center gap-1 shadow">
-                          <Plus size={12} /> ADD
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </motion.div>
+                    </motion.div>
+                  )}
+                </React.Fragment>
               );
             })
           )}
@@ -1426,7 +1369,7 @@ export default function BbCafeHome() {
         )}
       </AnimatePresence>
 
-      {/* CART DRAWER MODAL */}
+      {/* CART DRAWER MODAL (Loyalty Program Restored completely inside Cart Drawer Modal) */}
       <AnimatePresence>
         {isCartOpen && (
           <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-[110] flex items-end">
@@ -1446,7 +1389,7 @@ export default function BbCafeHome() {
                 <div key={item.id} className="flex justify-between items-center dark:bg-white/[0.02] bg-white p-4 rounded-2xl mb-3 border dark:border-white/5 border-gray-200 shadow-sm transition-colors duration-200">
                   <div className="min-w-0 pr-3">
                     <h4 className="font-bold text-xs dark:text-gray-100 text-neutral-900 truncate">{item?.name || "Item"}</h4>
-                    <p className="text-orange-505 font-black mt-1 text-[11px]">₹{item?.price || 0}</p>
+                    <p className="text-orange-550 font-black mt-1 text-[11px]">₹{item?.price || 0}</p>
                   </div>
                   <div className="flex items-center gap-2 bg-black/40 px-2 py-1 rounded-xl border border-white/10 flex-shrink-0">
                     <button onClick={() => removeItem(item.id)} className="w-6 h-6 flex items-center justify-center bg-red-500/10 text-red-500 rounded text-sm font-black">-</button>
@@ -1539,10 +1482,11 @@ export default function BbCafeHome() {
                   <input type="checkbox" checked={noCutlery} onChange={() => setNoCutlery(!noCutlery)} className="w-4 h-4 accent-green-500" />
                 </div>
 
+                {/* RESTORED FULLY FUNCTIONAL LOYALTY CLUB CARD INSIDE CART DRAWER */}
                 {customerDetails && (
-                  <div className="dark:bg-yellow-400/5 bg-yellow-400/10 border dark:border-yellow-400/20 border-yellow-400/30 rounded-2xl p-4 space-y-3 transition-colors duration-200">
-                    <div className="flex justify-between items-center border-b border-white/5 pb-2">
-                      <div className="flex items-center gap-1 text-yellow-600 dark:text-yellow-400 font-black text-[10px] uppercase"><Gift size={12}/> <span>LOYALTY CLUB</span></div>
+                  <div className="dark:bg-yellow-400/5 bg-yellow-100 border border-yellow-350 dark:border-yellow-400/20 rounded-2xl p-4 space-y-3 transition-colors duration-200 shadow-md">
+                    <div className="flex justify-between items-center border-b dark:border-white/10 border-yellow-200 pb-2">
+                      <div className="flex items-center gap-1.5 text-yellow-600 dark:text-yellow-400 font-black text-xs uppercase"><Gift size={12}/> <span>Bum Bum Loyalty Club</span></div>
                       <span className={`text-[8px] font-black border px-2 py-0.5 rounded-full ${getCustomerTier(customerPoints).color}`}>
                         {getCustomerTier(customerPoints).name}
                       </span>
@@ -1550,8 +1494,8 @@ export default function BbCafeHome() {
                     
                     <div className="flex justify-between items-center">
                       <div>
-                        <h4 className="text-2xl font-black dark:text-white text-neutral-900">{customerPoints} <span className="text-[9px] dark:text-gray-500 text-neutral-700 font-bold uppercase">Points</span></h4>
-                        <p className="text-[8px] dark:text-gray-400 text-neutral-700 font-bold">Spend ₹100 = Get 1 Point!</p>
+                        <h4 className="text-2xl font-black dark:text-white text-neutral-900 leading-none">{customerPoints} <span className="text-[9px] dark:text-gray-500 text-neutral-700 font-black uppercase">Points</span></h4>
+                        <p className="text-[8px] dark:text-gray-400 text-neutral-700 font-bold mt-1">₹100 खर्च करें = 1 पॉइंट पाएं!</p>
                       </div>
                       <div className="text-right text-[8px] dark:text-yellow-400 text-amber-900 font-black space-y-0.5 uppercase max-h-20 overflow-y-auto no-scrollbar">
                         {loyaltyRules.map(rule => (<p key={rule.id}>🎁 {rule.pointsCost} Pts = {rule.rewardName}</p>))}
@@ -1559,29 +1503,29 @@ export default function BbCafeHome() {
                     </div>
 
                     <div className="pt-1.5 flex flex-col gap-2">
-                      <div className="flex justify-between items-center">
-                        <span className="text-[9px] dark:text-gray-400 text-neutral-700 font-black uppercase">Share Progress:</span>
-                        <span className="text-[9px] dark:text-yellow-400 text-amber-900 font-black bg-yellow-100 dark:bg-yellow-400/10 px-2 py-0.5 rounded border dark:border-yellow-400/20 border-yellow-250">{shareCount}/5 Shared</span>
+                      <div className="flex justify-between items-center text-[9px]">
+                        <span className="dark:text-gray-400 text-neutral-700 font-black uppercase">Share Progress:</span>
+                        <span className="text-yellow-600 dark:text-yellow-400 font-black bg-yellow-100 dark:bg-yellow-400/10 px-2 py-0.5 rounded border border-yellow-350 dark:border-yellow-400/20">{shareCount}/5 Shared</span>
                       </div>
-                      <button type="button" onClick={handleShareApp} className="w-full bg-green-600 text-white font-black py-2 rounded-lg text-[9px] uppercase flex items-center justify-center gap-1 shadow-md animate-none">
+                      <button type="button" onClick={handleShareApp} className="w-full bg-green-600 text-white font-black py-2.5 rounded-xl text-[10px] uppercase flex items-center justify-center gap-1 shadow-md transition-all animate-none">
                         <Share2 size={12}/>
                         <span>Share 5 Times to earn free +1 Loyalty Point! 🎁</span>
                       </button>
                     </div>
 
-                    <div className="pt-2 border-t border-white/5 flex justify-between items-center">
+                    <div className="pt-2 border-t dark:border-white/10 border-yellow-200 flex justify-between items-center">
                       <span className="text-[9px] dark:text-gray-400 text-neutral-700 font-bold uppercase">Gift points to friend:</span>
-                      <button type="button" onClick={() => setIsGiftModalOpen(true)} className="bg-yellow-400/10 text-yellow-500 border border-yellow-400/20 px-2 py-1 rounded text-[8px] font-black uppercase animate-none">🎁 Gift Points</button>
+                      <button type="button" onClick={() => setIsGiftModalOpen(true)} className="bg-yellow-500/10 text-yellow-600 border border-yellow-400/20 px-2.5 py-1 rounded text-[8px] font-black uppercase">🎁 Gift Points</button>
                     </div>
 
-                    <div className="space-y-1.5 pt-2 border-t border-white/5">
+                    <div className="space-y-1.5 pt-2 border-t dark:border-white/10 border-yellow-200">
                       <p className="text-[9px] dark:text-gray-400 text-neutral-700 font-black uppercase">Redeem Points:</p>
                       <div className="grid grid-cols-2 gap-1.5 max-h-24 overflow-y-auto no-scrollbar">
                         {loyaltyRules.map(rule => {
                           const inCartCost = cart.reduce((acc: number, i: any) => acc + (i.pointsCost || 0), 0);
                           const isAffordable = (customerPoints - inCartCost) >= rule.pointsCost;
                           return (
-                            <button key={rule.id} type="button" onClick={() => handleCustomerRedeem(`reward-${rule.id}`, `🎁 FREE ${rule.rewardName}`, rule.pointsCost)} disabled={!isAffordable} className={`py-2 px-2 rounded text-[9px] font-black uppercase border truncate ${isAffordable ? 'bg-yellow-400 text-black border-yellow-400 hover:bg-yellow-500 animate-none' : 'bg-neutral-100 text-neutral-450 border-neutral-200 dark:bg-white/5 dark:text-gray-500 dark:border-white/5'}`}>🎁 {rule.rewardName} ({rule.pointsCost} P)</button>
+                            <button key={rule.id} type="button" onClick={() => handleCustomerRedeem(`reward-${rule.id}`, `🎁 FREE ${rule.rewardName}`, rule.pointsCost)} disabled={!isAffordable} className={`py-2 px-2 rounded text-[9px] font-black uppercase border truncate transition-all ${isAffordable ? 'bg-yellow-400 text-black border-yellow-400 hover:bg-yellow-500 animate-none' : 'bg-neutral-100 dark:bg-white/5 text-neutral-450 dark:text-gray-500 border-neutral-200 dark:border-white/5 cursor-not-allowed'}`}>🎁 {rule.rewardName} ({rule.pointsCost} P)</button>
                           );
                         })}
                       </div>
