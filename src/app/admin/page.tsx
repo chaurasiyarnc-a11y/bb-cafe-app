@@ -1,5 +1,5 @@
 'use client';
- 
+  
 import React, { useState, useEffect, useMemo } from 'react';
 // Changed to reliable relative path to avoid compile-time path resolution errors
 import { db } from '../../lib/firebase'; 
@@ -10,7 +10,7 @@ import toast, { Toaster } from 'react-hot-toast';
 // Categories default list
 const ADD_CATEGORIES = ["Special Pizza", "Special Thali", "Paneer Special", "Special Mix veg", "Fast Food", "Super Cool", "Indian Bread", "Special Rice"];
 
-// --- STATUS CHANGE HANDLER (Placed globally at the top to resolve Next.js lexical compile scope) ---
+// --- STATUS CHANGE HANDLER ---
 const handleStatusChange = async (order: any, newStatus: string) => {
   try {
     // 1. Firebase में स्टेटस अपडेट करें
@@ -142,7 +142,6 @@ const handlePrintReceipt = (order: any) => {
         
         <div class="qr-container">
           <p style="margin: 0; font-size: 11px; font-weight: bold;">Scan with PhonePe / UPI to Pay</p>
-          <!-- Loads your PhonePe QR code safely -->
           <img class="qr-image" src="/phonepe-qr.png" alt="Payment QR" />
         </div>
         
@@ -155,11 +154,89 @@ const handlePrintReceipt = (order: any) => {
         </div>
 
         <script>
-          // Automatic open print dialog
           window.onload = function() {
-            setTimeout(function() {
-              window.print();
-            }, 300);
+            setTimeout(function() { window.print(); }, 300);
+          }
+        </script>
+      </body>
+    </html>
+  `);
+  printWindow.document.close();
+};
+
+// --- PRINT RECIPE POSTER FOR KITCHEN WALL (SOP ROSTER SHEET) ---
+const handlePrintRosterSOP = (product: any) => {
+  const printWindow = window.open('', '_blank', 'width=800,height=1000');
+  if (!printWindow) {
+    return toast.error("Please allow pop-ups to print recipe sheets.");
+  }
+
+  const stepsHtml = product.ingredients?.map((item: any) => `
+    <div style="margin-bottom: 25px; page-break-inside: avoid;">
+      <div style="display: flex; align-items: flex-start; gap: 15px;">
+        <div style="background: #000; color: #fff; width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 18px; flex-shrink: 0;">
+          ${item.step}
+        </div>
+        <div style="flex: 1;">
+          <div style="display: flex; justify-content: space-between; border-bottom: 2px dashed #000; padding-bottom: 5px;">
+            <span style="font-size: 20px; font-weight: 900; text-transform: uppercase;">${item.name}</span>
+            <span style="font-size: 20px; font-weight: 900; color: #f97316;">${item.quantity}</span>
+          </div>
+          ${item.note ? `<p style="margin: 6px 0 0 0; font-size: 15px; font-style: italic; color: #444; font-weight: 600;">👉 ${item.note}</p>` : ''}
+        </div>
+      </div>
+    </div>
+  `).join('') || '<p style="text-align: center; font-size: 16px; font-style: italic;">SOP list has no ingredients added yet.</p>';
+
+  printWindow.document.write(`
+    <html>
+      <head>
+        <title>SOP_Recipe_${product.name}</title>
+        <style>
+          @page { size: A4; margin: 15mm; }
+          body { 
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; 
+            color: #000; 
+            background: #fff; 
+            line-height: 1.5;
+            padding: 10px;
+          }
+          .header { text-align: center; border-bottom: 5px double #000; padding-bottom: 15px; margin-bottom: 30px; }
+          .title { margin: 0; font-size: 32px; font-weight: 900; text-transform: uppercase; letter-spacing: 1.5px; }
+          .sub-title { font-size: 20px; font-weight: bold; margin-top: 8px; text-transform: uppercase; background: #000; color: #fff; padding: 6px 15px; display: inline-block; }
+          .category { font-size: 14px; text-transform: uppercase; font-weight: bold; color: #555; margin-top: 8px; }
+          .warning-box { border: 3px solid #000; padding: 15px; text-align: center; margin-top: 40px; font-weight: 900; font-size: 16px; text-transform: uppercase; background: #f3f4f6; }
+          @media print {
+            .no-print { display: none; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div class="title">BUM BUM CAFE - KITCHEN MANIFEST</div>
+          <div class="sub-title">STANDARD RECIPE: ${product.name}</div>
+          <div class="category">Category Segment: ${product.category}</div>
+        </div>
+
+        <div style="font-size: 16px; font-weight: bold; margin-bottom: 25px; text-transform: uppercase; border-left: 6px solid #f97316; padding-left: 12px;">
+          📝 Step-by-Step Cooking instructions & Raw Materials:
+        </div>
+
+        <div style="margin-top: 15px;">
+          ${stepsHtml}
+        </div>
+
+        <div class="warning-box">
+          ⚠️ रसोइया ध्यान दें: कैफ़े की गुणवत्ता बनाए रखने के लिए इस चार्ट के अनुसार ही सटीक मात्रा का उपयोग करें!
+        </div>
+
+        <div class="no-print" style="text-align: center; margin-top: 40px;">
+          <button onclick="window.print()" style="padding: 14px 35px; font-size: 16px; font-weight: bold; background: #f97316; color: #fff; border: none; border-radius: 8px; cursor: pointer; text-transform: uppercase; letter-spacing: 1px;">Print Recipe Poster</button>
+        </div>
+
+        <script>
+          window.onload = function() {
+            setTimeout(function() { window.print(); }, 300);
           }
         </script>
       </body>
@@ -172,7 +249,8 @@ export default function AdminDashboard() {
   const [isVerified, setIsVerified] = useState(false);
   const [loading, setLoading] = useState(true);
   const [passcode, setPasscode] = useState("");
-  const [tab, setTab] = useState<'dashboard' | 'orders' | 'menu' | 'categories' | 'customers' | 'loyalty' | 'banners' | 'reviews' | 'coupons'>('dashboard');
+  // Added 'passwords' and 'roster' to tabs
+  const [tab, setTab] = useState<'dashboard' | 'orders' | 'menu' | 'categories' | 'customers' | 'loyalty' | 'banners' | 'reviews' | 'coupons' | 'roster' | 'passwords'>('dashboard');
   
   const [orders, setOrders] = useState<any[]>([]);
   const [menu, setMenu] = useState<any[]>([]);
@@ -214,6 +292,12 @@ export default function AdminDashboard() {
 
   // --- CUSTOMER POINT TRANSFERS AUDIT STATE ---
   const [transferLogs, setTransferLogs] = useState<any[]>([]);
+
+  // --- DYNAMIC PASSCODES FROM FIRESTORE ---
+  const [passcodes, setPasscodes] = useState({ adminPin: "971429", managerPin: "123456" });
+  const [userRole, setUserRole] = useState<'admin' | 'manager' | null>(null);
+  const [newAdminPinInput, setNewAdminPinInput] = useState("");
+  const [newManagerPinInput, setNewManagerPinInput] = useState("");
 
   // --- START & END DATE FILTERS (30: Custom Date-Range Sales Audit) ---
   const [startDate, setStartDate] = useState(() => {
@@ -261,6 +345,12 @@ export default function AdminDashboard() {
   const [showBroadcastModal, setShowBroadcastModal] = useState(false);
   const [broadcastMessage, setBroadcastMessage] = useState("Special Offer from Bum Bum Cafe! Get 10% OFF on all Special Pizzas today! 🍕🔥");
 
+  // --- KITCHEN ROSTER RECIPE STATES ---
+  const [rosterSelectedProduct, setRosterSelectedProduct] = useState<any>(null);
+  const [rosterStepName, setRosterStepName] = useState("");
+  const [rosterStepQty, setRosterStepQty] = useState("");
+  const [rosterStepNote, setRosterStepNote] = useState("");
+
   // Helper function to format bill number to e.g., '0015'
   const formatBillNumber = (num: number) => {
     return String(num).padStart(4, '0');
@@ -269,13 +359,31 @@ export default function AdminDashboard() {
   // 1. Session verification check
   useEffect(() => {
     const adminSession = sessionStorage.getItem('bb_cafe_admin_verified');
-    if (adminSession === 'true') {
+    const adminRole = sessionStorage.getItem('bb_cafe_admin_role') as 'admin' | 'manager' | null;
+    if (adminSession === 'true' && adminRole) {
       setIsVerified(true);
+      setUserRole(adminRole);
     }
     setLoading(false);
   }, []);
 
-  // 2. Real-time Data Listeners
+  // 2. Real-time Security Passcodes Loader (Bypasses local storage securely)
+  useEffect(() => {
+    const unsubPasscodes = onSnapshot(doc(db, "settings", "passcodes"), (d) => {
+      if (d.exists()) {
+        const loaded = {
+          adminPin: d.data().adminPin || "971429",
+          managerPin: d.data().managerPin || "123456"
+        };
+        setPasscodes(loaded);
+        setNewAdminPinInput(loaded.adminPin);
+        setNewManagerPinInput(loaded.managerPin);
+      }
+    });
+    return () => unsubPasscodes();
+  }, []);
+
+  // 3. Real-time Data Listeners
   useEffect(() => {
     if (!isVerified) return;
 
@@ -354,18 +462,28 @@ export default function AdminDashboard() {
   // --- PASSCODE LOGIN ---
   const handlePasscodeLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    if (passcode === "971429") {
+    if (passcode === passcodes.adminPin) {
       sessionStorage.setItem('bb_cafe_admin_verified', 'true');
+      sessionStorage.setItem('bb_cafe_admin_role', 'admin');
       setIsVerified(true);
+      setUserRole('admin');
       toast.success("Welcome back, Boss!");
+    } else if (passcode === passcodes.managerPin) {
+      sessionStorage.setItem('bb_cafe_admin_verified', 'true');
+      sessionStorage.setItem('bb_cafe_admin_role', 'manager');
+      setIsVerified(true);
+      setUserRole('manager');
+      toast.success("Logged in as Cafe Manager!");
     } else {
-      toast.error("Incorrect Secret PIN!");
+      toast.error("Incorrect Security PIN!");
     }
   };
 
   const handleLogout = () => {
     sessionStorage.removeItem('bb_cafe_admin_verified');
+    sessionStorage.removeItem('bb_cafe_admin_role');
     setIsVerified(false);
+    setUserRole(null);
     window.location.href = "/";
   };
 
@@ -686,7 +804,7 @@ export default function AdminDashboard() {
       }
     });
 
-    const maxSales = Math.max(...days.map(d => d.sales), 100); // Avoid dividing by zero
+    const maxSales = Math.max(...days.map(d => d.sales), 100);
 
     return days.map(day => ({
       ...day,
@@ -882,11 +1000,17 @@ export default function AdminDashboard() {
     }
   };
 
-  // --- ADD NEW PRODUCT FUNCTION ---
+  // --- ADD NEW PRODUCT FUNCTION (With Duplicate check) ---
   const handleAddProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newName || !newCategory || !newImage) {
       return toast.error("Please fill all required fields!");
+    }
+
+    // --- (DUPLICATE ITEM PREVENT CHECKER) ---
+    const exists = menu.some(item => String(item.name).toLowerCase().trim() === newName.toLowerCase().trim());
+    if (exists) {
+      return toast.error("यह डिश पहले से मेन्यू में मौजूद है!");
     }
 
     let productData: any = {
@@ -966,11 +1090,20 @@ export default function AdminDashboard() {
     }
   };
 
-  // --- EDIT & UPDATE PROCESSOR ---
+  // --- EDIT & UPDATE PROCESSOR (With Duplicate checker) ---
   const handleUpdateProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editName || !editCategory || !editImage) {
       return toast.error("Please fill all fields!");
+    }
+
+    // --- (DUPLICATE ITEM PREVENT CHECKER FOR EDITING) ---
+    const exists = menu.some(item => 
+      item.id !== editingProduct.id && 
+      String(item.name).toLowerCase().trim() === editName.toLowerCase().trim()
+    );
+    if (exists) {
+      return toast.error("इस नाम की डिश पहले से मेन्यू में मौजूद है!");
     }
 
     let updatedData: any = {
@@ -1028,6 +1161,74 @@ export default function AdminDashboard() {
       toast.success("Recipe SOP Saved!");
     } catch (err) {
       toast.error("Failed to save recipe SOP.");
+    }
+  };
+
+  // --- SAVE DYNAMIC PASSCODES (Only Admin can update) ---
+  const handleUpdatePasscodes = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (userRole !== 'admin') {
+      return toast.error("केवल मुख्य एडमिन ही पिन बदल सकते हैं!");
+    }
+    if (newAdminPinInput.length < 4 || newManagerPinInput.length < 4) {
+      return toast.error("पिन कम से कम 4 अक्षरों का होना चाहिए!");
+    }
+    try {
+      await setDoc(doc(db, "settings", "passcodes"), {
+        adminPin: newAdminPinInput,
+        managerPin: newManagerPinInput
+      }, { merge: true });
+      toast.success("Security PINs updated successfully!");
+    } catch (err) {
+      toast.error("Failed to update security PINs.");
+    }
+  };
+
+  // --- ADD KITCHEN ROSTER INGREDIENT STEP ---
+  const handleAddRosterStep = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!rosterSelectedProduct) return toast.error("पहले एक डिश सिलेक्ट करें!");
+    if (!rosterStepName || !rosterStepQty) return toast.error("सामग्री का नाम और मात्रा लिखना ज़रूरी है!");
+
+    const currentIngredients = rosterSelectedProduct.ingredients || [];
+    const newStepNum = currentIngredients.length + 1;
+    const newStep = {
+      step: newStepNum,
+      name: rosterStepName,
+      quantity: rosterStepQty,
+      note: rosterStepNote || ""
+    };
+
+    const updatedIngredients = [...currentIngredients, newStep];
+    try {
+      await updateDoc(doc(db, "products", rosterSelectedProduct.id), {
+        ingredients: updatedIngredients
+      });
+      // Update local state to reflect instantly
+      setRosterSelectedProduct({ ...rosterSelectedProduct, ingredients: updatedIngredients });
+      setRosterStepName(""); setRosterStepQty(""); setRosterStepNote("");
+      toast.success("Roster Step Added!");
+    } catch (err) {
+      toast.error("Failed to add roster step.");
+    }
+  };
+
+  // --- DELETE KITCHEN ROSTER STEP ---
+  const handleDeleteRosterStep = async (idxToDelete: number) => {
+    if (!rosterSelectedProduct) return;
+    const currentIngredients = rosterSelectedProduct.ingredients || [];
+    const filtered = currentIngredients.filter((_: any, idx: number) => idx !== idxToDelete);
+    // Re-index steps logically
+    const updated = filtered.map((item: any, idx: number) => ({ ...item, step: idx + 1 }));
+
+    try {
+      await updateDoc(doc(db, "products", rosterSelectedProduct.id), {
+        ingredients: updated
+      });
+      setRosterSelectedProduct({ ...rosterSelectedProduct, ingredients: updated });
+      toast.success("Step Deleted!");
+    } catch (err) {
+      toast.error("Failed to delete step.");
     }
   };
 
@@ -1172,7 +1373,7 @@ Report generated automatically by Bum Bum Cafe POS.`
       <header className="p-6 bg-white/[0.03] border-b border-white/5 flex justify-between items-center sticky top-0 z-40 backdrop-blur-md">
         <div>
           <h1 className="text-xl font-black text-orange-500 italic uppercase">Admin Control</h1>
-          <p className="text-[10px] text-gray-500 font-bold tracking-widest uppercase">Bum Bum Cafe Mohandra</p>
+          <p className="text-[10px] text-gray-500 font-bold tracking-widest uppercase">Bum Bum Cafe Mohandra ({userRole === 'admin' ? 'Boss' : 'Manager'})</p>
         </div>
         <div className="flex items-center gap-3">
           <button onClick={toggleStore} className={`px-4 py-2 rounded-full text-[10px] font-black flex items-center gap-2 transition-all ${storeOpen ? 'bg-green-500/10 text-green-500 border border-green-500/20' : 'bg-red-500/10 text-red-500 border border-red-500/20'}`}>
@@ -1187,12 +1388,14 @@ Report generated automatically by Bum Bum Cafe POS.`
         <button onClick={() => setTab('dashboard')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'dashboard' ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/20' : 'bg-white/5 text-gray-500'}`}>📊 Dashboard</button>
         <button onClick={() => setTab('orders')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'orders' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>📦 Orders ({orders.length})</button>
         <button onClick={() => setTab('menu')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'menu' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>🍔 Menu List</button>
+        <button onClick={() => setTab('roster')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'roster' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>📋 Kitchen Roster</button>
         <button onClick={() => setTab('categories')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'categories' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>🗂️ Categories</button>
         <button onClick={() => setTab('customers')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'customers' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>👥 Customers ({combinedCustomers.length})</button>
         <button onClick={() => setTab('loyalty')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'loyalty' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>🎁 Loyalty Rules</button>
         <button onClick={() => setTab('banners')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'banners' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>🖼️ Banners</button>
         <button onClick={() => setTab('coupons')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'coupons' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>🎟️ Coupons</button>
         <button onClick={() => setTab('reviews')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'reviews' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>⭐ Reviews</button>
+        <button onClick={() => setTab('passwords')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'passwords' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>🔑 PIN Settings</button>
       </div>
 
       <main className="p-4 max-w-2xl mx-auto">
@@ -1919,7 +2122,7 @@ Report generated automatically by Bum Bum Cafe POS.`
         {/* --- TAB 7: BANNERS TAB --- */}
         {tab === 'banners' && (
           <div className="space-y-6">
-            <form onSubmit={handleAddBanner} className="bg-white/[0.02] border border-white/5 p-6 rounded-[2.5rem] space-y-4">
+            <form onSubmit={handleAddBanner} className="bg-[#020202] border border-white/5 p-6 rounded-[2.5rem] space-y-4">
               <h3 className="text-lg font-black text-orange-500 italic uppercase flex items-center gap-2"><ImageIcon size={18}/> Add Banner</h3>
               <input type="url" placeholder="Paste image url here..." value={newBannerUrl} onChange={(e) => setNewBannerUrl(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-xs font-bold text-white" required />
               <button type="submit" className="w-full bg-green-600 text-white p-4 rounded-xl font-black text-sm uppercase">Add Banner Image</button>
@@ -1997,6 +2200,175 @@ Report generated automatically by Bum Bum Cafe POS.`
             ))}
           </div>
         )}
+
+        {/* --- TAB 10: STRUCTURED KITCHEN RECIPE ROSTER --- */}
+        {tab === 'roster' && (
+          <div className="space-y-6">
+            <h3 className="text-xl font-black text-orange-500 uppercase tracking-wider flex items-center gap-2">📋 Kitchen SOP Recipe Roster</h3>
+            <p className="text-[10px] text-gray-500 uppercase tracking-widest font-black leading-relaxed">डिश बनाने के चरण (Steps) और सामग्री का अनुपात फीड करें, और रसोई की दीवार पर चिपकाने के लिए सीधे A4 साइज़ पोस्टर प्रिंट करें।</p>
+
+            {/* Select product dropdown to load roster details */}
+            <div className="bg-[#111] border border-white/5 p-5 rounded-3xl space-y-3">
+              <label className="text-xs font-bold text-gray-400 uppercase block">Select Dish / डिश चुनें</label>
+              <select 
+                value={rosterSelectedProduct ? rosterSelectedProduct.id : ""}
+                onChange={(e) => {
+                  const selected = menu.find(item => item.id === e.target.value);
+                  setRosterSelectedProduct(selected || null);
+                }}
+                className="w-full bg-black/60 border border-white/10 text-sm font-bold rounded-xl p-3 text-white outline-none focus:border-orange-500 cursor-pointer"
+              >
+                <option value="">-- Choose a Dish to see Roster --</option>
+                {menu.map((item) => (
+                  <option key={item.id} value={item.id}>{item.name}</option>
+                ))}
+              </select>
+            </div>
+
+            {rosterSelectedProduct && (
+              <div className="space-y-6">
+                {/* Print button & Recipe Preview */}
+                <div className="bg-[#111] border border-white/5 p-5 rounded-3xl flex justify-between items-center">
+                  <div>
+                    <h4 className="font-black text-sm text-white uppercase">{rosterSelectedProduct.name} - SOP</h4>
+                    <p className="text-[9px] text-gray-500 font-bold uppercase mt-0.5">Steps Added: {rosterSelectedProduct.ingredients?.length || 0}</p>
+                  </div>
+                  <button 
+                    onClick={() => handlePrintRosterSOP(rosterSelectedProduct)}
+                    className="px-5 py-3 bg-orange-500 hover:bg-orange-600 text-black rounded-2xl text-xs font-black uppercase transition-all shadow-md"
+                  >
+                    🖨️ Print Recipe Poster
+                  </button>
+                </div>
+
+                {/* Add Steps form */}
+                <form onSubmit={handleAddRosterStep} className="bg-white/[0.02] border border-white/5 p-6 rounded-[2.5rem] space-y-4">
+                  <h4 className="text-xs font-black text-orange-500 uppercase tracking-wider">Add SOP Step / नया चरण जोड़ें</h4>
+                  
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-gray-500 uppercase">Ingredient / Action (क्या डालें)</label>
+                      <input 
+                        type="text" 
+                        placeholder="e.g. Pizza Base / Cheese" 
+                        value={rosterStepName}
+                        onChange={(e) => setRosterStepName(e.target.value)}
+                        className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-xs font-bold text-white"
+                        required
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-gray-500 uppercase">Quantity / मात्रा</label>
+                      <input 
+                        type="text" 
+                        placeholder="e.g. 1 Piece / 30 grams" 
+                        value={rosterStepQty}
+                        onChange={(e) => setRosterStepQty(e.target.value)}
+                        className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-xs font-bold text-white"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-gray-500 uppercase">Special Cooking Instruction (विशेष निर्देश)</label>
+                    <input 
+                      type="text" 
+                      placeholder="e.g. ओवन में डालने से पहले अच्छे से सेकें (Optional)" 
+                      value={rosterStepNote}
+                      onChange={(e) => setRosterStepNote(e.target.value)}
+                      className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-xs font-bold text-white"
+                    />
+                  </div>
+
+                  <button type="submit" className="w-full bg-green-600 text-white p-3.5 rounded-xl font-black text-xs uppercase transition-all">Add Step to Recipe</button>
+                </form>
+
+                {/* Steps List view */}
+                <div className="space-y-3">
+                  <p className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">Active Recipe Steps</p>
+                  {(rosterSelectedProduct.ingredients || []).length === 0 ? (
+                    <p className="text-center text-xs font-bold text-gray-600 py-6 uppercase">No steps defined for this recipe. Add some above!</p>
+                  ) : (
+                    rosterSelectedProduct.ingredients.map((item: any, idx: number) => (
+                      <div key={idx} className="bg-white/[0.02] border border-white/5 p-4 rounded-2xl flex justify-between items-center text-xs font-bold">
+                        <div className="flex items-center gap-3">
+                          <span className="bg-orange-500/10 text-orange-500 w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black">
+                            {item.step}
+                          </span>
+                          <div>
+                            <p className="text-gray-300 uppercase">{item.name}</p>
+                            <p className="text-[10px] text-orange-400 mt-0.5">Quantity: {item.quantity}</p>
+                            {item.note && <p className="text-[9px] text-gray-500 font-medium italic mt-0.5">Note: {item.note}</p>}
+                          </div>
+                        </div>
+                        <button 
+                          onClick={() => handleDeleteRosterStep(idx)}
+                          className="p-2.5 bg-red-500/10 text-red-500 rounded-lg hover:bg-red-500/20 active:scale-95 transition-all"
+                        >
+                          <Trash size={14}/>
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* --- TAB 11: SECURITY PIN CONFIG TAB (Only Admin can change) --- */}
+        {tab === 'passwords' && (
+          <div className="space-y-6">
+            <h3 className="text-xl font-black text-orange-500 uppercase tracking-wider flex items-center gap-2"><Lock size={20}/> PIN Security Configuration</h3>
+            
+            <form onSubmit={handleUpdatePasscodes} className="bg-white/[0.02] border border-white/5 p-6 rounded-[2.5rem] space-y-5">
+              <div>
+                <h4 className="text-sm font-black text-orange-500 uppercase">Change security PINs</h4>
+                <p className="text-[9px] text-gray-500 font-bold uppercase mt-1 leading-relaxed">केवल एडमिनिस्ट्रेटर ही दोनों रोल (Admin व Manager) के लॉगिन क्रेडेंशियल्स को बदल सकता है।</p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold text-gray-400 uppercase">Admin LOGIN PIN</label>
+                  <input 
+                    type="password" 
+                    value={newAdminPinInput}
+                    onChange={(e) => setNewAdminPinInput(e.target.value)}
+                    disabled={userRole !== 'admin'}
+                    className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white tracking-widest"
+                    required
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold text-gray-400 uppercase">Manager LOGIN PIN</label>
+                  <input 
+                    type="password" 
+                    value={newManagerPinInput}
+                    onChange={(e) => setNewManagerPinInput(e.target.value)}
+                    disabled={userRole !== 'admin'}
+                    className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white tracking-widest"
+                    required
+                  />
+                </div>
+              </div>
+
+              {userRole !== 'admin' && (
+                <div className="bg-red-500/10 border border-red-500/20 p-4 rounded-xl">
+                  <p className="text-[10px] text-red-500 font-black uppercase tracking-wider text-center">⚠️ READ-ONLY: You are logged in as Cafe Manager. Only Admin role can edit PIN codes.</p>
+                </div>
+              )}
+
+              {userRole === 'admin' && (
+                <button type="submit" className="w-full bg-green-600 hover:bg-green-700 text-white p-4 rounded-xl font-black text-xs uppercase transition-all shadow-md">
+                  Update Passcodes
+                </button>
+              )}
+            </form>
+          </div>
+        )}
+
       </main>
 
       {/* --- 10: CUSTOMER ORDER HISTORY MODAL --- */}
