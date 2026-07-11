@@ -457,8 +457,15 @@ export default function BbCafeHome() {
     return () => clearInterval(interval);
   }, [banners]);
 
-  // PWA (App Install Prompt Listener)
+  // PWA (App Install Prompt Listener & Service Worker Registration)
   useEffect(() => {
+    // 1. सर्विस वर्कर रजिस्टर करें (क्रोम इंस्टॉलेशन एलिजिबिलिटी के लिए यह ज़रूरी है)
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js')
+        .then(() => console.log("Service Worker Registered Successfully"))
+        .catch((err) => console.log("Service Worker Registration failed", err));
+    }
+
     const handleBeforeInstallPrompt = (e: any) => {
       e.preventDefault();
       setDeferredPrompt(e);
@@ -1345,7 +1352,7 @@ export default function BbCafeHome() {
             </motion.div>
           </div>
         )}
-      </  AnimatePresence>
+      </AnimatePresence>
 
       {/* CART DRAWER MODAL */}
       <AnimatePresence>
@@ -1519,7 +1526,7 @@ export default function BbCafeHome() {
                   {appliedCoupon && (
                     <div className="flex justify-between items-center text-[10px] bg-green-500/10 border border-green-500/25 p-2 rounded-lg">
                       <span className="text-green-400 font-bold uppercase">Code Applied: {appliedCoupon.code}</span>
-                      <button onClick={() => { setAppliedCoupon(null); setEnteredCoupon(""); }} className="text-red-400 font-bold">Remove</button>
+                      <button onClick={() => {  setAppliedCoupon(null); setEnteredCoupon(""); }} className="text-red-400 font-bold">Remove</button>
                     </div>
                   )}
                 </div>
@@ -1786,7 +1793,7 @@ export default function BbCafeHome() {
             </div>
           </div>
         )}
-      </AnimatePresence>
+      </  AnimatePresence>
 
     </div>
   );
