@@ -1,3 +1,5 @@
+
+
 'use client';
 import React, { useState, useEffect, useMemo } from 'react';
 import { db } from '../lib/firebase'; 
@@ -423,6 +425,21 @@ export default function BbCafeHome() {
       unsubRules(); 
     };
   }, []);
+
+  // --- NEWLY RESTORED PWA INSTALL CLICK HANDLER ---
+  const handleInstallClick = async () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === 'accepted') {
+        toast.success("बम बम कैफ़े ऐप इंस्टॉल करने के लिए धन्यवाद! ❤️");
+      }
+      setDeferredPrompt(null);
+      setShowInstallBanner(false);
+    } else {
+      setIsInstallModalOpen(true);
+    }
+  };
 
   // --- ACTIONS ---
 
@@ -984,7 +1001,7 @@ export default function BbCafeHome() {
           )}
         </div>
 
-        {/* CATEGORY SLIDER */}
+        {/* CATEGORY SLIDER (Horizontally Slidable without visible Scrollbar) */}
         <div className="space-y-1">
           <p className="text-[8px] font-black uppercase tracking-wider text-orange-500">Inspiration for your first order</p>
           <div className="flex gap-5 overflow-x-auto py-2 px-1 scrollbar-none [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -1045,7 +1062,7 @@ export default function BbCafeHome() {
                       alt={item.name} 
                     />
                     
-                    <div className="absolute top-3 left-3 bg-black/50 backdrop-blur-md px-2 py-1 rounded-lg border border-white/10 flex items-center gap-1 text-[8px] font-black uppercase text-green-400">
+                    <div className="absolute top-3 left-3 bg-black/50 backdrop-blur-md px-2.5 py-1 rounded-lg border border-white/10 flex items-center gap-1 text-[8px] font-black uppercase text-green-400">
                       <span className="h-1 w-1 rounded-full bg-green-500 animate-pulse" />VEG
                     </div>
 
@@ -1187,6 +1204,7 @@ export default function BbCafeHome() {
             <form onSubmit={handleReviewSubmit} className="dark:bg-[#111] bg-white w-full max-w-md p-6 rounded-3xl border dark:border-white/10 border-gray-200 text-center space-y-4 shadow-xl transition-colors duration-200">
               <div className="flex justify-between items-center pb-2 border-b dark:border-white/10 border-gray-100">
                 <h3 className="text-xl font-black text-orange-500 uppercase italic">Your Feedback</h3>
+                
                 <button 
                   type="button" 
                   onClick={() => setIsReviewFormOpen(false)} 
