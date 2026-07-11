@@ -1,5 +1,5 @@
 'use client';
-  
+ 
 import React, { useState, useEffect, useMemo } from 'react';
 // Changed to reliable relative path to avoid compile-time path resolution errors
 import { db } from '../../lib/firebase'; 
