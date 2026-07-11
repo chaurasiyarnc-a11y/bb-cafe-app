@@ -25,7 +25,7 @@ const DELIVERY_AREAS = [
   { name: "Mohandra Town", fee: 20, minFree: 99, range: "0-1 KM" },
   { name: "Mohandra Ward 1-5 (Within 2 Km)", fee: 20, minFree: 199, range: "1-2 KM" },
   { name: "Nearby Area (Within 5 Km)", fee: 40, minFree: 499, range: "2-5 KM" },
-  { name: "Out of Town (5 to 8 Km)", fee: 60, minFree: 999, range: "5-8 KM" }
+  { name: "Out of Town (5 to 12 Km)", fee: 60, minFree: 999, range: "5-12 KM" } // रेंज को 5-12km कर दिया गया है
 ];
 
 const HINGLISH_DICT: { [key: string]: string } = {
@@ -260,7 +260,7 @@ export default function BbCafeHome() {
     return { bg: "from-[#ff5e00] to-[#b33600]", accent: "text-yellow-300", name: "BUM BUM CAFE - Mohandra" };
   }, []);
 
-  // Personalized Greeting Memo (dynamically changes greeting based on user details, time of day, and season)
+  // Personalized Greeting Memo
   const greetingText = useMemo(() => {
     const now = new Date();
     const hours = now.getHours();
@@ -444,6 +444,15 @@ export default function BbCafeHome() {
       unsubRules(); 
     };
   }, []);
+
+  // Promotional Banners Automatic Cycle Timer
+  useEffect(() => {
+    if (!banners || banners.length <= 1) return;
+    const interval = setInterval(() => {
+      setBannerIndex((prevIndex) => (prevIndex + 1) % banners.length);
+    }, 5000); 
+    return () => clearInterval(interval);
+  }, [banners]);
 
   useEffect(() => {
     if (cart.length > 0) {
@@ -848,7 +857,8 @@ export default function BbCafeHome() {
   if (!mounted) return null;
 
   return (
-    <div className="bg-[#050505] min-h-screen text-white pb-32 font-sans relative overflow-x-hidden">
+    // changed overflow-x-hidden to overflow-x-clip to prevent breaking position: sticky in certain browsers
+    <div className="bg-[#050505] min-h-screen text-white pb-32 font-sans relative overflow-x-clip">
       <Toaster position="top-center" />
       
       <style dangerouslySetInnerHTML={{ __html: `
@@ -903,8 +913,8 @@ export default function BbCafeHome() {
         </div>
       </header>
 
-      {/* FIXED STICKY SEARCH BAR (Keeps position on scroll correctly with elevated z-index and shadow) */}
-      <div className="sticky top-0 z-50 bg-[#050505]/95 backdrop-blur-md py-3 px-4 border-b border-white/10 shadow-md">
+      {/* FIXED STICKY SEARCH BAR (Stops perfectly at the very top with background container) */}
+      <div className="sticky top-0 z-50 bg-[#050505] py-3 px-4 border-b border-white/10 shadow-md">
         <div className="relative max-w-sm mx-auto">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
           <input 
@@ -917,7 +927,7 @@ export default function BbCafeHome() {
         </div>
       </div>
 
-      {/* DYNAMIC SHOP CLOSURE BANNER WARNING (Only checks storeOpen from Admin database now) */}
+      {/* DYNAMIC SHOP CLOSURE BANNER WARNING */}
       {!storeOpen && (
         <div className="bg-red-600 text-white font-black py-3 px-4 text-center text-xs flex items-center justify-center gap-2 shadow-lg border-b border-red-500">
           <span className="animate-pulse">⚠️</span>
@@ -1032,14 +1042,23 @@ export default function BbCafeHome() {
           </div>
         )}
 
-        {/* PRODUCTS LISTING (Without inline promotional scroll banners) */}
+        {/* PRODUCTS LISTING WITH ENTRY ENTRANCE ANIMATIONS */}
         <div className="grid grid-cols-1 gap-4 pt-1">
           {filteredMenu.length === 0 ? (
             <p className="text-center text-gray-500 py-8 text-xs font-bold uppercase">No items found...</p>
           ) : (
             filteredMenu.map((item) => {
               return (
-                <motion.div layout key={item.id} className="bg-white/[0.02] rounded-2xl border border-white/5 overflow-hidden flex flex-col relative">
+                // Beautiful entry animation for each card as you slide/scroll down
+                <motion.div 
+                  layout 
+                  key={item.id} 
+                  className="bg-white/[0.02] rounded-2xl border border-white/5 overflow-hidden flex flex-col relative"
+                  initial={{ opacity: 0, y: 30 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, margin: "-50px" }}
+                  transition={{ duration: 0.45, ease: "easeOut" }}
+                >
                   <div className="relative h-44 w-full overflow-hidden">
                     {/* Animated Image with scale transform on hover */}
                     <motion.img 
@@ -1075,7 +1094,6 @@ export default function BbCafeHome() {
                         <p className="text-orange-500 font-black text-base leading-none">{getDisplayPrice(item)}</p>
                         {item.variants && <span className="text-[8px] font-bold text-gray-400 mt-1 block">Options available</span>}
                       </div>
-                      {/* ADD Button strictly works without automated time scheduling now */}
                       {storeOpen && !isTooFar && (
                         <button onClick={() => item.variants ? setSelectedProduct(item) : addItem(item)} className="px-4 py-2 bg-orange-500/10 text-orange-400 border border-orange-500/30 hover:bg-orange-500 hover:text-white rounded-lg font-black text-[10px] active:scale-95 transition-all uppercase flex items-center gap-1 shadow">
                           <Plus size={12} /> ADD
