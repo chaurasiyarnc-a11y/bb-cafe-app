@@ -406,7 +406,6 @@ export default function BbCafeHome() {
 
   // --- REST OF EFFECTS ---
   useEffect(() => {
-    // Restored missing mounted initialization statement!
     setMounted(true);
 
     if (typeof window !== 'undefined') {
@@ -551,12 +550,11 @@ export default function BbCafeHome() {
         if (!receiverSnap.exists()) {
           transaction.set(receiverDocRef, { name: "Loyal Friend 🎁", phone: friendPhoneRaw, points: pointsToGift, lastActive: new Date() });
         } else {
-          // Replaced 'giftPointsAmount' with compile-safe, guaranteed 'pointsToGift' variable
           transaction.update(receiverDocRef, { points: increment(pointsToGift) });
         }
       });
 
-      toast.success(`🎁 सफलतापूर्वक ${pointsToGift} पॉइंट्स गिफ्ट कर दिए गए हैं!`);
+      toast.success(`🎁 सफलतापूर्वक ${pointsToGift}  पॉइंट्स गिफ्ट कर दिए गए हैं!`);
       const inviteMsg = `हे दोस्त! मैंने तुम्हें BAM BAM Cafe के ऐप पर 🎁 ${pointsToGift} Loyalty Points गिफ्ट किए हैं। यहाँ से स्वादिष्ट पिज्जा और थाली आर्डर करो: https://bb-cafe-app.vercel.app/`;
       const whatsappUrl = `https://wa.me/91${friendPhoneRaw}?text=${encodeURIComponent(inviteMsg)}`;
       
@@ -885,9 +883,9 @@ export default function BbCafeHome() {
         </div>
       )}
 
-      {/* PREMIUM UPGRADED NAVIGATION & VIDEO BACKGROUND HERO HEADER */}
-      <header className="relative pt-6 pb-12 px-5 overflow-hidden border-b border-white/10 shadow-2xl flex flex-col justify-between min-h-[160px]">
-        {/* local video path is used so it never gets blocked by external server CORS blockings */}
+      {/* PREMIUM UPGRADED HERO HEADER (Clean and Contiguous with no float) */}
+      <header className="relative pt-10 pb-8 px-5 overflow-hidden shadow-xl flex flex-col justify-end min-h-[170px]">
+        {/* local background video loop */}
         <video 
           autoPlay 
           loop 
@@ -901,53 +899,23 @@ export default function BbCafeHome() {
         </video>
 
         {/* Semi-transparent dark overlay gradient for readability */}
-        <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/60 to-black/90 z-10" />
+        <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/55 to-black/90 z-10" />
 
-        {/* 1. TOP NAVIGATION BAR */}
-        <div className="relative z-20 w-full flex justify-between items-center mb-6">
-          {/* Logo with Chef Hat Icon matching Mockup */}
-          <div className="flex items-center gap-1.5">
-            <div className="flex flex-col">
-              <div className="flex items-center gap-1 leading-none">
-                <span className="text-sm">🧑‍🍳</span>
-                <span className="text-lg font-black tracking-tighter text-white font-serif">Bum Bum</span>
-              </div>
-              <span className="text-[8px] font-black tracking-[0.2em] text-yellow-300 uppercase mt-0.5 border-t border-b border-white/20 py-0.5 px-1 leading-none text-center">CAFÉ</span>
-            </div>
-          </div>
-
-          {/* Cart Icon Badge & Menu Button on Top Right */}
-          <div className="flex items-center gap-3">
-            <button 
-              onClick={() => setIsCartOpen(true)} 
-              className="relative p-2.5 bg-black/40 backdrop-blur-md border border-white/10 rounded-full text-white hover:bg-black/60 transition-all"
-            >
-              <ShoppingCart size={16} />
-              {cart.length > 0 && (
-                <span className="absolute -top-1 -right-1 bg-red-600 text-white font-black text-[9px] w-4 h-4 rounded-full flex items-center justify-center animate-bounce">
-                  {cart.reduce((acc: number, i: any) => acc + i.quantity, 0)}
-                </span>
-              )}
-            </button>
-            <button 
-              onClick={() => setIsReviewsDrawerOpen(true)}
-              className="p-2.5 bg-black/40 backdrop-blur-md border border-white/10 rounded-full text-white hover:bg-black/60 transition-all"
-            >
-              <Menu size={16} />
-            </button>
-          </div>
-        </div>
-
-        {/* 2. HERO CONTENT AREA (Mockup Style Left Align) */}
-        <div className="relative z-20 max-w-[75%] space-y-1.5 mt-2 bg-black/35 backdrop-blur-sm p-4 rounded-2xl border border-white/5 shadow-lg">
+        {/* 1. HERO CONTENT AREA (Fancy typography + Zomato mockup style) */}
+        <div className="relative z-20 max-w-[85%] space-y-1.5 mt-auto bg-black/35 backdrop-blur-sm p-4 rounded-2xl border border-white/5 shadow-lg">
           <motion.div
             initial={{ x: -20, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
             transition={{ duration: 0.4 }}
+            className="space-y-1"
           >
-            <h2 className="text-xl font-black text-white leading-none">Delicious Food</h2>
-            <h3 className="text-lg font-black text-orange-500 leading-tight">Delivered Fast</h3>
-            <p className="text-[9px] text-gray-300 font-semibold mt-1">Order your favorite meals now!</p>
+            {/* Fancy styled name above Delicious Food */}
+            <span className="text-xl font-extrabold italic tracking-wide text-yellow-300 font-serif drop-shadow-md block leading-none">
+              Bum Bum Cafe
+            </span>
+            <h2 className="text-lg font-black text-white leading-none">Delicious Food</h2>
+            <h3 className="text-base font-black text-orange-500 leading-tight">Delivered Fast</h3>
+            <p className="text-[9px] text-gray-300 font-bold">Order your favorite meals now!</p>
           </motion.div>
           <button 
             onClick={scrollToMenu}
@@ -958,8 +926,8 @@ export default function BbCafeHome() {
         </div>
       </header>
 
-      {/* FIXED TRANSPARENT STICKY SEARCH BAR */}
-      <div className="sticky top-0 z-50 bg-transparent backdrop-blur-md py-3 px-4 shadow-none transition-colors duration-200">
+      {/* FIXED TRANSPARENT STICKY SEARCH BAR (Strictly Flush with page background) */}
+      <div className="sticky top-0 z-40 dark:bg-[#050505]/95 bg-gray-50/95 backdrop-blur-md py-3 px-4 border-b dark:border-white/5 border-gray-200 transition-colors duration-200 shadow-sm">
         <div className="relative max-w-sm mx-auto">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
           <input 
@@ -980,10 +948,10 @@ export default function BbCafeHome() {
         </div>
       )}
 
-      {/* HIGH CONTRAST SIDE ACTION BUTTONS */}
+      {/* HIGH CONTRAST SIDE ACTION BUTTONS (z-30 ensures they scroll neatly under search bar) */}
       <button 
         onClick={() => setIsSocialsOpen(true)} 
-        className="fixed right-0 top-[28%] -translate-y-1/2 bg-yellow-400 text-black border-l border-y border-yellow-500 py-3 px-1.5 rounded-l-lg z-40 text-[8px] font-black tracking-wider uppercase flex flex-col items-center gap-0.5 shadow-2xl"
+        className="fixed right-0 top-[35%] -translate-y-1/2 bg-yellow-400 text-black border-l border-y border-yellow-500 py-3 px-1.5 rounded-l-lg z-30 text-[8px] font-black tracking-wider uppercase flex flex-col items-center gap-0.5 shadow-2xl transition-all hover:bg-yellow-500"
         style={{ writingMode: 'vertical-lr' }}
       >
         📱 FOLLOW & EARN
@@ -991,7 +959,7 @@ export default function BbCafeHome() {
 
       <button 
         onClick={() => setIsReviewsDrawerOpen(true)} 
-        className="fixed right-0 top-[42%] -translate-y-1/2 bg-white text-black border-l border-y border-gray-300 py-3 px-1.5 rounded-l-lg z-40 text-[8px] font-black tracking-wider uppercase flex flex-col items-center gap-0.5 shadow-2xl"
+        className="fixed right-0 top-[48%] -translate-y-1/2 bg-white text-black border-l border-y border-gray-300 py-3 px-1.5 rounded-l-lg z-30 text-[8px] font-black tracking-wider uppercase flex flex-col items-center gap-0.5 shadow-2xl transition-all hover:bg-gray-100"
         style={{ writingMode: 'vertical-lr' }}
       >
         ⭐ WRITE REVIEW
@@ -1371,7 +1339,7 @@ export default function BbCafeHome() {
             <motion.div initial={{ y: 300 }} animate={{ y: 0 }} exit={{ y: 300 }} className="dark:bg-[#111] bg-white w-full p-6 rounded-t-3xl border-t dark:border-white/10 border-gray-200 max-w-lg mx-auto overflow-y-auto max-h-[90vh] shadow-2xl transition-colors duration-200">
               <div className="w-12 h-1 bg-white/15 rounded-full mx-auto mb-4" />
               <h3 className="text-xl font-black text-center">{selectedProduct?.name}</h3>
-              <p className="text-orange-505 font-black mb-4 uppercase text-[8px] text-center">Customize Your Order</p>
+              <p className="text-orange-550 font-black mb-4 uppercase text-[8px] text-center">Customize Your Order</p>
               
               <div className="space-y-3 mb-4">
                 <p className="text-[10px] font-bold text-gray-500 uppercase">1. Select Portion Size:</p>
@@ -1559,7 +1527,7 @@ export default function BbCafeHome() {
 
                     <div className="pt-2 border-t border-white/5 flex justify-between items-center">
                       <span className="text-[9px] dark:text-gray-400 text-neutral-700 font-bold uppercase">Gift points to friend:</span>
-                      <button type="button" onClick={() => setIsGiftModalOpen(true)} className="bg-yellow-500/10 text-yellow-500 border border-yellow-400/20 px-2.5 py-1 rounded text-[8px] font-black uppercase animate-none">🎁 Gift Points</button>
+                      <button type="button" onClick={() => setIsGiftModalOpen(true)} className="bg-yellow-500/10 text-yellow-600 border border-yellow-400/20 px-2.5 py-1 rounded text-[8px] font-black uppercase animate-none">🎁 Gift Points</button>
                     </div>
 
                     <div className="space-y-1.5 pt-2 border-t border-white/5">
@@ -1640,7 +1608,7 @@ export default function BbCafeHome() {
       <AnimatePresence>
         {isInstallModalOpen && (
           <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[270] flex items-center justify-center p-6">
-            <div className="dark:bg-[#111] bg-white w-full max-sm p-6 rounded-3xl border dark:border-white/10 border-gray-200 text-center space-y-4 shadow-2xl transition-colors duration-200">
+            <div className="dark:bg-[#111] bg-white w-full max-w-sm p-6 rounded-3xl border dark:border-white/10 border-gray-200 text-center space-y-4 shadow-2xl transition-colors duration-200">
               <Sparkles className="mx-auto text-yellow-400 animate-bounce" size={32} />
               
               <div className="space-y-1">
