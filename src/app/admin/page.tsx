@@ -32,7 +32,13 @@ const handleStatusChange = async (order: any, newStatus: string) => {
           toast.success("Synced with Loyverse POS!", { id: "pos-sync" });
         } else {
           console.error("Loyverse Sync Error:", result.error, result.details);
-          toast.error(`POS Sync Failed: ${result.error || "Unknown Error"}`, { id: "pos-sync" });
+          
+          // Loyverse से आने वाली सटीक एरर डिटेल्स को निकालें
+          const errDetail = result.details?.errors?.[0]?.details || result.details?.errors?.[0]?.message || "";
+          const errField = result.details?.errors?.[0]?.field || "";
+          const showMsg = errDetail ? `${result.error} [${errField}: ${errDetail}]` : result.error;
+
+          toast.error(`POS Sync Failed: ${showMsg || "Unknown Error"}`, { id: "pos-sync" });
         }
       } catch (err) {
         console.error("Fetch POS error:", err);
