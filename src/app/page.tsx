@@ -143,6 +143,7 @@ export default function BbCafeHome() {
   // PWA (App Install) States
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [showInstallBanner, setShowInstallBanner] = useState(false);
+  const [isInstallModalOpen, setIsInstallModalOpen] = useState(false); // नई कस्टमाइज़्ड गाइड पॉपअप स्टेट
 
   // --- 2. COMPONENT HELPERS & CALCULATION FUNCTIONS ---
 
@@ -501,19 +502,8 @@ export default function BbCafeHome() {
       setDeferredPrompt(null);
       setShowInstallBanner(false);
     } else {
-      // मैन्युअल इंस्टॉल गाइड फ़ॉलबैक (अगर ब्राउज़र ऑटोमैटिक इंस्टॉल ब्लॉक कर देता है)
-      toast((t) => (
-        <div className="flex flex-col gap-1 text-[11px] font-bold p-1">
-          <p className="text-gray-800 font-black">📲 मैन्युअल इंस्टॉल गाइड:</p>
-          <p className="text-gray-600 font-medium leading-relaxed">
-            • **Chrome (Android):** ऊपर 3 डॉट्स <span className="font-black">(⋮)</span> दबाएं और **'Install app'** चुनें।
-          </p>
-          <p className="text-gray-600 font-medium leading-relaxed">
-            • **Safari (iPhone):** नीचे **Share** आइकॉन दबाएं and **'Add to Home Screen'** चुनें।
-          </p>
-          <button onClick={() => toast.dismiss(t.id)} className="bg-orange-500 text-white px-2.5 py-1.5 rounded-lg mt-1.5 text-[9px] uppercase font-black tracking-wider shadow">समझ गया</button>
-        </div>
-      ), { duration: 12000 });
+      // फ़ॉलबैक: स्क्रीन पर कस्टमाइज़्ड "Install Guide" मॉडल खोलें
+      setIsInstallModalOpen(true);
     }
   };
 
@@ -974,7 +964,7 @@ export default function BbCafeHome() {
             <Phone size={13} />
           </a>
           <div className="bg-black/40 px-2 py-0.5 rounded-full border border-white/10 flex items-center gap-1 text-[8px] font-black uppercase text-green-400">
-            <span className="h-1 w-1 rounded-full bg-green-550" />100% VEG
+            <span className="h-1 w-1 rounded-full bg-green-500" />100% VEG
           </div>
         </div>
       </header>
@@ -1041,7 +1031,7 @@ export default function BbCafeHome() {
 
         {/* PERSONALIZED GREETING BANNER (Clean Text, No Background Box as requested) */}
         <div className="px-1.5 py-1">
-          <h3 className="text-xs font-black dark:text-gray-200 text-gray-950 leading-normal">{greetingText}</h3>
+          <h3 className="text-xs font-black dark:text-gray-200 text-gray-955 leading-normal">{greetingText}</h3>
         </div>
         
         {/* Animated & Sliding Promotional Banner */}
@@ -1255,7 +1245,7 @@ export default function BbCafeHome() {
             <div className="p-6 max-w-lg mx-auto pb-32">
               <div className="flex justify-between items-center mb-8">
                 <div>
-                  <h2 className="text-2xl font-black dark:text-white text-gray-950">All Reviews</h2>
+                  <h2 className="text-2xl font-black dark:text-white text-gray-955">All Reviews</h2>
                   <p className="text-xs text-gray-500 font-bold">Rating: 4.8/5.0 ★</p>
                 </div>
                 <button onClick={() => setIsReviewsDrawerOpen(false)} className="p-2.5 bg-white/5 rounded-full dark:text-white text-gray-800"><X size={20} /></button>
@@ -1435,13 +1425,13 @@ export default function BbCafeHome() {
                 <div className="dark:bg-white/[0.02] bg-gray-50 border dark:border-white/5 border-gray-200 rounded-2xl p-4 space-y-2 transition-colors duration-200">
                   <p className="text-[9px] font-black uppercase text-gray-400">Add Extra condiments to order:</p>
                   <div className="grid grid-cols-3 gap-2">
-                    <button onClick={() => setKetchupAddon(!ketchupAddon)} className={`p-2 rounded-xl border text-[9px] font-black ${ketchupAddon ? 'border-red-500 bg-red-500/5 text-red-400' : 'dark:border-white/5 border-gray-200 bg-transparent dark:text-gray-400 text-gray-500'}`}>
+                    <button onClick={() => setKetchupAddon(!ketchupAddon)} className={`p-2 rounded-xl border text-[9px] font-black ${ketchupAddon ? 'border-red-500 bg-red-500/5 text-red-400' : 'dark:border-white/5 border-gray-200 bg-transparent dark:text-gray-400 text-gray-700'}`}>
                       Ketchup (+₹10)
                     </button>
-                    <button onClick={() => setOreganoAddon(!oreganoAddon)} className={`p-2 rounded-xl border text-[9px] font-black ${oreganoAddon ? 'border-yellow-500 bg-yellow-500/5 text-yellow-400' : 'dark:border-white/5 border-gray-200 bg-transparent dark:text-gray-400 text-gray-500'}`}>
+                    <button onClick={() => setOreganoAddon(!oreganoAddon)} className={`p-2 rounded-xl border text-[9px] font-black ${oreganoAddon ? 'border-yellow-500 bg-yellow-500/5 text-yellow-400' : 'dark:border-white/5 border-gray-200 bg-transparent dark:text-gray-400 text-gray-700'}`}>
                       Oregano (+₹10)
                     </button>
-                    <button onClick={() => setChiliFlakesAddon(!chiliFlakesAddon)} className={`p-2 rounded-xl border text-[9px] font-black ${chiliFlakesAddon ? 'border-orange-500 bg-orange-500/5 text-orange-400' : 'dark:border-white/5 border-gray-200 bg-transparent dark:text-gray-400 text-gray-500'}`}>
+                    <button onClick={() => setChiliFlakesAddon(!chiliFlakesAddon)} className={`p-2 rounded-xl border text-[9px] font-black ${chiliFlakesAddon ? 'border-orange-500 bg-orange-500/5 text-orange-400' : 'dark:border-white/5 border-gray-200 bg-transparent dark:text-gray-400 text-gray-700'}`}>
                       Chili Flakes (+₹10)
                     </button>
                   </div>
@@ -1477,13 +1467,13 @@ export default function BbCafeHome() {
                           className={`p-3 rounded-xl border text-left flex flex-col justify-between transition-all duration-200 active:scale-95 ${
                             isSelected 
                               ? 'border-orange-500 bg-orange-500/10 text-orange-400 shadow-md' 
-                              : 'dark:border-white/5 border-gray-200 dark:bg-white/[0.01] bg-gray-50 dark:text-gray-300 text-gray-605 hover:border-gray-300 hover:dark:border-white/10'
+                              : 'dark:border-white/5 border-gray-200 dark:bg-white/[0.01] bg-gray-50 dark:text-gray-300 text-gray-700 hover:border-gray-300 hover:dark:border-white/10'
                           }`}
                         >
                           <span className="text-[9px] font-black leading-tight uppercase truncate">{area.name.replace("Mohandra ", "")}</span>
                           <div className="flex justify-between items-center w-full mt-2">
-                            <span className="text-[8px] font-black text-gray-400">शुल्क: ₹{area.fee}</span>
-                            <span className="text-[8px] font-black bg-white/5 px-1.5 py-0.5 rounded text-yellow-400">Min: ₹{area.minFree}</span>
+                            <span className="text-[8px] font-black text-gray-700">शुल्क: ₹{area.fee}</span>
+                            <span className="text-[8px] font-black bg-gray-100 dark:bg-white/5 px-1.5 py-0.5 rounded dark:text-yellow-400 text-yellow-700">Min: ₹{area.minFree}</span>
                           </div>
                         </button>
                       );
@@ -1604,6 +1594,46 @@ export default function BbCafeHome() {
                 )}
               </div>
             </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* CUSTOM PWA INSTALL MANUAL GUIDE MODAL */}
+      <AnimatePresence>
+        {isInstallModalOpen && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[270] flex items-center justify-center p-6">
+            <div className="dark:bg-[#111] bg-white w-full max-w-sm p-6 rounded-3xl border dark:border-white/10 border-gray-200 text-center space-y-4 shadow-2xl transition-colors duration-200">
+              <Sparkles className="mx-auto text-yellow-400 animate-bounce" size={32} />
+              
+              <div className="space-y-1">
+                <h3 className="text-base font-black dark:text-white text-gray-950">📲 आसान इंस्टॉलेशन गाइड</h3>
+                <p className="text-[10px] dark:text-gray-400 text-gray-600 font-bold leading-normal">
+                  यदि स्वचालित इंस्टॉल काम नहीं कर रहा है, तो आप नीचे दिए गए आसान चरणों से इसे मैन्युअल रूप से होम स्क्रीन पर जोड़ सकते हैं:
+                </p>
+              </div>
+
+              <div className="text-left text-xs space-y-3 dark:text-gray-300 text-gray-800 font-medium border-y dark:border-white/5 border-gray-200 py-4">
+                <p className="flex items-start gap-2">
+                  <span className="bg-orange-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px] font-black flex-shrink-0">1</span>
+                  <span>गूगल क्रोम (Chrome) में ऊपर दाईं ओर दिख रहे **तीन डॉट्स (⋮)** आइकॉन पर क्लिक करें।</span>
+                </p>
+                <p className="flex items-start gap-2">
+                  <span className="bg-orange-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px] font-black flex-shrink-0">2</span>
+                  <span>मेन्यू लिस्ट में नीचे जाकर **'Install app'** या **'Add to Home screen'** का विकल्प चुनें।</span>
+                </p>
+                <p className="flex items-start gap-2">
+                  <span className="bg-orange-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px] font-black flex-shrink-0">3</span>
+                  <span>अब **'Install'** बटन दबाएं। बम बम कैफ़े ऐप आपके फोन की होम स्क्रीन पर असली ऐप की तरह जुड़ जाएगा!</span>
+                </p>
+              </div>
+
+              <button 
+                onClick={() => setIsInstallModalOpen(false)} 
+                className="w-full bg-orange-500 text-white p-3.5 rounded-xl font-black text-xs uppercase tracking-wider active:scale-95 transition-all shadow"
+              >
+                समझ गया, बंद करें
+              </button>
+            </div>
           </div>
         )}
       </AnimatePresence>
@@ -1736,7 +1766,7 @@ export default function BbCafeHome() {
               <div className="space-y-1">
                 <h3 className="text-lg font-black dark:text-white text-gray-950">आर्डर भुगतान सहायता 💳</h3>
                 <p className="text-[10px] dark:text-gray-400 text-gray-600 font-semibold leading-relaxed">
-                  नीचे दिए गए बटन पर क्लिक करके अपने फोन के पेमेंट ऐप (GPay, PhonePe, Paytm) से सीधे भुगतान करें।
+                  नीचे दिए गए बटन पर क्लिक करके अपने... भुगतान करें।
                 </p>
               </div>
 
@@ -1755,8 +1785,7 @@ export default function BbCafeHome() {
                 <div className="flex-grow border-t border-white/5"></div>
               </div>
 
-              {/* White background inner box framed gracefully */}
-              <div className="bg-white p-3 rounded-2xl w-40 h-40 mx-auto flex items-center justify-center border border-gray-200 shadow-inner">
+              <div className="bg-white p-3 rounded-2xl w-40 h-40 mx-auto flex items-center justify-center border border-gray-200 shadow-inner transition-colors duration-200">
                 <img 
                   src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(`upi://pay?pa=Q231198993@ybl&pn=BUM%20BUM%20CAFE&am=${getTotalBillPrice()}&cu=INR`)}`} 
                   className="w-full h-full" 
@@ -1830,4 +1859,4 @@ export default function BbCafeHome() {
 
     </div>
   );
-  }
+}
