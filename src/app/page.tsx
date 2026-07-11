@@ -219,7 +219,7 @@ export default function BbCafeHome() {
   const isVideoUrl = (url: string) => {
     if (!url) return false;
     const cleanUrl = url.toLowerCase().split('?')[0];
-    return cleanUrl.endsWith('.mp4') || cleanUrl.endsWith('.webm') || cleanUrl.includes('/video');
+    return cleanUrl.endsWith('.mp4') || cleanUrl.endsWith('.webm') || cleanUrl.includes('/video') || cleanUrl.includes('video');
   };
 
   const calculateDistanceInKm = (lat1: number, lon1: number, lat2: number, lon2: number) => {
@@ -260,15 +260,41 @@ export default function BbCafeHome() {
     return { bg: "from-[#ff5e00] to-[#b33600]", accent: "text-yellow-300", name: "BUM BUM CAFE - Mohandra" };
   }, []);
 
-  const isStoreOpenCurrently = useMemo(() => {
-    if (!storeOpen) return false; 
+  // Personalized Greeting Memo (dynamically changes greeting based on user details, time of day, and season)
+  const greetingText = useMemo(() => {
     const now = new Date();
     const hours = now.getHours();
-    if (hours < 10 || hours >= 23) {
-      return false;
+    const month = now.getMonth() + 1; 
+    
+    let timeGreeting = "नमस्ते";
+    if (hours >= 5 && hours < 12) {
+      timeGreeting = "शुभ प्रभात ☀️";
+    } else if (hours >= 12 && hours < 17) {
+      timeGreeting = "शुभ दोपहर 🌤️";
+    } else if (hours >= 17 && hours < 22) {
+      timeGreeting = "शुभ संध्या 🌆";
+    } else {
+      timeGreeting = "शुभ रात्रि 🌙";
     }
-    return true;
-  }, [storeOpen]);
+
+    let festiveGreeting = "";
+    if (month === 10 || month === 11) {
+      festiveGreeting = "शुभ दीपावली उत्सव 🪔";
+    } else if (month === 3) {
+      festiveGreeting = "हैप्पी होली रंगोत्सव 🎨";
+    } else if (month === 8) {
+      festiveGreeting = "रक्षाबंधन की हार्दिक शुभकामनाएं 💖";
+    }
+
+    const finalGreeting = festiveGreeting ? `${festiveGreeting}! ${timeGreeting}` : timeGreeting;
+    const customerName = customerDetails?.name ? customerDetails.name : "";
+
+    if (customerName) {
+      return `नमस्ते ${customerName} जी, ${finalGreeting}! आज बम बम कैफ़े आपके लिए क्या बनाए? 😊`;
+    } else {
+      return `नमस्ते, ${finalGreeting}! आज बम बम कैफ़े आपके लिए क्या बनाए? 😊`;
+    }
+  }, [customerDetails]);
 
   const deduplicatedMenu = useMemo(() => {
     const seen = new Set();
@@ -806,7 +832,7 @@ export default function BbCafeHome() {
         name: reviewName,
         comment: reviewComment,
         rating: reviewRating,
-        isApproved: false, // Default to false for manual/admin review
+        isApproved: false, 
         timestamp: new Date()
       });
       toast.success("आपका रिव्यू सबमिट हो गया है! यह एडमिन अप्रूवल के बाद दिखेगा। ❤️");
@@ -877,8 +903,8 @@ export default function BbCafeHome() {
         </div>
       </header>
 
-      {/* STICKY SEARCH BAR */}
-      <div className="sticky top-0 z-40 bg-[#050505]/95 backdrop-blur-md py-3 px-4 border-b border-white/5">
+      {/* FIXED STICKY SEARCH BAR (Keeps position on scroll correctly with elevated z-index and shadow) */}
+      <div className="sticky top-0 z-50 bg-[#050505]/95 backdrop-blur-md py-3 px-4 border-b border-white/10 shadow-md">
         <div className="relative max-w-sm mx-auto">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
           <input 
@@ -891,11 +917,11 @@ export default function BbCafeHome() {
         </div>
       </div>
 
-      {/* DYNAMIC SHOP CLOSURE BANNER WARNING */}
-      {!isStoreOpenCurrently && (
+      {/* DYNAMIC SHOP CLOSURE BANNER WARNING (Only checks storeOpen from Admin database now) */}
+      {!storeOpen && (
         <div className="bg-red-600 text-white font-black py-3 px-4 text-center text-xs flex items-center justify-center gap-2 shadow-lg border-b border-red-500">
           <span className="animate-pulse">⚠️</span>
-          <span>बम बम कैफ़े अभी बंद है। हम सुबह 10:00 बजे खुलेंगे। आप केवल हमारा मेनू देख सकते हैं।</span>
+          <span>बम बम कैफ़े अभी बंद है। आप केवल हमारा मेनू देख सकते हैं।</span>
         </div>
       )}
 
@@ -917,6 +943,15 @@ export default function BbCafeHome() {
       </button>
 
       <main className="pt-3 px-3 max-w-lg mx-auto space-y-4">
+
+        {/* PERSONALIZED GREETING BANNER */}
+        <div className="bg-gradient-to-r from-orange-500/10 to-yellow-500/5 border border-white/5 rounded-2xl p-4 flex items-center justify-between shadow-sm">
+          <div className="space-y-1">
+            <p className="text-[9px] text-orange-400 font-extrabold uppercase tracking-widest">BUM BUM CAFE GREETING</p>
+            <h3 className="text-xs font-black text-white leading-normal">{greetingText}</h3>
+          </div>
+          <Sparkles className="text-yellow-400 animate-pulse flex-shrink-0 ml-2" size={18} />
+        </div>
         
         {/* Animated & Sliding Promotional Banner */}
         <div className="w-full h-36 rounded-2xl overflow-hidden relative border border-white/5 bg-white/[0.02]">
@@ -997,82 +1032,58 @@ export default function BbCafeHome() {
           </div>
         )}
 
-        {/* PRODUCTS LISTING */}
+        {/* PRODUCTS LISTING (Without inline promotional scroll banners) */}
         <div className="grid grid-cols-1 gap-4 pt-1">
           {filteredMenu.length === 0 ? (
             <p className="text-center text-gray-500 py-8 text-xs font-bold uppercase">No items found...</p>
           ) : (
-            filteredMenu.map((item, index) => {
-              const showInlineBanner = index === 3 && banners.length > 0;
+            filteredMenu.map((item) => {
               return (
-                <React.Fragment key={item.id}>
-                  <motion.div layout className="bg-white/[0.02] rounded-2xl border border-white/5 overflow-hidden flex flex-col relative">
-                    <div className="relative h-44 w-full">
-                      <img src={item.image || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=500&bg=80"} className="w-full h-full object-cover" alt={item.name} />
-                      
-                      <div className="absolute top-3 left-3 bg-black/50 backdrop-blur-md px-2 py-1 rounded-lg border border-white/10 flex items-center gap-1 text-[8px] font-black uppercase text-green-400">
-                        <span className="h-1 w-1 rounded-full bg-green-500 animate-pulse" />VEG
-                      </div>
+                <motion.div layout key={item.id} className="bg-white/[0.02] rounded-2xl border border-white/5 overflow-hidden flex flex-col relative">
+                  <div className="relative h-44 w-full overflow-hidden">
+                    {/* Animated Image with scale transform on hover */}
+                    <motion.img 
+                      src={item.image || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=500&bg=80"} 
+                      className="w-full h-full object-cover origin-center" 
+                      alt={item.name} 
+                      whileHover={{ scale: 1.08 }}
+                      transition={{ duration: 0.3, ease: "easeOut" }}
+                    />
+                    
+                    <div className="absolute top-3 left-3 bg-black/50 backdrop-blur-md px-2 py-1 rounded-lg border border-white/10 flex items-center gap-1 text-[8px] font-black uppercase text-green-400">
+                      <span className="h-1 w-1 rounded-full bg-green-500 animate-pulse" />VEG
+                    </div>
 
-                      <button onClick={(e) => handleToggleFavorite(item.id, e)} className="absolute top-3 right-3 bg-black/60 backdrop-blur-md p-1.5 rounded-full border border-white/10 text-white hover:text-red-500 transition-colors">
-                        <Heart size={14} className={favorites.includes(item.id) ? "fill-red-500 text-red-500" : "text-white"} />
-                      </button>
-                    </div>
-                    <div className="p-4 flex flex-col justify-between flex-1">
-                      <div className="flex justify-between items-start gap-4">
-                        <h4 className="font-black text-sm text-gray-100 line-clamp-1">{item.name}</h4>
-                        <div className="bg-green-600 text-white font-extrabold text-[9px] px-2 py-0.5 rounded flex items-center gap-0.5">
-                          <span>4.7</span><span className="text-[8px]">★</span>
-                        </div>
-                      </div>
-                      <div className="flex justify-between items-center text-[9px] text-gray-400 font-bold mt-0.5">
-                        <p className="uppercase text-[8px] text-gray-500">{item.category}</p><p>• 15-25 min</p>
-                      </div>
-                      <div className="h-px bg-white/5 my-2.5" />
-                      <div className="flex justify-between items-end mt-0.5">
-                        <div>
-                          <p className="text-gray-500 text-[8px] font-black uppercase tracking-widest leading-none mb-1">Price</p>
-                          <p className="text-orange-500 font-black text-base leading-none">{getDisplayPrice(item)}</p>
-                          {item.variants && <span className="text-[8px] font-bold text-gray-400 mt-1 block">Options available</span>}
-                        </div>
-                        {storeOpen && isStoreOpenCurrently && !isTooFar && (
-                          <button onClick={() => item.variants ? setSelectedProduct(item) : addItem(item)} className="px-4 py-2 bg-orange-500/10 text-orange-400 border border-orange-500/30 hover:bg-orange-500 hover:text-white rounded-lg font-black text-[10px] active:scale-95 transition-all uppercase flex items-center gap-1 shadow">
-                            <Plus size={12} /> ADD
-                          </button>
-                        )}
+                    <button onClick={(e) => handleToggleFavorite(item.id, e)} className="absolute top-3 right-3 bg-black/60 backdrop-blur-md p-1.5 rounded-full border border-white/10 text-white hover:text-red-500 transition-colors">
+                      <Heart size={14} className={favorites.includes(item.id) ? "fill-red-500 text-red-500" : "text-white"} />
+                    </button>
+                  </div>
+                  <div className="p-4 flex flex-col justify-between flex-1">
+                    <div className="flex justify-between items-start gap-4">
+                      <h4 className="font-black text-sm text-gray-100 line-clamp-1">{item.name}</h4>
+                      <div className="bg-green-600 text-white font-extrabold text-[9px] px-2 py-0.5 rounded flex items-center gap-0.5">
+                        <span>4.7</span><span className="text-[8px]">★</span>
                       </div>
                     </div>
-                  </motion.div>
-
-                  {showInlineBanner && (
-                    <div className="bg-gradient-to-r from-orange-600/15 to-[#b33600]/15 border border-orange-500/20 rounded-2xl p-4 overflow-hidden relative min-h-[7.5rem] flex flex-col justify-center">
-                      <div className="max-w-[70%] space-y-1 z-10 relative">
-                        <span className="text-[7px] font-black uppercase text-yellow-300 bg-yellow-400/10 border border-yellow-400/20 px-2 py-0.5 rounded-full w-max">🎁 SPECIAL OFFER</span>
-                        <h4 className="text-xs font-black text-white uppercase leading-tight line-clamp-1">{banners[bannerIndex % banners.length]?.name || "BUM BUM CAFE SPECIAL"}</h4>
-                        <p className="text-[9px] text-gray-400 leading-normal font-bold">स्वादिष्ट पिज्जा और सैंडविच पर बेहतरीन डिस्काउंट। आर्डर करने के लिए नीचे स्क्रॉल करें!</p>
-                      </div>
-                      
-                      <div className="absolute right-3 top-1/2 -translate-y-1/2 w-20 h-20 rounded-xl overflow-hidden opacity-60 shadow-lg border border-white/5">
-                        {isVideoUrl(banners[bannerIndex % banners.length]?.url) ? (
-                          <video 
-                            src={banners[bannerIndex % banners.length]?.url} 
-                            autoPlay 
-                            loop 
-                            muted 
-                            playsInline 
-                            className="w-full h-full object-cover" 
-                          />
-                        ) : (
-                          <img 
-                            src={banners[bannerIndex % banners.length]?.url} 
-                            className="w-full h-full object-cover" 
-                            alt="Festive promo block" 
-                          />
-                        )}
-                      </div>
+                    <div className="flex justify-between items-center text-[9px] text-gray-400 font-bold mt-0.5">
+                      <p className="uppercase text-[8px] text-gray-500">{item.category}</p><p>• 15-25 min</p>
                     </div>
-                  )}
-                </React.Fragment>
+                    <div className="h-px bg-white/5 my-2.5" />
+                    <div className="flex justify-between items-end mt-0.5">
+                      <div>
+                        <p className="text-gray-500 text-[8px] font-black uppercase tracking-widest leading-none mb-1">Price</p>
+                        <p className="text-orange-500 font-black text-base leading-none">{getDisplayPrice(item)}</p>
+                        {item.variants && <span className="text-[8px] font-bold text-gray-400 mt-1 block">Options available</span>}
+                      </div>
+                      {/* ADD Button strictly works without automated time scheduling now */}
+                      {storeOpen && !isTooFar && (
+                        <button onClick={() => item.variants ? setSelectedProduct(item) : addItem(item)} className="px-4 py-2 bg-orange-500/10 text-orange-400 border border-orange-500/30 hover:bg-orange-500 hover:text-white rounded-lg font-black text-[10px] active:scale-95 transition-all uppercase flex items-center gap-1 shadow">
+                          <Plus size={12} /> ADD
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </motion.div>
               );
             })
           )}
@@ -1178,7 +1189,7 @@ export default function BbCafeHome() {
               <div className="space-y-3 text-left">
                 <div>
                   <label className="text-[9px] font-black uppercase text-gray-500">Your Name</label>
-                  <input type="text" placeholder="Apna naam likhein..." value={reviewName} onChange={(e) => setReviewName(e.target.value)} required className="w-full bg-white/5 border border-white/10 p-3 rounded-lg text-xs text-white focus:border-orange-500 outline-none" />
+                  <input type="text" placeholder="Enter your name..." value={reviewName} onChange={(e) => setReviewName(e.target.value)} required className="w-full bg-white/5 border border-white/10 p-3 rounded-lg text-xs text-white focus:border-orange-500 outline-none" />
                 </div>
                 <div>
                   <label className="text-[9px] font-black uppercase text-gray-500">Rating</label>
@@ -1615,7 +1626,7 @@ export default function BbCafeHome() {
         )}
       </AnimatePresence>
 
-      {/* UPI MODAL */}
+      {/* UPI PAYMENT ASSISTANCE MODAL */}
       <AnimatePresence>
         {showUPIModal && (
           <div className="fixed inset-0 bg-black/95 z-[250] flex items-center justify-center p-6">
