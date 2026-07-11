@@ -4,11 +4,10 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { db } from '../lib/firebase'; 
 import { collection, onSnapshot, query, addDoc, doc, setDoc, increment, runTransaction, getDoc, getDocs, where } from 'firebase/firestore';
-import { ShoppingBag, Plus, Search, X, MapPin, Phone, User, Sparkles, Star, Percent, Gift, Loader2, Share2, Heart, Clock, ChevronRight, ShoppingCart, WifiOff } from 'lucide-react';
+import { ShoppingBag, Plus, Search, X, MapPin, Phone, User, Sparkles, Star, Percent, Gift, Loader2, Share2, Heart, Clock, ChevronRight, WifiOff } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
 import { useCartStore } from '../store/useCartStore';
-import Image from 'next/image';
 
 const FALLBACK_CATEGORIES = ["All", "Special Pizza", "Special Thali", "Paneer Special", "Special Mix veg", "Fast Food", "Super Cool", "Indian Bread", "Special Rice"];
 
@@ -1127,7 +1126,7 @@ export default function BbCafeHome() {
           className="absolute inset-0 w-full h-full object-cover z-0 select-none pointer-events-none"
         >
           <source src="https://www.basewfp.com/wp-content/uploads/2024/06/Video-for-Homepage-s.mp4" type="video/mp4" />
-          <Image src="https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=600&q=80" fill className="object-cover" alt="Bum Bum Cafe Header" />
+          <img src="https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=600&q=80" className="absolute inset-0 w-full h-full object-cover" alt="Bum Bum Cafe Header" />
         </video>
 
         <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/55 to-black/90 z-10" />
@@ -1248,10 +1247,9 @@ export default function BbCafeHome() {
                     onError={() => setBannerError(true)}
                   />
                 ) : (
-                  <Image 
+                  <img 
                     src={banners[bannerIndex]?.url} 
-                    fill
-                    className="object-cover" 
+                    className="w-full h-full object-cover" 
                     onError={() => setBannerError(true)} 
                     alt="BAM BAM CAFE Promo"
                   />
@@ -1276,8 +1274,8 @@ export default function BbCafeHome() {
               const isActive = selectedCategory === cat;
               return (
                 <button key={cat} onClick={() => setSelectedCategory(cat)} className="flex flex-col items-center flex-shrink-0 group outline-none">
-                  <div className={`relative w-14 h-14 rounded-full overflow-hidden border transition-all ${isActive ? 'border-orange-500 scale-105 shadow-md' : 'dark:border-white/10 border-gray-200'}`}>
-                    <Image src={getCategoryImage(cat)} fill className="object-cover" alt={cat} />
+                  <div className={`w-14 h-14 rounded-full overflow-hidden border transition-all ${isActive ? 'border-orange-500 scale-105 shadow-md' : 'dark:border-white/10 border-gray-200'}`}>
+                    <img src={getCategoryImage(cat)} className="w-full h-full object-cover" alt={cat} />
                   </div>
                   <span className={`text-[9px] font-black uppercase mt-1.5 truncate max-w-[70px] text-center ${isActive ? 'dark:text-orange-500 text-orange-700' : 'dark:text-gray-400 text-neutral-800'}`}>
                     {cat === "All" ? "All" : cat.replace("Special ", "").replace(" Special", "")}
@@ -1321,10 +1319,9 @@ export default function BbCafeHome() {
                     transition={{ duration: 0.45, ease: "easeOut" }}
                   >
                     <div className="relative h-44 w-full overflow-hidden">
-                      <Image 
+                      <img 
                         src={item.image || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=500&q=80"} 
-                        fill
-                        className="object-cover origin-center transition-transform duration-700 ease-out group-hover:scale-110" 
+                        className="w-full h-full object-cover origin-center transition-transform duration-700 ease-out group-hover:scale-110" 
                         alt={item.name} 
                       />
                       
