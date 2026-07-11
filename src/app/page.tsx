@@ -25,7 +25,7 @@ const DELIVERY_AREAS = [
   { name: "Mohandra Town", fee: 20, minFree: 99, range: "0-1 KM" },
   { name: "Mohandra Ward 1-5 (Within 2 Km)", fee: 20, minFree: 199, range: "1-2 KM" },
   { name: "Nearby Area (Within 5 Km)", fee: 40, minFree: 499, range: "2-5 KM" },
-  { name: "Out of Town (5 to 12 Km)", fee: 60, minFree: 999, range: "5-12 KM" } // रेंज को 5-12km कर दिया गया है
+  { name: "Out of Town (5 to 12 Km)", fee: 60, minFree: 999, range: "5-12 KM" } // 5 to 12 KM सीमा सेट की गई है
 ];
 
 const HINGLISH_DICT: { [key: string]: string } = {
@@ -140,6 +140,10 @@ export default function BbCafeHome() {
   // Geofencing limit parameters
   const [isTooFar, setIsTooFar] = useState(false);
   const [distanceKm, setDistanceKm] = useState<number | null>(null);
+
+  // PWA (App Install) States
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [showInstallBanner, setShowInstallBanner] = useState(false);
 
   // --- 2. COMPONENT HELPERS & CALCULATION FUNCTIONS ---
 
@@ -453,6 +457,31 @@ export default function BbCafeHome() {
     }, 5000); 
     return () => clearInterval(interval);
   }, [banners]);
+
+  // PWA (App Install Prompt Listener)
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e: any) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      setShowInstallBanner(true);
+    };
+    window.addEventListener('beforeinstallprompt' as any, handleBeforeInstallPrompt);
+    return () => {
+      window.removeEventListener('beforeinstallprompt' as any, handleBeforeInstallPrompt);
+    };
+  }, []);
+
+  const handleInstallClick = async () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === 'accepted') {
+        toast.success("बम बम कैफ़े ऐप इंस्टॉल करने के लिए धन्यवाद! ❤️");
+      }
+      setDeferredPrompt(null);
+      setShowInstallBanner(false);
+    }
+  };
 
   useEffect(() => {
     if (cart.length > 0) {
@@ -857,7 +886,7 @@ export default function BbCafeHome() {
   if (!mounted) return null;
 
   return (
-    // changed overflow-x-hidden to overflow-x-clip to prevent breaking position: sticky in certain browsers
+    // overflow-x-clip prevents scroll breaks with position: sticky
     <div className="bg-[#050505] min-h-screen text-white pb-32 font-sans relative overflow-x-clip">
       <Toaster position="top-center" />
       
@@ -913,7 +942,7 @@ export default function BbCafeHome() {
         </div>
       </header>
 
-      {/* FIXED STICKY SEARCH BAR (Stops perfectly at the very top with background container) */}
+      {/* FIXED STICKY SEARCH BAR (Stops at viewport top perfectly) */}
       <div className="sticky top-0 z-50 bg-[#050505] py-3 px-4 border-b border-white/10 shadow-md">
         <div className="relative max-w-sm mx-auto">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
@@ -953,6 +982,25 @@ export default function BbCafeHome() {
       </button>
 
       <main className="pt-3 px-3 max-w-lg mx-auto space-y-4">
+
+        {/* PWA INSTALLATION BANNER */}
+        {showInstallBanner && (
+          <div className="bg-gradient-to-r from-[#ff5e00] to-amber-500 p-3.5 rounded-2xl flex items-center justify-between shadow-lg border border-white/10 mx-1">
+            <div className="flex items-center gap-2.5">
+              <span className="text-xl">📲</span>
+              <div>
+                <h4 className="text-xs font-black text-white">Bum Bum Cafe App</h4>
+                <p className="text-[9px] text-orange-100 font-bold">बिना प्ले स्टोर के सीधे अपने फोन में इंस्टॉल करें!</p>
+              </div>
+            </div>
+            <button 
+              onClick={handleInstallClick}
+              className="bg-white text-black font-black text-[10px] px-3 py-2 rounded-xl uppercase shadow active:scale-95 transition-all flex-shrink-0"
+            >
+              Install ➔
+            </button>
+          </div>
+        )}
 
         {/* PERSONALIZED GREETING BANNER */}
         <div className="bg-gradient-to-r from-orange-500/10 to-yellow-500/5 border border-white/5 rounded-2xl p-4 flex items-center justify-between shadow-sm">
@@ -1042,14 +1090,13 @@ export default function BbCafeHome() {
           </div>
         )}
 
-        {/* PRODUCTS LISTING WITH ENTRY ENTRANCE ANIMATIONS */}
+        {/* PRODUCTS LISTING */}
         <div className="grid grid-cols-1 gap-4 pt-1">
           {filteredMenu.length === 0 ? (
             <p className="text-center text-gray-500 py-8 text-xs font-bold uppercase">No items found...</p>
           ) : (
             filteredMenu.map((item) => {
               return (
-                // Beautiful entry animation for each card as you slide/scroll down
                 <motion.div 
                   layout 
                   key={item.id} 
@@ -1060,7 +1107,7 @@ export default function BbCafeHome() {
                   transition={{ duration: 0.45, ease: "easeOut" }}
                 >
                   <div className="relative h-44 w-full overflow-hidden">
-                    {/* Animated Image with scale transform on hover */}
+                    {/* Animated Image with zoom on hover */}
                     <motion.img 
                       src={item.image || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=500&bg=80"} 
                       className="w-full h-full object-cover origin-center" 
@@ -1572,7 +1619,7 @@ export default function BbCafeHome() {
             </form>
           </div>
         )}
-      </AnimatePresence>
+      </  AnimatePresence>
 
       <AnimatePresence>
         {isGiftModalOpen && (
