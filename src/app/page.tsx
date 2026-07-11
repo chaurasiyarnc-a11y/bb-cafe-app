@@ -554,10 +554,10 @@ export default function BbCafeHome() {
     if (!navigator.geolocation) {
       return toast.error("आपके ब्राउज़र में जीपीएस लोकेशन उपलब्ध नहीं है।");
     }
-    toast.loading("सटीक लोकेशन ट्रैक कर रहे हैं...");
+    const toastId = toast.loading("सटीक लोकेशन ट्रैक कर रहे हैं...");
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        toast.dismiss();
+        toast.dismiss(toastId); // pass specific loading ID to auto-dismiss successfully
         const { latitude, longitude } = position.coords;
         setAddress(`My GPS Location: https://www.google.com/maps?q=${latitude},${longitude}`);
         toast.success("जीपीएस से लोकेशन सफलतापूर्वक जोड़ी गई!");
@@ -590,7 +590,7 @@ export default function BbCafeHome() {
         }
       },
       () => {
-        toast.dismiss();
+        toast.dismiss(toastId);
         toast.error("लोकेशन की अनुमति अस्वीकार कर दी गई है या नेटवर्क त्रुटि है।");
       }
     );
@@ -922,17 +922,20 @@ export default function BbCafeHome() {
   return (
     // dark:bg and bg classes enable system light/dark mode support smoothly
     <div className="dark:bg-[#050505] bg-gray-50 min-h-screen dark:text-white text-gray-900 pb-32 font-sans relative overflow-x-clip transition-colors duration-200">
-      <Toaster position="top-center" />
       
-      <style dangerouslySetInnerHTML={{ __html: `
-        .hide-scrollbar::-webkit-scrollbar {
-          display: none !important;
-        }
-        .hide-scrollbar {
-          -ms-overflow-style: none !important;
-          scrollbar-width: none !important;
-        }
-      `}} />
+      {/* 3000ms duration added so all notifications automatically dismiss after 3 seconds! */}
+      <Toaster 
+        position="top-center" 
+        toastOptions={{
+          duration: 3000,
+          style: {
+            background: '#222',
+            color: '#fff',
+            fontWeight: 'bold',
+            fontSize: '12px'
+          }
+        }} 
+      />
       
       {confettiActive && (
         <div className="fixed inset-0 pointer-events-none z-[999] overflow-hidden">
@@ -985,7 +988,7 @@ export default function BbCafeHome() {
             placeholder="Search pizza, thali, paneer special..." 
             value={searchQuery} 
             onChange={(e) => setSearchQuery(e.target.value)} 
-            className="w-full dark:bg-neutral-800 bg-gray-100 dark:text-white text-gray-900 py-2.5 px-11 rounded-xl outline-none text-xs font-semibold dark:placeholder-gray-400 placeholder-gray-500 border dark:border-neutral-700 border-gray-200 shadow-sm transition-colors duration-200" 
+            className="w-full dark:bg-neutral-800 bg-gray-100 dark:text-white text-gray-900 py-2.5 px-11 rounded-xl outline-none text-xs font-semibold dark:placeholder-gray-400 placeholder-gray-500 border dark:border-neutral-700 border-gray-200 transition-colors duration-200" 
           />
         </div>
       </div>
@@ -1036,7 +1039,7 @@ export default function BbCafeHome() {
           </div>
         )}
 
-        {/* PERSONALIZED GREETING BANNER (High contrast dynamic greeting text) */}
+        {/* PERSONALIZED GREETING BANNER (Clean Text, No Background Box as requested) */}
         <div className="px-1.5 py-1">
           <h3 className="text-xs font-black dark:text-gray-200 text-gray-950 leading-normal">{greetingText}</h3>
         </div>
@@ -1087,7 +1090,7 @@ export default function BbCafeHome() {
           <p className="text-[8px] font-black uppercase tracking-wider text-orange-500">Inspiration for your first order</p>
           <div className="flex gap-5 overflow-x-auto hide-scrollbar py-2 px-1">
             <button onClick={() => setSelectedCategory("Favorites")} className="flex flex-col items-center flex-shrink-0 group outline-none">
-              <div className={`w-14 h-14 rounded-full overflow-hidden border transition-all flex items-center justify-center ${selectedCategory === "Favorites" ? 'border-red-500 scale-105 shadow-md' : 'dark:border-white/10 border-gray-300'}`}>
+              <div className={`w-14 h-14 rounded-full overflow-hidden border transition-all flex items-center justify-center ${selectedCategory === "Favorites" ? 'border-red-500 scale-105 shadow-md' : 'dark:border-white/10 border-gray-200'}`}>
                 <Heart size={24} className={selectedCategory === "Favorites" ? 'text-red-500 fill-red-500' : 'text-gray-400'} />
               </div>
               <span className={`text-[9px] font-black uppercase mt-1.5 truncate ${selectedCategory === "Favorites" ? 'text-red-500' : 'dark:text-gray-400 text-gray-700 font-bold'}`}>My Favorites</span>
@@ -1097,7 +1100,7 @@ export default function BbCafeHome() {
               const isActive = selectedCategory === cat;
               return (
                 <button key={cat} onClick={() => setSelectedCategory(cat)} className="flex flex-col items-center flex-shrink-0 group outline-none">
-                  <div className={`w-14 h-14 rounded-full overflow-hidden border transition-all ${isActive ? 'border-orange-500 scale-105 shadow-md' : 'dark:border-white/10 border-gray-300'}`}>
+                  <div className={`w-14 h-14 rounded-full overflow-hidden border transition-all ${isActive ? 'border-orange-500 scale-105 shadow-md' : 'dark:border-white/10 border-gray-200'}`}>
                     <img src={getCategoryImage(cat)} className="w-full h-full object-cover" alt={cat} />
                   </div>
                   <span className={`text-[9px] font-black uppercase mt-1.5 truncate max-w-[70px] text-center ${isActive ? 'dark:text-orange-500 text-orange-700 font-black' : 'dark:text-gray-400 text-gray-700 font-bold'}`}>
@@ -1166,7 +1169,7 @@ export default function BbCafeHome() {
                     <div className="flex justify-between items-center text-[9px] dark:text-gray-400 text-gray-700 font-bold mt-0.5">
                       <p className="uppercase text-[8px] dark:text-gray-500 text-gray-400">{item.category}</p><p>• 15-25 min</p>
                     </div>
-                    <div className="h-px dark:bg-white/5 bg-gray-200 my-2.5" />
+                    <div className="h-px dark:bg-white/5 bg-gray-100 my-2.5" />
                     <div className="flex justify-between items-end mt-0.5">
                       <div>
                         <p className="dark:text-gray-500 text-gray-400 text-[8px] font-black uppercase tracking-widest leading-none mb-1">Price</p>
@@ -1276,7 +1279,7 @@ export default function BbCafeHome() {
             </div>
           </div>
         )}
-      </AnimatePresence>
+      </  AnimatePresence>
 
       <AnimatePresence>
         {isReviewFormOpen && (
@@ -1315,7 +1318,7 @@ export default function BbCafeHome() {
 
                 <div>
                   <label className="text-[9px] font-black uppercase text-gray-500">Comments</label>
-                  <textarea placeholder="Khana kaisa laga?..." value={reviewComment} onChange={(e) => setReviewComment(e.target.value)} required rows={3} className="w-full dark:bg-white/5 bg-gray-50 border dark:border-white/10 border-gray-200 p-3 rounded-lg text-xs dark:text-white text-gray-950 focus:border-orange-500 outline-none resize-none" />
+                  <textarea placeholder="Khana kaisa laga?..." value={reviewComment} onChange={(e) => setReviewComment(e.target.value)} required rows={3} className="w-full dark:bg-white/5 bg-gray-50 border dark:border-white/10 border-gray-200 p-3 rounded-lg text-xs dark:text-white text-gray-955 focus:border-orange-500 outline-none resize-none" />
                 </div>
               </div>
               <div className="flex gap-2 pt-1">
@@ -1346,7 +1349,7 @@ export default function BbCafeHome() {
                       className={`p-3 rounded-xl flex flex-col items-center border transition-all ${chosenSize.toLowerCase() === size.toLowerCase() ? 'bg-orange-500/10 border-orange-500 text-orange-500' : 'dark:bg-white/[0.03] bg-gray-50 dark:border-white/5 border-gray-200 dark:text-gray-400 text-gray-600'}`}
                     >
                       <span className="capitalize text-xs font-black">{size}</span>
-                      <span className="font-extrabold text-[10px] mt-1 dark:text-white text-gray-950">₹{price}</span>
+                      <span className="font-extrabold text-[10px] mt-1 dark:text-white text-gray-955">₹{price}</span>
                     </button>
                   ))}
                 </div>
@@ -1363,7 +1366,7 @@ export default function BbCafeHome() {
                           type="button"
                           key={addon}
                           onClick={() => setPizzaAddons(prev => ({ ...prev, [addon]: !prev[addon] }))}
-                          className={`p-2.5 rounded-xl border flex justify-between items-center text-[9px] font-bold ${isSelected ? 'border-orange-500 bg-orange-500/5 text-orange-400' : 'dark:border-white/5 border-gray-200 dark:bg-white/[0.02] bg-gray-50 dark:text-gray-300 text-gray-600'}`}
+                          className={`p-2.5 rounded-xl border flex justify-between items-center text-[9px] font-bold ${isSelected ? 'border-orange-500 bg-orange-500/5 text-orange-400' : 'dark:border-white/5 border-gray-200 dark:bg-white/[0.02] bg-gray-50 dark:text-gray-300 text-gray-605'}`}
                         >
                           <span>{addon}</span>
                           <span className="text-orange-400 font-black">+₹{cost}</span>
@@ -1395,19 +1398,19 @@ export default function BbCafeHome() {
             >
               <div className="w-12 h-1 bg-white/15 rounded-full mx-auto mb-4" />
               <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-black dark:text-white text-gray-950 font-mono">Your Order Cart</h2>
+                <h2 className="text-2xl font-black dark:text-white text-gray-955 font-mono">Your Order Cart</h2>
                 <button onClick={() => { setIsCartOpen(false); }} className="p-2.5 dark:bg-white/5 bg-gray-100 hover:dark:bg-white/10 hover:bg-gray-200 dark:text-white text-gray-800 rounded-full transition-all"><X size={20} /></button>
               </div>
 
               {cart.map((item: any) => (
                 <div key={item.id} className="flex justify-between items-center dark:bg-white/[0.02] bg-white p-4 rounded-2xl mb-3 border dark:border-white/5 border-gray-200 shadow-sm transition-colors duration-200">
                   <div className="min-w-0 pr-3">
-                    <h4 className="font-bold text-xs dark:text-gray-100 text-gray-950 truncate">{item?.name || "Item"}</h4>
+                    <h4 className="font-bold text-xs dark:text-gray-100 text-gray-955 truncate">{item?.name || "Item"}</h4>
                     <p className="text-orange-500 font-black mt-1 text-[11px]">₹{item?.price || 0}</p>
                   </div>
                   <div className="flex items-center gap-2 bg-black/40 px-2 py-1 rounded-xl border border-white/10 flex-shrink-0">
                     <button onClick={() => removeItem(item.id)} className="w-6 h-6 flex items-center justify-center bg-red-500/10 text-red-500 rounded text-sm font-black">-</button>
-                    <span className="font-black text-xs px-1 dark:text-white text-gray-950">{item.quantity}</span>
+                    <span className="font-black text-xs px-1 dark:text-white text-gray-800">{item.quantity}</span>
                     {item.isReward ? (
                       <button disabled className="w-6 h-6 flex items-center justify-center bg-white/5 text-gray-600 rounded text-sm font-black cursor-not-allowed">+</button>
                     ) : (
@@ -1474,7 +1477,7 @@ export default function BbCafeHome() {
                           className={`p-3 rounded-xl border text-left flex flex-col justify-between transition-all duration-200 active:scale-95 ${
                             isSelected 
                               ? 'border-orange-500 bg-orange-500/10 text-orange-400 shadow-md' 
-                              : 'dark:border-white/5 border-gray-200 dark:bg-white/[0.01] bg-gray-50 dark:text-gray-300 text-gray-700 hover:border-gray-300 hover:dark:border-white/10'
+                              : 'dark:border-white/5 border-gray-200 dark:bg-white/[0.01] bg-gray-50 dark:text-gray-300 text-gray-605 hover:border-gray-300 hover:dark:border-white/10'
                           }`}
                         >
                           <span className="text-[9px] font-black leading-tight uppercase truncate">{area.name.replace("Mohandra ", "")}</span>
@@ -1507,7 +1510,7 @@ export default function BbCafeHome() {
                     
                     <div className="flex justify-between items-center">
                       <div>
-                        <h4 className="text-2xl font-black dark:text-white text-gray-950">{customerPoints} <span className="text-[9px] text-gray-500 font-bold uppercase">Points</span></h4>
+                        <h4 className="text-2xl font-black dark:text-white text-gray-955">{customerPoints} <span className="text-[9px] text-gray-500 font-bold uppercase">Points</span></h4>
                         <p className="text-[8px] text-gray-400">Spend ₹100 = Get 1 Point!</p>
                       </div>
                       <div className="text-right text-[8px] text-yellow-400 font-black space-y-0.5 uppercase max-h-20 overflow-y-auto no-scrollbar">
@@ -1549,7 +1552,7 @@ export default function BbCafeHome() {
                 <div className="dark:bg-white/[0.02] bg-gray-50 border dark:border-white/5 border-gray-200 p-4 rounded-2xl space-y-2 transition-colors duration-200">
                   <div className="flex items-center gap-1.5 text-orange-500 font-black text-[10px] uppercase"><Percent size={14}/> <span>Have a promo code?</span></div>
                   <div className="flex gap-2">
-                    <input type="text" placeholder="e.g. WELCOME" value={enteredCoupon} onChange={(e) => setEnteredCoupon(e.target.value)} className="flex-1 dark:bg-black/40 bg-white border dark:border-white/10 border-gray-200 rounded-lg p-2 text-xs dark:text-white text-gray-900 uppercase" />
+                    <input type="text" placeholder="e.g. WELCOME" value={enteredCoupon} onChange={(e) => setEnteredCoupon(e.target.value)} className="flex-1 dark:bg-black/40 bg-white border dark:border-white/10 border-gray-200 rounded-lg p-2 text-xs dark:text-white text-gray-955 uppercase" />
                     <button type="button" onClick={handleApplyCoupon} className="bg-orange-500 text-black font-black text-[10px] p-2 px-4 rounded-lg">APPLY</button>
                   </div>
                   {appliedCoupon && (
@@ -1578,7 +1581,7 @@ export default function BbCafeHome() {
                   <div className="flex justify-between items-center mb-1">
                     <button type="button" onClick={handleDetectLocation} className="text-[8px] bg-green-600 text-white font-black px-2 py-1 rounded flex items-center gap-1 shadow-sm uppercase">📍 Detect Location</button>
                   </div>
-                  <textarea placeholder="Ghar ka address, Landmark ke saath..." value={address} onChange={(e) => setAddress(e.target.value)} className="w-full dark:bg-black/40 bg-white border dark:border-white/10 border-gray-200 rounded-xl p-3 text-xs font-semibold dark:text-white text-gray-900 resize-none h-16 outline-none" />
+                  <textarea placeholder="Ghar ka address, Landmark ke saath..." value={address} onChange={(e) => setAddress(e.target.value)} className="w-full dark:bg-black/40 bg-white border dark:border-white/10 border-gray-200 rounded-xl p-3 text-xs font-semibold dark:text-white text-gray-955 outline-none resize-none h-16 outline-none" />
                 </div>
 
                 <div className="bg-gradient-to-b from-orange-600 to-orange-700 p-5 rounded-2xl text-white">
@@ -1635,11 +1638,11 @@ export default function BbCafeHome() {
               <div className="space-y-3 text-left">
                 <div className="space-y-1">
                   <label className="text-[9px] font-bold text-gray-500 uppercase">Your Name</label>
-                  <input type="text" placeholder="Enter your name..." value={tempName} onChange={(e) => setTempName(e.target.value)} className="w-full dark:bg-white/5 bg-gray-50 border dark:border-white/10 border-gray-200 p-3 rounded-xl font-bold dark:text-white text-gray-950 outline-none focus:border-orange-500 text-xs" required />
+                  <input type="text" placeholder="Enter your name..." value={tempName} onChange={(e) => setTempName(e.target.value)} className="w-full dark:bg-white/5 bg-gray-50 border dark:border-white/10 border-gray-200 p-3 rounded-xl font-bold dark:text-white text-gray-955 outline-none focus:border-orange-500 text-xs" required />
                 </div>
                 <div className="space-y-1">
                   <label className="text-[9px] font-bold text-gray-500 uppercase">Mobile Number</label>
-                  <input type="tel" maxLength={10} placeholder="10-digit Phone Number" value={tempPhone} onChange={(e) => setTempPhone(e.target.value)} className="w-full dark:bg-white/5 bg-gray-50 border dark:border-white/10 border-gray-200 p-3 rounded-xl font-bold dark:text-white text-gray-950 outline-none focus:border-orange-500 text-xs" required />
+                  <input type="tel" maxLength={10} placeholder="10-digit Phone Number" value={tempPhone} onChange={(e) => setTempPhone(e.target.value)} className="w-full dark:bg-white/5 bg-gray-50 border dark:border-white/10 border-gray-200 p-3 rounded-xl font-bold dark:text-white text-gray-955 outline-none focus:border-orange-500 text-xs" required />
                 </div>
                 <div className="space-y-1">
                   <label className="text-[9px] font-bold text-gray-500 uppercase">Referral Code (Optional)</label>
@@ -1776,7 +1779,7 @@ export default function BbCafeHome() {
           <div className="fixed inset-0 bg-black/95 z-[240] flex items-center justify-center p-6">
             <div className="dark:bg-[#111] bg-white w-full max-w-md p-6 rounded-3xl border dark:border-white/10 border-gray-200 text-center space-y-4 max-h-[85vh] overflow-y-auto shadow-xl transition-colors duration-200">
               <div className="flex justify-between items-center border-b border-white/5 pb-2">
-                <span className="text-[10px] font-black text-green-500">🌱 DIGITAL GREEN INVOICE</span>
+                <span className="text-[10px] font-black text-green-400">🌱 DIGITAL GREEN INVOICE</span>
                 <button onClick={() => setShowInvoice(false)} className="text-gray-400"><X size={16} /></button>
               </div>
               <h4 className="text-xl font-black text-yellow-400 italic">BUM BUM CAFE</h4>
