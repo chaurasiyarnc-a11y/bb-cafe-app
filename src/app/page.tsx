@@ -44,7 +44,6 @@ const SUGGESTED_REVIEWS = [
   "पिज्जा का स्वाद लाजवाब है! मज़ा आ गया 🍕😋",
   "मोहांद्रा में सबसे बेस्ट सर्विस और स्वाद! ⭐⭐⭐⭐⭐",
   "सुपर फास्ट डिलीवरी और शानदार पैकेजिंग! 🛵📦",
-  "स्पेशल थाली का स्वाद एकदम घर जैसा है! 🍱❤️",
   "साफ़-सफ़ाई और शुद्धता 10/10 है! 🧼👌"
 ];
 
@@ -595,7 +594,6 @@ export default function BbCafeHome() {
       });
 
       toast.success(`🎁 सफलतापूर्वक ${pointsToGift} पॉइंट्स गिफ्ट कर दिए गए हैं!`);
-      // Fixed static production share URL used here to ensure stable link
       const inviteMsg = `हे दोस्त! मैंने तुम्हें BAM BAM Cafe के ऐप पर 🎁 ${pointsToGift} Loyalty Points गिफ्ट किए हैं। यहाँ से स्वादिष्ट पिज्जा और थाली आर्डर करो: https://bb-cafe-app.vercel.app/`;
       const whatsappUrl = `https://wa.me/91${friendPhoneRaw}?text=${encodeURIComponent(inviteMsg)}`;
       
@@ -717,7 +715,6 @@ export default function BbCafeHome() {
     const shareCountKey = `bb_shares_${phoneClean}`;
     let currentShares = Number(localStorage.getItem(shareCountKey) || 0);
 
-    // Fixed static production share URL used here to ensure stable link is always shared
     const shareMessage = `🔥 *BAM BAM CAFE - Mohandra* 🔥\nयहाँ से ऑर्डर करें बेहतरीन और स्वादिष्ट Pizza, Thali और Fast Food! सीधे आपके घर तक सुपर फास्ट होम डिलीवरी।\n👉 https://bb-cafe-app.vercel.app/`;
     const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(shareMessage)}`;
 
@@ -888,7 +885,7 @@ export default function BbCafeHome() {
   if (!mounted) return null;
 
   return (
-    // overflow-x-clip avoids breaking position: sticky scroll container
+    // overflow-x-clip prevents scroll breaks with position: sticky
     <div className="bg-[#050505] min-h-screen text-white pb-32 font-sans relative overflow-x-clip">
       <Toaster position="top-center" />
       
@@ -1004,13 +1001,13 @@ export default function BbCafeHome() {
           </div>
         )}
 
-        {/* PERSONALIZED GREETING BANNER */}
-        <div className="bg-gradient-to-r from-orange-500/10 to-yellow-500/5 border border-white/5 rounded-2xl p-4 flex items-center justify-between shadow-sm">
-          <div className="space-y-1">
-            <p className="text-[9px] text-orange-400 font-extrabold uppercase tracking-widest">BUM BUM CAFE GREETING</p>
-            <h3 className="text-xs font-black text-white leading-normal">{greetingText}</h3>
+        {/* PERSONALIZED GREETING BANNER (Clean Text, No Background Box) */}
+        <div className="px-1.5 py-1 flex items-center justify-between">
+          <div className="space-y-0.5">
+            <p className="text-[8px] text-orange-500 font-extrabold uppercase tracking-wider leading-none">BUM BUM CAFE GREETING</p>
+            <h3 className="text-xs font-bold text-gray-200">{greetingText}</h3>
           </div>
-          <Sparkles className="text-yellow-400 animate-pulse flex-shrink-0 ml-2" size={18} />
+          <Sparkles className="text-yellow-400 animate-pulse flex-shrink-0 ml-2" size={15} />
         </div>
         
         {/* Animated & Sliding Promotional Banner */}
@@ -1092,7 +1089,7 @@ export default function BbCafeHome() {
           </div>
         )}
 
-        {/* PRODUCTS LISTING WITH SCROLL ENTRY ANIMATIONS */}
+        {/* PRODUCTS LISTING */}
         <div className="grid grid-cols-1 gap-4 pt-1">
           {filteredMenu.length === 0 ? (
             <p className="text-center text-gray-500 py-8 text-xs font-bold uppercase">No items found...</p>
@@ -1703,7 +1700,7 @@ export default function BbCafeHome() {
               <div className="space-y-1">
                 <h3 className="text-lg font-black text-white">आर्डर भुगतान सहायता 💳</h3>
                 <p className="text-[10px] text-gray-400 font-semibold leading-relaxed">
-                  नीचे दिए गए बटन पर क्लिक करके अपने ... भुगतान करें।
+                  नीचे दिए गए बटन पर क्लिक करके अपने फोन के पेमेंट ऐप (GPay, PhonePe, Paytm) से सीधे भुगतान करें।
                 </p>
               </div>
 
