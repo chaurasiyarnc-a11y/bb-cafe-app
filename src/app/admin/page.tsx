@@ -32,13 +32,7 @@ const handleStatusChange = async (order: any, newStatus: string) => {
           toast.success("Synced with Loyverse POS!", { id: "pos-sync" });
         } else {
           console.error("Loyverse Sync Error:", result.error, result.details);
-          
-          // Loyverse से आने वाली सटीक एरर डिटेल्स को निकालें
-          const errDetail = result.details?.errors?.[0]?.details || result.details?.errors?.[0]?.message || "";
-          const errField = result.details?.errors?.[0]?.field || "";
-          const showMsg = errDetail ? `${result.error} [${errField}: ${errDetail}]` : result.error;
-
-          toast.error(`POS Sync Failed: ${showMsg || "Unknown Error"}`, { id: "pos-sync" });
+          toast.error(`POS Sync Failed: ${result.error || "Unknown Error"}`, { id: "pos-sync" });
         }
       } catch (err) {
         console.error("Fetch POS error:", err);
@@ -621,9 +615,6 @@ export default function AdminDashboard() {
     let upiSales = 0;
     rangeOrders.forEach(o => {
       const amt = Number(o.total) || 0;
-      // In Loyverse or custom order data, if payment_type is recorded as cash/upi or we just estimate.
-      // Let's check payment details or simulate splitting.
-      // If we assume odd bill numbers are UPI and even are Cash for simulation when pay info is empty:
       if (o.paymentMethod === 'Cash' || o.billNumber % 2 === 0) {
         cashSales += amt;
       } else {
@@ -675,7 +666,7 @@ export default function AdminDashboard() {
 
   // --- LAST 7 DAYS CHART DATA (16: Lightweight Sales Bar Chart) ---
   const last7DaysChartData = useMemo(() => {
-    const days = [];
+    const days: any[] = [];
     for (let i = 6; i >= 0; i--) {
       const d = new Date();
       d.setDate(d.getDate() - i);
@@ -1088,7 +1079,6 @@ ${topDishesText}
 Report generated automatically by Bum Bum Cafe POS.`
     );
 
-    // Opening WhatsApp link directly to Owner's Phone Number (+919714293759)
     window.open(`https://wa.me/919714293759?text=${message}`, '_blank');
   };
 
@@ -1746,7 +1736,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                         {c.isVisible !== false ? <Eye size={18}/> : <EyeOff size={18}/>}
                       </button>
                       <button onClick={() => handleDeleteCategory(c)} className="p-3 bg-red-500/10 text-red-500 rounded-xl hover:bg-red-500/20 active:scale-95 transition-all">
-                        <Trash size={18}/>
+                        <Trash size={16}/>
                       </button>
                     </div>
                   </div>
