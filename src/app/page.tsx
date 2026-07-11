@@ -245,6 +245,14 @@ export default function BbCafeHome() {
     return CATEGORY_IMAGES[catName] || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=150&q=80";
   };
 
+  // --- UNIQUE REFERRAL CODE GENERATOR ---
+  const getReferralCode = () => {
+    if (!customerDetails) return "WELCOME";
+    const namePart = customerDetails.name.trim().split(" ")[0].substring(0, 4).toUpperCase();
+    const phonePart = customerDetails.phone.slice(-4);
+    return `${namePart}${phonePart}`; // e.g. RAM3759
+  };
+
   // --- MEMOS ---
 
   const activeTheme = useMemo(() => {
@@ -398,6 +406,17 @@ export default function BbCafeHome() {
   useEffect(() => {
     // Restored missing mounted initialization statement!
     setMounted(true);
+
+    // Auto capture referral code from URL parameter
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const ref = params.get('ref');
+      if (ref) {
+        setTempRefCode(ref);
+        localStorage.setItem('bb_referred_by', ref);
+        toast.success(`🎉 रेफरल कोड ${ref} पाया गया!`);
+      }
+    }
 
     const unsubStore = onSnapshot(doc(db, "settings", "store"), (d) => { if(d.exists()) setStoreOpen(d.data().isOpen); });
     
@@ -613,7 +632,9 @@ export default function BbCafeHome() {
     if (chiliFlakesAddon) itemsText += `• Extra Chilly Flakes x1 - ₹10\n`;
     if (noCutlery) itemsText += `🌱 (Eco-Friendly: No plastic cutlery requested)\n`;
 
-    const msg = `🔥 *BAM BAM CAFE - NEW ORDER*\n\n*Bill No:* #${formattedBillStr}\n*Token No:* #${tokenNumber}\n*Customer:* ${customerDetails.name}\n*Phone:* ${customerDetails.phone}\n*Delivery Area:* ${selectedArea.name}\n*Address:* ${address}\n\n*ITEMS:*\n${itemsText}\n*Subtotal:* ₹${subtotal + addOnsCost}\n*Coupon Discount:* -₹${couponDiscount}\n*Delivery:* ₹${deliveryCharge}\n*TOTAL BILL: ₹${finalTotal}*\n\n*Points Earned:* +${pointsEarned} Pts\n${totalPointsCost > 0 ? `*Points Redeemed:* -${totalPointsCost} Pts\n` : ''}\n_Confirm order by replying 'YES'_`;
+    // Dynamic referral code included inside WhatsApp sharing text
+    const refCode = getReferralCode();
+    const msg = `🔥 *BAM BAM CAFE - NEW ORDER*\n\n*Bill No:* #${formattedBillStr}\n*Token No:* #${tokenNumber}\n*Customer:* ${customerDetails.name}\n*Phone:* ${customerDetails.phone}\n*Delivery Area:* ${selectedArea.name}\n*Address:* ${address}\n\n*ITEMS:*\n${itemsText}\n*Subtotal:* ₹${subtotal + addOnsCost}\n*Coupon Discount:* -₹${couponDiscount}\n*Delivery:* ₹${deliveryCharge}\n*TOTAL BILL: ₹${finalTotal}*\n\n*Invite Code:* ${refCode}\n*Points Earned:* +${pointsEarned} Pts\n${totalPointsCost > 0 ? `*Points Redeemed:* -${totalPointsCost} Pts\n` : ''}\n_Confirm order by replying 'YES'_`;
     
     playSoundEffect('success');
     setConfettiActive(true);
@@ -635,7 +656,7 @@ export default function BbCafeHome() {
 
   const handleShareApp = async () => {
     if (!customerDetails?.phone) {
-      toast.error("पॉइंट्स कमाने के लिए पहले Name और Phone दर्ज करें!");
+      toast.error("पॉइंड्स कमाने के लिए पहले Name और Phone दर्ज करें!");
       setIsLoginOpen(true);
       return;
     }
@@ -644,7 +665,9 @@ export default function BbCafeHome() {
     const shareCountKey = `bb_shares_${phoneClean}`;
     let currentShares = Number(localStorage.getItem(shareCountKey) || 0);
 
-    const shareMessage = `🔥 *BAM BAM CAFE - Mohandra* 🔥\nयहाँ से ऑर्डर करें बेहतरीन और स्वादिष्ट Pizza, Thali और Fast Food! सीधे आपके घर तक सुपर फास्ट होम डिलीवरी।\n👉 https://bb-cafe-app.vercel.app/`;
+    // Added 100% dynamic unique referral link for every individual user
+    const refCode = getReferralCode();
+    const shareMessage = `🔥 *BAM BAM CAFE - Mohandra* 🔥\n\nमेरे स्पेशल इन्वाइट कोड *${refCode}* से आर्डर करें और पॉइंट्स पाएं! 🎁\n👉 https://bb-cafe-app.vercel.app/?ref=${refCode}`;
     const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(shareMessage)}`;
 
     window.open(whatsappUrl, '_blank');
@@ -730,7 +753,7 @@ export default function BbCafeHome() {
     setIsLoginOpen(false);
     
     if (tempRefCode) {
-      toast.success(`स्वागत है ${tempName}! रेफ़रल कूपन लागू कर दिया गया है।`);
+      toast.success(`स्वागत है ${tempName}! रेफ़रल कोड लागू कर दिया गया है।`);
     } else {
       toast.success(`Welcome ${tempName}!`);
     }
@@ -898,7 +921,7 @@ export default function BbCafeHome() {
         </div>
       </header>
 
-      {/* FIXED TRANSPARENT STICKY SEARCH BAR */}
+      {/* FIXED TRANSPAREY STICKY SEARCH BAR */}
       <div className="sticky top-0 z-50 bg-transparent backdrop-blur-md py-3 px-4 shadow-none transition-colors duration-200">
         <div className="relative max-w-sm mx-auto">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
@@ -1041,6 +1064,91 @@ export default function BbCafeHome() {
             </div>
           </div>
         )}
+
+        {/* DYNAMIC LOYALTY CARD RESTORED DIRECTLY TO HOME PAGE (100% visible now!) */}
+        <div className="pt-2">
+          {customerDetails ? (
+            /* Logged In Loyalty Club UI with points, share progress and redemption */
+            <div className="dark:bg-yellow-400/5 bg-yellow-100 border border-yellow-350 dark:border-yellow-400/20 rounded-2xl p-4 space-y-3 transition-colors duration-200 shadow-md">
+              <div className="flex justify-between items-center border-b dark:border-white/10 border-yellow-200 pb-2">
+                <div className="flex items-center gap-1.5 text-yellow-600 dark:text-yellow-400 font-black text-xs uppercase">
+                  <Gift size={15}/> <span>Bum Bum Loyalty Club</span>
+                </div>
+                <span className={`text-[8px] font-black border px-2 py-0.5 rounded-full ${getCustomerTier(customerPoints).color}`}>
+                  {getCustomerTier(customerPoints).name}
+                </span>
+              </div>
+              
+              <div className="flex justify-between items-center gap-4">
+                <div>
+                  <h4 className="text-3xl font-black dark:text-white text-neutral-900 leading-none">
+                    {customerPoints} <span className="text-[10px] text-neutral-500 font-black uppercase">Points</span>
+                  </h4>
+                  <p className="text-[9px] dark:text-gray-400 text-neutral-600 font-bold mt-1">₹100 खर्च करें = 1 पॉइंट पाएं!</p>
+                </div>
+                <div className="text-right text-[8px] dark:text-yellow-400 text-amber-900 font-black space-y-0.5 uppercase max-h-20 overflow-y-auto no-scrollbar">
+                  {loyaltyRules.map(rule => (<p key={rule.id}>🎁 {rule.pointsCost} Pts = {rule.rewardName}</p>))}
+                </div>
+              </div>
+
+              <div className="pt-1.5 flex flex-col gap-2">
+                <div className="flex justify-between items-center text-[9px]">
+                  <span className="dark:text-gray-400 text-neutral-700 font-black uppercase">Share Progress:</span>
+                  <span className="text-yellow-600 dark:text-yellow-400 font-black bg-yellow-100 dark:bg-yellow-400/10 px-2 py-0.5 rounded border border-yellow-350 dark:border-yellow-400/20">{shareCount}/5 Shared</span>
+                </div>
+                <button type="button" onClick={handleShareApp} className="w-full bg-green-600 hover:bg-green-700 text-white font-black py-2.5 rounded-xl text-[10px] uppercase flex items-center justify-center gap-1 shadow-md transition-all">
+                  <Share2 size={13}/>
+                  <span>Share with friends to earn free points! 🎁</span>
+                </button>
+              </div>
+
+              <div className="pt-2 border-t dark:border-white/10 border-yellow-200 flex justify-between items-center">
+                <span className="text-[9px] dark:text-gray-400 text-neutral-700 font-bold uppercase">Gift points to friend:</span>
+                <button type="button" onClick={() => setIsGiftModalOpen(true)} className="bg-yellow-500/10 text-yellow-600 border border-yellow-400/20 px-2.5 py-1 rounded text-[8px] font-black uppercase">🎁 Gift Points</button>
+              </div>
+
+              <div className="space-y-1.5 pt-2 border-t dark:border-white/10 border-yellow-200">
+                <p className="text-[9px] dark:text-gray-400 text-neutral-700 font-black uppercase">Redeem Points:</p>
+                <div className="grid grid-cols-2 gap-1.5 max-h-24 overflow-y-auto no-scrollbar">
+                  {loyaltyRules.map(rule => {
+                    const inCartCost = cart.reduce((acc: number, i: any) => acc + (i.pointsCost || 0), 0);
+                    const isAffordable = (customerPoints - inCartCost) >= rule.pointsCost;
+                    return (
+                      <button 
+                        key={rule.id} 
+                        type="button" 
+                        onClick={() => handleCustomerRedeem(`reward-${rule.id}`, `🎁 FREE ${rule.rewardName}`, rule.pointsCost)} 
+                        disabled={!isAffordable} 
+                        className={`py-2 px-2 rounded text-[9px] font-black uppercase border truncate transition-all ${isAffordable ? 'bg-yellow-400 text-black border-yellow-400 hover:bg-yellow-500' : 'bg-neutral-100 dark:bg-white/5 text-neutral-400 dark:text-gray-500 border-neutral-200 dark:border-white/5 cursor-not-allowed'}`}
+                      >
+                        🎁 {rule.rewardName} ({rule.pointsCost} P)
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          ) : (
+            /* Logged Out / Prompt to Join Loyalty Club */
+            <div className="bg-gradient-to-br from-yellow-400 to-amber-500 text-black p-4 rounded-2xl shadow-md flex justify-between items-center gap-4">
+              <div className="space-y-1">
+                <div className="flex items-center gap-1.5 font-black text-xs uppercase"><Gift size={16}/> <span>Join Loyalty Club!</span></div>
+                <p className="text-[10px] font-semibold leading-normal">लॉयल्टी क्लब जॉइन करें और हर ऑर्डर पर पॉइंट्स कमाएं। 5 दोस्तों को शेयर करने पर भी +1 पॉइंट!</p>
+              </div>
+              <button 
+                onClick={() => setIsLoginOpen(true)}
+                className="bg-black text-white font-black text-[10px] px-3.5 py-2.5 rounded-xl uppercase flex-shrink-0 active:scale-95 transition-all shadow"
+              >
+                जॉइन करें ➔
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* PRODUCTS LISTING HEADER TITLE */}
+        <div className="pt-2">
+          <h3 className="text-sm font-black uppercase tracking-wider text-orange-600">🍳 Our Delicious Menu</h3>
+        </div>
 
         {/* PRODUCTS LISTING */}
         <div className="grid grid-cols-1 gap-4 pt-1">
@@ -1473,7 +1581,7 @@ export default function BbCafeHome() {
                           const inCartCost = cart.reduce((acc: number, i: any) => acc + (i.pointsCost || 0), 0);
                           const isAffordable = (customerPoints - inCartCost) >= rule.pointsCost;
                           return (
-                            <button key={rule.id} type="button" onClick={() => handleCustomerRedeem(`reward-${rule.id}`, `🎁 FREE ${rule.rewardName}`, rule.pointsCost)} disabled={!isAffordable} className={`py-2 px-2 rounded text-[9px] font-black uppercase border truncate ${isAffordable ? 'bg-yellow-400 text-black border-yellow-400 hover:bg-yellow-500 animate-none' : 'bg-neutral-100 text-neutral-400 border-neutral-200 dark:bg-white/5 dark:text-gray-500 dark:border-white/5'}`}>🎁 {rule.rewardName} ({rule.pointsCost} P)</button>
+                            <button key={rule.id} type="button" onClick={() => handleCustomerRedeem(`reward-${rule.id}`, `🎁 FREE ${rule.rewardName}`, rule.pointsCost)} disabled={!isAffordable} className={`py-2 px-2 rounded text-[9px] font-black uppercase border truncate ${isAffordable ? 'bg-yellow-400 text-black border-yellow-400 hover:bg-yellow-500 animate-none' : 'bg-neutral-100 text-neutral-450 border-neutral-200 dark:bg-white/5 dark:text-gray-500 dark:border-white/5'}`}>🎁 {rule.rewardName} ({rule.pointsCost} P)</button>
                           );
                         })}
                       </div>
