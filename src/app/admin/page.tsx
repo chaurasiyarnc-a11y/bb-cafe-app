@@ -32,13 +32,7 @@ const handleStatusChange = async (order: any, newStatus: string) => {
           toast.success("Synced with Loyverse POS!", { id: "pos-sync" });
         } else {
           console.error("Loyverse Sync Error:", result.error, result.details);
-          
-          // Loyverse से आने वाली सटीक एरर डिटेल्स को निकालें
-          const errDetail = result.details?.errors?.[0]?.details || result.details?.errors?.[0]?.message || "";
-          const errField = result.details?.errors?.[0]?.field || "";
-          const showMsg = errDetail ? `${result.error} [${errField}: ${errDetail}]` : result.error;
-
-          toast.error(`POS Sync Failed: ${showMsg || "Unknown Error"}`, { id: "pos-sync" });
+          toast.error(`POS Sync Failed: ${result.error || "Unknown Error"}`, { id: "pos-sync" });
         }
       } catch (err) {
         console.error("Fetch POS error:", err);
@@ -48,6 +42,130 @@ const handleStatusChange = async (order: any, newStatus: string) => {
   } catch (e) {
     toast.error("Failed to Sync Status.");
   }
+};
+
+// --- PRINT / SAVE AS PDF FUNCTION ---
+const handlePrintReceipt = (order: any) => {
+  const printWindow = window.open('', '_blank', 'width=600,height=800');
+  if (!printWindow) {
+    return toast.error("Please allow pop-ups in your browser to print the bill.");
+  }
+
+  const formattedBillNo = String(order.billNumber || 0).padStart(4, '0');
+  const orderDate = order.timestamp?.toDate ? order.timestamp.toDate().toLocaleString() : new Date(order.timestamp).toLocaleString();
+
+  const itemsRows = order.items?.map((item: any) => `
+    <tr>
+      <td style="padding: 6px 0; font-size: 13px;">${item.name}</td>
+      <td style="padding: 6px 0; font-size: 13px; text-align: center;">x${item.quantity}</td>
+      <td style="padding: 6px 0; font-size: 13px; text-align: right;">₹${item.price * item.quantity}</td>
+    </tr>
+  `).join('') || '';
+
+  printWindow.document.write(`
+    <html>
+      <head>
+        <title>Bill_#${formattedBillNo}</title>
+        <style>
+          @page { size: auto; margin: 0mm; }
+          body { 
+            font-family: 'Courier New', Courier, monospace; 
+            color: #000; 
+            background: #fff; 
+            padding: 20px; 
+            width: 320px; 
+            margin: 0 auto;
+          }
+          .text-center { text-align: center; }
+          .divider { border-top: 1px dashed #000; margin: 10px 0; }
+          table { width: 100%; border-collapse: collapse; }
+          .total-row { font-weight: bold; font-size: 15px; }
+          .qr-container { margin-top: 15px; text-align: center; }
+          .qr-image { width: 180px; height: auto; display: block; margin: 10px auto; }
+          @media print {
+            .no-print { display: none; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="text-center">
+          <h2 style="margin: 0; font-size: 20px; font-weight: bold; text-transform: uppercase;">BUM BUM CAFE</h2>
+          <p style="margin: 3px 0; font-size: 11px;">Mohandra, Panna (M.P.)</p>
+          <p style="margin: 3px 0; font-size: 11px;">Mobile: +91 9714293759</p>
+        </div>
+        
+        <div class="divider"></div>
+        
+        <div style="font-size: 12px; line-height: 1.5;">
+          <div><b>Bill No  :</b> #${formattedBillNo}</div>
+          <div><b>Token No :</b> #${order.tokenNumber || 'N/A'}</div>
+          <div><b>Date     :</b> ${orderDate}</div>
+          <div><b>Name     :</b> ${order.customerName || 'Guest'}</div>
+          <div><b>Phone    :</b> ${order.customerPhone || 'N/A'}</div>
+        </div>
+        
+        <div class="divider"></div>
+        
+        <table>
+          <thead>
+            <tr style="border-bottom: 1px dashed #000;">
+              <th style="text-align: left; font-size: 12px; padding-bottom: 5px;">Item</th>
+              <th style="text-align: center; font-size: 12px; padding-bottom: 5px;">Qty</th>
+              <th style="text-align: right; font-size: 12px; padding-bottom: 5px;">Price</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${itemsRows}
+          </tbody>
+        </table>
+        
+        <div class="divider"></div>
+        
+        <table style="font-size: 13px;">
+          <tr>
+            <td>Subtotal:</td>
+            <td style="text-align: right;">₹${order.subtotal || order.total}</td>
+          </tr>
+          ${order.discount ? `
+          <tr>
+            <td>Discount:</td>
+            <td style="text-align: right;">-₹${order.discount}</td>
+          </tr>
+          ` : ''}
+          <tr class="total-row">
+            <td style="padding-top: 5px; font-size: 16px;">GRAND TOTAL:</td>
+            <td style="text-align: right; padding-top: 5px; font-size: 16px;">₹${order.total}</td>
+          </tr>
+        </table>
+        
+        <div class="divider"></div>
+        
+        <div class="qr-container">
+          <p style="margin: 0; font-size: 11px; font-weight: bold;">Scan with PhonePe / UPI to Pay</p>
+          <!-- Loads your PhonePe QR code safely -->
+          <img class="qr-image" src="/phonepe-qr.png" alt="Payment QR" />
+        </div>
+        
+        <div class="divider"></div>
+        
+        <p class="text-center" style="margin: 5px 0 0 0; font-size: 12px; font-weight: bold;">Thank You! Visit Again!</p>
+        
+        <div class="text-center no-print" style="margin-top: 20px;">
+          <button onclick="window.print()" style="padding: 10px 20px; font-weight: bold; background: #f97316; color: white; border: none; border-radius: 8px; cursor: pointer;">Print / Save as PDF</button>
+        </div>
+
+        <script>
+          // Automatic open print dialog
+          window.onload = function() {
+            setTimeout(function() {
+              window.print();
+            }, 300);
+          }
+        </script>
+      </body>
+    </html>
+  `);
+  printWindow.document.close();
 };
 
 export default function AdminDashboard() {
@@ -1053,12 +1171,20 @@ export default function AdminDashboard() {
                   </div>
                   <div className="mt-4 pt-4 border-t border-white/5 flex justify-between items-center">
                     <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Name: {o.customerName || 'N/A'}</span>
-                    <select value={o.status || 'pending'} onChange={(e) => handleStatusChange(o, e.target.value)} className="bg-black/60 border border-white/10 text-xs font-bold rounded-xl p-2 px-3 text-white outline-none focus:border-orange-500 cursor-pointer">
-                      <option value="pending">⏳ Pending (Confirming)</option>
-                      <option value="preparing">👨‍🍳 Preparing in Kitchen</option>
-                      <option value="out_for_delivery">🛵 Out for Delivery</option>
-                      <option value="delivered">✅ Delivered / Completed</option>
-                    </select>
+                    <div className="flex items-center gap-2">
+                      <button 
+                        onClick={() => handlePrintReceipt(o)}
+                        className="px-3 py-2 bg-orange-500 hover:bg-orange-600 text-black rounded-xl text-[10px] font-black uppercase transition-all active:scale-95"
+                      >
+                        📄 Print Bill
+                      </button>
+                      <select value={o.status || 'pending'} onChange={(e) => handleStatusChange(o, e.target.value)} className="bg-black/60 border border-white/10 text-xs font-bold rounded-xl p-2 px-3 text-white outline-none focus:border-orange-500 cursor-pointer">
+                        <option value="pending">⏳ Pending (Confirming)</option>
+                        <option value="preparing">👨‍🍳 Preparing in Kitchen</option>
+                        <option value="out_for_delivery">🛵 Out for Delivery</option>
+                        <option value="delivered">✅ Delivered / Completed</option>
+                      </select>
+                    </div>
                   </div>
                 </div>
               ))
@@ -1370,7 +1496,7 @@ export default function AdminDashboard() {
                         {c.isVisible !== false ? <Eye size={18}/> : <EyeOff size={18}/>}
                       </button>
                       <button onClick={() => handleDeleteCategory(c)} className="p-3 bg-red-500/10 text-red-500 rounded-xl hover:bg-red-500/20 active:scale-95 transition-all">
-                        <Trash size={18}/>
+                        <Trash size={16}/>
                       </button>
                     </div>
                   </div>
