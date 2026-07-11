@@ -1,4 +1,5 @@
 
+
 'use client';
 import React, { useState, useEffect, useMemo } from 'react';
 import { db } from '../lib/firebase'; 
@@ -932,18 +933,46 @@ export default function BbCafeHome() {
         </div>
       )}
 
-      {/* COMPACT HEADER */}
-      <header className={`relative py-6 px-4 bg-gradient-to-r ${activeTheme.bg} flex justify-between items-center border-b border-white/10 shadow-lg`}>
-        <div>
-          <motion.h1 initial={{ scale: 0.9 }} animate={{ scale: 1 }} className="text-xl font-black italic tracking-tighter text-yellow-300">BAM BAM CAFE</motion.h1>
-          <p className="text-[10px] text-yellow-100 font-bold tracking-wider uppercase">{activeTheme.name}</p>
+      {/* PREMIUM VIDEO BACKGROUND HEADER */}
+      <header className="relative py-8 px-4 overflow-hidden border-b border-white/10 shadow-xl flex justify-between items-center min-h-[110px]">
+        {/* HTML5 background video tag with autoPlay & loops enabled */}
+        <video 
+          autoPlay 
+          loop 
+          muted 
+          playsInline 
+          className="absolute inset-0 w-full h-full object-cover z-0 select-none pointer-events-none"
+        >
+          {/* High-quality, fast-loading direct Pizza cheese pull video loop */}
+          <source src="https://assets.mixkit.co/videos/preview/mixkit-freshly-baked-pizza-with-stretching-cheese-43029-large.mp4" type="video/mp4" />
+          {/* Fallback image in case browser blocks video */}
+          <img src="https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=600&q=80" className="absolute inset-0 w-full h-full object-cover" alt="Bum Bum Cafe Header" />
+        </video>
+
+        {/* Semi-transparent dark overlay gradient for 100% text readability */}
+        <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/55 to-black/85 z-10" />
+
+        {/* Header content elements positioned above video & overlay */}
+        <div className="relative z-20">
+          <motion.h1 
+            initial={{ scale: 0.9, opacity: 0 }} 
+            animate={{ scale: 1, opacity: 1 }} 
+            transition={{ duration: 0.4 }}
+            className="text-2xl font-black italic tracking-tighter text-yellow-300 drop-shadow-md"
+          >
+            BAM BAM CAFE
+          </motion.h1>
+          <p className="text-[10px] text-yellow-100 font-extrabold tracking-wider uppercase drop-shadow-sm">
+            {activeTheme.name}
+          </p>
         </div>
-        <div className="flex items-center gap-2">
-          <a href="tel:9714293759" className="bg-green-600 text-white p-2 rounded-full border border-white/20 flex items-center justify-center animate-pulse" title="डायरेक्ट कॉल करें">
-            <Phone size={13} />
+
+        <div className="relative z-20 flex items-center gap-2">
+          <a href="tel:9714293759" className="bg-green-600 hover:bg-green-700 text-white p-2.5 rounded-full border border-white/20 flex items-center justify-center animate-pulse transition-all" title="डायरेक्ट कॉल करें">
+            <Phone size={14} />
           </a>
-          <div className="bg-black/40 px-2 py-0.5 rounded-full border border-white/10 flex items-center gap-1 text-[8px] font-black uppercase text-green-400">
-            <span className="h-1 w-1 rounded-full bg-green-500" />100% VEG
+          <div className="bg-black/60 backdrop-blur-md px-2.5 py-1 rounded-full border border-white/10 flex items-center gap-1.5 text-[8px] font-black uppercase text-green-400">
+            <span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />100% VEG
           </div>
         </div>
       </header>
@@ -1054,7 +1083,7 @@ export default function BbCafeHome() {
           )}
         </div>
 
-        {/* CATEGORY SLIDER (Restored with Scrollbar-Hiding Feature) */}
+        {/* CATEGORY SLIDER (Horizontally Slidable without visible Scrollbar) */}
         <div className="space-y-1">
           <p className="text-[8px] font-black uppercase tracking-wider text-orange-500">Inspiration for your first order</p>
           <div className="flex gap-5 overflow-x-auto py-2 px-1 scrollbar-none [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -1120,7 +1149,7 @@ export default function BbCafeHome() {
                       <span className="h-1 w-1 rounded-full bg-green-500 animate-pulse" />VEG
                     </div>
 
-                    {/* Highly Requested "FREE delivery" Bar Tag added beautifully (Blinkit style) */}
+                    {/* "FREE delivery" Bar Tag added beautifully (Blinkit style) */}
                     <div className="absolute bottom-0 left-0 bg-gradient-to-r from-blue-600 to-blue-500 text-white font-black text-[9px] px-3 py-1 rounded-tr-xl flex items-center gap-1 shadow-md uppercase tracking-wider">
                       <span>🛵</span> <span>FREE delivery</span>
                     </div>
@@ -1693,11 +1722,11 @@ export default function BbCafeHome() {
               <div className="space-y-3 text-left">
                 <div className="space-y-1">
                   <label className="text-[9px] font-black uppercase text-gray-500">Friend's Phone Number</label>
-                  <input type="tel" maxLength={10} placeholder="e.g. 9876543210" value={giftPhone} onChange={(e) => setGiftPhone(e.target.value)} required className="w-full dark:bg-white/5 bg-gray-50 border dark:border-white/10 border-gray-200 p-3 rounded-xl text-xs font-bold dark:text-white text-neutral-900 outline-none text-center" />
+                  <input type="tel" maxLength={10} placeholder="e.g. 9876543210" value={giftPhone} onChange={(e) => setGiftPhone(e.target.value)} required className="w-full dark:bg-white/5 bg-gray-50 border dark:border-white/10 border-gray-200 p-3 rounded-xl text-xs font-bold dark:text-neutral-900 outline-none text-center" />
                 </div>
                 <div className="space-y-1">
                   <label className="text-[9px] font-black uppercase text-gray-500">Points to Gift (Your Pts: {customerPoints})</label>
-                  <input type="number" placeholder="e.g. 10" value={giftPointsAmount} onChange={(e) => setGiftPointsAmount(e.target.value === "" ? "" : Number(e.target.value))} required className="w-full dark:bg-white/5 bg-gray-50 border dark:border-white/10 border-gray-200 p-3 rounded-xl text-xs font-bold dark:text-white text-neutral-900 outline-none text-center" />
+                  <input type="number" placeholder="e.g. 10" value={giftPointsAmount} onChange={(e) => setGiftPointsAmount(e.target.value === "" ? "" : Number(e.target.value))} required className="w-full dark:bg-white/5 bg-gray-50 border dark:border-white/10 border-gray-200 p-3 rounded-xl text-xs font-bold dark:text-neutral-900 outline-none text-center" />
                 </div>
               </div>
               <div className="flex gap-2">
