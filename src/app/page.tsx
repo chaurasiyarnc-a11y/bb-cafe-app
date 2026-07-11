@@ -364,23 +364,19 @@ export default function BbCafeHome() {
 
   // --- REPAIRED PWA & SW LIFECYCLE EFFECT ---
   useEffect(() => {
-    // 1. Service Worker register
     if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
       navigator.serviceWorker.register('/sw.js')
         .then((reg) => console.log("Service Worker Registered on:", reg.scope))
         .catch((err) => console.error("Service Worker registration failed:", err));
     }
 
-    // 2. Browser beforeinstallprompt event setup
     const handleBeforeInstallPrompt = (e: any) => {
       e.preventDefault();
-      console.log("PWA install prompt detected.");
       setDeferredPrompt(e);
       setShowInstallBanner(true);
     };
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
 
-    // 3. Standalone check & auto install fallback display timer
     const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone;
     
     let installBannerTimer: NodeJS.Timeout;
@@ -390,14 +386,45 @@ export default function BbCafeHome() {
       }, 3000);
     }
 
-    // Single unified cleanup function to avoid broken listener code!
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
       if (installBannerTimer) clearTimeout(installBannerTimer);
     };
   }, []);
 
-  // --- REST OF ACTIONS ---
+  // --- REST OF EFFECTS ---
+  useEffect(() => {
+    const unsubStore = onSnapshot(doc(db, "settings", "store"), (d) => { if(d.exists()) setStoreOpen(d.data().isOpen); });
+    
+    const unsubMenu = onSnapshot(query(collection(db, "products")), (snap) => {
+      const items = snap.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter((i: any) => i.isVisible !== false);
+      setMenu(items);
+      localStorage.setItem('bb_cached_menu', JSON.stringify(items)); 
+    }, () => {
+      const localCached = localStorage.getItem('bb_cached_menu');
+      if (localCached) setMenu(JSON.parse(localCached));
+    });
+
+    const unsubCats = onSnapshot(collection(db, "categories"), (snap) => { setDbCategories(snap.docs.map(d => ({ id: d.id, ...d.data() }))); });
+    const unsubBanners = onSnapshot(collection(db, "banners"), (snap) => { setBanners(snap.docs.map(d => ({ id: d.id, ...d.data() }))); });
+    const unsubCoupons = onSnapshot(collection(db, "coupons"), (snap) => { setCoupons(snap.docs.map(d => ({ id: d.id, ...d.data() }))); });
+    const unsubReviews = onSnapshot(collection(db, "reviews"), (snap) => {
+      setReviews(snap.docs.map(d => ({ id: d.id, ...d.data() })).filter((r: any) => r.isApproved === true));
+    });
+    const unsubRules = onSnapshot(collection(db, "loyalty_rules"), (snap) => { setLoyaltyRules(snap.docs.map(d => ({ id: d.id, ...d.data() }))); });
+
+    return () => { 
+      unsubStore(); 
+      unsubMenu(); 
+      unsubCats(); 
+      unsubBanners(); 
+      unsubReviews(); 
+      unsubCoupons(); 
+      unsubRules(); 
+    };
+  }, []);
+
+  // --- ACTIONS ---
 
   const handleApplyCoupon = () => {
     if (!enteredCoupon) return toast.error("Please enter a coupon code");
@@ -810,7 +837,7 @@ export default function BbCafeHome() {
 
       {/* PREMIUM VIDEO BACKGROUND HEADER */}
       <header className="relative py-8 px-4 overflow-hidden border-b border-white/10 shadow-xl flex justify-between items-center min-h-[110px]">
-        {/* local video path '/header-video.mp4' is used so it never gets blocked by external servers! */}
+        {/* local video path is used so it never gets blocked by external server CORS blockings */}
         <video 
           autoPlay 
           loop 
@@ -819,7 +846,6 @@ export default function BbCafeHome() {
           className="absolute inset-0 w-full h-full object-cover z-0 select-none pointer-events-none"
         >
           <source src="/header-video.mp4" type="video/mp4" />
-          {/* Backup link in case local file is still being added */}
           <source src="https://www.basewfp.com/wp-content/uploads/2024/06/Video-for-Homepage-s.mp4" type="video/mp4" />
           <img src="https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=600&q=80" className="absolute inset-0 w-full h-full object-cover" alt="Bum Bum Cafe Header" />
         </video>
@@ -958,7 +984,7 @@ export default function BbCafeHome() {
           )}
         </div>
 
-        {/* CATEGORY SLIDER (Horizontally Slidable without visible Scrollbar) */}
+        {/* CATEGORY SLIDER */}
         <div className="space-y-1">
           <p className="text-[8px] font-black uppercase tracking-wider text-orange-500">Inspiration for your first order</p>
           <div className="flex gap-5 overflow-x-auto py-2 px-1 scrollbar-none [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -1152,7 +1178,7 @@ export default function BbCafeHome() {
             </div>
           </div>
         )}
-      </  AnimatePresence>
+      </AnimatePresence>
 
       {/* WRITING REVIEW POPUP */}
       <AnimatePresence>
@@ -1161,7 +1187,6 @@ export default function BbCafeHome() {
             <form onSubmit={handleReviewSubmit} className="dark:bg-[#111] bg-white w-full max-w-md p-6 rounded-3xl border dark:border-white/10 border-gray-200 text-center space-y-4 shadow-xl transition-colors duration-200">
               <div className="flex justify-between items-center pb-2 border-b dark:border-white/10 border-gray-100">
                 <h3 className="text-xl font-black text-orange-500 uppercase italic">Your Feedback</h3>
-                
                 <button 
                   type="button" 
                   onClick={() => setIsReviewFormOpen(false)} 
@@ -1489,6 +1514,168 @@ export default function BbCafeHome() {
                   <button onClick={sendWhatsAppOrder} type="button" className="w-full bg-green-600 hover:bg-green-700 p-4 rounded-2xl font-black text-sm text-white flex items-center justify-center gap-2 shadow-lg animate-none">ORDER ON WHATSAPP</button>
                 )}
               </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* CUSTOM PWA INSTALL MANUAL GUIDE MODAL */}
+      <AnimatePresence>
+        {isInstallModalOpen && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[270] flex items-center justify-center p-6">
+            <div className="dark:bg-[#111] bg-white w-full max-w-sm p-6 rounded-3xl border dark:border-white/10 border-gray-200 text-center space-y-4 shadow-2xl transition-colors duration-200">
+              <Sparkles className="mx-auto text-yellow-400 animate-bounce" size={32} />
+              
+              <div className="space-y-1">
+                <h3 className="text-base font-black dark:text-white text-neutral-900">📲 आसान इंस्टॉलेशन गाइड</h3>
+                <p className="text-[10px] dark:text-gray-400 text-neutral-700 font-bold leading-normal">
+                  यदि स्वचालित इंस्टॉल काम नहीं कर रहा है, तो आप नीचे दिए गए आसान चरणों से इसे मैन्युअल रूप से होम स्क्रीन पर जोड़ सकते हैं:
+                </p>
+              </div>
+
+              <div className="text-left text-xs space-y-3 dark:text-gray-300 text-neutral-800 font-medium border-y dark:border-white/5 border-gray-200 py-4">
+                <p className="flex items-start gap-2">
+                  <span className="bg-orange-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px] font-black flex-shrink-0">1</span>
+                  <span>गूगल क्रोम (Chrome) में ऊपर दाईं ओर दिख रहे **तीन डॉट्स (⋮)** आइकॉन पर क्लिक करें।</span>
+                </p>
+                <p className="flex items-start gap-2">
+                  <span className="bg-orange-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px] font-black flex-shrink-0">2</span>
+                  <span>मेन्यू लिस्ट में नीचे जाकर **'Install app'** या **'Add to Home screen'** का विकल्प चुनें।</span>
+                </p>
+                <p className="flex items-start gap-2">
+                  <span className="bg-orange-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px] font-black flex-shrink-0">3</span>
+                  <span>अब **'Install'** बटन दबाएं। बम बम कैफ़े ऐप आपके फोन की होम स्क्रीन पर असली ऐप की तरह जुड़ जाएगा!</span>
+                </p>
+              </div>
+
+              <button 
+                onClick={() => setIsInstallModalOpen(false)} 
+                className="w-full bg-orange-500 text-white p-3.5 rounded-xl font-black text-xs uppercase tracking-wider active:scale-95 transition-all shadow"
+              >
+                समझ गया, बंद करें
+              </button>
+            </div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* FLOATING CART BUTTON */}
+      {cart.length > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-full max-w-sm px-4">
+          <button
+            onClick={() => setIsCartOpen(true)}
+            className="w-full bg-yellow-400 hover:bg-yellow-500 text-black py-4 px-5 rounded-2xl font-black text-xs uppercase flex justify-between items-center shadow-2xl active:scale-95 transition-all"
+          >
+            <div className="flex items-center gap-2">
+              <ShoppingBag size={18} />
+              <span>{cart.reduce((acc: number, item: any) => acc + item.quantity, 0)} Items Added</span>
+            </div>
+            <div className="flex items-center gap-0.5 bg-black/10 px-2 py-1 rounded-lg">
+              <span>View Cart</span>
+              <ChevronRight size={12} />
+            </div>
+          </button>
+        </div>
+      )}
+
+      {/* LOGIN MODAL */}
+      <AnimatePresence>
+        {isLoginOpen && (
+          <div className="fixed inset-0 bg-black/95 z-[200] flex items-center justify-center p-6">
+            <form onSubmit={handleSaveDetails} className="dark:bg-[#111] bg-white w-full max-w-md p-6 rounded-3xl border dark:border-white/10 border-gray-200 text-center space-y-4 shadow-xl transition-colors duration-200">
+              <User className="mx-auto text-orange-500" size={36} />
+              <div>
+                <h2 className="text-xl font-black mb-0.5">Your Details</h2>
+                <p className="text-gray-500 font-semibold text-[8px] uppercase tracking-wider">Setup Once • Order Fast</p>
+              </div>
+              <div className="space-y-3 text-left">
+                <div className="space-y-1">
+                  <label className="text-[9px] font-bold text-gray-500 uppercase">Your Name</label>
+                  <input type="text" placeholder="Enter your name..." value={tempName} onChange={(e) => setTempName(e.target.value)} className="w-full dark:bg-white/5 bg-gray-50 border dark:border-white/10 border-gray-200 p-3 rounded-xl font-bold dark:text-white text-neutral-900 outline-none focus:border-orange-500 text-xs" required />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[9px] font-bold text-gray-500 uppercase">Mobile Number</label>
+                  <input type="tel" maxLength={10} placeholder="10-digit Phone Number" value={tempPhone} onChange={(e) => setTempPhone(e.target.value)} className="w-full dark:bg-white/5 bg-gray-50 border dark:border-white/10 border-gray-200 p-3 rounded-xl font-bold dark:text-white text-neutral-900 outline-none focus:border-orange-500 text-xs" required />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[9px] font-bold text-gray-500 uppercase">Referral Code (Optional)</label>
+                  <input type="text" placeholder="Enter invite code..." value={tempRefCode} onChange={(e) => setTempRefCode(e.target.value)} className="w-full dark:bg-white/5 bg-gray-50 border dark:border-white/10 border-gray-200 p-3 rounded-xl font-bold dark:text-white text-neutral-900 outline-none focus:border-orange-500 text-xs" />
+                </div>
+              </div>
+              <button type="submit" className="w-full bg-orange-500 text-black p-4 rounded-xl font-black text-xs uppercase animate-none">PROCEED TO ORDER</button>
+              <button type="button" onClick={() => setIsLoginOpen(false)} className="mt-2 text-gray-500 text-[9px] font-black uppercase block mx-auto">Close</button>
+            </form>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* GIFT POINTS MODAL */}
+      <AnimatePresence>
+        {isGiftModalOpen && (
+          <div className="fixed inset-0 bg-black/95 z-[260] flex items-center justify-center p-6">
+            <motion.form onSubmit={handleGiftPoints} className="dark:bg-[#111] bg-white w-full max-w-md p-6 rounded-3xl border dark:border-white/10 border-gray-200 text-center space-y-4 shadow-xl transition-colors duration-200">
+              <Gift className="mx-auto text-yellow-400" size={32} />
+              <div>
+                <h3 className="text-lg font-black text-yellow-400 uppercase italic">Gift Loyalty Points</h3>
+                <p className="text-[9px] text-gray-500 font-semibold mt-0.5">अपने पॉइंट्स किसी दोस्त को गिफ्ट करें</p>
+              </div>
+              <div className="space-y-3 text-left">
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black uppercase text-gray-500">Friend's Phone Number</label>
+                  <input type="tel" maxLength={10} placeholder="e.g. 9876543210" value={giftPhone} onChange={(e) => setGiftPhone(e.target.value)} required className="w-full dark:bg-white/5 bg-gray-50 border dark:border-white/10 border-gray-200 p-3 rounded-xl text-xs font-bold dark:text-neutral-900 outline-none text-center" />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black uppercase text-gray-500">Points to Gift (Your Pts: {customerPoints})</label>
+                  <input type="number" placeholder="e.g. 10" value={giftPointsAmount} onChange={(e) => setGiftPointsAmount(e.target.value === "" ? "" : Number(e.target.value))} required className="w-full dark:bg-white/5 bg-gray-50 border dark:border-white/10 border-gray-200 p-3 rounded-xl text-xs font-bold dark:text-neutral-900 outline-none text-center" />
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <button type="submit" disabled={isGiftingLoading} className="flex-1 bg-yellow-400 text-black font-black p-3 rounded-xl text-xs uppercase flex items-center justify-center gap-1">
+                  {isGiftingLoading ? <Loader2 className="animate-spin" size={14} /> : <span>Gift Points 🎁</span>}
+                </button>
+                <button type="button" onClick={() => { setIsGiftModalOpen(false); setGiftPhone(""); setGiftPointsAmount(""); }} className="bg-white/5 text-gray-400 font-bold p-3 rounded-xl text-xs">CANCEL</button>
+              </div>
+            </motion.form>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* SOCIALS DIALOG MODAL */}
+      <AnimatePresence>
+        {isSocialsOpen && (
+          <div className="fixed inset-0 bg-black/95 z-[250] flex items-center justify-center p-6">
+            <motion.div className="dark:bg-[#111] bg-white w-full max-w-md p-6 rounded-3xl border dark:border-white/10 border-gray-200 text-center space-y-4 shadow-xl transition-colors duration-200">
+              <div>
+                <h3 className="text-xl font-black text-orange-500 uppercase italic">Connect & Earn Points</h3>
+                <p className="text-[8px] text-gray-500 font-bold uppercase tracking-wider">हर प्लेटफार्म पर फॉलो/सब्सक्राइब करने का +1 पॉइंट पाएं!</p>
+              </div>
+              <div className="space-y-2 text-left max-h-[22rem] overflow-y-auto no-scrollbar pr-1">
+                <button onClick={() => handleSocialClick('whatsapp_msg', 'https://wa.me/919714293759')} className="w-full flex items-center justify-between dark:bg-green-500/10 bg-green-50/50 border dark:border-green-500/20 border-green-200/50 p-3 rounded-xl">
+                  <span className="text-[10px] font-black dark:text-white text-neutral-900">🟢 WhatsApp Message</span>
+                  <span className="text-[8px] font-black uppercase px-2.5 py-1 rounded bg-yellow-400 text-black">{getClaimStatus('whatsapp_msg')}</span>
+                </button>
+                <button onClick={() => handleSocialClick('whatsapp_channel', 'https://whatsapp.com/channel/0029VaLhggoGE56natoQI43y')} className="w-full flex items-center justify-between dark:bg-emerald-500/10 bg-green-50/50 border dark:border-emerald-500/20 border-green-200/50 p-3 rounded-xl">
+                  <span className="text-[10px] font-black dark:text-white text-neutral-900">📢 WhatsApp Channel</span>
+                  <span className="text-[8px] font-black uppercase px-2.5 py-1 rounded bg-yellow-400 text-black">{getClaimStatus('whatsapp_channel')}</span>
+                </button>
+                <button onClick={() => handleSocialClick('youtube', 'https://www.youtube.com/@bbcafe.i')} className="w-full flex items-center justify-between dark:bg-red-600/10 bg-green-50/50 border dark:border-red-600/20 border-green-200/50 p-3 rounded-xl">
+                  <span className="text-[10px] font-black dark:text-white text-neutral-900">🔴 YouTube Channel</span>
+                  <span className="text-[8px] font-black uppercase px-2.5 py-1 rounded bg-yellow-400 text-black">{getClaimStatus('youtube')}</span>
+                </button>
+                <button onClick={() => handleSocialClick('instagram', 'https://www.instagram.com/bbcafe.in/')} className="w-full flex items-center justify-between dark:bg-pink-500/10 bg-green-50/50 border dark:border-pink-500/20 border-green-200/50 p-3 rounded-xl">
+                  <span className="text-[10px] font-black dark:text-white text-neutral-900">📸 Instagram</span>
+                  <span className="text-[8px] font-black uppercase px-2.5 py-1 rounded bg-yellow-400 text-black">{getClaimStatus('instagram')}</span>
+                </button>
+                <button onClick={() => handleSocialClick('facebook', 'https://www.facebook.com/bbcafe.in/')} className="w-full flex items-center justify-between dark:bg-blue-600/10 bg-green-50/50 border dark:border-blue-600/20 border-green-200/50 p-3 rounded-xl">
+                  <span className="text-[10px] font-black dark:text-white text-neutral-900">🔵 Facebook</span>
+                  <span className="text-[8px] font-black uppercase px-2.5 py-1 rounded bg-yellow-400 text-black">{getClaimStatus('facebook')}</span>
+                </button>
+                <button onClick={() => handleSocialClick('snapchat', 'https://www.snapchat.com/add/bbcafe.in')} className="w-full flex items-center justify-between dark:bg-yellow-400/10 bg-green-50/50 border dark:border-yellow-400/20 border-yellow-400/30 p-3 rounded-xl">
+                  <span className="text-[10px] font-black dark:text-white text-neutral-900">🟡 Snapchat</span>
+                  <span className="text-[8px] font-black uppercase px-2.5 py-1 rounded bg-yellow-400 text-black">{getClaimStatus('snapchat')}</span>
+                </button>
+              </div>
+              <button type="button" onClick={() => setIsSocialsOpen(false)} className="w-full bg-orange-500 text-black font-black p-3 rounded-xl text-xs uppercase">CLOSE</button>
             </motion.div>
           </div>
         )}
