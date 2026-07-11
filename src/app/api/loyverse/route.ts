@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-// 1. GET Request: आपके Loyverse के सभी आइटम्स और उनकी Variant IDs देखने के लिए
+// 1. GET Request: आपके Loyverse के सभी आइटम्स और Payment Types की ID देखने के लिए
 export async function GET() {
   try {
     const token = process.env.LOYVERSE_API_TOKEN;
@@ -8,20 +8,19 @@ export async function GET() {
       return NextResponse.json({ error: 'LOYVERSE_API_TOKEN environment variable is missing on Vercel.' }, { status: 500 });
     }
 
-    const response = await fetch('https://api.loyverse.com/v1.0/items', {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-      },
+    // 1. Items फ़ेच करें
+    const itemResponse = await fetch('https://api.loyverse.com/v1.0/items', {
+      headers: { 'Authorization': `Bearer ${token}` },
     });
+    const itemResult = await itemResponse.json();
 
-    const result = await response.json();
+    // 2. Payment Types फ़ेच करें
+    const paymentResponse = await fetch('https://api.loyverse.com/v1.0/payment_types', {
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    const paymentResult = await paymentResponse.json();
 
-    if (!response.ok) {
-      return NextResponse.json({ error: 'Failed to fetch items from Loyverse', details: result }, { status: response.status });
-    }
-
-    // Loyverse के आइटम्स की लिस्ट को आसान भाषा में बदलें
-    const itemsList = result.items?.map((item: any) => ({
+    const itemsList = itemResult.items?.map((item: any) => ({
       item_name: item.item_name,
       variants: item.variants?.map((v: any) => ({
         variant_name: v.option_values?.map((o: any) => o.value).join(' - ') || 'Default Variant',
@@ -30,9 +29,16 @@ export async function GET() {
       }))
     })) || [];
 
+    const paymentTypesList = paymentResult.payment_types?.map((p: any) => ({
+      name: p.name,
+      id: p.id,
+      type: p.type
+    })) || [];
+
     return NextResponse.json({ 
-      info: "Copy the 'variant_id' of your preferred default item (e.g. Website Order) and add it as LOYVERSE_DEFAULT_VARIANT_ID in Vercel settings.",
-      items: itemsList 
+      info: "If your sync fails, check if LOYVERSE_DEFAULT_VARIANT_ID and LOYVERSE_PAYMENT_TYPE_ID are added to Vercel.",
+      items: itemsList,
+      payment_types: paymentTypesList
     });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -47,12 +53,14 @@ export async function POST(request: Request) {
     const token = process.env.LOYVERSE_API_TOKEN;
     const storeId = process.env.LOYVERSE_STORE_ID;
     const defaultVariantId = process.env.LOYVERSE_DEFAULT_VARIANT_ID;
+    const paymentTypeId = process.env.LOYVERSE_PAYMENT_TYPE_ID || 'fc52f1b2-31cf-4f51-ba40-c165c1273282'; // Default Cash
 
     if (!token || !storeId) {
       return NextResponse.json({ error: 'Vercel settings are missing Loyverse keys.' }, { status: 500 });
     }
 
-    // यदि आर्डर आइटम में Variant ID नहीं है, तो Vercel में सेव की गई डिफ़ॉल्ट ID का उपयोग करें
+    // कुल पेमेंट राशि कैलकुलेट करें और लाइन आइटम्स तैयार करें
+    let totalAmount = 0;
     const lineItems = orderData.items?.map((item: any) => {
       const vId = item.variant_id || defaultVariantId;
       
@@ -60,10 +68,14 @@ export async function POST(request: Request) {
         throw new Error("Variant ID missing! Set LOYVERSE_DEFAULT_VARIANT_ID in Vercel settings.");
       }
 
+      const itemPrice = Number(item.price || 0);
+      const itemQty = Number(item.quantity || 1);
+      totalAmount += itemPrice * itemQty;
+
       return {
         variant_id: vId,
-        quantity: Number(item.quantity || 1),
-        price: Number(item.price || 0),
+        quantity: itemQty,
+        price: itemPrice,
         line_note: item.name || 'Web Item'
       };
     }) || [];
@@ -77,8 +89,9 @@ export async function POST(request: Request) {
       line_items: lineItems,
       payments: [
         {
-          payment_type_id: 'fc52f1b2-31cf-4f51-ba40-c165c1273282', // standard Cash ID
+          payment_type_id: paymentTypeId,
           paid_at: new Date().toISOString(),
+          money_amount: totalAmount // Loyverse के लिए भुगतान राशि
         },
       ],
     };
