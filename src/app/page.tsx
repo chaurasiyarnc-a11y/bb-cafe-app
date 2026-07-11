@@ -1,4 +1,5 @@
 
+
 'use client';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { db } from '../lib/firebase'; 
@@ -564,6 +565,7 @@ export default function BbCafeHome() {
         if (!receiverSnap.exists()) {
           transaction.set(receiverDocRef, { name: "Loyal Friend 🎁", phone: friendPhoneRaw, points: pointsToGift, lastActive: new Date() });
         } else {
+          // Replaced 'giftPointsAmount' with compile-safe, guaranteed 'pointsToGift' variable
           transaction.update(receiverDocRef, { points: increment(pointsToGift) });
         }
       });
@@ -643,9 +645,11 @@ export default function BbCafeHome() {
     
     if (ketchupAddon) itemsText += `• Extra Tomato Ketchup x1 - ₹10\n`;
     if (oreganoAddon) itemsText += `• Extra Oregano x1 - ₹10\n`;
-    if (chiliFlakesAddon) itemsText += `• Extra Chilly Flakes x1 - ₹10\n`;
+    if (chiliFlakesAddon) itemsText += `• Extra Chili Flakes x1 - ₹10\n`;
     if (noCutlery) itemsText += `🌱 (Eco-Friendly: No plastic cutlery requested)\n`;
 
+    // Declared local 'refCode' compile-safe variable inside sendWhatsAppOrder before templating
+    const refCode = getReferralCode();
     const msg = `🔥 *BAM BAM CAFE - NEW ORDER*\n\n*Bill No:* #${formattedBillStr}\n*Token No:* #${tokenNumber}\n*Customer:* ${customerDetails.name}\n*Phone:* ${customerDetails.phone}\n*Delivery Area:* ${selectedArea.name}\n*Address:* ${address}\n\n*ITEMS:*\n${itemsText}\n*Subtotal:* ₹${subtotal + addOnsCost}\n*Coupon Discount:* -₹${couponDiscount}\n*Delivery:* ₹${deliveryCharge}\n*TOTAL BILL: ₹${finalTotal}*\n\n*Invite Code:* ${refCode}\n*Points Earned:* +${pointsEarned} Pts\n${totalPointsCost > 0 ? `*Points Redeemed:* -${totalPointsCost} Pts\n` : ''}\n_Confirm order by replying 'YES'_`;
     
     playSoundEffect('success');
@@ -737,7 +741,7 @@ export default function BbCafeHome() {
 
       localStorage.setItem(storageKey, "true");
       setCustomerPoints(prev => prev + 1);
-      toast.success(`🎉 बधाई हो! ${platform.toUpperCase()} पर हमें फॉलो करने के लिए आपको +1 पॉइंट मिला है!`);
+      toast.success("🎉 बधाई हो! हमें फॉलो करने के लिए आपको +1 पॉइंट मिला है!");
     } catch (err) {
       toast.error("पॉइंट्स जोड़ने में समस्या आई।");
     }
@@ -822,6 +826,29 @@ export default function BbCafeHome() {
     setPizzaAddons({});
   };
 
+  const handleReviewSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!reviewName.trim() || !reviewComment.trim()) {
+      return toast.error("कृपया सभी आवश्यक फ़ील्ड भरें!");
+    }
+    try {
+      await addDoc(collection(db, "reviews"), {
+        name: reviewName,
+        comment: reviewComment,
+        rating: reviewRating,
+        isApproved: false, 
+        timestamp: new Date()
+      });
+      toast.success("आपका रिव्यू सबमिट हो गया है! यह एडमिन अप्रूवल के बाद दिखेगा। ❤️");
+      setReviewName("");
+      setReviewComment("");
+      setReviewRating(5);
+      setIsReviewFormOpen(false);
+    } catch (err) {
+      toast.error("रिव्यू सबमिट करने में कोई समस्या आई।");
+    }
+  };
+
   // Helper function to smooth scroll to the menu list
   const scrollToMenu = () => {
     if (menuRef && menuRef.current) {
@@ -873,7 +900,7 @@ export default function BbCafeHome() {
         </div>
       )}
 
-      {/* PREMIUM UPGRADED HERO HEADER (Extremely Compact Glass Card to show background video) */}
+      {/* PREMIUM UPGRADED HERO HEADER */}
       <header className="relative pt-10 pb-6 px-5 overflow-hidden shadow-xl flex flex-col justify-end min-h-[160px]">
         {/* local background video loop */}
         <video 
@@ -891,7 +918,7 @@ export default function BbCafeHome() {
         {/* Semi-transparent dark overlay gradient for readability */}
         <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/55 to-black/90 z-10" />
 
-        {/* Hero Content Area with highly compact glass card to maximize video visibility */}
+        {/* Hero Content Area with highly compact glass card */}
         <div className="relative z-20 max-w-[62%] space-y-1 mt-auto bg-black/45 backdrop-blur-md p-3 rounded-xl border border-white/10 shadow-lg">
           <motion.div
             initial={{ x: -20, opacity: 0 }}
@@ -916,7 +943,7 @@ export default function BbCafeHome() {
         </div>
       </header>
 
-      {/* FIXED STICKY SEARCH BAR (Flush with background to prevent visual floating gaps) */}
+      {/* FIXED STICKY SEARCH BAR */}
       <div className="sticky top-0 z-40 dark:bg-[#050505]/95 bg-gray-50/95 backdrop-blur-md py-3 px-4 border-b dark:border-white/5 border-gray-200 transition-colors duration-200 shadow-sm">
         <div className="relative max-w-sm mx-auto">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
@@ -1075,7 +1102,7 @@ export default function BbCafeHome() {
                       
                       <div className="absolute top-3 left-3 bg-black/50 backdrop-blur-md px-2.5 py-1 rounded-lg border border-white/10 flex items-center gap-1 text-[8px] font-black uppercase text-green-400">
                         <span className="h-1 w-1 rounded-full bg-green-500 animate-pulse" />VEG
-                      </div>
+                    </div>
 
                       {/* "FREE delivery" Bar Tag */}
                       <div className="absolute bottom-0 left-0 bg-gradient-to-r from-blue-600 to-blue-500 text-white font-black text-[9px] px-3 py-1 rounded-tr-xl flex items-center gap-1 shadow-md uppercase tracking-wider">
@@ -1386,7 +1413,7 @@ export default function BbCafeHome() {
         )}
       </AnimatePresence>
 
-      {/* CART DRAWER MODAL (Loyalty Program Restored completely inside Cart Drawer Modal) */}
+      {/* CART DRAWER MODAL */}
       <AnimatePresence>
         {isCartOpen && (
           <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-[110] flex items-end">
