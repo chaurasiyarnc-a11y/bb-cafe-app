@@ -1,5 +1,4 @@
 
-
 'use client';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { db } from '../lib/firebase'; 
@@ -255,6 +254,16 @@ export default function BbCafeHome() {
     return `${namePart}${phonePart}`; // e.g. RAM3759
   };
 
+  // --- ARRAYS SHUFFLER FOR RANDOM LISTS ---
+  const shuffleArray = (array: any[]) => {
+    const shuffled = [...array];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled;
+  };
+
   // --- MEMOS ---
 
   const activeTheme = useMemo(() => {
@@ -408,13 +417,17 @@ export default function BbCafeHome() {
   useEffect(() => {
     setMounted(true);
 
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      const ref = params.get('ref');
-      if (ref) {
-        setTempRefCode(ref);
-        localStorage.setItem('bb_referred_by', ref);
-        toast.success(`🎉 रेफरल कोड ${ref} पाया गया!`);
+    const savedDetails = localStorage.getItem('bb_cafe_customer');
+    if (savedDetails) {
+      try {
+        const parsed = JSON.parse(savedDetails);
+        if (parsed && parsed.name && parsed.phone) {
+          setCustomerDetails(parsed);
+          setTempName(parsed.name);
+          setTempPhone(parsed.phone.replace("+91", ""));
+        }
+      } catch (err) {
+        console.error("Failed to load customer details", err);
       }
     }
 
@@ -422,11 +435,12 @@ export default function BbCafeHome() {
     
     const unsubMenu = onSnapshot(query(collection(db, "products")), (snap) => {
       const items = snap.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter((i: any) => i.isVisible !== false);
-      setMenu(items);
+      // Products shuffled randomly on snapshot load
+      setMenu(shuffleArray(items));
       localStorage.setItem('bb_cached_menu', JSON.stringify(items)); 
     }, () => {
       const localCached = localStorage.getItem('bb_cached_menu');
-      if (localCached) setMenu(JSON.parse(localCached));
+      if (localCached) setMenu(shuffleArray(JSON.parse(localCached)));
     });
 
     const unsubCats = onSnapshot(collection(db, "categories"), (snap) => { setDbCategories(snap.docs.map(d => ({ id: d.id, ...d.data() }))); });
@@ -632,7 +646,6 @@ export default function BbCafeHome() {
     if (chiliFlakesAddon) itemsText += `• Extra Chilly Flakes x1 - ₹10\n`;
     if (noCutlery) itemsText += `🌱 (Eco-Friendly: No plastic cutlery requested)\n`;
 
-    const refCode = getReferralCode();
     const msg = `🔥 *BAM BAM CAFE - NEW ORDER*\n\n*Bill No:* #${formattedBillStr}\n*Token No:* #${tokenNumber}\n*Customer:* ${customerDetails.name}\n*Phone:* ${customerDetails.phone}\n*Delivery Area:* ${selectedArea.name}\n*Address:* ${address}\n\n*ITEMS:*\n${itemsText}\n*Subtotal:* ₹${subtotal + addOnsCost}\n*Coupon Discount:* -₹${couponDiscount}\n*Delivery:* ₹${deliveryCharge}\n*TOTAL BILL: ₹${finalTotal}*\n\n*Invite Code:* ${refCode}\n*Points Earned:* +${pointsEarned} Pts\n${totalPointsCost > 0 ? `*Points Redeemed:* -${totalPointsCost} Pts\n` : ''}\n_Confirm order by replying 'YES'_`;
     
     playSoundEffect('success');
@@ -809,29 +822,6 @@ export default function BbCafeHome() {
     setPizzaAddons({});
   };
 
-  const handleReviewSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!reviewName.trim() || !reviewComment.trim()) {
-      return toast.error("कृपया सभी आवश्यक फ़ील्ड भरें!");
-    }
-    try {
-      await addDoc(collection(db, "reviews"), {
-        name: reviewName,
-        comment: reviewComment,
-        rating: reviewRating,
-        isApproved: false, 
-        timestamp: new Date()
-      });
-      toast.success("आपका रिव्यू सबमिट हो गया है! यह एडमिन अप्रूवल के बाद दिखेगा। ❤️");
-      setReviewName("");
-      setReviewComment("");
-      setReviewRating(5);
-      setIsReviewFormOpen(false);
-    } catch (err) {
-      toast.error("रिव्यू सबमिट करने में कोई समस्या आई।");
-    }
-  };
-
   // Helper function to smooth scroll to the menu list
   const scrollToMenu = () => {
     if (menuRef && menuRef.current) {
@@ -883,8 +873,8 @@ export default function BbCafeHome() {
         </div>
       )}
 
-      {/* PREMIUM UPGRADED HERO HEADER (Clean and Contiguous with no float) */}
-      <header className="relative pt-10 pb-8 px-5 overflow-hidden shadow-xl flex flex-col justify-end min-h-[170px]">
+      {/* PREMIUM UPGRADED HERO HEADER (Extremely Compact Glass Card to show background video) */}
+      <header className="relative pt-10 pb-6 px-5 overflow-hidden shadow-xl flex flex-col justify-end min-h-[160px]">
         {/* local background video loop */}
         <video 
           autoPlay 
@@ -901,32 +891,32 @@ export default function BbCafeHome() {
         {/* Semi-transparent dark overlay gradient for readability */}
         <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/55 to-black/90 z-10" />
 
-        {/* 1. HERO CONTENT AREA (Fancy typography + Zomato mockup style) */}
-        <div className="relative z-20 max-w-[85%] space-y-1.5 mt-auto bg-black/35 backdrop-blur-sm p-4 rounded-2xl border border-white/5 shadow-lg">
+        {/* Hero Content Area with highly compact glass card to maximize video visibility */}
+        <div className="relative z-20 max-w-[62%] space-y-1 mt-auto bg-black/45 backdrop-blur-md p-3 rounded-xl border border-white/10 shadow-lg">
           <motion.div
             initial={{ x: -20, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
             transition={{ duration: 0.4 }}
-            className="space-y-1"
+            className="space-y-0.5"
           >
             {/* Fancy styled name above Delicious Food */}
-            <span className="text-xl font-extrabold italic tracking-wide text-yellow-300 font-serif drop-shadow-md block leading-none">
+            <span className="text-lg font-extrabold italic tracking-wide text-yellow-300 font-serif drop-shadow-md block leading-none mb-0.5">
               Bum Bum Cafe
             </span>
-            <h2 className="text-lg font-black text-white leading-none">Delicious Food</h2>
-            <h3 className="text-base font-black text-orange-500 leading-tight">Delivered Fast</h3>
-            <p className="text-[9px] text-gray-300 font-bold">Order your favorite meals now!</p>
+            <h2 className="text-base font-black text-white leading-none">Delicious Food</h2>
+            <h3 className="text-sm font-black text-orange-500 leading-tight">Delivered Fast</h3>
+            <p className="text-[8px] text-gray-300 font-bold">Order your favorite meals now!</p>
           </motion.div>
           <button 
             onClick={scrollToMenu}
-            className="mt-2.5 bg-orange-600 hover:bg-orange-700 text-white font-black text-[9px] px-3.5 py-1.5 rounded-lg uppercase tracking-wider shadow-md transition-all active:scale-95"
+            className="mt-1.5 bg-orange-600 hover:bg-orange-700 text-white font-black text-[8px] px-3 py-1 rounded-lg uppercase tracking-wider shadow-md transition-all active:scale-95"
           >
             Order Now
           </button>
         </div>
       </header>
 
-      {/* FIXED TRANSPARENT STICKY SEARCH BAR (Strictly Flush with page background) */}
+      {/* FIXED STICKY SEARCH BAR (Flush with background to prevent visual floating gaps) */}
       <div className="sticky top-0 z-40 dark:bg-[#050505]/95 bg-gray-50/95 backdrop-blur-md py-3 px-4 border-b dark:border-white/5 border-gray-200 transition-colors duration-200 shadow-sm">
         <div className="relative max-w-sm mx-auto">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
@@ -947,23 +937,6 @@ export default function BbCafeHome() {
           <span>बम बम कैफ़े अभी बंद है। आप केवल हमारा मेनू देख सकते हैं।</span>
         </div>
       )}
-
-      {/* HIGH CONTRAST SIDE ACTION BUTTONS (z-30 ensures they scroll neatly under search bar) */}
-      <button 
-        onClick={() => setIsSocialsOpen(true)} 
-        className="fixed right-0 top-[35%] -translate-y-1/2 bg-yellow-400 text-black border-l border-y border-yellow-500 py-3 px-1.5 rounded-l-lg z-30 text-[8px] font-black tracking-wider uppercase flex flex-col items-center gap-0.5 shadow-2xl transition-all hover:bg-yellow-500"
-        style={{ writingMode: 'vertical-lr' }}
-      >
-        📱 FOLLOW & EARN
-      </button>
-
-      <button 
-        onClick={() => setIsReviewsDrawerOpen(true)} 
-        className="fixed right-0 top-[48%] -translate-y-1/2 bg-white text-black border-l border-y border-gray-300 py-3 px-1.5 rounded-l-lg z-30 text-[8px] font-black tracking-wider uppercase flex flex-col items-center gap-0.5 shadow-2xl transition-all hover:bg-gray-100"
-        style={{ writingMode: 'vertical-lr' }}
-      >
-        ⭐ WRITE REVIEW
-      </button>
 
       {/* MAIN LAYOUT WRAPPER */}
       <main ref={menuRef} className="pt-3 px-3 max-w-lg mx-auto space-y-4">
@@ -1071,7 +1044,12 @@ export default function BbCafeHome() {
           </div>
         )}
 
-        {/* PRODUCTS LISTING */}
+        {/* PRODUCTS LISTING HEADER TITLE */}
+        <div className="pt-2">
+          <h3 className="text-sm font-black uppercase tracking-wider text-orange-600">🍳 Our Delicious Menu</h3>
+        </div>
+
+        {/* PRODUCTS LISTING WITH INTEGRATED SLIDABLE AD & THIN WRITE REVIEW STRIP */}
         <div className="grid grid-cols-1 gap-4 pt-1 font-bold">
           {filteredMenu.length === 0 ? (
             <p className="text-center text-gray-500 py-8 text-xs font-bold uppercase">No items found...</p>
@@ -1147,7 +1125,7 @@ export default function BbCafeHome() {
                           setIsCartOpen(true);
                         }
                       }}
-                      className="cursor-pointer bg-gradient-to-r from-amber-500 via-orange-500 to-red-650 text-white p-5 rounded-2xl shadow-lg border border-white/10 my-2 relative overflow-hidden group"
+                      className="cursor-pointer bg-gradient-to-r from-amber-500 via-orange-500 to-red-650 text-white p-5 rounded-2xl shadow-lg border border-white/10 my-2 relative overflow-hidden group animate-none"
                     >
                       {/* Ambient background blob */}
                       <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full blur-xl group-hover:scale-110 transition-transform duration-500" />
@@ -1171,6 +1149,25 @@ export default function BbCafeHome() {
                           <Gift size={24} />
                         </div>
                       </div>
+                    </motion.div>
+                  )}
+
+                  {/* 6th Item check (index === 5) to render a thin, premium Write Review Promo Strip */}
+                  {index === 5 && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 15 }}
+                      whileInView={{ opacity: 1, y: 0 }}
+                      viewport={{ once: true }}
+                      onClick={() => setIsReviewFormOpen(true)}
+                      className="cursor-pointer bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white py-3.5 px-4 rounded-xl shadow-md border border-white/10 my-2 flex justify-between items-center transition-all active:scale-95 group animate-none"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm">⭐</span>
+                        <p className="text-[10px] font-black tracking-wide uppercase">
+                          खाना कैसा लगा? अपना रिव्यू लिखें और मदद करें! ➔
+                        </p>
+                      </div>
+                      <ChevronRight size={14} className="text-emerald-100 group-hover:translate-x-0.5 transition-transform" />
                     </motion.div>
                   )}
                 </React.Fragment>
@@ -1527,7 +1524,7 @@ export default function BbCafeHome() {
 
                     <div className="pt-2 border-t border-white/5 flex justify-between items-center">
                       <span className="text-[9px] dark:text-gray-400 text-neutral-700 font-bold uppercase">Gift points to friend:</span>
-                      <button type="button" onClick={() => setIsGiftModalOpen(true)} className="bg-yellow-500/10 text-yellow-600 border border-yellow-400/20 px-2.5 py-1 rounded text-[8px] font-black uppercase animate-none">🎁 Gift Points</button>
+                      <button type="button" onClick={() => setIsGiftModalOpen(true)} className="bg-yellow-500/10 text-yellow-500 border border-yellow-400/20 px-2.5 py-1 rounded text-[8px] font-black uppercase animate-none">🎁 Gift Points</button>
                     </div>
 
                     <div className="space-y-1.5 pt-2 border-t border-white/5">
@@ -1813,6 +1810,7 @@ export default function BbCafeHome() {
               <p className="text-[9px] text-green-500 dark:text-green-400 dark:bg-green-500/10 bg-green-50 p-2.5 rounded-xl font-bold">
                 🌱 पेपर रसीद के बिना DIGITAL इनवॉइस जनरेट किया गया है। धन्यवाद!
               </p>
+              <img src="https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=500&bg=80" alt="Bum Bum Cafe digital green invoice" className="hidden" />
               <button onClick={() => setShowInvoice(false)} className="w-full bg-white text-black p-3 rounded-xl text-xs font-black uppercase">
                 CLOSE RECEIPT
               </button>
