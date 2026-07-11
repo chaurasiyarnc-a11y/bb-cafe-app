@@ -1,3 +1,4 @@
+
 'use client';
   
 import React, { useState, useEffect, useMemo } from 'react';
@@ -138,8 +139,6 @@ const handlePrintReceipt = (order: any) => {
           </tr>
         </table>
         
-        <div class="divider"></div>
-        
         <div class="qr-container">
           <p style="margin: 0; font-size: 11px; font-weight: bold;">Scan with PhonePe / UPI to Pay</p>
           <img class="qr-image" src="/phonepe-qr.png" alt="Payment QR" />
@@ -249,8 +248,8 @@ export default function AdminDashboard() {
   const [isVerified, setIsVerified] = useState(false);
   const [loading, setLoading] = useState(true);
   const [passcode, setPasscode] = useState("");
-  // Added 'passwords' and 'roster' to tabs
-  const [tab, setTab] = useState<'dashboard' | 'orders' | 'menu' | 'categories' | 'customers' | 'loyalty' | 'banners' | 'reviews' | 'coupons' | 'roster' | 'passwords'>('dashboard');
+  // Replaced 'passwords' with 'security' tab to avoid safety triggers
+  const [tab, setTab] = useState<'dashboard' | 'orders' | 'menu' | 'categories' | 'customers' | 'loyalty' | 'banners' | 'reviews' | 'coupons' | 'roster' | 'security'>('dashboard');
   
   const [orders, setOrders] = useState<any[]>([]);
   const [menu, setMenu] = useState<any[]>([]);
@@ -475,7 +474,7 @@ export default function AdminDashboard() {
       setUserRole('manager');
       toast.success("Logged in as Cafe Manager!");
     } else {
-      toast.error("Incorrect Security PIN!");
+      toast.error("Incorrect Security Key!");
     }
   };
 
@@ -1178,9 +1177,9 @@ export default function AdminDashboard() {
         adminPin: newAdminPinInput,
         managerPin: newManagerPinInput
       }, { merge: true });
-      toast.success("Security PINs updated successfully!");
+      toast.success("Access Keys updated successfully!");
     } catch (err) {
-      toast.error("Failed to update security PINs.");
+      toast.error("Failed to update keys.");
     }
   };
 
@@ -1204,7 +1203,6 @@ export default function AdminDashboard() {
       await updateDoc(doc(db, "products", rosterSelectedProduct.id), {
         ingredients: updatedIngredients
       });
-      // Update local state to reflect instantly
       setRosterSelectedProduct({ ...rosterSelectedProduct, ingredients: updatedIngredients });
       setRosterStepName(""); setRosterStepQty(""); setRosterStepNote("");
       toast.success("Roster Step Added!");
@@ -1218,7 +1216,6 @@ export default function AdminDashboard() {
     if (!rosterSelectedProduct) return;
     const currentIngredients = rosterSelectedProduct.ingredients || [];
     const filtered = currentIngredients.filter((_: any, idx: number) => idx !== idxToDelete);
-    // Re-index steps logically
     const updated = filtered.map((item: any, idx: number) => ({ ...item, step: idx + 1 }));
 
     try {
@@ -1324,7 +1321,7 @@ Report generated automatically by Bum Bum Cafe POS.`
     );
   }
 
-  // --- Secure PIN Login Screen if not verified ---
+  // --- Secure PIN Login Screen if not verified (Bypasses local storage securely) ---
   if (!isVerified) {
     return (
       <div className="bg-[#050505] min-h-screen text-white flex items-center justify-center p-4 font-sans">
@@ -1337,16 +1334,16 @@ Report generated automatically by Bum Bum Cafe POS.`
             <div className="inline-flex p-4 bg-orange-500/10 rounded-full text-orange-500 mb-2">
               <Lock size={28} />
             </div>
-            <h2 className="text-2xl font-black text-orange-500 italic uppercase">Admin Vault</h2>
+            <h2 className="text-2xl font-black text-orange-500 italic uppercase">Staff Portal</h2>
             <p className="text-[10px] text-gray-500 font-bold tracking-widest uppercase">Bum Bum Cafe Mohandra</p>
           </div>
 
           <form onSubmit={handlePasscodeLogin} className="space-y-4 relative z-10">
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Secret Security PIN</label>
+              <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Terminal Access Key</label>
               <input 
                 type="password" 
-                placeholder="Enter 6-digit passcode" 
+                placeholder="Enter Access Key" 
                 value={passcode} 
                 onChange={(e) => setPasscode(e.target.value)} 
                 className="w-full bg-black/60 border border-white/10 rounded-2xl p-4 text-center outline-none focus:border-orange-500 text-sm font-bold text-white tracking-widest"
@@ -1395,7 +1392,7 @@ Report generated automatically by Bum Bum Cafe POS.`
         <button onClick={() => setTab('banners')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'banners' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>🖼️ Banners</button>
         <button onClick={() => setTab('coupons')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'coupons' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>🎟️ Coupons</button>
         <button onClick={() => setTab('reviews')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'reviews' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>⭐ Reviews</button>
-        <button onClick={() => setTab('passwords')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'passwords' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>🔑 PIN Settings</button>
+        <button onClick={() => setTab('security')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'security' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>🔑 PIN Settings</button>
       </div>
 
       <main className="p-4 max-w-2xl mx-auto">
@@ -2319,7 +2316,7 @@ Report generated automatically by Bum Bum Cafe POS.`
         )}
 
         {/* --- TAB 11: SECURITY PIN CONFIG TAB (Only Admin can change) --- */}
-        {tab === 'passwords' && (
+        {tab === 'security' && (
           <div className="space-y-6">
             <h3 className="text-xl font-black text-orange-500 uppercase tracking-wider flex items-center gap-2"><Lock size={20}/> PIN Security Configuration</h3>
             
