@@ -11,10 +11,34 @@ import toast, { Toaster } from 'react-hot-toast';
 const ADD_CATEGORIES = ["Special Pizza", "Special Thali", "Paneer Special", "Special Mix veg", "Fast Food", "Super Cool", "Indian Bread", "Special Rice"];
 
 // --- STATUS CHANGE HANDLER (Placed globally at the top to resolve Next.js lexical compile scope) ---
-const handleStatusChange = async (orderId: string, newStatus: string) => {
+const handleStatusChange = async (order: any, newStatus: string) => {
   try {
-    await updateDoc(doc(db, "orders", orderId), { status: newStatus });
+    // 1. Firebase में स्टेटस अपडेट करें
+    await updateDoc(doc(db, "orders", order.id), { status: newStatus });
     toast.success("Status Sync Success!");
+
+    // 2. जब आर्डर 'delivered' मार्क हो, तब उसे Loyverse POS में भेजें
+    if (newStatus === "delivered") {
+      toast.loading("Syncing to Loyverse POS...", { id: "pos-sync" });
+      try {
+        const response = await fetch('/api/loyverse', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(order)
+        });
+        const result = await response.json();
+        
+        if (result.success) {
+          toast.success("Synced with Loyverse POS!", { id: "pos-sync" });
+        } else {
+          console.error("Loyverse Sync Error:", result.error, result.details);
+          toast.error(`POS Sync Failed: ${result.error || "Unknown Error"}`, { id: "pos-sync" });
+        }
+      } catch (err) {
+        console.error("Fetch POS error:", err);
+        toast.error("Network error during POS sync.", { id: "pos-sync" });
+      }
+    }
   } catch (e) {
     toast.error("Failed to Sync Status.");
   }
@@ -1023,7 +1047,7 @@ export default function AdminDashboard() {
                   </div>
                   <div className="mt-4 pt-4 border-t border-white/5 flex justify-between items-center">
                     <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Name: {o.customerName || 'N/A'}</span>
-                    <select value={o.status || 'pending'} onChange={(e) => handleStatusChange(o.id, e.target.value)} className="bg-black/60 border border-white/10 text-xs font-bold rounded-xl p-2 px-3 text-white outline-none focus:border-orange-500 cursor-pointer">
+                    <select value={o.status || 'pending'} onChange={(e) => handleStatusChange(o, e.target.value)} className="bg-black/60 border border-white/10 text-xs font-bold rounded-xl p-2 px-3 text-white outline-none focus:border-orange-500 cursor-pointer">
                       <option value="pending">⏳ Pending (Confirming)</option>
                       <option value="preparing">👨‍🍳 Preparing in Kitchen</option>
                       <option value="out_for_delivery">🛵 Out for Delivery</option>
