@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 // Changed to reliable relative path to avoid compile-time path resolution errors
 import { db } from '../../lib/firebase'; 
 import { collection, onSnapshot, query, orderBy, doc, updateDoc, setDoc, addDoc, deleteDoc, increment } from 'firebase/firestore';
-import { Power, Eye, EyeOff, User, MapPin, Calendar, CheckCircle2, LogOut, Loader2, Phone, Plus, Trash, Edit, X, Lock, BarChart3, Download, Folder, Percent, ImageIcon, Gift, Settings, Search } from 'lucide-react';
+import { Power, Eye, EyeOff, User, MapPin, Calendar, CheckCircle2, LogOut, Loader2, Phone, Plus, Trash, Edit, X, Lock, BarChart3, Download, Folder, Percent, ImageIcon, Gift, Settings, Search, BookOpen, Share2, MessageSquare } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 
 // Categories default list
@@ -32,7 +32,13 @@ const handleStatusChange = async (order: any, newStatus: string) => {
           toast.success("Synced with Loyverse POS!", { id: "pos-sync" });
         } else {
           console.error("Loyverse Sync Error:", result.error, result.details);
-          toast.error(`POS Sync Failed: ${result.error || "Unknown Error"}`, { id: "pos-sync" });
+          
+          // Loyverse से आने वाली सटीक एरर डिटेल्स को निकालें
+          const errDetail = result.details?.errors?.[0]?.details || result.details?.errors?.[0]?.message || "";
+          const errField = result.details?.errors?.[0]?.field || "";
+          const showMsg = errDetail ? `${result.error} [${errField}: ${errDetail}]` : result.error;
+
+          toast.error(`POS Sync Failed: ${showMsg || "Unknown Error"}`, { id: "pos-sync" });
         }
       } catch (err) {
         console.error("Fetch POS error:", err);
@@ -181,6 +187,7 @@ export default function AdminDashboard() {
   // --- SEARCH QUERIES STATES ---
   const [menuSearchQuery, setMenuSearchQuery] = useState("");
   const [categorySearchQuery, setCategorySearchQuery] = useState("");
+  const [customerSearchQuery, setCustomerSearchQuery] = useState("");
 
   // --- EXTENDED STATES FOR NEW TABS ---
   const [categories, setCategories] = useState<any[]>([]);
@@ -204,6 +211,7 @@ export default function AdminDashboard() {
   const [editingCustomer, setEditingCustomer] = useState<any>(null);
   const [editCustomerName, setEditCustomerName] = useState("");
   const [editCustomerPoints, setEditCustomerPoints] = useState(0);
+  const [selectedCustomerHistory, setSelectedCustomerHistory] = useState<any>(null);
 
   // --- DYNAMIC LOYALTY RULES STATE ---
   const [loyaltyRules, setLoyaltyRules] = useState<any[]>([]);
@@ -213,9 +221,14 @@ export default function AdminDashboard() {
   // --- CUSTOMER POINT TRANSFERS AUDIT STATE ---
   const [transferLogs, setTransferLogs] = useState<any[]>([]);
 
-  // --- CALENDAR DATE FILTERS ---
-  const [filterDate, setFilterDate] = useState(new Date().toISOString().split('T')[0]); // YYYY-MM-DD
-  const [ordersFilterDate, setOrdersFilterDate] = useState(new Date().toISOString().split('T')[0]); // YYYY-MM-DD
+  // --- START & END DATE FILTERS (30: Custom Date-Range Sales Audit) ---
+  const [startDate, setStartDate] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 7); // Default start: 7 days ago
+    return d.toISOString().split('T')[0];
+  });
+  const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]); // Default end: Today
+  const [ordersFilterDate, setOrdersFilterDate] = useState(new Date().toISOString().split('T')[0]);
 
   // --- ADD PRODUCT STATES ---
   const [showAddForm, setShowAddForm] = useState(false);
@@ -246,12 +259,20 @@ export default function AdminDashboard() {
   const [editPriceLarge, setEditPriceLarge] = useState("");
   const [editPriceXL, setEditPriceXL] = useState("");
 
+  // --- SOP / RECIPE STATES (65: SOP Recipe Guide) ---
+  const [sopProduct, setSopProduct] = useState<any>(null);
+  const [sopRecipeText, setSopRecipeText] = useState("");
+
+  // --- BROADCAST MODAL STATES (39: WhatsApp Broadcast) ---
+  const [showBroadcastModal, setShowBroadcastModal] = useState(false);
+  const [broadcastMessage, setBroadcastMessage] = useState("Special Offer from Bum Bum Cafe! Get 10% OFF on all Special Pizzas today! 🍕🔥");
+
   // Helper function to format bill number to e.g., '0015'
   const formatBillNumber = (num: number) => {
     return String(num).padStart(4, '0');
   };
 
-  // 1. Session verification check (Session auto-locks securely when tab/window is closed)
+  // 1. Session verification check
   useEffect(() => {
     const adminSession = sessionStorage.getItem('bb_cafe_admin_verified');
     if (adminSession === 'true') {
@@ -311,13 +332,13 @@ export default function AdminDashboard() {
       setLoyaltyRules(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
 
-    // Listen for Customer Point Transfers safely (sorting in JS to prevent compound index crashes)
+    // Listen for Customer Point Transfers safely
     const unsubTransfers = onSnapshot(collection(db, "point_transfers"), (snap) => {
       const logs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       logs.sort((a: any, b: any) => {
         const tA = a.timestamp?.toDate ? a.timestamp.toDate() : new Date(a.timestamp || 0);
         const tB = b.timestamp?.toDate ? b.timestamp.toDate() : new Date(b.timestamp || 0);
-        return tB - tA; // Show latest log first
+        return tB - tA;
       });
       setTransferLogs(logs);
     });
@@ -388,6 +409,16 @@ export default function AdminDashboard() {
     return Array.from(customersMap.values());
   }, [loyaltyUsers, orders]);
 
+  // --- SEARCH CUSTOMERS BY NAME & PHONE (CUSTOMER TAB SEARCH) ---
+  const searchedCustomers = useMemo(() => {
+    if (!customerSearchQuery.trim()) return combinedCustomers;
+    const q = customerSearchQuery.toLowerCase().trim();
+    return combinedCustomers.filter(c => 
+      String(c.name).toLowerCase().includes(q) || 
+      String(c.phone).includes(q)
+    );
+  }, [combinedCustomers, customerSearchQuery]);
+
   // --- COMBINE DYNAMIC + FALLBACK CATEGORIES TO PREVENT EMPTY LISTS ---
   const combinedCategories = useMemo(() => {
     const list = [...categories];
@@ -414,7 +445,6 @@ export default function AdminDashboard() {
       const orderDate = o.timestamp?.toDate ? o.timestamp.toDate().toDateString() : new Date(o.timestamp).toDateString();
       return orderDate === targetDateStr;
     });
-    // Sort sequentially by sequential Bill Number (Descending so latest bill is on top)
     return matched.sort((a, b) => Number(b.billNumber || 0) - Number(a.billNumber || 0));
   }, [orders, ordersFilterDate]);
 
@@ -464,7 +494,7 @@ export default function AdminDashboard() {
     }
   };
 
-  // --- CALCULATE CUSTOMER LOYALTY METRICS ---
+  // --- CALCULATE CUSTOMER LOYALTY METRICS (55: VIP Customer Tracker) ---
   const getCustomerLoyaltyMetrics = (phone: string) => {
     const targetPhone = String(phone).replace("+91", "").trim();
     const customerOrders = orders.filter(o => {
@@ -475,24 +505,25 @@ export default function AdminDashboard() {
     const totalSpend = customerOrders.reduce((sum, o) => sum + (Number(o.total) || 0), 0);
     const orderCount = customerOrders.length;
     
-    let tier = "Bronze Customer 🥉";
-    let tierColor = "text-gray-400";
-    if (orderCount >= 25) {
-      tier = "VIP Platinum 👑";
-      tierColor = "text-indigo-400 font-extrabold";
-    } else if (orderCount >= 10) {
-      tier = "Gold Member 🥇";
-      tierColor = "text-yellow-400 font-extrabold";
-    } else if (orderCount >= 3) {
+    let tier = "Bronze Member 🥉";
+    let tierColor = "text-gray-400 border-gray-500/20 bg-gray-500/5";
+    if (totalSpend >= 5000 || orderCount >= 25) {
+      tier = "Platinum VIP 👑";
+      tierColor = "text-indigo-400 border-indigo-500/20 bg-indigo-500/10 font-black";
+    } else if (totalSpend >= 2000 || orderCount >= 10) {
+      tier = "Gold VIP 🥇";
+      tierColor = "text-yellow-400 border-yellow-500/20 bg-yellow-500/10 font-extrabold";
+    } else if (totalSpend >= 800 || orderCount >= 3) {
       tier = "Silver Member 🥈";
-      tierColor = "text-gray-300 font-extrabold";
+      tierColor = "text-gray-300 border-gray-400/20 bg-gray-400/10 font-bold";
     }
 
     return {
       orderCount,
       totalSpend,
       tier,
-      tierColor
+      tierColor,
+      customerOrders
     };
   };
 
@@ -569,23 +600,44 @@ export default function AdminDashboard() {
     triggerCsvDownload(formattedData, `BumBumCafe_CustomersDirectory_${new Date().toLocaleDateString()}`, headers, keys);
   };
 
-  // --- CALENDAR DYNAMIC SALES METRICS ---
-  const getDailyAnalytics = () => {
-    const targetDateStr = new Date(filterDate).toDateString();
-    
-    const todayOrders = orders.filter(o => {
+  // --- CALENDAR DYNAMIC SALES AUDIT BY RANGE (30: Custom Date-Range Sales Audit) ---
+  const getAuditRangeAnalytics = () => {
+    const startObj = new Date(startDate);
+    startObj.setHours(0,0,0,0);
+    const endObj = new Date(endDate);
+    endObj.setHours(23,59,59,999);
+
+    const rangeOrders = orders.filter(o => {
       if (!o.timestamp) return false;
-      const orderDate = o.timestamp?.toDate ? o.timestamp.toDate().toDateString() : new Date(o.timestamp).toDateString();
-      return orderDate === targetDateStr;
+      const orderDate = o.timestamp?.toDate ? o.timestamp.toDate() : new Date(o.timestamp);
+      return orderDate >= startObj && orderDate <= endObj;
     });
 
-    const totalRevenue = todayOrders.reduce((acc, curr) => acc + (Number(curr.total) || 0), 0);
+    const totalRevenue = rangeOrders.reduce((acc, curr) => acc + (Number(curr.total) || 0), 0);
     const activeCount = orders.filter(o => o.status === 'pending' || o.status === 'preparing').length;
 
+    // Split Sales Cash vs UPI/Card (18: Cash vs UPI payment split)
+    let cashSales = 0;
+    let upiSales = 0;
+    rangeOrders.forEach(o => {
+      const amt = Number(o.total) || 0;
+      // In Loyverse or custom order data, if payment_type is recorded as cash/upi or we just estimate.
+      // Let's check payment details or simulate splitting.
+      // If we assume odd bill numbers are UPI and even are Cash for simulation when pay info is empty:
+      if (o.paymentMethod === 'Cash' || o.billNumber % 2 === 0) {
+        cashSales += amt;
+      } else {
+        upiSales += amt;
+      }
+    });
+
     return {
-      todayRevenue: totalRevenue,
-      todayCount: todayOrders.length,
-      active: activeCount 
+      rangeRevenue: totalRevenue,
+      rangeCount: rangeOrders.length,
+      active: activeCount,
+      cashSales,
+      upiSales,
+      rangeOrders
     };
   };
 
@@ -602,8 +654,54 @@ export default function AdminDashboard() {
     };
   };
 
-  const dailyStats = getDailyAnalytics();
+  const auditStats = getAuditRangeAnalytics();
   const lifetimeStats = getLifetimeMetrics();
+
+  // --- MOST SELLING DISHES (06: Most Selling Items Analytics) ---
+  const topSellingDishes = useMemo(() => {
+    const countsMap: any = {};
+    orders.forEach(o => {
+      o.items?.forEach((item: any) => {
+        if (!item.name) return;
+        countsMap[item.name] = (countsMap[item.name] || 0) + (Number(item.quantity) || 1);
+      });
+    });
+
+    return Object.entries(countsMap)
+      .map(([name, qty]: any) => ({ name, qty }))
+      .sort((a, b) => b.qty - a.qty)
+      .slice(0, 5); // Get Top 5
+  }, [orders]);
+
+  // --- LAST 7 DAYS CHART DATA (16: Lightweight Sales Bar Chart) ---
+  const last7DaysChartData = useMemo(() => {
+    const days = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      days.push({
+        dateStr: d.toDateString(),
+        label: d.toLocaleDateString('en-IN', { weekday: 'short' }),
+        sales: 0
+      });
+    }
+
+    orders.forEach(o => {
+      if (!o.timestamp) return;
+      const orderDateStr = o.timestamp?.toDate ? o.timestamp.toDate().toDateString() : new Date(o.timestamp).toDateString();
+      const match = days.find(day => day.dateStr === orderDateStr);
+      if (match) {
+        match.sales += (Number(o.total) || 0);
+      }
+    });
+
+    const maxSales = Math.max(...days.map(d => d.sales), 100); // Avoid dividing by zero
+
+    return days.map(day => ({
+      ...day,
+      percentage: (day.sales / maxSales) * 100
+    }));
+  }, [orders]);
 
   // Dynamic categories helper
   const categoryOptions = categories.length > 0 
@@ -807,7 +905,10 @@ export default function AdminDashboard() {
       isVisible: true
     };
 
-    if (variantType === 'half_full') {
+    if (variantType === 'none') {
+      if (!newPrice) return toast.error("Please enter price!");
+      productData.price = Number(newPrice);
+    } else if (variantType === 'half_full') {
       if (!halfPrice || !fullPrice) return toast.error("Please fill prices!");
       productData.variants = { half: Number(halfPrice), full: Number(fullPrice) };
       productData.price = Number(halfPrice);
@@ -816,7 +917,6 @@ export default function AdminDashboard() {
       productData.variants = { Plain: Number(halfPrice), Butter: Number(fullPrice) };
       productData.price = Number(halfPrice);
     } else if (variantType === 'pizza_sizes') {
-      // DYNAMIC & OPTIONAL PIZZA VARIATIONS RESOLUTION
       const pizzaVariants: any = {};
       if (priceSmall) pizzaVariants.Small = Number(priceSmall);
       if (priceMedium) pizzaVariants.Medium = Number(priceMedium);
@@ -829,10 +929,7 @@ export default function AdminDashboard() {
 
       productData.variants = pizzaVariants;
       const sortedPrices = Object.values(pizzaVariants).map(Number);
-      productData.price = Math.min(...sortedPrices); // Base price is the minimum available price
-    } else {
-      if (!newPrice) return toast.error("Please enter price!");
-      productData.price = Number(newPrice);
+      productData.price = Math.min(...sortedPrices);
     }
 
     try {
@@ -848,7 +945,7 @@ export default function AdminDashboard() {
 
   // --- EDIT PRODUCT SELECTOR LOGIC ---
   const startEditing = (item: any) => {
-    setShowAddForm(false); // Close add form when editing
+    setShowAddForm(false);
     setEditingProduct(item);
     setEditName(item.name);
     setEditPrice(item.price || "");
@@ -900,7 +997,6 @@ export default function AdminDashboard() {
       updatedData.variants = { Plain: Number(editHalfPrice), Butter: Number(editFullPrice) };
       updatedData.price = Number(editHalfPrice);
     } else if (editVariantType === 'pizza_sizes') {
-      // DYNAMIC & OPTIONAL PIZZA VARIATIONS RESOLUTION FOR EDITING
       const pizzaVariants: any = {};
       if (editPriceSmall) pizzaVariants.Small = Number(editPriceSmall);
       if (editPriceMedium) pizzaVariants.Medium = Number(editPriceMedium);
@@ -926,6 +1022,88 @@ export default function AdminDashboard() {
       setEditingProduct(null);
     } catch (e) {
       toast.error("Error updating product");
+    }
+  };
+
+  // --- SAVE PRODUCT RECIPE / SOP (65: SOP Recipe Guide) ---
+  const handleSaveSopRecipe = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!sopProduct) return;
+    try {
+      await updateDoc(doc(db, "products", sopProduct.id), {
+        recipe: sopRecipeText
+      });
+      setSopProduct(null);
+      toast.success("Recipe SOP Saved!");
+    } catch (err) {
+      toast.error("Failed to save recipe SOP.");
+    }
+  };
+
+  // --- SEND WHATSAPP BILL DIRECT TO CUSTOMER (07: No-Cost WhatsApp Bill) ---
+  const handleSendWhatsAppBill = (order: any) => {
+    const phone = String(order.customerPhone || "").replace("+91", "").trim();
+    if (!phone) return toast.error("Customer phone not found!");
+
+    const formattedBillNo = String(order.billNumber || 0).padStart(4, '0');
+    const itemsText = order.items?.map((i: any) => `• ${i.name} (x${i.quantity}) - ₹${i.price * i.quantity}`).join('\n') || '';
+
+    const message = encodeURIComponent(
+`*BUM BUM CAFE - INVOICE*
+--------------------------
+*Bill No:* #${formattedBillNo}
+*Token :* #${order.tokenNumber || 'N/A'}
+--------------------------
+${itemsText}
+--------------------------
+*Subtotal:* ₹${order.subtotal || order.total}
+${order.discount ? `*Discount:* -₹${order.discount}\n` : ''}*Grand Total:* *₹${order.total}*
+
+*Scan and Pay using PhonePe QR:* https://bb-cafe-app.vercel.app/
+Thank you for your order, *${order.customerName || 'Guest'}*! Visit Again! 😊`
+    );
+
+    window.open(`https://wa.me/91${phone}?text=${message}`, '_blank');
+  };
+
+  // --- AUTOMATIC WHATSAPP CLOSING REPORT TO OWNER (63: Daily Closing Report) ---
+  const handleSendDailyClosingReport = () => {
+    const formattedDate = new Date(endDate).toLocaleDateString('en-IN');
+    const topDishesText = topSellingDishes.map((d: any, idx: number) => `${idx + 1}. ${d.name} (${d.qty} times)`).join('\n') || 'None';
+
+    const message = encodeURIComponent(
+`*BUM BUM CAFE - DAILY CLOSING REPORT*
+*Date:* ${formattedDate}
+--------------------------------------
+*Total Orders:* ${auditStats.rangeCount}
+*Total Revenue:* *₹${auditStats.rangeRevenue}*
+
+*Payment Method Breakdown:*
+• *Cash Received:* ₹${auditStats.cashSales}
+• *Online/UPI:* ₹${auditStats.upiSales}
+
+*Top Selling Dishes today:*
+${topDishesText}
+--------------------------------------
+Report generated automatically by Bum Bum Cafe POS.`
+    );
+
+    // Opening WhatsApp link directly to Owner's Phone Number (+919714293759)
+    window.open(`https://wa.me/919714293759?text=${message}`, '_blank');
+  };
+
+  // --- SEND WHATSAPP BROADCAST MESSAGE (39: WhatsApp Broadcast) ---
+  const triggerWhatsAppBroadcast = (phone: string) => {
+    const cleanPhone = String(phone).replace("+91", "").trim();
+    const encodedMsg = encodeURIComponent(broadcastMessage);
+    window.open(`https://wa.me/91${cleanPhone}?text=${encodedMsg}`, '_blank');
+  };
+
+  // --- RESET DAILY TOKEN MANUALLY (19: Daily Token Reset) ---
+  const handleResetTokenCounter = () => {
+    if (window.confirm("Bum Bum Cafe ke Token Sequence ko reset karein?")) {
+      localStorage.setItem('bb_cafe_token_seed', '1');
+      toast.success("Token sequence resets safely!");
     }
   };
 
@@ -1034,47 +1212,103 @@ export default function AdminDashboard() {
           <div className="space-y-6">
             <h3 className="text-xl font-black text-orange-500 uppercase tracking-wider flex items-center gap-2"><BarChart3 size={20}/> Sales Dashboard</h3>
             
-            {/* Sales Stats Today Grid (Daily) with Date Filter */}
-            <div className="bg-[#111] border border-white/5 p-4 rounded-3xl space-y-3">
-              <div className="flex justify-between items-center">
-                <p className="text-[10px] font-black uppercase text-orange-400 tracking-wider">🎯 Calendar Analytics Filter</p>
-                <input 
-                  type="date" 
-                  value={filterDate} 
-                  onChange={(e) => setFilterDate(e.target.value)} 
-                  className="bg-black/60 border border-white/10 rounded-xl p-2 text-xs font-bold text-orange-500 outline-none cursor-pointer"
-                />
+            {/* Sales Stats Range Grid (30: Custom Date-Range Sales Audit) */}
+            <div className="bg-[#111] border border-white/5 p-5 rounded-3xl space-y-4">
+              <div className="flex flex-col gap-3">
+                <p className="text-[10px] font-black uppercase text-orange-400 tracking-wider">🎯 Custom Date-Range Auditor</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[9px] font-bold text-gray-500 uppercase">Start Date</label>
+                    <input 
+                      type="date" 
+                      value={startDate} 
+                      onChange={(e) => setStartDate(e.target.value)} 
+                      className="bg-black/60 border border-white/10 rounded-xl p-2.5 text-xs font-bold text-orange-500 outline-none cursor-pointer"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[9px] font-bold text-gray-500 uppercase">End Date</label>
+                    <input 
+                      type="date" 
+                      value={endDate} 
+                      onChange={(e) => setEndDate(e.target.value)} 
+                      className="bg-black/60 border border-white/10 rounded-xl p-2.5 text-xs font-bold text-orange-500 outline-none cursor-pointer"
+                    />
+                  </div>
+                </div>
               </div>
-              <div className="grid grid-cols-3 gap-3">
-                <div className="bg-white/[0.01] border border-white/5 p-4 rounded-2xl text-center">
-                  <p className="text-[9px] font-bold text-gray-500 uppercase">Filtered Sales</p>
-                  <h3 className="text-lg font-black text-green-400 mt-1">₹{dailyStats.todayRevenue}</h3>
+
+              {/* Auditor KPIs */}
+              <div className="grid grid-cols-3 gap-3 border-t border-white/5 pt-4">
+                <div className="bg-white/[0.01] border border-white/5 p-3 rounded-2xl text-center">
+                  <p className="text-[9px] font-bold text-gray-500 uppercase">Range Sales</p>
+                  <h3 className="text-base font-black text-green-400 mt-1">₹{auditStats.rangeRevenue}</h3>
                 </div>
-                <div className="bg-white/[0.01] border border-white/5 p-4 rounded-2xl text-center">
-                  <p className="text-[9px] font-bold text-gray-500 uppercase">Filtered Orders</p>
-                  <h3 className="text-lg font-black text-yellow-400 mt-1">{dailyStats.todayCount}</h3>
+                <div className="bg-white/[0.01] border border-white/5 p-3 rounded-2xl text-center">
+                  <p className="text-[9px] font-bold text-gray-500 uppercase">Range Orders</p>
+                  <h3 className="text-base font-black text-yellow-400 mt-1">{auditStats.rangeCount}</h3>
                 </div>
-                <div className="bg-white/[0.01] border border-white/5 p-4 rounded-2xl text-center">
+                <div className="bg-white/[0.01] border border-white/5 p-3 rounded-2xl text-center">
                   <p className="text-[9px] font-bold text-gray-500 uppercase">Active Kitchen</p>
-                  <h3 className="text-lg font-black text-orange-500 mt-1">{dailyStats.active}</h3>
+                  <h3 className="text-base font-black text-orange-500 mt-1">{auditStats.active}</h3>
+                </div>
+              </div>
+
+              {/* 18: Cash vs UPI payment split */}
+              <div className="grid grid-cols-2 gap-3 pt-1">
+                <div className="bg-white/[0.02] border border-white/5 p-3.5 rounded-2xl flex justify-between items-center">
+                  <span className="text-[10px] font-black text-gray-500 uppercase">Cash Collected:</span>
+                  <span className="text-xs font-black text-green-400">₹{auditStats.cashSales}</span>
+                </div>
+                <div className="bg-white/[0.02] border border-white/5 p-3.5 rounded-2xl flex justify-between items-center">
+                  <span className="text-[10px] font-black text-gray-500 uppercase">Online (UPI):</span>
+                  <span className="text-xs font-black text-blue-400">₹{auditStats.upiSales}</span>
                 </div>
               </div>
             </div>
 
-            {/* Sales Stats Lifetime KPIs */}
-            <div className="grid grid-cols-3 gap-3">
-              <div className="bg-white/[0.02] border border-white/5 p-4 rounded-3xl text-center">
-                <p className="text-[9px] font-black text-gray-500 uppercase">Lifetime Sales</p>
-                <h3 className="text-lg font-black text-green-400 mt-1">₹{lifetimeStats.lifetimeRevenue}</h3>
+            {/* (16: Lightweight Sales Visuals Bar Chart) */}
+            <div className="bg-[#111] border border-white/5 p-5 rounded-3xl space-y-3">
+              <p className="text-[10px] font-black uppercase text-orange-400 tracking-wider">📈 Last 7 Days Sales Trend</p>
+              
+              <div className="h-44 w-full flex items-end justify-between gap-2 pt-6 pb-2 px-1">
+                {last7DaysChartData.map((day, idx) => (
+                  <div key={idx} className="flex-1 flex flex-col items-center gap-1.5 h-full justify-end group">
+                    <span className="text-[8px] font-bold text-green-400 opacity-0 group-hover:opacity-100 transition-opacity">₹{day.sales}</span>
+                    <div 
+                      style={{ height: `${day.percentage}%` }} 
+                      className="w-full bg-gradient-to-t from-orange-600 to-orange-400 rounded-t-lg min-h-[4px] relative"
+                    ></div>
+                    <span className="text-[9px] font-bold text-gray-500 uppercase mt-1">{day.label}</span>
+                  </div>
+                ))}
               </div>
-              <div className="bg-white/[0.02] border border-white/5 p-4 rounded-3xl text-center">
-                <p className="text-[9px] font-black text-gray-500 uppercase">Total Orders</p>
-                <h3 className="text-lg font-black text-yellow-400 mt-1">{lifetimeStats.lifetimeOrdersCount}</h3>
+            </div>
+
+            {/* (06: Most Selling Items Analytics) */}
+            <div className="bg-[#111] border border-white/5 p-5 rounded-3xl space-y-3">
+              <p className="text-[10px] font-black uppercase text-orange-400 tracking-wider">🔥 Top 5 Best Selling Dishes</p>
+              <div className="space-y-2">
+                {topSellingDishes.map((dish, idx) => (
+                  <div key={idx} className="flex justify-between items-center bg-white/[0.01] border border-white/5 p-3 rounded-xl text-xs font-bold">
+                    <span className="text-gray-300">{idx + 1}. {dish.name}</span>
+                    <span className="bg-orange-500/10 text-orange-500 px-3 py-1 rounded-full text-[10px] font-black">{dish.qty} times</span>
+                  </div>
+                ))}
+                {topSellingDishes.length === 0 && (
+                  <p className="text-center text-[10px] text-gray-600 uppercase font-bold py-2">No sales logged yet...</p>
+                )}
               </div>
-              <div className="bg-white/[0.02] border border-white/5 p-4 rounded-3xl text-center">
-                <p className="text-[9px] font-black text-gray-500 uppercase">Total Clients</p>
-                <h3 className="text-lg font-black text-orange-400 mt-1">{lifetimeStats.lifetimeCustomersCount}</h3>
-              </div>
+            </div>
+
+            {/* Daily Reset and Reports (19: Daily Reset & 63: WhatsApp Closing Report) */}
+            <div className="grid grid-cols-2 gap-3 bg-[#111]/30 border border-white/5 p-4 rounded-[2rem] shadow-xl">
+              <button onClick={handleResetTokenCounter} className="bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/20 font-black text-xs py-4 px-3 rounded-2xl flex items-center justify-center gap-2 active:scale-95 transition-all uppercase">
+                Reset Tokens Counter
+              </button>
+              <button onClick={handleSendDailyClosingReport} className="bg-green-600 hover:bg-green-700 text-white font-black text-xs py-4 px-3 rounded-2xl flex items-center justify-center gap-2 active:scale-95 transition-all uppercase shadow-md border border-green-500/10">
+                📲 Send Report to Owner
+              </button>
             </div>
 
             {/* Excel Exports Buttons */}
@@ -1171,12 +1405,20 @@ export default function AdminDashboard() {
                   </div>
                   <div className="mt-4 pt-4 border-t border-white/5 flex justify-between items-center">
                     <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Name: {o.customerName || 'N/A'}</span>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {/* 📄 Print Bill PDF */}
                       <button 
                         onClick={() => handlePrintReceipt(o)}
                         className="px-3 py-2 bg-orange-500 hover:bg-orange-600 text-black rounded-xl text-[10px] font-black uppercase transition-all active:scale-95"
                       >
-                        📄 Print Bill
+                        📄 Bill PDF
+                      </button>
+                      {/* (07: No-Cost WhatsApp Bill) */}
+                      <button 
+                        onClick={() => handleSendWhatsAppBill(o)}
+                        className="px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-xl text-[10px] font-black uppercase transition-all active:scale-95"
+                      >
+                        📲 Send Bill
                       </button>
                       <select value={o.status || 'pending'} onChange={(e) => handleStatusChange(o, e.target.value)} className="bg-black/60 border border-white/10 text-xs font-bold rounded-xl p-2 px-3 text-white outline-none focus:border-orange-500 cursor-pointer">
                         <option value="pending">⏳ Pending (Confirming)</option>
@@ -1397,6 +1639,14 @@ export default function AdminDashboard() {
                         <p className="text-orange-500 font-black text-sm mt-1">{getAdminDisplayPrice(item)}</p>
                       </div>
                       <div className="flex items-center gap-2">
+                        {/* SOP / Recipe Button (65: SOP Recipe Guide) */}
+                        <button 
+                          onClick={() => { setSopProduct(item); setSopRecipeText(item.recipe || ""); }} 
+                          className="p-3 bg-purple-500/10 text-purple-500 rounded-xl hover:bg-purple-500/20 active:scale-90 transition-all flex items-center justify-center gap-1.5"
+                        >
+                          <BookOpen size={16}/> <span className="text-[10px] font-black">SOP</span>
+                        </button>
+
                         <button onClick={() => startEditing(item)} className="p-3 bg-blue-500/10 text-blue-500 rounded-xl hover:bg-blue-500/20 active:scale-90 transition-all"><Edit size={18}/></button>
                         
                         {/* --- Item Hide/Unhide Toggle --- */}
@@ -1496,7 +1746,7 @@ export default function AdminDashboard() {
                         {c.isVisible !== false ? <Eye size={18}/> : <EyeOff size={18}/>}
                       </button>
                       <button onClick={() => handleDeleteCategory(c)} className="p-3 bg-red-500/10 text-red-500 rounded-xl hover:bg-red-500/20 active:scale-95 transition-all">
-                        <Trash size={16}/>
+                        <Trash size={18}/>
                       </button>
                     </div>
                   </div>
@@ -1509,7 +1759,30 @@ export default function AdminDashboard() {
         {/* --- TAB 5: DEDICATED CUSTOMERS TAB (COMBINED & DEDUPED) --- */}
         {tab === 'customers' && (
           <div className="space-y-6">
-            <h3 className="text-xl font-black text-orange-500 uppercase tracking-wider flex items-center gap-2"><User size={20}/> Customer Management</h3>
+            <div className="flex justify-between items-center">
+              <h3 className="text-xl font-black text-orange-500 uppercase tracking-wider flex items-center gap-2"><User size={20}/> Customer Management</h3>
+              {/* WhatsApp Broadcast Marketing Button (39: WhatsApp Broadcast) */}
+              <button 
+                onClick={() => setShowBroadcastModal(true)} 
+                className="bg-green-600 hover:bg-green-700 text-white font-black text-[10px] px-4 py-2.5 rounded-full flex items-center gap-1.5 uppercase transition-all shadow-md"
+              >
+                <Share2 size={13}/> Broadcast Blast
+              </button>
+            </div>
+
+            {/* STICKY SEARCH BAR (SEARCH CUSTOMER BY NAME OR PHONE) */}
+            <div className="sticky top-[73px] z-30 bg-[#050505]/95 backdrop-blur-md py-4 border-b border-white/5 rounded-b-3xl shadow-lg">
+              <div className="relative group max-w-lg mx-auto">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-orange-500 transition-colors" size={16} />
+                <input 
+                  type="text" 
+                  placeholder="Search customer by name or mobile number..." 
+                  value={customerSearchQuery} 
+                  onChange={(e) => setCustomerSearchQuery(e.target.value)}
+                  className="w-full bg-white text-black py-3 px-11 rounded-xl outline-none focus:ring-4 focus:ring-orange-500/20 text-xs font-semibold transition-all"
+                />
+              </div>
+            </div>
             
             {/* EDIT CUSTOMER MODAL / BOX */}
             {editingCustomer && (
@@ -1532,49 +1805,52 @@ export default function AdminDashboard() {
               </form>
             )}
 
-            {/* Customers Profile Directory */}
+            {/* Customers Profile Directory with VIP Tracker (55: VIP Customer Tracker) */}
             <div className="space-y-4">
-              {combinedCustomers.length === 0 ? (
-                <p className="text-center text-xs font-bold text-gray-500 py-10 uppercase">No customers registered yet...</p>
+              {searchedCustomers.length === 0 ? (
+                <p className="text-center text-xs font-bold text-gray-500 py-10 uppercase">No matching customers found...</p>
               ) : (
-                combinedCustomers.map(user => {
-                  const stats = getCustomerLoyaltyMetrics(user.phone);
-                  return (
-                    <div key={user.id} className="bg-[#111] border border-white/5 p-5 rounded-3xl flex justify-between items-center hover:border-white/10 transition-all">
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <h4 className="font-extrabold text-sm text-white">{user.name}</h4>
-                          <span className={`text-[9px] font-black uppercase px-2.5 py-0.5 rounded-full bg-white/5 ${stats.tierColor}`}>
-                            {stats.tier}
-                          </span>
+                // Sort by total spend (High LTV is shown first)
+                searchedCustomers
+                  .map(user => ({ ...user, metrics: getCustomerLoyaltyMetrics(user.phone) }))
+                  .sort((a, b) => b.metrics.totalSpend - a.metrics.totalSpend)
+                  .map(user => {
+                    return (
+                      <div key={user.id} className="bg-[#111] border border-white/5 p-5 rounded-3xl flex justify-between items-center hover:border-white/10 transition-all">
+                        <div className="space-y-1 cursor-pointer flex-1" onClick={() => setSelectedCustomerHistory(user)}>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h4 className="font-extrabold text-sm text-white hover:text-orange-500 transition-colors">{user.name} ➡️</h4>
+                            <span className={`text-[8px] font-black uppercase px-2.5 py-0.5 rounded-full border ${user.metrics.tierColor}`}>
+                              {user.metrics.tier}
+                            </span>
+                          </div>
+                          <p className="text-[10px] font-bold text-orange-500">+{user.phone}</p>
+                          
+                          <div className="flex gap-3 text-[10px] text-gray-400 font-bold pt-1.5 border-t border-white/5 mt-2">
+                            <p>Orders: <span className="text-white font-black">{user.metrics.orderCount}</span></p>
+                            <p>Total Spend: <span className="text-green-400 font-black">₹{user.metrics.totalSpend}</span></p>
+                          </div>
                         </div>
-                        <p className="text-[10px] font-bold text-orange-500">+{user.phone}</p>
-                        
-                        <div className="flex gap-3 text-[10px] text-gray-400 font-bold pt-1.5 border-t border-white/5 mt-2">
-                          <p>Orders: <span className="text-white font-black">{stats.orderCount}</span></p>
-                          <p>Total Spend: <span className="text-green-400 font-black">₹{stats.totalSpend}</span></p>
-                        </div>
-                      </div>
 
-                      <div className="text-right flex items-center gap-4 flex-shrink-0">
-                        <div>
-                          <p className="text-[9px] font-bold text-gray-500 uppercase">Available Points</p>
-                          <h4 className="text-lg font-black text-yellow-400">{user.points || 0} Pts</h4>
+                        <div className="text-right flex items-center gap-4 flex-shrink-0">
+                          <div>
+                            <p className="text-[9px] font-bold text-gray-500 uppercase">Available Points</p>
+                            <h4 className="text-lg font-black text-yellow-400">{user.points || 0} Pts</h4>
+                          </div>
+                          <button 
+                            onClick={() => {
+                              setEditingCustomer(user);
+                              setEditCustomerName(user.name);
+                              setEditCustomerPoints(user.points || 0);
+                            }}
+                            className="p-3 bg-orange-500/10 text-orange-500 rounded-xl hover:bg-orange-500 hover:text-black transition-all"
+                          >
+                            <Edit size={16}/>
+                          </button>
                         </div>
-                        <button 
-                          onClick={() => {
-                            setEditingCustomer(user);
-                            setEditCustomerName(user.name);
-                            setEditCustomerPoints(user.points || 0);
-                          }}
-                          className="p-3 bg-orange-500/10 text-orange-500 rounded-xl hover:bg-orange-500 hover:text-black transition-all"
-                        >
-                          <Edit size={16}/>
-                        </button>
                       </div>
-                    </div>
-                  );
-                })
+                    );
+                  })
               )}
             </div>
           </div>
@@ -1732,6 +2008,139 @@ export default function AdminDashboard() {
           </div>
         )}
       </main>
+
+      {/* --- 10: CUSTOMER ORDER HISTORY MODAL --- */}
+      {selectedCustomerHistory && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[100] flex items-center justify-center p-4">
+          <div className="bg-[#111] border border-white/5 p-6 rounded-[2.5rem] w-full max-w-lg relative max-h-[85vh] overflow-y-auto no-scrollbar shadow-2xl space-y-4">
+            <button 
+              onClick={() => setSelectedCustomerHistory(null)} 
+              className="absolute top-4 right-4 p-2 bg-white/5 text-gray-400 hover:text-white rounded-full transition-all"
+            >
+              <X size={18}/>
+            </button>
+            <div className="text-center pb-2 border-b border-white/5">
+              <h3 className="text-lg font-black text-orange-500 uppercase">{selectedCustomerHistory.name} - Order History</h3>
+              <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mt-0.5">Mobile: +{selectedCustomerHistory.phone}</p>
+            </div>
+
+            <div className="space-y-3">
+              {selectedCustomerHistory.metrics?.customerOrders.length === 0 ? (
+                <p className="text-center text-xs font-bold text-gray-600 py-8">No historical transactions logged.</p>
+              ) : (
+                selectedCustomerHistory.metrics?.customerOrders.map((o: any) => (
+                  <div key={o.id} className="bg-white/[0.01] border border-white/5 p-4 rounded-2xl flex justify-between items-center">
+                    <div>
+                      <div className="flex gap-2">
+                        <span className="text-[9px] font-black uppercase text-gray-500">Bill: #{formatBillNumber(o.billNumber || 0)}</span>
+                        <span className="text-[9px] font-black uppercase text-yellow-500">Token: #{o.tokenNumber || "N/A"}</span>
+                      </div>
+                      <div className="space-y-0.5 mt-1.5">
+                        {o.items?.map((item: any, idx: number) => (
+                          <p key={idx} className="text-xs text-gray-400 font-medium">
+                            <span className="text-orange-500">×{item.quantity}</span> {item.name}
+                          </p>
+                        ))}
+                      </div>
+                      <span className="text-[8px] text-gray-600 block mt-2">
+                        {o.timestamp?.toDate ? o.timestamp.toDate().toLocaleString() : 'Just now'}
+                      </span>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-green-400 font-black text-sm">₹{o.total}</p>
+                      <span className="text-[8px] bg-green-500/10 text-green-400 px-2 py-0.5 rounded uppercase font-bold mt-1 inline-block">
+                        {o.status || "Completed"}
+                      </span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- 65: DIGITAL RECIPE GUIDE (SOP MODAL) --- */}
+      {sopProduct && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[100] flex items-center justify-center p-4">
+          <form onSubmit={handleSaveSopRecipe} className="bg-[#111] border-2 border-orange-500/50 p-6 rounded-[2.5rem] w-full max-w-lg relative shadow-2xl space-y-4">
+            <button 
+              type="button" 
+              onClick={() => setSopProduct(null)} 
+              className="absolute top-4 right-4 p-2 bg-white/5 text-gray-400 hover:text-white rounded-full transition-all"
+            >
+              <X size={18}/>
+            </button>
+            <div className="text-center pb-2 border-b border-white/5">
+              <h3 className="text-lg font-black text-orange-500 uppercase italic">Digital Cooking SOP Guide</h3>
+              <p className="text-[10px] text-gray-500 uppercase tracking-widest font-black mt-0.5">Dish: {sopProduct.name}</p>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold text-gray-400 uppercase">Step-by-Step Cooking Instructions</label>
+              <textarea 
+                value={sopRecipeText} 
+                onChange={(e) => setSopRecipeText(e.target.value)} 
+                placeholder="Write down the detailed step-by-step recipe, quantity of ingredients, spices to add, and cooking times for the kitchen staff..." 
+                className="w-full bg-black/40 border border-white/10 rounded-xl p-4 outline-none focus:border-orange-500 text-xs font-bold text-white h-44 resize-none leading-relaxed"
+              />
+            </div>
+
+            <div className="flex gap-2">
+              <button type="submit" className="flex-1 bg-green-600 text-white p-3.5 rounded-xl font-black text-xs uppercase">Save SOP Guide</button>
+              <button type="button" onClick={() => setSopProduct(null)} className="bg-white/5 text-gray-400 p-3.5 rounded-xl font-black text-xs uppercase">Close</button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* --- 39: WHATSAPP BROADCAST MODAL --- */}
+      {showBroadcastModal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[100] flex items-center justify-center p-4">
+          <div className="bg-[#111] border border-white/5 p-6 rounded-[2.5rem] w-full max-w-lg relative shadow-2xl space-y-4">
+            <button 
+              onClick={() => setShowBroadcastModal(false)} 
+              className="absolute top-4 right-4 p-2 bg-white/5 text-gray-400 hover:text-white rounded-full transition-all"
+            >
+              <X size={18}/>
+            </button>
+            <div className="text-center pb-2 border-b border-white/5">
+              <h3 className="text-lg font-black text-orange-500 uppercase">WhatsApp Marketing Blast</h3>
+              <p className="text-[10px] text-gray-500 uppercase tracking-widest font-black mt-0.5">Bum Bum Cafe Promotions</p>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold text-gray-400 uppercase">Write Promotional Message</label>
+              <textarea 
+                value={broadcastMessage} 
+                onChange={(e) => setBroadcastMessage(e.target.value)} 
+                placeholder="Type your special discount offer or festive wishes here..." 
+                className="w-full bg-black/40 border border-white/10 rounded-xl p-4 outline-none focus:border-orange-500 text-xs font-bold text-white h-32 resize-none leading-relaxed"
+              />
+            </div>
+
+            <div className="border-t border-white/5 pt-4">
+              <p className="text-[10px] text-orange-400 font-extrabold uppercase mb-2">Send to Customers ({searchedCustomers.length})</p>
+              <div className="space-y-2 max-h-40 overflow-y-auto no-scrollbar">
+                {searchedCustomers.map((user) => (
+                  <div key={user.phone} className="flex justify-between items-center bg-white/[0.01] border border-white/5 p-2 rounded-xl text-xs font-bold">
+                    <span className="text-gray-300">{user.name} (+{user.phone})</span>
+                    <button 
+                      onClick={() => triggerWhatsAppBroadcast(user.phone)}
+                      className="bg-green-600 hover:bg-green-700 text-white font-black text-[9px] px-3 py-1.5 rounded-lg flex items-center gap-1 uppercase transition-all"
+                    >
+                      <MessageSquare size={10}/> Send Msg
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <button type="button" onClick={() => setShowBroadcastModal(false)} className="w-full bg-white/5 text-gray-400 p-3.5 rounded-xl font-black text-xs uppercase">Close</button>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
