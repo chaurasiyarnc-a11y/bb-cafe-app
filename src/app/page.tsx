@@ -885,8 +885,9 @@ export default function BbCafeHome() {
   if (!mounted) return null;
 
   return (
-    // overflow-x-clip prevents scroll breaks with position: sticky
-    <div className="bg-[#050505] min-h-screen text-white pb-32 font-sans relative overflow-x-clip">
+    // overflow-x-clip avoids breaking position: sticky scroll container
+    // dark:bg and bg classes enable system light/dark mode support smoothly
+    <div className="dark:bg-[#050505] bg-gray-50 min-h-screen dark:text-white text-gray-900 pb-32 font-sans relative overflow-x-clip transition-colors duration-200">
       <Toaster position="top-center" />
       
       <style dangerouslySetInnerHTML={{ __html: `
@@ -941,8 +942,8 @@ export default function BbCafeHome() {
         </div>
       </header>
 
-      {/* FIXED STICKY SEARCH BAR (Stops at viewport top perfectly) */}
-      <div className="sticky top-0 z-50 bg-[#050505] py-3 px-4 border-b border-white/10 shadow-md">
+      {/* FIXED STICKY SEARCH BAR (Adapts smoothly to light/dark themes) */}
+      <div className="sticky top-0 z-50 dark:bg-[#050505] bg-white py-3 px-4 border-b dark:border-white/10 border-gray-200 shadow-md transition-colors duration-200">
         <div className="relative max-w-sm mx-auto">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
           <input 
@@ -950,7 +951,7 @@ export default function BbCafeHome() {
             placeholder="Search pizza, thali, paneer special..." 
             value={searchQuery} 
             onChange={(e) => setSearchQuery(e.target.value)} 
-            className="w-full bg-white text-black py-2.5 px-11 rounded-xl outline-none text-xs font-semibold placeholder-gray-500" 
+            className="w-full dark:bg-neutral-800 bg-gray-100 dark:text-white text-gray-900 py-2.5 px-11 rounded-xl outline-none text-xs font-semibold dark:placeholder-gray-400 placeholder-gray-500 border dark:border-neutral-700 border-gray-200 transition-colors duration-200" 
           />
         </div>
       </div>
@@ -1001,13 +1002,9 @@ export default function BbCafeHome() {
           </div>
         )}
 
-        {/* PERSONALIZED GREETING BANNER (Clean Text, No Background Box) */}
-        <div className="px-1.5 py-1 flex items-center justify-between">
-          <div className="space-y-0.5">
-            <p className="text-[8px] text-orange-500 font-extrabold uppercase tracking-wider leading-none">BUM BUM CAFE GREETING</p>
-            <h3 className="text-xs font-bold text-gray-200">{greetingText}</h3>
-          </div>
-          <Sparkles className="text-yellow-400 animate-pulse flex-shrink-0 ml-2" size={15} />
+        {/* PERSONALIZED GREETING BANNER (Clean Text, No Background Box as requested) */}
+        <div className="px-1.5 py-1">
+          <h3 className="text-xs font-bold dark:text-gray-200 text-gray-700 leading-normal">{greetingText}</h3>
         </div>
         
         {/* Animated & Sliding Promotional Banner */}
@@ -1099,7 +1096,7 @@ export default function BbCafeHome() {
                 <motion.div 
                   layout 
                   key={item.id} 
-                  className="bg-white/[0.02] rounded-2xl border border-white/5 overflow-hidden flex flex-col relative"
+                  className="dark:bg-white/[0.02] bg-white rounded-2xl border dark:border-white/5 border-gray-200 overflow-hidden flex flex-col relative shadow-sm transition-colors duration-200"
                   initial={{ opacity: 0, y: 30 }}
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true, margin: "-50px" }}
@@ -1125,18 +1122,18 @@ export default function BbCafeHome() {
                   </div>
                   <div className="p-4 flex flex-col justify-between flex-1">
                     <div className="flex justify-between items-start gap-4">
-                      <h4 className="font-black text-sm text-gray-100 line-clamp-1">{item.name}</h4>
+                      <h4 className="font-black text-sm dark:text-gray-100 text-gray-800 line-clamp-1">{item.name}</h4>
                       <div className="bg-green-600 text-white font-extrabold text-[9px] px-2 py-0.5 rounded flex items-center gap-0.5">
                         <span>4.7</span><span className="text-[8px]">★</span>
                       </div>
                     </div>
-                    <div className="flex justify-between items-center text-[9px] text-gray-400 font-bold mt-0.5">
-                      <p className="uppercase text-[8px] text-gray-500">{item.category}</p><p>• 15-25 min</p>
+                    <div className="flex justify-between items-center text-[9px] dark:text-gray-400 text-gray-500 font-bold mt-0.5">
+                      <p className="uppercase text-[8px] dark:text-gray-500 text-gray-400">{item.category}</p><p>• 15-25 min</p>
                     </div>
-                    <div className="h-px bg-white/5 my-2.5" />
+                    <div className="h-px dark:bg-white/5 bg-gray-100 my-2.5" />
                     <div className="flex justify-between items-end mt-0.5">
                       <div>
-                        <p className="text-gray-500 text-[8px] font-black uppercase tracking-widest leading-none mb-1">Price</p>
+                        <p className="dark:text-gray-500 text-gray-400 text-[8px] font-black uppercase tracking-widest leading-none mb-1">Price</p>
                         <p className="text-orange-500 font-black text-base leading-none">{getDisplayPrice(item)}</p>
                         {item.variants && <span className="text-[8px] font-bold text-gray-400 mt-1 block">Options available</span>}
                       </div>
@@ -1161,7 +1158,7 @@ export default function BbCafeHome() {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
             {PERMANENT_REVIEWS.map((r) => (
-              <div key={r.id} className="bg-white/[0.02] border border-white/5 p-4 rounded-2xl space-y-2">
+              <div key={r.id} className="dark:bg-white/[0.02] bg-white border dark:border-white/5 border-gray-200 p-4 rounded-2xl space-y-2 shadow-sm transition-colors duration-200">
                 <div className="flex justify-between items-center">
                   <h4 className="font-black text-xs text-orange-500">{r.name}</h4>
                   <div className="flex items-center gap-0.5 text-yellow-400">
@@ -1170,7 +1167,7 @@ export default function BbCafeHome() {
                     ))}
                   </div>
                 </div>
-                <p className="text-[10px] text-gray-300 italic leading-relaxed">"{r.comment}"</p>
+                <p className="text-[10px] dark:text-gray-300 text-gray-600 italic leading-relaxed">"{r.comment}"</p>
               </div>
             ))}
           </div>
@@ -1178,7 +1175,7 @@ export default function BbCafeHome() {
 
         {/* FOOTER */}
         <footer className="pt-8 border-t border-white/5 space-y-6">
-          <div className="bg-gradient-to-br from-green-950/20 to-emerald-900/10 p-6 rounded-[2rem] border border-green-500/10 relative overflow-hidden">
+          <div className="bg-gradient-to-br dark:from-green-950/20 dark:to-emerald-900/10 from-green-50 to-emerald-50/50 p-6 rounded-[2rem] border dark:border-green-500/10 border-green-200/50 relative overflow-hidden transition-colors duration-200">
             <div className="absolute top-0 right-0 w-24 h-24 bg-green-500/5 rounded-full blur-2xl" />
             
             <div className="text-center space-y-3 relative z-10">
@@ -1186,23 +1183,23 @@ export default function BbCafeHome() {
               <h4 className="text-xl font-black italic text-yellow-300 tracking-tight font-serif">BUM BUM CAFE</h4>
               <p className="text-[11px] font-bold text-green-300">जहाँ स्वाद और सुकून मिलते हैं! ✨</p>
               
-              <p className="text-[11px] text-gray-300 leading-relaxed max-w-sm mx-auto font-medium">
+              <p className="text-[11px] dark:text-gray-300 text-gray-600 leading-relaxed max-w-sm mx-auto font-medium">
                 हमने BAM BAM CAFE की शुरुआत एक छोटे से सपने के साथ की थी—लोगों को घर जैसा स्वाद और कैफे वाला माहौल देने के लिए। यहाँ हर कप कॉफी और हर स्लाइस पिज्जा प्यार और शुद्धता के साथ बनाया जाता है। हमारी कोशिश है कि आप जब भी यहाँ आएँ, एक प्यारी मुस्कान के साथ वापस जाएँ। ❤️
               </p>
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3 text-center text-[10px] font-black uppercase">
-            <div className="bg-white/[0.02] border border-white/5 p-4 rounded-2xl flex flex-col items-center justify-center space-y-1">
+            <div className="dark:bg-white/[0.02] bg-white border dark:border-white/5 border-gray-200 p-4 rounded-2xl flex flex-col items-center justify-center space-y-1 shadow-sm transition-colors duration-200">
               <Clock className="text-orange-500" size={16} />
-              <p className="text-gray-400 text-[8px]">Open Timing</p>
-              <p className="text-white text-[9px]">सुबह 10:00 से रात 11:00 बजे</p>
+              <p className="dark:text-gray-400 text-gray-500 text-[8px]">Open Timing</p>
+              <p className="dark:text-white text-gray-800 text-[9px]">सुबह 10:00 से रात 11:00 बजे</p>
             </div>
             
-            <a href="https://maps.app.goo.gl/8pj1Xby3bbMn5qxu5" target="_blank" rel="noreferrer" className="bg-white/[0.02] border border-white/5 p-4 rounded-2xl flex flex-col items-center justify-center space-y-1 hover:border-orange-500/30 transition-all">
+            <a href="https://maps.app.goo.gl/8pj1Xby3bbMn5qxu5" target="_blank" rel="noreferrer" className="dark:bg-white/[0.02] bg-white border dark:border-white/5 border-gray-200 p-4 rounded-2xl flex flex-col items-center justify-center space-y-1 hover:border-orange-500/30 shadow-sm transition-all duration-200">
               <MapPin className="text-green-500 animate-bounce" size={16} />
-              <p className="text-gray-400 text-[8px]">Our Location</p>
-              <p className="text-yellow-400 text-[9px] underline">Google Map 🗺️</p>
+              <p className="dark:text-gray-400 text-gray-500 text-[8px]">Our Location</p>
+              <p className="text-yellow-600 dark:text-yellow-400 text-[9px] underline">Google Map 🗺️</p>
             </a>
           </div>
 
@@ -1226,14 +1223,14 @@ export default function BbCafeHome() {
               </div>
               <div className="space-y-4">
                 {(reviews.length === 0 ? PERMANENT_REVIEWS : reviews).map((r: any) => (
-                  <div key={r.id} className="bg-white/[0.03] border border-white/5 rounded-2xl p-5 space-y-2 shadow">
+                  <div key={r.id} className="dark:bg-white/[0.03] bg-white border dark:border-white/5 border-gray-200 rounded-2xl p-5 space-y-2 shadow-sm transition-colors duration-200">
                     <div className="flex justify-between items-center">
                       <h4 className="font-black text-xs text-orange-500">{r.name}</h4>
                       <div className="flex items-center gap-1 text-yellow-400 bg-yellow-500/10 px-2 py-0.5 rounded text-[9px]">
                         <Star size={8} fill="currentColor"/><span className="font-extrabold">{r.rating}</span>
                       </div>
                     </div>
-                    <p className="text-[11px] text-gray-300 italic">"{r.comment}"</p>
+                    <p className="text-[11px] dark:text-gray-300 text-gray-600 italic">"{r.comment}"</p>
                   </div>
                 ))}
               </div>
@@ -1248,12 +1245,12 @@ export default function BbCafeHome() {
       <AnimatePresence>
         {isReviewFormOpen && (
           <div className="fixed inset-0 bg-black/95 z-[200] flex items-center justify-center p-6">
-            <form onSubmit={handleReviewSubmit} className="bg-[#111] w-full max-w-md p-6 rounded-3xl border border-white/10 text-center space-y-4">
+            <form onSubmit={handleReviewSubmit} className="dark:bg-[#111] bg-white w-full max-w-md p-6 rounded-3xl border dark:border-white/10 border-gray-200 text-center space-y-4 shadow-xl transition-colors duration-200">
               <h3 className="text-xl font-black text-orange-500 uppercase italic">Your Feedback</h3>
               <div className="space-y-3 text-left">
                 <div>
                   <label className="text-[9px] font-black uppercase text-gray-500">Your Name</label>
-                  <input type="text" placeholder="Enter your name..." value={reviewName} onChange={(e) => setReviewName(e.target.value)} required className="w-full bg-white/5 border border-white/10 p-3 rounded-lg text-xs text-white focus:border-orange-500 outline-none" />
+                  <input type="text" placeholder="Enter your name..." value={reviewName} onChange={(e) => setReviewName(e.target.value)} required className="w-full dark:bg-white/5 bg-gray-50 border dark:border-white/10 border-gray-200 p-3 rounded-lg text-xs dark:text-white text-gray-900 focus:border-orange-500 outline-none" />
                 </div>
                 <div>
                   <label className="text-[9px] font-black uppercase text-gray-500">Rating</label>
@@ -1272,7 +1269,7 @@ export default function BbCafeHome() {
                         type="button"
                         key={suggestion}
                         onClick={() => setReviewComment(suggestion)}
-                        className="bg-white/5 border border-white/10 hover:border-orange-500/50 px-2 py-1 rounded-full text-[9px] text-gray-300 font-bold transition-all text-left"
+                        className="dark:bg-white/5 bg-gray-100 border dark:border-white/10 border-gray-200 hover:border-orange-500/50 px-2 py-1 rounded-full text-[9px] dark:text-gray-300 text-gray-700 font-bold transition-all text-left"
                       >
                         {suggestion}
                       </button>
@@ -1282,12 +1279,12 @@ export default function BbCafeHome() {
 
                 <div>
                   <label className="text-[9px] font-black uppercase text-gray-500">Comments</label>
-                  <textarea placeholder="Khana kaisa laga?..." value={reviewComment} onChange={(e) => setReviewComment(e.target.value)} required rows={3} className="w-full bg-white/5 border border-white/10 p-3 rounded-lg text-xs text-white focus:border-orange-500 outline-none resize-none" />
+                  <textarea placeholder="Khana kaisa laga?..." value={reviewComment} onChange={(e) => setReviewComment(e.target.value)} required rows={3} className="w-full dark:bg-white/5 bg-gray-50 border dark:border-white/10 border-gray-200 p-3 rounded-lg text-xs dark:text-white text-gray-900 focus:border-orange-500 outline-none resize-none" />
                 </div>
               </div>
               <div className="flex gap-2 pt-1">
                 <button type="submit" className="flex-1 bg-orange-500 text-black font-black p-3 rounded-lg text-xs uppercase">SUBMIT</button>
-                <button type="button" onClick={() => setIsReviewFormOpen(false)} className="bg-white/5 text-gray-400 font-bold p-3 rounded-lg text-xs">CANCEL</button>
+                <button type="button" onClick={() => setIsReviewFormOpen(false)} className="dark:bg-white/5 bg-gray-100 dark:text-gray-400 text-gray-600 font-bold p-3 rounded-lg text-xs">CANCEL</button>
               </div>
             </form>
           </div>
@@ -1297,7 +1294,7 @@ export default function BbCafeHome() {
       <AnimatePresence>
         {selectedProduct && (
           <div className="fixed inset-0 bg-black/95 z-[100] flex items-end">
-            <motion.div initial={{ y: 300 }} animate={{ y: 0 }} exit={{ y: 300 }} className="bg-[#111] w-full p-6 rounded-t-3xl border-t border-white/10 max-w-lg mx-auto overflow-y-auto max-h-[90vh]">
+            <motion.div initial={{ y: 300 }} animate={{ y: 0 }} exit={{ y: 300 }} className="dark:bg-[#111] bg-white w-full p-6 rounded-t-3xl border-t dark:border-white/10 border-gray-200 max-w-lg mx-auto overflow-y-auto max-h-[90vh] shadow-2xl transition-colors duration-200">
               <div className="w-12 h-1 bg-white/15 rounded-full mx-auto mb-4" />
               <h3 className="text-xl font-black text-center">{selectedProduct?.name}</h3>
               <p className="text-orange-500 font-black mb-4 uppercase text-[8px] text-center">Customize Your Order</p>
@@ -1310,10 +1307,10 @@ export default function BbCafeHome() {
                       type="button" 
                       key={size} 
                       onClick={() => { setChosenSize(size); setChosenPrice(Number(price)); }} 
-                      className={`p-3 rounded-xl flex flex-col items-center border transition-all ${chosenSize.toLowerCase() === size.toLowerCase() ? 'bg-orange-500/10 border-orange-500 text-orange-500' : 'bg-white/[0.03] border-white/5 text-gray-400'}`}
+                      className={`p-3 rounded-xl flex flex-col items-center border transition-all ${chosenSize.toLowerCase() === size.toLowerCase() ? 'bg-orange-500/10 border-orange-500 text-orange-500' : 'dark:bg-white/[0.03] bg-gray-50 dark:border-white/5 border-gray-200 dark:text-gray-400 text-gray-600'}`}
                     >
                       <span className="capitalize text-xs font-black">{size}</span>
-                      <span className="font-extrabold text-[10px] mt-1 text-white">₹{price}</span>
+                      <span className="font-extrabold text-[10px] mt-1 dark:text-white text-gray-800">₹{price}</span>
                     </button>
                   ))}
                 </div>
@@ -1330,7 +1327,7 @@ export default function BbCafeHome() {
                           type="button"
                           key={addon}
                           onClick={() => setPizzaAddons(prev => ({ ...prev, [addon]: !prev[addon] }))}
-                          className={`p-2.5 rounded-xl border flex justify-between items-center text-[9px] font-bold ${isSelected ? 'border-orange-500 bg-orange-500/5 text-orange-400' : 'border-white/5 bg-white/[0.02] text-gray-300'}`}
+                          className={`p-2.5 rounded-xl border flex justify-between items-center text-[9px] font-bold ${isSelected ? 'border-orange-500 bg-orange-500/5 text-orange-400' : 'dark:border-white/5 border-gray-200 dark:bg-white/[0.02] bg-gray-50 dark:text-gray-300 text-gray-600'}`}
                         >
                           <span>{addon}</span>
                           <span className="text-orange-400 font-black">+₹{cost}</span>
@@ -1344,11 +1341,11 @@ export default function BbCafeHome() {
               <button type="button" onClick={handleAddToCart} className="w-full bg-orange-500 text-black p-4 rounded-xl font-black text-xs uppercase">
                 Confirm Add To Cart
               </button>
-              <button type="button" onClick={() => { setSelectedProduct(null); setChosenSize(""); setChosenPrice(0); }} className="w-full mt-3 text-gray-500 font-black text-[10px] text-center uppercase">Close</button>
+              <button type="button" onClick={() => { setSelectedProduct(null); setChosenSize(""); setChosenPrice(0); }} className="w-full mt-3 dark:text-gray-500 text-gray-400 font-black text-[10px] text-center uppercase">Close</button>
             </motion.div>
           </div>
         )}
-      </AnimatePresence>
+      </  AnimatePresence>
 
       {/* CART DRAWER MODAL */}
       <AnimatePresence>
@@ -1358,23 +1355,23 @@ export default function BbCafeHome() {
               initial={{ y: "100%" }} 
               animate={{ y: 0 }} 
               exit={{ y: "100%" }} 
-              className="bg-[#0b0c10] w-full h-[90vh] rounded-t-3xl border-t border-white/10 overflow-y-auto pb-32 p-5 max-w-lg mx-auto relative shadow-2xl"
+              className="dark:bg-[#0b0c10] bg-white w-full h-[90vh] rounded-t-3xl border-t dark:border-white/10 border-gray-200 overflow-y-auto pb-32 p-5 max-w-lg mx-auto relative shadow-2xl transition-colors duration-200"
             >
               <div className="w-12 h-1 bg-white/15 rounded-full mx-auto mb-4" />
               <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-black text-white font-mono">Your Order Cart</h2>
-                <button onClick={() => { setIsCartOpen(false); }} className="p-2.5 bg-white/5 hover:bg-white/10 text-white rounded-full transition-all"><X size={20} /></button>
+                <h2 className="text-2xl font-black dark:text-white text-gray-900 font-mono">Your Order Cart</h2>
+                <button onClick={() => { setIsCartOpen(false); }} className="p-2.5 dark:bg-white/5 bg-gray-100 hover:dark:bg-white/10 hover:bg-gray-200 dark:text-white text-gray-800 rounded-full transition-all"><X size={20} /></button>
               </div>
 
               {cart.map((item: any) => (
-                <div key={item.id} className="flex justify-between items-center bg-white/[0.02] p-4 rounded-2xl mb-3 border border-white/5">
+                <div key={item.id} className="flex justify-between items-center dark:bg-white/[0.02] bg-white p-4 rounded-2xl mb-3 border dark:border-white/5 border-gray-200 shadow-sm transition-colors duration-200">
                   <div className="min-w-0 pr-3">
-                    <h4 className="font-bold text-xs text-gray-100 truncate">{item?.name || "Item"}</h4>
+                    <h4 className="font-bold text-xs dark:text-gray-100 text-gray-800 truncate">{item?.name || "Item"}</h4>
                     <p className="text-orange-500 font-black mt-1 text-[11px]">₹{item?.price || 0}</p>
                   </div>
                   <div className="flex items-center gap-2 bg-black/40 px-2 py-1 rounded-xl border border-white/10 flex-shrink-0">
                     <button onClick={() => removeItem(item.id)} className="w-6 h-6 flex items-center justify-center bg-red-500/10 text-red-500 rounded text-sm font-black">-</button>
-                    <span className="font-black text-xs px-1 text-white">{item.quantity}</span>
+                    <span className="font-black text-xs px-1 dark:text-white text-gray-800">{item.quantity}</span>
                     {item.isReward ? (
                       <button disabled className="w-6 h-6 flex items-center justify-center bg-white/5 text-gray-600 rounded text-sm font-black cursor-not-allowed">+</button>
                     ) : (
@@ -1396,16 +1393,16 @@ export default function BbCafeHome() {
                   <p className="text-[8px] text-gray-400 font-bold">*Mohandra Town is free delivery above ₹99. Nearby Areas limit is active.</p>
                 </div>
 
-                <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-4 space-y-2">
+                <div className="dark:bg-white/[0.02] bg-gray-50 border dark:border-white/5 border-gray-200 rounded-2xl p-4 space-y-2 transition-colors duration-200">
                   <p className="text-[9px] font-black uppercase text-gray-400">Add Extra condiments to order:</p>
                   <div className="grid grid-cols-3 gap-2">
-                    <button onClick={() => setKetchupAddon(!ketchupAddon)} className={`p-2 rounded-xl border text-[9px] font-black ${ketchupAddon ? 'border-red-500 bg-red-500/5 text-red-400' : 'border-white/5 bg-transparent text-gray-400'}`}>
+                    <button onClick={() => setKetchupAddon(!ketchupAddon)} className={`p-2 rounded-xl border text-[9px] font-black ${ketchupAddon ? 'border-red-500 bg-red-500/5 text-red-400' : 'dark:border-white/5 border-gray-200 bg-transparent dark:text-gray-400 text-gray-500'}`}>
                       Ketchup (+₹10)
                     </button>
-                    <button onClick={() => setOreganoAddon(!oreganoAddon)} className={`p-2 rounded-xl border text-[9px] font-black ${oreganoAddon ? 'border-yellow-500 bg-yellow-500/5 text-yellow-400' : 'border-white/5 bg-transparent text-gray-400'}`}>
+                    <button onClick={() => setOreganoAddon(!oreganoAddon)} className={`p-2 rounded-xl border text-[9px] font-black ${oreganoAddon ? 'border-yellow-500 bg-yellow-500/5 text-yellow-400' : 'dark:border-white/5 border-gray-200 bg-transparent dark:text-gray-400 text-gray-500'}`}>
                       Oregano (+₹10)
                     </button>
-                    <button onClick={() => setChiliFlakesAddon(!chiliFlakesAddon)} className={`p-2 rounded-xl border text-[9px] font-black ${chiliFlakesAddon ? 'border-orange-500 bg-orange-500/5 text-orange-400' : 'border-white/5 bg-transparent text-gray-400'}`}>
+                    <button onClick={() => setChiliFlakesAddon(!chiliFlakesAddon)} className={`p-2 rounded-xl border text-[9px] font-black ${chiliFlakesAddon ? 'border-orange-500 bg-orange-500/5 text-orange-400' : 'dark:border-white/5 border-gray-200 bg-transparent dark:text-gray-400 text-gray-500'}`}>
                       Chili Flakes (+₹10)
                     </button>
                   </div>
@@ -1428,7 +1425,7 @@ export default function BbCafeHome() {
                   </div>
                 )}
 
-                <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-4 space-y-2">
+                <div className="dark:bg-white/[0.02] bg-gray-50 border dark:border-white/5 border-gray-200 rounded-2xl p-4 space-y-2 transition-colors duration-200">
                   <label className="text-[9px] font-black uppercase text-gray-400">Select Delivery Zone (KM):</label>
                   <div className="grid grid-cols-2 gap-2">
                     {DELIVERY_AREAS.map((area) => {
@@ -1441,7 +1438,7 @@ export default function BbCafeHome() {
                           className={`p-3 rounded-xl border text-left flex flex-col justify-between transition-all duration-200 active:scale-95 ${
                             isSelected 
                               ? 'border-orange-500 bg-orange-500/10 text-orange-400 shadow-md' 
-                              : 'border-white/5 bg-white/[0.01] text-gray-300 hover:border-white/10'
+                              : 'dark:border-white/5 border-gray-200 dark:bg-white/[0.01] bg-gray-50 dark:text-gray-300 text-gray-600 hover:border-gray-300 hover:dark:border-white/10'
                           }`}
                         >
                           <span className="text-[9px] font-black leading-tight uppercase truncate">{area.name.replace("Mohandra ", "")}</span>
@@ -1455,7 +1452,7 @@ export default function BbCafeHome() {
                   </div>
                 </div>
 
-                <div className="bg-green-950/10 border border-green-500/10 rounded-2xl p-4 flex justify-between items-center">
+                <div className="dark:bg-green-950/10 bg-green-50/50 border dark:border-green-500/10 border-green-200/50 rounded-2xl p-4 flex justify-between items-center transition-colors duration-200">
                   <div className="space-y-0.5">
                     <p className="text-[10px] font-black text-green-400 uppercase tracking-tight">🌱 Eco-Friendly Packaging</p>
                     <p className="text-[8px] text-gray-400 font-bold">चम्मच / टिश्यू पेपर की आवश्यकता नहीं है</p>
@@ -1464,7 +1461,7 @@ export default function BbCafeHome() {
                 </div>
 
                 {customerDetails && (
-                  <div className="bg-yellow-400/5 border border-yellow-400/20 rounded-2xl p-4 space-y-3">
+                  <div className="dark:bg-yellow-400/5 bg-yellow-400/10 border dark:border-yellow-400/20 border-yellow-400/30 rounded-2xl p-4 space-y-3 transition-colors duration-200">
                     <div className="flex justify-between items-center border-b border-white/5 pb-2">
                       <div className="flex items-center gap-1 text-yellow-400 font-black text-[10px] uppercase"><Gift size={12}/> <span>LOYALTY CLUB</span></div>
                       <span className={`text-[8px] font-black border px-2 py-0.5 rounded-full ${getCustomerTier(customerPoints).color}`}>
@@ -1474,7 +1471,7 @@ export default function BbCafeHome() {
                     
                     <div className="flex justify-between items-center">
                       <div>
-                        <h4 className="text-2xl font-black text-white">{customerPoints} <span className="text-[9px] text-gray-500 font-bold uppercase">Points</span></h4>
+                        <h4 className="text-2xl font-black dark:text-white text-gray-800">{customerPoints} <span className="text-[9px] text-gray-500 font-bold uppercase">Points</span></h4>
                         <p className="text-[8px] text-gray-400">Spend ₹100 = Get 1 Point!</p>
                       </div>
                       <div className="text-right text-[8px] text-yellow-400 font-black space-y-0.5 uppercase max-h-20 overflow-y-auto no-scrollbar">
@@ -1513,10 +1510,10 @@ export default function BbCafeHome() {
                   </div>
                 )}
 
-                <div className="bg-white/[0.02] border border-white/5 p-4 rounded-2xl space-y-2">
+                <div className="dark:bg-white/[0.02] bg-gray-50 border dark:border-white/5 border-gray-200 p-4 rounded-2xl space-y-2 transition-colors duration-200">
                   <div className="flex items-center gap-1.5 text-orange-500 font-black text-[10px] uppercase"><Percent size={14}/> <span>Have a promo code?</span></div>
                   <div className="flex gap-2">
-                    <input type="text" placeholder="e.g. WELCOME" value={enteredCoupon} onChange={(e) => setEnteredCoupon(e.target.value)} className="flex-1 bg-black/40 border border-white/10 rounded-lg p-2 text-xs text-white uppercase" />
+                    <input type="text" placeholder="e.g. WELCOME" value={enteredCoupon} onChange={(e) => setEnteredCoupon(e.target.value)} className="flex-1 dark:bg-black/40 bg-white border dark:border-white/10 border-gray-200 rounded-lg p-2 text-xs dark:text-white text-gray-900 uppercase" />
                     <button type="button" onClick={handleApplyCoupon} className="bg-orange-500 text-black font-black text-[10px] p-2 px-4 rounded-lg">APPLY</button>
                   </div>
                   {appliedCoupon && (
@@ -1528,7 +1525,7 @@ export default function BbCafeHome() {
                 </div>
 
                 {customerDetails ? (
-                  <div className="bg-white/[0.02] p-4 rounded-2xl border border-white/5 flex justify-between items-center">
+                  <div className="dark:bg-white/[0.02] bg-gray-50 p-4 rounded-2xl border dark:border-white/5 border-gray-200 flex justify-between items-center transition-colors duration-200">
                     <div>
                       <p className="text-[8px] text-gray-500 font-black uppercase">Ordering As</p>
                       <h4 className="font-black text-xs text-orange-500">{customerDetails.name}</h4>
@@ -1540,12 +1537,12 @@ export default function BbCafeHome() {
                   <button onClick={() => setIsLoginOpen(true)} className="w-full p-4 bg-orange-500/10 text-orange-400 border border-orange-500/20 rounded-2xl font-black text-xs uppercase">👤 Add Name & Phone To Order</button>
                 )}
 
-                <div className="bg-white/[0.02] p-4 rounded-2xl border border-white/5 space-y-2">
+                <div className="dark:bg-white/[0.02] bg-gray-50 p-4 rounded-2xl border dark:border-white/5 border-gray-200 space-y-2 transition-colors duration-200">
                   <div className="flex items-center gap-1.5 text-orange-500"><MapPin size={14}/> <h3 className="font-black uppercase text-[10px]">Delivery Address</h3></div>
                   <div className="flex justify-between items-center mb-1">
                     <button type="button" onClick={handleDetectLocation} className="text-[8px] bg-green-600 text-white font-black px-2 py-1 rounded flex items-center gap-1 shadow-sm uppercase">📍 Detect Location</button>
                   </div>
-                  <textarea placeholder="Ghar ka address, Landmark ke saath..." value={address} onChange={(e) => setAddress(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs font-semibold text-white resize-none h-16 outline-none" />
+                  <textarea placeholder="Ghar ka address, Landmark ke saath..." value={address} onChange={(e) => setAddress(e.target.value)} className="w-full dark:bg-black/40 bg-white border dark:border-white/10 border-gray-200 rounded-xl p-3 text-xs font-semibold dark:text-white text-gray-900 resize-none h-16 outline-none" />
                 </div>
 
                 <div className="bg-gradient-to-b from-orange-600 to-orange-700 p-5 rounded-2xl text-white">
@@ -1593,7 +1590,7 @@ export default function BbCafeHome() {
       <AnimatePresence>
         {isLoginOpen && (
           <div className="fixed inset-0 bg-black/95 z-[200] flex items-center justify-center p-6">
-            <form onSubmit={handleSaveDetails} className="bg-[#111] w-full max-w-md p-6 rounded-3xl border border-white/10 text-center space-y-4">
+            <form onSubmit={handleSaveDetails} className="dark:bg-[#111] bg-white w-full max-w-md p-6 rounded-3xl border dark:border-white/10 border-gray-200 text-center space-y-4 shadow-xl transition-colors duration-200">
               <User className="mx-auto text-orange-500" size={36} />
               <div>
                 <h2 className="text-xl font-black mb-0.5">Your Details</h2>
@@ -1602,15 +1599,15 @@ export default function BbCafeHome() {
               <div className="space-y-3 text-left">
                 <div className="space-y-1">
                   <label className="text-[9px] font-bold text-gray-500 uppercase">Your Name</label>
-                  <input type="text" placeholder="Enter your name..." value={tempName} onChange={(e) => setTempName(e.target.value)} className="w-full bg-white/5 border border-white/10 p-3 rounded-xl font-bold text-white outline-none focus:border-orange-500 text-xs" required />
+                  <input type="text" placeholder="Enter your name..." value={tempName} onChange={(e) => setTempName(e.target.value)} className="w-full dark:bg-white/5 bg-gray-50 border dark:border-white/10 border-gray-200 p-3 rounded-xl font-bold dark:text-white text-gray-900 outline-none focus:border-orange-500 text-xs" required />
                 </div>
                 <div className="space-y-1">
                   <label className="text-[9px] font-bold text-gray-500 uppercase">Mobile Number</label>
-                  <input type="tel" maxLength={10} placeholder="10-digit Phone Number" value={tempPhone} onChange={(e) => setTempPhone(e.target.value)} className="w-full bg-white/5 border border-white/10 p-3 rounded-xl font-bold text-white outline-none focus:border-orange-500 text-xs" required />
+                  <input type="tel" maxLength={10} placeholder="10-digit Phone Number" value={tempPhone} onChange={(e) => setTempPhone(e.target.value)} className="w-full dark:bg-white/5 bg-gray-50 border dark:border-white/10 border-gray-200 p-3 rounded-xl font-bold dark:text-white text-gray-900 outline-none focus:border-orange-500 text-xs" required />
                 </div>
                 <div className="space-y-1">
                   <label className="text-[9px] font-bold text-gray-500 uppercase">Referral Code (Optional)</label>
-                  <input type="text" placeholder="Enter invite code..." value={tempRefCode} onChange={(e) => setTempRefCode(e.target.value)} className="w-full bg-white/5 border border-white/10 p-3 rounded-xl font-bold text-white outline-none focus:border-orange-500 text-xs" />
+                  <input type="text" placeholder="Enter invite code..." value={tempRefCode} onChange={(e) => setTempRefCode(e.target.value)} className="w-full dark:bg-white/5 bg-gray-50 border dark:border-white/10 border-gray-200 p-3 rounded-xl font-bold dark:text-white text-gray-900 outline-none focus:border-orange-500 text-xs" />
                 </div>
               </div>
               <button type="submit" className="w-full bg-orange-500 text-black p-4 rounded-xl font-black text-xs uppercase">PROCEED TO ORDER</button>
@@ -1623,7 +1620,7 @@ export default function BbCafeHome() {
       <AnimatePresence>
         {isGiftModalOpen && (
           <div className="fixed inset-0 bg-black/95 z-[260] flex items-center justify-center p-6">
-            <motion.form onSubmit={handleGiftPoints} className="bg-[#111] w-full max-w-md p-6 rounded-3xl border border-white/10 text-center space-y-4">
+            <motion.form onSubmit={handleGiftPoints} className="dark:bg-[#111] bg-white w-full max-w-md p-6 rounded-3xl border dark:border-white/10 border-gray-200 text-center space-y-4 shadow-xl transition-colors duration-200">
               <Gift className="mx-auto text-yellow-400" size={32} />
               <div>
                 <h3 className="text-lg font-black text-yellow-400 uppercase italic">Gift Loyalty Points</h3>
@@ -1632,11 +1629,11 @@ export default function BbCafeHome() {
               <div className="space-y-3 text-left">
                 <div className="space-y-1">
                   <label className="text-[9px] font-black uppercase text-gray-500">Friend's Phone Number</label>
-                  <input type="tel" maxLength={10} placeholder="e.g. 9876543210" value={giftPhone} onChange={(e) => setGiftPhone(e.target.value)} required className="w-full bg-white/5 border border-white/10 p-3 rounded-xl text-xs font-bold text-white outline-none text-center" />
+                  <input type="tel" maxLength={10} placeholder="e.g. 9876543210" value={giftPhone} onChange={(e) => setGiftPhone(e.target.value)} required className="w-full dark:bg-white/5 bg-gray-50 border dark:border-white/10 border-gray-200 p-3 rounded-xl text-xs font-bold dark:text-white text-gray-900 outline-none text-center" />
                 </div>
                 <div className="space-y-1">
                   <label className="text-[9px] font-black uppercase text-gray-500">Points to Gift (Your Pts: {customerPoints})</label>
-                  <input type="number" placeholder="e.g. 10" value={giftPointsAmount} onChange={(e) => setGiftPointsAmount(e.target.value === "" ? "" : Number(e.target.value))} required className="w-full bg-white/5 border border-white/10 p-3 rounded-xl text-xs font-bold text-white outline-none text-center" />
+                  <input type="number" placeholder="e.g. 10" value={giftPointsAmount} onChange={(e) => setGiftPointsAmount(e.target.value === "" ? "" : Number(e.target.value))} required className="w-full dark:bg-white/5 bg-gray-50 border dark:border-white/10 border-gray-200 p-3 rounded-xl text-xs font-bold dark:text-white text-gray-900 outline-none text-center" />
                 </div>
               </div>
               <div className="flex gap-2">
@@ -1653,34 +1650,34 @@ export default function BbCafeHome() {
       <AnimatePresence>
         {isSocialsOpen && (
           <div className="fixed inset-0 bg-black/95 z-[250] flex items-center justify-center p-6">
-            <motion.div className="bg-[#111] w-full max-w-md p-6 rounded-3xl border border-white/10 text-center space-y-4">
+            <motion.div className="dark:bg-[#111] bg-white w-full max-w-md p-6 rounded-3xl border dark:border-white/10 border-gray-200 text-center space-y-4 shadow-xl transition-colors duration-200">
               <div>
                 <h3 className="text-xl font-black text-orange-500 uppercase italic">Connect & Earn Points</h3>
                 <p className="text-[8px] text-gray-500 font-bold uppercase tracking-wider">हर प्लेटफार्म पर फॉलो/सब्सक्राइब करने का +1 पॉइंट पाएं!</p>
               </div>
               <div className="space-y-2 text-left max-h-[22rem] overflow-y-auto no-scrollbar pr-1">
-                <button onClick={() => handleSocialClick('whatsapp_msg', 'https://wa.me/919714293759')} className="w-full flex items-center justify-between bg-green-500/10 border border-green-500/20 p-3 rounded-xl">
-                  <span className="text-[10px] font-black text-white">🟢 WhatsApp Message</span>
+                <button onClick={() => handleSocialClick('whatsapp_msg', 'https://wa.me/919714293759')} className="w-full flex items-center justify-between dark:bg-green-500/10 bg-green-50/50 border dark:border-green-500/20 border-green-200/50 p-3 rounded-xl">
+                  <span className="text-[10px] font-black dark:text-white text-gray-900">🟢 WhatsApp Message</span>
                   <span className="text-[8px] font-black uppercase px-2.5 py-1 rounded bg-yellow-400 text-black">{getClaimStatus('whatsapp_msg')}</span>
                 </button>
-                <button onClick={() => handleSocialClick('whatsapp_channel', 'https://whatsapp.com/channel/0029VaLhggoGE56natoQI43y')} className="w-full flex items-center justify-between bg-emerald-500/10 border border-emerald-500/20 p-3 rounded-xl">
-                  <span className="text-[10px] font-black text-white">📢 WhatsApp Channel</span>
+                <button onClick={() => handleSocialClick('whatsapp_channel', 'https://whatsapp.com/channel/0029VaLhggoGE56natoQI43y')} className="w-full flex items-center justify-between dark:bg-emerald-500/10 bg-green-50/50 border dark:border-emerald-500/20 border-green-200/50 p-3 rounded-xl">
+                  <span className="text-[10px] font-black dark:text-white text-gray-900">📢 WhatsApp Channel</span>
                   <span className="text-[8px] font-black uppercase px-2.5 py-1 rounded bg-yellow-400 text-black">{getClaimStatus('whatsapp_channel')}</span>
                 </button>
-                <button onClick={() => handleSocialClick('youtube', 'https://www.youtube.com/@bbcafe.i')} className="w-full flex items-center justify-between bg-red-600/10 border border-red-600/20 p-3 rounded-xl">
-                  <span className="text-[10px] font-black text-white">🔴 YouTube Channel</span>
+                <button onClick={() => handleSocialClick('youtube', 'https://www.youtube.com/@bbcafe.i')} className="w-full flex items-center justify-between dark:bg-red-600/10 bg-green-50/50 border dark:border-red-600/20 border-green-200/50 p-3 rounded-xl">
+                  <span className="text-[10px] font-black dark:text-white text-gray-900">🔴 YouTube Channel</span>
                   <span className="text-[8px] font-black uppercase px-2.5 py-1 rounded bg-yellow-400 text-black">{getClaimStatus('youtube')}</span>
                 </button>
-                <button onClick={() => handleSocialClick('instagram', 'https://www.instagram.com/bbcafe.in/')} className="w-full flex items-center justify-between bg-pink-500/10 border border-pink-500/20 p-3 rounded-xl">
-                  <span className="text-[10px] font-black text-white">📸 Instagram</span>
+                <button onClick={() => handleSocialClick('instagram', 'https://www.instagram.com/bbcafe.in/')} className="w-full flex items-center justify-between dark:bg-pink-500/10 bg-green-50/50 border dark:border-pink-500/20 border-green-200/50 p-3 rounded-xl">
+                  <span className="text-[10px] font-black dark:text-white text-gray-900">📸 Instagram</span>
                   <span className="text-[8px] font-black uppercase px-2.5 py-1 rounded bg-yellow-400 text-black">{getClaimStatus('instagram')}</span>
                 </button>
-                <button onClick={() => handleSocialClick('facebook', 'https://www.facebook.com/bbcafe.in/')} className="w-full flex items-center justify-between bg-blue-600/10 border border-blue-600/20 p-3 rounded-xl">
-                  <span className="text-[10px] font-black text-white">🔵 Facebook</span>
+                <button onClick={() => handleSocialClick('facebook', 'https://www.facebook.com/bbcafe.in/')} className="w-full flex items-center justify-between dark:bg-blue-600/10 bg-green-50/50 border dark:border-blue-600/20 border-green-200/50 p-3 rounded-xl">
+                  <span className="text-[10px] font-black dark:text-white text-gray-900">🔵 Facebook</span>
                   <span className="text-[8px] font-black uppercase px-2.5 py-1 rounded bg-yellow-400 text-black">{getClaimStatus('facebook')}</span>
                 </button>
-                <button onClick={() => handleSocialClick('snapchat', 'https://www.snapchat.com/add/bbcafe.in')} className="w-full flex items-center justify-between bg-yellow-400/10 border border-yellow-400/20 p-3 rounded-xl">
-                  <span className="text-[10px] font-black text-white">🟡 Snapchat</span>
+                <button onClick={() => handleSocialClick('snapchat', 'https://www.snapchat.com/add/bbcafe.in')} className="w-full flex items-center justify-between dark:bg-yellow-400/10 bg-green-50/50 border dark:border-yellow-400/20 border-green-200/50 p-3 rounded-xl">
+                  <span className="text-[10px] font-black dark:text-white text-gray-900">🟡 Snapchat</span>
                   <span className="text-[8px] font-black uppercase px-2.5 py-1 rounded bg-yellow-400 text-black">{getClaimStatus('snapchat')}</span>
                 </button>
               </div>
@@ -1694,12 +1691,12 @@ export default function BbCafeHome() {
       <AnimatePresence>
         {showUPIModal && (
           <div className="fixed inset-0 bg-black/95 z-[250] flex items-center justify-center p-6">
-            <div className="bg-[#111] w-full max-w-sm p-6 rounded-3xl border border-white/10 text-center space-y-4">
+            <div className="dark:bg-[#111] bg-white w-full max-w-sm p-6 rounded-3xl border dark:border-white/10 border-gray-200 text-center space-y-4 shadow-xl transition-colors duration-200">
               <Sparkles className="mx-auto text-yellow-400 animate-pulse" size={28} />
               
               <div className="space-y-1">
-                <h3 className="text-lg font-black text-white">आर्डर भुगतान सहायता 💳</h3>
-                <p className="text-[10px] text-gray-400 font-semibold leading-relaxed">
+                <h3 className="text-lg font-black dark:text-white text-gray-900">आर्डर भुगतान सहायता 💳</h3>
+                <p className="text-[10px] dark:text-gray-400 text-gray-600 font-semibold leading-relaxed">
                   नीचे दिए गए बटन पर क्लिक करके अपने फोन के पेमेंट ऐप (GPay, PhonePe, Paytm) से सीधे भुगतान करें।
                 </p>
               </div>
@@ -1719,7 +1716,7 @@ export default function BbCafeHome() {
                 <div className="flex-grow border-t border-white/5"></div>
               </div>
 
-              <div className="bg-white p-3 rounded-2xl w-40 h-40 mx-auto flex items-center justify-center border border-white/5 shadow-inner">
+              <div className="bg-white p-3 rounded-2xl w-40 h-40 mx-auto flex items-center justify-center border border-gray-200 shadow-inner transition-colors duration-200">
                 <img 
                   src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(`upi://pay?pa=Q231198993@ybl&pn=BUM%20BUM%20CAFE&am=${getTotalBillPrice()}&cu=INR`)}`} 
                   className="w-full h-full" 
@@ -1740,14 +1737,14 @@ export default function BbCafeHome() {
       <AnimatePresence>
         {showInvoice && lastPlacedOrder && (
           <div className="fixed inset-0 bg-black/95 z-[240] flex items-center justify-center p-6">
-            <div className="bg-[#111] w-full max-w-md p-6 rounded-3xl border border-white/10 text-center space-y-4 max-h-[85vh] overflow-y-auto">
+            <div className="dark:bg-[#111] bg-white w-full max-w-md p-6 rounded-3xl border dark:border-white/10 border-gray-200 text-center space-y-4 max-h-[85vh] overflow-y-auto shadow-xl transition-colors duration-200">
               <div className="flex justify-between items-center border-b border-white/5 pb-2">
                 <span className="text-[10px] font-black text-green-400">🌱 DIGITAL GREEN INVOICE</span>
                 <button onClick={() => setShowInvoice(false)} className="text-gray-400"><X size={16} /></button>
               </div>
               <h4 className="text-xl font-black text-yellow-400 italic">BUM BUM CAFE</h4>
               
-              <div className="text-left text-xs space-y-1.5 text-gray-300 font-mono">
+              <div className="text-left text-xs space-y-1.5 dark:text-gray-300 text-gray-600 font-mono">
                 <p>Order No: #{formatBillNumber(lastPlacedOrder.billNumber)}</p>
                 <p>Token No: #{lastPlacedOrder.tokenNumber}</p>
                 <p>Customer: {lastPlacedOrder.customerName}</p>
@@ -1780,7 +1777,7 @@ export default function BbCafeHome() {
                 </a>
               </div>
 
-              <p className="text-[9px] text-green-400 bg-green-500/10 p-2.5 rounded-xl font-bold">
+              <p className="text-[9px] text-green-500 dark:text-green-400 dark:bg-green-500/10 bg-green-50 p-2.5 rounded-xl font-bold">
                 🌱 पेपर रसीद के बिना DIGITAL इनवॉइस जनरेट किया गया है। धन्यवाद!
               </p>
               <button onClick={() => setShowInvoice(false)} className="w-full bg-white text-black p-3 rounded-xl text-xs font-black uppercase">
