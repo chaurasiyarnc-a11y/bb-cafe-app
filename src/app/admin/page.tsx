@@ -1303,6 +1303,78 @@ Report generated automatically by Bum Bum Cafe POS.`
     }
   };
 
+  // --- NATIVE CSV IMPORT HANDLER ---
+  const handleCsvImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    toast.loading("Processing Excel/CSV Import...", { id: "csv-import" });
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const text = event.target?.result as string;
+        const lines = text.split(/\r?\n/);
+        
+        if (lines.length <= 1) {
+          toast.error("File is empty or invalid!", { id: "csv-import" });
+          return;
+        }
+
+        let successCount = 0;
+        let failCount = 0;
+
+        // Loop starting from row index 1 to bypass header row (Name, Phone, Points)
+        for (let i = 1; i < lines.length; i++) {
+          const line = lines[i].trim();
+          if (!line) continue;
+
+          // Split line values cleanly and escape quotes
+          const columns = line.split(',').map(col => col.replace(/^"|"$/g, '').trim());
+          
+          let name = columns[0] || "Customer";
+          let phone = columns[1] || "";
+          let points = Number(columns[2]) || 0;
+
+          // Swap if phone is accidentally stored in the first column and name is empty
+          if (!phone && name && /^\d+$/.test(name)) {
+            phone = name;
+            name = "Customer";
+          }
+
+          // Clean phone number (strip spaces and +91 country code prefix)
+          const cleanPhone = phone.replace("+91", "").replace(/\s+/g, "").trim();
+
+          if (!cleanPhone || cleanPhone.length < 10) {
+            failCount++;
+            continue;
+          }
+
+          // Store directly inside Firestore 'customer_points'
+          await setDoc(doc(db, "customer_points", cleanPhone), {
+            name: name,
+            phone: cleanPhone,
+            points: points,
+            lastActive: new Date()
+          }, { merge: true });
+
+          successCount++;
+        }
+
+        toast.success(`Successfully imported ${successCount} customers! (Failed/Skipped: ${failCount})`, { 
+          id: "csv-import", 
+          duration: 5000 
+        });
+      } catch (err) {
+        console.error("CSV Parsing Error:", err);
+        toast.error("Failed to parse and import file.", { id: "csv-import" });
+      }
+    };
+
+    reader.readAsText(file);
+    e.target.value = ""; // Reset input so same file can be selected again if needed
+  };
+
   // --- CLIENT SIDE FILTER FOR DYNAMIC MENUS & CATEGORIES ---
   const searchedMenu = useMemo(() => {
     if (!menuSearchQuery.trim()) return menu;
@@ -1993,15 +2065,27 @@ Report generated automatically by Bum Bum Cafe POS.`
         {/* --- TAB 5: DEDICATED CUSTOMERS TAB (COMBINED & DEDUPED) --- */}
         {tab === 'customers' && (
           <div className="space-y-6">
-            <div className="flex justify-between items-center">
+            <div className="flex justify-between items-center flex-wrap gap-2">
               <h3 className="text-xl font-black text-orange-500 uppercase tracking-wider flex items-center gap-2"><User size={20}/> Customer Management</h3>
-              {/* WhatsApp Broadcast Marketing Button (39: WhatsApp Broadcast) */}
-              <button 
-                onClick={() => setShowBroadcastModal(true)} 
-                className="bg-green-600 hover:bg-green-700 text-white font-black text-[10px] px-4 py-2.5 rounded-full flex items-center gap-1.5 uppercase transition-all shadow-md"
-              >
-                <Share2 size={13}/> Broadcast Blast
-              </button>
+              <div className="flex gap-2">
+                {/* 📥 Native CSV/Excel Import Button */}
+                <label className="bg-yellow-500 hover:bg-yellow-600 text-black font-black text-[10px] px-4 py-2.5 rounded-full flex items-center gap-1.5 uppercase cursor-pointer transition-all shadow-md">
+                  <Download size={13} className="rotate-180"/> Import CSV
+                  <input 
+                    type="file" 
+                    accept=".csv" 
+                    onChange={handleCsvImport} 
+                    className="hidden" 
+                  />
+                </label>
+                {/* WhatsApp Broadcast Marketing Button (39: WhatsApp Broadcast) */}
+                <button 
+                  onClick={() => setShowBroadcastModal(true)} 
+                  className="bg-green-600 hover:bg-green-700 text-white font-black text-[10px] px-4 py-2.5 rounded-full flex items-center gap-1.5 uppercase transition-all shadow-md"
+                >
+                  <Share2 size={13}/> Broadcast Blast
+                </button>
+              </div>
             </div>
 
             {/* STICKY SEARCH BAR (SEARCH CUSTOMER BY NAME OR PHONE) */}
@@ -2312,7 +2396,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                   </div>
 
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-gray-500 uppercase">Special Cooking Instruction (विशेष निर्देश)</label>
+                    <label className="text-[10px] font-bold text-gray-400 uppercase">Special Cooking Instruction (विशेष निर्देश)</label>
                     <input 
                       type="text" 
                       placeholder="e.g. ओवन में डालने से पहले अच्छे से सेकें (Optional)" 
