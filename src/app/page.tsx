@@ -71,14 +71,14 @@ export default function BbCafeHome() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isCartOpen, setIsCartOpen] = useState(false);
   
-  // profile Drawer State
+  // Profile Drawer State
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isSocialsOpen, setIsSocialsOpen] = useState(false); 
   const [storeOpen, setStoreOpen] = useState(true);
   const [mounted, setMounted] = useState(false);
   const [isOnline, setIsOnline] = useState(true);
 
-  // Updated Default Correct Call Phone Number (Corrected to 9714293759)
+  // Updated Default Correct Call Phone Number
   const [whatsappNumber, setWhatsappNumber] = useState("919714293759");
 
   // Points Ledger/History State
@@ -709,7 +709,11 @@ export default function BbCafeHome() {
     if (isTooFar) {
       return toast.error("आपकी दूरी 20 KM से अधिक है। आप केवल मेनू देख सकते हैं, ऑर्डर प्लेस नहीं कर सकते!");
     }
-    if (!customerDetails) { setIsProfileOpen(true); return; }
+    if (!customerDetails) { 
+      setIsProfileOpen(true); 
+      toast.error("ऑर्डर करने के लिए पहले अपनी प्रोफाइल बनाएं! 👤");
+      return; 
+    }
     if (!address || address.trim().length < 10) return toast.error("Please enter full address!");
 
     const tokenNumber = Math.floor(1000 + Math.random() * 9000);
@@ -821,7 +825,7 @@ export default function BbCafeHome() {
     let currentShares = Number(localStorage.getItem(shareCountKey) || 0);
 
     const refCode = getReferralCode();
-    const shareMessage = `🔥 *BAM BAM CAFE - Mohandra* 🔥\n\nमेरे स्पेशल इन्वाइट कोड *${refCode}* से आर्डर करें और पॉइंट्स पाएं! 🎁\n👉 https://bb-cafe-app.vercel.app/?ref=${refCode}`;
+    const shareMessage = `🔥 *BAM BAM CAFE - Mohandra* 🔥\n\nमेरे स्पेशल इन्वाइट कोड *${refCode}* से आर्डर करें और... पॉइंट्स पाएं! 🎁\n👉 https://bb-cafe-app.vercel.app/?ref=${refCode}`;
     const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(shareMessage)}`;
 
     window.open(whatsappUrl, '_blank');
@@ -1084,7 +1088,7 @@ export default function BbCafeHome() {
       {closingMinutesLeft !== null && storeOpen && (
         <div className="bg-gradient-to-r from-amber-500 to-orange-600 text-white font-extrabold py-2 px-4 text-center text-[10px] flex items-center justify-center gap-1.5 shadow-md">
           <span>⏰</span>
-          <span>आर्डर चेतावनी: बम बम कैफ़े अगले {closingMinutesLeft} मिनट में बंद होने वाला है! आर्डर जल्दी पूरा करें।</span>
+          <span>आर्डर चेतावनी:  बम बम कैफ़े अगले {closingMinutesLeft} मिनट में बंद होने वाला है! आर्डर जल्दी पूरा करें।</span>
         </div>
       )}
       
@@ -1114,7 +1118,7 @@ export default function BbCafeHome() {
         </div>
       )}
 
-      {/* PREMIUM UPGRADED HERO HEADER */}
+      {/* PREMIUM UPGRADED HERO HEADER (Direct calling button removed from header) */}
       <header className="relative pt-10 pb-6 px-5 overflow-hidden shadow-xl flex flex-col justify-end min-h-[160px]">
         <video 
           autoPlay 
@@ -1150,18 +1154,9 @@ export default function BbCafeHome() {
             Order Now
           </button>
         </div>
-
-        {/* Dynamic & Correct Phone Call Button (UX 9 - Corrected Number +919714293759) */}
-        <a 
-          href="tel:+919714293759"
-          className="absolute top-4 right-4 z-20 bg-green-600 hover:bg-green-700 text-white p-2.5 rounded-full border border-white/10 flex items-center justify-center shadow-lg transition-transform hover:scale-105"
-          title="Direct call to cafe"
-        >
-          <Phone size={16} />
-        </a>
       </header>
 
-      {/* FIXED STICKY SEARCH BAR WITH INTEGRATED PROFILE ICON ACCESSIBILITY */}
+      {/* FIXED STICKY SEARCH BAR WITH EMERGENCY DIALER & ACCESS PROFILE (Calling button placed right next to profile icon) */}
       <div className="sticky top-0 z-40 dark:bg-[#050505]/95 bg-gray-50/95 backdrop-blur-md py-3 px-4 border-b dark:border-white/5 border-gray-200 transition-colors duration-200 shadow-sm">
         <div className="relative max-w-sm mx-auto flex items-center gap-2">
           <div className="relative flex-1">
@@ -1175,10 +1170,19 @@ export default function BbCafeHome() {
             />
           </div>
           
+          {/* Emergency Calling Button placed in Row Next to Profile (UX 9 - correct: +919714293759) */}
+          <a 
+            href="tel:+919714293759"
+            className="p-2.5 bg-green-600 hover:bg-green-700 text-white rounded-xl border border-transparent shadow flex items-center justify-center transition-colors"
+            title="Direct call to cafe"
+          >
+            <Phone size={18} />
+          </a>
+
           {/* USER ACCOUNT PROFILE BUTTON - Direct clean trigger to the Profile Drawer */}
           <button 
             onClick={() => setIsProfileOpen(true)}
-            className="p-2.5 dark:bg-neutral-800 bg-gray-100 dark:text-white text-neutral-950 rounded-xl border dark:border-neutral-700 border-gray-200 hover:border-orange-500 hover:text-orange-500 transition-colors shadow"
+            className="p-2.5 dark:bg-neutral-800 bg-gray-100 dark:text-white text-neutral-950 rounded-xl border dark:border-neutral-700 border-gray-200 hover:border-orange-500 hover:text-orange-500 transition-colors shadow flex-shrink-0"
             title="My Profile & Loyalty Rewards"
           >
             <User size={18} />
@@ -1214,16 +1218,9 @@ export default function BbCafeHome() {
           </div>
         )}
 
-        <div className="px-1.5 py-1 flex justify-between items-center">
+        {/* Greeting block (Bagal me profile hatadi gayi hai) */}
+        <div className="px-1.5 py-1">
           <h3 className="text-xs font-black dark:text-gray-200 text-neutral-900 leading-normal">{greetingText}</h3>
-          
-          {/* Direct trigger on header to navigate profile quickly */}
-          <button 
-            onClick={() => setIsProfileOpen(true)}
-            className="bg-orange-500/10 text-orange-500 hover:bg-orange-500 hover:text-white border border-orange-500/20 text-[9px] font-black uppercase px-2.5 py-1.5 rounded-lg shadow-sm transition-all active:scale-95 flex items-center gap-1"
-          >
-            👤 My Account & Rewards
-          </button>
         </div>
         
         <div className="w-full h-36 rounded-2xl overflow-hidden relative border border-white/5 bg-white/[0.02]">
@@ -1665,7 +1662,7 @@ export default function BbCafeHome() {
         )}
       </AnimatePresence>
 
-      {/* NEW INTEGRATED ACCESSIBLE CUSTOMER PROFILE & LOYALTY LEDGER DRAWER */}
+      {/* COMPACT & INTEGRATED PROFILE, LOYALTY LEDGER, EARNINGS & ORDER HISTORY DRAWER */}
       <AnimatePresence>
         {isProfileOpen && (
           <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-[115] flex items-end">
@@ -1681,7 +1678,7 @@ export default function BbCafeHome() {
                 <button onClick={() => setIsProfileOpen(false)} className="p-2.5 dark:bg-white/5 bg-gray-100 hover:dark:bg-white/10 hover:bg-gray-200 dark:text-white text-neutral-800 rounded-full transition-all"><X size={20} /></button>
               </div>
 
-              {/* PROFILE SETUP / LOGIN IF NULL */}
+              {/* PROFILE SETUP / LOGIN ON OPEN */}
               {!customerDetails ? (
                 <form onSubmit={handleSaveDetails} className="space-y-4">
                   <div className="text-center space-y-1.5 pb-2">
@@ -1708,7 +1705,7 @@ export default function BbCafeHome() {
                 </form>
               ) : (
                 <div className="space-y-6">
-                  {/* LOGGED IN USER CARD */}
+                  {/* USER ACCOUNT VIEW */}
                   <div className="dark:bg-white/[0.02] bg-gray-50 p-4 rounded-2xl border dark:border-white/5 border-gray-200 flex justify-between items-center transition-colors duration-200">
                     <div>
                       <p className="text-[8px] dark:text-gray-500 text-neutral-600 font-black uppercase">Customer Profile</p>
@@ -1724,7 +1721,7 @@ export default function BbCafeHome() {
                     </button>
                   </div>
 
-                  {/* LOYALTY PROGRAM BOARD */}
+                  {/* LOYALTY SCOREBOARD CARD */}
                   <div className="dark:bg-yellow-400/5 bg-yellow-100 border border-yellow-350 dark:border-yellow-400/20 rounded-2xl p-4 space-y-3 transition-colors duration-200 shadow-md">
                     <div className="flex justify-between items-center border-b dark:border-white/10 border-yellow-200 pb-2">
                       <div className="flex items-center gap-1.5 text-yellow-600 dark:text-yellow-400 font-black text-xs uppercase"><Gift size={12}/> <span>Bum Bum Loyalty Club</span></div>
@@ -1743,7 +1740,7 @@ export default function BbCafeHome() {
                       </div>
                     </div>
 
-                    {/* Dynamic Points Passbook History Ledger */}
+                    {/* Points Passbook Ledger */}
                     {pointsHistory.length > 0 && (
                       <div className="pt-2 border-t border-white/5 space-y-1.5">
                         <p className="text-[9px] font-black uppercase dark:text-gray-400 text-neutral-700">📜 Points Passbook (हाल ही के लेन-देन):</p>
@@ -1790,10 +1787,33 @@ export default function BbCafeHome() {
                     </div>
                   </div>
 
-                  {/* USER PERSONAL ORDER HISTORY */}
-                  {pastOrders.length > 0 && (
-                    <div className="space-y-3 pt-2">
-                      <h3 className="text-xs font-black dark:text-gray-300 text-neutral-800 uppercase flex items-center gap-1"><History size={14}/> <span>My Order History</span></h3>
+                  {/* Social Buttons Inside Sidebar/Profile (UX 5 - social butan ko side bar me rakho) */}
+                  <div className="pt-2 border-t dark:border-white/10 border-gray-200 space-y-2">
+                    <p className="text-[9px] dark:text-gray-400 text-neutral-700 font-black uppercase tracking-wider">Earn Points by Following us:</p>
+                    <div className="grid grid-cols-2 gap-2 text-[8px] font-black uppercase">
+                      <button onClick={() => handleSocialClick('whatsapp_msg', `https://wa.me/${whatsappNumber}`)} className="flex items-center justify-between dark:bg-green-500/10 bg-green-50 p-2.5 rounded-xl border dark:border-green-500/20 border-green-200/50">
+                        <span>🟢 WhatsApp msg</span>
+                        <span className="bg-yellow-400 text-black px-1.5 py-0.5 rounded text-[7px]">{getClaimStatus('whatsapp_msg')}</span>
+                      </button>
+                      <button onClick={() => handleSocialClick('whatsapp_channel', 'https://whatsapp.com/channel/0029VaLhggoGE56natoQI43y')} className="flex items-center justify-between dark:bg-emerald-500/10 bg-green-50 p-2.5 rounded-xl border dark:border-emerald-500/20 border-green-200/50">
+                        <span>📢 WA Channel</span>
+                        <span className="bg-yellow-400 text-black px-1.5 py-0.5 rounded text-[7px]">{getClaimStatus('whatsapp_channel')}</span>
+                      </button>
+                      <button onClick={() => handleSocialClick('youtube', 'https://www.youtube.com/@bbcafe.i')} className="flex items-center justify-between dark:bg-red-600/10 bg-green-50 p-2.5 rounded-xl border dark:border-red-600/20 border-green-200/50">
+                        <span>🔴 YouTube</span>
+                        <span className="bg-yellow-400 text-black px-1.5 py-0.5 rounded text-[7px]">{getClaimStatus('youtube')}</span>
+                      </button>
+                      <button onClick={() => handleSocialClick('instagram', 'https://www.instagram.com/bbcafe.in/')} className="flex items-center justify-between dark:bg-pink-500/10 bg-green-50 p-2.5 rounded-xl border dark:border-pink-500/20 border-green-200/50">
+                        <span>📸 Instagram</span>
+                        <span className="bg-yellow-400 text-black px-1.5 py-0.5 rounded text-[7px]">{getClaimStatus('instagram')}</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* USER PERSONAL ORDER HISTORY (UX 3 - Customer Profile me pichle orders jode gaye) */}
+                  <div className="space-y-3 pt-2">
+                    <h3 className="text-xs font-black dark:text-gray-300 text-neutral-800 uppercase flex items-center gap-1"><History size={14}/> <span>My Order History</span></h3>
+                    {pastOrders.length > 0 ? (
                       <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
                         {pastOrders.map((ord: any, index: number) => (
                           <div key={index} className="dark:bg-white/[0.02] bg-gray-50 border dark:border-white/5 border-gray-200 rounded-xl p-3.5 space-y-2 text-[10px] font-bold">
@@ -1812,7 +1832,7 @@ export default function BbCafeHome() {
                             <div className="h-px bg-white/5 my-1" />
                             <div className="flex justify-between items-center">
                               <span className="text-gray-400 font-semibold">Grand Total:</span>
-                              <span className="font-black dark:text-white text-neutral-950">₹{ord.total}</span>
+                              <span className="font-black dark:text-white text-neutral-955">₹{ord.total}</span>
                             </div>
                             <a 
                               href={`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(`नमस्ते बम बम कैफ़े! कृपया मेरे आर्डर नंबर #${formatBillNumber(ord.billNumber)} (टोकन नंबर: #${ord.tokenNumber}) का लाइव स्टेटस बताएं।`)}`}
@@ -1825,8 +1845,12 @@ export default function BbCafeHome() {
                           </div>
                         ))}
                       </div>
-                    </div>
-                  )}
+                    ) : (
+                      <p className="text-center text-gray-500 py-4 text-[9px] font-bold uppercase tracking-wider">
+                        अभी तक कोई आर्डर नहीं मिला। स्वादिष्ट आर्डर शुरू करें! 🍕
+                      </p>
+                    )}
+                  </div>
                 </div>
               )}
             </motion.div>
@@ -1834,7 +1858,7 @@ export default function BbCafeHome() {
         )}
       </AnimatePresence>
 
-      {/* CART DRAWER MODAL */}
+      {/* CART DRAWER MODAL (Profile Section and customer info block completely removed from Cart) */}
       <AnimatePresence>
         {isCartOpen && (
           <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-[110] flex items-end">
@@ -1870,7 +1894,25 @@ export default function BbCafeHome() {
               ))}
 
               <div className="mt-6 space-y-4">
-                {/* 2. FREE DELIVERY PROGRESS TARGET BAR */}
+                {/* 2. UPSELL / FREQUENTLY BOUGHT TOGETHER (UX 1 - shifted strictly above Free Delivery progress bar) */}
+                {upsellSuggestionItems.length > 0 && (
+                  <div className="dark:bg-purple-950/20 bg-purple-50 border border-purple-500/10 rounded-2xl p-4 space-y-2">
+                    <p className="text-[9px] font-black uppercase dark:text-purple-400 text-purple-800 tracking-wider">Frequently Bought Together 🥤</p>
+                    <div className="space-y-2">
+                      {upsellSuggestionItems.map((suggest) => (
+                        <div key={suggest.id} className="flex justify-between items-center text-[10px]">
+                          <div>
+                            <span className="font-bold block dark:text-white text-neutral-900">{suggest.name}</span>
+                            <span className="text-orange-600 font-extrabold">{getDisplayPrice(suggest)}</span>
+                          </div>
+                          <button onClick={() => addItem(suggest)} className="bg-purple-500/20 text-purple-355 border border-purple-500/30 px-3 py-1 rounded-lg font-black uppercase animate-none">ADD</button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* 3. FREE DELIVERY PROGRESS TARGET BAR */}
                 <div className="bg-orange-500/5 border border-orange-500/10 rounded-2xl p-4 space-y-2">
                   <div className="flex justify-between items-center text-[10px] font-black uppercase text-orange-500">
                     <span>🚚 Free Delivery Target:</span>
@@ -1882,7 +1924,7 @@ export default function BbCafeHome() {
                   <p className="text-[8px] dark:text-gray-400 text-neutral-800 font-bold">*Mohandra Town is free delivery above ₹99. Nearby Areas limit is active.</p>
                 </div>
 
-                {/* 3. SELECT DELIVERY ZONE */}
+                {/* 4. SELECT DELIVERY ZONE */}
                 <div className="dark:bg-white/[0.02] bg-gray-50 border dark:border-white/5 border-gray-200 rounded-2xl p-4 space-y-2 transition-colors duration-200">
                   <label className="text-[9px] font-black uppercase dark:text-gray-400 text-neutral-800">Select Delivery Zone (KM):</label>
                   <div className="grid grid-cols-2 gap-2">
@@ -1910,7 +1952,7 @@ export default function BbCafeHome() {
                   </div>
                 </div>
 
-                {/* 4. DELIVERY ADDRESS INPUT */}
+                {/* 5. DELIVERY ADDRESS INPUT */}
                 <div className="dark:bg-white/[0.02] bg-gray-50 p-4 rounded-2xl border dark:border-white/5 border-gray-200 space-y-2 transition-colors duration-200">
                   <div className="flex items-center gap-1.5 text-orange-500"><MapPin size={14}/> <h3 className="font-black uppercase text-[10px]">Delivery Address</h3></div>
                   <div className="flex justify-between items-center mb-1">
@@ -1919,7 +1961,7 @@ export default function BbCafeHome() {
                   <textarea placeholder="Ghar ka address, Landmark ke saath..." value={address} onChange={(e) => setAddress(e.target.value)} className="w-full dark:bg-black/40 bg-white border dark:border-white/10 border-gray-300 rounded-xl p-3 text-xs font-semibold dark:text-white text-neutral-900 outline-none resize-none h-16" />
                 </div>
 
-                {/* 5. ADD EXTRA CONDIMENTS BUTTONS */}
+                {/* 6. ADD EXTRA CONDIMENTS BUTTONS */}
                 <div className="dark:bg-white/[0.02] bg-gray-50 border dark:border-white/5 border-gray-200 rounded-2xl p-4 space-y-2 transition-colors duration-200">
                   <p className="text-[9px] font-black uppercase dark:text-gray-400 text-neutral-800">Add Extra condiments to order:</p>
                   <div className="grid grid-cols-3 gap-2">
@@ -1935,24 +1977,6 @@ export default function BbCafeHome() {
                   </div>
                 </div>
 
-                {/* 6. UPSELL / FREQUENTLY BOUGHT TOGETHER */}
-                {upsellSuggestionItems.length > 0 && (
-                  <div className="dark:bg-purple-950/20 bg-purple-50 border border-purple-500/10 rounded-2xl p-4 space-y-2">
-                    <p className="text-[9px] font-black uppercase dark:text-purple-400 text-purple-800 tracking-wider">Frequently Bought Together 🥤</p>
-                    <div className="space-y-2">
-                      {upsellSuggestionItems.map((suggest) => (
-                        <div key={suggest.id} className="flex justify-between items-center text-[10px]">
-                          <div>
-                            <span className="font-bold block dark:text-white text-neutral-900">{suggest.name}</span>
-                            <span className="text-orange-600 font-extrabold">{getDisplayPrice(suggest)}</span>
-                          </div>
-                          <button onClick={() => addItem(suggest)} className="bg-purple-500/20 text-purple-355 border border-purple-500/30 px-3 py-1 rounded-lg font-black uppercase animate-none">ADD</button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
                 {/* 7. ECO FRIENDLY PACKAGING */}
                 <div className="dark:bg-green-950/10 bg-green-50/50 border dark:border-green-500/10 border-green-200/50 rounded-2xl p-4 flex justify-between items-center transition-colors duration-200">
                   <div className="space-y-0.5">
@@ -1962,21 +1986,7 @@ export default function BbCafeHome() {
                   <input type="checkbox" checked={noCutlery} onChange={() => setNoCutlery(!noCutlery)} className="w-4 h-4 accent-green-500" />
                 </div>
 
-                {/* 8. MINI ORDERING AS PANEL IN CART */}
-                {customerDetails ? (
-                  <div className="dark:bg-white/[0.02] bg-gray-50 p-4 rounded-2xl border dark:border-white/5 border-gray-200 flex justify-between items-center transition-colors duration-200">
-                    <div>
-                      <p className="text-[8px] dark:text-gray-500 text-neutral-600 font-black uppercase">Ordering As</p>
-                      <h4 className="font-black text-xs text-orange-500">{customerDetails.name}</h4>
-                      <p className="text-[10px] dark:text-gray-400 text-neutral-700 font-semibold">{customerDetails.phone}</p>
-                    </div>
-                    <button onClick={() => { setIsCartOpen(false); setIsProfileOpen(true); }} className="text-[9px] bg-orange-500/10 text-orange-500 hover:bg-orange-500 hover:text-white px-2.5 py-1.5 rounded-lg font-black uppercase transition-all">Change</button>
-                  </div>
-                ) : (
-                  <button onClick={() => { setIsCartOpen(false); setIsProfileOpen(true); }} className="w-full p-4 bg-orange-500/10 text-orange-400 border border-orange-500/20 rounded-2xl font-black text-xs uppercase">👤 Add Name & Phone To Order</button>
-                )}
-
-                {/* 9. PAY SUMMARY CARD */}
+                {/* 8. PAY SUMMARY CARD */}
                 <div className="bg-gradient-to-b from-orange-600 to-orange-700 p-5 rounded-2xl text-white">
                   <div className="flex justify-between font-bold mb-1.5 text-xs"><span>Items Total</span> <span>₹{getCartSubtotal()}</span></div>
                   {getCartAddonsPrice() > 0 && <div className="flex justify-between font-bold mb-1.5 text-xs"><span>Extra Condiments</span> <span>+₹{getCartAddonsPrice()}</span></div>}
@@ -1988,7 +1998,7 @@ export default function BbCafeHome() {
                   <div className="flex justify-between font-black text-xl"><span>To Pay</span> <span>₹{getTotalBillPrice()}</span></div>
                 </div>
 
-                {/* 10. WHATSAPP CHECKOUT TRIGGER */}
+                {/* 9. WHATSAPP CHECKOUT TRIGGER */}
                 {isTooFar ? (
                   <div className="bg-red-600/20 text-red-400 p-4 rounded-2xl text-center text-xs font-bold border border-red-500/20">
                     आप 20 KM से अधिक दूर हैं। आर्डर स्वीकार नहीं किया जा सकता। ❌
@@ -2092,7 +2102,7 @@ export default function BbCafeHome() {
         )}
       </AnimatePresence>
 
-      {/* SOCIALS DIALOG MODAL */}
+      {/* SOCIALS DIALOG MODAL (Remains as card trigger option on menu) */}
       <AnimatePresence>
         {isSocialsOpen && (
           <div className="fixed inset-0 bg-black/95 z-[250] flex items-center justify-center p-6">
