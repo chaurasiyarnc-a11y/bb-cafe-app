@@ -920,6 +920,7 @@ export default function BbCafeHome() {
   if (!mounted) return null;
 
   return (
+    // overflow-x-clip avoids breaking position: sticky scroll container
     // dark:bg and bg classes enable system light/dark mode support smoothly
     <div className="dark:bg-[#050505] bg-gray-50 min-h-screen dark:text-white text-gray-900 pb-32 font-sans relative overflow-x-clip transition-colors duration-200">
       <Toaster position="top-center" />
@@ -1036,7 +1037,7 @@ export default function BbCafeHome() {
           </div>
         )}
 
-        {/* PERSONALIZED GREETING BANNER (Clean Text, No Background Box as requested) */}
+        {/* PERSONALIZED GREETING BANNER (Only clean dynamic greeting text) */}
         <div className="px-1.5 py-1">
           <h3 className="text-xs font-bold dark:text-gray-200 text-gray-700 leading-normal">{greetingText}</h3>
         </div>
@@ -1082,13 +1083,13 @@ export default function BbCafeHome() {
           )}
         </div>
 
-        {/* CATEGORY SLIDER (ZOOMED SIZE w-18 h-18) */}
+        {/* CATEGORY SLIDER (Restored back to w-14 h-14) */}
         <div className="space-y-1">
           <p className="text-[8px] font-black uppercase tracking-wider text-orange-500">Inspiration for your first order</p>
           <div className="flex gap-5 overflow-x-auto hide-scrollbar py-2 px-1">
             <button onClick={() => setSelectedCategory("Favorites")} className="flex flex-col items-center flex-shrink-0 group outline-none">
-              <div className={`w-18 h-18 rounded-full overflow-hidden border transition-all flex items-center justify-center ${selectedCategory === "Favorites" ? 'border-red-500 scale-105 shadow-md' : 'dark:border-white/10 border-gray-200'}`}>
-                <Heart size={30} className={selectedCategory === "Favorites" ? 'text-red-500 fill-red-500' : 'text-gray-400'} />
+              <div className={`w-14 h-14 rounded-full overflow-hidden border transition-all flex items-center justify-center ${selectedCategory === "Favorites" ? 'border-red-500 scale-105 shadow-md' : 'dark:border-white/10 border-gray-200'}`}>
+                <Heart size={24} className={selectedCategory === "Favorites" ? 'text-red-500 fill-red-500' : 'text-gray-400'} />
               </div>
               <span className={`text-[9px] font-black uppercase mt-1.5 truncate ${selectedCategory === "Favorites" ? 'text-red-500' : 'dark:text-gray-400 text-gray-500'}`}>My Favorites</span>
             </button>
@@ -1097,7 +1098,7 @@ export default function BbCafeHome() {
               const isActive = selectedCategory === cat;
               return (
                 <button key={cat} onClick={() => setSelectedCategory(cat)} className="flex flex-col items-center flex-shrink-0 group outline-none">
-                  <div className={`w-18 h-18 rounded-full overflow-hidden border transition-all ${isActive ? 'border-orange-500 scale-105 shadow-md' : 'dark:border-white/10 border-gray-200'}`}>
+                  <div className={`w-14 h-14 rounded-full overflow-hidden border transition-all ${isActive ? 'border-orange-500 scale-105 shadow-md' : 'dark:border-white/10 border-gray-200'}`}>
                     <img src={getCategoryImage(cat)} className="w-full h-full object-cover" alt={cat} />
                   </div>
                   <span className={`text-[9px] font-black uppercase mt-1.5 truncate max-w-[70px] text-center ${isActive ? 'text-orange-500' : 'dark:text-gray-400 text-gray-500'}`}>
@@ -1161,6 +1162,7 @@ export default function BbCafeHome() {
                         <span>4.7</span><span className="text-[8px]">★</span>
                       </div>
                     </div>
+                    {/* Muted Text styled properly for Light & Dark mode readability */}
                     <div className="flex justify-between items-center text-[9px] dark:text-gray-400 text-gray-500 font-bold mt-0.5">
                       <p className="uppercase text-[8px] dark:text-gray-500 text-gray-400">{item.category}</p><p>• 15-25 min</p>
                     </div>
@@ -1168,11 +1170,11 @@ export default function BbCafeHome() {
                     <div className="flex justify-between items-end mt-0.5">
                       <div>
                         <p className="dark:text-gray-500 text-gray-400 text-[8px] font-black uppercase tracking-widest leading-none mb-1">Price</p>
-                        <p className="text-orange-500 font-black text-base leading-none">{getDisplayPrice(item)}</p>
-                        {item.variants && <span className="text-[8px] font-bold text-gray-400 mt-1 block">Options available</span>}
+                        <p className="text-orange-600 dark:text-orange-500 font-black text-base leading-none">{getDisplayPrice(item)}</p>
+                        {item.variants && <span className="text-[8px] font-bold dark:text-gray-400 text-gray-500 mt-1 block">Options available</span>}
                       </div>
                       {storeOpen && !isTooFar && (
-                        <button onClick={() => item.variants ? setSelectedProduct(item) : addItem(item)} className="px-4 py-2 bg-orange-500/10 text-orange-400 border border-orange-500/30 hover:bg-orange-500 hover:text-white rounded-lg font-black text-[10px] active:scale-95 transition-all uppercase flex items-center gap-1 shadow">
+                        <button onClick={() => item.variants ? setSelectedProduct(item) : addItem(item)} className="px-4 py-2 bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-500/30 hover:bg-orange-500 hover:text-white rounded-lg font-black text-[10px] active:scale-95 transition-all uppercase flex items-center gap-1 shadow">
                           <Plus size={12} /> ADD
                         </button>
                       )}
