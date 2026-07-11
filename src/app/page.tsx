@@ -406,6 +406,7 @@ export default function BbCafeHome() {
 
   // --- REST OF EFFECTS ---
   useEffect(() => {
+    // Restored missing mounted initialization statement!
     setMounted(true);
 
     if (typeof window !== 'undefined') {
@@ -550,7 +551,8 @@ export default function BbCafeHome() {
         if (!receiverSnap.exists()) {
           transaction.set(receiverDocRef, { name: "Loyal Friend 🎁", phone: friendPhoneRaw, points: pointsToGift, lastActive: new Date() });
         } else {
-          transaction.update(receiverDocRef, { points: increment(giftPointsAmount) });
+          // Replaced 'giftPointsAmount' with compile-safe, guaranteed 'pointsToGift' variable
+          transaction.update(receiverDocRef, { points: increment(pointsToGift) });
         }
       });
 
@@ -884,8 +886,8 @@ export default function BbCafeHome() {
       )}
 
       {/* PREMIUM UPGRADED NAVIGATION & VIDEO BACKGROUND HERO HEADER */}
-      <header className="relative pt-6 pb-12 px-5 overflow-hidden border-b border-white/10 shadow-2xl flex flex-col justify-between min-h-[220px]">
-        {/* local background video loop */}
+      <header className="relative pt-6 pb-12 px-5 overflow-hidden border-b border-white/10 shadow-2xl flex flex-col justify-between min-h-[160px]">
+        {/* local video path is used so it never gets blocked by external server CORS blockings */}
         <video 
           autoPlay 
           loop 
@@ -898,7 +900,7 @@ export default function BbCafeHome() {
           <img src="https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=600&q=80" className="absolute inset-0 w-full h-full object-cover" alt="Bum Bum Cafe Header" />
         </video>
 
-        {/* Dark overlay backdrop for high-contrast visibility */}
+        {/* Semi-transparent dark overlay gradient for readability */}
         <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/60 to-black/90 z-10" />
 
         {/* 1. TOP NAVIGATION BAR */}
@@ -1100,11 +1102,6 @@ export default function BbCafeHome() {
             </div>
           </div>
         )}
-
-        {/* PRODUCTS LISTING HEADER TITLE */}
-        <div className="pt-2">
-          <h3 className="text-sm font-black uppercase tracking-wider text-orange-600">🍳 Our Delicious Menu</h3>
-        </div>
 
         {/* PRODUCTS LISTING */}
         <div className="grid grid-cols-1 gap-4 pt-1 font-bold">
@@ -1473,7 +1470,7 @@ export default function BbCafeHome() {
                 <div className="dark:bg-white/[0.02] bg-gray-50 border dark:border-white/5 border-gray-200 rounded-2xl p-4 space-y-2 transition-colors duration-200">
                   <p className="text-[9px] font-black uppercase dark:text-gray-400 text-neutral-800">Add Extra condiments to order:</p>
                   <div className="grid grid-cols-3 gap-2">
-                    <button onClick={() => setKetchupAddon(!ketchupAddon)} className={`p-2 rounded-xl border text-[9px] font-black ${ketchupAddon ? 'border-red-500 bg-red-500/5 text-red-600 animate-none' : 'dark:border-white/5 border-gray-200 bg-transparent dark:text-gray-400 text-neutral-800'}`}>
+                    <button onClick={() => setKetchupAddon(!ketchupAddon)} className={`p-2 rounded-xl border text-[9px] font-black ${ketchupAddon ? 'border-red-500 bg-red-500/5 text-red-650 animate-none' : 'dark:border-white/5 border-gray-200 bg-transparent dark:text-gray-400 text-neutral-800'}`}>
                       Ketchup (+₹10)
                     </button>
                     <button onClick={() => setOreganoAddon(!oreganoAddon)} className={`p-2 rounded-xl border text-[9px] font-black ${oreganoAddon ? 'border-yellow-500 bg-yellow-500/5 text-yellow-500 animate-none' : 'dark:border-white/5 border-gray-200 bg-transparent dark:text-gray-400 text-neutral-800'}`}>
@@ -1529,14 +1526,6 @@ export default function BbCafeHome() {
                   </div>
                 </div>
 
-                <div className="dark:bg-green-950/10 bg-green-50/50 border dark:border-green-500/10 border-green-200/50 rounded-2xl p-4 flex justify-between items-center transition-colors duration-200">
-                  <div className="space-y-0.5">
-                    <p className="text-[10px] font-black text-green-600 uppercase tracking-tight">🌱 Eco-Friendly Packaging</p>
-                    <p className="text-[8px] dark:text-gray-400 text-neutral-700 font-bold">चम्मच / टिश्यू पेपर की आवश्यकता नहीं है</p>
-                  </div>
-                  <input type="checkbox" checked={noCutlery} onChange={() => setNoCutlery(!noCutlery)} className="w-4 h-4 accent-green-500" />
-                </div>
-
                 {/* RESTORED FULLY FUNCTIONAL LOYALTY CLUB CARD INSIDE CART DRAWER */}
                 {customerDetails && (
                   <div className="dark:bg-yellow-400/5 bg-yellow-100 border border-yellow-350 dark:border-yellow-400/20 rounded-2xl p-4 space-y-3 transition-colors duration-200 shadow-md">
@@ -1570,7 +1559,7 @@ export default function BbCafeHome() {
 
                     <div className="pt-2 border-t border-white/5 flex justify-between items-center">
                       <span className="text-[9px] dark:text-gray-400 text-neutral-700 font-bold uppercase">Gift points to friend:</span>
-                      <button type="button" onClick={() => setIsGiftModalOpen(true)} className="bg-yellow-500/10 text-yellow-600 border border-yellow-400/20 px-2.5 py-1 rounded text-[8px] font-black uppercase animate-none">🎁 Gift Points</button>
+                      <button type="button" onClick={() => setIsGiftModalOpen(true)} className="bg-yellow-500/10 text-yellow-500 border border-yellow-400/20 px-2.5 py-1 rounded text-[8px] font-black uppercase animate-none">🎁 Gift Points</button>
                     </div>
 
                     <div className="space-y-1.5 pt-2 border-t border-white/5">
@@ -1651,7 +1640,7 @@ export default function BbCafeHome() {
       <AnimatePresence>
         {isInstallModalOpen && (
           <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[270] flex items-center justify-center p-6">
-            <div className="dark:bg-[#111] bg-white w-full max-w-sm p-6 rounded-3xl border dark:border-white/10 border-gray-200 text-center space-y-4 shadow-2xl transition-colors duration-200">
+            <div className="dark:bg-[#111] bg-white w-full max-sm p-6 rounded-3xl border dark:border-white/10 border-gray-200 text-center space-y-4 shadow-2xl transition-colors duration-200">
               <Sparkles className="mx-auto text-yellow-400 animate-bounce" size={32} />
               
               <div className="space-y-1">
