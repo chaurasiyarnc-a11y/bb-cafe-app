@@ -1102,7 +1102,7 @@ export default function BbCafeHome() {
                       
                       <div className="absolute top-3 left-3 bg-black/50 backdrop-blur-md px-2.5 py-1 rounded-lg border border-white/10 flex items-center gap-1 text-[8px] font-black uppercase text-green-400">
                         <span className="h-1 w-1 rounded-full bg-green-500 animate-pulse" />VEG
-                    </div>
+                      </div>
 
                       {/* "FREE delivery" Bar Tag */}
                       <div className="absolute bottom-0 left-0 bg-gradient-to-r from-blue-600 to-blue-500 text-white font-black text-[9px] px-3 py-1 rounded-tr-xl flex items-center gap-1 shadow-md uppercase tracking-wider">
@@ -1152,7 +1152,7 @@ export default function BbCafeHome() {
                           setIsCartOpen(true);
                         }
                       }}
-                      className="cursor-pointer bg-gradient-to-r from-amber-500 via-orange-500 to-red-650 text-white p-5 rounded-2xl shadow-lg border border-white/10 my-2 relative overflow-hidden group animate-none"
+                      className="cursor-pointer bg-gradient-to-r from-amber-500 via-orange-500 to-red-655 text-white p-5 rounded-2xl shadow-lg border border-white/10 my-2 relative overflow-hidden group animate-none"
                     >
                       {/* Ambient background blob */}
                       <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full blur-xl group-hover:scale-110 transition-transform duration-500" />
@@ -1162,13 +1162,13 @@ export default function BbCafeHome() {
                             🎁 LOYALTY CLUB PROMO PASS
                           </span>
                           <h4 className="text-sm font-black italic tracking-tight">
-                            Unlock Free Pizza, Thalis & Shakes!
+                            Unlock Free Pizza, Sandwich & Shakes!
                           </h4>
                           <p className="text-[10px] text-orange-100 font-bold leading-normal">
                             {customerDetails ? (
                               "आपका प्रोमो पास एक्टिवेटेड है! ✅ हर ₹100 पर 1 पॉइंट कमाएं। कार्ट खोलकर अपने रिवॉर्ड्स देखें और रीडीम करें ➔"
                             ) : (
-                              "अपना Name और Number दर्ज करके इस पास को एक्टिवेट करें! 🎁 हर ₹100 पर 1 पॉइंट कमाएं और फ्री पिज्जा/थाली पाएं। Tap to activate ➔"
+                              "अपना Name और Number दर्ज करके इस पास को एक्टिवेट करें! 🎁 हर ₹100 पर 1 पॉइंट कमाएं और फ्री पिज्जा/सैंडविच पाएं। Tap to activate ➔"
                             )}
                           </p>
                         </div>
@@ -1195,6 +1195,25 @@ export default function BbCafeHome() {
                         </p>
                       </div>
                       <ChevronRight size={14} className="text-emerald-100 group-hover:translate-x-0.5 transition-transform" />
+                    </motion.div>
+                  )}
+
+                  {/* 8th Item check (index === 7) to render a thin, premium Social Media Follow Strip */}
+                  {index === 7 && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 15 }}
+                      whileInView={{ opacity: 1, y: 0 }}
+                      viewport={{ once: true }}
+                      onClick={() => setIsSocialsOpen(true)}
+                      className="cursor-pointer bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white py-3.5 px-4 rounded-xl shadow-md border border-white/10 my-2 flex justify-between items-center transition-all active:scale-95 group animate-none"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm">📱</span>
+                        <p className="text-[10px] font-black tracking-wide uppercase">
+                          हमें सोशल मीडिया पर फॉलो करें और +1 फ्री पॉइंट पाएं! ➔
+                        </p>
+                      </div>
+                      <ChevronRight size={14} className="text-blue-100 group-hover:translate-x-0.5 transition-transform" />
                     </motion.div>
                   )}
                 </React.Fragment>
@@ -1429,6 +1448,7 @@ export default function BbCafeHome() {
                 <button onClick={() => { setIsCartOpen(false); }} className="p-2.5 dark:bg-white/5 bg-gray-100 hover:dark:bg-white/10 hover:bg-gray-200 dark:text-white text-neutral-800 rounded-full transition-all"><X size={20} /></button>
               </div>
 
+              {/* 1. CART ITEMS LIST */}
               {cart.map((item: any) => (
                 <div key={item.id} className="flex justify-between items-center dark:bg-white/[0.02] bg-white p-4 rounded-2xl mb-3 border dark:border-white/5 border-gray-200 shadow-sm transition-colors duration-200">
                   <div className="min-w-0 pr-3">
@@ -1448,6 +1468,7 @@ export default function BbCafeHome() {
               ))}
 
               <div className="mt-6 space-y-4">
+                {/* 2. FREE DELIVERY PROGRESS TARGET BAR */}
                 <div className="bg-orange-500/5 border border-orange-500/10 rounded-2xl p-4 space-y-2">
                   <div className="flex justify-between items-center text-[10px] font-black uppercase text-orange-500">
                     <span>🚚 Free Delivery Target:</span>
@@ -1459,38 +1480,7 @@ export default function BbCafeHome() {
                   <p className="text-[8px] dark:text-gray-400 text-neutral-800 font-bold">*Mohandra Town is free delivery above ₹99. Nearby Areas limit is active.</p>
                 </div>
 
-                <div className="dark:bg-white/[0.02] bg-gray-50 border dark:border-white/5 border-gray-200 rounded-2xl p-4 space-y-2 transition-colors duration-200">
-                  <p className="text-[9px] font-black uppercase dark:text-gray-400 text-neutral-800">Add Extra condiments to order:</p>
-                  <div className="grid grid-cols-3 gap-2">
-                    <button onClick={() => setKetchupAddon(!ketchupAddon)} className={`p-2 rounded-xl border text-[9px] font-black ${ketchupAddon ? 'border-red-500 bg-red-500/5 text-red-650 animate-none' : 'dark:border-white/5 border-gray-200 bg-transparent dark:text-gray-400 text-neutral-800'}`}>
-                      Ketchup (+₹10)
-                    </button>
-                    <button onClick={() => setOreganoAddon(!oreganoAddon)} className={`p-2 rounded-xl border text-[9px] font-black ${oreganoAddon ? 'border-yellow-500 bg-yellow-500/5 text-yellow-500 animate-none' : 'dark:border-white/5 border-gray-200 bg-transparent dark:text-gray-400 text-neutral-800'}`}>
-                      Oregano (+₹10)
-                    </button>
-                    <button onClick={() => setChiliFlakesAddon(!chiliFlakesAddon)} className={`p-2 rounded-xl border text-[9px] font-black ${chiliFlakesAddon ? 'border-orange-500 bg-orange-500/5 text-orange-500 animate-none' : 'dark:border-white/5 border-gray-200 bg-transparent dark:text-gray-400 text-neutral-800'}`}>
-                      Chili Flakes (+₹10)
-                    </button>
-                  </div>
-                </div>
-
-                {upsellSuggestionItems.length > 0 && (
-                  <div className="dark:bg-purple-950/20 bg-purple-50 border border-purple-500/10 rounded-2xl p-4 space-y-2">
-                    <p className="text-[9px] font-black uppercase dark:text-purple-400 text-purple-800 tracking-wider">Frequently Bought Together 🥤</p>
-                    <div className="space-y-2">
-                      {upsellSuggestionItems.map((suggest) => (
-                        <div key={suggest.id} className="flex justify-between items-center text-[10px]">
-                          <div>
-                            <span className="font-bold block dark:text-white text-neutral-900">{suggest.name}</span>
-                            <span className="text-orange-600 font-extrabold">{getDisplayPrice(suggest)}</span>
-                          </div>
-                          <button onClick={() => addItem(suggest)} className="bg-purple-500/20 text-purple-355 border border-purple-500/30 px-3 py-1 rounded-lg font-black uppercase animate-none">ADD</button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
+                {/* 3. SELECT DELIVERY ZONE (Shifted strictly under Free Delivery progress bar) */}
                 <div className="dark:bg-white/[0.02] bg-gray-50 border dark:border-white/5 border-gray-200 rounded-2xl p-4 space-y-2 transition-colors duration-200">
                   <label className="text-[9px] font-black uppercase dark:text-gray-400 text-neutral-800">Select Delivery Zone (KM):</label>
                   <div className="grid grid-cols-2 gap-2">
@@ -1518,7 +1508,59 @@ export default function BbCafeHome() {
                   </div>
                 </div>
 
-                {/* RESTORED FULLY FUNCTIONAL LOYALTY CLUB CARD INSIDE CART DRAWER */}
+                {/* 4. DELIVERY ADDRESS INPUT (Shifted strictly under Select Delivery Zone) */}
+                <div className="dark:bg-white/[0.02] bg-gray-50 p-4 rounded-2xl border dark:border-white/5 border-gray-200 space-y-2 transition-colors duration-200">
+                  <div className="flex items-center gap-1.5 text-orange-500"><MapPin size={14}/> <h3 className="font-black uppercase text-[10px]">Delivery Address</h3></div>
+                  <div className="flex justify-between items-center mb-1">
+                    <button type="button" onClick={handleDetectLocation} className="text-[8px] bg-green-600 text-white font-black px-2 py-1 rounded flex items-center gap-1 shadow-sm uppercase animate-none">📍 Detect Location</button>
+                  </div>
+                  <textarea placeholder="Ghar ka address, Landmark ke saath..." value={address} onChange={(e) => setAddress(e.target.value)} className="w-full dark:bg-black/40 bg-white border dark:border-white/10 border-gray-300 rounded-xl p-3 text-xs font-semibold dark:text-white text-neutral-900 outline-none resize-none h-16" />
+                </div>
+
+                {/* 5. ADD EXTRA CONDIMENTS BUTTONS */}
+                <div className="dark:bg-white/[0.02] bg-gray-50 border dark:border-white/5 border-gray-200 rounded-2xl p-4 space-y-2 transition-colors duration-200">
+                  <p className="text-[9px] font-black uppercase dark:text-gray-400 text-neutral-800">Add Extra condiments to order:</p>
+                  <div className="grid grid-cols-3 gap-2">
+                    <button onClick={() => setKetchupAddon(!ketchupAddon)} className={`p-2 rounded-xl border text-[9px] font-black ${ketchupAddon ? 'border-red-500 bg-red-500/5 text-red-650 animate-none' : 'dark:border-white/5 border-gray-200 bg-transparent dark:text-gray-400 text-neutral-800'}`}>
+                      Ketchup (+₹10)
+                    </button>
+                    <button onClick={() => setOreganoAddon(!oreganoAddon)} className={`p-2 rounded-xl border text-[9px] font-black ${oreganoAddon ? 'border-yellow-500 bg-yellow-500/5 text-yellow-500 animate-none' : 'dark:border-white/5 border-gray-200 bg-transparent dark:text-gray-400 text-neutral-800'}`}>
+                      Oregano (+₹10)
+                    </button>
+                    <button onClick={() => setChiliFlakesAddon(!chiliFlakesAddon)} className={`p-2 rounded-xl border text-[9px] font-black ${chiliFlakesAddon ? 'border-orange-500 bg-orange-500/5 text-orange-500 animate-none' : 'dark:border-white/5 border-gray-200 bg-transparent dark:text-gray-400 text-neutral-800'}`}>
+                      Chili Flakes (+₹10)
+                    </button>
+                  </div>
+                </div>
+
+                {/* 6. UPSELL / FREQUENTLY BOUGHT TOGETHER SECTION */}
+                {upsellSuggestionItems.length > 0 && (
+                  <div className="dark:bg-purple-950/20 bg-purple-50 border border-purple-500/10 rounded-2xl p-4 space-y-2">
+                    <p className="text-[9px] font-black uppercase dark:text-purple-400 text-purple-800 tracking-wider">Frequently Bought Together 🥤</p>
+                    <div className="space-y-2">
+                      {upsellSuggestionItems.map((suggest) => (
+                        <div key={suggest.id} className="flex justify-between items-center text-[10px]">
+                          <div>
+                            <span className="font-bold block dark:text-white text-neutral-900">{suggest.name}</span>
+                            <span className="text-orange-600 font-extrabold">{getDisplayPrice(suggest)}</span>
+                          </div>
+                          <button onClick={() => addItem(suggest)} className="bg-purple-500/20 text-purple-355 border border-purple-500/30 px-3 py-1 rounded-lg font-black uppercase animate-none">ADD</button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* 7. ECO FRIENDLY PACKAGING CHECKBOX */}
+                <div className="dark:bg-green-950/10 bg-green-50/50 border dark:border-green-500/10 border-green-200/50 rounded-2xl p-4 flex justify-between items-center transition-colors duration-200">
+                  <div className="space-y-0.5">
+                    <p className="text-[10px] font-black text-green-600 uppercase tracking-tight">🌱 Eco-Friendly Packaging</p>
+                    <p className="text-[8px] dark:text-gray-400 text-neutral-700 font-bold">चम्मच / टिश्यू पेपर की आवश्यकता नहीं है</p>
+                  </div>
+                  <input type="checkbox" checked={noCutlery} onChange={() => setNoCutlery(!noCutlery)} className="w-4 h-4 accent-green-500" />
+                </div>
+
+                {/* 8. RESTORED FULLY FUNCTIONAL LOYALTY CLUB CARD */}
                 {customerDetails && (
                   <div className="dark:bg-yellow-400/5 bg-yellow-100 border border-yellow-350 dark:border-yellow-400/20 rounded-2xl p-4 space-y-3 transition-colors duration-200 shadow-md">
                     <div className="flex justify-between items-center border-b dark:border-white/10 border-yellow-200 pb-2">
@@ -1561,7 +1603,7 @@ export default function BbCafeHome() {
                           const inCartCost = cart.reduce((acc: number, i: any) => acc + (i.pointsCost || 0), 0);
                           const isAffordable = (customerPoints - inCartCost) >= rule.pointsCost;
                           return (
-                            <button key={rule.id} type="button" onClick={() => handleCustomerRedeem(`reward-${rule.id}`, `🎁 FREE ${rule.rewardName}`, rule.pointsCost)} disabled={!isAffordable} className={`py-2 px-2 rounded text-[9px] font-black uppercase border truncate transition-all ${isAffordable ? 'bg-yellow-400 text-black border-yellow-400 hover:bg-yellow-500 animate-none' : 'bg-neutral-100 dark:bg-white/5 text-neutral-450 dark:text-gray-500 border-neutral-200 dark:border-white/5 cursor-not-allowed'}`}>🎁 {rule.rewardName} ({rule.pointsCost} P)</button>
+                            <button key={rule.id} type="button" onClick={() => handleCustomerRedeem(`reward-${rule.id}`, `🎁 FREE ${rule.rewardName}`, rule.pointsCost)} disabled={!isAffordable} className={`py-2 px-2 rounded text-[9px] font-black uppercase border truncate transition-all ${isAffordable ? 'bg-yellow-400 text-black border-yellow-400 hover:bg-yellow-500 animate-none' : 'bg-neutral-100 dark:bg-white/5 text-neutral-455 dark:text-gray-500 border-neutral-200 dark:border-white/5 cursor-not-allowed'}`}>🎁 {rule.rewardName} ({rule.pointsCost} P)</button>
                           );
                         })}
                       </div>
@@ -1569,6 +1611,7 @@ export default function BbCafeHome() {
                   </div>
                 )}
 
+                {/* 9. PROMO CODE / COUPON SECTION */}
                 <div className="dark:bg-white/[0.02] bg-gray-50 border dark:border-white/5 border-gray-200 p-4 rounded-2xl space-y-2 transition-colors duration-200">
                   <div className="flex items-center gap-1.5 text-orange-500 font-black text-[10px] uppercase"><Percent size={14}/> <span>Have a promo code?</span></div>
                   <div className="flex gap-2">
@@ -1583,6 +1626,7 @@ export default function BbCafeHome() {
                   )}
                 </div>
 
+                {/* 10. CUSTOMER DETAILS */}
                 {customerDetails ? (
                   <div className="dark:bg-white/[0.02] bg-gray-50 p-4 rounded-2xl border dark:border-white/5 border-gray-200 flex justify-between items-center transition-colors duration-200">
                     <div>
@@ -1596,14 +1640,7 @@ export default function BbCafeHome() {
                   <button onClick={() => setIsLoginOpen(true)} className="w-full p-4 bg-orange-500/10 text-orange-400 border border-orange-500/20 rounded-2xl font-black text-xs uppercase animate-none">👤 Add Name & Phone To Order</button>
                 )}
 
-                <div className="dark:bg-white/[0.02] bg-gray-50 p-4 rounded-2xl border dark:border-white/5 border-gray-200 space-y-2 transition-colors duration-200">
-                  <div className="flex items-center gap-1.5 text-orange-500"><MapPin size={14}/> <h3 className="font-black uppercase text-[10px]">Delivery Address</h3></div>
-                  <div className="flex justify-between items-center mb-1">
-                    <button type="button" onClick={handleDetectLocation} className="text-[8px] bg-green-600 text-white font-black px-2 py-1 rounded flex items-center gap-1 shadow-sm uppercase animate-none">📍 Detect Location</button>
-                  </div>
-                  <textarea placeholder="Ghar ka address, Landmark ke saath..." value={address} onChange={(e) => setAddress(e.target.value)} className="w-full dark:bg-black/40 bg-white border dark:border-white/10 border-gray-300 rounded-xl p-3 text-xs font-semibold dark:text-white text-neutral-900 outline-none resize-none h-16" />
-                </div>
-
+                {/* 11. PAY SUMMARY CARD */}
                 <div className="bg-gradient-to-b from-orange-600 to-orange-700 p-5 rounded-2xl text-white">
                   <div className="flex justify-between font-bold mb-1.5 text-xs"><span>Items Total</span> <span>₹{getCartSubtotal()}</span></div>
                   {getCartAddonsPrice() > 0 && <div className="flex justify-between font-bold mb-1.5 text-xs"><span>Extra Condiments</span> <span>+₹{getCartAddonsPrice()}</span></div>}
@@ -1615,6 +1652,7 @@ export default function BbCafeHome() {
                   <div className="flex justify-between font-black text-xl"><span>To Pay</span> <span>₹{getTotalBillPrice()}</span></div>
                 </div>
 
+                {/* 12. WHATSAPP CHECKOUT TRIGGER */}
                 {isTooFar ? (
                   <div className="bg-red-600/20 text-red-400 p-4 rounded-2xl text-center text-xs font-bold border border-red-500/20">
                     आप 20 KM से अधिक दूर हैं। आर्डर स्वीकार नहीं किया जा सकता। ❌
