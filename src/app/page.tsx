@@ -86,7 +86,7 @@ export default function BbCafeHome() {
 
   const [isGiftModalOpen, setIsGiftModalOpen] = useState(false);
   const [giftPhone, setGiftPhone] = useState("");
-  const [giftPointsAmount, setGiftPointsAmount] = useState<number | "">("");
+  const [giftPointsAmount, setGiftPointsAmount] = useState<number | " text-neutral-900">("");
   const [isGiftingLoading, setIsGiftingLoading] = useState(false);
 
   const [dbCategories, setDbCategories] = useState<any[]>([]);
@@ -396,6 +396,9 @@ export default function BbCafeHome() {
 
   // --- REST OF EFFECTS ---
   useEffect(() => {
+    // Restored missing mounted initialization statement!
+    setMounted(true);
+
     const unsubStore = onSnapshot(doc(db, "settings", "store"), (d) => { if(d.exists()) setStoreOpen(d.data().isOpen); });
     
     const unsubMenu = onSnapshot(query(collection(db, "products")), (snap) => {
@@ -426,7 +429,7 @@ export default function BbCafeHome() {
     };
   }, []);
 
-  // --- NEWLY RESTORED PWA INSTALL CLICK HANDLER ---
+  // --- PWA INSTALL CLICK HANDLER ---
   const handleInstallClick = async () => {
     if (deferredPrompt) {
       deferredPrompt.prompt();
@@ -1265,7 +1268,7 @@ export default function BbCafeHome() {
             <motion.div initial={{ y: 300 }} animate={{ y: 0 }} exit={{ y: 300 }} className="dark:bg-[#111] bg-white w-full p-6 rounded-t-3xl border-t dark:border-white/10 border-gray-200 max-w-lg mx-auto overflow-y-auto max-h-[90vh] shadow-2xl transition-colors duration-200">
               <div className="w-12 h-1 bg-white/15 rounded-full mx-auto mb-4" />
               <h3 className="text-xl font-black text-center">{selectedProduct?.name}</h3>
-              <p className="text-orange-500 font-black mb-4 uppercase text-[8px] text-center">Customize Your Order</p>
+              <p className="text-orange-505 font-black mb-4 uppercase text-[8px] text-center">Customize Your Order</p>
               
               <div className="space-y-3 mb-4">
                 <p className="text-[10px] font-bold text-gray-500 uppercase">1. Select Portion Size:</p>
