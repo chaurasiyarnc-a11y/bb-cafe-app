@@ -509,7 +509,7 @@ export default function BbCafeHome() {
             • **Chrome (Android):** ऊपर 3 डॉट्स <span className="font-black">(⋮)</span> दबाएं और **'Install app'** चुनें।
           </p>
           <p className="text-gray-600 font-medium leading-relaxed">
-            • **Safari (iPhone):** नीचे **Share** आइकॉन दबाएं और **'Add to Home Screen'** चुनें।
+            • **Safari (iPhone):** नीचे **Share** आइकॉन दबाएं and **'Add to Home Screen'** चुनें।
           </p>
           <button onClick={() => toast.dismiss(t.id)} className="bg-orange-500 text-white px-2.5 py-1.5 rounded-lg mt-1.5 text-[9px] uppercase font-black tracking-wider shadow">समझ गया</button>
         </div>
@@ -974,7 +974,7 @@ export default function BbCafeHome() {
             <Phone size={13} />
           </a>
           <div className="bg-black/40 px-2 py-0.5 rounded-full border border-white/10 flex items-center gap-1 text-[8px] font-black uppercase text-green-400">
-            <span className="h-1 w-1 rounded-full bg-green-500" />100% VEG
+            <span className="h-1 w-1 rounded-full bg-green-550" />100% VEG
           </div>
         </div>
       </header>
@@ -1160,7 +1160,7 @@ export default function BbCafeHome() {
                   <div className="p-4 flex flex-col justify-between flex-1">
                     <div className="flex justify-between items-start gap-4">
                       {/* Dark text for perfect light mode contrast */}
-                      <h4 className="font-black text-sm dark:text-gray-100 text-gray-950 line-clamp-1">{item.name}</h4>
+                      <h4 className="font-black text-sm dark:text-gray-100 text-gray-955 line-clamp-1">{item.name}</h4>
                       <div className="bg-green-600 text-white font-extrabold text-[9px] px-2 py-0.5 rounded flex items-center gap-0.5">
                         <span>4.7</span><span className="text-[8px]">★</span>
                       </div>
@@ -1279,7 +1279,7 @@ export default function BbCafeHome() {
             </div>
           </div>
         )}
-      </  AnimatePresence>
+      </AnimatePresence>
 
       <AnimatePresence>
         {isReviewFormOpen && (
@@ -1830,4 +1830,4 @@ export default function BbCafeHome() {
 
     </div>
   );
-}
+  }
