@@ -1,5 +1,3 @@
-
-
 'use client';
 import React, { useState, useEffect, useMemo } from 'react';
 import { db } from '../lib/firebase'; 
@@ -53,7 +51,7 @@ const PERMANENT_REVIEWS = [
   { id: "rev1", name: "Gaurav Soni", rating: 5, comment: "बम बम कैफे की पनीर पिज्जा सच में पूरे मोहांद्रा में बेस्ट है! एक्स्ट्रा चीज़ लव है। ⭐⭐⭐⭐⭐" },
   { id: "rev2", name: "Anjali Patel", rating: 5, comment: "फास्ट फ़ूड की पैकिंग बहुत अच्छी थी, डिलीवरी बॉय का व्यवहार भी बहुत विनम्र था। ⭐⭐⭐⭐⭐" },
   { id: "rev3", name: "Shubham Dwivedi", rating: 5, comment: "स्पेशल थाली का स्वाद एकदम घर जैसा है। सफ़ाई और शुद्धता लाजवाब है। ⭐⭐⭐⭐⭐" },
-  { id: "rev4", name: "Neha Chaurasia", rating: 5, comment: "इस क्षेत्र का सबसे अच्छा कैफे। पिज्जा टॉपिंग्स ताज़ा हैं और क्रस्ट बहुत सॉफ्ट है! ⭐⭐⭐⭐⭐" }
+  { id: "rev4", name: "Neha Chaurasia", rating: 5, comment: "इस क्षेत्र का सबसे अच्छा कैफे। पिज्जा विभाग ताज़ा है और क्रस्ट बहुत सॉफ्ट है! ⭐⭐⭐⭐⭐" }
 ];
 
 export default function BbCafeHome() {
@@ -364,164 +362,42 @@ export default function BbCafeHome() {
     }).slice(0, 2);
   }, [menu, cart]);
 
-  // --- LIFE CYCLE EFFECTS ---
-
+  // --- REPAIRED PWA & SW LIFECYCLE EFFECT ---
   useEffect(() => {
-    setMounted(true);
-    const updateOnlineStatus = () => {
-      setIsOnline(navigator.onLine);
-      if (navigator.onLine) {
-        toast.success("स्मार्ट ऑफलाइन मोड: आप वापस ऑनलाइन हैं!");
-      } else {
-        toast.error("स्मार्ट ऑफलाइन मोड: ऑफलाइन हैं, पुराना मेनू डेटा कैश से लोड है।");
-      }
-    };
-    window.addEventListener('online', updateOnlineStatus);
-    window.addEventListener('offline', updateOnlineStatus);
-    setIsOnline(navigator.onLine);
-
-    const savedFavs = localStorage.getItem('bb_favorites');
-    if (savedFavs) {
-      try { setFavorites(JSON.parse(savedFavs)); } catch (e) {}
-    }
-
-    const unsubStore = onSnapshot(doc(db, "settings", "store"), (d) => { if(d.exists()) setStoreOpen(d.data().isOpen); });
-    
-    const unsubMenu = onSnapshot(query(collection(db, "products")), (snap) => {
-      const items = snap.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter((i: any) => i.isVisible !== false);
-      setMenu(items);
-      localStorage.setItem('bb_cached_menu', JSON.stringify(items)); 
-    }, () => {
-      const localCached = localStorage.getItem('bb_cached_menu');
-      if (localCached) setMenu(JSON.parse(localCached));
-    });
-
-    const unsubCats = onSnapshot(collection(db, "categories"), (snap) => { setDbCategories(snap.docs.map(d => ({ id: d.id, ...d.data() }))); });
-    const unsubBanners = onSnapshot(collection(db, "banners"), (snap) => { setBanners(snap.docs.map(d => ({ id: d.id, ...d.data() }))); });
-    const unsubCoupons = onSnapshot(collection(db, "coupons"), (snap) => { setCoupons(snap.docs.map(d => ({ id: d.id, ...d.data() }))); });
-    const unsubReviews = onSnapshot(collection(db, "reviews"), (snap) => {
-      setReviews(snap.docs.map(d => ({ id: d.id, ...d.data() })).filter((r: any) => r.isApproved === true));
-    });
-    const unsubRules = onSnapshot(collection(db, "loyalty_rules"), (snap) => { setLoyaltyRules(snap.docs.map(d => ({ id: d.id, ...d.data() }))); });
-
-    const savedDetails = localStorage.getItem('bb_cafe_customer');
-    if (savedDetails) { try { setCustomerDetails(JSON.parse(savedDetails)); } catch (err) {} }
-
-    // Smart Cart Restore
-    const savedCart = localStorage.getItem('bb_cafe_draft_cart');
-    if (savedCart && cart.length === 0) {
-      try {
-        const parsed = JSON.parse(savedCart);
-        if (parsed && parsed.length > 0) {
-          toast((t) => (
-            <div className="flex flex-col gap-2 p-1">
-              <p className="text-xs font-bold text-gray-800">क्या आप अपने पिछले ड्राफ्ट कार्ट को रीस्टोर करना चाहते हैं?</p>
-              <div className="flex gap-2">
-                <button onClick={() => {
-                  parsed.forEach((item: any) => addItem(item));
-                  localStorage.removeItem('bb_cafe_draft_cart');
-                  toast.dismiss(t.id);
-                  toast.success("कार्ट रीस्टोर हो गया!");
-                }} className="bg-green-600 text-white text-[10px] font-black px-2.5 py-1.5 rounded-lg uppercase">रीस्टोर करें</button>
-                <button onClick={() => {
-                  localStorage.removeItem('bb_cafe_draft_cart');
-                  toast.dismiss(t.id);
-                }} className="bg-red-500 text-white text-[10px] font-black px-2.5 py-1.5 rounded-lg uppercase">हटाएं</button>
-              </div>
-            </div>
-          ), { duration: 8000 });
-        }
-      } catch (err) {}
-    }
-
-    return () => { 
-      window.removeEventListener('online', updateOnlineStatus);
-      window.removeEventListener('offline', updateOnlineStatus);
-      unsubStore(); 
-      unsubMenu(); 
-      unsubCats(); 
-      unsubBanners(); 
-      unsubReviews(); 
-      unsubCoupons(); 
-      unsubRules(); 
-    };
-  }, []);
-
-  // Promotional Banners Automatic Cycle Timer
-  useEffect(() => {
-    if (!banners || banners.length <= 1) return;
-    const interval = setInterval(() => {
-      setBannerIndex((prevIndex) => (prevIndex + 1) % banners.length);
-    }, 5000); 
-    return () => clearInterval(interval);
-  }, [banners]);
-
-  // PWA Prompt Setup
-  useEffect(() => {
-    if ('serviceWorker' in navigator) {
+    // 1. Service Worker register
+    if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
       navigator.serviceWorker.register('/sw.js')
-        .then(() => console.log("Service Worker Registered"))
-        .catch((err) => console.log("Service Worker Registration failed", err));
+        .then((reg) => console.log("Service Worker Registered on:", reg.scope))
+        .catch((err) => console.error("Service Worker registration failed:", err));
     }
 
+    // 2. Browser beforeinstallprompt event setup
     const handleBeforeInstallPrompt = (e: any) => {
       e.preventDefault();
+      console.log("PWA install prompt detected.");
       setDeferredPrompt(e);
       setShowInstallBanner(true);
     };
-    window.addEventListener('beforeinstallprompt' as any, handleBeforeInstallPrompt);
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
 
+    // 3. Standalone check & auto install fallback display timer
     const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone;
+    
+    let installBannerTimer: NodeJS.Timeout;
     if (!isStandalone) {
-      const timer = setTimeout(() => {
+      installBannerTimer = setTimeout(() => {
         setShowInstallBanner(true);
       }, 3000);
-      return () => {
-        clearTimeout(timer);
-        window.removeEventListener('beforeinstallprompt' as any, handleBeforeInstallPrompt);
-      };
     }
 
+    // Single unified cleanup function to avoid broken listener code!
     return () => {
-      window.removeEventListener('beforeinstallprompt' as any, handleBeforeInstallPrompt);
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      if (installBannerTimer) clearTimeout(installBannerTimer);
     };
   }, []);
 
-  const handleInstallClick = async () => {
-    if (deferredPrompt) {
-      deferredPrompt.prompt();
-      const { outcome } = await deferredPrompt.userChoice;
-      if (outcome === 'accepted') {
-        toast.success("बम बम कैफ़े ऐप इंस्टॉल करने के लिए धन्यवाद! ❤️");
-      }
-      setDeferredPrompt(null);
-      setShowInstallBanner(false);
-    } else {
-      setIsInstallModalOpen(true);
-    }
-  };
-
-  useEffect(() => {
-    if (cart.length > 0) {
-      localStorage.setItem('bb_cafe_draft_cart', JSON.stringify(cart));
-    } else {
-      localStorage.removeItem('bb_cafe_draft_cart');
-    }
-  }, [cart]);
-
-  useEffect(() => {
-    if (!customerDetails?.phone) { setCustomerPoints(0); return; }
-    const unsubPoints = onSnapshot(doc(db, "customer_points", customerDetails.phone.replace("+91", "")), (docSnap) => {
-      setCustomerPoints(docSnap.exists() ? (docSnap.data().points || 0) : 0);
-    }, () => { setCustomerPoints(0); });
-    
-    const phoneClean = customerDetails.phone.replace("+91", "");
-    setShareCount(Number(localStorage.getItem(`bb_shares_${phoneClean}`) || 0));
-
-    return () => unsubPoints();
-  }, [customerDetails]);
-
-  // --- EVENT HANDLERS & OPERATIONS ---
+  // --- REST OF ACTIONS ---
 
   const handleApplyCoupon = () => {
     if (!enteredCoupon) return toast.error("Please enter a coupon code");
@@ -631,7 +507,6 @@ export default function BbCafeHome() {
     toast.success(`${name} Cart में जोड़ दिया गया है!`);
   };
 
-  // Direct WhatsApp Order submission
   const sendWhatsAppOrder = async () => {
     if (isTooFar) {
       return toast.error("आपकी दूरी 20 KM से अधिक है। आप केवल मेनू देख सकते हैं, ऑर्डर प्लेस नहीं कर सकते!");
@@ -935,7 +810,7 @@ export default function BbCafeHome() {
 
       {/* PREMIUM VIDEO BACKGROUND HEADER */}
       <header className="relative py-8 px-4 overflow-hidden border-b border-white/10 shadow-xl flex justify-between items-center min-h-[110px]">
-        {/* HTML5 background video tag with autoPlay & loops enabled */}
+        {/* local video path '/header-video.mp4' is used so it never gets blocked by external servers! */}
         <video 
           autoPlay 
           loop 
@@ -943,16 +818,16 @@ export default function BbCafeHome() {
           playsInline 
           className="absolute inset-0 w-full h-full object-cover z-0 select-none pointer-events-none"
         >
-          {/* High-quality, fast-loading direct Pizza cheese pull video loop */}
-          <source src="https://assets.mixkit.co/videos/preview/mixkit-freshly-baked-pizza-with-stretching-cheese-43029-large.mp4" type="video/mp4" />
-          {/* Fallback image in case browser blocks video */}
+          <source src="/header-video.mp4" type="video/mp4" />
+          {/* Backup link in case local file is still being added */}
+          <source src="https://www.basewfp.com/wp-content/uploads/2024/06/Video-for-Homepage-s.mp4" type="video/mp4" />
           <img src="https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=600&q=80" className="absolute inset-0 w-full h-full object-cover" alt="Bum Bum Cafe Header" />
         </video>
 
-        {/* Semi-transparent dark overlay gradient for 100% text readability */}
+        {/* Semi-transparent dark overlay gradient for readability */}
         <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/55 to-black/85 z-10" />
 
-        {/* Header content elements positioned above video & overlay */}
+        {/* Header content elements */}
         <div className="relative z-20">
           <motion.h1 
             initial={{ scale: 0.9, opacity: 0 }} 
@@ -1138,7 +1013,6 @@ export default function BbCafeHome() {
                   transition={{ duration: 0.45, ease: "easeOut" }}
                 >
                   <div className="relative h-44 w-full overflow-hidden">
-                    {/* Highly Animated Zoom Image on Hover */}
                     <img 
                       src={item.image || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=500&bg=80"} 
                       className="w-full h-full object-cover origin-center transition-transform duration-700 ease-out group-hover:scale-110" 
@@ -1149,7 +1023,7 @@ export default function BbCafeHome() {
                       <span className="h-1 w-1 rounded-full bg-green-500 animate-pulse" />VEG
                     </div>
 
-                    {/* "FREE delivery" Bar Tag added beautifully (Blinkit style) */}
+                    {/* "FREE delivery" Bar Tag */}
                     <div className="absolute bottom-0 left-0 bg-gradient-to-r from-blue-600 to-blue-500 text-white font-black text-[9px] px-3 py-1 rounded-tr-xl flex items-center gap-1 shadow-md uppercase tracking-wider">
                       <span>🛵</span> <span>FREE delivery</span>
                     </div>
@@ -1257,7 +1131,6 @@ export default function BbCafeHome() {
                   <h2 className="text-2xl font-black text-white">All Reviews</h2>
                   <p className="text-xs text-yellow-400 font-bold">Rating: 4.8/5.0 ★</p>
                 </div>
-                {/* Fixed invisible close button for Drawer Modal (Now always prominent white on dark bg) */}
                 <button onClick={() => setIsReviewsDrawerOpen(false)} className="p-2.5 bg-white/10 text-white rounded-full hover:bg-white/20 transition-colors"><X size={20} /></button>
               </div>
               <div className="space-y-4">
@@ -1279,9 +1152,9 @@ export default function BbCafeHome() {
             </div>
           </div>
         )}
-      </AnimatePresence>
+      </  AnimatePresence>
 
-      {/* WRITING REVIEW POPUP (Highly Visible Close Button in Light Mode & Dark Mode) */}
+      {/* WRITING REVIEW POPUP */}
       <AnimatePresence>
         {isReviewFormOpen && (
           <div className="fixed inset-0 bg-black/95 z-[200] flex items-center justify-center p-6">
@@ -1289,7 +1162,6 @@ export default function BbCafeHome() {
               <div className="flex justify-between items-center pb-2 border-b dark:border-white/10 border-gray-100">
                 <h3 className="text-xl font-black text-orange-500 uppercase italic">Your Feedback</h3>
                 
-                {/* Red Circular High-Contrast Close Button for 100% Visibility in Light Mode */}
                 <button 
                   type="button" 
                   onClick={() => setIsReviewFormOpen(false)} 
@@ -1471,7 +1343,7 @@ export default function BbCafeHome() {
                             <span className="font-bold block dark:text-white text-neutral-900">{suggest.name}</span>
                             <span className="text-orange-600 font-extrabold">{getDisplayPrice(suggest)}</span>
                           </div>
-                          <button onClick={() => addItem(suggest)} className="bg-purple-500/20 text-purple-300 border border-purple-500/30 px-3 py-1 rounded-lg font-black uppercase animate-none">ADD</button>
+                          <button onClick={() => addItem(suggest)} className="bg-purple-500/20 text-purple-355 border border-purple-500/30 px-3 py-1 rounded-lg font-black uppercase animate-none">ADD</button>
                         </div>
                       ))}
                     </div>
@@ -1617,164 +1489,6 @@ export default function BbCafeHome() {
                   <button onClick={sendWhatsAppOrder} type="button" className="w-full bg-green-600 hover:bg-green-700 p-4 rounded-2xl font-black text-sm text-white flex items-center justify-center gap-2 shadow-lg animate-none">ORDER ON WHATSAPP</button>
                 )}
               </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* CUSTOM PWA INSTALL MANUAL GUIDE MODAL */}
-      <AnimatePresence>
-        {isInstallModalOpen && (
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[270] flex items-center justify-center p-6">
-            <div className="dark:bg-[#111] bg-white w-full max-w-sm p-6 rounded-3xl border dark:border-white/10 border-gray-200 text-center space-y-4 shadow-2xl transition-colors duration-200">
-              <Sparkles className="mx-auto text-yellow-400 animate-bounce" size={32} />
-              
-              <div className="space-y-1">
-                <h3 className="text-base font-black dark:text-white text-neutral-900">📲 आसान इंस्टॉलेशन गाइड</h3>
-                <p className="text-[10px] dark:text-gray-400 text-neutral-700 font-bold leading-normal">
-                  यदि स्वचालित इंस्टॉल काम नहीं कर रहा है, तो आप नीचे दिए गए आसान चरणों से इसे मैन्युअल रूप से होम स्क्रीन पर जोड़ सकते हैं:
-                </p>
-              </div>
-
-              <div className="text-left text-xs space-y-3 dark:text-gray-300 text-neutral-800 font-medium border-y dark:border-white/5 border-gray-200 py-4">
-                <p className="flex items-start gap-2">
-                  <span className="bg-orange-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px] font-black flex-shrink-0">1</span>
-                  <span>गूगल क्रोम (Chrome) में ऊपर दाईं ओर दिख रहे **तीन डॉट्स (⋮)** आइकॉन पर क्लिक करें।</span>
-                </p>
-                <p className="flex items-start gap-2">
-                  <span className="bg-orange-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px] font-black flex-shrink-0">2</span>
-                  <span>मेन्यू लिस्ट में नीचे जाकर **'Install app'** या **'Add to Home screen'** का विकल्प चुनें।</span>
-                </p>
-                <p className="flex items-start gap-2">
-                  <span className="bg-orange-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px] font-black flex-shrink-0">3</span>
-                  <span>अब **'Install'** बटन दबाएं। बम बम कैफ़े ऐप आपके फोन की होम स्क्रीन पर असली ऐप की तरह जुड़ जाएगा!</span>
-                </p>
-              </div>
-
-              <button 
-                onClick={() => setIsInstallModalOpen(false)} 
-                className="w-full bg-orange-500 text-white p-3.5 rounded-xl font-black text-xs uppercase tracking-wider active:scale-95 transition-all shadow"
-              >
-                समझ गया, बंद करें
-              </button>
-            </div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {cart.length > 0 && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-full max-w-sm px-4">
-          <button
-            onClick={() => setIsCartOpen(true)}
-            className="w-full bg-yellow-400 hover:bg-yellow-500 text-black py-4 px-5 rounded-2xl font-black text-xs uppercase flex justify-between items-center shadow-2xl active:scale-95 transition-all"
-          >
-            <div className="flex items-center gap-2">
-              <ShoppingBag size={18} />
-              <span>{cart.reduce((acc: number, item: any) => acc + item.quantity, 0)} Items Added</span>
-            </div>
-            <div className="flex items-center gap-0.5 bg-black/10 px-2 py-1 rounded-lg">
-              <span>View Cart</span>
-              <ChevronRight size={12} />
-            </div>
-          </button>
-        </div>
-      )}
-
-      <AnimatePresence>
-        {isLoginOpen && (
-          <div className="fixed inset-0 bg-black/95 z-[200] flex items-center justify-center p-6">
-            <form onSubmit={handleSaveDetails} className="dark:bg-[#111] bg-white w-full max-w-md p-6 rounded-3xl border dark:border-white/10 border-gray-200 text-center space-y-4 shadow-xl transition-colors duration-200">
-              <User className="mx-auto text-orange-500" size={36} />
-              <div>
-                <h2 className="text-xl font-black mb-0.5">Your Details</h2>
-                <p className="text-gray-500 font-semibold text-[8px] uppercase tracking-wider">Setup Once • Order Fast</p>
-              </div>
-              <div className="space-y-3 text-left">
-                <div className="space-y-1">
-                  <label className="text-[9px] font-bold text-gray-500 uppercase">Your Name</label>
-                  <input type="text" placeholder="Enter your name..." value={tempName} onChange={(e) => setTempName(e.target.value)} className="w-full dark:bg-white/5 bg-gray-50 border dark:border-white/10 border-gray-200 p-3 rounded-xl font-bold dark:text-white text-neutral-900 outline-none focus:border-orange-500 text-xs" required />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[9px] font-bold text-gray-500 uppercase">Mobile Number</label>
-                  <input type="tel" maxLength={10} placeholder="10-digit Phone Number" value={tempPhone} onChange={(e) => setTempPhone(e.target.value)} className="w-full dark:bg-white/5 bg-gray-50 border dark:border-white/10 border-gray-200 p-3 rounded-xl font-bold dark:text-white text-neutral-900 outline-none focus:border-orange-500 text-xs" required />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[9px] font-bold text-gray-500 uppercase">Referral Code (Optional)</label>
-                  <input type="text" placeholder="Enter invite code..." value={tempRefCode} onChange={(e) => setTempRefCode(e.target.value)} className="w-full dark:bg-white/5 bg-gray-50 border dark:border-white/10 border-gray-200 p-3 rounded-xl font-bold dark:text-white text-neutral-900 outline-none focus:border-orange-500 text-xs" />
-                </div>
-              </div>
-              <button type="submit" className="w-full bg-orange-500 text-black p-4 rounded-xl font-black text-xs uppercase animate-none">PROCEED TO ORDER</button>
-              <button type="button" onClick={() => setIsLoginOpen(false)} className="mt-2 text-gray-500 text-[9px] font-black uppercase block mx-auto">Close</button>
-            </form>
-          </div>
-        )}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {isGiftModalOpen && (
-          <div className="fixed inset-0 bg-black/95 z-[260] flex items-center justify-center p-6">
-            <motion.form onSubmit={handleGiftPoints} className="dark:bg-[#111] bg-white w-full max-w-md p-6 rounded-3xl border dark:border-white/10 border-gray-200 text-center space-y-4 shadow-xl transition-colors duration-200">
-              <Gift className="mx-auto text-yellow-400" size={32} />
-              <div>
-                <h3 className="text-lg font-black text-yellow-400 uppercase italic">Gift Loyalty Points</h3>
-                <p className="text-[9px] text-gray-500 font-semibold mt-0.5">अपने पॉइंट्स किसी दोस्त को गिफ्ट करें</p>
-              </div>
-              <div className="space-y-3 text-left">
-                <div className="space-y-1">
-                  <label className="text-[9px] font-black uppercase text-gray-500">Friend's Phone Number</label>
-                  <input type="tel" maxLength={10} placeholder="e.g. 9876543210" value={giftPhone} onChange={(e) => setGiftPhone(e.target.value)} required className="w-full dark:bg-white/5 bg-gray-50 border dark:border-white/10 border-gray-200 p-3 rounded-xl text-xs font-bold dark:text-neutral-900 outline-none text-center" />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[9px] font-black uppercase text-gray-500">Points to Gift (Your Pts: {customerPoints})</label>
-                  <input type="number" placeholder="e.g. 10" value={giftPointsAmount} onChange={(e) => setGiftPointsAmount(e.target.value === "" ? "" : Number(e.target.value))} required className="w-full dark:bg-white/5 bg-gray-50 border dark:border-white/10 border-gray-200 p-3 rounded-xl text-xs font-bold dark:text-neutral-900 outline-none text-center" />
-                </div>
-              </div>
-              <div className="flex gap-2">
-                <button type="submit" disabled={isGiftingLoading} className="flex-1 bg-yellow-400 text-black font-black p-3 rounded-xl text-xs uppercase flex items-center justify-center gap-1">
-                  {isGiftingLoading ? <Loader2 className="animate-spin" size={14} /> : <span>Gift Points 🎁</span>}
-                </button>
-                <button type="button" onClick={() => { setIsGiftModalOpen(false); setGiftPhone(""); setGiftPointsAmount(""); }} className="bg-white/5 text-gray-400 font-bold p-3 rounded-xl text-xs">CANCEL</button>
-              </div>
-            </motion.form>
-          </div>
-        )}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {isSocialsOpen && (
-          <div className="fixed inset-0 bg-black/95 z-[250] flex items-center justify-center p-6">
-            <motion.div className="dark:bg-[#111] bg-white w-full max-w-md p-6 rounded-3xl border dark:border-white/10 border-gray-200 text-center space-y-4 shadow-xl transition-colors duration-200">
-              <div>
-                <h3 className="text-xl font-black text-orange-500 uppercase italic">Connect & Earn Points</h3>
-                <p className="text-[8px] text-gray-500 font-bold uppercase tracking-wider">हर प्लेटफार्म पर फॉलो/सब्सक्राइब करने का +1 पॉइंट पाएं!</p>
-              </div>
-              <div className="space-y-2 text-left max-h-[22rem] overflow-y-auto no-scrollbar pr-1">
-                <button onClick={() => handleSocialClick('whatsapp_msg', 'https://wa.me/919714293759')} className="w-full flex items-center justify-between dark:bg-green-500/10 bg-green-50/50 border dark:border-green-500/20 border-green-200/50 p-3 rounded-xl">
-                  <span className="text-[10px] font-black dark:text-white text-neutral-900">🟢 WhatsApp Message</span>
-                  <span className="text-[8px] font-black uppercase px-2.5 py-1 rounded bg-yellow-400 text-black">{getClaimStatus('whatsapp_msg')}</span>
-                </button>
-                <button onClick={() => handleSocialClick('whatsapp_channel', 'https://whatsapp.com/channel/0029VaLhggoGE56natoQI43y')} className="w-full flex items-center justify-between dark:bg-emerald-500/10 bg-green-50/50 border dark:border-emerald-500/20 border-green-200/50 p-3 rounded-xl">
-                  <span className="text-[10px] font-black dark:text-white text-neutral-900">📢 WhatsApp Channel</span>
-                  <span className="text-[8px] font-black uppercase px-2.5 py-1 rounded bg-yellow-400 text-black">{getClaimStatus('whatsapp_channel')}</span>
-                </button>
-                <button onClick={() => handleSocialClick('youtube', 'https://www.youtube.com/@bbcafe.i')} className="w-full flex items-center justify-between dark:bg-red-600/10 bg-green-50/50 border dark:border-red-600/20 border-green-200/50 p-3 rounded-xl">
-                  <span className="text-[10px] font-black dark:text-white text-neutral-900">🔴 YouTube Channel</span>
-                  <span className="text-[8px] font-black uppercase px-2.5 py-1 rounded bg-yellow-400 text-black">{getClaimStatus('youtube')}</span>
-                </button>
-                <button onClick={() => handleSocialClick('instagram', 'https://www.instagram.com/bbcafe.in/')} className="w-full flex items-center justify-between dark:bg-pink-500/10 bg-green-50/50 border dark:border-pink-500/20 border-green-200/50 p-3 rounded-xl">
-                  <span className="text-[10px] font-black dark:text-white text-neutral-900">📸 Instagram</span>
-                  <span className="text-[8px] font-black uppercase px-2.5 py-1 rounded bg-yellow-400 text-black">{getClaimStatus('instagram')}</span>
-                </button>
-                <button onClick={() => handleSocialClick('facebook', 'https://www.facebook.com/bbcafe.in/')} className="w-full flex items-center justify-between dark:bg-blue-600/10 bg-green-50/50 border dark:border-blue-600/20 border-green-200/50 p-3 rounded-xl">
-                  <span className="text-[10px] font-black dark:text-white text-neutral-900">🔵 Facebook</span>
-                  <span className="text-[8px] font-black uppercase px-2.5 py-1 rounded bg-yellow-400 text-black">{getClaimStatus('facebook')}</span>
-                </button>
-                <button onClick={() => handleSocialClick('snapchat', 'https://www.snapchat.com/add/bbcafe.in')} className="w-full flex items-center justify-between dark:bg-yellow-400/10 bg-green-50/50 border dark:border-yellow-400/20 border-yellow-400/30 p-3 rounded-xl">
-                  <span className="text-[10px] font-black dark:text-white text-neutral-900">🟡 Snapchat</span>
-                  <span className="text-[8px] font-black uppercase px-2.5 py-1 rounded bg-yellow-400 text-black">{getClaimStatus('snapchat')}</span>
-                </button>
-              </div>
-              <button type="button" onClick={() => setIsSocialsOpen(false)} className="w-full bg-orange-500 text-black font-black p-3 rounded-xl text-xs uppercase animate-none">CLOSE</button>
             </motion.div>
           </div>
         )}
