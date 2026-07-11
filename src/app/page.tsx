@@ -1,3 +1,4 @@
+
 'use client';
 import React, { useState, useEffect, useMemo } from 'react';
 import { db } from '../lib/firebase'; 
@@ -237,6 +238,12 @@ export default function BbCafeHome() {
 
   const formatBillNumber = (num: number) => String(num).padStart(4, '0');
 
+  const getCategoryImage = (catName: string) => {
+    const found = dbCategories.find(c => c.name === catName);
+    if (found && found.image) return found.image;
+    return CATEGORY_IMAGES[catName] || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=150&q=80";
+  };
+
   // --- MEMOS ---
 
   const activeTheme = useMemo(() => {
@@ -323,6 +330,30 @@ export default function BbCafeHome() {
       return matchesCategory && itemName.includes(normalizedSearchQuery);
     });
   }, [deduplicatedMenu, selectedCategory, favorites, normalizedSearchQuery]);
+
+  const visibleCategories = useMemo(() => {
+    const baseCategories = ["All", ...FALLBACK_CATEGORIES.filter(c => c !== "All")];
+    const dbCatsMap = new Map();
+    dbCategories.forEach(c => dbCatsMap.set(String(c.name).toLowerCase().trim(), c));
+    const result: string[] = [];
+
+    baseCategories.forEach(catName => {
+      const cleanName = catName.toLowerCase().trim();
+      if (dbCatsMap.has(cleanName)) {
+        if (dbCatsMap.get(cleanName).isVisible !== false) result.push(catName);
+      } else {
+        result.push(catName);
+      }
+    });
+
+    dbCategories.forEach(c => {
+      const cleanName = String(c.name).toLowerCase().trim();
+      const alreadyAdded = result.some(r => r.toLowerCase().trim() === cleanName);
+      if (!alreadyAdded && c.isVisible !== false && c.name !== "All") result.push(c.name);
+    });
+
+    return Array.from(new Set(result));
+  }, [dbCategories]);
 
   const upsellSuggestionItems = useMemo(() => {
     return menu.filter(item => {
@@ -599,7 +630,7 @@ export default function BbCafeHome() {
     toast.success(`${name} Cart में जोड़ दिया गया है!`);
   };
 
-  // Direct WhatsApp order submission - UPI/QR Modal Completely Removed
+  // Direct WhatsApp Order submission
   const sendWhatsAppOrder = async () => {
     if (isTooFar) {
       return toast.error("आपकी दूरी 20 KM से अधिक है। आप केवल मेनू देख सकते हैं, ऑर्डर प्लेस नहीं कर सकते!");
@@ -1023,6 +1054,33 @@ export default function BbCafeHome() {
           )}
         </div>
 
+        {/* CATEGORY SLIDER (Restored with Scrollbar-Hiding Feature) */}
+        <div className="space-y-1">
+          <p className="text-[8px] font-black uppercase tracking-wider text-orange-500">Inspiration for your first order</p>
+          <div className="flex gap-5 overflow-x-auto py-2 px-1 scrollbar-none [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <button onClick={() => setSelectedCategory("Favorites")} className="flex flex-col items-center flex-shrink-0 group outline-none">
+              <div className={`w-14 h-14 rounded-full overflow-hidden border transition-all flex items-center justify-center ${selectedCategory === "Favorites" ? 'border-red-500 scale-105 shadow-md' : 'dark:border-white/10 border-gray-200 bg-white dark:bg-neutral-900'}`}>
+                <Heart size={24} className={selectedCategory === "Favorites" ? 'text-red-500 fill-red-500' : 'text-gray-400'} />
+              </div>
+              <span className={`text-[9px] font-black uppercase mt-1.5 truncate ${selectedCategory === "Favorites" ? 'text-red-500' : 'dark:text-gray-400 text-neutral-800'}`}>My Favorites</span>
+            </button>
+
+            {visibleCategories.map((cat) => {
+              const isActive = selectedCategory === cat;
+              return (
+                <button key={cat} onClick={() => setSelectedCategory(cat)} className="flex flex-col items-center flex-shrink-0 group outline-none">
+                  <div className={`w-14 h-14 rounded-full overflow-hidden border transition-all ${isActive ? 'border-orange-500 scale-105 shadow-md' : 'dark:border-white/10 border-gray-200'}`}>
+                    <img src={getCategoryImage(cat)} className="w-full h-full object-cover" alt={cat} />
+                  </div>
+                  <span className={`text-[9px] font-black uppercase mt-1.5 truncate max-w-[70px] text-center ${isActive ? 'dark:text-orange-500 text-orange-700' : 'dark:text-gray-400 text-neutral-800'}`}>
+                    {cat === "All" ? "All" : cat.replace("Special ", "").replace(" Special", "")}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         {/* RANGE ZONE WARNING */}
         {distanceKm !== null && isTooFar && (
           <div className="bg-red-500/10 border border-red-500/20 p-3.5 rounded-2xl flex items-center gap-3">
@@ -1044,23 +1102,27 @@ export default function BbCafeHome() {
                 <motion.div 
                   layout 
                   key={item.id} 
-                  className="dark:bg-white/[0.02] bg-white rounded-2xl border dark:border-white/5 border-gray-200 overflow-hidden flex flex-col relative shadow-md shadow-gray-200/40 dark:shadow-none transition-colors duration-200"
+                  className="group dark:bg-white/[0.02] bg-white rounded-2xl border dark:border-white/5 border-gray-200 overflow-hidden flex flex-col relative shadow-md shadow-gray-200/40 dark:shadow-none transition-all duration-300 hover:shadow-lg"
                   initial={{ opacity: 0, y: 30 }}
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true, margin: "-50px" }}
                   transition={{ duration: 0.45, ease: "easeOut" }}
                 >
                   <div className="relative h-44 w-full overflow-hidden">
-                    <motion.img 
+                    {/* Highly Animated Zoom Image on Hover */}
+                    <img 
                       src={item.image || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=500&bg=80"} 
-                      className="w-full h-full object-cover origin-center" 
+                      className="w-full h-full object-cover origin-center transition-transform duration-700 ease-out group-hover:scale-110" 
                       alt={item.name} 
-                      whileHover={{ scale: 1.08 }}
-                      transition={{ duration: 0.3, ease: "easeOut" }}
                     />
                     
                     <div className="absolute top-3 left-3 bg-black/50 backdrop-blur-md px-2 py-1 rounded-lg border border-white/10 flex items-center gap-1 text-[8px] font-black uppercase text-green-400">
                       <span className="h-1 w-1 rounded-full bg-green-500 animate-pulse" />VEG
+                    </div>
+
+                    {/* Highly Requested "FREE delivery" Bar Tag added beautifully (Blinkit style) */}
+                    <div className="absolute bottom-0 left-0 bg-gradient-to-r from-blue-600 to-blue-500 text-white font-black text-[9px] px-3 py-1 rounded-tr-xl flex items-center gap-1 shadow-md uppercase tracking-wider">
+                      <span>🛵</span> <span>FREE delivery</span>
                     </div>
 
                     <button onClick={(e) => handleToggleFavorite(item.id, e)} className="absolute top-3 right-3 bg-black/60 backdrop-blur-md p-1.5 rounded-full border border-white/10 text-white hover:text-red-500 transition-colors">
@@ -1070,7 +1132,6 @@ export default function BbCafeHome() {
                   <div className="p-4 flex flex-col justify-between flex-1">
                     <div className="flex justify-between items-start gap-4">
                       <h4 className="font-black text-sm dark:text-gray-100 text-neutral-900 line-clamp-1">{item.name}</h4>
-                      {/* Rating Label Changed to 4.9 */}
                       <div className="bg-green-600 text-white font-extrabold text-[9px] px-2 py-0.5 rounded flex items-center gap-0.5">
                         <span>4.9</span><span className="text-[8px]">★</span>
                       </div>
@@ -1164,10 +1225,11 @@ export default function BbCafeHome() {
             <div className="p-6 max-w-lg mx-auto pb-32">
               <div className="flex justify-between items-center mb-8">
                 <div>
-                  <h2 className="text-2xl font-black dark:text-white text-neutral-900">All Reviews</h2>
-                  <p className="text-xs text-gray-500 font-bold">Rating: 4.8/5.0 ★</p>
+                  <h2 className="text-2xl font-black text-white">All Reviews</h2>
+                  <p className="text-xs text-yellow-400 font-bold">Rating: 4.8/5.0 ★</p>
                 </div>
-                <button onClick={() => setIsReviewsDrawerOpen(false)} className="p-2.5 bg-white/5 rounded-full dark:text-white text-neutral-800"><X size={20} /></button>
+                {/* Fixed invisible close button for Drawer Modal (Now always prominent white on dark bg) */}
+                <button onClick={() => setIsReviewsDrawerOpen(false)} className="p-2.5 bg-white/10 text-white rounded-full hover:bg-white/20 transition-colors"><X size={20} /></button>
               </div>
               <div className="space-y-4">
                 {(reviews.length === 0 ? PERMANENT_REVIEWS : reviews).map((r: any) => (
@@ -1190,20 +1252,22 @@ export default function BbCafeHome() {
         )}
       </AnimatePresence>
 
-      {/* WRITING REVIEW MODAL WITH INTEGRATED CLOSE BUTTON */}
+      {/* WRITING REVIEW POPUP (Highly Visible Close Button in Light Mode & Dark Mode) */}
       <AnimatePresence>
         {isReviewFormOpen && (
           <div className="fixed inset-0 bg-black/95 z-[200] flex items-center justify-center p-6">
             <form onSubmit={handleReviewSubmit} className="dark:bg-[#111] bg-white w-full max-w-md p-6 rounded-3xl border dark:border-white/10 border-gray-200 text-center space-y-4 shadow-xl transition-colors duration-200">
               <div className="flex justify-between items-center pb-2 border-b dark:border-white/10 border-gray-100">
                 <h3 className="text-xl font-black text-orange-500 uppercase italic">Your Feedback</h3>
+                
+                {/* Red Circular High-Contrast Close Button for 100% Visibility in Light Mode */}
                 <button 
                   type="button" 
                   onClick={() => setIsReviewFormOpen(false)} 
-                  className="p-2.5 dark:bg-white/10 bg-gray-100 dark:text-white text-neutral-800 hover:bg-gray-200 dark:hover:bg-white/20 rounded-full transition-colors"
+                  className="p-2 bg-red-100 hover:bg-red-500 hover:text-white text-red-650 rounded-full transition-all duration-200"
                   title="Close Feedback"
                 >
-                  <X size={16} />
+                  <X size={18} />
                 </button>
               </div>
 
@@ -1327,7 +1391,7 @@ export default function BbCafeHome() {
                 <div key={item.id} className="flex justify-between items-center dark:bg-white/[0.02] bg-white p-4 rounded-2xl mb-3 border dark:border-white/5 border-gray-200 shadow-sm transition-colors duration-200">
                   <div className="min-w-0 pr-3">
                     <h4 className="font-bold text-xs dark:text-gray-100 text-neutral-900 truncate">{item?.name || "Item"}</h4>
-                    <p className="text-orange-500 font-black mt-1 text-[11px]">₹{item?.price || 0}</p>
+                    <p className="text-orange-505 font-black mt-1 text-[11px]">₹{item?.price || 0}</p>
                   </div>
                   <div className="flex items-center gap-2 bg-black/40 px-2 py-1 rounded-xl border border-white/10 flex-shrink-0">
                     <button onClick={() => removeItem(item.id)} className="w-6 h-6 flex items-center justify-center bg-red-500/10 text-red-500 rounded text-sm font-black">-</button>
@@ -1356,13 +1420,13 @@ export default function BbCafeHome() {
                 <div className="dark:bg-white/[0.02] bg-gray-50 border dark:border-white/5 border-gray-200 rounded-2xl p-4 space-y-2 transition-colors duration-200">
                   <p className="text-[9px] font-black uppercase dark:text-gray-400 text-neutral-800">Add Extra condiments to order:</p>
                   <div className="grid grid-cols-3 gap-2">
-                    <button onClick={() => setKetchupAddon(!ketchupAddon)} className={`p-2 rounded-xl border text-[9px] font-black ${ketchupAddon ? 'border-red-500 bg-red-500/5 text-red-600' : 'dark:border-white/5 border-gray-200 bg-transparent dark:text-gray-400 text-neutral-800'}`}>
+                    <button onClick={() => setKetchupAddon(!ketchupAddon)} className={`p-2 rounded-xl border text-[9px] font-black ${ketchupAddon ? 'border-red-500 bg-red-500/5 text-red-600 animate-none' : 'dark:border-white/5 border-gray-200 bg-transparent dark:text-gray-400 text-neutral-800'}`}>
                       Ketchup (+₹10)
                     </button>
-                    <button onClick={() => setOreganoAddon(!oreganoAddon)} className={`p-2 rounded-xl border text-[9px] font-black ${oreganoAddon ? 'border-yellow-500 bg-yellow-500/5 text-yellow-500' : 'dark:border-white/5 border-gray-200 bg-transparent dark:text-gray-400 text-neutral-800'}`}>
+                    <button onClick={() => setOreganoAddon(!oreganoAddon)} className={`p-2 rounded-xl border text-[9px] font-black ${oreganoAddon ? 'border-yellow-500 bg-yellow-500/5 text-yellow-500 animate-none' : 'dark:border-white/5 border-gray-200 bg-transparent dark:text-gray-400 text-neutral-800'}`}>
                       Oregano (+₹10)
                     </button>
-                    <button onClick={() => setChiliFlakesAddon(!chiliFlakesAddon)} className={`p-2 rounded-xl border text-[9px] font-black ${chiliFlakesAddon ? 'border-orange-500 bg-orange-500/5 text-orange-500' : 'dark:border-white/5 border-gray-200 bg-transparent dark:text-gray-400 text-neutral-800'}`}>
+                    <button onClick={() => setChiliFlakesAddon(!chiliFlakesAddon)} className={`p-2 rounded-xl border text-[9px] font-black ${chiliFlakesAddon ? 'border-orange-500 bg-orange-500/5 text-orange-500 animate-none' : 'dark:border-white/5 border-gray-200 bg-transparent dark:text-gray-400 text-neutral-800'}`}>
                       Chili Flakes (+₹10)
                     </button>
                   </div>
@@ -1378,7 +1442,7 @@ export default function BbCafeHome() {
                             <span className="font-bold block dark:text-white text-neutral-900">{suggest.name}</span>
                             <span className="text-orange-600 font-extrabold">{getDisplayPrice(suggest)}</span>
                           </div>
-                          <button onClick={() => addItem(suggest)} className="bg-purple-500/20 text-purple-355 border border-purple-500/30 px-3 py-1 rounded-lg font-black uppercase">ADD</button>
+                          <button onClick={() => addItem(suggest)} className="bg-purple-500/20 text-purple-300 border border-purple-500/30 px-3 py-1 rounded-lg font-black uppercase animate-none">ADD</button>
                         </div>
                       ))}
                     </div>
@@ -1398,7 +1462,7 @@ export default function BbCafeHome() {
                           className={`p-3 rounded-xl border text-left flex flex-col justify-between transition-all duration-200 active:scale-95 ${
                             isSelected 
                               ? 'border-orange-500 bg-orange-500/10 text-orange-600 shadow-md animate-none' 
-                              : 'dark:border-white/5 border-gray-200 dark:bg-white/[0.01] bg-gray-50 dark:text-neutral-300 text-neutral-800 hover:border-gray-400 hover:dark:border-white/10'
+                              : 'dark:border-white/5 border-gray-200 dark:bg-white/[0.01] bg-gray-50 dark:text-neutral-300 text-neutral-900 hover:border-gray-300 hover:dark:border-white/10'
                           }`}
                         >
                           <span className="text-[9px] font-black leading-tight uppercase truncate">{area.name.replace("Mohandra ", "")}</span>
@@ -1444,7 +1508,7 @@ export default function BbCafeHome() {
                         <span className="text-[9px] dark:text-gray-400 text-neutral-700 font-black uppercase">Share Progress:</span>
                         <span className="text-[9px] dark:text-yellow-400 text-amber-900 font-black bg-yellow-100 dark:bg-yellow-400/10 px-2 py-0.5 rounded border dark:border-yellow-400/20 border-yellow-250">{shareCount}/5 Shared</span>
                       </div>
-                      <button type="button" onClick={handleShareApp} className="w-full bg-green-600 text-white font-black py-2 rounded-lg text-[9px] uppercase flex items-center justify-center gap-1 shadow-md">
+                      <button type="button" onClick={handleShareApp} className="w-full bg-green-600 text-white font-black py-2 rounded-lg text-[9px] uppercase flex items-center justify-center gap-1 shadow-md animate-none">
                         <Share2 size={12}/>
                         <span>Share 5 Times to earn free +1 Loyalty Point! 🎁</span>
                       </button>
@@ -1452,7 +1516,7 @@ export default function BbCafeHome() {
 
                     <div className="pt-2 border-t border-white/5 flex justify-between items-center">
                       <span className="text-[9px] dark:text-gray-400 text-neutral-700 font-bold uppercase">Gift points to friend:</span>
-                      <button type="button" onClick={() => setIsGiftModalOpen(true)} className="bg-yellow-400/10 text-yellow-500 border border-yellow-400/20 px-2 py-1 rounded text-[8px] font-black uppercase">🎁 Gift Points</button>
+                      <button type="button" onClick={() => setIsGiftModalOpen(true)} className="bg-yellow-400/10 text-yellow-500 border border-yellow-400/20 px-2 py-1 rounded text-[8px] font-black uppercase animate-none">🎁 Gift Points</button>
                     </div>
 
                     <div className="space-y-1.5 pt-2 border-t border-white/5">
@@ -1462,7 +1526,7 @@ export default function BbCafeHome() {
                           const inCartCost = cart.reduce((acc: number, i: any) => acc + (i.pointsCost || 0), 0);
                           const isAffordable = (customerPoints - inCartCost) >= rule.pointsCost;
                           return (
-                            <button key={rule.id} type="button" onClick={() => handleCustomerRedeem(`reward-${rule.id}`, `🎁 FREE ${rule.rewardName}`, rule.pointsCost)} disabled={!isAffordable} className={`py-2 px-2 rounded text-[9px] font-black uppercase border truncate ${isAffordable ? 'bg-yellow-400 text-black border-yellow-400' : 'bg-neutral-100 text-neutral-400 border-neutral-200 dark:bg-white/5 dark:text-gray-500 dark:border-white/5'}`}>🎁 {rule.rewardName} ({rule.pointsCost} P)</button>
+                            <button key={rule.id} type="button" onClick={() => handleCustomerRedeem(`reward-${rule.id}`, `🎁 FREE ${rule.rewardName}`, rule.pointsCost)} disabled={!isAffordable} className={`py-2 px-2 rounded text-[9px] font-black uppercase border truncate ${isAffordable ? 'bg-yellow-400 text-black border-yellow-400 hover:bg-yellow-500 animate-none' : 'bg-neutral-100 text-neutral-400 border-neutral-200 dark:bg-white/5 dark:text-gray-500 dark:border-white/5'}`}>🎁 {rule.rewardName} ({rule.pointsCost} P)</button>
                           );
                         })}
                       </div>
@@ -1474,12 +1538,12 @@ export default function BbCafeHome() {
                   <div className="flex items-center gap-1.5 text-orange-500 font-black text-[10px] uppercase"><Percent size={14}/> <span>Have a promo code?</span></div>
                   <div className="flex gap-2">
                     <input type="text" placeholder="e.g. WELCOME" value={enteredCoupon} onChange={(e) => setEnteredCoupon(e.target.value)} className="flex-1 dark:bg-black/40 bg-white border dark:border-white/10 border-gray-300 rounded-lg p-2 text-xs dark:text-white text-neutral-900 font-bold uppercase" />
-                    <button type="button" onClick={handleApplyCoupon} className="bg-orange-500 text-black font-black text-[10px] p-2 px-4 rounded-lg">APPLY</button>
+                    <button type="button" onClick={handleApplyCoupon} className="bg-orange-500 text-black font-black text-[10px] p-2 px-4 rounded-lg animate-none">APPLY</button>
                   </div>
                   {appliedCoupon && (
                     <div className="flex justify-between items-center text-[10px] bg-green-500/10 border border-green-500/25 p-2 rounded-lg">
                       <span className="text-green-400 font-bold uppercase">Code Applied: {appliedCoupon.code}</span>
-                      <button onClick={() => { setAppliedCoupon(null); setEnteredCoupon(""); }} className="text-red-400 font-bold">Remove</button>
+                      <button onClick={() => { setAppliedCoupon(null); setEnteredCoupon(""); }} className="text-red-400 font-bold animate-none">Remove</button>
                     </div>
                   )}
                 </div>
@@ -1491,16 +1555,16 @@ export default function BbCafeHome() {
                       <h4 className="font-black text-xs text-orange-500">{customerDetails.name}</h4>
                       <p className="text-[10px] dark:text-gray-400 text-neutral-700 font-semibold">{customerDetails.phone}</p>
                     </div>
-                    <button onClick={() => { localStorage.removeItem('bb_cafe_customer'); setCustomerDetails(null); }} className="text-[9px] bg-red-500/10 text-red-500 px-2.5 py-1.5 rounded-lg font-black uppercase">Change</button>
+                    <button onClick={() => { localStorage.removeItem('bb_cafe_customer'); setCustomerDetails(null); }} className="text-[9px] bg-red-500/10 text-red-500 px-2.5 py-1.5 rounded-lg font-black uppercase animate-none">Change</button>
                   </div>
                 ) : (
-                  <button onClick={() => setIsLoginOpen(true)} className="w-full p-4 bg-orange-500/10 text-orange-400 border border-orange-500/20 rounded-2xl font-black text-xs uppercase">👤 Add Name & Phone To Order</button>
+                  <button onClick={() => setIsLoginOpen(true)} className="w-full p-4 bg-orange-500/10 text-orange-400 border border-orange-500/20 rounded-2xl font-black text-xs uppercase animate-none">👤 Add Name & Phone To Order</button>
                 )}
 
                 <div className="dark:bg-white/[0.02] bg-gray-50 p-4 rounded-2xl border dark:border-white/5 border-gray-200 space-y-2 transition-colors duration-200">
                   <div className="flex items-center gap-1.5 text-orange-500"><MapPin size={14}/> <h3 className="font-black uppercase text-[10px]">Delivery Address</h3></div>
                   <div className="flex justify-between items-center mb-1">
-                    <button type="button" onClick={handleDetectLocation} className="text-[8px] bg-green-600 text-white font-black px-2 py-1 rounded flex items-center gap-1 shadow-sm uppercase">📍 Detect Location</button>
+                    <button type="button" onClick={handleDetectLocation} className="text-[8px] bg-green-600 text-white font-black px-2 py-1 rounded flex items-center gap-1 shadow-sm uppercase animate-none">📍 Detect Location</button>
                   </div>
                   <textarea placeholder="Ghar ka address, Landmark ke saath..." value={address} onChange={(e) => setAddress(e.target.value)} className="w-full dark:bg-black/40 bg-white border dark:border-white/10 border-gray-300 rounded-xl p-3 text-xs font-semibold dark:text-white text-neutral-900 outline-none resize-none h-16" />
                 </div>
@@ -1521,7 +1585,7 @@ export default function BbCafeHome() {
                     आप 20 KM से अधिक दूर हैं। आर्डर स्वीकार नहीं किया जा सकता। ❌
                   </div>
                 ) : (
-                  <button onClick={sendWhatsAppOrder} type="button" className="w-full bg-green-600 hover:bg-green-700 p-4 rounded-2xl font-black text-sm text-white flex items-center justify-center gap-2 shadow-lg">ORDER ON WHATSAPP</button>
+                  <button onClick={sendWhatsAppOrder} type="button" className="w-full bg-green-600 hover:bg-green-700 p-4 rounded-2xl font-black text-sm text-white flex items-center justify-center gap-2 shadow-lg animate-none">ORDER ON WHATSAPP</button>
                 )}
               </div>
             </motion.div>
@@ -1610,7 +1674,7 @@ export default function BbCafeHome() {
                   <input type="text" placeholder="Enter invite code..." value={tempRefCode} onChange={(e) => setTempRefCode(e.target.value)} className="w-full dark:bg-white/5 bg-gray-50 border dark:border-white/10 border-gray-200 p-3 rounded-xl font-bold dark:text-white text-neutral-900 outline-none focus:border-orange-500 text-xs" />
                 </div>
               </div>
-              <button type="submit" className="w-full bg-orange-500 text-black p-4 rounded-xl font-black text-xs uppercase">PROCEED TO ORDER</button>
+              <button type="submit" className="w-full bg-orange-500 text-black p-4 rounded-xl font-black text-xs uppercase animate-none">PROCEED TO ORDER</button>
               <button type="button" onClick={() => setIsLoginOpen(false)} className="mt-2 text-gray-500 text-[9px] font-black uppercase block mx-auto">Close</button>
             </form>
           </div>
@@ -1681,11 +1745,11 @@ export default function BbCafeHome() {
                   <span className="text-[8px] font-black uppercase px-2.5 py-1 rounded bg-yellow-400 text-black">{getClaimStatus('snapchat')}</span>
                 </button>
               </div>
-              <button type="button" onClick={() => setIsSocialsOpen(false)} className="w-full bg-orange-500 text-black font-black p-3 rounded-xl text-xs uppercase">CLOSE</button>
+              <button type="button" onClick={() => setIsSocialsOpen(false)} className="w-full bg-orange-500 text-black font-black p-3 rounded-xl text-xs uppercase animate-none">CLOSE</button>
             </motion.div>
           </div>
         )}
-      </  AnimatePresence>
+      </AnimatePresence>
 
       {/* DIGITAL GREEN INVOICE */}
       <AnimatePresence>
