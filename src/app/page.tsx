@@ -86,7 +86,7 @@ export default function BbCafeHome() {
 
   const [isGiftModalOpen, setIsGiftModalOpen] = useState(false);
   const [giftPhone, setGiftPhone] = useState("");
-  const [giftPointsAmount, setGiftPointsAmount] = useState<number | " text-neutral-900">("");
+  const [giftPointsAmount, setGiftPointsAmount] = useState<number | "">("");
   const [isGiftingLoading, setIsGiftingLoading] = useState(false);
 
   const [dbCategories, setDbCategories] = useState<any[]>([]);
@@ -946,7 +946,7 @@ export default function BbCafeHome() {
               <span className="text-xl">📲</span>
               <div>
                 <h4 className="text-xs font-black text-white">Bum Bum Cafe App</h4>
-                <p className="text-[9px] text-orange-100 font-bold">बिना प्ले स्टोर के सीधे अपने फोन में इंस्टॉल करें!</p>
+                <p className="text-[9px] text-orange-100 font-bold">बिना प्ले स्टोर के सीधे अपने phone में इंस्टॉल करें!</p>
               </div>
             </div>
             <button 
