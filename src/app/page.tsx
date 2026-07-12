@@ -770,7 +770,7 @@ export default function BbCafeHome() {
     if (!friendPhoneRaw || friendPhoneRaw.length < 10) return toast.error("कृपया सही 10-digit मोबाइल नंबर डालें!");
     if (senderPhoneRaw === friendPhoneRaw) return toast.error("आप खुद को लॉयल्टी पॉइंट्स गिफ्ट नहीं कर सकते!");
     if (isNaN(pointsToGift) || pointsToGift <= 0) return toast.error("कृपया सही पॉइंट्स की संख्या डालें!");
-    if (customerPoints < pointsToGift) return toast.error(`आपके पास पर्याप्त पॉइंट्स नहीं हैं! वर्तमान पॉइंट्स: ${customerPoints}`);
+    if (customerPoints < pointsToGift) return toast.error(`आपके पास पर्याप्त पॉइंट्स नहीं हैं! वर्तमान  पॉइंट्स: ${customerPoints}`);
     if (!giftSenderPin || giftSenderPin.length !== 4) return toast.error("कृपया अपना सही 4-digit सुरक्षा पिन डालें!");
 
     setIsGiftingLoading(true);
@@ -835,7 +835,7 @@ export default function BbCafeHome() {
       } else if (err.message === "Device mismatch. Transfer blocked.") {
         toast.error("सुरक्षा अलर्ट: यह डिवाइस इस नंबर से मैच नहीं करता!");
       } else {
-        toast.error(err.message === "Insufficient points balance!" ? "अपर्याप्त पॉइंट्स!" : "पॉइंट्स गिफ्ट करने में समस्या आई।");
+        toast.error(err.message === "Insufficient points balance!" ? "अपर्याप्त  पॉइंट्स!" : "पॉइंट्स गिफ्ट करने में समस्या आई।");
       }
     } finally { setIsGiftingLoading(false); }
   };
@@ -870,7 +870,10 @@ export default function BbCafeHome() {
 
   const sendWhatsAppOrder = async () => {
     triggerHaptic();
-    if (isTooFar) {
+    const isDineIn = address.toLowerCase().includes("dine-in");
+
+    // Table QR check bypasses the 20km GPS block (Requirement 2)
+    if (isTooFar && !isDineIn) {
       return toast.error("आपकी दूरी 20 KM से अधिक है। आप केवल मेनू देख सकते हैं, ऑर्डर प्लेस नहीं कर सकते!");
     }
     if (!customerDetails) { 
@@ -1304,11 +1307,18 @@ export default function BbCafeHome() {
     }
   };
 
-  // anti-cheat handler helper
-  const getClaimStatus = (platform: string) => {
-    if (!customerDetails?.phone) return "🎁 +1 Pt";
-    const storageKey = `bb_claimed_${customerDetails.phone.replace("+91", "").trim()}_${platform}`;
-    return localStorage.getItem(storageKey) ? "✅ Claimed" : "🎁 Claim +1 Pt";
+  // Requirement 2: Auto-play next story/reel and automatic exit on finish
+  const handleReelEnded = () => {
+    triggerHaptic(20);
+    const currentIndex = stories.findIndex(s => s.id === activeStory.id);
+    if (currentIndex !== -1 && currentIndex < stories.length - 1) {
+      // Switch seamlessly to the next loaded reel
+      setActiveStory(stories[currentIndex + 1]);
+    } else {
+      // We finished the last reel; close full-screen modal automatically
+      setActiveStory(null);
+      toast.success("सभी रील्स समाप्त हो गईं! 😊");
+    }
   };
 
   if (!mounted) return null;
@@ -1345,7 +1355,7 @@ export default function BbCafeHome() {
         </div>
       )}
 
-      {/* Social Proof Toast Alert (Requirement 3 - Natural loop) */}
+      {/* Social Proof Toast Alert (Slower & Natural Order Alerts) */}
       <AnimatePresence>
         {showSocialAlert && socialProofs.length > 0 && (
           <motion.div 
@@ -1390,17 +1400,17 @@ export default function BbCafeHome() {
       <div className="fixed right-0 top-1/3 z-50 flex flex-col gap-2.5 items-end">
         <button 
           onClick={() => { triggerHaptic(); setIsReviewFormOpen(true); }}
-          className="pl-3 pr-2 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-l-xl shadow-lg border-l border-y border-white/10 flex items-center gap-1.5 transition-transform active:scale-95"
+          className="pl-3.5 pr-2.5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-l-xl shadow-lg border-l border-y border-white/10 flex items-center gap-1.5 transition-transform active:scale-95"
         >
           <Star size={11} className="fill-white" />
-          <span className="text-[9px] font-black tracking-wide uppercase">Review</span>
+          <span className="text-[9px] font-black tracking-widest uppercase">Review</span>
         </button>
         <button 
           onClick={() => { triggerHaptic(); setIsSocialsOpen(true); }}
-          className="pl-3 pr-2 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-l-xl shadow-lg border-l border-y border-white/10 flex items-center gap-1.5 transition-transform active:scale-95"
+          className="pl-3.5 pr-2.5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-l-xl shadow-lg border-l border-y border-white/10 flex items-center gap-1.5 transition-transform active:scale-95"
         >
           <Sparkles size={11} />
-          <span className="text-[9px] font-black tracking-wide uppercase">Socials</span>
+          <span className="text-[9px] font-black tracking-widest uppercase">Socials</span>
         </button>
       </div>
 
@@ -1647,7 +1657,7 @@ export default function BbCafeHome() {
                 DIY Pizza Tab
               </span>
               <h3 className="text-lg font-black text-neutral-900 dark:text-white">अपने मन का पिज़्ज़ा बनाएं 🍕</h3>
-              <p className="text-[10px] text-gray-400 font-semibold leading-relaxed">पसंद का बेस, सॉस, पनीर और मनपसंद वेजीज़ को टच करके अपनी रेसिपी तैयार करें!</p>
+              <p className="text-[10px] text-gray-400 font-semibold leading-relaxed">पसंद का बेस, सॉस, पनीर aur मनपसंद वेजीज़ को टच करके अपनी रेसिपी तैयार करें!</p>
             </div>
 
             {/* Step 1: Base Crust Selection */}
@@ -1885,7 +1895,7 @@ export default function BbCafeHome() {
                           triggerHaptic();
                           setIsProfileOpen(true);
                         }}
-                        className="cursor-pointer bg-gradient-to-r from-amber-500 via-orange-500 to-red-655 text-white p-5 rounded-2xl shadow-lg border border-white/10 my-2 relative overflow-hidden group animate-none"
+                        className="cursor-pointer bg-gradient-to-r from-amber-500 via-orange-505 to-red-655 text-white p-5 rounded-2xl shadow-lg border border-white/10 my-2 relative overflow-hidden group animate-none"
                       >
                         <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full blur-xl group-hover:scale-110 transition-transform duration-500" />
                         <div className="relative z-10 flex justify-between items-center gap-4">
@@ -1963,7 +1973,7 @@ export default function BbCafeHome() {
               <p className="dark:text-white text-neutral-800 text-[9px]">सुबह 10:00 से रात 11:00 बजे</p>
             </div>
             
-            <a href="https://maps.app.goo.gl/8pj1Xby3bbMn5qxu5" target="_blank" rel="noreferrer" className="dark:bg-white/[0.02] bg-white border dark:border-white/5 border-gray-200 p-4 rounded-2xl flex flex-col items-center justify-center space-y-1 hover:border-orange-500/30 shadow-md shadow-gray-200/30 dark:shadow-none transition-all duration-200">
+            <a href="https://maps.app.goo.gl/nHq8rLpn7kV3NsJd6" target="_blank" rel="noreferrer" className="dark:bg-white/[0.02] bg-white border dark:border-white/5 border-gray-200 p-4 rounded-2xl flex flex-col items-center justify-center space-y-1 hover:border-orange-500/30 shadow-md shadow-gray-200/30 dark:shadow-none transition-all duration-200">
               <MapPin className="text-green-500 animate-bounce" size={16} />
               <p className="dark:text-gray-400 text-gray-500 text-[8px]">Our Location</p>
               <p className="text-yellow-600 dark:text-yellow-400 text-[9px] underline">Google Map 🗺️</p>
@@ -2045,7 +2055,18 @@ export default function BbCafeHome() {
                 src={activeStory.url} 
                 autoPlay 
                 playsInline 
-                onEnded={handleReelEnded}
+                onEnded={() => {
+                  triggerHaptic(20);
+                  const currentIndex = stories.findIndex(s => s.id === activeStory.id);
+                  if (currentIndex !== -1 && currentIndex < stories.length - 1) {
+                    // Switch seamlessly to the next loaded reel
+                    setActiveStory(stories[currentIndex + 1]);
+                  } else {
+                    // We finished the last reel; close full-screen modal automatically
+                    setActiveStory(null);
+                    toast.success("सभी रील्स समाप्त हो गईं! 😊");
+                  }
+                }}
                 className="w-full h-auto max-h-[80vh] object-contain"
               />
             </div>
@@ -2135,7 +2156,7 @@ export default function BbCafeHome() {
                         type="button"
                         key={suggestion}
                         onClick={() => setReviewComment(suggestion)}
-                        className="dark:bg-white/5 bg-gray-100 border dark:border-white/10 border-gray-200 hover:border-orange-500/50 px-2 py-1 rounded-full text-[9px] dark:text-gray-300 text-neutral-800 font-bold transition-all text-left"
+                        className="dark:bg-white/5 bg-gray-100 border dark:border-white/10 border-gray-200 hover:border-orange-500/50 px-2 py-1 rounded-full text-[9px] dark:text-gray-300 text-neutral-850 font-bold transition-all text-left"
                       >
                         {suggestion}
                       </button>
@@ -2398,7 +2419,7 @@ export default function BbCafeHome() {
                         <button 
                           key={platform.id}
                           onClick={() => handleSocialClickWithClaim(platform)} 
-                          className="flex items-center justify-between dark:bg-green-500/10 bg-green-50 p-2.5 rounded-xl border dark:border-green-500/20 border-green-200/50"
+                          className="flex items-center justify-between dark:bg-green-500/10 bg-green-50 p-2.5 rounded-xl border dark:border-green-500/20 border-green-200/50 p-3 rounded-xl"
                         >
                           <span>{platform.label}</span>
                           <span className="bg-yellow-400 text-black px-1.5 py-0.5 rounded text-[7px]">{getClaimStatus(platform.id)}</span>
@@ -2560,7 +2581,8 @@ export default function BbCafeHome() {
                 <div className="dark:bg-white/[0.02] bg-gray-50 p-4 rounded-2xl border dark:border-white/5 border-gray-200 space-y-2 transition-colors duration-200">
                   <div className="flex items-center gap-1.5 text-orange-500"><MapPin size={14}/> <h3 className="font-black uppercase text-[10px]">Delivery Address</h3></div>
                   <div className="flex justify-between items-center mb-1">
-                    <button type="button" onClick={handleDetectLocation} className="text-[8px] bg-green-600 text-white font-black px-2 py-1 rounded flex items-center gap-1 shadow-sm uppercase animate-none">📍 Detect Location</button>
+                    {/* Live Location Fetch Button (Requirement 2) */}
+                    <button type="button" onClick={handleDetectLocation} className="text-[10px] bg-green-600 text-white font-black px-3.5 py-1.5 rounded-xl flex items-center gap-1 shadow-md uppercase animate-none">📍 Use Live GPS Location (सटीक लाइव लोकेशन)</button>
                   </div>
                   <textarea placeholder="Ghar ka address, Landmark ke saath..." value={address} onChange={(e) => setAddress(e.target.value)} className="w-full dark:bg-black/40 bg-white border dark:border-white/10 border-gray-300 rounded-xl p-3 text-xs font-semibold dark:text-white text-neutral-900 outline-none resize-none h-16" />
                 </div>
@@ -2603,12 +2625,12 @@ export default function BbCafeHome() {
                 </div>
 
                 {/* 9. WHATSAPP CHECKOUT TRIGGER */}
-                {isTooFar ? (
+                {isTooFar && !address.toLowerCase().includes("dine-in") ? (
                   <div className="bg-red-600/20 text-red-400 p-4 rounded-2xl text-center text-xs font-bold border border-red-500/20">
                     आप 20 KM से अधिक दूर हैं। आर्डर स्वीकार नहीं किया जा सकता। ❌
                   </div>
                 ) : (
-                  <button onClick={sendWhatsAppOrder} type="button" className="w-full bg-green-600 hover:bg-green-700 p-4 rounded-2xl font-black text-sm text-white flex items-center justify-center gap-2 shadow-lg animate-none">ORDER ON WHATSAPP</button>
+                  <button onClick={sendWhatsAppOrder} type="button" className="w-full bg-green-600 hover:bg-green-700 p-4 rounded-2xl font-black text-sm text-white flex items-center justify-center gap-2 shadow-lg animate-none font-mono">ORDER ON WHATSAPP</button>
                 )}
               </div>
             </motion.div>
@@ -2661,7 +2683,7 @@ export default function BbCafeHome() {
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-full max-w-sm px-4">
           <button
             onClick={() => { triggerHaptic(); setIsCartOpen(true); }}
-            className="w-full bg-yellow-400 hover:bg-yellow-500 text-black py-4 px-5 rounded-2xl font-black text-xs uppercase flex justify-between items-center shadow-2xl active:scale-95 transition-all"
+            className="w-full bg-yellow-400 hover:bg-yellow-500 text-black py-4 px-5 rounded-2xl font-black text-xs uppercase flex justify-between items-center shadow-2xl active:scale-95 transition-all font-mono"
           >
             <div className="flex items-center gap-2">
               <ShoppingBag size={18} />
@@ -2683,7 +2705,7 @@ export default function BbCafeHome() {
               <Gift className="mx-auto text-yellow-400" size={32} />
               <div>
                 <h3 className="text-lg font-black text-yellow-400 uppercase italic">Gift Loyalty Points</h3>
-                <p className="text-[9px] text-gray-505 font-semibold mt-0.5">अपने पॉइंट्स किसी दोस्त को गिफ्ट करें</p>
+                <p className="text-[9px] text-gray-500 font-semibold mt-0.5">अपने पॉइंट्स किसी दोस्त को गिफ्ट करें</p>
               </div>
               <div className="space-y-3 text-left">
                 <div className="space-y-1">
