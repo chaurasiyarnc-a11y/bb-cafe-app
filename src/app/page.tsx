@@ -1,4 +1,3 @@
-
 'use client';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { db } from '../lib/firebase'; 
@@ -538,6 +537,23 @@ export default function BbCafeHome() {
     return () => unsubUserPoints();
   }, [customerDetails]);
 
+  // Real-time points history observer
+  useEffect(() => {
+    if (!customerDetails?.phone) return;
+    const phoneClean = customerDetails.phone.replace("+91", "").trim();
+    const qHistory = query(
+      collection(db, "customer_points", phoneClean, "history"),
+      orderBy("timestamp", "desc"),
+      limit(10)
+    );
+    const unsubHistory = onSnapshot(qHistory, (snap) => {
+      setPointsHistory(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    }, (err) => {
+      console.log("History subcollection read error, likely awaiting data structure:", err);
+    });
+    return () => unsubHistory();
+  }, [customerDetails]);
+
   // UX 1: Past Order History Loader
   useEffect(() => {
     const savedOrders = localStorage.getItem('bb_past_orders');
@@ -561,6 +577,27 @@ export default function BbCafeHome() {
   useEffect(() => {
     setMounted(true);
 
+    // Capture PWA Install Promotion
+    const handleBeforeInstallPrompt = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      const dismissed = localStorage.getItem('bb_app_installed_or_dismissed');
+      if (!dismissed) {
+        setShowInstallBanner(true);
+      }
+    };
+
+    // Monitor Online/Offline Status
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    if (typeof window !== "undefined") {
+      setIsOnline(window.navigator.onLine);
+      window.addEventListener("online", handleOnline);
+      window.addEventListener("offline", handleOffline);
+      window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+    }
+
     const savedDetails = localStorage.getItem('bb_cafe_customer');
     if (savedDetails) {
       try {
@@ -579,15 +616,37 @@ export default function BbCafeHome() {
     // Dynamic WhatsApp Number & Background Video Listener (Requirement 4)
     const unsubStore = onSnapshot(doc(db, "settings", "store"), (d) => { 
       if (d.exists()) {
-        setStoreOpen(d.data().isOpen);
-        if (d.data().whatsappNumber) {
-          setWhatsappNumber(d.data().whatsappNumber);
+        const storeData = d.data();
+        setStoreOpen(storeData.isOpen);
+        if (storeData.whatsappNumber) {
+          setWhatsappNumber(storeData.whatsappNumber);
         }
-        if (d.data().latitude && d.data().longitude) {
-          setStoreCoordinates({ lat: Number(d.data().latitude), lng: Number(d.data().longitude) });
+        if (storeData.latitude && storeData.longitude) {
+          setStoreCoordinates({ lat: Number(storeData.latitude), lng: Number(storeData.longitude) });
         }
-        if (d.data().headerVideoUrl) {
-          setHeaderVideoUrl(d.data().headerVideoUrl);
+        if (storeData.headerVideoUrl) {
+          setHeaderVideoUrl(storeData.headerVideoUrl);
+        }
+        
+        // Auto-calculate remaining minutes for warnings
+        if (storeData.closingTime) {
+          try {
+            const [closeH, closeM] = storeData.closingTime.split(':').map(Number);
+            const now = new Date();
+            const closeDate = new Date();
+            closeDate.setHours(closeH, closeM, 0, 0);
+            
+            const diffMs = closeDate.getTime() - now.getTime();
+            const diffMins = Math.floor(diffMs / 60000);
+            
+            if (diffMins > 0 && diffMins <= 60) {
+              setClosingMinutesLeft(diffMins);
+            } else {
+              setClosingMinutesLeft(null);
+            }
+          } catch (e) {
+            setClosingMinutesLeft(null);
+          }
         }
       }
     });
@@ -633,6 +692,11 @@ export default function BbCafeHome() {
     const unsubRules = onSnapshot(collection(db, "loyalty_rules"), (snap) => { setLoyaltyRules(snap.docs.map(d => ({ id: d.id, ...d.data() }))); });
 
     return () => { 
+      if (typeof window !== "undefined") {
+        window.removeEventListener("online", handleOnline);
+        window.removeEventListener("offline", handleOffline);
+        window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+      }
       unsubStore(); 
       unsubMenu(); 
       unsubCats(); 
@@ -1296,6 +1360,10 @@ export default function BbCafeHome() {
     setActiveStory(null);
   };
 
+  const handleReelEnded = () => {
+    setActiveStory(null);
+  };
+
   const quickAppendInstruction = (tag: string, type = "normal") => {
     triggerHaptic(20);
     if (type === "diy") {
@@ -1332,7 +1400,7 @@ export default function BbCafeHome() {
 
       {/* Network Status Banner */}
       {!isOnline && (
-        <div className="bg-red-600 text-white font-black py-2 px-4 text-center text-xs flex items-center justify-center gap-2 shadow-lg sticky top-0 z-[150]">
+        <div className="bg-red-655 text-white font-black py-2 px-4 text-center text-xs flex items-center justify-center gap-2 shadow-lg sticky top-0 z-[150]">
           <WifiOff size={14} className="animate-pulse" />
           <span>आप ऑफ़लाइन हैं। कैश्ड मेनू दिखाया जा रहा है।</span>
         </div>
@@ -1468,7 +1536,7 @@ export default function BbCafeHome() {
 
           <button 
             onClick={() => { triggerHaptic(); setIsProfileOpen(true); }}
-            className="p-2.5 dark:bg-neutral-800 bg-gray-100 dark:text-white text-neutral-955 rounded-xl border dark:border-neutral-700 border-gray-200 hover:border-orange-500 hover:text-orange-500 transition-colors shadow flex-shrink-0"
+            className="p-2.5 dark:bg-neutral-800 bg-gray-100 dark:text-white text-neutral-900 rounded-xl border dark:border-neutral-700 border-gray-200 hover:border-orange-500 hover:text-orange-500 transition-colors shadow flex-shrink-0"
             title="My Profile & Loyalty Rewards"
           >
             <User size={18} />
@@ -1868,7 +1936,7 @@ export default function BbCafeHome() {
                                 triggerHaptic();
                                 item.variants ? setSelectedProduct(item) : addItem(item); 
                               }} 
-                              className="px-4 py-2 bg-orange-500/10 text-orange-700 dark:text-orange-400 border border-orange-500/30 hover:bg-orange-500 hover:text-white rounded-lg font-black text-[10px] active:scale-95 transition-all uppercase flex items-center gap-1 shadow"
+                              className="px-4 py-2 bg-orange-500/10 text-orange-750 dark:text-orange-400 border border-orange-500/30 hover:bg-orange-500 hover:text-white rounded-lg font-black text-[10px] active:scale-95 transition-all uppercase flex items-center gap-1 shadow"
                             >
                               <Plus size={12} /> ADD
                             </button>
@@ -1886,7 +1954,7 @@ export default function BbCafeHome() {
                           triggerHaptic();
                           setIsProfileOpen(true);
                         }}
-                        className="cursor-pointer bg-gradient-to-r from-amber-500 via-orange-500 to-red-655 text-white p-5 rounded-2xl shadow-lg border border-white/10 my-2 relative overflow-hidden group animate-none"
+                        className="cursor-pointer bg-gradient-to-r from-amber-500 via-orange-500 to-red-600 text-white p-5 rounded-2xl shadow-lg border border-white/10 my-2 relative overflow-hidden group animate-none"
                       >
                         <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full blur-xl group-hover:scale-110 transition-transform duration-500" />
                         <div className="relative z-10 flex justify-between items-center gap-4">
@@ -2055,7 +2123,7 @@ export default function BbCafeHome() {
               <p className="text-xs text-gray-300 font-semibold">{activeStory.description}</p>
               <button 
                 onClick={() => handleQuickAddFromStory(activeStory.title, activeStory.price)}
-                className="w-full max-w-sm mx-auto bg-orange-500 hover:bg-orange-600 text-black py-4 rounded-2xl font-black text-xs uppercase shadow animate-none"
+                className="w-full max-w-sm mx-auto bg-orange-50 hover:bg-orange-600 text-black py-4 rounded-2xl font-black text-xs uppercase shadow animate-none"
               >
                 ADD TO CART • ₹{activeStory.price}
               </button>
@@ -2090,7 +2158,7 @@ export default function BbCafeHome() {
                 ))}
               </div>
               <div className="fixed bottom-6 left-0 w-full px-6 z-50">
-                <button onClick={() => { triggerHaptic(); setIsReviewFormOpen(true); }} className="w-full max-w-md mx-auto bg-orange-500 text-black py-3.5 rounded-2xl font-black text-xs uppercase">✍️ Write a Review</button>
+                <button onClick={() => { triggerHaptic(); setIsReviewFormOpen(true); }} className="w-full max-w-md mx-auto bg-orange-50 text-black py-3.5 rounded-2xl font-black text-xs uppercase">✍️ Write a Review</button>
               </div>
             </div>
           </div>
@@ -2107,7 +2175,7 @@ export default function BbCafeHome() {
                 <button 
                   type="button" 
                   onClick={() => { triggerHaptic(); setIsReviewFormOpen(false); }} 
-                  className="p-2 bg-red-100 hover:bg-red-500 hover:text-white text-red-650 rounded-full transition-all duration-200"
+                  className="p-2 bg-red-100 hover:bg-red-500 hover:text-white text-red-600 rounded-full transition-all duration-200"
                   title="Close Feedback"
                 >
                   <X size={18} />
@@ -2165,7 +2233,7 @@ export default function BbCafeHome() {
             <motion.div initial={{ y: 300 }} animate={{ y: 0 }} exit={{ y: 300 }} className="dark:bg-[#111] bg-white w-full p-6 rounded-t-3xl border-t dark:border-white/10 border-gray-200 max-w-lg mx-auto overflow-y-auto max-h-[95vh] shadow-2xl transition-colors duration-200">
               <div className="w-12 h-1 bg-white/15 rounded-full mx-auto mb-4" />
               <h3 className="text-xl font-black text-center text-neutral-900 dark:text-white">{selectedProduct?.name}</h3>
-              <p className="text-orange-555 font-black mb-4 uppercase text-[8px] text-center">Customize Your Order</p>
+              <p className="text-orange-500 font-black mb-4 uppercase text-[8px] text-center">Customize Your Order</p>
               
               <div className="space-y-3 mb-4">
                 <p className="text-[10px] font-bold text-gray-500 uppercase">1. Select Portion Size:</p>
@@ -2195,7 +2263,7 @@ export default function BbCafeHome() {
                           type="button"
                           key={addon}
                           onClick={() => setNormalPizzaAddons(prev => ({ ...prev, [addon]: !prev[addon] }))}
-                          className={`p-2.5 rounded-xl border flex justify-between items-center text-[9px] font-bold ${isSelected ? 'border-orange-500 bg-orange-500/5 text-orange-400' : 'dark:border-white/5 border-gray-200 dark:bg-white/[0.02] bg-gray-50 dark:text-gray-300 text-neutral-850'}`}
+                          className={`p-2.5 rounded-xl border flex justify-between items-center text-[9px] font-bold ${isSelected ? 'border-orange-500 bg-orange-500/5 text-orange-400' : 'dark:border-white/5 border-gray-200 dark:bg-white/[0.02] bg-gray-50 dark:text-gray-300'}`}
                         >
                           <span>{addon}</span>
                           <span className="text-orange-400 font-black">+₹{cost}</span>
@@ -2224,7 +2292,7 @@ export default function BbCafeHome() {
                   placeholder="e.g. Make it extra spicy, No onions, soft crust etc..." 
                   value={chefNote} 
                   onChange={(e) => setChefNote(e.target.value)} 
-                  className="w-full text-xs p-3 rounded-xl dark:bg-white/[0.03] bg-gray-50 border dark:border-white/5 border-gray-200 dark:text-white text-neutral-955 outline-none focus:border-orange-500 h-16 resize-none"
+                  className="w-full text-xs p-3 rounded-xl dark:bg-white/[0.03] bg-gray-50 border dark:border-white/5 border-gray-200 dark:text-white outline-none focus:border-orange-500 h-16 resize-none"
                 />
               </div>
 
@@ -2278,7 +2346,7 @@ export default function BbCafeHome() {
                     </div>
                     <div className="space-y-1">
                       <label className="text-[9px] font-bold text-gray-500 uppercase">Referral Code (Optional)</label>
-                      <input type="text" placeholder="Enter invite code..." value={tempRefCode} onChange={(e) => setTempRefCode(e.target.value)} className="w-full dark:bg-neutral-800 bg-gray-50 border dark:border-neutral-700 border-gray-200 p-3 rounded-xl font-bold dark:text-white text-neutral-955 outline-none focus:border-orange-500 text-xs" />
+                      <input type="text" placeholder="Enter invite code..." value={tempRefCode} onChange={(e) => setTempRefCode(e.target.value)} className="w-full dark:bg-neutral-800 bg-gray-50 border dark:border-neutral-700 border-gray-200 p-3 rounded-xl font-bold dark:text-white text-neutral-900 outline-none focus:border-orange-500 text-xs" />
                     </div>
                   </div>
                   <button type="submit" className="w-full bg-orange-500 text-black p-3.5 rounded-xl font-black text-xs uppercase shadow transition-all active:scale-95 mt-4">Create Account ➔</button>
@@ -2326,7 +2394,7 @@ export default function BbCafeHome() {
                   </div>
 
                   {/* LOYALTY SCOREBOARD CARD */}
-                  <div className="dark:bg-yellow-400/5 bg-yellow-100 border border-yellow-350 dark:border-yellow-400/20 rounded-2xl p-4 space-y-3 transition-colors duration-200 shadow-md">
+                  <div className="dark:bg-yellow-400/5 bg-yellow-100 border border-yellow-300 dark:border-yellow-400/20 rounded-2xl p-4 space-y-3 transition-colors duration-200 shadow-md">
                     <div className="flex justify-between items-center border-b dark:border-white/10 border-yellow-200 pb-2">
                       <div className="flex items-center gap-1.5 text-yellow-600 dark:text-yellow-400 font-black text-xs uppercase"><Gift size={12}/> <span>Bum Bum Loyalty Club</span></div>
                       <span className={`text-[8px] font-black border px-2 py-0.5 rounded-full ${getCustomerTier(customerPoints).color}`}>
@@ -2351,7 +2419,7 @@ export default function BbCafeHome() {
                         <div className="space-y-1 max-h-24 overflow-y-auto pr-1 text-[8px] font-bold">
                           {pointsHistory.map((h: any) => (
                             <div key={h.id} className="flex justify-between items-center bg-black/10 dark:bg-white/5 p-1.5 rounded border dark:border-white/5 border-gray-200">
-                              <span className="truncate max-w-[170px] dark:text-gray-300 text-neutral-800">{h.description}</span>
+                              <span className="truncate max-w-[170px] dark:text-gray-300 text-neutral-850">{h.description}</span>
                               <span className={h.type === 'earn' ? 'text-green-500' : 'text-red-500'}>
                                 {h.type === 'earn' ? '+' : '-'}{h.points} Pts
                               </span>
@@ -2364,7 +2432,7 @@ export default function BbCafeHome() {
                     <div className="pt-1.5 flex flex-col gap-2">
                       <div className="flex justify-between items-center text-[9px]">
                         <span className="dark:text-gray-400 text-neutral-700 font-black uppercase">Share Progress:</span>
-                        <span className="text-yellow-600 dark:text-yellow-400 font-black bg-yellow-100 dark:bg-yellow-400/10 px-2 py-0.5 rounded border border-yellow-350 dark:border-yellow-400/20">{shareCount}/5 Shared</span>
+                        <span className="text-yellow-600 dark:text-yellow-400 font-black bg-yellow-100 dark:bg-yellow-400/10 px-2 py-0.5 rounded border border-yellow-300 dark:border-yellow-400/20">{shareCount}/5 Shared</span>
                       </div>
                       <button type="button" onClick={handleShareApp} className="w-full bg-green-600 text-white font-black py-2.5 rounded-xl text-[10px] uppercase flex items-center justify-center gap-1 shadow-md transition-all">
                         <Share2 size={12}/>
@@ -2384,7 +2452,7 @@ export default function BbCafeHome() {
                           const inCartCost = cart.reduce((acc: number, i: any) => acc + (i.pointsCost || 0), 0);
                           const isAffordable = (customerPoints - inCartCost) >= rule.pointsCost;
                           return (
-                            <button key={rule.id} type="button" onClick={() => handleCustomerRedeem(`reward-${rule.id}`, `🎁 FREE ${rule.rewardName}`, rule.pointsCost)} disabled={!isAffordable} className={`py-2 px-2 rounded text-[9px] font-black uppercase border truncate transition-all ${isAffordable ? 'bg-yellow-400 text-black border-yellow-400 hover:bg-yellow-500' : 'bg-neutral-100 dark:bg-white/5 text-neutral-455 dark:text-gray-500 border-neutral-200 dark:border-white/5 cursor-not-allowed'}`}>🎁 {rule.rewardName} ({rule.pointsCost} P)</button>
+                            <button key={rule.id} type="button" onClick={() => handleCustomerRedeem(`reward-${rule.id}`, `🎁 FREE ${rule.rewardName}`, rule.pointsCost)} disabled={!isAffordable} className={`py-2 px-2 rounded text-[9px] font-black uppercase border truncate transition-all ${isAffordable ? 'bg-yellow-400 text-black border-yellow-400 hover:bg-yellow-500' : 'bg-neutral-100 dark:bg-white/5 text-neutral-500 dark:text-gray-500 border-neutral-200 dark:border-white/5 cursor-not-allowed'}`}>🎁 {rule.rewardName} ({rule.pointsCost} P)</button>
                           );
                         })}
                       </div>
@@ -2430,7 +2498,7 @@ export default function BbCafeHome() {
                             <div className="h-px bg-white/5 my-1" />
                             <div className="flex justify-between items-center">
                               <span className="text-gray-400 font-semibold">Grand Total:</span>
-                              <span className="font-black dark:text-white text-neutral-955">₹{ord.total}</span>
+                              <span className="font-black dark:text-white text-neutral-900">₹{ord.total}</span>
                             </div>
                             <a 
                               href={`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(`नमस्ते बम बम कैफ़े! कृपया मेरे आर्डर नंबर #${formatBillNumber(ord.billNumber)} (टोकन नंबर: #${ord.tokenNumber}) का लाइव स्टेटस बताएं।`)}`}
@@ -2478,11 +2546,11 @@ export default function BbCafeHome() {
                   <div className="flex justify-between items-center">
                     <div className="min-w-0 pr-3">
                       <h4 className="font-bold text-xs dark:text-gray-100 text-neutral-900 truncate">{item?.name || "Item"}</h4>
-                      <p className="text-orange-555 font-black mt-1 text-[11px]">₹{item?.price || 0}</p>
+                      <p className="text-orange-500 font-black mt-1 text-[11px]">₹{item?.price || 0}</p>
                     </div>
                     <div className="flex items-center gap-2 bg-black/40 px-2 py-1 rounded-xl border border-white/10 flex-shrink-0">
                       <button onClick={() => { triggerHaptic(); removeItem(item.id); }} className="w-6 h-6 flex items-center justify-center bg-red-500/10 text-red-500 rounded text-sm font-black">-</button>
-                      <span className="font-black text-xs px-1 dark:text-white text-neutral-955">{item.quantity}</span>
+                      <span className="font-black text-xs px-1 dark:text-white text-neutral-900">{item.quantity}</span>
                       {item.isReward ? (
                         <button disabled className="w-6 h-6 flex items-center justify-center bg-white/5 text-gray-500 rounded text-sm font-black cursor-not-allowed">+</button>
                       ) : (
@@ -2510,7 +2578,7 @@ export default function BbCafeHome() {
                             <span className="font-bold block dark:text-white text-neutral-900">{suggest.name}</span>
                             <span className="text-orange-600 font-extrabold">{getDisplayPrice(suggest)}</span>
                           </div>
-                          <button onClick={() => { triggerHaptic(); addItem(suggest); }} className="bg-purple-500/20 text-purple-355 border border-purple-500/30 px-3 py-1 rounded-lg font-black uppercase animate-none">ADD</button>
+                          <button onClick={() => { triggerHaptic(); addItem(suggest); }} className="bg-purple-500/20 text-purple-600 border border-purple-500/30 px-3 py-1 rounded-lg font-black uppercase animate-none">ADD</button>
                         </div>
                       ))}
                     </div>
@@ -2542,7 +2610,7 @@ export default function BbCafeHome() {
                           onClick={() => { triggerHaptic(); setSelectedArea(area); }}
                           className={`p-3 rounded-xl border text-left flex flex-col justify-between transition-all duration-200 active:scale-95 ${
                             isSelected 
-                              ? 'border-orange-500 bg-orange-500/10 text-orange-655 shadow-md animate-none' 
+                              ? 'border-orange-500 bg-orange-500/10 text-orange-600 shadow-md animate-none' 
                               : 'dark:border-white/5 border-gray-200 dark:bg-white/[0.01] bg-gray-50 dark:text-neutral-300 text-neutral-900 hover:border-gray-300 hover:dark:border-white/10'
                           }`}
                         >
@@ -2570,7 +2638,7 @@ export default function BbCafeHome() {
                 <div className="dark:bg-white/[0.02] bg-gray-50 border dark:border-white/5 border-gray-200 rounded-2xl p-4 space-y-2 transition-colors duration-200">
                   <p className="text-[9px] font-black uppercase dark:text-gray-400 text-neutral-800">Add Extra condiments to order:</p>
                   <div className="grid grid-cols-3 gap-2">
-                    <button onClick={() => { triggerHaptic(); setKetchupAddon(!ketchupAddon); }} className={`p-2 rounded-xl border text-[9px] font-black ${ketchupAddon ? 'border-red-500 bg-red-500/5 text-red-655 animate-none' : 'dark:border-white/5 border-gray-200 bg-transparent dark:text-gray-400 text-neutral-800'}`}>
+                    <button onClick={() => { triggerHaptic(); setKetchupAddon(!ketchupAddon); }} className={`p-2 rounded-xl border text-[9px] font-black ${ketchupAddon ? 'border-red-500 bg-red-500/5 text-red-600 animate-none' : 'dark:border-white/5 border-gray-200 bg-transparent dark:text-gray-400 text-neutral-800'}`}>
                       Ketchup (+₹10)
                     </button>
                     <button onClick={() => { triggerHaptic(); setOreganoAddon(!oreganoAddon); }} className={`p-2 rounded-xl border text-[9px] font-black ${oreganoAddon ? 'border-yellow-500 bg-yellow-500/5 text-yellow-500 animate-none' : 'dark:border-white/5 border-gray-200 bg-transparent dark:text-gray-400 text-neutral-800'}`}>
@@ -2583,7 +2651,7 @@ export default function BbCafeHome() {
                 </div>
 
                 {/* 7. ECO FRIENDLY PACKAGING */}
-                <div className="dark:bg-green-950/10 bg-green-50/50 border dark:border-green-500/10 border-green-200/50 rounded-2xl p-4 flex justify-between items-center transition-colors duration-200">
+                <div className="dark:bg-green-955/10 bg-green-50/50 border dark:border-green-500/10 border-green-200/50 rounded-2xl p-4 flex justify-between items-center transition-colors duration-200">
                   <div className="space-y-0.5">
                     <p className="text-[10px] font-black text-green-600 uppercase tracking-tight">🌱 Eco-Friendly Packaging</p>
                     <p className="text-[8px] dark:text-gray-400 text-neutral-700 font-bold">चम्मच / टिश्यू पेपर की आवश्यकता नहीं है</p>
@@ -2617,7 +2685,7 @@ export default function BbCafeHome() {
         )}
       </AnimatePresence>
 
-      {/* CUSTOM PWA INSTALL MANUAL GUIDE MODAL */}
+      {/* COMPACT INSTALL BANNER GUIDE MODAL */}
       <AnimatePresence>
         {isInstallModalOpen && (
           <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[270] flex items-center justify-center p-6">
@@ -2684,7 +2752,7 @@ export default function BbCafeHome() {
               <Gift className="mx-auto text-yellow-400" size={32} />
               <div>
                 <h3 className="text-lg font-black text-yellow-400 uppercase italic">Gift Loyalty Points</h3>
-                <p className="text-[9px] text-gray-505 font-semibold mt-0.5">अपने पॉइंट्स किसी दोस्त को गिफ्ट करें</p>
+                <p className="text-[9px] text-gray-500 font-semibold mt-0.5">अपने पॉइंट्स किसी दोस्त को गिफ्ट करें</p>
               </div>
               <div className="space-y-3 text-left">
                 <div className="space-y-1">
@@ -2746,7 +2814,7 @@ export default function BbCafeHome() {
                 <button 
                   type="button" 
                   onClick={() => { triggerHaptic(); setIsClaimModalOpen(false); setClaimUsername(""); }} 
-                  className="bg-white/5 text-gray-455 p-3 rounded-xl font-black text-xs uppercase"
+                  className="bg-white/5 text-gray-400 p-3 rounded-xl font-black text-xs uppercase"
                 >
                   Cancel
                 </button>
@@ -2840,7 +2908,7 @@ export default function BbCafeHome() {
                 </button>
               </div>
 
-              <p className="text-[9px] text-green-555 dark:text-green-400 dark:bg-green-500/10 bg-green-50 p-2.5 rounded-xl font-bold">
+              <p className="text-[9px] text-green-600 dark:text-green-400 dark:bg-green-500/10 bg-green-50 p-2.5 rounded-xl font-bold">
                 🌱 पेपर रसीद के बिना DIGITAL इनवॉइस जनरेट किया गया है। धन्यवाद!
               </p>
               <button onClick={() => { triggerHaptic(); setShowInvoice(false); }} className="w-full bg-white text-black p-3 rounded-xl text-xs font-black uppercase">
@@ -2854,4 +2922,3 @@ export default function BbCafeHome() {
     </div>
   );
 }
-
