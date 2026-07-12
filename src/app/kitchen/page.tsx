@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../../lib/firebase';
-import { collection, onSnapshot, query, doc, updateDoc, orderBy, getDoc } from 'firebase/firestore';
+import { collection, onSnapshot, query, doc, updateDoc, orderBy, getDoc, where } from 'firebase/firestore';
 import { Clock, Check, Loader2, Play, Lock, AlertCircle, WifiOff, X } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 
@@ -62,32 +62,35 @@ export default function KitchenDisplaySystem() {
     }
   }, []);
 
-  // Real-time simple query with Client-side filtering (Daily Orders Only!)
+  // Real-time simple query with Client-side filtering & Database-level optimization (Daily Orders Only!)
   useEffect(() => {
     if (isLocked) return;
 
+    // OPTIMIZATION: Database se sirf wahi orders bhejenge jo active hain
     const qSimple = query(
       collection(db, "orders"),
-      orderBy("timestamp", "asc")
+      where("status", "in", ["pending", "preparing", "out_for_delivery"])
     );
 
     const unsub = onSnapshot(qSimple, (snap) => {
-      const allOrders = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const activeOrdersList = snap.docs.map(d => ({ id: d.id, ...d.data() as any }));
       
       // Aaj ka din shuru hone ka sateek samay (00:00 AM) nikalna
       const todayStart = new Date();
       todayStart.setHours(0, 0, 0, 0);
 
       // Client-side filtering for active & today's orders only (Daily orders filter)
-      const kitchenOrders = allOrders.filter((o: any) => {
-        // 1. Check if status is pending, preparing, or out for delivery
-        const isStatusMatch = ["pending", "preparing", "out_for_delivery"].includes(o.status);
-        if (!isStatusMatch) return false;
-
-        // 2. Check if the order belongs to today (Daily check)
+      const kitchenOrders = activeOrdersList.filter((o: any) => {
         if (!o.timestamp) return false;
         const orderDate = o.timestamp?.toDate ? o.timestamp.toDate() : new Date(o.timestamp);
         return orderDate >= todayStart;
+      });
+
+      // CLIENT-SIDE SORTING: Order sequence list ko time ke hisab se manually line me lagana
+      kitchenOrders.sort((a, b) => {
+        const tA = a.timestamp?.toDate ? a.timestamp.toDate() : new Date(a.timestamp || 0);
+        const tB = b.timestamp?.toDate ? b.timestamp.toDate() : new Date(b.timestamp || 0);
+        return tA.getTime() - tB.getTime();
       });
       
       // Sound alert logic for daily new orders
@@ -154,7 +157,7 @@ export default function KitchenDisplaySystem() {
           <form onSubmit={handlePinSubmit} className="space-y-4">
             <input 
               type="password" 
-              maxLength={6}
+              maxLength={6} 
               placeholder="Enter Staff/Manager PIN" 
               value={pinInput} 
               onChange={(e) => setPinInput(e.target.value)} 
