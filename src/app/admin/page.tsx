@@ -1,23 +1,29 @@
+
+
 'use client';
   
 import React, { useState, useEffect, useMemo } from 'react';
-// Changed to reliable relative path to avoid compile-time path resolution errors
 import { db } from '../../lib/firebase'; 
-import { collection, onSnapshot, query, orderBy, doc, updateDoc, setDoc, addDoc, deleteDoc, increment } from 'firebase/firestore';
-import { Power, Eye, EyeOff, User, MapPin, Calendar, CheckCircle2, LogOut, Loader2, Phone, Plus, Trash, Edit, X, Lock, BarChart3, Download, Folder, Percent, ImageIcon, Gift, Settings, Search, BookOpen, Share2, MessageSquare, Filter, RefreshCw, Check } from 'lucide-react';
+import { collection, onSnapshot, query, orderBy, doc, updateDoc, setDoc, addDoc, deleteDoc, increment, runTransaction } from 'firebase/firestore';
+import { Power, Eye, EyeOff, User, MapPin, Calendar, CheckCircle2, LogOut, Loader2, Phone, Plus, Trash, Edit, X, Lock, BarChart3, Download, Folder, Percent, ImageIcon, Gift, Settings, Search, BookOpen, Share2, MessageSquare, Filter, RefreshCw, Check, CheckCircle, XCircle } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 
-// Categories default list
 const ADD_CATEGORIES = ["Special Pizza", "Special Thali", "Paneer Special", "Special Mix veg", "Fast Food", "Super Cool", "Indian Bread", "Special Rice"];
 
-// --- STATUS CHANGE HANDLER ---
+const SOCIAL_LINKS = [
+  { id: 'whatsapp_msg', label: '🟢 WhatsApp Msg', icon: '💬', points: 1, url: 'https://wa.me/919714293759' },
+  { id: 'whatsapp_channel', label: '📢 WhatsApp Channel', icon: '📢', points: 1, url: 'https://whatsapp.com/channel/0029VaLhggoGE56natoQI43y' },
+  { id: 'youtube', label: '🔴 YouTube', icon: '🎥', points: 1, url: 'https://www.youtube.com/@bbcafe.i' },
+  { id: 'instagram', label: '📸 Instagram', icon: '📸', points: 1, url: 'https://www.instagram.com/bbcafe.in/' },
+  { id: 'facebook', label: '🔵 Facebook', icon: '📘', points: 1, url: 'https://www.facebook.com/bbcafe.in/' },
+  { id: 'snapchat', label: '👻 Snapchat', icon: '👻', points: 1, url: 'https://www.snapchat.com/add/bbcafe.in' }
+];
+
 const handleStatusChange = async (order: any, newStatus: string) => {
   try {
-    // 1. Firebase में स्टेटस अपडेट करें
     await updateDoc(doc(db, "orders", order.id), { status: newStatus });
     toast.success("Status Sync Success!");
 
-    // 2. जब आर्डर 'delivered' मार्क हो, तब उसे Loyverse POS में भेजें
     if (newStatus === "delivered") {
       toast.loading("Syncing to Loyverse POS...", { id: "pos-sync" });
       try {
@@ -44,7 +50,6 @@ const handleStatusChange = async (order: any, newStatus: string) => {
   }
 };
 
-// --- PRINT / SAVE AS PDF FUNCTION ---
 const handlePrintReceipt = (order: any) => {
   const printWindow = window.open('', '_blank', 'width=600,height=800');
   if (!printWindow) {
@@ -162,7 +167,6 @@ const handlePrintReceipt = (order: any) => {
   printWindow.document.close();
 };
 
-// --- PRINT RECIPE POSTER FOR KITCHEN WALL (SOP ROSTER SHEET) ---
 const handlePrintRosterSOP = (product: any) => {
   const printWindow = window.open('', '_blank', 'width=800,height=1000');
   if (!printWindow) {
@@ -247,19 +251,18 @@ export default function AdminDashboard() {
   const [isVerified, setIsVerified] = useState(false);
   const [loading, setLoading] = useState(true);
   const [passcode, setPasscode] = useState("");
-  // Replaced 'passwords' with 'security' tab to avoid safety triggers
-  const [tab, setTab] = useState<'dashboard' | 'orders' | 'menu' | 'categories' | 'customers' | 'loyalty' | 'banners' | 'reviews' | 'coupons' | 'roster' | 'security'>('dashboard');
+  const [tab, setTab] = useState<'dashboard' | 'orders' | 'menu' | 'categories' | 'customers' | 'loyalty' | 'banners' | 'reviews' | 'coupons' | 'roster' | 'proofs' | 'claims' | 'security'>('dashboard');
   
   const [orders, setOrders] = useState<any[]>([]);
   const [menu, setMenu] = useState<any[]>([]);
   const [storeOpen, setStoreOpen] = useState(true);
 
-  // --- SEARCH QUERIES STATES ---
+  // SEARCH QUERIES STATES
   const [menuSearchQuery, setMenuSearchQuery] = useState("");
   const [categorySearchQuery, setCategorySearchQuery] = useState("");
   const [customerSearchQuery, setCustomerSearchQuery] = useState("");
 
-  // --- EXTENDED STATES FOR NEW TABS ---
+  // EXTENDED STATES FOR NEW TABS
   const [categories, setCategories] = useState<any[]>([]);
   const [newCatName, setNewCatName] = useState("");
   const [newCatImage, setNewCatImage] = useState("");
@@ -276,37 +279,44 @@ export default function AdminDashboard() {
   const [newCouponCode, setNewCouponCode] = useState("");
   const [newCouponValue, setNewCouponValue] = useState("");
 
-  // --- CUSTOMER LOYALTY CLUB STATE ---
+  // Dynamic Social Proofs (Requirement 3)
+  const [socialProofs, setSocialProofs] = useState<any[]>([]);
+  const [newProofText, setNewProofText] = useState("");
+
+  // Social point claims (Requirement 4)
+  const [pointsClaims, setPointsClaims] = useState<any[]>([]);
+
+  // CUSTOMER LOYALTY CLUB STATE
   const [loyaltyUsers, setLoyaltyUsers] = useState<any[]>([]);
   const [editingCustomer, setEditingCustomer] = useState<any>(null);
   const [editCustomerName, setEditCustomerName] = useState("");
   const [editCustomerPoints, setEditCustomerPoints] = useState(0);
   const [selectedCustomerHistory, setSelectedCustomerHistory] = useState<any>(null);
 
-  // --- DYNAMIC LOYALTY RULES STATE ---
+  // DYNAMIC LOYALTY RULES STATE
   const [loyaltyRules, setLoyaltyRules] = useState<any[]>([]);
   const [newRuleName, setNewRuleName] = useState("");
   const [newRulePoints, setNewRulePoints] = useState("");
 
-  // --- CUSTOMER POINT TRANSFERS AUDIT STATE ---
+  // CUSTOMER POINT TRANSFERS AUDIT STATE
   const [transferLogs, setTransferLogs] = useState<any[]>([]);
 
-  // --- DYNAMIC PASSCODES FROM FIRESTORE ---
+  // DYNAMIC PASSCODES FROM FIRESTORE
   const [passcodes, setPasscodes] = useState({ adminPin: "971429", managerPin: "123456" });
   const [userRole, setUserRole] = useState<'admin' | 'manager' | null>(null);
   const [newAdminPinInput, setNewAdminPinInput] = useState("");
   const [newManagerPinInput, setNewManagerPinInput] = useState("");
 
-  // --- START & END DATE FILTERS (30: Custom Date-Range Sales Audit) ---
+  // START & END DATE FILTERS
   const [startDate, setStartDate] = useState(() => {
     const d = new Date();
-    d.setDate(d.getDate() - 7); // Default start: 7 days ago
+    d.setDate(d.getDate() - 7); 
     return d.toISOString().split('T')[0];
   });
-  const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]); // Default end: Today
+  const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]); 
   const [ordersFilterDate, setOrdersFilterDate] = useState(new Date().toISOString().split('T')[0]);
 
-  // --- ADD PRODUCT STATES ---
+  // ADD PRODUCT STATES
   const [showAddForm, setShowAddForm] = useState(false);
   const [newName, setNewName] = useState("");
   const [newPrice, setNewPrice] = useState("");
@@ -321,7 +331,7 @@ export default function AdminDashboard() {
   const [priceLarge, setPriceLarge] = useState("");
   const [priceXL, setPriceXL] = useState("");
 
-  // --- EDIT PRODUCT STATES ---
+  // EDIT PRODUCT STATES
   const [editingProduct, setEditingProduct] = useState<any>(null);
   const [editName, setEditName] = useState("");
   const [editPrice, setEditPrice] = useState("");
@@ -335,11 +345,11 @@ export default function AdminDashboard() {
   const [editPriceLarge, setEditPriceLarge] = useState("");
   const [editPriceXL, setEditPriceXL] = useState("");
 
-  // --- SOP / RECIPE STATES (65: SOP Recipe Guide) ---
+  // SOP RECIPE STATES
   const [sopProduct, setSopProduct] = useState<any>(null);
   const [sopRecipeText, setSopRecipeText] = useState("");
 
-  // --- BROADCAST MODAL STATES & FILTERS (39: WhatsApp Broadcast Enhancement) ---
+  // BROADCAST MODAL STATES
   const [showBroadcastModal, setShowBroadcastModal] = useState(false);
   const [broadcastMessage, setBroadcastMessage] = useState("Special Offer from Bum Bum Cafe! Get 10% OFF on all Special Pizzas today! 🍕🔥");
   const [broadcastTierFilter, setBroadcastTierFilter] = useState<string>('all');
@@ -347,11 +357,17 @@ export default function AdminDashboard() {
   const [broadcastMinSpend, setBroadcastMinSpend] = useState<number>(0);
   const [sentBroadcastPhones, setSentBroadcastPhones] = useState<string[]>([]);
 
-  // --- KITCHEN ROSTER RECIPE STATES ---
+  // KITCHEN ROSTER RECIPE STATES
   const [rosterSelectedProduct, setRosterSelectedProduct] = useState<any>(null);
   const [rosterStepName, setRosterStepName] = useState("");
   const [rosterStepQty, setRosterStepQty] = useState("");
   const [rosterStepNote, setRosterStepNote] = useState("");
+
+  // Reels CRUD Additions (Requirement 2)
+  const [newReelTitle, setNewReelTitle] = useState("");
+  const [newReelDesc, setNewReelDesc] = useState("");
+  const [newReelPrice, setNewReelPrice] = useState("");
+  const [newReelIsStory, setNewReelIsStory] = useState(false);
 
   // Helper function to format bill number to e.g., '0015'
   const formatBillNumber = (num: number) => {
@@ -369,7 +385,7 @@ export default function AdminDashboard() {
     setLoading(false);
   }, []);
 
-  // 2. Real-time Security Passcodes Loader (Bypasses local storage securely)
+  // 2. Real-time Security Passcodes Loader
   useEffect(() => {
     const unsubPasscodes = onSnapshot(doc(db, "settings", "passcodes"), (d) => {
       if (d.exists()) {
@@ -436,7 +452,17 @@ export default function AdminDashboard() {
       setLoyaltyRules(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
 
-    // Listen for Customer Point Transfers safely
+    // Real-time Social Proofs Loader (Requirement 3)
+    const unsubProofs = onSnapshot(collection(db, "social_proofs"), (snap) => {
+      setSocialProofs(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+
+    // Real-time Social Point Claims Loader (Requirement 4)
+    const unsubClaims = onSnapshot(collection(db, "points_claims"), (snap) => {
+      setPointsClaims(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+
+    // Listen for Customer Point Transfers
     const unsubTransfers = onSnapshot(collection(db, "point_transfers"), (snap) => {
       const logs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       logs.sort((a: any, b: any) => {
@@ -457,6 +483,8 @@ export default function AdminDashboard() {
       unsubReviews();
       unsubLoyalty();
       unsubRules();
+      unsubProofs();
+      unsubClaims();
       unsubTransfers();
     };
   }, [isVerified]);
@@ -523,7 +551,7 @@ export default function AdminDashboard() {
     return Array.from(customersMap.values());
   }, [loyaltyUsers, orders]);
 
-  // --- SEARCH CUSTOMERS BY NAME & PHONE (CUSTOMER TAB SEARCH) ---
+  // --- SEARCH CUSTOMERS BY NAME & PHONE ---
   const searchedCustomers = useMemo(() => {
     if (!customerSearchQuery.trim()) return combinedCustomers;
     const q = customerSearchQuery.toLowerCase().trim();
@@ -533,7 +561,7 @@ export default function AdminDashboard() {
     );
   }, [combinedCustomers, customerSearchQuery]);
 
-  // --- COMBINE DYNAMIC + FALLBACK CATEGORIES TO PREVENT EMPTY LISTS ---
+  // --- COMBINE DYNAMIC + FALLBACK CATEGORIES ---
   const combinedCategories = useMemo(() => {
     const list = [...categories];
     ADD_CATEGORIES.forEach(fallbackName => {
@@ -551,7 +579,7 @@ export default function AdminDashboard() {
     return list;
   }, [categories]);
 
-  // --- FILTER & SORT ORDERS BY SELECTED DATE AND SEQUENTIAL BILL NUMBER ---
+  // --- FILTER & SORT ORDERS BY SELECTED DATE ---
   const filteredOrdersList = useMemo(() => {
     const targetDateStr = new Date(ordersFilterDate).toDateString();
     const matched = orders.filter(o => {
@@ -562,7 +590,7 @@ export default function AdminDashboard() {
     return matched.sort((a, b) => Number(b.billNumber || 0) - Number(a.billNumber || 0));
   }, [orders, ordersFilterDate]);
 
-  // --- CUSTOMER PROFILE SAVER (POINTS MANUAL OVERRIDE) ---
+  // --- CUSTOMER PROFILE SAVER ---
   const handleUpdateCustomer = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editCustomerName) return toast.error("Name is required!");
@@ -608,7 +636,7 @@ export default function AdminDashboard() {
     }
   };
 
-  // --- CALCULATE CUSTOMER LOYALTY METRICS (55: VIP Customer Tracker) ---
+  // --- CALCULATE CUSTOMER LOYALTY METRICS ---
   const getCustomerLoyaltyMetrics = (phone: string) => {
     const targetPhone = String(phone).replace("+91", "").trim();
     const customerOrders = orders.filter(o => {
@@ -641,12 +669,12 @@ export default function AdminDashboard() {
     };
   };
 
-  // --- CSV / EXCEL EXPORT ENGINE WITH UTF-8 BOM ---
+  // --- CSV / EXCEL EXPORT ENGINE ---
   const triggerCsvDownload = (data: any[], filename: string, headers: string[], keys: string[]) => {
     if (data.length === 0) return toast.error("No data available to export!");
 
     const csvRows = [];
-    csvRows.push(headers.join(',')); // Add headers
+    csvRows.push(headers.join(','));
     
     data.forEach(item => {
       const values = keys.map(key => {
@@ -714,7 +742,7 @@ export default function AdminDashboard() {
     triggerCsvDownload(formattedData, `BumBumCafe_CustomersDirectory_${new Date().toLocaleDateString()}`, headers, keys);
   };
 
-  // --- CALENDAR DYNAMIC SALES AUDIT BY RANGE (30: Custom Date-Range Sales Audit) ---
+  // --- CALENDAR DYNAMIC SALES AUDIT BY RANGE ---
   const getAuditRangeAnalytics = () => {
     const startObj = new Date(startDate);
     startObj.setHours(0,0,0,0);
@@ -730,7 +758,6 @@ export default function AdminDashboard() {
     const totalRevenue = rangeOrders.reduce((acc, curr) => acc + (Number(curr.total) || 0), 0);
     const activeCount = orders.filter(o => o.status === 'pending' || o.status === 'preparing').length;
 
-    // Split Sales Cash vs UPI/Card (18: Cash vs UPI payment split)
     let cashSales = 0;
     let upiSales = 0;
     rangeOrders.forEach(o => {
@@ -752,7 +779,6 @@ export default function AdminDashboard() {
     };
   };
 
-  // --- GET LIFETIME DASHBOARD METRICS ---
   const getLifetimeMetrics = () => {
     const seenPhones = new Set();
     orders.forEach(o => { if (o.customerPhone) seenPhones.add(String(o.customerPhone)); });
@@ -768,7 +794,7 @@ export default function AdminDashboard() {
   const auditStats = getAuditRangeAnalytics();
   const lifetimeStats = getLifetimeMetrics();
 
-  // --- MOST SELLING DISHES (06: Most Selling Items Analytics) ---
+  // --- MOST SELLING DISHES ---
   const topSellingDishes = useMemo(() => {
     const countsMap: any = {};
     orders.forEach(o => {
@@ -781,10 +807,10 @@ export default function AdminDashboard() {
     return Object.entries(countsMap)
       .map(([name, qty]: any) => ({ name, qty }))
       .sort((a, b) => b.qty - a.qty)
-      .slice(0, 5); // Get Top 5
+      .slice(0, 5); 
   }, [orders]);
 
-  // --- LAST 7 DAYS CHART DATA (16: Lightweight Sales Bar Chart) ---
+  // --- LAST 7 DAYS CHART DATA ---
   const last7DaysChartData = useMemo(() => {
     const days: any[] = [];
     for (let i = 6; i >= 0; i--) {
@@ -838,7 +864,6 @@ export default function AdminDashboard() {
   const toggleCategoryVisibility = async (cat: any) => {
     try {
       if (cat.isVirtual) {
-        // Automatically save virtual fallback category to DB with toggled visibility
         await addDoc(collection(db, "categories"), {
           name: cat.name,
           image: cat.image,
@@ -863,7 +888,6 @@ export default function AdminDashboard() {
     if (!editCatName || !editCatImage) return toast.error("Please fill all fields!");
     try {
       if (editingCategory.isVirtual) {
-        // Automatically persist and save virtual category to Database
         await addDoc(collection(db, "categories"), {
           name: editCatName,
           image: editCatImage,
@@ -895,25 +919,88 @@ export default function AdminDashboard() {
     }
   };
 
-  // --- DYNAMIC BANNERS ACTIONS ---
+  // Requirement 2: Dynamic Reels/Stories CRUD Additions
   const handleAddBanner = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newBannerUrl) return;
     try {
-      await addDoc(collection(db, "banners"), { url: newBannerUrl, timestamp: new Date() });
-      setNewBannerUrl("");
-      toast.success("New Banner Added!");
+      await addDoc(collection(db, "banners"), { 
+        url: newBannerUrl, 
+        title: newReelTitle || "Special Story",
+        description: newReelDesc || "",
+        price: Number(newReelPrice) || 0,
+        isStory: newReelIsStory,
+        timestamp: new Date() 
+      });
+      setNewBannerUrl(""); setNewReelTitle(""); setNewReelDesc(""); setNewReelPrice(""); setNewReelIsStory(false);
+      toast.success("New Media/Reel Added!");
     } catch (err) { toast.error("Error adding banner"); }
   };
 
   const handleDeleteBanner = async (id: string) => {
     try {
       await deleteDoc(doc(db, "banners", id));
-      toast.success("Banner Deleted!");
-    } catch (err) { toast.error("Error deleting banner"); }
+      toast.success("Banner/Reel Deleted!");
+    } catch (err) { toast.error("Error deleting item"); }
   };
 
-  // --- DYNAMIC REVIEWS ACTIONS ---
+  // Requirement 3: Manage Social Proof Alerts CRUD
+  const handleAddSocialProof = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newProofText.trim()) return toast.error("Please enter alert text!");
+    try {
+      await addDoc(collection(db, "social_proofs"), {
+        text: newProofText.trim(),
+        timestamp: new Date()
+      });
+      setNewProofText("");
+      toast.success("New Order Alert Added!");
+    } catch (err) { toast.error("Error adding alert"); }
+  };
+
+  const handleDeleteSocialProof = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, "social_proofs", id));
+      toast.success("Order Alert Deleted!");
+    } catch (err) { toast.error("Error deleting alert"); }
+  };
+
+  // Requirement 4: Verification Loop for Point claims
+  const handleVerifyClaimApproval = async (claim: any) => {
+    try {
+      await runTransaction(db, async (transaction) => {
+        const userRef = doc(db, "customer_points", claim.customerPhone);
+        const claimRef = doc(db, "points_claims", claim.id);
+
+        const userSnap = await transaction.get(userRef);
+        if (!userSnap.exists()) {
+          transaction.set(userRef, { name: claim.customerName, phone: claim.customerPhone, points: claim.pointsToReward, lastActive: new Date() });
+        } else {
+          transaction.update(userRef, { points: increment(claim.pointsToReward) });
+        }
+
+        transaction.update(claimRef, { status: "approved" });
+
+        const histRef = doc(collection(db, "customer_points", claim.customerPhone, "history"));
+        transaction.set(histRef, {
+          type: "earn",
+          points: claim.pointsToReward,
+          description: `Followed us on ${claim.platformLabel} 📱 (Approved)`,
+          timestamp: new Date()
+        });
+      });
+
+      toast.success("Claim Approved! Point successfully credited.");
+    } catch (err) { toast.error("Verification transaction failed."); }
+  };
+
+  const handleRejectClaim = async (id: string) => {
+    try {
+      await updateDoc(doc(db, "points_claims", id), { status: "rejected" });
+      toast.success("Claim Request Rejected!");
+    } catch (err) { toast.error("Failed to reject claim request."); }
+  };
+
   const handleApproveReview = async (id: string) => {
     try {
       await updateDoc(doc(db, "reviews", id), { isApproved: true });
@@ -928,7 +1015,6 @@ export default function AdminDashboard() {
     } catch (err) { toast.error("Error deleting review"); }
   };
 
-  // --- DYNAMIC COUPONS ACTIONS ---
   const handleAddCoupon = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCouponCode || !newCouponValue) return;
@@ -947,10 +1033,9 @@ export default function AdminDashboard() {
     try {
       await deleteDoc(doc(db, "coupons", couponId));
       toast.success("Coupon Deleted!");
-    } catch (error) { parseInt("1"); toast.error("Error deleting coupon"); }
+    } catch (error) { toast.error("Error deleting coupon"); }
   };
 
-  // --- STORE ACTIONS ---
   const toggleStore = async () => {
     try {
       await setDoc(doc(db, "settings", "store"), { isOpen: !storeOpen });
@@ -958,7 +1043,6 @@ export default function AdminDashboard() {
     } catch (e) { toast.error("Error toggling store"); }
   };
 
-  // --- OTHER MENU ITEM ACTIONS ---
   const toggleItemVisibility = async (id: string, currentStatus: boolean) => {
     try {
       await updateDoc(doc(db, "products", id), { isVisible: !currentStatus });
@@ -977,7 +1061,6 @@ export default function AdminDashboard() {
     }
   };
 
-  // --- COMPACT BULK IMPORT ---
   const handleBulkImport = async () => {
     if (!window.confirm("BUM BUM CAFE PDF ke items ko database mein add karein?")) return;
     toast.loading("Importing menu items...", { id: "import" });
@@ -1002,14 +1085,12 @@ export default function AdminDashboard() {
     }
   };
 
-  // --- ADD NEW PRODUCT FUNCTION (With Duplicate check) ---
   const handleAddProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newName || !newCategory || !newImage) {
       return toast.error("Please fill all required fields!");
     }
 
-    // --- (DUPLICATE ITEM PREVENT CHECKER) ---
     const exists = menu.some(item => String(item.name).toLowerCase().trim() === newName.toLowerCase().trim());
     if (exists) {
       return toast.error("यह डिश पहले से मेन्यू में मौजूद है!");
@@ -1060,7 +1141,6 @@ export default function AdminDashboard() {
     }
   };
 
-  // --- EDIT PRODUCT SELECTOR LOGIC ---
   const startEditing = (item: any) => {
     setShowAddForm(false);
     setEditingProduct(item);
@@ -1092,14 +1172,12 @@ export default function AdminDashboard() {
     }
   };
 
-  // --- EDIT & UPDATE PROCESSOR (With Duplicate checker) ---
   const handleUpdateProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editName || !editCategory || !editImage) {
       return toast.error("Please fill all fields!");
     }
 
-    // --- (DUPLICATE ITEM PREVENT CHECKER FOR EDITING) ---
     const exists = menu.some(item => 
       item.id !== editingProduct.id && 
       String(item.name).toLowerCase().trim() === editName.toLowerCase().trim()
@@ -1151,7 +1229,6 @@ export default function AdminDashboard() {
     }
   };
 
-  // --- SAVE PRODUCT RECIPE / SOP (65: SOP Recipe Guide) ---
   const handleSaveSopRecipe = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!sopProduct) return;
@@ -1166,7 +1243,6 @@ export default function AdminDashboard() {
     }
   };
 
-  // --- SAVE DYNAMIC PASSCODES (Only Admin can update) ---
   const handleUpdatePasscodes = async (e: React.FormEvent) => {
     e.preventDefault();
     if (userRole !== 'admin') {
@@ -1186,7 +1262,6 @@ export default function AdminDashboard() {
     }
   };
 
-  // --- ADD KITCHEN ROSTER INGREDIENT STEP ---
   const handleAddRosterStep = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!rosterSelectedProduct) return toast.error("पहले एक डिश सिलेक्ट करें!");
@@ -1214,7 +1289,6 @@ export default function AdminDashboard() {
     }
   };
 
-  // --- DELETE KITCHEN ROSTER STEP ---
   const handleDeleteRosterStep = async (idxToDelete: number) => {
     if (!rosterSelectedProduct) return;
     const currentIngredients = rosterSelectedProduct.ingredients || [];
@@ -1232,7 +1306,6 @@ export default function AdminDashboard() {
     }
   };
 
-  // --- SEND WHATSAPP BILL DIRECT TO CUSTOMER (07: No-Cost WhatsApp Bill) ---
   const handleSendWhatsAppBill = (order: any) => {
     const phone = String(order.customerPhone || "").replace("+91", "").trim();
     if (!phone) return toast.error("Customer phone not found!");
@@ -1258,7 +1331,6 @@ Thank you for your order, *${order.customerName || 'Guest'}*! Visit Again! 😊`
     window.open(`https://wa.me/91${phone}?text=${message}`, '_blank');
   };
 
-  // --- AUTOMATIC WHATSAPP CLOSING REPORT TO OWNER (63: Daily Closing Report) ---
   const handleSendDailyClosingReport = () => {
     const formattedDate = new Date(endDate).toLocaleDateString('en-IN');
     const topDishesText = topSellingDishes.map((d: any, idx: number) => `${idx + 1}. ${d.name} (${d.qty} times)`).join('\n') || 'None';
@@ -1283,19 +1355,16 @@ Report generated automatically by Bum Bum Cafe POS.`
     window.open(`https://wa.me/919714293759?text=${message}`, '_blank');
   };
 
-  // --- SEND WHATSAPP BROADCAST MESSAGE (39: WhatsApp Broadcast with Sent Tracking) ---
   const triggerWhatsAppBroadcast = (phone: string) => {
     const cleanPhone = String(phone).replace("+91", "").trim();
     const encodedMsg = encodeURIComponent(broadcastMessage);
     window.open(`https://wa.me/91${cleanPhone}?text=${encodedMsg}`, '_blank');
 
-    // Add to session sent tracker
     if (!sentBroadcastPhones.includes(cleanPhone)) {
       setSentBroadcastPhones(prev => [...prev, cleanPhone]);
     }
   };
 
-  // --- RESET DAILY TOKEN MANUALLY (19: Daily Token Reset) ---
   const handleResetTokenCounter = () => {
     if (window.confirm("Bum Bum Cafe ke Token Sequence ko reset karein?")) {
       localStorage.setItem('bb_cafe_token_seed', '1');
@@ -1303,7 +1372,6 @@ Report generated automatically by Bum Bum Cafe POS.`
     }
   };
 
-  // --- NATIVE CSV IMPORT HANDLER ---
   const handleCsvImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -1324,25 +1392,21 @@ Report generated automatically by Bum Bum Cafe POS.`
         let successCount = 0;
         let failCount = 0;
 
-        // Loop starting from row index 1 to bypass header row (Name, Phone, Points)
         for (let i = 1; i < lines.length; i++) {
           const line = lines[i].trim();
           if (!line) continue;
 
-          // Split line values cleanly and escape quotes
           const columns = line.split(',').map(col => col.replace(/^"|"$/g, '').trim());
           
           let name = columns[0] || "Customer";
           let phone = columns[1] || "";
           let points = Number(columns[2]) || 0;
 
-          // Swap if phone is accidentally stored in the first column and name is empty
           if (!phone && name && /^\d+$/.test(name)) {
             phone = name;
             name = "Customer";
           }
 
-          // Clean phone number (strip spaces and +91 country code prefix)
           const cleanPhone = phone.replace("+91", "").replace(/\s+/g, "").trim();
 
           if (!cleanPhone || cleanPhone.length < 10) {
@@ -1350,7 +1414,6 @@ Report generated automatically by Bum Bum Cafe POS.`
             continue;
           }
 
-          // Store directly inside Firestore 'customer_points'
           await setDoc(doc(db, "customer_points", cleanPhone), {
             name: name,
             phone: cleanPhone,
@@ -1372,10 +1435,9 @@ Report generated automatically by Bum Bum Cafe POS.`
     };
 
     reader.readAsText(file);
-    e.target.value = ""; // Reset input so same file can be selected again if needed
+    e.target.value = ""; 
   };
 
-  // --- CLIENT SIDE FILTER FOR DYNAMIC MENUS & CATEGORIES ---
   const searchedMenu = useMemo(() => {
     if (!menuSearchQuery.trim()) return menu;
     return menu.filter(item => 
@@ -1391,13 +1453,11 @@ Report generated automatically by Bum Bum Cafe POS.`
     );
   }, [combinedCategories, categorySearchQuery]);
 
-  // --- FILTER CUSTOMERS SPECIALLY TARGETED FOR THE MARKETING BROADCAST BLAST ---
   const broadcastTargetedCustomers = useMemo(() => {
     return searchedCustomers.map(user => {
       const metrics = getCustomerLoyaltyMetrics(user.phone);
       return { ...user, metrics };
     }).filter(user => {
-      // Tier filter
       if (broadcastTierFilter !== 'all') {
         const tLower = user.metrics.tier.toLowerCase();
         if (broadcastTierFilter === 'platinum' && !tLower.includes('platinum')) return false;
@@ -1406,17 +1466,13 @@ Report generated automatically by Bum Bum Cafe POS.`
         if (broadcastTierFilter === 'bronze' && !tLower.includes('bronze')) return false;
       }
 
-      // Min Points filter
       if (Number(user.points || 0) < broadcastMinPoints) return false;
-
-      // Min Spend filter
       if (Number(user.metrics.totalSpend || 0) < broadcastMinSpend) return false;
 
       return true;
     });
   }, [searchedCustomers, broadcastTierFilter, broadcastMinPoints, broadcastMinSpend]);
 
-  // --- AUTO-NEXT QUEUE ASSISTANT FOR WHATSAPP BROADCAST ---
   const handleSendNextUnsentBroadcast = () => {
     const unsentList = broadcastTargetedCustomers.filter(u => !sentBroadcastPhones.includes(u.phone));
     if (unsentList.length === 0) {
@@ -1427,7 +1483,6 @@ Report generated automatically by Bum Bum Cafe POS.`
     toast.success(`Opening WhatsApp for ${nextTarget.name}...`);
   };
 
-  // --- Loading Screen ---
   if (loading) {
     return (
       <div className="bg-[#050505] min-h-screen text-white flex flex-col items-center justify-center font-sans">
@@ -1437,7 +1492,6 @@ Report generated automatically by Bum Bum Cafe POS.`
     );
   }
 
-  // --- Secure PIN Login Screen if not verified (Bypasses local storage securely) ---
   if (!isVerified) {
     return (
       <div className="bg-[#050505] min-h-screen text-white flex items-center justify-center p-4 font-sans">
@@ -1496,18 +1550,20 @@ Report generated automatically by Bum Bum Cafe POS.`
         </div>
       </header>
 
-      {/* --- RESPONSIVE HORIZONTAL TABS --- */}
+      {/* --- NAV TABS --- */}
       <div className="p-4 flex gap-2 overflow-x-auto no-scrollbar border-b border-white/5">
-        <button onClick={() => setTab('dashboard')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'dashboard' ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/20' : 'bg-white/5 text-gray-500'}`}>📊 Dashboard</button>
+        <button onClick={() => setTab('dashboard')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'dashboard' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>📊 Dashboard</button>
         <button onClick={() => setTab('orders')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'orders' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>📦 Orders ({orders.length})</button>
         <button onClick={() => setTab('menu')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'menu' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>🍔 Menu List</button>
         <button onClick={() => setTab('roster')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'roster' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>📋 Kitchen Roster</button>
         <button onClick={() => setTab('categories')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'categories' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>🗂️ Categories</button>
         <button onClick={() => setTab('customers')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'customers' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>👥 Customers ({combinedCustomers.length})</button>
         <button onClick={() => setTab('loyalty')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'loyalty' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>🎁 Loyalty Rules</button>
-        <button onClick={() => setTab('banners')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'banners' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>🖼️ Banners</button>
+        <button onClick={() => setTab('banners')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'banners' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>🖼️ Stories & Reels</button>
         <button onClick={() => setTab('coupons')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'coupons' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>🎟️ Coupons</button>
         <button onClick={() => setTab('reviews')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'reviews' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>⭐ Reviews</button>
+        <button onClick={() => setTab('proofs')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'proofs' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>🔥 Order Alerts</button>
+        <button onClick={() => setTab('claims')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'claims' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>✅ Verification Claims</button>
         <button onClick={() => setTab('security')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'security' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>🔑 PIN Settings</button>
       </div>
 
@@ -1518,7 +1574,6 @@ Report generated automatically by Bum Bum Cafe POS.`
           <div className="space-y-6">
             <h3 className="text-xl font-black text-orange-500 uppercase tracking-wider flex items-center gap-2"><BarChart3 size={20}/> Sales Dashboard</h3>
             
-            {/* Sales Stats Range Grid (30: Custom Date-Range Sales Audit) */}
             <div className="bg-[#111] border border-white/5 p-5 rounded-3xl space-y-4">
               <div className="flex flex-col gap-3">
                 <p className="text-[10px] font-black uppercase text-orange-400 tracking-wider">🎯 Custom Date-Range Auditor</p>
@@ -1544,7 +1599,6 @@ Report generated automatically by Bum Bum Cafe POS.`
                 </div>
               </div>
 
-              {/* Auditor KPIs */}
               <div className="grid grid-cols-3 gap-3 border-t border-white/5 pt-4">
                 <div className="bg-white/[0.01] border border-white/5 p-3 rounded-2xl text-center">
                   <p className="text-[9px] font-bold text-gray-500 uppercase">Range Sales</p>
@@ -1560,7 +1614,6 @@ Report generated automatically by Bum Bum Cafe POS.`
                 </div>
               </div>
 
-              {/* 18: Cash vs UPI payment split */}
               <div className="grid grid-cols-2 gap-3 pt-1">
                 <div className="bg-white/[0.02] border border-white/5 p-3.5 rounded-2xl flex justify-between items-center">
                   <span className="text-[10px] font-black text-gray-500 uppercase">Cash Collected:</span>
@@ -1573,10 +1626,8 @@ Report generated automatically by Bum Bum Cafe POS.`
               </div>
             </div>
 
-            {/* (16: Lightweight Sales Visuals Bar Chart) */}
             <div className="bg-[#111] border border-white/5 p-5 rounded-3xl space-y-3">
               <p className="text-[10px] font-black uppercase text-orange-400 tracking-wider">📈 Last 7 Days Sales Trend</p>
-              
               <div className="h-44 w-full flex items-end justify-between gap-2 pt-6 pb-2 px-1">
                 {last7DaysChartData.map((day, idx) => (
                   <div key={idx} className="flex-1 flex flex-col items-center gap-1.5 h-full justify-end group">
@@ -1591,7 +1642,6 @@ Report generated automatically by Bum Bum Cafe POS.`
               </div>
             </div>
 
-            {/* (06: Most Selling Items Analytics) */}
             <div className="bg-[#111] border border-white/5 p-5 rounded-3xl space-y-3">
               <p className="text-[10px] font-black uppercase text-orange-400 tracking-wider">🔥 Top 5 Best Selling Dishes</p>
               <div className="space-y-2">
@@ -1607,7 +1657,6 @@ Report generated automatically by Bum Bum Cafe POS.`
               </div>
             </div>
 
-            {/* Daily Reset and Reports (19: Daily Reset & 63: WhatsApp Closing Report) */}
             <div className="grid grid-cols-2 gap-3 bg-[#111]/30 border border-white/5 p-4 rounded-[2rem] shadow-xl">
               <button onClick={handleResetTokenCounter} className="bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/20 font-black text-xs py-4 px-3 rounded-2xl flex items-center justify-center gap-2 active:scale-95 transition-all uppercase">
                 Reset Tokens Counter
@@ -1617,7 +1666,6 @@ Report generated automatically by Bum Bum Cafe POS.`
               </button>
             </div>
 
-            {/* Excel Exports Buttons */}
             <div className="grid grid-cols-2 gap-3 bg-[#111]/30 border border-white/5 p-4 rounded-[2rem] shadow-xl">
               <button onClick={handleExportOrders} className="bg-green-600 hover:bg-green-700 text-white font-black text-xs py-4 px-3 rounded-2xl flex items-center justify-center gap-2 active:scale-95 transition-all uppercase shadow-md border border-green-500/10">
                 <Download size={14}/> Sales Ledger Excel
@@ -1627,7 +1675,6 @@ Report generated automatically by Bum Bum Cafe POS.`
               </button>
             </div>
 
-            {/* Permanent Orders Ledger */}
             <div className="space-y-4">
               <h4 className="text-sm font-black text-gray-400 uppercase tracking-widest pt-2">📚 Permanent Financial Ledger</h4>
               {orders.length === 0 ? (
@@ -1651,7 +1698,6 @@ Report generated automatically by Bum Bum Cafe POS.`
                           </p>
                         ))}
                       </div>
-
                       <p className="text-[9px] font-semibold text-gray-600 mt-2">{o.timestamp?.toDate ? o.timestamp.toDate().toLocaleString() : 'Just now'}</p>
                     </div>
                     <div className="text-right flex-shrink-0">
@@ -1665,11 +1711,9 @@ Report generated automatically by Bum Bum Cafe POS.`
           </div>
         )}
 
-        {/* --- TAB 2: LIVE ORDERS WITH DATE FILTER & SEQUENTIAL TOKENS --- */}
+        {/* --- TAB 2: LIVE ORDERS --- */}
         {tab === 'orders' && (
           <div className="space-y-4">
-            
-            {/* Orders Calendar Filter */}
             <div className="bg-[#111] border border-white/5 p-5 rounded-3xl flex justify-between items-center">
               <div>
                 <h4 className="font-black text-sm text-orange-500 uppercase tracking-wider">📦 Filter Daily Orders</h4>
@@ -1712,14 +1756,12 @@ Report generated automatically by Bum Bum Cafe POS.`
                   <div className="mt-4 pt-4 border-t border-white/5 flex justify-between items-center">
                     <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Name: {o.customerName || 'N/A'}</span>
                     <div className="flex items-center gap-2 flex-wrap">
-                      {/* 📄 Print Bill PDF */}
                       <button 
                         onClick={() => handlePrintReceipt(o)}
                         className="px-3 py-2 bg-orange-500 hover:bg-orange-600 text-black rounded-xl text-[10px] font-black uppercase transition-all active:scale-95"
                       >
                         📄 Bill PDF
                       </button>
-                      {/* (07: No-Cost WhatsApp Bill) */}
                       <button 
                         onClick={() => handleSendWhatsAppBill(o)}
                         className="px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-xl text-[10px] font-black uppercase transition-all active:scale-95"
@@ -1740,11 +1782,9 @@ Report generated automatically by Bum Bum Cafe POS.`
           </div>
         )}
 
-        {/* --- TAB 3: DISHES MENU LIST TAB --- */}
+        {/* --- TAB 3: DISHES MENU LIST --- */}
         {tab === 'menu' && (
           <div className="space-y-4">
-            
-            {/* ACTION BUTTONS */}
             <div className="flex flex-col gap-2">
               <button onClick={handleBulkImport} type="button" className="w-full bg-yellow-400 text-black py-4 rounded-2xl font-black text-sm flex items-center justify-center gap-2 active:scale-95 transition-all shadow-xl">📥 IMPORT ALL 80+ PDF MENU ITEMS</button>
               <button onClick={() => { setShowAddForm(!showAddForm); setEditingProduct(null); }} className="w-full bg-orange-500/10 text-orange-500 border border-orange-500/20 py-4 rounded-2xl font-black text-sm flex items-center justify-center gap-2 hover:bg-orange-500/20 transition-all">
@@ -1752,34 +1792,32 @@ Report generated automatically by Bum Bum Cafe POS.`
               </button>
             </div>
 
-            {/* STICKY GLASS SEARCH BAR */}
             <div className="sticky top-[73px] z-30 bg-[#050505]/95 backdrop-blur-md py-4 border-b border-white/5 rounded-b-3xl shadow-lg">
               <div className="relative group max-w-lg mx-auto">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-orange-500 transition-colors" size={16} />
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
                 <input 
                   type="text" 
                   placeholder="Search item name or category..." 
                   value={menuSearchQuery} 
                   onChange={(e) => setMenuSearchQuery(e.target.value)}
-                  className="w-full bg-white text-black py-3 px-11 rounded-xl outline-none focus:ring-4 focus:ring-orange-500/20 text-xs font-semibold transition-all"
+                  className="w-full bg-white text-black py-3 px-11 rounded-xl outline-none text-xs font-semibold"
                 />
               </div>
             </div>
 
-            {/* ADD PRODUCT FORM */}
             {showAddForm && (
               <form onSubmit={handleAddProduct} className="bg-white/[0.02] border border-white/5 p-6 rounded-[2.5rem] space-y-4">
                 <h3 className="text-lg font-black text-orange-500 italic uppercase">Add Product Form</h3>
                 
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-gray-400 uppercase">Item Name</label>
-                  <input type="text" placeholder="e.g., Cheese Corn Pizza" value={newName} onChange={(e) => setNewName(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" required />
+                  <input type="text" placeholder="e.g., Cheese Corn Pizza" value={newName} onChange={(e) => setNewName(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-white" required />
                 </div>
 
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-gray-400 uppercase">Category</label>
-                  <select value={newCategory} onChange={(e) => setNewCategory(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" required>
-                    {categoryOptions.filter(c => c !== "All").map(cat => (
+                  <select value={newCategory} onChange={(e) => setNewCategory(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-white" required>
+                    {categoryOptions.filter(c => c !== "All" && c !== "DIY Pizza").map(cat => (
                       <option key={cat} value={cat} className="bg-[#111]">{cat}</option>
                     ))}
                   </select>
@@ -1787,23 +1825,23 @@ Report generated automatically by Bum Bum Cafe POS.`
 
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-gray-400 uppercase">Image URL</label>
-                  <input type="url" placeholder="Paste image url link..." value={newImage} onChange={(e) => setNewImage(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" required />
+                  <input type="url" placeholder="Paste image url link..." value={newImage} onChange={(e) => setNewImage(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-white" required />
                 </div>
 
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-gray-400 uppercase">Portion Option Type</label>
-                  <select value={variantType} onChange={(e: any) => setVariantType(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white">
+                  <select value={variantType} onChange={(e: any) => setVariantType(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-white">
                     <option value="none" className="bg-[#111]">None (Single Price)</option>
                     <option value="half_full" className="bg-[#111]">Half / Full</option>
                     <option value="plain_butter" className="bg-[#111]">Plain / Butter</option>
-                    <option value="pizza_sizes" className="bg-[#111]">Pizza Sizes (Small, Medium, Large, Extra Large)</option>
+                    <option value="pizza_sizes" className="bg-[#111]">Pizza Sizes</option>
                   </select>
                 </div>
 
                 {variantType === 'none' && (
                   <div className="space-y-1">
                     <label className="text-xs font-bold text-gray-400 uppercase">Price (₹)</label>
-                    <input type="number" placeholder="Item Price (e.g., 150)" value={newPrice} onChange={(e) => setNewPrice(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" />
+                    <input type="number" placeholder="Item Price" value={newPrice} onChange={(e) => setNewPrice(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-white" />
                   </div>
                 )}
 
@@ -1811,51 +1849,49 @@ Report generated automatically by Bum Bum Cafe POS.`
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1">
                       <label className="text-xs font-bold text-gray-400 uppercase">Half / Plain Price (₹)</label>
-                      <input type="number" placeholder="Price" value={halfPrice} onChange={(e) => setHalfPrice(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" />
+                      <input type="number" placeholder="Price" value={halfPrice} onChange={(e) => setHalfPrice(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-white" />
                     </div>
                     <div className="space-y-1">
                       <label className="text-xs font-bold text-gray-400 uppercase">Full / Butter Price (₹)</label>
-                      <input type="number" placeholder="Price" value={fullPrice} onChange={(e) => setFullPrice(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" />
+                      <input type="number" placeholder="Price" value={fullPrice} onChange={(e) => setFullPrice(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-white" />
                     </div>
                   </div>
                 )}
 
                 {variantType === 'pizza_sizes' && (
                   <div className="space-y-3 bg-[#111]/40 p-4 rounded-2xl border border-white/5">
-                    <p className="text-[10px] text-orange-400 font-extrabold uppercase tracking-wide">Enter available prices (Leave blank if unavailable):</p>
+                    <p className="text-[10px] text-orange-400 font-extrabold uppercase">Prices (Leave blank if unavailable):</p>
                     <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Small Price (₹)</label><input type="number" placeholder="Optional" value={priceSmall} onChange={(e) => setPriceSmall(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" /></div>
-                      <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Medium Price (₹)</label><input type="number" placeholder="Optional" value={priceMedium} onChange={(e) => setPriceMedium(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" /></div>
-                      <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Large Price (₹)</label><input type="number" placeholder="Optional" value={priceLarge} onChange={(e) => setPriceLarge(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" /></div>
-                      <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">XL Price (₹)</label><input type="number" placeholder="Optional" value={priceXL} onChange={(e) => setPriceXL(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" /></div>
+                      <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Small (₹)</label><input type="number" value={priceSmall} onChange={(e) => setPriceSmall(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-white text-xs font-bold" /></div>
+                      <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Medium (₹)</label><input type="number" value={priceMedium} onChange={(e) => setPriceMedium(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-white text-xs font-bold" /></div>
+                      <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Large (₹)</label><input type="number" value={priceLarge} onChange={(e) => setPriceLarge(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-white text-xs font-bold" /></div>
+                      <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Extra Large (₹)</label><input type="number" value={priceXL} onChange={(e) => setPriceXL(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-white text-xs font-bold" /></div>
                     </div>
                   </div>
                 )}
 
-                <button type="submit" className="w-full bg-green-600 text-white p-4 rounded-xl font-black text-sm shadow-lg active:scale-95 transition-all uppercase">Save Product</button>
+                <button type="submit" className="w-full bg-green-600 text-white p-4 rounded-xl font-black text-sm uppercase">Save Product</button>
               </form>
             )}
 
-            {/* EDIT PRODUCT MODAL POP-UP */}
             {editingProduct && (
               <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[100] flex items-center justify-center p-4 overflow-y-auto">
-                <form onSubmit={handleUpdateProduct} className="bg-[#111] border-2 border-orange-500/50 p-8 rounded-[2.5rem] w-full max-w-lg relative max-h-[90vh] overflow-y-auto no-scrollbar shadow-2xl space-y-4">
-                  <button type="button" onClick={() => setEditingProduct(null)} className="absolute top-4 right-4 p-2.5 bg-white/5 text-gray-400 hover:text-white rounded-full transition-all"><X size={18}/></button>
+                <form onSubmit={handleUpdateProduct} className="bg-[#111] border-2 border-orange-500/50 p-8 rounded-[2.5rem] w-full max-w-lg relative max-h-[90vh] overflow-y-auto shadow-2xl space-y-4">
+                  <button type="button" onClick={() => setEditingProduct(null)} className="absolute top-4 right-4 p-2.5 bg-white/5 text-gray-400 hover:text-white rounded-full"><X size={18}/></button>
                   
                   <div className="text-center pb-2">
                     <h3 className="text-2xl font-black text-orange-500 italic uppercase">Edit Product</h3>
-                    <p className="text-[10px] text-gray-500 uppercase tracking-widest font-black mt-0.5">Customize Cafe Dish</p>
                   </div>
                   
                   <div className="space-y-1">
                     <label className="text-xs font-bold text-gray-400 uppercase">Item Name</label>
-                    <input type="text" placeholder="e.g., Paneer Pizza" value={editName} onChange={(e) => setEditName(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" required />
+                    <input type="text" value={editName} onChange={(e) => setEditName(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-white" required />
                   </div>
 
                   <div className="space-y-1">
                     <label className="text-xs font-bold text-gray-400 uppercase">Category</label>
-                    <select value={editCategory} onChange={(e) => setEditCategory(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" required>
-                      {categoryOptions.filter(c => c !== "All").map(cat => (
+                    <select value={editCategory} onChange={(e) => setEditCategory(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-white" required>
+                      {categoryOptions.filter(c => c !== "All" && c !== "DIY Pizza").map(cat => (
                         <option key={cat} value={cat} className="bg-[#111]">{cat}</option>
                       ))}
                     </select>
@@ -1863,54 +1899,52 @@ Report generated automatically by Bum Bum Cafe POS.`
 
                   <div className="space-y-1">
                     <label className="text-xs font-bold text-gray-400 uppercase">Image URL</label>
-                    <input type="url" placeholder="Paste image url..." value={editImage} onChange={(e) => setEditImage(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" required />
+                    <input type="url" value={editImage} onChange={(e) => setEditImage(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-white" required />
                   </div>
 
                   <div className="space-y-1">
-                    <label className="text-xs font-bold text-gray-400 uppercase">Portion Option Type</label>
-                    <select value={editVariantType} onChange={(e: any) => setEditVariantType(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white">
+                    <label className="text-xs font-bold text-gray-400 uppercase">Option Type</label>
+                    <select value={editVariantType} onChange={(e: any) => setEditVariantType(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-white">
                       <option value="none" className="bg-[#111]">None (Single Price)</option>
                       <option value="half_full" className="bg-[#111]">Half / Full</option>
                       <option value="plain_butter" className="bg-[#111]">Plain / Butter</option>
-                      <option value="pizza_sizes" className="bg-[#111]">Pizza Sizes (Small, Medium, Large, Extra Large)</option>
+                      <option value="pizza_sizes" className="bg-[#111]">Pizza Sizes</option>
                     </select>
                   </div>
 
                   {editVariantType === 'none' && (
                     <div className="space-y-1">
                       <label className="text-xs font-bold text-gray-400 uppercase">Price (₹)</label>
-                      <input type="number" placeholder="Item Price" value={editPrice} onChange={(e) => setEditPrice(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" />
+                      <input type="number" value={editPrice} onChange={(e) => setEditPrice(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-white" />
                     </div>
                   )}
 
                   {(editVariantType === 'half_full' || editVariantType === 'plain_butter') && (
                     <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Half / Plain Price (₹)</label><input type="number" placeholder="Price" value={editHalfPrice} onChange={(e) => setEditHalfPrice(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" /></div>
-                      <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Full / Butter Price (₹)</label><input type="number" placeholder="Price" value={editFullPrice} onChange={(e) => setEditFullPrice(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" /></div>
+                      <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Half / Plain (₹)</label><input type="number" value={editHalfPrice} onChange={(e) => setEditHalfPrice(e.target.value)} className="w-full bg-black/40 border border-white/10 rouded-xl p-3 text-white text-xs font-bold" /></div>
+                      <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Full / Butter (₹)</label><input type="number" value={editFullPrice} onChange={(e) => setEditFullPrice(e.target.value)} className="w-full bg-black/40 border border-white/10 rouded-xl p-3 text-white text-xs font-bold" /></div>
                     </div>
                   )}
 
                   {editVariantType === 'pizza_sizes' && (
                     <div className="space-y-3 bg-[#111]/40 p-4 rounded-2xl border border-white/5">
-                      <p className="text-[10px] text-orange-400 font-extrabold uppercase tracking-wide">Edit available prices (Leave blank if unavailable):</p>
                       <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Small Price (₹)</label><input type="number" placeholder="Optional" value={editPriceSmall} onChange={(e) => setEditPriceSmall(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" /></div>
-                        <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Medium Price (₹)</label><input type="number" placeholder="Optional" value={editPriceMedium} onChange={(e) => setEditPriceMedium(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" /></div>
-                        <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Large Price (₹)</label><input type="number" placeholder="Optional" value={editPriceLarge} onChange={(e) => setEditPriceLarge(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" /></div>
-                        <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">XL Price (₹)</label><input type="number" placeholder="Optional" value={editPriceXL} onChange={(e) => setEditPriceXL(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white" /></div>
+                        <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Small Price</label><input type="number" value={editPriceSmall} onChange={(e) => setEditPriceSmall(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs font-bold text-white" /></div>
+                        <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Medium Price</label><input type="number" value={editPriceMedium} onChange={(e) => setEditPriceMedium(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs font-bold text-white" /></div>
+                        <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Large Price</label><input type="number" value={editPriceLarge} onChange={(e) => setEditPriceLarge(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs font-bold text-white" /></div>
+                        <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Extra Large</label><input type="number" value={editPriceXL} onChange={(e) => setEditPriceXL(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs font-bold text-white" /></div>
                       </div>
                     </div>
                   )}
 
                   <div className="flex gap-2 pt-2">
-                    <button type="submit" className="flex-1 bg-green-600 hover:bg-green-700 text-white p-4 rounded-xl font-black text-sm shadow-lg active:scale-95 transition-all uppercase">Update Item</button>
-                    <button type="button" onClick={() => setEditingProduct(null)} className="bg-white/5 text-gray-400 p-4 rounded-xl font-black text-sm active:scale-95 transition-all">CANCEL</button>
+                    <button type="submit" className="flex-1 bg-green-600 text-white p-4 rounded-xl font-black text-sm uppercase">Update Item</button>
+                    <button type="button" onClick={() => setEditingProduct(null)} className="bg-white/5 text-gray-400 p-4 rounded-xl font-black text-xs uppercase">Cancel</button>
                   </div>
                 </form>
               </div>
             )}
 
-            {/* Menu Items List */}
             <div className="space-y-3 pt-2">
               {searchedMenu.length === 0 ? (
                 <p className="text-center text-xs font-black uppercase text-gray-500 py-10">No matching dishes found...</p>
@@ -1945,21 +1979,17 @@ Report generated automatically by Bum Bum Cafe POS.`
                         <p className="text-orange-500 font-black text-sm mt-1">{getAdminDisplayPrice(item)}</p>
                       </div>
                       <div className="flex items-center gap-2">
-                        {/* SOP / Recipe Button (65: SOP Recipe Guide) */}
                         <button 
                           onClick={() => { setSopProduct(item); setSopRecipeText(item.recipe || ""); }} 
-                          className="p-3 bg-purple-500/10 text-purple-500 rounded-xl hover:bg-purple-500/20 active:scale-90 transition-all flex items-center justify-center gap-1.5"
+                          className="p-3 bg-purple-500/10 text-purple-500 rounded-xl flex items-center gap-1.5"
                         >
                           <BookOpen size={16}/> <span className="text-[10px] font-black">SOP</span>
                         </button>
-
-                        <button onClick={() => startEditing(item)} className="p-3 bg-blue-500/10 text-blue-500 rounded-xl hover:bg-blue-500/20 active:scale-90 transition-all"><Edit size={18}/></button>
-                        
-                        {/* --- Item Hide/Unhide Toggle --- */}
+                        <button onClick={() => startEditing(item)} className="p-3 bg-blue-500/10 text-blue-500 rounded-xl"><Edit size={18}/></button>
                         <button onClick={() => toggleItemVisibility(item.id, item.isVisible !== false)} className={`p-3 rounded-xl transition-all ${item.isVisible !== false ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
                           {item.isVisible !== false ? <Eye size={18}/> : <EyeOff size={18}/>}
                         </button>
-                        <button onClick={() => handleDeleteProduct(item.id)} className="p-3 bg-red-500/10 text-red-500 rounded-xl hover:bg-red-500/20 active:scale-90 transition-all"><Trash size={18}/></button>
+                        <button onClick={() => handleDeleteProduct(item.id)} className="p-3 bg-red-500/10 text-red-500 rounded-xl"><Trash size={18}/></button>
                       </div>
                     </div>
                   );
@@ -1969,151 +1999,123 @@ Report generated automatically by Bum Bum Cafe POS.`
           </div>
         )}
 
-        {/* --- TAB 4: CATEGORY MANAGER TAB --- */}
+        {/* --- TAB 4: CATEGORY MANAGER --- */}
         {tab === 'categories' && (
           <div className="space-y-6">
-            
-            {/* ADD CATEGORY FORM */}
             {!editingCategory && (
               <form onSubmit={handleAddCategory} className="bg-white/[0.02] border border-white/5 p-6 rounded-[2.5rem] space-y-4">
                 <h3 className="text-lg font-black text-orange-500 italic uppercase flex items-center gap-2"><Folder size={18}/> Add Category</h3>
                 <div className="grid grid-cols-2 gap-3">
-                  <input type="text" placeholder="Category Name" value={newCatName} onChange={(e) => setNewCatName(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-xs font-black text-white" required />
-                  <input type="url" placeholder="Image URL link" value={newCatImage} onChange={(e) => setNewCatImage(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-xs font-black text-white" required />
+                  <input type="text" placeholder="Category Name" value={newCatName} onChange={(e) => setNewCatName(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-xs font-black text-white" required />
+                  <input type="url" placeholder="Image URL link" value={newCatImage} onChange={(e) => setNewCatImage(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-xs font-black text-white" required />
                 </div>
-                <button type="submit" className="w-full bg-green-600 text-white p-4 rounded-xl font-black text-sm uppercase active:scale-95 transition-all">Add Category</button>
+                <button type="submit" className="w-full bg-green-600 text-white p-4 rounded-xl font-black text-sm uppercase">Add Category</button>
               </form>
             )}
 
-            {/* STICKY GLASS SEARCH BAR FOR CATEGORIES */}
             <div className="sticky top-[73px] z-30 bg-[#050505]/95 backdrop-blur-md py-4 border-b border-white/5 rounded-b-3xl shadow-lg">
               <div className="relative group max-w-lg mx-auto">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-orange-500 transition-colors" size={16} />
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
                 <input 
                   type="text" 
                   placeholder="Search categories..." 
                   value={categorySearchQuery} 
                   onChange={(e) => setCategorySearchQuery(e.target.value)}
-                  className="w-full bg-white text-black py-3 px-11 rounded-xl outline-none focus:ring-4 focus:ring-orange-500/20 text-xs font-semibold transition-all"
+                  className="w-full bg-white text-black py-3 px-11 rounded-xl outline-none text-xs font-semibold"
                 />
               </div>
             </div>
 
-            {/* EDIT CATEGORY MODAL POP-UP */}
             {editingCategory && (
-              <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[100] flex items-center justify-center p-4 overflow-y-auto">
-                <form onSubmit={handleUpdateCategory} className="bg-[#111] border-2 border-orange-500 p-8 rounded-[2.5rem] w-full max-w-lg relative max-h-[90vh] overflow-y-auto no-scrollbar shadow-2xl space-y-4">
-                  <button type="button" onClick={() => setEditingCategory(null)} className="absolute top-4 right-4 p-2.5 bg-white/5 text-gray-400 hover:text-white rounded-full transition-all"><X size={18}/></button>
-
+              <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[100] flex items-center justify-center p-4">
+                <form onSubmit={handleUpdateCategory} className="bg-[#111] border-2 border-orange-500 p-8 rounded-[2.5rem] w-full max-w-lg relative shadow-2xl space-y-4">
+                  <button type="button" onClick={() => setEditingCategory(null)} className="absolute top-4 right-4 p-2.5 bg-white/5 text-gray-400 hover:text-white rounded-full"><X size={18}/></button>
                   <div className="text-center pb-2">
                     <h3 className="text-2xl font-black text-orange-500 italic uppercase flex items-center justify-center gap-2"><Folder size={22}/> Edit Category</h3>
-                    <p className="text-[10px] text-gray-500 uppercase tracking-widest font-black mt-0.5">Modify Category Attributes</p>
                   </div>
 
                   <div className="space-y-4">
                     <div className="space-y-1">
                       <label className="text-xs font-bold text-gray-400 uppercase">Category Name</label>
-                      <input type="text" placeholder="Category Name" value={editCatName} onChange={(e) => setEditCatName(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-4 outline-none focus:border-orange-500 text-sm font-bold text-white" required />
+                      <input type="text" value={editCatName} onChange={(e) => setEditCatName(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-4 outline-none text-sm font-bold text-white" required />
                     </div>
                     <div className="space-y-1">
                       <label className="text-xs font-bold text-gray-400 uppercase">Image URL Link</label>
-                      <input type="url" placeholder="Image URL link" value={editCatImage} onChange={(e) => setEditCatImage(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-4 outline-none focus:border-orange-500 text-sm font-bold text-white" required />
+                      <input type="url" value={editCatImage} onChange={(e) => setEditCatImage(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-4 outline-none text-sm font-bold text-white" required />
                     </div>
                   </div>
 
                   <div className="flex gap-2 pt-2">
-                    <button type="submit" className="flex-1 bg-green-600 text-white p-4 rounded-xl font-black text-sm uppercase transition-all hover:bg-green-700">Update Category</button>
+                    <button type="submit" className="flex-1 bg-green-600 text-white p-4 rounded-xl font-black text-sm uppercase">Update Category</button>
                     <button type="button" onClick={() => setEditingCategory(null)} className="bg-white/5 text-gray-400 p-4 rounded-xl font-black text-sm uppercase">Cancel</button>
                   </div>
                 </form>
               </div>
             )}
 
-            {/* Dynamic Combined Category List */}
             <div className="space-y-3">
-              <p className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">Category List ({searchedCategories.length})</p>
-              {searchedCategories.length === 0 ? (
-                <p className="text-center text-xs font-black uppercase text-gray-500 py-10">No categories found...</p>
-              ) : (
-                searchedCategories.map(c => (
-                  <div key={c.id} className="bg-white/[0.02] border border-white/5 p-4 rounded-3xl flex justify-between items-center hover:bg-white/[0.04] transition-all">
-                    <div className="flex items-center gap-4">
-                      <img src={c.image} className="w-12 h-12 rounded-full object-cover border border-white/10" alt="Category"/>
-                      <div className="flex flex-col">
-                        <h4 className="font-black text-sm text-gray-200">{c.name}</h4>
-                        {c.isVirtual && <span className="text-[8px] text-orange-500 font-bold uppercase tracking-wider">Default Back-up</span>}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button onClick={() => startEditingCategory(c)} className="p-3 bg-blue-500/10 text-blue-500 rounded-xl hover:bg-blue-500/20 active:scale-95 transition-all">
-                        <Edit size={18}/>
-                      </button>
-                      <button onClick={() => toggleCategoryVisibility(c)} className={`p-3 rounded-xl transition-all ${c.isVisible !== false ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
-                        {c.isVisible !== false ? <Eye size={18}/> : <EyeOff size={18}/>}
-                      </button>
-                      <button onClick={() => handleDeleteCategory(c)} className="p-3 bg-red-500/10 text-red-500 rounded-xl hover:bg-red-500/20 active:scale-95 transition-all">
-                        <Trash size={16}/>
-                      </button>
+              {searchedCategories.map(c => (
+                <div key={c.id} className="bg-white/[0.02] border border-white/5 p-4 rounded-3xl flex justify-between items-center hover:bg-white/[0.04]">
+                  <div className="flex items-center gap-4">
+                    <img src={c.image} className="w-12 h-12 rounded-full object-cover" alt="Category"/>
+                    <div className="flex flex-col">
+                      <h4 className="font-black text-sm text-gray-200">{c.name}</h4>
+                      {c.isVirtual && <span className="text-[8px] text-orange-500 font-bold uppercase">Default Back-up</span>}
                     </div>
                   </div>
-                ))
-              )}
+                  <div className="flex items-center gap-2">
+                    <button onClick={() => startEditingCategory(c)} className="p-3 bg-blue-500/10 text-blue-500 rounded-xl"><Edit size={18}/></button>
+                    <button onClick={() => toggleCategoryVisibility(c)} className={`p-3 rounded-xl transition-all ${c.isVisible !== false ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
+                      {c.isVisible !== false ? <Eye size={18}/> : <EyeOff size={18}/>}
+                    </button>
+                    <button onClick={() => handleDeleteCategory(c)} className="p-3 bg-red-500/10 text-red-500 rounded-xl"><Trash size={16}/></button>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         )}
 
-        {/* --- TAB 5: DEDICATED CUSTOMERS TAB (COMBINED & DEDUPED) --- */}
+        {/* --- TAB 5: CUSTOMERS TAB --- */}
         {tab === 'customers' && (
           <div className="space-y-6">
             <div className="flex justify-between items-center flex-wrap gap-2">
               <h3 className="text-xl font-black text-orange-500 uppercase tracking-wider flex items-center gap-2"><User size={20}/> Customer Management</h3>
               <div className="flex gap-2">
-                {/* 📥 Native CSV/Excel Import Button */}
-                <label className="bg-yellow-500 hover:bg-yellow-600 text-black font-black text-[10px] px-4 py-2.5 rounded-full flex items-center gap-1.5 uppercase cursor-pointer transition-all shadow-md">
-                  <Download size={13} className="rotate-180"/> Import CSV
-                  <input 
-                    type="file" 
-                    accept=".csv" 
-                    onChange={handleCsvImport} 
-                    className="hidden" 
-                  />
+                <label className="bg-yellow-500 hover:bg-yellow-600 text-black font-black text-[10px] px-4 py-2.5 rounded-full flex items-center gap-1.5 uppercase cursor-pointer transition-all">
+                  Import CSV
+                  <input type="file" accept=".csv" onChange={handleCsvImport} className="hidden" />
                 </label>
-                {/* WhatsApp Broadcast Marketing Button (39: WhatsApp Broadcast) */}
-                <button 
-                  onClick={() => setShowBroadcastModal(true)} 
-                  className="bg-green-600 hover:bg-green-700 text-white font-black text-[10px] px-4 py-2.5 rounded-full flex items-center gap-1.5 uppercase transition-all shadow-md"
-                >
+                <button onClick={() => setShowBroadcastModal(true)} className="bg-green-600 text-white font-black text-[10px] px-4 py-2.5 rounded-full flex items-center gap-1.5 uppercase shadow-md">
                   <Share2 size={13}/> Broadcast Blast
                 </button>
               </div>
             </div>
 
-            {/* STICKY SEARCH BAR (SEARCH CUSTOMER BY NAME OR PHONE) */}
             <div className="sticky top-[73px] z-30 bg-[#050505]/95 backdrop-blur-md py-4 border-b border-white/5 rounded-b-3xl shadow-lg">
               <div className="relative group max-w-lg mx-auto">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-orange-500 transition-colors" size={16} />
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
                 <input 
                   type="text" 
                   placeholder="Search customer by name or mobile number..." 
                   value={customerSearchQuery} 
                   onChange={(e) => setCustomerSearchQuery(e.target.value)}
-                  className="w-full bg-white text-black py-3 px-11 rounded-xl outline-none focus:ring-4 focus:ring-orange-500/20 text-xs font-semibold transition-all"
+                  className="w-full bg-white text-black py-3 px-11 rounded-xl outline-none text-xs font-semibold"
                 />
               </div>
             </div>
             
-            {/* EDIT CUSTOMER MODAL / BOX */}
             {editingCustomer && (
               <form onSubmit={handleUpdateCustomer} className="bg-[#151515] border-2 border-orange-500 p-6 rounded-[2.5rem] space-y-4">
                 <h4 className="text-sm font-black text-orange-500 uppercase">Edit Customer Profile</h4>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
                     <label className="text-[10px] font-bold text-gray-500 uppercase">Customer Name</label>
-                    <input type="text" value={editCustomerName} onChange={(e) => setEditCustomerName(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-xs font-black text-white" required />
+                    <input type="text" value={editCustomerName} onChange={(e) => setEditCustomerName(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-xs font-black text-white" required />
                   </div>
                   <div className="space-y-1">
                     <label className="text-[10px] font-bold text-gray-500 uppercase">Adjust Points</label>
-                    <input type="number" value={editCustomerPoints} onChange={(e) => setEditCustomerPoints(Number(e.target.value))} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-xs font-black text-white" required />
+                    <input type="number" value={editCustomerPoints} onChange={(e) => setEditCustomerPoints(Number(e.target.value))} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-xs font-black text-white" required />
                   </div>
                 </div>
                 <div className="flex gap-2">
@@ -2123,21 +2125,19 @@ Report generated automatically by Bum Bum Cafe POS.`
               </form>
             )}
 
-            {/* Customers Profile Directory with VIP Tracker (55: VIP Customer Tracker) */}
             <div className="space-y-4">
               {searchedCustomers.length === 0 ? (
                 <p className="text-center text-xs font-bold text-gray-500 py-10 uppercase">No matching customers found...</p>
               ) : (
-                // Sort by total spend (High LTV is shown first)
                 searchedCustomers
                   .map(user => ({ ...user, metrics: getCustomerLoyaltyMetrics(user.phone) }))
                   .sort((a, b) => b.metrics.totalSpend - a.metrics.totalSpend)
                   .map(user => {
                     return (
-                      <div key={user.id} className="bg-[#111] border border-white/5 p-5 rounded-3xl flex justify-between items-center hover:border-white/10 transition-all">
+                      <div key={user.id} className="bg-[#111] border border-white/5 p-5 rounded-3xl flex justify-between items-center hover:border-white/10">
                         <div className="space-y-1 cursor-pointer flex-1" onClick={() => setSelectedCustomerHistory(user)}>
                           <div className="flex items-center gap-2 flex-wrap">
-                            <h4 className="font-extrabold text-sm text-white hover:text-orange-500 transition-colors">{user.name} ➡️</h4>
+                            <h4 className="font-extrabold text-sm text-white hover:text-orange-500">{user.name} ➡️</h4>
                             <span className={`text-[8px] font-black uppercase px-2.5 py-0.5 rounded-full border ${user.metrics.tierColor}`}>
                               {user.metrics.tier}
                             </span>
@@ -2161,7 +2161,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                               setEditCustomerName(user.name);
                               setEditCustomerPoints(user.points || 0);
                             }}
-                            className="p-3 bg-orange-500/10 text-orange-500 rounded-xl hover:bg-orange-500 hover:text-black transition-all"
+                            className="p-3 bg-orange-500/10 text-orange-500 rounded-xl"
                           >
                             <Edit size={16}/>
                           </button>
@@ -2174,7 +2174,7 @@ Report generated automatically by Bum Bum Cafe POS.`
           </div>
         )}
 
-        {/* --- TAB 6: DYNAMIC LOYALTY RULES MANAGER --- */}
+        {/* --- TAB 6: LOYALTY RULES --- */}
         {tab === 'loyalty' && (
           <div className="space-y-6">
             <form onSubmit={handleAddRule} className="bg-white/[0.02] border border-white/5 p-6 rounded-[2.5rem] space-y-4">
@@ -2182,25 +2182,24 @@ Report generated automatically by Bum Bum Cafe POS.`
               <p className="text-[10px] text-gray-400 font-semibold leading-relaxed">Create rewards that customers can redeem automatically on checkout when their points hit the requirement:</p>
               
               <div className="grid grid-cols-2 gap-3">
-                <input type="text" placeholder="Reward Name (e.g., Free Mocktail)" value={newRuleName} onChange={(e) => setNewRuleName(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-xs font-black text-white" required />
-                <input type="number" placeholder="Points Needed (e.g., 30)" value={newRulePoints} onChange={(e) => setNewRulePoints(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-xs font-black text-white" required />
+                <input type="text" placeholder="Reward Name" value={newRuleName} onChange={(e) => setNewRuleName(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-xs font-black text-white" required />
+                <input type="number" placeholder="Points Needed" value={newRulePoints} onChange={(e) => setNewRulePoints(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-xs font-black text-white" required />
               </div>
               <button type="submit" className="w-full bg-green-600 text-white p-4 rounded-xl font-black text-sm uppercase">Add Reward Rule</button>
             </form>
 
-            {/* Current Active Rules */}
             <div className="space-y-3">
               <p className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">Active Customer Reward Rules ({loyaltyRules.length})</p>
               {loyaltyRules.length === 0 ? (
-                <p className="text-center text-xs font-bold text-gray-500 py-6 uppercase">No custom rules configured yet...</p>
+                <p className="text-center text-xs font-bold text-gray-500 py-6">No custom rules configured yet...</p>
               ) : (
                 loyaltyRules.map(rule => (
-                  <div key={rule.id} className="bg-white/[0.02] border border-white/5 p-5 rounded-3xl flex justify-between items-center hover:bg-white/[0.04] transition-all">
+                  <div key={rule.id} className="bg-white/[0.02] border border-white/5 p-5 rounded-3xl flex justify-between items-center hover:bg-white/[0.04]">
                     <div>
                       <h4 className="font-black text-sm text-gray-200">{rule.rewardName}</h4>
                       <p className="text-xs text-yellow-400 font-extrabold mt-0.5">Cost: {rule.pointsCost} Points</p>
                     </div>
-                    <button onClick={() => handleDeleteRule(rule.id)} className="p-3 bg-red-500/10 text-red-500 rounded-xl hover:bg-red-500/20 active:scale-95 transition-all">
+                    <button onClick={() => handleDeleteRule(rule.id)} className="p-3 bg-red-500/10 text-red-500 rounded-xl">
                       <Trash size={16}/>
                     </button>
                   </div>
@@ -2208,56 +2207,72 @@ Report generated automatically by Bum Bum Cafe POS.`
               )}
             </div>
 
-            {/* --- CUSTOMER TO CUSTOMER POINT TRANSFERS LOGS AUDIT --- */}
             <div className="bg-[#111] border border-white/5 p-6 rounded-[2.5rem] space-y-4">
               <h3 className="text-sm font-black text-orange-500 uppercase tracking-widest flex items-center gap-2">🔄 Points Transfer Logs ({transferLogs.length})</h3>
-              <p className="text-[10px] text-gray-500 font-bold uppercase">Tracks customer-to-customer point gifts</p>
-              
               <div className="space-y-2 max-h-60 overflow-y-auto no-scrollbar">
-                {transferLogs.length === 0 ? (
-                  <p className="text-center text-xs font-bold text-gray-600 py-6 uppercase">No point transfers logged...</p>
-                ) : (
-                  transferLogs.map(log => (
-                    <div key={log.id} className="bg-white/[0.01] border border-white/5 p-4 rounded-2xl flex justify-between items-center text-xs">
-                      <div>
-                        <p className="font-bold text-gray-300">
-                          <span className="text-orange-400">{log.senderName || "Sender"}</span> (+{log.senderPhone})
-                        </p>
-                        <p className="text-[10px] text-gray-500 mt-0.5">
-                          ➡️ Gifted to: <span className="text-yellow-500 font-extrabold">+{log.recipientPhone}</span>
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <span className="bg-orange-500/10 text-orange-500 font-black px-2.5 py-1 rounded-md text-[10px] inline-block">
-                          {log.points} Pts 🎁
-                        </span>
-                        <p className="text-[8px] text-gray-600 mt-1">
-                          {log.timestamp?.toDate ? log.timestamp.toDate().toLocaleString() : "Just now"}
-                        </p>
-                      </div>
+                {transferLogs.map(log => (
+                  <div key={log.id} className="bg-white/[0.01] border border-white/5 p-4 rounded-2xl flex justify-between items-center text-xs">
+                    <div>
+                      <p className="font-bold text-gray-300">
+                        <span className="text-orange-400">{log.senderName || "Sender"}</span> (+{log.senderPhone})
+                      </p>
+                      <p className="text-[10px] text-gray-500 mt-0.5">
+                        ➡️ Gifted to: <span className="text-yellow-500 font-extrabold">+{log.recipientPhone}</span>
+                      </p>
                     </div>
-                  ))
-                )}
+                    <div className="text-right">
+                      <span className="bg-orange-500/10 text-orange-500 font-black px-2.5 py-1 rounded-md text-[10px] inline-block">
+                        {log.points} Pts 🎁
+                      </span>
+                      <p className="text-[8px] text-gray-600 mt-1">
+                        {log.timestamp?.toDate ? log.timestamp.toDate().toLocaleString() : "Just now"}
+                      </p>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
 
           </div>
         )}
 
-        {/* --- TAB 7: BANNERS TAB --- */}
+        {/* --- TAB 7: BANNERS, REELS & STORIES MANAGER (Requirement 2) --- */}
         {tab === 'banners' && (
           <div className="space-y-6">
             <form onSubmit={handleAddBanner} className="bg-[#020202] border border-white/5 p-6 rounded-[2.5rem] space-y-4">
-              <h3 className="text-lg font-black text-orange-500 italic uppercase flex items-center gap-2"><ImageIcon size={18}/> Add Banner</h3>
-              <input type="url" placeholder="Paste image url here..." value={newBannerUrl} onChange={(e) => setNewBannerUrl(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-xs font-bold text-white" required />
-              <button type="submit" className="w-full bg-green-600 text-white p-4 rounded-xl font-black text-sm uppercase">Add Banner Image</button>
+              <h3 className="text-lg font-black text-orange-500 italic uppercase flex items-center gap-2"><ImageIcon size={18}/> Manage Stories & Banners</h3>
+              <p className="text-[10px] text-gray-500 font-bold uppercase leading-normal">यहाँ से आप मुख्य स्क्रीन के रील्स/वीडियो स्टोरीज़ या आफर बैनर्स को जोड़ सकते हैं।</p>
+              
+              <div className="grid grid-cols-2 gap-3 text-xs font-bold">
+                <input type="text" placeholder="Title/Dish Name" value={newReelTitle} onChange={(e) => setNewReelTitle(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-white outline-none" />
+                <input type="number" placeholder="Quick-Add Price (₹)" value={newReelPrice} onChange={(e) => setNewReelPrice(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-white outline-none" />
+              </div>
+              <input type="text" placeholder="Description Text (e.g. Delicious cheese stretch!)" value={newReelDesc} onChange={(e) => setNewReelDesc(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs text-white outline-none" />
+              <input type="url" placeholder="Paste Video/Image Link URL here..." value={newBannerUrl} onChange={(e) => setNewBannerUrl(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs text-white outline-none" required />
+              
+              <div className="flex items-center gap-2 text-xs font-bold pl-1">
+                <input type="checkbox" id="isStoryCheck" checked={newReelIsStory} onChange={() => setNewReelIsStory(!newReelIsStory)} className="accent-orange-500 h-4 w-4" />
+                <label htmlFor="isStoryCheck" className="text-gray-300">मार्क करें यदि यह गोलाकार "Food Story" है (Mark as circular Story Bubble)</label>
+              </div>
+
+              <button type="submit" className="w-full bg-green-600 text-white p-4 rounded-xl font-black text-sm uppercase">Add Banner / Reel ➔</button>
             </form>
 
             <div className="grid grid-cols-2 gap-4">
               {banners.map(b => (
                 <div key={b.id} className="bg-white/[0.02] border border-white/5 p-3 rounded-2xl relative group">
-                  <img src={b.url} className="w-full h-24 object-cover rounded-xl opacity-80" alt="Banner" />
-                  <button onClick={() => handleDeleteBanner(b.id)} className="absolute top-4 right-4 p-2 bg-red-500/20 text-red-500 rounded-xl hover:bg-red-500 active:text-black transition-all">
+                  <div className="h-24 overflow-hidden rounded-xl bg-neutral-900 flex items-center justify-center">
+                    {isVideoUrl(b.url) ? (
+                      <video src={b.url} muted className="w-full h-full object-cover" />
+                    ) : (
+                      <img src={b.url} className="w-full h-full object-cover opacity-80" alt="Banner" />
+                    )}
+                  </div>
+                  <div className="mt-2 text-[10px] space-y-0.5">
+                    <p className="font-black text-gray-200 truncate">{b.title || "Offer Banner"}</p>
+                    <p className="text-orange-500 uppercase tracking-widest text-[8px] font-black">{b.isStory ? "Circular Story" : "Main Offer Banner"}</p>
+                  </div>
+                  <button onClick={() => handleDeleteBanner(b.id)} className="absolute top-4 right-4 p-2 bg-red-500/20 text-red-500 rounded-xl hover:bg-red-500 active:text-black">
                     <Trash size={14}/>
                   </button>
                 </div>
@@ -2266,13 +2281,13 @@ Report generated automatically by Bum Bum Cafe POS.`
           </div>
         )}
 
-        {/* --- TAB 8: MANAGE COUPONS TAB --- */}
+        {/* --- TAB 8: COUPONS --- */}
         {tab === 'coupons' && (
           <div className="space-y-6">
             <form onSubmit={handleAddCoupon} className="bg-white/[0.02] border border-white/5 p-6 rounded-[2.5rem] space-y-4">
               <h3 className="text-lg font-black text-orange-500 italic uppercase flex items-center gap-2"><Percent size={18}/> Add Coupon Code</h3>
               <div className="grid grid-cols-2 gap-3">
-                <input type="text" placeholder="CODE (e.g. WELCOME)" value={newCouponCode} onChange={(e) => setNewCouponCode(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-xs font-black uppercase text-white" required />
+                <input type="text" placeholder="CODE (e.g. WELCOME)" value={newCouponCode} onChange={(e) => setNewCouponCode(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-xs font-black uppercase text-white" required />
                 <input type="number" placeholder="Discount (₹)" value={newCouponValue} onChange={(e) => setNewCouponValue(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs font-black text-white" required />
               </div>
               <button type="submit" className="w-full bg-green-600 text-white p-4 rounded-xl font-black text-sm uppercase">Create Coupon</button>
@@ -2285,7 +2300,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                     <h4 className="text-sm font-black text-orange-500 uppercase tracking-widest">{c.code}</h4>
                     <p className="text-xs font-bold text-gray-400 mt-1">Value: Flat ₹{c.discountValue} OFF</p>
                   </div>
-                  <button onClick={() => handleDeleteCoupon(c.id)} className="p-3 bg-red-500/10 text-red-500 rounded-xl hover:bg-red-500/20 active:scale-95 transition-all">
+                  <button onClick={() => handleDeleteCoupon(c.id)} className="p-3 bg-red-500/10 text-red-500 rounded-xl">
                     <Trash size={16}/>
                   </button>
                 </div>
@@ -2294,10 +2309,10 @@ Report generated automatically by Bum Bum Cafe POS.`
           </div>
         )}
 
-        {/* --- TAB 9: APPROVE REVIEWS TAB --- */}
+        {/* --- TAB 9: APPROVE & MANAGE REVIEWS --- */}
         {tab === 'reviews' && (
           <div className="space-y-4">
-            {reviews.length === 0 && <p className="text-center text-gray-600 py-16 font-bold uppercase tracking-widest">No feedback reviews yet...</p>}
+            {reviews.length === 0 && <p className="text-center text-gray-600 py-16 font-bold uppercase tracking-widest">No reviews found...</p>}
             {reviews.map(r => (
               <div key={r.id} className="bg-white/[0.02] border border-white/5 p-6 rounded-[2rem] space-y-3">
                 <div className="flex justify-between items-center">
@@ -2315,9 +2330,9 @@ Report generated automatically by Bum Bum Cafe POS.`
                 
                 <div className="flex gap-2 justify-end pt-2 border-t border-white/5">
                   {!r.isApproved && (
-                    <button onClick={() => handleApproveReview(r.id)} className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-xl text-xs font-black uppercase transition-all">Approve Review</button>
+                    <button onClick={() => handleApproveReview(r.id)} className="px-4 py-2 bg-green-600 text-white rounded-xl text-xs font-black uppercase">Approve Review</button>
                   )}
-                  <button onClick={() => handleDeleteReview(r.id)} className="p-2 bg-red-500/10 text-red-500 rounded-xl hover:bg-red-500 hover:text-black transition-all">
+                  <button onClick={() => handleDeleteReview(r.id)} className="p-2 bg-red-500/10 text-red-500 rounded-xl">
                     <Trash size={16}/>
                   </button>
                 </div>
@@ -2326,13 +2341,12 @@ Report generated automatically by Bum Bum Cafe POS.`
           </div>
         )}
 
-        {/* --- TAB 10: STRUCTURED KITCHEN RECIPE ROSTER --- */}
+        {/* --- TAB 10: KITCHEN RECIPE ROSTER --- */}
         {tab === 'roster' && (
           <div className="space-y-6">
             <h3 className="text-xl font-black text-orange-500 uppercase tracking-wider flex items-center gap-2">📋 Kitchen SOP Recipe Roster</h3>
-            <p className="text-[10px] text-gray-500 uppercase tracking-widest font-black leading-relaxed">डिश बनाने के चरण (Steps) और सामग्री का अनुपात फीड करें, और रसोई की दीवार पर चिपकाने के लिए सीधे A4 साइज़ पोस्टर प्रिंट करें।</p>
+            <p className="text-[10px] text-gray-500 uppercase tracking-widest font-black leading-relaxed font-mono">डिश बनाने के चरण (Steps) और सामग्री का अनुपात फीड करें, और रसोई की दीवार पर चिपकाने के लिए सीधे A4 साइज़ पोस्टर प्रिंट करें।</p>
 
-            {/* Select product dropdown to load roster details */}
             <div className="bg-[#111] border border-white/5 p-5 rounded-3xl space-y-3">
               <label className="text-xs font-bold text-gray-400 uppercase block">Select Dish / डिश चुनें</label>
               <select 
@@ -2341,9 +2355,9 @@ Report generated automatically by Bum Bum Cafe POS.`
                   const selected = menu.find(item => item.id === e.target.value);
                   setRosterSelectedProduct(selected || null);
                 }}
-                className="w-full bg-black/60 border border-white/10 text-sm font-bold rounded-xl p-3 text-white outline-none focus:border-orange-500 cursor-pointer"
+                className="w-full bg-black/60 border border-white/10 text-sm font-bold rounded-xl p-3 text-white outline-none cursor-pointer"
               >
-                <option value="">-- Choose a Dish to see Roster --</option>
+                <option value="">-- Choose a Dish --</option>
                 {menu.map((item) => (
                   <option key={item.id} value={item.id}>{item.name}</option>
                 ))}
@@ -2352,68 +2366,42 @@ Report generated automatically by Bum Bum Cafe POS.`
 
             {rosterSelectedProduct && (
               <div className="space-y-6">
-                {/* Print button & Recipe Preview */}
                 <div className="bg-[#111] border border-white/5 p-5 rounded-3xl flex justify-between items-center">
                   <div>
                     <h4 className="font-black text-sm text-white uppercase">{rosterSelectedProduct.name} - SOP</h4>
-                    <p className="text-[9px] text-gray-500 font-bold uppercase mt-0.5">Steps Added: {rosterSelectedProduct.ingredients?.length || 0}</p>
+                    <p className="text-[9px] text-gray-500 font-bold uppercase mt-0.5">Steps: {rosterSelectedProduct.ingredients?.length || 0}</p>
                   </div>
                   <button 
                     onClick={() => handlePrintRosterSOP(rosterSelectedProduct)}
-                    className="px-5 py-3 bg-orange-500 hover:bg-orange-600 text-black rounded-2xl text-xs font-black uppercase transition-all shadow-md"
+                    className="px-5 py-3 bg-orange-500 text-black rounded-2xl text-xs font-black uppercase"
                   >
                     🖨️ Print Recipe Poster
                   </button>
                 </div>
 
-                {/* Add Steps form */}
                 <form onSubmit={handleAddRosterStep} className="bg-white/[0.02] border border-white/5 p-6 rounded-[2.5rem] space-y-4">
-                  <h4 className="text-xs font-black text-orange-500 uppercase tracking-wider">Add SOP Step / नया चरण जोड़ें</h4>
-                  
+                  <h4 className="text-xs font-black text-orange-500 uppercase">Add SOP Step / नया चरण जोड़ें</h4>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1">
                       <label className="text-[10px] font-bold text-gray-500 uppercase">Ingredient / Action (क्या डालें)</label>
-                      <input 
-                        type="text" 
-                        placeholder="e.g. Pizza Base / Cheese" 
-                        value={rosterStepName}
-                        onChange={(e) => setRosterStepName(e.target.value)}
-                        className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-xs font-bold text-white"
-                        required
-                      />
+                      <input type="text" placeholder="e.g. Pizza Base / Cheese" value={rosterStepName} onChange={(e) => setRosterStepName(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-xs font-bold text-white" required />
                     </div>
                     <div className="space-y-1">
                       <label className="text-[10px] font-bold text-gray-500 uppercase">Quantity / मात्रा</label>
-                      <input 
-                        type="text" 
-                        placeholder="e.g. 1 Piece / 30 grams" 
-                        value={rosterStepQty}
-                        onChange={(e) => setRosterStepQty(e.target.value)}
-                        className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-xs font-bold text-white"
-                        required
-                      />
+                      <input type="text" placeholder="e.g. 1 Piece / 30 grams" value={rosterStepQty} onChange={(e) => setRosterStepQty(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-xs font-bold text-white" required />
                     </div>
                   </div>
-
                   <div className="space-y-1">
                     <label className="text-[10px] font-bold text-gray-400 uppercase">Special Cooking Instruction (विशेष निर्देश)</label>
-                    <input 
-                      type="text" 
-                      placeholder="e.g. ओवन में डालने से पहले अच्छे से सेकें (Optional)" 
-                      value={rosterStepNote}
-                      onChange={(e) => setRosterStepNote(e.target.value)}
-                      className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-xs font-bold text-white"
-                    />
+                    <input type="text" placeholder="e.g. ओवन में डालने से पहले अच्छे से सेकें (Optional)" value={rosterStepNote} onChange={(e) => setRosterStepNote(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-xs font-bold text-white" />
                   </div>
-
-                  <button type="submit" className="w-full bg-green-600 text-white p-3.5 rounded-xl font-black text-xs uppercase transition-all">Add Step to Recipe</button>
+                  <button type="submit" className="w-full bg-green-600 text-white p-3.5 rounded-xl font-black text-xs uppercase">Add Step to Recipe</button>
                 </form>
 
-                {/* Steps List view */}
                 <div className="space-y-3">
-                  <p className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">Active Recipe Steps</p>
+                  <p className="text-xs font-bold text-gray-500 uppercase pl-1">Active Recipe Steps</p>
                   {(rosterSelectedProduct.ingredients || []).length === 0 ? (
-                    <p className="text-center text-xs font-bold text-gray-600 py-6 uppercase">No steps defined for this recipe. Add some above!</p>
+                    <p className="text-center text-xs font-bold text-gray-600 py-6">No steps defined for this recipe.</p>
                   ) : (
                     rosterSelectedProduct.ingredients.map((item: any, idx: number) => (
                       <div key={idx} className="bg-white/[0.02] border border-white/5 p-4 rounded-2xl flex justify-between items-center text-xs font-bold">
@@ -2427,23 +2415,100 @@ Report generated automatically by Bum Bum Cafe POS.`
                             {item.note && <p className="text-[9px] text-gray-500 font-medium italic mt-0.5">Note: {item.note}</p>}
                           </div>
                         </div>
-                        <button 
-                          onClick={() => handleDeleteRosterStep(idx)}
-                          className="p-2.5 bg-red-500/10 text-red-500 rounded-lg hover:bg-red-500/20 active:scale-95 transition-all"
-                        >
+                        <button onClick={() => handleDeleteRosterStep(idx)} className="p-2.5 bg-red-500/10 text-red-500 rounded-lg">
                           <Trash size={14}/>
                         </button>
                       </div>
                     ))
                   )}
                 </div>
-
               </div>
             )}
           </div>
         )}
 
-        {/* --- TAB 11: SECURITY PIN CONFIG TAB (Only Admin can change) --- */}
+        {/* --- TAB 11: SOCIAL PROOF MANAGER (Requirement 3) --- */}
+        {tab === 'proofs' && (
+          <div className="space-y-6 animate-fadeIn">
+            <form onSubmit={handleAddSocialProof} className="bg-white/[0.02] border border-white/5 p-6 rounded-[2.5rem] space-y-4">
+              <h3 className="text-lg font-black text-orange-500 italic uppercase flex items-center gap-2">🔥 Create Social Proof Notification</h3>
+              <p className="text-[10px] text-gray-400 font-semibold leading-relaxed">यहाँ से आप नीचे स्क्रॉल होने वाले आर्डर अलर्ट बदल सकते हैं।</p>
+              
+              <textarea 
+                rows={2}
+                placeholder="उदा: शुभम द्विवेदी जी (टाउन) ने अभी-अभी 'स्पेशल थाली' आर्डर की 🍱" 
+                value={newProofText}
+                onChange={(e) => setNewProofText(e.target.value)}
+                className="w-full bg-black/40 border border-white/10 rounded-xl p-4 text-xs text-white outline-none font-bold"
+                required
+              />
+              <button type="submit" className="w-full bg-green-600 text-white p-3.5 rounded-xl font-black text-xs uppercase">Add Custom Alert</button>
+            </form>
+
+            <div className="space-y-3">
+              <p className="text-xs font-bold text-gray-500 uppercase pl-1">All Live Order Alerts ({socialProofs.length})</p>
+              {socialProofs.map(alert => (
+                <div key={alert.id} className="bg-white/[0.02] border border-white/5 p-4 rounded-3xl flex justify-between items-center text-xs">
+                  <p className="font-bold text-gray-300 max-w-[80%] leading-relaxed">{alert.text}</p>
+                  <button onClick={() => handleDeleteSocialProof(alert.id)} className="p-2.5 bg-red-500/10 text-red-500 rounded-lg">
+                    <Trash size={14}/>
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* --- TAB 12: SECURITY POINT CLAIMS MANAGER (Requirement 4) --- */}
+        {tab === 'claims' && (
+          <div className="space-y-6 animate-fadeIn">
+            <div>
+              <h3 className="text-xl font-black text-orange-500 uppercase tracking-wider flex items-center gap-2">📢 Points Claims Manager</h3>
+              <p className="text-[10px] text-gray-500 font-bold uppercase mt-1">वेरिफाई करें कि क्या यूज़र ने आपको वाकई सोशल मीडिया पर फॉलो किया है</p>
+            </div>
+
+            <div className="space-y-3">
+              {pointsClaims.length === 0 ? (
+                <p className="text-center text-xs font-bold text-gray-600 py-12 uppercase">कोई क्लेम अनुरोध नहीं मिला।</p>
+              ) : (
+                pointsClaims.map((claim) => (
+                  <div key={claim.id} className="bg-neutral-900 border border-white/5 p-4 rounded-3xl space-y-3 text-xs">
+                    <div className="flex justify-between items-center">
+                      <span className="font-black text-orange-500">{claim.customerName}</span>
+                      <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-full ${claim.status === 'approved' ? 'bg-green-500/10 text-green-500' : claim.status === 'rejected' ? 'bg-red-500/10 text-red-500' : 'bg-yellow-500/10 text-yellow-500'}`}>
+                        {claim.status}
+                      </span>
+                    </div>
+                    <div className="text-[10px] text-gray-400 font-semibold space-y-0.5">
+                      <p>प्लेटफार्म: <span className="text-white">{claim.platformLabel}</span></p>
+                      <p>सोशल यूज़रनेम / हैंडल: <span className="text-yellow-400 font-black">{claim.socialUsername}</span></p>
+                      <p>कस्टमर नंबर: <span className="text-white">+{claim.customerPhone}</span></p>
+                      <p className="text-[9px] text-gray-600">{claim.timestamp?.toDate ? claim.timestamp.toDate().toLocaleString() : ""}</p>
+                    </div>
+                    {claim.status === "pending" && (
+                      <div className="flex gap-2 pt-1.5">
+                        <button 
+                          onClick={() => handleVerifyClaimApproval(claim)} 
+                          className="flex-1 bg-green-600 text-white font-black py-1.5 rounded text-[9px] uppercase flex items-center justify-center gap-1 shadow-md"
+                        >
+                          <CheckCircle size={10}/> Accept (+1 Point)
+                        </button>
+                        <button 
+                          onClick={() => handleRejectClaim(claim.id)} 
+                          className="flex-1 bg-red-950/40 text-red-400 font-black py-1.5 rounded text-[9px] uppercase flex items-center justify-center gap-1"
+                        >
+                          <XCircle size={10}/> Reject claim
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* --- TAB 13: PIN SETTINGS --- */}
         {tab === 'security' && (
           <div className="space-y-6">
             <h3 className="text-xl font-black text-orange-500 uppercase tracking-wider flex items-center gap-2"><Lock size={20}/> PIN Security Configuration</h3>
@@ -2496,7 +2561,7 @@ Report generated automatically by Bum Bum Cafe POS.`
 
       </main>
 
-      {/* --- 10: CUSTOMER ORDER HISTORY MODAL --- */}
+      {/* --- CUSTOMER ORDER HISTORY MODAL --- */}
       {selectedCustomerHistory && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[100] flex items-center justify-center p-4">
           <div className="bg-[#111] border border-white/5 p-6 rounded-[2.5rem] w-full max-w-lg relative max-h-[85vh] overflow-y-auto no-scrollbar shadow-2xl space-y-4">
@@ -2547,7 +2612,7 @@ Report generated automatically by Bum Bum Cafe POS.`
         </div>
       )}
 
-      {/* --- 65: DIGITAL RECIPE GUIDE (SOP MODAL) --- */}
+      {/* --- DIGITAL RECIPE GUIDE (SOP MODAL) --- */}
       {sopProduct && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[100] flex items-center justify-center p-4">
           <form onSubmit={handleSaveSopRecipe} className="bg-[#111] border-2 border-orange-500/50 p-6 rounded-[2.5rem] w-full max-w-lg relative shadow-2xl space-y-4">
@@ -2568,7 +2633,7 @@ Report generated automatically by Bum Bum Cafe POS.`
               <textarea 
                 value={sopRecipeText} 
                 onChange={(e) => setSopRecipeText(e.target.value)} 
-                placeholder="Write down the detailed step-by-step recipe, quantity of ingredients, spices to add, and cooking times for the kitchen staff..." 
+                placeholder="Write down the detailed step-by-step recipe, quantity of ingredients..." 
                 className="w-full bg-black/40 border border-white/10 rounded-xl p-4 outline-none focus:border-orange-500 text-xs font-bold text-white h-44 resize-none leading-relaxed"
               />
             </div>
@@ -2581,7 +2646,7 @@ Report generated automatically by Bum Bum Cafe POS.`
         </div>
       )}
 
-      {/* --- 39: IMPROVED WHATSAPP BROADCAST MODAL WITH DYNAMIC FILTERS & SENT TRACKING --- */}
+      {/* --- IMPROVED WHATSAPP BROADCAST MODAL --- */}
       {showBroadcastModal && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[100] flex items-center justify-center p-4">
           <div className="bg-[#111] border border-white/5 p-6 rounded-[2.5rem] w-full max-w-lg relative shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto no-scrollbar">
@@ -2596,14 +2661,12 @@ Report generated automatically by Bum Bum Cafe POS.`
               <p className="text-[10px] text-gray-500 uppercase tracking-widest font-black mt-0.5">Target the Right Loyal Customers</p>
             </div>
 
-            {/* --- SMART DYNAMIC TARGET FILTERS --- */}
             <div className="bg-white/[0.02] border border-white/5 p-4 rounded-2xl space-y-3">
               <p className="text-[10px] font-black uppercase text-orange-400 flex items-center gap-1">
                 <Filter size={12}/> Target Segment Filters
               </p>
               
               <div className="grid grid-cols-3 gap-2">
-                {/* 1. Tier Filter */}
                 <div className="space-y-1">
                   <label className="text-[9px] font-bold text-gray-500 uppercase">VIP Tier</label>
                   <select 
@@ -2619,7 +2682,6 @@ Report generated automatically by Bum Bum Cafe POS.`
                   </select>
                 </div>
 
-                {/* 2. Min Points Filter */}
                 <div className="space-y-1">
                   <label className="text-[9px] font-bold text-gray-500 uppercase">Min Points</label>
                   <input 
@@ -2631,7 +2693,6 @@ Report generated automatically by Bum Bum Cafe POS.`
                   />
                 </div>
 
-                {/* 3. Min Spend Filter */}
                 <div className="space-y-1">
                   <label className="text-[9px] font-bold text-gray-500 uppercase">Min Spend (₹)</label>
                   <input 
@@ -2644,7 +2705,6 @@ Report generated automatically by Bum Bum Cafe POS.`
                 </div>
               </div>
 
-              {/* Targets Count Summary */}
               <div className="flex justify-between items-center text-[10px] text-gray-400 font-bold border-t border-white/5 pt-2.5">
                 <span>Targets Found: <strong className="text-orange-500">{broadcastTargetedCustomers.length}</strong></span>
                 <span>Sent: <strong className="text-green-500">{broadcastTargetedCustomers.filter(c => sentBroadcastPhones.includes(c.phone)).length}</strong></span>
@@ -2652,7 +2712,6 @@ Report generated automatically by Bum Bum Cafe POS.`
               </div>
             </div>
 
-            {/* --- MESSAGE COMPOSER --- */}
             <div className="space-y-1.5">
               <label className="text-[10px] font-bold text-gray-400 uppercase">Write Promotional Message</label>
               <textarea 
@@ -2663,11 +2722,8 @@ Report generated automatically by Bum Bum Cafe POS.`
               />
             </div>
 
-            {/* --- AUTO-NEXT ACTIVE SENDER ASSISTANT --- */}
             <div className="bg-orange-500/10 border border-orange-500/20 p-4 rounded-2xl space-y-3 text-center">
               <p className="text-[10px] text-orange-400 font-extrabold uppercase tracking-wide">⚡ One-Click Queue Sender Assistant</p>
-              <p className="text-[9px] text-gray-500">यह बटन कतार में से अगले बचे हुए कस्टमर का चैट सीधे ओपन करेगा और उसे सेंड मार्क कर देगा।</p>
-              
               <div className="flex gap-2">
                 <button 
                   onClick={handleSendNextUnsentBroadcast}
@@ -2678,16 +2734,15 @@ Report generated automatically by Bum Bum Cafe POS.`
                 </button>
                 <button 
                   onClick={() => { setSentBroadcastPhones([]); toast.success("Sent history reset successfully!"); }}
-                  title="Reset session sent list"
+                  title="Reset session"
                   type="button"
-                  className="bg-white/5 hover:bg-white/10 text-gray-400 p-3 rounded-xl transition-all"
+                  className="bg-white/5 text-gray-450 p-3 rounded-xl"
                 >
                   <RefreshCw size={16} />
                 </button>
               </div>
             </div>
 
-            {/* --- FILTERED TARGETS LIST WITH VERIFIED FLAGS --- */}
             <div className="border-t border-white/5 pt-4">
               <div className="flex justify-between items-center mb-2">
                 <p className="text-[10px] text-gray-400 font-extrabold uppercase">Target Audience List ({broadcastTargetedCustomers.length})</p>
@@ -2695,7 +2750,7 @@ Report generated automatically by Bum Bum Cafe POS.`
               
               <div className="space-y-1.5 max-h-40 overflow-y-auto no-scrollbar">
                 {broadcastTargetedCustomers.length === 0 ? (
-                  <p className="text-center text-[10px] text-gray-500 py-6 uppercase font-bold">No customers match these filter parameters...</p>
+                  <p className="text-center text-[10px] text-gray-500 py-6 uppercase font-bold">No customers match...</p>
                 ) : (
                   broadcastTargetedCustomers.map((user) => {
                     const isAlreadySent = sentBroadcastPhones.includes(user.phone);
@@ -2729,7 +2784,7 @@ Report generated automatically by Bum Bum Cafe POS.`
               </div>
             </div>
 
-            <button type="button" onClick={() => setShowBroadcastModal(false)} className="w-full bg-white/5 text-gray-400 p-3.5 rounded-xl font-black text-xs uppercase hover:bg-white/10">Close</button>
+            <button type="button" onClick={() => setShowBroadcastModal(false)} className="w-full bg-white/5 text-gray-400 p-3.5 rounded-xl font-black text-xs uppercase">Close</button>
           </div>
         </div>
       )}
