@@ -519,6 +519,41 @@ export default function BbCafeHome() {
   }, []);
 
   // Greeting disappears after 6 seconds (Requirement: Greet timer disappearing UX)
+ // Visible Categories slider memo (Requirement Fix)
+  const visibleCategories = useMemo(() => {
+    const baseCategories = ["All", ...FALLBACK_CATEGORIES.filter(c => c !== "All")];
+    const dbCatsMap = new Map();
+    dbCategories.forEach(c => dbCatsMap.set(String(c.name).toLowerCase().trim(), c));
+    const result: string[] = [];
+
+    baseCategories.forEach(catName => {
+      const cleanName = catName.toLowerCase().trim();
+      if (dbCatsMap.has(cleanName)) {
+        if (dbCatsMap.get(cleanName).isVisible !== false) result.push(catName);
+      } else {
+        result.push(catName);
+      }
+    });
+
+    dbCategories.forEach(c => {
+      const cleanName = String(c.name).toLowerCase().trim();
+      const alreadyAdded = result.some(r => r.toLowerCase().trim() === cleanName);
+      if (!alreadyAdded && c.isVisible !== false && c.name !== "All") result.push(c.name);
+    });
+
+    const dedupedList = Array.from(new Set(result));
+    
+    // Inject "DIY Pizza" dynamically
+    const finalWithDiy: string[] = [];
+    dedupedList.forEach(cat => {
+      if (cat === "All") {
+        finalWithDiy.push("DIY Pizza"); 
+      }
+      finalWithDiy.push(cat);
+    });
+
+    return Array.from(new Set(finalWithDiy));
+  }, [dbCategories]);
   useEffect(() => {
     const timer = setTimeout(() => {
       setShowGreeting(false);
