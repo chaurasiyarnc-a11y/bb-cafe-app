@@ -550,7 +550,24 @@ export default function BbCafeHome() {
     }
   };
   const handleDismissInstallBanner = () => {
+  const handleDismissInstallBanner = () => {
     triggerHaptic(20);
+    setShowInstallBanner(false);
+    localStorage.setItem('bb_app_installed_or_dismissed', 'true');
+  };
+
+  const handleInstallClick = async () => {
+    triggerHaptic();
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === 'accepted') {
+        toast.success("बम बम कैफ़े ऐप इंस्टॉल करने के लिए धन्यवाद! ❤️");
+      }
+      setDeferredPrompt(null);
+    } else {
+      setIsInstallModalOpen(true);
+    }
     setShowInstallBanner(false);
     localStorage.setItem('bb_app_installed_or_dismissed', 'true');
   };
@@ -587,6 +604,20 @@ export default function BbCafeHome() {
             setSelectedArea(DELIVERY_AREAS[1]); 
             toast.success(`सटीक दूरी: ${calculatedDistance.toFixed(2)} KM। आपके लिए 'Mohandra Ward 1-5' क्षेत्र चुना गया है।`);
           } else if (calculatedDistance <= 5.0) {
+            setSelectedArea(DELIVERY_AREAS[2]); 
+            toast.success(`सटीक दूरी: ${calculatedDistance.toFixed(2)} KM। आपके लिए 'Nearby Area (Within 5 Km)' क्षेत्र चुना गया है।`);
+          } else {
+            setSelectedArea(DELIVERY_AREAS[3]); 
+            toast.success(`सटीक दूरी: ${calculatedDistance.toFixed(2)} KM। आपके लिए 'Out of Town' क्षेत्र चुना गया है।`);
+          }
+        }
+      },
+      () => {
+        toast.dismiss(toastId);
+        toast.error("लोकेशन की अनुमति अस्वीकार कर दी गई है या नेटवर्क त्रुटि है।");
+      }
+    );
+  };
             setSelectedArea(DELIVERY_AREAS[2]); 
             toast.success(`सटीक दूरी: ${calculatedDistance.toFixed(2)} KM। आपके लिए 'Nearby Area (Within 5 Km)' क्षेत्र चुना गया है।`);
           } else {
