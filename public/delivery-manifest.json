@@ -16,6 +16,7 @@
     }
   ],
   "start_url": "/delivery",
+  "scope": "/delivery",
   "background_color": "#050505",
   "theme_color": "#ff5e00",
   "display": "standalone",
