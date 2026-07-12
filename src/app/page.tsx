@@ -795,6 +795,34 @@ const handleAddDiyPizzaToCart = () => {
       toast.success("📤 नया शेयर प्रोग्रेस शुरू हुआ! (1/5 पूरा)");
     }
   };
+  // Redeem points secure handler function (Requirement Fix)
+  const handleCustomerRedeem = async (id: string, name: string, pointsCost: number) => {
+    triggerHaptic();
+    const currentPointsInCart = cart.reduce((acc: number, item: any) => acc + (item.pointsCost || 0), 0);
+    if (customerPoints - currentPointsInCart < pointsCost) return toast.error("आपके पास पर्याप्त ऑयल्टी पॉइंट्स उपलब्ध नहीं हैं!");
+    
+    const enteredPin = prompt("सुरक्षा के लिए अपना 4-अंकों का सुरक्षा पिन (PIN) दर्ज करें:");
+    if (!enteredPin) return;
+
+    if (!customerDetails?.phone) return;
+    const phoneClean = customerDetails.phone.replace("+91", "").trim();
+    
+    try {
+      const userSnap = await getDoc(doc(db, "customer_points", phoneClean));
+      if (userSnap.exists()) {
+        const dbPin = userSnap.data().pin;
+        if (dbPin && dbPin !== enteredPin) {
+          return toast.error("गलत सुरक्षा पिन! रीडीम रद्द किया गया।");
+        }
+      }
+    } catch (e) {
+      return toast.error("पिन वेरिफिकेशन विफल रहा।");
+    }
+
+    addItem({ id, name, price: 0, pointsCost, isReward: true });
+    playSoundEffect('add');
+    toast.success(`${name} Cart में जोड़ दिया गया है!`);
+  };
   const handleDetectLocation = () => {
     triggerHaptic();
     if (!navigator.geolocation) {
