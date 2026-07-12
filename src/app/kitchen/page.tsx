@@ -55,7 +55,7 @@ export default function KitchenDisplaySystem() {
     fetchPins();
   }, []);
 
-  // Real-time simple query with Client-side filtering (Requires ZERO composite indexes!)
+  // Real-time simple query with Client-side filtering (Daily Orders Only!)
   useEffect(() => {
     if (isLocked) return;
 
@@ -67,12 +67,23 @@ export default function KitchenDisplaySystem() {
     const unsub = onSnapshot(qSimple, (snap) => {
       const allOrders = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       
-      // Client-side filtering to bypass Firebase composite index requirements (Feature 1 fix)
-      const kitchenOrders = allOrders.filter((o: any) => 
-        ["pending", "preparing", "out_for_delivery"].includes(o.status)
-      );
+      // Aaj ka din shuru hone ka sateek samay (00:00 AM) nikalna
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+
+      // Client-side filtering for active & today's orders only (Daily orders filter)
+      const kitchenOrders = allOrders.filter((o: any) => {
+        // 1. Check if status is pending, preparing, or out for delivery
+        const isStatusMatch = ["pending", "preparing", "out_for_delivery"].includes(o.status);
+        if (!isStatusMatch) return false;
+
+        // 2. Check if the order belongs to today (Daily check)
+        if (!o.timestamp) return false;
+        const orderDate = o.timestamp?.toDate ? o.timestamp.toDate() : new Date(o.timestamp);
+        return orderDate >= todayStart;
+      });
       
-      // Sound alert logic
+      // Sound alert logic for daily new orders
       if (prevOrdersCountRef.current !== null && kitchenOrders.length > prevOrdersCountRef.current) {
         playAlertSound();
         toast.success("🚨 रसोई घर: नया आर्डर आया है!");
