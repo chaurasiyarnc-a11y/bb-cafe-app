@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { db } from '../../lib/firebase'; 
 import { collection, onSnapshot, query, orderBy, doc, updateDoc, setDoc, addDoc, deleteDoc, increment, runTransaction } from 'firebase/firestore';
-import { Power, Eye, EyeOff, User, MapPin, Calendar, CheckCircle2, LogOut, Loader2, Phone, Plus, Trash, Edit, X, Lock, BarChart3, Download, Folder, Percent, ImageIcon, Gift, Settings, Search, BookOpen, Share2, MessageSquare, Filter, RefreshCw, Check, CheckCircle, XCircle } from 'lucide-react';
+import { Power, Eye, EyeOff, User, MapPin, Calendar, CheckCircle2, LogOut, Loader2, Phone, Plus, Trash, Edit, X, BarChart3, Download, Folder, Percent, ImageIcon, Gift, Settings, Search, BookOpen, Share2, MessageSquare, Filter, RefreshCw, Check, CheckCircle, XCircle, Play } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 
 const ADD_CATEGORIES = ["Special Pizza", "Special Thali", "Paneer Special", "Special Mix veg", "Fast Food", "Super Cool", "Indian Bread", "Special Rice"];
@@ -240,7 +240,7 @@ export default function AdminDashboard() {
   const [isVerified, setIsVerified] = useState(false);
   const [loading, setLoading] = useState(true);
   const [passcode, setPasscode] = useState("");
-  const [tab, setTab] = useState<'dashboard' | 'orders' | 'menu' | 'categories' | 'customers' | 'loyalty' | 'banners' | 'reviews' | 'coupons' | 'roster' | 'proofs' | 'claims' | 'security'>('dashboard');
+  const [tab, setTab] = useState<'dashboard' | 'orders' | 'menu' | 'categories' | 'customers' | 'loyalty' | 'banners' | 'reels' | 'header_video' | 'reviews' | 'coupons' | 'roster' | 'proofs' | 'claims' | 'security'>('dashboard');
   
   const [orders, setOrders] = useState<any[]>([]);
   const [menu, setMenu] = useState<any[]>([]);
@@ -261,8 +261,20 @@ export default function AdminDashboard() {
   const [editCatName, setEditCatName] = useState("");
   const [editCatImage, setEditCatImage] = useState("");
 
+  // Banners & Reels Management (Requirement 1, 2, 3)
   const [banners, setBanners] = useState<any[]>([]);
   const [newBannerUrl, setNewBannerUrl] = useState("");
+  const [newBannerTitle, setNewBannerTitle] = useState("");
+
+  const [reels, setReels] = useState<any[]>([]);
+  const [newReelUrl, setNewReelUrl] = useState("");
+  const [newReelTitle, setNewReelTitle] = useState("");
+  const [newReelDesc, setNewReelDesc] = useState("");
+  const [newReelPrice, setNewReelPrice] = useState("");
+
+  // Header Background Video State (Requirement 4)
+  const [headerVideoInput, setHeaderVideoInput] = useState("");
+
   const [reviews, setReviews] = useState<any[]>([]);
   const [coupons, setCoupons] = useState<any[]>([]);
   const [newCouponCode, setNewCouponCode] = useState("");
@@ -352,12 +364,6 @@ export default function AdminDashboard() {
   const [rosterStepQty, setRosterStepQty] = useState("");
   const [rosterStepNote, setRosterStepNote] = useState("");
 
-  // Reels CRUD Additions (Requirement 2)
-  const [newReelTitle, setNewReelTitle] = useState("");
-  const [newReelDesc, setNewReelDesc] = useState("");
-  const [newReelPrice, setNewReelPrice] = useState("");
-  const [newReelIsStory, setNewReelIsStory] = useState(false);
-
   useEffect(() => {
     const adminSession = sessionStorage.getItem('bb_cafe_admin_verified');
     const adminRole = sessionStorage.getItem('bb_cafe_admin_role') as 'admin' | 'manager' | null;
@@ -402,12 +408,23 @@ export default function AdminDashboard() {
       setCategories(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
 
+    // Dynamic WhatsApp Number & Background Video Listener (Requirement 4)
     const unsubStore = onSnapshot(doc(db, "settings", "store"), (d) => {
-      if (d.exists()) setStoreOpen(d.data().isOpen);
+      if (d.exists()) {
+        setStoreOpen(d.data().isOpen);
+        if (d.data().headerVideoUrl) {
+          setHeaderVideoInput(d.data().headerVideoUrl);
+        }
+      }
     });
 
+    // Requirement 7: Separate collections fetch
     const unsubBanners = onSnapshot(collection(db, "banners"), (snap) => {
       setBanners(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+
+    const unsubReels = onSnapshot(collection(db, "reels"), (snap) => {
+      setReels(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
 
     const unsubCoupons = onSnapshot(collection(db, "coupons"), (snap) => {
@@ -452,6 +469,7 @@ export default function AdminDashboard() {
       unsubCats();
       unsubStore();
       unsubBanners();
+      unsubReels();
       unsubCoupons();
       unsubReviews();
       unsubLoyalty();
@@ -873,29 +891,68 @@ export default function AdminDashboard() {
     }
   };
 
-  // Requirement 2: Stories/Reels CRUD
+  // Requirement 2 & 3: Manage Circular Food Reels/Stories & Banners Separately
   const handleAddBanner = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newBannerUrl) return;
+    if (!newBannerUrl || !newBannerTitle) return toast.error("Please enter a media link and title!");
     try {
       await addDoc(collection(db, "banners"), { 
         url: newBannerUrl, 
-        title: newReelTitle || "Special Story",
-        description: newReelDesc || "",
-        price: Number(newReelPrice) || 0,
-        isStory: newReelIsStory,
+        title: newBannerTitle,
         timestamp: new Date() 
       });
-      setNewBannerUrl(""); setNewReelTitle(""); setNewReelDesc(""); setNewReelPrice(""); setNewReelIsStory(false);
-      toast.success("New Media/Reel Added!");
+      setNewBannerUrl(""); setNewBannerTitle("");
+      toast.success("New Promo Banner Added! 🖼️");
     } catch (err) { toast.error("Error adding banner"); }
   };
 
   const handleDeleteBanner = async (id: string) => {
     try {
       await deleteDoc(doc(db, "banners", id));
-      toast.success("Banner/Reel Deleted!");
+      toast.success("Promo Banner Deleted!");
     } catch (err) { toast.error("Error deleting item"); }
+  };
+
+  // Manage Food Reels/Stories Collection
+  const handleAddReel = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newReelUrl || !newReelTitle || !newReelPrice) {
+      return toast.error("Please enter Reel title, price, and media URL!");
+    }
+    try {
+      await addDoc(collection(db, "reels"), {
+        url: newReelUrl,
+        title: newReelTitle,
+        description: newReelDesc || "",
+        price: Number(newReelPrice) || 0,
+        timestamp: new Date()
+      });
+      setNewReelUrl(""); setNewReelTitle(""); setNewReelDesc(""); setNewReelPrice("");
+      toast.success("New Food Reel / Story Added! 🎥");
+    } catch (err) {
+      toast.error("Error adding reel story.");
+    }
+  };
+
+  const handleDeleteReel = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, "reels", id));
+      toast.success("Food Reel / Story Deleted!");
+    } catch (err) {
+      toast.error("Error deleting reel story.");
+    }
+  };
+
+  // Requirement 4: Header Background Video Change Support
+  const handleUpdateHeaderVideo = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!headerVideoInput) return toast.error("Please enter a valid video link!");
+    try {
+      await setDoc(doc(db, "settings", "store"), { headerVideoUrl: headerVideoInput }, { merge: true });
+      toast.success("Main background header video updated! 🎬");
+    } catch (err) {
+      toast.error("Failed to update video.");
+    }
   };
 
   // Requirement 3: Manage Social Proof Alerts CRUD
@@ -1015,6 +1072,7 @@ export default function AdminDashboard() {
     }
   };
 
+  // Requirement Menu Duplicates Preventer Fix
   const handleBulkImport = async () => {
     if (!window.confirm("BUM BUM CAFE PDF ke items ko database mein add karein?")) return;
     toast.loading("Importing menu items...", { id: "import" });
@@ -1025,14 +1083,32 @@ export default function AdminDashboard() {
     ];
 
     try {
+      let importedCount = 0;
+      let skippedCount = 0;
+
       for (const item of data) {
-        await addDoc(collection(db, "products"), {
-          ...item,
-          isVisible: true
-        });
+        // Find if item name is already present to prevent duplicate creations
+        const matched = menu.find(m => String(m.name).toLowerCase().trim() === item.name.toLowerCase().trim());
+        if (matched) {
+          // Exists, so merge/update instead of replicating duplicates
+          await updateDoc(doc(db, "products", matched.id), {
+            price: item.price,
+            category: item.category,
+            image: item.image,
+            variants: item.variants || null
+          });
+          skippedCount++;
+        } else {
+          // Completely new, safe to add
+          await addDoc(collection(db, "products"), {
+            ...item,
+            isVisible: true
+          });
+          importedCount++;
+        }
       }
       toast.dismiss("import");
-      toast.success("Sample items imported! Database seeded safely.");
+      toast.success(`Excel Import Success! ${importedCount} Added, ${skippedCount} Duplicates Merged.`);
     } catch (e) {
       toast.dismiss("import");
       toast.error("Error seeding PDF items");
@@ -1513,7 +1589,9 @@ Report generated automatically by Bum Bum Cafe POS.`
         <button onClick={() => setTab('categories')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'categories' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>🗂️ Categories</button>
         <button onClick={() => setTab('customers')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'customers' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>👥 Customers ({combinedCustomers.length})</button>
         <button onClick={() => setTab('loyalty')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'loyalty' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>🎁 Loyalty Rules</button>
-        <button onClick={() => setTab('banners')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'banners' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>🖼️ Stories & Reels</button>
+        <button onClick={() => setTab('banners')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'banners' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>🖼️ Promo Banners</button>
+        <button onClick={() => setTab('reels')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'reels' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>🎥 Food Reels</button>
+        <button onClick={() => setTab('header_video')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'header_video' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>🎬 Header Video</button>
         <button onClick={() => setTab('coupons')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'coupons' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>🎟️ Coupons</button>
         <button onClick={() => setTab('reviews')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'reviews' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>⭐ Reviews</button>
         <button onClick={() => setTab('proofs')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'proofs' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>🔥 Order Alerts</button>
@@ -1746,6 +1824,7 @@ Report generated automatically by Bum Bum Cafe POS.`
               </button>
             </div>
 
+            {/* Sticky Search bar directly aligned under sticky header */}
             <div className="sticky top-[73px] z-30 bg-[#050505]/95 backdrop-blur-md py-4 border-b border-white/5 rounded-b-3xl shadow-lg">
               <div className="relative group max-w-lg mx-auto">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
@@ -1826,77 +1905,6 @@ Report generated automatically by Bum Bum Cafe POS.`
 
                 <button type="submit" className="w-full bg-green-600 text-white p-4 rounded-xl font-black text-sm uppercase">Save Product</button>
               </form>
-            )}
-
-            {editingProduct && (
-              <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[100] flex items-center justify-center p-4 overflow-y-auto">
-                <form onSubmit={handleUpdateProduct} className="bg-[#111] border-2 border-orange-500/50 p-8 rounded-[2.5rem] w-full max-w-lg relative max-h-[90vh] overflow-y-auto shadow-2xl space-y-4">
-                  <button type="button" onClick={() => setEditingProduct(null)} className="absolute top-4 right-4 p-2.5 bg-white/5 text-gray-400 hover:text-white rounded-full"><X size={18}/></button>
-                  
-                  <div className="text-center pb-2">
-                    <h3 className="text-2xl font-black text-orange-500 italic uppercase">Edit Product</h3>
-                  </div>
-                  
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-gray-450 uppercase">Item Name</label>
-                    <input type="text" value={editName} onChange={(e) => setEditName(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-white" required />
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-gray-405 uppercase">Category</label>
-                    <select value={editCategory} onChange={(e) => setEditCategory(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-white" required>
-                      {categoryOptions.filter(c => c !== "All" && c !== "DIY Pizza").map(cat => (
-                        <option key={cat} value={cat} className="bg-[#111]">{cat}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-gray-405 uppercase">Image URL</label>
-                    <input type="url" value={editImage} onChange={(e) => setEditImage(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-white" required />
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-gray-405 uppercase">Option Type</label>
-                    <select value={editVariantType} onChange={(e: any) => setEditVariantType(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-white">
-                      <option value="none" className="bg-[#111]">None (Single Price)</option>
-                      <option value="half_full" className="bg-[#111]">Half / Full</option>
-                      <option value="plain_butter" className="bg-[#111]">Plain / Butter</option>
-                      <option value="pizza_sizes" className="bg-[#111]">Pizza Sizes</option>
-                    </select>
-                  </div>
-
-                  {editVariantType === 'none' && (
-                    <div className="space-y-1">
-                      <label className="text-xs font-bold text-gray-400 uppercase">Price (₹)</label>
-                      <input type="number" value={editPrice} onChange={(e) => setEditPrice(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-white" />
-                    </div>
-                  )}
-
-                  {(editVariantType === 'half_full' || editVariantType === 'plain_butter') && (
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1"><label className="text-xs font-bold text-gray-405 uppercase">Half / Plain (₹)</label><input type="number" value={editHalfPrice} onChange={(e) => setEditHalfPrice(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-white text-xs font-bold" /></div>
-                      <div className="space-y-1"><label className="text-xs font-bold text-gray-405 uppercase">Full / Butter (₹)</label><input type="number" value={editFullPrice} onChange={(e) => setEditFullPrice(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-white text-xs font-bold" /></div>
-                    </div>
-                  )}
-
-                  {editVariantType === 'pizza_sizes' && (
-                    <div className="space-y-3 bg-[#111]/40 p-4 rounded-2xl border border-white/5">
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Small Price</label><input type="number" value={editPriceSmall} onChange={(e) => setEditPriceSmall(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs font-bold text-white" /></div>
-                        <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Medium Price</label><input type="number" value={editPriceMedium} onChange={(e) => setEditPriceMedium(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs font-bold text-white" /></div>
-                        <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Large Price</label><input type="number" value={editPriceLarge} onChange={(e) => setEditPriceLarge(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs font-bold text-white" /></div>
-                        <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Extra Large</label><input type="number" value={editPriceXL} onChange={(e) => setEditPriceXL(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs font-bold text-white" /></div>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="flex gap-2 pt-2">
-                    <button type="submit" className="flex-1 bg-green-600 text-white p-4 rounded-xl font-black text-sm uppercase">Update Item</button>
-                    <button type="button" onClick={() => setEditingProduct(null)} className="bg-white/5 text-gray-450 p-4 rounded-xl font-black text-xs uppercase">Cancel</button>
-                  </div>
-                </form>
-              </div>
             )}
 
             <div className="space-y-3 pt-2">
@@ -2001,7 +2009,7 @@ Report generated automatically by Bum Bum Cafe POS.`
 
                   <div className="flex gap-2 pt-2">
                     <button type="submit" className="flex-1 bg-green-600 text-white p-4 rounded-xl font-black text-sm uppercase">Update Category</button>
-                    <button type="button" onClick={() => setEditingCategory(null)} className="bg-white/5 text-gray-400 p-4 rounded-xl font-black text-sm uppercase">Cancel</button>
+                    <button type="button" onClick={() => setEditingCategory(null)} className="bg-white/5 text-gray-405 p-4 rounded-xl font-black text-sm uppercase">Cancel</button>
                   </div>
                 </form>
               </div>
@@ -2190,26 +2198,37 @@ Report generated automatically by Bum Bum Cafe POS.`
           </div>
         )}
 
-        {/* --- TAB 7: BANNERS, REELS & STORIES MANAGER (Requirement 2) --- */}
+        {/* --- TAB 7: BANNERS MANAGER (Requirement 1, 3) --- */}
         {tab === 'banners' && (
           <div className="space-y-6">
             <form onSubmit={handleAddBanner} className="bg-[#020202] border border-white/5 p-6 rounded-[2.5rem] space-y-4">
-              <h3 className="text-lg font-black text-orange-500 italic uppercase flex items-center gap-2"><ImageIcon size={18}/> Manage Stories & Banners</h3>
-              <p className="text-[10px] text-gray-500 font-bold uppercase leading-normal">यहाँ से आप मुख्य स्क्रीन के रील्स/वीडियो स्टोरीज़ या आफर बैनर्स को जोड़ सकते हैं।</p>
+              <h3 className="text-lg font-black text-orange-500 italic uppercase flex items-center gap-2"><ImageIcon size={18}/> Manage Promo Banners</h3>
+              <p className="text-[10px] text-gray-500 font-bold uppercase leading-normal">यहाँ से आप मुख्य स्क्रीन के बड़े आफर बैनर्स (Image या Video) को जोड़ सकते हैं।</p>
               
-              <div className="grid grid-cols-2 gap-3 text-xs font-bold">
-                <input type="text" placeholder="Title/Dish Name" value={newReelTitle} onChange={(e) => setNewReelTitle(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-white outline-none" />
-                <input type="number" placeholder="Quick-Add Price (₹)" value={newReelPrice} onChange={(e) => setNewReelPrice(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-white outline-none" />
-              </div>
-              <input type="text" placeholder="Description Text (e.g. Delicious cheese stretch!)" value={newReelDesc} onChange={(e) => setNewReelDesc(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs text-white outline-none" />
-              <input type="url" placeholder="Paste Video/Image Link URL here..." value={newBannerUrl} onChange={(e) => setNewBannerUrl(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs text-white outline-none" required />
-              
-              <div className="flex items-center gap-2 text-xs font-bold pl-1">
-                <input type="checkbox" id="isStoryCheck" checked={newReelIsStory} onChange={() => setNewReelIsStory(!newReelIsStory)} className="accent-orange-500 h-4 w-4" />
-                <label htmlFor="isStoryCheck" className="text-gray-300">मार्क करें यदि यह गोलाकार "Food Story" है (Mark as circular Story Bubble)</label>
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-gray-400 uppercase">Banner Title</label>
+                <input type="text" placeholder="e.g. Free Delivery above ₹99" value={newBannerTitle} onChange={(e) => setNewBannerTitle(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs text-white outline-none" required />
               </div>
 
-              <button type="submit" className="w-full bg-green-600 text-white p-4 rounded-xl font-black text-sm uppercase">Add Banner / Reel ➔</button>
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-gray-400 uppercase">Media Link (Video/Image URL)</label>
+                <input type="url" placeholder="Paste Image link or Video URL..." value={newBannerUrl} onChange={(e) => setNewBannerUrl(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs text-white outline-none" required />
+              </div>
+
+              {newBannerUrl && (
+                <div className="space-y-2">
+                  <p className="text-[10px] text-orange-400 font-extrabold uppercase">Media Preview:</p>
+                  <div className="h-40 rounded-xl overflow-hidden bg-neutral-900 border border-white/5 flex items-center justify-center">
+                    {isVideoUrl(newBannerUrl) ? (
+                      <video src={newBannerUrl} autoPlay loop muted playsInline className="w-full h-full object-cover" />
+                    ) : (
+                      <img src={newBannerUrl} className="w-full h-full object-cover" alt="Preview" />
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <button type="submit" className="w-full bg-green-600 text-white p-4 rounded-xl font-black text-sm uppercase">Add Promo Banner 🖼️</button>
             </form>
 
             <div className="grid grid-cols-2 gap-4">
@@ -2224,7 +2243,6 @@ Report generated automatically by Bum Bum Cafe POS.`
                   </div>
                   <div className="mt-2 text-[10px] space-y-0.5">
                     <p className="font-black text-gray-200 truncate">{b.title || "Offer Banner"}</p>
-                    <p className="text-orange-550 uppercase tracking-widest text-[8px] font-black">{b.isStory ? "Circular Story" : "Main Offer Banner"}</p>
                   </div>
                   <button onClick={() => handleDeleteBanner(b.id)} className="absolute top-4 right-4 p-2 bg-red-500/20 text-red-500 rounded-xl hover:bg-red-500 active:text-black">
                     <Trash size={14}/>
@@ -2232,6 +2250,107 @@ Report generated automatically by Bum Bum Cafe POS.`
                 </div>
               ))}
             </div>
+          </div>
+        )}
+
+        {/* --- TAB 7.5: FOOD REELS / STORIES MANAGER (Requirement 1, 2, 3) --- */}
+        {tab === 'reels' && (
+          <div className="space-y-6">
+            <form onSubmit={handleAddReel} className="bg-[#020202] border border-white/5 p-6 rounded-[2.5rem] space-y-4">
+              <h3 className="text-lg font-black text-orange-500 italic uppercase flex items-center gap-2"><Play size={18}/> Manage Food Reels / Stories</h3>
+              <p className="text-[10px] text-gray-500 font-bold uppercase leading-normal">यहाँ से आप circular food stories और video reels add kar sakte hain (with item price).</p>
+              
+              <div className="grid grid-cols-2 gap-3 text-xs font-bold">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-gray-400 uppercase">Title/Dish Name</label>
+                  <input type="text" placeholder="e.g. Cheese Pizza Reel" value={newReelTitle} onChange={(e) => setNewReelTitle(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-white outline-none" required />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-gray-400 uppercase">Item Price (₹)</label>
+                  <input type="number" placeholder="e.g. 120" value={newReelPrice} onChange={(e) => setNewReelPrice(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-white outline-none" required />
+                </div>
+              </div>
+              
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-gray-400 uppercase">Description</label>
+                <input type="text" placeholder="e.g. Freshly baked mozzarella cheese pull!" value={newReelDesc} onChange={(e) => setNewReelDesc(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs text-white outline-none" required />
+              </div>
+              
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-gray-400 uppercase">Media Link (Video/Image URL)</label>
+                <input type="url" placeholder="Paste .mp4 link or Image URL..." value={newReelUrl} onChange={(e) => setNewReelUrl(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs text-white outline-none" required />
+              </div>
+
+              {newReelUrl && (
+                <div className="space-y-2">
+                  <p className="text-[10px] text-orange-400 font-extrabold uppercase">Media Preview:</p>
+                  <div className="h-40 rounded-xl overflow-hidden bg-neutral-900 border border-white/5 flex items-center justify-center">
+                    {isVideoUrl(newReelUrl) ? (
+                      <video src={newReelUrl} autoPlay loop muted playsInline className="w-full h-full object-cover" />
+                    ) : (
+                      <img src={newReelUrl} className="w-full h-full object-cover" alt="Preview" />
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <button type="submit" className="w-full bg-green-600 text-white p-4 rounded-xl font-black text-sm uppercase">Add Food Reel 🎥</button>
+            </form>
+
+            <div className="grid grid-cols-2 gap-4">
+              {reels.map(r => (
+                <div key={r.id} className="bg-white/[0.02] border border-white/5 p-3 rounded-2xl relative group">
+                  <div className="h-32 overflow-hidden rounded-xl bg-neutral-900 flex items-center justify-center">
+                    {isVideoUrl(r.url) ? (
+                      <video src={r.url} muted loop autoPlay className="w-full h-full object-cover" />
+                    ) : (
+                      <img src={r.url} className="w-full h-full object-cover" alt="Reel Preview" />
+                    )}
+                  </div>
+                  <div className="mt-2 text-[10px] space-y-0.5">
+                    <p className="font-black text-gray-200 truncate">{r.title}</p>
+                    <p className="text-orange-500 font-bold">Price: ₹{r.price}</p>
+                    <p className="text-gray-450 truncate">{r.description}</p>
+                  </div>
+                  <button onClick={() => handleDeleteReel(r.id)} className="absolute top-4 right-4 p-2 bg-red-500/20 text-red-500 rounded-xl hover:bg-red-500 active:text-black">
+                    <Trash size={14}/>
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* --- TAB 7.6: MAIN BACKGROUND HEADER VIDEO (Requirement 4) --- */}
+        {tab === 'header_video' && (
+          <div className="space-y-6">
+            <h3 className="text-xl font-black text-orange-500 uppercase tracking-wider flex items-center gap-2">🎬 Main Background Header Video</h3>
+            <p className="text-[10px] text-gray-500 uppercase tracking-widest font-black leading-relaxed font-mono">यहाँ से आप मुख्य होमपेज के पीछे चलने वाले बैकग्राउंड वीडियो को बदल सकते हैं।</p>
+
+            <form onSubmit={handleUpdateHeaderVideo} className="bg-white/[0.02] border border-white/5 p-6 rounded-[2.5rem] space-y-4">
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-gray-400 uppercase">Background Video URL</label>
+                <input 
+                  type="url" 
+                  value={headerVideoInput} 
+                  onChange={(e) => setHeaderVideoInput(e.target.value)} 
+                  placeholder="Paste .mp4 or stream video URL..."
+                  className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-xs font-black text-white" 
+                  required 
+                />
+              </div>
+              
+              {headerVideoInput && (
+                <div className="space-y-2">
+                  <p className="text-[10px] text-orange-400 font-extrabold uppercase">Live Preview:</p>
+                  <div className="h-36 rounded-2xl overflow-hidden bg-neutral-900 border border-white/5">
+                    <video src={headerVideoInput} autoPlay loop muted playsInline className="w-full h-full object-cover" />
+                  </div>
+                </div>
+              )}
+
+              <button type="submit" className="w-full bg-green-600 text-white p-4 rounded-xl font-black text-sm uppercase">Update Header Video 🎬</button>
+            </form>
           </div>
         )}
 
@@ -2434,7 +2553,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                       </span>
                     </div>
                     <div className="text-[10px] text-gray-400 font-semibold space-y-0.5">
-                      <p>प्लेटफार्म: <span className="text-white">{claim.platformLabel}</span></p>
+                      <p>प्लेटформа: <span className="text-white">{claim.platformLabel}</span></p>
                       <p>सोशल यूज़रनेम / हैंडल: <span className="text-yellow-400 font-black">{claim.socialUsername}</span></p>
                       <p>कस्टमर नंबर: <span className="text-white">+{claim.customerPhone}</span></p>
                       <p className="text-[9px] text-gray-600">{claim.timestamp?.toDate ? claim.timestamp.toDate().toLocaleString() : ""}</p>
@@ -2470,7 +2589,7 @@ Report generated automatically by Bum Bum Cafe POS.`
             <form onSubmit={handleUpdatePasscodes} className="bg-white/[0.02] border border-white/5 p-6 rounded-[2.5rem] space-y-5">
               <div>
                 <h4 className="text-sm font-black text-orange-500 uppercase">Change security PINs</h4>
-                <p className="text-[9px] text-gray-500 font-bold uppercase mt-1 leading-relaxed font-mono">केवल एडमिनिस्ट्रेटर ही दोनों रोल (Admin व Manager) के लॉगिन क्रेडेंशियल्स को बदल सकता है।</p>
+                <p className="text-[9px] text-gray-500 font-bold uppercase mt-1 leading-relaxed font-mono">केवल एडमिनिस्ट्रेटर ही दोनों रोल (Admin व Manager) के क्रेडेंशियल्स को बदल सकता है।</p>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -2690,7 +2809,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                   onClick={() => { setSentBroadcastPhones([]); toast.success("Sent history reset successfully!"); }}
                   title="Reset session"
                   type="button"
-                  className="bg-white/5 text-gray-450 p-3 rounded-xl transition-all active:scale-95"
+                  className="bg-white/5 text-gray-455 transition-all active:scale-95"
                 >
                   <RefreshCw size={16} />
                 </button>
@@ -2743,6 +2862,80 @@ Report generated automatically by Bum Bum Cafe POS.`
         </div>
       )}
 
+      {/* --- REQUIREMENT 5: CENTERED OVERLAY PRODUCT EDIT MODAL --- */}
+      {/* Placed at the very root level of layout to prevent parent scrolling issues */}
+      {editingProduct && (
+        <div className="fixed inset-0 bg-black/85 backdrop-blur-sm z-[200] flex items-center justify-center p-4 overflow-y-auto">
+          <form onSubmit={handleUpdateProduct} className="bg-[#111] border-2 border-orange-500/50 p-6 rounded-[2.5rem] w-full max-w-lg relative max-h-[90vh] overflow-y-auto shadow-2xl space-y-4">
+            <button type="button" onClick={() => setEditingProduct(null)} className="absolute top-4 right-4 p-2.5 bg-white/5 text-gray-400 hover:text-white rounded-full"><X size={18}/></button>
+            
+            <div className="text-center pb-2 border-b border-white/5">
+              <h3 className="text-xl font-black text-orange-500 italic uppercase">Edit Product Info</h3>
+            </div>
+            
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-gray-400 uppercase">Item Name</label>
+              <input type="text" value={editName} onChange={(e) => setEditName(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-white focus:border-orange-500" required />
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-gray-400 uppercase">Category</label>
+              <select value={editCategory} onChange={(e) => setEditCategory(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-white focus:border-orange-500" required>
+                {categoryOptions.filter(c => c !== "All" && c !== "DIY Pizza").map(cat => (
+                  <option key={cat} value={cat} className="bg-[#111]">{cat}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-gray-400 uppercase">Image URL</label>
+              <input type="url" value={editImage} onChange={(e) => setEditImage(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-white focus:border-orange-500" required />
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-gray-400 uppercase">Option Type</label>
+              <select value={editVariantType} onChange={(e: any) => setEditVariantType(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-white focus:border-orange-500">
+                <option value="none" className="bg-[#111]">None (Single Price)</option>
+                <option value="half_full" className="bg-[#111]">Half / Full</option>
+                <option value="plain_butter" className="bg-[#111]">Plain / Butter</option>
+                <option value="pizza_sizes" className="bg-[#111]">Pizza Sizes</option>
+              </select>
+            </div>
+
+            {editVariantType === 'none' && (
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-gray-400 uppercase">Price (₹)</label>
+                <input type="number" value={editPrice} onChange={(e) => setEditPrice(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-white" />
+              </div>
+            )}
+
+            {(editVariantType === 'half_full' || editVariantType === 'plain_butter') && (
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1"><label className="text-xs font-bold text-gray-455 uppercase">Half / Plain (₹)</label><input type="number" value={editHalfPrice} onChange={(e) => setEditHalfPrice(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-white text-xs font-bold" /></div>
+                <div className="space-y-1"><label className="text-xs font-bold text-gray-455 uppercase">Full / Butter (₹)</label><input type="number" value={editFullPrice} onChange={(e) => setEditFullPrice(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-white text-xs font-bold" /></div>
+              </div>
+            )}
+
+            {editVariantType === 'pizza_sizes' && (
+              <div className="space-y-3 bg-[#111]/40 p-4 rounded-2xl border border-white/5">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Small Price</label><input type="number" value={editPriceSmall} onChange={(e) => setEditPriceSmall(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs font-bold text-white" /></div>
+                  <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Medium Price</label><input type="number" value={editPriceMedium} onChange={(e) => setEditPriceMedium(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs font-bold text-white" /></div>
+                  <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Large Price</label><input type="number" value={editPriceLarge} onChange={(e) => setEditPriceLarge(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs font-bold text-white" /></div>
+                  <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Extra Large</label><input type="number" value={editPriceXL} onChange={(e) => setEditPriceXL(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs font-bold text-white" /></div>
+                </div>
+              </div>
+            )}
+
+            <div className="flex gap-2 pt-2">
+              <button type="submit" className="flex-1 bg-green-600 text-white p-4 rounded-xl font-black text-sm uppercase">Update Item</button>
+              <button type="button" onClick={() => setEditingProduct(null)} className="bg-white/5 text-gray-405 p-4 rounded-xl font-black text-xs uppercase">Cancel</button>
+            </div>
+          </form>
+        </div>
+      )}
+
     </div>
   );
 }
+
