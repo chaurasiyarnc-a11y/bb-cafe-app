@@ -42,6 +42,34 @@ const PIZZA_ADDONS: { [size: string]: { [addon: string]: number } } = {
   "extra large": { "Veg Add-on": 30, "Paneer": 50, "Black Olives": 50, "Jalapeno": 50, "Extra Cheese": 60, "Mushroom": 50 }
 };
 
+// DIY Pizza exact prices from user inputs
+const DIY_PIZZA_PRICES: any = {
+  small: {
+    base: 15, sauce: 10, mozzarella: 40,
+    veggies: { onion: 10, tomato: 10, capsicum: 10, corn: 10 },
+    black_olive: 20, jalapeno: 20, red_peprica: 20, paneer: 30, mushroom: 30
+  },
+  medium: {
+    base: 20, sauce: 15, mozzarella: 60,
+    veggies: { onion: 15, tomato: 15, capsicum: 15, corn: 15 },
+    black_olive: 30, jalapeno: 30, red_peprica: 30, paneer: 40, mushroom: 40
+  },
+  large: {
+    base: 30, sauce: 30, mozzarella: 100,
+    veggies: { onion: 20, tomato: 20, capsicum: 20, corn: 20 },
+    black_olive: 50, jalapeno: 50, red_peprica: 40, paneer: 50, mushroom: 50
+  }
+};
+
+const SOCIAL_LINKS = [
+  { id: 'whatsapp_msg', label: '🟢 WhatsApp Msg', icon: '💬', points: 1, url: 'https://wa.me/919714293759' },
+  { id: 'whatsapp_channel', label: '📢 WhatsApp Channel', icon: '📢', points: 1, url: 'https://whatsapp.com/channel/0029VaLhggoGE56natoQI43y' },
+  { id: 'youtube', label: '🔴 YouTube', icon: '🎥', points: 1, url: 'https://www.youtube.com/@bbcafe.i' },
+  { id: 'instagram', label: '📸 Instagram', icon: '📸', points: 1, url: 'https://www.instagram.com/bbcafe.in/' },
+  { id: 'facebook', label: '🔵 Facebook', icon: '📘', points: 1, url: 'https://www.facebook.com/bbcafe.in/' },
+  { id: 'snapchat', label: '👻 Snapchat', icon: '👻', points: 1, url: 'https://www.snapchat.com/add/bbcafe.in' }
+];
+
 const QUICK_INSTRUCTION_TAGS = ["🌶️ Extra Spicy", "🧅 No Onion-Garlic", "🧀 Extra Cheese", "🔥 Well Baked", "🌱 Make it Mild"];
 
 const SUGGESTED_REVIEWS = [
@@ -58,17 +86,11 @@ const PERMANENT_REVIEWS = [
   { id: "rev4", name: "Neha Chaurasia", rating: 5, comment: "इस क्षेत्र का सबसे अच्छा कैफे। पिज्जा विभाग ताज़ा है और क्रस्ट बहुत सॉफ्ट है! ⭐⭐⭐⭐⭐" }
 ];
 
-const MOCK_STORIES = [
-  { id: 'st1', title: 'Cheese Stretch', type: 'video', url: 'https://assets.mixkit.co/videos/preview/mixkit-freshly-baked-pizza-with-elastic-cheese-43093-large.mp4', thumbnail: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=150&q=80', description: 'Fresh Hot Cheese Pizza! Bursting with flavor.' },
-  { id: 'st2', title: 'Tandoor Magic', type: 'video', url: 'https://assets.mixkit.co/videos/preview/mixkit-chef-cooking-french-fries-in-fryer-43090-large.mp4', thumbnail: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=150&q=80', description: 'Fresh crispy fries, deep-fried to absolute perfection!' },
-  { id: 'st3', title: 'Chilled Shake', type: 'video', url: 'https://assets.mixkit.co/videos/preview/mixkit-pouring-cold-brew-iced-coffee-into-a-glass-42171-large.mp4', thumbnail: 'https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?auto=format&fit=crop&w=150&q=80', description: 'Ice cold Shakes to cool your summer afternoons.' }
-];
-
-const MOCK_SOCIAL_NOTIFS = [
-  { id: 1, text: "प्रियंका जी (वार्ड 2) ने अभी-अभी 'पनीर पिज्जा' ऑर्डर किया 🍕" },
-  { id: 2, text: "अमित सोनी जी (टाउन) ने अभी-अभी 'स्पेशल थाली' ऑर्डर की 🍱" },
-  { id: 3, text: "राहुल कुमार जी (वार्ड 4) ने अभी-अभी 'चॉकलेट शेक' ऑर्डर किया 🥤" },
-  { id: 4, text: "अंजलि जी (वार्ड 5) ने अभी-अभी 'मिक्स वेज पिज्जा' आर्डर किया 🧀" }
+const DEFAULT_SOCIAL_PROOF = [
+  { id: "sp1", text: "प्रियंका जी (वार्ड 2) ने अभी-अभी 'पनीर पिज्जा' ऑर्डर किया 🍕" },
+  { id: "sp2", text: "अमित सोनी जी (टाउन) ने अभी-अभी 'स्पेशल थाली' ऑर्डर की 🍱" },
+  { id: "sp3", text: "राहुल कुमार जी (वार्ड 4) ने अभी-अभी 'चॉकलेट शेक' ऑर्डर किया 🥤" },
+  { id: "sp4", text: "अंजलि जी (वार्ड 5) ने अभी-अभी 'मिक्स वेज पिज्जा' आर्डर किया 🧀" }
 ];
 
 export default function BbCafeHome() {
@@ -137,21 +159,34 @@ export default function BbCafeHome() {
   const [enteredCoupon, setEnteredCoupon] = useState("");
   const [appliedCoupon, setAppliedCoupon] = useState<any>(null);
 
-  // Pizza Step-by-Step DIY Builder States (Idea 24)
-  const [builderStep, setBuilderStep] = useState<number>(1);
-  const [chosenSize, setChosenSize] = useState<string>("");
-  const [chosenPrice, setChosenPrice] = useState<number>(0);
-  const [pizzaSauce, setPizzaSauce] = useState<string>("Classic Tomato Sauce");
-  const [pizzaSauceCost, setPizzaSauceCost] = useState<number>(0);
-  const [pizzaAddons, setPizzaAddons] = useState<{ [addon: string]: boolean }>({});
+  // Normal Pizza Customization Addons
+  const [normalPizzaSize, setNormalPizzaSize] = useState("");
+  const [normalPizzaPrice, setNormalPizzaPrice] = useState(0);
+  const [normalPizzaAddons, setNormalPizzaAddons] = useState<{ [addon: string]: boolean }>({});
   const [chefNote, setChefNote] = useState(""); 
 
-  // Story Viewer States (Idea 17)
+  // --- NEW DIY PIZZA WORKSPACE STATES (Category Tab based - Requirement 1) ---
+  const [diySize, setDiySize] = useState<string>("small"); // small, medium, large
+  const [diySauce, setDiySauce] = useState<boolean>(true); // Pizza sauce included
+  const [diyMozzarella, setDiyMozzarella] = useState<boolean>(true); // Mozzarella included
+  const [diyVegSelection, setDiyVegSelection] = useState<{ [veg: string]: boolean }>({ onion: false, tomato: false, capsicum: false, corn: false });
+  const [diyPremiumToppings, setDiyPremiumToppings] = useState<{ [top: string]: boolean }>({ black_olive: false, jalapeno: false, red_peprica: false, paneer: false, mushroom: false });
+  const [diyChefNote, setDiyChefNote] = useState<string>("");
+
+  // Reels/Stories States (Idea 17)
+  const [stories, setStories] = useState<any[]>([]);
   const [activeStory, setActiveStory] = useState<any | null>(null);
 
   // Social Proof Alerts States (Idea 9)
+  const [socialProofs, setSocialProofs] = useState<any[]>([]);
   const [socialAlertIndex, setSocialAlertIndex] = useState(0);
   const [showSocialAlert, setShowSocialAlert] = useState(false);
+
+  // Social Media Point Claims (Anti-Cheat Loop)
+  const [isClaimModalOpen, setIsClaimModalOpen] = useState(false);
+  const [claimingPlatform, setClaimingPlatform] = useState<any>(null);
+  const [claimUsername, setClaimUsername] = useState("");
+  const [isClaimingLoading, setIsClaimingLoading] = useState(false);
 
   // Cart Specific Add-ons
   const [ketchupAddon, setKetchupAddon] = useState(false);
@@ -294,6 +329,31 @@ export default function BbCafeHome() {
     return shuffled;
   };
 
+  // Dynamic DIY Pizza Price Calculator (Requirement 1)
+  const calculatedDiyPizzaPrice = useMemo(() => {
+    const config = DIY_PIZZA_PRICES[diySize];
+    if (!config) return 0;
+    let total = config.base;
+    if (diySauce) total += config.sauce;
+    if (diyMozzarella) total += config.mozzarella;
+
+    // Sum veggies
+    Object.entries(diyVegSelection).forEach(([veg, isSelected]) => {
+      if (isSelected) {
+        total += config.veggies[veg] || 0;
+      }
+    });
+
+    // Sum premium toppings
+    Object.entries(diyPremiumToppings).forEach(([top, isSelected]) => {
+      if (isSelected) {
+        total += config[top] || 0;
+      }
+    });
+
+    return total;
+  }, [diySize, diySauce, diyMozzarella, diyVegSelection, diyPremiumToppings]);
+
   // --- MEMOS ---
 
   const activeTheme = useMemo(() => {
@@ -402,7 +462,18 @@ export default function BbCafeHome() {
       if (!alreadyAdded && c.isVisible !== false && c.name !== "All") result.push(c.name);
     });
 
-    return Array.from(new Set(result));
+    const dedupedList = Array.from(new Set(result));
+    
+    // REQUIREMENT 1: Inject "DIY Pizza" between Favorites and All dynamically
+    const finalWithDiy: string[] = [];
+    dedupedList.forEach(cat => {
+      if (cat === "All") {
+        finalWithDiy.push("DIY Pizza"); // Insert DIY Pizza directly before All
+      }
+      finalWithDiy.push(cat);
+    });
+
+    return Array.from(new Set(finalWithDiy));
   }, [dbCategories]);
 
   const upsellSuggestionItems = useMemo(() => {
@@ -496,27 +567,38 @@ export default function BbCafeHome() {
     return () => unsubHistory();
   }, [customerDetails]);
 
-  // Social Proof Dynamic Trigger Loop (Idea 9)
+  // Social Proof Alerts Fetcher (Dynamic and Slowed down - Requirement 3)
   useEffect(() => {
+    const unsubProofs = onSnapshot(collection(db, "social_proofs"), (snap) => {
+      if (!snap.empty) {
+        setSocialProofs(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      } else {
+        setSocialProofs(DEFAULT_SOCIAL_PROOF);
+      }
+    });
+
+    return () => unsubProofs();
+  }, []);
+
+  // Slowed transitions for live alerts (Requirement 3)
+  useEffect(() => {
+    if (socialProofs.length === 0) return;
     const interval = setInterval(() => {
-      setSocialAlertIndex((prev) => (prev + 1) % MOCK_SOCIAL_NOTIFS.length);
+      setSocialAlertIndex((prev) => (prev + 1) % socialProofs.length);
       setShowSocialAlert(true);
       
-      // Auto-hide alert after 5.5 seconds
       setTimeout(() => {
         setShowSocialAlert(false);
-      }, 5500);
-    }, 15000); // Trigger every 15 seconds
+      }, 7500); // Alert displays for 7.5 seconds
+    }, 25000); // Rotates slowly every 25 seconds
 
     return () => clearInterval(interval);
-  }, []);
+  }, [socialProofs]);
 
   // Real-time Live Order Tracking (Idea 4)
   useEffect(() => {
     if (!customerDetails?.phone) return;
-    const phoneClean = customerDetails.phone.replace("+91", "").trim();
     
-    // Listen to most recent pending order from customer
     const qOrders = query(
       collection(db, "orders"),
       where("customerPhone", "==", customerDetails.phone),
@@ -618,9 +700,12 @@ export default function BbCafeHome() {
     });
 
     const unsubCats = onSnapshot(collection(db, "categories"), (snap) => { setDbCategories(snap.docs.map(d => ({ id: d.id, ...d.data() }))); });
-    const unsubBanners = onSnapshot(collection(db, "banners"), (snap) => { setBanners(snap.docs.map(d => ({ id: d.id, ...d.data() }))); });
+    const unsubBanners = onSnapshot(collection(db, "banners"), (snap) => { 
+      setBanners(snap.docs.map(d => ({ id: d.id, ...d.data() }))); 
+      setStories(snap.docs.map(d => ({ id: d.id, ...d.data() })).filter((r: any) => r.isStory === true || r.isStory === "true"));
+    });
     const unsubReviews = onSnapshot(collection(db, "reviews"), (snap) => {
-      setReviews(snap.docs.map(d => ({ id: d.id, ...d.data() })).filter((r: any) => r.isApproved === true));
+      setReviews(snap.docs.map(d => ({ id: d.id, ...d.data() })).filter((r: any) => r.isApproved === true || r.isApproved === "true"));
     });
     const unsubRules = onSnapshot(collection(db, "loyalty_rules"), (snap) => { setLoyaltyRules(snap.docs.map(d => ({ id: d.id, ...d.data() }))); });
 
@@ -723,7 +808,7 @@ export default function BbCafeHome() {
     );
   };
 
-  // Security 1: Transaction-based secure points transferring + Device & PIN security checks
+  // Security 1: Transaction-based secure points transferring + PIN security checks
   const handleGiftPoints = async (e: React.FormEvent) => {
     e.preventDefault();
     triggerHaptic();
@@ -996,9 +1081,10 @@ export default function BbCafeHome() {
     }
   };
 
-  const handleSocialClick = async (platform: string, url: string) => {
+  // Anti-Cheat Loop: Open Verification Form instead of instant credit (Requirement 4)
+  const handleSocialClickWithClaim = (platform: any) => {
     triggerHaptic();
-    window.open(url, '_blank');
+    window.open(platform.url, '_blank');
 
     if (!customerDetails?.phone) {
       toast.error("पॉइंट्स क्लेम करने के लिए कृपया पहले अपना Name और Phone दर्ज करें!");
@@ -1006,45 +1092,41 @@ export default function BbCafeHome() {
       return;
     }
 
-    const storageKey = `bb_claimed_${customerDetails.phone.replace("+91", "")}_${platform}`;
-    const alreadyClaimed = localStorage.getItem(storageKey);
+    setClaimingPlatform(platform);
+    setIsClaimModalOpen(true);
+  };
 
-    if (alreadyClaimed) {
-      toast.success("आप इस प्लेटफ़ॉर्म के लिए पहले ही पॉइंट ले चुके हैं! धन्यवाद ❤️");
-      return;
-    }
+  const handleClaimSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    triggerHaptic();
+    if (!claimUsername.trim()) return toast.error("कृपया अपना यूज़रनेम / हैंडल दर्ज करें!");
+
+    setIsClaimingLoading(true);
+    const phoneRaw = customerDetails!.phone.replace("+91", "").trim();
 
     try {
-      const phoneRaw = customerDetails.phone.replace("+91", "").trim();
-      const pointsRef = doc(db, "customer_points", phoneRaw);
-      
-      await setDoc(pointsRef, {
-        points: increment(1),
-        lastActive: new Date()
-      }, { merge: true });
-
-      await addDoc(collection(db, "customer_points", phoneRaw, "history"), {
-        type: 'earn',
-        points: 1,
-        description: `Followed us on ${platform} 📱`,
+      // Save claim request to Firestore for admin review
+      await addDoc(collection(db, "points_claims"), {
+        customerName: customerDetails!.name,
+        customerPhone: phoneRaw,
+        platformId: claimingPlatform.id,
+        platformLabel: claimingPlatform.label,
+        socialUsername: claimUsername.trim(),
+        status: "pending",
+        pointsToReward: claimingPlatform.points,
         timestamp: new Date()
       });
 
-      localStorage.setItem(storageKey, "true");
-      setCustomerPoints(prev => prev + 1);
-      toast.success("🎉 बधाई हो! हमें फॉलो करने के लिए आपको +1 पॉइंट मिला है!");
+      toast.success("✅ दावा (Claim Request) सफलतापूर्वक सबमिट किया गया! एडमिन जांच के बाद पॉइंट क्रेडिट कर देंगे।");
+      setIsClaimModalOpen(false);
+      setClaimUsername("");
     } catch (err) {
-      toast.error("पॉइंट्स जोड़ने में समस्या आई।");
+      toast.error("दावा सबमिट करने में समस्या आई।");
+    } finally {
+      setIsClaimingLoading(false);
     }
   };
 
-  const getClaimStatus = (platform: string) => {
-    if (!customerDetails?.phone) return "🎁 +1 Pt";
-    const storageKey = `bb_claimed_${customerDetails.phone.replace("+91", "")}_${platform}`;
-    return localStorage.getItem(storageKey) ? "✅ Claimed" : "🎁 Claim +1 Pt";
-  };
-
-  // Bug 5: Complete Referral Code and Inviter Crediting Logic with Device Tokens and Security PINs
   const handleSaveDetails = async (e: React.FormEvent) => {
     e.preventDefault();
     triggerHaptic();
@@ -1134,16 +1216,16 @@ export default function BbCafeHome() {
     localStorage.setItem('bb_favorites', JSON.stringify(updated));
   };
 
-  // Step-by-Step Pizza Builder Add to Cart Trigger (Idea 24)
-  const handleAddToCart = () => {
+  // Standard Pizza Addon Confirm
+  const handleNormalPizzaAdd = () => {
     triggerHaptic();
-    if (!chosenSize) return toast.error("Please select a size first!");
-    
-    const sizeAddons = PIZZA_ADDONS[chosenSize.toLowerCase()] || {};
+    if (!normalPizzaSize) return toast.error("Please select a size!");
+
+    const sizeAddons = PIZZA_ADDONS[normalPizzaSize.toLowerCase()] || {};
     let addonsTotal = 0;
     const activeAddonNames: string[] = [];
 
-    Object.entries(pizzaAddons).forEach(([addonName, isSelected]) => {
+    Object.entries(normalPizzaAddons).forEach(([addonName, isSelected]) => {
       if (isSelected) {
         const addonCost = sizeAddons[addonName] || 0;
         addonsTotal += addonCost;
@@ -1151,36 +1233,59 @@ export default function BbCafeHome() {
       }
     });
 
-    let finalName = `${selectedProduct.name} (${chosenSize})`;
-    if (pizzaSauce && pizzaSauce !== "Classic Tomato Sauce") {
-      finalName += ` with ${pizzaSauce}`;
-    }
+    let finalName = `${selectedProduct.name} (${normalPizzaSize})`;
     if (activeAddonNames.length > 0) {
       finalName += ` [${activeAddonNames.join(", ")}]`;
     }
-    
-    const uniqueCartId = `${selectedProduct.id}-${chosenSize}-${pizzaSauce.replace(/\s+/g, '')}-${Object.keys(pizzaAddons).filter(k => pizzaAddons[k]).join("-")}`;
 
-    addItem({ 
-      ...selectedProduct, 
-      id: uniqueCartId, 
-      name: finalName, 
-      price: Number(chosenPrice) + pizzaSauceCost + addonsTotal,
-      note: chefNote ? chefNote.trim() : "" 
+    const uniqueCartId = `${selectedProduct.id}-${normalPizzaSize}-${Object.keys(normalPizzaAddons).filter(k => normalPizzaAddons[k]).join("-")}`;
+
+    addItem({
+      ...selectedProduct,
+      id: uniqueCartId,
+      name: finalName,
+      price: Number(normalPizzaPrice) + addonsTotal,
+      note: chefNote ? chefNote.trim() : ""
     });
-    
+
     playSoundEffect('add');
-    toast.success(`${chosenSize} added to cart!`);
+    toast.success("Added to cart!");
+    setSelectedProduct(null);
+    setNormalPizzaSize("");
+    setNormalPizzaPrice(0);
+    setNormalPizzaAddons({});
+    setChefNote("");
+  };
+
+  // Requirement 1: Add DIY Custom Pizza into Cart
+  const handleAddDiyPizzaToCart = () => {
+    triggerHaptic();
+    const sizeLabels: any = { small: "Small Base", medium: "Medium Base", large: "Large Base" };
     
-    // Reset builder states
-    setSelectedProduct(null); 
-    setChosenSize(""); 
-    setChosenPrice(0); 
-    setPizzaSauce("Classic Tomato Sauce");
-    setPizzaSauceCost(0);
-    setPizzaAddons({});
-    setChefNote(""); 
-    setBuilderStep(1);
+    // Generate description list of selected premium toppings & veggies
+    const activeVeggies = Object.entries(diyVegSelection).filter(([_, val]) => val).map(([key]) => key.toUpperCase());
+    const activePremiums = Object.entries(diyPremiumToppings).filter(([_, val]) => val).map(([key]) => key.replace('_', ' ').toUpperCase());
+    
+    const toppingsStr = [...activeVeggies, ...activePremiums].join(", ");
+
+    const finalDiyName = `🍕 DIY Custom Pizza [${sizeLabels[diySize]}]${toppingsStr ? ` - Toppings: ${toppingsStr}` : ''}`;
+    
+    const uniqueDiyId = `diy-pizza-${diySize}-${Object.keys(diyVegSelection).filter(k => diyVegSelection[k]).join("")}-${Object.keys(diyPremiumToppings).filter(k => diyPremiumToppings[k]).join("")}`;
+
+    addItem({
+      id: uniqueDiyId,
+      name: finalDiyName,
+      price: calculatedDiyPizzaPrice,
+      note: diyChefNote ? diyChefNote.trim() : ""
+    });
+
+    playSoundEffect('add');
+    toast.success("आपका कस्टमाइज़्ड पिज्जा कार्ट में जोड़ा गया! 🍕");
+
+    // Reset Workspace
+    setDiyVegSelection({ onion: false, tomato: false, capsicum: false, corn: false });
+    setDiyPremiumToppings({ black_olive: false, jalapeno: false, red_peprica: false, paneer: false, mushroom: false });
+    setDiyChefNote("");
   };
 
   const handleReviewSubmit = async (e: React.FormEvent) => {
@@ -1231,10 +1336,8 @@ export default function BbCafeHome() {
     }
   };
 
-  // Idea 17: Stories directly add product to cart
   const handleQuickAddFromStory = (productName: string, price: number) => {
     triggerHaptic();
-    // Search matching item in menu
     const matchedItem = menu.find(item => item.name.toLowerCase().includes(productName.toLowerCase()));
     if (matchedItem) {
       addItem(matchedItem);
@@ -1248,9 +1351,13 @@ export default function BbCafeHome() {
     setActiveStory(null);
   };
 
-  const quickAppendInstruction = (tag: string) => {
+  const quickAppendInstruction = (tag: string, type = "normal") => {
     triggerHaptic(20);
-    setChefNote(prev => prev ? `${prev}, ${tag}` : tag);
+    if (type === "diy") {
+      setDiyChefNote(prev => prev ? `${prev}, ${tag}` : tag);
+    } else {
+      setChefNote(prev => prev ? `${prev}, ${tag}` : tag);
+    }
   };
 
   if (!mounted) return null;
@@ -1287,9 +1394,9 @@ export default function BbCafeHome() {
         </div>
       )}
 
-      {/* Social Proof Toast Alert (Idea 9) */}
+      {/* Social Proof Toast Alert (Slower & Admin Editable - Requirement 3) */}
       <AnimatePresence>
-        {showSocialAlert && (
+        {showSocialAlert && socialProofs.length > 0 && (
           <motion.div 
             initial={{ opacity: 0, y: 50, x: '-50%' }}
             animate={{ opacity: 1, y: 0, x: '-50%' }}
@@ -1297,7 +1404,7 @@ export default function BbCafeHome() {
             className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[100] bg-black/90 backdrop-blur-md border border-orange-500/30 text-white px-4 py-2.5 rounded-full shadow-2xl flex items-center gap-2 max-w-[90%] text-center"
           >
             <span className="text-sm">🔥</span>
-            <span className="text-[10px] font-black tracking-wide truncate">{MOCK_SOCIAL_NOTIFS[socialAlertIndex].text}</span>
+            <span className="text-[10px] font-black tracking-wide truncate">{socialProofs[socialAlertIndex]?.text}</span>
           </motion.div>
         )}
       </AnimatePresence>
@@ -1463,28 +1570,30 @@ export default function BbCafeHome() {
         )}
 
         {/* Dynamic Video Stories / Food Reels (Idea 17) */}
-        <div className="space-y-1 px-1">
-          <p className="text-[8px] font-black uppercase tracking-wider text-orange-500">खूबसूरत फ़ूड रील्स (Daily Food Reels)</p>
-          <div className="flex gap-4 overflow-x-auto py-1.5 scrollbar-none [&::-webkit-scrollbar]:hidden">
-            {MOCK_STORIES.map((story) => (
-              <button 
-                key={story.id} 
-                onClick={() => { triggerHaptic(); setActiveStory(story); }}
-                className="flex flex-col items-center flex-shrink-0 focus:outline-none"
-              >
-                <div className="w-16 h-16 rounded-full p-0.5 bg-gradient-to-tr from-yellow-400 via-orange-500 to-red-600 relative">
-                  <div className="w-full h-full rounded-full overflow-hidden border-2 border-white dark:border-neutral-900 bg-neutral-800 flex items-center justify-center relative">
-                    <img src={story.thumbnail} className="w-full h-full object-cover" alt={story.title} />
-                    <div className="absolute inset-0 bg-black/10 flex items-center justify-center">
-                      <Play size={14} className="text-white fill-white" />
+        {stories.length > 0 && (
+          <div className="space-y-1 px-1">
+            <p className="text-[8px] font-black uppercase tracking-wider text-orange-500">खूबसूरत फ़ूड रील्स (Daily Food Reels)</p>
+            <div className="flex gap-4 overflow-x-auto py-1.5 scrollbar-none [&::-webkit-scrollbar]:hidden">
+              {stories.map((story) => (
+                <button 
+                  key={story.id} 
+                  onClick={() => { triggerHaptic(); setActiveStory(story); }}
+                  className="flex flex-col items-center flex-shrink-0 focus:outline-none"
+                >
+                  <div className="w-16 h-16 rounded-full p-0.5 bg-gradient-to-tr from-yellow-400 via-orange-500 to-red-600 relative">
+                    <div className="w-full h-full rounded-full overflow-hidden border-2 border-white dark:border-neutral-900 bg-neutral-800 flex items-center justify-center relative">
+                      <img src={story.url} className="w-full h-full object-cover" alt={story.title} />
+                      <div className="absolute inset-0 bg-black/10 flex items-center justify-center">
+                        <Play size={14} className="text-white fill-white" />
+                      </div>
                     </div>
                   </div>
-                </div>
-                <span className="text-[8px] font-bold dark:text-gray-300 text-neutral-800 mt-1">{story.title}</span>
-              </button>
-            ))}
+                  <span className="text-[8px] font-bold dark:text-gray-300 text-neutral-800 mt-1 max-w-[70px] truncate">{story.title}</span>
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
         <div className="px-1.5 py-1">
           <h3 className="text-xs font-black dark:text-gray-200 text-neutral-900 leading-normal">{greetingText}</h3>
@@ -1545,8 +1654,12 @@ export default function BbCafeHome() {
               const isActive = selectedCategory === cat;
               return (
                 <button key={cat} onClick={() => setSelectedCategory(cat)} className="flex flex-col items-center flex-shrink-0 group outline-none">
-                  <div className={`w-14 h-14 rounded-full overflow-hidden border transition-all ${isActive ? 'border-orange-500 scale-105 shadow-md' : 'dark:border-white/10 border-gray-200'}`}>
-                    <img src={getCategoryImage(cat)} className="w-full h-full object-cover" alt={cat} />
+                  <div className={`w-14 h-14 rounded-full overflow-hidden border transition-all ${isActive ? 'border-orange-500 scale-105 shadow-md' : 'dark:border-white/10 border-gray-200 bg-neutral-900'}`}>
+                    {cat === "DIY Pizza" ? (
+                      <div className="w-full h-full flex items-center justify-center text-lg bg-gradient-to-tr from-yellow-500 to-red-500 text-white">🍕</div>
+                    ) : (
+                      <img src={getCategoryImage(cat)} className="w-full h-full object-cover" alt={cat} />
+                    )}
                   </div>
                   <span className={`text-[9px] font-black uppercase mt-1.5 truncate max-w-[70px] text-center ${isActive ? 'dark:text-orange-500 text-orange-700' : 'dark:text-gray-400 text-neutral-800'}`}>
                     {cat === "All" ? "All" : cat.replace("Special ", "").replace(" Special", "")}
@@ -1567,178 +1680,323 @@ export default function BbCafeHome() {
           </div>
         )}
 
-        <div className="pt-2">
-          <h3 className="text-sm font-black uppercase tracking-wider text-orange-600">🍳 Our Delicious Menu</h3>
-        </div>
+        {/* INLINE DEDICATED DIY PIZZA BUILDER WORKSPACE (Requirement 1) */}
+        {selectedCategory === "DIY Pizza" ? (
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.98 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="dark:bg-[#0f1115] bg-white border dark:border-white/5 border-gray-200 rounded-3xl p-5 shadow-xl space-y-6 max-w-sm mx-auto"
+          >
+            <div className="text-center space-y-1">
+              <span className="bg-orange-500/10 text-orange-500 px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest">
+                DIY Pizza Tab
+              </span>
+              <h3 className="text-lg font-black text-neutral-900 dark:text-white">अपने मन का पिज़्ज़ा बनाएं 🍕</h3>
+              <p className="text-[10px] text-gray-400 font-semibold leading-relaxed">पसंद का बेस, सॉस, पनीर और मनपसंद वेजीज़ को टच करके अपनी रेसिपी तैयार करें!</p>
+            </div>
 
-        {/* PRODUCTS LISTING / SKELETON LOADER (Idea 5) */}
-        <div className="grid grid-cols-1 gap-4 pt-1 font-bold">
-          {menuLoading ? (
-            // Skeleton pulsing elements
-            Array.from({ length: 3 }).map((_, idx) => (
-              <div key={idx} className="dark:bg-white/[0.02] bg-white rounded-2xl border dark:border-white/5 border-gray-200 p-4 space-y-4 animate-pulse">
-                <div className="h-44 bg-neutral-300 dark:bg-neutral-800 rounded-xl w-full" />
-                <div className="space-y-2">
-                  <div className="h-4 bg-neutral-300 dark:bg-neutral-800 rounded w-1/2" />
-                  <div className="h-3 bg-neutral-300 dark:bg-neutral-800 rounded w-1/4" />
-                </div>
-                <div className="flex justify-between items-center">
-                  <div className="h-6 bg-neutral-300 dark:bg-neutral-800 rounded w-1/6" />
-                  <div className="h-8 bg-neutral-300 dark:bg-neutral-800 rounded w-1/5" />
-                </div>
-              </div>
-            ))
-          ) : filteredMenu.length === 0 ? (
-            <p className="text-center text-gray-500 py-8 text-xs font-bold uppercase">No items found...</p>
-          ) : (
-            filteredMenu.map((item, index) => {
-              const isItemAvailable = item.isAvailable !== false;
-
-              return (
-                <React.Fragment key={item.id}>
-                  <motion.div 
-                    layout 
-                    className={`group dark:bg-white/[0.02] bg-white rounded-2xl border dark:border-white/5 border-gray-200 overflow-hidden flex flex-col relative shadow-md shadow-gray-200/40 dark:shadow-none transition-all duration-300 hover:shadow-lg ${!isItemAvailable ? 'opacity-70' : ''}`}
-                    initial={{ opacity: 0, y: 30 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true, margin: "-50px" }}
-                    transition={{ duration: 0.45, ease: "easeOut" }}
+            {/* Step 1: Base Crust Selection */}
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase text-orange-500">1. पिज़्ज़ा बेस चुनें (Base Size):</label>
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { id: 'small', label: 'Small Base (₹15)' },
+                  { id: 'medium', label: 'Medium Base (₹20)' },
+                  { id: 'large', label: 'Large Base (₹30)' }
+                ].map((base) => (
+                  <button
+                    key={base.id}
+                    onClick={() => { triggerHaptic(); setDiySize(base.id); }}
+                    className={`p-3 rounded-xl border text-[10px] font-black text-center transition-all ${diySize === base.id ? 'border-orange-500 bg-orange-500/10 text-orange-500' : 'dark:border-white/5 border-gray-200'}`}
                   >
-                    <div className="relative h-44 w-full overflow-hidden">
-                      <img 
-                        src={item.image || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=500&q=80"} 
-                        className="w-full h-full object-cover origin-center transition-transform duration-700 ease-out group-hover:scale-110" 
-                        alt={item.name} 
-                      />
-                      
-                      <div className="absolute top-3 left-3 bg-black/50 backdrop-blur-md px-2.5 py-1 rounded-lg border border-white/10 flex items-center gap-1 text-[8px] font-black uppercase text-green-400">
-                        <span className="h-1 w-1 rounded-full bg-green-500 animate-pulse" />VEG
-                      </div>
+                    {base.label}
+                  </button>
+                ))}
+              </div>
+            </div>
 
-                      <div className="absolute bottom-0 left-0 bg-gradient-to-r from-blue-600 to-blue-500 text-white font-black text-[9px] px-3 py-1 rounded-tr-xl flex items-center gap-1 shadow-md uppercase tracking-wider">
-                        <span>🛵</span> <span>FREE delivery</span>
-                      </div>
+            {/* Step 2: Sauce & Cheese Base Choices */}
+            <div className="grid grid-cols-2 gap-2 pt-2">
+              <button
+                onClick={() => { triggerHaptic(); setDiySauce(!diySauce); }}
+                className={`p-3 rounded-xl border text-xs font-black flex justify-between items-center transition-all ${diySauce ? 'border-orange-500 bg-orange-500/5 text-orange-400' : 'dark:border-white/5 border-gray-200 opacity-60'}`}
+              >
+                <span>🥫 Pizza Sauce</span>
+                <span className="font-extrabold text-[10px]">
+                  +₹{DIY_PIZZA_PRICES[diySize]?.sauce}
+                </span>
+              </button>
 
-                      {!isItemAvailable && (
-                        <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
-                          <span className="bg-red-600 text-white font-black text-[10px] px-3 py-1.5 rounded-lg uppercase tracking-widest shadow-md">
-                            आज उपलब्ध नहीं है (Out of Stock)
-                          </span>
-                        </div>
-                      )}
+              <button
+                onClick={() => { triggerHaptic(); setDiyMozzarella(!diyMozzarella); }}
+                className={`p-3 rounded-xl border text-xs font-black flex justify-between items-center transition-all ${diyMozzarella ? 'border-orange-500 bg-orange-500/5 text-orange-400' : 'dark:border-white/5 border-gray-200 opacity-60'}`}
+              >
+                <span>🧀 Mozzarella</span>
+                <span className="font-extrabold text-[10px]">
+                  +₹{DIY_PIZZA_PRICES[diySize]?.mozzarella}
+                </span>
+              </button>
+            </div>
 
-                      <button onClick={(e) => handleToggleFavorite(item.id, e)} className="absolute top-3 right-3 bg-black/60 backdrop-blur-md p-1.5 rounded-full border border-white/10 text-white hover:text-red-500 transition-colors">
-                        <Heart size={14} className={favorites.includes(item.id) ? "fill-red-500 text-red-500" : "text-white"} />
-                      </button>
-                    </div>
-                    <div className="p-4 flex flex-col justify-between flex-1">
-                      <div className="flex justify-between items-start gap-4">
-                        <h4 className="font-black text-sm dark:text-gray-100 text-neutral-900 line-clamp-1">{item.name}</h4>
-                        <div className="bg-green-600 text-white font-extrabold text-[9px] px-2 py-0.5 rounded flex items-center gap-0.5">
-                          <span>4.9</span><span className="text-[8px]">★</span>
-                        </div>
-                      </div>
-                      <div className="flex justify-between items-center text-[9px] dark:text-gray-400 text-neutral-700 font-bold mt-0.5">
-                        <p className="uppercase text-[8px] dark:text-gray-500 text-gray-400">{item.category}</p><p>• 15-25 min</p>
-                      </div>
-                      <div className="h-px dark:bg-white/5 bg-gray-100 my-2.5" />
-                      <div className="flex justify-between items-end mt-0.5">
-                        <div>
-                          <p className="dark:text-gray-500 text-gray-400 text-[8px] font-black uppercase tracking-widest leading-none mb-1">Price</p>
-                          <p className="text-orange-700 dark:text-orange-500 font-black text-base leading-none">{getDisplayPrice(item)}</p>
-                          {item.variants && <span className="text-[8px] font-bold dark:text-gray-400 text-gray-500 mt-1 block">Options available</span>}
-                        </div>
-                        
-                        {storeOpen && !isTooFar && isItemAvailable && (
-                          <button 
-                            onClick={() => { 
-                              triggerHaptic();
-                              item.variants ? setSelectedProduct(item) : addItem(item); 
-                            }} 
-                            className="px-4 py-2 bg-orange-500/10 text-orange-700 dark:text-orange-400 border border-orange-500/30 hover:bg-orange-500 hover:text-white rounded-lg font-black text-[10px] active:scale-95 transition-all uppercase flex items-center gap-1 shadow"
-                          >
-                            <Plus size={12} /> ADD
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  </motion.div>
-
-                  {index === 3 && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 20 }}
-                      whileInView={{ opacity: 1, y: 0 }}
-                      viewport={{ once: true }}
-                      onClick={() => {
-                        triggerHaptic();
-                        setIsProfileOpen(true);
-                      }}
-                      className="cursor-pointer bg-gradient-to-r from-amber-500 via-orange-500 to-red-655 text-white p-5 rounded-2xl shadow-lg border border-white/10 my-2 relative overflow-hidden group animate-none"
+            {/* Step 3: Veggie Selection */}
+            <div className="space-y-2.5 pt-2">
+              <label className="text-[10px] font-black uppercase text-orange-500">3. ताज़ा वेजीज़ जोड़ें (Veg Selection):</label>
+              <div className="grid grid-cols-2 gap-2">
+                {Object.entries(DIY_PIZZA_PRICES[diySize]?.veggies || {}).map(([veg, cost]: any) => {
+                  const isSelected = !!diyVegSelection[veg];
+                  return (
+                    <button
+                      key={veg}
+                      onClick={() => { triggerHaptic(); setDiyVegSelection(p => ({ ...p, [veg]: !p[veg] })); }}
+                      className={`p-2.5 rounded-xl border flex justify-between items-center text-[10px] font-black capitalize transition-all ${isSelected ? 'border-orange-500 bg-orange-500/5 text-orange-400' : 'dark:border-white/5 border-gray-200'}`}
                     >
-                      <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full blur-xl group-hover:scale-110 transition-transform duration-500" />
-                      <div className="relative z-10 flex justify-between items-center gap-4">
-                        <div className="space-y-1.5">
-                          <span className="bg-black/30 border border-white/20 text-[8px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full text-yellow-300">
-                            🎁 LOYALTY CLUB PROMO PASS
-                          </span>
-                          <h4 className="text-sm font-black italic tracking-tight">
-                            Unlock Free Pizza, Sandwich & Shakes!
-                          </h4>
-                          <p className="text-[10px] text-orange-100 font-bold leading-normal">
-                            {customerDetails ? (
-                              "आपका प्रोमो पास एक्टिवेटेड है! ✅ हर ₹100 पर 1 पॉइंट कमाएं। यहाँ क्लिक कर अपने रिवॉर्ड्स देखें और रीडीम करें ➔"
-                            ) : (
-                              "अपना Name और Number दर्ज करके इस पास को एक्टिवेट करें! 🎁 हर ₹100 पर 1 पॉइंट कमाएं और फ्री पिज्जा/सैंडविच पाएं। Tap to activate ➔"
-                            )}
+                      <span>{veg}</span>
+                      <span className="font-extrabold text-orange-500">+₹{cost}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Step 4: Premium Ingredients */}
+            <div className="space-y-2.5 pt-2">
+              <label className="text-[10px] font-black uppercase text-orange-500">4. प्रीमियम एक्स्ट्रा टॉपिंग (Premium Toppings):</label>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { id: 'black_olive', label: 'Black Olive' },
+                  { id: 'jalapeno', label: 'Zalapino' },
+                  { id: 'red_peprica', label: 'Redpeprica' },
+                  { id: 'paneer', label: 'Paneer' },
+                  { id: 'mushroom', label: 'Mushroom' }
+                ].map((item) => {
+                  const isSelected = !!diyPremiumToppings[item.id];
+                  const cost = DIY_PIZZA_PRICES[diySize]?.[item.id] || 0;
+                  return (
+                    <button
+                      key={item.id}
+                      onClick={() => { triggerHaptic(); setDiyPremiumToppings(p => ({ ...p, [item.id]: !p[item.id] })); }}
+                      className={`p-2.5 rounded-xl border flex justify-between items-center text-[10px] font-black transition-all ${isSelected ? 'border-orange-500 bg-orange-500/5 text-orange-400' : 'dark:border-white/5 border-gray-200'}`}
+                    >
+                      <span>{item.label}</span>
+                      <span className="font-extrabold text-orange-500">+₹{cost}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Step 5: Cooking Tags & Notes */}
+            <div className="space-y-2 pt-2">
+              <label className="text-[10px] font-black uppercase text-orange-500">5. कुकिंग निर्देश (Chef Instructions):</label>
+              <div className="flex flex-wrap gap-1 pb-1">
+                {QUICK_INSTRUCTION_TAGS.map((tag) => (
+                  <button
+                    type="button"
+                    key={tag}
+                    onClick={() => quickAppendInstruction(tag, "diy")}
+                    className="text-[9px] font-bold py-1 px-2.5 rounded-full border dark:border-white/5 border-gray-200 bg-neutral-100 dark:bg-neutral-800 dark:text-gray-300 text-neutral-800 hover:border-orange-500 transition-colors"
+                  >
+                    {tag}
+                  </button>
+                ))}
+              </div>
+              <textarea
+                placeholder="पिज्जा के लिए विशेष निर्देश दर्ज करें..."
+                value={diyChefNote}
+                onChange={(e) => setDiyChefNote(e.target.value)}
+                className="w-full text-xs p-3 rounded-xl dark:bg-white/[0.03] bg-gray-50 border dark:border-white/5 border-gray-200 dark:text-white outline-none focus:border-orange-500 h-16 resize-none"
+              />
+            </div>
+
+            {/* Dynamic Real-time Bill Price Summary Card */}
+            <div className="bg-gradient-to-r from-orange-600 to-orange-700 p-4 rounded-2xl text-white text-center space-y-1">
+              <p className="text-[9px] font-bold uppercase opacity-85">Pizza Builder Subtotal</p>
+              <h4 className="text-2xl font-black">₹{calculatedDiyPizzaPrice}</h4>
+            </div>
+
+            {/* Confirm & Bake Button */}
+            {storeOpen && !isTooFar ? (
+              <button
+                onClick={handleAddDiyPizzaToCart}
+                className="w-full bg-green-600 hover:bg-green-700 text-white font-black py-4 rounded-2xl text-xs uppercase flex items-center justify-center gap-1.5 shadow-lg active:scale-[0.98] transition-all"
+              >
+                <span>Add Custom Pizza to Cart ➔</span>
+              </button>
+            ) : (
+              <div className="text-center text-xs font-bold text-red-500 uppercase py-2">
+                {isTooFar ? "आपकी दूरी 20 KM से अधिक है!" : "बम बम कैफ़े अभी बंद है!"}
+              </div>
+            )}
+          </motion.div>
+        ) : (
+          // STANDARD PRODUCTS LISTING (Add DIY Customization removed here)
+          <div className="grid grid-cols-1 gap-4 pt-1 font-bold">
+            {menuLoading ? (
+              Array.from({ length: 3 }).map((_, idx) => (
+                <div key={idx} className="dark:bg-white/[0.02] bg-white rounded-2xl border dark:border-white/5 border-gray-200 p-4 space-y-4 animate-pulse">
+                  <div className="h-44 bg-neutral-300 dark:bg-neutral-800 rounded-xl w-full" />
+                  <div className="space-y-2">
+                    <div className="h-4 bg-neutral-300 dark:bg-neutral-800 rounded w-1/2" />
+                    <div className="h-3 bg-neutral-300 dark:bg-neutral-800 rounded w-1/4" />
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <div className="h-6 bg-neutral-300 dark:bg-neutral-800 rounded w-1/6" />
+                    <div className="h-8 bg-neutral-300 dark:bg-neutral-800 rounded w-1/5" />
+                  </div>
+                </div>
+              ))
+            ) : filteredMenu.length === 0 ? (
+              <p className="text-center text-gray-500 py-8 text-xs font-bold uppercase">No items found...</p>
+            ) : (
+              filteredMenu.map((item, index) => {
+                const isItemAvailable = item.isAvailable !== false;
+
+                return (
+                  <React.Fragment key={item.id}>
+                    <motion.div 
+                      layout 
+                      className={`group dark:bg-white/[0.02] bg-white rounded-2xl border dark:border-white/5 border-gray-200 overflow-hidden flex flex-col relative shadow-md shadow-gray-200/40 dark:shadow-none transition-all duration-300 hover:shadow-lg ${!isItemAvailable ? 'opacity-70' : ''}`}
+                      initial={{ opacity: 0, y: 30 }}
+                      whileInView={{ opacity: 1, y: 0 }}
+                      viewport={{ once: true, margin: "-50px" }}
+                      transition={{ duration: 0.45, ease: "easeOut" }}
+                    >
+                      <div className="relative h-44 w-full overflow-hidden">
+                        <img 
+                          src={item.image || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=500&q=80"} 
+                          className="w-full h-full object-cover origin-center transition-transform duration-700 ease-out group-hover:scale-110" 
+                          alt={item.name} 
+                        />
+                        
+                        <div className="absolute top-3 left-3 bg-black/50 backdrop-blur-md px-2.5 py-1 rounded-lg border border-white/10 flex items-center gap-1 text-[8px] font-black uppercase text-green-400">
+                          <span className="h-1 w-1 rounded-full bg-green-500 animate-pulse" />VEG
+                        </div>
+
+                        <div className="absolute bottom-0 left-0 bg-gradient-to-r from-blue-600 to-blue-500 text-white font-black text-[9px] px-3 py-1 rounded-tr-xl flex items-center gap-1 shadow-md uppercase tracking-wider">
+                          <span>🛵</span> <span>FREE delivery</span>
+                        </div>
+
+                        {!isItemAvailable && (
+                          <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                            <span className="bg-red-600 text-white font-black text-[10px] px-3 py-1.5 rounded-lg uppercase tracking-widest shadow-md">
+                              आज उपलब्ध नहीं है (Out of Stock)
+                            </span>
+                          </div>
+                        )}
+
+                        <button onClick={(e) => handleToggleFavorite(item.id, e)} className="absolute top-3 right-3 bg-black/60 backdrop-blur-md p-1.5 rounded-full border border-white/10 text-white hover:text-red-500 transition-colors">
+                          <Heart size={14} className={favorites.includes(item.id) ? "fill-red-500 text-red-500" : "text-white"} />
+                        </button>
+                      </div>
+                      <div className="p-4 flex flex-col justify-between flex-1">
+                        <div className="flex justify-between items-start gap-4">
+                          <h4 className="font-black text-sm dark:text-gray-100 text-neutral-900 line-clamp-1">{item.name}</h4>
+                          <div className="bg-green-600 text-white font-extrabold text-[9px] px-2 py-0.5 rounded flex items-center gap-0.5">
+                            <span>4.9</span><span className="text-[8px]">★</span>
+                          </div>
+                        </div>
+                        <div className="flex justify-between items-center text-[9px] dark:text-gray-400 text-neutral-700 font-bold mt-0.5">
+                          <p className="uppercase text-[8px] dark:text-gray-500 text-gray-400">{item.category}</p><p>• 15-25 min</p>
+                        </div>
+                        <div className="h-px dark:bg-white/5 bg-gray-100 my-2.5" />
+                        <div className="flex justify-between items-end mt-0.5">
+                          <div>
+                            <p className="dark:text-gray-500 text-gray-400 text-[8px] font-black uppercase tracking-widest leading-none mb-1">Price</p>
+                            <p className="text-orange-700 dark:text-orange-500 font-black text-base leading-none">{getDisplayPrice(item)}</p>
+                            {item.variants && <span className="text-[8px] font-bold dark:text-gray-400 text-gray-500 mt-1 block">Options available</span>}
+                          </div>
+                          
+                          {storeOpen && !isTooFar && isItemAvailable && (
+                            <button 
+                              onClick={() => { 
+                                triggerHaptic();
+                                item.variants ? setSelectedProduct(item) : addItem(item); 
+                              }} 
+                              className="px-4 py-2 bg-orange-500/10 text-orange-700 dark:text-orange-400 border border-orange-500/30 hover:bg-orange-500 hover:text-white rounded-lg font-black text-[10px] active:scale-95 transition-all uppercase flex items-center gap-1 shadow"
+                            >
+                              <Plus size={12} /> ADD
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </motion.div>
+
+                    {index === 3 && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        whileInView={{ opacity: 1, y: 0 }}
+                        viewport={{ once: true }}
+                        onClick={() => {
+                          triggerHaptic();
+                          setIsProfileOpen(true);
+                        }}
+                        className="cursor-pointer bg-gradient-to-r from-amber-500 via-orange-500 to-red-655 text-white p-5 rounded-2xl shadow-lg border border-white/10 my-2 relative overflow-hidden group animate-none"
+                      >
+                        <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full blur-xl group-hover:scale-110 transition-transform duration-500" />
+                        <div className="relative z-10 flex justify-between items-center gap-4">
+                          <div className="space-y-1.5">
+                            <span className="bg-black/30 border border-white/20 text-[8px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full text-yellow-300">
+                              🎁 LOYALTY CLUB PROMO PASS
+                            </span>
+                            <h4 className="text-sm font-black italic tracking-tight">
+                              Unlock Free Pizza, Sandwich & Shakes!
+                            </h4>
+                            <p className="text-[10px] text-orange-100 font-bold leading-normal">
+                              {customerDetails ? (
+                                "आपका प्रोमो पास एक्टिवेटेड है! ✅ हर ₹100 पर 1 पॉइंट कमाएं। यहाँ क्लिक कर अपने रिवॉर्ड्स देखें और रीडीम करें ➔"
+                              ) : (
+                                "अपना Name और Number दर्ज करके इस पास को एक्टिवेट करें! 🎁 हर ₹100 पर 1 पॉइंट कमाएं और फ्री पिज्जा/सैंडविच पाएं। Tap to activate ➔"
+                              )}
+                            </p>
+                          </div>
+                          <div className="bg-white/15 backdrop-blur-md p-3 rounded-full border border-white/20 text-yellow-300 group-hover:rotate-12 transition-transform duration-300">
+                            <Gift size={24} />
+                          </div>
+                        </div>
+                      </motion.div>
+                    )}
+
+                    {index === 5 && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 15 }}
+                        whileInView={{ opacity: 1, y: 0 }}
+                        viewport={{ once: true }}
+                        onClick={() => { triggerHaptic(); setIsReviewFormOpen(true); }}
+                        className="cursor-pointer bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white py-3.5 px-4 rounded-xl shadow-md border border-white/10 my-2 flex justify-between items-center transition-all active:scale-95 group animate-none"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm">⭐</span>
+                          <p className="text-[10px] font-black tracking-wide uppercase">
+                            खाना कैसा लगा? अपना रिव्यू लिखें और मदद करें! ➔
                           </p>
                         </div>
-                        <div className="bg-white/15 backdrop-blur-md p-3 rounded-full border border-white/20 text-yellow-300 group-hover:rotate-12 transition-transform duration-300">
-                          <Gift size={24} />
+                        <ChevronRight size={14} className="text-emerald-100 group-hover:translate-x-0.5 transition-transform" />
+                      </motion.div>
+                    )}
+
+                    {index === 7 && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 15 }}
+                        whileInView={{ opacity: 1, y: 0 }}
+                        viewport={{ once: true }}
+                        onClick={() => { triggerHaptic(); setIsSocialsOpen(true); }}
+                        className="cursor-pointer bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white py-3.5 px-4 rounded-xl shadow-md border border-white/10 my-2 flex justify-between items-center transition-all active:scale-95 group animate-none"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm">📱</span>
+                          <p className="text-[10px] font-black tracking-wide uppercase">
+                            हमें सोशल मीडिया पर फॉलो करें और +1 फ्री पॉइंट पाएं! ➔
+                          </p>
                         </div>
-                      </div>
-                    </motion.div>
-                  )}
-
-                  {index === 5 && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 15 }}
-                      whileInView={{ opacity: 1, y: 0 }}
-                      viewport={{ once: true }}
-                      onClick={() => { triggerHaptic(); setIsReviewFormOpen(true); }}
-                      className="cursor-pointer bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white py-3.5 px-4 rounded-xl shadow-md border border-white/10 my-2 flex justify-between items-center transition-all active:scale-95 group animate-none"
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm">⭐</span>
-                        <p className="text-[10px] font-black tracking-wide uppercase">
-                          खाना कैसा लगा? अपना रिव्यू लिखें और मदद करें! ➔
-                        </p>
-                      </div>
-                      <ChevronRight size={14} className="text-emerald-100 group-hover:translate-x-0.5 transition-transform" />
-                    </motion.div>
-                  )}
-
-                  {index === 7 && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 15 }}
-                      whileInView={{ opacity: 1, y: 0 }}
-                      viewport={{ once: true }}
-                      onClick={() => { triggerHaptic(); setIsSocialsOpen(true); }}
-                      className="cursor-pointer bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white py-3.5 px-4 rounded-xl shadow-md border border-white/10 my-2 flex justify-between items-center transition-all active:scale-95 group animate-none"
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm">📱</span>
-                        <p className="text-[10px] font-black tracking-wide uppercase">
-                          हमें सोशल मीडिया पर फॉलो करें और +1 फ्री पॉइंट पाएं! ➔
-                        </p>
-                      </div>
-                      <ChevronRight size={14} className="text-blue-100 group-hover:translate-x-0.5 transition-transform" />
-                    </motion.div>
-                  )}
-                </React.Fragment>
-              );
-            })
-          )}
-        </div>
+                        <ChevronRight size={14} className="text-blue-100 group-hover:translate-x-0.5 transition-transform" />
+                      </motion.div>
+                    )}
+                  </React.Fragment>
+                );
+              })
+            )}
+          </div>
+        )}
 
         {/* PERMANENT REVIEWS SECTION */}
         <div className="pt-6 space-y-4">
@@ -1930,91 +2188,44 @@ export default function BbCafeHome() {
         )}
       </AnimatePresence>
 
-      {/* STEP-BY-STEP DIY PIZZA BUILDER (Idea 24 & Idea 15 Tags Included) */}
+      {/* STANDARD CUSTOMIZATION MODAL FOR REGULAR PIZZAS */}
       <AnimatePresence>
         {selectedProduct && (
           <div className="fixed inset-0 bg-black/95 z-[100] flex items-end">
             <motion.div initial={{ y: 300 }} animate={{ y: 0 }} exit={{ y: 300 }} className="dark:bg-[#111] bg-white w-full p-6 rounded-t-3xl border-t dark:border-white/10 border-gray-200 max-w-lg mx-auto overflow-y-auto max-h-[95vh] shadow-2xl transition-colors duration-200">
               <div className="w-12 h-1 bg-white/15 rounded-full mx-auto mb-4" />
+              <h3 className="text-xl font-black text-center text-neutral-900 dark:text-white">{selectedProduct?.name}</h3>
+              <p className="text-orange-550 font-black mb-4 uppercase text-[8px] text-center">Customize Your Order</p>
               
-              <div className="text-center mb-4">
-                <span className="text-[9px] font-black tracking-widest bg-orange-500/10 text-orange-500 border border-orange-500/20 px-3 py-1 rounded-full uppercase">
-                  Step {builderStep} of 5
-                </span>
-                <h3 className="text-xl font-black mt-2 text-neutral-900 dark:text-white">DIY Pizza Builder 🍕</h3>
-                <p className="text-[10px] text-gray-400 font-semibold">{selectedProduct?.name}</p>
+              <div className="space-y-3 mb-4">
+                <p className="text-[10px] font-bold text-gray-500 uppercase">1. Select Portion Size:</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {Object.entries(selectedProduct?.variants || {}).map(([size, price]: any) => (
+                    <button 
+                      type="button" 
+                      key={size} 
+                      onClick={() => { setNormalPizzaSize(size); setNormalPizzaPrice(Number(price)); }} 
+                      className={`p-3 rounded-xl flex flex-col items-center border transition-all ${normalPizzaSize.toLowerCase() === size.toLowerCase() ? 'bg-orange-500/10 border-orange-500 text-orange-500' : 'dark:bg-white/[0.03] bg-gray-50 dark:border-white/5 border-gray-200 dark:text-gray-400 text-neutral-800'}`}
+                    >
+                      <span className="capitalize text-xs font-black">{size}</span>
+                      <span className="font-extrabold text-[10px] mt-1 dark:text-white text-neutral-900">₹{price}</span>
+                    </button>
+                  ))}
+                </div>
               </div>
 
-              {/* Progress Steps Indicators */}
-              <div className="flex items-center justify-center gap-1.5 mb-6">
-                {[1, 2, 3, 4, 5].map((step) => (
-                  <div 
-                    key={step} 
-                    className={`h-1.5 rounded-full transition-all duration-300 ${builderStep === step ? 'w-8 bg-orange-500' : 'w-2 bg-gray-200 dark:bg-neutral-800'}`}
-                  />
-                ))}
-              </div>
-
-              {/* Step 1: Portions & Sizes */}
-              {builderStep === 1 && (
-                <div className="space-y-4 animate-fadeIn">
-                  <p className="text-xs font-black uppercase text-gray-500 dark:text-gray-400">Step 1: Select Crust Size</p>
+              {normalPizzaSize && (selectedProduct?.category === "Special Pizza" || selectedProduct?.name?.toLowerCase().includes("pizza")) && (
+                <div className="space-y-3 mb-4 border-t border-white/5 pt-3">
+                  <p className="text-[10px] font-bold text-gray-500 uppercase">2. Select Add-ons:</p>
                   <div className="grid grid-cols-2 gap-2">
-                    {Object.entries(selectedProduct?.variants || {}).map(([size, price]: any) => (
-                      <button 
-                        type="button" 
-                        key={size} 
-                        onClick={() => { triggerHaptic(); setChosenSize(size); setChosenPrice(Number(price)); }} 
-                        className={`p-4 rounded-2xl flex flex-col items-center border transition-all ${chosenSize.toLowerCase() === size.toLowerCase() ? 'bg-orange-500/10 border-orange-500 text-orange-500' : 'dark:bg-white/[0.03] bg-gray-50 dark:border-white/5 border-gray-200 dark:text-gray-400 text-neutral-800'}`}
-                      >
-                        <span className="capitalize text-xs font-black">{size}</span>
-                        <span className="font-extrabold text-[10px] mt-1 dark:text-white text-neutral-900">₹{price}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Step 2: Base Pizza Sauces */}
-              {builderStep === 2 && (
-                <div className="space-y-4 animate-fadeIn">
-                  <p className="text-xs font-black uppercase text-gray-500 dark:text-gray-400">Step 2: Choose Chef Special Sauce</p>
-                  <div className="grid grid-cols-1 gap-2">
-                    {[
-                      { name: "Classic Tomato Sauce", price: 0 },
-                      { name: "Spicy Schezwan Sauce", price: 10 },
-                      { name: "Creamy Jalapeno Sauce", price: 20 }
-                    ].map((sauce) => (
-                      <button
-                        type="button"
-                        key={sauce.name}
-                        onClick={() => { triggerHaptic(); setPizzaSauce(sauce.name); setPizzaSauceCost(sauce.price); }}
-                        className={`p-3.5 rounded-2xl border text-left flex justify-between items-center text-xs font-bold ${pizzaSauce === sauce.name ? 'border-orange-500 bg-orange-500/5 text-orange-400' : 'dark:border-white/5 border-gray-200 dark:bg-white/[0.02] bg-gray-50 dark:text-gray-300 text-neutral-800'}`}
-                      >
-                        <span>{sauce.name}</span>
-                        <span className="text-orange-500 font-black">+{sauce.price > 0 ? `₹${sauce.price}` : 'FREE'}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Step 3: Fresh Veggie Add-ons */}
-              {builderStep === 3 && (
-                <div className="space-y-4 animate-fadeIn">
-                  <div className="flex justify-between items-center">
-                    <p className="text-xs font-black uppercase text-gray-500 dark:text-gray-400">Step 3: Fresh Veggie Toppings</p>
-                    <span className="text-[9px] font-bold text-orange-500">Add multi-veg</span>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    {Object.entries(PIZZA_ADDONS[chosenSize.toLowerCase()] || {}).filter(([addon]) => !["Extra Cheese", "Paneer"].includes(addon)).map(([addon, cost]) => {
-                      const isSelected = !!pizzaAddons[addon];
+                    {Object.entries(PIZZA_ADDONS[normalPizzaSize.toLowerCase()] || {}).map(([addon, cost]) => {
+                      const isSelected = !!normalPizzaAddons[addon];
                       return (
                         <button
                           type="button"
                           key={addon}
-                          onClick={() => { triggerHaptic(); setPizzaAddons(prev => ({ ...prev, [addon]: !prev[addon] })); }}
-                          className={`p-3 rounded-2xl border flex justify-between items-center text-[10px] font-bold ${isSelected ? 'border-orange-500 bg-orange-500/5 text-orange-400' : 'dark:border-white/5 border-gray-200 dark:bg-white/[0.02] bg-gray-50 dark:text-gray-300 text-neutral-800'}`}
+                          onClick={() => setNormalPizzaAddons(prev => ({ ...prev, [addon]: !prev[addon] }))}
+                          className={`p-2.5 rounded-xl border flex justify-between items-center text-[9px] font-bold ${isSelected ? 'border-orange-500 bg-orange-500/5 text-orange-400' : 'dark:border-white/5 border-gray-200 dark:bg-white/[0.02] bg-gray-50 dark:text-gray-300 text-neutral-800'}`}
                         >
                           <span>{addon}</span>
                           <span className="text-orange-400 font-black">+₹{cost}</span>
@@ -2025,106 +2236,32 @@ export default function BbCafeHome() {
                 </div>
               )}
 
-              {/* Step 4: Premium Cheese & Paneer */}
-              {builderStep === 4 && (
-                <div className="space-y-4 animate-fadeIn">
-                  <p className="text-xs font-black uppercase text-gray-500 dark:text-gray-400">Step 4: Premium Cheese & Protein</p>
-                  <div className="grid grid-cols-1 gap-2">
-                    {Object.entries(PIZZA_ADDONS[chosenSize.toLowerCase()] || {}).filter(([addon]) => ["Extra Cheese", "Paneer"].includes(addon)).map(([addon, cost]) => {
-                      const isSelected = !!pizzaAddons[addon];
-                      return (
-                        <button
-                          type="button"
-                          key={addon}
-                          onClick={() => { triggerHaptic(); setPizzaAddons(prev => ({ ...prev, [addon]: !prev[addon] })); }}
-                          className={`p-3.5 rounded-2xl border flex justify-between items-center text-[11px] font-bold ${isSelected ? 'border-orange-500 bg-orange-500/5 text-orange-400' : 'dark:border-white/5 border-gray-200 dark:bg-white/[0.02] bg-gray-50 dark:text-gray-300 text-neutral-800'}`}
-                        >
-                          <span>{addon}</span>
-                          <span className="text-orange-400 font-black">+₹{cost}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
+              <div className="space-y-2 mb-6 border-t border-white/5 pt-3">
+                <p className="text-[10px] font-bold text-gray-500 uppercase">Special Note for Chef / Instructions:</p>
+                <div className="flex flex-wrap gap-1.5 pb-2">
+                  {QUICK_INSTRUCTION_TAGS.map((tag) => (
+                    <button
+                      type="button"
+                      key={tag}
+                      onClick={() => quickAppendInstruction(tag, "normal")}
+                      className="text-[9px] font-bold py-1 px-2 rounded-full border dark:border-white/5 border-gray-200 bg-neutral-100 dark:bg-neutral-800 dark:text-gray-300 text-neutral-800 hover:border-orange-500 transition-colors"
+                    >
+                      {tag}
+                    </button>
+                  ))}
                 </div>
-              )}
-
-              {/* Step 5: Cooking Instructions & Chef Note (Idea 15 Quick Tags Included) */}
-              {builderStep === 5 && (
-                <div className="space-y-4 animate-fadeIn">
-                  <p className="text-xs font-black uppercase text-gray-500 dark:text-gray-400">Step 5: Chef Notes & Quick Instructions</p>
-                  
-                  {/* Quick Instruction Tags (Idea 15) */}
-                  <div className="flex flex-wrap gap-1.5 pb-2">
-                    {QUICK_INSTRUCTION_TAGS.map((tag) => (
-                      <button
-                        type="button"
-                        key={tag}
-                        onClick={() => quickAppendInstruction(tag)}
-                        className="text-[10px] font-bold py-1 px-2.5 rounded-full border dark:border-white/5 border-gray-200 bg-neutral-100 dark:bg-neutral-800 dark:text-gray-300 text-neutral-800 hover:border-orange-500 hover:text-orange-500 transition-colors"
-                      >
-                        {tag}
-                      </button>
-                    ))}
-                  </div>
-
-                  <textarea 
-                    placeholder="e.g. Make it extra spicy, No onions, soft crust etc..." 
-                    value={chefNote} 
-                    onChange={(e) => setChefNote(e.target.value)} 
-                    className="w-full text-xs p-3.5 rounded-xl dark:bg-white/[0.03] bg-gray-50 border dark:border-white/5 border-gray-200 dark:text-white text-neutral-900 outline-none focus:border-orange-500 h-24 resize-none"
-                  />
-                </div>
-              )}
-
-              {/* Navigation Controls */}
-              <div className="flex gap-2.5 mt-6 pt-3 border-t dark:border-white/5 border-gray-100">
-                {builderStep > 1 && (
-                  <button 
-                    type="button" 
-                    onClick={() => { triggerHaptic(); setBuilderStep(prev => prev - 1); }}
-                    className="flex-1 bg-neutral-200 dark:bg-neutral-800 dark:text-white text-neutral-800 font-black py-3.5 rounded-2xl text-xs uppercase"
-                  >
-                    Back
-                  </button>
-                )}
-                
-                {builderStep < 5 ? (
-                  <button 
-                    type="button" 
-                    disabled={builderStep === 1 && !chosenSize}
-                    onClick={() => { triggerHaptic(); setBuilderStep(prev => prev + 1); }}
-                    className="flex-1 bg-orange-500 disabled:opacity-50 text-black font-black py-3.5 rounded-2xl text-xs uppercase"
-                  >
-                    Next
-                  </button>
-                ) : (
-                  <button 
-                    type="button" 
-                    onClick={handleAddToCart} 
-                    className="flex-1 bg-green-600 text-white font-black py-3.5 rounded-2xl text-xs uppercase flex items-center justify-center gap-1"
-                  >
-                    Confirm & Bake 🍕
-                  </button>
-                )}
+                <textarea 
+                  placeholder="e.g. Make it extra spicy, No onions, soft crust etc..." 
+                  value={chefNote} 
+                  onChange={(e) => setChefNote(e.target.value)} 
+                  className="w-full text-xs p-3 rounded-xl dark:bg-white/[0.03] bg-gray-50 border dark:border-white/5 border-gray-200 dark:text-white text-neutral-900 outline-none focus:border-orange-500 h-16 resize-none"
+                />
               </div>
 
-              <button 
-                type="button" 
-                onClick={() => { 
-                  triggerHaptic();
-                  setSelectedProduct(null); 
-                  setChosenSize(""); 
-                  setChosenPrice(0); 
-                  setPizzaSauce("Classic Tomato Sauce");
-                  setPizzaSauceCost(0);
-                  setPizzaAddons({});
-                  setChefNote(""); 
-                  setBuilderStep(1);
-                }} 
-                className="w-full mt-3 dark:text-gray-500 text-gray-400 font-black text-[10px] text-center uppercase"
-              >
-                Close
+              <button type="button" onClick={handleNormalPizzaAdd} className="w-full bg-orange-500 text-black p-4 rounded-xl font-black text-xs uppercase">
+                Confirm Add To Cart
               </button>
+              <button type="button" onClick={() => { setSelectedProduct(null); setNormalPizzaSize(""); setNormalPizzaPrice(0); setChefNote(""); }} className="w-full mt-3 dark:text-gray-500 text-gray-400 font-black text-[10px] text-center uppercase">Close</button>
             </motion.div>
           </div>
         )}
@@ -2143,7 +2280,9 @@ export default function BbCafeHome() {
               <div className="w-12 h-1 bg-white/15 rounded-full mx-auto mb-4" />
               <div className="flex justify-between items-center mb-6">
                 <h2 className="text-2xl font-black dark:text-white text-neutral-900 font-mono">My Account & Loyalty</h2>
-                <button onClick={() => { triggerHaptic(); setIsProfileOpen(false); }} className="p-2.5 dark:bg-white/5 bg-gray-100 hover:dark:bg-white/10 hover:bg-gray-200 dark:text-white text-neutral-800 rounded-full transition-all"><X size={20} /></button>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => { triggerHaptic(); setIsProfileOpen(false); }} className="p-2.5 dark:bg-white/5 bg-gray-100 hover:dark:bg-white/10 hover:bg-gray-200 dark:text-white text-neutral-800 rounded-full transition-all"><X size={20} /></button>
+                </div>
               </div>
 
               {!customerDetails ? (
@@ -2282,26 +2421,20 @@ export default function BbCafeHome() {
                     </div>
                   </div>
 
-                  {/* Social Buttons Inside Sidebar/Profile */}
+                  {/* Synchronized Social Links inside profile drawer */}
                   <div className="pt-2 border-t dark:border-white/10 border-gray-200 space-y-2">
                     <p className="text-[9px] dark:text-gray-400 text-neutral-700 font-black uppercase tracking-wider">Earn Points by Following us:</p>
                     <div className="grid grid-cols-2 gap-2 text-[8px] font-black uppercase">
-                      <button onClick={() => handleSocialClick('whatsapp_msg', `https://wa.me/${whatsappNumber}`)} className="flex items-center justify-between dark:bg-green-500/10 bg-green-50 p-2.5 rounded-xl border dark:border-green-500/20 border-green-200/50">
-                        <span>🟢 WhatsApp msg</span>
-                        <span className="bg-yellow-400 text-black px-1.5 py-0.5 rounded text-[7px]">{getClaimStatus('whatsapp_msg')}</span>
-                      </button>
-                      <button onClick={() => handleSocialClick('whatsapp_channel', 'https://whatsapp.com/channel/0029VaLhggoGE56natoQI43y')} className="flex items-center justify-between dark:bg-emerald-500/10 bg-green-50 p-2.5 rounded-xl border dark:border-emerald-500/20 border-green-200/50">
-                        <span>📢 WA Channel</span>
-                        <span className="bg-yellow-400 text-black px-1.5 py-0.5 rounded text-[7px]">{getClaimStatus('whatsapp_channel')}</span>
-                      </button>
-                      <button onClick={() => handleSocialClick('youtube', 'https://www.youtube.com/@bbcafe.i')} className="flex items-center justify-between dark:bg-red-600/10 bg-green-50 p-2.5 rounded-xl border dark:border-red-600/20 border-green-200/50">
-                        <span>🔴 YouTube</span>
-                        <span className="bg-yellow-400 text-black px-1.5 py-0.5 rounded text-[7px]">{getClaimStatus('youtube')}</span>
-                      </button>
-                      <button onClick={() => handleSocialClick('instagram', 'https://www.instagram.com/bbcafe.in/')} className="flex items-center justify-between dark:bg-pink-500/10 bg-green-50 p-2.5 rounded-xl border dark:border-pink-500/20 border-green-200/50">
-                        <span>📸 Instagram</span>
-                        <span className="bg-yellow-400 text-black px-1.5 py-0.5 rounded text-[7px]">{getClaimStatus('instagram')}</span>
-                      </button>
+                      {SOCIAL_LINKS.map((platform) => (
+                        <button 
+                          key={platform.id}
+                          onClick={() => handleSocialClickWithClaim(platform)} 
+                          className="flex items-center justify-between dark:bg-green-500/10 bg-green-50 p-2.5 rounded-xl border dark:border-green-500/20 border-green-200/50"
+                        >
+                          <span>{platform.label}</span>
+                          <span className="bg-yellow-400 text-black px-1.5 py-0.5 rounded text-[7px]">{getClaimStatus(platform.id)}</span>
+                        </button>
+                      ))}
                     </div>
                   </div>
 
@@ -2608,7 +2741,52 @@ export default function BbCafeHome() {
         )}
       </AnimatePresence>
 
-      {/* SOCIALS DIALOG MODAL */}
+      {/* VERIFIED SOCIAL POINTS CLAIM MODAL (Requirement 4) */}
+      <AnimatePresence>
+        {isClaimModalOpen && claimingPlatform && (
+          <div className="fixed inset-0 bg-black/95 z-[260] flex items-center justify-center p-6">
+            <motion.form 
+              onSubmit={handleClaimSubmit}
+              className="dark:bg-[#111] bg-white w-full max-w-sm p-6 rounded-3xl border dark:border-white/10 border-gray-200 text-center space-y-4 shadow-xl"
+            >
+              <div className="text-xl">{claimingPlatform.icon}</div>
+              <div className="space-y-1">
+                <h3 className="text-base font-black dark:text-orange-500 text-orange-700 uppercase">वेरिफिकेशन दावा सबमिट करें</h3>
+                <p className="text-[10px] text-gray-400 leading-normal font-semibold">
+                  {claimingPlatform.label} पर फॉलो/सब्सक्राइब करने के बाद, नीचे अपना यूज़रनेम दर्ज करें। हमारे एडमिन इसकी जांच करके आपका {claimingPlatform.points} पॉइंट क्रेडिट करेंगे!
+                </p>
+              </div>
+
+              <div className="space-y-1 text-left">
+                <label className="text-[9px] font-black uppercase text-gray-500">Your Profile Handle / Username</label>
+                <input 
+                  type="text" 
+                  placeholder="e.g. @yourname" 
+                  value={claimUsername} 
+                  onChange={(e) => setClaimUsername(e.target.value)} 
+                  required 
+                  className="w-full dark:bg-white/10 bg-gray-50 border dark:border-white/10 border-gray-200 p-3 rounded-xl text-xs font-bold dark:text-white text-neutral-900 outline-none text-center" 
+                />
+              </div>
+
+              <div className="flex gap-2">
+                <button type="submit" disabled={isClaimingLoading} className="flex-1 bg-yellow-400 text-black font-black p-3 rounded-xl text-xs uppercase flex items-center justify-center gap-1">
+                  {isClaimingLoading ? <Loader2 className="animate-spin" size={14} /> : <span>Claim Reward Request ➔</span>}
+                </button>
+                <button 
+                  type="button" 
+                  onClick={() => { triggerHaptic(); setIsClaimModalOpen(false); setClaimUsername(""); }} 
+                  className="bg-white/5 text-gray-400 font-bold p-3 rounded-xl text-xs uppercase"
+                >
+                  Cancel
+                </button>
+              </div>
+            </motion.form>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* SOCIALS DIALOG MODAL (Synchronized - Requirement 4) */}
       <AnimatePresence>
         {isSocialsOpen && (
           <div className="fixed inset-0 bg-black/95 z-[250] flex items-center justify-center p-6">
@@ -2618,30 +2796,16 @@ export default function BbCafeHome() {
                 <p className="text-[8px] text-gray-500 font-bold uppercase tracking-wider">हर प्लेटफार्म पर फॉलो/सब्सक्राइब करने का +1 पॉइंट पाएं!</p>
               </div>
               <div className="space-y-2 text-left max-h-[22rem] overflow-y-auto no-scrollbar pr-1">
-                <button onClick={() => handleSocialClick('whatsapp_msg', `https://wa.me/${whatsappNumber}`)} className="w-full flex items-center justify-between dark:bg-green-500/10 bg-green-50/50 border dark:border-green-500/20 border-green-200/50 p-3 rounded-xl">
-                  <span className="text-[10px] font-black dark:text-white text-neutral-900">🟢 WhatsApp Message</span>
-                  <span className="text-[8px] font-black uppercase px-2.5 py-1 rounded bg-yellow-400 text-black">{getClaimStatus('whatsapp_msg')}</span>
-                </button>
-                <button onClick={() => handleSocialClick('whatsapp_channel', 'https://whatsapp.com/channel/0029VaLhggoGE56natoQI43y')} className="w-full flex items-center justify-between dark:bg-emerald-500/10 bg-green-50/50 border dark:border-emerald-500/20 border-green-200/50 p-3 rounded-xl">
-                  <span className="text-[10px] font-black dark:text-white text-neutral-900">📢 WhatsApp Channel</span>
-                  <span className="text-[8px] font-black uppercase px-2.5 py-1 rounded bg-yellow-400 text-black">{getClaimStatus('whatsapp_channel')}</span>
-                </button>
-                <button onClick={() => handleSocialClick('youtube', 'https://www.youtube.com/@bbcafe.i')} className="w-full flex items-center justify-between dark:bg-red-600/10 bg-green-50/50 border dark:border-red-600/20 border-green-200/50 p-3 rounded-xl">
-                  <span className="text-[10px] font-black dark:text-white text-neutral-900">🔴 YouTube Channel</span>
-                  <span className="text-[8px] font-black uppercase px-2.5 py-1 rounded bg-yellow-400 text-black">{getClaimStatus('youtube')}</span>
-                </button>
-                <button onClick={() => handleSocialClick('instagram', 'https://www.instagram.com/bbcafe.in/')} className="w-full flex items-center justify-between dark:bg-pink-500/10 bg-green-50/50 border dark:border-pink-500/20 border-green-200/50 p-3 rounded-xl">
-                  <span className="text-[10px] font-black dark:text-white text-neutral-900">📸 Instagram</span>
-                  <span className="text-[8px] font-black uppercase px-2.5 py-1 rounded bg-yellow-400 text-black">{getClaimStatus('instagram')}</span>
-                </button>
-                <button onClick={() => handleSocialClick('facebook', 'https://www.facebook.com/bbcafe.in/')} className="w-full flex items-center justify-between dark:bg-blue-600/10 bg-green-50/50 border dark:border-blue-600/20 border-green-200/50 p-3 rounded-xl">
-                  <span className="text-[10px] font-black dark:text-white text-neutral-900">🔵 Facebook</span>
-                  <span className="text-[8px] font-black uppercase px-2.5 py-1 rounded bg-yellow-400 text-black">{getClaimStatus('facebook')}</span>
-                </button>
-                <button onClick={() => handleSocialClick('snapchat', 'https://www.snapchat.com/add/bbcafe.in')} className="w-full flex items-center justify-between dark:bg-yellow-400/10 bg-green-50/50 border dark:border-yellow-400/20 border-yellow-400/30 p-3 rounded-xl">
-                  <span className="text-[10px] font-black dark:text-white text-neutral-900">🟡 Snapchat</span>
-                  <span className="text-[8px] font-black uppercase px-2.5 py-1 rounded bg-yellow-400 text-black">{getClaimStatus('snapchat')}</span>
-                </button>
+                {SOCIAL_LINKS.map((platform) => (
+                  <button 
+                    key={platform.id}
+                    onClick={() => handleSocialClickWithClaim(platform)} 
+                    className="w-full flex items-center justify-between dark:bg-green-500/10 bg-green-50/50 border dark:border-green-500/20 border-green-200/50 p-3 rounded-xl"
+                  >
+                    <span className="text-[10px] font-black dark:text-white text-neutral-900">{platform.label}</span>
+                    <span className="text-[8px] font-black uppercase px-2.5 py-1 rounded bg-yellow-400 text-black">{getClaimStatus(platform.id)}</span>
+                  </button>
+                ))}
               </div>
               <button type="button" onClick={() => { triggerHaptic(); setIsSocialsOpen(false); }} className="w-full bg-orange-500 text-black font-black p-3 rounded-xl text-xs uppercase">CLOSE</button>
             </motion.div>
@@ -2649,7 +2813,7 @@ export default function BbCafeHome() {
         )}
       </AnimatePresence>
 
-      {/* DIGITAL GREEN INVOICE (Web Share API sharing included) */}
+      {/* DIGITAL GREEN INVOICE */}
       <AnimatePresence>
         {showInvoice && lastPlacedOrder && (
           <div className="fixed inset-0 bg-black/95 z-[240] flex items-center justify-center p-6">
@@ -2699,7 +2863,7 @@ export default function BbCafeHome() {
                 <button 
                   onClick={handleShareInvoice} 
                   type="button" 
-                  className="bg-green-600 text-white py-2.5 rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 shadow animate-none"
+                  className="bg-green-600 text-white py-2.5 rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 shadow"
                 >
                   <Share2 size={12}/>
                   <span>Share Receipt (शेयर रसीद)</span>
