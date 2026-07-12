@@ -5,6 +5,7 @@ export const metadata: Metadata = {
   metadataBase: new URL("https://bb-cafe-app.vercel.app"),
   title: "Bum Bum Cafe | Premium Ordering",
   description: "Luxury Dining Experience at bbcafe.in",
+  manifest: "/manifest.json", // === 1. IS LINE KO METADATA ME WAPAS JOD DIYA HAI ===
   openGraph: {
     title: "Bum Bum Cafe | Premium Ordering",
     description: "Luxury Dining Experience at bbcafe.in",
@@ -23,6 +24,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
+        {/* === 2. HEAD KE ANDAR SE MANUALLY LINK TAG KO DELETE HI RAKHA HAI === */}
         <meta name="theme-color" content="#ff5e00" />
       </head>
       <body>{children}</body>
