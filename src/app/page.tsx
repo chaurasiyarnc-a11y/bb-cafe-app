@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { db } from '../lib/firebase'; 
 import { collection, onSnapshot, query, addDoc, doc, setDoc, increment, runTransaction, getDoc, getDocs, where, limit, orderBy } from 'firebase/firestore';
-import { ShoppingBag, Plus, Search, X, MapPin, Phone, User, Sparkles, Star, Percent, Gift, Loader2, Share2, Heart, Clock, ChevronRight, WifiOff, History, LogOut, Lock, Video, Award, Check, Play } from 'lucide-react';
+import { ShoppingBag, Plus, Search, X, MapPin, Phone, User, Sparkles, Star, Percent, Gift, Loader2, Share2, Heart, Clock, ChevronRight, WifiOff, History, LogOut, Lock, Video, Award, Check, Play, Navigation } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
 import { useCartStore } from '../store/useCartStore';
@@ -203,6 +203,9 @@ export default function BbCafeHome() {
   const [showInstallBanner, setShowInstallBanner] = useState(false);
   const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
 
+  // UI States (Requirement: Greet timer disappearing UX)
+  const [showGreeting, setShowGreeting] = useState(true);
+
   // --- HELPERS & CALCULATION FUNCTIONS ---
 
   const triggerHaptic = (ms = 35) => {
@@ -228,9 +231,9 @@ export default function BbCafeHome() {
         osc.frequency.setValueAtTime(523.25, audioCtx.currentTime); 
         gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
         osc.start();
-        osc.frequency.setValueAtTime(659.25, audioCtx.currentTime + 0.1);
-        osc.frequency.setValueAtTime(783.99, audioCtx.currentTime + 0.2);
-        osc.stop(audioCtx.currentTime + 0.4);
+        osc.frequency.setValueAtTime(659.25, audioCtx.currentTime + 0.15);
+        osc.frequency.setValueAtTime(880, audioCtx.currentTime + 0.3);
+        osc.stop(audioCtx.currentTime + 0.5);
       }
     } catch (e) {}
   };
@@ -361,7 +364,7 @@ export default function BbCafeHome() {
       return { bg: "from-pink-500 to-purple-800", accent: "text-white", name: "होली रंगोत्सव स्पेशल 🎨" };
     }
     if (month === 8) {
-      return { bg: "from-rose-600 to-amber-800", accent: "text-yellow-200", name: "रक्षाबंधन विशेष स्नेह 💖" };
+      return { bg: "from-rose-600 to-amber-800", accent: "text-yellow-250", name: "रक्षाबंधन विशेष स्नेह 💖" };
     }
     return { bg: "from-[#ff5e00] to-[#b33600]", accent: "text-yellow-300", name: "BUM BUM CAFE - Mohandra" };
   }, []);
@@ -534,6 +537,16 @@ export default function BbCafeHome() {
     return () => unsubUserPoints();
   }, [customerDetails]);
 
+  // UX 1: Past Order History Loader
+  useEffect(() => {
+    const savedOrders = localStorage.getItem('bb_past_orders');
+    if (savedOrders) {
+      try {
+        setPastOrders(JSON.parse(savedOrders));
+      } catch (e) {}
+    }
+  }, []);
+
   // Auto-Sliding Promo Banner (Requirement 4)
   useEffect(() => {
     if (banners.length <= 1) return;
@@ -627,6 +640,27 @@ export default function BbCafeHome() {
       unsubReviews(); 
       unsubRules(); 
     };
+  }, []);
+
+  // Dine-In QR Auto-detection & table allocation (Requirement 3)
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const tableNum = params.get('table');
+      if (tableNum) {
+        setAddress(`Dine-In: Table Number ${tableNum} 🍽️`);
+        setSelectedArea({ name: "Dine-In (Table)", fee: 0, minFree: 0, range: "Inside Cafe" }); // Dine-in delivery is free!
+        toast.success(`🍽️ Welcome to Table ${tableNum}! Direct table self-ordering is now active.`);
+      }
+    }
+  }, []);
+
+  // Greeting disappears after 6 seconds (Requirement: Greet timer disappearing UX)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setShowGreeting(false);
+    }, 6000);
+    return () => clearTimeout(timer);
   }, []);
 
   const handleInstallClick = async () => {
@@ -1191,7 +1225,7 @@ export default function BbCafeHome() {
     });
 
     playSoundEffect('add');
-    toast.success("आपका कस्टमाइज़्ड पिज्जा कार्ट में जोड़ा गया! 🍕");
+    toast.success("आपका कस्टमाइज़्ड पिज्जा कर्ट में जोड़ा गया! 🍕");
 
     setDiyVegSelection({ onion: false, tomato: false, capsicum: false, corn: false });
     setDiyPremiumToppings({ black_olive: false, jalapeno: false, red_peprica: false, paneer: false, mushroom: false });
@@ -1277,20 +1311,6 @@ export default function BbCafeHome() {
     return localStorage.getItem(storageKey) ? "✅ Claimed" : "🎁 Claim +1 Pt";
   };
 
-  // Requirement 2: Auto-play next story/reel and automatic exit on finish
-  const handleReelEnded = () => {
-    triggerHaptic(20);
-    const currentIndex = stories.findIndex(s => s.id === activeStory.id);
-    if (currentIndex !== -1 && currentIndex < stories.length - 1) {
-      // Switch seamlessly to the next loaded reel
-      setActiveStory(stories[currentIndex + 1]);
-    } else {
-      // We finished the last reel; close full-screen modal automatically
-      setActiveStory(null);
-      toast.success("सभी रील्स समाप्त हो गईं! 😊");
-    }
-  };
-
   if (!mounted) return null;
 
   return (
@@ -1325,7 +1345,7 @@ export default function BbCafeHome() {
         </div>
       )}
 
-      {/* Social Proof Toast Alert (Slower & Natural Order Alerts - Requirement 3) */}
+      {/* Social Proof Toast Alert (Requirement 3 - Natural loop) */}
       <AnimatePresence>
         {showSocialAlert && socialProofs.length > 0 && (
           <motion.div 
@@ -1366,21 +1386,21 @@ export default function BbCafeHome() {
         </div>
       )}
 
-      {/* FLOATING ACTION SIDEBAR (Requirement 5) */}
-      <div className="fixed right-3 top-1/3 z-50 flex flex-col gap-2.5">
+      {/* FLOATING ACTION SIDEBAR - MINI STICKY TABS (Requirement 3 - visible labels & smaller font size) */}
+      <div className="fixed right-0 top-1/3 z-50 flex flex-col gap-2.5 items-end">
         <button 
           onClick={() => { triggerHaptic(); setIsReviewFormOpen(true); }}
-          className="w-10 h-10 bg-emerald-600 hover:bg-emerald-700 text-white rounded-full shadow-lg border border-white/10 flex items-center justify-center transition-transform active:scale-90"
-          title="Review"
+          className="pl-3 pr-2 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-l-xl shadow-lg border-l border-y border-white/10 flex items-center gap-1.5 transition-transform active:scale-95"
         >
-          <Star size={16} className="fill-white" />
+          <Star size={11} className="fill-white" />
+          <span className="text-[9px] font-black tracking-wide uppercase">Review</span>
         </button>
         <button 
           onClick={() => { triggerHaptic(); setIsSocialsOpen(true); }}
-          className="w-10 h-10 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg border border-white/10 flex items-center justify-center transition-transform active:scale-90"
-          title="Social Rewards"
+          className="pl-3 pr-2 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-l-xl shadow-lg border-l border-y border-white/10 flex items-center gap-1.5 transition-transform active:scale-95"
         >
-          <Sparkles size={16} />
+          <Sparkles size={11} />
+          <span className="text-[9px] font-black tracking-wide uppercase">Socials</span>
         </button>
       </div>
 
@@ -1412,7 +1432,7 @@ export default function BbCafeHome() {
               Bum Bum Cafe
             </span>
             <h2 className="text-xs font-black text-white leading-none">Delicious Food • Delivered Fast</h2>
-            <p className="text-[7px] text-gray-300 font-bold">Order Pizza, Special Thali & Paneer Delights instantly!</p>
+            <p className="text-[7px] text-gray-300 font-bold">Order Pizza, Special Sandwich & Paneer Delights instantly!</p>
           </motion.div>
           <button 
             onClick={scrollToMenu}
@@ -1423,14 +1443,14 @@ export default function BbCafeHome() {
         </div>
       </header>
 
-      {/* FIXED STICKY SEARCH BAR */}
+      {/* FIXED STICKY SEARCH BAR (Requirement: placeholder changed from Thali to Sandwich) */}
       <div className="sticky top-0 z-40 dark:bg-[#050505]/95 bg-gray-50/95 backdrop-blur-md py-3 px-4 border-b dark:border-white/5 border-gray-200 transition-colors duration-200 shadow-sm">
         <div className="relative max-w-sm mx-auto flex items-center gap-2">
           <div className="relative flex-1">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
             <input 
               type="text" 
-              placeholder="Search pizza, thali, paneer special..." 
+              placeholder="Search pizza, sandwich, paneer special..." 
               value={searchQuery} 
               onChange={(e) => setSearchQuery(e.target.value)} 
               className="w-full dark:bg-neutral-800 bg-gray-100 dark:text-white text-neutral-900 py-2.5 px-11 rounded-xl outline-none text-xs font-semibold dark:placeholder-gray-400 placeholder-gray-500 border dark:border-neutral-700 border-gray-200 transition-colors duration-200" 
@@ -1465,10 +1485,19 @@ export default function BbCafeHome() {
       {/* MAIN LAYOUT WRAPPER */}
       <main ref={menuRef} className="pt-3 px-3 max-w-lg mx-auto space-y-4">
 
-        {/* REQUIREMENT 2: Greeting message search bar ke just neeche ho */}
-        <div className="px-1.5 py-1">
-          <h3 className="text-xs font-black dark:text-gray-200 text-neutral-900 leading-normal">{greetingText}</h3>
-        </div>
+        {/* REQUIREMENT 2: Greeting message search bar ke just neeche ho (fades away after 6 seconds) */}
+        <AnimatePresence>
+          {showGreeting && (
+            <motion.div 
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              className="px-1.5 py-1 overflow-hidden"
+            >
+              <h3 className="text-xs font-black dark:text-gray-200 text-neutral-900 leading-normal">{greetingText}</h3>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* REQUIREMENT 1: App install banner dismisses smoothly and persistently */}
         {showInstallBanner && (
@@ -1930,14 +1959,14 @@ export default function BbCafeHome() {
           <div className="grid grid-cols-2 gap-3 text-center text-[10px] font-black uppercase">
             <div className="dark:bg-white/[0.02] bg-white border dark:border-white/5 border-gray-200 p-4 rounded-2xl flex flex-col items-center justify-center space-y-1 shadow-md shadow-gray-200/30 dark:shadow-none transition-colors duration-200">
               <Clock className="text-orange-500" size={16} />
-              <p className="dark:text-gray-450 text-gray-500 text-[8px]">Open Timing</p>
+              <p className="dark:text-gray-400 text-gray-500 text-[8px]">Open Timing</p>
               <p className="dark:text-white text-neutral-800 text-[9px]">सुबह 10:00 से रात 11:00 बजे</p>
             </div>
             
             <a href="https://maps.app.goo.gl/8pj1Xby3bbMn5qxu5" target="_blank" rel="noreferrer" className="dark:bg-white/[0.02] bg-white border dark:border-white/5 border-gray-200 p-4 rounded-2xl flex flex-col items-center justify-center space-y-1 hover:border-orange-500/30 shadow-md shadow-gray-200/30 dark:shadow-none transition-all duration-200">
               <MapPin className="text-green-500 animate-bounce" size={16} />
-              <p className="dark:text-gray-450 text-gray-500 text-[8px]">Our Location</p>
-              <p className="text-yellow-650 dark:text-yellow-400 text-[9px] underline">Google Map 🗺️</p>
+              <p className="dark:text-gray-400 text-gray-500 text-[8px]">Our Location</p>
+              <p className="text-yellow-600 dark:text-yellow-400 text-[9px] underline">Google Map 🗺️</p>
             </a>
           </div>
 
@@ -1946,6 +1975,56 @@ export default function BbCafeHome() {
           </div>
         </footer>
       </main>
+
+      {/* REQUIREMENT: LIVE ORDER REAL-TIME TRACKING FOOTER PANEL */}
+      <AnimatePresence>
+        {liveOrder && (
+          <motion.div 
+            initial={{ y: 100, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 100, opacity: 0 }}
+            className="fixed bottom-24 inset-x-4 z-50 max-w-sm mx-auto bg-neutral-950/95 backdrop-blur-md border border-orange-500/30 p-4 rounded-3xl shadow-2xl flex flex-col gap-2 text-xs font-bold font-sans"
+          >
+            <div className="flex justify-between items-center">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-orange-500 animate-pulse" />
+                <span className="text-gray-200">आर्डर लाइव ट्रैकिंग (Bill #{formatBillNumber(liveOrder.billNumber)})</span>
+              </div>
+              <span className="bg-orange-500/10 text-orange-400 px-2 py-0.5 rounded-md text-[9px] uppercase font-black font-mono">
+                Token: #{liveOrder.tokenNumber}
+              </span>
+            </div>
+
+            {/* Progress Bar indicating live state in kitchen */}
+            <div className="space-y-1 mt-1">
+              <div className="flex justify-between text-[8px] text-gray-400 uppercase">
+                <span className={liveOrder.status === 'pending' ? 'text-orange-400 font-extrabold' : ''}>Confirming ⏳</span>
+                <span className={liveOrder.status === 'preparing' ? 'text-yellow-400 font-extrabold' : ''}>Preparing 👨‍🍳</span>
+                <span className={liveOrder.status === 'out_for_delivery' ? 'text-blue-400 font-extrabold' : ''}>On the Way 🛵</span>
+              </div>
+              <div className="w-full bg-white/5 h-1.5 rounded-full overflow-hidden relative">
+                <div 
+                  className="bg-gradient-to-r from-orange-500 to-yellow-400 h-full transition-all duration-500" 
+                  style={{ 
+                    width: liveOrder.status === 'pending' ? '25%' : liveOrder.status === 'preparing' ? '65%' : '90%' 
+                  }} 
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-2 pt-1 border-t border-white/5">
+              <a 
+                href={`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(`नमस्ते बम बम कैफ़े! कृपया मेरे आर्डर नंबर #${formatBillNumber(liveOrder.billNumber)} (टोकन नंबर: #${liveOrder.tokenNumber}) का लाइव स्टेटस बताएं।`)}`}
+                target="_blank"
+                rel="noreferrer"
+                className="flex-1 bg-white/5 hover:bg-white/10 text-center text-[10px] text-yellow-400 py-1.5 rounded-xl border border-white/5 transition-all"
+              >
+                Track Live Status (WA) 🔍
+              </a>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* FULL SCREEN REELS VIEWER (Autoplays seamlessly and exits on finish - Requirement 2) */}
       <AnimatePresence>
@@ -2115,7 +2194,7 @@ export default function BbCafeHome() {
                           type="button"
                           key={addon}
                           onClick={() => setNormalPizzaAddons(prev => ({ ...prev, [addon]: !prev[addon] }))}
-                          className={`p-2.5 rounded-xl border flex justify-between items-center text-[9px] font-bold ${isSelected ? 'border-orange-500 bg-orange-500/5 text-orange-400' : 'dark:border-white/5 border-gray-200 dark:bg-white/[0.02] bg-gray-50 dark:text-gray-300 text-neutral-800'}`}
+                          className={`p-2.5 rounded-xl border flex justify-between items-center text-[9px] font-bold ${isSelected ? 'border-orange-500 bg-orange-500/5 text-orange-400' : 'dark:border-white/5 border-gray-200 dark:bg-white/[0.02] bg-gray-50 dark:text-gray-300 text-neutral-850'}`}
                         >
                           <span>{addon}</span>
                           <span className="text-orange-400 font-black">+₹{cost}</span>
@@ -2604,7 +2683,7 @@ export default function BbCafeHome() {
               <Gift className="mx-auto text-yellow-400" size={32} />
               <div>
                 <h3 className="text-lg font-black text-yellow-400 uppercase italic">Gift Loyalty Points</h3>
-                <p className="text-[9px] text-gray-500 font-semibold mt-0.5">अपने पॉइंट्स किसी दोस्त को गिफ्ट करें</p>
+                <p className="text-[9px] text-gray-505 font-semibold mt-0.5">अपने पॉइंट्स किसी दोस्त को गिफ्ट करें</p>
               </div>
               <div className="space-y-3 text-left">
                 <div className="space-y-1">
