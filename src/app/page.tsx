@@ -661,6 +661,21 @@ const handleAddDiyPizzaToCart = () => {
     setFavorites(updated);
     localStorage.setItem('bb_favorites', JSON.stringify(updated));
   };
+  // Quick add from story/reel helper function (Requirement Fix)
+  const handleQuickAddFromStory = (productName: string, price: number) => {
+    triggerHaptic();
+    const matchedItem = menu.find(item => item.name.toLowerCase().includes(productName.toLowerCase()));
+    if (matchedItem) {
+      addItem(matchedItem);
+      playSoundEffect('add');
+      toast.success(`${matchedItem.name} added to cart!`);
+    } else {
+      addItem({ id: `st-prod-${Date.now()}`, name: productName, price: price });
+      playSoundEffect('add');
+      toast.success(`${productName} added to cart!`);
+    }
+    setActiveStory(null);
+  };
   const handleDetectLocation = () => {
     triggerHaptic();
     if (!navigator.geolocation) {
