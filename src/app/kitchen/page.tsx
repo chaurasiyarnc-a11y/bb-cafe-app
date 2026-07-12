@@ -1,13 +1,17 @@
 'use client';
 import React, { useState, useEffect, useRef } from 'react';
-import { db } from '../../lib/firebase';
-import { collection, onSnapshot, query, where, doc, updateDoc, orderBy } from 'firebase/firestore';
-import { Clock, Check, Loader2, Play, AlertCircle, WifiOff } from 'lucide-react';
+import { db } from '../lib/firebase';
+import { collection, onSnapshot, query, doc, updateDoc, orderBy, getDoc } from 'firebase/firestore';
+import { Clock, Check, Loader2, Play, Lock, AlertCircle, WifiOff, X } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 
 export default function KitchenDisplaySystem() {
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isLocked, setIsLocked] = useState(true);
+  const [pinInput, setPinInput] = useState("");
+  const [passcodes, setPasscodes] = useState({ adminPin: "971429", managerPin: "123456" });
+  
   const prevOrdersCountRef = useRef<number | null>(null);
 
   // Play Sound alert for kitchen when new order arrives
@@ -19,32 +23,62 @@ export default function KitchenDisplaySystem() {
       osc.connect(gain);
       gain.connect(audioCtx.destination);
       
-      osc.frequency.setValueAtTime(587.33, audioCtx.currentTime); // D5 note
+      osc.frequency.setValueAtTime(587.33, audioCtx.currentTime); 
       gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
       osc.start();
-      osc.frequency.setValueAtTime(659.25, audioCtx.currentTime + 0.15); // E5 note
-      osc.frequency.setValueAtTime(880, audioCtx.currentTime + 0.3); // A5 note
+      osc.frequency.setValueAtTime(659.25, audioCtx.currentTime + 0.15); 
+      osc.frequency.setValueAtTime(880, audioCtx.currentTime + 0.3); 
       osc.stop(audioCtx.currentTime + 0.5);
     } catch (e) {}
   };
 
+  // Check login session & Fetch passcodes
   useEffect(() => {
-    const qKitchen = query(
+    const isVerifiedSession = localStorage.getItem('bb_kds_verified') === 'true';
+    if (isVerifiedSession) {
+      setIsLocked(false);
+    }
+
+    const fetchPins = async () => {
+      try {
+        const d = await getDoc(doc(db, "settings", "passcodes"));
+        if (d.exists()) {
+          setPasscodes({
+            adminPin: d.data().adminPin || "971429",
+            managerPin: d.data().managerPin || "123456"
+          });
+        }
+      } catch (err) {
+        console.error("Failed to load passcodes", err);
+      }
+    };
+    fetchPins();
+  }, []);
+
+  // Real-time simple query with Client-side filtering (Requires ZERO composite indexes!)
+  useEffect(() => {
+    if (isLocked) return;
+
+    const qSimple = query(
       collection(db, "orders"),
-      where("status", "in", ["pending", "preparing", "out_for_delivery"]),
       orderBy("timestamp", "asc")
     );
 
-    const unsub = onSnapshot(qKitchen, (snap) => {
-      const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const unsub = onSnapshot(qSimple, (snap) => {
+      const allOrders = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       
-      // Sound alert if a new order arrives
-      if (prevOrdersCountRef.current !== null && list.length > prevOrdersCountRef.current) {
+      // Client-side filtering to bypass Firebase composite index requirements (Feature 1 fix)
+      const kitchenOrders = allOrders.filter((o: any) => 
+        ["pending", "preparing", "out_for_delivery"].includes(o.status)
+      );
+      
+      // Sound alert logic
+      if (prevOrdersCountRef.current !== null && kitchenOrders.length > prevOrdersCountRef.current) {
         playAlertSound();
         toast.success("🚨 रसोई घर: नया आर्डर आया है!");
       }
-      prevOrdersCountRef.current = list.length;
-      setOrders(list);
+      prevOrdersCountRef.current = kitchenOrders.length;
+      setOrders(kitchenOrders);
       setLoading(false);
     }, (err) => {
       console.error(err);
@@ -52,7 +86,19 @@ export default function KitchenDisplaySystem() {
     });
 
     return () => unsub();
-  }, []);
+  }, [isLocked]);
+
+  const handlePinSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (pinInput === passcodes.adminPin || pinInput === passcodes.managerPin) {
+      localStorage.setItem('bb_kds_verified', 'true');
+      setIsLocked(false);
+      toast.success("KDS Terminal Unlocked! 👨‍🍳");
+    } else {
+      toast.error("Incorrect PIN! Access Denied.");
+      setPinInput("");
+    }
+  };
 
   const handleUpdateStatus = async (orderId: string, currentStatus: string) => {
     const nextStatusMap: { [key: string]: string } = {
@@ -71,6 +117,42 @@ export default function KitchenDisplaySystem() {
     }
   };
 
+  // --- SECURITY LOCK SCREEN ---
+  if (isLocked) {
+    return (
+      <div className="bg-[#050505] min-h-screen text-white flex items-center justify-center p-4">
+        <Toaster />
+        <div className="w-full max-w-sm bg-white/[0.02] border border-white/5 p-8 rounded-[2.5rem] space-y-6 shadow-2xl text-center relative overflow-hidden">
+          <div className="inline-flex p-4 bg-orange-500/10 rounded-full text-orange-500 mb-2">
+            <Lock size={28} />
+          </div>
+          <div>
+            <h2 className="text-xl font-black text-orange-500 uppercase italic">KDS Locked 🔒</h2>
+            <p className="text-[10px] text-gray-500 font-bold tracking-widest uppercase mt-1">Kitchen Display System</p>
+          </div>
+
+          <form onSubmit={handlePinSubmit} className="space-y-4">
+            <input 
+              type="password" 
+              maxLength={6}
+              placeholder="Enter Staff/Manager PIN" 
+              value={pinInput} 
+              onChange={(e) => setPinInput(e.target.value)} 
+              className="w-full bg-black/60 border border-white/10 rounded-2xl p-4 text-center outline-none focus:border-orange-500 text-sm font-bold text-white tracking-widest"
+              required 
+            />
+            <button 
+              type="submit" 
+              className="w-full bg-orange-500 hover:bg-orange-600 text-white p-4 rounded-2xl font-black text-xs uppercase tracking-wider transition-all"
+            >
+              Unlock Terminal
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
   if (loading) {
     return (
       <div className="bg-[#050505] min-h-screen text-white flex flex-col items-center justify-center">
@@ -88,8 +170,20 @@ export default function KitchenDisplaySystem() {
           <h1 className="text-2xl font-black text-orange-500 italic uppercase">Bum Bum Cafe - KDS</h1>
           <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Kitchen Order Screen • Real-time Cooking</p>
         </div>
-        <div className="bg-orange-500/10 text-orange-500 font-black px-4 py-2 rounded-full text-xs border border-orange-500/20">
-          🔥 Cooking Orders: {orders.length}
+        <div className="flex items-center gap-3">
+          <div className="bg-orange-500/10 text-orange-500 font-black px-4 py-2 rounded-full text-xs border border-orange-500/20">
+            🔥 Cooking Orders: {orders.length}
+          </div>
+          <button 
+            onClick={() => {
+              localStorage.removeItem('bb_kds_verified');
+              setIsLocked(true);
+            }} 
+            className="p-2.5 bg-white/5 rounded-full text-gray-400 active:scale-90 transition-all"
+            title="Lock Terminal"
+          >
+            <Lock size={16} />
+          </button>
         </div>
       </header>
 
