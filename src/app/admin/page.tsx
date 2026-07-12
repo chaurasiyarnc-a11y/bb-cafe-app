@@ -1,3 +1,5 @@
+
+
 'use client';
   
 import React, { useState, useEffect, useMemo, useRef } from 'react';
@@ -491,6 +493,13 @@ export default function AdminDashboard() {
       });
       setTransferLogs(logs);
     });
+
+    // Register Service Worker for Admin PWA
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js')
+        .then((reg) => console.log('Admin Service Worker Registered!', reg.scope))
+        .catch((err) => console.error('Admin Service Worker failed:', err));
+    }
 
     return () => {
       unsubOrders();
@@ -1613,6 +1622,8 @@ Report generated automatically by Bum Bum Cafe POS.`
   if (!isVerified) {
     return (
       <div className="bg-[#050505] min-h-screen text-white flex items-center justify-center p-4 font-sans">
+        {/* Linked dedicated Admin manifest */}
+        <link rel="manifest" href="/admin-manifest.json" />
         <Toaster />
         <div className="w-full max-w-md bg-white/[0.02] border border-white/5 p-8 rounded-[2.5rem] space-y-6 shadow-2xl relative overflow-hidden">
           <div className="absolute -top-10 -left-10 w-32 h-32 bg-orange-500/10 blur-3xl rounded-full"></div>
@@ -1652,6 +1663,8 @@ Report generated automatically by Bum Bum Cafe POS.`
 
   return (
     <div className="bg-[#050505] min-h-screen text-white pb-20 font-sans">
+      {/* Linked dedicated Admin manifest */}
+      <link rel="manifest" href="/admin-manifest.json" />
       <Toaster />
       
       {/* Header */}
@@ -1798,7 +1811,7 @@ Report generated automatically by Bum Bum Cafe POS.`
             <div className="space-y-4 font-mono">
               <h4 className="text-sm font-black text-gray-400 uppercase tracking-widest pt-2">📚 Permanent Financial Ledger</h4>
               {orders.length === 0 ? (
-                <p className="text-center text-gray-600 py-12 text-xs uppercase font-bold tracking-widest">No transaction data logged...</p>
+                <p className="text-center text-gray-655 py-12 text-xs uppercase font-bold tracking-widest">No transaction data logged...</p>
               ) : (
                 orders.map((o) => (
                   <div key={o.id} className="bg-[#111] border border-white/5 p-5 rounded-3xl flex justify-between items-center relative overflow-hidden text-xs">
@@ -2084,7 +2097,7 @@ Report generated automatically by Bum Bum Cafe POS.`
             </div>
 
             {editingCategory && (
-              <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[100] flex items-center justify-center p-4">
+              <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-[100] flex items-center justify-center p-4">
                 <form onSubmit={handleUpdateCategory} className="bg-[#111] border-2 border-orange-500 p-8 rounded-[2.5rem] w-full max-w-lg relative shadow-2xl space-y-4">
                   <button type="button" onClick={() => setEditingCategory(null)} className="absolute top-4 right-4 p-2.5 bg-white/5 text-gray-405 hover:text-white rounded-full"><X size={18}/></button>
                   <div className="text-center pb-2">
@@ -2139,7 +2152,7 @@ Report generated automatically by Bum Bum Cafe POS.`
             <div className="flex justify-between items-center flex-wrap gap-2">
               <h3 className="text-xl font-black text-orange-500 uppercase tracking-wider flex items-center gap-2"><User size={20}/> Customer Management</h3>
               <div className="flex gap-2">
-                <label className="bg-yellow-500 hover:bg-yellow-600 text-black font-black text-[10px] px-4 py-2.5 rounded-full flex items-center gap-1.5 uppercase cursor-pointer transition-all">
+                <label className="bg-yellow-505 hover:bg-yellow-600 text-black font-black text-[10px] px-4 py-2.5 rounded-full flex items-center gap-1.5 uppercase cursor-pointer transition-all">
                   Import CSV
                   <input type="file" accept=".csv" onChange={handleCsvImport} className="hidden" />
                 </label>
@@ -2177,7 +2190,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                 </div>
                 <div className="flex gap-2">
                   <button type="submit" className="flex-1 bg-green-600 text-white p-3 rounded-xl font-black text-xs uppercase">Save Changes</button>
-                  <button type="button" onClick={() => setEditingCustomer(null)} className="bg-white/5 text-gray-450 p-3 rounded-xl font-black text-xs uppercase">Cancel</button>
+                  <button type="button" onClick={() => setEditingCustomer(null)} className="bg-white/5 text-gray-455 p-3 rounded-xl font-black text-xs uppercase">Cancel</button>
                 </div>
               </form>
             )}
@@ -2240,7 +2253,7 @@ Report generated automatically by Bum Bum Cafe POS.`
               
               <div className="grid grid-cols-2 gap-3">
                 <input type="text" placeholder="Reward Name" value={newRuleName} onChange={(e) => setNewRuleName(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-xs font-black text-white" required />
-                <input type="number" placeholder="Points Needed" value={newRulePoints} onChange={(e) => setNewRulePoints(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-xs font-black text-white" required />
+                <input type="number" placeholder="Points Needed" value={newRulePoints} onChange={(e) => setNewRulePoints(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs font-black text-white" required />
               </div>
               <button type="submit" className="w-full bg-green-600 text-white p-4 rounded-xl font-black text-sm uppercase">Add Reward Rule</button>
             </form>
@@ -2248,7 +2261,7 @@ Report generated automatically by Bum Bum Cafe POS.`
             <div className="space-y-3">
               <p className="text-xs font-bold text-gray-505 uppercase tracking-widest pl-1">Active Customer Reward Rules ({loyaltyRules.length})</p>
               {loyaltyRules.length === 0 ? (
-                <p className="text-center text-xs font-bold text-gray-500 py-6">No custom rules configured yet...</p>
+                <p className="text-center text-xs font-bold text-gray-505 py-6">No custom rules configured yet...</p>
               ) : (
                 loyaltyRules.map(rule => (
                   <div key={rule.id} className="bg-white/[0.02] border border-white/5 p-5 rounded-3xl flex justify-between items-center hover:bg-white/[0.04]">
@@ -2281,7 +2294,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                       <span className="bg-orange-500/10 text-orange-500 font-black px-2.5 py-1 rounded-md text-[10px] inline-block">
                         {log.points} Pts 🎁
                       </span>
-                      <p className="text-[8px] text-gray-600 mt-1">
+                      <p className="text-[8px] text-gray-655 mt-1">
                         {log.timestamp?.toDate ? log.timestamp.toDate().toLocaleString() : "Just now"}
                       </p>
                     </div>
@@ -2425,7 +2438,7 @@ Report generated automatically by Bum Bum Cafe POS.`
         {tab === 'header_video' && (
           <div className="space-y-6">
             <h3 className="text-xl font-black text-orange-500 uppercase tracking-wider flex items-center gap-2">🎬 Main Background Header Video</h3>
-            <p className="text-[10px] text-gray-500 uppercase tracking-widest font-black leading-relaxed font-mono">यहाँ से आप मुख्य होमपेज के पीछे चलने वाले बैकग्राउंड वीडियो को बदल सकते हैं।</p>
+            <p className="text-[10px] text-gray-505 uppercase tracking-widest font-black leading-relaxed font-mono">यहाँ से आप मुख्य होमपेज के पीछे चलने वाले बैकग्राउंड वीडियो को बदल सकते हैं।</p>
 
             <form onSubmit={handleUpdateHeaderVideo} className="bg-white/[0.02] border border-white/5 p-6 rounded-[2.5rem] space-y-4">
               <div className="space-y-1">
@@ -2485,7 +2498,7 @@ Report generated automatically by Bum Bum Cafe POS.`
         {/* --- TAB 9: APPROVE & MANAGE REVIEWS --- */}
         {tab === 'reviews' && (
           <div className="space-y-4">
-            {reviews.length === 0 && <p className="text-center text-gray-600 py-16 font-bold uppercase tracking-widest">No reviews found...</p>}
+            {reviews.length === 0 && <p className="text-center text-gray-655 py-16 font-bold uppercase tracking-widest">No reviews found...</p>}
             {reviews.map(r => (
               <div key={r.id} className="bg-white/[0.02] border border-white/5 p-6 rounded-[2rem] space-y-3">
                 <div className="flex justify-between items-center">
@@ -2542,7 +2555,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                 <div className="bg-[#111] border border-white/5 p-5 rounded-3xl flex justify-between items-center">
                   <div>
                     <h4 className="font-black text-sm text-white uppercase">{rosterSelectedProduct.name} - SOP</h4>
-                    <p className="text-[9px] text-gray-505 font-bold uppercase mt-0.5">Steps: {rosterSelectedProduct.ingredients?.length || 0}</p>
+                    <p className="text-[9px] text-gray-555 font-bold uppercase mt-0.5">Steps: {rosterSelectedProduct.ingredients?.length || 0}</p>
                   </div>
                   <button 
                     onClick={() => handlePrintRosterSOP(rosterSelectedProduct)}
@@ -2561,7 +2574,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                     </div>
                     <div className="space-y-1">
                       <label className="text-[10px] font-bold text-gray-455 uppercase">Quantity / मात्रा</label>
-                      <input type="text" placeholder="e.g. 1 Piece / 30 grams" value={rosterStepQty} onChange={(e) => setRosterStepQty(e.target.value)} className="w-[#151515] border border-white/10 rounded-xl p-3 outline-none text-xs font-bold text-white" required />
+                      <input type="text" placeholder="e.g. 1 Piece / 30 grams" value={rosterStepQty} onChange={(e) => setRosterStepQty(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-xs font-bold text-white" required />
                     </div>
                   </div>
                   <div className="space-y-1">
@@ -2602,7 +2615,7 @@ Report generated automatically by Bum Bum Cafe POS.`
 
         {/* --- TAB 11: SOCIAL PROOF MANAGER (Requirement 3) --- */}
         {tab === 'proofs' && (
-          <div className="space-y-6 animate-fadeIn">
+          <div className="space-y-6">
             <form onSubmit={handleAddSocialProof} className="bg-white/[0.02] border border-white/5 p-6 rounded-[2.5rem] space-y-4">
               <h3 className="text-lg font-black text-orange-500 italic uppercase flex items-center gap-2">🔥 Create Social Proof Notification</h3>
               <p className="text-[10px] text-gray-400 font-semibold leading-relaxed">यहाँ से आप नीचे स्क्रॉल होने वाले आर्डर अलर्ट बदल सकते हैं।</p>
@@ -2634,15 +2647,15 @@ Report generated automatically by Bum Bum Cafe POS.`
 
         {/* --- TAB 12: SECURITY POINT CLAIMS MANAGER (Requirement 4) --- */}
         {tab === 'claims' && (
-          <div className="space-y-6 animate-fadeIn">
+          <div className="space-y-6">
             <div>
               <h3 className="text-xl font-black text-orange-500 uppercase tracking-wider flex items-center gap-2">📢 Points Claims Manager</h3>
-              <p className="text-[10px] text-gray-500 font-bold uppercase mt-1">वेरिफाई करें कि क्या यूज़र ने आपको वाकई सोशल मीडिया पर फॉलो किया है</p>
+              <p className="text-[10px] text-gray-505 font-bold uppercase mt-1">वेरिफाई करें कि क्या यूज़र ने आपको वाकई सोशल मीडिया पर फॉलो किया है</p>
             </div>
 
             <div className="space-y-3">
               {pointsClaims.length === 0 ? (
-                <p className="text-center text-xs font-bold text-gray-655 py-12 uppercase">कोई दावा अनुरोध नहीं मिला।</p>
+                <p className="text-center text-xs font-bold text-gray-505 py-12 uppercase">कोई दावा अनुरोध नहीं मिला।</p>
               ) : (
                 pointsClaims.map((claim) => (
                   <div key={claim.id} className="bg-neutral-900 border border-white/5 p-4 rounded-3xl space-y-3 text-xs">
@@ -2689,7 +2702,7 @@ Report generated automatically by Bum Bum Cafe POS.`
             <form onSubmit={handleUpdatePasscodes} className="bg-white/[0.02] border border-white/5 p-6 rounded-[2.5rem] space-y-5">
               <div>
                 <h4 className="text-sm font-black text-orange-500 uppercase">Change security PINs</h4>
-                <p className="text-[9px] text-gray-500 font-bold uppercase mt-1 leading-relaxed font-mono">केवल एडमिनिस्ट्रेटर ही दोनों रोल (Admin व Manager) के क्रेडेंशियल्स को बदल सकता है।</p>
+                <p className="text-[9px] text-gray-555 font-bold uppercase mt-1 leading-relaxed font-mono">केवल एडमिनिस्ट्रेटर ही दोनों रोल (Admin व Manager) के क्रेडेंशियल्स को बदल सकता है।</p>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -2734,7 +2747,7 @@ Report generated automatically by Bum Bum Cafe POS.`
             <div className="bg-[#111] border border-white/5 p-6 rounded-[2.5rem] space-y-4">
               <div>
                 <h4 className="text-sm font-black text-orange-500 uppercase tracking-widest flex items-center gap-1">🍽️ Dine-In Table QR Generator</h4>
-                <p className="text-[9px] text-gray-500 font-bold uppercase mt-1 leading-relaxed">Select a table number to generate a direct scan QR code for automatic table order routing:</p>
+                <p className="text-[9px] text-gray-555 font-bold uppercase mt-1 leading-relaxed">Select a table number to generate a direct scan QR code for automatic table order routing:</p>
               </div>
 
               <div className="flex gap-3 items-end">
@@ -2772,13 +2785,13 @@ Report generated automatically by Bum Bum Cafe POS.`
           <div className="bg-[#111] border border-white/5 p-6 rounded-[2.5rem] w-full max-w-lg relative max-h-[85vh] overflow-y-auto no-scrollbar shadow-2xl space-y-4">
             <button 
               onClick={() => setSelectedCustomerHistory(null)} 
-              className="absolute top-4 right-4 p-2 bg-white/5 text-gray-450 hover:text-white rounded-full transition-all"
+              className="absolute top-4 right-4 p-2 bg-white/5 text-gray-455 hover:text-white rounded-full transition-all"
             >
               <X size={18}/>
             </button>
             <div className="text-center pb-2 border-b border-white/5">
               <h3 className="text-lg font-black text-orange-500 uppercase">{selectedCustomerHistory.name} - Order History</h3>
-              <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mt-0.5">Mobile: +{selectedCustomerHistory.phone}</p>
+              <p className="text-[10px] text-gray-555 font-bold uppercase tracking-widest mt-0.5">Mobile: +{selectedCustomerHistory.phone}</p>
             </div>
 
             <div className="space-y-3">
@@ -2799,7 +2812,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                           </p>
                         ))}
                       </div>
-                      <span className="text-[8px] text-gray-600 block mt-2">
+                      <span className="text-[8px] text-gray-655 block mt-2">
                         {o.timestamp?.toDate ? o.timestamp.toDate().toLocaleString() : 'Just now'}
                       </span>
                     </div>
@@ -2857,7 +2870,7 @@ Report generated automatically by Bum Bum Cafe POS.`
           <div className="bg-[#111] border border-white/5 p-6 rounded-[2.5rem] w-full max-w-lg relative shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto no-scrollbar">
             <button 
               onClick={() => setShowBroadcastModal(false)} 
-              className="absolute top-4 right-4 p-2 bg-white/5 text-gray-450 hover:text-white rounded-full transition-all"
+              className="absolute top-4 right-4 p-2 bg-white/5 text-gray-455 hover:text-white rounded-full transition-all"
             >
               <X size={18}/>
             </button>
@@ -2888,7 +2901,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[9px] font-bold text-gray-500 uppercase">Min Points</label>
+                  <label className="text-[9px] font-bold text-gray-505 uppercase">Min Points</label>
                   <input 
                     type="number" 
                     placeholder="Min Points"
@@ -2899,7 +2912,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[9px] font-bold text-gray-500 uppercase">Min Spend (₹)</label>
+                  <label className="text-[9px] font-bold text-gray-505 uppercase">Min Spend (₹)</label>
                   <input 
                     type="number" 
                     placeholder="Min Spend"
@@ -2963,7 +2976,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                       <div key={user.phone} className={`flex justify-between items-center p-2 rounded-xl text-xs font-bold border transition-colors ${isAlreadySent ? 'bg-green-500/[0.02] border-green-500/10' : 'bg-white/[0.01] border-white/5'}`}>
                         <div className="flex flex-col">
                           <span className={`${isAlreadySent ? 'text-gray-500' : 'text-gray-350'}`}>{user.name} (+{user.phone})</span>
-                          <span className="text-[8px] text-gray-500 uppercase tracking-widest">{user.metrics.tier} • {user.points || 0} Pts</span>
+                          <span className="text-[8px] text-gray-505 uppercase tracking-widest">{user.metrics.tier} • {user.points || 0} Pts</span>
                         </div>
                         <div className="flex items-center gap-2">
                           {isAlreadySent ? (
@@ -2977,7 +2990,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                           )}
                           <button 
                             onClick={() => triggerWhatsAppBroadcast(user.phone)}
-                            className={`font-black text-[9px] px-3 py-1.5 rounded-lg flex items-center gap-1 uppercase transition-all ${isAlreadySent ? 'bg-white/5 text-gray-500' : 'bg-green-600 hover:bg-green-700 text-white'}`}
+                            className={`font-black text-[9px] px-3 py-1.5 rounded-lg flex items-center gap-1 uppercase transition-all ${isAlreadySent ? 'bg-white/5 text-gray-505' : 'bg-green-600 hover:bg-green-700 text-white'}`}
                           >
                             <MessageSquare size={10}/> Send
                           </button>
