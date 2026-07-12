@@ -676,6 +676,30 @@ const handleAddDiyPizzaToCart = () => {
     }
     setActiveStory(null);
   };
+  // Review submission helper function (Requirement Fix)
+  const handleReviewSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    triggerHaptic();
+    if (!reviewName.trim() || !reviewComment.trim()) {
+      return toast.error("कृपया सभी आवश्यक फ़ील्ड भरें!");
+    }
+    try {
+      await addDoc(collection(db, "reviews"), {
+        name: reviewName,
+        comment: reviewComment,
+        rating: reviewRating,
+        isApproved: false, 
+        timestamp: new Date()
+      });
+      toast.success("आपका रिव्यू सबमिट हो गया है! यह एडमिन अप्रूवल के बाद दिखेगा। ❤️");
+      setReviewName("");
+      setReviewComment("");
+      setReviewRating(5);
+      setIsReviewFormOpen(false);
+    } catch (err) {
+      toast.error("रिव्यू सबमिट करने में कोई समस्या आई।");
+    }
+  };
   const handleDetectLocation = () => {
     triggerHaptic();
     if (!navigator.geolocation) {
