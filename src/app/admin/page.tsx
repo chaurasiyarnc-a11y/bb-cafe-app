@@ -19,6 +19,13 @@ const SOCIAL_LINKS = [
   { id: 'snapchat', label: '👻 Snapchat', icon: '👻', points: 1, url: 'https://www.snapchat.com/add/bbcafe.in' }
 ];
 
+// Helper to determine if a URL points to a video (Requirement Fix)
+const isVideoUrl = (url: string) => {
+  if (!url) return false;
+  const cleanUrl = url.toLowerCase().split('?')[0];
+  return cleanUrl.endsWith('.mp4') || cleanUrl.endsWith('.webm') || cleanUrl.includes('/video') || cleanUrl.includes('video');
+};
+
 const handleStatusChange = async (order: any, newStatus: string) => {
   try {
     await updateDoc(doc(db, "orders", order.id), { status: newStatus });
@@ -98,7 +105,9 @@ const handlePrintReceipt = (order: any) => {
           <p style="margin: 3px 0; font-size: 11px;">Mohandra, Panna (M.P.)</p>
           <p style="margin: 3px 0; font-size: 11px;">Mobile: +91 9714293759</p>
         </div>
+        
         <div class="divider"></div>
+        
         <div style="font-size: 12px; line-height: 1.5;">
           <div><b>Bill No  :</b> #${formattedBillNo}</div>
           <div><b>Token No :</b> #${order.tokenNumber || 'N/A'}</div>
@@ -106,7 +115,9 @@ const handlePrintReceipt = (order: any) => {
           <div><b>Name     :</b> ${order.customerName || 'Guest'}</div>
           <div><b>Phone    :</b> ${order.customerPhone || 'N/A'}</div>
         </div>
+        
         <div class="divider"></div>
+        
         <table>
           <thead>
             <tr style="border-bottom: 1px dashed #000;">
@@ -119,7 +130,9 @@ const handlePrintReceipt = (order: any) => {
             ${itemsRows}
           </tbody>
         </table>
+        
         <div class="divider"></div>
+        
         <table style="font-size: 13px;">
           <tr>
             <td>Subtotal:</td>
@@ -136,15 +149,20 @@ const handlePrintReceipt = (order: any) => {
             <td style="text-align: right; padding-top: 5px; font-size: 16px;">₹${order.total}</td>
           </tr>
         </table>
+        
         <div class="qr-container">
           <p style="margin: 0; font-size: 11px; font-weight: bold;">Scan with PhonePe / UPI to Pay</p>
           <img class="qr-image" src="/phonepe-qr.png" alt="Payment QR" />
         </div>
+        
         <div class="divider"></div>
+        
         <p class="text-center" style="margin: 5px 0 0 0; font-size: 12px; font-weight: bold;">Thank You! Visit Again!</p>
+        
         <div class="text-center no-print" style="margin-top: 20px;">
           <button onclick="window.print()" style="padding: 10px 20px; font-weight: bold; background: #f97316; color: white; border: none; border-radius: 8px; cursor: pointer;">Print / Save as PDF</button>
         </div>
+
         <script>
           window.onload = function() {
             setTimeout(function() { window.print(); }, 300);
@@ -208,18 +226,23 @@ const handlePrintRosterSOP = (product: any) => {
           <div class="sub-title">STANDARD RECIPE: ${product.name}</div>
           <div class="category">Category Segment: ${product.category}</div>
         </div>
+
         <div style="font-size: 16px; font-weight: bold; margin-bottom: 25px; text-transform: uppercase; border-left: 6px solid #f97316; padding-left: 12px;">
           📝 Step-by-Step Cooking instructions & Raw Materials:
         </div>
+
         <div style="margin-top: 15px;">
           ${stepsHtml}
         </div>
+
         <div class="warning-box">
           ⚠️ रसोइया ध्यान दें: कैफ़े की गुणवत्ता बनाए रखने के लिए इस चार्ट के अनुसार ही सटीक मात्रा का उपयोग करें!
         </div>
+
         <div class="no-print" style="text-align: center; margin-top: 40px;">
           <button onclick="window.print()" style="padding: 14px 35px; font-size: 16px; font-weight: bold; background: #f97316; color: #fff; border: none; border-radius: 8px; cursor: pointer; text-transform: uppercase; letter-spacing: 1px;">Print Recipe Poster</button>
         </div>
+
         <script>
           window.onload = function() {
             setTimeout(function() { window.print(); }, 300);
@@ -1318,7 +1341,7 @@ Report generated automatically by Bum Bum Cafe POS.`
   };
 
   const handleResetTokenCounter = () => {
-    if (window.confirm("Bum Bum Cafe ke Token Sequence ko reset kareइन?")) {
+    if (window.confirm("Bum Bum Cafe ke Token Sequence ko reset karein?")) {
       localStorage.setItem('bb_cafe_token_seed', '1');
       toast.success("Token sequence resets safely!");
     }
@@ -2072,7 +2095,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                 </div>
                 <div className="flex gap-2">
                   <button type="submit" className="flex-1 bg-green-600 text-white p-3 rounded-xl font-black text-xs uppercase">Save Changes</button>
-                  <button type="button" onClick={() => setEditingCustomer(null)} className="bg-white/5 text-gray-400 p-3 rounded-xl font-black text-xs uppercase">Cancel</button>
+                  <button type="button" onClick={() => setEditingCustomer(null)} className="bg-white/5 text-gray-450 p-3 rounded-xl font-black text-xs uppercase">Cancel</button>
                 </div>
               </form>
             )}
