@@ -135,7 +135,7 @@ export default function BbCafeHome() {
 
   const [isGiftModalOpen, setIsGiftModalOpen] = useState(false);
   const [giftPhone, setGiftPhone] = useState("");
-  const [giftPointsAmount, setGiftPointsAmount] = useState<number | " text-[9px]">("");
+  const [giftPointsAmount, setGiftPointsAmount] = useState<number | "">("");
   const [giftSenderPin, setGiftSenderPin] = useState(""); 
   const [isGiftingLoading, setIsGiftingLoading] = useState(false);
 
