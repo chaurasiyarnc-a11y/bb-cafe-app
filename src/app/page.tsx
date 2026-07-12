@@ -823,6 +823,20 @@ const handleAddDiyPizzaToCart = () => {
     playSoundEffect('add');
     toast.success(`${name} Cart में जोड़ दिया गया है!`);
   };
+  // Social follow and claim handler function (Requirement Fix)
+  const handleSocialClickWithClaim = (platform: any) => {
+    triggerHaptic();
+    window.open(platform.url, '_blank');
+
+    if (!customerDetails?.phone) {
+      toast.error("पॉइंट्स क्लेम करने के लिए कृपया पहले अपना Name aur Phone दर्ज करें!");
+      setIsProfileOpen(true);
+      return;
+    }
+
+    setClaimingPlatform(platform);
+    setIsClaimModalOpen(true);
+  };
   const handleDetectLocation = () => {
     triggerHaptic();
     if (!navigator.geolocation) {
