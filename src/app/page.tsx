@@ -617,7 +617,7 @@ export default function BbCafeHome() {
         toast.error("लोकेशन की अनुमति अस्वीकार कर दी गई है या नेटवर्क त्रुटि है।");
       }
     );
-  };
+  
             setSelectedArea(DELIVERY_AREAS[2]); 
             toast.success(`सटीक दूरी: ${calculatedDistance.toFixed(2)} KM। आपके लिए 'Nearby Area (Within 5 Km)' क्षेत्र चुना गया है।`);
           } else {
