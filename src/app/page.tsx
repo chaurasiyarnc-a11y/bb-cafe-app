@@ -1,5 +1,3 @@
-
-
 'use client';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { db } from '../lib/firebase'; 
@@ -42,7 +40,6 @@ const PIZZA_ADDONS: { [size: string]: { [addon: string]: number } } = {
   "extra large": { "Veg Add-on": 30, "Paneer": 50, "Black Olives": 50, "Jalapeno": 50, "Extra Cheese": 60, "Mushroom": 50 }
 };
 
-// DIY Pizza exact prices from user inputs
 const DIY_PIZZA_PRICES: any = {
   small: {
     base: 15, sauce: 10, mozzarella: 40,
@@ -89,7 +86,7 @@ const PERMANENT_REVIEWS = [
 const DEFAULT_SOCIAL_PROOF = [
   { id: "sp1", text: "प्रियंका जी (वार्ड 2) ने अभी-अभी 'पनीर पिज्जा' ऑर्डर किया 🍕" },
   { id: "sp2", text: "अमित सोनी जी (टाउन) ने अभी-अभी 'स्पेशल थाली' ऑर्डर की 🍱" },
-  { id: "sp3", text: "राहुल कुमार जी (वार्ड 4) ने अभी-अभी 'चॉकलेट शेक' ऑर्डर किया 🥤" },
+  { id: "sp3", text: "राहुल कुमार जी (वार्ड 4) ने अभी--अभी 'चॉकलेट शेक' ऑर्डर किया 🥤" },
   { id: "sp4", text: "अंजलि जी (वार्ड 5) ने अभी-अभी 'मिक्स वेज पिज्जा' आर्डर किया 🧀" }
 ];
 
@@ -121,7 +118,6 @@ export default function BbCafeHome() {
   const [pointsHistory, setPointsHistory] = useState<any[]>([]);
   const [pastOrders, setPastOrders] = useState<any[]>([]);
 
-  // Live Order State (Idea 4)
   const [liveOrder, setLiveOrder] = useState<any | null>(null);
 
   const [closingMinutesLeft, setClosingMinutesLeft] = useState<number | null>(null);
@@ -165,24 +161,24 @@ export default function BbCafeHome() {
   const [normalPizzaAddons, setNormalPizzaAddons] = useState<{ [addon: string]: boolean }>({});
   const [chefNote, setChefNote] = useState(""); 
 
-  // --- NEW DIY PIZZA WORKSPACE STATES (Category Tab based - Requirement 1) ---
-  const [diySize, setDiySize] = useState<string>("small"); // small, medium, large
-  const [diySauce, setDiySauce] = useState<boolean>(true); // Pizza sauce included
-  const [diyMozzarella, setDiyMozzarella] = useState<boolean>(true); // Mozzarella included
+  // --- NEW DIY PIZZA WORKSPACE STATES ---
+  const [diySize, setDiySize] = useState<string>("small"); 
+  const [diySauce, setDiySauce] = useState<boolean>(true); 
+  const [diyMozzarella, setDiyMozzarella] = useState<boolean>(true); 
   const [diyVegSelection, setDiyVegSelection] = useState<{ [veg: string]: boolean }>({ onion: false, tomato: false, capsicum: false, corn: false });
   const [diyPremiumToppings, setDiyPremiumToppings] = useState<{ [top: string]: boolean }>({ black_olive: false, jalapeno: false, red_peprica: false, paneer: false, mushroom: false });
   const [diyChefNote, setDiyChefNote] = useState<string>("");
 
-  // Reels/Stories States (Idea 17)
+  // Reels/Stories States
   const [stories, setStories] = useState<any[]>([]);
   const [activeStory, setActiveStory] = useState<any | null>(null);
 
-  // Social Proof Alerts States (Idea 9)
+  // Social Proof Alerts States
   const [socialProofs, setSocialProofs] = useState<any[]>([]);
   const [socialAlertIndex, setSocialAlertIndex] = useState(0);
   const [showSocialAlert, setShowSocialAlert] = useState(false);
 
-  // Social Media Point Claims (Anti-Cheat Loop)
+  // Social Media Point Claims
   const [isClaimModalOpen, setIsClaimModalOpen] = useState(false);
   const [claimingPlatform, setClaimingPlatform] = useState<any>(null);
   const [claimUsername, setClaimUsername] = useState("");
@@ -329,7 +325,6 @@ export default function BbCafeHome() {
     return shuffled;
   };
 
-  // Dynamic DIY Pizza Price Calculator (Requirement 1)
   const calculatedDiyPizzaPrice = useMemo(() => {
     const config = DIY_PIZZA_PRICES[diySize];
     if (!config) return 0;
@@ -337,14 +332,12 @@ export default function BbCafeHome() {
     if (diySauce) total += config.sauce;
     if (diyMozzarella) total += config.mozzarella;
 
-    // Sum veggies
     Object.entries(diyVegSelection).forEach(([veg, isSelected]) => {
       if (isSelected) {
         total += config.veggies[veg] || 0;
       }
     });
 
-    // Sum premium toppings
     Object.entries(diyPremiumToppings).forEach(([top, isSelected]) => {
       if (isSelected) {
         total += config[top] || 0;
@@ -468,7 +461,7 @@ export default function BbCafeHome() {
     const finalWithDiy: string[] = [];
     dedupedList.forEach(cat => {
       if (cat === "All") {
-        finalWithDiy.push("DIY Pizza"); // Insert DIY Pizza directly before All
+        finalWithDiy.push("DIY Pizza"); 
       }
       finalWithDiy.push(cat);
     });
@@ -484,7 +477,6 @@ export default function BbCafeHome() {
     }).slice(0, 2);
   }, [menu, cart]);
 
-  // Eco-Hero Count (Idea 18)
   const ecoCutlerySaves = useMemo(() => {
     return pastOrders.filter(o => o.noCutlery === true).length;
   }, [pastOrders]);
@@ -589,8 +581,8 @@ export default function BbCafeHome() {
       
       setTimeout(() => {
         setShowSocialAlert(false);
-      }, 7500); // Alert displays for 7.5 seconds
-    }, 25000); // Rotates slowly every 25 seconds
+      }, 7500); 
+    }, 25000); 
 
     return () => clearInterval(interval);
   }, [socialProofs]);
@@ -661,7 +653,7 @@ export default function BbCafeHome() {
       }
     }
 
-    // Dynamic WhatsApp Number & Coordinates (Dynamic GPS Settings)
+    // Dynamic WhatsApp Number & Coordinates
     const unsubStore = onSnapshot(doc(db, "settings", "store"), (d) => { 
       if (d.exists()) {
         setStoreOpen(d.data().isOpen);
@@ -736,7 +728,6 @@ export default function BbCafeHome() {
 
   // --- ACTIONS ---
 
-  // Security 2: Fetch specific coupon dynamically from Firestore on check
   const handleApplyCoupon = async () => {
     triggerHaptic();
     if (!enteredCoupon) return toast.error("Please enter a coupon code");
@@ -808,7 +799,6 @@ export default function BbCafeHome() {
     );
   };
 
-  // Security 1: Transaction-based secure points transferring + PIN security checks
   const handleGiftPoints = async (e: React.FormEvent) => {
     e.preventDefault();
     triggerHaptic();
@@ -890,7 +880,6 @@ export default function BbCafeHome() {
     } finally { setIsGiftingLoading(false); }
   };
 
-  // Secure Points Redemption checking with PIN
   const handleCustomerRedeem = async (id: string, name: string, pointsCost: number) => {
     triggerHaptic();
     const currentPointsInCart = cart.reduce((acc: number, item: any) => acc + (item.pointsCost || 0), 0);
@@ -1105,7 +1094,6 @@ export default function BbCafeHome() {
     const phoneRaw = customerDetails!.phone.replace("+91", "").trim();
 
     try {
-      // Save claim request to Firestore for admin review
       await addDoc(collection(db, "points_claims"), {
         customerName: customerDetails!.name,
         customerPhone: phoneRaw,
@@ -1216,7 +1204,6 @@ export default function BbCafeHome() {
     localStorage.setItem('bb_favorites', JSON.stringify(updated));
   };
 
-  // Standard Pizza Addon Confirm
   const handleNormalPizzaAdd = () => {
     triggerHaptic();
     if (!normalPizzaSize) return toast.error("Please select a size!");
@@ -1257,12 +1244,10 @@ export default function BbCafeHome() {
     setChefNote("");
   };
 
-  // Requirement 1: Add DIY Custom Pizza into Cart
   const handleAddDiyPizzaToCart = () => {
     triggerHaptic();
     const sizeLabels: any = { small: "Small Base", medium: "Medium Base", large: "Large Base" };
     
-    // Generate description list of selected premium toppings & veggies
     const activeVeggies = Object.entries(diyVegSelection).filter(([_, val]) => val).map(([key]) => key.toUpperCase());
     const activePremiums = Object.entries(diyPremiumToppings).filter(([_, val]) => val).map(([key]) => key.replace('_', ' ').toUpperCase());
     
@@ -1282,7 +1267,6 @@ export default function BbCafeHome() {
     playSoundEffect('add');
     toast.success("आपका कस्टमाइज़्ड पिज्जा कार्ट में जोड़ा गया! 🍕");
 
-    // Reset Workspace
     setDiyVegSelection({ onion: false, tomato: false, capsicum: false, corn: false });
     setDiyPremiumToppings({ black_olive: false, jalapeno: false, red_peprica: false, paneer: false, mushroom: false });
     setDiyChefNote("");
@@ -1358,6 +1342,13 @@ export default function BbCafeHome() {
     } else {
       setChefNote(prev => prev ? `${prev}, ${tag}` : tag);
     }
+  };
+
+  // anti-cheat handler helper
+  const getClaimStatus = (platform: string) => {
+    if (!customerDetails?.phone) return "🎁 +1 Pt";
+    const storageKey = `bb_claimed_${customerDetails.phone.replace("+91", "").trim()}_${platform}`;
+    return localStorage.getItem(storageKey) ? "✅ Claimed" : "🎁 Claim +1 Pt";
   };
 
   if (!mounted) return null;
@@ -1514,42 +1505,6 @@ export default function BbCafeHome() {
 
       {/* MAIN LAYOUT WRAPPER */}
       <main ref={menuRef} className="pt-3 px-3 max-w-lg mx-auto space-y-4">
-
-        {/* Live Order Status Card (Idea 4) */}
-        {liveOrder && (
-          <motion.div 
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-gradient-to-r from-green-900/40 to-emerald-950/40 border border-green-500/30 p-4 rounded-2xl shadow-lg space-y-3 mx-1 text-white"
-          >
-            <div className="flex justify-between items-center">
-              <div className="flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-full bg-green-400 animate-ping" />
-                <span className="text-[10px] font-black tracking-wider uppercase text-green-400">सक्रिय ऑर्डर (Active Order Tracker)</span>
-              </div>
-              <span className="text-[9px] font-mono text-gray-300">Bill No: #{formatBillNumber(liveOrder.billNumber)}</span>
-            </div>
-            
-            <div className="flex justify-between items-center text-xs">
-              <div>
-                <p className="font-bold">स्थिति (Status): 
-                  <span className="text-yellow-400 uppercase font-black ml-1">
-                    {liveOrder.status === 'pending' ? 'रसोई में है (Cooking) 👩‍🍳' : 'डिलीवरी पर है (Out for Delivery) 🛵'}
-                  </span>
-                </p>
-                <p className="text-[10px] text-gray-300 mt-1">टोकन नंबर: #{liveOrder.tokenNumber}</p>
-              </div>
-              <a 
-                href={`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(`नमस्ते बम बम कैफ़े! कृपया मेरे आर्डर नंबर #${formatBillNumber(liveOrder.billNumber)} (टोकन नंबर: #${liveOrder.tokenNumber}) का लाइव स्टेटस बताएं।`)}`}
-                target="_blank"
-                rel="noreferrer"
-                className="bg-green-600 text-[10px] font-black px-3 py-2 rounded-xl flex items-center gap-1"
-              >
-                Track Live
-              </a>
-            </div>
-          </motion.div>
-        )}
 
         {showInstallBanner && (
           <div className="bg-gradient-to-r from-[#ff5e00] to-amber-500 p-3.5 rounded-2xl flex items-center justify-between shadow-lg border border-white/10 mx-1">
@@ -2195,7 +2150,7 @@ export default function BbCafeHome() {
             <motion.div initial={{ y: 300 }} animate={{ y: 0 }} exit={{ y: 300 }} className="dark:bg-[#111] bg-white w-full p-6 rounded-t-3xl border-t dark:border-white/10 border-gray-200 max-w-lg mx-auto overflow-y-auto max-h-[95vh] shadow-2xl transition-colors duration-200">
               <div className="w-12 h-1 bg-white/15 rounded-full mx-auto mb-4" />
               <h3 className="text-xl font-black text-center text-neutral-900 dark:text-white">{selectedProduct?.name}</h3>
-              <p className="text-orange-550 font-black mb-4 uppercase text-[8px] text-center">Customize Your Order</p>
+              <p className="text-orange-555 font-black mb-4 uppercase text-[8px] text-center">Customize Your Order</p>
               
               <div className="space-y-3 mb-4">
                 <p className="text-[10px] font-bold text-gray-500 uppercase">1. Select Portion Size:</p>
@@ -2254,7 +2209,7 @@ export default function BbCafeHome() {
                   placeholder="e.g. Make it extra spicy, No onions, soft crust etc..." 
                   value={chefNote} 
                   onChange={(e) => setChefNote(e.target.value)} 
-                  className="w-full text-xs p-3 rounded-xl dark:bg-white/[0.03] bg-gray-50 border dark:border-white/5 border-gray-200 dark:text-white text-neutral-900 outline-none focus:border-orange-500 h-16 resize-none"
+                  className="w-full text-xs p-3 rounded-xl dark:bg-white/[0.03] bg-gray-50 border dark:border-white/5 border-gray-200 dark:text-white text-neutral-955 outline-none focus:border-orange-500 h-16 resize-none"
                 />
               </div>
 
@@ -2308,7 +2263,7 @@ export default function BbCafeHome() {
                     </div>
                     <div className="space-y-1">
                       <label className="text-[9px] font-bold text-gray-500 uppercase">Referral Code (Optional)</label>
-                      <input type="text" placeholder="Enter invite code..." value={tempRefCode} onChange={(e) => setTempRefCode(e.target.value)} className="w-full dark:bg-neutral-800 bg-gray-50 border dark:border-neutral-700 border-gray-200 p-3 rounded-xl font-bold dark:text-white text-neutral-900 outline-none focus:border-orange-500 text-xs" />
+                      <input type="text" placeholder="Enter invite code..." value={tempRefCode} onChange={(e) => setTempRefCode(e.target.value)} className="w-full dark:bg-neutral-800 bg-gray-50 border dark:border-neutral-700 border-gray-200 p-3 rounded-xl font-bold dark:text-white text-neutral-955 outline-none focus:border-orange-500 text-xs" />
                     </div>
                   </div>
                   <button type="submit" className="w-full bg-orange-500 text-black p-3.5 rounded-xl font-black text-xs uppercase shadow transition-all active:scale-95 mt-4">Create Account ➔</button>
@@ -2338,7 +2293,7 @@ export default function BbCafeHome() {
                     </button>
                   </div>
 
-                  {/* Eco-Hero Badge & Savings Tracker (Idea 18) */}
+                  {/* Eco-Hero Badge & Savings Tracker */}
                   <div className="bg-gradient-to-r from-emerald-500/10 to-teal-500/10 border border-emerald-500/20 p-4 rounded-2xl flex items-center justify-between shadow-sm">
                     <div className="space-y-1">
                       <p className="text-[8px] uppercase tracking-wider text-emerald-500 font-black">पर्यावरण संरक्षण ट्रैकर (Eco Impact)</p>
@@ -2776,7 +2731,7 @@ export default function BbCafeHome() {
                 <button 
                   type="button" 
                   onClick={() => { triggerHaptic(); setIsClaimModalOpen(false); setClaimUsername(""); }} 
-                  className="bg-white/5 text-gray-400 font-bold p-3 rounded-xl text-xs uppercase"
+                  className="bg-white/5 text-gray-450 p-3 rounded-xl font-black text-xs uppercase"
                 >
                   Cancel
                 </button>
@@ -2793,7 +2748,7 @@ export default function BbCafeHome() {
             <motion.div className="dark:bg-[#111] bg-white w-full max-w-md p-6 rounded-3xl border dark:border-white/10 border-gray-200 text-center space-y-4 shadow-xl transition-colors duration-200">
               <div>
                 <h3 className="text-xl font-black text-orange-500 uppercase italic">Connect & Earn Points</h3>
-                <p className="text-[8px] text-gray-500 font-bold uppercase tracking-wider">हर प्लेटफार्म पर फॉलो/सब्सक्राइब करने का +1 पॉइंट पाएं!</p>
+                <p className="text-[8px] text-gray-505 font-bold uppercase tracking-wider">हर प्लेटफार्म पर फॉलो/सब्सक्राइब करने का +1 पॉइंट पाएं!</p>
               </div>
               <div className="space-y-2 text-left max-h-[22rem] overflow-y-auto no-scrollbar pr-1">
                 {SOCIAL_LINKS.map((platform) => (
