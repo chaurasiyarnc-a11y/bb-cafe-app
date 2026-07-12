@@ -139,8 +139,8 @@ export default function KitchenDisplaySystem() {
   if (isLocked) {
     return (
       <div className="bg-[#050505] min-h-screen text-white flex items-center justify-center p-4">
-        {/* Linked dedicated KDS manifest */}
-        <link rel="manifest" href="/kds-manifest.json" />
+        {/* Linked dedicated Kitchen manifest */}
+        <link rel="manifest" href="/kitchen-manifest.json" />
         <Toaster />
         <div className="w-full max-w-sm bg-white/[0.02] border border-white/5 p-8 rounded-[2.5rem] space-y-6 shadow-2xl text-center relative overflow-hidden">
           <div className="inline-flex p-4 bg-orange-500/10 rounded-full text-orange-500 mb-2">
@@ -176,8 +176,8 @@ export default function KitchenDisplaySystem() {
   if (loading) {
     return (
       <div className="bg-[#050505] min-h-screen text-white flex flex-col items-center justify-center">
-        {/* Linked dedicated KDS manifest */}
-        <link rel="manifest" href="/kds-manifest.json" />
+        {/* Linked dedicated Kitchen manifest */}
+        <link rel="manifest" href="/kitchen-manifest.json" />
         <Loader2 className="animate-spin text-orange-500 mb-2" size={32} />
         <p className="text-[10px] font-black uppercase tracking-widest text-gray-500">Kitchen Display Syncing...</p>
       </div>
@@ -186,8 +186,8 @@ export default function KitchenDisplaySystem() {
 
   return (
     <div className="bg-[#080808] min-h-screen text-white p-6 font-sans">
-      {/* Linked dedicated KDS manifest */}
-      <link rel="manifest" href="/kds-manifest.json" />
+      {/* Linked dedicated Kitchen manifest */}
+      <link rel="manifest" href="/kitchen-manifest.json" />
       <Toaster />
       <header className="border-b border-white/5 pb-4 mb-6 flex justify-between items-center">
         <div>
