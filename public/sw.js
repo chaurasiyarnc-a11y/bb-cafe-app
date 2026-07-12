@@ -1,18 +1,18 @@
-const CACHE_NAME = 'bb-cafe-cache-v2'; // Cache version ko v2 kar diya hai taaki naya badlav load ho sake
+const CACHE_NAME = 'bb-cafe-cache-v3';
 const ASSETS_TO_CACHE = [
   '/',
   '/manifest.json',
   '/delivery',
   '/delivery-manifest.json',
-  '/kds',
-  '/kds-manifest.json',
+  '/kitchen',
+  '/kitchen-manifest.json',
   '/admin',
   '/admin-manifest.json',
   '/icon-192x192.png',
   '/icon-512x512.png'
 ];
 
-// Install Event (Assets को ब्राउज़र मेमोरी में स्टोर करना)
+// Install Event
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
@@ -22,7 +22,7 @@ self.addEventListener('install', (event) => {
   self.skipWaiting();
 });
 
-// Activate Event (पुराने कैश को साफ़ करना)
+// Activate Event
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) => {
@@ -38,7 +38,7 @@ self.addEventListener('activate', (event) => {
   self.clientsClaim();
 });
 
-// Fetch Event (ऑफ़लाइन होने पर फ़ाइल्स दिखाना)
+// Fetch Event
 self.addEventListener('fetch', (event) => {
   if (!event.request.url.startsWith(self.location.origin)) return;
 
