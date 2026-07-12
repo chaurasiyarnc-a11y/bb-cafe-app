@@ -1,24 +1,15 @@
-{
-  "short_name": "BB Kitchen",
-  "name": "Bum Bum Cafe | Kitchen Display System",
-  "icons": [
-    {
-      "src": "/icon-192x192.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "/icon-512x512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any maskable"
-    }
-  ],
-  "start_url": "/kitchen",
-  "scope": "/kitchen",
-  "background_color": "#050505",
-  "theme_color": "#ff5e00",
-  "display": "standalone",
-  "orientation": "landscape"
-}
+const CACHE_NAME = 'bb-cafe-cache-v3'; // Version badalkar v3 kar diya hai
+const ASSETS_TO_CACHE = [
+  '/',
+  '/manifest.json',
+  '/delivery',
+  '/delivery-manifest.json',
+  '/kitchen',              // Yahan badlav kiya gaya hai
+  '/kitchen-manifest.json',     // Yahan badlav kiya gaya hai
+  '/admin',
+  '/admin-manifest.json',
+  '/icon-192x192.png',
+  '/icon-512x512.png'
+];
+
+// ... baaki sw.js ka fetch, install aur activate ka code wahi rahega jo aapne pehle banaya tha ...
