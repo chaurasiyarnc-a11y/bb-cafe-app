@@ -1,11 +1,11 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
+import { getFirestore, enableMultiTabIndexedDbPersistence } from "firebase/firestore"; // enableMultiTabIndexedDbPersistence ko import kiya gaya hai
 import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
   // Yahan humne sahi API Key likh di hai (small 'l' ke sath):
-  apiKey: "AIzaSyCaVEwWnh7_-uDWcvOlFmfymy7kiSxbyMI",
+  apiKey: "AIzaSyCaVEWwnh7_-uDWcvO1Fmfymy7kiSxbyMI",
   authDomain: "gen-lang-client-0229168883.firebaseapp.com",
   projectId: "gen-lang-client-0229168883",
   storageBucket: "gen-lang-client-0229168883.firebasestorage.app",
@@ -20,5 +20,16 @@ const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
 export const storage = getStorage(app);
+
+// Browser (Client-side) me offline persistence ko safely enable karna
+if (typeof window !== "undefined") {
+  enableMultiTabIndexedDbPersistence(db).catch((err) => {
+    if (err.code === 'failed-precondition') {
+      console.warn("Firestore persistence failed: Multiple tabs open.");
+    } else if (err.code === 'unimplemented') {
+      console.warn("Firestore persistence failed: Browser doesn't support it.");
+    }
+  });
+}
 
 export default app;
