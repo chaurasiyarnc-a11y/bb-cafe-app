@@ -238,6 +238,14 @@ export default function BbCafeHome() {
     } catch (e) {}
   };
 
+  // Fixed scroll element compiler bug (Requirement 1 fix)
+  const scrollToMenu = () => {
+    triggerHaptic();
+    if (menuRef && menuRef.current) {
+      menuRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
   const getCartSubtotal = () => cart.reduce((acc: number, i: any) => acc + (i.price * i.quantity), 0);
 
   const getCartAddonsPrice = () => {
@@ -1355,7 +1363,7 @@ export default function BbCafeHome() {
           <div className="grid grid-cols-2 gap-3 text-center text-[10px] font-black uppercase">
             <div className="dark:bg-white/[0.02] bg-white border dark:border-white/5 border-gray-200 p-4 rounded-2xl flex flex-col items-center justify-center space-y-1 shadow-md shadow-gray-200/30 dark:shadow-none transition-colors duration-200">
               <Clock className="text-orange-500" size={16} />
-              <p className="dark:text-gray-450 text-gray-500 text-[8px]">Open Timing</p>
+              <p className="dark:text-gray-450 text-gray-505 text-[8px]">Open Timing</p>
               <p className="dark:text-white text-neutral-800 text-[9px]">सुबह 10:00 से रात 11:00 बजे</p>
             </div>
             
@@ -1379,7 +1387,7 @@ export default function BbCafeHome() {
             initial={{ y: 100, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 100, opacity: 0 }}
-            className="fixed bottom-24 inset-x-4 z-50 max-w-sm mx-auto bg-neutral-950/95 backdrop-blur-md border border-orange-500/30 p-4 rounded-3xl shadow-2xl flex flex-col gap-2 text-xs font-bold font-sans"
+            className="fixed bottom-24 inset-x-4 z-50 max-w-sm mx-auto bg-neutral-955/95 backdrop-blur-md border border-orange-500/30 p-4 rounded-3xl shadow-2xl flex flex-col gap-2 text-xs font-bold font-sans animate-none"
           >
             <div className="flex justify-between items-center">
               <div className="flex items-center gap-2">
@@ -1406,6 +1414,13 @@ export default function BbCafeHome() {
                   }} 
                 />
               </div>
+            </div>
+
+            <div className="flex justify-between items-center bg-black/40 p-2.5 rounded-xl border border-white/5 mt-1">
+              <span className="text-[10px] text-gray-450 uppercase">Verification OTP Code (सुरक्षा पिन)</span>
+              <span className="text-yellow-400 font-black text-sm font-mono tracking-widest bg-yellow-500/10 px-2.5 py-0.5 rounded border border-yellow-500/20">
+                {liveOrder.deliveryPin || "WAIT"}
+              </span>
             </div>
 
             <div className="flex gap-2 pt-1 border-t border-white/5">
@@ -1590,7 +1605,7 @@ export default function BbCafeHome() {
                           type="button"
                           key={addon}
                           onClick={() => setNormalPizzaAddons(prev => ({ ...prev, [addon]: !prev[addon] }))}
-                          className={`p-2.5 rounded-xl border flex justify-between items-center text-[9px] font-bold ${isSelected ? 'border-orange-500 bg-orange-500/5 text-orange-400' : 'dark:border-white/5 border-gray-200 dark:bg-white/[0.02] bg-gray-50 dark:text-gray-300 text-neutral-850'}`}
+                          className={`p-2.5 rounded-xl border flex justify-between items-center text-[9px] font-bold ${isSelected ? 'border-orange-500 bg-orange-500/5 text-orange-400' : 'dark:border-white/5 border-gray-200 dark:bg-white/[0.02] bg-gray-50 dark:text-gray-300 text-neutral-855'}`}
                         >
                           <span>{addon}</span>
                           <span className="text-orange-400 font-black">+₹{cost}</span>
@@ -1609,7 +1624,7 @@ export default function BbCafeHome() {
                       type="button"
                       key={tag}
                       onClick={() => quickAppendInstruction(tag, "normal")}
-                      className="text-[9px] font-bold py-1 px-2 rounded-full border dark:border-white/5 border-gray-200 bg-neutral-100 dark:bg-neutral-800 dark:text-gray-300 text-neutral-800 hover:border-orange-500 transition-colors"
+                      className="text-[9px] font-bold py-1 px-2 rounded-full border dark:border-white/5 border-gray-200 bg-neutral-100 dark:bg-neutral-800 dark:text-gray-300 text-neutral-850 hover:border-orange-500 transition-colors"
                     >
                       {tag}
                     </button>
@@ -1683,7 +1698,7 @@ export default function BbCafeHome() {
                   {/* USER ACCOUNT VIEW */}
                   <div className="dark:bg-white/[0.02] bg-gray-50 p-4 rounded-2xl border dark:border-white/5 border-gray-200 flex justify-between items-center transition-colors duration-200">
                     <div>
-                      <p className="text-[8px] dark:text-gray-500 text-neutral-600 font-black uppercase">Customer Profile</p>
+                      <p className="text-[8px] dark:text-gray-505 text-neutral-605 font-black uppercase">Customer Profile</p>
                       <h4 className="font-black text-base text-orange-500">{customerDetails.name}</h4>
                       <p className="text-xs dark:text-gray-400 text-neutral-700 font-semibold">{customerDetails.phone}</p>
                       <p className="text-[9px] text-yellow-600 dark:text-yellow-400 font-bold mt-1 uppercase">Invite Code: {getReferralCode()}</p>
@@ -1734,19 +1749,19 @@ export default function BbCafeHome() {
                         <h4 className="text-2xl font-black dark:text-white text-neutral-900 leading-none">{customerPoints} <span className="text-[9px] dark:text-gray-500 text-neutral-700 font-black uppercase">Points</span></h4>
                         <p className="text-[8px] dark:text-gray-400 text-neutral-700 font-bold mt-1">₹100 खर्च करें = 1 पॉइंट पाएं!</p>
                       </div>
-                      <div className="text-right text-[8px] dark:text-yellow-400 text-amber-900 font-black space-y-0.5 uppercase max-h-20 overflow-y-auto no-scrollbar">
+                      <div className="text-right text-[8px] dark:text-yellow-400 text-amber-900 font-black space-y-0.5 uppercase max-h-20 overflow-y-auto no-scrollbar font-mono">
                         {loyaltyRules.map(rule => (<p key={rule.id}>🎁 {rule.pointsCost} Pts = {rule.rewardName}</p>))}
                       </div>
                     </div>
 
                     {/* Points Passbook Ledger */}
                     {pointsHistory.length > 0 && (
-                      <div className="pt-2 border-t border-white/5 space-y-1.5">
-                        <p className="text-[9px] font-black uppercase dark:text-gray-400 text-neutral-700">📜 Points Passbook (हाल ही के लेन-देन):</p>
+                      <div className="pt-2 border-t border-white/5 space-y-1.5 font-mono">
+                        <p className="text-[9px] font-black uppercase dark:text-gray-400 text-neutral-700 font-sans">📜 Points Passbook (हाल ही के लेन-देन):</p>
                         <div className="space-y-1 max-h-24 overflow-y-auto pr-1 text-[8px] font-bold">
                           {pointsHistory.map((h: any) => (
                             <div key={h.id} className="flex justify-between items-center bg-black/10 dark:bg-white/5 p-1.5 rounded border dark:border-white/5 border-gray-200">
-                              <span className="truncate max-w-[170px] dark:text-gray-300 text-neutral-800">{h.description}</span>
+                              <span className="truncate max-w-[170px] dark:text-gray-300 text-neutral-800 font-sans">{h.description}</span>
                               <span className={h.type === 'earn' ? 'text-green-500' : 'text-red-500'}>
                                 {h.type === 'earn' ? '+' : '-'}{h.points} Pts
                               </span>
@@ -1814,7 +1829,7 @@ export default function BbCafeHome() {
                               <span className="text-orange-500">Bill No: #{formatBillNumber(ord.billNumber || 0)}</span>
                               <span className="bg-green-600/15 text-green-400 px-1.5 py-0.5 rounded font-black text-[8px]">Token: #{ord.tokenNumber || "N/A"}</span>
                             </div>
-                            <div className="text-[9px] text-gray-400 font-semibold space-y-0.5">
+                            <div className="text-[9px] text-gray-400 font-semibold space-y-0.5 font-sans">
                               {ord.items.map((it: any, i: number) => (
                                 <div key={i} className="flex justify-between">
                                   <span>{it.name} x{it.quantity}</span>
@@ -1824,11 +1839,11 @@ export default function BbCafeHome() {
                             </div>
                             <div className="h-px bg-white/5 my-1" />
                             <div className="flex justify-between items-center">
-                              <span className="text-gray-405 font-semibold">Grand Total:</span>
-                              <span className="font-black dark:text-white text-neutral-955 font-mono">₹{ord.total}</span>
+                              <span className="text-gray-400 font-semibold">Grand Total:</span>
+                              <span className="font-black dark:text-white text-neutral-955 font-mono font-bold">₹{ord.total}</span>
                             </div>
                             <a 
-                              href={`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(`नमस्ते बम बम कैफ़े! कृपया मेरे आर्डर नंबर #${formatBillNumber(ord.billNumber)} (टोकन नंबर: #${ord.tokenNumber}) का लाइव स्टेटस बताएं।`)}`}
+                              href={`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(`नमस्ते  बम बम कैफ़े! कृपया मेरे आर्डर नंबर #${formatBillNumber(ord.billNumber)} (टोकन नंबर: #${ord.tokenNumber}) का लाइव स्टेटस बताएं।`)}`}
                               target="_blank"
                               rel="noreferrer"
                               className="w-full bg-white/5 hover:bg-white/10 text-center text-[9px] font-black text-yellow-400 py-2 rounded-lg block border border-white/5 transition-all mt-1 font-sans"
@@ -1869,11 +1884,11 @@ export default function BbCafeHome() {
 
               {/* 1. CART ITEMS LIST */}
               {cart.map((item: any) => (
-                <div key={item.id} className="flex flex-col dark:bg-white/[0.02] bg-white p-4 rounded-2xl mb-3 border dark:border-white/5 border-gray-200 shadow-sm transition-colors duration-200 gap-1.5">
+                <div key={item.id} className="flex flex-col dark:bg-white/[0.02] bg-white p-4 rounded-2xl mb-3 border dark:border-white/5 border-gray-200 shadow-sm transition-colors duration-200 gap-1.5 font-sans">
                   <div className="flex justify-between items-center">
                     <div className="min-w-0 pr-3">
                       <h4 className="font-bold text-xs dark:text-gray-100 text-neutral-900 truncate">{item?.name || "Item"}</h4>
-                      <p className="text-orange-555 font-black mt-1 text-[11px]">₹{item?.price || 0}</p>
+                      <p className="text-orange-555 font-black mt-1 text-[11px] font-mono">₹{item?.price || 0}</p>
                     </div>
                     <div className="flex items-center gap-2 bg-black/40 px-2 py-1 rounded-xl border border-white/10 flex-shrink-0">
                       <button onClick={() => { triggerHaptic(); removeItem(item.id); }} className="w-6 h-6 flex items-center justify-center bg-red-500/10 text-red-500 rounded text-sm font-black">-</button>
@@ -1893,7 +1908,7 @@ export default function BbCafeHome() {
                 </div>
               ))}
 
-              <div className="mt-6 space-y-4">
+              <div className="mt-6 space-y-4 font-sans">
                 {/* 2. UPSELL / FREQUENTLY BOUGHT TOGETHER */}
                 {upsellSuggestionItems.length > 0 && (
                   <div className="dark:bg-purple-950/20 bg-purple-50 border border-purple-500/10 rounded-2xl p-4 space-y-2">
@@ -2080,7 +2095,7 @@ export default function BbCafeHome() {
               <Gift className="mx-auto text-yellow-400" size={32} />
               <div>
                 <h3 className="text-lg font-black text-yellow-400 uppercase italic">Gift Loyalty Points</h3>
-                <p className="text-[9px] text-gray-500 font-semibold mt-0.5">अपने पॉइंट्स किसी दोस्त को गिफ्ट करें</p>
+                <p className="text-[9px] text-gray-505 font-semibold mt-0.5">अपने पॉइंट्स किसी दोस्त को गिफ्ट करें</p>
               </div>
               <div className="space-y-3 text-left">
                 <div className="space-y-1">
@@ -2155,11 +2170,11 @@ export default function BbCafeHome() {
       {/* SOCIALS DIALOG MODAL */}
       <AnimatePresence>
         {isSocialsOpen && (
-          <div className="fixed inset-0 bg-black/95 z-[250] flex items-center justify-center p-6">
+          <div className="fixed inset-0 bg-[#111]/95 z-[250] flex items-center justify-center p-6">
             <motion.div className="dark:bg-[#111] bg-white w-full max-w-md p-6 rounded-3xl border dark:border-white/10 border-gray-200 text-center space-y-4 shadow-xl transition-colors duration-200">
               <div>
                 <h3 className="text-xl font-black text-orange-500 uppercase italic">Connect & Earn Points</h3>
-                <p className="text-[8px] text-gray-555 font-bold uppercase tracking-wider">हर प्लेटफार्म पर फॉलो/सब्सक्राइब करने का +1 पॉइंट पाएं!</p>
+                <p className="text-[8px] text-gray-500 font-bold uppercase tracking-wider">हर प्लेटफार्म पर फॉलो/सब्सक्राइब करने का +1 पॉइंट पाएं!</p>
               </div>
               <div className="space-y-2 text-left max-h-[22rem] overflow-y-auto no-scrollbar pr-1">
                 {SOCIAL_LINKS.map((platform) => (
@@ -2188,7 +2203,7 @@ export default function BbCafeHome() {
                 <span className="text-[10px] font-black text-green-400">🌱 DIGITAL GREEN INVOICE</span>
                 <button onClick={() => { triggerHaptic(); setShowInvoice(false); }} className="text-gray-400"><X size={16} /></button>
               </div>
-              <h4 className="text-xl font-black text-yellow-400 italic">BUM BUM CAFE</h4>
+              <h4 className="text-xl font-black text-yellow-400 italic font-serif">BUM BUM CAFE</h4>
               
               <div className="text-left text-xs space-y-1.5 dark:text-gray-300 text-neutral-800 font-mono">
                 <p>Order No: #{formatBillNumber(lastPlacedOrder.billNumber)}</p>
@@ -2217,7 +2232,15 @@ export default function BbCafeHome() {
                 </div>
               </div>
 
-              <div className="pt-2 flex flex-col gap-2">
+              <div className="bg-black/40 p-3 rounded-2xl border border-dashed border-orange-500/20 text-center my-2 space-y-0.5">
+                <p className="text-[9px] text-gray-500 uppercase font-black">Delivery Verification OTP Code</p>
+                <p className="text-yellow-400 font-black text-lg tracking-widest font-mono bg-yellow-500/10 px-4 py-1.5 rounded-xl border border-yellow-500/20 inline-block">
+                  {lastPlacedOrder.deliveryPin || "WAIT"}
+                </p>
+                <p className="text-[8px] text-gray-450 mt-1 font-bold">डिलीवरी बॉय के आने पर उसे यह कोड बताएं, तभी आर्डर डिलीवर होगा।</p>
+              </div>
+
+              <div className="pt-2 flex flex-col gap-2 font-sans">
                 <a 
                   href={`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(`नमस्ते बम बम कैफ़े! कृपया मेरे आर्डर नंबर #${formatBillNumber(lastPlacedOrder.billNumber)} (टोकन नंबर: #${lastPlacedOrder.tokenNumber}) का लाइव स्टेटस बताएं।`)}`}
                   target="_blank"
@@ -2236,10 +2259,10 @@ export default function BbCafeHome() {
                 </button>
               </div>
 
-              <p className="text-[9px] text-green-555 dark:text-green-400 dark:bg-green-500/10 bg-green-50 p-2.5 rounded-xl font-bold">
+              <p className="text-[9px] text-green-500 dark:text-green-400 dark:bg-green-500/10 bg-green-50 p-2.5 rounded-xl font-bold font-sans">
                 🌱 पेपर रसीद के बिना DIGITAL इनवॉइस जनरेट किया गया है। धन्यवाद!
               </p>
-              <button onClick={() => { triggerHaptic(); setShowInvoice(false); }} className="w-full bg-white text-black p-3 rounded-xl text-xs font-black uppercase">
+              <button onClick={() => { triggerHaptic(); setShowInvoice(false); }} className="w-full bg-white text-black p-3 rounded-xl text-xs font-black uppercase font-sans">
                 CLOSE RECEIPT
               </button>
             </div>
