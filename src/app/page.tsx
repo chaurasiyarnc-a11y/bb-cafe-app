@@ -549,6 +549,11 @@ export default function BbCafeHome() {
       toast.error("कूपन चेक करने में समस्या आई।");
     }
   };
+  const handleDismissInstallBanner = () => {
+    triggerHaptic(20);
+    setShowInstallBanner(false);
+    localStorage.setItem('bb_app_installed_or_dismissed', 'true');
+  };
 
   const handleDetectLocation = () => {
     triggerHaptic();
