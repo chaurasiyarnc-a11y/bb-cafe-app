@@ -1,6 +1,6 @@
 {
-  "short_name": "BumBumCafe",
-  "name": "Bum Bum Cafe | Premium Ordering",
+  "short_name": "BB Kitchen",
+  "name": "Bum Bum Cafe | Kitchen Display System",
   "icons": [
     {
       "src": "/icon-192x192.png",
@@ -15,10 +15,10 @@
       "purpose": "any maskable"
     }
   ],
-  "start_url": "/",
-  "scope": "/",
+  "start_url": "/kitchen",
+  "scope": "/kitchen",
   "background_color": "#050505",
   "theme_color": "#ff5e00",
   "display": "standalone",
-  "orientation": "portrait"
+  "orientation": "landscape"
 }
