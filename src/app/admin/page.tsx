@@ -1,6 +1,6 @@
 'use client';
   
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { db } from '../../lib/firebase'; 
 import { collection, onSnapshot, query, orderBy, doc, updateDoc, setDoc, addDoc, deleteDoc, increment, runTransaction } from 'firebase/firestore';
 import { Power, Eye, EyeOff, User, MapPin, Calendar, CheckCircle2, LogOut, Loader2, Phone, Plus, Trash, Edit, X, Lock, BarChart3, Download, Folder, Percent, ImageIcon, Gift, Settings, Search, BookOpen, Share2, MessageSquare, Filter, RefreshCw, Check, CheckCircle, XCircle, Play } from 'lucide-react';
@@ -240,7 +240,7 @@ export default function AdminDashboard() {
   const [isVerified, setIsVerified] = useState(false);
   const [loading, setLoading] = useState(true);
   const [passcode, setPasscode] = useState("");
-  const [tab, setTab] = useState<'dashboard' | 'orders' | 'menu' | 'categories' | 'customers' | 'loyalty' | 'banners' | 'reels' | 'header_video' | 'coupons' | 'reviews' | 'roster' | 'proofs' | 'claims' | 'security'>('dashboard');
+  const [tab, setTab] = useState<'dashboard' | 'orders' | 'menu' | 'categories' | 'customers' | 'loyalty' | 'banners' | 'reels' | 'header_video' | 'reviews' | 'coupons' | 'roster' | 'proofs' | 'claims' | 'security'>('dashboard');
   
   const [orders, setOrders] = useState<any[]>([]);
   const [menu, setMenu] = useState<any[]>([]);
@@ -272,6 +272,9 @@ export default function AdminDashboard() {
   const [newReelTitle, setNewReelTitle] = useState("");
   const [newReelDesc, setNewReelDesc] = useState("");
   const [newReelPrice, setNewReelPrice] = useState("");
+
+  // Table QR Generator state (Requirement 3)
+  const [genTableNum, setGenTableNum] = useState("1");
 
   // Header Background Video State (Requirement 4)
   const [headerVideoInput, setHeaderVideoInput] = useState("");
@@ -365,6 +368,23 @@ export default function AdminDashboard() {
   const [rosterStepQty, setRosterStepQty] = useState("");
   const [rosterStepNote, setRosterStepNote] = useState("");
 
+  // Sound Warning Beep Player for Kitchen/Counter Managers
+  const playNewOrderBeep = () => {
+    try {
+      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.frequency.setValueAtTime(880, audioCtx.currentTime); 
+      gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.2);
+    } catch (e) {}
+  };
+
+  const prevOrdersCountRef = useRef<number | null>(null);
+
   useEffect(() => {
     const adminSession = sessionStorage.getItem('bb_cafe_admin_verified');
     const adminRole = sessionStorage.getItem('bb_cafe_admin_role') as 'admin' | 'manager' | null;
@@ -397,7 +417,15 @@ export default function AdminDashboard() {
 
     const qOrders = query(collection(db, "orders"), orderBy("timestamp", "desc"));
     const unsubOrders = onSnapshot(qOrders, (snap) => {
-      setOrders(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      const currentOrdersList = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+      // PLAY ALERT IF NEW ORDER ARRIVES (Requirement 2 / sound warning beep)
+      if (prevOrdersCountRef.current !== null && currentOrdersList.length > prevOrdersCountRef.current) {
+        playNewOrderBeep();
+        toast.success("🚨 ALERT: Naya Online Order Received!");
+      }
+      prevOrdersCountRef.current = currentOrdersList.length;
+      setOrders(currentOrdersList);
     });
 
     const qProducts = query(collection(db, "products"));
@@ -1744,7 +1772,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                   </div>
                 ))}
                 {topSellingDishes.length === 0 && (
-                  <p className="text-center text-[10px] text-gray-500 py-2">No sales logged yet...</p>
+                  <p className="text-center text-[10px] text-gray-600 uppercase font-bold py-2">No sales logged yet...</p>
                 )}
               </div>
             </div>
@@ -1759,10 +1787,10 @@ Report generated automatically by Bum Bum Cafe POS.`
             </div>
 
             <div className="grid grid-cols-2 gap-3 bg-[#111]/30 border border-white/5 p-4 rounded-[2rem] shadow-xl">
-              <button onClick={handleExportOrders} className="bg-green-600 hover:bg-green-700 text-white font-black text-xs py-4 px-3 rounded-2xl flex items-center justify-center gap-2 active:scale-95 transition-all uppercase shadow-md border border-green-500/10">
+              <button onClick={handleExportOrders} className="bg-green-600 hover:bg-green-700 text-white font-black text-xs py-4 px-3 rounded-2xl flex items-center justify-center gap-2 active:scale-95 transition-all uppercase shadow-md border border-green-500/10 font-mono">
                 <Download size={14}/> Sales Ledger Excel
               </button>
-              <button onClick={handleExportCustomers} className="bg-orange-500 hover:bg-orange-600 text-black font-black text-xs py-4 px-3 rounded-2xl flex items-center justify-center gap-2 active:scale-95 transition-all uppercase shadow-md border border-orange-400/10">
+              <button onClick={handleExportCustomers} className="bg-orange-500 hover:bg-orange-600 text-black font-black text-xs py-4 px-3 rounded-2xl flex items-center justify-center gap-2 active:scale-95 transition-all uppercase shadow-md border border-orange-455/10">
                 <Download size={14}/> Customer List Excel
               </button>
             </div>
@@ -1840,7 +1868,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                     ))}
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4 text-[11px] font-bold text-gray-500 uppercase tracking-wider">
+                  <div className="grid grid-cols-2 gap-4 text-[11px] font-bold text-gray-500 uppercase tracking-wider font-mono">
                     <div className="flex items-center gap-2 font-sans"><Phone size={12}/> {o.customerPhone}</div>
                     <div className="flex items-center gap-2"><MapPin size={12}/> {o.address}</div>
                     <div className="flex items-center gap-2 col-span-2 font-sans"><Calendar size={12}/> {o.timestamp?.toDate ? o.timestamp.toDate().toLocaleString() : 'Just now'}</div>
@@ -1882,7 +1910,7 @@ Report generated automatically by Bum Bum Cafe POS.`
               
               {/* REQUIREMENT Menu duplicator tool integration */}
               <div className="grid grid-cols-2 gap-2">
-                <button onClick={handleMergeDuplicates} className="bg-indigo-650 hover:bg-indigo-755 text-white py-4 rounded-2xl font-black text-xs uppercase flex items-center justify-center gap-1.5 shadow active:scale-95 transition-all">
+                <button onClick={handleMergeDuplicates} className="bg-indigo-650 hover:bg-indigo-700 text-white py-4 rounded-2xl font-black text-xs uppercase flex items-center justify-center gap-1.5 shadow active:scale-95 transition-all">
                   🔍 Merge Existing Duplicates
                 </button>
                 <button onClick={() => { setShowAddForm(!showAddForm); setEditingProduct(null); }} className="bg-orange-500/10 text-orange-500 border border-orange-500/20 py-4 rounded-2xl font-black text-xs flex items-center justify-center gap-1.5 hover:bg-orange-500/20 active:scale-95 transition-all uppercase">
@@ -2076,7 +2104,7 @@ Report generated automatically by Bum Bum Cafe POS.`
 
                   <div className="flex gap-2 pt-2">
                     <button type="submit" className="flex-1 bg-green-600 text-white p-4 rounded-xl font-black text-sm uppercase">Update Category</button>
-                    <button type="button" onClick={() => setEditingCategory(null)} className="bg-white/5 text-gray-405 p-4 rounded-xl font-black text-sm uppercase">Cancel</button>
+                    <button type="button" onClick={() => setEditingCategory(null)} className="bg-white/5 text-gray-400 p-4 rounded-xl font-black text-sm uppercase">Cancel</button>
                   </div>
                 </form>
               </div>
@@ -2111,7 +2139,7 @@ Report generated automatically by Bum Bum Cafe POS.`
             <div className="flex justify-between items-center flex-wrap gap-2">
               <h3 className="text-xl font-black text-orange-500 uppercase tracking-wider flex items-center gap-2"><User size={20}/> Customer Management</h3>
               <div className="flex gap-2">
-                <label className="bg-yellow-500 hover:bg-yellow-605 text-black font-black text-[10px] px-4 py-2.5 rounded-full flex items-center gap-1.5 uppercase cursor-pointer transition-all">
+                <label className="bg-yellow-500 hover:bg-yellow-600 text-black font-black text-[10px] px-4 py-2.5 rounded-full flex items-center gap-1.5 uppercase cursor-pointer transition-all">
                   Import CSV
                   <input type="file" accept=".csv" onChange={handleCsvImport} className="hidden" />
                 </label>
@@ -2156,7 +2184,7 @@ Report generated automatically by Bum Bum Cafe POS.`
 
             <div className="space-y-4">
               {searchedCustomers.length === 0 ? (
-                <p className="text-center text-xs font-bold text-gray-500 py-10 uppercase">No matching customers found...</p>
+                <p className="text-center text-xs font-bold text-gray-505 py-10 uppercase">No matching customers found...</p>
               ) : (
                 searchedCustomers
                   .map(user => ({ ...user, metrics: getCustomerLoyaltyMetrics(user.phone) }))
@@ -2181,7 +2209,7 @@ Report generated automatically by Bum Bum Cafe POS.`
 
                         <div className="text-right flex items-center gap-4 flex-shrink-0">
                           <div>
-                            <p className="text-[9px] font-bold text-gray-500 uppercase">Available Points</p>
+                            <p className="text-[9px] font-bold text-gray-505 uppercase">Available Points</p>
                             <h4 className="text-lg font-black text-yellow-400">{user.points || 0} Pts</h4>
                           </div>
                           <button 
@@ -2218,7 +2246,7 @@ Report generated automatically by Bum Bum Cafe POS.`
             </form>
 
             <div className="space-y-3">
-              <p className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">Active Customer Reward Rules ({loyaltyRules.length})</p>
+              <p className="text-xs font-bold text-gray-505 uppercase tracking-widest pl-1">Active Customer Reward Rules ({loyaltyRules.length})</p>
               {loyaltyRules.length === 0 ? (
                 <p className="text-center text-xs font-bold text-gray-500 py-6">No custom rules configured yet...</p>
               ) : (
@@ -2278,7 +2306,7 @@ Report generated automatically by Bum Bum Cafe POS.`
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-bold text-gray-400 uppercase">Media Link (Video/Image URL)</label>
+                <label className="text-xs font-bold text-gray-405 uppercase">Media Link (Video/Image URL)</label>
                 <input type="url" placeholder="Paste Image link or Video URL..." value={newBannerUrl} onChange={(e) => setNewBannerUrl(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs text-white outline-none" required />
               </div>
 
@@ -2490,7 +2518,7 @@ Report generated automatically by Bum Bum Cafe POS.`
         {tab === 'roster' && (
           <div className="space-y-6">
             <h3 className="text-xl font-black text-orange-500 uppercase tracking-wider flex items-center gap-2"><Settings size={20}/> Kitchen SOP Recipe Roster</h3>
-            <p className="text-[10px] text-gray-500 uppercase tracking-widest font-black leading-relaxed font-mono">डिश बनाने के चरण (Steps) और सामग्री का अनुपात फीड करें, और रसोई की दीवार पर चिपकाने के लिए सीधे A4 साइज़ पोस्टर प्रिंट करें।</p>
+            <p className="text-[10px] text-gray-505 uppercase tracking-widest font-black leading-relaxed font-mono">डिश बनाने के चरण (Steps) और सामग्री का अनुपात फीड करें, और रसोई की दीवार पर चिपकाने के लिए सीधे A4 साइज़ पोस्टर प्रिंट करें।</p>
 
             <div className="bg-[#111] border border-white/5 p-5 rounded-3xl space-y-3">
               <label className="text-xs font-bold text-gray-405 uppercase block">Select Dish / डिश चुनें</label>
@@ -2533,7 +2561,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                     </div>
                     <div className="space-y-1">
                       <label className="text-[10px] font-bold text-gray-455 uppercase">Quantity / मात्रा</label>
-                      <input type="text" placeholder="e.g. 1 Piece / 30 grams" value={rosterStepQty} onChange={(e) => setRosterStepQty(e.target.value)} className="w-full bg-[#151515] border border-white/10 rounded-xl p-3 outline-none text-xs font-bold text-white" required />
+                      <input type="text" placeholder="e.g. 1 Piece / 30 grams" value={rosterStepQty} onChange={(e) => setRosterStepQty(e.target.value)} className="w-[#151515] border border-white/10 rounded-xl p-3 outline-none text-xs font-bold text-white" required />
                     </div>
                   </div>
                   <div className="space-y-1">
@@ -2661,12 +2689,12 @@ Report generated automatically by Bum Bum Cafe POS.`
             <form onSubmit={handleUpdatePasscodes} className="bg-white/[0.02] border border-white/5 p-6 rounded-[2.5rem] space-y-5">
               <div>
                 <h4 className="text-sm font-black text-orange-500 uppercase">Change security PINs</h4>
-                <p className="text-[9px] text-gray-500 font-bold uppercase mt-1 leading-relaxed font-mono">केवल एडमिनिस्ट्रेटर ही दोनों रोल (Admin व Manager) के लॉगिन क्रेडेंशियल्स को बदल सकता है।</p>
+                <p className="text-[9px] text-gray-500 font-bold uppercase mt-1 leading-relaxed font-mono">केवल एडमिनिस्ट्रेटर ही दोनों रोल (Admin व Manager) के क्रेडेंशियल्स को बदल सकता है।</p>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-gray-450 uppercase">Admin LOGIN PIN</label>
+                  <label className="text-[10px] font-bold text-gray-400 uppercase">Admin LOGIN PIN</label>
                   <input 
                     type="password" 
                     value={newAdminPinInput}
@@ -2677,7 +2705,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-gray-455 uppercase">Manager LOGIN PIN</label>
+                  <label className="text-[10px] font-bold text-gray-400 uppercase">Manager LOGIN PIN</label>
                   <input 
                     type="password" 
                     value={newManagerPinInput}
@@ -2701,6 +2729,38 @@ Report generated automatically by Bum Bum Cafe POS.`
                 </button>
               )}
             </form>
+
+            {/* Table QR Code Generator Widget (Requirement 3) */}
+            <div className="bg-[#111] border border-white/5 p-6 rounded-[2.5rem] space-y-4">
+              <div>
+                <h4 className="text-sm font-black text-orange-500 uppercase tracking-widest flex items-center gap-1">🍽️ Dine-In Table QR Generator</h4>
+                <p className="text-[9px] text-gray-500 font-bold uppercase mt-1 leading-relaxed">Select a table number to generate a direct scan QR code for automatic table order routing:</p>
+              </div>
+
+              <div className="flex gap-3 items-end">
+                <div className="flex-1 space-y-1">
+                  <label className="text-[10px] font-bold text-gray-400 uppercase">Table Number</label>
+                  <input 
+                    type="number" 
+                    min={1} 
+                    value={genTableNum} 
+                    onChange={(e) => setGenTableNum(e.target.value)} 
+                    placeholder="e.g. 3"
+                    className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-xs font-black text-white" 
+                  />
+                </div>
+                <button 
+                  onClick={() => {
+                    if (!genTableNum) return toast.error("Please enter a table number!");
+                    const url = `https://bb-cafe-app.vercel.app/?table=${genTableNum}`;
+                    window.open(`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(url)}`, '_blank');
+                  }}
+                  className="bg-orange-500 hover:bg-orange-600 text-black font-black text-xs py-3.5 px-6 rounded-xl uppercase tracking-wider transition-all"
+                >
+                  Generate QR Code
+                </button>
+              </div>
+            </div>
           </div>
         )}
 
@@ -2764,7 +2824,7 @@ Report generated automatically by Bum Bum Cafe POS.`
             <button 
               type="button" 
               onClick={() => setSopProduct(null)} 
-              className="absolute top-4 right-4 p-2 bg-white/5 text-gray-400 hover:text-white rounded-full transition-all"
+              className="absolute top-4 right-4 p-2 bg-white/5 text-gray-405 hover:text-white rounded-full transition-all"
             >
               <X size={18}/>
             </button>
@@ -2797,7 +2857,7 @@ Report generated automatically by Bum Bum Cafe POS.`
           <div className="bg-[#111] border border-white/5 p-6 rounded-[2.5rem] w-full max-w-lg relative shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto no-scrollbar">
             <button 
               onClick={() => setShowBroadcastModal(false)} 
-              className="absolute top-4 right-4 p-2 bg-white/5 text-gray-400 hover:text-white rounded-full transition-all"
+              className="absolute top-4 right-4 p-2 bg-white/5 text-gray-450 hover:text-white rounded-full transition-all"
             >
               <X size={18}/>
             </button>
@@ -2939,7 +2999,7 @@ Report generated automatically by Bum Bum Cafe POS.`
       {editingProduct && (
         <div className="fixed inset-0 bg-black/85 backdrop-blur-sm z-[200] flex items-center justify-center p-4 overflow-y-auto">
           <form onSubmit={handleUpdateProduct} className="bg-[#111] border-2 border-orange-500/50 p-6 rounded-[2.5rem] w-full max-w-lg relative max-h-[90vh] overflow-y-auto shadow-2xl space-y-4">
-            <button type="button" onClick={() => setEditingProduct(null)} className="absolute top-4 right-4 p-2.5 bg-white/5 text-gray-400 hover:text-white rounded-full"><X size={18}/></button>
+            <button type="button" onClick={() => setEditingProduct(null)} className="absolute top-4 right-4 p-2.5 bg-white/5 text-gray-450 hover:text-white rounded-full"><X size={18}/></button>
             
             <div className="text-center pb-2 border-b border-white/5">
               <h3 className="text-xl font-black text-orange-500 italic uppercase">Edit Product Info</h3>
@@ -2952,7 +3012,7 @@ Report generated automatically by Bum Bum Cafe POS.`
 
             <div className="space-y-1">
               <label className="text-xs font-bold text-gray-400 uppercase">Category</label>
-              <select value={editCategory} onChange={(e) => setEditCategory(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-white focus:border-orange-500" required border-orange-555>
+              <select value={editCategory} onChange={(e) => setEditCategory(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-white focus:border-orange-500" required>
                 {categoryOptions.filter(c => c !== "All" && c !== "DIY Pizza").map(cat => (
                   <option key={cat} value={cat} className="bg-[#111]">{cat}</option>
                 ))}
@@ -3010,3 +3070,4 @@ Report generated automatically by Bum Bum Cafe POS.`
     </div>
   );
 }
+
