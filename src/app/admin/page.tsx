@@ -1133,8 +1133,11 @@ export default function AdminDashboard() {
       });
 
       let mergedCount = 0;
+      // Fixed compatible iteration style without using --downlevelIteration compilation flag (Requirement 4)
+      const entries = Array.from(nameMap.entries());
 
-      for (const [name, items] of nameMap.entries()) {
+      for (let i = 0; i < entries.length; i++) {
+        const [name, items] = entries[i];
         if (items.length > 1) {
           // We have duplicates! Let's keep the first one as primary
           const primaryItem = items[0];
@@ -1741,16 +1744,16 @@ Report generated automatically by Bum Bum Cafe POS.`
                   </div>
                 ))}
                 {topSellingDishes.length === 0 && (
-                  <p className="text-center text-[10px] text-gray-600 uppercase font-bold py-2">No sales logged yet...</p>
+                  <p className="text-center text-[10px] text-gray-500 py-2">No sales logged yet...</p>
                 )}
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-3 bg-[#111]/30 border border-white/5 p-4 rounded-[2rem] shadow-xl">
-              <button onClick={handleResetTokenCounter} className="bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/20 font-black text-xs py-4 px-3 rounded-2xl flex items-center justify-center gap-2 active:scale-95 transition-all uppercase">
+              <button onClick={handleResetTokenCounter} className="bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/20 font-black text-xs py-4 px-3 rounded-2xl flex items-center justify-center gap-2 active:scale-95 transition-all uppercase font-mono">
                 Reset Tokens Counter
               </button>
-              <button onClick={handleSendDailyClosingReport} className="bg-green-600 hover:bg-green-700 text-white font-black text-xs py-4 px-3 rounded-2xl flex items-center justify-center gap-2 active:scale-95 transition-all uppercase shadow-md border border-green-500/10">
+              <button onClick={handleSendDailyClosingReport} className="bg-green-600 hover:bg-green-700 text-white font-black text-xs py-4 px-3 rounded-2xl flex items-center justify-center gap-2 active:scale-95 transition-all uppercase shadow-md border border-green-500/10 font-mono">
                 📲 Send Report to Owner
               </button>
             </div>
@@ -1764,30 +1767,30 @@ Report generated automatically by Bum Bum Cafe POS.`
               </button>
             </div>
 
-            <div className="space-y-4">
+            <div className="space-y-4 font-mono">
               <h4 className="text-sm font-black text-gray-400 uppercase tracking-widest pt-2">📚 Permanent Financial Ledger</h4>
               {orders.length === 0 ? (
                 <p className="text-center text-gray-600 py-12 text-xs uppercase font-bold tracking-widest">No transaction data logged...</p>
               ) : (
                 orders.map((o) => (
-                  <div key={o.id} className="bg-[#111] border border-white/5 p-5 rounded-3xl flex justify-between items-center relative overflow-hidden">
+                  <div key={o.id} className="bg-[#111] border border-white/5 p-5 rounded-3xl flex justify-between items-center relative overflow-hidden text-xs">
                     <div className="space-y-1 pr-4">
                       <div className="flex gap-2.5">
                         <span className="text-[10px] font-black uppercase text-gray-500">Bill No: #{formatBillNumber(o.billNumber || 0)}</span>
                         <span className="text-[10px] font-black uppercase text-yellow-500">Token: #{o.tokenNumber || "N/A"}</span>
                       </div>
                       <h4 className="font-extrabold text-sm text-gray-300">Name: {o.customerName || "Customer"}</h4>
-                      <p className="text-[11px] font-bold text-orange-500">Mobile: {o.customerPhone || "N/A"}</p>
-                      <p className="text-[10px] text-gray-400 font-medium">Address: {o.address || "N/A"}</p>
+                      <p className="text-[11px] font-bold text-orange-500 font-sans">Mobile: {o.customerPhone || "N/A"}</p>
+                      <p className="text-[10px] text-gray-450 font-medium">Address: {o.address || "N/A"}</p>
                       
                       <div className="border-t border-white/5 pt-2 mt-2 space-y-0.5">
                         {o.items?.map((item: any, idx: number) => (
-                          <p key={idx} className="text-[11px] font-bold text-gray-400">
+                          <p key={idx} className="text-[11px] font-bold text-gray-400 font-sans">
                             <span className="text-orange-500">×{item.quantity}</span> {item.name}
                           </p>
                         ))}
                       </div>
-                      <p className="text-[9px] font-semibold text-gray-600 mt-2">{o.timestamp?.toDate ? o.timestamp.toDate().toLocaleString() : 'Just now'}</p>
+                      <p className="text-[9px] font-semibold text-gray-600 mt-2 font-sans">{o.timestamp?.toDate ? o.timestamp.toDate().toLocaleString() : 'Just now'}</p>
                     </div>
                     <div className="text-right flex-shrink-0">
                       <p className="text-green-400 font-black text-lg leading-none">₹{o.total}</p>
@@ -1823,8 +1826,8 @@ Report generated automatically by Bum Bum Cafe POS.`
                 <div key={o.id} className="bg-white/[0.03] p-6 rounded-[2rem] border border-white/5 relative overflow-hidden">
                   <div className="flex justify-between items-start mb-4">
                     <div className="flex flex-wrap gap-1.5">
-                      <span className="bg-orange-500 text-black text-[10px] px-3 py-1 rounded-full font-black">BILL: #{formatBillNumber(o.billNumber || 0)}</span>
-                      <span className="bg-yellow-400 text-black text-[10px] px-3 py-1 rounded-full font-black">TOKEN: #{o.tokenNumber || "N/A"}</span>
+                      <span className="bg-orange-500 text-black text-[10px] px-3 py-1 rounded-full font-black font-mono">BILL: #{formatBillNumber(o.billNumber || 0)}</span>
+                      <span className="bg-yellow-400 text-black text-[10px] px-3 py-1 rounded-full font-black font-mono">TOKEN: #{o.tokenNumber || "N/A"}</span>
                     </div>
                     <span className="text-orange-500 font-black text-xl">₹{o.total}</span>
                   </div>
@@ -1838,9 +1841,9 @@ Report generated automatically by Bum Bum Cafe POS.`
                   </div>
 
                   <div className="grid grid-cols-2 gap-4 text-[11px] font-bold text-gray-500 uppercase tracking-wider">
-                    <div className="flex items-center gap-2"><Phone size={12}/> {o.customerPhone}</div>
+                    <div className="flex items-center gap-2 font-sans"><Phone size={12}/> {o.customerPhone}</div>
                     <div className="flex items-center gap-2"><MapPin size={12}/> {o.address}</div>
-                    <div className="flex items-center gap-2 col-span-2"><Calendar size={12}/> {o.timestamp?.toDate ? o.timestamp.toDate().toLocaleString() : 'Just now'}</div>
+                    <div className="flex items-center gap-2 col-span-2 font-sans"><Calendar size={12}/> {o.timestamp?.toDate ? o.timestamp.toDate().toLocaleString() : 'Just now'}</div>
                   </div>
                   <div className="mt-4 pt-4 border-t border-white/5 flex justify-between items-center">
                     <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Name: {o.customerName || 'N/A'}</span>
@@ -1875,11 +1878,11 @@ Report generated automatically by Bum Bum Cafe POS.`
         {tab === 'menu' && (
           <div className="space-y-4">
             <div className="flex flex-col gap-2">
-              <button onClick={handleBulkImport} type="button" className="w-full bg-yellow-400 text-black py-4 rounded-2xl font-black text-sm flex items-center justify-center gap-2 active:scale-95 transition-all shadow-xl">📥 IMPORT ALL 80+ PDF MENU ITEMS</button>
+              <button onClick={handleBulkImport} type="button" className="w-full bg-yellow-400 text-black py-4 rounded-2xl font-black text-sm flex items-center justify-center gap-2 active:scale-95 transition-all shadow-xl font-sans">📥 IMPORT ALL 80+ PDF MENU ITEMS</button>
               
-              {/* REQUIREMENT 4: Automated duplicates merging tool */}
+              {/* REQUIREMENT Menu duplicator tool integration */}
               <div className="grid grid-cols-2 gap-2">
-                <button onClick={handleMergeDuplicates} className="bg-indigo-600 text-white py-4 rounded-2xl font-black text-xs uppercase flex items-center justify-center gap-1.5 shadow active:scale-95 transition-all">
+                <button onClick={handleMergeDuplicates} className="bg-indigo-650 hover:bg-indigo-755 text-white py-4 rounded-2xl font-black text-xs uppercase flex items-center justify-center gap-1.5 shadow active:scale-95 transition-all">
                   🔍 Merge Existing Duplicates
                 </button>
                 <button onClick={() => { setShowAddForm(!showAddForm); setEditingProduct(null); }} className="bg-orange-500/10 text-orange-500 border border-orange-500/20 py-4 rounded-2xl font-black text-xs flex items-center justify-center gap-1.5 hover:bg-orange-500/20 active:scale-95 transition-all uppercase">
@@ -2073,7 +2076,7 @@ Report generated automatically by Bum Bum Cafe POS.`
 
                   <div className="flex gap-2 pt-2">
                     <button type="submit" className="flex-1 bg-green-600 text-white p-4 rounded-xl font-black text-sm uppercase">Update Category</button>
-                    <button type="button" onClick={() => setEditingCategory(null)} className="bg-white/5 text-gray-400 p-4 rounded-xl font-black text-sm uppercase">Cancel</button>
+                    <button type="button" onClick={() => setEditingCategory(null)} className="bg-white/5 text-gray-405 p-4 rounded-xl font-black text-sm uppercase">Cancel</button>
                   </div>
                 </form>
               </div>
@@ -2108,7 +2111,7 @@ Report generated automatically by Bum Bum Cafe POS.`
             <div className="flex justify-between items-center flex-wrap gap-2">
               <h3 className="text-xl font-black text-orange-500 uppercase tracking-wider flex items-center gap-2"><User size={20}/> Customer Management</h3>
               <div className="flex gap-2">
-                <label className="bg-yellow-500 hover:bg-yellow-600 text-black font-black text-[10px] px-4 py-2.5 rounded-full flex items-center gap-1.5 uppercase cursor-pointer transition-all">
+                <label className="bg-yellow-500 hover:bg-yellow-605 text-black font-black text-[10px] px-4 py-2.5 rounded-full flex items-center gap-1.5 uppercase cursor-pointer transition-all">
                   Import CSV
                   <input type="file" accept=".csv" onChange={handleCsvImport} className="hidden" />
                 </label>
@@ -2153,7 +2156,7 @@ Report generated automatically by Bum Bum Cafe POS.`
 
             <div className="space-y-4">
               {searchedCustomers.length === 0 ? (
-                <p className="text-center text-xs font-bold text-gray-505 py-10 uppercase">No matching customers found...</p>
+                <p className="text-center text-xs font-bold text-gray-500 py-10 uppercase">No matching customers found...</p>
               ) : (
                 searchedCustomers
                   .map(user => ({ ...user, metrics: getCustomerLoyaltyMetrics(user.phone) }))
@@ -2178,7 +2181,7 @@ Report generated automatically by Bum Bum Cafe POS.`
 
                         <div className="text-right flex items-center gap-4 flex-shrink-0">
                           <div>
-                            <p className="text-[9px] font-bold text-gray-505 uppercase">Available Points</p>
+                            <p className="text-[9px] font-bold text-gray-500 uppercase">Available Points</p>
                             <h4 className="text-lg font-black text-yellow-400">{user.points || 0} Pts</h4>
                           </div>
                           <button 
@@ -2270,12 +2273,12 @@ Report generated automatically by Bum Bum Cafe POS.`
               <p className="text-[10px] text-gray-500 font-bold uppercase leading-normal">यहाँ से आप मुख्य स्क्रीन के बड़े आफर बैनर्स (Image या Video) को जोड़ सकते हैं।</p>
               
               <div className="space-y-1">
-                <label className="text-xs font-bold text-gray-405 uppercase">Banner Title</label>
+                <label className="text-xs font-bold text-gray-400 uppercase">Banner Title</label>
                 <input type="text" placeholder="e.g. Free Delivery above ₹99" value={newBannerTitle} onChange={(e) => setNewBannerTitle(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs text-white outline-none" required />
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-bold text-gray-405 uppercase">Media Link (Video/Image URL)</label>
+                <label className="text-xs font-bold text-gray-400 uppercase">Media Link (Video/Image URL)</label>
                 <input type="url" placeholder="Paste Image link or Video URL..." value={newBannerUrl} onChange={(e) => setNewBannerUrl(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs text-white outline-none" required />
               </div>
 
@@ -2530,7 +2533,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                     </div>
                     <div className="space-y-1">
                       <label className="text-[10px] font-bold text-gray-455 uppercase">Quantity / मात्रा</label>
-                      <input type="text" placeholder="e.g. 1 Piece / 30 grams" value={rosterStepQty} onChange={(e) => setRosterStepQty(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-xs font-bold text-white" required />
+                      <input type="text" placeholder="e.g. 1 Piece / 30 grams" value={rosterStepQty} onChange={(e) => setRosterStepQty(e.target.value)} className="w-full bg-[#151515] border border-white/10 rounded-xl p-3 outline-none text-xs font-bold text-white" required />
                     </div>
                   </div>
                   <div className="space-y-1">
@@ -2663,7 +2666,7 @@ Report generated automatically by Bum Bum Cafe POS.`
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-gray-400 uppercase">Admin LOGIN PIN</label>
+                  <label className="text-[10px] font-bold text-gray-450 uppercase">Admin LOGIN PIN</label>
                   <input 
                     type="password" 
                     value={newAdminPinInput}
@@ -2674,7 +2677,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-gray-400 uppercase">Manager LOGIN PIN</label>
+                  <label className="text-[10px] font-bold text-gray-455 uppercase">Manager LOGIN PIN</label>
                   <input 
                     type="password" 
                     value={newManagerPinInput}
@@ -2878,7 +2881,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                   onClick={() => { setSentBroadcastPhones([]); toast.success("Sent history reset successfully!"); }}
                   title="Reset session"
                   type="button"
-                  className="bg-white/5 text-gray-455 transition-all active:scale-95"
+                  className="bg-white/5 text-gray-450 transition-all active:scale-95"
                 >
                   <RefreshCw size={16} />
                 </button>
@@ -2949,7 +2952,7 @@ Report generated automatically by Bum Bum Cafe POS.`
 
             <div className="space-y-1">
               <label className="text-xs font-bold text-gray-400 uppercase">Category</label>
-              <select value={editCategory} onChange={(e) => setEditCategory(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-white focus:border-orange-500" required>
+              <select value={editCategory} onChange={(e) => setEditCategory(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-white focus:border-orange-500" required border-orange-555>
                 {categoryOptions.filter(c => c !== "All" && c !== "DIY Pizza").map(cat => (
                   <option key={cat} value={cat} className="bg-[#111]">{cat}</option>
                 ))}
