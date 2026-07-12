@@ -98,9 +98,7 @@ const handlePrintReceipt = (order: any) => {
           <p style="margin: 3px 0; font-size: 11px;">Mohandra, Panna (M.P.)</p>
           <p style="margin: 3px 0; font-size: 11px;">Mobile: +91 9714293759</p>
         </div>
-        
         <div class="divider"></div>
-        
         <div style="font-size: 12px; line-height: 1.5;">
           <div><b>Bill No  :</b> #${formattedBillNo}</div>
           <div><b>Token No :</b> #${order.tokenNumber || 'N/A'}</div>
@@ -108,9 +106,7 @@ const handlePrintReceipt = (order: any) => {
           <div><b>Name     :</b> ${order.customerName || 'Guest'}</div>
           <div><b>Phone    :</b> ${order.customerPhone || 'N/A'}</div>
         </div>
-        
         <div class="divider"></div>
-        
         <table>
           <thead>
             <tr style="border-bottom: 1px dashed #000;">
@@ -123,9 +119,7 @@ const handlePrintReceipt = (order: any) => {
             ${itemsRows}
           </tbody>
         </table>
-        
         <div class="divider"></div>
-        
         <table style="font-size: 13px;">
           <tr>
             <td>Subtotal:</td>
@@ -142,20 +136,15 @@ const handlePrintReceipt = (order: any) => {
             <td style="text-align: right; padding-top: 5px; font-size: 16px;">₹${order.total}</td>
           </tr>
         </table>
-        
         <div class="qr-container">
           <p style="margin: 0; font-size: 11px; font-weight: bold;">Scan with PhonePe / UPI to Pay</p>
           <img class="qr-image" src="/phonepe-qr.png" alt="Payment QR" />
         </div>
-        
         <div class="divider"></div>
-        
         <p class="text-center" style="margin: 5px 0 0 0; font-size: 12px; font-weight: bold;">Thank You! Visit Again!</p>
-        
         <div class="text-center no-print" style="margin-top: 20px;">
           <button onclick="window.print()" style="padding: 10px 20px; font-weight: bold; background: #f97316; color: white; border: none; border-radius: 8px; cursor: pointer;">Print / Save as PDF</button>
         </div>
-
         <script>
           window.onload = function() {
             setTimeout(function() { window.print(); }, 300);
@@ -219,23 +208,18 @@ const handlePrintRosterSOP = (product: any) => {
           <div class="sub-title">STANDARD RECIPE: ${product.name}</div>
           <div class="category">Category Segment: ${product.category}</div>
         </div>
-
         <div style="font-size: 16px; font-weight: bold; margin-bottom: 25px; text-transform: uppercase; border-left: 6px solid #f97316; padding-left: 12px;">
           📝 Step-by-Step Cooking instructions & Raw Materials:
         </div>
-
         <div style="margin-top: 15px;">
           ${stepsHtml}
         </div>
-
         <div class="warning-box">
           ⚠️ रसोइया ध्यान दें: कैफ़े की गुणवत्ता बनाए रखने के लिए इस चार्ट के अनुसार ही सटीक मात्रा का उपयोग करें!
         </div>
-
         <div class="no-print" style="text-align: center; margin-top: 40px;">
           <button onclick="window.print()" style="padding: 14px 35px; font-size: 16px; font-weight: bold; background: #f97316; color: #fff; border: none; border-radius: 8px; cursor: pointer; text-transform: uppercase; letter-spacing: 1px;">Print Recipe Poster</button>
         </div>
-
         <script>
           window.onload = function() {
             setTimeout(function() { window.print(); }, 300);
@@ -257,7 +241,7 @@ export default function AdminDashboard() {
   const [menu, setMenu] = useState<any[]>([]);
   const [storeOpen, setStoreOpen] = useState(true);
 
-  // SEARCH QUERIES STATES
+  // SEARCH SEARCH
   const [menuSearchQuery, setMenuSearchQuery] = useState("");
   const [categorySearchQuery, setCategorySearchQuery] = useState("");
   const [customerSearchQuery, setCustomerSearchQuery] = useState("");
@@ -369,12 +353,9 @@ export default function AdminDashboard() {
   const [newReelPrice, setNewReelPrice] = useState("");
   const [newReelIsStory, setNewReelIsStory] = useState(false);
 
-  // Helper function to format bill number to e.g., '0015'
-  const formatBillNumber = (num: number) => {
-    return String(num).padStart(4, '0');
-  };
+  // Helper formatting
+  const formatBillNumber = (num: number) => String(num).padStart(4, '0');
 
-  // 1. Session verification check
   useEffect(() => {
     const adminSession = sessionStorage.getItem('bb_cafe_admin_verified');
     const adminRole = sessionStorage.getItem('bb_cafe_admin_role') as 'admin' | 'manager' | null;
@@ -385,7 +366,7 @@ export default function AdminDashboard() {
     setLoading(false);
   }, []);
 
-  // 2. Real-time Security Passcodes Loader
+  // Passcodes Loader
   useEffect(() => {
     const unsubPasscodes = onSnapshot(doc(db, "settings", "passcodes"), (d) => {
       if (d.exists()) {
@@ -401,53 +382,44 @@ export default function AdminDashboard() {
     return () => unsubPasscodes();
   }, []);
 
-  // 3. Real-time Data Listeners
+  // Real-time Data Listeners
   useEffect(() => {
     if (!isVerified) return;
 
-    // Listen for Orders
     const qOrders = query(collection(db, "orders"), orderBy("timestamp", "desc"));
     const unsubOrders = onSnapshot(qOrders, (snap) => {
       setOrders(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
 
-    // Listen for Products
     const qProducts = query(collection(db, "products"));
     const unsubProducts = onSnapshot(qProducts, (snap) => {
       setMenu(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
 
-    // Listen for Dynamic Categories
     const unsubCats = onSnapshot(collection(db, "categories"), (snap) => {
       setCategories(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
 
-    // Listen for Store Status
     const unsubStore = onSnapshot(doc(db, "settings", "store"), (d) => {
       if (d.exists()) setStoreOpen(d.data().isOpen);
     });
 
-    // Listen for Banners
     const unsubBanners = onSnapshot(collection(db, "banners"), (snap) => {
       setBanners(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
 
-    // Listen for Coupons
     const unsubCoupons = onSnapshot(collection(db, "coupons"), (snap) => {
       setCoupons(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
 
-    // Listen for Reviews
     const unsubReviews = onSnapshot(collection(db, "reviews"), (snap) => {
       setReviews(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
 
-    // Listen for Customer Loyalty Points
     const unsubLoyalty = onSnapshot(collection(db, "customer_points"), (snap) => {
       setLoyaltyUsers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
 
-    // Listen for Loyalty Rules
     const unsubRules = onSnapshot(collection(db, "loyalty_rules"), (snap) => {
       setLoyaltyRules(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
@@ -462,7 +434,6 @@ export default function AdminDashboard() {
       setPointsClaims(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
 
-    // Listen for Customer Point Transfers
     const unsubTransfers = onSnapshot(collection(db, "point_transfers"), (snap) => {
       const logs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       logs.sort((a: any, b: any) => {
@@ -489,7 +460,6 @@ export default function AdminDashboard() {
     };
   }, [isVerified]);
 
-  // --- PASSCODE LOGIN ---
   const handlePasscodeLogin = (e: React.FormEvent) => {
     e.preventDefault();
     if (passcode === passcodes.adminPin) {
@@ -517,11 +487,8 @@ export default function AdminDashboard() {
     window.location.href = "/";
   };
 
-  // --- MERGE REGISTERED & HISTORICAL (OLD) CUSTOMERS ---
   const combinedCustomers = useMemo(() => {
     const customersMap = new Map();
-    
-    // 1. Process active loyalty database users
     loyaltyUsers.forEach(user => {
       const cleanPhone = String(user.id || user.phone || "").replace("+91", "").trim();
       customersMap.set(cleanPhone, {
@@ -533,7 +500,6 @@ export default function AdminDashboard() {
       });
     });
 
-    // 2. Scan historical orders to fetch old customer directory safely
     orders.forEach(order => {
       if (!order.customerPhone) return;
       const cleanPhone = String(order.customerPhone).replace("+91", "").trim();
@@ -551,7 +517,6 @@ export default function AdminDashboard() {
     return Array.from(customersMap.values());
   }, [loyaltyUsers, orders]);
 
-  // --- SEARCH CUSTOMERS BY NAME & PHONE ---
   const searchedCustomers = useMemo(() => {
     if (!customerSearchQuery.trim()) return combinedCustomers;
     const q = customerSearchQuery.toLowerCase().trim();
@@ -561,7 +526,6 @@ export default function AdminDashboard() {
     );
   }, [combinedCustomers, customerSearchQuery]);
 
-  // --- COMBINE DYNAMIC + FALLBACK CATEGORIES ---
   const combinedCategories = useMemo(() => {
     const list = [...categories];
     ADD_CATEGORIES.forEach(fallbackName => {
@@ -579,7 +543,6 @@ export default function AdminDashboard() {
     return list;
   }, [categories]);
 
-  // --- FILTER & SORT ORDERS BY SELECTED DATE ---
   const filteredOrdersList = useMemo(() => {
     const targetDateStr = new Date(ordersFilterDate).toDateString();
     const matched = orders.filter(o => {
@@ -590,7 +553,6 @@ export default function AdminDashboard() {
     return matched.sort((a, b) => Number(b.billNumber || 0) - Number(a.billNumber || 0));
   }, [orders, ordersFilterDate]);
 
-  // --- CUSTOMER PROFILE SAVER ---
   const handleUpdateCustomer = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editCustomerName) return toast.error("Name is required!");
@@ -608,7 +570,6 @@ export default function AdminDashboard() {
     }
   };
 
-  // --- DYNAMIC LOYALTY RULES CONTROLLER ---
   const handleAddRule = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newRuleName || !newRulePoints) return toast.error("Please fill all fields!");
@@ -636,7 +597,6 @@ export default function AdminDashboard() {
     }
   };
 
-  // --- CALCULATE CUSTOMER LOYALTY METRICS ---
   const getCustomerLoyaltyMetrics = (phone: string) => {
     const targetPhone = String(phone).replace("+91", "").trim();
     const customerOrders = orders.filter(o => {
@@ -669,7 +629,6 @@ export default function AdminDashboard() {
     };
   };
 
-  // --- CSV / EXCEL EXPORT ENGINE ---
   const triggerCsvDownload = (data: any[], filename: string, headers: string[], keys: string[]) => {
     if (data.length === 0) return toast.error("No data available to export!");
 
@@ -699,7 +658,6 @@ export default function AdminDashboard() {
     toast.success("Excel Data Exported!");
   };
 
-  // Export 1: Order Sales History
   const handleExportOrders = () => {
     const formattedData = orders.map(o => {
       const itemsSummary = o.items?.map((i: any) => `${i.name} (x${i.quantity})`).join(' | ') || '';
@@ -717,7 +675,6 @@ export default function AdminDashboard() {
     triggerCsvDownload(formattedData, `BumBumCafe_SalesLedger_${new Date().toLocaleDateString()}`, headers, keys);
   };
 
-  // Export 2: Unique Client Database
   const handleExportCustomers = () => {
     const seen = new Set();
     const formattedData: any[] = [];
@@ -742,7 +699,6 @@ export default function AdminDashboard() {
     triggerCsvDownload(formattedData, `BumBumCafe_CustomersDirectory_${new Date().toLocaleDateString()}`, headers, keys);
   };
 
-  // --- CALENDAR DYNAMIC SALES AUDIT BY RANGE ---
   const getAuditRangeAnalytics = () => {
     const startObj = new Date(startDate);
     startObj.setHours(0,0,0,0);
@@ -794,7 +750,6 @@ export default function AdminDashboard() {
   const auditStats = getAuditRangeAnalytics();
   const lifetimeStats = getLifetimeMetrics();
 
-  // --- MOST SELLING DISHES ---
   const topSellingDishes = useMemo(() => {
     const countsMap: any = {};
     orders.forEach(o => {
@@ -810,7 +765,6 @@ export default function AdminDashboard() {
       .slice(0, 5); 
   }, [orders]);
 
-  // --- LAST 7 DAYS CHART DATA ---
   const last7DaysChartData = useMemo(() => {
     const days: any[] = [];
     for (let i = 6; i >= 0; i--) {
@@ -840,12 +794,10 @@ export default function AdminDashboard() {
     }));
   }, [orders]);
 
-  // Dynamic categories helper
   const categoryOptions = categories.length > 0 
     ? categories.map(c => c.name)
     : ADD_CATEGORIES;
 
-  // --- DYNAMIC CATEGORY ACTIONS ---
   const handleAddCategory = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCatName || !newCatImage) return toast.error("Please fill Name & Image link!");
@@ -919,7 +871,7 @@ export default function AdminDashboard() {
     }
   };
 
-  // Requirement 2: Dynamic Reels/Stories CRUD Additions
+  // Requirement 2: Stories/Reels CRUD
   const handleAddBanner = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newBannerUrl) return;
@@ -1366,7 +1318,7 @@ Report generated automatically by Bum Bum Cafe POS.`
   };
 
   const handleResetTokenCounter = () => {
-    if (window.confirm("Bum Bum Cafe ke Token Sequence ko reset karein?")) {
+    if (window.confirm("Bum Bum Cafe ke Token Sequence ko reset kareइन?")) {
       localStorage.setItem('bb_cafe_token_seed', '1');
       toast.success("Token sequence resets safely!");
     }
@@ -1921,8 +1873,8 @@ Report generated automatically by Bum Bum Cafe POS.`
 
                   {(editVariantType === 'half_full' || editVariantType === 'plain_butter') && (
                     <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Half / Plain (₹)</label><input type="number" value={editHalfPrice} onChange={(e) => setEditHalfPrice(e.target.value)} className="w-full bg-black/40 border border-white/10 rouded-xl p-3 text-white text-xs font-bold" /></div>
-                      <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Full / Butter (₹)</label><input type="number" value={editFullPrice} onChange={(e) => setEditFullPrice(e.target.value)} className="w-full bg-black/40 border border-white/10 rouded-xl p-3 text-white text-xs font-bold" /></div>
+                      <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Half / Plain (₹)</label><input type="number" value={editHalfPrice} onChange={(e) => setEditHalfPrice(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-white text-xs font-bold" /></div>
+                      <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Full / Butter (₹)</label><input type="number" value={editFullPrice} onChange={(e) => setEditFullPrice(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-white text-xs font-bold" /></div>
                     </div>
                   )}
 
@@ -1939,7 +1891,7 @@ Report generated automatically by Bum Bum Cafe POS.`
 
                   <div className="flex gap-2 pt-2">
                     <button type="submit" className="flex-1 bg-green-600 text-white p-4 rounded-xl font-black text-sm uppercase">Update Item</button>
-                    <button type="button" onClick={() => setEditingProduct(null)} className="bg-white/5 text-gray-400 p-4 rounded-xl font-black text-xs uppercase">Cancel</button>
+                    <button type="button" onClick={() => setEditingProduct(null)} className="bg-white/5 text-gray-450 p-4 rounded-xl font-black text-xs uppercase">Cancel</button>
                   </div>
                 </form>
               </div>
@@ -1975,7 +1927,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                       <img src={item.image} className="w-16 h-16 rounded-2xl object-cover opacity-80" alt={item.name} />
                       <div className="flex-1">
                         <h4 className="font-bold text-sm">{item.name}</h4>
-                        <p className="text-orange-500 font-black text-xs italic capitalize">{item.category}</p>
+                        <p className="text-orange-550 font-black text-xs italic capitalize">{item.category}</p>
                         <p className="text-orange-500 font-black text-sm mt-1">{getAdminDisplayPrice(item)}</p>
                       </div>
                       <div className="flex items-center gap-2">
@@ -2037,11 +1989,11 @@ Report generated automatically by Bum Bum Cafe POS.`
                   <div className="space-y-4">
                     <div className="space-y-1">
                       <label className="text-xs font-bold text-gray-400 uppercase">Category Name</label>
-                      <input type="text" value={editCatName} onChange={(e) => setEditCatName(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-4 outline-none text-sm font-bold text-white" required />
+                      <input type="text" value={editCatName} onChange={(e) => setEditCatName(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-4 outline-none focus:border-orange-500 text-sm font-bold text-white" required />
                     </div>
                     <div className="space-y-1">
                       <label className="text-xs font-bold text-gray-400 uppercase">Image URL Link</label>
-                      <input type="url" value={editCatImage} onChange={(e) => setEditCatImage(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-4 outline-none text-sm font-bold text-white" required />
+                      <input type="url" value={editCatImage} onChange={(e) => setEditCatImage(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-4 outline-none focus:border-orange-500 text-sm font-bold text-white" required />
                     </div>
                   </div>
 
@@ -2469,7 +2421,7 @@ Report generated automatically by Bum Bum Cafe POS.`
 
             <div className="space-y-3">
               {pointsClaims.length === 0 ? (
-                <p className="text-center text-xs font-bold text-gray-600 py-12 uppercase">कोई क्लेम अनुरोध नहीं मिला।</p>
+                <p className="text-center text-xs font-bold text-gray-600 py-12 uppercase">कोई दावा अनुरोध नहीं मिला।</p>
               ) : (
                 pointsClaims.map((claim) => (
                   <div key={claim.id} className="bg-neutral-900 border border-white/5 p-4 rounded-3xl space-y-3 text-xs">
