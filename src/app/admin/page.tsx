@@ -19,11 +19,14 @@ const SOCIAL_LINKS = [
   { id: 'snapchat', label: '👻 Snapchat', icon: '👻', points: 1, url: 'https://www.snapchat.com/add/bbcafe.in' }
 ];
 
-// Helper to determine if a URL points to a video (Requirement Fix)
-const isVideoUrl = (url: string) => {
+const isVideoUrl = (url: string): boolean => {
   if (!url) return false;
   const cleanUrl = url.toLowerCase().split('?')[0];
   return cleanUrl.endsWith('.mp4') || cleanUrl.endsWith('.webm') || cleanUrl.includes('/video') || cleanUrl.includes('video');
+};
+
+const formatBillNumber = (num: number) => {
+  return String(num).padStart(4, '0');
 };
 
 const handleStatusChange = async (order: any, newStatus: string) => {
@@ -94,9 +97,7 @@ const handlePrintReceipt = (order: any) => {
           .total-row { font-weight: bold; font-size: 15px; }
           .qr-container { margin-top: 15px; text-align: center; }
           .qr-image { width: 180px; height: auto; display: block; margin: 10px auto; }
-          @media print {
-            .no-print { display: none; }
-          }
+          @media print { .no-print { display: none; } }
         </style>
       </head>
       <body>
@@ -105,9 +106,7 @@ const handlePrintReceipt = (order: any) => {
           <p style="margin: 3px 0; font-size: 11px;">Mohandra, Panna (M.P.)</p>
           <p style="margin: 3px 0; font-size: 11px;">Mobile: +91 9714293759</p>
         </div>
-        
         <div class="divider"></div>
-        
         <div style="font-size: 12px; line-height: 1.5;">
           <div><b>Bill No  :</b> #${formattedBillNo}</div>
           <div><b>Token No :</b> #${order.tokenNumber || 'N/A'}</div>
@@ -115,9 +114,7 @@ const handlePrintReceipt = (order: any) => {
           <div><b>Name     :</b> ${order.customerName || 'Guest'}</div>
           <div><b>Phone    :</b> ${order.customerPhone || 'N/A'}</div>
         </div>
-        
         <div class="divider"></div>
-        
         <table>
           <thead>
             <tr style="border-bottom: 1px dashed #000;">
@@ -130,9 +127,7 @@ const handlePrintReceipt = (order: any) => {
             ${itemsRows}
           </tbody>
         </table>
-        
         <div class="divider"></div>
-        
         <table style="font-size: 13px;">
           <tr>
             <td>Subtotal:</td>
@@ -149,20 +144,15 @@ const handlePrintReceipt = (order: any) => {
             <td style="text-align: right; padding-top: 5px; font-size: 16px;">₹${order.total}</td>
           </tr>
         </table>
-        
         <div class="qr-container">
           <p style="margin: 0; font-size: 11px; font-weight: bold;">Scan with PhonePe / UPI to Pay</p>
           <img class="qr-image" src="/phonepe-qr.png" alt="Payment QR" />
         </div>
-        
         <div class="divider"></div>
-        
         <p class="text-center" style="margin: 5px 0 0 0; font-size: 12px; font-weight: bold;">Thank You! Visit Again!</p>
-        
         <div class="text-center no-print" style="margin-top: 20px;">
           <button onclick="window.print()" style="padding: 10px 20px; font-weight: bold; background: #f97316; color: white; border: none; border-radius: 8px; cursor: pointer;">Print / Save as PDF</button>
         </div>
-
         <script>
           window.onload = function() {
             setTimeout(function() { window.print(); }, 300);
@@ -215,9 +205,7 @@ const handlePrintRosterSOP = (product: any) => {
           .sub-title { font-size: 20px; font-weight: bold; margin-top: 8px; text-transform: uppercase; background: #000; color: #fff; padding: 6px 15px; display: inline-block; }
           .category { font-size: 14px; text-transform: uppercase; font-weight: bold; color: #555; margin-top: 8px; }
           .warning-box { border: 3px solid #000; padding: 15px; text-align: center; margin-top: 40px; font-weight: 900; font-size: 16px; text-transform: uppercase; background: #f3f4f6; }
-          @media print {
-            .no-print { display: none; }
-          }
+          @media print { .no-print { display: none; } }
         </style>
       </head>
       <body>
@@ -226,23 +214,18 @@ const handlePrintRosterSOP = (product: any) => {
           <div class="sub-title">STANDARD RECIPE: ${product.name}</div>
           <div class="category">Category Segment: ${product.category}</div>
         </div>
-
         <div style="font-size: 16px; font-weight: bold; margin-bottom: 25px; text-transform: uppercase; border-left: 6px solid #f97316; padding-left: 12px;">
           📝 Step-by-Step Cooking instructions & Raw Materials:
         </div>
-
         <div style="margin-top: 15px;">
           ${stepsHtml}
         </div>
-
         <div class="warning-box">
           ⚠️ रसोइया ध्यान दें: कैफ़े की गुणवत्ता बनाए रखने के लिए इस चार्ट के अनुसार ही सटीक मात्रा का उपयोग करें!
         </div>
-
         <div class="no-print" style="text-align: center; margin-top: 40px;">
           <button onclick="window.print()" style="padding: 14px 35px; font-size: 16px; font-weight: bold; background: #f97316; color: #fff; border: none; border-radius: 8px; cursor: pointer; text-transform: uppercase; letter-spacing: 1px;">Print Recipe Poster</button>
         </div>
-
         <script>
           window.onload = function() {
             setTimeout(function() { window.print(); }, 300);
@@ -375,9 +358,6 @@ export default function AdminDashboard() {
   const [newReelDesc, setNewReelDesc] = useState("");
   const [newReelPrice, setNewReelPrice] = useState("");
   const [newReelIsStory, setNewReelIsStory] = useState(false);
-
-  // Helper formatting
-  const formatBillNumber = (num: number) => String(num).padStart(4, '0');
 
   useEffect(() => {
     const adminSession = sessionStorage.getItem('bb_cafe_admin_verified');
@@ -1739,7 +1719,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                       </button>
                       <button 
                         onClick={() => handleSendWhatsAppBill(o)}
-                        className="px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-xl text-[10px] font-black uppercase transition-all active:scale-95"
+                        className="px-3 py-2 bg-green-600 hover:bg-green-700 text-white text-[10px] font-black uppercase rounded-xl"
                       >
                         📲 Send Bill
                       </button>
@@ -1865,7 +1845,7 @@ Report generated automatically by Bum Bum Cafe POS.`
 
                   <div className="space-y-1">
                     <label className="text-xs font-bold text-gray-400 uppercase">Category</label>
-                    <select value={editCategory} onChange={(e) => setEditCategory(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-white" required>
+                    <select value={editCategory} onChange={(e) => setEditCategory(e.target.value)} className="w-full bg-[#111] border border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-white" required>
                       {categoryOptions.filter(c => c !== "All" && c !== "DIY Pizza").map(cat => (
                         <option key={cat} value={cat} className="bg-[#111]">{cat}</option>
                       ))}
@@ -2216,7 +2196,7 @@ Report generated automatically by Bum Bum Cafe POS.`
           <div className="space-y-6">
             <form onSubmit={handleAddBanner} className="bg-[#020202] border border-white/5 p-6 rounded-[2.5rem] space-y-4">
               <h3 className="text-lg font-black text-orange-500 italic uppercase flex items-center gap-2"><ImageIcon size={18}/> Manage Stories & Banners</h3>
-              <p className="text-[10px] text-gray-500 font-bold uppercase leading-normal">यहाँ से आप मुख्य स्क्रीन के रील्स/वीडियो स्टोरीज़ या आफर बैनर्स को जोड़ सकते हैं।</p>
+              <p className="text-[10px] text-gray-500 font-bold uppercase leading-normal font-mono">यहाँ से आप मुख्य स्क्रीन के रील्स/वीडियो स्टोरीज़ या आफर बैनर्स को जोड़ सकते हैं।</p>
               
               <div className="grid grid-cols-2 gap-3 text-xs font-bold">
                 <input type="text" placeholder="Title/Dish Name" value={newReelTitle} onChange={(e) => setNewReelTitle(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-white outline-none" />
@@ -2319,7 +2299,7 @@ Report generated automatically by Bum Bum Cafe POS.`
         {/* --- TAB 10: KITCHEN RECIPE ROSTER --- */}
         {tab === 'roster' && (
           <div className="space-y-6">
-            <h3 className="text-xl font-black text-orange-500 uppercase tracking-wider flex items-center gap-2">📋 Kitchen SOP Recipe Roster</h3>
+            <h3 className="text-xl font-black text-orange-500 uppercase tracking-wider flex items-center gap-2"><Settings size={20}/> Kitchen SOP Recipe Roster</h3>
             <p className="text-[10px] text-gray-500 uppercase tracking-widest font-black leading-relaxed font-mono">डिश बनाने के चरण (Steps) और सामग्री का अनुपात फीड करें, और रसोई की दीवार पर चिपकाने के लिए सीधे A4 साइज़ पोस्टर प्रिंट करें।</p>
 
             <div className="bg-[#111] border border-white/5 p-5 rounded-3xl space-y-3">
@@ -2414,7 +2394,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                 placeholder="उदा: शुभम द्विवेदी जी (टाउन) ने अभी-अभी 'स्पेशल थाली' आर्डर की 🍱" 
                 value={newProofText}
                 onChange={(e) => setNewProofText(e.target.value)}
-                className="w-full bg-black/40 border border-white/10 rounded-xl p-4 text-xs text-white outline-none font-bold"
+                className="w-full bg-black/40 border border-white/10 rounded-xl p-4 text-xs text-white outline-none font-bold animate-none"
                 required
               />
               <button type="submit" className="w-full bg-green-600 text-white p-3.5 rounded-xl font-black text-xs uppercase">Add Custom Alert</button>
@@ -2491,7 +2471,7 @@ Report generated automatically by Bum Bum Cafe POS.`
             <form onSubmit={handleUpdatePasscodes} className="bg-white/[0.02] border border-white/5 p-6 rounded-[2.5rem] space-y-5">
               <div>
                 <h4 className="text-sm font-black text-orange-500 uppercase">Change security PINs</h4>
-                <p className="text-[9px] text-gray-500 font-bold uppercase mt-1 leading-relaxed">केवल एडमिनिस्ट्रेटर ही दोनों रोल (Admin व Manager) के लॉगिन क्रेडेंशियल्स को बदल सकता है।</p>
+                <p className="text-[9px] text-gray-500 font-bold uppercase mt-1 leading-relaxed font-mono">केवल एडमिनिस्ट्रेटर ही दोनों रोल (Admin व Manager) के लॉगिन क्रेडेंशियल्स को बदल सकता है।</p>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -2502,7 +2482,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                     value={newAdminPinInput}
                     onChange={(e) => setNewAdminPinInput(e.target.value)}
                     disabled={userRole !== 'admin'}
-                    className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white tracking-widest"
+                    className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white tracking-widest animate-none"
                     required
                   />
                 </div>
@@ -2513,7 +2493,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                     value={newManagerPinInput}
                     onChange={(e) => setNewManagerPinInput(e.target.value)}
                     disabled={userRole !== 'admin'}
-                    className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white tracking-widest"
+                    className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none focus:border-orange-500 text-sm font-bold text-white tracking-widest animate-none"
                     required
                   />
                 </div>
@@ -2609,7 +2589,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                 value={sopRecipeText} 
                 onChange={(e) => setSopRecipeText(e.target.value)} 
                 placeholder="Write down the detailed step-by-step recipe, quantity of ingredients..." 
-                className="w-full bg-black/40 border border-white/10 rounded-xl p-4 outline-none focus:border-orange-500 text-xs font-bold text-white h-44 resize-none leading-relaxed"
+                className="w-full bg-black/40 border border-white/10 rounded-xl p-4 outline-none focus:border-orange-500 text-xs font-bold text-white h-44 resize-none leading-relaxed animate-none"
               />
             </div>
 
@@ -2621,7 +2601,7 @@ Report generated automatically by Bum Bum Cafe POS.`
         </div>
       )}
 
-      {/* --- IMPROVED WHATSAPP BROADCAST MODAL --- */}
+      {/* --- Smart Marketing Blast BROADCAST MODAL --- */}
       {showBroadcastModal && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[100] flex items-center justify-center p-4">
           <div className="bg-[#111] border border-white/5 p-6 rounded-[2.5rem] w-full max-w-lg relative shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto no-scrollbar">
@@ -2647,7 +2627,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                   <select 
                     value={broadcastTierFilter} 
                     onChange={(e) => setBroadcastTierFilter(e.target.value)}
-                    className="w-full bg-black/60 border border-white/10 text-[10px] font-bold rounded-lg p-2 text-white outline-none"
+                    className="w-full bg-black/60 border border-white/10 text-[10px] font-bold rounded-lg p-2 text-white outline-none cursor-pointer"
                   >
                     <option value="all">All Tiers</option>
                     <option value="platinum">👑 Platinum</option>
@@ -2693,7 +2673,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                 value={broadcastMessage} 
                 onChange={(e) => setBroadcastMessage(e.target.value)} 
                 placeholder="Type your special discount offer or festive wishes here..." 
-                className="w-full bg-black/40 border border-white/10 rounded-xl p-4 outline-none focus:border-orange-500 text-xs font-bold text-white h-24 resize-none leading-relaxed"
+                className="w-full bg-black/40 border border-white/10 rounded-xl p-4 outline-none focus:border-orange-500 text-xs font-bold text-white h-24 resize-none leading-relaxed animate-none"
               />
             </div>
 
@@ -2703,7 +2683,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                 <button 
                   onClick={handleSendNextUnsentBroadcast}
                   type="button"
-                  className="flex-1 bg-orange-500 hover:bg-orange-600 text-black font-black text-xs uppercase py-3.5 px-4 rounded-xl flex items-center justify-center gap-2 active:scale-95 transition-all shadow-md"
+                  className="flex-1 bg-orange-500 hover:bg-orange-600 text-black font-black text-xs uppercase py-3.5 px-4 rounded-xl flex items-center justify-center gap-2 active:scale-95 transition-all shadow-md animate-none"
                 >
                   💬 Send Next (Unsent Queue)
                 </button>
@@ -2711,7 +2691,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                   onClick={() => { setSentBroadcastPhones([]); toast.success("Sent history reset successfully!"); }}
                   title="Reset session"
                   type="button"
-                  className="bg-white/5 text-gray-450 p-3 rounded-xl"
+                  className="bg-white/5 text-gray-450 p-3 rounded-xl transition-all active:scale-95"
                 >
                   <RefreshCw size={16} />
                 </button>
@@ -2759,7 +2739,7 @@ Report generated automatically by Bum Bum Cafe POS.`
               </div>
             </div>
 
-            <button type="button" onClick={() => setShowBroadcastModal(false)} className="w-full bg-white/5 text-gray-400 p-3.5 rounded-xl font-black text-xs uppercase">Close</button>
+            <button type="button" onClick={() => setShowBroadcastModal(false)} className="w-full bg-white/5 text-gray-400 p-3.5 rounded-xl font-black text-xs uppercase hover:bg-white/10">Close</button>
           </div>
         </div>
       )}
