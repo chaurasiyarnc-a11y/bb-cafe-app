@@ -240,7 +240,7 @@ export default function AdminDashboard() {
   const [isVerified, setIsVerified] = useState(false);
   const [loading, setLoading] = useState(true);
   const [passcode, setPasscode] = useState("");
-  const [tab, setTab] = useState<'dashboard' | 'orders' | 'menu' | 'categories' | 'customers' | 'loyalty' | 'banners' | 'reels' | 'header_video' | 'reviews' | 'coupons' | 'roster' | 'proofs' | 'claims' | 'security'>('dashboard');
+  const [tab, setTab] = useState<'dashboard' | 'orders' | 'menu' | 'categories' | 'customers' | 'loyalty' | 'banners' | 'reels' | 'header_video' | 'coupons' | 'reviews' | 'roster' | 'proofs' | 'claims' | 'security'>('dashboard');
   
   const [orders, setOrders] = useState<any[]>([]);
   const [menu, setMenu] = useState<any[]>([]);
@@ -268,6 +268,7 @@ export default function AdminDashboard() {
 
   const [reels, setReels] = useState<any[]>([]);
   const [newReelUrl, setNewReelUrl] = useState("");
+  const [newReelCoverUrl, setNewReelCoverUrl] = useState(""); // Reels cover (Requirement 1)
   const [newReelTitle, setNewReelTitle] = useState("");
   const [newReelDesc, setNewReelDesc] = useState("");
   const [newReelPrice, setNewReelPrice] = useState("");
@@ -913,7 +914,7 @@ export default function AdminDashboard() {
     } catch (err) { toast.error("Error deleting item"); }
   };
 
-  // Manage Food Reels/Stories Collection
+  // Manage Food Reels/Stories Collection (With Cover URL Support - Requirement 1)
   const handleAddReel = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newReelUrl || !newReelTitle || !newReelPrice) {
@@ -922,12 +923,13 @@ export default function AdminDashboard() {
     try {
       await addDoc(collection(db, "reels"), {
         url: newReelUrl,
+        coverUrl: newReelCoverUrl || "", // Stores static cover/thumbnail
         title: newReelTitle,
         description: newReelDesc || "",
         price: Number(newReelPrice) || 0,
         timestamp: new Date()
       });
-      setNewReelUrl(""); setNewReelTitle(""); setNewReelDesc(""); setNewReelPrice("");
+      setNewReelUrl(""); setNewReelCoverUrl(""); setNewReelTitle(""); setNewReelDesc(""); setNewReelPrice("");
       toast.success("New Food Reel / Story Added! 🎥");
     } catch (err) {
       toast.error("Error adding reel story.");
@@ -1112,6 +1114,61 @@ export default function AdminDashboard() {
     } catch (e) {
       toast.dismiss("import");
       toast.error("Error seeding PDF items");
+    }
+  };
+
+  // Requirement 4: Merge Existing duplicates safely with database transaction/batches
+  const handleMergeDuplicates = async () => {
+    if (!window.confirm("क्या आप वाकई सभी डुप्लीकेट आइटम्स को मर्ज करके डिलीट करना चाहते हैं?")) return;
+    toast.loading("Merging duplicates...", { id: "merge" });
+
+    try {
+      const nameMap = new Map<string, any[]>();
+      menu.forEach(item => {
+        const cleanName = String(item.name).toLowerCase().trim();
+        if (!nameMap.has(cleanName)) {
+          nameMap.set(cleanName, []);
+        }
+        nameMap.get(cleanName)!.push(item);
+      });
+
+      let mergedCount = 0;
+
+      for (const [name, items] of nameMap.entries()) {
+        if (items.length > 1) {
+          // We have duplicates! Let's keep the first one as primary
+          const primaryItem = items[0];
+          
+          // Merge variants dynamically if any are defined
+          let mergedVariants = { ...(primaryItem.variants || {}) };
+          items.slice(1).forEach(dup => {
+            if (dup.variants) {
+              mergedVariants = { ...mergedVariants, ...dup.variants };
+            }
+          });
+
+          // Update primary item with aggregated values
+          const updatePayload: any = {};
+          if (Object.keys(mergedVariants).length > 0) {
+            updatePayload.variants = mergedVariants;
+          }
+
+          await updateDoc(doc(db, "products", primaryItem.id), updatePayload);
+
+          // Clear out the duplicate products completely
+          for (const dup of items.slice(1)) {
+            await deleteDoc(doc(db, "products", dup.id));
+          }
+
+          mergedCount += (items.length - 1);
+        }
+      }
+
+      toast.dismiss("merge");
+      toast.success(`Deduplication complete! merged and removed ${mergedCount} duplicates.`);
+    } catch (err) {
+      toast.dismiss("merge");
+      toast.error("Failed to merge duplicate items.");
     }
   };
 
@@ -1819,9 +1876,16 @@ Report generated automatically by Bum Bum Cafe POS.`
           <div className="space-y-4">
             <div className="flex flex-col gap-2">
               <button onClick={handleBulkImport} type="button" className="w-full bg-yellow-400 text-black py-4 rounded-2xl font-black text-sm flex items-center justify-center gap-2 active:scale-95 transition-all shadow-xl">📥 IMPORT ALL 80+ PDF MENU ITEMS</button>
-              <button onClick={() => { setShowAddForm(!showAddForm); setEditingProduct(null); }} className="w-full bg-orange-500/10 text-orange-500 border border-orange-500/20 py-4 rounded-2xl font-black text-sm flex items-center justify-center gap-2 hover:bg-orange-500/20 transition-all">
-                <Plus size={18}/> {showAddForm ? "CLOSE FORM" : "ADD NEW ITEM"}
-              </button>
+              
+              {/* REQUIREMENT 4: Automated duplicates merging tool */}
+              <div className="grid grid-cols-2 gap-2">
+                <button onClick={handleMergeDuplicates} className="bg-indigo-600 text-white py-4 rounded-2xl font-black text-xs uppercase flex items-center justify-center gap-1.5 shadow active:scale-95 transition-all">
+                  🔍 Merge Existing Duplicates
+                </button>
+                <button onClick={() => { setShowAddForm(!showAddForm); setEditingProduct(null); }} className="bg-orange-500/10 text-orange-500 border border-orange-500/20 py-4 rounded-2xl font-black text-xs flex items-center justify-center gap-1.5 hover:bg-orange-500/20 active:scale-95 transition-all uppercase">
+                  <Plus size={16}/> {showAddForm ? "CLOSE FORM" : "ADD NEW ITEM"}
+                </button>
+              </div>
             </div>
 
             {/* Sticky Search bar directly aligned under sticky header */}
@@ -1991,7 +2055,7 @@ Report generated automatically by Bum Bum Cafe POS.`
             {editingCategory && (
               <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[100] flex items-center justify-center p-4">
                 <form onSubmit={handleUpdateCategory} className="bg-[#111] border-2 border-orange-500 p-8 rounded-[2.5rem] w-full max-w-lg relative shadow-2xl space-y-4">
-                  <button type="button" onClick={() => setEditingCategory(null)} className="absolute top-4 right-4 p-2.5 bg-white/5 text-gray-400 hover:text-white rounded-full"><X size={18}/></button>
+                  <button type="button" onClick={() => setEditingCategory(null)} className="absolute top-4 right-4 p-2.5 bg-white/5 text-gray-405 hover:text-white rounded-full"><X size={18}/></button>
                   <div className="text-center pb-2">
                     <h3 className="text-2xl font-black text-orange-500 italic uppercase flex items-center justify-center gap-2"><Folder size={22}/> Edit Category</h3>
                   </div>
@@ -2089,7 +2153,7 @@ Report generated automatically by Bum Bum Cafe POS.`
 
             <div className="space-y-4">
               {searchedCustomers.length === 0 ? (
-                <p className="text-center text-xs font-bold text-gray-500 py-10 uppercase">No matching customers found...</p>
+                <p className="text-center text-xs font-bold text-gray-505 py-10 uppercase">No matching customers found...</p>
               ) : (
                 searchedCustomers
                   .map(user => ({ ...user, metrics: getCustomerLoyaltyMetrics(user.phone) }))
@@ -2114,7 +2178,7 @@ Report generated automatically by Bum Bum Cafe POS.`
 
                         <div className="text-right flex items-center gap-4 flex-shrink-0">
                           <div>
-                            <p className="text-[9px] font-bold text-gray-500 uppercase">Available Points</p>
+                            <p className="text-[9px] font-bold text-gray-505 uppercase">Available Points</p>
                             <h4 className="text-lg font-black text-yellow-400">{user.points || 0} Pts</h4>
                           </div>
                           <button 
@@ -2206,12 +2270,12 @@ Report generated automatically by Bum Bum Cafe POS.`
               <p className="text-[10px] text-gray-500 font-bold uppercase leading-normal">यहाँ से आप मुख्य स्क्रीन के बड़े आफर बैनर्स (Image या Video) को जोड़ सकते हैं।</p>
               
               <div className="space-y-1">
-                <label className="text-xs font-bold text-gray-400 uppercase">Banner Title</label>
+                <label className="text-xs font-bold text-gray-405 uppercase">Banner Title</label>
                 <input type="text" placeholder="e.g. Free Delivery above ₹99" value={newBannerTitle} onChange={(e) => setNewBannerTitle(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs text-white outline-none" required />
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-bold text-gray-400 uppercase">Media Link (Video/Image URL)</label>
+                <label className="text-xs font-bold text-gray-405 uppercase">Media Link (Video/Image URL)</label>
                 <input type="url" placeholder="Paste Image link or Video URL..." value={newBannerUrl} onChange={(e) => setNewBannerUrl(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs text-white outline-none" required />
               </div>
 
@@ -2277,6 +2341,11 @@ Report generated automatically by Bum Bum Cafe POS.`
               </div>
               
               <div className="space-y-1">
+                <label className="text-xs font-bold text-gray-400 uppercase">Reel Cover Image (URL)</label>
+                <input type="url" placeholder="Paste static thumbnail image URL..." value={newReelCoverUrl} onChange={(e) => setNewReelCoverUrl(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs text-white outline-none" />
+              </div>
+
+              <div className="space-y-1">
                 <label className="text-xs font-bold text-gray-400 uppercase">Media Link (Video/Image URL)</label>
                 <input type="url" placeholder="Paste .mp4 link or Image URL..." value={newReelUrl} onChange={(e) => setNewReelUrl(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs text-white outline-none" required />
               </div>
@@ -2310,7 +2379,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                   <div className="mt-2 text-[10px] space-y-0.5">
                     <p className="font-black text-gray-200 truncate">{r.title}</p>
                     <p className="text-orange-500 font-bold">Price: ₹{r.price}</p>
-                    <p className="text-gray-450 truncate">{r.description}</p>
+                    <p className="text-gray-455 truncate">{r.description}</p>
                   </div>
                   <button onClick={() => handleDeleteReel(r.id)} className="absolute top-4 right-4 p-2 bg-red-500/20 text-red-500 rounded-xl hover:bg-red-500 active:text-black">
                     <Trash size={14}/>
@@ -2329,7 +2398,7 @@ Report generated automatically by Bum Bum Cafe POS.`
 
             <form onSubmit={handleUpdateHeaderVideo} className="bg-white/[0.02] border border-white/5 p-6 rounded-[2.5rem] space-y-4">
               <div className="space-y-1">
-                <label className="text-xs font-bold text-gray-400 uppercase">Background Video URL</label>
+                <label className="text-xs font-bold text-gray-405 uppercase">Background Video URL</label>
                 <input 
                   type="url" 
                   value={headerVideoInput} 
@@ -2371,7 +2440,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                 <div key={c.id} className="bg-white/[0.02] border border-white/5 p-5 rounded-2xl flex justify-between items-center">
                   <div>
                     <h4 className="text-sm font-black text-orange-500 uppercase tracking-widest">{c.code}</h4>
-                    <p className="text-xs font-bold text-gray-400 mt-1">Value: Flat ₹{c.discountValue} OFF</p>
+                    <p className="text-xs font-bold text-gray-455 mt-1">Value: Flat ₹{c.discountValue} OFF</p>
                   </div>
                   <button onClick={() => handleDeleteCoupon(c.id)} className="p-3 bg-red-500/10 text-red-500 rounded-xl">
                     <Trash size={16}/>
@@ -2421,7 +2490,7 @@ Report generated automatically by Bum Bum Cafe POS.`
             <p className="text-[10px] text-gray-500 uppercase tracking-widest font-black leading-relaxed font-mono">डिश बनाने के चरण (Steps) और सामग्री का अनुपात फीड करें, और रसोई की दीवार पर चिपकाने के लिए सीधे A4 साइज़ पोस्टर प्रिंट करें।</p>
 
             <div className="bg-[#111] border border-white/5 p-5 rounded-3xl space-y-3">
-              <label className="text-xs font-bold text-gray-400 uppercase block">Select Dish / डिश चुनें</label>
+              <label className="text-xs font-bold text-gray-405 uppercase block">Select Dish / डिश चुनें</label>
               <select 
                 value={rosterSelectedProduct ? rosterSelectedProduct.id : ""}
                 onChange={(e) => {
@@ -2442,7 +2511,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                 <div className="bg-[#111] border border-white/5 p-5 rounded-3xl flex justify-between items-center">
                   <div>
                     <h4 className="font-black text-sm text-white uppercase">{rosterSelectedProduct.name} - SOP</h4>
-                    <p className="text-[9px] text-gray-500 font-bold uppercase mt-0.5">Steps: {rosterSelectedProduct.ingredients?.length || 0}</p>
+                    <p className="text-[9px] text-gray-505 font-bold uppercase mt-0.5">Steps: {rosterSelectedProduct.ingredients?.length || 0}</p>
                   </div>
                   <button 
                     onClick={() => handlePrintRosterSOP(rosterSelectedProduct)}
@@ -2456,11 +2525,11 @@ Report generated automatically by Bum Bum Cafe POS.`
                   <h4 className="text-xs font-black text-orange-500 uppercase">Add SOP Step / नया चरण जोड़ें</h4>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-gray-500 uppercase">Ingredient / Action (क्या डालें)</label>
+                      <label className="text-[10px] font-bold text-gray-455 uppercase">Ingredient / Action (क्या डालें)</label>
                       <input type="text" placeholder="e.g. Pizza Base / Cheese" value={rosterStepName} onChange={(e) => setRosterStepName(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-xs font-bold text-white" required />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-gray-500 uppercase">Quantity / मात्रा</label>
+                      <label className="text-[10px] font-bold text-gray-455 uppercase">Quantity / मात्रा</label>
                       <input type="text" placeholder="e.g. 1 Piece / 30 grams" value={rosterStepQty} onChange={(e) => setRosterStepQty(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-xs font-bold text-white" required />
                     </div>
                   </div>
@@ -2472,7 +2541,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                 </form>
 
                 <div className="space-y-3">
-                  <p className="text-xs font-bold text-gray-505 uppercase pl-1">Active Recipe Steps</p>
+                  <p className="text-xs font-bold text-gray-455 uppercase pl-1">Active Recipe Steps</p>
                   {(rosterSelectedProduct.ingredients || []).length === 0 ? (
                     <p className="text-center text-xs font-bold text-gray-600 py-6">No steps defined for this recipe.</p>
                   ) : (
@@ -2542,7 +2611,7 @@ Report generated automatically by Bum Bum Cafe POS.`
 
             <div className="space-y-3">
               {pointsClaims.length === 0 ? (
-                <p className="text-center text-xs font-bold text-gray-600 py-12 uppercase">कोई दावा अनुरोध नहीं मिला।</p>
+                <p className="text-center text-xs font-bold text-gray-655 py-12 uppercase">कोई दावा अनुरोध नहीं मिला।</p>
               ) : (
                 pointsClaims.map((claim) => (
                   <div key={claim.id} className="bg-neutral-900 border border-white/5 p-4 rounded-3xl space-y-3 text-xs">
@@ -2556,7 +2625,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                       <p>प्लेटформа: <span className="text-white">{claim.platformLabel}</span></p>
                       <p>सोशल यूज़रनेम / हैंडल: <span className="text-yellow-400 font-black">{claim.socialUsername}</span></p>
                       <p>कस्टमर नंबर: <span className="text-white">+{claim.customerPhone}</span></p>
-                      <p className="text-[9px] text-gray-600">{claim.timestamp?.toDate ? claim.timestamp.toDate().toLocaleString() : ""}</p>
+                      <p className="text-[9px] text-gray-650">{claim.timestamp?.toDate ? claim.timestamp.toDate().toLocaleString() : ""}</p>
                     </div>
                     {claim.status === "pending" && (
                       <div className="flex gap-2 pt-1.5">
@@ -2568,7 +2637,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                         </button>
                         <button 
                           onClick={() => handleRejectClaim(claim.id)} 
-                          className="flex-1 bg-red-950/40 text-red-400 font-black py-1.5 rounded text-[9px] uppercase flex items-center justify-center gap-1"
+                          className="flex-1 bg-red-955 text-red-400 font-black py-1.5 rounded text-[9px] uppercase flex items-center justify-center gap-1"
                         >
                           <XCircle size={10}/> Reject claim
                         </button>
@@ -2589,7 +2658,7 @@ Report generated automatically by Bum Bum Cafe POS.`
             <form onSubmit={handleUpdatePasscodes} className="bg-white/[0.02] border border-white/5 p-6 rounded-[2.5rem] space-y-5">
               <div>
                 <h4 className="text-sm font-black text-orange-500 uppercase">Change security PINs</h4>
-                <p className="text-[9px] text-gray-500 font-bold uppercase mt-1 leading-relaxed font-mono">केवल एडमिनिस्ट्रेटर ही दोनों रोल (Admin व Manager) के क्रेडेंशियल्स को बदल सकता है।</p>
+                <p className="text-[9px] text-gray-500 font-bold uppercase mt-1 leading-relaxed font-mono">केवल एडमिनिस्ट्रेटर ही दोनों रोल (Admin व Manager) के लॉगिन क्रेडेंशियल्स को बदल सकता है।</p>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -2651,13 +2720,13 @@ Report generated automatically by Bum Bum Cafe POS.`
 
             <div className="space-y-3">
               {selectedCustomerHistory.metrics?.customerOrders.length === 0 ? (
-                <p className="text-center text-xs font-bold text-gray-600 py-8">No historical transactions logged.</p>
+                <p className="text-center text-xs font-bold text-gray-655 py-8">No historical transactions logged.</p>
               ) : (
                 selectedCustomerHistory.metrics?.customerOrders.map((o: any) => (
                   <div key={o.id} className="bg-white/[0.01] border border-white/5 p-4 rounded-2xl flex justify-between items-center text-xs">
                     <div>
                       <div className="flex gap-2">
-                        <span className="text-[9px] font-black uppercase text-gray-500">Bill: #{formatBillNumber(o.billNumber || 0)}</span>
+                        <span className="text-[9px] font-black uppercase text-gray-550">Bill: #{formatBillNumber(o.billNumber || 0)}</span>
                         <span className="text-[9px] font-black uppercase text-yellow-500">Token: #{o.tokenNumber || "N/A"}</span>
                       </div>
                       <div className="space-y-0.5 mt-1.5">
@@ -2713,7 +2782,7 @@ Report generated automatically by Bum Bum Cafe POS.`
 
             <div className="flex gap-2">
               <button type="submit" className="flex-1 bg-green-600 text-white p-3.5 rounded-xl font-black text-xs uppercase">Save SOP Guide</button>
-              <button type="button" onClick={() => setSopProduct(null)} className="bg-white/5 text-gray-400 p-3.5 rounded-xl font-black text-xs uppercase">Close</button>
+              <button type="button" onClick={() => setSopProduct(null)} className="bg-white/5 text-gray-405 p-3.5 rounded-xl font-black text-xs uppercase">Close</button>
             </div>
           </form>
         </div>
@@ -2725,7 +2794,7 @@ Report generated automatically by Bum Bum Cafe POS.`
           <div className="bg-[#111] border border-white/5 p-6 rounded-[2.5rem] w-full max-w-lg relative shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto no-scrollbar">
             <button 
               onClick={() => setShowBroadcastModal(false)} 
-              className="absolute top-4 right-4 p-2 bg-white/5 text-gray-450 hover:text-white rounded-full transition-all"
+              className="absolute top-4 right-4 p-2 bg-white/5 text-gray-400 hover:text-white rounded-full transition-all"
             >
               <X size={18}/>
             </button>
@@ -2809,7 +2878,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                   onClick={() => { setSentBroadcastPhones([]); toast.success("Sent history reset successfully!"); }}
                   title="Reset session"
                   type="button"
-                  className="bg-white/5 text-gray-450 transition-all active:scale-95"
+                  className="bg-white/5 text-gray-455 transition-all active:scale-95"
                 >
                   <RefreshCw size={16} />
                 </button>
