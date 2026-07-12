@@ -135,7 +135,7 @@ export default function BbCafeHome() {
 
   const [isGiftModalOpen, setIsGiftModalOpen] = useState(false);
   const [giftPhone, setGiftPhone] = useState("");
-  const [giftPointsAmount, setGiftPointsAmount] = useState<number | "">("");
+  const [giftPointsAmount, setGiftPointsAmount] = useState<number | " text-[9px]">("");
   const [giftSenderPin, setGiftSenderPin] = useState(""); 
   const [isGiftingLoading, setIsGiftingLoading] = useState(false);
 
@@ -206,7 +206,7 @@ export default function BbCafeHome() {
   // UI States (Requirement: Greet timer disappearing UX)
   const [showGreeting, setShowGreeting] = useState(true);
 
-  // --- COMPILER FIXES: ALL HELPER FUNCTIONS DECLARED BEFORE RETURN STATEMENT ---
+  // --- COMPILER FIXES: DECLARED PROPERLY BEFORE RETURN STATEMENT ---
   const triggerHaptic = (ms = 35) => {
     if (typeof window !== 'undefined' && window.navigator && window.navigator.vibrate) {
       window.navigator.vibrate(ms);
@@ -237,7 +237,6 @@ export default function BbCafeHome() {
     } catch (e) {}
   };
 
-  // Fixed scroll element compiler bug (Requirement 1 fix - declared before return)
   const scrollToMenu = () => {
     triggerHaptic();
     if (menuRef && menuRef.current) {
@@ -358,28 +357,23 @@ export default function BbCafeHome() {
     return total;
   }, [diySize, diySauce, diyMozzarella, diyVegSelection, diyPremiumToppings]);
 
-  // anti-cheat handler helper (Requirement 4 - verified missing definition fixed)
   const getClaimStatus = (platform: string) => {
     if (!customerDetails?.phone) return "🎁 +1 Pt";
     const storageKey = `bb_claimed_${customerDetails.phone.replace("+91", "").trim()}_${platform}`;
     return localStorage.getItem(storageKey) ? "✅ Claimed" : "🎁 Claim +1 Pt";
   };
 
-  // Requirement 2: Auto-play next story/reel and automatic exit on finish
   const handleReelEnded = () => {
     triggerHaptic(20);
     const currentIndex = stories.findIndex(s => s.id === activeStory.id);
     if (currentIndex !== -1 && currentIndex < stories.length - 1) {
-      // Switch seamlessly to the next loaded reel
       setActiveStory(stories[currentIndex + 1]);
     } else {
-      // We finished the last reel; close full-screen modal automatically
       setActiveStory(null);
       toast.success("सभी रील्स समाप्त हो गईं! 😊");
     }
   };
 
-  // Cooking note instructions append helper
   const quickAppendInstruction = (tag: string, type = "normal") => {
     triggerHaptic(20);
     if (type === "diy") {
@@ -389,53 +383,55 @@ export default function BbCafeHome() {
     }
   };
 
-  // --- MEMOS ---
-  const visibleCategories = useMemo(() => {
-    const baseCategories = ["All", ...FALLBACK_CATEGORIES.filter(c => c !== "All")];
-    const dbCatsMap = new Map();
-    dbCategories.forEach(c => dbCatsMap.set(String(c.name).toLowerCase().trim(), c));
-    const result: string[] = [];
+  const activeTheme = useMemo(() => {
+    const today = new Date();
+    const month = today.getMonth() + 1; 
+    if (month === 10 || month === 11) {
+      return { bg: "from-amber-600 to-red-900", accent: "text-yellow-300", name: "शुभ दीपावली उत्सव 🪔" };
+    }
+    if (month === 3) {
+      return { bg: "from-pink-500 to-purple-800", accent: "text-white", name: "होली रंगोत्सव स्पेशल 🎨" };
+    }
+    if (month === 8) {
+      return { bg: "from-rose-600 to-amber-800", accent: "text-yellow-250", name: "रक्षाबंधन विशेष स्नेह 💖" };
+    }
+    return { bg: "from-[#ff5e00] to-[#b33600]", accent: "text-yellow-300", name: "BUM BUM CAFE - Mohandra" };
+  }, []);
 
-    baseCategories.forEach(catName => {
-      const cleanName = catName.toLowerCase().trim();
-      if (dbCatsMap.has(cleanName)) {
-        if (dbCatsMap.get(cleanName).isVisible !== false) result.push(catName);
-      } else {
-        result.push(catName);
-      }
-    });
-
-    dbCategories.forEach(c => {
-      const cleanName = String(c.name).toLowerCase().trim();
-      const alreadyAdded = result.some(r => r.toLowerCase().trim() === cleanName);
-      if (!alreadyAdded && c.isVisible !== false && c.name !== "All") result.push(c.name);
-    });
-
-    const dedupedList = Array.from(new Set(result));
+  const greetingText = useMemo(() => {
+    const now = new Date();
+    const hours = now.getHours();
+    const month = now.getMonth() + 1; 
     
-    // REQUIREMENT 1: Inject "DIY Pizza" between Favorites and All dynamically
-    const finalWithDiy: string[] = [];
-    dedupedList.forEach(cat => {
-      if (cat === "All") {
-        finalWithDiy.push("DIY Pizza"); 
-      }
-      finalWithDiy.push(cat);
-    });
+    let timeGreeting = "नमस्ते";
+    if (hours >= 5 && hours < 12) {
+      timeGreeting = "शुभ प्रभात ☀️";
+    } else if (hours >= 12 && hours < 17) {
+      timeGreeting = "शुभ दोपहर 🌤️";
+    } else if (hours >= 17 && hours < 22) {
+      timeGreeting = "शुभ संध्या 🌆";
+    } else {
+      timeGreeting = "शुभ रात्रि 🌙";
+    }
 
-    return Array.from(new Set(finalWithDiy));
-  }, [dbCategories]);
+    let festiveGreeting = "";
+    if (month === 10 || month === 11) {
+      festiveGreeting = "शुभ दीपावली उत्सव 🪔";
+    } else if (month === 3) {
+      festiveGreeting = "हैप्पी होली रंगोत्सव 🎨";
+    } else if (month === 8) {
+      festiveGreeting = "रक्षाबंधन की हार्दिक शुभकामनाएं 💖";
+    }
 
-  const upsellSuggestionItems = useMemo(() => {
-    return menu.filter(item => {
-      const isShake = item?.category === "Super Cool" || item?.category === "Fast Food";
-      const notInCart = !cart.some((c: any) => c.id === item.id);
-      return isShake && notInCart;
-    }).slice(0, 2);
-  }, [menu, cart]);
+    const finalGreeting = festiveGreeting ? `${festiveGreeting}! ${timeGreeting}` : timeGreeting;
+    const customerName = customerDetails?.name ? customerDetails.name : "";
 
-  const ecoCutlerySaves = useMemo(() => {
-    return pastOrders.filter(o => o.noCutlery === true).length;
-  }, [pastOrders]);
+    if (customerName) {
+      return `नमस्ते ${customerName} जी, ${finalGreeting}! आज बम बम कैफ़े आपके लिए क्या बनाए? 😊`;
+    } else {
+      return `नमस्ते, ${finalGreeting}! आज बम बम कैफ़े आपके लिए क्या बनाए? 😊`;
+    }
+  }, [customerDetails]);
 
   // --- DETECT LATEST ORDERS & ENERGIZE CHECKS ---
   useEffect(() => {
@@ -454,7 +450,6 @@ export default function BbCafeHome() {
       }
     }
 
-    // Dynamic WhatsApp Number & Background Video Listener
     const unsubStore = onSnapshot(doc(db, "settings", "store"), (d) => { 
       if (d.exists()) {
         setStoreOpen(d.data().isOpen);
@@ -494,18 +489,9 @@ export default function BbCafeHome() {
     });
 
     const unsubCats = onSnapshot(collection(db, "categories"), (snap) => { setDbCategories(snap.docs.map(d => ({ id: d.id, ...d.data() }))); });
-    
-    // Separate Fetch Collections (Requirement 7)
-    const unsubBanners = onSnapshot(collection(db, "banners"), (snap) => { 
-      setBanners(snap.docs.map(d => ({ id: d.id, ...d.data() }))); 
-    });
-    const unsubStories = onSnapshot(collection(db, "reels"), (snap) => { 
-      setStories(snap.docs.map(d => ({ id: d.id, ...d.data() }))); 
-    });
-
-    const unsubReviews = onSnapshot(collection(db, "reviews"), (snap) => {
-      setReviews(snap.docs.map(d => ({ id: d.id, ...d.data() })).filter((r: any) => r.isApproved === true || r.isApproved === "true"));
-    });
+    const unsubBanners = onSnapshot(collection(db, "banners"), (snap) => { setBanners(snap.docs.map(d => ({ id: d.id, ...d.data() }))); });
+    const unsubStories = onSnapshot(collection(db, "reels"), (snap) => { setStories(snap.docs.map(d => ({ id: d.id, ...d.data() }))); });
+    const unsubReviews = onSnapshot(collection(db, "reviews"), (snap) => { setReviews(snap.docs.map(d => ({ id: d.id, ...d.data() })).filter((r: any) => r.isApproved === true || r.isApproved === "true")); });
     const unsubRules = onSnapshot(collection(db, "loyalty_rules"), (snap) => { setLoyaltyRules(snap.docs.map(d => ({ id: d.id, ...d.data() }))); });
 
     return () => { 
@@ -539,31 +525,6 @@ export default function BbCafeHome() {
     }, 6000);
     return () => clearTimeout(timer);
   }, []);
-
-  const handleInstallClick = async () => {
-    triggerHaptic();
-    if (deferredPrompt) {
-      deferredPrompt.prompt();
-      const { outcome } = await deferredPrompt.userChoice;
-      if (outcome === 'accepted') {
-        toast.success("बम बम कैफ़े ऐप इंस्टॉल करने के लिए धन्यवाद! ❤️");
-      }
-      setDeferredPrompt(null);
-    } else {
-      setIsInstallModalOpen(true);
-    }
-    // Instantly hide the banner and persist dismiss state
-    setShowInstallBanner(false);
-    localStorage.setItem('bb_app_installed_or_dismissed', 'true');
-  };
-
-  const handleDismissInstallBanner = () => {
-    triggerHaptic(20);
-    setShowInstallBanner(false);
-    localStorage.setItem('bb_app_installed_or_dismissed', 'true');
-  };
-
-  // --- ACTIONS ---
 
   const handleApplyCoupon = async () => {
     triggerHaptic();
@@ -717,32 +678,78 @@ export default function BbCafeHome() {
     } finally { setIsGiftingLoading(false); }
   };
 
-  const handleCustomerRedeem = async (id: string, name: string, pointsCost: number) => {
+  const handleSaveDetails = async (e: React.FormEvent) => {
+    e.preventDefault();
     triggerHaptic();
-    const currentPointsInCart = cart.reduce((acc: number, item: any) => acc + (item.pointsCost || 0), 0);
-    if (customerPoints - currentPointsInCart < pointsCost) return toast.error("आपके पास पर्याप्त ऑयल्टी पॉइंट्स उपलब्ध नहीं हैं!");
+    if (!tempName || tempName.trim().length < 3) return toast.error("Please enter your real name");
+    if (!tempPhone || tempPhone.trim().length < 10) return toast.error("Please enter 10-digit number");
+    if (!tempPin || tempPin.length !== 4 || isNaN(Number(tempPin))) {
+      return toast.error("सुरक्षा के लिए 4-अंकों का न्यूमेरिकल पिन दर्ज करें!");
+    }
     
-    const enteredPin = prompt("सुरक्षा के लिए अपना 4-अंकों का सुरक्षा पिन (PIN) दर्ज करें:");
-    if (!enteredPin) return;
-
-    if (!customerDetails?.phone) return;
-    const phoneClean = customerDetails.phone.replace("+91", "").trim();
+    const phoneClean = tempPhone.trim().replace("+91", "");
     
-    try {
-      const userSnap = await getDoc(doc(db, "customer_points", phoneClean));
-      if (userSnap.exists()) {
-        const dbPin = userSnap.data().pin;
-        if (dbPin && dbPin !== enteredPin) {
-          return toast.error("गलत सुरक्षा पिन! रीडीम रद्द किया गया।");
-        }
-      }
-    } catch (e) {
-      return toast.error("पिन वेरिफिकेशन विफल रहा।");
+    let devToken = localStorage.getItem('bb_device_token');
+    if (!devToken) {
+      devToken = Math.random().toString(36).substring(2) + Date.now().toString(36);
+      localStorage.setItem('bb_device_token', devToken);
     }
 
-    addItem({ id, name, price: 0, pointsCost, isReward: true });
-    playSoundEffect('add');
-    toast.success(`${name} Cart में जोड़ दिया गया है!`);
+    const details: any = { name: tempName, phone: `+91${phoneClean}`, pin: tempPin };
+
+    if (tempRefCode) {
+      const refCodeClean = tempRefCode.trim().toUpperCase();
+      details.refCode = refCodeClean;
+
+      try {
+        const q = query(collection(db, "customer_points"), where("inviteCode", "==", refCodeClean));
+        const querySnap = await getDocs(q);
+        
+        if (!querySnap.empty) {
+          const inviterDoc = querySnap.docs[0];
+          const inviterPhone = inviterDoc.id;
+
+          const myProfileSnap = await getDoc(doc(db, "customer_points", phoneClean));
+          if (!myProfileSnap.exists()) {
+            await runTransaction(db, async (transaction) => {
+              transaction.update(doc(db, "customer_points", inviterPhone), {
+                points: increment(5)
+              });
+
+              const inviteHistoryRef = doc(collection(db, "customer_points", inviterPhone, "history"));
+              transaction.set(inviteHistoryRef, {
+                type: 'earn',
+                points: 5,
+                description: `Invited new friend: ${tempName} 🎉`,
+                timestamp: new Date()
+              });
+            });
+            toast.success("सफलतापूर्वक इनवाइट कोड लागू किया गया! आपके दोस्त को 5 ऑयल्टी पॉइंट्स मिले।");
+          }
+        }
+      } catch (err) {
+        console.error("Referral process error:", err);
+      }
+    }
+
+    const namePart = tempName.trim().split(" ")[0].substring(0, 4).toUpperCase();
+    const phonePart = phoneClean.slice(-4);
+    const computedInviteCode = `${namePart}${phonePart}`;
+
+    try {
+      await setDoc(doc(db, "customer_points", phoneClean), {
+        name: tempName,
+        phone: phoneClean,
+        inviteCode: computedInviteCode,
+        pin: tempPin,
+        deviceToken: devToken,
+        lastActive: new Date()
+      }, { merge: true });
+    } catch (err) {}
+    
+    localStorage.setItem('bb_cafe_customer', JSON.stringify(details));
+    setCustomerDetails(details); 
+    toast.success(`Welcome ${tempName}! Your invite code: ${computedInviteCode}`);
   };
 
   const sendWhatsAppOrder = async () => {
@@ -1401,7 +1408,7 @@ export default function BbCafeHome() {
                           <div>
                             <p className="dark:text-gray-500 text-gray-400 text-[8px] font-black uppercase tracking-widest leading-none mb-1">Price</p>
                             <p className="text-orange-700 dark:text-orange-500 font-black text-base leading-none">{getDisplayPrice(item)}</p>
-                            {item.variants && <span className="text-[8px] font-bold dark:text-gray-400 text-gray-500 mt-1 block">Options available</span>}
+                            {item.variants && <span className="text-[8px] font-bold dark:text-gray-400 text-gray-505 mt-1 block">Options available</span>}
                           </div>
                           
                           {storeOpen && !isTooFar && isItemAvailable && (
@@ -1502,7 +1509,7 @@ export default function BbCafeHome() {
           <div className="grid grid-cols-2 gap-3 text-center text-[10px] font-black uppercase">
             <div className="dark:bg-white/[0.02] bg-white border dark:border-white/5 border-gray-200 p-4 rounded-2xl flex flex-col items-center justify-center space-y-1 shadow-md shadow-gray-200/30 dark:shadow-none transition-colors duration-200">
               <Clock className="text-orange-500" size={16} />
-              <p className="dark:text-gray-400 text-gray-505 text-[8px]">Open Timing</p>
+              <p className="dark:text-gray-450 text-gray-505 text-[8px]">Open Timing</p>
               <p className="dark:text-white text-neutral-800 text-[9px]">सुबह 10:00 से रात 11:00 बजे</p>
             </div>
             
@@ -1556,7 +1563,7 @@ export default function BbCafeHome() {
             </div>
 
             <div className="flex justify-between items-center bg-black/40 p-2.5 rounded-xl border border-white/5 mt-1">
-              <span className="text-[10px] text-gray-450 uppercase font-sans">Delivery OTP Code (सुरक्षा पिन)</span>
+              <span className="text-[10px] text-gray-455 uppercase font-sans">Delivery OTP Code (सुरक्षा पिन)</span>
               <span className="text-yellow-400 font-black text-sm font-mono tracking-widest bg-yellow-500/10 px-2.5 py-0.5 rounded border border-yellow-500/20">
                 {liveOrder.deliveryPin || "WAIT"}
               </span>
@@ -1744,7 +1751,7 @@ export default function BbCafeHome() {
                           type="button"
                           key={addon}
                           onClick={() => setNormalPizzaAddons(prev => ({ ...prev, [addon]: !prev[addon] }))}
-                          className={`p-2.5 rounded-xl border flex justify-between items-center text-[9px] font-bold ${isSelected ? 'border-orange-500 bg-orange-500/5 text-orange-400' : 'dark:border-white/5 border-gray-200 dark:bg-white/[0.02] bg-gray-50 dark:text-gray-350 text-neutral-855'}`}
+                          className={`p-2.5 rounded-xl border flex justify-between items-center text-[9px] font-bold ${isSelected ? 'border-orange-500 bg-orange-500/5 text-orange-450' : 'dark:border-white/5 border-gray-200 dark:bg-white/[0.02] bg-gray-50 dark:text-gray-300 text-neutral-855'}`}
                         >
                           <span>{addon}</span>
                           <span className="text-orange-400 font-black">+₹{cost}</span>
@@ -1763,7 +1770,7 @@ export default function BbCafeHome() {
                       type="button"
                       key={tag}
                       onClick={() => quickAppendInstruction(tag, "normal")}
-                      className="text-[9px] font-bold py-1 px-2 rounded-full border dark:border-white/5 border-gray-200 bg-neutral-100 dark:bg-neutral-800 dark:text-gray-300 text-neutral-850 hover:border-orange-500 transition-colors"
+                      className="text-[9px] font-bold py-1 px-2 rounded-full border dark:border-white/5 border-gray-200 bg-neutral-100 dark:bg-neutral-800 dark:text-gray-300 text-neutral-800 hover:border-orange-500 transition-colors"
                     >
                       {tag}
                     </button>
@@ -1830,7 +1837,7 @@ export default function BbCafeHome() {
                       <input type="text" placeholder="Enter invite code..." value={tempRefCode} onChange={(e) => setTempRefCode(e.target.value)} className="w-full dark:bg-neutral-800 bg-gray-50 border dark:border-neutral-700 border-gray-205 p-3 rounded-xl font-bold dark:text-white text-neutral-955 outline-none focus:border-orange-500 text-xs" />
                     </div>
                   </div>
-                  <button type="submit" className="w-full bg-orange-500 text-black p-3.5 rounded-xl font-black text-xs uppercase shadow transition-all active:scale-95 mt-4">Create Account ➔</button>
+                  <button type="submit" className="w-full bg-orange-500 text-black p-3.5 rounded-xl font-black text-xs uppercase shadow transition-all active:scale-95 mt-4 font-sans">Create Account ➔</button>
                 </form>
               ) : (
                 <div className="space-y-6">
@@ -1858,8 +1865,8 @@ export default function BbCafeHome() {
                   </div>
 
                   {/* Eco-Hero Badge & Savings Tracker */}
-                  <div className="bg-gradient-to-r from-emerald-500/10 to-teal-500/10 border border-emerald-500/20 p-4 rounded-2xl flex items-center justify-between shadow-sm">
-                    <div className="space-y-1">
+                  <div className="bg-gradient-to-r from-emerald-500/10 to-teal-500/10 border border-emerald-500/20 p-4 rounded-2xl flex items-center justify-between shadow-sm font-sans">
+                    <div className="space-y-1 font-sans">
                       <p className="text-[8px] uppercase tracking-wider text-emerald-500 font-black">पर्यावरण संरक्षण ट्रैकर (Eco Impact)</p>
                       <h4 className="text-xs font-black dark:text-white text-neutral-900">
                         आपने बचाए: <span className="text-emerald-500 text-sm font-black">{ecoCutlerySaves} प्लास्टिक चम्मच 🌳</span>
@@ -1968,7 +1975,7 @@ export default function BbCafeHome() {
                               <span className="text-orange-500">Bill No: #{formatBillNumber(ord.billNumber || 0)}</span>
                               <span className="bg-green-600/15 text-green-400 px-1.5 py-0.5 rounded font-black text-[8px]">Token: #{ord.tokenNumber || "N/A"}</span>
                             </div>
-                            <div className="text-[9px] text-gray-400 font-semibold space-y-0.5 font-sans">
+                            <div className="text-[9px] text-gray-405 font-semibold space-y-0.5 font-sans">
                               {ord.items.map((it: any, i: number) => (
                                 <div key={i} className="flex justify-between">
                                   <span>{it.name} x{it.quantity}</span>
@@ -2080,7 +2087,7 @@ export default function BbCafeHome() {
 
                 {/* 4. SELECT DELIVERY ZONE */}
                 <div className="dark:bg-white/[0.02] bg-gray-50 border dark:border-white/5 border-gray-200 rounded-2xl p-4 space-y-2 transition-colors duration-200">
-                  <label className="text-[9px] font-black uppercase dark:text-gray-400 text-neutral-800">Select Delivery Zone (KM):</label>
+                  <label className="text-[9px] font-black uppercase dark:text-gray-405 text-neutral-850 font-sans">Select Delivery Zone (KM):</label>
                   <div className="grid grid-cols-2 gap-2">
                     {DELIVERY_AREAS.map((area) => {
                       const isSelected = selectedArea.name === area.name;
@@ -2096,8 +2103,8 @@ export default function BbCafeHome() {
                           }`}
                         >
                           <span className="text-[9px] font-black leading-tight uppercase truncate">{area.name.replace("Mohandra ", "")}</span>
-                          <div className="flex justify-between items-center w-full mt-2">
-                            <span className="text-[8px] font-black dark:text-neutral-300 text-neutral-800 font-mono">शुल्क: ₹{area.fee}</span>
+                          <div className="flex justify-between items-center w-full mt-2 font-mono">
+                            <span className="text-[8px] font-black dark:text-neutral-300 text-neutral-800">शुल्क: ₹{area.fee}</span>
                             <span className="text-[8px] font-black bg-gray-100 dark:bg-white/5 px-1.5 py-0.5 rounded dark:text-yellow-400 text-amber-900">Min: ₹{area.minFree}</span>
                           </div>
                         </button>
@@ -2123,7 +2130,7 @@ export default function BbCafeHome() {
                     <button onClick={() => { triggerHaptic(); setKetchupAddon(!ketchupAddon); }} className={`p-2 rounded-xl border text-[9px] font-black ${ketchupAddon ? 'border-red-500 bg-red-500/5 text-red-655 animate-none' : 'dark:border-white/5 border-gray-200 bg-transparent dark:text-gray-400 text-neutral-800'}`}>
                       Ketchup (+₹10)
                     </button>
-                    <button onClick={() => { triggerHaptic(); setOreganoAddon(!oreganoAddon); }} className={`p-2 rounded-xl border text-[9px] font-black ${oreganoAddon ? 'border-yellow-500 bg-yellow-500/5 text-yellow-500 animate-none' : 'dark:border-white/5 border-gray-200 bg-transparent dark:text-gray-400 text-neutral-800'}`}>
+                    <button onClick={() => { triggerHaptic(); setPageSize ? undefined : setOreganoAddon(!oreganoAddon); }} className={`p-2 rounded-xl border text-[9px] font-black ${oreganoAddon ? 'border-yellow-500 bg-yellow-500/5 text-yellow-500 animate-none' : 'dark:border-white/5 border-gray-200 bg-transparent dark:text-gray-400 text-neutral-800'}`}>
                       Oregano (+₹10)
                     </button>
                     <button onClick={() => { triggerHaptic(); setChiliFlakesAddon(!chiliFlakesAddon); }} className={`p-2 rounded-xl border text-[9px] font-black ${chiliFlakesAddon ? 'border-orange-500 bg-orange-500/5 text-orange-500 animate-none' : 'dark:border-white/5 border-gray-200 bg-transparent dark:text-gray-400 text-neutral-800'}`}>
@@ -2142,7 +2149,7 @@ export default function BbCafeHome() {
                 </div>
 
                 {/* 8. PAY SUMMARY CARD */}
-                <div className="bg-gradient-to-b from-orange-600 to-orange-700 p-5 rounded-2xl text-white">
+                <div className="bg-gradient-to-b from-orange-600 to-orange-700 p-5 rounded-2xl text-white font-mono">
                   <div className="flex justify-between font-bold mb-1.5 text-xs"><span>Items Total</span> <span>₹{getCartSubtotal()}</span></div>
                   {getCartAddonsPrice() > 0 && <div className="flex justify-between font-bold mb-1.5 text-xs"><span>Extra Condiments</span> <span>+₹{getCartAddonsPrice()}</span></div>}
                   {appliedCoupon && (
@@ -2172,7 +2179,7 @@ export default function BbCafeHome() {
         {isInstallModalOpen && (
           <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[270] flex items-center justify-center p-6">
             <div className="dark:bg-[#111] bg-white w-full max-w-sm p-6 rounded-3xl border dark:border-white/10 border-gray-200 text-center space-y-4 shadow-2xl transition-colors duration-200">
-              <Sparkles className="mx-auto text-yellow-450 animate-bounce" size={32} />
+              <Sparkles className="mx-auto text-yellow-400 animate-bounce" size={32} />
               
               <div className="space-y-1">
                 <h3 className="text-base font-black dark:text-white text-neutral-900">📲 आसान इंस्टॉलेशन गाइड</h3>
@@ -2233,10 +2240,10 @@ export default function BbCafeHome() {
             <motion.form onSubmit={handleGiftPoints} className="dark:bg-[#111] bg-white w-full max-w-md p-6 rounded-3xl border dark:border-white/10 border-gray-200 text-center space-y-4 shadow-xl transition-colors duration-200">
               <Gift className="mx-auto text-yellow-400" size={32} />
               <div>
-                <h3 className="text-lg font-black text-yellow-400 uppercase italic">Gift Loyalty Points</h3>
-                <p className="text-[9px] text-gray-555 font-semibold mt-0.5">अपने  पॉइंट्स किसी दोस्त को गिफ्ट करें</p>
+                <h3 className="text-lg font-black text-yellow-400 uppercase italic font-sans">Gift Loyalty Points</h3>
+                <p className="text-[9px] text-gray-500 font-semibold mt-0.5 font-sans">अपने  पॉइंट्स किसी दोस्त को गिफ्ट करें</p>
               </div>
-              <div className="space-y-3 text-left">
+              <div className="space-y-3 text-left font-sans">
                 <div className="space-y-1">
                   <label className="text-[9px] font-black uppercase text-gray-500">Friend's Phone Number</label>
                   <input type="tel" maxLength={10} placeholder="e.g. 9876543210" value={giftPhone} onChange={(e) => setGiftPhone(e.target.value)} required className="w-full dark:bg-white/10 bg-gray-50 border dark:border-white/10 border-gray-200 p-3 rounded-xl text-xs font-bold dark:text-white text-neutral-900 outline-none text-center" />
@@ -2250,16 +2257,16 @@ export default function BbCafeHome() {
                   <input type="password" maxLength={4} placeholder="🔒 enter your pin" value={giftSenderPin} onChange={(e) => setGiftSenderPin(e.target.value)} required className="w-full dark:bg-white/10 bg-gray-50 border dark:border-white/10 border-gray-200 p-3 rounded-xl text-xs font-bold dark:text-white text-neutral-900 outline-none text-center tracking-widest" />
                 </div>
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-2 font-sans">
                 <button type="submit" disabled={isGiftingLoading} className="flex-1 bg-yellow-400 text-black font-black p-3 rounded-xl text-xs uppercase flex items-center justify-center gap-1">
                   {isGiftingLoading ? <Loader2 className="animate-spin" size={14} /> : <span>Gift Points 🎁</span>}
                 </button>
-                <button type="button" onClick={() => { triggerHaptic(); setIsGiftModalOpen(false); setGiftPhone(""); setGiftPointsAmount(""); setGiftSenderPin(""); }} className="bg-white/5 text-gray-405 p-3 rounded-xl font-black text-xs">CANCEL</button>
+                <button type="button" onClick={() => { triggerHaptic(); setIsGiftModalOpen(false); setGiftPhone(""); setGiftPointsAmount(""); setGiftSenderPin(""); }} className="bg-white/5 text-gray-400 font-bold p-3 rounded-xl text-xs">CANCEL</button>
               </div>
             </motion.form>
           </div>
         )}
-      </  AnimatePresence>
+      </AnimatePresence>
 
       {/* VERIFIED SOCIAL POINTS CLAIM MODAL (Requirement 4) */}
       <AnimatePresence>
@@ -2267,7 +2274,7 @@ export default function BbCafeHome() {
           <div className="fixed inset-0 bg-black/95 z-[260] flex items-center justify-center p-6">
             <motion.form 
               onSubmit={handleClaimSubmit}
-              className="dark:bg-[#111] bg-white w-full max-w-sm p-6 rounded-3xl border dark:border-white/10 border-gray-200 text-center space-y-4 shadow-xl"
+              className="dark:bg-[#111] bg-white w-full max-w-sm p-6 rounded-3xl border dark:border-white/10 border-gray-200 text-center space-y-4 shadow-xl font-sans"
             >
               <div className="text-xl">{claimingPlatform.icon}</div>
               <div className="space-y-1">
@@ -2278,7 +2285,7 @@ export default function BbCafeHome() {
               </div>
 
               <div className="space-y-1 text-left">
-                <label className="text-[9px] font-black uppercase text-gray-500">Your Profile Handle / Username</label>
+                <label className="text-[9px] font-black uppercase text-gray-505">Your Profile Handle / Username</label>
                 <input 
                   type="text" 
                   placeholder="e.g. @yourname" 
@@ -2310,7 +2317,7 @@ export default function BbCafeHome() {
       <AnimatePresence>
         {isSocialsOpen && (
           <div className="fixed inset-0 bg-[#111]/95 z-[250] flex items-center justify-center p-6">
-            <motion.div className="dark:bg-[#111] bg-white w-full max-w-md p-6 rounded-3xl border dark:border-white/10 border-gray-200 text-center space-y-4 shadow-xl transition-colors duration-200">
+            <motion.div className="dark:bg-[#111] bg-white w-full max-w-md p-6 rounded-3xl border dark:border-white/10 border-gray-200 text-center space-y-4 shadow-xl transition-colors duration-200 font-sans">
               <div>
                 <h3 className="text-xl font-black text-orange-500 uppercase italic">Connect & Earn Points</h3>
                 <p className="text-[8px] text-gray-500 font-bold uppercase tracking-wider">हर प्लेटफार्म पर फॉलो/सब्सक्राइब करने का +1 पॉइंट पाएं!</p>
@@ -2371,15 +2378,15 @@ export default function BbCafeHome() {
                 </div>
               </div>
 
-              <div className="bg-black/40 p-3 rounded-2xl border border-dashed border-orange-500/20 text-center my-2 space-y-0.5">
-                <p className="text-[9px] text-gray-500 uppercase font-black font-sans">Delivery Verification OTP Code</p>
+              <div className="bg-black/40 p-3 rounded-2xl border border-dashed border-orange-500/20 text-center my-2 space-y-0.5 font-sans">
+                <p className="text-[9px] text-gray-550 uppercase font-black">Delivery Verification OTP Code</p>
                 <p className="text-yellow-400 font-black text-lg tracking-widest font-mono bg-yellow-500/10 px-4 py-1.5 rounded-xl border border-yellow-500/20 inline-block">
                   {lastPlacedOrder.deliveryPin || "WAIT"}
                 </p>
-                <p className="text-[8px] text-gray-450 mt-1 font-bold font-sans">डिलीवरी बॉय के आने पर उसे यह कोड बताएं, तभी आर्डर डिलीवर होगा।</p>
+                <p className="text-[8px] text-gray-450 mt-1 font-bold">डिलीवरी बॉय के आने पर उसे यह कोड बताएं, तभी आर्डर डिलीवर होगा।</p>
               </div>
 
-              <div className="pt-2 flex flex-col gap-2 font-sans">
+              <div className="pt-2 flex flex-col gap-2 font-sans font-sans">
                 <a 
                   href={`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(`नमस्ते बम बम कैफ़े! कृपया मेरे आर्डर नंबर #${formatBillNumber(lastPlacedOrder.billNumber)} (टोकन नंबर: #${lastPlacedOrder.tokenNumber}) का लाइव स्टेटस बताएं।`)}`}
                   target="_blank"
@@ -2412,3 +2419,4 @@ export default function BbCafeHome() {
     </div>
   );
 }
+
