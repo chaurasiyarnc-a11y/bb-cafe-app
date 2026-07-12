@@ -1386,7 +1386,8 @@ export default function BbCafeHome() {
 
   return (
     <div className="dark:bg-[#050505] bg-gray-50 min-h-screen dark:text-white text-gray-900 pb-32 font-sans relative overflow-x-clip transition-colors duration-200">
-      
+
+      <link rel="manifest" href="/manifest.json" />
       <Toaster 
         position="top-center" 
         toastOptions={{
