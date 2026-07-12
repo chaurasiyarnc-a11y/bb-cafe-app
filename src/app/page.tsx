@@ -560,7 +560,33 @@ export default function BbCafeHome() {
     }, 6000);
     return () => clearTimeout(timer);
   }, []);
+const handleAddDiyPizzaToCart = () => {
+    triggerHaptic();
+    const sizeLabels: any = { small: "Small Base", medium: "Medium Base", large: "Large Base" };
+    
+    const activeVeggies = Object.entries(diyVegSelection).filter(([_, val]) => val).map(([key]) => key.toUpperCase());
+    const activePremiums = Object.entries(diyPremiumToppings).filter(([_, val]) => val).map(([key]) => key.replace('_', ' ').toUpperCase());
+    
+    const toppingsStr = [...activeVeggies, ...activePremiums].join(", ");
 
+    const finalDiyName = `🍕 DIY Custom Pizza [${sizeLabels[diySize]}]${toppingsStr ? ` - Toppings: ${toppingsStr}` : ''}`;
+    
+    const uniqueDiyId = `diy-pizza-${diySize}-${Object.keys(diyVegSelection).filter(k => diyVegSelection[k]).join("")}-${Object.keys(diyPremiumToppings).filter(k => diyPremiumToppings[k]).join("")}`;
+
+    addItem({
+      id: uniqueDiyId,
+      name: finalDiyName,
+      price: calculatedDiyPizzaPrice,
+      note: diyChefNote ? diyChefNote.trim() : ""
+    });
+
+    playSoundEffect('add');
+    toast.success("आपका कस्टमाइज़्ड पिज्जा कर्ट में जोड़ा गया! 🍕");
+
+    setDiyVegSelection({ onion: false, tomato: false, capsicum: false, corn: false });
+    setDiyPremiumToppings({ black_olive: false, jalapeno: false, red_peprica: false, paneer: false, mushroom: false });
+    setDiyChefNote("");
+  };
   const handleDismissInstallBanner = () => {
     triggerHaptic(20);
     setShowInstallBanner(false);
