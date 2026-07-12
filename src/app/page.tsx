@@ -2520,4 +2520,4 @@ const handleAddDiyPizzaToCart = () => {
     </div>
   );
 }
-
+}
