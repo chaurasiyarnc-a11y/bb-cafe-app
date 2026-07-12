@@ -1,5 +1,3 @@
-यह 
-
 'use client';
   
 import React, { useState, useEffect, useMemo } from 'react';
@@ -2002,7 +2000,7 @@ Report generated automatically by Bum Bum Cafe POS.`
 
                   <div className="flex gap-2 pt-2">
                     <button type="submit" className="flex-1 bg-green-600 text-white p-4 rounded-xl font-black text-sm uppercase">Update Category</button>
-                    <button type="button" onClick={() => setEditingCategory(null)} className="bg-white/5 text-gray-450 p-4 rounded-xl font-black text-sm uppercase">Cancel</button>
+                    <button type="button" onClick={() => setEditingCategory(null)} className="bg-white/5 text-gray-450 p-4 rounded-xl font-black text-xs uppercase">Cancel</button>
                   </div>
                 </form>
               </div>
