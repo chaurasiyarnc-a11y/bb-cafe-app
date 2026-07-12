@@ -740,6 +740,10 @@ const handleAddDiyPizzaToCart = () => {
     setNormalPizzaAddons({});
     setChefNote("");
   };
+  // Eco savings count memo (Requirement Fix)
+  const ecoCutlerySaves = useMemo(() => {
+    return pastOrders.filter(o => o.noCutlery === true).length;
+  }, [pastOrders]);
   const handleDetectLocation = () => {
     triggerHaptic();
     if (!navigator.geolocation) {
