@@ -1,4 +1,4 @@
-
+यह 
 
 'use client';
   
@@ -276,7 +276,7 @@ export default function AdminDashboard() {
   // Social point claims (Requirement 4)
   const [pointsClaims, setPointsClaims] = useState<any[]>([]);
 
-  // CUSTOMER LOYALTY CLUB STATE
+  // CUSTOMER LOYAL CLUB STATE
   const [loyaltyUsers, setLoyaltyUsers] = useState<any[]>([]);
   const [editingCustomer, setEditingCustomer] = useState<any>(null);
   const [editCustomerName, setEditCustomerName] = useState("");
@@ -2002,7 +2002,7 @@ Report generated automatically by Bum Bum Cafe POS.`
 
                   <div className="flex gap-2 pt-2">
                     <button type="submit" className="flex-1 bg-green-600 text-white p-4 rounded-xl font-black text-sm uppercase">Update Category</button>
-                    <button type="button" onClick={() => setEditingCategory(null)} className="bg-white/5 text-gray-400 p-4 rounded-xl font-black text-sm uppercase">Cancel</button>
+                    <button type="button" onClick={() => setEditingCategory(null)} className="bg-white/5 text-gray-450 p-4 rounded-xl font-black text-sm uppercase">Cancel</button>
                   </div>
                 </form>
               </div>
@@ -2196,7 +2196,7 @@ Report generated automatically by Bum Bum Cafe POS.`
           <div className="space-y-6">
             <form onSubmit={handleAddBanner} className="bg-[#020202] border border-white/5 p-6 rounded-[2.5rem] space-y-4">
               <h3 className="text-lg font-black text-orange-500 italic uppercase flex items-center gap-2"><ImageIcon size={18}/> Manage Stories & Banners</h3>
-              <p className="text-[10px] text-gray-500 font-bold uppercase leading-normal font-mono">यहाँ से आप मुख्य स्क्रीन के रील्स/वीडियो स्टोरीज़ या आफर बैनर्स को जोड़ सकते हैं।</p>
+              <p className="text-[10px] text-gray-500 font-bold uppercase leading-normal">यहाँ से आप मुख्य स्क्रीन के रील्स/वीडियो स्टोरीज़ या आफर बैनर्स को जोड़ सकते हैं।</p>
               
               <div className="grid grid-cols-2 gap-3 text-xs font-bold">
                 <input type="text" placeholder="Title/Dish Name" value={newReelTitle} onChange={(e) => setNewReelTitle(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-white outline-none" />
@@ -2225,7 +2225,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                   </div>
                   <div className="mt-2 text-[10px] space-y-0.5">
                     <p className="font-black text-gray-200 truncate">{b.title || "Offer Banner"}</p>
-                    <p className="text-orange-500 uppercase tracking-widest text-[8px] font-black">{b.isStory ? "Circular Story" : "Main Offer Banner"}</p>
+                    <p className="text-orange-550 uppercase tracking-widest text-[8px] font-black">{b.isStory ? "Circular Story" : "Main Offer Banner"}</p>
                   </div>
                   <button onClick={() => handleDeleteBanner(b.id)} className="absolute top-4 right-4 p-2 bg-red-500/20 text-red-500 rounded-xl hover:bg-red-500 active:text-black">
                     <Trash size={14}/>
@@ -2601,7 +2601,7 @@ Report generated automatically by Bum Bum Cafe POS.`
         </div>
       )}
 
-      {/* --- Smart Marketing Blast BROADCAST MODAL --- */}
+      {/* --- IMPROVED WHATSAPP BROADCAST MODAL --- */}
       {showBroadcastModal && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[100] flex items-center justify-center p-4">
           <div className="bg-[#111] border border-white/5 p-6 rounded-[2.5rem] w-full max-w-lg relative shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto no-scrollbar">
@@ -2739,7 +2739,7 @@ Report generated automatically by Bum Bum Cafe POS.`
               </div>
             </div>
 
-            <button type="button" onClick={() => setShowBroadcastModal(false)} className="w-full bg-white/5 text-gray-400 p-3.5 rounded-xl font-black text-xs uppercase hover:bg-white/10">Close</button>
+            <button type="button" onClick={() => setShowBroadcastModal(false)} className="w-full bg-white/5 text-gray-400 p-3.5 rounded-xl font-black text-xs uppercase">Close</button>
           </div>
         </div>
       )}
