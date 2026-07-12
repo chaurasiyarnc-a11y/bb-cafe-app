@@ -609,7 +609,44 @@ const handleAddDiyPizzaToCart = () => {
     setShowInstallBanner(false);
     localStorage.setItem('bb_app_installed_or_dismissed', 'true');
   };
+// Normalized search query with Hinglish support (Requirement Fix)
+  const normalizedSearchQuery = useMemo(() => {
+    const words = searchQuery.toLowerCase().trim().split(/\s+/);
+    const mappedWords = words.map(word => HINGLISH_DICT[word] || word);
+    return mappedWords.join(" ");
+  }, [searchQuery]);
 
+  // Deduplicated menu items filtering out disabled categories (Requirement Fix)
+  const deduplicatedMenu = useMemo(() => {
+    const seen = new Set();
+    const hiddenCategoryNames = new Set(dbCategories.filter((c: any) => c.isVisible === false).map((c: any) => String(c.name).toLowerCase().trim()));
+
+    return menu.filter(item => {
+      const itemCatClean = item?.category ? String(item.category).toLowerCase().trim() : "";
+      if (hiddenCategoryNames.has(itemCatClean)) return false;
+      const nameKey = item?.name ? String(item.name).toLowerCase().trim() : item.id;
+      if (seen.has(nameKey)) return false;
+      seen.add(nameKey);
+      return true;
+    });
+  }, [menu, dbCategories]);
+
+  // Main filtered menu memo (Requirement Fix)
+  const filteredMenu = useMemo(() => {
+    return deduplicatedMenu.filter(item => {
+      const itemName = item?.name ? String(item.name).toLowerCase() : "";
+      const itemCategory = item?.category ? String(item.category) : "";
+      
+      const isFavoriteFilter = selectedCategory === "Favorites";
+      const matchesCategory = isFavoriteFilter 
+        ? favorites.includes(item.id) 
+        : (selectedCategory === "All" || itemCategory === selectedCategory);
+        
+      return matchesCategory && itemName.includes(normalizedSearchQuery);
+    });
+  }, [deduplicatedMenu, selectedCategory, favorites, normalizedSearchQuery]);
+
+  const handleDetectLocation = () => { // <--- Missing Header Line Restored!
   const handleDetectLocation = () => {
     triggerHaptic();
     if (!navigator.geolocation) {
