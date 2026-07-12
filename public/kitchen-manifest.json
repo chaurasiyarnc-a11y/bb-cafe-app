@@ -11,3 +11,5 @@ const ASSETS_TO_CACHE = [
   '/icon-192x192.png',
   '/icon-512x512.png'
 ];
+
+// ... baaki sw.js ka fetch, install aur activate ka code wahi rahega jo aapne pehle banaya tha ...
