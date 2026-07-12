@@ -12,7 +12,7 @@ export default function DeliveryDashboard() {
   const [pinInput, setPinInput] = useState("");
   const [passcodes, setPasscodes] = useState({ adminPin: "971429", managerPin: "123456" });
 
-  // Check login session & Fetch passcodes on mount
+  // Check login session & Fetch passcodes & Register Service Worker on mount
   useEffect(() => {
     const isVerifiedSession = localStorage.getItem('bb_delivery_verified') === 'true';
     if (isVerifiedSession) {
@@ -33,6 +33,13 @@ export default function DeliveryDashboard() {
       }
     };
     fetchPins();
+
+    // Register Service Worker for PWA (Browser me app install trigger karne ke liye)
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js')
+        .then((reg) => console.log('Service Worker Registered!', reg.scope))
+        .catch((err) => console.error('Service Worker registration failed:', err));
+    }
   }, []);
 
   // Real-time simple query with Client-side filtering (Only Out-For-Delivery & Today's Orders)
@@ -111,6 +118,8 @@ export default function DeliveryDashboard() {
   if (isLocked) {
     return (
       <div className="bg-[#050505] min-h-screen text-white flex items-center justify-center p-4">
+        {/* Linked dedicated delivery manifest here */}
+        <link rel="manifest" href="/delivery-manifest.json" />
         <Toaster />
         <div className="w-full max-w-sm bg-white/[0.02] border border-white/5 p-8 rounded-[2.5rem] space-y-6 shadow-2xl text-center relative overflow-hidden">
           <div className="inline-flex p-4 bg-orange-500/10 rounded-full text-orange-500 mb-2">
@@ -146,6 +155,8 @@ export default function DeliveryDashboard() {
   if (loading) {
     return (
       <div className="bg-[#050505] min-h-screen text-white flex flex-col items-center justify-center">
+        {/* Linked dedicated delivery manifest here */}
+        <link rel="manifest" href="/delivery-manifest.json" />
         <Loader2 className="animate-spin text-orange-500 mb-2" size={32} />
         <p className="text-[10px] font-black uppercase tracking-widest text-gray-500">Syncing Deliveries...</p>
       </div>
@@ -154,6 +165,8 @@ export default function DeliveryDashboard() {
 
   return (
     <div className="bg-[#080808] min-h-screen text-white p-4 font-sans pb-24">
+      {/* Linked dedicated delivery manifest here */}
+      <link rel="manifest" href="/delivery-manifest.json" />
       <Toaster />
       <header className="border-b border-white/5 pb-4 mb-6 flex justify-between items-center">
         <div>
