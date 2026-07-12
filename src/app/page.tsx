@@ -492,14 +492,19 @@ export default function BbCafeHome() {
     const handleBeforeInstallPrompt = (e: any) => {
       e.preventDefault();
       setDeferredPrompt(e);
-      setShowInstallBanner(true);
+      // Check if user dismissed it in this session already
+      const isAlreadyDismissed = localStorage.getItem('bb_app_installed_or_dismissed');
+      if (!isAlreadyDismissed) {
+        setShowInstallBanner(true);
+      }
     };
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
 
     const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone;
     
     let installBannerTimer: NodeJS.Timeout;
-    if (!isStandalone) {
+    const isAlreadyDismissed = localStorage.getItem('bb_app_installed_or_dismissed');
+    if (!isStandalone && !isAlreadyDismissed) {
       installBannerTimer = setTimeout(() => {
         setShowInstallBanner(true);
       }, 3000);
@@ -634,6 +639,15 @@ export default function BbCafeHome() {
     }
   }, []);
 
+  // Auto-Sliding Promo Banner (Requirement 4)
+  useEffect(() => {
+    if (banners.length <= 1) return;
+    const interval = setInterval(() => {
+      setBannerIndex((prev) => (prev + 1) % banners.length);
+    }, 4000); // Cycles every 4 seconds
+    return () => clearInterval(interval);
+  }, [banners]);
+
   // --- INITIAL DATABASE LOAD AND SYNC ---
   useEffect(() => {
     setMounted(true);
@@ -692,10 +706,15 @@ export default function BbCafeHome() {
     });
 
     const unsubCats = onSnapshot(collection(db, "categories"), (snap) => { setDbCategories(snap.docs.map(d => ({ id: d.id, ...d.data() }))); });
+    
+    // REQUIREMENT 7: Seprate Reels & Banner Fetch on Homepage and Admin
     const unsubBanners = onSnapshot(collection(db, "banners"), (snap) => { 
       setBanners(snap.docs.map(d => ({ id: d.id, ...d.data() }))); 
-      setStories(snap.docs.map(d => ({ id: d.id, ...d.data() })).filter((r: any) => r.isStory === true || r.isStory === "true"));
     });
+    const unsubStories = onSnapshot(collection(db, "reels"), (snap) => { 
+      setStories(snap.docs.map(d => ({ id: d.id, ...d.data() }))); 
+    });
+
     const unsubReviews = onSnapshot(collection(db, "reviews"), (snap) => {
       setReviews(snap.docs.map(d => ({ id: d.id, ...d.data() })).filter((r: any) => r.isApproved === true || r.isApproved === "true"));
     });
@@ -706,6 +725,7 @@ export default function BbCafeHome() {
       unsubMenu(); 
       unsubCats(); 
       unsubBanners(); 
+      unsubStories();
       unsubReviews(); 
       unsubRules(); 
     };
@@ -720,10 +740,18 @@ export default function BbCafeHome() {
         toast.success("बम बम कैफ़े ऐप इंस्टॉल करने के लिए धन्यवाद! ❤️");
       }
       setDeferredPrompt(null);
-      setShowInstallBanner(false);
     } else {
       setIsInstallModalOpen(true);
     }
+    // Instantly hide the banner and persist dismiss state
+    setShowInstallBanner(false);
+    localStorage.setItem('bb_app_installed_or_dismissed', 'true');
+  };
+
+  const handleDismissInstallBanner = () => {
+    triggerHaptic(20);
+    setShowInstallBanner(false);
+    localStorage.setItem('bb_app_installed_or_dismissed', 'true');
   };
 
   // --- ACTIONS ---
@@ -1381,7 +1409,7 @@ export default function BbCafeHome() {
       {closingMinutesLeft !== null && storeOpen && (
         <div className="bg-gradient-to-r from-amber-500 to-orange-600 text-white font-extrabold py-2 px-4 text-center text-[10px] flex items-center justify-center gap-1.5 shadow-md">
           <span>⏰</span>
-          <span>आर्डर चेतावनी: बम बम कैफ़े अगले {closingMinutesLeft} मिनट में बंद होने वाला है! आर्डर जल्दी पूरा करें।</span>
+          <span>आर्डर चेतावनी: बम बम कैफ़े अगले {closingMinutesLeft} minute में बंद होने वाला है! आर्डर जल्दी पूरा करें।</span>
         </div>
       )}
 
@@ -1426,8 +1454,26 @@ export default function BbCafeHome() {
         </div>
       )}
 
-      {/* PREMIUM HERO HEADER */}
-      <header className="relative pt-10 pb-6 px-5 overflow-hidden shadow-xl flex flex-col justify-end min-h-[160px]">
+      {/* FLOATING ACTION SIDEBAR (Requirement 5) */}
+      <div className="fixed right-3 top-1/3 z-50 flex flex-col gap-2.5">
+        <button 
+          onClick={() => { triggerHaptic(); setIsReviewFormOpen(true); }}
+          className="w-10 h-10 bg-emerald-600 hover:bg-emerald-700 text-white rounded-full shadow-lg border border-white/10 flex items-center justify-center transition-transform active:scale-90"
+          title="Review"
+        >
+          <Star size={16} className="fill-white" />
+        </button>
+        <button 
+          onClick={() => { triggerHaptic(); setIsSocialsOpen(true); }}
+          className="w-10 h-10 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg border border-white/10 flex items-center justify-center transition-transform active:scale-90"
+          title="Social Rewards"
+        >
+          <Sparkles size={16} />
+        </button>
+      </div>
+
+      {/* PREMIUM HERO HEADER (Requirement 6) */}
+      <header className="relative pt-6 pb-4 px-4 overflow-hidden shadow-xl flex flex-col justify-end min-h-[140px]">
         <video 
           autoPlay 
           loop 
@@ -1439,25 +1485,25 @@ export default function BbCafeHome() {
           <img src="https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=600&q=80" className="absolute inset-0 w-full h-full object-cover" alt="Bum Bum Cafe Header" />
         </video>
 
-        <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/55 to-black/90 z-10" />
+        <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/40 to-black/80 z-10" />
 
-        <div className="relative z-20 max-w-[62%] space-y-1 mt-auto bg-black/45 backdrop-blur-md p-3 rounded-xl border border-white/10 shadow-lg">
+        {/* Repositioned & Refined for maximum Video Background Visibility */}
+        <div className="relative z-20 max-w-[85%] mt-auto bg-black/35 backdrop-blur-sm p-2.5 rounded-xl border border-white/5 shadow-md">
           <motion.div
-            initial={{ x: -20, opacity: 0 }}
+            initial={{ x: -25, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
             transition={{ duration: 0.4 }}
             className="space-y-0.5"
           >
-            <span className="text-lg font-extrabold italic tracking-wide text-yellow-300 font-serif drop-shadow-md block leading-none mb-0.5">
+            <span className="text-sm font-extrabold italic tracking-wide text-yellow-300 font-serif drop-shadow block leading-none mb-0.5">
               Bum Bum Cafe
             </span>
-            <h2 className="text-base font-black text-white leading-none">Delicious Food</h2>
-            <h3 className="text-sm font-black text-orange-500 leading-tight">Delivered Fast</h3>
-            <p className="text-[8px] text-gray-300 font-bold">Order your favorite meals now!</p>
+            <h2 className="text-xs font-black text-white leading-none">Delicious Food • Delivered Fast</h2>
+            <p className="text-[7px] text-gray-300 font-bold">Order Pizza, Special Thali & Paneer Delights instantly!</p>
           </motion.div>
           <button 
             onClick={scrollToMenu}
-            className="mt-1.5 bg-orange-600 hover:bg-orange-700 text-white font-black text-[8px] px-3 py-1 rounded-lg uppercase tracking-wider shadow-md transition-all active:scale-95"
+            className="mt-1 bg-orange-600 hover:bg-orange-700 text-white font-black text-[7px] px-2.5 py-0.5 rounded-md uppercase tracking-wider shadow-md transition-all active:scale-95"
           >
             Order Now
           </button>
@@ -1506,11 +1552,24 @@ export default function BbCafeHome() {
       {/* MAIN LAYOUT WRAPPER */}
       <main ref={menuRef} className="pt-3 px-3 max-w-lg mx-auto space-y-4">
 
+        {/* REQUIREMENT 2: Greeting message search bar ke just neeche ho */}
+        <div className="px-1.5 py-1">
+          <h3 className="text-xs font-black dark:text-gray-200 text-neutral-900 leading-normal">{greetingText}</h3>
+        </div>
+
+        {/* REQUIREMENT 1: App install banner dismisses smoothly and persistently */}
         {showInstallBanner && (
-          <div className="bg-gradient-to-r from-[#ff5e00] to-amber-500 p-3.5 rounded-2xl flex items-center justify-between shadow-lg border border-white/10 mx-1">
+          <div className="bg-gradient-to-r from-[#ff5e00] to-amber-500 p-3.5 rounded-2xl flex items-center justify-between shadow-lg border border-white/10 mx-1 relative">
+            <button 
+              onClick={handleDismissInstallBanner}
+              className="absolute top-2 right-2 text-white/70 hover:text-white"
+              title="Dismiss"
+            >
+              <X size={14} />
+            </button>
             <div className="flex items-center gap-2.5">
               <span className="text-xl">📲</span>
-              <div>
+              <div className="pr-4">
                 <h4 className="text-xs font-black text-white">Bum Bum Cafe App</h4>
                 <p className="text-[9px] text-orange-100 font-bold">बिना प्ले स्टोर के सीधे अपने phone में इंस्टॉल करें!</p>
               </div>
@@ -1524,6 +1583,7 @@ export default function BbCafeHome() {
           </div>
         )}
 
+        {/* REQUIREMENT 3: Banner ke uper sari reel story ho */}
         {/* Dynamic Video Stories / Food Reels (Idea 17) */}
         {stories.length > 0 && (
           <div className="space-y-1 px-1">
@@ -1549,11 +1609,8 @@ export default function BbCafeHome() {
             </div>
           </div>
         )}
-
-        <div className="px-1.5 py-1">
-          <h3 className="text-xs font-black dark:text-gray-200 text-neutral-900 leading-normal">{greetingText}</h3>
-        </div>
         
+        {/* REQUIREMENT 4: Auto-sliding Promo Banner */}
         <div className="w-full h-36 rounded-2xl overflow-hidden relative border border-white/5 bg-white/[0.02]">
           {(banners.length === 0 || bannerError) ? (
             <div className="w-full h-full bg-gradient-to-r from-orange-600/35 to-[#b33600]/35 flex flex-col justify-center p-5 space-y-1">
@@ -1908,42 +1965,6 @@ export default function BbCafeHome() {
                             <Gift size={24} />
                           </div>
                         </div>
-                      </motion.div>
-                    )}
-
-                    {index === 5 && (
-                      <motion.div
-                        initial={{ opacity: 0, y: 15 }}
-                        whileInView={{ opacity: 1, y: 0 }}
-                        viewport={{ once: true }}
-                        onClick={() => { triggerHaptic(); setIsReviewFormOpen(true); }}
-                        className="cursor-pointer bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white py-3.5 px-4 rounded-xl shadow-md border border-white/10 my-2 flex justify-between items-center transition-all active:scale-95 group animate-none"
-                      >
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm">⭐</span>
-                          <p className="text-[10px] font-black tracking-wide uppercase">
-                            खाना कैसा लगा? अपना रिव्यू लिखें और मदद करें! ➔
-                          </p>
-                        </div>
-                        <ChevronRight size={14} className="text-emerald-100 group-hover:translate-x-0.5 transition-transform" />
-                      </motion.div>
-                    )}
-
-                    {index === 7 && (
-                      <motion.div
-                        initial={{ opacity: 0, y: 15 }}
-                        whileInView={{ opacity: 1, y: 0 }}
-                        viewport={{ once: true }}
-                        onClick={() => { triggerHaptic(); setIsSocialsOpen(true); }}
-                        className="cursor-pointer bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white py-3.5 px-4 rounded-xl shadow-md border border-white/10 my-2 flex justify-between items-center transition-all active:scale-95 group animate-none"
-                      >
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm">📱</span>
-                          <p className="text-[10px] font-black tracking-wide uppercase">
-                            हमें सोशल मीडिया पर फॉलो करें और +1 फ्री पॉइंट पाएं! ➔
-                          </p>
-                        </div>
-                        <ChevronRight size={14} className="text-blue-100 group-hover:translate-x-0.5 transition-transform" />
                       </motion.div>
                     )}
                   </React.Fragment>
@@ -2463,7 +2484,7 @@ export default function BbCafeHome() {
                   <div className="flex justify-between items-center">
                     <div className="min-w-0 pr-3">
                       <h4 className="font-bold text-xs dark:text-gray-100 text-neutral-900 truncate">{item?.name || "Item"}</h4>
-                      <p className="text-orange-550 font-black mt-1 text-[11px]">₹{item?.price || 0}</p>
+                      <p className="text-orange-555 font-black mt-1 text-[11px]">₹{item?.price || 0}</p>
                     </div>
                     <div className="flex items-center gap-2 bg-black/40 px-2 py-1 rounded-xl border border-white/10 flex-shrink-0">
                       <button onClick={() => { triggerHaptic(); removeItem(item.id); }} className="w-6 h-6 flex items-center justify-center bg-red-500/10 text-red-500 rounded text-sm font-black">-</button>
@@ -2669,7 +2690,7 @@ export default function BbCafeHome() {
               <Gift className="mx-auto text-yellow-400" size={32} />
               <div>
                 <h3 className="text-lg font-black text-yellow-400 uppercase italic">Gift Loyalty Points</h3>
-                <p className="text-[9px] text-gray-500 font-semibold mt-0.5">अपने पॉइंट्स किसी दोस्त को गिफ्ट करें</p>
+                <p className="text-[9px] text-gray-555 font-semibold mt-0.5">अपने पॉइंट्स किसी दोस्त को गिफ्ट करें</p>
               </div>
               <div className="space-y-3 text-left">
                 <div className="space-y-1">
@@ -2689,7 +2710,7 @@ export default function BbCafeHome() {
                 <button type="submit" disabled={isGiftingLoading} className="flex-1 bg-yellow-400 text-black font-black p-3 rounded-xl text-xs uppercase flex items-center justify-center gap-1">
                   {isGiftingLoading ? <Loader2 className="animate-spin" size={14} /> : <span>Gift Points 🎁</span>}
                 </button>
-                <button type="button" onClick={() => { triggerHaptic(); setIsGiftModalOpen(false); setGiftPhone(""); setGiftPointsAmount(""); setGiftSenderPin(""); }} className="bg-white/5 text-gray-400 font-bold p-3 rounded-xl text-xs">CANCEL</button>
+                <button type="button" onClick={() => { triggerHaptic(); setIsGiftModalOpen(false); setGiftPhone(""); setGiftPointsAmount(""); setGiftSenderPin(""); }} className="bg-white/5 text-gray-450 font-bold p-3 rounded-xl text-xs">CANCEL</button>
               </div>
             </motion.form>
           </div>
@@ -2731,7 +2752,7 @@ export default function BbCafeHome() {
                 <button 
                   type="button" 
                   onClick={() => { triggerHaptic(); setIsClaimModalOpen(false); setClaimUsername(""); }} 
-                  className="bg-white/5 text-gray-450 p-3 rounded-xl font-black text-xs uppercase"
+                  className="bg-white/5 text-gray-455 p-3 rounded-xl font-black text-xs uppercase"
                 >
                   Cancel
                 </button>
@@ -2748,7 +2769,7 @@ export default function BbCafeHome() {
             <motion.div className="dark:bg-[#111] bg-white w-full max-w-md p-6 rounded-3xl border dark:border-white/10 border-gray-200 text-center space-y-4 shadow-xl transition-colors duration-200">
               <div>
                 <h3 className="text-xl font-black text-orange-500 uppercase italic">Connect & Earn Points</h3>
-                <p className="text-[8px] text-gray-505 font-bold uppercase tracking-wider">हर प्लेटफार्म पर फॉलो/सब्सक्राइब करने का +1 पॉइंट पाएं!</p>
+                <p className="text-[8px] text-gray-555 font-bold uppercase tracking-wider">हर प्लेटफार्म पर फॉलो/सब्सक्राइब करने का +1 पॉइंट पाएं!</p>
               </div>
               <div className="space-y-2 text-left max-h-[22rem] overflow-y-auto no-scrollbar pr-1">
                 {SOCIAL_LINKS.map((platform) => (
@@ -2825,7 +2846,7 @@ export default function BbCafeHome() {
                 </button>
               </div>
 
-              <p className="text-[9px] text-green-500 dark:text-green-400 dark:bg-green-500/10 bg-green-50 p-2.5 rounded-xl font-bold">
+              <p className="text-[9px] text-green-555 dark:text-green-400 dark:bg-green-500/10 bg-green-50 p-2.5 rounded-xl font-bold">
                 🌱 पेपर रसीद के बिना DIGITAL इनवॉइस जनरेट किया गया है। धन्यवाद!
               </p>
               <button onClick={() => { triggerHaptic(); setShowInvoice(false); }} className="w-full bg-white text-black p-3 rounded-xl text-xs font-black uppercase">
