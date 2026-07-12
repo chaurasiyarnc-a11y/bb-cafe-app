@@ -1537,7 +1537,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                       type="date" 
                       value={startDate} 
                       onChange={(e) => setStartDate(e.target.value)} 
-                      className="bg-black/60 border border-white/10 rounded-xl p-2.5 text-xs font-bold text-orange-500 outline-none cursor-pointer"
+                      className="bg-black/60 border border-white/10 rounded-xl p-2.5 text-xs font-bold text-orange-500 outline-none cursor-pointer animate-none"
                     />
                   </div>
                   <div className="flex flex-col gap-1">
@@ -1546,7 +1546,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                       type="date" 
                       value={endDate} 
                       onChange={(e) => setEndDate(e.target.value)} 
-                      className="bg-black/60 border border-white/10 rounded-xl p-2.5 text-xs font-bold text-orange-500 outline-none cursor-pointer"
+                      className="bg-black/60 border border-white/10 rounded-xl p-2.5 text-xs font-bold text-orange-500 outline-none cursor-pointer animate-none"
                     />
                   </div>
                 </div>
@@ -1587,7 +1587,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                     <span className="text-[8px] font-bold text-green-400 opacity-0 group-hover:opacity-100 transition-opacity">₹{day.sales}</span>
                     <div 
                       style={{ height: `${day.percentage}%` }} 
-                      className="w-full bg-gradient-to-t from-orange-600 to-orange-400 rounded-t-lg min-h-[4px] relative"
+                      className="w-full bg-gradient-to-t from-orange-600 to-orange-400 rounded-t-lg min-h-[4px] relative animate-none"
                     ></div>
                     <span className="text-[9px] font-bold text-gray-500 uppercase mt-1">{day.label}</span>
                   </div>
@@ -1655,7 +1655,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                     </div>
                     <div className="text-right flex-shrink-0">
                       <p className="text-green-400 font-black text-lg leading-none">₹{o.total}</p>
-                      <span className="text-[9px] font-black uppercase bg-green-500/10 text-green-400 px-2.5 py-1 rounded-md mt-2 inline-block">PAID</span>
+                      <span className="text-[9px] font-black uppercase bg-green-500/10 text-green-400 px-2.5 py-1 rounded-md mt-2 inline-block animate-none">PAID</span>
                     </div>
                   </div>
                 ))
@@ -1676,7 +1676,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                 type="date" 
                 value={ordersFilterDate} 
                 onChange={(e) => setOrdersFilterDate(e.target.value)} 
-                className="bg-black/60 border border-white/10 rounded-xl p-3 text-xs font-bold text-orange-500 outline-none cursor-pointer"
+                className="bg-black/60 border border-white/10 rounded-xl p-3 text-xs font-bold text-orange-500 outline-none cursor-pointer animate-none"
               />
             </div>
 
@@ -1687,13 +1687,13 @@ Report generated automatically by Bum Bum Cafe POS.`
                 <div key={o.id} className="bg-white/[0.03] p-6 rounded-[2rem] border border-white/5 relative overflow-hidden">
                   <div className="flex justify-between items-start mb-4">
                     <div className="flex flex-wrap gap-1.5">
-                      <span className="bg-orange-500 text-black text-[10px] px-3 py-1 rounded-full font-black">BILL: #{formatBillNumber(o.billNumber || 0)}</span>
-                      <span className="bg-yellow-400 text-black text-[10px] px-3 py-1 rounded-full font-black">TOKEN: #{o.tokenNumber || "N/A"}</span>
+                      <span className="bg-orange-500 text-black text-[10px] px-3 py-1 rounded-full font-black animate-none">BILL: #{formatBillNumber(o.billNumber || 0)}</span>
+                      <span className="bg-yellow-400 text-black text-[10px] px-3 py-1 rounded-full font-black animate-none">TOKEN: #{o.tokenNumber || "N/A"}</span>
                     </div>
                     <span className="text-orange-500 font-black text-xl">₹{o.total}</span>
                   </div>
                   
-                  <div className="space-y-2 mb-6 border-b border-white/5 pb-4">
+                  <div className="space-y-2 mb-6 border-b border-white/5 pb-4 animate-none">
                     {o.items?.map((item: any, idx: number) => (
                       <p key={idx} className="text-sm font-bold text-gray-300">
                         <span className="text-orange-500">×{item.quantity}</span> {item.name}
@@ -1701,7 +1701,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                     ))}
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4 text-[11px] font-bold text-gray-500 uppercase tracking-wider">
+                  <div className="grid grid-cols-2 gap-4 text-[11px] font-bold text-gray-500 uppercase tracking-wider animate-none">
                     <div className="flex items-center gap-2"><Phone size={12}/> {o.customerPhone}</div>
                     <div className="flex items-center gap-2"><MapPin size={12}/> {o.address}</div>
                     <div className="flex items-center gap-2 col-span-2"><Calendar size={12}/> {o.timestamp?.toDate ? o.timestamp.toDate().toLocaleString() : 'Just now'}</div>
@@ -1711,17 +1711,17 @@ Report generated automatically by Bum Bum Cafe POS.`
                     <div className="flex items-center gap-2 flex-wrap">
                       <button 
                         onClick={() => handlePrintReceipt(o)}
-                        className="px-3 py-2 bg-orange-500 hover:bg-orange-600 text-black rounded-xl text-[10px] font-black uppercase transition-all active:scale-95"
+                        className="px-3 py-2 bg-orange-500 hover:bg-orange-600 text-black rounded-xl text-[10px] font-black uppercase transition-all active:scale-95 animate-none"
                       >
                         📄 Bill PDF
                       </button>
                       <button 
                         onClick={() => handleSendWhatsAppBill(o)}
-                        className="px-3 py-2 bg-green-600 hover:bg-green-700 text-white text-[10px] font-black uppercase rounded-xl"
+                        className="px-3 py-2 bg-green-600 hover:bg-green-700 text-white text-[10px] font-black uppercase rounded-xl transition-all active:scale-95 animate-none"
                       >
                         📲 Send Bill
                       </button>
-                      <select value={o.status || 'pending'} onChange={(e) => handleStatusChange(o, e.target.value)} className="bg-black/60 border border-white/10 text-xs font-bold rounded-xl p-2 px-3 text-white outline-none focus:border-orange-500 cursor-pointer">
+                      <select value={o.status || 'pending'} onChange={(e) => handleStatusChange(o, e.target.value)} className="bg-black/60 border border-white/10 text-xs font-bold rounded-xl p-2 px-3 text-white outline-none focus:border-orange-500 cursor-pointer animate-none">
                         <option value="pending">⏳ Pending (Confirming)</option>
                         <option value="preparing">👨‍🍳 Preparing in Kitchen</option>
                         <option value="out_for_delivery">🛵 Out for Delivery</option>
@@ -1739,8 +1739,8 @@ Report generated automatically by Bum Bum Cafe POS.`
         {tab === 'menu' && (
           <div className="space-y-4">
             <div className="flex flex-col gap-2">
-              <button onClick={handleBulkImport} type="button" className="w-full bg-yellow-400 text-black py-4 rounded-2xl font-black text-sm flex items-center justify-center gap-2 active:scale-95 transition-all shadow-xl">📥 IMPORT ALL 80+ PDF MENU ITEMS</button>
-              <button onClick={() => { setShowAddForm(!showAddForm); setEditingProduct(null); }} className="w-full bg-orange-500/10 text-orange-500 border border-orange-500/20 py-4 rounded-2xl font-black text-sm flex items-center justify-center gap-2 hover:bg-orange-500/20 transition-all">
+              <button onClick={handleBulkImport} type="button" className="w-full bg-yellow-400 text-black py-4 rounded-2xl font-black text-sm flex items-center justify-center gap-2 active:scale-95 transition-all shadow-xl animate-none">📥 IMPORT ALL 80+ PDF MENU ITEMS</button>
+              <button onClick={() => { setShowAddForm(!showAddForm); setEditingProduct(null); }} className="w-full bg-orange-500/10 text-orange-500 border border-orange-500/20 py-4 rounded-2xl font-black text-sm flex items-center justify-center gap-2 hover:bg-orange-500/20 transition-all animate-none">
                 <Plus size={18}/> {showAddForm ? "CLOSE FORM" : "ADD NEW ITEM"}
               </button>
             </div>
@@ -1759,17 +1759,17 @@ Report generated automatically by Bum Bum Cafe POS.`
             </div>
 
             {showAddForm && (
-              <form onSubmit={handleAddProduct} className="bg-white/[0.02] border border-white/5 p-6 rounded-[2.5rem] space-y-4">
+              <form onSubmit={handleAddProduct} className="bg-white/[0.02] border border-white/5 p-6 rounded-[2.5rem] space-y-4 animate-none">
                 <h3 className="text-lg font-black text-orange-500 italic uppercase">Add Product Form</h3>
                 
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-gray-400 uppercase">Item Name</label>
-                  <input type="text" placeholder="e.g., Cheese Corn Pizza" value={newName} onChange={(e) => setNewName(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-white" required />
+                  <input type="text" placeholder="e.g., Cheese Corn Pizza" value={newName} onChange={(e) => setNewName(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-white animate-none" required />
                 </div>
 
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-gray-400 uppercase">Category</label>
-                  <select value={newCategory} onChange={(e) => setNewCategory(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-white" required>
+                  <select value={newCategory} onChange={(e) => setNewCategory(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-white animate-none" required>
                     {categoryOptions.filter(c => c !== "All" && c !== "DIY Pizza").map(cat => (
                       <option key={cat} value={cat} className="bg-[#111]">{cat}</option>
                     ))}
@@ -1778,12 +1778,12 @@ Report generated automatically by Bum Bum Cafe POS.`
 
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-gray-400 uppercase">Image URL</label>
-                  <input type="url" placeholder="Paste image url link..." value={newImage} onChange={(e) => setNewImage(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-white" required />
+                  <input type="url" placeholder="Paste image url link..." value={newImage} onChange={(e) => setNewImage(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-white animate-none" required />
                 </div>
 
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-gray-400 uppercase">Portion Option Type</label>
-                  <select value={variantType} onChange={(e: any) => setVariantType(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-white">
+                  <select value={variantType} onChange={(e: any) => setVariantType(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-white animate-none">
                     <option value="none" className="bg-[#111]">None (Single Price)</option>
                     <option value="half_full" className="bg-[#111]">Half / Full</option>
                     <option value="plain_butter" className="bg-[#111]">Plain / Butter</option>
@@ -1794,43 +1794,43 @@ Report generated automatically by Bum Bum Cafe POS.`
                 {variantType === 'none' && (
                   <div className="space-y-1">
                     <label className="text-xs font-bold text-gray-400 uppercase">Price (₹)</label>
-                    <input type="number" placeholder="Item Price" value={newPrice} onChange={(e) => setNewPrice(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-white" />
+                    <input type="number" placeholder="Item Price" value={newPrice} onChange={(e) => setNewPrice(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-white animate-none" />
                   </div>
                 )}
 
                 {(variantType === 'half_full' || variantType === 'plain_butter') && (
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-2 gap-3 animate-none">
                     <div className="space-y-1">
                       <label className="text-xs font-bold text-gray-400 uppercase">Half / Plain Price (₹)</label>
-                      <input type="number" placeholder="Price" value={halfPrice} onChange={(e) => setHalfPrice(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-white" />
+                      <input type="number" placeholder="Price" value={halfPrice} onChange={(e) => setHalfPrice(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-white animate-none" />
                     </div>
                     <div className="space-y-1">
                       <label className="text-xs font-bold text-gray-400 uppercase">Full / Butter Price (₹)</label>
-                      <input type="number" placeholder="Price" value={fullPrice} onChange={(e) => setFullPrice(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-white" />
+                      <input type="number" placeholder="Price" value={fullPrice} onChange={(e) => setFullPrice(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-white animate-none" />
                     </div>
                   </div>
                 )}
 
                 {variantType === 'pizza_sizes' && (
-                  <div className="space-y-3 bg-[#111]/40 p-4 rounded-2xl border border-white/5">
+                  <div className="space-y-3 bg-[#111]/40 p-4 rounded-2xl border border-white/5 animate-none">
                     <p className="text-[10px] text-orange-400 font-extrabold uppercase">Prices (Leave blank if unavailable):</p>
                     <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Small (₹)</label><input type="number" value={priceSmall} onChange={(e) => setPriceSmall(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-white text-xs font-bold" /></div>
-                      <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Medium (₹)</label><input type="number" value={priceMedium} onChange={(e) => setPriceMedium(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-white text-xs font-bold" /></div>
-                      <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Large (₹)</label><input type="number" value={priceLarge} onChange={(e) => setPriceLarge(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-white text-xs font-bold" /></div>
-                      <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Extra Large (₹)</label><input type="number" value={priceXL} onChange={(e) => setPriceXL(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-white text-xs font-bold" /></div>
+                      <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Small (₹)</label><input type="number" value={priceSmall} onChange={(e) => setPriceSmall(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-white text-xs font-bold animate-none" /></div>
+                      <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Medium (₹)</label><input type="number" value={priceMedium} onChange={(e) => setPriceMedium(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-white text-xs font-bold animate-none" /></div>
+                      <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Large (₹)</label><input type="number" value={priceLarge} onChange={(e) => setPriceLarge(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-white text-xs font-bold animate-none" /></div>
+                      <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Extra Large (₹)</label><input type="number" value={priceXL} onChange={(e) => setPriceXL(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-white text-xs font-bold animate-none" /></div>
                     </div>
                   </div>
                 )}
 
-                <button type="submit" className="w-full bg-green-600 text-white p-4 rounded-xl font-black text-sm uppercase">Save Product</button>
+                <button type="submit" className="w-full bg-green-600 text-white p-4 rounded-xl font-black text-sm uppercase transition-all active:scale-95 animate-none">Save Product</button>
               </form>
             )}
 
             {editingProduct && (
               <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[100] flex items-center justify-center p-4 overflow-y-auto">
-                <form onSubmit={handleUpdateProduct} className="bg-[#111] border-2 border-orange-500/50 p-8 rounded-[2.5rem] w-full max-w-lg relative max-h-[90vh] overflow-y-auto shadow-2xl space-y-4">
-                  <button type="button" onClick={() => setEditingProduct(null)} className="absolute top-4 right-4 p-2.5 bg-white/5 text-gray-400 hover:text-white rounded-full"><X size={18}/></button>
+                <form onSubmit={handleUpdateProduct} className="bg-[#111] border-2 border-orange-500/50 p-8 rounded-[2.5rem] w-full max-w-lg relative max-h-[90vh] overflow-y-auto shadow-2xl space-y-4 animate-none">
+                  <button type="button" onClick={() => setEditingProduct(null)} className="absolute top-4 right-4 p-2.5 bg-white/5 text-gray-400 hover:text-white rounded-full transition-all active:scale-95"><X size={18}/></button>
                   
                   <div className="text-center pb-2">
                     <h3 className="text-2xl font-black text-orange-500 italic uppercase">Edit Product</h3>
@@ -1838,12 +1838,12 @@ Report generated automatically by Bum Bum Cafe POS.`
                   
                   <div className="space-y-1">
                     <label className="text-xs font-bold text-gray-400 uppercase">Item Name</label>
-                    <input type="text" value={editName} onChange={(e) => setEditName(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-white" required />
+                    <input type="text" value={editName} onChange={(e) => setEditName(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-white animate-none" required />
                   </div>
 
                   <div className="space-y-1">
                     <label className="text-xs font-bold text-gray-400 uppercase">Category</label>
-                    <select value={editCategory} onChange={(e) => setEditCategory(e.target.value)} className="w-full bg-[#111] border border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-white" required>
+                    <select value={editCategory} onChange={(e) => setEditCategory(e.target.value)} className="w-full bg-[#111] border border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-white animate-none" required>
                       {categoryOptions.filter(c => c !== "All" && c !== "DIY Pizza").map(cat => (
                         <option key={cat} value={cat} className="bg-[#111]">{cat}</option>
                       ))}
@@ -1852,12 +1852,12 @@ Report generated automatically by Bum Bum Cafe POS.`
 
                   <div className="space-y-1">
                     <label className="text-xs font-bold text-gray-400 uppercase">Image URL</label>
-                    <input type="url" value={editImage} onChange={(e) => setEditImage(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-white" required />
+                    <input type="url" value={editImage} onChange={(e) => setEditImage(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-white animate-none" required />
                   </div>
 
                   <div className="space-y-1">
                     <label className="text-xs font-bold text-gray-400 uppercase">Option Type</label>
-                    <select value={editVariantType} onChange={(e: any) => setEditVariantType(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-white">
+                    <select value={editVariantType} onChange={(e: any) => setEditVariantType(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-white animate-none">
                       <option value="none" className="bg-[#111]">None (Single Price)</option>
                       <option value="half_full" className="bg-[#111]">Half / Full</option>
                       <option value="plain_butter" className="bg-[#111]">Plain / Butter</option>
@@ -1866,33 +1866,33 @@ Report generated automatically by Bum Bum Cafe POS.`
                   </div>
 
                   {editVariantType === 'none' && (
-                    <div className="space-y-1">
+                    <div className="space-y-1 animate-none">
                       <label className="text-xs font-bold text-gray-400 uppercase">Price (₹)</label>
-                      <input type="number" value={editPrice} onChange={(e) => setEditPrice(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-white" />
+                      <input type="number" value={editPrice} onChange={(e) => setEditPrice(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-white animate-none" />
                     </div>
                   )}
 
                   {(editVariantType === 'half_full' || editVariantType === 'plain_butter') && (
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Half / Plain (₹)</label><input type="number" value={editHalfPrice} onChange={(e) => setEditHalfPrice(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-white text-xs font-bold" /></div>
-                      <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Full / Butter (₹)</label><input type="number" value={editFullPrice} onChange={(e) => setEditFullPrice(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-white text-xs font-bold" /></div>
+                    <div className="grid grid-cols-2 gap-3 animate-none">
+                      <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Half / Plain (₹)</label><input type="number" value={editHalfPrice} onChange={(e) => setEditHalfPrice(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-white text-xs font-bold animate-none" /></div>
+                      <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Full / Butter (₹)</label><input type="number" value={editFullPrice} onChange={(e) => setEditFullPrice(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-white text-xs font-bold animate-none" /></div>
                     </div>
                   )}
 
                   {editVariantType === 'pizza_sizes' && (
-                    <div className="space-y-3 bg-[#111]/40 p-4 rounded-2xl border border-white/5">
+                    <div className="space-y-3 bg-[#111]/40 p-4 rounded-2xl border border-white/5 animate-none">
                       <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Small Price</label><input type="number" value={editPriceSmall} onChange={(e) => setEditPriceSmall(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs font-bold text-white" /></div>
-                        <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Medium Price</label><input type="number" value={editPriceMedium} onChange={(e) => setEditPriceMedium(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs font-bold text-white" /></div>
-                        <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Large Price</label><input type="number" value={editPriceLarge} onChange={(e) => setEditPriceLarge(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs font-bold text-white" /></div>
+                        <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Small Price</label><input type="number" value={editPriceSmall} onChange={(e) => setEditPriceSmall(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs font-bold text-white animate-none" /></div>
+                        <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Medium Price</label><input type="number" value={editPriceMedium} onChange={(e) => setEditPriceMedium(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs font-bold text-white animate-none" /></div>
+                        <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Large Price</label><input type="number" value={editPriceLarge} onChange={(e) => setEditPriceLarge(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs font-bold text-white animate-none" /></div>
                         <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Extra Large</label><input type="number" value={editPriceXL} onChange={(e) => setEditPriceXL(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs font-bold text-white" /></div>
                       </div>
                     </div>
                   )}
 
                   <div className="flex gap-2 pt-2">
-                    <button type="submit" className="flex-1 bg-green-600 text-white p-4 rounded-xl font-black text-sm uppercase">Update Item</button>
-                    <button type="button" onClick={() => setEditingProduct(null)} className="bg-white/5 text-gray-450 p-4 rounded-xl font-black text-xs uppercase">Cancel</button>
+                    <button type="submit" className="flex-1 bg-green-600 text-white p-4 rounded-xl font-black text-sm uppercase transition-all active:scale-95">Update Item</button>
+                    <button type="button" onClick={() => setEditingProduct(null)} className="bg-white/5 text-gray-450 p-4 rounded-xl font-black text-xs uppercase transition-all active:scale-95">Cancel</button>
                   </div>
                 </form>
               </div>
@@ -1934,15 +1934,15 @@ Report generated automatically by Bum Bum Cafe POS.`
                       <div className="flex items-center gap-2">
                         <button 
                           onClick={() => { setSopProduct(item); setSopRecipeText(item.recipe || ""); }} 
-                          className="p-3 bg-purple-500/10 text-purple-500 rounded-xl flex items-center gap-1.5"
+                          className="p-3 bg-purple-500/10 text-purple-500 rounded-xl flex items-center gap-1.5 transition-all active:scale-95"
                         >
                           <BookOpen size={16}/> <span className="text-[10px] font-black">SOP</span>
                         </button>
-                        <button onClick={() => startEditing(item)} className="p-3 bg-blue-500/10 text-blue-500 rounded-xl"><Edit size={18}/></button>
+                        <button onClick={() => startEditing(item)} className="p-3 bg-blue-500/10 text-blue-500 rounded-xl transition-all active:scale-95"><Edit size={18}/></button>
                         <button onClick={() => toggleItemVisibility(item.id, item.isVisible !== false)} className={`p-3 rounded-xl transition-all ${item.isVisible !== false ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
                           {item.isVisible !== false ? <Eye size={18}/> : <EyeOff size={18}/>}
                         </button>
-                        <button onClick={() => handleDeleteProduct(item.id)} className="p-3 bg-red-500/10 text-red-500 rounded-xl"><Trash size={18}/></button>
+                        <button onClick={() => handleDeleteProduct(item.id)} className="p-3 bg-red-500/10 text-red-500 rounded-xl transition-all active:scale-95"><Trash size={18}/></button>
                       </div>
                     </div>
                   );
@@ -1954,15 +1954,15 @@ Report generated automatically by Bum Bum Cafe POS.`
 
         {/* --- TAB 4: CATEGORY MANAGER --- */}
         {tab === 'categories' && (
-          <div className="space-y-6">
+          <div className="space-y-6 animate-none">
             {!editingCategory && (
-              <form onSubmit={handleAddCategory} className="bg-white/[0.02] border border-white/5 p-6 rounded-[2.5rem] space-y-4">
+              <form onSubmit={handleAddCategory} className="bg-white/[0.02] border border-white/5 p-6 rounded-[2.5rem] space-y-4 animate-none">
                 <h3 className="text-lg font-black text-orange-500 italic uppercase flex items-center gap-2"><Folder size={18}/> Add Category</h3>
                 <div className="grid grid-cols-2 gap-3">
                   <input type="text" placeholder="Category Name" value={newCatName} onChange={(e) => setNewCatName(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-xs font-black text-white" required />
                   <input type="url" placeholder="Image URL link" value={newCatImage} onChange={(e) => setNewCatImage(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-xs font-black text-white" required />
                 </div>
-                <button type="submit" className="w-full bg-green-600 text-white p-4 rounded-xl font-black text-sm uppercase">Add Category</button>
+                <button type="submit" className="w-full bg-green-600 text-white p-4 rounded-xl font-black text-sm uppercase transition-all active:scale-95">Add Category</button>
               </form>
             )}
 
@@ -1982,7 +1982,7 @@ Report generated automatically by Bum Bum Cafe POS.`
             {editingCategory && (
               <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[100] flex items-center justify-center p-4">
                 <form onSubmit={handleUpdateCategory} className="bg-[#111] border-2 border-orange-500 p-8 rounded-[2.5rem] w-full max-w-lg relative shadow-2xl space-y-4">
-                  <button type="button" onClick={() => setEditingCategory(null)} className="absolute top-4 right-4 p-2.5 bg-white/5 text-gray-400 hover:text-white rounded-full"><X size={18}/></button>
+                  <button type="button" onClick={() => setEditingCategory(null)} className="absolute top-4 right-4 p-2.5 bg-white/5 text-gray-400 hover:text-white rounded-full transition-all active:scale-95"><X size={18}/></button>
                   <div className="text-center pb-2">
                     <h3 className="text-2xl font-black text-orange-500 italic uppercase flex items-center justify-center gap-2"><Folder size={22}/> Edit Category</h3>
                   </div>
@@ -1999,8 +1999,8 @@ Report generated automatically by Bum Bum Cafe POS.`
                   </div>
 
                   <div className="flex gap-2 pt-2">
-                    <button type="submit" className="flex-1 bg-green-600 text-white p-4 rounded-xl font-black text-sm uppercase">Update Category</button>
-                    <button type="button" onClick={() => setEditingCategory(null)} className="bg-white/5 text-gray-450 p-4 rounded-xl font-black text-xs uppercase">Cancel</button>
+                    <button type="submit" className="flex-1 bg-green-600 text-white p-4 rounded-xl font-black text-sm uppercase transition-all active:scale-95">Update Category</button>
+                    <button type="button" onClick={() => setEditingCategory(null)} className="bg-white/5 text-gray-400 p-4 rounded-xl font-black text-sm uppercase">Cancel</button>
                   </div>
                 </form>
               </div>
@@ -2017,11 +2017,11 @@ Report generated automatically by Bum Bum Cafe POS.`
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <button onClick={() => startEditingCategory(c)} className="p-3 bg-blue-500/10 text-blue-500 rounded-xl"><Edit size={18}/></button>
+                    <button onClick={() => startEditingCategory(c)} className="p-3 bg-blue-500/10 text-blue-500 rounded-xl transition-all active:scale-95"><Edit size={18}/></button>
                     <button onClick={() => toggleCategoryVisibility(c)} className={`p-3 rounded-xl transition-all ${c.isVisible !== false ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
                       {c.isVisible !== false ? <Eye size={18}/> : <EyeOff size={18}/>}
                     </button>
-                    <button onClick={() => handleDeleteCategory(c)} className="p-3 bg-red-500/10 text-red-500 rounded-xl"><Trash size={16}/></button>
+                    <button onClick={() => handleDeleteCategory(c)} className="p-3 bg-red-500/10 text-red-500 rounded-xl transition-all active:scale-95"><Trash size={16}/></button>
                   </div>
                 </div>
               ))}
@@ -2031,15 +2031,15 @@ Report generated automatically by Bum Bum Cafe POS.`
 
         {/* --- TAB 5: CUSTOMERS TAB --- */}
         {tab === 'customers' && (
-          <div className="space-y-6">
+          <div className="space-y-6 animate-none">
             <div className="flex justify-between items-center flex-wrap gap-2">
               <h3 className="text-xl font-black text-orange-500 uppercase tracking-wider flex items-center gap-2"><User size={20}/> Customer Management</h3>
               <div className="flex gap-2">
-                <label className="bg-yellow-500 hover:bg-yellow-600 text-black font-black text-[10px] px-4 py-2.5 rounded-full flex items-center gap-1.5 uppercase cursor-pointer transition-all">
+                <label className="bg-yellow-500 hover:bg-yellow-600 text-black font-black text-[10px] px-4 py-2.5 rounded-full flex items-center gap-1.5 uppercase cursor-pointer transition-all active:scale-95">
                   Import CSV
                   <input type="file" accept=".csv" onChange={handleCsvImport} className="hidden" />
                 </label>
-                <button onClick={() => setShowBroadcastModal(true)} className="bg-green-600 text-white font-black text-[10px] px-4 py-2.5 rounded-full flex items-center gap-1.5 uppercase shadow-md">
+                <button onClick={() => setShowBroadcastModal(true)} className="bg-green-600 text-white font-black text-[10px] px-4 py-2.5 rounded-full flex items-center gap-1.5 uppercase shadow-md transition-all active:scale-95">
                   <Share2 size={13}/> Broadcast Blast
                 </button>
               </div>
@@ -2073,7 +2073,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                 </div>
                 <div className="flex gap-2">
                   <button type="submit" className="flex-1 bg-green-600 text-white p-3 rounded-xl font-black text-xs uppercase">Save Changes</button>
-                  <button type="button" onClick={() => setEditingCustomer(null)} className="bg-white/5 text-gray-450 p-3 rounded-xl font-black text-xs uppercase">Cancel</button>
+                  <button type="button" onClick={() => setEditingCustomer(null)} className="bg-white/5 text-gray-400 p-3 rounded-xl font-black text-xs uppercase">Cancel</button>
                 </div>
               </form>
             )}
@@ -2114,7 +2114,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                               setEditCustomerName(user.name);
                               setEditCustomerPoints(user.points || 0);
                             }}
-                            className="p-3 bg-orange-500/10 text-orange-500 rounded-xl"
+                            className="p-3 bg-orange-500/10 text-orange-500 rounded-xl transition-all active:scale-95"
                           >
                             <Edit size={16}/>
                           </button>
@@ -2129,16 +2129,16 @@ Report generated automatically by Bum Bum Cafe POS.`
 
         {/* --- TAB 6: LOYALTY RULES --- */}
         {tab === 'loyalty' && (
-          <div className="space-y-6">
+          <div className="space-y-6 animate-none">
             <form onSubmit={handleAddRule} className="bg-white/[0.02] border border-white/5 p-6 rounded-[2.5rem] space-y-4">
               <h3 className="text-lg font-black text-orange-500 italic uppercase flex items-center gap-2"><Gift size={18}/> Setup Loyalty Rules</h3>
               <p className="text-[10px] text-gray-400 font-semibold leading-relaxed">Create rewards that customers can redeem automatically on checkout when their points hit the requirement:</p>
               
               <div className="grid grid-cols-2 gap-3">
-                <input type="text" placeholder="Reward Name" value={newRuleName} onChange={(e) => setNewRuleName(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-xs font-black text-white" required />
-                <input type="number" placeholder="Points Needed" value={newRulePoints} onChange={(e) => setNewRulePoints(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-xs font-black text-white" required />
+                <input type="text" placeholder="Reward Name" value={newRuleName} onChange={(e) => setNewRuleName(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-xs font-black text-white animate-none" required />
+                <input type="number" placeholder="Points Needed" value={newRulePoints} onChange={(e) => setNewRulePoints(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-xs font-black text-white animate-none" required />
               </div>
-              <button type="submit" className="w-full bg-green-600 text-white p-4 rounded-xl font-black text-sm uppercase">Add Reward Rule</button>
+              <button type="submit" className="w-full bg-green-600 text-white p-4 rounded-xl font-black text-sm uppercase transition-all active:scale-95">Add Reward Rule</button>
             </form>
 
             <div className="space-y-3">
@@ -2152,7 +2152,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                       <h4 className="font-black text-sm text-gray-200">{rule.rewardName}</h4>
                       <p className="text-xs text-yellow-400 font-extrabold mt-0.5">Cost: {rule.pointsCost} Points</p>
                     </div>
-                    <button onClick={() => handleDeleteRule(rule.id)} className="p-3 bg-red-500/10 text-red-500 rounded-xl">
+                    <button onClick={() => handleDeleteRule(rule.id)} className="p-3 bg-red-500/10 text-red-500 rounded-xl transition-all active:scale-95">
                       <Trash size={16}/>
                     </button>
                   </div>
@@ -2196,19 +2196,19 @@ Report generated automatically by Bum Bum Cafe POS.`
               <h3 className="text-lg font-black text-orange-500 italic uppercase flex items-center gap-2"><ImageIcon size={18}/> Manage Stories & Banners</h3>
               <p className="text-[10px] text-gray-500 font-bold uppercase leading-normal">यहाँ से आप मुख्य स्क्रीन के रील्स/वीडियो स्टोरीज़ या आफर बैनर्स को जोड़ सकते हैं।</p>
               
-              <div className="grid grid-cols-2 gap-3 text-xs font-bold">
+              <div className="grid grid-cols-2 gap-3 text-xs font-bold animate-none">
                 <input type="text" placeholder="Title/Dish Name" value={newReelTitle} onChange={(e) => setNewReelTitle(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-white outline-none" />
                 <input type="number" placeholder="Quick-Add Price (₹)" value={newReelPrice} onChange={(e) => setNewReelPrice(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-white outline-none" />
               </div>
-              <input type="text" placeholder="Description Text (e.g. Delicious cheese stretch!)" value={newReelDesc} onChange={(e) => setNewReelDesc(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs text-white outline-none" />
-              <input type="url" placeholder="Paste Video/Image Link URL here..." value={newBannerUrl} onChange={(e) => setNewBannerUrl(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs text-white outline-none" required />
+              <input type="text" placeholder="Description Text (e.g. Delicious cheese stretch!)" value={newReelDesc} onChange={(e) => setNewReelDesc(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs text-white outline-none animate-none" />
+              <input type="url" placeholder="Paste Video/Image Link URL here..." value={newBannerUrl} onChange={(e) => setNewBannerUrl(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs text-white outline-none animate-none" required />
               
-              <div className="flex items-center gap-2 text-xs font-bold pl-1">
+              <div className="flex items-center gap-2 text-xs font-bold pl-1 animate-none">
                 <input type="checkbox" id="isStoryCheck" checked={newReelIsStory} onChange={() => setNewReelIsStory(!newReelIsStory)} className="accent-orange-500 h-4 w-4" />
                 <label htmlFor="isStoryCheck" className="text-gray-300">मार्क करें यदि यह गोलाकार "Food Story" है (Mark as circular Story Bubble)</label>
               </div>
 
-              <button type="submit" className="w-full bg-green-600 text-white p-4 rounded-xl font-black text-sm uppercase">Add Banner / Reel ➔</button>
+              <button type="submit" className="w-full bg-green-600 text-white p-4 rounded-xl font-black text-sm uppercase transition-all active:scale-95">Add Banner / Reel ➔</button>
             </form>
 
             <div className="grid grid-cols-2 gap-4">
@@ -2216,16 +2216,16 @@ Report generated automatically by Bum Bum Cafe POS.`
                 <div key={b.id} className="bg-white/[0.02] border border-white/5 p-3 rounded-2xl relative group">
                   <div className="h-24 overflow-hidden rounded-xl bg-neutral-900 flex items-center justify-center">
                     {isVideoUrl(b.url) ? (
-                      <video src={b.url} muted className="w-full h-full object-cover" />
+                      <video src={b.url} muted className="w-full h-full object-cover animate-none" />
                     ) : (
-                      <img src={b.url} className="w-full h-full object-cover opacity-80" alt="Banner" />
+                      <img src={b.url} className="w-full h-full object-cover opacity-80 animate-none" alt="Banner" />
                     )}
                   </div>
-                  <div className="mt-2 text-[10px] space-y-0.5">
+                  <div className="mt-2 text-[10px] space-y-0.5 animate-none">
                     <p className="font-black text-gray-200 truncate">{b.title || "Offer Banner"}</p>
                     <p className="text-orange-550 uppercase tracking-widest text-[8px] font-black">{b.isStory ? "Circular Story" : "Main Offer Banner"}</p>
                   </div>
-                  <button onClick={() => handleDeleteBanner(b.id)} className="absolute top-4 right-4 p-2 bg-red-500/20 text-red-500 rounded-xl hover:bg-red-500 active:text-black">
+                  <button onClick={() => handleDeleteBanner(b.id)} className="absolute top-4 right-4 p-2 bg-red-500/20 text-red-500 rounded-xl hover:bg-red-500 active:text-black transition-all active:scale-95">
                     <Trash size={14}/>
                   </button>
                 </div>
@@ -2239,21 +2239,21 @@ Report generated automatically by Bum Bum Cafe POS.`
           <div className="space-y-6">
             <form onSubmit={handleAddCoupon} className="bg-white/[0.02] border border-white/5 p-6 rounded-[2.5rem] space-y-4">
               <h3 className="text-lg font-black text-orange-500 italic uppercase flex items-center gap-2"><Percent size={18}/> Add Coupon Code</h3>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-3 animate-none">
                 <input type="text" placeholder="CODE (e.g. WELCOME)" value={newCouponCode} onChange={(e) => setNewCouponCode(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-xs font-black uppercase text-white" required />
                 <input type="number" placeholder="Discount (₹)" value={newCouponValue} onChange={(e) => setNewCouponValue(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs font-black text-white" required />
               </div>
-              <button type="submit" className="w-full bg-green-600 text-white p-4 rounded-xl font-black text-sm uppercase">Create Coupon</button>
+              <button type="submit" className="w-full bg-green-600 text-white p-4 rounded-xl font-black text-sm uppercase transition-all active:scale-95">Create Coupon</button>
             </form>
 
             <div className="space-y-3">
               {coupons.map(c => (
-                <div key={c.id} className="bg-white/[0.02] border border-white/5 p-5 rounded-2xl flex justify-between items-center">
+                <div key={c.id} className="bg-white/[0.02] border border-white/5 p-5 rounded-2xl flex justify-between items-center animate-none">
                   <div>
                     <h4 className="text-sm font-black text-orange-500 uppercase tracking-widest">{c.code}</h4>
                     <p className="text-xs font-bold text-gray-400 mt-1">Value: Flat ₹{c.discountValue} OFF</p>
                   </div>
-                  <button onClick={() => handleDeleteCoupon(c.id)} className="p-3 bg-red-500/10 text-red-500 rounded-xl">
+                  <button onClick={() => handleDeleteCoupon(c.id)} className="p-3 bg-red-500/10 text-red-500 rounded-xl transition-all active:scale-95">
                     <Trash size={16}/>
                   </button>
                 </div>
@@ -2264,7 +2264,7 @@ Report generated automatically by Bum Bum Cafe POS.`
 
         {/* --- TAB 9: APPROVE & MANAGE REVIEWS --- */}
         {tab === 'reviews' && (
-          <div className="space-y-4">
+          <div className="space-y-4 animate-none">
             {reviews.length === 0 && <p className="text-center text-gray-600 py-16 font-bold uppercase tracking-widest">No reviews found...</p>}
             {reviews.map(r => (
               <div key={r.id} className="bg-white/[0.02] border border-white/5 p-6 rounded-[2rem] space-y-3">
@@ -2283,9 +2283,9 @@ Report generated automatically by Bum Bum Cafe POS.`
                 
                 <div className="flex gap-2 justify-end pt-2 border-t border-white/5">
                   {!r.isApproved && (
-                    <button onClick={() => handleApproveReview(r.id)} className="px-4 py-2 bg-green-600 text-white rounded-xl text-xs font-black uppercase">Approve Review</button>
+                    <button onClick={() => handleApproveReview(r.id)} className="px-4 py-2 bg-green-600 text-white rounded-xl text-xs font-black uppercase transition-all active:scale-95">Approve Review</button>
                   )}
-                  <button onClick={() => handleDeleteReview(r.id)} className="p-2 bg-red-500/10 text-red-500 rounded-xl">
+                  <button onClick={() => handleDeleteReview(r.id)} className="p-2 bg-red-500/10 text-red-500 rounded-xl transition-all active:scale-95">
                     <Trash size={16}/>
                   </button>
                 </div>
@@ -2296,7 +2296,7 @@ Report generated automatically by Bum Bum Cafe POS.`
 
         {/* --- TAB 10: KITCHEN RECIPE ROSTER --- */}
         {tab === 'roster' && (
-          <div className="space-y-6">
+          <div className="space-y-6 animate-none">
             <h3 className="text-xl font-black text-orange-500 uppercase tracking-wider flex items-center gap-2"><Settings size={20}/> Kitchen SOP Recipe Roster</h3>
             <p className="text-[10px] text-gray-500 uppercase tracking-widest font-black leading-relaxed font-mono">डिश बनाने के चरण (Steps) और सामग्री का अनुपात फीड करें, और रसोई की दीवार पर चिपकाने के लिए सीधे A4 साइज़ पोस्टर प्रिंट करें।</p>
 
@@ -2318,7 +2318,7 @@ Report generated automatically by Bum Bum Cafe POS.`
             </div>
 
             {rosterSelectedProduct && (
-              <div className="space-y-6">
+              <div className="space-y-6 animate-none">
                 <div className="bg-[#111] border border-white/5 p-5 rounded-3xl flex justify-between items-center">
                   <div>
                     <h4 className="font-black text-sm text-white uppercase">{rosterSelectedProduct.name} - SOP</h4>
@@ -2326,7 +2326,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                   </div>
                   <button 
                     onClick={() => handlePrintRosterSOP(rosterSelectedProduct)}
-                    className="px-5 py-3 bg-orange-500 text-black rounded-2xl text-xs font-black uppercase"
+                    className="px-5 py-3 bg-orange-500 text-black rounded-2xl text-xs font-black uppercase transition-all active:scale-95"
                   >
                     🖨️ Print Recipe Poster
                   </button>
@@ -2337,18 +2337,18 @@ Report generated automatically by Bum Bum Cafe POS.`
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1">
                       <label className="text-[10px] font-bold text-gray-500 uppercase">Ingredient / Action (क्या डालें)</label>
-                      <input type="text" placeholder="e.g. Pizza Base / Cheese" value={rosterStepName} onChange={(e) => setRosterStepName(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-xs font-bold text-white" required />
+                      <input type="text" placeholder="e.g. Pizza Base / Cheese" value={rosterStepName} onChange={(e) => setRosterStepName(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-xs font-bold text-white animate-none" required />
                     </div>
                     <div className="space-y-1">
                       <label className="text-[10px] font-bold text-gray-500 uppercase">Quantity / मात्रा</label>
-                      <input type="text" placeholder="e.g. 1 Piece / 30 grams" value={rosterStepQty} onChange={(e) => setRosterStepQty(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-xs font-bold text-white" required />
+                      <input type="text" placeholder="e.g. 1 Piece / 30 grams" value={rosterStepQty} onChange={(e) => setRosterStepQty(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-xs font-bold text-white animate-none" required />
                     </div>
                   </div>
                   <div className="space-y-1">
                     <label className="text-[10px] font-bold text-gray-400 uppercase">Special Cooking Instruction (विशेष निर्देश)</label>
-                    <input type="text" placeholder="e.g. ओवन में डालने से पहले अच्छे से सेकें (Optional)" value={rosterStepNote} onChange={(e) => setRosterStepNote(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-xs font-bold text-white" />
+                    <input type="text" placeholder="e.g. ओवन में डालने से पहले अच्छे से सेकें (Optional)" value={rosterStepNote} onChange={(e) => setRosterStepNote(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-xs font-bold text-white animate-none" />
                   </div>
-                  <button type="submit" className="w-full bg-green-600 text-white p-3.5 rounded-xl font-black text-xs uppercase">Add Step to Recipe</button>
+                  <button type="submit" className="w-full bg-green-600 text-white p-3.5 rounded-xl font-black text-xs uppercase transition-all active:scale-95">Add Step to Recipe</button>
                 </form>
 
                 <div className="space-y-3">
@@ -2368,7 +2368,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                             {item.note && <p className="text-[9px] text-gray-500 font-medium italic mt-0.5">Note: {item.note}</p>}
                           </div>
                         </div>
-                        <button onClick={() => handleDeleteRosterStep(idx)} className="p-2.5 bg-red-500/10 text-red-500 rounded-lg">
+                        <button onClick={() => handleDeleteRosterStep(idx)} className="p-2.5 bg-red-500/10 text-red-500 rounded-lg transition-all active:scale-95">
                           <Trash size={14}/>
                         </button>
                       </div>
@@ -2382,7 +2382,7 @@ Report generated automatically by Bum Bum Cafe POS.`
 
         {/* --- TAB 11: SOCIAL PROOF MANAGER (Requirement 3) --- */}
         {tab === 'proofs' && (
-          <div className="space-y-6 animate-fadeIn">
+          <div className="space-y-6 animate-none">
             <form onSubmit={handleAddSocialProof} className="bg-white/[0.02] border border-white/5 p-6 rounded-[2.5rem] space-y-4">
               <h3 className="text-lg font-black text-orange-500 italic uppercase flex items-center gap-2">🔥 Create Social Proof Notification</h3>
               <p className="text-[10px] text-gray-400 font-semibold leading-relaxed">यहाँ से आप नीचे स्क्रॉल होने वाले आर्डर अलर्ट बदल सकते हैं।</p>
@@ -2395,7 +2395,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                 className="w-full bg-black/40 border border-white/10 rounded-xl p-4 text-xs text-white outline-none font-bold animate-none"
                 required
               />
-              <button type="submit" className="w-full bg-green-600 text-white p-3.5 rounded-xl font-black text-xs uppercase">Add Custom Alert</button>
+              <button type="submit" className="w-full bg-green-600 text-white p-3.5 rounded-xl font-black text-xs uppercase transition-all active:scale-95">Add Custom Alert</button>
             </form>
 
             <div className="space-y-3">
@@ -2403,7 +2403,7 @@ Report generated automatically by Bum Bum Cafe POS.`
               {socialProofs.map(alert => (
                 <div key={alert.id} className="bg-white/[0.02] border border-white/5 p-4 rounded-3xl flex justify-between items-center text-xs">
                   <p className="font-bold text-gray-300 max-w-[80%] leading-relaxed">{alert.text}</p>
-                  <button onClick={() => handleDeleteSocialProof(alert.id)} className="p-2.5 bg-red-500/10 text-red-500 rounded-lg">
+                  <button onClick={() => handleDeleteSocialProof(alert.id)} className="p-2.5 bg-red-500/10 text-red-500 rounded-lg transition-all active:scale-95">
                     <Trash size={14}/>
                   </button>
                 </div>
@@ -2414,13 +2414,13 @@ Report generated automatically by Bum Bum Cafe POS.`
 
         {/* --- TAB 12: SECURITY POINT CLAIMS MANAGER (Requirement 4) --- */}
         {tab === 'claims' && (
-          <div className="space-y-6 animate-fadeIn">
+          <div className="space-y-6 animate-none">
             <div>
               <h3 className="text-xl font-black text-orange-500 uppercase tracking-wider flex items-center gap-2">📢 Points Claims Manager</h3>
               <p className="text-[10px] text-gray-500 font-bold uppercase mt-1">वेरिफाई करें कि क्या यूज़र ने आपको वाकई सोशल मीडिया पर फॉलो किया है</p>
             </div>
 
-            <div className="space-y-3">
+            <div className="space-y-3 animate-none">
               {pointsClaims.length === 0 ? (
                 <p className="text-center text-xs font-bold text-gray-600 py-12 uppercase">कोई दावा अनुरोध नहीं मिला।</p>
               ) : (
@@ -2442,13 +2442,13 @@ Report generated automatically by Bum Bum Cafe POS.`
                       <div className="flex gap-2 pt-1.5">
                         <button 
                           onClick={() => handleVerifyClaimApproval(claim)} 
-                          className="flex-1 bg-green-600 text-white font-black py-1.5 rounded text-[9px] uppercase flex items-center justify-center gap-1 shadow-md"
+                          className="flex-1 bg-green-600 text-white font-black py-1.5 rounded text-[9px] uppercase flex items-center justify-center gap-1 shadow-md transition-all active:scale-95"
                         >
                           <CheckCircle size={10}/> Accept (+1 Point)
                         </button>
                         <button 
                           onClick={() => handleRejectClaim(claim.id)} 
-                          className="flex-1 bg-red-950/40 text-red-400 font-black py-1.5 rounded text-[9px] uppercase flex items-center justify-center gap-1"
+                          className="flex-1 bg-red-950/40 text-red-400 font-black py-1.5 rounded text-[9px] uppercase flex items-center justify-center gap-1 transition-all active:scale-95"
                         >
                           <XCircle size={10}/> Reject claim
                         </button>
@@ -2504,7 +2504,7 @@ Report generated automatically by Bum Bum Cafe POS.`
               )}
 
               {userRole === 'admin' && (
-                <button type="submit" className="w-full bg-green-600 hover:bg-green-700 text-white p-4 rounded-xl font-black text-xs uppercase transition-all shadow-md">
+                <button type="submit" className="w-full bg-green-600 hover:bg-green-700 text-white p-4 rounded-xl font-black text-xs uppercase transition-all shadow-md active:scale-95">
                   Update Passcodes
                 </button>
               )}
@@ -2520,11 +2520,11 @@ Report generated automatically by Bum Bum Cafe POS.`
           <div className="bg-[#111] border border-white/5 p-6 rounded-[2.5rem] w-full max-w-lg relative max-h-[85vh] overflow-y-auto no-scrollbar shadow-2xl space-y-4">
             <button 
               onClick={() => setSelectedCustomerHistory(null)} 
-              className="absolute top-4 right-4 p-2 bg-white/5 text-gray-400 hover:text-white rounded-full transition-all"
+              className="absolute top-4 right-4 p-2 bg-white/5 text-gray-400 hover:text-white rounded-full transition-all active:scale-95"
             >
               <X size={18}/>
             </button>
-            <div className="text-center pb-2 border-b border-white/5">
+            <div className="text-center pb-2 border-b border-white/5 animate-none">
               <h3 className="text-lg font-black text-orange-500 uppercase">{selectedCustomerHistory.name} - Order History</h3>
               <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mt-0.5">Mobile: +{selectedCustomerHistory.phone}</p>
             </div>
@@ -2534,7 +2534,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                 <p className="text-center text-xs font-bold text-gray-600 py-8">No historical transactions logged.</p>
               ) : (
                 selectedCustomerHistory.metrics?.customerOrders.map((o: any) => (
-                  <div key={o.id} className="bg-white/[0.01] border border-white/5 p-4 rounded-2xl flex justify-between items-center">
+                  <div key={o.id} className="bg-white/[0.01] border border-white/5 p-4 rounded-2xl flex justify-between items-center animate-none">
                     <div>
                       <div className="flex gap-2">
                         <span className="text-[9px] font-black uppercase text-gray-500">Bill: #{formatBillNumber(o.billNumber || 0)}</span>
@@ -2553,7 +2553,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                     </div>
                     <div className="text-right">
                       <p className="text-green-400 font-black text-sm">₹{o.total}</p>
-                      <span className="text-[8px] bg-green-500/10 text-green-400 px-2 py-0.5 rounded uppercase font-bold mt-1 inline-block">
+                      <span className="text-[8px] bg-green-500/10 text-green-400 px-2 py-0.5 rounded uppercase font-bold mt-1 inline-block animate-none">
                         {o.status || "Completed"}
                       </span>
                     </div>
@@ -2568,11 +2568,11 @@ Report generated automatically by Bum Bum Cafe POS.`
       {/* --- DIGITAL RECIPE GUIDE (SOP MODAL) --- */}
       {sopProduct && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[100] flex items-center justify-center p-4">
-          <form onSubmit={handleSaveSopRecipe} className="bg-[#111] border-2 border-orange-500/50 p-6 rounded-[2.5rem] w-full max-w-lg relative shadow-2xl space-y-4">
+          <form onSubmit={handleSaveSopRecipe} className="bg-[#111] border-2 border-orange-500/50 p-6 rounded-[2.5rem] w-full max-w-lg relative shadow-2xl space-y-4 animate-none">
             <button 
               type="button" 
               onClick={() => setSopProduct(null)} 
-              className="absolute top-4 right-4 p-2 bg-white/5 text-gray-400 hover:text-white rounded-full transition-all"
+              className="absolute top-4 right-4 p-2 bg-white/5 text-gray-400 hover:text-white rounded-full transition-all active:scale-95"
             >
               <X size={18}/>
             </button>
@@ -2581,7 +2581,7 @@ Report generated automatically by Bum Bum Cafe POS.`
               <p className="text-[10px] text-gray-500 uppercase tracking-widest font-black mt-0.5">Dish: {sopProduct.name}</p>
             </div>
 
-            <div className="space-y-1.5">
+            <div className="space-y-1.5 animate-none">
               <label className="text-[10px] font-bold text-gray-400 uppercase">Step-by-Step Cooking Instructions</label>
               <textarea 
                 value={sopRecipeText} 
@@ -2592,20 +2592,20 @@ Report generated automatically by Bum Bum Cafe POS.`
             </div>
 
             <div className="flex gap-2">
-              <button type="submit" className="flex-1 bg-green-600 text-white p-3.5 rounded-xl font-black text-xs uppercase">Save SOP Guide</button>
-              <button type="button" onClick={() => setSopProduct(null)} className="bg-white/5 text-gray-400 p-3.5 rounded-xl font-black text-xs uppercase">Close</button>
+              <button type="submit" className="flex-1 bg-green-600 text-white p-3.5 rounded-xl font-black text-xs uppercase transition-all active:scale-95">Save SOP Guide</button>
+              <button type="button" onClick={() => setSopProduct(null)} className="bg-white/5 text-gray-400 p-3.5 rounded-xl font-black text-xs uppercase transition-all active:scale-95">Close</button>
             </div>
           </form>
         </div>
       )}
 
-      {/* --- IMPROVED WHATSAPP BROADCAST MODAL --- */}
+      {/* --- Smart Marketing Blast BROADCAST MODAL --- */}
       {showBroadcastModal && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[100] flex items-center justify-center p-4">
           <div className="bg-[#111] border border-white/5 p-6 rounded-[2.5rem] w-full max-w-lg relative shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto no-scrollbar">
             <button 
               onClick={() => setShowBroadcastModal(false)} 
-              className="absolute top-4 right-4 p-2 bg-white/5 text-gray-400 hover:text-white rounded-full transition-all"
+              className="absolute top-4 right-4 p-2 bg-white/5 text-gray-400 hover:text-white rounded-full transition-all active:scale-95"
             >
               <X size={18}/>
             </button>
@@ -2715,11 +2715,11 @@ Report generated automatically by Bum Bum Cafe POS.`
                         </div>
                         <div className="flex items-center gap-2">
                           {isAlreadySent ? (
-                            <span className="text-[9px] text-green-500 font-extrabold uppercase flex items-center gap-1 bg-green-500/10 px-2 py-1 rounded-md">
+                            <span className="text-[9px] text-green-500 font-extrabold uppercase flex items-center gap-1 bg-green-500/10 px-2 py-1 rounded-md animate-none">
                               <Check size={10}/> Sent
                             </span>
                           ) : (
-                            <span className="text-[9px] text-yellow-500 font-extrabold uppercase flex items-center gap-1 bg-yellow-500/10 px-2 py-1 rounded-md">
+                            <span className="text-[9px] text-yellow-500 font-extrabold uppercase flex items-center gap-1 bg-yellow-500/10 px-2 py-1 rounded-md animate-none">
                               Unsent
                             </span>
                           )}
