@@ -8,6 +8,16 @@ import toast, { Toaster } from 'react-hot-toast';
 
 const ADD_CATEGORIES = ["Special Pizza", "Special Thali", "Paneer Special", "Special Mix veg", "Fast Food", "Super Cool", "Indian Bread", "Special Rice"];
 
+const SOCIAL_LINKS = [
+  { id: 'whatsapp_msg', label: '🟢 WhatsApp Msg', icon: '💬', points: 1, url: 'https://wa.me/919714293759' },
+  { id: 'whatsapp_channel', label: '📢 WhatsApp Channel', icon: '📢', points: 1, url: 'https://whatsapp.com/channel/0029VaLhggoGE56natoQI43y' },
+  { id: 'youtube', label: '🔴 YouTube', icon: '🎥', points: 1, url: 'https://www.youtube.com/@bbcafe.i' },
+  { id: 'instagram', label: '📸 Instagram', icon: '📸', points: 1, url: 'https://www.instagram.com/bbcafe.in/' },
+  { id: 'facebook', label: '🔵 Facebook', icon: '📘', points: 1, url: 'https://www.facebook.com/bbcafe.in/' },
+  { id: 'snapchat', label: '👻 Snapchat', icon: '👻', points: 1, url: 'https://www.snapchat.com/add/bbcafe.in' }
+];
+
+// Helper to determine if a URL points to a video
 const isVideoUrl = (url: string): boolean => {
   if (!url) return false;
   const cleanUrl = url.toLowerCase().split('?')[0];
@@ -521,7 +531,7 @@ export default function AdminDashboard() {
   const combinedCategories = useMemo(() => {
     const list = [...categories];
     ADD_CATEGORIES.forEach(fallbackName => {
-      const exists = categories.some(c => String(cat.name).toLowerCase().trim() === fallbackName.toLowerCase().trim());
+      const exists = categories.some(c => String(c.name).toLowerCase().trim() === fallbackName.toLowerCase().trim());
       if (!exists) {
         list.push({
           id: `virtual-${fallbackName.replace(/\s+/g, '-')}`,
@@ -1865,8 +1875,8 @@ Report generated automatically by Bum Bum Cafe POS.`
 
                   {(editVariantType === 'half_full' || editVariantType === 'plain_butter') && (
                     <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Half / Plain (₹)</label><input type="number" value={editHalfPrice} onChange={(e) => setEditHalfPrice(e.target.value)} className="w-full bg-black/40 border border-white/10 rouded-xl p-3 text-white text-xs font-bold" /></div>
-                      <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Full / Butter (₹)</label><input type="number" value={editFullPrice} onChange={(e) => setEditFullPrice(e.target.value)} className="w-full bg-black/40 border border-white/10 rouded-xl p-3 text-white text-xs font-bold" /></div>
+                      <div className="space-y-1"><label className="text-xs font-bold text-gray-405 uppercase">Half / Plain (₹)</label><input type="number" value={editHalfPrice} onChange={(e) => setEditHalfPrice(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-white text-xs font-bold" /></div>
+                      <div className="space-y-1"><label className="text-xs font-bold text-gray-405 uppercase">Full / Butter (₹)</label><input type="number" value={editFullPrice} onChange={(e) => setEditFullPrice(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-white text-xs font-bold" /></div>
                     </div>
                   )}
 
@@ -1980,18 +1990,18 @@ Report generated automatically by Bum Bum Cafe POS.`
 
                   <div className="space-y-4">
                     <div className="space-y-1">
-                      <label className="text-xs font-bold text-gray-400 uppercase">Category Name</label>
+                      <label className="text-xs font-bold text-gray-455 uppercase">Category Name</label>
                       <input type="text" value={editCatName} onChange={(e) => setEditCatName(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-4 outline-none focus:border-orange-500 text-sm font-bold text-white" required />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-xs font-bold text-gray-400 uppercase">Image URL Link</label>
+                      <label className="text-xs font-bold text-gray-455 uppercase">Image URL Link</label>
                       <input type="url" value={editCatImage} onChange={(e) => setEditCatImage(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-4 outline-none focus:border-orange-500 text-sm font-bold text-white" required />
                     </div>
                   </div>
 
                   <div className="flex gap-2 pt-2">
                     <button type="submit" className="flex-1 bg-green-600 text-white p-4 rounded-xl font-black text-sm uppercase">Update Category</button>
-                    <button type="button" onClick={() => setEditingCategory(null)} className="bg-white/5 text-gray-450 p-4 rounded-xl font-black text-sm uppercase">Cancel</button>
+                    <button type="button" onClick={() => setEditingCategory(null)} className="bg-white/5 text-gray-400 p-4 rounded-xl font-black text-sm uppercase">Cancel</button>
                   </div>
                 </form>
               </div>
@@ -2515,7 +2525,7 @@ Report generated automatically by Bum Bum Cafe POS.`
             >
               <X size={18}/>
             </button>
-            <div className="text-center pb-2 border-b border-white/5 animate-none">
+            <div className="text-center pb-2 border-b border-white/5">
               <h3 className="text-lg font-black text-orange-500 uppercase">{selectedCustomerHistory.name} - Order History</h3>
               <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mt-0.5">Mobile: +{selectedCustomerHistory.phone}</p>
             </div>
@@ -2525,7 +2535,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                 <p className="text-center text-xs font-bold text-gray-600 py-8">No historical transactions logged.</p>
               ) : (
                 selectedCustomerHistory.metrics?.customerOrders.map((o: any) => (
-                  <div key={o.id} className="bg-white/[0.01] border border-white/5 p-4 rounded-2xl flex justify-between items-center">
+                  <div key={o.id} className="bg-white/[0.01] border border-white/5 p-4 rounded-2xl flex justify-between items-center text-xs">
                     <div>
                       <div className="flex gap-2">
                         <span className="text-[9px] font-black uppercase text-gray-500">Bill: #{formatBillNumber(o.billNumber || 0)}</span>
@@ -2578,7 +2588,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                 value={sopRecipeText} 
                 onChange={(e) => setSopRecipeText(e.target.value)} 
                 placeholder="Write down the detailed step-by-step recipe, quantity of ingredients..." 
-                className="w-full bg-black/40 border border-white/10 rounded-xl p-4 outline-none focus:border-orange-500 text-xs font-bold text-white h-44 resize-none leading-relaxed animate-none"
+                className="w-full bg-black/40 border border-white/10 rounded-xl p-4 outline-none focus:border-orange-500 text-xs font-bold text-white h-44 resize-none leading-relaxed"
               />
             </div>
 
@@ -2701,16 +2711,16 @@ Report generated automatically by Bum Bum Cafe POS.`
                     return (
                       <div key={user.phone} className={`flex justify-between items-center p-2 rounded-xl text-xs font-bold border transition-colors ${isAlreadySent ? 'bg-green-500/[0.02] border-green-500/10' : 'bg-white/[0.01] border-white/5'}`}>
                         <div className="flex flex-col">
-                          <span className={`${isAlreadySent ? 'text-gray-500' : 'text-gray-300'}`}>{user.name} (+{user.phone})</span>
+                          <span className={`${isAlreadySent ? 'text-gray-500' : 'text-gray-350'}`}>{user.name} (+{user.phone})</span>
                           <span className="text-[8px] text-gray-500 uppercase tracking-widest">{user.metrics.tier} • {user.points || 0} Pts</span>
                         </div>
                         <div className="flex items-center gap-2">
                           {isAlreadySent ? (
-                            <span className="text-[9px] text-green-500 font-extrabold uppercase flex items-center gap-1 bg-green-500/10 px-2 py-1 rounded-md animate-none">
+                            <span className="text-[9px] text-green-500 font-extrabold uppercase flex items-center gap-1 bg-green-500/10 px-2 py-1 rounded-md">
                               <Check size={10}/> Sent
                             </span>
                           ) : (
-                            <span className="text-[9px] text-yellow-500 font-extrabold uppercase flex items-center gap-1 bg-yellow-500/10 px-2 py-1 rounded-md animate-none">
+                            <span className="text-[9px] text-yellow-500 font-extrabold uppercase flex items-center gap-1 bg-yellow-500/10 px-2 py-1 rounded-md">
                               Unsent
                             </span>
                           )}
