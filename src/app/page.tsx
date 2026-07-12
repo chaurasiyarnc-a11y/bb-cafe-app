@@ -744,6 +744,57 @@ const handleAddDiyPizzaToCart = () => {
   const ecoCutlerySaves = useMemo(() => {
     return pastOrders.filter(o => o.noCutlery === true).length;
   }, [pastOrders]);
+  // Share app retention helper function (Requirement Fix)
+  const handleShareApp = async () => {
+    triggerHaptic();
+    if (!customerDetails?.phone) {
+      toast.error("पॉइंट्स कमाने के लिए पहले Name aur Phone दर्ज करें!");
+      setIsProfileOpen(true);
+      return;
+    }
+
+    const phoneClean = customerDetails.phone.replace("+91", "").trim();
+    const shareCountKey = `bb_shares_${phoneClean}`;
+    let currentShares = Number(localStorage.getItem(shareCountKey) || 0);
+
+    const refCode = getReferralCode();
+    const shareMessage = `🔥 *BAM BAM CAFE - Mohandra* 🔥\n\nमेरे स्पेशल इन्वाइट कोड *${refCode}* से आर्डर करें और... पॉइंट्स पाएं! 🎁\n👉 https://bb-cafe-app.vercel.app/?ref=${refCode}`;
+    const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(shareMessage)}`;
+
+    window.open(whatsappUrl, '_blank');
+
+    if (currentShares < 5) {
+      const nextShares = currentShares + 1;
+      localStorage.setItem(shareCountKey, String(nextShares));
+      setShareCount(nextShares);
+
+      if (nextShares === 5) {
+        try {
+          const pointsRef = doc(db, "customer_points", phoneClean);
+          await setDoc(pointsRef, {
+            points: increment(1),
+            lastActive: new Date()
+          }, { merge: true });
+
+          await addDoc(collection(db, "customer_points", phoneClean, "history"), {
+            type: 'earn',
+            points: 1,
+            description: `Shared app 5 times! 📤`,
+            timestamp: new Date()
+          });
+
+          setCustomerPoints(prev => prev + 1);
+          toast.success("🎉 शानदार! आपने 5 दोस्तों के साथ ऐप शेयर करके +1 Loyalty Point कमा लिया है!");
+        } catch (e) {}
+      } else {
+        toast.success(`📤 शेयर किया गया! (${nextShares}/5 प्रोग्रेस। +1 पॉइंट के लिए ${5 - nextShares} और दोस्तों को शेयर करें!)`);
+      }
+    } else {
+      localStorage.setItem(shareCountKey, "1");
+      setShareCount(1);
+      toast.success("📤 नया शेयर प्रोग्रेस शुरू हुआ! (1/5 पूरा)");
+    }
+  };
   const handleDetectLocation = () => {
     triggerHaptic();
     if (!navigator.geolocation) {
