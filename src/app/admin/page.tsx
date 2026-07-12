@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { db } from '../../lib/firebase'; 
 import { collection, onSnapshot, query, orderBy, doc, updateDoc, setDoc, addDoc, deleteDoc, increment, runTransaction } from 'firebase/firestore';
-import { Power, Eye, EyeOff, User, MapPin, Calendar, CheckCircle2, LogOut, Loader2, Phone, Plus, Trash, Edit, X, BarChart3, Download, Folder, Percent, ImageIcon, Gift, Settings, Search, BookOpen, Share2, MessageSquare, Filter, RefreshCw, Check, CheckCircle, XCircle, Play } from 'lucide-react';
+import { Power, Eye, EyeOff, User, MapPin, Calendar, CheckCircle2, LogOut, Loader2, Phone, Plus, Trash, Edit, X, Lock, BarChart3, Download, Folder, Percent, ImageIcon, Gift, Settings, Search, BookOpen, Share2, MessageSquare, Filter, RefreshCw, Check, CheckCircle, XCircle, Play } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 
 const ADD_CATEGORIES = ["Special Pizza", "Special Thali", "Paneer Special", "Special Mix veg", "Fast Food", "Super Cool", "Indian Bread", "Special Rice"];
@@ -1937,7 +1937,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                       <img src={item.image} className="w-16 h-16 rounded-2xl object-cover opacity-80" alt={item.name} />
                       <div className="flex-1">
                         <h4 className="font-bold text-sm">{item.name}</h4>
-                        <p className="text-orange-550 font-black text-xs italic capitalize">{item.category}</p>
+                        <p className="text-orange-555 font-black text-xs italic capitalize">{item.category}</p>
                         <p className="text-orange-500 font-black text-sm mt-1">{getAdminDisplayPrice(item)}</p>
                       </div>
                       <div className="flex items-center gap-2">
@@ -2009,7 +2009,7 @@ Report generated automatically by Bum Bum Cafe POS.`
 
                   <div className="flex gap-2 pt-2">
                     <button type="submit" className="flex-1 bg-green-600 text-white p-4 rounded-xl font-black text-sm uppercase">Update Category</button>
-                    <button type="button" onClick={() => setEditingCategory(null)} className="bg-white/5 text-gray-405 p-4 rounded-xl font-black text-sm uppercase">Cancel</button>
+                    <button type="button" onClick={() => setEditingCategory(null)} className="bg-white/5 text-gray-400 p-4 rounded-xl font-black text-sm uppercase">Cancel</button>
                   </div>
                 </form>
               </div>
@@ -2465,14 +2465,14 @@ Report generated automatically by Bum Bum Cafe POS.`
                     </div>
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-gray-400 uppercase">Special Cooking Instruction (विशेष निर्देश)</label>
+                    <label className="text-[10px] font-bold text-gray-405 uppercase">Special Cooking Instruction (विशेष निर्देश)</label>
                     <input type="text" placeholder="e.g. ओवन में डालने से पहले अच्छे से सेकें (Optional)" value={rosterStepNote} onChange={(e) => setRosterStepNote(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-xs font-bold text-white" />
                   </div>
                   <button type="submit" className="w-full bg-green-600 text-white p-3.5 rounded-xl font-black text-xs uppercase">Add Step to Recipe</button>
                 </form>
 
                 <div className="space-y-3">
-                  <p className="text-xs font-bold text-gray-500 uppercase pl-1">Active Recipe Steps</p>
+                  <p className="text-xs font-bold text-gray-505 uppercase pl-1">Active Recipe Steps</p>
                   {(rosterSelectedProduct.ingredients || []).length === 0 ? (
                     <p className="text-center text-xs font-bold text-gray-600 py-6">No steps defined for this recipe.</p>
                   ) : (
@@ -2640,7 +2640,7 @@ Report generated automatically by Bum Bum Cafe POS.`
           <div className="bg-[#111] border border-white/5 p-6 rounded-[2.5rem] w-full max-w-lg relative max-h-[85vh] overflow-y-auto no-scrollbar shadow-2xl space-y-4">
             <button 
               onClick={() => setSelectedCustomerHistory(null)} 
-              className="absolute top-4 right-4 p-2 bg-white/5 text-gray-400 hover:text-white rounded-full transition-all"
+              className="absolute top-4 right-4 p-2 bg-white/5 text-gray-450 hover:text-white rounded-full transition-all"
             >
               <X size={18}/>
             </button>
@@ -2725,7 +2725,7 @@ Report generated automatically by Bum Bum Cafe POS.`
           <div className="bg-[#111] border border-white/5 p-6 rounded-[2.5rem] w-full max-w-lg relative shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto no-scrollbar">
             <button 
               onClick={() => setShowBroadcastModal(false)} 
-              className="absolute top-4 right-4 p-2 bg-white/5 text-gray-400 hover:text-white rounded-full transition-all"
+              className="absolute top-4 right-4 p-2 bg-white/5 text-gray-450 hover:text-white rounded-full transition-all"
             >
               <X size={18}/>
             </button>
@@ -2809,7 +2809,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                   onClick={() => { setSentBroadcastPhones([]); toast.success("Sent history reset successfully!"); }}
                   title="Reset session"
                   type="button"
-                  className="bg-white/5 text-gray-455 transition-all active:scale-95"
+                  className="bg-white/5 text-gray-450 transition-all active:scale-95"
                 >
                   <RefreshCw size={16} />
                 </button>
@@ -2938,4 +2938,3 @@ Report generated automatically by Bum Bum Cafe POS.`
     </div>
   );
 }
-
