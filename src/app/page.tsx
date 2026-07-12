@@ -601,8 +601,7 @@ export default function BbCafeHome() {
         toast.dismiss(toastId);
         toast.error("लोकेशन की अनुमति अस्वीकार कर दी गई है या नेटवर्क त्रुटि है।");
       }
-    );
-
+      } else if (calculatedDistance <= 2.0) {
             setSelectedArea(DELIVERY_AREAS[1]); 
             toast.success(`सटीक दूरी: ${calculatedDistance.toFixed(2)} KM। आपके लिए 'Mohandra Ward 1-5' क्षेत्र चुना गया है।`);
           } else if (calculatedDistance <= 5.0) {
