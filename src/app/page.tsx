@@ -206,8 +206,7 @@ export default function BbCafeHome() {
   // UI States (Requirement: Greet timer disappearing UX)
   const [showGreeting, setShowGreeting] = useState(true);
 
-  // --- HELPERS & CALCULATION FUNCTIONS ---
-
+  // --- COMPILER FIXES: HELPER FUNCTIONS PLACE BEFORE RETURN ---
   const triggerHaptic = (ms = 35) => {
     if (typeof window !== 'undefined' && window.navigator && window.navigator.vibrate) {
       window.navigator.vibrate(ms);
@@ -359,93 +358,37 @@ export default function BbCafeHome() {
     return total;
   }, [diySize, diySauce, diyMozzarella, diyVegSelection, diyPremiumToppings]);
 
+  // anti-cheat handler helper
+  const getClaimStatus = (platform: string) => {
+    if (!customerDetails?.phone) return "🎁 +1 Pt";
+    const storageKey = `bb_claimed_${customerDetails.phone.replace("+91", "").trim()}_${platform}`;
+    return localStorage.getItem(storageKey) ? "✅ Claimed" : "🎁 Claim +1 Pt";
+  };
+
+  // Requirement 2: Auto-play next story/reel and automatic exit on finish
+  const handleReelEnded = () => {
+    triggerHaptic(20);
+    const currentIndex = stories.findIndex(s => s.id === activeStory.id);
+    if (currentIndex !== -1 && currentIndex < stories.length - 1) {
+      // Switch seamlessly to the next loaded reel
+      setActiveStory(stories[currentIndex + 1]);
+    } else {
+      // We finished the last reel; close full-screen modal automatically
+      setActiveStory(null);
+      toast.success("सभी रील्स समाप्त हो गईं! 😊");
+    }
+  };
+
+  const quickAppendInstruction = (tag: string, type = "normal") => {
+    triggerHaptic(20);
+    if (type === "diy") {
+      setDiyChefNote(prev => prev ? `${prev}, ${tag}` : tag);
+    } else {
+      setChefNote(prev => prev ? `${prev}, ${tag}` : tag);
+    }
+  };
+
   // --- MEMOS ---
-
-  const activeTheme = useMemo(() => {
-    const today = new Date();
-    const month = today.getMonth() + 1; 
-    
-    if (month === 10 || month === 11) {
-      return { bg: "from-amber-600 to-red-900", accent: "text-yellow-300", name: "शुभ दीपावली उत्सव 🪔" };
-    }
-    if (month === 3) {
-      return { bg: "from-pink-500 to-purple-800", accent: "text-white", name: "होली रंगोत्सव स्पेशल 🎨" };
-    }
-    if (month === 8) {
-      return { bg: "from-rose-600 to-amber-800", accent: "text-yellow-250", name: "रक्षाबंधन विशेष स्नेह 💖" };
-    }
-    return { bg: "from-[#ff5e00] to-[#b33600]", accent: "text-yellow-300", name: "BUM BUM CAFE - Mohandra" };
-  }, []);
-
-  const greetingText = useMemo(() => {
-    const now = new Date();
-    const hours = now.getHours();
-    const month = now.getMonth() + 1; 
-    
-    let timeGreeting = "नमस्ते";
-    if (hours >= 5 && hours < 12) {
-      timeGreeting = "शुभ प्रभात ☀️";
-    } else if (hours >= 12 && hours < 17) {
-      timeGreeting = "शुभ दोपहर 🌤️";
-    } else if (hours >= 17 && hours < 22) {
-      timeGreeting = "शुभ संध्या 🌆";
-    } else {
-      timeGreeting = "शुभ रात्रि 🌙";
-    }
-
-    let festiveGreeting = "";
-    if (month === 10 || month === 11) {
-      festiveGreeting = "शुभ दीपावली उत्सव 🪔";
-    } else if (month === 3) {
-      festiveGreeting = "हैप्पी होली रंगोत्सव 🎨";
-    } else if (month === 8) {
-      festiveGreeting = "रक्षाबंधन की हार्दिक शुभकामनाएं 💖";
-    }
-
-    const finalGreeting = festiveGreeting ? `${festiveGreeting}! ${timeGreeting}` : timeGreeting;
-    const customerName = customerDetails?.name ? customerDetails.name : "";
-
-    if (customerName) {
-      return `नमस्ते ${customerName} जी, ${finalGreeting}! आज बम बम कैफ़े आपके लिए क्या बनाए? 😊`;
-    } else {
-      return `नमस्ते, ${finalGreeting}! आज बम बम कैफ़े आपके लिए क्या बनाए? 😊`;
-    }
-  }, [customerDetails]);
-
-  const deduplicatedMenu = useMemo(() => {
-    const seen = new Set();
-    const hiddenCategoryNames = new Set(dbCategories.filter((c: any) => c.isVisible === false).map((c: any) => String(c.name).toLowerCase().trim()));
-
-    return menu.filter(item => {
-      const itemCatClean = item?.category ? String(item.category).toLowerCase().trim() : "";
-      if (hiddenCategoryNames.has(itemCatClean)) return false;
-      const nameKey = item?.name ? String(item.name).toLowerCase().trim() : item.id;
-      if (seen.has(nameKey)) return false;
-      seen.add(nameKey);
-      return true;
-    });
-  }, [menu, dbCategories]);
-
-  const normalizedSearchQuery = useMemo(() => {
-    const words = searchQuery.toLowerCase().trim().split(/\s+/);
-    const mappedWords = words.map(word => HINGLISH_DICT[word] || word);
-    return mappedWords.join(" ");
-  }, [searchQuery]);
-
-  const filteredMenu = useMemo(() => {
-    return deduplicatedMenu.filter(item => {
-      const itemName = item?.name ? String(item.name).toLowerCase() : "";
-      const itemCategory = item?.category ? String(item.category) : "";
-      
-      const isFavoriteFilter = selectedCategory === "Favorites";
-      const matchesCategory = isFavoriteFilter 
-        ? favorites.includes(item.id) 
-        : (selectedCategory === "All" || itemCategory === selectedCategory);
-        
-      return matchesCategory && itemName.includes(normalizedSearchQuery);
-    });
-  }, [deduplicatedMenu, selectedCategory, favorites, normalizedSearchQuery]);
-
   const visibleCategories = useMemo(() => {
     const baseCategories = ["All", ...FALLBACK_CATEGORIES.filter(c => c !== "All")];
     const dbCatsMap = new Map();
@@ -493,81 +436,8 @@ export default function BbCafeHome() {
     return pastOrders.filter(o => o.noCutlery === true).length;
   }, [pastOrders]);
 
-  // Natural slow order alerts interval (Slightly randomized loop every 80 seconds)
+  // --- DETECT LATEST ORDERS & ENERGIZE CHECKS ---
   useEffect(() => {
-    if (socialProofs.length === 0) return;
-    const interval = setInterval(() => {
-      setSocialAlertIndex((prev) => (prev + 1) % socialProofs.length);
-      setShowSocialAlert(true);
-      
-      setTimeout(() => {
-        setShowSocialAlert(false);
-      }, 7000); 
-    }, 80000); 
-
-    return () => clearInterval(interval);
-  }, [socialProofs]);
-
-  // Real-time Live Order Tracking (Idea 4)
-  useEffect(() => {
-    if (!customerDetails?.phone) return;
-    
-    const qOrders = query(
-      collection(db, "orders"),
-      where("customerPhone", "==", customerDetails.phone),
-      orderBy("timestamp", "desc"),
-      limit(1)
-    );
-
-    const unsubLiveOrder = onSnapshot(qOrders, (snap) => {
-      if (!snap.empty) {
-        const orderData = snap.docs[0].data();
-        if (orderData.status !== 'delivered') {
-          setLiveOrder({ id: snap.docs[0].id, ...orderData });
-        } else {
-          setLiveOrder(null);
-        }
-      }
-    });
-
-    return () => unsubLiveOrder();
-  }, [customerDetails]);
-
-  // Bug Fix: Real-time user points observer to sync local state immediately after profile setup
-  useEffect(() => {
-    if (!customerDetails?.phone) return;
-    const phoneClean = customerDetails.phone.replace("+91", "").trim();
-    const unsubUserPoints = onSnapshot(doc(db, "customer_points", phoneClean), (snap) => {
-      if (snap.exists()) {
-        setCustomerPoints(snap.data().points || 0);
-      }
-    });
-    return () => unsubUserPoints();
-  }, [customerDetails]);
-
-  // UX 1: Past Order History Loader
-  useEffect(() => {
-    const savedOrders = localStorage.getItem('bb_past_orders');
-    if (savedOrders) {
-      try {
-        setPastOrders(JSON.parse(savedOrders));
-      } catch (e) {}
-    }
-  }, []);
-
-  // Auto-Sliding Promo Banner (Requirement 4)
-  useEffect(() => {
-    if (banners.length <= 1) return;
-    const interval = setInterval(() => {
-      setBannerIndex((prev) => (prev + 1) % banners.length);
-    }, 4000); 
-    return () => clearInterval(interval);
-  }, [banners]);
-
-  // --- INITIAL DATABASE LOAD AND SYNC ---
-  useEffect(() => {
-    setMounted(true);
-
     const savedDetails = localStorage.getItem('bb_cafe_customer');
     if (savedDetails) {
       try {
@@ -583,7 +453,7 @@ export default function BbCafeHome() {
       }
     }
 
-    // Dynamic WhatsApp Number & Background Video Listener (Requirement 4)
+    // Dynamic WhatsApp Number & Background Video Listener
     const unsubStore = onSnapshot(doc(db, "settings", "store"), (d) => { 
       if (d.exists()) {
         setStoreOpen(d.data().isOpen);
@@ -602,7 +472,6 @@ export default function BbCafeHome() {
     setMenuLoading(true);
     const unsubMenu = onSnapshot(query(collection(db, "products")), (snap) => {
       const items = snap.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter((i: any) => i.isVisible !== false);
-      
       setMenu(prev => {
         if (prev.length === 0) {
           return shuffleArray(items);
@@ -614,7 +483,6 @@ export default function BbCafeHome() {
         }
       });
       setMenuLoading(false);
-
       localStorage.setItem('bb_cached_menu', JSON.stringify(items)); 
     }, () => {
       const localCached = localStorage.getItem('bb_cached_menu');
@@ -650,72 +518,303 @@ export default function BbCafeHome() {
     };
   }, []);
 
-  // Dine-In QR Auto-detection & table allocation (Requirement 3)
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      const tableNum = params.get('table');
-      if (tableNum) {
-        setAddress(`Dine-In: Table Number ${tableNum} 🍽️`);
-        setSelectedArea({ name: "Dine-In (Table)", fee: 0, minFree: 0, range: "Inside Cafe" }); // Dine-in delivery is free!
-        toast.success(`🍽️ Welcome to Table ${tableNum}! Direct table self-ordering is now active.`);
-      }
-    }
-  }, []);
-
-  // Greeting disappears after 6 seconds (Requirement: Greet timer disappearing UX)
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setShowGreeting(false);
-    }, 6000);
-    return () => clearTimeout(timer);
-  }, []);
-
-  // anti-cheat handler helper (Requirement 4 - verified missing definition fixed)
-  const getClaimStatus = (platform: string) => {
-    if (!customerDetails?.phone) return "🎁 +1 Pt";
-    const storageKey = `bb_claimed_${customerDetails.phone.replace("+91", "").trim()}_${platform}`;
-    return localStorage.getItem(storageKey) ? "✅ Claimed" : "🎁 Claim +1 Pt";
-  };
-
-  // Requirement 2: Auto-play next story/reel and automatic exit on finish
-  const handleReelEnded = () => {
-    triggerHaptic(20);
-    const currentIndex = stories.findIndex(s => s.id === activeStory.id);
-    if (currentIndex !== -1 && currentIndex < stories.length - 1) {
-      // Switch seamlessly to the next loaded reel
-      setActiveStory(stories[currentIndex + 1]);
-    } else {
-      // We finished the last reel; close full-screen modal automatically
-      setActiveStory(null);
-      toast.success("सभी रील्स समाप्त हो गईं! 😊");
-    }
-  };
-
-  const handleInstallClick = async () => {
+  const handleApplyCoupon = async () => {
     triggerHaptic();
-    if (deferredPrompt) {
-      deferredPrompt.prompt();
-      const { outcome } = await deferredPrompt.userChoice;
-      if (outcome === 'accepted') {
-        toast.success("बम बम कैफ़े ऐप इंस्टॉल करने के लिए धन्यवाद! ❤️");
+    if (!enteredCoupon) return toast.error("Please enter a coupon code");
+    const codeClean = enteredCoupon.trim().toUpperCase();
+    const toastId = toast.loading("सत्यापन किया जा रहा है...");
+    
+    try {
+      const couponRef = doc(db, "coupons", codeClean);
+      const couponSnap = await getDoc(couponRef);
+      
+      toast.dismiss(toastId);
+      if (couponSnap.exists()) {
+        const data = couponSnap.data();
+        setAppliedCoupon({ id: couponSnap.id, code: codeClean, ...data });
+        toast.success(`Coupon '${codeClean}' applied! ₹${data.discountValue} OFF`);
+      } else {
+        toast.error("यह कूपन कोड मान्य नहीं है!");
       }
-      setDeferredPrompt(null);
-    } else {
-      setIsInstallModalOpen(true);
+    } catch (err) {
+      toast.dismiss(toastId);
+      toast.error("कूपन चेक करने में समस्या आई।");
     }
-    // Instantly hide the banner and persist dismiss state
-    setShowInstallBanner(false);
-    localStorage.setItem('bb_app_installed_or_dismissed', 'true');
   };
 
-  const handleDismissInstallBanner = () => {
-    triggerHaptic(20);
-    setShowInstallBanner(false);
-    localStorage.setItem('bb_app_installed_or_dismissed', 'true');
+  const handleDetectLocation = () => {
+    triggerHaptic();
+    if (!navigator.geolocation) {
+      return toast.error("आपके ब्राउज़र में जीपीएस लोकेशन उपलब्ध नहीं है।");
+    }
+    const toastId = toast.loading("सटीक लोकेशन ट्रैक कर रहे हैं...");
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        toast.dismiss(toastId); 
+        const { latitude, longitude } = position.coords;
+        setAddress(`My GPS Location: https://www.google.com/maps?q=${latitude},${longitude}`);
+        toast.success("जीपीएस से लोकेशन सफलतापूर्वक जोड़ी गई!");
+        
+        const mohandraLat = storeCoordinates.lat;
+        const mohandraLng = storeCoordinates.lng;
+        
+        const calculatedDistance = calculateDistanceInKm(latitude, longitude, mohandraLat, mohandraLng);
+        setDistanceKm(Number(calculatedDistance.toFixed(2)));
+
+        if (calculatedDistance > 20) {
+          setIsTooFar(true);
+          toast.error("ध्यान दें: आप बम बम कैफे से 20 किमी से अधिक दूर हैं। आप केवल हमारा शानदार मेनू देख सकते हैं, आर्डर नहीं कर सकते।", { duration: 8000 });
+        } else {
+          setIsTooFar(false);
+          
+          if (calculatedDistance <= 1.0) {
+            setSelectedArea(DELIVERY_AREAS[0]); 
+            toast.success(`सटीक दूरी: ${calculatedDistance.toFixed(2)} KM। आपके लिए 'Mohandra Town' क्षेत्र चुना गया है।`);
+          } else if (calculatedDistance <= 2.0) {
+            setSelectedArea(DELIVERY_AREAS[1]); 
+            toast.success(`सटीक दूरी: ${calculatedDistance.toFixed(2)} KM। आपके लिए 'Mohandra Ward 1-5' क्षेत्र चुना गया है।`);
+          } else if (calculatedDistance <= 5.0) {
+            setSelectedArea(DELIVERY_AREAS[2]); 
+            toast.success(`सटीक दूरी: ${calculatedDistance.toFixed(2)} KM। आपके लिए 'Nearby Area (Within 5 Km)' क्षेत्र चुना गया है।`);
+          } else {
+            setSelectedArea(DELIVERY_AREAS[3]); 
+            toast.success(`सटीक दूरी: ${calculatedDistance.toFixed(2)} KM। आपके लिए 'Out of Town' क्षेत्र चुना गया है।`);
+          }
+        }
+      },
+      () => {
+        toast.dismiss(toastId);
+        toast.error("लोकेशन की अनुमति अस्वीकार कर दी गई है या नेटवर्क त्रुटि है।");
+      }
+    );
   };
 
-  if (!mounted) return null;
+  const handleGiftPoints = async (e: React.FormEvent) => {
+    e.preventDefault();
+    triggerHaptic();
+    if (!customerDetails?.phone) return toast.error("कृपया पहले अपनी डिटेल्स जोड़ें!");
+    const senderPhoneRaw = customerDetails.phone.replace("+91", "").trim();
+    const friendPhoneRaw = String(giftPhone).replace("+91", "").trim();
+    const pointsToGift = Number(giftPointsAmount);
+
+    if (!friendPhoneRaw || friendPhoneRaw.length < 10) return toast.error("कृपया सही 10-digit मोबाइल नंबर डालें!");
+    if (senderPhoneRaw === friendPhoneRaw) return toast.error("आप खुद को लॉयल्टी पॉइंट्स गिफ्ट नहीं कर सकते!");
+    if (isNaN(pointsToGift) || pointsToGift <= 0) return toast.error("कृपया सही पॉइंट्स की संख्या डालें!");
+    if (customerPoints < pointsToGift) return toast.error(`आपके पास पर्याप्त पॉइंट्स नहीं हैं! वर्तमान  पॉइंट्स: ${customerPoints}`);
+    if (!giftSenderPin || giftSenderPin.length !== 4) return toast.error("कृपया अपना सही 4-digit सुरक्षा पिन डालें!");
+
+    setIsGiftingLoading(true);
+    const senderDocRef = doc(db, "customer_points", senderPhoneRaw);
+    const receiverDocRef = doc(db, "customer_points", friendPhoneRaw);
+
+    try {
+      await runTransaction(db, async (transaction) => {
+        const senderSnap = await transaction.get(senderDocRef);
+        const receiverSnap = await transaction.get(receiverDocRef);
+        
+        if (!senderSnap.exists()) throw new Error("Sender account does not exist.");
+        
+        const dbPin = senderSnap.data().pin;
+        if (dbPin && dbPin !== giftSenderPin) {
+          throw new Error("Invalid Pin Entered");
+        }
+
+        const savedDeviceToken = localStorage.getItem('bb_device_token');
+        const dbDeviceToken = senderSnap.data().deviceToken;
+        if (dbDeviceToken && dbDeviceToken !== savedDeviceToken) {
+          throw new Error("Device mismatch. Transfer blocked.");
+        }
+
+        const currentSenderPoints = senderSnap.data().points || 0;
+        if (currentSenderPoints < pointsToGift) throw new Error("Insufficient points balance!");
+
+        transaction.update(senderDocRef, { points: increment(-pointsToGift) });
+        
+        if (!receiverSnap.exists()) {
+          transaction.set(receiverDocRef, { name: "Loyal Friend 🎁", phone: friendPhoneRaw, points: pointsToGift, lastActive: new Date() });
+        } else {
+          transaction.update(receiverDocRef, { points: increment(pointsToGift) });
+        }
+
+        const senderHistoryRef = doc(collection(db, "customer_points", senderPhoneRaw, "history"));
+        transaction.set(senderHistoryRef, {
+          type: 'redeem',
+          points: pointsToGift,
+          description: `Gifted points to ${friendPhoneRaw} 🎁`,
+          timestamp: new Date()
+        });
+
+        const receiverHistoryRef = doc(collection(db, "customer_points", friendPhoneRaw, "history"));
+        transaction.set(receiverHistoryRef, {
+          type: 'earn',
+          points: pointsToGift,
+          description: `Received gift from ${senderPhoneRaw} 🎁`,
+          timestamp: new Date()
+        });
+      });
+
+      toast.success(`🎁 सफलतापूर्वक ${pointsToGift}  पॉइंट्स गिफ्ट कर दिए गए हैं!`);
+      const inviteMsg = `हे दोस्त! मैंने तुम्हें BAM BAM Cafe के ऐप पर 🎁 ${pointsToGift} Loyalty Points गिफ्ट किए हैं। यहाँ से स्वादिष्ट पिज्जा और थाली आर्डर करो: https://bb-cafe-app.vercel.app/`;
+      const whatsappUrl = `https://wa.me/91${friendPhoneRaw}?text=${encodeURIComponent(inviteMsg)}`;
+      
+      setGiftPhone(""); setGiftPointsAmount(""); setGiftSenderPin(""); setIsGiftModalOpen(false);
+      if (window.confirm("क्या आप अपने दोस्त को व्हाट्सएप पर गिफ्ट का मैसेज भेजना चाहते हैं?")) window.open(whatsappUrl, '_blank');
+    } catch (err: any) {
+      if (err.message === "Invalid Pin Entered") {
+        toast.error("गलत सुरक्षा पिन! कृपया सही पिन डालें।");
+      } else if (err.message === "Device mismatch. Transfer blocked.") {
+        toast.error("सुरक्षा अलर्ट: यह डिवाइस इस नंबर से मैच नहीं करता!");
+      } else {
+        toast.error(err.message === "Insufficient points balance!" ? "अपर्याप्त  पॉइंट्स!" : "पॉइंट्स गिफ्ट करने में समस्या आई।");
+      }
+    } finally { setIsGiftingLoading(false); }
+  };
+
+  const handleCustomerRedeem = async (id: string, name: string, pointsCost: number) => {
+    triggerHaptic();
+    const currentPointsInCart = cart.reduce((acc: number, item: any) => acc + (item.pointsCost || 0), 0);
+    if (customerPoints - currentPointsInCart < pointsCost) return toast.error("आपके पास पर्याप्त ऑयल्टी पॉइंट्स उपलब्ध नहीं हैं!");
+    
+    const enteredPin = prompt("सुरक्षा के लिए अपना 4-अंकों का सुरक्षा पिन (PIN) दर्ज करें:");
+    if (!enteredPin) return;
+
+    if (!customerDetails?.phone) return;
+    const phoneClean = customerDetails.phone.replace("+91", "").trim();
+    
+    try {
+      const userSnap = await getDoc(doc(db, "customer_points", phoneClean));
+      if (userSnap.exists()) {
+        const dbPin = userSnap.data().pin;
+        if (dbPin && dbPin !== enteredPin) {
+          return toast.error("गलत सुरक्षा पिन! रीडीम रद्द किया गया।");
+        }
+      }
+    } catch (e) {
+      return toast.error("पिन वेरिफिकेशन विफल रहा।");
+    }
+
+    addItem({ id, name, price: 0, pointsCost, isReward: true });
+    playSoundEffect('add');
+    toast.success(`${name} Cart में जोड़ दिया गया है!`);
+  };
+
+  const sendWhatsAppOrder = async () => {
+    triggerHaptic();
+    const isDineIn = address.toLowerCase().includes("dine-in");
+
+    // Table QR check bypasses the 20km GPS block (Requirement 2)
+    if (isTooFar && !isDineIn) {
+      return toast.error("आपकी दूरी 20 KM से अधिक है। आप केवल मेनू देख सकते हैं, ऑर्डर प्लेस नहीं कर सकते!");
+    }
+    if (!customerDetails) { 
+      setIsProfileOpen(true); 
+      toast.error("ऑर्डर करने के लिए पहले अपनी प्रोफाइल बनाएं! 👤");
+      return; 
+    }
+    if (!address || address.trim().length < 10) return toast.error("Please enter full address!");
+
+    const tokenNumber = Math.floor(1000 + Math.random() * 9000);
+    let billNumber = 1;
+    const counterDocRef = doc(db, "settings", "store_bill_counter");
+
+    try {
+      await runTransaction(db, async (transaction) => {
+        const counterDoc = await transaction.get(counterDocRef);
+        if (!counterDoc.exists()) {
+          transaction.set(counterDocRef, { nextBillNumber: 2 });
+          billNumber = 1;
+        } else {
+          billNumber = counterDoc.data().nextBillNumber || 1;
+          transaction.update(counterDocRef, { nextBillNumber: billNumber + 1 });
+        }
+      });
+    } catch (e) { billNumber = Math.floor((Date.now() / 1000) % 100000); }
+
+    const formattedBillStr = formatBillNumber(billNumber);
+    const subtotal = getCartSubtotal();
+    const addOnsCost = getCartAddonsPrice();
+    const deliveryCharge = getDeliveryCharge();
+    const couponDiscount = appliedCoupon ? Number(appliedCoupon.discountValue) : 0;
+    const finalTotal = getTotalBillPrice();
+    
+    const pointsEarned = Math.floor(finalTotal / 100);
+    const totalPointsCost = cart.reduce((acc: number, i: any) => acc + (i.pointsCost || 0), 0);
+
+    // Dynamic Delivery security OTP PIN generator (Requirement: secure delivery loop)
+    const deliveryPin = Math.floor(1000 + Math.random() * 9000);
+
+    const orderObj = {
+      billNumber, tokenNumber, customerName: customerDetails.name, customerPhone: customerDetails.phone,
+      address, items: cart, subtotal, discount: couponDiscount, total: finalTotal, timestamp: new Date(), status: 'pending',
+      deliveryArea: selectedArea.name, noCutlery, ketchupAddon, oreganoAddon, chiliFlakesAddon,
+      deliveryPin // Secure OTP embedded
+    };
+
+    try {
+      await addDoc(collection(db, "orders"), orderObj);
+      const phoneClean = customerDetails.phone.replace("+91", "");
+      if (pointsEarned > 0 || totalPointsCost > 0) {
+        await setDoc(doc(db, "customer_points", phoneClean), {
+          name: customerDetails.name, phone: phoneClean, points: increment(pointsEarned - totalPointsCost), lastActive: new Date()
+        }, { merge: true });
+
+        if (pointsEarned > 0) {
+          await addDoc(collection(db, "customer_points", phoneClean, "history"), {
+            type: 'earn',
+            points: pointsEarned,
+            description: `Ordered Bill #${formattedBillStr} 🍕`,
+            timestamp: new Date()
+          });
+        }
+        if (totalPointsCost > 0) {
+          await addDoc(collection(db, "customer_points", phoneClean, "history"), {
+            type: 'redeem',
+            points: totalPointsCost,
+            description: `Redeemed rewards on Bill #${formattedBillStr} 🎁`,
+            timestamp: new Date()
+          });
+        }
+      }
+    } catch (e) {}
+
+    const updatedPastOrders = [orderObj, ...pastOrders];
+    setPastOrders(updatedPastOrders);
+    localStorage.setItem('bb_past_orders', JSON.stringify(updatedPastOrders));
+
+    setLastPlacedOrder(orderObj);
+
+    let itemsText = "";
+    cart.forEach((i: any) => {
+      itemsText += `• ${i.name || "Item"} x${i.quantity || 1} - ₹${(i.price || 0) * (i.quantity || 1)}\n`;
+      if (i.note) {
+        itemsText += `  └─ *Note for Chef:* ${i.note}\n`;
+      }
+    });
+    
+    if (ketchupAddon) itemsText += `• Extra Tomato Ketchup x1 - ₹10\n`;
+    if (oreganoAddon) itemsText += `• Extra Oregano x1 - ₹10\n`;
+    if (chiliFlakesAddon) itemsText += `• Extra Chili Flakes x1 - ₹10\n`;
+    if (noCutlery) itemsText += `🌱 (Eco-Friendly: No plastic cutlery requested)\n`;
+
+    const refCode = getReferralCode();
+    const msg = `🔥 *BAM BAM CAFE - NEW ORDER*\n\n*Bill No:* #${formattedBillStr}\n*Token No:* #${tokenNumber}\n*Customer:* ${customerDetails.name}\n*Phone:* ${customerDetails.phone}\n*Delivery Area:* ${selectedArea.name}\n*Address:* ${address}\n\n*ITEMS:*\n${itemsText}\n*Subtotal:* ₹${subtotal + addOnsCost}\n*Coupon Discount:* -₹${couponDiscount}\n*Delivery:* ₹${deliveryCharge}\n*TOTAL BILL: ₹${finalTotal}*\n\n*Invite Code:* ${refCode}\n*Points Earned:* +${pointsEarned} Pts\n${totalPointsCost > 0 ? `*Points Redeemed:* -${totalPointsCost} Pts\n` : ''}\n_Confirm order by replying 'YES'_`;
+    
+    playSoundEffect('success');
+    setConfettiActive(true);
+    setTimeout(() => setConfettiActive(false), 5000);
+
+    window.open(`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(msg)}`, '_blank');
+
+    setShowInvoice(true); 
+    clearCart(); 
+    setKetchupAddon(false);
+    setOreganoAddon(false);
+    setChiliFlakesAddon(false);
+    setNoCutlery(false);
+    setAppliedCoupon(null); 
+    setEnteredCoupon(""); 
+    setIsCartOpen(false);
+  };
 
   return (
     <div className="dark:bg-[#050505] bg-gray-50 min-h-screen dark:text-white text-gray-900 pb-32 font-sans relative overflow-x-clip transition-colors duration-200">
@@ -878,13 +977,6 @@ export default function BbCafeHome() {
           </button>
         </div>
       </div>
-
-      {!storeOpen && (
-        <div className="bg-red-600 text-white font-black py-3 px-4 text-center text-xs flex items-center justify-center gap-2 shadow-lg border-b border-red-500">
-          <span className="animate-pulse">⚠️</span>
-          <span>बम बम कैफ़े अभी बंद है। आप केवल हमारा मेनू देख सकते हैं।</span>
-        </div>
-      )}
 
       {/* MAIN LAYOUT WRAPPER */}
       <main ref={menuRef} className="pt-3 px-3 max-w-lg mx-auto space-y-4">
@@ -1262,7 +1354,7 @@ export default function BbCafeHome() {
                           <div>
                             <p className="dark:text-gray-500 text-gray-400 text-[8px] font-black uppercase tracking-widest leading-none mb-1">Price</p>
                             <p className="text-orange-700 dark:text-orange-500 font-black text-base leading-none">{getDisplayPrice(item)}</p>
-                            {item.variants && <span className="text-[8px] font-bold dark:text-gray-400 text-gray-500 mt-1 block">Options available</span>}
+                            {item.variants && <span className="text-[8px] font-bold dark:text-gray-400 text-gray-505 mt-1 block">Options available</span>}
                           </div>
                           
                           {storeOpen && !isTooFar && isItemAvailable && (
@@ -1363,7 +1455,7 @@ export default function BbCafeHome() {
           <div className="grid grid-cols-2 gap-3 text-center text-[10px] font-black uppercase">
             <div className="dark:bg-white/[0.02] bg-white border dark:border-white/5 border-gray-200 p-4 rounded-2xl flex flex-col items-center justify-center space-y-1 shadow-md shadow-gray-200/30 dark:shadow-none transition-colors duration-200">
               <Clock className="text-orange-500" size={16} />
-              <p className="dark:text-gray-450 text-gray-505 text-[8px]">Open Timing</p>
+              <p className="dark:text-gray-400 text-gray-505 text-[8px]">Open Timing</p>
               <p className="dark:text-white text-neutral-800 text-[9px]">सुबह 10:00 से रात 11:00 बजे</p>
             </div>
             
@@ -1417,7 +1509,7 @@ export default function BbCafeHome() {
             </div>
 
             <div className="flex justify-between items-center bg-black/40 p-2.5 rounded-xl border border-white/5 mt-1">
-              <span className="text-[10px] text-gray-450 uppercase">Verification OTP Code (सुरक्षा पिन)</span>
+              <span className="text-[10px] text-gray-450 uppercase font-sans">Verification OTP Code (सुरक्षा पिन)</span>
               <span className="text-yellow-400 font-black text-sm font-mono tracking-widest bg-yellow-500/10 px-2.5 py-0.5 rounded border border-yellow-500/20">
                 {liveOrder.deliveryPin || "WAIT"}
               </span>
@@ -1428,7 +1520,7 @@ export default function BbCafeHome() {
                 href={`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(`नमस्ते बम बम कैफ़े! कृपया मेरे आर्डर नंबर #${formatBillNumber(liveOrder.billNumber)} (टोकन नंबर: #${liveOrder.tokenNumber}) का लाइव स्टेटस बताएं।`)}`}
                 target="_blank"
                 rel="noreferrer"
-                className="flex-1 bg-white/5 hover:bg-white/10 text-center text-[10px] text-yellow-400 py-1.5 rounded-xl border border-white/5 transition-all"
+                className="flex-1 bg-white/5 hover:bg-white/10 text-center text-[10px] text-yellow-400 py-1.5 rounded-xl border border-white/5 transition-all font-sans"
               >
                 Track Live Status (WA) 🔍
               </a>
@@ -1495,12 +1587,12 @@ export default function BbCafeHome() {
                         <Star size={8} fill="currentColor"/><span className="font-extrabold">{r.rating}</span>
                       </div>
                     </div>
-                    <p className="text-[11px] dark:text-gray-300 text-neutral-800 italic">"{r.comment}"</p>
+                    <p className="text-[11px] dark:text-gray-300 text-neutral-800 italic font-sans">"{r.comment}"</p>
                   </div>
                 ))}
               </div>
               <div className="fixed bottom-6 left-0 w-full px-6 z-50">
-                <button onClick={() => { triggerHaptic(); setIsReviewFormOpen(true); }} className="w-full max-w-md mx-auto bg-orange-500 text-black py-3.5 rounded-2xl font-black text-xs uppercase">✍️ Write a Review</button>
+                <button onClick={() => { triggerHaptic(); setIsReviewFormOpen(true); }} className="w-full max-w-md mx-auto bg-orange-500 text-black py-3.5 rounded-2xl font-black text-xs uppercase font-sans">✍️ Write a Review</button>
               </div>
             </div>
           </div>
@@ -1559,7 +1651,7 @@ export default function BbCafeHome() {
                   <textarea placeholder="Khana kaisa laga?..." value={reviewComment} onChange={(e) => setReviewComment(e.target.value)} required rows={3} className="w-full dark:bg-white/5 bg-gray-50 border dark:border-white/10 border-gray-200 p-3 rounded-lg text-xs dark:text-white text-neutral-900 focus:border-orange-500 outline-none resize-none font-bold" />
                 </div>
               </div>
-              <div className="flex gap-2 pt-1">
+              <div className="flex gap-2 pt-1 font-sans">
                 <button type="submit" className="flex-1 bg-orange-500 text-black font-black p-3 rounded-lg text-xs uppercase">SUBMIT</button>
                 <button type="button" onClick={() => { triggerHaptic(); setIsReviewFormOpen(false); }} className="dark:bg-white/5 bg-gray-100 dark:text-gray-400 text-neutral-700 font-bold p-3 rounded-lg text-xs uppercase">CANCEL</button>
               </div>
@@ -1588,7 +1680,7 @@ export default function BbCafeHome() {
                       className={`p-3 rounded-xl flex flex-col items-center border transition-all ${normalPizzaSize.toLowerCase() === size.toLowerCase() ? 'bg-orange-500/10 border-orange-500 text-orange-500' : 'dark:bg-white/[0.03] bg-gray-50 dark:border-white/5 border-gray-200 dark:text-gray-400 text-neutral-800'}`}
                     >
                       <span className="capitalize text-xs font-black">{size}</span>
-                      <span className="font-extrabold text-[10px] mt-1 dark:text-white text-neutral-900">₹{price}</span>
+                      <span className="font-extrabold text-[10px] mt-1 dark:text-white text-neutral-900 font-mono">₹{price}</span>
                     </button>
                   ))}
                 </div>
@@ -1624,7 +1716,7 @@ export default function BbCafeHome() {
                       type="button"
                       key={tag}
                       onClick={() => quickAppendInstruction(tag, "normal")}
-                      className="text-[9px] font-bold py-1 px-2 rounded-full border dark:border-white/5 border-gray-200 bg-neutral-100 dark:bg-neutral-800 dark:text-gray-300 text-neutral-850 hover:border-orange-500 transition-colors"
+                      className="text-[9px] font-bold py-1 px-2 rounded-full border dark:border-white/5 border-gray-200 bg-neutral-100 dark:bg-neutral-800 dark:text-gray-300 text-neutral-800 hover:border-orange-500 transition-colors"
                     >
                       {tag}
                     </button>
@@ -1638,14 +1730,14 @@ export default function BbCafeHome() {
                 />
               </div>
 
-              <button type="button" onClick={handleNormalPizzaAdd} className="w-full bg-orange-500 text-black p-4 rounded-xl font-black text-xs uppercase animate-none">
+              <button type="button" onClick={handleNormalPizzaAdd} className="w-full bg-orange-500 text-black p-4 rounded-xl font-black text-xs uppercase animate-none font-sans">
                 Confirm Add To Cart
               </button>
-              <button type="button" onClick={() => { setSelectedProduct(null); setNormalPizzaSize(""); setNormalPizzaPrice(0); setChefNote(""); }} className="w-full mt-3 dark:text-gray-500 text-gray-400 font-black text-[10px] text-center uppercase">Close</button>
+              <button type="button" onClick={() => { setSelectedProduct(null); setNormalPizzaSize(""); setNormalPizzaPrice(0); setChefNote(""); }} className="w-full mt-3 dark:text-gray-500 text-gray-400 font-black text-[10px] text-center uppercase font-sans">Close</button>
             </motion.div>
           </div>
         )}
-      </AnimatePresence>
+      </AnPresence>
 
       {/* COMPACT PROFILE, LOYALTY LEDGER, & ORDER HISTORY DRAWER */}
       <AnimatePresence>
@@ -1666,7 +1758,7 @@ export default function BbCafeHome() {
               </div>
 
               {!customerDetails ? (
-                <form onSubmit={handleSaveDetails} className="space-y-4">
+                <form onSubmit={handleSaveDetails} className="space-y-4 font-sans">
                   <div className="text-center space-y-1.5 pb-2">
                     <User className="mx-auto text-orange-500" size={32} />
                     <h3 className="text-sm font-black dark:text-white text-neutral-900">प्रोफाइल सेटअप करें</h3>
@@ -1688,7 +1780,7 @@ export default function BbCafeHome() {
                     </div>
                     <div className="space-y-1">
                       <label className="text-[9px] font-bold text-gray-500 uppercase">Referral Code (Optional)</label>
-                      <input type="text" placeholder="Enter invite code..." value={tempRefCode} onChange={(e) => setTempRefCode(e.target.value)} className="w-full dark:bg-neutral-800 bg-gray-50 border dark:border-neutral-700 border-gray-200 p-3 rounded-xl font-bold dark:text-white text-neutral-955 outline-none focus:border-orange-500 text-xs" />
+                      <input type="text" placeholder="Enter invite code..." value={tempRefCode} onChange={(e) => setTempRefCode(e.target.value)} className="w-full dark:bg-neutral-800 bg-gray-50 border dark:border-neutral-700 border-gray-205 p-3 rounded-xl font-bold dark:text-white text-neutral-955 outline-none focus:border-orange-500 text-xs" />
                     </div>
                   </div>
                   <button type="submit" className="w-full bg-orange-500 text-black p-3.5 rounded-xl font-black text-xs uppercase shadow transition-all active:scale-95 mt-4">Create Account ➔</button>
@@ -1737,7 +1829,7 @@ export default function BbCafeHome() {
 
                   {/* LOYALTY SCOREBOARD CARD */}
                   <div className="dark:bg-yellow-400/5 bg-yellow-100 border border-yellow-350 dark:border-yellow-400/20 rounded-2xl p-4 space-y-3 transition-colors duration-200 shadow-md">
-                    <div className="flex justify-between items-center border-b dark:border-white/10 border-yellow-200 pb-2">
+                    <div className="flex justify-between items-center border-b dark:border-white/10 border-yellow-200 pb-2 font-sans">
                       <div className="flex items-center gap-1.5 text-yellow-600 dark:text-yellow-400 font-black text-xs uppercase"><Gift size={12}/> <span>Bum Bum Loyalty Club</span></div>
                       <span className={`text-[8px] font-black border px-2 py-0.5 rounded-full ${getCustomerTier(customerPoints).color}`}>
                         {getCustomerTier(customerPoints).name}
@@ -1771,7 +1863,7 @@ export default function BbCafeHome() {
                       </div>
                     )}
 
-                    <div className="pt-1.5 flex flex-col gap-2">
+                    <div className="pt-1.5 flex flex-col gap-2 font-sans">
                       <div className="flex justify-between items-center text-[9px]">
                         <span className="dark:text-gray-400 text-neutral-700 font-black uppercase">Share Progress:</span>
                         <span className="text-yellow-600 dark:text-yellow-400 font-black bg-yellow-100 dark:bg-yellow-400/10 px-2 py-0.5 rounded border border-yellow-350 dark:border-yellow-400/20">{shareCount}/5 Shared</span>
@@ -1782,19 +1874,19 @@ export default function BbCafeHome() {
                       </button>
                     </div>
 
-                    <div className="pt-2 border-t border-white/5 flex justify-between items-center">
+                    <div className="pt-2 border-t border-white/5 flex justify-between items-center font-sans">
                       <span className="text-[9px] dark:text-gray-400 text-neutral-700 font-bold uppercase">Gift points to friend:</span>
                       <button type="button" onClick={() => { triggerHaptic(); setIsGiftModalOpen(true); }} className="bg-yellow-500/10 text-yellow-500 border border-yellow-400/20 px-2.5 py-1 rounded text-[8px] font-black uppercase">🎁 Gift Points</button>
                     </div>
 
-                    <div className="space-y-1.5 pt-2 border-t border-white/5">
+                    <div className="space-y-1.5 pt-2 border-t border-white/5 font-sans">
                       <p className="text-[9px] dark:text-gray-400 text-neutral-700 font-black uppercase">Redeem Points (adds straight to cart!):</p>
                       <div className="grid grid-cols-2 gap-1.5 max-h-24 overflow-y-auto no-scrollbar">
                         {loyaltyRules.map(rule => {
                           const inCartCost = cart.reduce((acc: number, i: any) => acc + (i.pointsCost || 0), 0);
                           const isAffordable = (customerPoints - inCartCost) >= rule.pointsCost;
                           return (
-                            <button key={rule.id} type="button" onClick={() => handleCustomerRedeem(`reward-${rule.id}`, `🎁 FREE ${rule.rewardName}`, rule.pointsCost)} disabled={!isAffordable} className={`py-2 px-2 rounded text-[9px] font-black uppercase border truncate transition-all ${isAffordable ? 'bg-yellow-400 text-black border-yellow-400 hover:bg-yellow-500' : 'bg-neutral-100 dark:bg-white/5 text-neutral-455 dark:text-gray-500 border-neutral-200 dark:border-white/5 cursor-not-allowed'}`}>🎁 {rule.rewardName} ({rule.pointsCost} P)</button>
+                            <button key={rule.id} type="button" onClick={() => handleCustomerRedeem(`reward-${rule.id}`, `🎁 FREE ${rule.rewardName}`, rule.pointsCost)} disabled={!isAffordable} className={`py-2 px-2 rounded text-[9px] font-black uppercase border truncate transition-all ${isAffordable ? 'bg-yellow-400 text-black border-yellow-400 hover:bg-yellow-500' : 'bg-neutral-100 dark:bg-white/5 text-neutral-455 dark:text-gray-505 border-neutral-200 dark:border-white/5 cursor-not-allowed'}`}>🎁 {rule.rewardName} ({rule.pointsCost} P)</button>
                           );
                         })}
                       </div>
@@ -1802,7 +1894,7 @@ export default function BbCafeHome() {
                   </div>
 
                   {/* Synchronized Social Links inside profile drawer */}
-                  <div className="pt-2 border-t dark:border-white/10 border-gray-200 space-y-2">
+                  <div className="pt-2 border-t dark:border-white/10 border-gray-200 space-y-2 font-sans">
                     <p className="text-[9px] dark:text-gray-400 text-neutral-700 font-black uppercase tracking-wider">Earn Points by Following us:</p>
                     <div className="grid grid-cols-2 gap-2 text-[8px] font-black uppercase">
                       {SOCIAL_LINKS.map((platform) => (
@@ -1819,7 +1911,7 @@ export default function BbCafeHome() {
                   </div>
 
                   {/* USER PERSONAL ORDER HISTORY */}
-                  <div className="space-y-3 pt-2">
+                  <div className="space-y-3 pt-2 font-sans">
                     <h3 className="text-xs font-black dark:text-gray-300 text-neutral-800 uppercase flex items-center gap-1"><History size={14}/> <span>My Order History</span></h3>
                     {pastOrders.length > 0 ? (
                       <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
@@ -1979,7 +2071,7 @@ export default function BbCafeHome() {
 
                 {/* 6. ADD EXTRA CONDIMENTS BUTTONS */}
                 <div className="dark:bg-white/[0.02] bg-gray-50 border dark:border-white/5 border-gray-200 rounded-2xl p-4 space-y-2 transition-colors duration-200">
-                  <p className="text-[9px] font-black uppercase dark:text-gray-400 text-neutral-800">Add Extra condiments to order:</p>
+                  <p className="text-[9px] font-black uppercase dark:text-gray-405 text-neutral-800">Add Extra condiments to order:</p>
                   <div className="grid grid-cols-3 gap-2">
                     <button onClick={() => { triggerHaptic(); setKetchupAddon(!ketchupAddon); }} className={`p-2 rounded-xl border text-[9px] font-black ${ketchupAddon ? 'border-red-500 bg-red-500/5 text-red-655 animate-none' : 'dark:border-white/5 border-gray-200 bg-transparent dark:text-gray-400 text-neutral-800'}`}>
                       Ketchup (+₹10)
@@ -2095,7 +2187,7 @@ export default function BbCafeHome() {
               <Gift className="mx-auto text-yellow-400" size={32} />
               <div>
                 <h3 className="text-lg font-black text-yellow-400 uppercase italic">Gift Loyalty Points</h3>
-                <p className="text-[9px] text-gray-505 font-semibold mt-0.5">अपने पॉइंट्स किसी दोस्त को गिफ्ट करें</p>
+                <p className="text-[9px] text-gray-500 font-semibold mt-0.5">अपने  पॉइंट्स किसी दोस्त को गिफ्ट करें</p>
               </div>
               <div className="space-y-3 text-left">
                 <div className="space-y-1">
@@ -2115,7 +2207,7 @@ export default function BbCafeHome() {
                 <button type="submit" disabled={isGiftingLoading} className="flex-1 bg-yellow-400 text-black font-black p-3 rounded-xl text-xs uppercase flex items-center justify-center gap-1">
                   {isGiftingLoading ? <Loader2 className="animate-spin" size={14} /> : <span>Gift Points 🎁</span>}
                 </button>
-                <button type="button" onClick={() => { triggerHaptic(); setIsGiftModalOpen(false); setGiftPhone(""); setGiftPointsAmount(""); setGiftSenderPin(""); }} className="bg-white/5 text-gray-400 font-bold p-3 rounded-xl text-xs">CANCEL</button>
+                <button type="button" onClick={() => { triggerHaptic(); setIsGiftModalOpen(false); setGiftPhone(""); setGiftPointsAmount(""); setGiftSenderPin(""); }} className="bg-white/5 text-gray-405 p-3 rounded-xl font-black text-xs">CANCEL</button>
               </div>
             </motion.form>
           </div>
@@ -2233,11 +2325,11 @@ export default function BbCafeHome() {
               </div>
 
               <div className="bg-black/40 p-3 rounded-2xl border border-dashed border-orange-500/20 text-center my-2 space-y-0.5">
-                <p className="text-[9px] text-gray-500 uppercase font-black">Delivery Verification OTP Code</p>
+                <p className="text-[9px] text-gray-500 uppercase font-black font-sans">Delivery Verification OTP Code</p>
                 <p className="text-yellow-400 font-black text-lg tracking-widest font-mono bg-yellow-500/10 px-4 py-1.5 rounded-xl border border-yellow-500/20 inline-block">
                   {lastPlacedOrder.deliveryPin || "WAIT"}
                 </p>
-                <p className="text-[8px] text-gray-450 mt-1 font-bold">डिलीवरी बॉय के आने पर उसे यह कोड बताएं, तभी आर्डर डिलीवर होगा।</p>
+                <p className="text-[8px] text-gray-450 mt-1 font-bold font-sans">डिलीवरी बॉय के आने पर उसे यह कोड बताएं, तभी आर्डर डिलीवर होगा।</p>
               </div>
 
               <div className="pt-2 flex flex-col gap-2 font-sans">
@@ -2259,7 +2351,7 @@ export default function BbCafeHome() {
                 </button>
               </div>
 
-              <p className="text-[9px] text-green-500 dark:text-green-400 dark:bg-green-500/10 bg-green-50 p-2.5 rounded-xl font-bold font-sans">
+              <p className="text-[9px] text-green-505 dark:text-green-400 dark:bg-green-500/10 bg-green-50 p-2.5 rounded-xl font-bold font-sans">
                 🌱 पेपर रसीद के बिना DIGITAL इनवॉइस जनरेट किया गया है। धन्यवाद!
               </p>
               <button onClick={() => { triggerHaptic(); setShowInvoice(false); }} className="w-full bg-white text-black p-3 rounded-xl text-xs font-black uppercase font-sans">
