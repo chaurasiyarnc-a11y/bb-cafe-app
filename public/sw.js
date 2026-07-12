@@ -1,7 +1,15 @@
-const CACHE_NAME = 'bb-cafe-cache-v1';
+const CACHE_NAME = 'bb-cafe-cache-v2'; // Cache version ko v2 kar diya hai taaki naya badlav load ho sake
 const ASSETS_TO_CACHE = [
   '/',
   '/manifest.json',
+  '/delivery',
+  '/delivery-manifest.json',
+  '/kds',
+  '/kds-manifest.json',
+  '/admin',
+  '/admin-manifest.json',
+  '/icon-192x192.png',
+  '/icon-512x512.png'
 ];
 
 // Install Event (Assets को ब्राउज़र मेमोरी में स्टोर करना)
