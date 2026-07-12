@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../../lib/firebase';
-import { collection, onSnapshot, query, doc, updateDoc, orderBy, getDoc } from 'firebase/firestore';
+import { collection, onSnapshot, query, doc, updateDoc, orderBy, getDoc, where } from 'firebase/firestore';
 import { Phone, MapPin, Check, Loader2, Lock, User, Clock, WifiOff, X, Navigation } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 
@@ -42,29 +42,34 @@ export default function DeliveryDashboard() {
     }
   }, []);
 
-  // Real-time simple query with Client-side filtering (Only Out-For-Delivery & Today's Orders)
+  // Real-time simple query with Client-side filtering & Database-level optimization (Only Out-For-Delivery & Today's Orders)
   useEffect(() => {
     if (isLocked) return;
 
+    // OPTIMIZATION: Database se sirf wahi orders mâng rahe hain jo out_for_delivery hain
     const qSimple = query(
       collection(db, "orders"),
-      orderBy("timestamp", "asc")
+      where("status", "==", "out_for_delivery")
     );
 
     const unsub = onSnapshot(qSimple, (snap) => {
-      const allOrders = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const activeDeliveryList = snap.docs.map(d => ({ id: d.id, ...d.data() as any }));
       
       const todayStart = new Date();
       todayStart.setHours(0, 0, 0, 0);
 
       // Filter: Only show orders currently out for delivery today
-      const deliveryOrders = allOrders.filter((o: any) => {
-        const isStatusMatch = o.status === "out_for_delivery";
-        if (!isStatusMatch) return false;
-
+      const deliveryOrders = activeDeliveryList.filter((o: any) => {
         if (!o.timestamp) return false;
         const orderDate = o.timestamp?.toDate ? o.timestamp.toDate() : new Date(o.timestamp);
         return orderDate >= todayStart;
+      });
+
+      // CLIENT-SIDE SORTING: Order sequence list ko time ke hisab se manually line me lagana
+      deliveryOrders.sort((a, b) => {
+        const tA = a.timestamp?.toDate ? a.timestamp.toDate() : new Date(a.timestamp || 0);
+        const tB = b.timestamp?.toDate ? b.timestamp.toDate() : new Date(b.timestamp || 0);
+        return tA.getTime() - tB.getTime();
       });
       
       setOrders(deliveryOrders);
