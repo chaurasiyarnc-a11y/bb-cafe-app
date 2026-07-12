@@ -700,6 +700,46 @@ const handleAddDiyPizzaToCart = () => {
       toast.error("रिव्यू सबमिट करने में कोई समस्या आई।");
     }
   };
+  // Normal pizza customized cart submission helper (Requirement Fix)
+  const handleNormalPizzaAdd = () => {
+    triggerHaptic();
+    if (!normalPizzaSize) return toast.error("Please select a size!");
+
+    const sizeAddons = PIZZA_ADDONS[normalPizzaSize.toLowerCase()] || {};
+    let addonsTotal = 0;
+    const activeAddonNames: string[] = [];
+
+    Object.entries(normalPizzaAddons).forEach(([addonName, isSelected]) => {
+      if (isSelected) {
+        const addonCost = sizeAddons[addonName] || 0;
+        addonsTotal += addonCost;
+        activeAddonNames.push(`${addonName} (+₹${addonCost})`);
+      }
+    });
+
+    let finalName = `${selectedProduct.name} (${normalPizzaSize})`;
+    if (activeAddonNames.length > 0) {
+      finalName += ` [${activeAddonNames.join(", ")}]`;
+    }
+
+    const uniqueCartId = `${selectedProduct.id}-${normalPizzaSize}-${Object.keys(normalPizzaAddons).filter(k => normalPizzaAddons[k]).join("-")}`;
+
+    addItem({
+      ...selectedProduct,
+      id: uniqueCartId,
+      name: finalName,
+      price: Number(normalPizzaPrice) + addonsTotal,
+      note: chefNote ? chefNote.trim() : ""
+    });
+
+    playSoundEffect('add');
+    toast.success("Added to cart!");
+    setSelectedProduct(null);
+    setNormalPizzaSize("");
+    setNormalPizzaPrice(0);
+    setNormalPizzaAddons({});
+    setChefNote("");
+  };
   const handleDetectLocation = () => {
     triggerHaptic();
     if (!navigator.geolocation) {
