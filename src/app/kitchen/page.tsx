@@ -1,6 +1,6 @@
 'use client';
 import React, { useState, useEffect, useRef } from 'react';
-import { db } from '../lib/firebase';
+import { db } from '../../lib/firebase';
 import { collection, onSnapshot, query, where, doc, updateDoc, orderBy } from 'firebase/firestore';
 import { Clock, Check, Loader2, Play, AlertCircle, WifiOff } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
