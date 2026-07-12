@@ -646,7 +646,21 @@ const handleAddDiyPizzaToCart = () => {
     });
   }, [deduplicatedMenu, selectedCategory, favorites, normalizedSearchQuery]);
 
-  const handleDetectLocation = () => { // <--- Missing Header Line Restored!
+  // Toggle favorites helper function (Requirement Fix)
+  const handleToggleFavorite = (id: string, e: any) => {
+    triggerHaptic();
+    e.stopPropagation();
+    let updated;
+    if (favorites.includes(id)) {
+      updated = favorites.filter(f => f !== id);
+      toast.success("पसंदीदा सूची से हटाया गया।");
+    } else {
+      updated = [...favorites, id];
+      toast.success("पसंदीदा सूची में जोड़ा गया! ❤️");
+    }
+    setFavorites(updated);
+    localStorage.setItem('bb_favorites', JSON.stringify(updated));
+  };
   const handleDetectLocation = () => {
     triggerHaptic();
     if (!navigator.geolocation) {
