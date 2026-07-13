@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../../lib/firebase';
-import { collection, onSnapshot, query, doc, updateDoc, orderBy, getDoc, where } from 'firebase/firestore';
+import { collection, onSnapshot, query, doc, updateDoc, orderBy, getDoc, getDocs, where } from 'firebase/firestore';
 import { Phone, MapPin, Check, Loader2, Lock, User, Clock, WifiOff, X, Navigation } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 
@@ -10,7 +10,6 @@ export default function DeliveryDashboard() {
   const [loading, setLoading] = useState(true);
   const [isLocked, setIsLocked] = useState(true);
   const [pinInput, setPinInput] = useState("");
-  const [passcodes, setPasscodes] = useState({ adminPin: "971429", managerPin: "123456" });
 
   // Check login session & Fetch passcodes & Register Service Worker on mount
   useEffect(() => {
@@ -19,34 +18,20 @@ export default function DeliveryDashboard() {
       setIsLocked(false);
     }
 
-    const fetchPins = async () => {
-      try {
-        const d = await getDoc(doc(db, "settings", "passcodes"));
-        if (d.exists()) {
-          setPasscodes({
-            adminPin: d.data().adminPin || "971429",
-            managerPin: d.data().managerPin || "123456"
-          });
-        }
-      } catch (err) {
-        console.error("Failed to load passcodes", err);
-      }
-    };
-    fetchPins();
-
-    // Register Service Worker for PWA (Browser me app install trigger karne ke liye)
+    // Register Service Worker for PWA
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/sw.js')
-        .then((reg) => console.log('Service Worker Registered!', reg.scope))
+        .then((reg) => console.log('Service Worker Registered Successfully!', reg.scope))
         .catch((err) => console.error('Service Worker registration failed:', err));
     }
+    setLoading(false);
   }, []);
 
   // Real-time simple query with Client-side filtering & Database-level optimization (Only Out-For-Delivery & Today's Orders)
   useEffect(() => {
     if (isLocked) return;
 
-    // OPTIMIZATION: Database se sirf wahi orders mâng rahe hain jo out_for_delivery hain
+    // Database-level query optimization (Only Out for Delivery)
     const qSimple = query(
       collection(db, "orders"),
       where("status", "==", "out_for_delivery")
@@ -65,7 +50,7 @@ export default function DeliveryDashboard() {
         return orderDate >= todayStart;
       });
 
-      // CLIENT-SIDE SORTING: Order sequence list ko time ke hisab se manually line me lagana
+      // Client-side sorting by time
       deliveryOrders.sort((a, b) => {
         const tA = a.timestamp?.toDate ? a.timestamp.toDate() : new Date(a.timestamp || 0);
         const tB = b.timestamp?.toDate ? b.timestamp.toDate() : new Date(b.timestamp || 0);
@@ -82,19 +67,45 @@ export default function DeliveryDashboard() {
     return () => unsub();
   }, [isLocked]);
 
-  const handlePinSubmit = (e: React.FormEvent) => {
+  // LOGIN: Verifies Entered PIN against personal Rider account in Firestore
+  const handlePinSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (pinInput === passcodes.adminPin || pinInput === passcodes.managerPin) {
-      localStorage.setItem('bb_delivery_verified', 'true');
-      setIsLocked(false);
-      toast.success("Delivery Terminal Unlocked! 🛵");
-    } else {
-      toast.error("Incorrect PIN! Access Denied.");
-      setPinInput("");
+    const toastId = toast.loading("Verifying security credentials...");
+    try {
+      const q = query(
+        collection(db, "staff_members"),
+        where("pin", "==", pinInput),
+        where("role", "==", "delivery")
+      );
+      const snap = await getDocs(q);
+      toast.dismiss(toastId);
+      
+      if (!snap.empty) {
+        const rider = snap.docs[0].data();
+        localStorage.setItem('bb_delivery_verified', 'true');
+        localStorage.setItem('bb_delivery_boy_name', rider.name);
+        setIsLocked(false);
+        toast.success(`Welcome back, ${rider.name}! Terminal Unlocked! 🛵`);
+      } else {
+        toast.error("Incorrect PIN! Access Denied.");
+        setPinInput("");
+      }
+    } catch (err) {
+      toast.dismiss(toastId);
+      toast.error("Login verification failed. Database error.");
     }
   };
 
+  // SECURE OTP CONFIRMATION ON COMPLETE DELIVERY
   const handleCompleteDelivery = async (order: any) => {
+    const enteredPin = prompt(`Confirm Delivery PIN / OTP:\nKripya customer se poocha gaya 4-digit Delivery PIN darj karein:`);
+    if (!enteredPin) return;
+
+    // Checks entered OTP against order.deliveryPin
+    if (String(enteredPin).trim() !== String(order.deliveryPin || "")) {
+      return toast.error("गलत Delivery PIN! आर्डर डिलीवर मार्क नहीं किया जा सकता। ❌");
+    }
+
     try {
       // 1. Update Firestore order status to 'delivered'
       await updateDoc(doc(db, "orders", order.id), { status: 'delivered' });
@@ -138,8 +149,8 @@ export default function DeliveryDashboard() {
           <form onSubmit={handlePinSubmit} className="space-y-4">
             <input 
               type="password" 
-              maxLength={6}
-              placeholder="Enter Access PIN" 
+              maxLength={4}
+              placeholder="Enter Your Personal PIN" 
               value={pinInput} 
               onChange={(e) => setPinInput(e.target.value)} 
               className="w-full bg-black/60 border border-white/10 rounded-2xl p-4 text-center outline-none focus:border-orange-500 text-sm font-bold text-white tracking-widest"
@@ -176,7 +187,7 @@ export default function DeliveryDashboard() {
       <header className="border-b border-white/5 pb-4 mb-6 flex justify-between items-center">
         <div>
           <h1 className="text-xl font-black text-orange-500 italic uppercase flex items-center gap-1.5">
-            🛵 Delivery Portal
+            🛵 Delivery Portal {typeof window !== 'undefined' && localStorage.getItem('bb_delivery_boy_name') ? `- ${localStorage.getItem('bb_delivery_boy_name')}` : ''}
           </h1>
           <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Out for delivery orders list</p>
         </div>
@@ -187,6 +198,7 @@ export default function DeliveryDashboard() {
           <button 
             onClick={() => {
               localStorage.removeItem('bb_delivery_verified');
+              localStorage.removeItem('bb_delivery_boy_name');
               setIsLocked(true);
             }} 
             className="p-2 bg-white/5 rounded-full text-gray-400 active:scale-90 transition-all"
