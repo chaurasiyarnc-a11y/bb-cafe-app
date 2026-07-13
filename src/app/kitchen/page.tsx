@@ -12,6 +12,9 @@ export default function KitchenDisplaySystem() {
   const [pinInput, setPinInput] = useState("");
   const [passcodes, setPasscodes] = useState({ adminPin: "971429", managerPin: "123456" });
   
+  // कैफ़े ओपन/क्लोज के लिए स्टोर की स्थिति का स्टेट
+  const [isStoreOpen, setIsStoreOpen] = useState(true);
+
   const prevOrdersCountRef = useRef<number | null>(null);
 
   // Play custom MP3 sound alert for kitchen when new order arrives
@@ -44,7 +47,7 @@ export default function KitchenDisplaySystem() {
     };
     fetchPins();
 
-    // Register Service Worker for PWA
+    // Register Service Worker for PWA (Browser installation ke liye)
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/sw.js')
         .then((reg) => console.log('KDS Service Worker Registered Successfully!', reg.scope))
@@ -52,7 +55,7 @@ export default function KitchenDisplaySystem() {
     }
   }, []);
 
-  // Real-time simple query with Client-side filtering & Database-level optimization
+  // Real-time simple query with Client-side filtering & Database-level optimization (Daily Orders Only!)
   useEffect(() => {
     if (isLocked) return;
 
@@ -99,12 +102,23 @@ export default function KitchenDisplaySystem() {
     return () => unsub();
   }, [isLocked]);
 
+  // Real-time listener for store status
+  useEffect(() => {
+    if (isLocked) return;
+    const unsubStore = onSnapshot(doc(db, "settings", "store"), (snap) => {
+      if (snap.exists()) {
+        setIsStoreOpen(snap.data().isOpen);
+      }
+    });
+    return () => unsubStore();
+  }, [isLocked]);
+
   // LOGIN: Verifies Entered PIN against personal Cook account in Firestore
   const handlePinSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const toastId = toast.loading("Verifying kitchen credentials...");
     try {
-      // 1. MASTER ADMIN PIN OVERRIDE
+      // 1. MASTER ADMIN PIN OVERRIDE (Backup bypass)
       if (pinInput === passcodes.adminPin) {
         toast.dismiss(toastId);
         localStorage.setItem('bb_kds_verified', 'true');
@@ -166,6 +180,17 @@ export default function KitchenDisplaySystem() {
       toast.success("आर्डर सफलतापूर्वक रिजेक्ट और ख़ारिज कर दिया गया है! 🚫");
     } catch (e) {
       toast.error("ऑर्डर रिजेक्ट करने में समस्या आई।");
+    }
+  };
+
+  // Toggle Cafe online/offline status from KDS
+  const handleToggleStoreStatus = async () => {
+    triggerHaptic(50);
+    try {
+      await updateDoc(doc(db, "settings", "store"), { isOpen: !isStoreOpen });
+      toast.success(`Store status updated to ${!isStoreOpen ? "Open" : "Closed"}!`);
+    } catch (e) {
+      toast.error("Failed to update store status.");
     }
   };
 
@@ -237,6 +262,13 @@ export default function KitchenDisplaySystem() {
           <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Kitchen Order Screen • Real-time Cooking</p>
         </div>
         <div className="flex items-center gap-3">
+          {/* Cafe Open/Close Status Toggle Button */}
+          <button
+            onClick={handleToggleStoreStatus}
+            className={`px-4 py-2 rounded-full text-xs font-black uppercase transition-all shadow border ${isStoreOpen ? 'bg-green-600/10 text-green-500 border-green-500/20' : 'bg-red-600/10 text-red-500 border-red-500/20'}`}
+          >
+            {isStoreOpen ? "🟢 Cafe: Online" : "🔴 Cafe: Offline"}
+          </button>
           <div className="bg-orange-500/10 text-orange-500 font-black px-4 py-2 rounded-full text-xs border border-orange-500/20">
             🔥 Cooking Orders: {orders.length}
           </div>
@@ -295,15 +327,14 @@ export default function KitchenDisplaySystem() {
                     📍 Area: {o.deliveryArea}
                   </p>
                 )}
-                
-                {/* Main fulfillment mode indicator */}
+
+                {/* Fulfillment mode indicator */}
                 {o.fulfillmentType && (
                   <p className="text-[10px] font-black uppercase tracking-wide flex items-center gap-1 text-orange-400">
                     ⚙️ Mode: {o.fulfillmentType === "delivery" ? "Home Delivery 🛵" : o.fulfillmentType === "pickup" ? "Self-Pickup 🛍️" : `Table No. ${o.tableNumber || "N/A"} 🍽️`}
                   </p>
                 )}
-
-                {/* Primary status change action button */}
+                
                 <button
                   onClick={() => handleUpdateStatus(o.id, o.status)}
                   className={`w-full py-3.5 rounded-xl text-xs font-black uppercase flex items-center justify-center gap-1.5 transition-all active:scale-[0.98] ${o.status === 'pending' ? 'bg-red-600 hover:bg-red-700 text-white' : o.status === 'preparing' ? 'bg-yellow-500 hover:bg-yellow-600 text-black' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}
@@ -317,8 +348,9 @@ export default function KitchenDisplaySystem() {
                   )}
                 </button>
 
-                {/* Secondary 'Reject / Fake' action button */}
+                {/* Reject/Fake Order Button */}
                 <button
+                  type="button"
                   onClick={() => handleRejectOrder(o.id)}
                   className="w-full py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider text-red-400 hover:text-red-500 hover:bg-red-500/10 border border-red-500/20 transition-all flex items-center justify-center gap-1 mt-1"
                 >
