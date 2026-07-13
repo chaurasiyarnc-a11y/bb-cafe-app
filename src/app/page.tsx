@@ -1,5 +1,3 @@
-
-
 'use client';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { db } from '../lib/firebase'; 
@@ -900,7 +898,7 @@ export default function BbCafeHome() {
         });
       });
 
-      toast.success(`🎁 सफलतापूर्वक ${pointsToGift}  पॉइंट्स गिफ्ट कर दिए गए हैं!`);
+      toast.success(`🎁 सफलतापूर्वक ${pointsToGift}  पॉ\%$ट्स गिफ्ट कर दिए गए हैं!`);
       const inviteMsg = `हे दोस्त! मैंने तुम्हें BAM BAM Cafe के ऐप पर 🎁 ${pointsToGift} Loyalty Points गिफ्ट किए हैं। यहाँ से स्वादिष्ट पिज्जा और थाली आर्डर करो: https://bb-cafe-app.vercel.app/`;
       const whatsappUrl = `https://wa.me/91${friendPhoneRaw}?text=${encodeURIComponent(inviteMsg)}`;
       
@@ -958,6 +956,10 @@ export default function BbCafeHome() {
     if (!address || address.trim().length < 10) return toast.error("Please enter full address!");
 
     const tokenNumber = Math.floor(1000 + Math.random() * 9000);
+    
+    // GENERATE UNIQUE 4-DIGIT DELIVERY VERIFICATION PIN/OTP
+    const deliveryPin = Math.floor(1000 + Math.random() * 9000);
+
     let billNumber = 1;
     const counterDocRef = doc(db, "settings", "store_bill_counter");
 
@@ -985,7 +987,7 @@ export default function BbCafeHome() {
     const totalPointsCost = cart.reduce((acc: number, i: any) => acc + (i.pointsCost || 0), 0);
 
     const orderObj = {
-      billNumber, tokenNumber, customerName: customerDetails.name, customerPhone: customerDetails.phone,
+      billNumber, tokenNumber, deliveryPin, customerName: customerDetails.name, customerPhone: customerDetails.phone,
       address, items: cart, subtotal, discount: couponDiscount, total: finalTotal, timestamp: new Date(), status: 'pending',
       deliveryArea: selectedArea.name, noCutlery, ketchupAddon, oreganoAddon, chiliFlakesAddon
     };
@@ -1037,7 +1039,9 @@ export default function BbCafeHome() {
     if (noCutlery) itemsText += `🌱 (Eco-Friendly: No plastic cutlery requested)\n`;
 
     const refCode = getReferralCode();
-    const msg = `🔥 *BAM BAM CAFE - NEW ORDER*\n\n*Bill No:* #${formattedBillStr}\n*Token No:* #${tokenNumber}\n*Customer:* ${customerDetails.name}\n*Phone:* ${customerDetails.phone}\n*Delivery Area:* ${selectedArea.name}\n*Address:* ${address}\n\n*ITEMS:*\n${itemsText}\n*Subtotal:* ₹${subtotal + addOnsCost}\n*Coupon Discount:* -₹${couponDiscount}\n*Delivery:* ₹${deliveryCharge}\n*TOTAL BILL: ₹${finalTotal}*\n\n*Invite Code:* ${refCode}\n*Points Earned:* +${pointsEarned} Pts\n${totalPointsCost > 0 ? `*Points Redeemed:* -${totalPointsCost} Pts\n` : ''}\n_Confirm order by replying 'YES'_`;
+    
+    // Added Delivery PIN instruction safely in the WhatsApp dispatch template
+    const msg = `🔥 *BAM BAM CAFE - NEW ORDER*\n\n*Bill No:* #${formattedBillStr}\n*Token No:* #${tokenNumber}\n*Customer:* ${customerDetails.name}\n*Phone:* ${customerDetails.phone}\n*Delivery Area:* ${selectedArea.name}\n*Address:* ${address}\n\n*ITEMS:*\n${itemsText}\n*Subtotal:* ₹${subtotal + addOnsCost}\n*Coupon Discount:* -₹${couponDiscount}\n*Delivery:* ₹${deliveryCharge}\n*TOTAL BILL: ₹${finalTotal}*\n\n🔑 *Delivery PIN:* ${deliveryPin} (Rider ko ye confirm karke hi order le)\n*Invite Code:* ${refCode}\n*Points Earned:* +${pointsEarned} Pts\n${totalPointsCost > 0 ? `*Points Redeemed:* -${totalPointsCost} Pts\n` : ''}\n_Confirm order by replying 'YES'_`;
     
     playSoundEffect('success');
     setConfettiActive(true);
@@ -1395,7 +1399,7 @@ export default function BbCafeHome() {
   if (!mounted) return null;
 
   return (
-    <div className="dark:bg-[#050505] bg-gray-50 min-h-screen dark:text-white text-gray-900 pb-32 font-sans relative overflow-x-clip transition-colors duration-200">
+    <div className="dark:bg-[#050505] bg-gray-550 min-h-screen dark:text-white text-gray-900 pb-32 font-sans relative overflow-x-clip transition-colors duration-200">
       
       {/* Manual direct homepage manifest link injection */}
       <link rel="manifest" href="/manifest.json" />
@@ -1621,7 +1625,7 @@ export default function BbCafeHome() {
                   onClick={() => { triggerHaptic(); setActiveStory(story); }}
                   className="flex flex-col items-center flex-shrink-0 focus:outline-none"
                 >
-                  <div className="w-16 h-16 rounded-full p-0.5 bg-gradient-to-tr from-yellow-400 via-orange-500 to-red-600 relative">
+                  <div className="w-16 h-16 rounded-full p-0.5 bg-gradient-to-tr from-yellow-400 via-orange-500 to-red-655 relative">
                     <div className="w-full h-full rounded-full overflow-hidden border-2 border-white dark:border-neutral-900 bg-neutral-800 flex items-center justify-center relative">
                       {/* Reel Cover Image Integration (Requirement 1) */}
                       <img src={story.coverUrl || story.url} className="w-full h-full object-cover" alt={story.title} />
@@ -1885,7 +1889,7 @@ export default function BbCafeHome() {
                 </div>
               ))
             ) : filteredMenu.length === 0 ? (
-              <p className="text-center text-gray-505 py-8 text-xs font-bold uppercase">No items found...</p>
+              <p className="text-center text-gray-550 py-8 text-xs font-bold uppercase">No items found...</p>
             ) : (
               filteredMenu.map((item, index) => {
                 const isItemAvailable = item.isAvailable !== false;
@@ -2178,7 +2182,7 @@ export default function BbCafeHome() {
             </div>
           </div>
         )}
-      </AnimatePresence>
+      </  Presence>
 
       {/* WRITING REVIEW POPUP */}
       <AnimatePresence>
@@ -2278,7 +2282,7 @@ export default function BbCafeHome() {
                           type="button"
                           key={addon}
                           onClick={() => setNormalPizzaAddons(prev => ({ ...prev, [addon]: !prev[addon] }))}
-                          className={`p-2.5 rounded-xl border flex justify-between items-center text-[9px] font-bold ${isSelected ? 'border-orange-500 bg-orange-500/5 text-orange-400' : 'dark:border-white/5 border-gray-200 dark:bg-white/[0.02] bg-gray-550 dark:text-gray-300'}`}
+                          className={`p-2.5 rounded-xl border flex justify-between items-center text-[9px] font-bold ${isSelected ? 'border-orange-500 bg-orange-500/5 text-orange-400' : 'dark:border-white/5 border-gray-200 dark:bg-white/[0.02] bg-gray-50 dark:text-gray-300'}`}
                         >
                           <span>{addon}</span>
                           <span className="text-orange-400 font-black">+₹{cost}</span>
@@ -2591,7 +2595,7 @@ export default function BbCafeHome() {
                         <div key={suggest.id} className="flex justify-between items-center text-[10px]">
                           <div>
                             <span className="font-bold block dark:text-white text-neutral-900">{suggest.name}</span>
-                            <span className="text-orange-600 font-extrabold">{getDisplayPrice(suggest)}</span>
+                            <span className="text-orange-650 font-extrabold">{getDisplayPrice(suggest)}</span>
                           </div>
                           <button onClick={() => { triggerHaptic(); addItem(suggest); }} className="bg-purple-500/20 text-purple-650 border border-purple-500/30 px-3 py-1 rounded-lg font-black uppercase animate-none">ADD</button>
                         </div>
@@ -2772,7 +2776,7 @@ export default function BbCafeHome() {
               <div className="space-y-3 text-left">
                 <div className="space-y-1">
                   <label className="text-[9px] font-black uppercase text-gray-500">Friend's Phone Number</label>
-                  <input type="tel" maxLength={10} placeholder="e.g. 9876543210" value={giftPhone} onChange={(e) => setGiftPhone(e.target.value)} required className="w-full dark:bg-white/10 bg-gray-50 border dark:border-white/10 border-gray-200 p-3 rounded-xl text-xs font-bold dark:text-white text-neutral-900 outline-none text-center" />
+                  <input type="tel" maxLength={10} placeholder="e.g. 9876543210" value={giftPhone} onChange={(e) => setGiftPhone(e.target.value)} required className="w-full dark:bg-white/10 bg-gray-550 border dark:border-white/10 border-gray-200 p-3 rounded-xl text-xs font-bold dark:text-white text-neutral-900 outline-none text-center" />
                 </div>
                 <div className="space-y-1">
                   <label className="text-[9px] font-black uppercase text-gray-500">Points to Gift (Your Pts: {customerPoints})</label>
@@ -2882,6 +2886,12 @@ export default function BbCafeHome() {
                 <p>Token No: #{lastPlacedOrder.tokenNumber}</p>
                 <p>Customer: {lastPlacedOrder.customerName}</p>
                 <p>Phone: {lastPlacedOrder.customerPhone}</p>
+                
+                {/* DISPLAY GENERATED DELIVERY PIN ON DIGITAL RECEIPT FOR SECURE CODE EXCHANGE */}
+                <div className="bg-orange-500/10 border border-orange-500/20 p-2 rounded-xl text-center text-xs font-black text-orange-500 uppercase tracking-wider my-2.5">
+                  🔑 Delivery PIN: {lastPlacedOrder.deliveryPin} <span className="block text-[8px] text-gray-400 font-bold uppercase mt-1">(Rider ko ye PIN bata kar hi order receive karein)</span>
+                </div>
+
                 <div className="border-t border-dashed border-white/10 my-2" />
                 {lastPlacedOrder.items.map((it: any) => (
                   <div key={it.id} className="flex flex-col">
