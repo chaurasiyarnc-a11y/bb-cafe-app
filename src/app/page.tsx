@@ -204,6 +204,8 @@ export default function BbCafeHome() {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [showInstallBanner, setShowInstallBanner] = useState(false);
   const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
+  // Double order punch hone se bachne ke liye loading state
+  const [isSubmittingOrder, setIsSubmittingOrder] = useState(false);
 
   // UI States (Requirement: Greet timer disappearing UX)
   const [showGreeting, setShowGreeting] = useState(true);
@@ -945,21 +947,29 @@ export default function BbCafeHome() {
     toast.success(`${name} Cart में जोड़ दिया गया है!`);
   };
 
-  const sendWhatsAppOrder = async () => {
+const sendWhatsAppOrder = async () => {
     triggerHaptic();
+    
+    // TRAP: Agar pehle se submit ho raha hai, toh doosre click ko block karein
+    if (isSubmittingOrder) return;
+    setIsSubmittingOrder(true);
+
     if (isTooFar) {
+      setIsSubmittingOrder(false);
       return toast.error("आपकी दूरी 20 KM से अधिक है। आप केवल मेनू देख सकते हैं, ऑर्डर प्लेस नहीं कर सकते!");
     }
     if (!customerDetails) { 
       setIsProfileOpen(true); 
       toast.error("ऑर्डर करने के लिए पहले अपनी प्रोफाइल बनाएं! 👤");
+      setIsSubmittingOrder(false);
       return; 
     }
-    if (!address || address.trim().length < 10) return toast.error("Please enter full address!");
+    if (!address || address.trim().length < 10) {
+      setIsSubmittingOrder(false);
+      return toast.error("Please enter full address!");
+    }
 
     const tokenNumber = Math.floor(1000 + Math.random() * 9000);
-    
-    // GENERATE UNIQUE 4-DIGIT DELIVERY VERIFICATION PIN/OTP
     const deliveryPin = Math.floor(1000 + Math.random() * 9000);
 
     let billNumber = 1;
@@ -976,7 +986,9 @@ export default function BbCafeHome() {
           transaction.update(counterDocRef, { nextBillNumber: billNumber + 1 });
         }
       });
-    } catch (e) { billNumber = Math.floor((Date.now() / 1000) % 100000); }
+    } catch (e) { 
+      billNumber = Math.floor((Date.now() / 1000) % 100000); 
+    }
 
     const formattedBillStr = formatBillNumber(billNumber);
     const subtotal = getCartSubtotal();
@@ -1019,7 +1031,11 @@ export default function BbCafeHome() {
           });
         }
       }
-    } catch (e) {}
+    } catch (e) {
+      toast.error("Database sync failed. Kripya dobara try karein.");
+      setIsSubmittingOrder(false); // Error aane par button ko wapas chalu karein
+      return;
+    }
 
     const updatedPastOrders = [orderObj, ...pastOrders];
     setPastOrders(updatedPastOrders);
@@ -1042,7 +1058,6 @@ export default function BbCafeHome() {
 
     const refCode = getReferralCode();
     
-    // Added Delivery PIN instruction safely in the WhatsApp dispatch template
     const msg = `🔥 *BAM BAM CAFE - NEW ORDER*\n\n*Bill No:* #${formattedBillStr}\n*Token No:* #${tokenNumber}\n*Customer:* ${customerDetails.name}\n*Phone:* ${customerDetails.phone}\n*Delivery Area:* ${selectedArea.name}\n*Address:* ${address}\n\n*ITEMS:*\n${itemsText}\n*Subtotal:* ₹${subtotal + addOnsCost}\n*Coupon Discount:* -₹${couponDiscount}\n*Delivery:* ₹${deliveryCharge}\n*TOTAL BILL: ₹${finalTotal}*\n\n🔑 *Delivery PIN:* ${deliveryPin} (Rider ko ye confirm karke hi order le)\n*Invite Code:* ${refCode}\n*Points Earned:* +${pointsEarned} Pts\n${totalPointsCost > 0 ? `*Points Redeemed:* -${totalPointsCost} Pts\n` : ''}\n_Confirm order by replying 'YES'_`;
     
     playSoundEffect('success');
@@ -1060,6 +1075,7 @@ export default function BbCafeHome() {
     setAppliedCoupon(null); 
     setEnteredCoupon(""); 
     setIsCartOpen(false);
+    setIsSubmittingOrder(false); // Success hone par button reset karein
   };
 
   const handleShareApp = async () => {
@@ -2691,19 +2707,28 @@ export default function BbCafeHome() {
                   <div className="h-px bg-white/20 mb-3" />
                   <div className="flex justify-between font-black text-xl"><span>To Pay</span> <span>₹{getTotalBillPrice()}</span></div>
                 </div>
-
-                {/* 9. WHATSAPP CHECKOUT TRIGGER */}
+          {/* 9. WHATSAPP CHECKOUT TRIGGER */}
                 {isTooFar ? (
-                  <div className="bg-red-600/20 text-red-400 p-4 rounded-2xl text-center text-xs font-bold border border-red-500/20">
+                  <div className="bg-red-655/20 text-red-400 p-4 rounded-2xl text-center text-xs font-bold border border-red-500/20">
                     आप 20 KM से अधिक दूर हैं। आर्डर स्वीकार नहीं किया जा सकता। ❌
                   </div>
                 ) : (
-                  <button onClick={sendWhatsAppOrder} type="button" className="w-full bg-green-600 hover:bg-green-700 p-4 rounded-2xl font-black text-sm text-white flex items-center justify-center gap-2 shadow-lg animate-none">ORDER ON WHATSAPP</button>
+                  <button 
+                    onClick={sendWhatsAppOrder} 
+                    type="button" 
+                    disabled={isSubmittingOrder} // Button ko disable kiya gaya hai
+                    className="w-full bg-green-600 hover:bg-green-700 p-4 rounded-2xl font-black text-sm text-white flex items-center justify-center gap-2 shadow-lg animate-none disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    {isSubmittingOrder ? (
+                      <span className="flex items-center gap-2">
+                        <Loader2 className="animate-spin" size={16} />
+                        Kripya thoda wait karein... ⏳
+                      </span>
+                    ) : (
+                      <span>ORDER ON WHATSAPP</span>
+                    )}
+                  </button>
                 )}
-              </div>
-            </motion.div>
-          </div>
-        )}
       </AnimatePresence>
 
       {/* COMPACT INSTALL BANNER GUIDE MODAL */}
