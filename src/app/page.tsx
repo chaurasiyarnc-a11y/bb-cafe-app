@@ -2109,53 +2109,83 @@ export default function BbCafeHome() {
       </main>
 
       {/* LIVE ORDER REAL-TIME TRACKING FOOTER PANEL */}
-      <AnimatePresence>
-        {liveOrder && (
-          <motion.div 
-            initial={{ y: 100, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: 100, opacity: 0 }}
-            className="fixed bottom-24 inset-x-4 z-50 max-w-sm mx-auto bg-neutral-950/95 backdrop-blur-md border border-orange-500/30 p-4 rounded-3xl shadow-2xl flex flex-col gap-2 text-xs font-bold font-sans"
+<AnimatePresence>
+  {liveOrder && (
+    <motion.div 
+      initial={{ y: 100, opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
+      exit={{ y: 100, opacity: 0 }}
+      className="fixed bottom-24 inset-x-4 z-50 max-w-sm mx-auto bg-neutral-950/95 backdrop-blur-md border border-orange-500/30 p-4 rounded-3xl shadow-2xl flex flex-col gap-2 text-xs font-bold font-sans"
+    >
+      <div className="flex justify-between items-center">
+        <div className="flex items-center gap-2">
+          <span className={`w-2 h-2 rounded-full ${liveOrder.status === 'rejected' ? 'bg-red-500' : 'bg-orange-500 animate-pulse'}`} />
+          <span className="text-gray-200">
+            {liveOrder.status === 'rejected' 
+              ? (isHindi ? "⚠️ आर्डर अलर्ट" : "⚠️ Order Alert")
+              : (isHindi ? `आर्डर लाइव ट्रैकिंग (Bill #${formatBillNumber(liveOrder.billNumber)})` : `Order Tracking (Bill #${formatBillNumber(liveOrder.billNumber)})`)
+            }
+          </span>
+        </div>
+        {liveOrder.status === 'rejected' ? (
+          <button 
+            onClick={() => { triggerHaptic(); setLiveOrder(null); }}
+            className="text-gray-400 hover:text-white p-1"
           >
-            <div className="flex justify-between items-center">
-              <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-orange-500 animate-pulse" />
-                <span className="text-gray-200">{isHindi ? `आर्डर लाइव ट्रैकिंग (Bill #${formatBillNumber(liveOrder.billNumber)})` : `Order Tracking (Bill #${formatBillNumber(liveOrder.billNumber)})`}</span>
-              </div>
-              <span className="bg-orange-500/10 text-orange-400 px-2 py-0.5 rounded-md text-[9px] uppercase font-black font-mono">
-                Token: #{liveOrder.tokenNumber}
-              </span>
-            </div>
-
-            <div className="space-y-1 mt-1">
-              <div className="flex justify-between text-[8px] text-gray-400 uppercase">
-                <span className={liveOrder.status === 'pending' ? 'text-orange-400 font-extrabold' : ''}>{isHindi ? "स्वीकृति" : "Confirming"} ⏳</span>
-                <span className={liveOrder.status === 'preparing' ? 'text-yellow-400 font-extrabold' : ''}>{isHindi ? "तैयारी" : "Preparing"} 👨‍🍳</span>
-                <span className={liveOrder.status === 'out_for_delivery' ? 'text-blue-400 font-extrabold' : ''}>{isHindi ? "मार्ग में" : "On the Way"} 🛵</span>
-              </div>
-              <div className="w-full bg-white/5 h-1.5 rounded-full overflow-hidden relative">
-                <div 
-                  className="bg-gradient-to-r from-orange-500 to-yellow-400 h-full transition-all duration-500" 
-                  style={{ 
-                    width: liveOrder.status === 'pending' ? '25%' : liveOrder.status === 'preparing' ? '65%' : '90%' 
-                  }} 
-                />
-              </div>
-            </div>
-
-            <div className="flex gap-2 pt-1 border-t border-white/5">
-              <a 
-                href={`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(`नमस्ते बम बम कैफ़े! कृपया मेरे आर्डर नंबर #${formatBillNumber(liveOrder.billNumber)} (टोकन नंबर: #${liveOrder.tokenNumber}) का लाइव स्टेटस बताएं।`)}`}
-                target="_blank"
-                rel="noreferrer"
-                className="flex-1 bg-white/5 hover:bg-white/10 text-center text-[10px] text-yellow-400 py-1.5 rounded-xl border border-white/5 transition-all"
-              >
-                Track Live Status (WA) 🔍
-              </a>
-            </div>
-          </motion.div>
+            <X size={14} />
+          </button>
+        ) : (
+          <span className="bg-orange-500/10 text-orange-400 px-2 py-0.5 rounded-md text-[9px] uppercase font-black font-mono">
+            Token: #{liveOrder.tokenNumber}
+          </span>
         )}
-      </AnimatePresence>
+      </div>
+
+      {liveOrder.status === 'rejected' ? (
+        <div className="space-y-3 py-1">
+          <p className="text-red-400 text-[10px] leading-relaxed font-black">
+            {isHindi 
+              ? "🚨 आपका आर्डर कैफ़े द्वारा रद्द (Reject) कर दिया गया है! कृपया स्पष्टीकरण या दोबारा आर्डर के लिए कैफ़े में तुरंत संपर्क करें।"
+              : "🚨 Your order has been rejected by the cafe! Please call us immediately for confirmation or details."
+            }
+          </p>
+          <a 
+            href="tel:+919714293759"
+            className="w-full bg-red-600 hover:bg-red-700 text-white text-center text-[10px] py-2 rounded-xl block font-black uppercase transition-all"
+          >
+            Call Cafe 📞
+          </a>
+        </div>
+      ) : (
+        <div className="space-y-1 mt-1">
+          <div className="flex justify-between text-[8px] text-gray-400 uppercase">
+            <span className={liveOrder.status === 'pending' ? 'text-orange-400 font-extrabold' : ''}>{isHindi ? "स्वीकृति" : "Confirming"} ⏳</span>
+            <span className={liveOrder.status === 'preparing' ? 'text-yellow-400 font-extrabold' : ''}>{isHindi ? "तैयारी" : "Preparing"} 👨‍🍳</span>
+            <span className={liveOrder.status === 'out_for_delivery' ? 'text-blue-400 font-extrabold' : ''}>{isHindi ? "मार्ग में" : "On the Way"} 🛵</span>
+          </div>
+          <div className="w-full bg-white/5 h-1.5 rounded-full overflow-hidden relative">
+            <div 
+              className="bg-gradient-to-r from-orange-500 to-yellow-400 h-full transition-all duration-500" 
+              style={{ 
+                width: liveOrder.status === 'pending' ? '25%' : liveOrder.status === 'preparing' ? '65%' : '90%' 
+              }} 
+            />
+          </div>
+          <div className="flex gap-2 pt-1 border-t border-white/5 mt-1.5">
+            <a 
+              href={`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(`नमस्ते बम बम कैफ़े! कृपया मेरे आर्डर नंबर #${formatBillNumber(liveOrder.billNumber)} का लाइव स्टेटस बताएं।`)}`}
+              target="_blank"
+              rel="noreferrer"
+              className="flex-1 bg-white/5 hover:bg-white/10 text-center text-[10px] text-yellow-400 py-1.5 rounded-xl border border-white/5 transition-all"
+            >
+              Track Live Status (WA) 🔍
+            </a>
+          </div>
+        </div>
+      )}
+    </motion.div>
+  )}
+</AnimatePresence>
 
       {/* FULL SCREEN REELS VIEWER */}
       <AnimatePresence>
