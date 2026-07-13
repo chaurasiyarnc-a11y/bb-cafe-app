@@ -5,7 +5,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { db } from '../../lib/firebase'; 
 import { collection, onSnapshot, query, orderBy, doc, updateDoc, setDoc, addDoc, deleteDoc, increment, runTransaction } from 'firebase/firestore';
-import { Power, Eye, EyeOff, User, MapPin, Calendar, CheckCircle2, LogOut, Loader2, Phone, Plus, Trash, Edit, X, Lock, BarChart3, Download, Folder, Percent, ImageIcon, Gift, Settings, Search, BookOpen, Share2, MessageSquare, Filter, RefreshCw, Check, CheckCircle, XCircle, Play } from 'lucide-react';
+import { Power, Eye, EyeOff, User, MapPin, Calendar, CheckCircle2, LogOut, Loader2, Phone, Plus, Trash, Edit, X, Lock, BarChart3, Download, Folder, Percent, ImageIcon, Gift, Settings, Search, BookOpen, Share2, MessageSquare, Filter, RefreshCw, Check, CheckCircle, XCircle, Play, Shield, Users } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 
 const ADD_CATEGORIES = ["Special Pizza", "Special Thali", "Paneer Special", "Special Mix veg", "Fast Food", "Super Cool", "Indian Bread", "Special Rice"];
@@ -263,22 +263,22 @@ export default function AdminDashboard() {
   const [editCatName, setEditCatName] = useState("");
   const [editCatImage, setEditCatImage] = useState("");
 
-  // Banners & Reels Management (Requirement 1, 2, 3)
+  // Banners & Reels Management
   const [banners, setBanners] = useState<any[]>([]);
   const [newBannerUrl, setNewBannerUrl] = useState("");
   const [newBannerTitle, setNewBannerTitle] = useState("");
 
   const [reels, setReels] = useState<any[]>([]);
   const [newReelUrl, setNewReelUrl] = useState("");
-  const [newReelCoverUrl, setNewReelCoverUrl] = useState(""); // Reels cover (Requirement 1)
+  const [newReelCoverUrl, setNewReelCoverUrl] = useState("");
   const [newReelTitle, setNewReelTitle] = useState("");
   const [newReelDesc, setNewReelDesc] = useState("");
   const [newReelPrice, setNewReelPrice] = useState("");
 
-  // Table QR Generator state (Requirement 3)
+  // Table QR Generator state
   const [genTableNum, setGenTableNum] = useState("1");
 
-  // Header Background Video State (Requirement 4)
+  // Header Background Video State
   const [headerVideoInput, setHeaderVideoInput] = useState("");
 
   const [reviews, setReviews] = useState<any[]>([]);
@@ -286,11 +286,11 @@ export default function AdminDashboard() {
   const [newCouponCode, setNewCouponCode] = useState("");
   const [newCouponValue, setNewCouponValue] = useState("");
 
-  // Dynamic Social Proofs (Requirement 3)
+  // Dynamic Social Proofs
   const [socialProofs, setSocialProofs] = useState<any[]>([]);
   const [newProofText, setNewProofText] = useState("");
 
-  // Social point claims (Requirement 4)
+  // Social point claims
   const [pointsClaims, setPointsClaims] = useState<any[]>([]);
 
   // CUSTOMER LOYAL CLUB STATE
@@ -307,6 +307,19 @@ export default function AdminDashboard() {
 
   // CUSTOMER POINT TRANSFERS AUDIT STATE
   const [transferLogs, setTransferLogs] = useState<any[]>([]);
+
+  // STAFF MANAGEMENT STATES
+  const [staff, setStaff] = useState<any[]>([]);
+  const [newStaffName, setNewStaffName] = useState("");
+  const [newStaffRole, setNewStaffRole] = useState("delivery");
+  const [newStaffPin, setNewStaffPin] = useState("");
+  
+  // Staff Editing States
+  const [editingStaffId, setEditingStaffId] = useState<string | null>(null);
+  const [editingStaffName, setEditingStaffName] = useState("");
+  const [editingStaffRole, setEditingStaffRole] = useState("delivery");
+  const [editingStaffPin, setEditingStaffPin] = useState("");
+  const [revealPinId, setRevealPinId] = useState<string | null>(null);
 
   // DYNAMIC PASSCODES FROM FIRESTORE
   const [passcodes, setPasscodes] = useState({ adminPin: "971429", managerPin: "123456" });
@@ -439,7 +452,7 @@ export default function AdminDashboard() {
       setCategories(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
 
-    // Dynamic WhatsApp Number & Background Video Listener (Requirement 4)
+    // Dynamic WhatsApp Number & Background Video Listener
     const unsubStore = onSnapshot(doc(db, "settings", "store"), (d) => {
       if (d.exists()) {
         setStoreOpen(d.data().isOpen);
@@ -449,7 +462,7 @@ export default function AdminDashboard() {
       }
     });
 
-    // Requirement 7: Separate collections fetch
+    // Separate collections fetch
     const unsubBanners = onSnapshot(collection(db, "banners"), (snap) => {
       setBanners(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
@@ -474,12 +487,12 @@ export default function AdminDashboard() {
       setLoyaltyRules(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
 
-    // Real-time Social Proofs Loader (Requirement 3)
+    // Real-time Social Proofs Loader
     const unsubProofs = onSnapshot(collection(db, "social_proofs"), (snap) => {
       setSocialProofs(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
 
-    // Real-time Social Point Claims Loader (Requirement 4)
+    // Real-time Social Point Claims Loader
     const unsubClaims = onSnapshot(collection(db, "points_claims"), (snap) => {
       setPointsClaims(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
@@ -494,12 +507,10 @@ export default function AdminDashboard() {
       setTransferLogs(logs);
     });
 
-    // Register Service Worker for Admin PWA
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js')
-        .then((reg) => console.log('Admin Service Worker Registered!', reg.scope))
-        .catch((err) => console.error('Admin Service Worker failed:', err));
-    }
+    // Staff Accounts Real-time Listener (Real-time Staff list sync)
+    const unsubStaff = onSnapshot(collection(db, "staff_members"), (snap) => {
+      setStaff(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
 
     return () => {
       unsubOrders();
@@ -515,6 +526,7 @@ export default function AdminDashboard() {
       unsubProofs();
       unsubClaims();
       unsubTransfers();
+      unsubStaff();
     };
   }, [isVerified]);
 
@@ -929,7 +941,7 @@ export default function AdminDashboard() {
     }
   };
 
-  // Requirement 2 & 3: Manage Circular Food Reels/Stories & Banners Separately
+  // Manage Circular Food Reels/Stories & Banners Separately
   const handleAddBanner = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newBannerUrl || !newBannerTitle) return toast.error("Please enter a media link and title!");
@@ -951,7 +963,7 @@ export default function AdminDashboard() {
     } catch (err) { toast.error("Error deleting item"); }
   };
 
-  // Manage Food Reels/Stories Collection (With Cover URL Support - Requirement 1)
+  // Manage Food Reels/Stories Collection (With Cover URL Support)
   const handleAddReel = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newReelUrl || !newReelTitle || !newReelPrice) {
@@ -960,7 +972,7 @@ export default function AdminDashboard() {
     try {
       await addDoc(collection(db, "reels"), {
         url: newReelUrl,
-        coverUrl: newReelCoverUrl || "", // Stores static cover/thumbnail
+        coverUrl: newReelCoverUrl || "",
         title: newReelTitle,
         description: newReelDesc || "",
         price: Number(newReelPrice) || 0,
@@ -982,7 +994,7 @@ export default function AdminDashboard() {
     }
   };
 
-  // Requirement 4: Header Background Video Change Support
+  // Background Video Change Support
   const handleUpdateHeaderVideo = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!headerVideoInput) return toast.error("Please enter a valid video link!");
@@ -994,7 +1006,7 @@ export default function AdminDashboard() {
     }
   };
 
-  // Requirement 3: Manage Social Proof Alerts CRUD
+  // Manage Social Proof Alerts CRUD
   const handleAddSocialProof = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newProofText.trim()) return toast.error("Please enter alert text!");
@@ -1015,7 +1027,7 @@ export default function AdminDashboard() {
     } catch (err) { toast.error("Error deleting alert"); }
   };
 
-  // Requirement 4: Verification Loop for Point claims
+  // Verification Loop for Point claims
   const handleVerifyClaimApproval = async (claim: any) => {
     try {
       await runTransaction(db, async (transaction) => {
@@ -1111,7 +1123,7 @@ export default function AdminDashboard() {
     }
   };
 
-  // Requirement Menu Duplicates Preventer Fix
+  // Bulk Import
   const handleBulkImport = async () => {
     if (!window.confirm("BUM BUM CAFE PDF ke items ko database mein add karein?")) return;
     toast.loading("Importing menu items...", { id: "import" });
@@ -1126,10 +1138,8 @@ export default function AdminDashboard() {
       let skippedCount = 0;
 
       for (const item of data) {
-        // Find if item name is already present to prevent duplicate creations
         const matched = menu.find(m => String(m.name).toLowerCase().trim() === item.name.toLowerCase().trim());
         if (matched) {
-          // Exists, so merge/update instead of replicating duplicates
           await updateDoc(doc(db, "products", matched.id), {
             price: item.price,
             category: item.category,
@@ -1138,7 +1148,6 @@ export default function AdminDashboard() {
           });
           skippedCount++;
         } else {
-          // Completely new, safe to add
           await addDoc(collection(db, "products"), {
             ...item,
             isVisible: true
@@ -1154,7 +1163,7 @@ export default function AdminDashboard() {
     }
   };
 
-  // Requirement 4: Merge Existing duplicates safely with database transaction/batches
+  // Merge Duplicates
   const handleMergeDuplicates = async () => {
     if (!window.confirm("क्या आप वाकई सभी डुप्लीकेट आइटम्स को मर्ज करके डिलीट करना चाहते हैं?")) return;
     toast.loading("Merging duplicates...", { id: "merge" });
@@ -1170,16 +1179,13 @@ export default function AdminDashboard() {
       });
 
       let mergedCount = 0;
-      // Fixed compatible iteration style without using --downlevelIteration compilation flag (Requirement 4)
       const entries = Array.from(nameMap.entries());
 
       for (let i = 0; i < entries.length; i++) {
         const [name, items] = entries[i];
         if (items.length > 1) {
-          // We have duplicates! Let's keep the first one as primary
           const primaryItem = items[0];
           
-          // Merge variants dynamically if any are defined
           let mergedVariants = { ...(primaryItem.variants || {}) };
           items.slice(1).forEach(dup => {
             if (dup.variants) {
@@ -1187,7 +1193,6 @@ export default function AdminDashboard() {
             }
           });
 
-          // Update primary item with aggregated values
           const updatePayload: any = {};
           if (Object.keys(mergedVariants).length > 0) {
             updatePayload.variants = mergedVariants;
@@ -1195,7 +1200,6 @@ export default function AdminDashboard() {
 
           await updateDoc(doc(db, "products", primaryItem.id), updatePayload);
 
-          // Clear out the duplicate products completely
           for (const dup of items.slice(1)) {
             await deleteDoc(doc(db, "products", dup.id));
           }
@@ -1367,6 +1371,79 @@ export default function AdminDashboard() {
       toast.success("Recipe SOP Saved!");
     } catch (err) {
       toast.error("Failed to save recipe SOP.");
+    }
+  };
+
+  // REAL-TIME STAFF ADD & MANAGE OPERATIONS
+  const [staff, setStaff] = useState<any[]>([]);
+  const [newStaffName, setNewStaffName] = useState("");
+  const [newStaffRole, setNewStaffRole] = useState("delivery");
+  const [newStaffPin, setNewStaffPin] = useState("");
+  const [editingStaffId, setEditingStaffId] = useState<string | null>(null);
+  const [editingStaffName, setEditingStaffName] = useState("");
+  const [editingStaffRole, setEditingStaffRole] = useState("delivery");
+  const [editingStaffPin, setEditingStaffPin] = useState("");
+  const [revealPinId, setRevealPinId] = useState<string | null>(null);
+
+  // Real-time Staff Members listener
+  useEffect(() => {
+    if (!isVerified) return;
+    const unsubStaff = onSnapshot(collection(db, "staff_members"), (snap) => {
+      setStaff(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+    return () => unsubStaff();
+  }, [isVerified]);
+
+  const handleAddStaff = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newStaffName.trim() || !newStaffPin) return toast.error("Kripya saari details bharein!");
+    if (newStaffPin.length !== 4 || isNaN(Number(newStaffPin))) {
+      return toast.error("PIN 4-अंकों ka numerical hona chahiye!");
+    }
+    
+    try {
+      await addDoc(collection(db, "staff_members"), {
+        name: newStaffName.trim(),
+        role: newStaffRole,
+        pin: newStaffPin,
+        timestamp: new Date()
+      });
+      setNewStaffName("");
+      setNewStaffPin("");
+      toast.success("Naya staff member successfully add ho gaya! 🎉");
+    } catch (err) {
+      toast.error("Staff member add karne me dikkat aayi.");
+    }
+  };
+
+  const handleDeleteStaff = async (id: string) => {
+    if (!confirm("Kya aap sach me is staff member ko delete karna chahte hain?")) return;
+    try {
+      await deleteDoc(doc(db, "staff_members", id));
+      toast.success("Staff member successfully deleted.");
+    } catch (err) {
+      toast.error("Delete failed.");
+    }
+  };
+
+  const handleUpdateStaff = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingStaffId) return;
+    if (!editingStaffName.trim() || !editingStaffPin) return toast.error("Saari details bharein!");
+    if (editingStaffPin.length !== 4 || isNaN(Number(editingStaffPin))) {
+      return toast.error("PIN 4-अंकों ka numerical hona chahiye!");
+    }
+
+    try {
+      await updateDoc(doc(db, "staff_members", editingStaffId), {
+        name: editingStaffName.trim(),
+        role: editingStaffRole,
+        pin: editingStaffPin
+      });
+      setEditingStaffId(null);
+      toast.success("Staff member details updated!");
+    } catch (err) {
+      toast.error("Update failed.");
     }
   };
 
@@ -1742,7 +1819,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                   <h3 className="text-base font-black text-yellow-400 mt-1">{auditStats.rangeCount}</h3>
                 </div>
                 <div className="bg-white/[0.01] border border-white/5 p-3 rounded-2xl text-center">
-                  <p className="text-[9px] font-bold text-gray-500 uppercase">Active Kitchen</p>
+                  <p className="text-[9px] font-bold text-gray-505 uppercase">Active Kitchen</p>
                   <h3 className="text-base font-black text-orange-500 mt-1">{auditStats.active}</h3>
                 </div>
               </div>
@@ -1769,7 +1846,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                       style={{ height: `${day.percentage}%` }} 
                       className="w-full bg-gradient-to-t from-orange-600 to-orange-400 rounded-t-lg min-h-[4px] relative"
                     ></div>
-                    <span className="text-[9px] font-bold text-gray-500 uppercase mt-1">{day.label}</span>
+                    <span className="text-[9px] font-bold text-gray-505 uppercase mt-1">{day.label}</span>
                   </div>
                 ))}
               </div>
@@ -1785,7 +1862,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                   </div>
                 ))}
                 {topSellingDishes.length === 0 && (
-                  <p className="text-center text-[10px] text-gray-600 uppercase font-bold py-2">No sales logged yet...</p>
+                  <p className="text-center text-[10px] text-gray-655 uppercase font-bold py-2">No sales logged yet...</p>
                 )}
               </div>
             </div>
@@ -1861,7 +1938,7 @@ Report generated automatically by Bum Bum Cafe POS.`
             </div>
 
             {filteredOrdersList.length === 0 ? (
-              <p className="text-center text-gray-600 py-20 font-bold uppercase tracking-widest text-xs">No active orders found for this date...</p>
+              <p className="text-center text-gray-655 py-20 font-bold uppercase tracking-widest text-xs">No active orders found for this date...</p>
             ) : (
               filteredOrdersList.map((o) => (
                 <div key={o.id} className="bg-white/[0.03] p-6 rounded-[2rem] border border-white/5 relative overflow-hidden">
@@ -1875,7 +1952,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                   
                   <div className="space-y-2 mb-6 border-b border-white/5 pb-4">
                     {o.items?.map((item: any, idx: number) => (
-                      <p key={idx} className="text-sm font-bold text-gray-300">
+                      <p key={idx} className="text-sm font-bold text-gray-350 font-sans">
                         <span className="text-orange-500">×{item.quantity}</span> {item.name}
                       </p>
                     ))}
@@ -1887,7 +1964,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                     <div className="flex items-center gap-2 col-span-2 font-sans"><Calendar size={12}/> {o.timestamp?.toDate ? o.timestamp.toDate().toLocaleString() : 'Just now'}</div>
                   </div>
                   <div className="mt-4 pt-4 border-t border-white/5 flex justify-between items-center">
-                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Name: {o.customerName || 'N/A'}</span>
+                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest font-sans">Name: {o.customerName || 'N/A'}</span>
                     <div className="flex items-center gap-2 flex-wrap">
                       <button 
                         onClick={() => handlePrintReceipt(o)}
@@ -2005,8 +2082,8 @@ Report generated automatically by Bum Bum Cafe POS.`
                     <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Small (₹)</label><input type="number" value={priceSmall} onChange={(e) => setPriceSmall(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-white text-xs font-bold" /></div>
                       <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Medium (₹)</label><input type="number" value={priceMedium} onChange={(e) => setPriceMedium(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-white text-xs font-bold" /></div>
-                      <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Large (₹)</label><input type="number" value={priceLarge} onChange={(e) => setPriceLarge(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-white text-xs font-bold" /></div>
-                      <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Extra Large (₹)</label><input type="number" value={priceXL} onChange={(e) => setPriceXL(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-white text-xs font-bold" /></div>
+                      <div className="space-y-1"><label className="text-xs font-bold text-gray-405 uppercase">Large (₹)</label><input type="number" value={priceLarge} onChange={(e) => setPriceLarge(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-white text-xs font-bold" /></div>
+                      <div className="space-y-1"><label className="text-xs font-bold text-gray-405 uppercase">Extra Large (₹)</label><input type="number" value={priceXL} onChange={(e) => setPriceXL(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-white text-xs font-bold" /></div>
                     </div>
                   </div>
                 )}
@@ -2197,7 +2274,7 @@ Report generated automatically by Bum Bum Cafe POS.`
 
             <div className="space-y-4">
               {searchedCustomers.length === 0 ? (
-                <p className="text-center text-xs font-bold text-gray-505 py-10 uppercase">No matching customers found...</p>
+                <p className="text-center text-xs font-bold text-gray-550 py-10 uppercase">No matching customers found...</p>
               ) : (
                 searchedCustomers
                   .map(user => ({ ...user, metrics: getCustomerLoyaltyMetrics(user.phone) }))
@@ -2222,7 +2299,7 @@ Report generated automatically by Bum Bum Cafe POS.`
 
                         <div className="text-right flex items-center gap-4 flex-shrink-0">
                           <div>
-                            <p className="text-[9px] font-bold text-gray-505 uppercase">Available Points</p>
+                            <p className="text-[9px] font-bold text-gray-555 uppercase">Available Points</p>
                             <h4 className="text-lg font-black text-yellow-400">{user.points || 0} Pts</h4>
                           </div>
                           <button 
@@ -2264,7 +2341,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                 <p className="text-center text-xs font-bold text-gray-505 py-6">No custom rules configured yet...</p>
               ) : (
                 loyaltyRules.map(rule => (
-                  <div key={rule.id} className="bg-white/[0.02] border border-white/5 p-5 rounded-3xl flex justify-between items-center hover:bg-white/[0.04]">
+                  <div key={rule.id} className="bg-white/[0.02] border border-white/5 p-5 rounded-2xl flex justify-between items-center hover:bg-white/[0.04]">
                     <div>
                       <h4 className="font-black text-sm text-gray-200">{rule.rewardName}</h4>
                       <p className="text-xs text-yellow-400 font-extrabold mt-0.5">Cost: {rule.pointsCost} Points</p>
@@ -2361,7 +2438,7 @@ Report generated automatically by Bum Bum Cafe POS.`
           </div>
         )}
 
-        {/* --- TAB 7.5: FOOD REELS / STORIES MANAGER (Requirement 1, 2, 3) --- */}
+        {/* --- TAB 7.5: FOOD REELS / STORIES MANAGER --- */}
         {tab === 'reels' && (
           <div className="space-y-6">
             <form onSubmit={handleAddReel} className="bg-[#020202] border border-white/5 p-6 rounded-[2.5rem] space-y-4">
@@ -2434,7 +2511,7 @@ Report generated automatically by Bum Bum Cafe POS.`
           </div>
         )}
 
-        {/* --- TAB 7.6: MAIN BACKGROUND HEADER VIDEO (Requirement 4) --- */}
+        {/* --- TAB 7.6: MAIN BACKGROUND HEADER VIDEO --- */}
         {tab === 'header_video' && (
           <div className="space-y-6">
             <h3 className="text-xl font-black text-orange-500 uppercase tracking-wider flex items-center gap-2">🎬 Main Background Header Video</h3>
@@ -2613,7 +2690,7 @@ Report generated automatically by Bum Bum Cafe POS.`
           </div>
         )}
 
-        {/* --- TAB 11: SOCIAL PROOF MANAGER (Requirement 3) --- */}
+        {/* --- TAB 11: SOCIAL PROOF MANAGER --- */}
         {tab === 'proofs' && (
           <div className="space-y-6">
             <form onSubmit={handleAddSocialProof} className="bg-white/[0.02] border border-white/5 p-6 rounded-[2.5rem] space-y-4">
@@ -2632,7 +2709,7 @@ Report generated automatically by Bum Bum Cafe POS.`
             </form>
 
             <div className="space-y-3">
-              <p className="text-xs font-bold text-gray-500 uppercase pl-1">All Live Order Alerts ({socialProofs.length})</p>
+              <p className="text-xs font-bold text-gray-550 uppercase pl-1">All Live Order Alerts ({socialProofs.length})</p>
               {socialProofs.map(alert => (
                 <div key={alert.id} className="bg-white/[0.02] border border-white/5 p-4 rounded-3xl flex justify-between items-center text-xs">
                   <p className="font-bold text-gray-300 max-w-[80%] leading-relaxed">{alert.text}</p>
@@ -2645,7 +2722,7 @@ Report generated automatically by Bum Bum Cafe POS.`
           </div>
         )}
 
-        {/* --- TAB 12: SECURITY POINT CLAIMS MANAGER (Requirement 4) --- */}
+        {/* --- TAB 12: SECURITY POINT CLAIMS MANAGER --- */}
         {tab === 'claims' && (
           <div className="space-y-6">
             <div>
@@ -2694,11 +2771,12 @@ Report generated automatically by Bum Bum Cafe POS.`
           </div>
         )}
 
-        {/* --- TAB 13: PIN SETTINGS --- */}
+        {/* --- TAB 13: PIN SETTINGS & MULTI-STAFF MANAGEMENT (Requirement Updated) --- */}
         {tab === 'security' && (
           <div className="space-y-6">
-            <h3 className="text-xl font-black text-orange-500 uppercase tracking-wider flex items-center gap-2"><Lock size={20}/> PIN Security Configuration</h3>
+            <h3 className="text-xl font-black text-orange-500 uppercase tracking-wider flex items-center gap-2"><Lock size={20}/> PIN & Staff Configuration</h3>
             
+            {/* 1. MASTER CODES FORM (Admins only) */}
             <form onSubmit={handleUpdatePasscodes} className="bg-white/[0.02] border border-white/5 p-6 rounded-[2.5rem] space-y-5">
               <div>
                 <h4 className="text-sm font-black text-orange-500 uppercase">Change security PINs</h4>
@@ -2743,7 +2821,125 @@ Report generated automatically by Bum Bum Cafe POS.`
               )}
             </form>
 
-            {/* Table QR Code Generator Widget (Requirement 3) */}
+            {/* 2. DYNAMIC STAFF MANAGEMENT DIRECTORY (Add, Edit, View Individual PINs) */}
+            <div className="bg-white/[0.02] border border-white/5 p-6 rounded-[2.5rem] space-y-5">
+              <div>
+                <h4 className="text-sm font-black text-yellow-400 uppercase tracking-widest flex items-center gap-1.5">👥 Staff Accounts Registry</h4>
+                <p className="text-[9px] text-gray-500 font-bold uppercase mt-1 leading-relaxed">Yahan se aap sabhi Delivery boys aur Kitchen Cooks ke liye alag se unique PIN aur Name setup kar sakte hain:</p>
+              </div>
+
+              {/* Add Staff Member Form */}
+              {!editingStaffId ? (
+                <form onSubmit={handleAddStaff} className="bg-black/40 border border-white/5 p-4 rounded-2xl space-y-3.5 text-xs font-bold text-left">
+                  <p className="text-[9px] font-black text-orange-500 uppercase tracking-wider">➕ Add Staff Member / नया स्टाफ जोड़ें</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-[9px] text-gray-500 uppercase">Staff Name</label>
+                      <input type="text" placeholder="e.g. Ramesh" value={newStaffName} onChange={(e) => setNewStaffName(e.target.value)} className="w-full bg-neutral-900 border border-white/10 rounded-lg p-2.5 text-white outline-none" required />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[9px] text-gray-500 uppercase">Personal 4-digit PIN</label>
+                      <input type="password" maxLength={4} placeholder="e.g. 1234" value={newStaffPin} onChange={(e) => setNewStaffPin(e.target.value)} className="w-full bg-neutral-900 border border-white/10 rounded-lg p-2.5 text-white outline-none text-center tracking-widest" required />
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[9px] text-gray-500 uppercase">Staff Role</label>
+                    <select value={newStaffRole} onChange={(e) => setNewStaffRole(e.target.value)} className="w-full bg-neutral-900 border border-white/10 rounded-lg p-2.5 text-white outline-none cursor-pointer">
+                      <option value="delivery">Rider / Delivery Boy 🛵</option>
+                      <option value="kitchen">Cook / Kitchen Staff 👨‍🍳</option>
+                      <option value="cashier">Cashier / Counter Manager 💼</option>
+                    </select>
+                  </div>
+                  <button type="submit" className="w-full bg-green-600 text-white p-2.5 rounded-lg font-black uppercase text-[10px]">Add Staff Member</button>
+                </form>
+              ) : (
+                <form onSubmit={handleUpdateStaff} className="bg-orange-500/5 border border-orange-500/20 p-4 rounded-2xl space-y-3.5 text-xs font-bold text-left">
+                  <p className="text-[9px] font-black text-orange-500 uppercase tracking-wider">✏️ Edit Staff Member</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-[9px] text-gray-500 uppercase">Staff Name</label>
+                      <input type="text" value={editingStaffName} onChange={(e) => setEditingStaffName(e.target.value)} className="w-full bg-neutral-900 border border-white/10 rounded-lg p-2.5 text-white outline-none" required />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[9px] text-gray-500 uppercase">Personal 4-digit PIN</label>
+                      <input type="password" maxLength={4} value={editingStaffPin} onChange={(e) => setEditingStaffPin(e.target.value)} className="w-full bg-neutral-900 border border-white/10 rounded-lg p-2.5 text-white outline-none text-center tracking-widest" required />
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[9px] text-gray-500 uppercase">Staff Role</label>
+                    <select value={editingStaffRole} onChange={(e) => setEditingStaffRole(e.target.value)} className="w-full bg-neutral-900 border border-white/10 rounded-lg p-2.5 text-white outline-none cursor-pointer">
+                      <option value="delivery">Rider / Delivery Boy 🛵</option>
+                      <option value="kitchen">Cook / Kitchen Staff 👨‍🍳</option>
+                      <option value="cashier">Cashier / Counter Manager 💼</option>
+                    </select>
+                  </div>
+                  <div className="flex gap-2">
+                    <button type="submit" className="flex-1 bg-green-600 text-white p-2.5 rounded-lg font-black uppercase text-[10px]">Save Changes</button>
+                    <button type="button" onClick={() => setEditingStaffId(null)} className="bg-white/5 text-gray-400 p-2.5 rounded-lg font-black uppercase text-[10px]">Cancel</button>
+                  </div>
+                </form>
+              )}
+
+              {/* Staff Accounts List Directory */}
+              <div className="space-y-2 pt-2">
+                <p className="text-[10px] font-bold text-gray-400 uppercase">Registered Staff Directory ({staff.length})</p>
+                {staff.length === 0 ? (
+                  <p className="text-center text-[10px] text-gray-500 uppercase font-bold py-4">No staff members registered yet.</p>
+                ) : (
+                  staff.map((member) => {
+                    const isPinRevealed = revealPinId === member.id;
+                    return (
+                      <div key={member.id} className="bg-black/30 border border-white/5 p-3.5 rounded-2xl flex justify-between items-center text-xs font-bold gap-4">
+                        <div>
+                          <p className="text-white font-black">{member.name}</p>
+                          <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-md mt-1 inline-block ${member.role === 'delivery' ? 'bg-blue-500/10 text-blue-400' : member.role === 'kitchen' ? 'bg-yellow-500/10 text-yellow-400' : 'bg-green-500/10 text-green-400'}`}>
+                            {member.role === 'delivery' ? 'Rider 🛵' : member.role === 'kitchen' ? 'Kitchen 👨‍🍳' : 'Cashier 💼'}
+                          </span>
+                        </div>
+                        
+                        <div className="flex items-center gap-3">
+                          {/* PIN Hide/Reveal Widget */}
+                          <div className="flex items-center gap-1.5 bg-black/50 border border-white/5 px-2.5 py-1.5 rounded-xl">
+                            <span className="text-[10px] font-mono text-orange-400 tracking-wider">
+                              PIN: {isPinRevealed ? member.pin : '••••'}
+                            </span>
+                            <button 
+                              onClick={() => setRevealPinId(isPinRevealed ? null : member.id)}
+                              className="text-gray-400 hover:text-white"
+                              title="Toggle PIN Visibility"
+                            >
+                              {isPinRevealed ? <EyeOff size={12}/> : <Eye size={12}/>}
+                            </button>
+                          </div>
+
+                          <button 
+                            onClick={() => {
+                              setEditingStaffId(member.id);
+                              setEditingStaffName(member.name);
+                              setEditingStaffRole(member.role);
+                              setEditingStaffPin(member.pin);
+                            }}
+                            className="p-2 bg-blue-500/10 text-blue-400 rounded-xl"
+                            title="Edit"
+                          >
+                            <Edit size={12}/>
+                          </button>
+                          <button 
+                            onClick={() => handleDeleteStaff(member.id)}
+                            className="p-2 bg-red-500/10 text-red-500 rounded-xl"
+                            title="Delete"
+                          >
+                            <Trash size={12}/>
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+
+            {/* Table QR Code Generator Widget */}
             <div className="bg-[#111] border border-white/5 p-6 rounded-[2.5rem] space-y-4">
               <div>
                 <h4 className="text-sm font-black text-orange-500 uppercase tracking-widest flex items-center gap-1">🍽️ Dine-In Table QR Generator</h4>
@@ -2901,7 +3097,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[9px] font-bold text-gray-505 uppercase">Min Points</label>
+                  <label className="text-[9px] font-bold text-gray-550 uppercase">Min Points</label>
                   <input 
                     type="number" 
                     placeholder="Min Points"
@@ -2912,7 +3108,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[9px] font-bold text-gray-505 uppercase">Min Spend (₹)</label>
+                  <label className="text-[9px] font-bold text-gray-550 uppercase">Min Spend (₹)</label>
                   <input 
                     type="number" 
                     placeholder="Min Spend"
@@ -3012,7 +3208,7 @@ Report generated automatically by Bum Bum Cafe POS.`
       {editingProduct && (
         <div className="fixed inset-0 bg-black/85 backdrop-blur-sm z-[200] flex items-center justify-center p-4 overflow-y-auto">
           <form onSubmit={handleUpdateProduct} className="bg-[#111] border-2 border-orange-500/50 p-6 rounded-[2.5rem] w-full max-w-lg relative max-h-[90vh] overflow-y-auto shadow-2xl space-y-4">
-            <button type="button" onClick={() => setEditingProduct(null)} className="absolute top-4 right-4 p-2.5 bg-white/5 text-gray-450 hover:text-white rounded-full"><X size={18}/></button>
+            <button type="button" onClick={() => setEditingProduct(null)} className="absolute top-4 right-4 p-2.5 bg-white/5 text-gray-455 hover:text-white rounded-full"><X size={18}/></button>
             
             <div className="text-center pb-2 border-b border-white/5">
               <h3 className="text-xl font-black text-orange-500 italic uppercase">Edit Product Info</h3>
