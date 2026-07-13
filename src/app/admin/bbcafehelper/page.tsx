@@ -1,17 +1,30 @@
 'use client';
 import React, { useState, useEffect, useMemo } from 'react';
 import { db } from '@/lib/firebase'; 
-import { collection, onSnapshot, query, addDoc, doc, deleteDoc, updateDoc, setDoc, orderBy, getDoc, increment } from 'firebase/firestore';
-import { Plus, X, Trash2, Calendar, IndianRupee, ArrowLeft, Lock, Loader2, Filter, ShoppingBag, Flame, Banknote, ShieldAlert, Layers, ChevronRight, Settings, Wrench, Package, AlertTriangle, ArrowRightLeft, Globe } from 'lucide-react';
+import { collection, onSnapshot, query, addDoc, doc, deleteDoc, updateDoc, setDoc, orderBy, getDoc, increment, limit } from 'firebase/firestore';
+import { Plus, X, Trash2, Calendar, IndianRupee, ArrowLeft, Lock, Loader2, Filter, ShoppingBag, Flame, Banknote, ShieldAlert, Layers, ChevronRight, Settings, Wrench, Package, AlertTriangle, ArrowRightLeft, Globe, Download, Printer, Edit, History } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
 
-// Default fallback categories if database is empty
+// Suggested items to prevent repetitive typing issues
+const SUGGESTED_STORE_ITEMS = [
+  "Paneer (पनीर)", "Milk (दूध)", "Mozzarella Cheese", "Pizza Base (6\")", "Pizza Base (8\")", "Pizza Base (10\")", "Maida (मैदा)", "Sugar (चीनी)", "Onion (प्याज़)", "Tomato (टमाटर)", "Capsicum (शिमला मिर्च)", "Sweet Corn", "Butter (मक्खन)", "Tomato Sauce", "Mayonnaise", "Disposable Spoons", "Tissue Paper", "Carry Bags"
+];
+
+// Fallback Default Expense Categories
 const DEFAULT_EXP_CATEGORIES = [
   { id: "Raw Materials", name: "Raw Materials 🥛" },
   { id: "Packaging", name: "Packaging 📦" },
   { id: "Utility & Fuel", name: "Utility & Fuel 🔥" },
   { id: "Wages/Salary", name: "Wages/Salary 💵" },
+  { id: "Others", name: "Others 📝" }
+];
+
+// Fallback Default Packaging Categories
+const DEFAULT_PKG_CATEGORIES = [
+  { id: "Boxes", name: "Boxes 📦" },
+  { id: "Disposables", name: "Disposables 🥤" },
+  { id: "Paper Items", name: "Paper Items 🧻" },
   { id: "Others", name: "Others 📝" }
 ];
 
@@ -41,10 +54,13 @@ const t = {
     moveStock: "किचन में भेजें",
     qtyToMove: "स्थानांतरित मात्रा",
     lowStockWarning: "🚨 स्टॉक समाप्त होने की चेतावनी!",
-    tableBoxes: "पिज्जा बॉक्स स्टॉक",
+    tableBoxes: "पैकेजिंग व डिस्पोजल डैशबोर्ड",
     manageCategories: "⚙️ श्रेणियां प्रबंधित करें",
     newCategoryPlaceholder: "नई श्रेणी का नाम दर्ज करें (जैसे Fruits)",
-    addCategoryBtn: "जोड़ें"
+    addCategoryBtn: "जोड़ें",
+    searchPlaceholder: "खोजें...",
+    suggestedSelect: "-- सूची से चुनें --",
+    customInput: "या नया नाम टाइप करें"
   },
   en: {
     title: "Cafe Helper Dashboard",
@@ -70,10 +86,13 @@ const t = {
     moveStock: "Move to Kitchen",
     qtyToMove: "Quantity to Move",
     lowStockWarning: "🚨 Low Stock Alert!",
-    tableBoxes: "Pizza Boxes Stock Tracker",
+    tableBoxes: "Packaging & Disposables Stock Dashboard",
     manageCategories: "⚙️ Manage Categories",
     newCategoryPlaceholder: "Enter new category name (e.g., Fruits)",
-    addCategoryBtn: "Add"
+    addCategoryBtn: "Add",
+    searchPlaceholder: "Search here...",
+    suggestedSelect: "-- Choose From List --",
+    customInput: "Or Type Custom Name"
   }
 };
 
@@ -82,21 +101,21 @@ export default function BbCafeHelper() {
   const [enteredPin, setEnteredPin] = useState("");
   const [isVerifyingPin, setIsVerifyingPin] = useState(false);
 
-  // Tab & Language States
+  // Tab, Search & Language States
   const [activeTab, setActiveTab] = useState<'expenses' | 'assets' | 'store_room' | 'packaging'>('expenses');
   const [isHindi, setIsHindi] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
 
   // --- 1. DYNAMIC EXPENSES & CATEGORIES STATES ---
   const [expenseAmount, setExpenseAmount] = useState("");
-  const [expenseCategory, setExpenseCategory] = useState("Raw Materials");
+  const [expenseCategory, setExpenseCategory] = useState("");
   const [expenseDescription, setExpenseDescription] = useState("");
   const [expenseDate, setExpenseDate] = useState(new Date().toISOString().split('T')[0]);
   const [expenses, setExpenses] = useState<any[]>([]);
-  
-  // Real-time custom expense categories states
   const [expenseCategories, setExpenseCategories] = useState<any[]>([]);
   const [newExpenseCatInput, setNewExpenseCatInput] = useState("");
   const [showManageCatPanel, setShowManageCatPanel] = useState(false);
+  const [editingExpense, setEditingExpense] = useState<any>(null); // In-place Edit Expense
 
   // --- 2. FIXED ASSETS STATES & LOGIC ---
   const [assetName, setAssetName] = useState("");
@@ -105,23 +124,32 @@ export default function BbCafeHelper() {
   const [assetLifespan, setAssetLifespan] = useState("");
   const [assetMaintenance, setAssetMaintenance] = useState("");
   const [assets, setAssets] = useState<any[]>([]);
+  const [editingAsset, setEditingAsset] = useState<any>(null); // In-place Edit Asset
 
   // --- 3. STORE ROOM STATES & LOGIC ---
   const [storeItemName, setStoreItemName] = useState("");
   const [storeItemQty, setStoreItemQuantity] = useState("");
   const [storeItemUnit, setStoreItemUnit] = useState("Kg");
   const [storeItems, setStoreItems] = useState<any[]>([]);
-  const [isTransferringStock, setIsTransferringStock] = useState<any>(null); // holds item being transferred
+  const [isTransferringStock, setIsTransferringStock] = useState<any>(null); 
   const [transferQtyInput, setTransferQtyInput] = useState("");
+  const [storeLedger, setStoreLedger] = useState<any[]>([]); // In/Out Log history
+  const [editingStoreItem, setEditingStoreItem] = useState<any>(null); // In-place Edit Store Item
 
-  // --- 4. PACKAGING STATES & LOGIC (PIZZA BOXES) ---
-  const [pizzaBoxes, setPizzaBoxes] = useState<any>({
-    small: 100,
-    medium: 100,
-    large: 100,
-    xl: 100,
-    minLimit: 30
-  });
+  // --- 4. DYNAMIC PACKAGING & DISPOSABLES STATES ---
+  const [pkgItems, setPkgItems] = useState<any[]>([]);
+  const [pkgCategories, setPkgCategories] = useState<any[]>([]);
+  const [newPkgName, setNewPkgName] = useState("");
+  const [newPkgQty, setNewPkgQty] = useState("");
+  const [newPkgCategory, setNewPkgCategory] = useState("");
+  const [newPkgMinLimit, setNewPkgMinLimit] = useState("30");
+  const [showAddPkgForm, setShowAddPkgForm] = useState(false);
+  const [editingPkgItem, setEditingPkgItem] = useState<any>(null); 
+  const [editPkgName, setEditPkgName] = useState("");
+  const [editPkgCategory, setEditPkgCategory] = useState("");
+  const [editPkgMinLimit, setEditPkgMinLimit] = useState("");
+  const [newPkgCatInput, setNewPkgCatInput] = useState("");
+  const [showManagePkgCat, setShowManagePkgCat] = useState(false);
 
   const triggerHaptic = (ms = 35) => {
     if (typeof window !== 'undefined' && window.navigator && window.navigator.vibrate) {
@@ -137,7 +165,7 @@ export default function BbCafeHelper() {
 
     try {
       const passcodeSnap = await getDoc(doc(db, "settings", "passcodes"));
-      let correctPin = "971429"; // Default bypass
+      let correctPin = "971429"; 
 
       if (passcodeSnap.exists() && passcodeSnap.data().adminPin) {
         correctPin = String(passcodeSnap.data().adminPin);
@@ -171,7 +199,6 @@ export default function BbCafeHelper() {
       if (!snap.empty) {
         const loadedCats = snap.docs.map(d => ({ id: d.id, ...d.data() as any }));
         setExpenseCategories(loadedCats);
-        // Automatically default form category select to the first loaded category
         if (loadedCats.length > 0) {
           setExpenseCategory(loadedCats[0].name);
         }
@@ -191,16 +218,29 @@ export default function BbCafeHelper() {
       setStoreItems(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
 
-    // Load Packaging Stock levels
-    const unsubPkg = onSnapshot(doc(db, "settings", "packaging_stock"), (snap) => {
-      if (snap.exists()) {
-        setPizzaBoxes(snap.data());
+    // Load Store Room In/Out Ledger transactions
+    const unsubLedger = onSnapshot(query(collection(db, "store_room_ledger"), orderBy("timestamp", "desc"), limit(20)), (snap) => {
+      setStoreLedger(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+
+    // Load Dynamic Packaging Categories
+    const unsubPkgCats = onSnapshot(query(collection(db, "packaging_categories"), orderBy("name", "asc")), (snap) => {
+      if (!snap.empty) {
+        const loadedPkgCats = snap.docs.map(d => ({ id: d.id, ...d.data() as any }));
+        setPkgCategories(loadedPkgCats);
+        if (loadedPkgCats.length > 0) {
+          setNewPkgCategory(loadedPkgCats[0].name);
+        }
       } else {
-        // Seed default stock on first load
-        setDoc(doc(db, "settings", "packaging_stock"), {
-          small: 100, medium: 100, large: 100, xl: 100, minLimit: 30
-        });
+        setPkgCategories(DEFAULT_PKG_CATEGORIES);
+        setNewPkgCategory(DEFAULT_PKG_CATEGORIES[0].name);
       }
+    });
+
+    // Load Dynamic Packaging Materials Inventory List
+    const unsubPkgItems = onSnapshot(query(collection(db, "packaging_inventory"), orderBy("timestamp", "desc")), (snap) => {
+      const items = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      setPkgItems(items);
     });
 
     return () => {
@@ -208,11 +248,18 @@ export default function BbCafeHelper() {
       unsubExpCats();
       unsubAssets();
       unsubStore();
-      unsubPkg();
+      unsubLedger();
+      unsubPkgCats();
+      unsubPkgItems();
     };
   }, [isAdminAuthorized]);
 
-  // --- 1. DYNAMIC EXPENSES & CATEGORIES HANDLERS ---
+  // Reset Search Query on Tab Change
+  useEffect(() => {
+    setSearchQuery("");
+  }, [activeTab]);
+
+  // --- 1. DAILY EXPENSES & CATEGORIES HANDLERS ---
   const handleSaveExpense = async (e: React.FormEvent) => {
     e.preventDefault();
     triggerHaptic();
@@ -238,6 +285,28 @@ export default function BbCafeHelper() {
     }
   };
 
+  const handleUpdateExpense = async (e: React.FormEvent) => {
+    e.preventDefault();
+    triggerHaptic();
+    const numericAmount = Number(editingExpense.amount);
+    if (isNaN(numericAmount) || numericAmount <= 0 || !editingExpense.description.trim()) {
+      return toast.error("विवरण और राशि सही से दर्ज करें!");
+    }
+
+    try {
+      await updateDoc(doc(db, "expenses", editingExpense.id), {
+        amount: numericAmount,
+        category: editingExpense.category,
+        description: editingExpense.description.trim(),
+        date: editingExpense.date
+      });
+      setEditingExpense(null);
+      toast.success("खर्च संशोधन सफलतापूर्वक सहेजा गया!");
+    } catch (err) {
+      toast.error("खर्च अपडेट करने में विफलता।");
+    }
+  };
+
   const handleDeleteExpense = async (id: string) => {
     triggerHaptic(50);
     if (!window.confirm("क्या आप वाकई इस खर्च को डिलीट करना चाहते हैं?")) return;
@@ -249,14 +318,12 @@ export default function BbCafeHelper() {
     }
   };
 
-  // Add custom dynamic category to database
   const handleAddExpenseCategory = async (e: React.FormEvent) => {
     e.preventDefault();
     triggerHaptic();
     const cleanName = newExpenseCatInput.trim();
     if (!cleanName) return toast.error("श्रेणी का नाम दर्ज करें!");
 
-    // Stop duplicate categories
     const exists = expenseCategories.some(c => String(c.name).toLowerCase().trim() === cleanName.toLowerCase());
     if (exists) return toast.error("यह श्रेणी पहले से ही मौजूद है!");
 
@@ -272,7 +339,6 @@ export default function BbCafeHelper() {
     }
   };
 
-  // Delete custom dynamic category from database
   const handleDeleteExpenseCategory = async (id: string, name: string) => {
     triggerHaptic(50);
     if (!window.confirm(`क्या आप वाकई श्रेणी '${name}' को डिलीट करना चाहते हैं?`)) return;
@@ -285,7 +351,90 @@ export default function BbCafeHelper() {
     }
   };
 
-  // --- 2. ASSET HANDLERS ---
+  // --- REPORT EXPORTERS ---
+  const handleExportExpensesCSV = () => {
+    const headers = ['Description', 'Category', 'Expense Date', 'Amount (INR)'];
+    const keys = ['description', 'category', 'date', 'amount'];
+    
+    const csvRows = [];
+    csvRows.push(headers.join(','));
+    expenses.forEach(item => {
+      const values = keys.map(key => {
+        let val = item[key];
+        if (val === undefined || val === null) val = '';
+        return `"${String(val).replace(/"/g, '""')}"`;
+      });
+      csvRows.push(values.join(','));
+    });
+
+    const csvString = csvRows.join('\r\n');
+    const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csvString], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `BumBumCafe_Expenses_${new Date().toLocaleDateString()}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast.success("Expense Excel report exported!");
+  };
+
+  const handlePrintExpensesPDF = () => {
+    const printWindow = window.open('', '_blank', 'width=800,height=1000');
+    if (!printWindow) return toast.error("Please allow pop-ups to print reports.");
+
+    const rowsHtml = expenses.map(e => `
+      <tr>
+        <td style="padding: 10px; border-bottom: 1px solid #ddd; text-align: left;">${e.description}</td>
+        <td style="padding: 10px; border-bottom: 1px solid #ddd; text-align: center;">${e.category}</td>
+        <td style="padding: 10px; border-bottom: 1px solid #ddd; text-align: center;">${e.date}</td>
+        <td style="padding: 10px; border-bottom: 1px solid #ddd; text-align: right; font-weight: bold; color: #16a34a;">₹${e.amount}</td>
+      </tr>
+    `).join('') || '<tr><td colspan="4" style="padding: 20px; text-align: center;">No expenses recorded.</td></tr>';
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Daily_Expenses_Report</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 25px; color: #333; }
+            h2 { text-align: center; color: #ea580c; margin-bottom: 5px; }
+            p { text-align: center; font-size: 12px; color: #666; margin-top: 0; }
+            table { width: 100%; border-collapse: collapse; margin-top: 25px; }
+            th { background-color: #f3f4f6; padding: 12px 10px; font-weight: bold; border-bottom: 2px solid #ddd; }
+            .total { font-size: 16px; font-weight: bold; text-align: right; padding-top: 20px; border-top: 2px solid #333; }
+          </style>
+        </head>
+        <body>
+          <h2>BUM BUM CAFE - DAILY EXPENSES</h2>
+          <p>Report Generated on: ${new Date().toLocaleString()}</p>
+          <table>
+            <thead>
+              <tr>
+                <th style="text-align: left;">Description</th>
+                <th style="text-align: center;">Category</th>
+                <th style="text-align: center;">Date</th>
+                <th style="text-align: right;">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rowsHtml}
+            </tbody>
+          </table>
+          <div class="total">
+            <span style="margin-right: 40px;">Today's Total: ₹${todayExpense}</span>
+            <span>Monthly Total: ₹${monthlyExpense}</span>
+          </div>
+          <script>
+            window.onload = function() { window.print(); }
+          </script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
+
+  // --- 2. FIXED ASSETS HANDLERS ---
   const handleSaveAsset = async (e: React.FormEvent) => {
     e.preventDefault();
     triggerHaptic();
@@ -316,6 +465,30 @@ export default function BbCafeHelper() {
     }
   };
 
+  const handleUpdateAsset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    triggerHaptic();
+    const numericCost = Number(editingAsset.cost);
+    const numericLifespan = Number(editingAsset.lifespanYears);
+    if (!editingAsset.name.trim() || isNaN(numericCost) || numericCost <= 0 || isNaN(numericLifespan) || numericLifespan <= 0) {
+      return toast.error("कृपया सभी फ़ील्ड सही से भरें!");
+    }
+
+    try {
+      await updateDoc(doc(db, "fixed_assets", editingAsset.id), {
+        name: editingAsset.name.trim(),
+        cost: numericCost,
+        purchaseDate: editingAsset.purchaseDate,
+        lifespanYears: numericLifespan,
+        nextMaintenanceDate: editingAsset.nextMaintenanceDate || ""
+      });
+      setEditingAsset(null);
+      toast.success("संपत्ति विवरण सफलतापूर्वक संशोधित किया गया!");
+    } catch (err) {
+      toast.error("अपडेट करने में असमर्थ।");
+    }
+  };
+
   const handleDeleteAsset = async (id: string) => {
     triggerHaptic(50);
     if (!window.confirm("क्या आप इस संपत्ति को हटाना चाहते हैं?")) return;
@@ -327,18 +500,7 @@ export default function BbCafeHelper() {
     }
   };
 
-  // Calculates depreciation (current book value) based on estimated lifespan
-  const calculateCurrentValue = (purchaseDateStr: string, cost: number, lifespanYears: number) => {
-    if (!purchaseDateStr) return cost;
-    const purchaseDate = new Date(purchaseDateStr);
-    const today = new Date();
-    const ageInYears = (today.getTime() - purchaseDate.getTime()) / (1000 * 60 * 60 * 24 * 365.25);
-    if (ageInYears >= lifespanYears) return 0;
-    const remainingVal = cost * (1 - (ageInYears / lifespanYears));
-    return Math.max(0, Math.round(remainingVal));
-  };
-
-  // --- 3. STORE ROOM HANDLERS ---
+  // --- 3. STORE ROOM & LEDGER HANDLERS ---
   const handleSaveStoreItem = async (e: React.FormEvent) => {
     e.preventDefault();
     triggerHaptic();
@@ -349,17 +511,68 @@ export default function BbCafeHelper() {
     }
 
     try {
-      await addDoc(collection(db, "store_room"), {
+      // 1. Save main Store Room document
+      const docRef = await addDoc(collection(db, "store_room"), {
         name: storeItemName.trim(),
         quantity: numericQty,
         unit: storeItemUnit,
         timestamp: new Date()
       });
+
+      // 2. Log initial entry in Transaction Ledger as "In (आया)"
+      await addDoc(collection(db, "store_room_ledger"), {
+        itemId: docRef.id,
+        name: storeItemName.trim(),
+        quantity: numericQty,
+        unit: storeItemUnit,
+        type: "in",
+        timestamp: new Date()
+      });
+
       setStoreItemName("");
       setStoreItemQuantity("");
       toast.success("स्टोर रूम में माल दर्ज हो गया!");
     } catch (e) {
       toast.error("स्टोर रूम में जोड़ने में विफल।");
+    }
+  };
+
+  const handleUpdateStoreItem = async (e: React.FormEvent) => {
+    e.preventDefault();
+    triggerHaptic();
+    const numericQty = Number(editingStoreItem.quantity);
+    if (!editingStoreItem.name.trim() || isNaN(numericQty) || numericQty < 0) {
+      return toast.error("कृपया नाम और मात्रा सही दर्ज करें!");
+    }
+
+    try {
+      // 1. Calculate transaction difference for ledger logging
+      const originalDoc = storeItems.find(i => i.id === editingStoreItem.id);
+      const originalQty = originalDoc ? originalDoc.quantity : 0;
+      const difference = numericQty - originalQty;
+
+      await updateDoc(doc(db, "store_room", editingStoreItem.id), {
+        name: editingStoreItem.name.trim(),
+        quantity: numericQty,
+        unit: editingStoreItem.unit
+      });
+
+      // 2. If quantity was manually adjusted, write audit log
+      if (difference !== 0) {
+        await addDoc(collection(db, "store_room_ledger"), {
+          itemId: editingStoreItem.id,
+          name: editingStoreItem.name.trim(),
+          quantity: Math.abs(difference),
+          unit: editingStoreItem.unit,
+          type: difference > 0 ? "in" : "out",
+          timestamp: new Date()
+        });
+      }
+
+      setEditingStoreItem(null);
+      toast.success("स्टोर आइटम विवरण संशोधित किया गया!");
+    } catch (err) {
+      toast.error("विवरण अपडेट करने में असमर्थ।");
     }
   };
 
@@ -377,6 +590,17 @@ export default function BbCafeHelper() {
       await updateDoc(itemRef, {
         quantity: increment(-moveQty)
       });
+
+      // Log dispatch Transaction Ledger as "Out (गया)"
+      await addDoc(collection(db, "store_room_ledger"), {
+        itemId: isTransferringStock.id,
+        name: isTransferringStock.name,
+        quantity: moveQty,
+        unit: isTransferringStock.unit,
+        type: "out",
+        timestamp: new Date()
+      });
+
       toast.success(`${moveQty} ${isTransferringStock.unit} ${isTransferringStock.name} किचन में भेजा गया! 👨‍🍳`);
       setIsTransferringStock(null);
       setTransferQtyInput("");
@@ -396,45 +620,146 @@ export default function BbCafeHelper() {
     }
   };
 
-  // --- 4. PACKAGING UPDATERS (PIZZA BOXES) ---
-  const handleUpdateBoxCount = async (sizeKey: string, newCount: number) => {
+  // --- 4. DYNAMIC PACKAGING & DISPOSABLES HANDLERS ---
+  const handleSavePkgItem = async (e: React.FormEvent) => {
+    e.preventDefault();
     triggerHaptic();
-    if (newCount < 0) return;
+
+    const numericQty = Number(newPkgQty);
+    const numericLimit = Number(newPkgMinLimit);
+    if (!newPkgName.trim() || isNaN(numericQty) || numericQty < 0 || isNaN(numericLimit) || numericLimit < 0) {
+      return toast.error("कृपया सभी फ़ील्ड्स सही से भरें!");
+    }
+
     try {
-      await updateDoc(doc(db, "settings", "packaging_stock"), {
-        [sizeKey]: newCount
+      await addDoc(collection(db, "packaging_inventory"), {
+        name: newPkgName.trim(),
+        quantity: numericQty,
+        category: newPkgCategory,
+        minLimit: numericLimit,
+        timestamp: new Date()
       });
+      setNewPkgName("");
+      setNewPkgQty("");
+      setNewPkgMinLimit("30");
+      setShowAddPkgForm(false);
+      toast.success("नया पैकेजिंग माल सफलतापूर्वक जोड़ा गया! 📦");
     } catch (err) {
-      toast.error("स्टॉक अपडेट करने में असमर्थ।");
+      toast.error("पैकेजिंग माल जोड़ने में विफल।");
     }
   };
 
-  const handleUpdateMinLimit = async (limitVal: number) => {
+  const handleUpdatePkgStock = async (id: string, currentStock: number, valChange: number) => {
     triggerHaptic();
-    if (limitVal < 0) return;
+    const finalVal = currentStock + valChange;
+    if (finalVal < 0) return;
     try {
-      await updateDoc(doc(db, "settings", "packaging_stock"), {
-        minLimit: limitVal
+      await updateDoc(doc(db, "packaging_inventory", id), {
+        quantity: finalVal
       });
     } catch (err) {
-      toast.error("अल्ट सीमा अपडेट करने में असमर्थ।");
+      toast.error("स्टॉक अपडेट करने में विफल।");
     }
   };
 
-  // --- MEMOIZED CALCULATIONS ---
-  const todayExpense = useMemo(() => {
-    const todayStr = new Date().toISOString().split('T')[0];
-    return expenses
-      .filter(e => e.date === todayStr)
-      .reduce((sum, e) => sum + (e.amount || 0), 0);
-  }, [expenses]);
+  const handleEditPkgItem = async (e: React.FormEvent) => {
+    e.preventDefault();
+    triggerHaptic();
 
-  const monthlyExpense = useMemo(() => {
-    const currentMonth = new Date().toISOString().slice(0, 7); 
-    return expenses
-      .filter(e => e.date && e.date.startsWith(currentMonth))
-      .reduce((sum, e) => sum + (e.amount || 0), 0);
-  }, [expenses]);
+    const numericLimit = Number(editPkgMinLimit);
+    if (!editPkgName.trim() || isNaN(numericLimit) || numericLimit < 0) {
+      return toast.error("कृपया सही नाम और अलर्ट सीमा भरें!");
+    }
+
+    try {
+      await updateDoc(doc(db, "packaging_inventory", editingPkgItem.id), {
+        name: editPkgName.trim(),
+        category: editPkgCategory,
+        minLimit: numericLimit
+      });
+      setEditingPkgItem(null);
+      toast.success("आइटम विवरण सफलतापूर्वक अपडेट किया गया!");
+    } catch (err) {
+      toast.error("विवरण अपडेट करने में विफल।");
+    }
+  };
+
+  const handleDeletePkgItem = async (id: string, name: string) => {
+    triggerHaptic(50);
+    if (!window.confirm(`क्या आप वाकई '${name}' को हमेशा के लिए डिलीट करना चाहते हैं?`)) return;
+
+    try {
+      await deleteDoc(doc(db, "packaging_inventory", id));
+      toast.success("आइटम सफलतापूर्वक हटा दिया गया।");
+    } catch (err) {
+      toast.error("आइटम हटाने में विफल।");
+    }
+  };
+
+  const handleAddPkgCategory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    triggerHaptic();
+
+    const cleanCat = newPkgCatInput.trim();
+    if (!cleanCat) return toast.error("कैटेगरी का नाम दर्ज करें!");
+
+    const exists = pkgCategories.some(c => c.name.toLowerCase().trim() === cleanCat.toLowerCase());
+    if (exists) return toast.error("यह कैटेगरी पहले से मौजूद है!");
+
+    try {
+      await addDoc(collection(db, "packaging_categories"), {
+        name: cleanCat,
+        timestamp: new Date()
+      });
+      setNewPkgCatInput("");
+      toast.success(`कैटेगरी '${cleanCat}' सफलतापूर्वक जोड़ी गई!`);
+    } catch (err) {
+      toast.error("कैटेगरी जोड़ने में विफल।");
+    }
+  };
+
+  const handleDeletePkgCategory = async (id: string, name: string) => {
+    triggerHaptic(50);
+    if (!window.confirm(`क्या आप वाकई कैटेगरी '${name}' को डिलीट करना चाहते हैं?`)) return;
+
+    try {
+      await deleteDoc(doc(db, "packaging_categories", id));
+      toast.success("कैटेगरी हटा दी गई।");
+    } catch (err) {
+      toast.error("कैटेगरी हटाने में विफल।");
+    }
+  };
+
+  // --- SEARCH FILTERING LOGIC ---
+  const filteredExpenses = useMemo(() => {
+    if (!searchQuery.trim()) return expenses;
+    const q = searchQuery.toLowerCase().trim();
+    return expenses.filter(e => 
+      e.description.toLowerCase().includes(q) || 
+      e.category.toLowerCase().includes(q)
+    );
+  }, [expenses, searchQuery]);
+
+  const filteredAssets = useMemo(() => {
+    if (!searchQuery.trim()) return assets;
+    const q = searchQuery.toLowerCase().trim();
+    return assets.filter(a => a.name.toLowerCase().includes(q));
+  }, [assets, searchQuery]);
+
+  const filteredStoreItems = useMemo(() => {
+    if (!searchQuery.trim()) return storeItems;
+    const q = searchQuery.toLowerCase().trim();
+    return storeItems.filter(i => i.name.toLowerCase().includes(q));
+  }, [storeItems, searchQuery]);
+
+  const filteredPkgItems = useMemo(() => {
+    if (!searchQuery.trim()) return pkgItems;
+    const q = searchQuery.toLowerCase().trim();
+    return pkgItems.filter(i => 
+      i.name.toLowerCase().includes(q) || 
+      i.category.toLowerCase().includes(q)
+    );
+  }, [pkgItems, searchQuery]);
 
   const activeTranslation = isHindi ? t.hi : t.en;
 
@@ -459,7 +784,7 @@ export default function BbCafeHelper() {
               placeholder="Enter Master PIN" 
               value={enteredPin} 
               onChange={(e) => setEnteredPin(e.target.value)} 
-              className="w-full bg-black/60 border border-white/10 rounded-2xl p-4 text-center outline-none focus:border-orange-500 text-sm font-bold text-white tracking-widest"
+              className="w-full bg-black/60 border border-white/10 rounded-2xl p-4 text-center outline-none focus:border-orange-500 text-sm font-bold text-white tracking-widest text-white dark:text-white"
               required 
             />
             <button 
@@ -522,11 +847,25 @@ export default function BbCafeHelper() {
               key={tab.id}
               type="button"
               onClick={() => { triggerHaptic(); setActiveTab(tab.id as any); }}
-              className={`px-4 py-2.5 rounded-xl text-[10px] font-black uppercase whitespace-nowrap border transition-all ${activeTab === tab.id ? 'bg-orange-500 border-orange-500 text-white shadow-lg' : 'bg-white/[0.02] border-white/5 text-gray-400'}`}
+              className={`px-4 py-2.5 rounded-xl text-[10px] font-black uppercase whitespace-nowrap border transition-all ${activeTab === tab.id ? 'bg-orange-500 border-orange-500 text-white shadow-lg shadow-orange-500/10' : 'bg-white/[0.02] border-white/5 text-gray-400'}`}
             >
               {tab.label}
             </button>
           ))}
+        </div>
+
+        {/* STICKY SEARCH BAR (Locks below header when scrolling) */}
+        <div className="sticky top-[72px] z-30 bg-[#050505]/95 backdrop-blur-md py-3.5 border-b border-white/5 rounded-b-2xl shadow-lg px-1">
+          <div className="relative group max-w-md mx-auto">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
+            <input 
+              type="text" 
+              placeholder={activeTranslation.searchPlaceholder} 
+              value={searchQuery} 
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-gray-100 dark:bg-neutral-800 border dark:border-white/10 border-gray-300 outline-none text-xs font-semibold rounded-xl py-2.5 pl-11 pr-4 text-black dark:text-white"
+            />
+          </div>
         </div>
 
         {/* --- TAB 1: DAILY EXPENSES --- */}
@@ -543,7 +882,7 @@ export default function BbCafeHelper() {
               </div>
             </div>
 
-            {/* EXPENSE CATEGORY MANAGER SECTION (Dynamic add & remove categories) */}
+            {/* EXPENSE CATEGORY MANAGER SECTION */}
             <div className="bg-white/[0.02] border border-white/5 p-4 rounded-3xl space-y-3 shadow-md">
               <div className="flex justify-between items-center">
                 <p className="text-[10px] font-black uppercase tracking-wider text-orange-400">{activeTranslation.manageCategories}</p>
@@ -570,7 +909,7 @@ export default function BbCafeHelper() {
                         placeholder={activeTranslation.newCategoryPlaceholder}
                         value={newExpenseCatInput}
                         onChange={(e) => setNewExpenseCatInput(e.target.value)}
-                        className="flex-1 text-xs font-semibold p-2.5 rounded-xl bg-black border border-white/10 outline-none text-white focus:border-orange-500"
+                        className="flex-1 text-xs font-semibold p-2.5 rounded-xl bg-gray-100 dark:bg-neutral-800 border border-gray-300 dark:border-white/10 outline-none text-black dark:text-white focus:border-orange-500"
                       />
                       <button 
                         type="submit"
@@ -615,7 +954,7 @@ export default function BbCafeHelper() {
                     placeholder="e.g. 500" 
                     value={expenseAmount} 
                     onChange={(e) => setExpenseAmount(e.target.value)} 
-                    className="w-full text-xs font-bold p-3 rounded-xl dark:bg-white/[0.03] bg-gray-50 border dark:border-white/5 border-gray-200 outline-none text-white focus:border-orange-500"
+                    className="w-full text-xs font-bold p-3 rounded-xl bg-gray-100 dark:bg-neutral-800 border border-gray-300 dark:border-white/10 outline-none text-black dark:text-white focus:border-orange-500"
                     required 
                   />
                 </div>
@@ -624,10 +963,10 @@ export default function BbCafeHelper() {
                   <select 
                     value={expenseCategory} 
                     onChange={(e) => setExpenseCategory(e.target.value)}
-                    className="w-full text-xs font-bold p-3 rounded-xl bg-neutral-900 border dark:border-white/5 border-gray-200 outline-none text-white focus:border-orange-500 cursor-pointer"
+                    className="w-full text-xs font-bold p-3 rounded-xl bg-gray-100 dark:bg-neutral-800 border border-gray-300 dark:border-white/10 outline-none text-black dark:text-white focus:border-orange-500 cursor-pointer"
                   >
                     {expenseCategories.map(cat => (
-                      <option key={cat.id} value={cat.name}>{cat.name}</option>
+                      <option key={cat.id} value={cat.name} className="bg-[#111]">{cat.name}</option>
                     ))}
                   </select>
                 </div>
@@ -640,7 +979,7 @@ export default function BbCafeHelper() {
                     type="date" 
                     value={expenseDate} 
                     onChange={(e) => setExpenseDate(e.target.value)} 
-                    className="w-full text-xs font-bold p-3 rounded-xl dark:bg-white/[0.03] bg-gray-50 border dark:border-white/5 border-gray-200 outline-none text-white focus:border-orange-500 cursor-pointer"
+                    className="w-full text-xs font-bold p-3 rounded-xl bg-gray-100 dark:bg-neutral-800 border border-gray-300 dark:border-white/10 outline-none text-black dark:text-white focus:border-orange-500 cursor-pointer"
                     required 
                   />
                 </div>
@@ -650,7 +989,7 @@ export default function BbCafeHelper() {
                     placeholder={activeTranslation.description}
                     value={expenseDescription} 
                     onChange={(e) => setExpenseDescription(e.target.value)} 
-                    className="w-full text-xs font-semibold p-3 rounded-xl dark:bg-white/[0.03] bg-gray-50 border dark:border-white/5 border-gray-200 outline-none text-white focus:border-orange-500 h-16 resize-none"
+                    className="w-full text-xs font-semibold p-3 rounded-xl bg-gray-100 dark:bg-neutral-800 border border-gray-300 dark:border-white/10 outline-none text-black dark:text-white focus:border-orange-500 h-16 resize-none"
                     required 
                   />
                 </div>
@@ -662,19 +1001,48 @@ export default function BbCafeHelper() {
             </form>
 
             <div className="space-y-3">
-              <p className="text-xs font-bold text-gray-400 uppercase tracking-widest pl-1">{isHindi ? "📜 हालिया खर्च सूची" : "📜 Recent Expenses Ledger"}</p>
-              {expenses.length === 0 ? (
+              <div className="flex justify-between items-center pl-1">
+                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">{isHindi ? "📜 हालिया खर्च सूची" : "📜 Recent Expenses Ledger"}</p>
+                <div className="flex gap-2">
+                  <button 
+                    type="button"
+                    onClick={handleExportExpensesCSV}
+                    className="px-2.5 py-1 bg-white/5 border border-white/10 hover:bg-white/10 rounded-lg text-[9px] font-black text-green-400 flex items-center gap-1 uppercase transition-all"
+                  >
+                    <Download size={10} /> Excel
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={handlePrintExpensesPDF}
+                    className="px-2.5 py-1 bg-white/5 border border-white/10 hover:bg-white/10 rounded-lg text-[9px] font-black text-blue-400 flex items-center gap-1 uppercase transition-all"
+                  >
+                    <Printer size={10} /> PDF/Print
+                  </button>
+                </div>
+              </div>
+
+              {filteredExpenses.length === 0 ? (
                 <p className="text-center text-gray-500 py-6 text-xs uppercase font-bold">{isHindi ? "कोई खर्च दर्ज नहीं मिला।" : "No expense logs recorded yet."}</p>
               ) : (
-                expenses.map(e => (
+                filteredExpenses.map(e => (
                   <div key={e.id} className="bg-white/[0.02] border border-white/5 p-4 rounded-2xl flex items-center justify-between gap-3 text-xs font-bold hover:bg-white/[0.04] transition-colors relative">
-                    <div className="space-y-1 pr-6">
+                    <div className="space-y-1 pr-6 flex-1">
                       <h4 className="text-gray-200">{e.description}</h4>
                       <p className="text-[9px] text-orange-400 uppercase">{e.category} • {e.date}</p>
                     </div>
-                    <div className="text-right flex items-center gap-3">
+                    <div className="text-right flex items-center gap-2 flex-shrink-0">
                       <span className="text-sm text-green-400 font-black">₹{e.amount}</span>
-                      <button type="button" onClick={() => handleDeleteExpense(e.id)} className="text-gray-400 hover:text-red-500 transition-colors p-1" title="Delete">
+                      <button 
+                        type="button"
+                        onClick={() => {
+                          setEditingExpense({ ...e });
+                        }}
+                        className="text-blue-400 hover:text-blue-500 p-1"
+                        title="Edit inline"
+                      >
+                        <Edit size={14} />
+                      </button>
+                      <button onClick={() => handleDeleteExpense(e.id)} className="text-gray-400 hover:text-red-500 transition-colors p-1" title="Delete">
                         <Trash2 size={14} />
                       </button>
                     </div>
@@ -682,6 +1050,68 @@ export default function BbCafeHelper() {
                 ))
               )}
             </div>
+
+            {/* In-place popup modal to edit expense */}
+            <AnimatePresence>
+              {editingExpense && (
+                <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[120] flex items-center justify-center p-6">
+                  <motion.form 
+                    onSubmit={handleUpdateExpense}
+                    className="bg-[#111] border border-orange-500/30 p-6 rounded-3xl w-full max-w-sm space-y-4"
+                    initial={{ scale: 0.95, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    exit={{ scale: 0.95, opacity: 0 }}
+                  >
+                    <h4 className="font-black text-sm uppercase text-orange-500 text-center">✏️ Edit Expense (खर्च संशोधित करें)</h4>
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-bold text-gray-500 uppercase">{activeTranslation.amount}</label>
+                      <input 
+                        type="number" 
+                        value={editingExpense.amount}
+                        onChange={(e) => setEditingExpense({ ...editingExpense, amount: e.target.value })}
+                        className="w-full text-xs font-bold p-3 rounded-xl bg-black border border-white/10 outline-none text-white focus:border-orange-500"
+                        required 
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-bold text-gray-500 uppercase">{activeTranslation.category}</label>
+                      <select 
+                        value={editingExpense.category}
+                        onChange={(e) => setEditingExpense({ ...editingExpense, category: e.target.value })}
+                        className="w-full text-xs font-bold p-3 rounded-xl bg-black border border-white/10 outline-none text-white focus:border-orange-500 cursor-pointer"
+                      >
+                        {expenseCategories.map(cat => (
+                          <option key={cat.id} value={cat.name}>{cat.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-bold text-gray-500 uppercase">Date</label>
+                      <input 
+                        type="date" 
+                        value={editingExpense.date}
+                        onChange={(e) => setEditingExpense({ ...editingExpense, date: e.target.value })}
+                        className="w-full text-xs font-bold p-3 rounded-xl bg-black border border-white/10 outline-none text-white"
+                        required 
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-bold text-gray-500 uppercase">Details</label>
+                      <textarea 
+                        value={editingExpense.description}
+                        onChange={(e) => setEditingExpense({ ...editingExpense, description: e.target.value })}
+                        className="w-full text-xs font-semibold p-3 rounded-xl bg-black border border-white/10 outline-none text-white h-16 resize-none"
+                        required 
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <button type="submit" className="flex-1 bg-green-600 text-white font-black py-2.5 rounded-xl text-[10px] uppercase">Save</button>
+                      <button type="button" onClick={() => setEditingExpense(null)} className="bg-white/5 text-gray-400 font-bold py-2.5 rounded-xl text-[10px] uppercase">Cancel</button>
+                    </div>
+                  </motion.form>
+                </div>
+              )}
+            </AnimatePresence>
           </div>
         )}
 
@@ -700,7 +1130,7 @@ export default function BbCafeHelper() {
                   placeholder="e.g. Deep Fridge / Sandwich Griller" 
                   value={assetName} 
                   onChange={(e) => setAssetName(e.target.value)} 
-                  className="w-full text-xs font-bold p-3 rounded-xl dark:bg-white/[0.03] bg-gray-550 border dark:border-neutral-700 border-gray-200 outline-none text-white focus:border-orange-500"
+                  className="w-full text-xs font-bold p-3 rounded-xl bg-gray-100 dark:bg-neutral-800 border border-gray-300 dark:border-white/10 outline-none text-black dark:text-white focus:border-orange-500"
                   required 
                 />
               </div>
@@ -713,7 +1143,7 @@ export default function BbCafeHelper() {
                     placeholder="e.g. 15000" 
                     value={assetCost} 
                     onChange={(e) => setAssetCost(e.target.value)} 
-                    className="w-full text-xs font-bold p-3 rounded-xl dark:bg-white/[0.03] bg-gray-550 border dark:border-neutral-700 border-gray-200 outline-none text-white focus:border-orange-500"
+                    className="w-full text-xs font-bold p-3 rounded-xl bg-gray-100 dark:bg-neutral-800 border border-gray-300 dark:border-white/10 outline-none text-black dark:text-white focus:border-orange-500"
                     required 
                   />
                 </div>
@@ -724,7 +1154,7 @@ export default function BbCafeHelper() {
                     placeholder="e.g. 5" 
                     value={assetLifespan} 
                     onChange={(e) => setAssetLifespan(e.target.value)} 
-                    className="w-full text-xs font-bold p-3 rounded-xl dark:bg-white/[0.03] bg-gray-550 border dark:border-neutral-700 border-gray-200 outline-none text-white focus:border-orange-500"
+                    className="w-full text-xs font-bold p-3 rounded-xl bg-gray-100 dark:bg-neutral-800 border border-gray-300 dark:border-white/10 outline-none text-black dark:text-white focus:border-orange-500"
                     required 
                   />
                 </div>
@@ -737,7 +1167,7 @@ export default function BbCafeHelper() {
                     type="date" 
                     value={assetPurchaseDate} 
                     onChange={(e) => setAssetPurchaseDate(e.target.value)} 
-                    className="w-full text-xs font-bold p-3 rounded-xl dark:bg-white/[0.03] bg-gray-550 border dark:border-neutral-700 border-gray-200 outline-none text-white focus:border-orange-500 cursor-pointer"
+                    className="w-full text-xs font-bold p-3 rounded-xl bg-gray-100 dark:bg-neutral-800 border border-gray-300 dark:border-white/10 outline-none text-black dark:text-white focus:border-orange-500 cursor-pointer"
                     required 
                   />
                 </div>
@@ -747,7 +1177,7 @@ export default function BbCafeHelper() {
                     type="date" 
                     value={assetMaintenance} 
                     onChange={(e) => setAssetMaintenance(e.target.value)} 
-                    className="w-full text-xs font-bold p-3 rounded-xl dark:bg-white/[0.03] bg-gray-550 border dark:border-neutral-700 border-gray-200 outline-none text-white focus:border-orange-500 cursor-pointer"
+                    className="w-full text-xs font-bold p-3 rounded-xl bg-gray-100 dark:bg-neutral-800 border border-gray-300 dark:border-white/10 outline-none text-black dark:text-white focus:border-orange-500 cursor-pointer"
                   />
                 </div>
               </div>
@@ -759,10 +1189,10 @@ export default function BbCafeHelper() {
 
             <div className="space-y-3">
               <p className="text-xs font-bold text-gray-400 uppercase tracking-widest pl-1">{isHindi ? "⚙️ संपत्ति सूची व वर्तमान मूल्य" : "⚙️ Registered Assets & Book Value"}</p>
-              {assets.length === 0 ? (
+              {filteredAssets.length === 0 ? (
                 <p className="text-center text-gray-500 py-6 text-xs uppercase font-bold">{isHindi ? "कोई उपकरण पंजीकृत नहीं है।" : "No registered assets yet."}</p>
               ) : (
-                assets.map(a => {
+                filteredAssets.map(a => {
                   const currentVal = calculateCurrentValue(a.purchaseDate, a.cost, a.lifespanYears);
                   const isMaintenanceOverdue = a.nextMaintenanceDate && new Date(a.nextMaintenanceDate).getTime() < new Date().getTime();
 
@@ -773,9 +1203,21 @@ export default function BbCafeHelper() {
                           <h4 className="text-sm font-black text-gray-200">{a.name}</h4>
                           <p className="text-[9px] text-gray-500 uppercase mt-0.5">{isHindi ? "खरीद मूल्य" : "Original Cost"}: ₹{a.cost} • {a.purchaseDate}</p>
                         </div>
-                        <button type="button" onClick={() => handleDeleteAsset(a.id)} className="text-gray-400 hover:text-red-500 p-1">
-                          <Trash2 size={15} />
-                        </button>
+                        <div className="flex items-center gap-1.5">
+                          <button 
+                            type="button"
+                            onClick={() => {
+                              setEditingAsset({ ...a });
+                            }}
+                            className="text-blue-400 hover:text-blue-500 p-1"
+                            title="Edit"
+                          >
+                            <Edit size={14} />
+                          </button>
+                          <button onClick={() => handleDeleteAsset(a.id)} className="text-gray-400 hover:text-red-500 p-1">
+                            <Trash2 size={15} />
+                          </button>
+                        </div>
                       </div>
 
                       <div className="grid grid-cols-2 gap-2 border-t border-white/5 pt-2.5 text-[10px] font-semibold text-gray-400">
@@ -799,6 +1241,78 @@ export default function BbCafeHelper() {
                 })
               )}
             </div>
+
+            {/* In-place popup modal to edit fixed asset */}
+            <AnimatePresence>
+              {editingAsset && (
+                <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[120] flex items-center justify-center p-6">
+                  <motion.form 
+                    onSubmit={handleUpdateAsset}
+                    className="bg-[#111] border border-orange-500/30 p-6 rounded-3xl w-full max-w-sm space-y-4"
+                    initial={{ scale: 0.95, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    exit={{ scale: 0.95, opacity: 0 }}
+                  >
+                    <h4 className="font-black text-sm uppercase text-orange-500 text-center">✏️ Edit Fixed Asset (संपत्ति विवरण बदलें)</h4>
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-bold text-gray-500 uppercase">{activeTranslation.assetName}</label>
+                      <input 
+                        type="text" 
+                        value={editingAsset.name}
+                        onChange={(e) => setEditingAsset({ ...editingAsset, name: e.target.value })}
+                        className="w-full text-xs font-bold p-3 rounded-xl bg-black border border-white/10 outline-none text-white focus:border-orange-500"
+                        required 
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <label className="text-[9px] font-bold text-gray-500 uppercase">Cost (₹)</label>
+                        <input 
+                          type="number" 
+                          value={editingAsset.cost}
+                          onChange={(e) => setEditingAsset({ ...editingAsset, cost: e.target.value })}
+                          className="w-full text-xs font-bold p-3 rounded-xl bg-black border border-white/10 outline-none text-white"
+                          required 
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[9px] font-bold text-gray-500 uppercase">Lifespan</label>
+                        <input 
+                          type="number" 
+                          value={editingAsset.lifespanYears}
+                          onChange={(e) => setEditingAsset({ ...editingAsset, lifespanYears: e.target.value })}
+                          className="w-full text-xs font-bold p-3 rounded-xl bg-black border border-white/10"
+                          required 
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-bold text-gray-500 uppercase">Purchase Date</label>
+                      <input 
+                        type="date" 
+                        value={editingAsset.purchaseDate}
+                        onChange={(e) => setEditingAsset({ ...editingAsset, purchaseDate: e.target.value })}
+                        className="w-full text-xs font-bold p-3 rounded-xl bg-black border border-white/10 text-white"
+                        required 
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-bold text-gray-500 uppercase">Next Service Date</label>
+                      <input 
+                        type="date" 
+                        value={editingAsset.nextMaintenanceDate}
+                        onChange={(e) => setEditingAsset({ ...editingAsset, nextMaintenanceDate: e.target.value })}
+                        className="w-full text-xs font-bold p-3 rounded-xl bg-black border border-white/10 text-white"
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <button type="submit" className="flex-1 bg-green-600 text-white font-black py-2.5 rounded-xl text-[10px] uppercase">Update</button>
+                      <button type="button" onClick={() => setEditingAsset(null)} className="bg-white/5 text-gray-400 font-bold py-2.5 rounded-xl text-[10px] uppercase">Cancel</button>
+                    </div>
+                  </motion.form>
+                </div>
+              )}
+            </AnimatePresence>
           </div>
         )}
 
@@ -810,16 +1324,36 @@ export default function BbCafeHelper() {
                 📦 {isHindi ? "स्टोर रूम थोक स्टॉक दर्ज करें" : "Add Bulk Inventory to Store Room"}
               </p>
 
-              <div className="space-y-1">
-                <label className="text-[9px] font-bold text-gray-400 uppercase">{isHindi ? "सामग्री का नाम" : "Raw Material / Grocery Name"}</label>
-                <input 
-                  type="text" 
-                  placeholder="e.g. Flour (मैदा) / Mozzarella Cheese" 
-                  value={storeItemName} 
-                  onChange={(e) => setStoreItemName(e.target.value)} 
-                  className="w-full text-xs font-bold p-3 rounded-xl dark:bg-white/[0.03] bg-gray-50 border dark:border-white/5 border-gray-200 outline-none text-white focus:border-orange-500"
-                  required 
-                />
+              {/* Requirement: Pre-filled dynamic suggestions list dropdown or custom input */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-[9px] font-bold text-gray-400 uppercase">{isHindi ? "सूची से सामग्री चुनें (Suggested)" : "Choose Suggested Material"}</label>
+                  <select 
+                    onChange={(e) => {
+                      if (e.target.value) {
+                        setStoreItemName(e.target.value);
+                      }
+                    }}
+                    className="w-full text-xs font-bold p-3 rounded-xl bg-gray-100 dark:bg-neutral-800 border border-gray-300 dark:border-white/10 outline-none text-black dark:text-white cursor-pointer"
+                  >
+                    <option value="">{activeTranslation.suggestedSelect}</option>
+                    {SUGGESTED_STORE_ITEMS.map((item, idx) => (
+                      <option key={idx} value={item} className="bg-[#111]">{item}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[9px] font-bold text-gray-400 uppercase">{activeTranslation.customInput}</label>
+                  <input 
+                    type="text" 
+                    placeholder="e.g. Garlic / Carry Bag / Custom item" 
+                    value={storeItemName} 
+                    onChange={(e) => setStoreItemName(e.target.value)} 
+                    className="w-full text-xs font-bold p-3 rounded-xl bg-gray-100 dark:bg-neutral-800 border border-gray-300 dark:border-white/10 outline-none text-black dark:text-white focus:border-orange-500"
+                    required 
+                  />
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -830,7 +1364,7 @@ export default function BbCafeHelper() {
                     placeholder="e.g. 5" 
                     value={storeItemQty} 
                     onChange={(e) => setStoreItemQuantity(e.target.value)} 
-                    className="w-full text-xs font-bold p-3 rounded-xl dark:bg-white/[0.03] bg-gray-50 border dark:border-white/5 border-gray-200 outline-none text-white focus:border-orange-500"
+                    className="w-full text-xs font-bold p-3 rounded-xl bg-gray-100 dark:bg-neutral-800 border border-gray-300 dark:border-white/10 outline-none text-black dark:text-white focus:border-orange-500"
                     required 
                   />
                 </div>
@@ -839,7 +1373,7 @@ export default function BbCafeHelper() {
                   <select 
                     value={storeItemUnit} 
                     onChange={(e) => setStoreItemUnit(e.target.value)}
-                    className="w-full text-xs font-bold p-3 rounded-xl bg-neutral-900 border dark:border-white/5 border-gray-200 outline-none text-white focus:border-orange-500 cursor-pointer"
+                    className="w-full text-xs font-bold p-3 rounded-xl bg-gray-100 dark:bg-neutral-800 border border-gray-300 dark:border-white/10 outline-none text-black dark:text-white focus:border-orange-500 cursor-pointer"
                   >
                     <option value="Kg">Kilogram (Kg)</option>
                     <option value="Pcs">Pieces (Pcs)</option>
@@ -855,6 +1389,131 @@ export default function BbCafeHelper() {
               </button>
             </form>
 
+            <div className="space-y-3">
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-widest pl-1">{isHindi ? "📦 वर्तमान स्टोर रूम स्टॉक" : "📦 Current Store Room Stock"}</p>
+              {filteredStoreItems.length === 0 ? (
+                <p className="text-center text-gray-500 py-6 text-xs uppercase font-bold">{isHindi ? "स्टोर रूम खाली है।" : "Store room is empty."}</p>
+              ) : (
+                filteredStoreItems.map(item => (
+                  <div key={item.id} className="bg-white/[0.02] border border-white/5 p-4 rounded-2xl flex items-center justify-between gap-3 text-xs font-bold hover:bg-white/[0.04] transition-colors relative">
+                    <div className="space-y-0.5">
+                      <h4 className="text-gray-200">{item.name}</h4>
+                      <p className="text-[10px] text-green-400 uppercase">{item.quantity} {item.unit} available</p>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button 
+                        type="button"
+                        onClick={() => { triggerHaptic(); setIsTransferringStock(item); }}
+                        className="px-3 py-1.5 bg-orange-500/10 hover:bg-orange-500/20 text-orange-500 rounded-lg text-[9px] font-black uppercase flex items-center gap-1 border border-orange-500/20"
+                      >
+                        <ArrowRightLeft size={10} /> {isHindi ? "किचन में भेजें" : "Move"}
+                      </button>
+                      <button 
+                        type="button"
+                        onClick={() => {
+                          setEditingStoreItem({ ...item });
+                        }}
+                        className="p-2.5 bg-blue-500/10 text-blue-400 rounded-lg"
+                        title="Edit inline"
+                      >
+                        ✏️
+                      </button>
+                      <button onClick={() => handleDeleteStoreItem(item.id)} className="text-gray-400 hover:text-red-500 p-1" title="Delete">
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Dynamic Store Room In/Out Transaction Ledger passbook (Aaya or gaya details) */}
+            <div className="bg-[#111] border border-white/5 p-5 rounded-[2.5rem] space-y-4">
+              <h3 className="text-sm font-black text-orange-500 uppercase tracking-widest flex items-center gap-1.5">
+                <History size={15} /> {isHindi ? "📜 आवक-जावक रजिस्टर (Ledger)" : "📜 Store Room In/Out Ledger"}
+              </h3>
+              <div className="space-y-2 max-h-60 overflow-y-auto no-scrollbar pr-1">
+                {storeLedger.map((log: any) => (
+                  <div key={log.id} className="bg-white/[0.01] border border-white/5 p-3 rounded-2xl flex justify-between items-center text-[10px] font-bold">
+                    <div className="space-y-0.5">
+                      <p className="text-gray-300 uppercase">{log.name}</p>
+                      <p className="text-[8px] text-gray-500">
+                        {log.timestamp?.toDate ? log.timestamp.toDate().toLocaleString() : "Just now"}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <span className={`px-2.5 py-1 rounded-md text-[8px] font-black uppercase ${log.type === 'in' ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-400'}`}>
+                        {log.type === 'in' ? (isHindi ? "आया (+)" : "Received") : (isHindi ? "किचन गया (-)" : "Dispatched")}
+                      </span>
+                      <p className="text-white mt-1 text-[11px] font-black">{log.quantity} {log.unit}</p>
+                    </div>
+                  </div>
+                ))}
+                {storeLedger.length === 0 && (
+                  <p className="text-center text-[9px] text-gray-655 font-bold uppercase py-4">No transactions logged yet...</p>
+                )}
+              </div>
+            </div>
+
+            {/* In-place popup modal to edit store room item details */}
+            <AnimatePresence>
+              {editingStoreItem && (
+                <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[120] flex items-center justify-center p-6">
+                  <motion.form 
+                    onSubmit={handleUpdateStoreItem}
+                    className="bg-[#111] border border-orange-500/30 p-6 rounded-3xl w-full max-w-sm space-y-4"
+                    initial={{ scale: 0.95, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    exit={{ scale: 0.95, opacity: 0 }}
+                  >
+                    <h4 className="font-black text-sm uppercase text-orange-500 text-center">✏️ Edit Store Item (आइटम विवरण बदलें)</h4>
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-bold text-gray-500 uppercase">Item Name</label>
+                      <input 
+                        type="text" 
+                        value={editingStoreItem.name}
+                        onChange={(e) => setEditingStoreItem({ ...editingStoreItem, name: e.target.value })}
+                        className="w-full text-xs font-bold p-3 rounded-xl bg-black border border-white/10 outline-none text-white focus:border-orange-500"
+                        required 
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <label className="text-[9px] font-bold text-gray-500 uppercase">Current Stock Qty</label>
+                        <input 
+                          type="number" 
+                          value={editingStoreItem.quantity}
+                          onChange={(e) => setEditingStoreItem({ ...editingStoreItem, quantity: e.target.value })}
+                          className="w-full text-xs font-bold p-3 rounded-xl bg-black border border-white/10 outline-none text-white"
+                          required 
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[9px] font-bold text-gray-500 uppercase">Unit</label>
+                        <select 
+                          value={editingStoreItem.unit}
+                          onChange={(e) => setEditingStoreItem({ ...editingStoreItem, unit: e.target.value })}
+                          className="w-full text-xs font-bold p-3 rounded-xl bg-black border border-white/10 text-white cursor-pointer"
+                        >
+                          <option value="Kg">Kg</option>
+                          <option value="Pcs">Pcs</option>
+                          <option value="Bags">Bags</option>
+                          <option value="Tins">Tins</option>
+                          <option value="Packets">Packets</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <button type="submit" className="flex-1 bg-green-600 text-white font-black py-2.5 rounded-xl text-[10px] uppercase">Update</button>
+                      <button type="button" onClick={() => setEditingStoreItem(null)} className="bg-white/5 text-gray-400 font-bold py-2.5 rounded-xl text-[10px] uppercase">Cancel</button>
+                    </div>
+                  </motion.form>
+                </div>
+              )}
+            </AnimatePresence>
+
+            {/* Pop-up modal for stock movement */}
             <AnimatePresence>
               {isTransferringStock && (
                 <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[120] flex items-center justify-center p-6">
@@ -897,59 +1556,199 @@ export default function BbCafeHelper() {
                 </div>
               )}
             </AnimatePresence>
-
-            <div className="space-y-3">
-              <p className="text-xs font-bold text-gray-400 uppercase tracking-widest pl-1">{isHindi ? "📦 वर्तमान स्टोर रूम स्टॉक" : "📦 Current Store Room Stock"}</p>
-              {storeItems.length === 0 ? (
-                <p className="text-center text-gray-500 py-6 text-xs uppercase font-bold">{isHindi ? "स्टोर रूम खाली है।" : "Store room is empty."}</p>
-              ) : (
-                storeItems.map(item => (
-                  <div key={item.id} className="bg-white/[0.02] border border-white/5 p-4 rounded-2xl flex items-center justify-between gap-3 text-xs font-bold hover:bg-white/[0.04] transition-colors relative">
-                    <div className="space-y-0.5">
-                      <h4 className="text-gray-200">{item.name}</h4>
-                      <p className="text-[10px] text-green-400 uppercase">{item.quantity} {item.unit} available</p>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <button 
-                        type="button"
-                        onClick={() => { triggerHaptic(); setIsTransferringStock(item); }}
-                        className="px-3 py-1.5 bg-orange-500/10 hover:bg-orange-500/20 text-orange-500 rounded-lg text-[9px] font-black uppercase flex items-center gap-1 border border-orange-500/20"
-                      >
-                        <ArrowRightLeft size={10} /> {isHindi ? "किचन में भेजें" : "Move"}
-                      </button>
-                      <button type="button" onClick={() => handleDeleteStoreItem(item.id)} className="text-gray-400 hover:text-red-500 p-1" title="Delete">
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
           </div>
         )}
 
-        {/* --- TAB 4: PACKAGING & GROCERY --- */}
+        {/* --- TAB 4: DYNAMIC PACKAGING & DISPOSABLES DASHBOARD --- */}
         {activeTab === 'packaging' && (
           <div className="space-y-6">
             
+            {/* Quick Actions (Add Pkg Item / Manage Categories) */}
+            <div className="grid grid-cols-2 gap-2">
+              <button 
+                type="button" 
+                onClick={() => { triggerHaptic(); setShowManagePkgCat(!showManagePkgCat); }} 
+                className="bg-white/5 border border-white/10 hover:bg-white/10 py-3 rounded-2xl font-black text-xs uppercase text-center text-gray-300"
+              >
+                ⚙️ {isHindi ? "कैटेगरी प्रबंधित करें" : "Manage Categories"}
+              </button>
+              <button 
+                type="button" 
+                onClick={() => { triggerHaptic(); setShowAddPkgForm(!showAddPkgForm); setEditingPkgItem(null); }} 
+                className="bg-orange-500/10 hover:bg-orange-500/20 text-orange-500 border border-orange-500/20 py-3 rounded-2xl font-black text-xs uppercase text-center"
+              >
+                {showAddPkgForm ? (isHindi ? "फॉर्म बंद करें" : "Close Form") : (isHindi ? "➕ नया माल जोड़ें" : "➕ Add New Item")}
+              </button>
+            </div>
+
+            {/* Packaging Categories Management */}
+            <AnimatePresence>
+              {showManagePkgCat && (
+                <motion.div 
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: "auto", opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  className="overflow-hidden bg-white/[0.02] border border-white/5 p-4 rounded-3xl space-y-3"
+                >
+                  <p className="text-[10px] font-black uppercase text-orange-400">{isHindi ? "पैकेजिंग श्रेणियां जोड़ें:" : "Manage Packaging Categories:"}</p>
+                  <form onSubmit={handleAddPkgCategory} className="flex gap-2">
+                    <input 
+                      type="text" 
+                      placeholder={isHindi ? "उदा. डब्बे, चम्मच, टिशू" : "e.g., Boxes, Cutlery"}
+                      value={newPkgCatInput}
+                      onChange={(e) => setNewPkgCatInput(e.target.value)}
+                      className="flex-1 text-xs font-semibold p-2.5 rounded-xl bg-gray-100 dark:bg-neutral-800 border border-gray-300 dark:border-white/10 outline-none text-black dark:text-white focus:border-orange-500"
+                      required
+                    />
+                    <button type="submit" className="px-4 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-xl text-xs font-black uppercase">{isHindi ? "जोड़ें" : "Add"}</button>
+                  </form>
+
+                  <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto no-scrollbar pt-1">
+                    {pkgCategories.map(cat => (
+                      <div key={cat.id} className="flex items-center gap-1.5 px-3 py-1.5 bg-[#111] border border-white/5 rounded-xl text-xs font-bold">
+                        <span className="text-gray-300">{cat.name}</span>
+                        <button type="button" onClick={() => handleDeletePkgCategory(cat.id, cat.name)} className="text-gray-500 hover:text-red-500 p-0.5"><X size={12} /></button>
+                      </div>
+                    ))}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Add New Packaging Item Form */}
+            {showAddPkgForm && (
+              <form onSubmit={handleSavePkgItem} className="bg-white/[0.02] border border-white/5 p-5 rounded-3xl space-y-4 shadow-xl">
+                <p className="text-[10px] font-black uppercase tracking-wider text-orange-500 border-b border-white/5 pb-2">
+                  📦 {isHindi ? "नया पैकेजिंग/डिस्पोजल माल जोड़ें" : "Add Packaging/Disposable Stock"}
+                </p>
+
+                {/* Pre-filled dropdown to prevent spelling errors during dynamic item add */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs font-bold">
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-bold text-gray-400 uppercase">{isHindi ? "सुझाए गए नाम चुनें" : "Suggested Packaging Item"}</label>
+                    <select 
+                      onChange={(e) => {
+                        if (e.target.value) {
+                          setNewPkgName(e.target.value);
+                        }
+                      }}
+                      className="w-full bg-gray-100 dark:bg-neutral-800 border border-gray-300 dark:border-white/10 p-3 rounded-xl outline-none text-black dark:text-white cursor-pointer"
+                    >
+                      <option value="">{activeTranslation.suggestedSelect}</option>
+                      <option value="Pizza Box Small 6\"">Pizza Box Small 6"</option>
+                      <option value="Pizza Box Medium 8\"">Pizza Box Medium 8"</option>
+                      <option value="Pizza Box Large 10\"">Pizza Box Large 10"</option>
+                      <option value="Pizza Box Extra Large 12\"">Pizza Box Extra Large 12"</option>
+                      <option value="Disposable Spoon 🥄">Disposable Spoon 🥄</option>
+                      <option value="Tissue Paper 🧻">Tissue Paper 🧻</option>
+                      <option value="Water Glass 🥤">Water Glass 🥤</option>
+                      <option value="Plastic Carry Bag">Plastic Carry Bag</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-bold text-gray-400 uppercase">{activeTranslation.customInput}</label>
+                    <input 
+                      type="text" 
+                      placeholder="e.g. Spoon / Tissue Paper" 
+                      value={newPkgName} 
+                      onChange={(e) => setNewPkgName(e.target.value)} 
+                      className="w-full text-xs font-bold p-3 rounded-xl bg-gray-100 dark:bg-neutral-800 border border-gray-300 dark:border-white/10 outline-none text-black dark:text-white focus:border-orange-500"
+                      required 
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-bold text-gray-500 uppercase">{isHindi ? "श्रेणी (Category)" : "Category"}</label>
+                    <select 
+                      value={newPkgCategory} 
+                      onChange={(e) => setNewPkgCategory(e.target.value)}
+                      className="w-full text-xs font-bold p-3 rounded-xl bg-gray-100 dark:bg-neutral-800 border border-gray-300 dark:border-white/10 outline-none text-black dark:text-white focus:border-orange-500 cursor-pointer"
+                    >
+                      {pkgCategories.map(cat => (
+                        <option key={cat.id} value={cat.name} className="bg-[#111]">{cat.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-bold text-gray-500 uppercase">{isHindi ? "प्रारंभिक स्टॉक" : "Initial Stock Quantity"}</label>
+                    <input 
+                      type="number" 
+                      placeholder="e.g. 100" 
+                      value={newPkgQty} 
+                      onChange={(e) => setNewPkgQty(e.target.value)} 
+                      className="w-full text-xs font-bold p-3 rounded-xl bg-gray-100 dark:bg-neutral-800 border border-gray-300 dark:border-white/10 outline-none text-black dark:text-white focus:border-orange-500"
+                      required 
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[9px] font-bold text-gray-500 uppercase">{isHindi ? "न्यूनतम अलर्ट सीमा" : "Reorder Warning Limit"}</label>
+                  <input 
+                    type="number" 
+                    placeholder="e.g. 30" 
+                    value={newPkgMinLimit} 
+                    onChange={(e) => setNewPkgMinLimit(e.target.value)} 
+                    className="w-full text-xs font-bold p-3 rounded-xl bg-gray-100 dark:bg-neutral-800 border border-gray-300 dark:border-white/10 outline-none text-black dark:text-white focus:border-orange-500"
+                    required 
+                  />
+                </div>
+
+                <button type="submit" className="w-full bg-green-600 text-white font-black py-3 rounded-xl text-xs uppercase shadow">
+                  {activeTranslation.save}
+                </button>
+              </form>
+            )}
+
+            {/* Editing Packaging Item Popup */}
+            {editingPkgItem && (
+              <div className="fixed inset-0 bg-black/95 backdrop-blur-md z-[120] flex items-center justify-center p-6">
+                <form 
+                  onSubmit={handleEditPkgItem}
+                  className="bg-[#111] border border-orange-500/30 p-6 rounded-3xl w-full max-w-sm space-y-4 text-left"
+                >
+                  <h4 className="font-black text-sm uppercase text-orange-500 text-center">✏️ Edit Packaging Item</h4>
+                  
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-bold text-gray-500 uppercase">Item Name</label>
+                    <input type="text" value={editPkgName} onChange={(e) => setEditPkgName(e.target.value)} className="w-full text-xs font-bold p-3 rounded-xl bg-black border border-white/10 outline-none text-white focus:border-orange-500" required />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-bold text-gray-500 uppercase">Category</label>
+                      <select value={editPkgCategory} onChange={(e) => setEditPkgCategory(e.target.value)} className="w-full text-xs font-bold p-3 rounded-xl bg-black border border-white/10 outline-none text-white focus:border-orange-500 cursor-pointer">
+                        {pkgCategories.map(cat => (
+                          <option key={cat.id} value={cat.name} className="bg-[#111]">{cat.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-bold text-gray-500 uppercase">Min Limit</label>
+                      <input type="number" value={editPkgMinLimit} onChange={(e) => setEditPkgMinLimit(e.target.value)} className="w-full text-xs font-bold p-3 rounded-xl bg-black border border-white/10 outline-none text-white focus:border-orange-500" required />
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <button type="submit" className="flex-1 bg-green-600 text-white font-black py-2.5 rounded-xl text-[10px] uppercase">Update</button>
+                    <button type="button" onClick={() => setEditingPkgItem(null)} className="bg-white/5 text-gray-400 font-bold py-2.5 rounded-xl text-[10px] uppercase">Cancel</button>
+                  </div>
+                </form>
+              </div>
+            )}
+
+            {/* Dynamic Packaging Inventory Dashboard Grid */}
             <div className="bg-white/[0.02] border border-white/5 p-5 rounded-3xl space-y-4">
               <div className="flex justify-between items-center border-b border-white/5 pb-2">
                 <h4 className="text-xs font-black uppercase text-orange-500 tracking-wider flex items-center gap-1">
                   <Package size={14} /> {activeTranslation.tableBoxes}
                 </h4>
-                <div className="flex items-center gap-1 bg-black/40 px-2 py-1 rounded-lg border border-white/5">
-                  <span className="text-[8px] font-bold text-gray-455 uppercase">{isHindi ? "अलर्ट सीमा" : "Min Limit"}:</span>
-                  <input 
-                    type="number" 
-                    value={pizzaBoxes.minLimit} 
-                    onChange={(e) => handleUpdateMinLimit(Number(e.target.value))} 
-                    className="w-8 bg-transparent text-center text-[10px] font-black outline-none text-yellow-400"
-                  />
-                </div>
               </div>
 
-              {Object.entries(pizzaBoxes).some(([key, val]) => key !== 'minLimit' && Number(val) < pizzaBoxes.minLimit) && (
+              {filteredPkgItems.some(i => Number(i.quantity) < Number(i.minLimit)) && (
                 <div className="bg-red-500/10 text-red-500 p-3 rounded-2xl border border-red-500/20 text-[9px] font-black flex items-start gap-1.5 leading-normal animate-pulse">
                   <AlertTriangle size={14} className="flex-shrink-0" />
                   <p>{activeTranslation.lowStockWarning}</p>
@@ -957,40 +1756,57 @@ export default function BbCafeHelper() {
               )}
 
               <div className="grid grid-cols-2 gap-3.5">
-                {[
-                  { id: 'small', label: 'Small Box (7")' },
-                  { id: 'medium', label: 'Medium Box (9")' },
-                  { id: 'large', label: 'Large Box (12")' },
-                  { id: 'xl', label: 'XL Box (15")' }
-                ].map(box => {
-                  const currentStock = pizzaBoxes[box.id] || 0;
-                  const isLow = currentStock < pizzaBoxes.minLimit;
-
+                {filteredPkgItems.map(item => {
+                  const isLow = Number(item.quantity) < Number(item.minLimit);
                   return (
                     <div 
-                      key={box.id} 
-                      className={`p-4 rounded-2xl border flex flex-col justify-between transition-colors duration-200 ${isLow ? 'bg-red-500/[0.01] border-red-500/30' : 'bg-[#111] border-white/5'}`}
+                      key={item.id} 
+                      className={`p-4 rounded-2xl border flex flex-col justify-between transition-colors duration-200 relative group ${isLow ? 'bg-red-500/[0.01] border-red-500/30' : 'bg-[#111] border-white/5'}`}
                     >
+                      <button 
+                        type="button" 
+                        onClick={() => handleDeletePkgItem(item.id, item.name)}
+                        className="absolute top-2.5 right-2 text-gray-500 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100 p-1"
+                      >
+                        <Trash2 size={12} />
+                      </button>
+
                       <div className="flex justify-between items-start">
-                        <span className="text-[10px] font-black text-gray-300 uppercase leading-none">{box.label}</span>
+                        <div className="space-y-0.5">
+                          <span className="text-[10px] font-black text-gray-300 uppercase leading-none block truncate max-w-[110px]" title={item.name}>{item.name}</span>
+                          <span className="text-[8px] font-bold text-gray-500 uppercase block">{item.category}</span>
+                        </div>
                         {isLow && <span className="h-1.5 w-1.5 rounded-full bg-red-500 animate-ping" />}
                       </div>
+
                       <div className="flex justify-between items-center mt-3">
-                        <span className={`text-base font-black ${isLow ? 'text-red-500' : 'text-green-400'}`}>{currentStock} Pcs</span>
-                        <div className="flex gap-1.5 bg-black/40 p-1 rounded-lg border border-white/5">
+                        <span className={`text-sm font-black ${isLow ? 'text-red-500' : 'text-green-400'}`}>{item.quantity} Pcs</span>
+                        <div className="flex gap-1.5 bg-black/40 p-1 rounded-lg border border-white/5 flex-shrink-0">
                           <button 
                             type="button"
-                            onClick={() => handleUpdateBoxCount(box.id, currentStock - 10)} 
+                            onClick={() => handleUpdatePkgStock(item.id, item.quantity, -10)} 
                             className="w-5 h-5 flex items-center justify-center bg-red-500/10 text-red-500 text-[10px] font-black rounded"
                           >
                             -10
                           </button>
                           <button 
                             type="button"
-                            onClick={() => handleUpdateBoxCount(box.id, currentStock + 50)} 
+                            onClick={() => handleUpdatePkgStock(item.id, item.quantity, 50)} 
                             className="w-5 h-5 flex items-center justify-center bg-green-500/10 text-green-500 text-[10px] font-black rounded"
                           >
                             +50
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingPkgItem(item);
+                              setEditPkgName(item.name);
+                              setEditPkgCategory(item.category);
+                              setEditPkgMinLimit(String(item.minLimit));
+                            }}
+                            className="w-5 h-5 flex items-center justify-center bg-blue-500/10 text-blue-400 text-[10px] font-black rounded"
+                          >
+                            ✏️
                           </button>
                         </div>
                       </div>
@@ -1006,16 +1822,16 @@ export default function BbCafeHelper() {
                 type="button"
                 onClick={() => {
                   triggerHaptic();
-                  const lowBoxes = Object.entries(pizzaBoxes)
-                    .filter(([key, val]) => key !== 'minLimit' && Number(val) < pizzaBoxes.minLimit)
-                    .map(([key, val]) => `• ${key.toUpperCase()} Box: Current Stock is ${val} Pcs`)
+                  const lowBoxes = pkgItems
+                    .filter(i => Number(i.quantity) < Number(i.minLimit))
+                    .map(i => `• ${i.name}: Stock underlimit (${i.quantity} Pcs Left)`)
                     .join("\n");
 
                   if (!lowBoxes) {
                     return toast.success("सभी पैकेजिंग आइटम पर्याप्त स्टॉक में हैं! 📦");
                   }
 
-                  const msg = encodeURIComponent(`🔥 *BUM BUM CAFE - PACKAGING REORDER*\n\nकृपया निम्नलिखित पिज्जा बॉक्स सप्लायर को आर्डर भेजें:\n${lowBoxes}\n\nधन्यवाद!`);
+                  const msg = encodeURIComponent(`🔥 *BUM BUM CAFE - PACKAGING REORDER*\n\nकृपया निम्नलिखित डिस्पोजेबल/बॉक्स सप्लायर को आर्डर भेजें:\n${lowBoxes}\n\nधन्यवाद!`);
                   window.open(`https://wa.me/919714293759?text=${msg}`, '_blank');
                 }}
                 className="px-3 py-1.5 bg-yellow-500 text-black font-black rounded-lg text-[9px]"
