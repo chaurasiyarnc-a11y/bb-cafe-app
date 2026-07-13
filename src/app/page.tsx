@@ -2960,32 +2960,7 @@ export default function BbCafeHome() {
         )}
       </AnimatePresence>
 
-      {/* SOCIALS DIALOG MODAL */}
-      <AnimatePresence>
-        {isSocialsOpen && (
-          <div className="fixed inset-0 bg-black/95 z-[250] flex items-center justify-center p-6">
-            <motion.div className="dark:bg-[#111] bg-white w-full max-w-md p-6 rounded-3xl border dark:border-white/10 border-gray-200 text-center space-y-4 shadow-xl transition-colors duration-200">
-              <div>
-                <h3 className="text-xl font-black text-orange-500 uppercase italic">Connect & Earn Points</h3>
-                <p className="text-[8px] text-gray-550 font-bold uppercase tracking-wider">हर प्लेटफार्म पर फॉलो/सब्सक्राइब करने का +1 पॉइंट पाएं!</p>
-              </div>
-              <div className="space-y-2 text-left max-h-[22rem] overflow-y-auto no-scrollbar pr-1">
-                {SOCIAL_LINKS.map((platform) => (
-                  <button 
-                    key={platform.id}
-                    onClick={() => handleSocialClickWithClaim(platform)} 
-                    className="w-full flex items-center justify-between dark:bg-green-500/10 bg-green-50 p-2.5 rounded-xl border dark:border-green-500/20 border-green-200/50 p-3 rounded-xl"
-                  >
-                    <span className="text-[10px] font-black dark:text-white text-neutral-900">{platform.label}</span>
-                    <span className="text-[8px] font-black uppercase px-2.5 py-1 rounded bg-yellow-400 text-black">{getClaimStatus(platform.id)}</span>
-                  </button>
-                ))}
-              </div>
-              <button type="button" onClick={() => { triggerHaptic(); setIsSocialsOpen(false); }} className="w-full bg-orange-500 text-black font-black p-3 rounded-xl text-xs uppercase">CLOSE</button>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+      
 
       {/* DIGITAL GREEN INVOICE */}
       <AnimatePresence>
