@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { db } from '@/lib/firebase'; 
 import { collection, onSnapshot, query, addDoc, doc, deleteDoc, updateDoc, setDoc, orderBy, getDoc, increment, limit } from 'firebase/firestore';
-import { Plus, X, Trash2, Calendar, IndianRupee, ArrowLeft, Lock, Loader2, Filter, ShoppingBag, Flame, Banknote, ShieldAlert, Layers, ChevronRight, Settings, Wrench, Package, AlertTriangle, ArrowRightLeft, Globe, Download, Printer, Edit, History } from 'lucide-react';
+import { Search, Plus, X, Trash2, Calendar, IndianRupee, ArrowLeft, Lock, Loader2, Filter, ShoppingBag, Flame, Banknote, ShieldAlert, Layers, ChevronRight, Settings, Wrench, Package, AlertTriangle, ArrowRightLeft, Globe, Download, Printer, Edit, History } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
 
@@ -70,7 +70,10 @@ const t = {
     addCategoryBtn: "जोड़ें",
     searchPlaceholder: "खोजें...",
     suggestedSelect: "-- सूची से चुनें --",
-    customInput: "या नया नाम टाइप करें"
+    customInput: "या नया नाम टाइप करें",
+    lowStockReportBtn: "📥 समाप्त स्टॉक रिपोर्ट एक्सपोर्ट करें (Excel)",
+    lowStockReportDesc: "स्टोर रूम और पैकेजिंग की वे सामग्रियां जो समाप्त या कम हैं",
+    allStockOk: "सभी सामग्रियां पर्याप्त मात्रा में उपलब्ध हैं!"
   },
   en: {
     title: "Cafe Helper Dashboard",
@@ -102,7 +105,26 @@ const t = {
     addCategoryBtn: "Add",
     searchPlaceholder: "Search here...",
     suggestedSelect: "-- Choose From List --",
-    customInput: "Or Type Custom Name"
+    customInput: "Or Type Custom Name",
+    lowStockReportBtn: "📥 Export Finished Stock Report (Excel)",
+    lowStockReportDesc: "List of items that are completely out or low in stock",
+    allStockOk: "All stock items are sufficiently available!"
+  }
+};
+
+// Helper function to calculate Asset Depreciation (Book Value)
+const calculateCurrentValue = (purchaseDateStr: string, cost: number, lifespanYears: number) => {
+  if (!purchaseDateStr || !cost || !lifespanYears) return 0;
+  try {
+    const purchaseDate = new Date(purchaseDateStr);
+    const today = new Date();
+    const ageInYears = (today.getTime() - purchaseDate.getTime()) / (1000 * 60 * 60 * 24 * 365.25);
+    if (ageInYears <= 0) return cost;
+    if (ageInYears >= lifespanYears) return 0;
+    const remainingValue = cost * (1 - (ageInYears / lifespanYears));
+    return Math.max(0, Math.round(remainingValue));
+  } catch (error) {
+    return cost;
   }
 };
 
@@ -167,6 +189,7 @@ export default function BbCafeHelper() {
   const [newStoreCatInput, setNewStoreCatInput] = useState("");
   const [showManageStoreCat, setShowManageStoreCat] = useState(false);
   const [editingStoreCat, setEditingStoreCat] = useState<any>(null);
+  const [editStoreCatName, setEditStoreCatName] = useState("");
 
   // --- 4. DYNAMIC PACKAGING & DISPOSABLES STATES ---
   const [pkgItems, setPkgItems] = useState<any[]>([]);
@@ -327,7 +350,7 @@ export default function BbCafeHelper() {
       setExpenseAmount("");
       setExpenseDescription("");
       toast.success("खर्च सफलतापूर्वक दर्ज किया गया!");
-    } catch (e) {
+    } catch (err) {
       toast.error("खर्च सहेजने में विफल।");
     }
   };
@@ -360,7 +383,7 @@ export default function BbCafeHelper() {
     try {
       await deleteDoc(doc(db, "expenses", id));
       toast.success("खर्च हटा दिया गया।");
-    } catch (e) {
+    } catch (err) {
       toast.error("डिलीट करने में विफल।");
     }
   };
@@ -481,6 +504,70 @@ export default function BbCafeHelper() {
     printWindow.document.close();
   };
 
+  // --- NEW FEATURE: DYNAMIC AUTO-FILTER & EXPORT LOW STOCK CSV ---
+  const handleExportFinishedStockReport = () => {
+    triggerHaptic();
+
+    // 1. Store Room Out of Stock / Low Stock items (Stock qty <= 2)
+    const lowStoreItems = storeItems
+      .filter(item => (Number(item.quantity) || 0) <= 2)
+      .map(item => ({
+        name: item.name,
+        category: item.category || "General Store 📦",
+        currentStock: `${item.quantity} ${item.unit}`,
+        status: Number(item.quantity) === 0 ? "OUT OF STOCK" : "LOW STOCK",
+        department: "Store Room"
+      }));
+
+    // 2. Packaging Out of Stock / Low Stock items (Stock qty < minLimit)
+    const lowPkgItems = pkgItems
+      .filter(item => (Number(item.quantity) || 0) < (Number(item.minLimit) || 30))
+      .map(item => ({
+        name: item.name,
+        category: item.category || "Packaging 🍕",
+        currentStock: `${item.quantity} Pcs`,
+        status: Number(item.quantity) === 0 ? "OUT OF STOCK" : "LOW STOCK",
+        department: "Packaging Stock"
+      }));
+
+    // Combine both lists
+    const mergedList = [...lowStoreItems, ...lowPkgItems];
+
+    if (mergedList.length === 0) {
+      return toast.success(isHindi ? t.hi.allStockOk : t.en.allStockOk);
+    }
+
+    // Automatically sort/filter by category
+    mergedList.sort((a, b) => a.category.localeCompare(b.category));
+
+    // Create CSV content
+    const headers = ["Item Name", "Category", "Current Stock", "Status", "Department"];
+    const csvRows = [headers.join(",")];
+
+    mergedList.forEach(item => {
+      const row = [
+        `"${item.name.replace(/"/g, '""')}"`,
+        `"${item.category.replace(/"/g, '""')}"`,
+        `"${item.currentStock}"`,
+        `"${item.status}"`,
+        `"${item.department}"`
+      ];
+      csvRows.push(row.join(","));
+    });
+
+    const csvString = csvRows.join("\r\n");
+    const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csvString], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `BumBumCafe_Finished_Stock_Report_${new Date().toLocaleDateString()}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    toast.success(isHindi ? "समाप्त स्टॉक सूची सफलतापूर्वक डाउनलोड हो गई!" : "Finished stock report downloaded!");
+  };
+
   // --- 2. ASSET HANDLERS ---
   const handleSaveAsset = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -507,7 +594,7 @@ export default function BbCafeHelper() {
       setAssetLifespan("");
       setAssetMaintenance("");
       toast.success("नया अचल उपकरण दर्ज किया गया!");
-    } catch (e) {
+    } catch (err) {
       toast.error("उपकरण सहेजने में विफल।");
     }
   };
@@ -542,7 +629,7 @@ export default function BbCafeHelper() {
     try {
       await deleteDoc(doc(db, "fixed_assets", id));
       toast.success("संपत्ति डेटा हटा दिया गया।");
-    } catch (e) {
+    } catch (err) {
       toast.error("हटाने में विफल।");
     }
   };
@@ -580,7 +667,7 @@ export default function BbCafeHelper() {
       setStoreItemName("");
       setStoreItemQuantity("");
       toast.success("स्टोर रूम में माल दर्ज हो गया!");
-    } catch (e) {
+    } catch (err) {
       toast.error("स्टोर रूम में जोड़ने में विफल।");
     }
   };
@@ -664,7 +751,7 @@ export default function BbCafeHelper() {
     try {
       await deleteDoc(doc(db, "store_room", id));
       toast.success("स्टोर आइटम हटाया गया।");
-    } catch (e) {
+    } catch (err) {
       toast.error("हटाने में विफल।");
     }
   };
@@ -866,6 +953,13 @@ export default function BbCafeHelper() {
 
   const activeTranslation = isHindi ? t.hi : t.en;
 
+  // Total low stock count from both Store and Packaging
+  const totalLowStockItemsCount = useMemo(() => {
+    const storeLowCount = storeItems.filter(item => (Number(item.quantity) || 0) <= 2).length;
+    const pkgLowCount = pkgItems.filter(item => (Number(item.quantity) || 0) < (Number(item.minLimit) || 30)).length;
+    return storeLowCount + pkgLowCount;
+  }, [storeItems, pkgItems]);
+
   // --- SECURITY LOCK SCREEN ---
   if (!isAdminAuthorized) {
     return (
@@ -887,7 +981,7 @@ export default function BbCafeHelper() {
               placeholder="Enter Master PIN" 
               value={enteredPin} 
               onChange={(e) => setEnteredPin(e.target.value)} 
-              className="w-full bg-black/60 border border-white/10 rounded-2xl p-4 text-center outline-none focus:border-orange-500 text-sm font-bold text-white tracking-widest text-white dark:text-white"
+              className="w-full bg-black/60 border border-white/10 rounded-2xl p-4 text-center outline-none focus:border-orange-500 text-sm font-bold text-white tracking-widest"
               required 
             />
             <button 
@@ -907,13 +1001,13 @@ export default function BbCafeHelper() {
       <Toaster />
 
       {/* HEADER PANEL */}
-      <header className="sticky top-0 z-40 dark:bg-[#050505]/95 bg-gray-50/95 backdrop-blur-md py-4 px-4 border-b dark:border-white/5 border-gray-200 shadow-sm">
+      <header className="sticky top-0 z-40 dark:bg-[#050505]/95 bg-[#050505]/95 backdrop-blur-md py-4 px-4 border-b dark:border-white/5 border-white/5 shadow-sm">
         <div className="max-w-lg mx-auto flex justify-between items-center">
           <div className="flex items-center gap-2">
             <button 
               type="button"
               onClick={() => { triggerHaptic(); window.history.back(); }}
-              className="p-2.5 dark:bg-white/5 bg-gray-100 rounded-xl hover:bg-gray-200 text-gray-400"
+              className="p-2.5 dark:bg-white/5 bg-white/5 rounded-xl hover:bg-white/10 text-gray-400"
               title="Back"
             >
               <ArrowLeft size={16} />
@@ -971,16 +1065,45 @@ export default function BbCafeHelper() {
           </div>
         </div>
 
+        {/* --- GLOBAL LOW STOCK REORDER CONTROLLER CARD --- */}
+        {totalLowStockItemsCount > 0 && (
+          <div className="bg-red-500/10 border border-red-500/20 p-5 rounded-3xl space-y-3 shadow-md animate-pulse">
+            <div className="flex justify-between items-start">
+              <div>
+                <p className="text-xs font-black uppercase text-red-500 flex items-center gap-1.5">
+                  <AlertTriangle size={15} /> {isHindi ? "⚠️ कम / समाप्त स्टॉक चेतावनी" : "⚠️ Low / Out of Stock Alert"}
+                </p>
+                <p className="text-[9px] text-gray-400 font-medium mt-1">
+                  {isHindi ? `स्टोर रूम और पैकेजिंग में ${totalLowStockItemsCount} सामग्रियां कम हैं।` : `${totalLowStockItemsCount} items are running low or out of stock.`}
+                </p>
+              </div>
+              <span className="bg-red-500 text-white px-2 py-0.5 rounded-full text-[9px] font-black">
+                {totalLowStockItemsCount}
+              </span>
+            </div>
+            
+            {/* Auto-Filtered Export Trigger Button */}
+            <button
+              type="button"
+              onClick={handleExportFinishedStockReport}
+              className="w-full bg-red-600 hover:bg-red-700 text-white py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow"
+            >
+              <Download size={12} />
+              {activeTranslation.lowStockReportBtn}
+            </button>
+          </div>
+        )}
+
         {/* --- TAB 1: DAILY EXPENSES --- */}
         {activeTab === 'expenses' && (
           <div className="space-y-6">
             <div className="grid grid-cols-2 gap-3">
               <div className="bg-[#111] border border-white/5 p-4 rounded-2xl">
-                <span className="text-[8px] font-black text-gray-500 uppercase">{activeTranslation.todayExpense}</span>
+                <span className="text-[8px] font-black text-gray-400 uppercase">{activeTranslation.todayExpense}</span>
                 <h3 className="text-lg font-black text-green-400 mt-1">₹{todayExpense}</h3>
               </div>
               <div className="bg-[#111] border border-white/5 p-4 rounded-2xl">
-                <span className="text-[8px] font-black text-gray-505 uppercase">{activeTranslation.monthExpense}</span>
+                <span className="text-[8px] font-black text-gray-400 uppercase">{activeTranslation.monthExpense}</span>
                 <h3 className="text-lg font-black text-orange-500 mt-1">₹{monthlyExpense}</h3>
               </div>
             </div>
@@ -1051,7 +1174,7 @@ export default function BbCafeHelper() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="text-[9px] font-bold text-gray-505 uppercase">{activeTranslation.amount}</label>
+                  <label className="text-[9px] font-bold text-gray-400 uppercase">{activeTranslation.amount}</label>
                   <input 
                     type="number" 
                     placeholder="e.g. 500" 
@@ -1062,7 +1185,7 @@ export default function BbCafeHelper() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[9px] font-bold text-gray-505 uppercase">{activeTranslation.category}</label>
+                  <label className="text-[9px] font-bold text-gray-400 uppercase">{activeTranslation.category}</label>
                   <select 
                     value={expenseCategory} 
                     onChange={(e) => setExpenseCategory(e.target.value)}
@@ -1077,7 +1200,7 @@ export default function BbCafeHelper() {
 
               <div className="grid grid-cols-1 gap-3">
                 <div className="space-y-1">
-                  <label className="text-[9px] font-bold text-gray-505 uppercase">{isHindi ? "तारीख (Date)" : "Date"}</label>
+                  <label className="text-[9px] font-bold text-gray-400 uppercase">{isHindi ? "तारीख (Date)" : "Date"}</label>
                   <input 
                     type="date" 
                     value={expenseDate} 
@@ -1087,7 +1210,7 @@ export default function BbCafeHelper() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[9px] font-bold text-gray-505 uppercase">{isHindi ? "खर्च का विवरण (Details)" : "Details/Notes"}</label>
+                  <label className="text-[9px] font-bold text-gray-400 uppercase">{isHindi ? "खर्च का विवरण (Details)" : "Details/Notes"}</label>
                   <textarea 
                     placeholder={activeTranslation.description}
                     value={expenseDescription} 
@@ -1189,7 +1312,7 @@ export default function BbCafeHelper() {
                       </select>
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[9px] font-bold text-gray-505 uppercase">Date</label>
+                      <label className="text-[9px] font-bold text-gray-500 uppercase font-sans">Date</label>
                       <input 
                         type="date" 
                         value={editingExpense.date}
@@ -1199,7 +1322,7 @@ export default function BbCafeHelper() {
                       />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[9px] font-bold text-gray-505 uppercase">Details</label>
+                      <label className="text-[9px] font-bold text-gray-500 uppercase font-sans">Details</label>
                       <textarea 
                         value={editingExpense.description}
                         onChange={(e) => setEditingExpense({ ...editingExpense, description: e.target.value })}
@@ -1207,7 +1330,7 @@ export default function BbCafeHelper() {
                         required 
                       />
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 font-sans">
                       <button type="submit" className="flex-1 bg-green-600 text-white font-black py-2.5 rounded-xl text-[10px] uppercase">Save</button>
                       <button type="button" onClick={() => setEditingExpense(null)} className="bg-white/5 text-gray-400 font-bold py-2.5 rounded-xl text-[10px] uppercase">Cancel</button>
                     </div>
@@ -1240,7 +1363,7 @@ export default function BbCafeHelper() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="text-[9px] font-bold text-gray-405 uppercase">{activeTranslation.purchaseCost}</label>
+                  <label className="text-[9px] font-bold text-gray-400 uppercase">{activeTranslation.purchaseCost}</label>
                   <input 
                     type="number" 
                     placeholder="e.g. 15000" 
@@ -1251,7 +1374,7 @@ export default function BbCafeHelper() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[9px] font-bold text-gray-405 uppercase">{activeTranslation.lifespan}</label>
+                  <label className="text-[9px] font-bold text-gray-400 uppercase">{activeTranslation.lifespan}</label>
                   <input 
                     type="number" 
                     placeholder="e.g. 5" 
@@ -1265,7 +1388,7 @@ export default function BbCafeHelper() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="text-[9px] font-bold text-gray-405 uppercase">{activeTranslation.purchaseDate}</label>
+                  <label className="text-[9px] font-bold text-gray-400 uppercase">{activeTranslation.purchaseDate}</label>
                   <input 
                     type="date" 
                     value={assetPurchaseDate} 
@@ -1275,7 +1398,7 @@ export default function BbCafeHelper() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[9px] font-bold text-gray-405 uppercase">{activeTranslation.nextService}</label>
+                  <label className="text-[9px] font-bold text-gray-400 uppercase">{activeTranslation.nextService}</label>
                   <input 
                     type="date" 
                     value={assetMaintenance} 
@@ -1296,7 +1419,7 @@ export default function BbCafeHelper() {
                 <p className="text-center text-gray-500 py-6 text-xs uppercase font-bold">{isHindi ? "कोई उपकरण पंजीकृत नहीं है।" : "No registered assets yet."}</p>
               ) : (
                 filteredAssets.map(a => {
-                  const currentVal = calculateCurrentValue(a.purchaseDate, a.cost, a.lifespanYears);
+                  const currentVal = calculateCurrentValue(a.purchaseDate, Number(a.cost), Number(a.lifespanYears));
                   const isMaintenanceOverdue = a.nextMaintenanceDate && new Date(a.nextMaintenanceDate).getTime() < new Date().getTime();
 
                   return (
@@ -1358,7 +1481,7 @@ export default function BbCafeHelper() {
                   >
                     <h4 className="font-black text-sm uppercase text-orange-500 text-center">✏️ Edit Fixed Asset (संपत्ति विवरण बदलें)</h4>
                     <div className="space-y-1">
-                      <label className="text-[9px] font-bold text-gray-550 uppercase">{activeTranslation.assetName}</label>
+                      <label className="text-[9px] font-bold text-gray-400 uppercase">{activeTranslation.assetName}</label>
                       <input 
                         type="text" 
                         value={editingAsset.name}
@@ -1367,9 +1490,9 @@ export default function BbCafeHelper() {
                         required 
                       />
                     </div>
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-2 gap-3 font-sans">
                       <div className="space-y-1">
-                        <label className="text-[9px] font-bold text-gray-550 uppercase">Cost (₹)</label>
+                        <label className="text-[9px] font-bold text-gray-400 uppercase font-sans">Cost (₹)</label>
                         <input 
                           type="number" 
                           value={editingAsset.cost}
@@ -1379,7 +1502,7 @@ export default function BbCafeHelper() {
                         />
                       </div>
                       <div className="space-y-1">
-                        <label className="text-[9px] font-bold text-gray-550 uppercase">Lifespan</label>
+                        <label className="text-[9px] font-bold text-gray-400 uppercase font-sans">Lifespan</label>
                         <input 
                           type="number" 
                           value={editingAsset.lifespanYears}
@@ -1390,7 +1513,7 @@ export default function BbCafeHelper() {
                       </div>
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[9px] font-bold text-gray-550 uppercase">Purchase Date</label>
+                      <label className="text-[9px] font-bold text-gray-400 uppercase font-sans">Purchase Date</label>
                       <input 
                         type="date" 
                         value={editingAsset.purchaseDate}
@@ -1400,7 +1523,7 @@ export default function BbCafeHelper() {
                       />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[9px] font-bold text-gray-555 uppercase">Next Service Date</label>
+                      <label className="text-[9px] font-bold text-gray-400 uppercase font-sans">Next Service Date</label>
                       <input 
                         type="date" 
                         value={editingAsset.nextMaintenanceDate}
@@ -1408,9 +1531,9 @@ export default function BbCafeHelper() {
                         className="w-full text-xs font-bold p-3 rounded-xl bg-black border border-white/10 text-white"
                       />
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 font-sans">
                       <button type="submit" className="flex-1 bg-green-600 text-white font-black py-2.5 rounded-xl text-[10px] uppercase">Update</button>
-                      <button type="button" onClick={() => setEditingAsset(null)} className="bg-white/5 text-gray-405 p-2.5 rounded-xl font-black text-[10px] uppercase">Cancel</button>
+                      <button type="button" onClick={() => setEditingAsset(null)} className="bg-white/5 text-gray-400 p-2.5 rounded-xl font-black text-[10px] uppercase">Cancel</button>
                     </div>
                   </motion.form>
                 </div>
@@ -1499,11 +1622,11 @@ export default function BbCafeHelper() {
                 <div className="fixed inset-0 bg-black/95 backdrop-blur-md z-[125] flex items-center justify-center p-6">
                   <form 
                     onSubmit={handleUpdateStoreCategory}
-                    className="bg-[#111] border border-orange-500/30 p-6 rounded-3xl w-full max-w-sm space-y-4"
+                    className="bg-[#111] border border-orange-500/30 p-6 rounded-3xl w-full max-w-sm space-y-4 font-sans"
                   >
                     <h4 className="font-black text-sm uppercase text-orange-500 text-center">✏️ Edit Store Category</h4>
                     <div className="space-y-1">
-                      <label className="text-[9px] font-bold text-gray-500 uppercase">Category Name</label>
+                      <label className="text-[9px] font-bold text-gray-400 uppercase">Category Name</label>
                       <input 
                         type="text" 
                         value={editStoreCatName}
@@ -1610,38 +1733,44 @@ export default function BbCafeHelper() {
               {filteredStoreItems.length === 0 ? (
                 <p className="text-center text-gray-500 py-6 text-xs uppercase font-bold">{isHindi ? "स्टोर रूम खाली है।" : "Store room is empty."}</p>
               ) : (
-                filteredStoreItems.map(item => (
-                  <div key={item.id} className="bg-white/[0.02] border border-white/5 p-4 rounded-2xl flex items-center justify-between gap-3 text-xs font-bold hover:bg-white/[0.04] transition-colors relative">
-                    <div className="space-y-0.5">
-                      <h4 className="text-gray-200">{item.name}</h4>
-                      <p className="text-[10px] text-green-400 uppercase">{item.quantity} {item.unit} available</p>
-                      <span className="text-[8px] bg-neutral-900 text-gray-400 border border-white/5 px-2 py-0.5 rounded-full inline-block mt-1 font-bold">{item.category || "General"}</span>
-                    </div>
+                filteredStoreItems.map(item => {
+                  const isLow = Number(item.quantity) <= 2;
+                  return (
+                    <div key={item.id} className={`p-4 rounded-2xl flex items-center justify-between gap-3 text-xs font-bold hover:bg-white/[0.04] transition-colors border relative ${isLow ? 'bg-red-500/[0.01] border-red-500/30' : 'bg-white/[0.02] border-white/5'}`}>
+                      <div className="space-y-0.5">
+                        <div className="flex items-center gap-1.5">
+                          <h4 className="text-gray-200">{item.name}</h4>
+                          {isLow && <span className="h-1.5 w-1.5 rounded-full bg-red-500 animate-ping" />}
+                        </div>
+                        <p className={`text-[10px] uppercase ${isLow ? 'text-red-500' : 'text-green-400'}`}>{item.quantity} {item.unit} available</p>
+                        <span className="text-[8px] bg-neutral-900 text-gray-400 border border-white/5 px-2 py-0.5 rounded-full inline-block mt-1 font-bold">{item.category || "General"}</span>
+                      </div>
 
-                    <div className="flex items-center gap-2">
-                      <button 
-                        type="button"
-                        onClick={() => { triggerHaptic(); setIsTransferringStock(item); }}
-                        className="px-3 py-1.5 bg-orange-500/10 hover:bg-orange-500/20 text-orange-500 rounded-lg text-[9px] font-black uppercase flex items-center gap-1 border border-orange-500/20"
-                      >
-                        <ArrowRightLeft size={10} /> {isHindi ? "किचन में भेजें" : "Move"}
-                      </button>
-                      <button 
-                        type="button"
-                        onClick={() => {
-                          setEditingStoreItem({ ...item });
-                        }}
-                        className="p-2.5 bg-blue-500/10 text-blue-400 rounded-lg"
-                        title="Edit inline"
-                      >
-                        ✏️
-                      </button>
-                      <button onClick={() => handleDeleteStoreItem(item.id)} className="text-gray-400 hover:text-red-500 p-1" title="Delete">
-                        <Trash2 size={14} />
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button 
+                          type="button"
+                          onClick={() => { triggerHaptic(); setIsTransferringStock(item); }}
+                          className="px-3 py-1.5 bg-orange-500/10 hover:bg-orange-500/20 text-orange-500 rounded-lg text-[9px] font-black uppercase flex items-center gap-1 border border-orange-500/20"
+                        >
+                          <ArrowRightLeft size={10} /> {isHindi ? "किचन में भेजें" : "Move"}
+                        </button>
+                        <button 
+                          type="button"
+                          onClick={() => {
+                            setEditingStoreItem({ ...item });
+                          }}
+                          className="p-2.5 bg-blue-500/10 text-blue-400 rounded-lg"
+                          title="Edit inline"
+                        >
+                          ✏️
+                        </button>
+                        <button onClick={() => handleDeleteStoreItem(item.id)} className="text-gray-400 hover:text-red-500 p-1" title="Delete">
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
 
@@ -1668,7 +1797,7 @@ export default function BbCafeHelper() {
                   </div>
                 ))}
                 {storeLedger.length === 0 && (
-                  <p className="text-center text-[9px] text-gray-655 font-bold uppercase py-4">No transactions logged yet...</p>
+                  <p className="text-center text-[9px] text-gray-400 font-bold uppercase py-4">No transactions logged yet...</p>
                 )}
               </div>
             </div>
@@ -1679,14 +1808,14 @@ export default function BbCafeHelper() {
                 <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[120] flex items-center justify-center p-6">
                   <motion.form 
                     onSubmit={handleUpdateStoreItem}
-                    className="bg-[#111] border border-orange-500/30 p-6 rounded-3xl w-full max-w-sm space-y-4"
+                    className="bg-[#111] border border-orange-500/30 p-6 rounded-3xl w-full max-w-sm space-y-4 font-sans"
                     initial={{ scale: 0.95, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
                     exit={{ scale: 0.95, opacity: 0 }}
                   >
                     <h4 className="font-black text-sm uppercase text-orange-500 text-center">✏️ Edit Store Item (आइटम विवरण बदलें)</h4>
                     <div className="space-y-1">
-                      <label className="text-[9px] font-bold text-gray-500 uppercase font-sans">Item Name</label>
+                      <label className="text-[9px] font-bold text-gray-450 uppercase">Item Name</label>
                       <input 
                         type="text" 
                         value={editingStoreItem.name}
@@ -1695,9 +1824,9 @@ export default function BbCafeHelper() {
                         required 
                       />
                     </div>
-                    <div className="grid grid-cols-2 gap-3 font-sans">
+                    <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-1">
-                        <label className="text-[9px] font-bold text-gray-500 uppercase">Current Stock Qty</label>
+                        <label className="text-[9px] font-bold text-gray-450 uppercase">Current Stock Qty</label>
                         <input 
                           type="number" 
                           value={editingStoreItem.quantity}
@@ -1707,7 +1836,7 @@ export default function BbCafeHelper() {
                         />
                       </div>
                       <div className="space-y-1">
-                        <label className="text-[9px] font-bold text-gray-500 uppercase font-sans">Category</label>
+                        <label className="text-[9px] font-bold text-gray-450 uppercase">Category</label>
                         <select 
                           value={editingStoreItem.category || ""}
                           onChange={(e) => setEditingStoreItem({ ...editingStoreItem, category: e.target.value })}
@@ -1720,8 +1849,8 @@ export default function BbCafeHelper() {
                       </div>
                     </div>
                     <div className="flex gap-2">
-                      <button type="submit" className="flex-1 bg-green-600 text-white font-black py-2.5 rounded-xl text-[10px] uppercase">Update</button>
-                      <button type="button" onClick={() => setEditingStoreItem(null)} className="bg-white/5 text-gray-400 font-bold py-2.5 rounded-xl text-[10px] uppercase">Cancel</button>
+                      <button type="submit" className="flex-1 bg-green-600 text-white font-black py-2.5 rounded-xl text-[10px] uppercase font-sans">Update</button>
+                      <button type="button" onClick={() => setEditingStoreItem(null)} className="bg-white/5 text-gray-400 font-bold py-2.5 rounded-xl text-[10px] uppercase font-sans">Cancel</button>
                     </div>
                   </motion.form>
                 </div>
@@ -1734,7 +1863,7 @@ export default function BbCafeHelper() {
                 <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[120] flex items-center justify-center p-6">
                   <motion.form 
                     onSubmit={handleMoveToKitchen}
-                    className="bg-[#111] border border-orange-500/30 p-6 rounded-3xl w-full max-w-sm space-y-4 text-center"
+                    className="bg-[#111] border border-orange-500/30 p-6 rounded-3xl w-full max-w-sm space-y-4 text-center font-sans"
                     initial={{ scale: 0.95, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
                     exit={{ scale: 0.95, opacity: 0 }}
@@ -1744,11 +1873,11 @@ export default function BbCafeHelper() {
                     </div>
                     <div>
                       <h4 className="font-black text-sm uppercase text-orange-500">{activeTranslation.moveStock}</h4>
-                      <p className="text-[9px] text-gray-400 font-bold uppercase mt-1 font-sans">Item: {isTransferringStock.name} (Max: {isTransferringStock.quantity} {isTransferringStock.unit})</p>
+                      <p className="text-[9px] text-gray-400 font-bold uppercase mt-1">Item: {isTransferringStock.name} (Max: {isTransferringStock.quantity} {isTransferringStock.unit})</p>
                     </div>
 
-                    <div className="space-y-1 text-left font-sans">
-                      <label className="text-[9px] font-bold text-gray-500 uppercase">{activeTranslation.qtyToMove}</label>
+                    <div className="space-y-1 text-left">
+                      <label className="text-[9px] font-bold text-gray-400 uppercase">{activeTranslation.qtyToMove}</label>
                       <input 
                         type="number" 
                         placeholder="e.g. 1" 
@@ -1876,7 +2005,7 @@ export default function BbCafeHelper() {
 
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
-                    <label className="text-[9px] font-bold text-gray-505 uppercase">{isHindi ? "श्रेणी (Category)" : "Category"}</label>
+                    <label className="text-[9px] font-bold text-gray-400 uppercase">{isHindi ? "श्रेणी (Category)" : "Category"}</label>
                     <select 
                       value={newPkgCategory} 
                       onChange={(e) => setNewPkgCategory(e.target.value)}
@@ -1888,7 +2017,7 @@ export default function BbCafeHelper() {
                     </select>
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[9px] font-bold text-gray-505 uppercase">{isHindi ? "प्रारंभिक स्टॉक" : "Initial Stock Quantity"}</label>
+                    <label className="text-[9px] font-bold text-gray-400 uppercase">{isHindi ? "प्रारंभिक स्टॉक" : "Initial Stock Quantity"}</label>
                     <input 
                       type="number" 
                       placeholder="e.g. 100" 
@@ -1901,7 +2030,7 @@ export default function BbCafeHelper() {
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[9px] font-bold text-gray-550 uppercase">{isHindi ? "न्यूनतम अलर्ट सीमा" : "Reorder Warning Limit"}</label>
+                  <label className="text-[9px] font-bold text-gray-400 uppercase">{isHindi ? "न्यूनतम अलर्ट सीमा" : "Reorder Warning Limit"}</label>
                   <input 
                     type="number" 
                     placeholder="e.g. 30" 
@@ -1928,13 +2057,13 @@ export default function BbCafeHelper() {
                   <h4 className="font-black text-sm uppercase text-orange-500 text-center">✏️ Edit Packaging Item</h4>
                   
                   <div className="space-y-1">
-                    <label className="text-[9px] font-bold text-gray-500 uppercase">Item Name</label>
+                    <label className="text-[9px] font-bold text-gray-450 uppercase">Item Name</label>
                     <input type="text" value={editPkgName} onChange={(e) => setEditPkgName(e.target.value)} className="w-full text-xs font-bold p-3 rounded-xl bg-black border border-white/10 outline-none text-white focus:border-orange-500" required />
                   </div>
 
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1">
-                      <label className="text-[9px] font-bold text-gray-500 uppercase">Category</label>
+                      <label className="text-[9px] font-bold text-gray-450 uppercase">Category</label>
                       <select value={editPkgCategory} onChange={(e) => setEditPkgCategory(e.target.value)} className="w-full text-xs font-bold p-3 rounded-xl bg-black border border-white/10 outline-none text-white focus:border-orange-500 cursor-pointer">
                         {pkgCategories.map(cat => (
                           <option key={cat.id} value={cat.name} className="bg-[#111]">{cat.name}</option>
@@ -1942,14 +2071,14 @@ export default function BbCafeHelper() {
                       </select>
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[9px] font-bold text-gray-500 uppercase">Min Limit</label>
+                      <label className="text-[9px] font-bold text-gray-450 uppercase">Min Limit</label>
                       <input type="number" value={editPkgMinLimit} onChange={(e) => setEditPkgMinLimit(e.target.value)} className="w-full text-xs font-bold p-3 rounded-xl bg-black border border-white/10 outline-none text-white" required />
                     </div>
                   </div>
 
                   <div className="flex gap-2">
                     <button type="submit" className="flex-1 bg-green-600 text-white font-black py-2.5 rounded-xl text-[10px] uppercase">Update</button>
-                    <button type="button" onClick={() => setEditingPkgItem(null)} className="bg-white/5 text-gray-404 p-2.5 rounded-xl font-black text-[10px] uppercase">Cancel</button>
+                    <button type="button" onClick={() => setEditingPkgItem(null)} className="bg-white/5 text-gray-400 p-2.5 rounded-xl font-black text-[10px] uppercase">Cancel</button>
                   </div>
                 </form>
               </div>
@@ -2031,7 +2160,7 @@ export default function BbCafeHelper() {
               </div>
             </div>
 
-            <div className="bg-[#111] border border-white/5 p-4 rounded-2xl flex justify-between items-center text-xs font-bold text-gray-455 uppercase font-mono">
+            <div className="bg-[#111] border border-white/5 p-4 rounded-2xl flex justify-between items-center text-xs font-bold text-gray-400 uppercase font-mono">
               <span>Generate Packaging WhatsApp Order:</span>
               <button 
                 type="button"
