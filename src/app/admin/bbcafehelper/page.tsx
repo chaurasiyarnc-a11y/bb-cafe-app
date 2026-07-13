@@ -6,13 +6,13 @@ import { Plus, X, Trash2, Calendar, IndianRupee, ArrowLeft, Lock, Loader2, Filte
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
 
-// Expense categories dropdown options
-const EXPENSE_CATEGORIES = [
-  { id: "Raw Materials", label: "Raw Materials 🥛" },
-  { id: "Packaging", label: "Packaging 📦" },
-  { id: "Utility & Fuel", label: "Utility & Fuel 🔥" },
-  { id: "Wages/Salary", label: "Wages/Salary 💵" },
-  { id: "Others", label: "Others 📝" }
+// Default fallback categories if database is empty
+const DEFAULT_EXP_CATEGORIES = [
+  { id: "Raw Materials", name: "Raw Materials 🥛" },
+  { id: "Packaging", name: "Packaging 📦" },
+  { id: "Utility & Fuel", name: "Utility & Fuel 🔥" },
+  { id: "Wages/Salary", name: "Wages/Salary 💵" },
+  { id: "Others", name: "Others 📝" }
 ];
 
 // Bilingual translations dictionary
@@ -41,7 +41,10 @@ const t = {
     moveStock: "किचन में भेजें",
     qtyToMove: "स्थानांतरित मात्रा",
     lowStockWarning: "🚨 स्टॉक समाप्त होने की चेतावनी!",
-    tableBoxes: "पिज्जा बॉक्स स्टॉक"
+    tableBoxes: "पिज्जा बॉक्स स्टॉक",
+    manageCategories: "⚙️ श्रेणियां प्रबंधित करें",
+    newCategoryPlaceholder: "नई श्रेणी का नाम दर्ज करें (जैसे Fruits)",
+    addCategoryBtn: "जोड़ें"
   },
   en: {
     title: "Cafe Helper Dashboard",
@@ -67,7 +70,10 @@ const t = {
     moveStock: "Move to Kitchen",
     qtyToMove: "Quantity to Move",
     lowStockWarning: "🚨 Low Stock Alert!",
-    tableBoxes: "Pizza Boxes Stock Tracker"
+    tableBoxes: "Pizza Boxes Stock Tracker",
+    manageCategories: "⚙️ Manage Categories",
+    newCategoryPlaceholder: "Enter new category name (e.g., Fruits)",
+    addCategoryBtn: "Add"
   }
 };
 
@@ -80,12 +86,17 @@ export default function BbCafeHelper() {
   const [activeTab, setActiveTab] = useState<'expenses' | 'assets' | 'store_room' | 'packaging'>('expenses');
   const [isHindi, setIsHindi] = useState(true);
 
-  // --- 1. EXPENSES STATES & LOGIC ---
+  // --- 1. DYNAMIC EXPENSES & CATEGORIES STATES ---
   const [expenseAmount, setExpenseAmount] = useState("");
   const [expenseCategory, setExpenseCategory] = useState("Raw Materials");
   const [expenseDescription, setExpenseDescription] = useState("");
   const [expenseDate, setExpenseDate] = useState(new Date().toISOString().split('T')[0]);
   const [expenses, setExpenses] = useState<any[]>([]);
+  
+  // Real-time custom expense categories states
+  const [expenseCategories, setExpenseCategories] = useState<any[]>([]);
+  const [newExpenseCatInput, setNewExpenseCatInput] = useState("");
+  const [showManageCatPanel, setShowManageCatPanel] = useState(false);
 
   // --- 2. FIXED ASSETS STATES & LOGIC ---
   const [assetName, setAssetName] = useState("");
@@ -155,6 +166,21 @@ export default function BbCafeHelper() {
       setExpenses(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
 
+    // Load Custom Expense Categories dynamically
+    const unsubExpCats = onSnapshot(query(collection(db, "expense_categories"), orderBy("name", "asc")), (snap) => {
+      if (!snap.empty) {
+        const loadedCats = snap.docs.map(d => ({ id: d.id, ...d.data() as any }));
+        setExpenseCategories(loadedCats);
+        // Automatically default form category select to the first loaded category
+        if (loadedCats.length > 0) {
+          setExpenseCategory(loadedCats[0].name);
+        }
+      } else {
+        setExpenseCategories(DEFAULT_EXP_CATEGORIES);
+        setExpenseCategory(DEFAULT_EXP_CATEGORIES[0].name);
+      }
+    });
+
     // Load Fixed Assets
     const unsubAssets = onSnapshot(query(collection(db, "fixed_assets"), orderBy("timestamp", "desc")), (snap) => {
       setAssets(snap.docs.map(d => ({ id: d.id, ...d.data() })));
@@ -179,13 +205,14 @@ export default function BbCafeHelper() {
 
     return () => {
       unsubExpenses();
+      unsubExpCats();
       unsubAssets();
       unsubStore();
       unsubPkg();
     };
   }, [isAdminAuthorized]);
 
-  // --- EXPENSE HANDLERS ---
+  // --- 1. DYNAMIC EXPENSES & CATEGORIES HANDLERS ---
   const handleSaveExpense = async (e: React.FormEvent) => {
     e.preventDefault();
     triggerHaptic();
@@ -222,7 +249,43 @@ export default function BbCafeHelper() {
     }
   };
 
-  // --- ASSET HANDLERS ---
+  // Add custom dynamic category to database
+  const handleAddExpenseCategory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    triggerHaptic();
+    const cleanName = newExpenseCatInput.trim();
+    if (!cleanName) return toast.error("श्रेणी का नाम दर्ज करें!");
+
+    // Stop duplicate categories
+    const exists = expenseCategories.some(c => String(c.name).toLowerCase().trim() === cleanName.toLowerCase());
+    if (exists) return toast.error("यह श्रेणी पहले से ही मौजूद है!");
+
+    try {
+      await addDoc(collection(db, "expense_categories"), {
+        name: cleanName,
+        timestamp: new Date()
+      });
+      setNewExpenseCatInput("");
+      toast.success(`श्रेणी '${cleanName}' सफलतापूर्वक जोड़ी गई!`);
+    } catch (err) {
+      toast.error("श्रेणी जोड़ने में असमर्थ।");
+    }
+  };
+
+  // Delete custom dynamic category from database
+  const handleDeleteExpenseCategory = async (id: string, name: string) => {
+    triggerHaptic(50);
+    if (!window.confirm(`क्या आप वाकई श्रेणी '${name}' को डिलीट करना चाहते हैं?`)) return;
+
+    try {
+      await deleteDoc(doc(db, "expense_categories", id));
+      toast.success("श्रेणी हटा दी गई है।");
+    } catch (err) {
+      toast.error("श्रेणी डिलीट करने में विफल।");
+    }
+  };
+
+  // --- 2. ASSET HANDLERS ---
   const handleSaveAsset = async (e: React.FormEvent) => {
     e.preventDefault();
     triggerHaptic();
@@ -275,7 +338,7 @@ export default function BbCafeHelper() {
     return Math.max(0, Math.round(remainingVal));
   };
 
-  // --- STORE ROOM HANDLERS ---
+  // --- 3. STORE ROOM HANDLERS ---
   const handleSaveStoreItem = async (e: React.FormEvent) => {
     e.preventDefault();
     triggerHaptic();
@@ -333,7 +396,7 @@ export default function BbCafeHelper() {
     }
   };
 
-  // --- PACKAGING UPDATERS (PIZZA BOXES) ---
+  // --- 4. PACKAGING UPDATERS (PIZZA BOXES) ---
   const handleUpdateBoxCount = async (sizeKey: string, newCount: number) => {
     triggerHaptic();
     if (newCount < 0) return;
@@ -480,6 +543,65 @@ export default function BbCafeHelper() {
               </div>
             </div>
 
+            {/* EXPENSE CATEGORY MANAGER SECTION (Dynamic add & remove categories) */}
+            <div className="bg-white/[0.02] border border-white/5 p-4 rounded-3xl space-y-3 shadow-md">
+              <div className="flex justify-between items-center">
+                <p className="text-[10px] font-black uppercase tracking-wider text-orange-400">{activeTranslation.manageCategories}</p>
+                <button
+                  type="button"
+                  onClick={() => { triggerHaptic(); setShowManageCatPanel(!showManageCatPanel); }}
+                  className="px-3 py-1 bg-white/5 rounded-xl text-[9px] font-black uppercase border border-white/10"
+                >
+                  {showManageCatPanel ? (isHindi ? "बंद करें" : "Close") : (isHindi ? "खोलें" : "Open")}
+                </button>
+              </div>
+
+              <AnimatePresence>
+                {showManageCatPanel && (
+                  <motion.div 
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    className="overflow-hidden space-y-3"
+                  >
+                    <form onSubmit={handleAddExpenseCategory} className="flex gap-2">
+                      <input 
+                        type="text" 
+                        placeholder={activeTranslation.newCategoryPlaceholder}
+                        value={newExpenseCatInput}
+                        onChange={(e) => setNewExpenseCatInput(e.target.value)}
+                        className="flex-1 text-xs font-semibold p-2.5 rounded-xl bg-black border border-white/10 outline-none text-white focus:border-orange-500"
+                      />
+                      <button 
+                        type="submit"
+                        className="px-4 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-xl text-xs font-black uppercase"
+                      >
+                        {activeTranslation.addCategoryBtn}
+                      </button>
+                    </form>
+
+                    <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto no-scrollbar pt-1">
+                      {expenseCategories.map(cat => (
+                        <div 
+                          key={cat.id} 
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-[#111] border border-white/5 rounded-xl text-xs font-bold"
+                        >
+                          <span className="text-gray-300">{cat.name}</span>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteExpenseCategory(cat.id, cat.name)}
+                            className="text-gray-500 hover:text-red-500 p-0.5"
+                          >
+                            <X size={12} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
             <form onSubmit={handleSaveExpense} className="bg-white/[0.02] border border-white/5 p-5 rounded-3xl space-y-4 shadow-xl">
               <p className="text-[10px] font-black uppercase tracking-wider text-orange-500 border-b border-white/5 pb-2">
                 ➕ {activeTranslation.addExpense}
@@ -504,8 +626,8 @@ export default function BbCafeHelper() {
                     onChange={(e) => setExpenseCategory(e.target.value)}
                     className="w-full text-xs font-bold p-3 rounded-xl bg-neutral-900 border dark:border-white/5 border-gray-200 outline-none text-white focus:border-orange-500 cursor-pointer"
                   >
-                    {EXPENSE_CATEGORIES.map(cat => (
-                      <option key={cat.id} value={cat.id}>{cat.id}</option>
+                    {expenseCategories.map(cat => (
+                      <option key={cat.id} value={cat.name}>{cat.name}</option>
                     ))}
                   </select>
                 </div>
@@ -578,7 +700,7 @@ export default function BbCafeHelper() {
                   placeholder="e.g. Deep Fridge / Sandwich Griller" 
                   value={assetName} 
                   onChange={(e) => setAssetName(e.target.value)} 
-                  className="w-full text-xs font-bold p-3 rounded-xl dark:bg-white/[0.03] bg-gray-50 border dark:border-white/5 border-gray-200 outline-none text-white focus:border-orange-500"
+                  className="w-full text-xs font-bold p-3 rounded-xl dark:bg-white/[0.03] bg-gray-550 border dark:border-neutral-700 border-gray-200 outline-none text-white focus:border-orange-500"
                   required 
                 />
               </div>
@@ -817,7 +939,7 @@ export default function BbCafeHelper() {
                   <Package size={14} /> {activeTranslation.tableBoxes}
                 </h4>
                 <div className="flex items-center gap-1 bg-black/40 px-2 py-1 rounded-lg border border-white/5">
-                  <span className="text-[8px] font-bold text-gray-450 uppercase">{isHindi ? "अलर्ट सीमा" : "Min Limit"}:</span>
+                  <span className="text-[8px] font-bold text-gray-455 uppercase">{isHindi ? "अलर्ट सीमा" : "Min Limit"}:</span>
                   <input 
                     type="number" 
                     value={pizzaBoxes.minLimit} 
