@@ -15,7 +15,7 @@ const EXPENSE_CATEGORIES = [
   { id: "Others", label: "Others 📝" }
 ];
 
-// Bilingual translations dictionary
+// Bilingual translations dictionary (addExpense variable fixed here)
 const t = {
   hi: {
     title: "कैफ़े सहायक डैशबोर्ड",
@@ -24,6 +24,7 @@ const t = {
     assetsTab: "🏢 अचल संपत्ति",
     storeTab: "📦 स्टोर रूम",
     packagingTab: "🍕 पैकेजिंग व किराना",
+    addExpense: "नया खर्च जोड़ें",
     save: "सहेजें ➔",
     close: "बंद करें",
     amount: "राशि (₹)",
@@ -49,6 +50,7 @@ const t = {
     assetsTab: "🏢 Fixed Assets",
     storeTab: "📦 Store Room",
     packagingTab: "🍕 Packaging & Stock",
+    addExpense: "Add Daily Expense",
     save: "Save Record ➔",
     close: "Close",
     amount: "Amount (₹)",
@@ -785,12 +787,13 @@ export default function BbCafeHelper() {
 
                     <div className="flex items-center gap-2">
                       <button 
+                        type="button"
                         onClick={() => { triggerHaptic(); setIsTransferringStock(item); }}
                         className="px-3 py-1.5 bg-orange-500/10 hover:bg-orange-500/20 text-orange-500 rounded-lg text-[9px] font-black uppercase flex items-center gap-1 border border-orange-500/20"
                       >
                         <ArrowRightLeft size={10} /> {isHindi ? "किचन में भेजें" : "Move"}
                       </button>
-                      <button onClick={() => handleDeleteStoreItem(item.id)} className="text-gray-400 hover:text-red-500 p-1" title="Delete">
+                      <button type="button" onClick={() => handleDeleteStoreItem(item.id)} className="text-gray-400 hover:text-red-500 p-1" title="Delete">
                         <Trash2 size={14} />
                       </button>
                     </div>
@@ -851,12 +854,14 @@ export default function BbCafeHelper() {
                         <span className={`text-base font-black ${isLow ? 'text-red-500' : 'text-green-400'}`}>{currentStock} Pcs</span>
                         <div className="flex gap-1.5 bg-black/40 p-1 rounded-lg border border-white/5">
                           <button 
+                            type="button"
                             onClick={() => handleUpdateBoxCount(box.id, currentStock - 10)} 
                             className="w-5 h-5 flex items-center justify-center bg-red-500/10 text-red-500 text-[10px] font-black rounded"
                           >
                             -10
                           </button>
                           <button 
+                            type="button"
                             onClick={() => handleUpdateBoxCount(box.id, currentStock + 50)} 
                             className="w-5 h-5 flex items-center justify-center bg-green-500/10 text-green-500 text-[10px] font-black rounded"
                           >
@@ -870,9 +875,10 @@ export default function BbCafeHelper() {
               </div>
             </div>
 
-            <div className="bg-[#111] border border-white/5 p-4 rounded-2xl flex justify-between items-center text-xs font-bold text-gray-450 uppercase font-mono">
+            <div className="bg-[#111] border border-white/5 p-4 rounded-2xl flex justify-between items-center text-xs font-bold text-gray-455 uppercase font-mono">
               <span>Generate Packaging WhatsApp Order:</span>
               <button 
+                type="button"
                 onClick={() => {
                   triggerHaptic();
                   const lowBoxes = Object.entries(pizzaBoxes)
