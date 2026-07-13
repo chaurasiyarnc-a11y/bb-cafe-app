@@ -1,8 +1,6 @@
-
-
 'use client';
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
   Home, 
   Store, 
@@ -13,8 +11,8 @@ import {
   Search, 
   Filter, 
   Plus, 
+  X,
   Trash2, 
-  Edit, 
   UserCheck, 
   BarChart3, 
   Settings, 
@@ -96,6 +94,20 @@ interface StockOutLog {
   remarks: string;
 }
 
+interface NotificationItem {
+  id: string;
+  type: string;
+  text: string;
+  time: string;
+}
+
+// Helper function for Vibration
+const triggerHaptic = (ms = 35) => {
+  if (typeof window !== 'undefined' && window.navigator && window.navigator.vibrate) {
+    window.navigator.vibrate(ms);
+  }
+};
+
 // ==========================================
 // 2. MASTER INITIAL INVENTORY SEED DATA
 // ==========================================
@@ -105,17 +117,17 @@ const INITIAL_INVENTORY: InventoryItem[] = [
   { id: "item_3", name: "TUAR DAL", category: "Raw Material", storeQty: 50, cafeQty: 8, unit: "Kg", purchasePrice: 145, minLimit: 15, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-11", expiryDate: "2026-11-20", batchNumber: "B-TD402", barcode: "890105800233" },
   { id: "item_4", name: "MUG FADA", category: "Raw Material", storeQty: 30, cafeQty: 5, unit: "Kg", purchasePrice: 110, minLimit: 10, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-12", expiryDate: "2026-10-30", batchNumber: "B-MF122", barcode: "890105800234" },
   { id: "item_5", name: "BESAN", category: "Raw Material", storeQty: 45, cafeQty: 12, unit: "Kg", purchasePrice: 85, minLimit: 12, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-13", expiryDate: "2026-09-15", batchNumber: "B-BS009", barcode: "890105800235" },
-  { id: "item_6", name: "SUGER", category: "Raw Material", storeQty: 15, cafeQty: 2, unit: "Kg", purchasePrice: 44, minLimit: 25, supplier: "Om Super Market", lastPurchaseDate: "2026-07-02", expiryDate: "2027-07-02", batchNumber: "B-SU88", barcode: "890105800236" }, // Low Stock
+  { id: "item_6", name: "SUGER", category: "Raw Material", storeQty: 15, cafeQty: 2, unit: "Kg", purchasePrice: 44, minLimit: 25, supplier: "Om Super Market", lastPurchaseDate: "2026-07-02", expiryDate: "2027-07-02", batchNumber: "B-SU88", barcode: "890105800236" },
   { id: "item_7", name: "OIL TIN", category: "Raw Material", storeQty: 12, cafeQty: 2, unit: "Tins", purchasePrice: 1950, minLimit: 5, supplier: "Sagar Distributors", lastPurchaseDate: "2026-07-05", expiryDate: "2027-05-01", batchNumber: "B-OT55", barcode: "890105800237" },
   { id: "item_8", name: "SINGDANA", category: "Raw Material", storeQty: 20, cafeQty: 4, unit: "Kg", purchasePrice: 120, minLimit: 8, supplier: "Om Super Market", lastPurchaseDate: "2026-07-09", expiryDate: "2026-12-09", batchNumber: "B-SD02", barcode: "890105800238" },
-  { id: "item_9", name: "GHEE", category: "Dairy", storeQty: 10, cafeQty: 1, unit: "Kg", purchasePrice: 680, minLimit: 3, supplier: "Sony Dairy", lastPurchaseDate: "2026-07-11", expiryDate: "2026-11-11", batchNumber: "B-GH11", barcode: "890105800239" }, // Low Stock
+  { id: "item_9", name: "GHEE", category: "Dairy", storeQty: 10, cafeQty: 1, unit: "Kg", purchasePrice: 680, minLimit: 3, supplier: "Sony Dairy", lastPurchaseDate: "2026-07-11", expiryDate: "2026-11-11", batchNumber: "B-GH11", barcode: "890105800239" },
   { id: "item_10", name: "BUTTER", category: "Dairy", storeQty: 24, cafeQty: 5, unit: "Kg", purchasePrice: 420, minLimit: 8, supplier: "Sony Dairy", lastPurchaseDate: "2026-07-12", expiryDate: "2026-10-12", batchNumber: "B-BT22", barcode: "890105800240" },
   { id: "item_11", name: "CHEESE", category: "Dairy", storeQty: 18, cafeQty: 3, unit: "Kg", purchasePrice: 440, minLimit: 5, supplier: "Sony Dairy", lastPurchaseDate: "2026-07-12", expiryDate: "2026-10-15", batchNumber: "B-CH44", barcode: "890105800241" },
   { id: "item_12", name: "GAS BOTAL", category: "Others", storeQty: 4, cafeQty: 1, unit: "Pcs", purchasePrice: 1150, minLimit: 2, supplier: "Bharat Gas", lastPurchaseDate: "2026-07-01", expiryDate: "2030-01-01", batchNumber: "B-GB11", barcode: "890105800242" },
   
   // --- PACKAGING ---
   { id: "item_13", name: "TEASSU PAPER", category: "Packaging", storeQty: 500, cafeQty: 150, unit: "Pcs", purchasePrice: 0.8, minLimit: 200, supplier: "Narmada Packagings", lastPurchaseDate: "2026-07-10", barcode: "890105800243" },
-  { id: "item_14", name: "THALI PLASTIC", category: "Disposable", storeQty: 150, cafeQty: 20, unit: "Pcs", purchasePrice: 4.5, minLimit: 50, supplier: "Narmada Packagings", lastPurchaseDate: "2026-07-11", barcode: "890105800244" }, // Low Stock
+  { id: "item_14", name: "THALI PLASTIC", category: "Disposable", storeQty: 150, cafeQty: 20, unit: "Pcs", purchasePrice: 4.5, minLimit: 50, supplier: "Narmada Packagings", lastPurchaseDate: "2026-07-11", barcode: "890105800244" },
   { id: "item_15", name: "CONTENOR 500ML", category: "Disposable", storeQty: 400, cafeQty: 80, unit: "Pcs", purchasePrice: 5.2, minLimit: 100, supplier: "Prabhat Polymer", lastPurchaseDate: "2026-07-12", barcode: "890105800245" },
   { id: "item_16", name: "CONTENOR 250ML", category: "Disposable", storeQty: 450, cafeQty: 90, unit: "Pcs", purchasePrice: 3.8, minLimit: 100, supplier: "Prabhat Polymer", lastPurchaseDate: "2026-07-12", barcode: "890105800246" },
   
@@ -128,18 +140,17 @@ export default function BumBumCafeStockApp() {
   // Global States
   const [inventory, setInventory] = useState<InventoryItem[]>(INITIAL_INVENTORY);
   const [activeTab, setActiveTab] = useState<'home' | 'store' | 'cafe' | 'transfer' | 'more'>('home');
-  const [currentView, setCurrentView] = useState<string>('dashboard'); // detail routing inside 'more'
-  const [isAdmin, setIsAdmin] = useState<boolean>(true); // Admin vs Helper Mode
+  const [currentView, setCurrentView] = useState<string>('dashboard');
+  const [isAdmin, setIsAdmin] = useState<boolean>(true);
   const [isDarkMode, setIsDarkMode] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [selectedCategory, setSelectedCategory] = useState<string>("All");
   
   // Slide-out panels & Drawers
-  const [showFilters, setShowFilters] = useState<boolean>(false);
   const [showNotifications, setShowNotifications] = useState<boolean>(false);
   const [selectedItemDetail, setSelectedItemDetail] = useState<InventoryItem | null>(null);
   const [scannerActive, setScannerActive] = useState<boolean>(false);
-  const [scannerResult, setScannerResult] = useState<string | null>(null);
+  const [, setScannerResult] = useState<string | null>(null);
 
   // Form Modals
   const [showAddStockModal, setShowAddStockModal] = useState<boolean>(false);
@@ -170,16 +181,16 @@ export default function BumBumCafeStockApp() {
     invoiceNo: '', supplier: '', item: '', category: 'Raw Material', quantity: '', unit: 'Kg', price: '', gst: '5', expiry: '', batch: '', uploadInvoice: ''
   });
   const [formStockOut, setFormStockOut] = useState({
-    item: '', quantity: '', purpose: 'Kitchen Use' as any, remarks: ''
+    item: '', quantity: '', purpose: 'Kitchen Use' as "Kitchen Use" | "Waste" | "Damage" | "Staff Use", remarks: ''
   });
   const [formTransfer, setFormTransfer] = useState({
-    item: '', quantity: '', direction: 'Store ➜ Cafe' as any, notes: ''
+    item: '', quantity: '', direction: 'Store ➜ Cafe' as "Store ➜ Cafe" | "Cafe ➜ Store", notes: ''
   });
   const [formSupplier, setFormSupplier] = useState({ name: '', phone: '', address: '' });
 
-  // Notifications pool
-  const notificationsList = useMemo(() => {
-    const list = [];
+  // Notifications pool (Typed properly to avoid implicit 'any' error)
+  const notificationsList = useMemo<NotificationItem[]>(() => {
+    const list: NotificationItem[] = [];
     inventory.forEach(item => {
       const total = item.storeQty + item.cafeQty;
       if (total === 0) {
@@ -191,7 +202,7 @@ export default function BumBumCafeStockApp() {
     return list;
   }, [inventory]);
 
-  // Handle Bottom Nav clicks (clean routing simulator)
+  // Handle Bottom Nav clicks (routing simulator)
   const handleNavClick = (tab: 'home' | 'store' | 'cafe' | 'transfer' | 'more') => {
     setActiveTab(tab);
     if (tab === 'home') setCurrentView('dashboard');
@@ -254,7 +265,6 @@ export default function BumBumCafeStockApp() {
     setScannerActive(true);
     setScannerResult(null);
     setTimeout(() => {
-      // Pick a random product from inventory and display its metadata
       const randomProduct = inventory[Math.floor(Math.random() * inventory.length)];
       setScannerResult(randomProduct.name);
       setScannerActive(false);
@@ -263,7 +273,7 @@ export default function BumBumCafeStockApp() {
     }, 2500);
   };
 
-  // Safe Interactive Notifications/Toast System
+  // Toast System
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "info" } | null>(null);
   const toastMessage = (message: string, type: "success" | "error" | "info" = "success") => {
     setToast({ message, type });
@@ -281,7 +291,6 @@ export default function BumBumCafeStockApp() {
     const qtyNum = parseFloat(formStockIn.quantity);
     const priceNum = parseFloat(formStockIn.price);
 
-    // Update main matching item or insert new
     setInventory(prev => {
       const exists = prev.find(i => i.name.toUpperCase() === formStockIn.item.toUpperCase());
       if (exists) {
@@ -308,7 +317,6 @@ export default function BumBumCafeStockApp() {
       }
     });
 
-    // Write audit log
     const newPurchase: PurchaseLog = {
       id: `p_${Date.now()}`,
       itemName: formStockIn.item.toUpperCase(),
@@ -326,7 +334,7 @@ export default function BumBumCafeStockApp() {
     setFormStockIn({ invoiceNo: '', supplier: '', item: '', category: 'Raw Material', quantity: '', unit: 'Kg', price: '', gst: '5', expiry: '', batch: '', uploadInvoice: '' });
   };
 
-  // Dynamic Stock-Out Handler (Decrements Cafe stock or Main Store)
+  // Dynamic Stock-Out Handler (Decrements Cafe stock)
   const handleStockOutSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formStockOut.item || !formStockOut.quantity) {
@@ -342,7 +350,7 @@ export default function BumBumCafeStockApp() {
         if (item.id === formStockOut.item) {
           if (item.cafeQty < qtyNum) {
             stockIsShort = true;
-            return item; // do not deduct
+            return item;
           }
           return { ...item, cafeQty: item.cafeQty - qtyNum };
         }
@@ -355,7 +363,6 @@ export default function BumBumCafeStockApp() {
       return;
     }
 
-    // Write Outward Logs
     const matchName = inventory.find(i => i.id === formStockOut.item)?.name || "Unknown";
     const newLog: StockOutLog = {
       id: `so_${Date.now()}`,
@@ -372,7 +379,7 @@ export default function BumBumCafeStockApp() {
     setFormStockOut({ item: '', quantity: '', purpose: 'Kitchen Use', remarks: '' });
   };
 
-  // Dynamic Transfer Handler (Deducts Source -> Adds Destination)
+  // Dynamic Transfer Handler
   const handleTransferSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formTransfer.item || !formTransfer.quantity) {
@@ -422,7 +429,7 @@ export default function BumBumCafeStockApp() {
     setFormTransfer({ item: '', quantity: '', direction: 'Store ➜ Cafe', notes: '' });
   };
 
-  // Export Simulated CSV/Excel Function
+  // Export CSV/Excel Function
   const triggerSimulationExport = (reportName: string) => {
     const headers = ["Item Name", "Category", "Quantity", "Unit", "Total Value (INR)", "Status"];
     const rows = inventory.map(item => [
@@ -530,12 +537,12 @@ export default function BumBumCafeStockApp() {
       <main className="max-w-md mx-auto px-4 pt-4 pb-20 space-y-6">
 
         {/* ==========================================
-            3. TAB 1: DUSTBOARD (HOME)
+            3. TAB 1: DASHBOARD (HOME)
             ========================================== */}
         {activeTab === 'home' && currentView === 'dashboard' && (
           <div className="space-y-6">
             
-            {/* Quick Hero Banner / Notion card style */}
+            {/* Quick Hero Banner */}
             <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-3xl p-5 text-white shadow-xl shadow-orange-500/25 relative overflow-hidden">
               <div className="absolute -right-10 -bottom-10 opacity-10 rotate-12">
                 <Flame size={160} />
@@ -604,7 +611,7 @@ export default function BumBumCafeStockApp() {
             <div className={`p-5 rounded-3xl border ${isDarkMode ? 'bg-[#1A1A1A] border-neutral-800' : 'bg-white border-neutral-100'} shadow-sm space-y-3`}>
               <div className="flex items-center justify-between">
                 <span className="text-xs font-black uppercase tracking-widest text-neutral-400">Low / Out of Stock List</span>
-                <span className="bg-amber-100 dark:bg-amber-500/10 text-amber-600 px-2 py-0.5 rounded-full text-[9px] font-black uppercase">Critial</span>
+                <span className="bg-amber-100 dark:bg-amber-500/10 text-amber-600 px-2 py-0.5 rounded-full text-[9px] font-black uppercase">Critical</span>
               </div>
 
               <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
@@ -1084,7 +1091,7 @@ export default function BumBumCafeStockApp() {
             {currentView === 'reports_list' && (
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-xs font-black uppercase tracking-widest text-neutral-400">Reports Engine</h3>
+                  <h3 className="text-xs font-black uppercase tracking-widest text-neutral-400 font-sans">Reports Engine</h3>
                   <button onClick={() => setCurrentView('more_home')} className="text-xs text-orange-500 font-bold uppercase tracking-wider">Back</button>
                 </div>
 
@@ -1285,7 +1292,7 @@ export default function BumBumCafeStockApp() {
 
               {/* simulated purchase timeline */}
               <div className="space-y-2.5">
-                <h4 className="text-[10px] font-black uppercase tracking-widest text-neutral-400">Activity & Delivery Audit</h4>
+                <h4 className="text-[10px] font-black uppercase tracking-widest text-neutral-400 font-sans">Activity & Delivery Audit</h4>
                 <div className="space-y-2">
                   <div className="flex items-center justify-between text-xs p-2.5 bg-neutral-50 dark:bg-neutral-800/50 rounded-xl">
                     <div className="flex items-center gap-2">
@@ -1383,7 +1390,7 @@ export default function BumBumCafeStockApp() {
               }`}
             >
               <div className="flex justify-between items-center">
-                <h3 className="text-xs font-black uppercase tracking-widest text-neutral-400">Stock Receipt (Stock In)</h3>
+                <h3 className="text-xs font-black uppercase tracking-widest text-neutral-400 font-sans">Stock Receipt (Stock In)</h3>
                 <button type="button" onClick={() => setShowAddStockModal(false)} className="p-2.5 bg-neutral-100 dark:bg-neutral-800 rounded-xl"><X size={14} /></button>
               </div>
 
@@ -1471,7 +1478,7 @@ export default function BumBumCafeStockApp() {
               }`}
             >
               <div className="flex justify-between items-center">
-                <h3 className="text-xs font-black uppercase tracking-widest text-neutral-400">Deduct Stock / Stock Out</h3>
+                <h3 className="text-xs font-black uppercase tracking-widest text-neutral-400 font-sans">Deduct Stock / Stock Out</h3>
                 <button type="button" onClick={() => setShowStockOutModal(false)} className="p-2.5 bg-neutral-100 dark:bg-neutral-800 rounded-xl"><X size={14} /></button>
               </div>
 
@@ -1552,7 +1559,7 @@ export default function BumBumCafeStockApp() {
               </div>
 
               <div className="space-y-1 text-xs">
-                <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400">Select Item</label>
+                <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400 font-sans">Select Item</label>
                 <select 
                   value={formTransfer.item}
                   onChange={e => setFormTransfer({...formTransfer, item: e.target.value})}
@@ -1566,7 +1573,7 @@ export default function BumBumCafeStockApp() {
 
               <div className="grid grid-cols-2 gap-2 text-xs">
                 <div className="space-y-1">
-                  <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400">Qty to Transfer</label>
+                  <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400 font-sans">Qty to Transfer</label>
                   <input 
                     type="number" 
                     placeholder="e.g. 5"
@@ -1577,7 +1584,7 @@ export default function BumBumCafeStockApp() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400">Logistics Route</label>
+                  <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400 font-sans">Logistics Route</label>
                   <select 
                     value={formTransfer.direction}
                     onChange={e => setFormTransfer({...formTransfer, direction: e.target.value as any})}
@@ -1590,7 +1597,7 @@ export default function BumBumCafeStockApp() {
               </div>
 
               <div className="space-y-1 text-xs">
-                <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400">Internal Audit Note</label>
+                <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400 font-sans">Internal Audit Note</label>
                 <input 
                   type="text" 
                   placeholder="e.g. Evening prep restocking run"
