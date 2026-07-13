@@ -947,10 +947,9 @@ export default function BbCafeHome() {
     toast.success(`${name} Cart में जोड़ दिया गया है!`);
   };
 
-const sendWhatsAppOrder = async () => {
+  const sendWhatsAppOrder = async () => {
     triggerHaptic();
     
-    // TRAP: Agar pehle se submit ho raha hai, toh doosre click ko block karein
     if (isSubmittingOrder) return;
     setIsSubmittingOrder(true);
 
@@ -1033,7 +1032,7 @@ const sendWhatsAppOrder = async () => {
       }
     } catch (e) {
       toast.error("Database sync failed. Kripya dobara try karein.");
-      setIsSubmittingOrder(false); // Error aane par button ko wapas chalu karein
+      setIsSubmittingOrder(false); 
       return;
     }
 
@@ -1075,7 +1074,7 @@ const sendWhatsAppOrder = async () => {
     setAppliedCoupon(null); 
     setEnteredCoupon(""); 
     setIsCartOpen(false);
-    setIsSubmittingOrder(false); // Success hone par button reset karein
+    setIsSubmittingOrder(false); 
   };
 
   const handleShareApp = async () => {
@@ -1129,7 +1128,6 @@ const sendWhatsAppOrder = async () => {
     }
   };
 
-  // Anti-Cheat Loop: Open Verification Form instead of instant credit (Requirement 4)
   const handleSocialClickWithClaim = (platform: any) => {
     triggerHaptic();
     window.open(platform.url, '_blank');
@@ -1178,12 +1176,14 @@ const sendWhatsAppOrder = async () => {
     e.preventDefault();
     triggerHaptic();
     if (!tempName || tempName.trim().length < 3) return toast.error("Please enter your real name");
-    if (!tempPhone || tempPhone.trim().length < 10) return toast.error("Please enter 10-digit number");
+    
+    // Sanitize input phone to match clean digits
+    const phoneClean = tempPhone.trim().replace(/\D/g, "").replace(/^91/, "");
+    if (phoneClean.length < 10) return toast.error("Please enter 10-digit number");
+    
     if (!tempPin || tempPin.length !== 4 || isNaN(Number(tempPin))) {
       return toast.error("सुरक्षा के लिए 4-अंकों का न्यूमेरिकल पिन दर्ज करें!");
     }
-    
-    const phoneClean = tempPhone.trim().replace("+91", "");
     
     let devToken = localStorage.getItem('bb_device_token');
     if (!devToken) {
@@ -1407,7 +1407,6 @@ const sendWhatsAppOrder = async () => {
     }
   };
 
-  // anti-cheat handler helper
   const getClaimStatus = (platform: string) => {
     if (!customerDetails?.phone) return "🎁 +1 Pt";
     const storageKey = `bb_claimed_${customerDetails.phone.replace("+91", "").trim()}_${platform}`;
@@ -1419,7 +1418,6 @@ const sendWhatsAppOrder = async () => {
   return (
     <div className="dark:bg-[#050505] bg-gray-50 min-h-screen dark:text-white text-gray-900 pb-32 font-sans relative overflow-x-clip transition-colors duration-200">
       
-      {/* Manual direct homepage manifest link injection */}
       <link rel="manifest" href="/manifest.json" />
 
       <Toaster 
@@ -1437,7 +1435,7 @@ const sendWhatsAppOrder = async () => {
 
       {/* Network Status Banner */}
       {!isOnline && (
-        <div className="bg-red-655 text-white font-black py-2 px-4 text-center text-xs flex items-center justify-center gap-2 shadow-lg sticky top-0 z-[150]">
+        <div className="bg-red-600 text-white font-black py-2 px-4 text-center text-xs flex items-center justify-center gap-2 shadow-lg sticky top-0 z-[150]">
           <WifiOff size={14} className="animate-pulse" />
           <span>आप ऑफ़लाइन हैं। कैश्ड मेनू दिखाया जा रहा है।</span>
         </div>
@@ -1451,7 +1449,7 @@ const sendWhatsAppOrder = async () => {
         </div>
       )}
 
-      {/* Social Proof Toast Alert (Requirement 3 - Natural loop) */}
+      {/* Social Proof Toast Alert */}
       <AnimatePresence>
         {showSocialAlert && socialProofs.length > 0 && (
           <motion.div 
@@ -1492,7 +1490,7 @@ const sendWhatsAppOrder = async () => {
         </div>
       )}
 
-      {/* FLOATING ACTION SIDEBAR - MINI STICKY TABS (Requirement 3 - visible labels & smaller font size) */}
+      {/* FLOATING ACTION SIDEBAR */}
       <div className="fixed right-0 top-1/3 z-50 flex flex-col gap-2.5 items-end">
         <button 
           onClick={() => { triggerHaptic(); setIsReviewFormOpen(true); }}
@@ -1510,7 +1508,7 @@ const sendWhatsAppOrder = async () => {
         </button>
       </div>
 
-      {/* PREMIUM HERO HEADER (Requirement 6 - Styled with Dynamic background Video support) */}
+      {/* PREMIUM HERO HEADER */}
       <header className="relative pt-6 pb-4 px-4 overflow-hidden shadow-xl flex flex-col justify-end min-h-[140px]">
         <video 
           autoPlay 
@@ -1526,7 +1524,6 @@ const sendWhatsAppOrder = async () => {
 
         <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/40 to-black/80 z-10" />
 
-        {/* Repositioned & Refined for maximum Video Background Visibility */}
         <div className="relative z-20 max-w-[85%] mt-auto bg-black/35 backdrop-blur-sm p-2.5 rounded-xl border border-white/5 shadow-md">
           <motion.div
             initial={{ x: -25, opacity: 0 }}
@@ -1549,7 +1546,7 @@ const sendWhatsAppOrder = async () => {
         </div>
       </header>
 
-      {/* FIXED STICKY SEARCH BAR (Requirement: placeholder changed from Thali to Sandwich) */}
+      {/* FIXED STICKY SEARCH BAR */}
       <div className="sticky top-0 z-40 dark:bg-[#050505]/95 bg-gray-50/95 backdrop-blur-md py-3 px-4 border-b dark:border-white/5 border-gray-200 transition-colors duration-200 shadow-sm">
         <div className="relative max-w-sm mx-auto flex items-center gap-2">
           <div className="relative flex-1">
@@ -1591,7 +1588,6 @@ const sendWhatsAppOrder = async () => {
       {/* MAIN LAYOUT WRAPPER */}
       <main ref={menuRef} className="pt-3 px-3 max-w-lg mx-auto space-y-4">
 
-        {/* REQUIREMENT 2: Greeting message search bar ke just neeche ho (fades away after 6 seconds) */}
         <AnimatePresence>
           {showGreeting && (
             <motion.div 
@@ -1605,7 +1601,6 @@ const sendWhatsAppOrder = async () => {
           )}
         </AnimatePresence>
 
-        {/* REQUIREMENT 1: App install banner dismisses smoothly and persistently */}
         {showInstallBanner && (
           <div className="bg-gradient-to-r from-[#ff5e00] to-amber-500 p-3.5 rounded-2xl flex items-center justify-between shadow-lg border border-white/10 mx-1 relative">
             <button 
@@ -1631,8 +1626,7 @@ const sendWhatsAppOrder = async () => {
           </div>
         )}
 
-        {/* REQUIREMENT 3: Banner ke uper sari reel story ho */}
-        {/* Dynamic Video Stories / Food Reels (Idea 17) */}
+        {/* Dynamic Video Stories */}
         {stories.length > 0 && (
           <div className="space-y-1 px-1">
             <p className="text-[8px] font-black uppercase tracking-wider text-orange-500">खूबसूरत फ़ूड रील्स (Daily Food Reels)</p>
@@ -1643,9 +1637,8 @@ const sendWhatsAppOrder = async () => {
                   onClick={() => { triggerHaptic(); setActiveStory(story); }}
                   className="flex flex-col items-center flex-shrink-0 focus:outline-none"
                 >
-                  <div className="w-16 h-16 rounded-full p-0.5 bg-gradient-to-tr from-yellow-400 via-orange-500 to-red-655 relative">
+                  <div className="w-16 h-16 rounded-full p-0.5 bg-gradient-to-tr from-yellow-400 via-orange-500 to-red-600 relative">
                     <div className="w-full h-full rounded-full overflow-hidden border-2 border-white dark:border-neutral-900 bg-neutral-800 flex items-center justify-center relative">
-                      {/* Reel Cover Image Integration (Requirement 1) */}
                       <img src={story.coverUrl || story.url} className="w-full h-full object-cover" alt={story.title} />
                       <div className="absolute inset-0 bg-black/10 flex items-center justify-center">
                         <Play size={14} className="text-white fill-white" />
@@ -1659,7 +1652,7 @@ const sendWhatsAppOrder = async () => {
           </div>
         )}
         
-        {/* REQUIREMENT 4: Auto-sliding Promo Banner */}
+        {/* Promo Banner */}
         <div className="w-full h-36 rounded-2xl overflow-hidden relative border border-white/5 bg-white/[0.02]">
           {(banners.length === 0 || bannerError) ? (
             <div className="w-full h-full bg-gradient-to-r from-orange-600/35 to-[#b33600]/35 flex flex-col justify-center p-5 space-y-1">
@@ -1736,7 +1729,7 @@ const sendWhatsAppOrder = async () => {
             <span className="text-xl">⚠️</span>
             <div className="space-y-0.5">
               <p className="text-[10px] font-black text-red-400 uppercase">आर्डर सीमा से बाहर ({distanceKm} KM)</p>
-              <p className="text-[9px] text-gray-400">आप कैफे से 20 किमी से अधिक दूर हैं। आप केवल हमारा शानदार मेनू देख सकते हैं, आर्डर नहीं कर सकते।</p>
+              <p className="text-[9px] text-gray-500">आप कैफे से 20 किमी से अधिक दूर हैं। आप केवल हमारा शानदार मेनू देख सकते हैं, आर्डर नहीं कर सकते।</p>
             </div>
           </div>
         )}
@@ -1907,7 +1900,7 @@ const sendWhatsAppOrder = async () => {
                 </div>
               ))
             ) : filteredMenu.length === 0 ? (
-              <p className="text-center text-gray-550 py-8 text-xs font-bold uppercase">No items found...</p>
+              <p className="text-center text-gray-500 py-8 text-xs font-bold uppercase">No items found...</p>
             ) : (
               filteredMenu.map((item, index) => {
                 const isItemAvailable = item.isAvailable !== false;
@@ -1957,7 +1950,7 @@ const sendWhatsAppOrder = async () => {
                           </div>
                         </div>
                         <div className="flex justify-between items-center text-[9px] dark:text-gray-400 text-neutral-700 font-bold mt-0.5">
-                          <p className="uppercase text-[8px] dark:text-gray-550 text-gray-400">{item.category}</p><p>• 15-25 min</p>
+                          <p className="uppercase text-[8px] dark:text-gray-500 text-gray-400">{item.category}</p><p>• 15-25 min</p>
                         </div>
                         <div className="h-px dark:bg-white/5 bg-gray-100 my-2.5" />
                         <div className="flex justify-between items-end mt-0.5">
@@ -1973,7 +1966,7 @@ const sendWhatsAppOrder = async () => {
                                 triggerHaptic();
                                 item.variants ? setSelectedProduct(item) : addItem(item); 
                               }} 
-                              className="px-4 py-2 bg-orange-500/10 text-orange-750 dark:text-orange-400 border border-orange-500/30 hover:bg-orange-500 hover:text-white rounded-lg font-black text-[10px] active:scale-95 transition-all uppercase flex items-center gap-1 shadow"
+                              className="px-4 py-2 bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-500/30 hover:bg-orange-500 hover:text-white rounded-lg font-black text-[10px] active:scale-95 transition-all uppercase flex items-center gap-1 shadow"
                             >
                               <Plus size={12} /> ADD
                             </button>
@@ -2027,7 +2020,7 @@ const sendWhatsAppOrder = async () => {
         <div className="pt-6 space-y-4">
           <div className="flex justify-between items-center">
             <h3 className="text-sm font-black uppercase tracking-wider text-yellow-400 flex items-center gap-1">⭐ हमारे ग्राहकों के प्यारे शब्द</h3>
-            <span className="text-[9px] font-bold text-gray-405">Total Reviews ({reviews.length || 4})</span>
+            <span className="text-[9px] font-bold text-gray-400">Total Reviews ({reviews.length || 4})</span>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
             {PERMANENT_REVIEWS.map((r) => (
@@ -2076,13 +2069,13 @@ const sendWhatsAppOrder = async () => {
             </a>
           </div>
 
-          <div className="text-center text-[9px] text-gray-650 font-bold tracking-widest pt-2">
+          <div className="text-center text-[9px] text-gray-600 font-bold tracking-widest pt-2">
             © 2026 BUM BUM CAFE - MOHANDRA. ALL RIGHTS RESERVED.
           </div>
         </footer>
       </main>
 
-      {/* REQUIREMENT: LIVE ORDER REAL-TIME TRACKING FOOTER PANEL */}
+      {/* LIVE ORDER REAL-TIME TRACKING FOOTER PANEL */}
       <AnimatePresence>
         {liveOrder && (
           <motion.div 
@@ -2101,7 +2094,6 @@ const sendWhatsAppOrder = async () => {
               </span>
             </div>
 
-            {/* Progress Bar indicating live state in kitchen */}
             <div className="space-y-1 mt-1">
               <div className="flex justify-between text-[8px] text-gray-400 uppercase">
                 <span className={liveOrder.status === 'pending' ? 'text-orange-400 font-extrabold' : ''}>Confirming ⏳</span>
@@ -2132,7 +2124,7 @@ const sendWhatsAppOrder = async () => {
         )}
       </AnimatePresence>
 
-      {/* FULL SCREEN REELS VIEWER (Autoplays seamlessly and exits on finish - Requirement 2) */}
+      {/* FULL SCREEN REELS VIEWER */}
       <AnimatePresence>
         {activeStory && (
           <div className="fixed inset-0 bg-black z-[250] flex flex-col justify-between">
@@ -2234,7 +2226,7 @@ const sendWhatsAppOrder = async () => {
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[9px] font-black uppercase text-gray-550">पसंदीदा रिव्यू टच करें:</label>
+                  <label className="text-[9px] font-black uppercase text-gray-500">पसंदीदा रिव्यू टच करें:</label>
                   <div className="flex flex-wrap gap-1.5 py-1">
                     {SUGGESTED_REVIEWS.map((suggestion) => (
                       <button
@@ -2336,7 +2328,7 @@ const sendWhatsAppOrder = async () => {
               <button type="button" onClick={handleNormalPizzaAdd} className="w-full bg-orange-500 text-black p-4 rounded-xl font-black text-xs uppercase animate-none">
                 Confirm Add To Cart
               </button>
-              <button type="button" onClick={() => { setSelectedProduct(null); setNormalPizzaSize(""); setNormalPizzaPrice(0); setChefNote(""); }} className="w-full mt-3 dark:text-gray-550 text-gray-400 font-black text-[10px] text-center uppercase">Close</button>
+              <button type="button" onClick={() => { setSelectedProduct(null); setNormalPizzaSize(""); setNormalPizzaPrice(0); setChefNote(""); }} className="w-full mt-3 dark:text-gray-500 text-gray-400 font-black text-[10px] text-center uppercase">Close</button>
             </motion.div>
           </div>
         )}
@@ -2371,19 +2363,19 @@ const sendWhatsAppOrder = async () => {
                   <div className="space-y-3 text-left">
                     <div className="space-y-1">
                       <label className="text-[9px] font-bold text-gray-500 uppercase">Your Name</label>
-                      <input type="text" placeholder="Enter your name..." value={tempName} onChange={(e) => setTempName(e.target.value)} className="w-full dark:bg-neutral-800 bg-gray-50 border dark:border-neutral-700 border-gray-200 p-3 rounded-xl font-bold dark:text-white text-neutral-900 outline-none focus:border-orange-500 text-xs" required />
+                      <input type="text" placeholder="Enter your name..." value={tempName} onChange={(e) => setTempName(e.target.value)} className="w-full dark:bg-neutral-850 bg-gray-50 border dark:border-neutral-700 border-gray-200 p-3 rounded-xl font-bold dark:text-white text-neutral-900 outline-none focus:border-orange-500 text-xs" required />
                     </div>
                     <div className="space-y-1">
                       <label className="text-[9px] font-bold text-gray-500 uppercase">Mobile Number</label>
-                      <input type="tel" maxLength={10} placeholder="10-digit Phone Number" value={tempPhone} onChange={(e) => setTempPhone(e.target.value)} className="w-full dark:bg-neutral-800 bg-gray-50 border dark:border-neutral-700 border-gray-200 p-3 rounded-xl font-bold dark:text-white text-neutral-900 outline-none focus:border-orange-500 text-xs" required />
+                      <input type="tel" maxLength={10} placeholder="10-digit Phone Number" value={tempPhone} onChange={(e) => setTempPhone(e.target.value)} className="w-full dark:bg-neutral-850 bg-gray-50 border dark:border-neutral-700 border-gray-200 p-3 rounded-xl font-bold dark:text-white text-neutral-900 outline-none focus:border-orange-500 text-xs" required />
                     </div>
                     <div className="space-y-1">
                       <label className="text-[9px] font-bold text-gray-500 uppercase flex items-center gap-1"><Lock size={10}/> <span>Create 4-Digit Security PIN (सुरक्षा पिन)</span></label>
-                      <input type="password" maxLength={4} placeholder="e.g. 1234" value={tempPin} onChange={(e) => setTempPin(e.target.value)} className="w-full dark:bg-neutral-800 bg-gray-50 border dark:border-neutral-700 border-gray-200 p-3 rounded-xl font-bold dark:text-white text-neutral-900 outline-none focus:border-orange-500 text-xs text-center tracking-widest" required />
+                      <input type="password" maxLength={4} placeholder="e.g. 1234" value={tempPin} onChange={(e) => setTempPin(e.target.value)} className="w-full dark:bg-neutral-850 bg-gray-50 border dark:border-neutral-700 border-gray-200 p-3 rounded-xl font-bold dark:text-white text-neutral-900 outline-none focus:border-orange-500 text-xs text-center tracking-widest" required />
                     </div>
                     <div className="space-y-1">
                       <label className="text-[9px] font-bold text-gray-500 uppercase">Referral Code (Optional)</label>
-                      <input type="text" placeholder="Enter invite code..." value={tempRefCode} onChange={(e) => setTempRefCode(e.target.value)} className="w-full dark:bg-neutral-850 bg-gray-550 border dark:border-neutral-700 border-gray-200 p-3 rounded-xl font-bold dark:text-white text-neutral-900 outline-none focus:border-orange-500 text-xs" />
+                      <input type="text" placeholder="Enter invite code..." value={tempRefCode} onChange={(e) => setTempRefCode(e.target.value)} className="w-full dark:bg-neutral-800 bg-gray-50 border dark:border-neutral-700 border-gray-200 p-3 rounded-xl font-bold dark:text-white text-neutral-900 outline-none focus:border-orange-500 text-xs" />
                     </div>
                   </div>
                   <button type="submit" className="w-full bg-orange-500 text-black p-3.5 rounded-xl font-black text-xs uppercase shadow transition-all active:scale-95 mt-4">Create Account ➔</button>
@@ -2393,7 +2385,7 @@ const sendWhatsAppOrder = async () => {
                   {/* USER ACCOUNT VIEW */}
                   <div className="dark:bg-white/[0.02] bg-gray-50 p-4 rounded-2xl border dark:border-white/5 border-gray-200 flex justify-between items-center transition-colors duration-200">
                     <div>
-                      <p className="text-[8px] dark:text-gray-550 text-neutral-600 font-black uppercase">Customer Profile</p>
+                      <p className="text-[8px] dark:text-gray-500 text-neutral-600 font-black uppercase">Customer Profile</p>
                       <h4 className="font-black text-base text-orange-500">{customerDetails.name}</h4>
                       <p className="text-xs dark:text-gray-400 text-neutral-700 font-semibold">{customerDetails.phone}</p>
                       <p className="text-[9px] text-yellow-600 dark:text-yellow-400 font-bold mt-1 uppercase">Invite Code: {getReferralCode()}</p>
@@ -2456,7 +2448,7 @@ const sendWhatsAppOrder = async () => {
                         <div className="space-y-1 max-h-24 overflow-y-auto pr-1 text-[8px] font-bold">
                           {pointsHistory.map((h: any) => (
                             <div key={h.id} className="flex justify-between items-center bg-black/10 dark:bg-white/5 p-1.5 rounded border dark:border-white/5 border-gray-200">
-                              <span className="truncate max-w-[170px] dark:text-gray-300 text-neutral-850">{h.description}</span>
+                              <span className="truncate max-w-[170px] dark:text-gray-300 text-neutral-800">{h.description}</span>
                               <span className={h.type === 'earn' ? 'text-green-500' : 'text-red-500'}>
                                 {h.type === 'earn' ? '+' : '-'}{h.points} Pts
                               </span>
@@ -2613,9 +2605,9 @@ const sendWhatsAppOrder = async () => {
                         <div key={suggest.id} className="flex justify-between items-center text-[10px]">
                           <div>
                             <span className="font-bold block dark:text-white text-neutral-900">{suggest.name}</span>
-                            <span className="text-orange-650 font-extrabold">{getDisplayPrice(suggest)}</span>
+                            <span className="text-orange-600 font-extrabold">{getDisplayPrice(suggest)}</span>
                           </div>
-                          <button onClick={() => { triggerHaptic(); addItem(suggest); }} className="bg-purple-500/20 text-purple-650 border border-purple-500/30 px-3 py-1 rounded-lg font-black uppercase animate-none">ADD</button>
+                          <button onClick={() => { triggerHaptic(); addItem(suggest); }} className="bg-purple-500/20 text-purple-600 border border-purple-500/30 px-3 py-1 rounded-lg font-black uppercase animate-none">ADD</button>
                         </div>
                       ))}
                     </div>
@@ -2647,7 +2639,7 @@ const sendWhatsAppOrder = async () => {
                           onClick={() => { triggerHaptic(); setSelectedArea(area); }}
                           className={`p-3 rounded-xl border text-left flex flex-col justify-between transition-all duration-200 active:scale-95 ${
                             isSelected 
-                              ? 'border-orange-500 bg-orange-500/10 text-orange-655 shadow-md animate-none' 
+                              ? 'border-orange-500 bg-orange-500/10 text-orange-600 shadow-md animate-none' 
                               : 'dark:border-white/5 border-gray-200 dark:bg-white/[0.01] bg-gray-50 dark:text-neutral-300 text-neutral-900 hover:border-gray-300 hover:dark:border-white/10'
                           }`}
                         >
@@ -2675,7 +2667,7 @@ const sendWhatsAppOrder = async () => {
                 <div className="dark:bg-white/[0.02] bg-gray-50 border dark:border-white/5 border-gray-200 rounded-2xl p-4 space-y-2 transition-colors duration-200">
                   <p className="text-[9px] font-black uppercase dark:text-gray-400 text-neutral-800">Add Extra condiments to order:</p>
                   <div className="grid grid-cols-3 gap-2">
-                    <button onClick={() => { triggerHaptic(); setKetchupAddon(!ketchupAddon); }} className={`p-2 rounded-xl border text-[9px] font-black ${ketchupAddon ? 'border-red-500 bg-red-500/5 text-red-655 animate-none' : 'dark:border-white/5 border-gray-200 bg-transparent dark:text-gray-400 text-neutral-800'}`}>
+                    <button onClick={() => { triggerHaptic(); setKetchupAddon(!ketchupAddon); }} className={`p-2 rounded-xl border text-[9px] font-black ${ketchupAddon ? 'border-red-500 bg-red-500/5 text-red-600 animate-none' : 'dark:border-white/5 border-gray-200 bg-transparent dark:text-gray-400 text-neutral-800'}`}>
                       Ketchup (+₹10)
                     </button>
                     <button onClick={() => { triggerHaptic(); setOreganoAddon(!oreganoAddon); }} className={`p-2 rounded-xl border text-[9px] font-black ${oreganoAddon ? 'border-yellow-500 bg-yellow-500/5 text-yellow-500 animate-none' : 'dark:border-white/5 border-gray-200 bg-transparent dark:text-gray-400 text-neutral-800'}`}>
@@ -2688,7 +2680,7 @@ const sendWhatsAppOrder = async () => {
                 </div>
 
                 {/* 7. ECO FRIENDLY PACKAGING */}
-                <div className="dark:bg-green-955/10 bg-green-50/50 border dark:border-green-500/10 border-green-200/50 rounded-2xl p-4 flex justify-between items-center transition-colors duration-200">
+                <div className="dark:bg-green-950/10 bg-green-50/50 border dark:border-green-500/10 border-green-200/50 rounded-2xl p-4 flex justify-between items-center transition-colors duration-200">
                   <div className="space-y-0.5">
                     <p className="text-[10px] font-black text-green-600 uppercase tracking-tight">🌱 Eco-Friendly Packaging</p>
                     <p className="text-[8px] dark:text-gray-400 text-neutral-700 font-bold">चम्मच / टिश्यू पेपर की आवश्यकता नहीं है</p>
@@ -2707,16 +2699,17 @@ const sendWhatsAppOrder = async () => {
                   <div className="h-px bg-white/20 mb-3" />
                   <div className="flex justify-between font-black text-xl"><span>To Pay</span> <span>₹{getTotalBillPrice()}</span></div>
                 </div>
-          {/* 9. WHATSAPP CHECKOUT TRIGGER */}
+
+                {/* 9. WHATSAPP CHECKOUT TRIGGER */}
                 {isTooFar ? (
-                  <div className="bg-red-655/20 text-red-400 p-4 rounded-2xl text-center text-xs font-bold border border-red-500/20">
+                  <div className="bg-red-600/20 text-red-400 p-4 rounded-2xl text-center text-xs font-bold border border-red-500/20">
                     आप 20 KM से अधिक दूर हैं। आर्डर स्वीकार नहीं किया जा सकता। ❌
                   </div>
                 ) : (
                   <button 
                     onClick={sendWhatsAppOrder} 
                     type="button" 
-                    disabled={isSubmittingOrder} // Button ko disable kiya gaya hai
+                    disabled={isSubmittingOrder} 
                     className="w-full bg-green-600 hover:bg-green-700 p-4 rounded-2xl font-black text-sm text-white flex items-center justify-center gap-2 shadow-lg animate-none disabled:opacity-60 disabled:cursor-not-allowed"
                   >
                     {isSubmittingOrder ? (
@@ -2729,6 +2722,10 @@ const sendWhatsAppOrder = async () => {
                     )}
                   </button>
                 )}
+              </div>
+            </motion.div>
+          </div>
+        )}
       </AnimatePresence>
 
       {/* COMPACT INSTALL BANNER GUIDE MODAL */}
@@ -2790,7 +2787,7 @@ const sendWhatsAppOrder = async () => {
         </div>
       )}
 
-      {/* SECURED GIFT POINTS MODAL (Sender PIN Input Integrated) */}
+      {/* SECURED GIFT POINTS MODAL */}
       <AnimatePresence>
         {isGiftModalOpen && (
           <div className="fixed inset-0 bg-black/95 z-[260] flex items-center justify-center p-6">
@@ -2810,7 +2807,7 @@ const sendWhatsAppOrder = async () => {
                   <input type="number" placeholder="e.g. 10" value={giftPointsAmount} onChange={(e) => setGiftPointsAmount(e.target.value === "" ? "" : Number(e.target.value))} required className="w-full dark:bg-white/10 bg-gray-50 border dark:border-white/10 border-gray-200 p-3 rounded-xl text-xs font-bold dark:text-white text-neutral-900 outline-none text-center" />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[9px] font-black uppercase text-gray-505 flex items-center gap-1"><Lock size={10}/> <span>Your 4-Digit Security PIN (सुरक्षा पिन)</span></label>
+                  <label className="text-[9px] font-black uppercase text-gray-500 flex items-center gap-1"><Lock size={10}/> <span>Your 4-Digit Security PIN (सुरक्षा पिन)</span></label>
                   <input type="password" maxLength={4} placeholder="🔒 enter your pin" value={giftSenderPin} onChange={(e) => setGiftSenderPin(e.target.value)} required className="w-full dark:bg-white/10 bg-gray-50 border dark:border-white/10 border-gray-200 p-3 rounded-xl text-xs font-bold dark:text-white text-neutral-900 outline-none text-center tracking-widest" />
                 </div>
               </div>
@@ -2825,7 +2822,7 @@ const sendWhatsAppOrder = async () => {
         )}
       </AnimatePresence>
 
-      {/* VERIFIED SOCIAL POINTS CLAIM MODAL (Requirement 4) */}
+      {/* VERIFIED SOCIAL POINTS CLAIM MODAL */}
       <AnimatePresence>
         {isClaimModalOpen && claimingPlatform && (
           <div className="fixed inset-0 bg-black/95 z-[260] flex items-center justify-center p-6">
@@ -2842,7 +2839,7 @@ const sendWhatsAppOrder = async () => {
               </div>
 
               <div className="space-y-1 text-left">
-                <label className="text-[9px] font-black uppercase text-gray-550">Your Profile Handle / Username</label>
+                <label className="text-[9px] font-black uppercase text-gray-500">Your Profile Handle / Username</label>
                 <input 
                   type="text" 
                   placeholder="e.g. @yourname" 
@@ -2877,7 +2874,7 @@ const sendWhatsAppOrder = async () => {
             <motion.div className="dark:bg-[#111] bg-white w-full max-w-md p-6 rounded-3xl border dark:border-white/10 border-gray-200 text-center space-y-4 shadow-xl transition-colors duration-200">
               <div>
                 <h3 className="text-xl font-black text-orange-500 uppercase italic">Connect & Earn Points</h3>
-                <p className="text-[8px] text-gray-505 font-bold uppercase tracking-wider">हर प्लेटफार्म पर फॉलो/सब्सक्राइब करने का +1 पॉइंट पाएं!</p>
+                <p className="text-[8px] text-gray-500 font-bold uppercase tracking-wider">हर प्लेटफार्म पर फॉलो/सब्सक्राइब करने का +1 पॉइंट पाएं!</p>
               </div>
               <div className="space-y-2 text-left max-h-[22rem] overflow-y-auto no-scrollbar pr-1">
                 {SOCIAL_LINKS.map((platform) => (
@@ -2914,7 +2911,6 @@ const sendWhatsAppOrder = async () => {
                 <p>Customer: {lastPlacedOrder.customerName}</p>
                 <p>Phone: {lastPlacedOrder.customerPhone}</p>
                 
-                {/* DISPLAY GENERATED DELIVERY PIN ON DIGITAL RECEIPT FOR SECURE CODE EXCHANGE */}
                 <div className="bg-orange-500/10 border border-orange-500/20 p-2 rounded-xl text-center text-xs font-black text-orange-500 uppercase tracking-wider my-2.5">
                   🔑 Delivery PIN: {lastPlacedOrder.deliveryPin} <span className="block text-[8px] text-gray-400 font-bold uppercase mt-1">(Rider ko ye PIN bata kar hi order receive karein)</span>
                 </div>
@@ -2960,7 +2956,7 @@ const sendWhatsAppOrder = async () => {
                 </button>
               </div>
 
-              <p className="text-[9px] text-green-650 dark:text-green-400 dark:bg-green-500/10 bg-green-50 p-2.5 rounded-xl font-bold">
+              <p className="text-[9px] text-green-600 dark:text-green-400 dark:bg-green-500/10 bg-green-50 p-2.5 rounded-xl font-bold">
                 🌱 पेपर रसीद के बिना DIGITAL इनवॉइस जनरेट किया गया है। धन्यवाद!
               </p>
               <button onClick={() => { triggerHaptic(); setShowInvoice(false); }} className="w-full bg-white text-black p-3 rounded-xl text-xs font-black uppercase">
