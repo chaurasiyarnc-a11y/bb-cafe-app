@@ -14,21 +14,11 @@ export default function KitchenDisplaySystem() {
   
   const prevOrdersCountRef = useRef<number | null>(null);
 
-  // Play Sound alert for kitchen when new order arrives
+  // Play custom MP3 sound alert for kitchen when new order arrives
   const playAlertSound = () => {
     try {
-      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
-      const osc = audioCtx.createOscillator();
-      const gain = audioCtx.createGain();
-      osc.connect(gain);
-      gain.connect(audioCtx.destination);
-      
-      osc.frequency.setValueAtTime(587.33, audioCtx.currentTime); 
-      gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
-      osc.start();
-      osc.frequency.setValueAtTime(659.25, audioCtx.currentTime + 0.15); 
-      osc.frequency.setValueAtTime(880, audioCtx.currentTime + 0.3); 
-      osc.stop(audioCtx.currentTime + 0.5);
+      const audio = new Audio('/kitchen.mp3');
+      audio.play().catch((err) => console.log("Sound play blocked by browser:", err));
     } catch (e) {}
   };
 
