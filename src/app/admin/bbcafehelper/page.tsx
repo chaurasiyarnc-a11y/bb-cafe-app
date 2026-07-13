@@ -149,7 +149,7 @@ export default function BumBumCafeStockApp() {
   // Slide-out panels & Drawers
   const [showNotifications, setShowNotifications] = useState<boolean>(false);
   const [selectedItemDetail, setSelectedItemDetail] = useState<InventoryItem | null>(null);
-  const [scannerActive, setScannerActive] = useState<boolean>(false);
+  const [, setScannerActive] = useState<boolean>(false);
   const [, setScannerResult] = useState<string | null>(null);
 
   // Form Modals
@@ -455,7 +455,6 @@ export default function BumBumCafeStockApp() {
 
   return (
     <div className={`min-h-screen ${isDarkMode ? 'bg-[#0F0F0F] text-white' : 'bg-[#FAFAFA] text-neutral-900'} pb-24 font-sans relative transition-colors duration-300`}>
-      <Toaster />
 
       {/* Toast Notification HUD */}
       <AnimatePresence>
@@ -1045,7 +1044,7 @@ export default function BumBumCafeStockApp() {
 
                 {/* Audit Log */}
                 <div className="space-y-2">
-                  <h4 className="text-xs font-black uppercase tracking-wider text-neutral-400">Incoming Purchase Audit Log</h4>
+                  <h4 className="text-xs font-black uppercase tracking-wider text-neutral-400 font-sans">Incoming Purchase Audit Log</h4>
                   {purchaseHistory.map(log => (
                     <div key={log.id} className={`p-4 rounded-3xl border ${isDarkMode ? 'bg-[#1A1A1A] border-neutral-800' : 'bg-white border-neutral-100'} text-xs space-y-1`}>
                       <div className="flex justify-between">
