@@ -775,7 +775,9 @@ export default function AdminDashboard() {
       return orderDate >= startObj && orderDate <= endObj;
     });
 
-    const totalRevenue = rangeOrders.reduce((acc, curr) => acc + (Number(curr.total) || 0), 0);
+    const totalRevenue = orders
+  .filter(o => o.status !== "rejected" && o.status !== "fake") // रिजेक्टेड आर्डर को बाहर किया
+  .reduce((sum, o) => sum + (o.total || 0), 0);
     const activeCount = orders.filter(o => o.status === 'pending' || o.status === 'preparing').length;
 
     let cashSales = 0;
