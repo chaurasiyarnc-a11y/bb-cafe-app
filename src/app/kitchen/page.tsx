@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../../lib/firebase';
-import { collection, onSnapshot, query, doc, updateDoc, orderBy, getDoc, where } from 'firebase/firestore';
+import { collection, onSnapshot, query, doc, updateDoc, orderBy, getDoc, where, getDocs } from 'firebase/firestore';
 import { Clock, Check, Loader2, Play, Lock, AlertCircle, WifiOff, X } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 
@@ -109,15 +109,43 @@ export default function KitchenDisplaySystem() {
     return () => unsub();
   }, [isLocked]);
 
-  const handlePinSubmit = (e: React.FormEvent) => {
+  // LOGIN: Verifies Entered PIN against personal Cook account in Firestore
+  const handlePinSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (pinInput === passcodes.adminPin || pinInput === passcodes.managerPin) {
-      localStorage.setItem('bb_kds_verified', 'true');
-      setIsLocked(false);
-      toast.success("KDS Terminal Unlocked! 👨‍🍳");
-    } else {
-      toast.error("Incorrect PIN! Access Denied.");
-      setPinInput("");
+    const toastId = toast.loading("Verifying kitchen credentials...");
+    try {
+      // 1. MASTER ADMIN PIN OVERRIDE (Backup bypass)
+      if (pinInput === passcodes.adminPin) {
+        toast.dismiss(toastId);
+        localStorage.setItem('bb_kds_verified', 'true');
+        localStorage.setItem('bb_kds_cook_name', "Admin");
+        setIsLocked(false);
+        toast.success("KDS Unlocked as Admin! 👑");
+        return;
+      }
+
+      // 2. PERSONAL COOK PIN CHECK
+      const q = query(
+        collection(db, "staff_members"),
+        where("pin", "==", pinInput),
+        where("role", "==", "kitchen")
+      );
+      const snap = await getDocs(q);
+      toast.dismiss(toastId);
+
+      if (!snap.empty) {
+        const cook = snap.docs[0].data();
+        localStorage.setItem('bb_kds_verified', 'true');
+        localStorage.setItem('bb_kds_cook_name', cook.name);
+        setIsLocked(false);
+        toast.success(`Welcome, Chef ${cook.name}! KDS Unlocked! 👨‍🍳`);
+      } else {
+        toast.error("Incorrect PIN! Access Denied.");
+        setPinInput("");
+      }
+    } catch (err) {
+      toast.dismiss(toastId);
+      toast.error("Login verification failed. Database error.");
     }
   };
 
@@ -158,7 +186,7 @@ export default function KitchenDisplaySystem() {
             <input 
               type="password" 
               maxLength={6} 
-              placeholder="Enter Staff/Manager PIN" 
+              placeholder="Enter Your Personal PIN" 
               value={pinInput} 
               onChange={(e) => setPinInput(e.target.value)} 
               className="w-full bg-black/60 border border-white/10 rounded-2xl p-4 text-center outline-none focus:border-orange-500 text-sm font-bold text-white tracking-widest"
@@ -194,7 +222,9 @@ export default function KitchenDisplaySystem() {
       <Toaster />
       <header className="border-b border-white/5 pb-4 mb-6 flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-black text-orange-500 italic uppercase">Bum Bum Cafe - KDS</h1>
+          <h1 className="text-2xl font-black text-orange-500 italic uppercase">
+            Bum Bum Cafe - KDS {typeof window !== 'undefined' && localStorage.getItem('bb_kds_cook_name') ? `- Chef ${localStorage.getItem('bb_kds_cook_name')}` : ''}
+          </h1>
           <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Kitchen Order Screen • Real-time Cooking</p>
         </div>
         <div className="flex items-center gap-3">
@@ -204,6 +234,7 @@ export default function KitchenDisplaySystem() {
           <button 
             onClick={() => {
               localStorage.removeItem('bb_kds_verified');
+              localStorage.removeItem('bb_kds_cook_name');
               setIsLocked(true);
             }} 
             className="p-2.5 bg-white/5 rounded-full text-gray-400 active:scale-90 transition-all"
