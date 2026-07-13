@@ -309,7 +309,12 @@ export default function AdminDashboard() {
   const [transferLogs, setTransferLogs] = useState<any[]>([]);
 
   
-
+ // STAFF MANAGEMENT STATES (Is block ko upar jodhein)
+  const [staff, setStaff] = useState<any[]>([]);
+  const [newStaffName, setNewStaffName] = useState("");
+  const [newStaffRole, setNewStaffRole] = useState("delivery");
+  const [newStaffPin, setNewStaffPin] = useState("");
+  
   // DYNAMIC PASSCODES FROM FIRESTORE
   const [passcodes, setPasscodes] = useState({ adminPin: "971429", managerPin: "123456" });
   const [userRole, setUserRole] = useState<'admin' | 'manager' | null>(null);
