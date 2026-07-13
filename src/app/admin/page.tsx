@@ -384,18 +384,11 @@ export default function AdminDashboard() {
   const [rosterStepQty, setRosterStepQty] = useState("");
   const [rosterStepNote, setRosterStepNote] = useState("");
 
-  // Sound Warning Beep Player for Kitchen/Counter Managers
+  // Play custom MP3 sound warning for Admin/Counter when new order arrives
   const playNewOrderBeep = () => {
     try {
-      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
-      const osc = audioCtx.createOscillator();
-      const gain = audioCtx.createGain();
-      osc.connect(gain);
-      gain.connect(audioCtx.destination);
-      osc.frequency.setValueAtTime(880, audioCtx.currentTime); 
-      gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
-      osc.start();
-      osc.stop(audioCtx.currentTime + 0.2);
+      const audio = new Audio('/admin.mp3');
+      audio.play().catch((err) => console.log("Sound play blocked by browser:", err));
     } catch (e) {}
   };
 
