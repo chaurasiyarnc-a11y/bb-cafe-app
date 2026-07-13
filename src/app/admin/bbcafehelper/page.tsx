@@ -1,4 +1,5 @@
 
+
 'use client';
 import React, { useState, useEffect, useMemo } from 'react';
 import { db } from '@/lib/firebase'; 
@@ -7,9 +8,153 @@ import { Search, Plus, X, Trash2, Calendar, IndianRupee, ArrowLeft, Lock, Loader
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
 
-// Suggested items to prevent repetitive typing issues
-const SUGGESTED_STORE_ITEMS = [
-  "Paneer (पनीर)", "Milk (दूध)", "Mozzarella Cheese", "Pizza Base (6\")", "Pizza Base (8\")", "Pizza Base (10\")", "Maida (मैदा)", "Sugar (चीनी)", "Onion (प्याज़)", "Tomato (टमाटर)", "Capsicum (शिमला मिर्च)", "Sweet Corn", "Butter (मक्खन)", "Tomato Sauce", "Mayonnaise", "Disposable Spoons", "Tissue Paper", "Carry Bags"
+// Master Classified Items List provided by user (Automatically categorized with correct standard units)
+const MASTER_CAFE_ITEMS = [
+  // --- GROCERY (RICE, DALS, FLOURS, SPICES, ETC.) ---
+  { name: "TABLE RICE", category: "Grocery 🍞", unit: "Kg", type: "store" },
+  { name: "KHICHDI RICE", category: "Grocery 🍞", unit: "Kg", type: "store" },
+  { name: "TUAR DAL", category: "Grocery 🍞", unit: "Kg", type: "store" },
+  { name: "MUG FADA", category: "Grocery 🍞", unit: "Kg", type: "store" },
+  { name: "BESAN", category: "Grocery 🍞", unit: "Kg", type: "store" },
+  { name: "SUGER", category: "Grocery 🍞", unit: "Kg", type: "store" },
+  { name: "OIL TIN", category: "Grocery 🍞", unit: "Tins", type: "store" },
+  { name: "SINGDANA", category: "Grocery 🍞", unit: "Kg", type: "store" },
+  { name: "MIRCHA K.", category: "Grocery 🍞", unit: "Kg", type: "store" },
+  { name: "TAZ LAKDI", category: "Grocery 🍞", unit: "Kg", type: "store" },
+  { name: "TAZ PATTA", category: "Grocery 🍞", unit: "Kg", type: "store" },
+  { name: "LOVING", category: "Grocery 🍞", unit: "Kg", type: "store" },
+  { name: "BADIYA", category: "Grocery 🍞", unit: "Kg", type: "store" },
+  { name: "JEERA", category: "Grocery 🍞", unit: "Kg", type: "store" },
+  { name: "TAL", category: "Grocery 🍞", unit: "Kg", type: "store" },
+  { name: "AZMO", category: "Grocery 🍞", unit: "Kg", type: "store" },
+  { name: "KOKAM", category: "Grocery 🍞", unit: "Kg", type: "store" },
+  { name: "METHI", category: "Grocery 🍞", unit: "Kg", type: "store" },
+  { name: "TATA SODA", category: "Grocery 🍞", unit: "Packets", type: "store" },
+  { name: "EMALY", category: "Grocery 🍞", unit: "Kg", type: "store" },
+  { name: "VARIYALI", category: "Grocery 🍞", unit: "Kg", type: "store" },
+  { name: "RAI KURIYA", category: "Grocery 🍞", unit: "Kg", type: "store" },
+  { name: "RAI", category: "Grocery 🍞", unit: "Kg", type: "store" },
+  { name: "SABUDANA", category: "Grocery 🍞", unit: "Kg", type: "store" },
+  { name: "GUL RAJBHOG", category: "Grocery 🍞", unit: "Kg", type: "store" },
+  { name: "GUD", category: "Grocery 🍞", unit: "Kg", type: "store" },
+  { name: "PAPAD LIZZIT", category: "Grocery 🍞", unit: "Packets", type: "store" },
+  { name: "TEA", category: "Grocery 🍞", unit: "Kg", type: "store" },
+  { name: "TEA MASALA", category: "Grocery 🍞", unit: "Kg", type: "store" },
+  { name: "TATA SALT", category: "Grocery 🍞", unit: "Kg", type: "store" },
+  { name: "KAJU FADA", category: "Grocery 🍞", unit: "Kg", type: "store" },
+  { name: "KISMIS", category: "Grocery 🍞", unit: "Kg", type: "store" },
+  { name: "BADAM CRUSH", category: "Grocery 🍞", unit: "Kg", type: "store" },
+  { name: "ANJEER", category: "Grocery 🍞", unit: "Kg", type: "store" },
+  { name: "TUTIFRUITI", category: "Grocery 🍞", unit: "Kg", type: "store" },
+  { name: "SAKAR DIAMOND", category: "Grocery 🍞", unit: "Kg", type: "store" },
+  { name: "KHAS KHAS", category: "Grocery 🍞", unit: "Kg", type: "store" },
+  { name: "MUKHWASH", category: "Grocery 🍞", unit: "Kg", type: "store" },
+  { name: "POHA", category: "Grocery 🍞", unit: "Kg", type: "store" },
+  { name: "KOPRA POWDER", category: "Grocery 🍞", unit: "Kg", type: "store" },
+  { name: "MORIYO FARALI", category: "Grocery 🍞", unit: "Kg", type: "store" },
+  { name: "COFFEE POWDER", category: "Grocery 🍞", unit: "Kg", type: "store" },
+  { name: "PINAPPLE CRUSH", category: "Grocery 🍞", unit: "Packets", type: "store" },
+  { name: "ROSS CRUSH", category: "Grocery 🍞", unit: "Packets", type: "store" },
+  { name: "MANGO CRUSH", category: "Grocery 🍞", unit: "Packets", type: "store" },
+  { name: "VALL", category: "Grocery 🍞", unit: "Kg", type: "store" },
+  { name: "MUG", category: "Grocery 🍞", unit: "Kg", type: "store" },
+  { name: "VATANA", category: "Grocery 🍞", unit: "Kg", type: "store" },
+  { name: "CHANA", category: "Grocery 🍞", unit: "Kg", type: "store" },
+  { name: "ADUD DAL", category: "Grocery 🍞", unit: "Kg", type: "store" },
+  { name: "CHANA DAL", category: "Grocery 🍞", unit: "Kg", type: "store" },
+  { name: "CHOLI (WHITE)", category: "Grocery 🍞", unit: "Kg", type: "store" },
+  { name: "CHAPATI ATTA", category: "Grocery 🍞", unit: "Kg", type: "store" },
+  { name: "BAJRA ATTA", category: "Grocery 🍞", unit: "Kg", type: "store" },
+  { name: "BHAKRI ATTA", category: "Grocery 🍞", unit: "Kg", type: "store" },
+  { name: "MAKAI ATTA", category: "Grocery 🍞", unit: "Kg", type: "store" },
+  { name: "RICE ATTA", category: "Grocery 🍞", unit: "Kg", type: "store" },
+  { name: "CHANA MASALA", category: "Grocery 🍞", unit: "Kg", type: "store" },
+  { name: "PAVBHAJI MASALA", category: "Grocery 🍞", unit: "Kg", type: "store" },
+  { name: "SHOTH POWDER", category: "Grocery 🍞", unit: "Kg", type: "store" },
+  { name: "AMCHUR POWDER", category: "Grocery 🍞", unit: "Kg", type: "store" },
+  { name: "BLACK SALT", category: "Grocery 🍞", unit: "Kg", type: "store" },
+  { name: "HING POWDER", category: "Grocery 🍞", unit: "Kg", type: "store" },
+  { name: "MIRCHA POWDER", category: "Grocery 🍞", unit: "Kg", type: "store" },
+  { name: "HALDI POWDER", category: "Grocery 🍞", unit: "Kg", type: "store" },
+  { name: "CHAT MASALA", category: "Grocery 🍞", unit: "Kg", type: "store" },
+  { name: "KITCHEN KING", category: "Grocery 🍞", unit: "Kg", type: "store" },
+  { name: "DHANA POWDER", category: "Grocery 🍞", unit: "Kg", type: "store" },
+  { name: "PICKLE MASALA", category: "Grocery 🍞", unit: "Kg", type: "store" },
+  { name: "GARAM MASALA", category: "Grocery 🍞", unit: "Kg", type: "store" },
+  { name: "K. METHI", category: "Grocery 🍞", unit: "Kg", type: "store" },
+  { name: "GULAB JAMUN GITS", category: "Grocery 🍞", unit: "Packets", type: "store" },
+  { name: "SWEET MANGO", category: "Grocery 🍞", unit: "Kg", type: "store" },
+  { name: "SWEET LEMON", category: "Grocery 🍞", unit: "Kg", type: "store" },
+  { name: "KERDA", category: "Grocery 🍞", unit: "Kg", type: "store" },
+  { name: "CHUNDA", category: "Grocery 🍞", unit: "Kg", type: "store" },
+  { name: "MIX PICKLE", category: "Grocery 🍞", unit: "Kg", type: "store" },
+  { name: "CHANAMETHI PICKLE", category: "Grocery 🍞", unit: "Kg", type: "store" },
+  { name: "DHOKLA LOT", category: "Grocery 🍞", unit: "Kg", type: "store" },
+  { name: "KHAMAN LOT", category: "Grocery 🍞", unit: "Kg", type: "store" },
+  { name: "PICKLE JAR", category: "Grocery 🍞", unit: "Pcs", type: "store" },
+
+  // --- DAIRY CATEGORY ---
+  { name: "GHEE", category: "Dairy 🥛", unit: "Kg", type: "store" },
+  { name: "BUTTER", category: "Dairy 🥛", unit: "Kg", type: "store" },
+  { name: "CHEESE", category: "Dairy 🥛", unit: "Kg", type: "store" },
+  { name: "SHRIKHAND", category: "Dairy 🥛", unit: "Kg", type: "store" },
+
+  // --- PACKAGING & DISPOSABLES CATEGORIES ---
+  { name: "TEASSU PAPER", category: "Paper Items 🧻", unit: "Pcs", type: "pkg" },
+  { name: "THALI PLASTIC", category: "Disposables 🥤", unit: "Pcs", type: "pkg" },
+  { name: "CONTENOR 500ML", category: "Disposables 🥤", unit: "Pcs", type: "pkg" },
+  { name: "CONTENOR 250ML", category: "Disposables 🥤", unit: "Pcs", type: "pkg" },
+  { name: "CONTENOR SILVER", category: "Disposables 🥤", unit: "Pcs", type: "pkg" },
+  { name: "PAPER DISH 9NO.", category: "Disposables 🥤", unit: "Pcs", type: "pkg" },
+  { name: "PLASTIC BAWAL", category: "Disposables 🥤", unit: "Pcs", type: "pkg" },
+  { name: "HANDLE BAG", category: "Boxes 📦", unit: "Pcs", type: "pkg" },
+  { name: "TEA PARCLE BAG", category: "Boxes 📦", unit: "Pcs", type: "pkg" },
+  { name: "CAP KITCHEN", category: "Others 📝", unit: "Pcs", type: "pkg" },
+  { name: "PLASTIC SPOON", category: "Disposables 🥤", unit: "Pcs", type: "pkg" },
+  { name: "PLASTIC GLASS", category: "Disposables 🥤", unit: "Pcs", type: "pkg" },
+  { name: "TEA CUP (BIG 100ML)", category: "Disposables 🥤", unit: "Pcs", type: "pkg" },
+  { name: "TEA CUP (SMALL 50ML)", category: "Disposables 🥤", unit: "Pcs", type: "pkg" },
+  { name: "P. WATKI (CHATNI)", category: "Disposables 🥤", unit: "Pcs", type: "pkg" },
+  { name: "SILVER FOIL", category: "Paper Items 🧻", unit: "Pcs", type: "pkg" },
+  { name: "CREAM FOIL", category: "Paper Items 🧻", unit: "Pcs", type: "pkg" },
+  { name: "STROW PIPE", category: "Disposables 🥤", unit: "Pcs", type: "pkg" },
+  { name: "TOOTHPICS", category: "Others 📝", unit: "Pcs", type: "pkg" },
+  { name: "GARBAG BAG", category: "Others 📝", unit: "Pcs", type: "pkg" },
+  { name: "HAND GLOVS", category: "Others 📝", unit: "Pcs", type: "pkg" },
+  { name: "GARBAG BAG SMALL", category: "Others 📝", unit: "Pcs", type: "pkg" },
+  { name: "KOT BOOK", category: "Others 📝", unit: "Pcs", type: "pkg" },
+  { name: "PRINTER ROLL", category: "Others 📝", unit: "Pcs", type: "pkg" },
+
+  // --- OTHERS & UTILITIES/CLEANING ---
+  { name: "NIRMA POWDER", category: "Others 📝", unit: "Packets", type: "pkg" },
+  { name: "HAND WASH", category: "Others 📝", unit: "Pcs", type: "pkg" },
+  { name: "GLASS CLEANER", category: "Others 📝", unit: "Pcs", type: "pkg" },
+  { name: "PHENILE", category: "Others 📝", unit: "Pcs", type: "pkg" },
+  { name: "SANATIZER", category: "Others 📝", unit: "Pcs", type: "pkg" },
+  { name: "LIQUED", category: "Others 📝", unit: "Pcs", type: "pkg" },
+  { name: "GAS BOTAL", category: "Others 📝", unit: "Pcs", type: "store" },
+
+  // --- BEVERAGES & COLD DRINKS (OTHERS Category) ---
+  { name: "THUMSUP 750ML", category: "Others 📝", unit: "Pcs", type: "store" },
+  { name: "SPRITE 750ML", category: "Others 📝", unit: "Pcs", type: "store" },
+  { name: "MAZA 600ML", category: "Others 📝", unit: "Pcs", type: "store" },
+  { name: "THUMSUP TIN", category: "Others 📝", unit: "Pcs", type: "store" },
+  { name: "FANTA TIN", category: "Others 📝", unit: "Pcs", type: "store" },
+  { name: "COCACOLA TIN", category: "Others 📝", unit: "Pcs", type: "store" },
+  { name: "SPRITE TIN", category: "Others 📝", unit: "Pcs", type: "store" },
+  { name: "SPRITE 200ML", category: "Others 📝", unit: "Pcs", type: "store" },
+  { name: "THUMSUP 200ML", category: "Others 📝", unit: "Pcs", type: "store" },
+  { name: "MAZA 200ML", category: "Others 📝", unit: "Pcs", type: "store" },
+  { name: "COCK  200", category: "Others 📝", unit: "Pcs", type: "store" },
+  { name: "FANTA 200", category: "Others 📝", unit: "Pcs", type: "store" },
+  { name: "JEERA SODA", category: "Others 📝", unit: "Pcs", type: "store" },
+  { name: "SODA", category: "Others 📝", unit: "Pcs", type: "store" },
+  { name: "DEW 750ML", category: "Others 📝", unit: "Pcs", type: "store" },
+  { name: "MIRINDA 750ML", category: "Others 📝", unit: "Pcs", type: "store" },
+  { name: "FIZZ 200ML", category: "Others 📝", unit: "Pcs", type: "store" },
+  { name: "TROPICANA 200ML", category: "Others 📝", unit: "Pcs", type: "store" },
+  { name: "STING 200ML", category: "Others 📝", unit: "Pcs", type: "store" },
+  { name: "WATER", category: "Others 📝", unit: "Pcs", type: "store" }
 ];
 
 // Fallback Default Expense Categories
@@ -72,7 +217,9 @@ const t = {
     customInput: "या नया नाम टाइप करें",
     lowStockReportBtn: "📥 समाप्त स्टॉक रिपोर्ट एक्सपोर्ट करें (Excel)",
     lowStockReportDesc: "स्टोर रूम और पैकेजिंग की वे सामग्रियां जो समाप्त या कम हैं",
-    allStockOk: "सभी सामग्रियां पर्याप्त मात्रा में उपलब्ध हैं!"
+    allStockOk: "सभी सामग्रियां पर्याप्त मात्रा में उपलब्ध हैं!",
+    setupDatabaseBtn: "🚀 मास्टर सामग्री सूची सिंक करें",
+    setupDatabaseDesc: "सभी 136 कैफ़े सामग्रियों को डेटाबेस में लोड करें"
   },
   en: {
     title: "Cafe Helper Dashboard",
@@ -107,7 +254,9 @@ const t = {
     customInput: "Or Type Custom Name",
     lowStockReportBtn: "📥 Export Finished Stock Report (Excel)",
     lowStockReportDesc: "List of items that are completely out or low in stock",
-    allStockOk: "All stock items are sufficiently available!"
+    allStockOk: "All stock items are sufficiently available!",
+    setupDatabaseBtn: "🚀 Seed Master Item List",
+    setupDatabaseDesc: "Populate all 136 items into the DB with correct categories"
   }
 };
 
@@ -131,6 +280,7 @@ export default function BbCafeHelper() {
   const [isAdminAuthorized, setIsAdminAuthorized] = useState(false);
   const [enteredPin, setEnteredPin] = useState("");
   const [isVerifyingPin, setIsVerifyingPin] = useState(false);
+  const [isInitializingDb, setIsInitializingDb] = useState(false);
 
   // Tab & Language States
   const [activeTab, setActiveTab] = useState<'expenses' | 'assets' | 'store_room' | 'packaging'>('expenses');
@@ -328,6 +478,55 @@ export default function BbCafeHelper() {
     setSearchQuery("");
   }, [activeTab]);
 
+  // --- DATABASE SEED / SYNC FOR ALL 136 ITEMS ---
+  const handleSyncMasterDatabase = async () => {
+    triggerHaptic();
+    const isConfirmed = window.confirm(
+      isHindi 
+        ? "क्या आप प्रदान की गई सभी 136 सामग्रियों को डेटाबेस में लोड करना चाहते हैं? इससे पुराने नाम डिलीट नहीं होंगे, केवल नए नाम लोड होंगे।" 
+        : "Are you sure you want to seed all 136 master items to your database? This will merge them without deleting existing items."
+    );
+    if (!isConfirmed) return;
+
+    setIsInitializingDb(true);
+    let seededCount = 0;
+
+    try {
+      for (const item of MASTER_CAFE_ITEMS) {
+        const cleanId = item.name.trim().toUpperCase().replace(/[^A-Z0-9]/g, "_");
+
+        if (item.type === "store") {
+          await setDoc(doc(db, "store_room", cleanId), {
+            name: item.name,
+            quantity: 0,
+            category: item.category,
+            unit: item.unit,
+            timestamp: new Date()
+          }, { merge: true });
+        } else {
+          await setDoc(doc(db, "packaging_inventory", cleanId), {
+            name: item.name,
+            quantity: 0,
+            category: item.category,
+            minLimit: 30,
+            timestamp: new Date()
+          }, { merge: true });
+        }
+        seededCount++;
+      }
+
+      toast.success(
+        isHindi 
+          ? `बधाई हो! सभी ${seededCount} सामग्रियों को डेटाबेस में सिंक कर दिया गया है!` 
+          : `Success! Loaded all ${seededCount} master items with respective categories!`
+      );
+    } catch (err) {
+      toast.error(isHindi ? "डेटाबेस लोड करने में समस्या आई।" : "Failed to seed Master Items.");
+    } finally {
+      setIsInitializingDb(false);
+    }
+  };
+
   // --- 1. DYNAMIC EXPENSES & CATEGORIES HANDLERS ---
   const handleSaveExpense = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -503,11 +702,11 @@ export default function BbCafeHelper() {
     printWindow.document.close();
   };
 
-  // --- NEW FEATURE: DYNAMIC AUTO-FILTER & EXPORT LOW STOCK CSV ---
+  // --- AUTOMATIC LOW STOCK / EMPTY STOCK EXCEL REPORT EXPORTER ---
   const handleExportFinishedStockReport = () => {
     triggerHaptic();
 
-    // 1. Store Room Out of Stock / Low Stock items (Stock qty <= 2)
+    // 1. Store Room Out of Stock or Low Stock items (Stock qty <= 2)
     const lowStoreItems = storeItems
       .filter(item => (Number(item.quantity) || 0) <= 2)
       .map(item => ({
@@ -518,7 +717,7 @@ export default function BbCafeHelper() {
         department: "Store Room"
       }));
 
-    // 2. Packaging Out of Stock / Low Stock items (Stock qty < minLimit)
+    // 2. Packaging Out of Stock or Low Stock items (Stock qty < minLimit)
     const lowPkgItems = pkgItems
       .filter(item => (Number(item.quantity) || 0) < (Number(item.minLimit) || 30))
       .map(item => ({
@@ -529,17 +728,17 @@ export default function BbCafeHelper() {
         department: "Packaging Stock"
       }));
 
-    // Combine both lists
+    // Combine both store room and packaging lists
     const mergedList = [...lowStoreItems, ...lowPkgItems];
 
     if (mergedList.length === 0) {
       return toast.success(isHindi ? t.hi.allStockOk : t.en.allStockOk);
     }
 
-    // Automatically sort/filter by category
+    // Automatically sort/filter compiled list by Category
     mergedList.sort((a, b) => a.category.localeCompare(b.category));
 
-    // Create CSV content
+    // Create CSV content with correct sorting
     const headers = ["Item Name", "Category", "Current Stock", "Status", "Department"];
     const csvRows = [headers.join(",")];
 
@@ -559,12 +758,12 @@ export default function BbCafeHelper() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.setAttribute("href", url);
-    link.setAttribute("download", `BumBumCafe_Finished_Stock_Report_${new Date().toLocaleDateString()}.csv`);
+    link.setAttribute("download", `BumBumCafe_Low_Stock_Report_${new Date().toLocaleDateString()}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
 
-    toast.success(isHindi ? "समाप्त स्टॉक सूची सफलतापूर्वक डाउनलोड हो गई!" : "Finished stock report downloaded!");
+    toast.success(isHindi ? "समाप्त स्टॉक सूची कैटेगिरी के साथ सफलतापूर्वक डाउनलोड हो गई!" : "Low stock report downloaded sorted by category!");
   };
 
   // --- 2. ASSET HANDLERS ---
@@ -952,12 +1151,21 @@ export default function BbCafeHelper() {
 
   const activeTranslation = isHindi ? t.hi : t.en;
 
-  // Total low stock count from both Store and Packaging
+  // Real-time Low / Out of Stock alerts count combining both modules
   const totalLowStockItemsCount = useMemo(() => {
     const storeLowCount = storeItems.filter(item => (Number(item.quantity) || 0) <= 2).length;
     const pkgLowCount = pkgItems.filter(item => (Number(item.quantity) || 0) < (Number(item.minLimit) || 30)).length;
     return storeLowCount + pkgLowCount;
   }, [storeItems, pkgItems]);
+
+  // Dynamic suggestions filtered from user's master list
+  const suggestedStoreOptions = useMemo(() => {
+    return MASTER_CAFE_ITEMS.filter(item => item.type === "store");
+  }, []);
+
+  const suggestedPkgOptions = useMemo(() => {
+    return MASTER_CAFE_ITEMS.filter(item => item.type === "pkg");
+  }, []);
 
   // --- SECURITY LOCK SCREEN ---
   if (!isAdminAuthorized) {
@@ -1064,7 +1272,7 @@ export default function BbCafeHelper() {
           </div>
         </div>
 
-        {/* --- GLOBAL LOW STOCK REORDER CONTROLLER CARD --- */}
+        {/* --- GLOBAL LOW STOCK ALERT & EXPORT CONTROLLER PANEL --- */}
         {totalLowStockItemsCount > 0 && (
           <div className="bg-red-500/10 border border-red-500/20 p-5 rounded-3xl space-y-3 shadow-md animate-pulse">
             <div className="flex justify-between items-start">
@@ -1073,15 +1281,17 @@ export default function BbCafeHelper() {
                   <AlertTriangle size={15} /> {isHindi ? "⚠️ कम / समाप्त स्टॉक चेतावनी" : "⚠️ Low / Out of Stock Alert"}
                 </p>
                 <p className="text-[9px] text-gray-400 font-medium mt-1">
-                  {isHindi ? `स्टोर रूम और पैकेजिंग में ${totalLowStockItemsCount} सामग्रियां कम हैं।` : `${totalLowStockItemsCount} items are running low or out of stock.`}
+                  {isHindi 
+                    ? `स्टोर रूम और पैकेजिंग विभाग में कुल ${totalLowStockItemsCount} सामग्रियां समाप्त या न्यूनतम अलर्ट सीमा से कम हैं।` 
+                    : `Total of ${totalLowStockItemsCount} items are completely finished or running low.`}
                 </p>
               </div>
-              <span className="bg-red-500 text-white px-2 py-0.5 rounded-full text-[9px] font-black">
+              <span className="bg-red-500 text-white px-2.5 py-0.5 rounded-full text-[9px] font-black">
                 {totalLowStockItemsCount}
               </span>
             </div>
             
-            {/* Auto-Filtered Export Trigger Button */}
+            {/* Download Button */}
             <button
               type="button"
               onClick={handleExportFinishedStockReport}
@@ -1092,6 +1302,30 @@ export default function BbCafeHelper() {
             </button>
           </div>
         )}
+
+        {/* --- MASTER SEED BUTTON PANEL FOR BACK-END SETUP --- */}
+        <div className="bg-white/[0.02] border border-white/5 p-4 rounded-3xl space-y-2">
+          <div className="flex justify-between items-center">
+            <div>
+              <p className="text-[10px] font-black text-orange-400 uppercase tracking-widest">{isHindi ? "⚙️ डेटाबेस क्विक टूल्स" : "⚙️ Database Quick Tools"}</p>
+              <p className="text-[8px] text-gray-500 font-bold uppercase mt-0.5">{activeTranslation.setupDatabaseDesc}</p>
+            </div>
+            <button
+              type="button"
+              onClick={handleSyncMasterDatabase}
+              disabled={isInitializingDb}
+              className="px-3.5 py-2 bg-orange-500/10 border border-orange-500/20 hover:bg-orange-500/20 text-orange-500 rounded-xl text-[10px] font-black uppercase flex items-center gap-1.5 transition-all"
+            >
+              {isInitializingDb ? (
+                <>
+                  <Loader2 className="animate-spin" size={12} /> Syncing...
+                </>
+              ) : (
+                activeTranslation.setupDatabaseBtn
+              )}
+            </button>
+          </div>
+        </div>
 
         {/* --- TAB 1: DAILY EXPENSES --- */}
         {activeTab === 'expenses' && (
@@ -1648,21 +1882,26 @@ export default function BbCafeHelper() {
                 📦 {isHindi ? "स्टोर रूम थोक स्टॉक दर्ज करें" : "Add Bulk Inventory to Store Room"}
               </p>
 
-              {/* Pre-filled dropdown to prevent spelling errors */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {/* Auto Suggested Master Dropdown mapping compiled 136 items */}
                 <div className="space-y-1">
-                  <label className="text-[9px] font-bold text-gray-400 uppercase">{isHindi ? "सूची से सामग्री चुनें (Suggested)" : "Choose Suggested Material"}</label>
+                  <label className="text-[9px] font-bold text-gray-400 uppercase">{isHindi ? "मास्टर सूची से सामग्री चुनें" : "Choose Suggested Material"}</label>
                   <select 
                     onChange={(e) => {
                       if (e.target.value) {
+                        const selectedOption = suggestedStoreOptions.find(opt => opt.name === e.target.value);
                         setStoreItemName(e.target.value);
+                        if (selectedOption) {
+                          setStoreItemCategory(selectedOption.category);
+                          setStoreItemUnit(selectedOption.unit);
+                        }
                       }
                     }}
                     className="w-full text-xs font-bold p-3 rounded-xl bg-white dark:bg-neutral-800 border border-gray-300 dark:border-white/10 outline-none text-neutral-900 dark:text-white cursor-pointer"
                   >
                     <option value="">{activeTranslation.suggestedSelect}</option>
-                    {SUGGESTED_STORE_ITEMS.map((item, idx) => (
-                      <option key={idx} value={item} className="bg-[#111]">{item}</option>
+                    {suggestedStoreOptions.map((item, idx) => (
+                      <option key={idx} value={item.name} className="bg-[#111]">{item.name} ({item.category})</option>
                     ))}
                   </select>
                 </div>
@@ -1671,7 +1910,7 @@ export default function BbCafeHelper() {
                   <label className="text-[9px] font-bold text-gray-400 uppercase">{activeTranslation.customInput}</label>
                   <input 
                     type="text" 
-                    placeholder="e.g. Flour (मैदा) / Mozzarella Cheese" 
+                    placeholder="e.g. Flour (मैदा)" 
                     value={storeItemName} 
                     onChange={(e) => setStoreItemName(e.target.value)} 
                     className="w-full text-xs font-bold p-3 rounded-xl bg-white dark:bg-neutral-800 border border-gray-300 dark:border-white/10 outline-none text-neutral-900 dark:text-white focus:border-orange-500"
@@ -1708,7 +1947,6 @@ export default function BbCafeHelper() {
                 </div>
               </div>
 
-              {/* Dynamic store category selector dropdown */}
               <div className="space-y-1">
                 <label className="text-[9px] font-bold text-gray-400 uppercase">{isHindi ? "स्टोर श्रेणी (Category)" : "Store Category"}</label>
                 <select 
@@ -1773,7 +2011,7 @@ export default function BbCafeHelper() {
               )}
             </div>
 
-            {/* Store Room In/Out Transaction Ledger passbook */}
+            {/* Store Room In/Out Transaction Ledger */}
             <div className="bg-[#111] border border-white/5 p-5 rounded-[2.5rem] space-y-4">
               <h3 className="text-sm font-black text-orange-500 uppercase tracking-widest flex items-center gap-1.5">
                 <History size={15} /> {isHindi ? "📜 आवक-जावक रजिस्टर (Ledger)" : "📜 Store Room In/Out Ledger"}
@@ -1783,7 +2021,7 @@ export default function BbCafeHelper() {
                   <div key={log.id} className="bg-white/[0.01] border border-white/5 p-3 rounded-2xl flex justify-between items-center text-[10px] font-bold">
                     <div className="space-y-0.5">
                       <p className="text-gray-300 uppercase">{log.name}</p>
-                      <p className="text-[8px] text-gray-500">
+                      <p className="text-[8px] text-gray-550">
                         {log.timestamp?.toDate ? log.timestamp.toDate().toLocaleString() : "Just now"}
                       </p>
                     </div>
@@ -1796,7 +2034,7 @@ export default function BbCafeHelper() {
                   </div>
                 ))}
                 {storeLedger.length === 0 && (
-                  <p className="text-center text-[9px] text-gray-400 font-bold uppercase py-4">No transactions logged yet...</p>
+                  <p className="text-center text-[9px] text-gray-450 font-bold uppercase py-4">No transactions logged yet...</p>
                 )}
               </div>
             </div>
@@ -1812,7 +2050,7 @@ export default function BbCafeHelper() {
                     animate={{ scale: 1, opacity: 1 }}
                     exit={{ scale: 0.95, opacity: 0 }}
                   >
-                    <h4 className="font-black text-sm uppercase text-orange-500 text-center">✏️ Edit Store Item (आइटम विवरण बदलें)</h4>
+                    <h4 className="font-black text-sm uppercase text-orange-500 text-center">✏️ Edit Store Item</h4>
                     <div className="space-y-1">
                       <label className="text-[9px] font-bold text-gray-450 uppercase">Item Name</label>
                       <input 
@@ -1835,7 +2073,7 @@ export default function BbCafeHelper() {
                         />
                       </div>
                       <div className="space-y-1">
-                        <label className="text-[9px] font-bold text-gray-450 uppercase">Category</label>
+                        <label className="text-[9px] font-bold text-gray-455 uppercase">Category</label>
                         <select 
                           value={editingStoreItem.category || ""}
                           onChange={(e) => setEditingStoreItem({ ...editingStoreItem, category: e.target.value })}
@@ -1876,7 +2114,7 @@ export default function BbCafeHelper() {
                     </div>
 
                     <div className="space-y-1 text-left">
-                      <label className="text-[9px] font-bold text-gray-400 uppercase">{activeTranslation.qtyToMove}</label>
+                      <label className="text-[9px] font-bold text-gray-450 uppercase">{activeTranslation.qtyToMove}</label>
                       <input 
                         type="number" 
                         placeholder="e.g. 1" 
@@ -1965,27 +2203,26 @@ export default function BbCafeHelper() {
                   📦 {isHindi ? "नया पैकेजिंग/डिस्पोजल माल जोड़ें" : "Add Packaging/Disposable Stock"}
                 </p>
 
-                {/* Pre-filled dropdown to prevent spelling errors during dynamic item add */}
+                {/* Suggested Master dropdown mapping the 136 items filter list */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs font-bold">
                   <div className="space-y-1">
                     <label className="text-[9px] font-bold text-gray-400 uppercase">{isHindi ? "सुझाए गए नाम चुनें" : "Suggested Packaging Item"}</label>
                     <select 
                       onChange={(e) => {
                         if (e.target.value) {
+                          const selectedOption = suggestedPkgOptions.find(opt => opt.name === e.target.value);
                           setNewPkgName(e.target.value);
+                          if (selectedOption) {
+                            setNewPkgCategory(selectedOption.category);
+                          }
                         }
                       }}
                       className="w-full text-xs font-bold p-3 rounded-xl bg-white dark:bg-neutral-800 border border-gray-300 dark:border-white/10 outline-none text-neutral-900 dark:text-white cursor-pointer"
                     >
                       <option value="">{activeTranslation.suggestedSelect}</option>
-                      <option value='Pizza Box Small 6"'>Pizza Box Small 6"</option>
-                      <option value='Pizza Box Medium 8"'>Pizza Box Medium 8"</option>
-                      <option value='Pizza Box Large 10"'>Pizza Box Large 10"</option>
-                      <option value='Pizza Box Extra Large 12"'>Pizza Box Extra Large 12"</option>
-                      <option value="Disposable Spoon 🥄">Disposable Spoon 🥄</option>
-                      <option value="Tissue Paper 🧻">Tissue Paper 🧻</option>
-                      <option value="Water Glass 🥤">Water Glass 🥤</option>
-                      <option value="Plastic Carry Bag">Plastic Carry Bag</option>
+                      {suggestedPkgOptions.map((item, idx) => (
+                        <option key={idx} value={item.name} className="bg-[#111]">{item.name} ({item.category})</option>
+                      ))}
                     </select>
                   </div>
 
@@ -1993,7 +2230,7 @@ export default function BbCafeHelper() {
                     <label className="text-[9px] font-bold text-gray-400 uppercase">{activeTranslation.customInput}</label>
                     <input 
                       type="text" 
-                      placeholder="e.g. Spoon / Tissue Paper" 
+                      placeholder="e.g. TEASSU PAPER" 
                       value={newPkgName} 
                       onChange={(e) => setNewPkgName(e.target.value)} 
                       className="w-full text-xs font-bold p-3 rounded-xl bg-white dark:bg-neutral-800 border border-gray-300 dark:border-white/10 outline-none text-neutral-900 dark:text-white focus:border-orange-500"
@@ -2062,7 +2299,7 @@ export default function BbCafeHelper() {
 
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1">
-                      <label className="text-[9px] font-bold text-gray-450 uppercase">Category</label>
+                      <label className="text-[9px] font-bold text-gray-455 uppercase">Category</label>
                       <select value={editPkgCategory} onChange={(e) => setEditPkgCategory(e.target.value)} className="w-full text-xs font-bold p-3 rounded-xl bg-black border border-white/10 outline-none text-white focus:border-orange-500 cursor-pointer">
                         {pkgCategories.map(cat => (
                           <option key={cat.id} value={cat.name} className="bg-[#111]">{cat.name}</option>
@@ -2070,14 +2307,14 @@ export default function BbCafeHelper() {
                       </select>
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[9px] font-bold text-gray-450 uppercase">Min Limit</label>
+                      <label className="text-[9px] font-bold text-gray-455 uppercase">Min Limit</label>
                       <input type="number" value={editPkgMinLimit} onChange={(e) => setEditPkgMinLimit(e.target.value)} className="w-full text-xs font-bold p-3 rounded-xl bg-black border border-white/10 outline-none text-white" required />
                     </div>
                   </div>
 
                   <div className="flex gap-2">
-                    <button type="submit" className="flex-1 bg-green-600 text-white font-black py-2.5 rounded-xl text-[10px] uppercase">Update</button>
-                    <button type="button" onClick={() => setEditingPkgItem(null)} className="bg-white/5 text-gray-400 p-2.5 rounded-xl font-black text-[10px] uppercase">Cancel</button>
+                    <button type="submit" className="flex-1 bg-green-600 text-white font-black py-2.5 rounded-xl text-[10px] uppercase font-sans">Update</button>
+                    <button type="button" onClick={() => setEditingPkgItem(null)} className="bg-white/5 text-gray-400 p-2.5 rounded-xl font-black text-[10px] uppercase font-sans">Cancel</button>
                   </div>
                 </form>
               </div>
@@ -2159,7 +2396,7 @@ export default function BbCafeHelper() {
               </div>
             </div>
 
-            <div className="bg-[#111] border border-white/5 p-4 rounded-2xl flex justify-between items-center text-xs font-bold text-gray-400 uppercase font-mono">
+            <div className="bg-[#111] border border-white/5 p-4 rounded-2xl flex justify-between items-center text-xs font-bold text-gray-450 uppercase font-mono">
               <span>Generate Packaging WhatsApp Order:</span>
               <button 
                 type="button"
