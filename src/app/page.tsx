@@ -520,27 +520,39 @@ export default function BbCafeHome() {
     );
 
     const unsubLiveOrder = onSnapshot(qOrders, (snap) => {
-      if (!snap.empty) {
-        const userOrders = snap.docs.map(doc => ({ id: doc.id, ...doc.data() as any }));
-        // Client-side sort by timestamp descending
-        userOrders.sort((a, b) => {
-          const tA = a.timestamp?.toDate ? a.timestamp.toDate() : new Date(a.timestamp || 0);
-          const tB = b.timestamp?.toDate ? b.timestamp.toDate() : new Date(b.timestamp || 0);
-          return tB.getTime() - tA.getTime();
-        });
-
-        const latestOrder = userOrders[0];
-        if (latestOrder && latestOrder.status !== 'delivered') {
-          setLiveOrder(latestOrder);
-        } else {
-          setLiveOrder(null);
-        }
-      } else {
-        setLiveOrder(null);
-      }
-    }, (err) => {
-      console.error("Live order tracking error:", err);
+  if (!snap.empty) {
+    const userOrders = snap.docs.map(doc => ({ id: doc.id, ...doc.data() as any }));
+    // Client-side sort by timestamp descending
+    userOrders.sort((a, b) => {
+      const tA = a.timestamp?.toDate ? a.timestamp.toDate() : new Date(a.timestamp || 0);
+      const tB = b.timestamp?.toDate ? b.timestamp.toDate() : new Date(b.timestamp || 0);
+      return tB.getTime() - tA.getTime();
     });
+
+    const latestOrder = userOrders[0];
+
+    // जांचें कि क्या इस रिजेक्टेड आर्डर को ग्राहक पहले ही बंद (Dismiss) कर चुका है
+    let dismissedIds: string[] = [];
+    try {
+      dismissedIds = JSON.parse(localStorage.getItem('bb_dismissed_rejected_orders') || '[]');
+    } catch (e) {}
+
+    if (latestOrder && latestOrder.status !== 'delivered') {
+      if (latestOrder.status === 'rejected' && dismissedIds.includes(latestOrder.id)) {
+        // अगर पहले ही बंद किया जा चुका है, तो दोबारा न दिखाएं
+        setLiveOrder(null);
+      } else {
+        setLiveOrder(latestOrder);
+      }
+    } else {
+      setLiveOrder(null);
+    }
+  } else {
+    setLiveOrder(null);
+  }
+}, (err) => {
+  console.error("Live order tracking error:", err);
+});
 
     return () => unsubLiveOrder();
   }, [customerDetails]);
@@ -2128,13 +2140,25 @@ export default function BbCafeHome() {
           </span>
         </div>
         {liveOrder.status === 'rejected' ? (
-          <button 
-            onClick={() => { triggerHaptic(); setLiveOrder(null); }}
-            className="text-gray-400 hover:text-white p-1"
-          >
-            <X size={14} />
-          </button>
-        ) : (
+  <button 
+    type="button"
+    onClick={() => { 
+      triggerHaptic(); 
+      // आर्डर ID को सहेजें ताकि रीफ्रेश करने पर यह दोबारा न दिखे
+      try {
+        const dismissed = JSON.parse(localStorage.getItem('bb_dismissed_rejected_orders') || '[]');
+        if (!dismissed.includes(liveOrder.id)) {
+          dismissed.push(liveOrder.id);
+          localStorage.setItem('bb_dismissed_rejected_orders', JSON.stringify(dismissed));
+        }
+      } catch (e) {}
+      setLiveOrder(null); 
+    }}
+    className="text-gray-400 hover:text-white p-1"
+  >
+    <X size={14} />
+  </button>
+) : (
           <span className="bg-orange-500/10 text-orange-400 px-2 py-0.5 rounded-md text-[9px] uppercase font-black font-mono">
             Token: #{liveOrder.tokenNumber}
           </span>
