@@ -1,6 +1,6 @@
 'use client';
 import React, { useState, useEffect, useMemo } from 'react';
-import { db } from '../../lib/firebase'; 
+import { db } from '../../../lib/firebase'; 
 import { collection, onSnapshot, query, addDoc, doc, deleteDoc, updateDoc, setDoc, orderBy, getDoc, increment } from 'firebase/firestore';
 import { Plus, X, Trash2, Calendar, IndianRupee, ArrowLeft, Lock, Loader2, Filter, ShoppingBag, Flame, Banknote, ShieldAlert, Layers, ChevronRight, Settings, Wrench, Package, AlertTriangle, ArrowRightLeft, Globe } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
