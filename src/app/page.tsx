@@ -1,3 +1,5 @@
+
+
 'use client';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { db } from '../lib/firebase'; 
@@ -898,7 +900,7 @@ export default function BbCafeHome() {
         });
       });
 
-      toast.success(`🎁 सफलतापूर्वक ${pointsToGift}  पॉ\%$ट्स गिफ्ट कर दिए गए हैं!`);
+      toast.success(`🎁 सफलतापूर्वक ${pointsToGift}  पॉइंट्स गिफ्ट कर दिए गए हैं!`);
       const inviteMsg = `हे दोस्त! मैंने तुम्हें BAM BAM Cafe के ऐप पर 🎁 ${pointsToGift} Loyalty Points गिफ्ट किए हैं। यहाँ से स्वादिष्ट पिज्जा और थाली आर्डर करो: https://bb-cafe-app.vercel.app/`;
       const whatsappUrl = `https://wa.me/91${friendPhoneRaw}?text=${encodeURIComponent(inviteMsg)}`;
       
@@ -1399,7 +1401,7 @@ export default function BbCafeHome() {
   if (!mounted) return null;
 
   return (
-    <div className="dark:bg-[#050505] bg-gray-550 min-h-screen dark:text-white text-gray-900 pb-32 font-sans relative overflow-x-clip transition-colors duration-200">
+    <div className="dark:bg-[#050505] bg-gray-50 min-h-screen dark:text-white text-gray-900 pb-32 font-sans relative overflow-x-clip transition-colors duration-200">
       
       {/* Manual direct homepage manifest link injection */}
       <link rel="manifest" href="/manifest.json" />
@@ -1697,7 +1699,7 @@ export default function BbCafeHome() {
               const isActive = selectedCategory === cat;
               return (
                 <button key={cat} onClick={() => setSelectedCategory(cat)} className="flex flex-col items-center flex-shrink-0 group outline-none">
-                  <div className={`w-14 h-14 rounded-full overflow-hidden border transition-all ${isActive ? 'border-orange-500 scale-105 shadow-md' : 'dark:border-white/10 border-gray-200 bg-neutral-900'}`}>
+                  <div className={`w-14 h-14 rounded-full overflow-hidden border transition-all ${isActive ? 'border-orange-500 scale-105 shadow-md' : 'dark:border-white/10 border-gray-200 bg-neutral-950'}`}>
                     {cat === "DIY Pizza" ? (
                       <div className="w-full h-full flex items-center justify-center text-lg bg-gradient-to-tr from-yellow-500 to-red-500 text-white">🍕</div>
                     ) : (
@@ -2182,7 +2184,7 @@ export default function BbCafeHome() {
             </div>
           </div>
         )}
-      </  Presence>
+      </AnimatePresence>
 
       {/* WRITING REVIEW POPUP */}
       <AnimatePresence>
@@ -2216,7 +2218,7 @@ export default function BbCafeHome() {
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[9px] font-black uppercase text-gray-505">पसंदीदा रिव्यू टच करें:</label>
+                  <label className="text-[9px] font-black uppercase text-gray-550">पसंदीदा रिव्यू टच करें:</label>
                   <div className="flex flex-wrap gap-1.5 py-1">
                     {SUGGESTED_REVIEWS.map((suggestion) => (
                       <button
@@ -2365,7 +2367,7 @@ export default function BbCafeHome() {
                     </div>
                     <div className="space-y-1">
                       <label className="text-[9px] font-bold text-gray-500 uppercase">Referral Code (Optional)</label>
-                      <input type="text" placeholder="Enter invite code..." value={tempRefCode} onChange={(e) => setTempRefCode(e.target.value)} className="w-full dark:bg-neutral-850 bg-gray-50 border dark:border-neutral-700 border-gray-200 p-3 rounded-xl font-bold dark:text-white text-neutral-900 outline-none focus:border-orange-500 text-xs" />
+                      <input type="text" placeholder="Enter invite code..." value={tempRefCode} onChange={(e) => setTempRefCode(e.target.value)} className="w-full dark:bg-neutral-850 bg-gray-550 border dark:border-neutral-700 border-gray-200 p-3 rounded-xl font-bold dark:text-white text-neutral-900 outline-none focus:border-orange-500 text-xs" />
                     </div>
                   </div>
                   <button type="submit" className="w-full bg-orange-500 text-black p-3.5 rounded-xl font-black text-xs uppercase shadow transition-all active:scale-95 mt-4">Create Account ➔</button>
@@ -2375,7 +2377,7 @@ export default function BbCafeHome() {
                   {/* USER ACCOUNT VIEW */}
                   <div className="dark:bg-white/[0.02] bg-gray-50 p-4 rounded-2xl border dark:border-white/5 border-gray-200 flex justify-between items-center transition-colors duration-200">
                     <div>
-                      <p className="text-[8px] dark:text-gray-505 text-neutral-600 font-black uppercase">Customer Profile</p>
+                      <p className="text-[8px] dark:text-gray-550 text-neutral-600 font-black uppercase">Customer Profile</p>
                       <h4 className="font-black text-base text-orange-500">{customerDetails.name}</h4>
                       <p className="text-xs dark:text-gray-400 text-neutral-700 font-semibold">{customerDetails.phone}</p>
                       <p className="text-[9px] text-yellow-600 dark:text-yellow-400 font-bold mt-1 uppercase">Invite Code: {getReferralCode()}</p>
@@ -2776,7 +2778,7 @@ export default function BbCafeHome() {
               <div className="space-y-3 text-left">
                 <div className="space-y-1">
                   <label className="text-[9px] font-black uppercase text-gray-500">Friend's Phone Number</label>
-                  <input type="tel" maxLength={10} placeholder="e.g. 9876543210" value={giftPhone} onChange={(e) => setGiftPhone(e.target.value)} required className="w-full dark:bg-white/10 bg-gray-550 border dark:border-white/10 border-gray-200 p-3 rounded-xl text-xs font-bold dark:text-white text-neutral-900 outline-none text-center" />
+                  <input type="tel" maxLength={10} placeholder="e.g. 9876543210" value={giftPhone} onChange={(e) => setGiftPhone(e.target.value)} required className="w-full dark:bg-white/10 bg-gray-50 border dark:border-white/10 border-gray-200 p-3 rounded-xl text-xs font-bold dark:text-white text-neutral-900 outline-none text-center" />
                 </div>
                 <div className="space-y-1">
                   <label className="text-[9px] font-black uppercase text-gray-500">Points to Gift (Your Pts: {customerPoints})</label>
@@ -2815,7 +2817,7 @@ export default function BbCafeHome() {
               </div>
 
               <div className="space-y-1 text-left">
-                <label className="text-[9px] font-black uppercase text-gray-500">Your Profile Handle / Username</label>
+                <label className="text-[9px] font-black uppercase text-gray-550">Your Profile Handle / Username</label>
                 <input 
                   type="text" 
                   placeholder="e.g. @yourname" 
@@ -2850,7 +2852,7 @@ export default function BbCafeHome() {
             <motion.div className="dark:bg-[#111] bg-white w-full max-w-md p-6 rounded-3xl border dark:border-white/10 border-gray-200 text-center space-y-4 shadow-xl transition-colors duration-200">
               <div>
                 <h3 className="text-xl font-black text-orange-500 uppercase italic">Connect & Earn Points</h3>
-                <p className="text-[8px] text-gray-500 font-bold uppercase tracking-wider">हर प्लेटफार्म पर फॉलो/सब्सक्राइब करने का +1 पॉइंट पाएं!</p>
+                <p className="text-[8px] text-gray-505 font-bold uppercase tracking-wider">हर प्लेटफार्म पर फॉलो/सब्सक्राइब करने का +1 पॉइंट पाएं!</p>
               </div>
               <div className="space-y-2 text-left max-h-[22rem] overflow-y-auto no-scrollbar pr-1">
                 {SOCIAL_LINKS.map((platform) => (
