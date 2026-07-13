@@ -81,7 +81,7 @@ const t = {
     moveStock: "Move to Kitchen",
     qtyToMove: "Quantity to Move",
     lowStockWarning: "🚨 Low Stock Alert!",
-    tableBoxes: "Packaging & Disposables Stock Dashboard",
+    tableBoxes: "Pizza Boxes Stock Tracker",
     manageCategories: "⚙️ Manage Categories",
     newCategoryPlaceholder: "Enter new category name (e.g., Fruits)",
     addCategoryBtn: "Add",
@@ -111,6 +111,21 @@ export default function BbCafeHelper() {
   const [newExpenseCatInput, setNewExpenseCatInput] = useState("");
   const [showManageCatPanel, setShowManageCatPanel] = useState(false);
   const [editingExpense, setEditingExpense] = useState<any>(null); 
+
+  // --- MEMOIZED CALCULATIONS (Moved to top of scope to prevent lexical/hoisting compilation errors) ---
+  const todayExpense = useMemo(() => {
+    const todayStr = new Date().toISOString().split('T')[0];
+    return expenses
+      .filter(e => e.date === todayStr)
+      .reduce((sum, e) => sum + (e.amount || 0), 0);
+  }, [expenses]);
+
+  const monthlyExpense = useMemo(() => {
+    const currentMonth = new Date().toISOString().slice(0, 7); 
+    return expenses
+      .filter(e => e.date && e.date.startsWith(currentMonth))
+      .reduce((sum, e) => sum + (e.amount || 0), 0);
+  }, [expenses]);
 
   // --- 2. FIXED ASSETS STATES & LOGIC ---
   const [assetName, setAssetName] = useState("");
@@ -495,16 +510,6 @@ export default function BbCafeHelper() {
     }
   };
 
-  const calculateCurrentValue = (purchaseDateStr: string, cost: number, lifespanYears: number) => {
-    if (!purchaseDateStr) return cost;
-    const purchaseDate = new Date(purchaseDateStr);
-    const today = new Date();
-    const ageInYears = (today.getTime() - purchaseDate.getTime()) / (1000 * 60 * 60 * 24 * 365.25);
-    if (ageInYears >= lifespanYears) return 0;
-    const remainingVal = cost * (1 - (ageInYears / lifespanYears));
-    return Math.max(0, Math.round(remainingVal));
-  };
-
   // --- 3. STORE ROOM & LEDGER HANDLERS ---
   const handleSaveStoreItem = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -852,7 +857,7 @@ export default function BbCafeHelper() {
               key={tab.id}
               type="button"
               onClick={() => { triggerHaptic(); setActiveTab(tab.id as any); }}
-              className={`px-4 py-2.5 rounded-xl text-[10px] font-black uppercase whitespace-nowrap border transition-all ${activeTab === tab.id ? 'bg-orange-500 border-orange-500 text-white shadow-lg' : 'bg-white/[0.02] border-white/5 text-gray-400'}`}
+              className={`px-4 py-2.5 rounded-xl text-[10px] font-black uppercase whitespace-nowrap border transition-all ${activeTab === tab.id ? 'bg-orange-500 border-orange-500 text-white shadow-lg shadow-orange-500/10' : 'bg-white/[0.02] border-white/5 text-gray-400'}`}
             >
               {tab.label}
             </button>
@@ -882,7 +887,7 @@ export default function BbCafeHelper() {
                 <h3 className="text-lg font-black text-green-400 mt-1">₹{todayExpense}</h3>
               </div>
               <div className="bg-[#111] border border-white/5 p-4 rounded-2xl">
-                <span className="text-[8px] font-black text-gray-500 uppercase">{activeTranslation.monthExpense}</span>
+                <span className="text-[8px] font-black text-gray-505 uppercase">{activeTranslation.monthExpense}</span>
                 <h3 className="text-lg font-black text-orange-500 mt-1">₹{monthlyExpense}</h3>
               </div>
             </div>
@@ -1047,7 +1052,7 @@ export default function BbCafeHelper() {
                       >
                         <Edit size={14} />
                       </button>
-                      <button type="button" onClick={() => handleDeleteExpense(e.id)} className="text-gray-400 hover:text-red-500 transition-colors p-1" title="Delete">
+                      <button onClick={() => handleDeleteExpense(e.id)} className="text-gray-400 hover:text-red-500 transition-colors p-1" title="Delete">
                         <Trash2 size={14} />
                       </button>
                     </div>
@@ -1091,7 +1096,7 @@ export default function BbCafeHelper() {
                       </select>
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[9px] font-bold text-gray-500 uppercase">Date</label>
+                      <label className="text-[9px] font-bold text-gray-505 uppercase">Date</label>
                       <input 
                         type="date" 
                         value={editingExpense.date}
@@ -1101,7 +1106,7 @@ export default function BbCafeHelper() {
                       />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[9px] font-bold text-gray-500 uppercase">Details</label>
+                      <label className="text-[9px] font-bold text-gray-505 uppercase">Details</label>
                       <textarea 
                         value={editingExpense.description}
                         onChange={(e) => setEditingExpense({ ...editingExpense, description: e.target.value })}
@@ -1219,7 +1224,7 @@ export default function BbCafeHelper() {
                           >
                             <Edit size={14} />
                           </button>
-                          <button type="button" onClick={() => handleDeleteAsset(a.id)} className="text-gray-400 hover:text-red-500 p-1">
+                          <button onClick={() => handleDeleteAsset(a.id)} className="text-gray-400 hover:text-red-500 p-1">
                             <Trash2 size={15} />
                           </button>
                         </div>
@@ -1260,7 +1265,7 @@ export default function BbCafeHelper() {
                   >
                     <h4 className="font-black text-sm uppercase text-orange-500 text-center">✏️ Edit Fixed Asset (संपत्ति विवरण बदलें)</h4>
                     <div className="space-y-1">
-                      <label className="text-[9px] font-bold text-gray-500 uppercase">{activeTranslation.assetName}</label>
+                      <label className="text-[9px] font-bold text-gray-505 uppercase">{activeTranslation.assetName}</label>
                       <input 
                         type="text" 
                         value={editingAsset.name}
@@ -1271,7 +1276,7 @@ export default function BbCafeHelper() {
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-1">
-                        <label className="text-[9px] font-bold text-gray-500 uppercase">Cost (₹)</label>
+                        <label className="text-[9px] font-bold text-gray-505 uppercase">Cost (₹)</label>
                         <input 
                           type="number" 
                           value={editingAsset.cost}
@@ -1281,7 +1286,7 @@ export default function BbCafeHelper() {
                         />
                       </div>
                       <div className="space-y-1">
-                        <label className="text-[9px] font-bold text-gray-500 uppercase">Lifespan</label>
+                        <label className="text-[9px] font-bold text-gray-505 uppercase">Lifespan</label>
                         <input 
                           type="number" 
                           value={editingAsset.lifespanYears}
@@ -1292,7 +1297,7 @@ export default function BbCafeHelper() {
                       </div>
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[9px] font-bold text-gray-500 uppercase">Purchase Date</label>
+                      <label className="text-[9px] font-bold text-gray-505 uppercase">Purchase Date</label>
                       <input 
                         type="date" 
                         value={editingAsset.purchaseDate}
@@ -1302,7 +1307,7 @@ export default function BbCafeHelper() {
                       />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[9px] font-bold text-gray-500 uppercase">Next Service Date</label>
+                      <label className="text-[9px] font-bold text-gray-505 uppercase">Next Service Date</label>
                       <input 
                         type="date" 
                         value={editingAsset.nextMaintenanceDate}
@@ -1312,7 +1317,7 @@ export default function BbCafeHelper() {
                     </div>
                     <div className="flex gap-2">
                       <button type="submit" className="flex-1 bg-green-600 text-white font-black py-2.5 rounded-xl text-[10px] uppercase">Update</button>
-                      <button type="button" onClick={() => setEditingAsset(null)} className="bg-white/5 text-gray-400 font-bold py-2.5 rounded-xl text-[10px] uppercase">Cancel</button>
+                      <button type="button" onClick={() => setEditingAsset(null)} className="bg-white/5 text-gray-405 p-2.5 rounded-xl font-black text-[10px] uppercase">Cancel</button>
                     </div>
                   </motion.form>
                 </div>
@@ -1424,7 +1429,7 @@ export default function BbCafeHelper() {
                       >
                         ✏️
                       </button>
-                      <button type="button" onClick={() => handleDeleteStoreItem(item.id)} className="text-gray-400 hover:text-red-500 p-1" title="Delete">
+                      <button onClick={() => handleDeleteStoreItem(item.id)} className="text-gray-400 hover:text-red-500 p-1" title="Delete">
                         <Trash2 size={14} />
                       </button>
                     </div>
@@ -1511,7 +1516,7 @@ export default function BbCafeHelper() {
                     </div>
                     <div className="flex gap-2">
                       <button type="submit" className="flex-1 bg-green-600 text-white font-black py-2.5 rounded-xl text-[10px] uppercase">Update</button>
-                      <button type="button" onClick={() => setEditingStoreItem(null)} className="bg-white/5 text-gray-400 font-bold py-2.5 rounded-xl text-[10px] uppercase">Cancel</button>
+                      <button type="button" onClick={() => setEditingStoreItem(null)} className="bg-white/5 text-gray-404 p-2.5 rounded-xl font-black text-[10px] uppercase">Cancel</button>
                     </div>
                   </motion.form>
                 </div>
@@ -1637,7 +1642,7 @@ export default function BbCafeHelper() {
                           setNewPkgName(e.target.value);
                         }
                       }}
-                      className="w-full bg-gray-100 dark:bg-neutral-800 border border-gray-300 dark:border-white/10 p-3 rounded-xl outline-none text-black dark:text-white cursor-pointer"
+                      className="w-full text-xs font-bold p-3 rounded-xl bg-gray-100 dark:bg-neutral-800 border border-gray-300 dark:border-white/10 p-3 rounded-xl outline-none text-black dark:text-white cursor-pointer"
                     >
                       <option value="">{activeTranslation.suggestedSelect}</option>
                       <option value='Pizza Box Small 6"'>Pizza Box Small 6"</option>
