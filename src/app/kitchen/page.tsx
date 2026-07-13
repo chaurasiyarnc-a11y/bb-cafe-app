@@ -44,7 +44,7 @@ export default function KitchenDisplaySystem() {
     };
     fetchPins();
 
-    // Register Service Worker for PWA (Browser installation ke liye)
+    // Register Service Worker for PWA
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/sw.js')
         .then((reg) => console.log('KDS Service Worker Registered Successfully!', reg.scope))
@@ -52,7 +52,7 @@ export default function KitchenDisplaySystem() {
     }
   }, []);
 
-  // Real-time simple query with Client-side filtering & Database-level optimization (Daily Orders Only!)
+  // Real-time simple query with Client-side filtering & Database-level optimization
   useEffect(() => {
     if (isLocked) return;
 
@@ -104,7 +104,7 @@ export default function KitchenDisplaySystem() {
     e.preventDefault();
     const toastId = toast.loading("Verifying kitchen credentials...");
     try {
-      // 1. MASTER ADMIN PIN OVERRIDE (Backup bypass)
+      // 1. MASTER ADMIN PIN OVERRIDE
       if (pinInput === passcodes.adminPin) {
         toast.dismiss(toastId);
         localStorage.setItem('bb_kds_verified', 'true');
@@ -153,6 +153,25 @@ export default function KitchenDisplaySystem() {
       toast.success(`Status updated to ${nextStatus.replace('_', ' ')}!`);
     } catch (e) {
       toast.error("Failed to update status.");
+    }
+  };
+
+  // NEW FUNCTION: Mark order as Fake / Rejected
+  const handleRejectOrder = async (orderId: string) => {
+    triggerHaptic(50);
+    if (!window.confirm("क्या आप वाकई इस आर्डर को 'फेक आर्डर' मानकर रिजेक्ट करना चाहते हैं?")) return;
+
+    try {
+      await updateDoc(doc(db, "orders", orderId), { status: "rejected" });
+      toast.success("आर्डर सफलतापूर्वक रिजेक्ट और ख़ारिज कर दिया गया है! 🚫");
+    } catch (e) {
+      toast.error("ऑर्डर रिजेक्ट करने में समस्या आई।");
+    }
+  };
+
+  const triggerHaptic = (ms = 35) => {
+    if (typeof window !== 'undefined' && window.navigator && window.navigator.vibrate) {
+      window.navigator.vibrate(ms);
     }
   };
 
@@ -270,13 +289,21 @@ export default function KitchenDisplaySystem() {
                 </div>
               </div>
 
-              <div className="space-y-3">
+              <div className="space-y-2">
                 {o.deliveryArea && (
                   <p className="text-[10px] font-bold text-gray-500 uppercase flex items-center gap-1">
                     📍 Area: {o.deliveryArea}
                   </p>
                 )}
                 
+                {/* Main fulfillment mode indicator */}
+                {o.fulfillmentType && (
+                  <p className="text-[10px] font-black uppercase tracking-wide flex items-center gap-1 text-orange-400">
+                    ⚙️ Mode: {o.fulfillmentType === "delivery" ? "Home Delivery 🛵" : o.fulfillmentType === "pickup" ? "Self-Pickup 🛍️" : `Table No. ${o.tableNumber || "N/A"} 🍽️`}
+                  </p>
+                )}
+
+                {/* Primary status change action button */}
                 <button
                   onClick={() => handleUpdateStatus(o.id, o.status)}
                   className={`w-full py-3.5 rounded-xl text-xs font-black uppercase flex items-center justify-center gap-1.5 transition-all active:scale-[0.98] ${o.status === 'pending' ? 'bg-red-600 hover:bg-red-700 text-white' : o.status === 'preparing' ? 'bg-yellow-500 hover:bg-yellow-600 text-black' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}
@@ -288,6 +315,15 @@ export default function KitchenDisplaySystem() {
                   ) : (
                     <>✅ Order Delivered (डिलीवर हो गया)</>
                   )}
+                </button>
+
+                {/* Secondary 'Reject / Fake' action button */}
+                <button
+                  onClick={() => handleRejectOrder(o.id)}
+                  className="w-full py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider text-red-400 hover:text-red-500 hover:bg-red-500/10 border border-red-500/20 transition-all flex items-center justify-center gap-1 mt-1"
+                >
+                  <X size={12} />
+                  <span>Reject Fake Order (ख़ारिज करें)</span>
                 </button>
               </div>
             </div>
