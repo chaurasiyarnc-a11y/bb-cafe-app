@@ -1,6 +1,6 @@
 'use client';
 import React, { useState, useEffect, useMemo } from 'react';
-import { db } from '../../../lib/firebase'; 
+import { db } from '@/lib/firebase'; 
 import { collection, onSnapshot, query, addDoc, doc, deleteDoc, updateDoc, setDoc, orderBy, getDoc, increment } from 'firebase/firestore';
 import { Plus, X, Trash2, Calendar, IndianRupee, ArrowLeft, Lock, Loader2, Filter, ShoppingBag, Flame, Banknote, ShieldAlert, Layers, ChevronRight, Settings, Wrench, Package, AlertTriangle, ArrowRightLeft, Globe } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -15,7 +15,7 @@ const EXPENSE_CATEGORIES = [
   { id: "Others", label: "Others 📝" }
 ];
 
-// Bilingual translations dictionary (addExpense variable fixed here)
+// Bilingual translations dictionary
 const t = {
   hi: {
     title: "कैफ़े सहायक डैशबोर्ड",
@@ -420,6 +420,7 @@ export default function BbCafeHelper() {
         <div className="max-w-lg mx-auto flex justify-between items-center">
           <div className="flex items-center gap-2">
             <button 
+              type="button"
               onClick={() => { triggerHaptic(); window.history.back(); }}
               className="p-2.5 dark:bg-white/5 bg-gray-100 rounded-xl hover:bg-gray-200 text-gray-400"
               title="Back"
@@ -434,6 +435,7 @@ export default function BbCafeHelper() {
 
           {/* HINDI / ENGLISH LANGUAGE TOGGLE */}
           <button 
+            type="button"
             onClick={() => { triggerHaptic(); setIsHindi(!isHindi); }}
             className="px-3 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-xl text-[9px] font-black tracking-wider shadow flex items-center gap-1"
           >
@@ -455,6 +457,7 @@ export default function BbCafeHelper() {
           ].map(tab => (
             <button
               key={tab.id}
+              type="button"
               onClick={() => { triggerHaptic(); setActiveTab(tab.id as any); }}
               className={`px-4 py-2.5 rounded-xl text-[10px] font-black uppercase whitespace-nowrap border transition-all ${activeTab === tab.id ? 'bg-orange-500 border-orange-500 text-white shadow-lg' : 'bg-white/[0.02] border-white/5 text-gray-400'}`}
             >
@@ -549,7 +552,7 @@ export default function BbCafeHelper() {
                     </div>
                     <div className="text-right flex items-center gap-3">
                       <span className="text-sm text-green-400 font-black">₹{e.amount}</span>
-                      <button onClick={() => handleDeleteExpense(e.id)} className="text-gray-400 hover:text-red-500 transition-colors p-1" title="Delete">
+                      <button type="button" onClick={() => handleDeleteExpense(e.id)} className="text-gray-400 hover:text-red-500 transition-colors p-1" title="Delete">
                         <Trash2 size={14} />
                       </button>
                     </div>
@@ -588,7 +591,7 @@ export default function BbCafeHelper() {
                     placeholder="e.g. 15000" 
                     value={assetCost} 
                     onChange={(e) => setAssetCost(e.target.value)} 
-                    className="w-full text-xs font-bold p-3 rounded-xl dark:bg-white/[0.03] bg-gray-50 border dark:border-white/5 border-gray-200 outline-none text-white focus:border-orange-500"
+                    className="w-full text-xs font-bold p-3 rounded-xl dark:bg-white/[0.03] bg-gray-550 border dark:border-neutral-700 border-gray-200 outline-none text-white focus:border-orange-500"
                     required 
                   />
                 </div>
@@ -599,7 +602,7 @@ export default function BbCafeHelper() {
                     placeholder="e.g. 5" 
                     value={assetLifespan} 
                     onChange={(e) => setAssetLifespan(e.target.value)} 
-                    className="w-full text-xs font-bold p-3 rounded-xl dark:bg-white/[0.03] bg-gray-50 border dark:border-white/5 border-gray-200 outline-none text-white focus:border-orange-500"
+                    className="w-full text-xs font-bold p-3 rounded-xl dark:bg-white/[0.03] bg-gray-550 border dark:border-neutral-700 border-gray-200 outline-none text-white focus:border-orange-500"
                     required 
                   />
                 </div>
@@ -612,7 +615,7 @@ export default function BbCafeHelper() {
                     type="date" 
                     value={assetPurchaseDate} 
                     onChange={(e) => setAssetPurchaseDate(e.target.value)} 
-                    className="w-full text-xs font-bold p-3 rounded-xl dark:bg-white/[0.03] bg-gray-50 border dark:border-white/5 border-gray-200 outline-none text-white focus:border-orange-500 cursor-pointer"
+                    className="w-full text-xs font-bold p-3 rounded-xl dark:bg-white/[0.03] bg-gray-550 border dark:border-neutral-700 border-gray-200 outline-none text-white focus:border-orange-500 cursor-pointer"
                     required 
                   />
                 </div>
@@ -622,7 +625,7 @@ export default function BbCafeHelper() {
                     type="date" 
                     value={assetMaintenance} 
                     onChange={(e) => setAssetMaintenance(e.target.value)} 
-                    className="w-full text-xs font-bold p-3 rounded-xl dark:bg-white/[0.03] bg-gray-50 border dark:border-white/5 border-gray-200 outline-none text-white focus:border-orange-500 cursor-pointer"
+                    className="w-full text-xs font-bold p-3 rounded-xl dark:bg-white/[0.03] bg-gray-550 border dark:border-neutral-700 border-gray-200 outline-none text-white focus:border-orange-500 cursor-pointer"
                   />
                 </div>
               </div>
@@ -648,7 +651,7 @@ export default function BbCafeHelper() {
                           <h4 className="text-sm font-black text-gray-200">{a.name}</h4>
                           <p className="text-[9px] text-gray-500 uppercase mt-0.5">{isHindi ? "खरीद मूल्य" : "Original Cost"}: ₹{a.cost} • {a.purchaseDate}</p>
                         </div>
-                        <button onClick={() => handleDeleteAsset(a.id)} className="text-gray-400 hover:text-red-500 p-1">
+                        <button type="button" onClick={() => handleDeleteAsset(a.id)} className="text-gray-400 hover:text-red-500 p-1">
                           <Trash2 size={15} />
                         </button>
                       </div>
