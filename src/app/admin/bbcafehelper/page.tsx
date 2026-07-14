@@ -172,8 +172,8 @@ export default function BumBumCafeStockApp() {
   const [showStockOutModal, setShowStockOutModal] = useState<boolean>(false);
   const [showTransferModal, setShowTransferModal] = useState<boolean>(false);
   const [showAddSupplierModal, setShowAddSupplierModal] = useState<boolean>(false);
-  const [showCategoryManager, setShowCategoryManager] = useState<boolean>(false);
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
+  const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
 
   // Dynamic Category Forms
   const [categoryInput, setCategoryInput] = useState<string>("");
@@ -218,7 +218,7 @@ export default function BumBumCafeStockApp() {
   });
   const [formSupplier, setFormSupplier] = useState({ name: '', phone: '', address: '' });
 
-  // Notifications pool (Typed properly to avoid implicit 'any' error)
+  // Notifications pool
   const notificationsList = useMemo<NotificationItem[]>(() => {
     const list: NotificationItem[] = [];
     inventory.forEach(item => {
@@ -356,7 +356,7 @@ export default function BumBumCafeStockApp() {
     setScannerManualBarcode("");
   };
 
-  // Supplier Add & Delete
+  // Supplier Add, Edit & Delete Actions
   const handleSupplierAdd = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formSupplier.name.trim()) return;
@@ -374,6 +374,19 @@ export default function BumBumCafeStockApp() {
     setFormSupplier({ name: '', phone: '', address: '' });
   };
 
+  const handleSupplierEditSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingSupplier) return;
+
+    setSuppliers(prev => 
+      prev.map(sup => sup.id === editingSupplier.id ? editingSupplier : sup)
+    );
+
+    // Cascade rename to inventory matching that supplier name if changed
+    toastMessage("Supplier details modified!");
+    setEditingSupplier(null);
+  };
+
   const handleSupplierDelete = (id: string, name: string) => {
     triggerHaptic(50);
     const confirm = window.confirm(`क्या आप सप्लायर "${name}" को डिलीट करना चाहते हैं?`);
@@ -383,7 +396,7 @@ export default function BumBumCafeStockApp() {
     toastMessage("Supplier Removed Successfully!");
   };
 
-  // Item Delete
+  // Item Delete Action
   const handleItemDelete = (id: string, name: string) => {
     triggerHaptic(50);
     const confirm = window.confirm(`क्या आप आइटम "${name}" को हमेशा के लिए डिलीट करना चाहते हैं?`);
@@ -436,7 +449,6 @@ export default function BumBumCafeStockApp() {
       return;
     }
 
-    // Cascade category rename to existing inventory items
     setCategories(prev => prev.map((cat, idx) => idx === editingCategoryIndex ? newName : cat));
     setInventory(prev => 
       prev.map(item => item.category === oldName ? { ...item, category: newName } : item)
@@ -1114,11 +1126,7 @@ export default function BumBumCafeStockApp() {
                     <div 
                       key={option.id}
                       onClick={() => {
-                        if (option.id === 'categories_manager') {
-                          setShowCategoryManager(true);
-                        } else {
-                          setCurrentView(option.id);
-                        }
+                        setCurrentView(option.id);
                       }}
                       className={`p-4 rounded-3xl border cursor-pointer hover:border-orange-500 flex items-center justify-between transition-all ${
                         isDarkMode ? 'bg-[#1A1A1A] border-neutral-800' : 'bg-white border-neutral-100'
@@ -1333,7 +1341,7 @@ export default function BumBumCafeStockApp() {
               </div>
             )}
 
-            {/* D. MANAGE SUPPLIERS WITH DELETE ACCORDION */}
+            {/* D. MANAGE SUPPLIERS WITH ADD, EDIT & DELETE */}
             {currentView === 'suppliers_list' && (
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
@@ -1357,20 +1365,98 @@ export default function BumBumCafeStockApp() {
                         <p className="font-black text-[#FF6B00] text-sm">{s.name}</p>
                         <p className="text-[9px] text-neutral-400 uppercase tracking-widest mt-0.5">📞 {s.phone} • 📍 {s.address}</p>
                       </div>
-                      <button 
-                        onClick={() => handleSupplierDelete(s.id, s.name)}
-                        className="p-2 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white rounded-xl transition-all"
-                        title="Delete Supplier"
-                      >
-                        <Trash2 size={13} />
-                      </button>
+                      <div className="flex gap-2">
+                        <button 
+                          onClick={() => setEditingSupplier(s)}
+                          className="p-2 bg-blue-500/10 hover:bg-blue-500 text-blue-500 hover:text-white rounded-xl transition-all"
+                          title="Edit Supplier"
+                        >
+                          <Edit size={13} />
+                        </button>
+                        <button 
+                          onClick={() => handleSupplierDelete(s.id, s.name)}
+                          className="p-2 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white rounded-xl transition-all"
+                          title="Delete Supplier"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
               </div>
             )}
 
-            {/* E. USERS & ROLES */}
+            {/* E. MANAGE CATEGORIES (DYNAMIC LIST INSIDE TAB) */}
+            {currentView === 'categories_manager' && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-black uppercase tracking-widest text-neutral-400 font-sans">Raw Material Categories</h3>
+                  <button onClick={() => setCurrentView('more_home')} className="text-xs text-orange-500 font-bold uppercase tracking-wider">Back</button>
+                </div>
+
+                {/* Add Category Form inline */}
+                <form onSubmit={handleCategoryAdd} className="flex gap-2 text-xs">
+                  <input 
+                    type="text" 
+                    placeholder="New category name (e.g. Spices)" 
+                    value={categoryInput}
+                    onChange={e => setCategoryInput(e.target.value)}
+                    className="flex-1 p-3 rounded-2xl border dark:bg-[#1A1A1A] dark:border-neutral-800"
+                    required
+                  />
+                  <button type="submit" className="px-5 py-3 bg-[#FF6B00] text-white rounded-2xl font-black uppercase">Add</button>
+                </form>
+
+                {/* Edit Category inline panel */}
+                {editingCategoryIndex !== null && (
+                  <form onSubmit={handleCategoryEditSubmit} className="flex gap-2 text-xs p-3.5 bg-yellow-500/10 border border-yellow-500/20 rounded-2xl">
+                    <input 
+                      type="text" 
+                      placeholder="Edit category name..." 
+                      value={editingCategoryValue}
+                      onChange={e => setEditingCategoryValue(e.target.value)}
+                      className="flex-1 p-2.5 rounded-xl border dark:bg-neutral-800"
+                      required
+                    />
+                    <button type="submit" className="px-4 py-2 bg-green-600 text-white rounded-xl font-bold uppercase">Update</button>
+                    <button type="button" onClick={() => setEditingCategoryIndex(null)} className="px-4 py-2 bg-neutral-200 dark:bg-neutral-800 text-neutral-400 rounded-xl">Cancel</button>
+                  </form>
+                )}
+
+                {/* Categories listings */}
+                <div className="grid grid-cols-1 gap-2 text-xs">
+                  {categories.map((cat, idx) => (
+                    <div key={idx} className={`p-4 rounded-3xl border flex items-center justify-between ${
+                      isDarkMode ? 'bg-[#1A1A1A] border-neutral-800' : 'bg-white border-neutral-100'
+                    }`}>
+                      <span className="font-bold">{cat}</span>
+                      <div className="flex gap-2">
+                        <button 
+                          onClick={() => {
+                            setEditingCategoryIndex(idx);
+                            setEditingCategoryValue(cat);
+                          }}
+                          className="p-2 bg-blue-500/10 hover:bg-blue-500 text-blue-500 hover:text-white rounded-xl transition-all"
+                          title="Edit Category"
+                        >
+                          <Edit size={13} />
+                        </button>
+                        <button 
+                          onClick={() => handleCategoryDelete(cat)}
+                          className="p-2 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white rounded-xl transition-all"
+                          title="Delete Category"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* F. USERS & ROLES */}
             {currentView === 'users_roles' && (
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
@@ -1406,12 +1492,12 @@ export default function BumBumCafeStockApp() {
               </div>
             )}
 
-            {/* F. SETTINGS PANEL */}
+            {/* G. SETTINGS PANEL */}
             {currentView === 'app_settings' && (
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <h3 className="text-xs font-black uppercase tracking-widest text-neutral-400">Application Configuration</h3>
-                  <button onClick={() => setCurrentView('more_home')} className="text-xs text-[#FF6B00] font-bold uppercase tracking-wider">Back</button>
+                  <button onClick={() => setCurrentView('more_home')} className="text-xs text-orange-500 font-bold uppercase tracking-wider">Back</button>
                 </div>
 
                 <div className={`p-5 rounded-3xl border space-y-4 text-xs ${isDarkMode ? 'bg-[#1A1A1A] border-neutral-800' : 'bg-white border-neutral-100'}`}>
@@ -1638,7 +1724,65 @@ export default function BumBumCafeStockApp() {
           </div>
         )}
 
-        {/* C. INTERACTIVE REAL-TIME BARCODE SCANNER SIMULATOR (PACKED MATERIAL SPECIAL) */}
+        {/* C. SUPPLIER EDIT OVERLAY */}
+        {editingSupplier && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[110] flex items-center justify-center p-4">
+            <motion.form 
+              onSubmit={handleSupplierEditSubmit}
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className={`w-full max-w-sm rounded-[2rem] p-6 space-y-4 border ${
+                isDarkMode ? 'bg-[#0F0F0F] border-neutral-800 text-white' : 'bg-white border-neutral-100 text-neutral-900'
+              }`}
+            >
+              <div className="flex justify-between items-center">
+                <h3 className="text-xs font-black uppercase tracking-widest text-[#FF6B00]">Edit Supplier Details</h3>
+                <button type="button" onClick={() => setEditingSupplier(null)} className="p-2.5 bg-neutral-100 dark:bg-neutral-800 rounded-xl"><X size={14} /></button>
+              </div>
+
+              <div className="space-y-1.5 text-xs">
+                <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400">Supplier Name</label>
+                <input 
+                  type="text" 
+                  value={editingSupplier.name} 
+                  onChange={e => setEditingSupplier({...editingSupplier, name: e.target.value})}
+                  className="w-full p-2.5 rounded-xl border dark:bg-neutral-800"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="space-y-1.5">
+                  <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400">Phone</label>
+                  <input 
+                    type="text" 
+                    value={editingSupplier.phone} 
+                    onChange={e => setEditingSupplier({...editingSupplier, phone: e.target.value})}
+                    className="w-full p-2.5 rounded-xl border dark:bg-neutral-800"
+                    required
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400">Address / City</label>
+                  <input 
+                    type="text" 
+                    value={editingSupplier.address} 
+                    onChange={e => setEditingSupplier({...editingSupplier, address: e.target.value})}
+                    className="w-full p-2.5 rounded-xl border dark:bg-neutral-800"
+                    required
+                  />
+                </div>
+              </div>
+
+              <button type="submit" className="w-full p-3 bg-blue-600 text-white font-black text-xs uppercase tracking-wider rounded-2xl shadow">
+                Save Changes ➔
+              </button>
+            </motion.form>
+          </div>
+        )}
+
+        {/* D. INTERACTIVE REAL-TIME BARCODE SCANNER SIMULATOR (PACKED MATERIAL SPECIAL) */}
         {scannerActive && (
           <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[120] flex items-center justify-center p-4">
             <motion.div 
@@ -1734,132 +1878,7 @@ export default function BumBumCafeStockApp() {
           </div>
         )}
 
-        {/* D. RAW MATERIAL CATEGORIES MANAGER DYNAMIC POPUP (ADD, REMOVE, EDIT) */}
-        {showCategoryManager && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[110] flex items-end justify-center">
-            <motion.div 
-              initial={{ y: "100%" }}
-              animate={{ y: 0 }}
-              exit={{ y: "100%" }}
-              className={`w-full max-w-md rounded-t-[2.5rem] p-6 space-y-4 border-t ${
-                isDarkMode ? 'bg-[#0F0F0F] border-neutral-800 text-white' : 'bg-white border-neutral-200 text-neutral-900'
-              }`}
-            >
-              <div className="flex justify-between items-center">
-                <div>
-                  <h3 className="text-xs font-black uppercase tracking-widest text-[#FF6B00]">Category Configuration Hub</h3>
-                  <p className="text-[8px] text-neutral-400 font-bold uppercase tracking-wider">Configure dynamic item classifications</p>
-                </div>
-                <button 
-                  onClick={() => {
-                    setShowCategoryManager(false);
-                    setEditingCategoryIndex(null);
-                  }} 
-                  className="p-2 bg-neutral-100 dark:bg-neutral-800 rounded-xl"
-                >
-                  <X size={15} />
-                </button>
-              </div>
-
-              {/* Add Category Form */}
-              <form onSubmit={handleCategoryAdd} className="flex gap-2 text-xs">
-                <input 
-                  type="text" 
-                  placeholder="New category name (e.g. Dry Fruits)" 
-                  value={categoryInput}
-                  onChange={e => setCategoryInput(e.target.value)}
-                  className="flex-1 p-3 rounded-2xl border dark:bg-neutral-800"
-                  required
-                />
-                <button type="submit" className="px-5 py-3 bg-[#FF6B00] text-white rounded-2xl font-black uppercase">Add</button>
-              </form>
-
-              {/* Edit Category Mode Form */}
-              {editingCategoryIndex !== null && (
-                <form onSubmit={handleCategoryEditSubmit} className="flex gap-2 text-xs p-3.5 bg-yellow-500/10 border border-yellow-500/20 rounded-2xl">
-                  <input 
-                    type="text" 
-                    placeholder="Edit category name..." 
-                    value={editingCategoryValue}
-                    onChange={e => setEditingCategoryValue(e.target.value)}
-                    className="flex-1 p-2.5 rounded-xl border dark:bg-neutral-800"
-                    required
-                  />
-                  <button type="submit" className="px-4 py-2 bg-green-600 text-white rounded-xl font-bold uppercase">Update</button>
-                  <button type="button" onClick={() => setEditingCategoryIndex(null)} className="px-4 py-2 bg-neutral-200 dark:bg-neutral-800 text-neutral-400 rounded-xl">Cancel</button>
-                </form>
-              )}
-
-              {/* Category Grid List with Action Buttons */}
-              <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
-                {categories.map((cat, idx) => (
-                  <div key={idx} className="flex items-center justify-between p-3 rounded-2xl bg-neutral-50 dark:bg-neutral-800/50 text-xs">
-                    <span className="font-bold">{cat}</span>
-                    <div className="flex gap-2">
-                      <button 
-                        onClick={() => {
-                          setEditingCategoryIndex(idx);
-                          setEditingCategoryValue(cat);
-                        }}
-                        className="p-1.5 bg-blue-500/10 hover:bg-blue-500 text-blue-500 hover:text-white rounded-lg transition-all"
-                        title="Edit Category Name"
-                      >
-                        <Edit size={12} />
-                      </button>
-                      <button 
-                        onClick={() => handleCategoryDelete(cat)}
-                        className="p-1.5 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white rounded-lg transition-all"
-                        title="Delete Category"
-                      >
-                        <Trash2 size={12} />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </motion.div>
-          </div>
-        )}
-
-        {/* E. NOTIFICATIONS HUD PANEL */}
-        {showNotifications && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[99] flex items-end justify-center">
-            <motion.div 
-              initial={{ y: "100%" }}
-              animate={{ y: 0 }}
-              exit={{ y: "100%" }}
-              transition={{ type: "spring", damping: 25 }}
-              className={`w-full max-w-md rounded-t-[2.5rem] p-6 space-y-4 border-t ${
-                isDarkMode ? 'bg-[#0F0F0F] border-neutral-800 text-white' : 'bg-white border-neutral-200 text-neutral-900'
-              }`}
-            >
-              <div className="flex justify-between items-center">
-                <h3 className="text-xs font-black uppercase tracking-widest text-neutral-400">Urgent Notifications Panel</h3>
-                <button onClick={() => setShowNotifications(false)} className="text-xs text-[#FF6B00] font-bold uppercase tracking-wider">Close</button>
-              </div>
-
-              <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
-                {notificationsList.map(notif => (
-                  <div key={notif.id} className="p-3.5 rounded-2xl bg-neutral-50 dark:bg-neutral-800/50 text-xs flex justify-between items-start">
-                    <p className="font-medium">{notif.text}</p>
-                    <span className="text-[8px] bg-[#FF6B00]/10 text-[#FF6B00] px-2 py-0.5 rounded-full font-black uppercase whitespace-nowrap">
-                      {notif.type}
-                    </span>
-                  </div>
-                ))}
-
-                {notificationsList.length === 0 && (
-                  <div className="text-center py-6">
-                    <CheckCircle2 className="mx-auto text-green-500 mb-2 animate-bounce" size={24} />
-                    <p className="text-xs font-bold uppercase tracking-wide">All stock levels look perfect!</p>
-                  </div>
-                )}
-              </div>
-            </motion.div>
-          </div>
-        )}
-
-        {/* F. MODAL FORM: STOCK IN / INCOMING */}
+        {/* H. MODAL FORM: STOCK IN / INCOMING */}
         {showAddStockModal && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[99] flex items-center justify-center p-4">
             <motion.form 
@@ -1959,7 +1978,7 @@ export default function BumBumCafeStockApp() {
           </div>
         )}
 
-        {/* G. MODAL FORM: STOCK OUT */}
+        {/* J. MODAL FORM: STOCK OUT */}
         {showStockOutModal && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[99] flex items-center justify-center p-4">
             <motion.form 
@@ -2035,7 +2054,7 @@ export default function BumBumCafeStockApp() {
           </div>
         )}
 
-        {/* H. MODAL FORM: STOCK TRANSFER */}
+        {/* K. MODAL FORM: STOCK TRANSFER */}
         {showTransferModal && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[99] flex items-center justify-center p-4">
             <motion.form 
@@ -2108,7 +2127,7 @@ export default function BumBumCafeStockApp() {
           </div>
         )}
 
-        {/* I. MODAL FORM: ADD SUPPLIER */}
+        {/* L. MODAL FORM: ADD SUPPLIER */}
         {showAddSupplierModal && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[99] flex items-center justify-center p-4">
             <motion.form 
