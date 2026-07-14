@@ -85,13 +85,6 @@ const PERMANENT_REVIEWS = [
   { id: "rev4", name: "Neha Chaurasia", rating: 5, comment: "इस क्षेत्र का सबसे अच्छा कैफे। पिज्जा विभाग ताज़ा है और क्रस्ट बहुत सॉफ्ट है! ⭐⭐⭐⭐⭐" }
 ];
 
-const DEFAULT_SOCIAL_PROOF = [
-  { id: "sp1", text: "प्रियंका जी ने अभी-अभी 'पनीर पिज्जा' ऑर्डर किया 🍕" },
-  { id: "sp2", text: "अमित सोनी जी (टाउन) ने अभी-अभी 'स्पेशल थाली' ऑर्डर की 🍱" },
-  { id: "sp3", text: "राहुल कुमार जी (वार्ड 4) ने अभी--अभी 'चॉकलेट शेक' ऑर्डर किया 🥤" },
-  { id: "sp4", text: "अंजलि जी (वार्ड 5) ने अभी-अभी 'मिक्स वेज पिज्जा' आर्डर किया 🧀" }
-];
-
 export default function BbCafeHome() {
   const store = useCartStore() as any;
   const cart = store?.items || [];
@@ -115,6 +108,10 @@ export default function BbCafeHome() {
 
   const [whatsappNumber, setWhatsappNumber] = useState("919714293759");
   const [storeCoordinates, setStoreCoordinates] = useState({ lat: 24.2863, lng: 80.1245 });
+
+  // Store Timings (Dynamic from Firebase Firestore settings)
+  const [storeTimingHindi, setStoreTimingHindi] = useState("सुबह 10:00 से रात 11:00 बजे");
+  const [storeTimingEnglish, setStoreTimingEnglish] = useState("10:00 AM to 11:00 PM");
 
   const [pointsHistory, setPointsHistory] = useState<any[]>([]);
   const [pastOrders, setPastOrders] = useState<any[]>([]);
@@ -520,39 +517,39 @@ export default function BbCafeHome() {
     );
 
     const unsubLiveOrder = onSnapshot(qOrders, (snap) => {
-  if (!snap.empty) {
-    const userOrders = snap.docs.map(doc => ({ id: doc.id, ...doc.data() as any }));
-    // Client-side sort by timestamp descending
-    userOrders.sort((a, b) => {
-      const tA = a.timestamp?.toDate ? a.timestamp.toDate() : new Date(a.timestamp || 0);
-      const tB = b.timestamp?.toDate ? b.timestamp.toDate() : new Date(b.timestamp || 0);
-      return tB.getTime() - tA.getTime();
-    });
+      if (!snap.empty) {
+        const userOrders = snap.docs.map(doc => ({ id: doc.id, ...doc.data() as any }));
+        // Client-side sort by timestamp descending
+        userOrders.sort((a, b) => {
+          const tA = a.timestamp?.toDate ? a.timestamp.toDate() : new Date(a.timestamp || 0);
+          const tB = b.timestamp?.toDate ? b.timestamp.toDate() : new Date(b.timestamp || 0);
+          return tB.getTime() - tA.getTime();
+        });
 
-    const latestOrder = userOrders[0];
+        const latestOrder = userOrders[0];
 
-    // जांचें कि क्या इस रिजेक्टेड आर्डर को ग्राहक पहले ही बंद (Dismiss) कर चुका है
-    let dismissedIds: string[] = [];
-    try {
-      dismissedIds = JSON.parse(localStorage.getItem('bb_dismissed_rejected_orders') || '[]');
-    } catch (e) {}
+        // जांचें कि क्या इस रिजेक्टेड आर्डर को ग्राहक पहले ही बंद (Dismiss) कर चुका है
+        let dismissedIds: string[] = [];
+        try {
+          dismissedIds = JSON.parse(localStorage.getItem('bb_dismissed_rejected_orders') || '[]');
+        } catch (e) {}
 
-    if (latestOrder && latestOrder.status !== 'delivered') {
-      if (latestOrder.status === 'rejected' && dismissedIds.includes(latestOrder.id)) {
-        // अगर पहले ही बंद किया जा चुका है, तो दोबारा न दिखाएं
-        setLiveOrder(null);
+        if (latestOrder && latestOrder.status !== 'delivered') {
+          if (latestOrder.status === 'rejected' && dismissedIds.includes(latestOrder.id)) {
+            // अगर पहले ही बंद किया जा चुका है, तो दोबारा न दिखाएं
+            setLiveOrder(null);
+          } else {
+            setLiveOrder(latestOrder);
+          }
+        } else {
+          setLiveOrder(null);
+        }
       } else {
-        setLiveOrder(latestOrder);
+        setLiveOrder(null);
       }
-    } else {
-      setLiveOrder(null);
-    }
-  } else {
-    setLiveOrder(null);
-  }
-}, (err) => {
-  console.error("Live order tracking error:", err);
-});
+    }, (err) => {
+      console.error("Live order tracking error:", err);
+    });
 
     return () => unsubLiveOrder();
   }, [customerDetails]);
@@ -645,7 +642,7 @@ export default function BbCafeHome() {
       }
     }
 
-    // Dynamic WhatsApp Number & Background Video Listener (Requirement 4)
+    // Dynamic WhatsApp Number, Timings & Background Video Listener
     const unsubStore = onSnapshot(doc(db, "settings", "store"), (d) => { 
       if (d.exists()) {
         const storeData = d.data();
@@ -659,6 +656,20 @@ export default function BbCafeHome() {
         if (storeData.headerVideoUrl) {
           setHeaderVideoUrl(storeData.headerVideoUrl);
         }
+
+        // --- FETCH AND SET DYNAMIC STORE TIMINGS FROM FIREBASE ADMIN ---
+        if (storeData.timingHindi) {
+          setStoreTimingHindi(storeData.timingHindi);
+        } else if (storeData.openingTime && storeData.closingTime) {
+          setStoreTimingHindi(`सुबह ${storeData.openingTime} से रात ${storeData.closingTime}`);
+        }
+
+        if (storeData.timingEnglish) {
+          setStoreTimingEnglish(storeData.timingEnglish);
+        } else if (storeData.openingTime && storeData.closingTime) {
+          setStoreTimingEnglish(`${storeData.openingTime} to ${storeData.closingTime}`);
+        }
+        // ---------------------------------------------------------------
         
         // Auto-calculate remaining minutes for warnings
         if (storeData.closingTime) {
@@ -789,9 +800,9 @@ export default function BbCafeHome() {
 
   const handleApplyCoupon = async () => {
     triggerHaptic();
-    if (!enteredCoupon) return toast.error("Please enter a coupon code");
+    if (!enteredCoupon) return toast.error(isHindi ? "कृपया कूपन कोड दर्ज करें" : "Please enter a coupon code");
     const codeClean = enteredCoupon.trim().toUpperCase();
-    const toastId = toast.loading("सत्यापन किया जा रहा है...");
+    const toastId = toast.loading(isHindi ? "सत्यापन किया जा रहा है..." : "Verifying...");
     
     try {
       const couponRef = doc(db, "coupons", codeClean);
@@ -801,13 +812,13 @@ export default function BbCafeHome() {
       if (couponSnap.exists()) {
         const data = couponSnap.data();
         setAppliedCoupon({ id: couponSnap.id, code: codeClean, ...data });
-        toast.success(`Coupon '${codeClean}' applied! ₹${data.discountValue} OFF`);
+        toast.success(isHindi ? `कूपन '${codeClean}' लागू हो गया! ₹${data.discountValue} की छूट` : `Coupon '${codeClean}' applied! ₹${data.discountValue} OFF`);
       } else {
-        toast.error("यह कूपन कोड मान्य नहीं है!");
+        toast.error(isHindi ? "यह कूपन कोड मान्य नहीं है!" : "Invalid coupon code!");
       }
     } catch (err) {
       toast.dismiss(toastId);
-      toast.error("कूपन चेक करने में समस्या आई।");
+      toast.error(isHindi ? "कूपन चेक करने में समस्या आई।" : "Error verifying coupon.");
     }
   };
 
@@ -2101,10 +2112,13 @@ export default function BbCafeHome() {
           </div>
 
           <div className="grid grid-cols-2 gap-3 text-center text-[10px] font-black uppercase">
+            {/* Dynamic Store Timings in Footer (Fetched from Firebase Settings / Admin customizable) */}
             <div className="dark:bg-white/[0.02] bg-white border dark:border-white/5 border-gray-200 p-4 rounded-2xl flex flex-col items-center justify-center space-y-1 shadow-md shadow-gray-200/30 dark:shadow-none transition-colors duration-200">
               <Clock className="text-orange-500" size={16} />
               <p className="dark:text-gray-400 text-gray-500 text-[8px]">Open Timing</p>
-              <p className="dark:text-white text-neutral-800 text-[9px]">{isHindi ? "सुबह 10:00 से रात 11:00 बजे" : "10:00 AM to 11:00 PM"}</p>
+              <p className="dark:text-white text-neutral-800 text-[9px]">
+                {isHindi ? storeTimingHindi : storeTimingEnglish}
+              </p>
             </div>
             
             <a href="https://maps.app.goo.gl/8pj1Xby3bbMn5qxu5" target="_blank" rel="noreferrer" className="dark:bg-white/[0.02] bg-white border dark:border-white/5 border-gray-200 p-4 rounded-2xl flex flex-col items-center justify-center space-y-1 hover:border-orange-500/30 shadow-md shadow-gray-200/30 dark:shadow-none transition-all duration-200">
@@ -2121,95 +2135,94 @@ export default function BbCafeHome() {
       </main>
 
       {/* LIVE ORDER REAL-TIME TRACKING FOOTER PANEL */}
-<AnimatePresence>
-  {liveOrder && (
-    <motion.div 
-      initial={{ y: 100, opacity: 0 }}
-      animate={{ y: 0, opacity: 1 }}
-      exit={{ y: 100, opacity: 0 }}
-      className="fixed bottom-24 inset-x-4 z-50 max-w-sm mx-auto bg-neutral-950/95 backdrop-blur-md border border-orange-500/30 p-4 rounded-3xl shadow-2xl flex flex-col gap-2 text-xs font-bold font-sans"
-    >
-      <div className="flex justify-between items-center">
-        <div className="flex items-center gap-2">
-          <span className={`w-2 h-2 rounded-full ${liveOrder.status === 'rejected' ? 'bg-red-500' : 'bg-orange-500 animate-pulse'}`} />
-          <span className="text-gray-200">
-            {liveOrder.status === 'rejected' 
-              ? (isHindi ? "⚠️ आर्डर अलर्ट" : "⚠️ Order Alert")
-              : (isHindi ? `आर्डर लाइव ट्रैकिंग (Bill #${formatBillNumber(liveOrder.billNumber)})` : `Order Tracking (Bill #${formatBillNumber(liveOrder.billNumber)})`)
-            }
-          </span>
-        </div>
-        {liveOrder.status === 'rejected' ? (
-  <button 
-    type="button"
-    onClick={() => { 
-      triggerHaptic(); 
-      // आर्डर ID को सहेजें ताकि रीफ्रेश करने पर यह दोबारा न दिखे
-      try {
-        const dismissed = JSON.parse(localStorage.getItem('bb_dismissed_rejected_orders') || '[]');
-        if (!dismissed.includes(liveOrder.id)) {
-          dismissed.push(liveOrder.id);
-          localStorage.setItem('bb_dismissed_rejected_orders', JSON.stringify(dismissed));
-        }
-      } catch (e) {}
-      setLiveOrder(null); 
-    }}
-    className="text-gray-400 hover:text-white p-1"
-  >
-    <X size={14} />
-  </button>
-) : (
-          <span className="bg-orange-500/10 text-orange-400 px-2 py-0.5 rounded-md text-[9px] uppercase font-black font-mono">
-            Token: #{liveOrder.tokenNumber}
-          </span>
-        )}
-      </div>
-
-      {liveOrder.status === 'rejected' ? (
-        <div className="space-y-3 py-1">
-          <p className="text-red-400 text-[10px] leading-relaxed font-black">
-            {isHindi 
-              ? "🚨 आपका आर्डर कैफ़े द्वारा रद्द (Reject) कर दिया गया है! कृपया स्पष्टीकरण या दोबारा आर्डर के लिए कैफ़े में तुरंत संपर्क करें।"
-              : "🚨 Your order has been rejected by the cafe! Please call us immediately for confirmation or details."
-            }
-          </p>
-          <a 
-            href="tel:+919714293759"
-            className="w-full bg-red-600 hover:bg-red-700 text-white text-center text-[10px] py-2 rounded-xl block font-black uppercase transition-all"
+      <AnimatePresence>
+        {liveOrder && (
+          <motion.div 
+            initial={{ y: 100, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 100, opacity: 0 }}
+            className="fixed bottom-24 inset-x-4 z-50 max-w-sm mx-auto bg-neutral-950/95 backdrop-blur-md border border-orange-500/30 p-4 rounded-3xl shadow-2xl flex flex-col gap-2 text-xs font-bold font-sans"
           >
-            Call Cafe 📞
-          </a>
-        </div>
-      ) : (
-        <div className="space-y-1 mt-1">
-          <div className="flex justify-between text-[8px] text-gray-400 uppercase">
-            <span className={liveOrder.status === 'pending' ? 'text-orange-400 font-extrabold' : ''}>{isHindi ? "स्वीकृति" : "Confirming"} ⏳</span>
-            <span className={liveOrder.status === 'preparing' ? 'text-yellow-400 font-extrabold' : ''}>{isHindi ? "तैयारी" : "Preparing"} 👨‍🍳</span>
-            <span className={liveOrder.status === 'out_for_delivery' ? 'text-blue-400 font-extrabold' : ''}>{isHindi ? "मार्ग में" : "On the Way"} 🛵</span>
-          </div>
-          <div className="w-full bg-white/5 h-1.5 rounded-full overflow-hidden relative">
-            <div 
-              className="bg-gradient-to-r from-orange-500 to-yellow-400 h-full transition-all duration-500" 
-              style={{ 
-                width: liveOrder.status === 'pending' ? '25%' : liveOrder.status === 'preparing' ? '65%' : '90%' 
-              }} 
-            />
-          </div>
-          <div className="flex gap-2 pt-1 border-t border-white/5 mt-1.5">
-            <a 
-              href={`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(`नमस्ते बम बम कैफ़े! कृपया मेरे आर्डर नंबर #${formatBillNumber(liveOrder.billNumber)} का लाइव स्टेटस बताएं।`)}`}
-              target="_blank"
-              rel="noreferrer"
-              className="flex-1 bg-white/5 hover:bg-white/10 text-center text-[10px] text-yellow-400 py-1.5 rounded-xl border border-white/5 transition-all"
-            >
-              Track Live Status (WA) 🔍
-            </a>
-          </div>
-        </div>
-      )}
-    </motion.div>
-  )}
-</AnimatePresence>
+            <div className="flex justify-between items-center">
+              <div className="flex items-center gap-2">
+                <span className={`w-2 h-2 rounded-full ${liveOrder.status === 'rejected' ? 'bg-red-500' : 'bg-orange-500 animate-pulse'}`} />
+                <span className="text-gray-200">
+                  {liveOrder.status === 'rejected' 
+                    ? (isHindi ? "⚠️ आर्डर अलर्ट" : "⚠️ Order Alert")
+                    : (isHindi ? `आर्डर लाइव ट्रैकिंग (Bill #${formatBillNumber(liveOrder.billNumber)})` : `Order Tracking (Bill #${formatBillNumber(liveOrder.billNumber)})`)
+                  }
+                </span>
+              </div>
+              {liveOrder.status === 'rejected' ? (
+                <button 
+                  type="button"
+                  onClick={() => { 
+                    triggerHaptic(); 
+                    try {
+                      const dismissed = JSON.parse(localStorage.getItem('bb_dismissed_rejected_orders') || '[]');
+                      if (!dismissed.includes(liveOrder.id)) {
+                        dismissed.push(liveOrder.id);
+                        localStorage.setItem('bb_dismissed_rejected_orders', JSON.stringify(dismissed));
+                      }
+                    } catch (e) {}
+                    setLiveOrder(null); 
+                  }}
+                  className="text-gray-400 hover:text-white p-1"
+                >
+                  <X size={14} />
+                </button>
+              ) : (
+                <span className="bg-orange-500/10 text-orange-400 px-2 py-0.5 rounded-md text-[9px] uppercase font-black font-mono">
+                  Token: #{liveOrder.tokenNumber}
+                </span>
+              )}
+            </div>
+
+            {liveOrder.status === 'rejected' ? (
+              <div className="space-y-3 py-1">
+                <p className="text-red-400 text-[10px] leading-relaxed font-black">
+                  {isHindi 
+                    ? "🚨 आपका आर्डर कैफ़े द्वारा रद्द (Reject) कर दिया गया है! कृपया स्पष्टीकरण या दोबारा आर्डर के लिए कैफ़े में तुरंत संपर्क करें।"
+                    : "🚨 Your order has been rejected by the cafe! Please call us immediately for confirmation or details."
+                  }
+                </p>
+                <a 
+                  href="tel:+919714293759"
+                  className="w-full bg-red-600 hover:bg-red-700 text-white text-center text-[10px] py-2 rounded-xl block font-black uppercase transition-all"
+                >
+                  Call Cafe 📞
+                </a>
+              </div>
+            ) : (
+              <div className="space-y-1 mt-1">
+                <div className="flex justify-between text-[8px] text-gray-400 uppercase">
+                  <span className={liveOrder.status === 'pending' ? 'text-orange-400 font-extrabold' : ''}>{isHindi ? "स्वीकृति" : "Confirming"} ⏳</span>
+                  <span className={liveOrder.status === 'preparing' ? 'text-yellow-400 font-extrabold' : ''}>{isHindi ? "तैयारी" : "Preparing"} 👨‍🍳</span>
+                  <span className={liveOrder.status === 'out_for_delivery' ? 'text-blue-400 font-extrabold' : ''}>{isHindi ? "मार्ग में" : "On the Way"} 🛵</span>
+                </div>
+                <div className="w-full bg-white/5 h-1.5 rounded-full overflow-hidden relative">
+                  <div 
+                    className="bg-gradient-to-r from-orange-500 to-yellow-400 h-full transition-all duration-500" 
+                    style={{ 
+                      width: liveOrder.status === 'pending' ? '25%' : liveOrder.status === 'preparing' ? '65%' : '90%' 
+                    }} 
+                  />
+                </div>
+                <div className="flex gap-2 pt-1 border-t border-white/5 mt-1.5">
+                  <a 
+                    href={`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(`नमस्ते बम बम कैफ़े! कृपया मेरे आर्डर नंबर #${formatBillNumber(liveOrder.billNumber)} का लाइव स्टेटस बताएं।`)}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex-1 bg-white/5 hover:bg-white/10 text-center text-[10px] text-yellow-400 py-1.5 rounded-xl border border-white/5 transition-all"
+                  >
+                    Track Live Status (WA) 🔍
+                  </a>
+                </div>
+              </div>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* FULL SCREEN REELS VIEWER */}
       <AnimatePresence>
@@ -2449,23 +2462,23 @@ export default function BbCafeHome() {
                   
                   <div className="space-y-3 text-left">
                     <div className="space-y-1">
-                      <label className="text-[9px] font-bold text-gray-500 uppercase">{isHindi ? "आपका नाम" : "Your Name"}</label>
+                      <label className="text-[9px] font-bold text-gray-550 uppercase">{isHindi ? "आपका नाम" : "Your Name"}</label>
                       <input type="text" placeholder="Enter your name..." value={tempName} onChange={(e) => setTempName(e.target.value)} className="w-full dark:bg-neutral-800 bg-gray-50 border dark:border-neutral-700 border-gray-200 p-3 rounded-xl font-bold dark:text-white text-neutral-900 outline-none focus:border-orange-500 text-xs" required />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[9px] font-bold text-gray-500 uppercase">{isHindi ? "मोबाइल नंबर" : "Mobile Number"}</label>
+                      <label className="text-[9px] font-bold text-gray-550 uppercase">{isHindi ? "मोबाइल नंबर" : "Mobile Number"}</label>
                       <input type="tel" maxLength={10} placeholder="10-digit Phone Number" value={tempPhone} onChange={(e) => setTempPhone(e.target.value)} className="w-full dark:bg-neutral-800 bg-gray-50 border dark:border-neutral-700 border-gray-200 p-3 rounded-xl font-bold dark:text-white text-neutral-900 outline-none focus:border-orange-500 text-xs" required />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[9px] font-bold text-gray-500 uppercase flex items-center gap-1"><Lock size={10}/> <span>{isHindi ? "सुरक्षा पिन बनाएँ (4-अंक)" : "Create 4-Digit Security PIN"}</span></label>
+                      <label className="text-[9px] font-bold text-gray-550 uppercase flex items-center gap-1"><Lock size={10}/> <span>{isHindi ? "सुरक्षा पिन बनाएँ (4-अंक)" : "Create 4-Digit Security PIN"}</span></label>
                       <input type="password" maxLength={4} placeholder="e.g. 1234" value={tempPin} onChange={(e) => setTempPin(e.target.value)} className="w-full dark:bg-neutral-800 bg-gray-50 border dark:border-neutral-700 border-gray-200 p-3 rounded-xl font-bold dark:text-white text-neutral-900 outline-none focus:border-orange-500 text-xs text-center tracking-widest" required />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[9px] font-bold text-gray-500 uppercase">{isHindi ? "इनवाइट कोड (वैकल्पिक)" : "Referral Code (Optional)"}</label>
+                      <label className="text-[9px] font-bold text-gray-550 uppercase">{isHindi ? "इनवाइट कोड (वैकल्पिक)" : "Referral Code (Optional)"}</label>
                       <input type="text" placeholder="Enter invite code..." value={tempRefCode} onChange={(e) => setTempRefCode(e.target.value)} className="w-full dark:bg-neutral-800 bg-gray-50 border dark:border-neutral-700 border-gray-200 p-3 rounded-xl font-bold dark:text-white text-neutral-900 outline-none focus:border-orange-500 text-xs" />
                     </div>
                   </div>
-                  <button type="submit" className="w-full bg-orange-500 text-black p-3.5 rounded-xl font-black text-xs uppercase shadow transition-all active:scale-95 mt-4">{isHindi ? "खाता बनाएं ➔" : "Create Account ➔"}</button>
+                  <button type="submit" className="w-full bg-orange-50 text-black p-3.5 rounded-xl font-black text-xs uppercase shadow transition-all active:scale-95 mt-4">{isHindi ? "खाता बनाएं ➔" : "Create Account ➔"}</button>
                 </form>
               ) : (
                 <div className="space-y-6">
@@ -2718,7 +2731,7 @@ export default function BbCafeHome() {
                   </div>
                 )}
 
-                {/* 4. ADD EXTRA CONDIMENTS (Now shifted strictly below Frequently Bought Together) */}
+                {/* 4. ADD EXTRA CONDIMENTS */}
                 <div className="dark:bg-white/[0.02] bg-gray-50 border dark:border-white/5 border-gray-200 rounded-2xl p-4 space-y-2 transition-colors duration-200">
                   <p className="text-[9px] font-black uppercase dark:text-gray-400 text-neutral-800">{isHindi ? "आर्डर में एक्स्ट्रा मसाला जोड़ें:" : "Add Extra condiments to order:"}</p>
                   <div className="grid grid-cols-3 gap-2">
@@ -2810,6 +2823,41 @@ export default function BbCafeHome() {
                     <p className="text-[8px] dark:text-gray-400 text-neutral-700 font-bold">{isHindi ? "चम्मच / टिश्यू पेपर की आवश्यकता नहीं है" : "No spoon or tissue paper requested"}</p>
                   </div>
                   <input type="checkbox" checked={noCutlery} onChange={() => { triggerHaptic(); setNoCutlery(!noCutlery); }} className="w-4 h-4 accent-green-500" />
+                </div>
+
+                {/* --- PROMO/COUPON CODE INPUT SECTION (FIXED DISCOUNT IN CART) --- */}
+                <div className="dark:bg-white/[0.02] bg-gray-50 border dark:border-white/5 border-gray-200 rounded-2xl p-4 space-y-2.5 transition-colors duration-200">
+                  <label className="text-[9px] font-black uppercase dark:text-gray-400 text-neutral-800">
+                    {isHindi ? "कूपन कोड / प्रोमो कोड:" : "Coupon Code / Promo Code:"}
+                  </label>
+                  <div className="flex gap-2">
+                    <input 
+                      type="text" 
+                      placeholder={isHindi ? "कूपन कोड डालें (उदा: SAVE50)" : "Enter code (e.g. SAVE50)"} 
+                      value={enteredCoupon} 
+                      onChange={(e) => setEnteredCoupon(e.target.value)} 
+                      className="flex-1 dark:bg-black/40 bg-white border dark:border-white/10 border-gray-300 rounded-xl px-3 py-2 text-xs font-bold dark:text-white text-neutral-900 outline-none uppercase" 
+                    />
+                    <button 
+                      type="button" 
+                      onClick={handleApplyCoupon} 
+                      className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-xl text-xs font-black transition-all active:scale-95"
+                    >
+                      {isHindi ? "लागू करें" : "Apply"}
+                    </button>
+                  </div>
+                  {appliedCoupon && (
+                    <div className="flex justify-between items-center bg-green-500/10 border border-green-500/20 px-3 py-1.5 rounded-xl text-[10px] text-green-400 font-bold mt-2">
+                      <span>✅ '{appliedCoupon.code}' Applied (-₹{appliedCoupon.discountValue})</span>
+                      <button 
+                        type="button" 
+                        onClick={() => { triggerHaptic(); setAppliedCoupon(null); setEnteredCoupon(""); }} 
+                        className="text-red-400 hover:text-red-500 font-black ml-2"
+                      >
+                        {isHindi ? "हटाएं" : "Remove"}
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 {/* 8. PAY SUMMARY CARD */}
@@ -2971,7 +3019,7 @@ export default function BbCafeHome() {
 
       {/* VERIFIED SOCIAL POINTS CLAIM MODAL */}
       <AnimatePresence>
-        {isClaimModalOpen && claimingPlatform && (
+        {isClaimOpen && claimingPlatform && (
           <div className="fixed inset-0 bg-black/95 z-[260] flex items-center justify-center p-6">
             <motion.form 
               onSubmit={handleClaimSubmit}
@@ -3013,8 +3061,6 @@ export default function BbCafeHome() {
           </div>
         )}
       </AnimatePresence>
-
-      
 
       {/* DIGITAL GREEN INVOICE */}
       <AnimatePresence>
