@@ -1,5 +1,3 @@
-
-
 'use client';
 
 import React, { useState, useMemo } from 'react';
@@ -192,8 +190,8 @@ export default function BumBumCafeStockApp() {
 
   // Sub-data tracking for History logs
   const [purchaseHistory, setPurchaseHistory] = useState<PurchaseLog[]>([
-    { id: "p_1", itemName: "OREGON SACHETS", qty: 100, unit: "Pcs", price: 150, supplier: "Rajesh Traders", date: "2026-07-10", invoiceNo: "INV-2026-889", targetLocation: "Main Store", paymentType: "Credit Ledger" },
-    { id: "p_2", itemName: "MOZZARELLA CHEESE", qty: 5, unit: "Kg", price: 490, supplier: "Sony Dairy", date: "2026-07-12", invoiceNo: "INV-2026-904", targetLocation: "Main Store", paymentType: "Cash/UPI" },
+    { id: "p_1", itemName: "OREGON SACHETS", qty: 100, unit: "Pcs", price: 150, supplier: "Rajesh Traders", date: "2026-07-10", invoiceNo: "INV-2026-889", paymentType: "Credit Ledger" },
+    { id: "p_2", itemName: "MOZZARELLA CHEESE", qty: 5, unit: "Kg", price: 490, supplier: "Sony Dairy", date: "2026-07-12", invoiceNo: "INV-2026-904", paymentType: "Cash/UPI" },
   ]);
   const [stockOutHistory, setStockOutHistory] = useState<StockOutLog[]>([
     { id: "so_1", itemName: "SUGER POWDER", qty: 1.5, purpose: "Waste", date: "2026-07-12", remarks: "Sugar spoiled by high humidity", financialLoss: 57 },
@@ -315,7 +313,7 @@ export default function BumBumCafeStockApp() {
     setTimeout(() => setToast(null), 3000);
   };
 
-  // Barcode Scan Simulator
+  // Barcode Scan Simulator with Match Logic & Location Targeting
   const handleBarcodeManualScan = (e: React.FormEvent) => {
     e.preventDefault();
     triggerHaptic();
@@ -356,6 +354,7 @@ export default function BumBumCafeStockApp() {
       })
     );
 
+    // Save purchase history audit
     const newPurchase: PurchaseLog = {
       id: `p_${Date.now()}`,
       itemName: scannedProductDetected.name,
@@ -417,7 +416,7 @@ export default function BumBumCafeStockApp() {
     toastMessage("Supplier Removed Successfully!");
   };
 
-  // WhatsApp low stock order generator
+  // WhatsApp low stock order generator based on specific supplier
   const triggerWhatsAppOrder = (supplierName: string) => {
     const lowStockForSupplier = inventory.filter(item => 
       item.supplier === supplierName && item.storeQty < item.minLimit
@@ -585,7 +584,7 @@ export default function BumBumCafeStockApp() {
     });
   };
 
-  // Dynamic Stock-Out Handler
+  // Dynamic Stock-Out Handler (Deducts Cafe stock)
   const handleStockOutSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formStockOut.item || !formStockOut.quantity) {
@@ -712,6 +711,30 @@ export default function BumBumCafeStockApp() {
     }
   };
 
+  // Export CSV/Excel Function
+  const triggerSimulationExport = (reportName: string) => {
+    const headers = ["Item Name", "Category", "Quantity", "Unit", "Total Value (INR)", "Status"];
+    const rows = inventory.map(item => [
+      item.name,
+      item.category,
+      item.storeQty,
+      item.unit,
+      item.storeQty * item.purchasePrice,
+      item.storeQty === 0 ? "Out of Stock" : item.storeQty < item.minLimit ? "Low Stock" : "Normal"
+    ]);
+
+    const csvContent = "data:text/csv;charset=utf-8," 
+      + [headers.join(","), ...rows.map(e => e.join(","))].join("\n");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `${reportName}_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toastMessage(`Downloaded: ${reportName} (CSV)!`);
+  };
+
   return (
     <div className={`min-h-screen ${isDarkMode ? 'bg-[#0F0F0F] text-white' : 'bg-[#FAFAFA] text-neutral-900'} pb-24 font-sans relative transition-colors duration-300`}>
 
@@ -744,7 +767,7 @@ export default function BumBumCafeStockApp() {
               <h1 className="text-sm font-black tracking-widest text-[#FF6B00]">BUM BUM CAFE</h1>
               <div className="flex items-center gap-1.5 mt-0.5">
                 <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                <span className="text-[9px] text-neutral-400 font-bold uppercase tracking-wider">Godown Inventory Hub</span>
+                <span className="text-[9px] text-neutral-400 font-bold uppercase tracking-wider">Live Inventory Hub</span>
               </div>
             </div>
           </div>
@@ -812,20 +835,20 @@ export default function BumBumCafeStockApp() {
               <h3 className="text-xs font-black uppercase tracking-widest text-neutral-400 px-1">Inventory Valuations</h3>
               <div className="grid grid-cols-2 gap-3">
                 <div className={`p-4 rounded-3xl border ${isDarkMode ? 'bg-[#1A1A1A] border-neutral-800' : 'bg-white border-neutral-100'} shadow-sm`}>
-                  <p className="text-[8px] font-black uppercase tracking-wider text-neutral-400">Total Godown Value</p>
+                  <p className="text-[8px] font-black uppercase tracking-wider text-neutral-400">Total Stock Value</p>
                   <h4 className="text-lg font-black text-[#FF6B00] mt-1">₹{dashboardStats.totalStockVal.toLocaleString()}</h4>
                 </div>
                 <div className={`p-4 rounded-3xl border ${isDarkMode ? 'bg-[#1A1A1A] border-neutral-800' : 'bg-white border-neutral-100'} shadow-sm`}>
-                  <p className="text-[8px] font-black uppercase tracking-wider text-neutral-400">Wastage / Loss Value</p>
-                  <h4 className="text-lg font-black text-red-500 mt-1">₹{dashboardStats.monthlyFinancialWastageLoss.toLocaleString()}</h4>
+                  <p className="text-[8px] font-black uppercase tracking-wider text-neutral-400">Main Store Value</p>
+                  <h4 className="text-lg font-black mt-1">₹{dashboardStats.mainStoreVal.toLocaleString()}</h4>
                 </div>
                 <div className={`p-4 rounded-3xl border ${isDarkMode ? 'bg-[#1A1A1A] border-neutral-800' : 'bg-white border-neutral-100'} shadow-sm`}>
-                  <p className="text-[8px] font-black uppercase tracking-wider text-neutral-400">Critical Low Items</p>
-                  <h4 className="text-lg font-black text-amber-500 mt-1">{dashboardStats.lowStockCount} Items</h4>
+                  <p className="text-[8px] font-black uppercase tracking-wider text-neutral-400">Monthly Wastage Loss</p>
+                  <h4 className="text-lg font-black mt-1 text-red-500">₹{dashboardStats.monthlyFinancialWastageLoss.toLocaleString()}</h4>
                 </div>
                 <div className={`p-4 rounded-3xl border ${isDarkMode ? 'bg-[#1A1A1A] border-neutral-800' : 'bg-white border-neutral-100'} shadow-sm`}>
-                  <p className="text-[8px] font-black uppercase tracking-wider text-neutral-400">Out of Stock</p>
-                  <h4 className="text-lg font-black text-red-500 mt-1">{dashboardStats.outOfStockCount} Items</h4>
+                  <p className="text-[8px] font-black uppercase tracking-wider text-neutral-400">Low Stock Alert</p>
+                  <h4 className="text-lg font-black mt-1 text-amber-500">{dashboardStats.lowStockCount} Items</h4>
                 </div>
               </div>
             </div>
@@ -880,7 +903,7 @@ export default function BumBumCafeStockApp() {
             {/* QUICK ACTIONS ROW */}
             <div className="space-y-3">
               <h3 className="text-xs font-black uppercase tracking-widest text-neutral-400 px-1">Quick Actions Panel</h3>
-              <div className="grid grid-cols-3 gap-2 text-center text-xs">
+              <div className="grid grid-cols-4 gap-2 text-center text-xs">
                 <div onClick={() => setShowAddStockModal(true)} className={`p-3 rounded-2xl border ${isDarkMode ? 'bg-[#1A1A1A] border-neutral-800' : 'bg-white border-neutral-100'} shadow-sm cursor-pointer hover:border-orange-500 transition-all`}>
                   <Plus className="mx-auto text-[#FF6B00]" size={16} />
                   <span className="text-[9px] font-black uppercase tracking-wider block mt-1">Add Stock</span>
@@ -890,7 +913,7 @@ export default function BumBumCafeStockApp() {
                   <span className="text-[9px] font-black uppercase tracking-wider block mt-1">Stock Out</span>
                 </div>
                 <div onClick={() => { setActiveTab('more'); setCurrentView('reports_list'); }} className={`p-3 rounded-2xl border ${isDarkMode ? 'bg-[#1A1A1A] border-neutral-800' : 'bg-white border-neutral-100'} shadow-sm cursor-pointer hover:border-orange-500 transition-all`}>
-                  <BarChart3 className="mx-auto text-emerald-500" size={16} />
+                  <BarChart3 className="mx-auto text-[#FF6B00]" size={16} />
                   <span className="text-[9px] font-black uppercase tracking-wider block mt-1">Reports</span>
                 </div>
               </div>
@@ -1157,8 +1180,8 @@ export default function BumBumCafeStockApp() {
                     </div>
                   </div>
 
-                  <div className="space-y-1">
-                    <label className="font-black uppercase tracking-wider text-neutral-400 text-[9px]">Payment Method</label>
+                  <div className="space-y-1 text-xs">
+                    <label className="font-black uppercase tracking-wider text-neutral-400 text-[8px] font-sans">Payment Method</label>
                     <select 
                       value={formStockIn.paymentType}
                       onChange={e => setFormStockIn({...formStockIn, paymentType: e.target.value as any})}
@@ -1194,7 +1217,7 @@ export default function BumBumCafeStockApp() {
             {currentView === 'stock_out_logs' && (
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-xs font-black uppercase tracking-widest text-neutral-400 font-sans">Outward Dispatches</h3>
+                  <h3 className="text-xs font-black uppercase tracking-widest text-neutral-400 font-sans font-sans font-sans font-sans font-sans">Outward Dispatches</h3>
                   <button onClick={() => setCurrentView('more_home')} className="text-xs text-orange-500 font-bold uppercase tracking-wider font-sans">Back</button>
                 </div>
 
@@ -1225,7 +1248,7 @@ export default function BumBumCafeStockApp() {
             {currentView === 'reports_list' && (
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-xs font-black uppercase tracking-widest text-neutral-400 font-sans font-sans">Reports Engine</h3>
+                  <h3 className="text-xs font-black uppercase tracking-widest text-neutral-400 font-sans">Reports Engine</h3>
                   <button onClick={() => setCurrentView('more_home')} className="text-xs text-orange-500 font-bold uppercase tracking-wider font-sans">Back</button>
                 </div>
 
@@ -1294,7 +1317,7 @@ export default function BumBumCafeStockApp() {
                       <div className="flex justify-between items-start">
                         <div>
                           <p className="font-black text-[#FF6B00] text-sm">{s.name}</p>
-                          <p className="text-[9px] text-neutral-400 uppercase tracking-widest mt-0.5 font-sans font-sans">📞 {s.phone} • 📍 {s.address}</p>
+                          <p className="text-[9px] text-neutral-400 uppercase tracking-widest mt-0.5 font-sans font-sans font-sans">📞 {s.phone} • 📍 {s.address}</p>
                           <p className="text-[10px] font-bold mt-1 text-red-500 uppercase tracking-wide font-sans">Pending Credit: ₹{s.pendingCredit.toLocaleString()}</p>
                         </div>
                         <div className="flex gap-1.5">
@@ -1333,7 +1356,7 @@ export default function BumBumCafeStockApp() {
             {currentView === 'categories_manager' && (
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-xs font-black uppercase tracking-widest text-neutral-400 font-sans">Raw Material Categories</h3>
+                  <h3 className="text-xs font-black uppercase tracking-widest text-neutral-400 font-sans font-sans">Raw Material Categories</h3>
                   <button onClick={() => setCurrentView('more_home')} className="text-xs text-orange-500 font-bold uppercase tracking-wider font-sans">Back</button>
                 </div>
 
@@ -1360,7 +1383,7 @@ export default function BumBumCafeStockApp() {
                       required
                     />
                     <button type="submit" className="px-4 py-2 bg-green-600 text-white rounded-xl font-bold uppercase font-sans">Update</button>
-                    <button type="button" onClick={() => setEditingCategoryIndex(null)} className="px-4 py-2 bg-neutral-200 dark:bg-neutral-800 text-neutral-400 rounded-xl font-sans">Cancel</button>
+                    <button type="button" onClick={() => setEditingCategoryIndex(null)} className="px-4 py-2 bg-neutral-200 dark:bg-neutral-800 text-neutral-400 rounded-xl font-sans font-sans">Cancel</button>
                   </form>
                 )}
 
@@ -1399,7 +1422,7 @@ export default function BumBumCafeStockApp() {
             {currentView === 'cold_chain' && (
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-xs font-black uppercase tracking-widest text-[#FF6B00]">Cold-Chain Temperature Logs</h3>
+                  <h3 className="text-xs font-black uppercase tracking-widest text-[#FF6B00] font-sans">Cold-Chain Temperature Logs</h3>
                   <button onClick={() => setCurrentView('more_home')} className="text-xs text-orange-500 font-bold uppercase tracking-wider font-sans">Back</button>
                 </div>
 
@@ -1426,11 +1449,11 @@ export default function BumBumCafeStockApp() {
                         <p className="text-[9px] text-neutral-400 mt-0.5 font-sans font-sans">Recorded by {log.by} at {log.time}</p>
                       </div>
                       {log.temp > -15 ? (
-                        <span className="bg-red-100 dark:bg-red-500/10 text-red-500 px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-wide font-sans">
+                        <span className="bg-red-100 dark:bg-red-500/10 text-red-500 px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-wide font-sans font-sans">
                           Warning: Warm
                         </span>
                       ) : (
-                        <span className="bg-green-100 dark:bg-green-500/10 text-green-500 px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-wide font-sans">
+                        <span className="bg-green-100 dark:bg-green-500/10 text-green-500 px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-wide font-sans font-sans">
                           Safe
                         </span>
                       )}
@@ -1444,19 +1467,19 @@ export default function BumBumCafeStockApp() {
             {currentView === 'audit_manager' && (
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-xs font-black uppercase tracking-widest text-[#FF6B00]">Physical Stock Audit</h3>
-                  <button onClick={() => setCurrentView('more_home')} className="text-xs text-orange-500 font-bold uppercase tracking-wider font-sans">Back</button>
+                  <h3 className="text-xs font-black uppercase tracking-widest text-[#FF6B00] font-sans">Physical Stock Audit</h3>
+                  <button onClick={() => setCurrentView('more_home')} className="text-xs text-orange-500 font-bold uppercase tracking-wider font-sans font-sans">Back</button>
                 </div>
 
                 <div className={`p-5 rounded-3xl border space-y-4 text-xs ${isDarkMode ? 'bg-[#1A1A1A] border-neutral-800' : 'bg-white border-neutral-100'}`}>
                   <div>
-                    <h4 className="font-bold text-sm font-sans font-sans">Align Stock discrepancies</h4>
-                    <p className="text-[9px] text-neutral-400 uppercase tracking-wide mt-0.5 font-sans">Compare counted shelf stock against database numbers</p>
+                    <h4 className="font-bold text-sm font-sans font-sans font-sans">Align Stock discrepancies</h4>
+                    <p className="text-[9px] text-neutral-400 uppercase tracking-wide mt-0.5 font-sans font-sans font-sans">Compare counted shelf stock against database numbers</p>
                   </div>
 
                   <button 
                     onClick={() => setShowAuditReconcileModal(true)}
-                    className="w-full p-3.5 bg-[#FF6B00] hover:bg-orange-600 text-white rounded-2xl font-black uppercase text-xs tracking-wider font-sans"
+                    className="w-full p-3.5 bg-[#FF6B00] hover:bg-orange-600 text-white rounded-2xl font-black uppercase text-xs tracking-wider font-sans font-sans"
                   >
                     Start Stock Audit Alignment
                   </button>
@@ -1468,8 +1491,8 @@ export default function BumBumCafeStockApp() {
             {currentView === 'equipment_manager' && (
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-xs font-black uppercase tracking-widest text-neutral-400 font-sans">Equipment Register & Service</h3>
-                  <button onClick={() => setCurrentView('more_home')} className="text-xs text-orange-500 font-bold uppercase tracking-wider font-sans">Back</button>
+                  <h3 className="text-xs font-black uppercase tracking-widest text-neutral-400 font-sans font-sans">Equipment Register & Service</h3>
+                  <button onClick={() => setCurrentView('more_home')} className="text-xs text-[#FF6B00] font-bold uppercase tracking-wider font-sans font-sans">Back</button>
                 </div>
 
                 <div className="grid grid-cols-1 gap-2.5 text-xs">
@@ -1480,9 +1503,9 @@ export default function BumBumCafeStockApp() {
                       <div className="flex justify-between items-start">
                         <div>
                           <p className="font-bold text-[#FF6B00] text-sm">{eq.name}</p>
-                          <p className="text-[9px] text-neutral-400 uppercase tracking-widest mt-0.5 font-sans font-sans">Last Service: {eq.lastService} • Next: {eq.nextService}</p>
+                          <p className="text-[9px] text-neutral-400 uppercase tracking-widest mt-0.5 font-sans font-sans font-sans font-sans font-sans">Last Service: {eq.lastService} • Next: {eq.nextService}</p>
                         </div>
-                        <span className={`px-2.5 py-1 rounded-full text-[8px] font-black uppercase font-sans ${
+                        <span className={`px-2.5 py-1 rounded-full text-[8px] font-black uppercase font-sans font-sans ${
                           eq.status === 'Good' ? 'bg-green-100 text-green-500' : 'bg-amber-100 text-amber-500'
                         }`}>
                           {eq.status}
@@ -1492,13 +1515,13 @@ export default function BumBumCafeStockApp() {
                       <div className="flex gap-2 border-t border-neutral-50 dark:border-neutral-800 pt-3">
                         <button 
                           onClick={() => setSelectedEquipmentQR(eq)}
-                          className="flex-1 py-2 bg-neutral-100 dark:bg-neutral-800 text-neutral-400 font-bold rounded-xl flex items-center justify-center gap-1.5 font-sans"
+                          className="flex-1 py-2 bg-neutral-100 dark:bg-neutral-800 text-neutral-400 font-bold rounded-xl flex items-center justify-center gap-1.5 font-sans font-sans"
                         >
                           <QrCode size={12} /> Scan Machine QR
                         </button>
                         <a 
                           href={`tel:${eq.phone}`}
-                          className="flex-1 py-2 bg-orange-500/10 hover:bg-orange-500/20 text-[#FF6B00] font-bold rounded-xl flex items-center justify-center gap-1.5 text-center font-sans"
+                          className="flex-1 py-2 bg-orange-500/10 hover:bg-orange-500/20 text-[#FF6B00] font-bold rounded-xl flex items-center justify-center gap-1.5 text-center font-sans font-sans"
                         >
                           📞 Call Technician
                         </a>
@@ -1513,8 +1536,8 @@ export default function BumBumCafeStockApp() {
             {currentView === 'app_settings' && (
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-xs font-black uppercase tracking-widest text-neutral-400 font-sans font-sans">Application Configuration</h3>
-                  <button onClick={() => setCurrentView('more_home')} className="text-xs text-orange-500 font-bold uppercase tracking-wider font-sans">Back</button>
+                  <h3 className="text-xs font-black uppercase tracking-widest text-neutral-400 font-sans font-sans font-sans font-sans font-sans font-sans">Application Configuration</h3>
+                  <button onClick={() => setCurrentView('more_home')} className="text-xs text-orange-500 font-bold uppercase tracking-wider font-sans font-sans font-sans font-sans font-sans font-sans">Back</button>
                 </div>
 
                 <div className={`p-5 rounded-3xl border space-y-4 text-xs ${isDarkMode ? 'bg-[#1A1A1A] border-neutral-800' : 'bg-white border-neutral-100'}`}>
@@ -1523,7 +1546,7 @@ export default function BumBumCafeStockApp() {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="font-black text-sm uppercase tracking-wide">Dark Mode Preference</p>
-                      <p className="text-[9px] text-neutral-400 uppercase tracking-wider font-sans">Optimal design for low light godowns</p>
+                      <p className="text-[9px] text-neutral-400 uppercase tracking-wider font-sans font-sans font-sans font-sans font-sans font-sans font-sans font-sans">Optimal design for low light godowns</p>
                     </div>
                     <button
                       onClick={() => setIsDarkMode(!isDarkMode)}
@@ -1536,10 +1559,10 @@ export default function BumBumCafeStockApp() {
                   {/* Offline Support Status */}
                   <div className="flex items-center justify-between border-t border-neutral-100 dark:border-neutral-800 pt-4">
                     <div>
-                      <p className="font-black text-sm uppercase tracking-wide font-sans">Offline PWA Auto-Sync</p>
-                      <p className="text-[9px] text-neutral-400 uppercase tracking-wider font-sans">Synchronize local cache dynamically</p>
+                      <p className="font-black text-sm uppercase tracking-wide font-sans font-sans font-sans font-sans font-sans font-sans font-sans font-sans">Offline PWA Auto-Sync</p>
+                      <p className="text-[9px] text-neutral-400 uppercase tracking-wider font-sans font-sans font-sans font-sans font-sans font-sans font-sans font-sans">Synchronize local cache dynamically</p>
                     </div>
-                    <span className="px-2.5 py-1 bg-green-500/10 text-green-500 font-black rounded-full text-[9px] uppercase tracking-wider flex items-center gap-1 font-sans">
+                    <span className="px-2.5 py-1 bg-green-500/10 text-green-500 font-black rounded-full text-[9px] uppercase tracking-wider flex items-center gap-1 font-sans font-sans font-sans font-sans">
                       <Wifi size={10} /> Online
                     </span>
                   </div>
@@ -1607,7 +1630,7 @@ export default function BumBumCafeStockApp() {
 
               {/* Simulated Purchase Timeline */}
               <div className="space-y-2.5">
-                <h4 className="text-[10px] font-black uppercase tracking-widest text-neutral-400 font-sans font-sans">Activity & Delivery Audit</h4>
+                <h4 className="text-[10px] font-black uppercase tracking-widest text-neutral-400 font-sans">Activity & Delivery Audit</h4>
                 <div className="space-y-2">
                   <div className="flex items-center justify-between text-xs p-2.5 bg-neutral-50 dark:bg-neutral-800/50 rounded-xl">
                     <div className="flex items-center gap-2">
@@ -2003,12 +2026,12 @@ export default function BumBumCafeStockApp() {
               }`}
             >
               <div className="flex justify-between items-center">
-                <h3 className="text-xs font-black uppercase tracking-widest text-neutral-400 font-sans">Merchant Registration</h3>
+                <h3 className="text-xs font-black uppercase tracking-widest text-neutral-400">Merchant Registration</h3>
                 <button type="button" onClick={() => setShowAddSupplierModal(false)} className="p-2.5 bg-neutral-100 dark:bg-neutral-800 rounded-xl"><X size={14} /></button>
               </div>
 
               <div className="space-y-1 text-xs">
-                <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400 font-sans">Company / Supplier Name</label>
+                <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400">Company / Supplier Name</label>
                 <input 
                   type="text" 
                   placeholder="e.g. Swastik Packaging Hub"
@@ -2021,7 +2044,7 @@ export default function BumBumCafeStockApp() {
 
               <div className="grid grid-cols-2 gap-2 text-xs">
                 <div className="space-y-1">
-                  <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400 font-sans">Phone</label>
+                  <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400">Phone</label>
                   <input 
                     type="text" 
                     placeholder="98765xxxxx"
@@ -2031,7 +2054,7 @@ export default function BumBumCafeStockApp() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400 font-sans">Address</label>
+                  <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400">Address</label>
                   <input 
                     type="text" 
                     placeholder="City / Area"
