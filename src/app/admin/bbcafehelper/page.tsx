@@ -827,13 +827,13 @@ export default function BumBumCafeStockApp() {
   // Simulated AI Bill Scanner Autocompletion
   const handleAIScanSimulation = () => {
     setIsAIScanningAnimation(true);
-  const [isAIScanningAnimation, setIsAIScanningAnimation] = useState<boolean>(false);
     triggerHaptic();
     
     setTimeout(() => {
       setIsAIScanningAnimation(false);
       setShowAIScanner(false);
-
+      const [isAIScanningAnimation, setIsAIScanningAnimation] = useState<boolean>(false);
+      
       // Auto-extract matching items from user's actual JAYANT SALES invoice
       const JAYANT_BILL_ITEMS = [
         { name: "DEL MONTE PIZZA PASTA 1KG", qty: 12, price: 150, category: "Raw Material" },
