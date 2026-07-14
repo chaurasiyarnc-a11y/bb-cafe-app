@@ -4,8 +4,8 @@
   
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { db } from '../../lib/firebase'; 
-import { collection, onSnapshot, query, orderBy, doc, updateDoc, setDoc, addDoc, deleteDoc, increment, runTransaction } from 'firebase/firestore';
-import { Power, Eye, EyeOff, User, MapPin, Calendar, CheckCircle2, LogOut, Loader2, Phone, Plus, Trash, Edit, X, Lock, BarChart3, Download, Folder, Percent, ImageIcon, Gift, Settings, Search, BookOpen, Share2, MessageSquare, Filter, RefreshCw, Check, CheckCircle, XCircle, Play, Shield, Users } from 'lucide-react';
+import { collection, onSnapshot, query, orderBy, doc, updateDoc, setDoc, addDoc, deleteDoc, increment, runTransaction, getDocs, where, getDoc } from 'firebase/firestore';
+import { Power, Eye, EyeOff, User, MapPin, Calendar, CheckCircle2, LogOut, Loader2, Phone, Plus, Trash, Edit, X, Lock, BarChart3, Download, Folder, Percent, ImageIcon, Gift, Settings, Search, BookOpen, Share2, MessageSquare, Filter, RefreshCw, Check, CheckCircle, XCircle, Play, Shield, Users, Clock } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 
 const ADD_CATEGORIES = ["Special Pizza", "Special Thali", "Paneer Special", "Special Mix veg", "Fast Food", "Super Cool", "Indian Bread", "Special Rice"];
@@ -251,7 +251,7 @@ export default function AdminDashboard() {
   // SEARCH SEARCH
   const [menuSearchQuery, setMenuSearchQuery] = useState("");
   const [categorySearchQuery, setCategorySearchQuery] = useState("");
-  const [customerSearchQuery, setCustomerSearchQuery] = useState("");
+  const [customerSearchQuery, setCategoryCustomerQuery] = useState("");
 
   // EXTENDED STATES FOR NEW TABS
   const [categories, setCategories] = useState<any[]>([]);
@@ -280,6 +280,8 @@ export default function AdminDashboard() {
 
   // Header Background Video State
   const [headerVideoInput, setHeaderVideoInput] = useState("");
+  const [storeTimingHindi, setStoreTimingHindi] = useState("सुबह 10:00 से रात 11:00 बजे");
+  const [storeTimingEnglish, setStoreTimingEnglish] = useState("10:00 AM to 11:00 PM");
 
   const [reviews, setReviews] = useState<any[]>([]);
   const [coupons, setCoupons] = useState<any[]>([]);
@@ -308,8 +310,7 @@ export default function AdminDashboard() {
   // CUSTOMER POINT TRANSFERS AUDIT STATE
   const [transferLogs, setTransferLogs] = useState<any[]>([]);
 
-  
-// STAFF MANAGEMENT STATES
+  // STAFF MANAGEMENT STATES
   const [staff, setStaff] = useState<any[]>([]);
   const [newStaffName, setNewStaffName] = useState("");
   const [newStaffRole, setNewStaffRole] = useState("delivery");
@@ -446,12 +447,19 @@ export default function AdminDashboard() {
       setCategories(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
 
-    // Dynamic WhatsApp Number & Background Video Listener
+    // Dynamic Timing & Video Listener
     const unsubStore = onSnapshot(doc(db, "settings", "store"), (d) => {
       if (d.exists()) {
-        setStoreOpen(d.data().isOpen);
-        if (d.data().headerVideoUrl) {
-          setHeaderVideoInput(d.data().headerVideoUrl);
+        const storeData = d.data();
+        setStoreOpen(storeData.isOpen);
+        if (storeData.headerVideoUrl) {
+          setHeaderVideoInput(storeData.headerVideoUrl);
+        }
+        if (storeData.timingHindi) {
+          setStoreTimingHindi(storeData.timingHindi);
+        }
+        if (storeData.timingEnglish) {
+          setStoreTimingEnglish(storeData.timingEnglish);
         }
       }
     });
@@ -501,11 +509,6 @@ export default function AdminDashboard() {
       setTransferLogs(logs);
     });
 
-    // Staff Accounts Real-time Listener (Real-time Staff list sync)
-    const unsubStaff = onSnapshot(collection(db, "staff_members"), (snap) => {
-      setStaff(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    });
-
     return () => {
       unsubOrders();
       unsubProducts();
@@ -520,7 +523,6 @@ export default function AdminDashboard() {
       unsubProofs();
       unsubClaims();
       unsubTransfers();
-      unsubStaff();
     };
   }, [isVerified]);
 
@@ -1005,7 +1007,7 @@ export default function AdminDashboard() {
     }
   };
 
-  // Background Video Change Support
+  // Background Video & Timings Change Support
   const handleUpdateHeaderVideo = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!headerVideoInput) return toast.error("Please enter a valid video link!");
@@ -1014,6 +1016,22 @@ export default function AdminDashboard() {
       toast.success("Main background header video updated! 🎬");
     } catch (err) {
       toast.error("Failed to update video.");
+    }
+  };
+
+  const handleUpdateStoreTimings = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!storeTimingHindi || !storeTimingEnglish) {
+      return toast.error("Kripya dono languages me timing bharein!");
+    }
+    try {
+      await setDoc(doc(db, "settings", "store"), {
+        timingHindi: storeTimingHindi,
+        timingEnglish: storeTimingEnglish
+      }, { merge: true });
+      toast.success("Store Timings successfully updated! ⏰");
+    } catch (err) {
+      toast.error("Failed to update timings.");
     }
   };
 
@@ -1088,17 +1106,19 @@ export default function AdminDashboard() {
     } catch (err) { toast.error("Error deleting review"); }
   };
 
+  // Bulletproof Coupon Saving via direct setDoc with UPPERCASE Code Document ID
   const handleAddCoupon = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCouponCode || !newCouponValue) return;
+    const cleanCode = newCouponCode.trim().toUpperCase();
     try {
-      await addDoc(collection(db, "coupons"), {
-        code: newCouponCode.trim().toUpperCase(),
+      await setDoc(doc(db, "coupons", cleanCode), {
+        code: cleanCode,
         discountValue: Number(newCouponValue),
         timestamp: new Date()
       });
       setNewCouponCode(""); setNewCouponValue("");
-      toast.success("New Coupon created!");
+      toast.success("New Coupon created successfully! 🎟️");
     } catch (err) { toast.error("Error creating coupon"); }
   };
 
@@ -1384,8 +1404,6 @@ export default function AdminDashboard() {
       toast.error("Failed to save recipe SOP.");
     }
   };
-
-
 
   // Real-time Staff Members listener
   useEffect(() => {
@@ -1771,7 +1789,7 @@ Report generated automatically by Bum Bum Cafe POS.`
         <button onClick={() => setTab('loyalty')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'loyalty' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>🎁 Loyalty Rules</button>
         <button onClick={() => setTab('banners')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'banners' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>🖼️ Promo Banners</button>
         <button onClick={() => setTab('reels')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'reels' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>🎥 Food Reels</button>
-        <button onClick={() => setTab('header_video')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'header_video' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>🎬 Header Video</button>
+        <button onClick={() => setTab('header_video')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'header_video' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>🎬 Header & Timings</button>
         <button onClick={() => setTab('coupons')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'coupons' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>🎟️ Coupons</button>
         <button onClick={() => setTab('reviews')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'reviews' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>⭐ Reviews</button>
         <button onClick={() => setTab('proofs')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'proofs' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>🔥 Order Alerts</button>
@@ -1814,15 +1832,15 @@ Report generated automatically by Bum Bum Cafe POS.`
               {/* 4-Column stats grid with direct integration of the Rejected Orders metric */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 border-t border-white/5 pt-4">
                 <div className="bg-white/[0.01] border border-white/5 p-3 rounded-2xl text-center">
-                  <p className="text-[9px] font-bold text-gray-500 uppercase">Range Sales</p>
+                  <p className="text-[9px] font-bold text-gray-505 uppercase">Range Sales</p>
                   <h3 className="text-base font-black text-green-400 mt-1">₹{auditStats.rangeRevenue}</h3>
                 </div>
                 <div className="bg-white/[0.01] border border-white/5 p-3 rounded-2xl text-center">
-                  <p className="text-[9px] font-bold text-gray-500 uppercase">Range Orders</p>
+                  <p className="text-[9px] font-bold text-gray-505 uppercase">Range Orders</p>
                   <h3 className="text-base font-black text-yellow-400 mt-1">{auditStats.rangeCount}</h3>
                 </div>
                 <div className="bg-white/[0.01] border border-white/5 p-3 rounded-2xl text-center">
-                  <p className="text-[9px] font-bold text-gray-505 uppercase">Active Kitchen</p>
+                  <p className="text-[9px] font-bold text-gray-555 uppercase">Active Kitchen</p>
                   <h3 className="text-base font-black text-orange-500 mt-1">{auditStats.active}</h3>
                 </div>
                 <div className="bg-red-500/10 border border-red-500/20 p-3 rounded-2xl text-center">
@@ -2266,7 +2284,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                   type="text" 
                   placeholder="Search customer by name or mobile number..." 
                   value={customerSearchQuery} 
-                  onChange={(e) => setCustomerSearchQuery(e.target.value)}
+                  onChange={(e) => setCategoryCustomerQuery(e.target.value)}
                   className="w-full bg-white text-black py-3 px-11 rounded-xl outline-none text-xs font-semibold"
                 />
               </div>
@@ -2294,7 +2312,7 @@ Report generated automatically by Bum Bum Cafe POS.`
 
             <div className="space-y-4">
               {searchedCustomers.length === 0 ? (
-                <p className="text-center text-xs font-bold text-gray-550 py-10 uppercase">No matching customers found...</p>
+                <p className="text-center text-xs font-bold text-gray-555 py-10 uppercase">No matching customers found...</p>
               ) : (
                 searchedCustomers
                   .map(user => ({ ...user, metrics: getCustomerLoyaltyMetrics(user.phone) }))
@@ -2305,7 +2323,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                         <div className="space-y-1 cursor-pointer flex-1" onClick={() => setSelectedCustomerHistory(user)}>
                           <div className="flex items-center gap-2 flex-wrap">
                             <h4 className="font-extrabold text-sm text-white hover:text-orange-500">{user.name} ➡️</h4>
-                            <span className={`text-[8px] font-black uppercase px-2.5 py-0.5 rounded-full border ${user.metrics.tierColor}`}>
+                            <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-full border ${user.metrics.tierColor}`}>
                               {user.metrics.tier}
                             </span>
                           </div>
@@ -2408,7 +2426,7 @@ Report generated automatically by Bum Bum Cafe POS.`
           <div className="space-y-6">
             <form onSubmit={handleAddBanner} className="bg-[#020202] border border-white/5 p-6 rounded-[2.5rem] space-y-4">
               <h3 className="text-lg font-black text-orange-500 italic uppercase flex items-center gap-2"><ImageIcon size={18}/> Manage Promo Banners</h3>
-              <p className="text-[10px] text-gray-550 font-bold uppercase leading-normal">यहाँ से आप मुख्य स्क्रीन के बड़े आफर बैनर्स (Image या Video) को जोड़ सकते हैं।</p>
+              <p className="text-[10px] text-gray-555 font-bold uppercase leading-normal">यहाँ से आप मुख्य स्क्रीन के बड़े आफर बैनर्स (Image या Video) को जोड़ सकते हैं।</p>
               
               <div className="space-y-1">
                 <label className="text-xs font-bold text-gray-400 uppercase">Banner Title</label>
@@ -2463,7 +2481,7 @@ Report generated automatically by Bum Bum Cafe POS.`
           <div className="space-y-6">
             <form onSubmit={handleAddReel} className="bg-[#020202] border border-white/5 p-6 rounded-[2.5rem] space-y-4">
               <h3 className="text-lg font-black text-orange-500 italic uppercase flex items-center gap-2"><Play size={18}/> Manage Food Reels / Stories</h3>
-              <p className="text-[10px] text-gray-550 font-bold uppercase leading-normal">यहाँ से आप circular food stories और video reels add kar sakte hain (with item price).</p>
+              <p className="text-[10px] text-gray-555 font-bold uppercase leading-normal">यहाँ से आप circular food stories और video reels add kar sakte hain (with item price).</p>
               
               <div className="grid grid-cols-2 gap-3 text-xs font-bold">
                 <div className="space-y-1">
@@ -2531,13 +2549,15 @@ Report generated automatically by Bum Bum Cafe POS.`
           </div>
         )}
 
-        {/* --- TAB 7.6: MAIN BACKGROUND HEADER VIDEO --- */}
+        {/* --- TAB 7.6: MAIN BACKGROUND HEADER VIDEO & TIMINGS --- */}
         {tab === 'header_video' && (
           <div className="space-y-6">
-            <h3 className="text-xl font-black text-orange-500 uppercase tracking-wider flex items-center gap-2">🎬 Main Background Header Video</h3>
-            <p className="text-[10px] text-gray-550 uppercase tracking-widest font-black leading-relaxed font-mono">यहाँ से आप मुख्य होमपेज के पीछे चलने वाले बैकग्राउंड वीडियो को बदल सकते हैं।</p>
+            <h3 className="text-xl font-black text-orange-500 uppercase tracking-wider flex items-center gap-2">🎬 Store Settings (Video & Timings)</h3>
+            <p className="text-[10px] text-gray-555 uppercase tracking-widest font-black leading-relaxed font-mono">यहाँ से आप मुख्य होमपेज के पीछे चलने वाले वीडियो और फ़ुटर में दिखने वाली दुकान की टाइमिंग बदल सकते हैं।</p>
 
+            {/* 1. Header Video Form */}
             <form onSubmit={handleUpdateHeaderVideo} className="bg-white/[0.02] border border-white/5 p-6 rounded-[2.5rem] space-y-4">
+              <p className="text-xs font-black text-orange-400 uppercase tracking-wider">Background Video Settings</p>
               <div className="space-y-1">
                 <label className="text-xs font-bold text-gray-405 uppercase">Background Video URL</label>
                 <input 
@@ -2560,6 +2580,37 @@ Report generated automatically by Bum Bum Cafe POS.`
               )}
 
               <button type="submit" className="w-full bg-green-600 text-white p-4 rounded-xl font-black text-sm uppercase">Update Header Video 🎬</button>
+            </form>
+
+            {/* 2. Store Timing Settings Form */}
+            <form onSubmit={handleUpdateStoreTimings} className="bg-white/[0.02] border border-white/5 p-6 rounded-[2.5rem] space-y-4">
+              <p className="text-xs font-black text-orange-400 uppercase tracking-wider">Restaurant Opening/Closing Timings (फ़ुटर टाइमिंग)</p>
+              
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-gray-400 uppercase">Timing (Hindi / हिंदी)</label>
+                <input 
+                  type="text" 
+                  value={storeTimingHindi} 
+                  onChange={(e) => setStoreTimingHindi(e.target.value)} 
+                  placeholder="उदा: सुबह 10:00 से रात 11:00 बजे"
+                  className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-xs font-black text-white" 
+                  required 
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-gray-400 uppercase">Timing (English)</label>
+                <input 
+                  type="text" 
+                  value={storeTimingEnglish} 
+                  onChange={(e) => setStoreTimingEnglish(e.target.value)} 
+                  placeholder="e.g. 10:00 AM to 11:00 PM"
+                  className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-xs font-black text-white" 
+                  required 
+                />
+              </div>
+
+              <button type="submit" className="w-full bg-green-600 text-white p-4 rounded-xl font-black text-sm uppercase">Update Store Timings ⏰</button>
             </form>
           </div>
         )}
@@ -2595,7 +2646,7 @@ Report generated automatically by Bum Bum Cafe POS.`
         {/* --- TAB 9: APPROVE & MANAGE REVIEWS --- */}
         {tab === 'reviews' && (
           <div className="space-y-4">
-            {reviews.length === 0 && <p className="text-center text-gray-550 py-16 font-bold uppercase tracking-widest">No reviews found...</p>}
+            {reviews.length === 0 && <p className="text-center text-gray-555 py-16 font-bold uppercase tracking-widest">No reviews found...</p>}
             {reviews.map(r => (
               <div key={r.id} className="bg-white/[0.02] border border-white/5 p-6 rounded-[2rem] space-y-3">
                 <div className="flex justify-between items-center">
@@ -2628,7 +2679,7 @@ Report generated automatically by Bum Bum Cafe POS.`
         {tab === 'roster' && (
           <div className="space-y-6">
             <h3 className="text-xl font-black text-orange-500 uppercase tracking-wider flex items-center gap-2"><Settings size={20}/> Kitchen SOP Recipe Roster</h3>
-            <p className="text-[10px] text-gray-550 uppercase tracking-widest font-black leading-relaxed font-mono">डिश बनाने के चरण (Steps) और सामग्री का अनुपात फीड करें, और रसोई की दीवार पर चिपकाने के लिए सीधे A4 साइज़ पोस्टर प्रिंट करें।</p>
+            <p className="text-[10px] text-gray-555 uppercase tracking-widest font-black leading-relaxed font-mono">डिश बनाने के चरण (Steps) और सामग्री का अनुपात फीड करें, और रसोई की दीवार पर चिपकाने के लिए सीधे A4 साइज़ पोस्टर प्रिंट करें।</p>
 
             <div className="bg-[#111] border border-white/5 p-5 rounded-3xl space-y-3">
               <label className="text-xs font-bold text-gray-405 uppercase block">Select Dish / डिश चुनें</label>
@@ -2729,7 +2780,7 @@ Report generated automatically by Bum Bum Cafe POS.`
             </form>
 
             <div className="space-y-3">
-              <p className="text-xs font-bold text-gray-550 uppercase pl-1">All Live Order Alerts ({socialProofs.length})</p>
+              <p className="text-xs font-bold text-gray-555 uppercase pl-1">All Live Order Alerts ({socialProofs.length})</p>
               {socialProofs.map(alert => (
                 <div key={alert.id} className="bg-white/[0.02] border border-white/5 p-4 rounded-3xl flex justify-between items-center text-xs">
                   <p className="font-bold text-gray-300 max-w-[80%] leading-relaxed">{alert.text}</p>
@@ -2766,7 +2817,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                       <p>प्लेटформа: <span className="text-white">{claim.platformLabel}</span></p>
                       <p>सोशल यूज़रनेम / हैंडल: <span className="text-yellow-400 font-black">{claim.socialUsername}</span></p>
                       <p>कस्टमर नंबर: <span className="text-white">+{claim.customerPhone}</span></p>
-                      <p className="text-[9px] text-gray-650">{claim.timestamp?.toDate ? claim.timestamp.toDate().toLocaleString() : ""}</p>
+                      <p className="text-[9px] text-gray-655">{claim.timestamp?.toDate ? claim.timestamp.toDate().toLocaleString() : ""}</p>
                     </div>
                     {claim.status === "pending" && (
                       <div className="flex gap-2 pt-1.5">
@@ -3189,7 +3240,7 @@ Report generated automatically by Bum Bum Cafe POS.`
               
               <div className="space-y-1.5 max-h-40 overflow-y-auto no-scrollbar">
                 {broadcastTargetedCustomers.length === 0 ? (
-                  <p className="text-center text-[10px] text-gray-505 py-6 uppercase font-bold">No customers match...</p>
+                  <p className="text-center text-[10px] text-gray-555 py-6 uppercase font-bold">No customers match...</p>
                 ) : (
                   broadcastTargetedCustomers.map((user) => {
                     const isAlreadySent = sentBroadcastPhones.includes(user.phone);
