@@ -42,6 +42,7 @@ interface InventoryItem {
   name: string;
   category: string;
   storeQty: number;
+  cafeQty: number;
   unit: string;
   purchasePrice: number;
   minLimit: number;
@@ -111,36 +112,128 @@ const triggerHaptic = (ms = 35) => {
 };
 
 // ==========================================
-// 2. MASTER INITIAL INVENTORY SEED DATA (FROM KHATABOOK PDF)
+// 2. MASTER INVENTORY DATA (ENGLISH FONTS, COMPREHENSIVE CATEGORIES)
 // ==========================================
 const INITIAL_INVENTORY: InventoryItem[] = [
-  // Spices & Raw Materials
-  { id: "rep_1", name: "OREGON SACHETS", category: "Raw Material", storeQty: 5, unit: "Pcs", purchasePrice: 150, minLimit: 10, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800301" },
-  { id: "rep_2", name: "CHILLI FLAKES", category: "Raw Material", storeQty: 2, unit: "Pcs", purchasePrice: 150, minLimit: 10, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800302" },
-  { id: "rep_3", name: "FRESH YEAST KOBO", category: "Raw Material", storeQty: 0, unit: "Pcs", purchasePrice: 80, minLimit: 5, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800303" },
-  { id: "rep_4", name: "MEDA", category: "Raw Material", storeQty: 10, unit: "Kg", purchasePrice: 40, minLimit: 15, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800304" },
-  { id: "rep_5", name: "SUGER POWDER", category: "Raw Material", storeQty: 0, unit: "Kg", purchasePrice: 45, minLimit: 8, supplier: "Om Super Market", lastPurchaseDate: "2026-07-14", barcode: "890105800304" },
-  { id: "rep_6", name: "MOZZARELLA CHEESE", category: "Dairy", storeQty: 1, unit: "Kg", purchasePrice: 490, minLimit: 5, supplier: "Sony Dairy", lastPurchaseDate: "2026-07-14", barcode: "890105800335", expiryDate: "2026-07-16" },
-  { id: "rep_7", name: "MAYONNAISE", category: "Raw Material", storeQty: 2, unit: "Pcs", purchasePrice: 160, minLimit: 5, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800336" },
-  { id: "rep_8", name: "PIZZA PASTA SAUCE", category: "Raw Material", storeQty: 8, unit: "Pcs", purchasePrice: 160, minLimit: 10, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800338" },
-  
-  // Packaging & Disposables
-  { id: "rep_9", name: "PIZZA BOX LARGE 10\"", category: "Packaging", storeQty: 400, unit: "Pcs", purchasePrice: 7.50, minLimit: 100, supplier: "Narmada Packagings", lastPurchaseDate: "2026-07-14", barcode: "890105800357" },
-  { id: "rep_10", name: "PIZZA BOX 8\"", category: "Packaging", storeQty: 300, unit: "Pcs", purchasePrice: 4.50, minLimit: 100, supplier: "Narmada Packagings", lastPurchaseDate: "2026-07-14", barcode: "890105800358" },
-  { id: "rep_11", name: "SILVER CONTAINER 500ML", category: "Disposable", storeQty: 150, unit: "Pcs", purchasePrice: 3.50, minLimit: 50, supplier: "Prabhat Polymer", lastPurchaseDate: "2026-07-14", barcode: "890105800319" },
-  { id: "rep_12", name: "COLD COFFEE GLASS BIG SET", category: "Disposable", storeQty: 155, unit: "Pcs", purchasePrice: 6.50, minLimit: 50, supplier: "Prabhat Polymer", lastPurchaseDate: "2026-07-14", barcode: "890105800334" },
-  
-  // Frozen Material & Equipment
-  { id: "item_13", name: "FRENCH FRIES", category: "Frozen Material", storeQty: 40, unit: "Kg", purchasePrice: 110, minLimit: 15, supplier: "Sagar Distributors", lastPurchaseDate: "2026-07-12", expiryDate: "2026-10-12", batchNumber: "B-FF890", barcode: "890175800249" },
-  { id: "item_14", name: "VEG PATTY", category: "Frozen Material", storeQty: 100, unit: "Pcs", purchasePrice: 18, minLimit: 30, supplier: "Sagar Distributors", lastPurchaseDate: "2026-07-12", expiryDate: "2026-09-12", batchNumber: "B-VP441", barcode: "890175800250" },
-  { id: "item_15", name: "DEEP FREEZE", category: "Equipment", storeQty: 2, unit: "Pcs", purchasePrice: 28000, minLimit: 1, supplier: "Sagar Distributors", lastPurchaseDate: "2026-07-01", barcode: "890175800252" }
+  // --- DAIRY ---
+  { id: "dairy_1", name: "MILK", category: "Dairy", storeQty: 40, cafeQty: 0, unit: "Ltr", purchasePrice: 60, minLimit: 10, supplier: "Sony Dairy", lastPurchaseDate: "2026-07-14", barcode: "890105800401" },
+  { id: "dairy_2", name: "CURD", category: "Dairy", storeQty: 15, cafeQty: 0, unit: "Kg", purchasePrice: 80, minLimit: 5, supplier: "Sony Dairy", lastPurchaseDate: "2026-07-14", barcode: "890105800402" },
+  { id: "dairy_3", name: "BUTTER", category: "Dairy", storeQty: 24, cafeQty: 0, unit: "Kg", purchasePrice: 420, minLimit: 8, supplier: "Sony Dairy", lastPurchaseDate: "2026-07-14", barcode: "890105800240" },
+  { id: "dairy_4", name: "GHEE", category: "Dairy", storeQty: 10, cafeQty: 0, unit: "Kg", purchasePrice: 680, minLimit: 3, supplier: "Sony Dairy", lastPurchaseDate: "2026-07-14", barcode: "890105800239" },
+  { id: "dairy_5", name: "PROCESSED CHEESE", category: "Dairy", storeQty: 15, cafeQty: 0, unit: "Kg", purchasePrice: 420, minLimit: 5, supplier: "Sony Dairy", lastPurchaseDate: "2026-07-14", barcode: "890105800403" },
+  { id: "dairy_6", name: "MOZZARELLA CHEESE", category: "Dairy", storeQty: 18, cafeQty: 0, unit: "Kg", purchasePrice: 440, minLimit: 5, supplier: "Sony Dairy", lastPurchaseDate: "2026-07-14", barcode: "890105800241", expiryDate: "2026-07-16" },
+  { id: "dairy_7", name: "PANEER", category: "Dairy", storeQty: 20, cafeQty: 0, unit: "Kg", purchasePrice: 320, minLimit: 5, supplier: "Sony Dairy", lastPurchaseDate: "2026-07-14", barcode: "890105800404" },
+  { id: "dairy_8", name: "FRESH CREAM", category: "Dairy", storeQty: 10, cafeQty: 0, unit: "Kg", purchasePrice: 240, minLimit: 3, supplier: "Sony Dairy", lastPurchaseDate: "2026-07-14", barcode: "890105800405" },
+  { id: "dairy_9", name: "VANILLA ICE CREAM", category: "Dairy", storeQty: 12, cafeQty: 0, unit: "Ltr", purchasePrice: 180, minLimit: 4, supplier: "Sony Dairy", lastPurchaseDate: "2026-07-14", barcode: "890105800406" },
+
+  // --- VEGETABLES ---
+  { id: "veg_1", name: "ONION", category: "Vegetables", storeQty: 50, cafeQty: 0, unit: "Kg", purchasePrice: 30, minLimit: 15, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800407" },
+  { id: "veg_2", name: "TOMATO", category: "Vegetables", storeQty: 30, cafeQty: 0, unit: "Kg", purchasePrice: 40, minLimit: 10, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800408" },
+  { id: "veg_3", name: "POTATO", category: "Vegetables", storeQty: 60, cafeQty: 0, unit: "Kg", purchasePrice: 25, minLimit: 15, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800409" },
+  { id: "veg_4", name: "CAPSICUM", category: "Vegetables", storeQty: 15, cafeQty: 0, unit: "Kg", purchasePrice: 80, minLimit: 5, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800410" },
+  { id: "veg_5", name: "CABBAGE", category: "Vegetables", storeQty: 20, cafeQty: 0, unit: "Kg", purchasePrice: 30, minLimit: 8, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800411" },
+  { id: "veg_6", name: "CARROT", category: "Vegetables", storeQty: 15, cafeQty: 0, unit: "Kg", purchasePrice: 40, minLimit: 5, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800412" },
+  { id: "veg_7", name: "GREEN CHILLI", category: "Vegetables", storeQty: 5, cafeQty: 0, unit: "Kg", purchasePrice: 60, minLimit: 2, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800413" },
+  { id: "veg_8", name: "GINGER", category: "Vegetables", storeQty: 5, cafeQty: 0, unit: "Kg", purchasePrice: 120, minLimit: 2, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800414" },
+  { id: "veg_9", name: "GARLIC", category: "Vegetables", storeQty: 5, cafeQty: 0, unit: "Kg", purchasePrice: 150, minLimit: 2, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800415" },
+  { id: "veg_10", name: "CORIANDER LEAVES", category: "Vegetables", storeQty: 3, cafeQty: 0, unit: "Kg", purchasePrice: 80, minLimit: 1, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800416" },
+  { id: "veg_11", name: "MINT LEAVES", category: "Vegetables", storeQty: 2, cafeQty: 0, unit: "Kg", purchasePrice: 100, minLimit: 1, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800417" },
+  { id: "veg_12", name: "LEMON", category: "Vegetables", storeQty: 100, cafeQty: 0, unit: "Pcs", purchasePrice: 3, minLimit: 20, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800418" },
+  { id: "veg_13", name: "SPINACH", category: "Vegetables", storeQty: 8, cafeQty: 0, unit: "Kg", purchasePrice: 40, minLimit: 3, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800419" },
+  { id: "veg_14", name: "CAULIFLOWER", category: "Vegetables", storeQty: 12, cafeQty: 0, unit: "Kg", purchasePrice: 45, minLimit: 4, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800420" },
+  { id: "veg_15", name: "GREEN PEAS", category: "Vegetables", storeQty: 15, cafeQty: 0, unit: "Kg", purchasePrice: 60, minLimit: 5, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800421" },
+  { id: "veg_16", name: "BRINJAL", category: "Vegetables", storeQty: 10, cafeQty: 0, unit: "Kg", purchasePrice: 30, minLimit: 3, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800422" },
+  { id: "veg_17", name: "FENUGREEK LEAVES", category: "Vegetables", storeQty: 8, cafeQty: 0, unit: "Kg", purchasePrice: 50, minLimit: 3, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800423" },
+  { id: "veg_18", name: "CURRY LEAVES", category: "Vegetables", storeQty: 2, cafeQty: 0, unit: "Kg", purchasePrice: 120, minLimit: 1, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800424" },
+
+  // --- GRAINS & BAKERY ---
+  { id: "grain_1", name: "MAIDA", category: "Grains & Bakery", storeQty: 100, cafeQty: 0, unit: "Kg", purchasePrice: 40, minLimit: 20, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800304" },
+  { id: "grain_2", name: "WHEAT FLOUR", category: "Grains & Bakery", storeQty: 120, cafeQty: 0, unit: "Kg", purchasePrice: 45, minLimit: 25, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800425" },
+  { id: "grain_3", name: "SUJI", category: "Grains & Bakery", storeQty: 30, cafeQty: 0, unit: "Kg", purchasePrice: 50, minLimit: 10, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800426" },
+  { id: "grain_4", name: "BESAN", category: "Grains & Bakery", storeQty: 45, cafeQty: 0, unit: "Kg", purchasePrice: 85, minLimit: 12, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800235" },
+  { id: "grain_5", name: "CORN FLOUR", category: "Grains & Bakery", storeQty: 20, cafeQty: 0, unit: "Kg", purchasePrice: 60, minLimit: 5, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800427" },
+  { id: "grain_6", name: "BREAD CRUMBS", category: "Grains & Bakery", storeQty: 15, cafeQty: 0, unit: "Kg", purchasePrice: 90, minLimit: 5, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800428" },
+  { id: "grain_7", name: "BREAD", category: "Grains & Bakery", storeQty: 20, cafeQty: 0, unit: "Pcs", purchasePrice: 35, minLimit: 8, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800313" },
+  { id: "grain_8", name: "BURGER BUN", category: "Grains & Bakery", storeQty: 50, cafeQty: 0, unit: "Pcs", purchasePrice: 12, minLimit: 15, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800312" },
+  { id: "grain_9", name: "PIZZA BASE", category: "Grains & Bakery", storeQty: 40, cafeQty: 0, unit: "Pcs", purchasePrice: 20, minLimit: 15, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800355" },
+  { id: "grain_10", name: "MOMOS SHEET", category: "Grains & Bakery", storeQty: 100, cafeQty: 0, unit: "Pcs", purchasePrice: 2, minLimit: 30, supplier: "Narmada Packagings", lastPurchaseDate: "2026-07-14", barcode: "890105800429" },
+  { id: "grain_11", name: "SPRING ROLL SHEET", category: "Grains & Bakery", storeQty: 100, cafeQty: 0, unit: "Pcs", purchasePrice: 3, minLimit: 30, supplier: "Narmada Packagings", lastPurchaseDate: "2026-07-14", barcode: "890105800430" },
+  { id: "grain_12", name: "NUDLES", category: "Grains & Bakery", storeQty: 25, cafeQty: 0, unit: "Kg", purchasePrice: 80, minLimit: 8, supplier: "Om Super Market", lastPurchaseDate: "2026-07-14", barcode: "890105800431" },
+  { id: "grain_13", name: "PASTA", category: "Grains & Bakery", storeQty: 30, cafeQty: 0, unit: "Kg", purchasePrice: 120, minLimit: 8, supplier: "Om Super Market", lastPurchaseDate: "2026-07-14", barcode: "890105800432" },
+  { id: "grain_14", name: "MAGGI", category: "Grains & Bakery", storeQty: 48, cafeQty: 0, unit: "Pcs", purchasePrice: 12, minLimit: 12, supplier: "Om Super Market", lastPurchaseDate: "2026-07-14", barcode: "890105800433" },
+
+  // --- RICE & PULSES ---
+  { id: "rice_1", name: "BASMATI RICE", category: "Rice & Pulses", storeQty: 100, cafeQty: 0, unit: "Kg", purchasePrice: 95, minLimit: 25, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800434" },
+  { id: "rice_2", name: "NORMAL RICE", category: "Rice & Pulses", storeQty: 120, cafeQty: 0, unit: "Kg", purchasePrice: 45, minLimit: 30, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800231" },
+  { id: "rice_3", name: "TUAR DAL", category: "Rice & Pulses", storeQty: 50, cafeQty: 0, unit: "Kg", purchasePrice: 145, minLimit: 15, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800233" },
+  { id: "rice_4", name: "MOONG DAL", category: "Rice & Pulses", storeQty: 40, cafeQty: 0, unit: "Kg", purchasePrice: 120, minLimit: 10, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800435" },
+  { id: "rice_5", name: "CHANA DAL", category: "Rice & Pulses", storeQty: 35, cafeQty: 0, unit: "Kg", purchasePrice: 90, minLimit: 10, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800436" },
+  { id: "rice_6", name: "SABUDANA", category: "Rice & Pulses", storeQty: 25, cafeQty: 0, unit: "Kg", purchasePrice: 80, minLimit: 8, supplier: "Om Super Market", lastPurchaseDate: "2026-07-14", barcode: "890105800437" },
+  { id: "rice_7", name: "POHA", category: "Rice & Pulses", storeQty: 30, cafeQty: 0, unit: "Kg", purchasePrice: 65, minLimit: 10, supplier: "Om Super Market", lastPurchaseDate: "2026-07-14", barcode: "890105800314" },
+
+  // --- DRY FRUITS ---
+  { id: "df_1", name: "CASHEW", category: "Dry Fruits", storeQty: 10, cafeQty: 0, unit: "Kg", purchasePrice: 850, minLimit: 3, supplier: "Om Super Market", lastPurchaseDate: "2026-07-14", barcode: "890105800438" },
+  { id: "df_2", name: "ALMOND", category: "Dry Fruits", storeQty: 10, cafeQty: 0, unit: "Kg", purchasePrice: 900, minLimit: 3, supplier: "Om Super Market", lastPurchaseDate: "2026-07-14", barcode: "890105800439" },
+  { id: "df_3", name: "PISTACHIO", category: "Dry Fruits", storeQty: 5, cafeQty: 0, unit: "Kg", purchasePrice: 1100, minLimit: 2, supplier: "Om Super Market", lastPurchaseDate: "2026-07-14", barcode: "890105800440" },
+  { id: "df_4", name: "RAISINS", category: "Dry Fruits", storeQty: 10, cafeQty: 0, unit: "Kg", purchasePrice: 280, minLimit: 3, supplier: "Om Super Market", lastPurchaseDate: "2026-07-14", barcode: "890105800441" },
+
+  // --- OILS ---
+  { id: "oil_1", name: "REFINED OIL", category: "Oils", storeQty: 40, cafeQty: 0, unit: "Ltr", purchasePrice: 110, minLimit: 15, supplier: "Sagar Distributors", lastPurchaseDate: "2026-07-14", barcode: "890105800237" },
+  { id: "oil_2", name: "MUSTARD OIL", category: "Oils", storeQty: 20, cafeQty: 0, unit: "Ltr", purchasePrice: 140, minLimit: 8, supplier: "Sagar Distributors", lastPurchaseDate: "2026-07-14", barcode: "890105800442" },
+
+  // --- SPICES ---
+  { id: "spice_1", name: "SALT", category: "Spices", storeQty: 50, cafeQty: 0, unit: "Kg", purchasePrice: 20, minLimit: 15, supplier: "Om Super Market", lastPurchaseDate: "2026-07-14", barcode: "890105800308" },
+  { id: "spice_2", name: "BLACK SALT", category: "Spices", storeQty: 10, cafeQty: 0, unit: "Kg", purchasePrice: 45, minLimit: 3, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800443" },
+  { id: "spice_3", name: "RED CHILLI POWDER", category: "Spices", storeQty: 15, cafeQty: 0, unit: "Kg", purchasePrice: 280, minLimit: 5, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800309" },
+  { id: "spice_4", name: "KASHMIRI RED CHILLI", category: "Spices", storeQty: 10, cafeQty: 0, unit: "Kg", purchasePrice: 340, minLimit: 3, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800444" },
+  { id: "spice_5", name: "TURMERIC", category: "Spices", storeQty: 20, cafeQty: 0, unit: "Kg", purchasePrice: 180, minLimit: 5, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800330" },
+  { id: "spice_6", name: "CORIANDER POWDER", category: "Spices", storeQty: 15, cafeQty: 0, unit: "Kg", purchasePrice: 190, minLimit: 5, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800445" },
+  { id: "spice_7", name: "CUMIN", category: "Spices", storeQty: 15, cafeQty: 0, unit: "Kg", purchasePrice: 320, minLimit: 4, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800315" },
+  { id: "spice_8", name: "CHAAT MASALA", category: "Spices", storeQty: 15, cafeQty: 0, unit: "Kg", purchasePrice: 280, minLimit: 4, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800446" },
+  { id: "spice_9", name: "BLACK PEPPER", category: "Spices", storeQty: 5, cafeQty: 0, unit: "Kg", purchasePrice: 550, minLimit: 2, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800311" },
+  { id: "spice_10", name: "OREGANO", category: "Spices", storeQty: 15, cafeQty: 0, unit: "Kg", purchasePrice: 440, minLimit: 3, supplier: "Om Super Market", lastPurchaseDate: "2026-07-14", barcode: "890105800301" },
+  { id: "spice_11", name: "CHILLI FLAKES", category: "Spices", storeQty: 15, cafeQty: 0, unit: "Kg", purchasePrice: 440, minLimit: 3, supplier: "Om Super Market", lastPurchaseDate: "2026-07-14", barcode: "890105800302" },
+
+  // --- SAUCES & CONDIMENTS ---
+  { id: "sauce_1", name: "TOMATO KETCHUP", category: "Sauces & Condiments", storeQty: 30, cafeQty: 0, unit: "Pcs", purchasePrice: 95, minLimit: 10, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800346" },
+  { id: "sauce_2", name: "SCHEZWAN SAUCE", category: "Sauces & Condiments", storeQty: 25, cafeQty: 0, unit: "Pcs", purchasePrice: 120, minLimit: 5, supplier: "Om Super Market", lastPurchaseDate: "2026-07-14", barcode: "890105800447" },
+  { id: "sauce_3", name: "MAYONNAISE", category: "Sauces & Condiments", storeQty: 30, cafeQty: 0, unit: "Pcs", purchasePrice: 140, minLimit: 8, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800336" },
+  { id: "sauce_4", name: "PIZZA SAUCE", category: "Sauces & Condiments", storeQty: 25, cafeQty: 0, unit: "Pcs", purchasePrice: 160, minLimit: 8, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800338" },
+  { id: "sauce_5", name: "VINEGAR", category: "Sauces & Condiments", storeQty: 20, cafeQty: 0, unit: "Pcs", purchasePrice: 45, minLimit: 5, supplier: "Om Super Market", lastPurchaseDate: "2026-07-14", barcode: "890105800448" },
+
+  // --- BEVERAGE MATERIALS ---
+  { id: "bev_1", name: "TEA LEAF", category: "Beverage Materials", storeQty: 25, cafeQty: 0, unit: "Kg", purchasePrice: 280, minLimit: 5, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800449" },
+  { id: "bev_2", name: "COFFEE", category: "Beverage Materials", storeQty: 15, cafeQty: 0, unit: "Kg", purchasePrice: 480, minLimit: 3, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800450" },
+  { id: "bev_3", name: "SUGAR", category: "Beverage Materials", storeQty: 100, cafeQty: 0, unit: "Kg", purchasePrice: 44, minLimit: 20, supplier: "Om Super Market", lastPurchaseDate: "2026-07-14", barcode: "890105800236" },
+  { id: "bev_4", name: "CHOCOLATE SYRUP", category: "Beverage Materials", storeQty: 10, cafeQty: 0, unit: "Pcs", purchasePrice: 160, minLimit: 3, supplier: "Om Super Market", lastPurchaseDate: "2026-07-14", barcode: "890105800352" },
+  { id: "bev_5", name: "SODA WATER", category: "Beverage Materials", storeQty: 48, cafeQty: 0, unit: "Pcs", purchasePrice: 15, minLimit: 12, supplier: "Coca-Cola Agency", lastPurchaseDate: "2026-07-14", barcode: "890105800451" },
+
+  // --- PIZZA TOPPINGS ---
+  { id: "top_1", name: "SWEET CORN", category: "Pizza Toppings", storeQty: 20, cafeQty: 0, unit: "Kg", purchasePrice: 120, minLimit: 5, supplier: "Sagar Distributors", lastPurchaseDate: "2026-07-14", barcode: "890105800452" },
+  { id: "top_2", name: "SLICED BLACK OLIVES", category: "Pizza Toppings", storeQty: 15, cafeQty: 0, unit: "Pcs", purchasePrice: 140, minLimit: 4, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800349" },
+  { id: "top_3", name: "JALAPENO SLICES", category: "Pizza Toppings", storeQty: 15, cafeQty: 0, unit: "Pcs", purchasePrice: 140, minLimit: 4, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800351" },
+
+  // --- READY-TO-USE ITEMS ---
+  { id: "rtu_1", name: "VEG PATTY", category: "Ready-to-Use Items", storeQty: 100, cafeQty: 0, unit: "Pcs", purchasePrice: 18, minLimit: 20, supplier: "Sagar Distributors", lastPurchaseDate: "2026-07-12", barcode: "890175800250" },
+  { id: "rtu_2", name: "PAPAD", category: "Ready-to-Use Items", storeQty: 50, cafeQty: 0, unit: "Pcs", purchasePrice: 5, minLimit: 10, supplier: "Om Super Market", lastPurchaseDate: "2026-07-14", barcode: "890175800453" },
+
+  // --- PACKAGING ---
+  { id: "pkg_1", name: "PIZZA BOX S", category: "Packaging", storeQty: 200, cafeQty: 0, unit: "Pcs", purchasePrice: 4.50, minLimit: 50, supplier: "Narmada Packagings", lastPurchaseDate: "2026-07-14", barcode: "890105800358" },
+  { id: "pkg_2", name: "PIZZA BOX M", category: "Packaging", storeQty: 300, cafeQty: 0, unit: "Pcs", purchasePrice: 5.50, minLimit: 50, supplier: "Narmada Packagings", lastPurchaseDate: "2026-07-14", barcode: "890105800359" },
+  { id: "pkg_3", name: "PIZZA BOX L", category: "Packaging", storeQty: 400, cafeQty: 0, unit: "Pcs", purchasePrice: 7.50, minLimit: 100, supplier: "Narmada Packagings", lastPurchaseDate: "2026-07-14", barcode: "890105800357" },
+  { id: "pkg_4", name: "BURGER BOX", category: "Packaging", storeQty: 300, cafeQty: 0, unit: "Pcs", purchasePrice: 3.50, minLimit: 50, supplier: "Narmada Packagings", lastPurchaseDate: "2026-07-14", barcode: "890105800454" },
+  { id: "pkg_5", name: "PAPER CUP", category: "Packaging", storeQty: 1000, cafeQty: 0, unit: "Pcs", purchasePrice: 1.20, minLimit: 200, supplier: "Narmada Packagings", lastPurchaseDate: "2026-07-14", barcode: "890105800455" },
+  { id: "pkg_6", name: "TISSUE", category: "Packaging", storeQty: 2000, cafeQty: 0, unit: "Pcs", purchasePrice: 0.20, minLimit: 400, supplier: "Narmada Packagings", lastPurchaseDate: "2026-07-14", barcode: "890105800243" },
+
+  // --- CORE SYSTEM EQUIPMENT ---
+  { id: "item_e1", name: "DEEP FREEZE", category: "Equipment", storeQty: 2, cafeQty: 0, unit: "Pcs", purchasePrice: 28000, minLimit: 1, supplier: "Sagar Distributors", lastPurchaseDate: "2026-07-01", barcode: "890175800252" }
 ];
 
 export default function BumBumCafeStockApp() {
   // Global States
   const [inventory, setInventory] = useState<InventoryItem[]>(INITIAL_INVENTORY);
   const [categories, setCategories] = useState<string[]>([
-    "Raw Material", "Packaging", "Disposable", "Beverages", "Dairy", "Frozen Material", "Cleaning", "Equipment", "Others"
+    "Dairy", "Vegetables", "Grains & Bakery", "Rice & Pulses", "Dry Fruits", "Oils", "Spices", "Sauces & Condiments", "Beverage Materials", "Pizza Toppings", "Ready-to-Use Items", "Packaging", "Equipment", "Others"
   ]);
   const [activeTab, setActiveTab] = useState<'home' | 'store' | 'more'>('home');
   const [currentView, setCurrentView] = useState<string>('dashboard');
@@ -763,7 +856,7 @@ export default function BumBumCafeStockApp() {
               <h1 className="text-sm font-black tracking-widest text-[#FF6B00]">BUM BUM CAFE</h1>
               <div className="flex items-center gap-1.5 mt-0.5">
                 <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                <span className="text-[9px] text-neutral-400 font-bold uppercase tracking-wider font-sans">Godown Inventory Hub</span>
+                <span className="text-[9px] text-neutral-400 font-bold uppercase tracking-wider">Godown Inventory Hub</span>
               </div>
             </div>
           </div>
@@ -828,22 +921,22 @@ export default function BumBumCafeStockApp() {
 
             {/* DASHBOARD ANALYTICS CARDS */}
             <div className="space-y-3">
-              <h3 className="text-xs font-black uppercase tracking-widest text-neutral-400 px-1 font-sans">Inventory Valuations</h3>
+              <h3 className="text-xs font-black uppercase tracking-widest text-neutral-400 px-1">Inventory Valuations</h3>
               <div className="grid grid-cols-2 gap-3">
                 <div className={`p-4 rounded-3xl border ${isDarkMode ? 'bg-[#1A1A1A] border-neutral-800' : 'bg-white border-neutral-100'} shadow-sm`}>
-                  <p className="text-[8px] font-black uppercase tracking-wider text-neutral-400 font-sans">Total Godown Value</p>
+                  <p className="text-[8px] font-black uppercase tracking-wider text-neutral-400">Total Godown Value</p>
                   <h4 className="text-lg font-black text-[#FF6B00] mt-1">₹{dashboardStats.totalStockVal.toLocaleString()}</h4>
                 </div>
                 <div className={`p-4 rounded-3xl border ${isDarkMode ? 'bg-[#1A1A1A] border-neutral-800' : 'bg-white border-neutral-100'} shadow-sm`}>
-                  <p className="text-[8px] font-black uppercase tracking-wider text-neutral-400 font-sans">Wastage / Loss Value</p>
+                  <p className="text-[8px] font-black uppercase tracking-wider text-neutral-400">Wastage / Loss Value</p>
                   <h4 className="text-lg font-black text-red-500 mt-1">₹{dashboardStats.monthlyFinancialWastageLoss.toLocaleString()}</h4>
                 </div>
                 <div className={`p-4 rounded-3xl border ${isDarkMode ? 'bg-[#1A1A1A] border-neutral-800' : 'bg-white border-neutral-100'} shadow-sm`}>
-                  <p className="text-[8px] font-black uppercase tracking-wider text-neutral-400 font-sans">Critical Low Items</p>
+                  <p className="text-[8px] font-black uppercase tracking-wider text-neutral-400">Critical Low Items</p>
                   <h4 className="text-lg font-black text-amber-500 mt-1">{dashboardStats.lowStockCount} Items</h4>
                 </div>
                 <div className={`p-4 rounded-3xl border ${isDarkMode ? 'bg-[#1A1A1A] border-neutral-800' : 'bg-white border-neutral-100'} shadow-sm`}>
-                  <p className="text-[8px] font-black uppercase tracking-wider text-neutral-400 font-sans">Out of Stock</p>
+                  <p className="text-[8px] font-black uppercase tracking-wider text-neutral-400">Out of Stock</p>
                   <h4 className="text-lg font-black text-red-500 mt-1">{dashboardStats.outOfStockCount} Items</h4>
                 </div>
               </div>
@@ -853,7 +946,7 @@ export default function BumBumCafeStockApp() {
             <div className="grid grid-cols-2 gap-3">
               <div className={`p-4 rounded-3xl border ${isDarkMode ? 'bg-[#1A1A1A] border-neutral-800' : 'bg-white border-neutral-100'} shadow-sm flex items-center justify-between`}>
                 <div>
-                  <p className="text-[8px] font-black uppercase tracking-wider text-neutral-400 font-sans">Today Stock In</p>
+                  <p className="text-[8px] font-black uppercase tracking-wider text-neutral-400">Today Stock In</p>
                   <h4 className="text-base font-black text-green-500 mt-1">₹{dashboardStats.todayPurchases}</h4>
                 </div>
                 <PlusCircle size={22} className="text-green-500" />
@@ -861,7 +954,7 @@ export default function BumBumCafeStockApp() {
 
               <div className={`p-4 rounded-3xl border ${isDarkMode ? 'bg-[#1A1A1A] border-neutral-800' : 'bg-white border-neutral-100'} shadow-sm flex items-center justify-between`}>
                 <div>
-                  <p className="text-[8px] font-black uppercase tracking-wider text-neutral-400 font-sans">Today Waste Qty</p>
+                  <p className="text-[8px] font-black uppercase tracking-wider text-neutral-400">Today Waste Qty</p>
                   <h4 className="text-base font-black text-red-500 mt-1">{dashboardStats.todayWaste} Qty</h4>
                 </div>
                 <TrendingDown size={22} className="text-red-500" />
@@ -871,7 +964,7 @@ export default function BumBumCafeStockApp() {
             {/* LOW STOCK HUD LIST */}
             <div className={`p-5 rounded-3xl border ${isDarkMode ? 'bg-[#1A1A1A] border-neutral-800' : 'bg-white border-neutral-100'} shadow-sm space-y-3`}>
               <div className="flex items-center justify-between">
-                <span className="text-xs font-black uppercase tracking-widest text-neutral-400 font-sans">Low / Out of Stock List</span>
+                <span className="text-xs font-black uppercase tracking-widest text-neutral-400">Low / Out of Stock List</span>
                 <span className="bg-amber-100 dark:bg-amber-500/10 text-amber-600 px-2 py-0.5 rounded-full text-[9px] font-black uppercase">Critical</span>
               </div>
 
@@ -882,13 +975,13 @@ export default function BumBumCafeStockApp() {
                     <div key={item.id} className="flex items-center justify-between p-2.5 rounded-2xl bg-neutral-50 dark:bg-neutral-800/50 text-xs">
                       <div>
                         <p className="font-bold">{item.name}</p>
-                        <p className="text-[9px] text-neutral-400 uppercase font-sans">{item.category}</p>
+                        <p className="text-[9px] text-neutral-400 uppercase">{item.category}</p>
                       </div>
                       <div className="text-right">
                         <p className={`font-black ${combined === 0 ? 'text-red-500' : 'text-amber-500'}`}>
                           {combined} {item.unit} Left
                         </p>
-                        <p className="text-[8px] text-neutral-400 font-sans font-sans">Limit: {item.minLimit}</p>
+                        <p className="text-[8px] text-neutral-400">Limit: {item.minLimit}</p>
                       </div>
                     </div>
                   );
@@ -898,19 +991,19 @@ export default function BumBumCafeStockApp() {
 
             {/* QUICK ACTIONS ROW */}
             <div className="space-y-3 font-sans">
-              <h3 className="text-xs font-black uppercase tracking-widest text-neutral-400 px-1 font-sans">Quick Actions Panel</h3>
+              <h3 className="text-xs font-black uppercase tracking-widest text-neutral-400 px-1">Quick Actions Panel</h3>
               <div className="grid grid-cols-3 gap-2 text-center text-xs">
                 <div onClick={() => setShowAddStockModal(true)} className={`p-3 rounded-2xl border ${isDarkMode ? 'bg-[#1A1A1A] border-neutral-800' : 'bg-white border-neutral-100'} shadow-sm cursor-pointer hover:border-orange-500 transition-all`}>
                   <Plus className="mx-auto text-[#FF6B00]" size={16} />
-                  <span className="text-[9px] font-black uppercase tracking-wider block mt-1 font-sans">Add Stock</span>
+                  <span className="text-[9px] font-black uppercase tracking-wider block mt-1">Add Stock</span>
                 </div>
                 <div onClick={() => setShowStockOutModal(true)} className={`p-3 rounded-2xl border ${isDarkMode ? 'bg-[#1A1A1A] border-neutral-800' : 'bg-white border-neutral-100'} shadow-sm cursor-pointer hover:border-orange-500 transition-all`}>
                   <MinusCircle className="mx-auto text-red-500" size={16} />
-                  <span className="text-[9px] font-black uppercase tracking-wider block mt-1 font-sans font-sans">Stock Out</span>
+                  <span className="text-[9px] font-black uppercase tracking-wider block mt-1">Stock Out</span>
                 </div>
                 <div onClick={() => { setActiveTab('more'); setCurrentView('reports_list'); }} className={`p-3 rounded-2xl border ${isDarkMode ? 'bg-[#1A1A1A] border-neutral-800' : 'bg-white border-neutral-100'} shadow-sm cursor-pointer hover:border-orange-500 transition-all`}>
                   <BarChart3 className="mx-auto text-emerald-500" size={16} />
-                  <span className="text-[9px] font-black uppercase tracking-wider block mt-1 font-sans">Reports</span>
+                  <span className="text-[9px] font-black uppercase tracking-wider block mt-1">Reports</span>
                 </div>
               </div>
             </div>
@@ -925,12 +1018,12 @@ export default function BumBumCafeStockApp() {
           <div className="space-y-6">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-base font-black uppercase tracking-widest text-neutral-400 font-sans">Main Store Godown</h2>
-                <p className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider font-sans">Bulk inventory control system</p>
+                <h2 className="text-base font-black uppercase tracking-widest text-neutral-400">Main Store Godown</h2>
+                <p className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider">Bulk inventory control system</p>
               </div>
               <button 
                 onClick={() => setShowAddStockModal(true)}
-                className="px-4 py-2 bg-[#FF6B00] hover:bg-orange-600 text-white font-black text-xs uppercase tracking-wider rounded-2xl flex items-center gap-1.5 shadow font-sans"
+                className="px-4 py-2 bg-[#FF6B00] hover:bg-orange-600 text-white font-black text-xs uppercase tracking-wider rounded-2xl flex items-center gap-1.5 shadow"
               >
                 <Plus size={14} />
                 <span>Add Item</span>
@@ -938,7 +1031,7 @@ export default function BumBumCafeStockApp() {
             </div>
 
             {/* CATEGORY FILTER SWITCHES */}
-            <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none font-sans">
+            <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
               <button
                 onClick={() => setSelectedCategory("All")}
                 className={`px-3.5 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider border whitespace-nowrap transition-all ${
@@ -980,25 +1073,25 @@ export default function BumBumCafeStockApp() {
                         <div className="flex items-center gap-2">
                           <span className="text-sm font-black text-[#FF6B00] dark:text-orange-400">{item.name}</span>
                           {isLow && (
-                            <span className="bg-red-100 dark:bg-red-500/10 text-red-500 px-2 py-0.5 rounded-full text-[8px] font-black uppercase font-sans">
+                            <span className="bg-red-100 dark:bg-red-500/10 text-red-500 px-2 py-0.5 rounded-full text-[8px] font-black uppercase">
                               Low Stock
                             </span>
                           )}
                         </div>
-                        <p className="text-[9px] text-neutral-400 font-bold uppercase tracking-wider font-sans">{item.category} • {item.supplier}</p>
+                        <p className="text-[9px] text-neutral-400 font-bold uppercase tracking-wider">{item.category} • {item.supplier}</p>
                         {item.barcode && <p className="text-[8px] text-neutral-400 tracking-wider">Barcode: {item.barcode}</p>}
-                        {item.expiryDate && <p className="text-[8px] text-red-400 font-bold font-sans">Expiry: {item.expiryDate}</p>}
+                        {item.expiryDate && <p className="text-[8px] text-red-400 font-bold">Expiry: {item.expiryDate}</p>}
                       </div>
 
                       <div className="text-right">
                         <span className="text-xs font-black text-neutral-500">Unit: {item.unit}</span>
-                        <p className="text-[9px] text-neutral-400 font-bold uppercase mt-0.5 font-sans">Price: ₹{item.purchasePrice}</p>
+                        <p className="text-[9px] text-neutral-400 font-bold uppercase mt-0.5">Price: ₹{item.purchasePrice}</p>
                       </div>
                     </div>
 
                     <div className="grid grid-cols-1 border-t border-b border-neutral-100 dark:border-neutral-800/80 my-3 py-2 text-center text-xs">
                       <div>
-                        <span className="text-[8px] font-black text-neutral-400 uppercase tracking-wider block font-sans">Main Godown Available Stock</span>
+                        <span className="text-[8px] font-black text-neutral-400 uppercase tracking-wider block">Main Godown Available Stock</span>
                         <span className="font-black text-sm">{item.storeQty} {item.unit}</span>
                         <div className="flex items-center justify-center gap-2 mt-1">
                           <button onClick={() => adjustQuickStoreQty(item.id, -1)} className="p-1.5 bg-red-100 dark:bg-red-500/10 text-red-500 rounded-md"><MinusCircle size={12} /></button>
@@ -1007,13 +1100,13 @@ export default function BumBumCafeStockApp() {
                       </div>
                     </div>
 
-                    <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-wider font-sans">
+                    <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-wider">
                       <span className="text-neutral-400">Value: ₹{(item.storeQty * item.purchasePrice).toLocaleString()}</span>
                       
-                      <div className="flex gap-2 font-sans">
+                      <div className="flex gap-2">
                         <button 
                           onClick={() => setSelectedItemDetail(item)}
-                          className="px-3 py-1.5 bg-neutral-100 dark:bg-neutral-800 text-neutral-400 rounded-xl hover:bg-neutral-200 transition-all font-black font-sans"
+                          className="px-3 py-1.5 bg-neutral-100 dark:bg-neutral-800 text-neutral-400 rounded-xl hover:bg-neutral-200 transition-all font-black"
                         >
                           <span>Manage</span>
                         </button>
@@ -1036,16 +1129,16 @@ export default function BumBumCafeStockApp() {
             {currentView === 'dashboard' || currentView === 'more_home' ? (
               <div className="space-y-4">
                 <div className="flex items-center gap-3 border-b border-neutral-100 dark:border-neutral-800 pb-3">
-                  <div className="w-10 h-10 rounded-2xl bg-orange-100 flex items-center justify-center text-[#FF6B00] font-black font-sans">
+                  <div className="w-10 h-10 rounded-2xl bg-orange-100 flex items-center justify-center text-[#FF6B00] font-black">
                     ➕
                   </div>
                   <div>
-                    <h2 className="text-sm font-black uppercase tracking-widest font-sans">More Operational Features</h2>
-                    <p className="text-[8px] text-neutral-400 font-bold uppercase tracking-wider font-sans font-sans">Access configurations, audits, and settings</p>
+                    <h2 className="text-sm font-black uppercase tracking-widest">More Operational Features</h2>
+                    <p className="text-[8px] text-neutral-400 font-bold uppercase tracking-wider">Access configurations, audits, and settings</p>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 gap-2 text-xs font-sans">
+                <div className="grid grid-cols-1 gap-2 text-xs">
                   {[
                     { id: 'stock_in', label: "Purchase / Stock In", desc: "Log invoices and stock incoming goods", icon: <PlusCircle size={16} /> },
                     { id: 'stock_out_logs', label: "Stock Out Logs", desc: "View wastage, damage, and staff use logs", icon: <MinusCircle size={16} /> },
@@ -1085,7 +1178,7 @@ export default function BumBumCafeStockApp() {
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <h3 className="text-xs font-black uppercase tracking-widest text-neutral-400 font-sans">Purchase Log / Stock In</h3>
-                  <button onClick={() => setCurrentView('more_home')} className="text-xs text-orange-500 font-bold uppercase tracking-wider font-sans font-sans font-sans">Back</button>
+                  <button onClick={() => setCurrentView('more_home')} className="text-xs text-orange-500 font-bold uppercase tracking-wider">Back</button>
                 </div>
 
                 <form onSubmit={handleStockInSubmit} className={`p-5 rounded-3xl border space-y-3 text-xs ${isDarkMode ? 'bg-[#1A1A1A] border-neutral-800' : 'bg-white border-neutral-100'}`}>
@@ -1102,7 +1195,7 @@ export default function BumBumCafeStockApp() {
 
                   <div className="grid grid-cols-2 gap-2">
                     <div className="space-y-1">
-                      <label className="font-black uppercase tracking-wider text-neutral-400 text-[9px] font-sans">Supplier</label>
+                      <label className="font-black uppercase tracking-wider text-neutral-400 text-[9px]">Supplier</label>
                       <select 
                         value={formStockIn.supplier}
                         onChange={e => setFormStockIn({...formStockIn, supplier: e.target.value})}
@@ -1195,7 +1288,7 @@ export default function BumBumCafeStockApp() {
 
                 {/* Audit Log */}
                 <div className="space-y-2">
-                  <h4 className="text-xs font-black uppercase tracking-wider text-neutral-400 font-sans font-sans">Incoming Purchase Audit Log</h4>
+                  <h4 className="text-xs font-black uppercase tracking-wider text-neutral-400 font-sans">Incoming Purchase Audit Log</h4>
                   {purchaseHistory.map(log => (
                     <div key={log.id} className={`p-4 rounded-3xl border ${isDarkMode ? 'bg-[#1A1A1A] border-neutral-800' : 'bg-white border-neutral-100'} text-xs space-y-1`}>
                       <div className="flex justify-between">
@@ -1211,10 +1304,10 @@ export default function BumBumCafeStockApp() {
 
             {/* B. STOCK OUT HISTORY & CONTROL */}
             {currentView === 'stock_out_logs' && (
-              <div className="space-y-4 font-sans">
+              <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <h3 className="text-xs font-black uppercase tracking-widest text-neutral-400 font-sans">Outward Dispatches</h3>
-                  <button onClick={() => setCurrentView('more_home')} className="text-xs text-orange-500 font-bold uppercase tracking-wider font-sans">Back</button>
+                  <button onClick={() => setCurrentView('more_home')} className="text-xs text-orange-500 font-bold uppercase tracking-wider">Back</button>
                 </div>
 
                 <div className="space-y-2.5">
@@ -1244,7 +1337,7 @@ export default function BumBumCafeStockApp() {
             {currentView === 'reports_list' && (
               <div className="space-y-4 font-sans">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-xs font-black uppercase tracking-widest text-neutral-400 font-sans">Reports Engine</h3>
+                  <h3 className="text-xs font-black uppercase tracking-widest text-neutral-400 font-sans font-sans">Reports Engine</h3>
                   <button onClick={() => setCurrentView('more_home')} className="text-xs text-orange-500 font-bold uppercase tracking-wider font-sans">Back</button>
                 </div>
 
@@ -1434,15 +1527,15 @@ export default function BumBumCafeStockApp() {
                   <button type="submit" className="px-5 py-3 bg-[#FF6B00] text-white rounded-2xl font-black uppercase font-sans">Log</button>
                 </form>
 
-                <div className="space-y-2 font-sans">
-                  <h4 className="text-[10px] font-black uppercase tracking-wider text-neutral-400 font-sans">Today's Temperature Log Checksheet</h4>
+                <div className="space-y-2">
+                  <h4 className="text-[10px] font-black uppercase tracking-wider text-neutral-400 font-sans font-sans">Today's Temperature Log Checksheet</h4>
                   {todayTempLog.map((log, idx) => (
                     <div key={idx} className={`p-4 rounded-3xl border flex items-center justify-between text-xs ${
                       isDarkMode ? 'bg-[#1A1A1A] border-neutral-800' : 'bg-white border-neutral-100'
                     }`}>
                       <div>
                         <p className={`font-black ${log.temp > -15 ? 'text-red-500' : 'text-green-500'}`}>{log.temp}°C</p>
-                        <p className="text-[9px] text-neutral-400 mt-0.5 font-sans">Recorded by {log.by} at {log.time}</p>
+                        <p className="text-[9px] text-neutral-400 mt-0.5 font-sans font-sans">Recorded by {log.by} at {log.time}</p>
                       </div>
                       {log.temp > -15 ? (
                         <span className="bg-red-100 dark:bg-red-500/10 text-red-500 px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-wide font-sans">
@@ -1464,18 +1557,18 @@ export default function BumBumCafeStockApp() {
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <h3 className="text-xs font-black uppercase tracking-widest text-[#FF6B00] font-sans">Physical Stock Audit</h3>
-                  <button onClick={() => setCurrentView('more_home')} className="text-xs text-orange-500 font-bold uppercase tracking-wider font-sans">Back</button>
+                  <button onClick={() => setCurrentView('more_home')} className="text-xs text-orange-500 font-bold uppercase tracking-wider font-sans font-sans">Back</button>
                 </div>
 
                 <div className={`p-5 rounded-3xl border space-y-4 text-xs ${isDarkMode ? 'bg-[#1A1A1A] border-neutral-800' : 'bg-white border-neutral-100'}`}>
                   <div>
-                    <h4 className="font-bold text-sm font-sans">Align Stock discrepancies</h4>
-                    <p className="text-[9px] text-neutral-400 uppercase tracking-wide mt-0.5 font-sans">Compare counted shelf stock against database numbers</p>
+                    <h4 className="font-bold text-sm font-sans font-sans">Align Stock discrepancies</h4>
+                    <p className="text-[9px] text-neutral-400 uppercase tracking-wide mt-0.5 font-sans font-sans">Compare counted shelf stock against database numbers</p>
                   </div>
 
                   <button 
                     onClick={() => setShowAuditReconcileModal(true)}
-                    className="w-full p-3.5 bg-[#FF6B00] hover:bg-orange-600 text-white rounded-2xl font-black uppercase text-xs tracking-wider font-sans"
+                    className="w-full p-3.5 bg-[#FF6B00] hover:bg-orange-600 text-white rounded-2xl font-black uppercase text-xs tracking-wider font-sans font-sans"
                   >
                     Start Stock Audit Alignment
                   </button>
@@ -1485,10 +1578,10 @@ export default function BumBumCafeStockApp() {
 
             {/* H. EQUIPMENT SERVICE LOG BOOK */}
             {currentView === 'equipment_manager' && (
-              <div className="space-y-4 font-sans">
+              <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-xs font-black uppercase tracking-widest text-neutral-400 font-sans">Equipment Register & Service</h3>
-                  <button onClick={() => setCurrentView('more_home')} className="text-xs text-orange-500 font-bold uppercase tracking-wider font-sans">Back</button>
+                  <h3 className="text-xs font-black uppercase tracking-widest text-neutral-400 font-sans font-sans">Equipment Register & Service</h3>
+                  <button onClick={() => setCurrentView('more_home')} className="text-xs text-[#FF6B00] font-bold uppercase tracking-wider font-sans font-sans font-sans">Back</button>
                 </div>
 
                 <div className="grid grid-cols-1 gap-2.5 text-xs">
@@ -1499,9 +1592,9 @@ export default function BumBumCafeStockApp() {
                       <div className="flex justify-between items-start">
                         <div>
                           <p className="font-bold text-[#FF6B00] text-sm">{eq.name}</p>
-                          <p className="text-[9px] text-neutral-400 uppercase tracking-widest mt-0.5 font-sans">Last Service: {eq.lastService} • Next: {eq.nextService}</p>
+                          <p className="text-[9px] text-neutral-400 uppercase tracking-widest mt-0.5 font-sans font-sans font-sans font-sans">Last Service: {eq.lastService} • Next: {eq.nextService}</p>
                         </div>
-                        <span className={`px-2.5 py-1 rounded-full text-[8px] font-black uppercase font-sans ${
+                        <span className={`px-2.5 py-1 rounded-full text-[8px] font-black uppercase font-sans font-sans ${
                           eq.status === 'Good' ? 'bg-green-100 text-green-500' : 'bg-amber-100 text-amber-500'
                         }`}>
                           {eq.status}
@@ -1511,13 +1604,13 @@ export default function BumBumCafeStockApp() {
                       <div className="flex gap-2 border-t border-neutral-50 dark:border-neutral-800 pt-3">
                         <button 
                           onClick={() => setSelectedEquipmentQR(eq)}
-                          className="flex-1 py-2 bg-neutral-100 dark:bg-neutral-800 text-neutral-400 font-bold rounded-xl flex items-center justify-center gap-1.5 font-sans"
+                          className="flex-1 py-2 bg-neutral-100 dark:bg-neutral-800 text-neutral-400 font-bold rounded-xl flex items-center justify-center gap-1.5 font-sans font-sans"
                         >
                           <QrCode size={12} /> Scan Machine QR
                         </button>
                         <a 
                           href={`tel:${eq.phone}`}
-                          className="flex-1 py-2 bg-orange-500/10 hover:bg-orange-500/20 text-[#FF6B00] font-bold rounded-xl flex items-center justify-center gap-1.5 text-center font-sans"
+                          className="flex-1 py-2 bg-orange-500/10 hover:bg-orange-500/20 text-[#FF6B00] font-bold rounded-xl flex items-center justify-center gap-1.5 text-center font-sans font-sans"
                         >
                           📞 Call Technician
                         </a>
@@ -1530,10 +1623,10 @@ export default function BumBumCafeStockApp() {
 
             {/* I. SETTINGS PANEL */}
             {currentView === 'app_settings' && (
-              <div className="space-y-4 font-sans">
+              <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-xs font-black uppercase tracking-widest text-neutral-400 font-sans">Application Configuration</h3>
-                  <button onClick={() => setCurrentView('more_home')} className="text-xs text-orange-500 font-bold uppercase tracking-wider font-sans">Back</button>
+                  <h3 className="text-xs font-black uppercase tracking-widest text-neutral-400 font-sans font-sans font-sans font-sans font-sans font-sans">Application Configuration</h3>
+                  <button onClick={() => setCurrentView('more_home')} className="text-xs text-orange-500 font-bold uppercase tracking-wider font-sans font-sans font-sans font-sans">Back</button>
                 </div>
 
                 <div className={`p-5 rounded-3xl border space-y-4 text-xs ${isDarkMode ? 'bg-[#1A1A1A] border-neutral-800' : 'bg-white border-neutral-100'}`}>
@@ -1542,7 +1635,7 @@ export default function BumBumCafeStockApp() {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="font-black text-sm uppercase tracking-wide">Dark Mode Preference</p>
-                      <p className="text-[9px] text-neutral-400 uppercase tracking-wider font-sans">Optimal design for low light godowns</p>
+                      <p className="text-[9px] text-neutral-400 uppercase tracking-wider font-sans font-sans font-sans">Optimal design for low light godowns</p>
                     </div>
                     <button
                       onClick={() => setIsDarkMode(!isDarkMode)}
@@ -1555,10 +1648,10 @@ export default function BumBumCafeStockApp() {
                   {/* Offline Support Status */}
                   <div className="flex items-center justify-between border-t border-neutral-100 dark:border-neutral-800 pt-4">
                     <div>
-                      <p className="font-black text-sm uppercase tracking-wide font-sans">Offline PWA Auto-Sync</p>
-                      <p className="text-[9px] text-neutral-400 uppercase tracking-wider font-sans">Synchronize local cache dynamically</p>
+                      <p className="font-black text-sm uppercase tracking-wide font-sans font-sans font-sans font-sans">Offline PWA Auto-Sync</p>
+                      <p className="text-[9px] text-neutral-400 uppercase tracking-wider font-sans font-sans font-sans font-sans">Synchronize local cache dynamically</p>
                     </div>
-                    <span className="px-2.5 py-1 bg-green-500/10 text-green-500 font-black rounded-full text-[9px] uppercase tracking-wider flex items-center gap-1 font-sans">
+                    <span className="px-2.5 py-1 bg-green-500/10 text-green-500 font-black rounded-full text-[9px] uppercase tracking-wider flex items-center gap-1 font-sans font-sans font-sans font-sans font-sans">
                       <Wifi size={10} /> Online
                     </span>
                   </div>
@@ -1578,7 +1671,7 @@ export default function BumBumCafeStockApp() {
         
         {/* A. PRODUCT ITEM SPECIFIC DETAILED DRAWER (WITH ITEM DELETE / EDIT INSIDE) */}
         {selectedItemDetail && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[99] flex items-end justify-center font-sans">
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[99] flex items-end justify-center font-sans font-sans">
             <motion.div 
               initial={{ y: "100%" }}
               animate={{ y: 0 }}
@@ -1647,7 +1740,7 @@ export default function BumBumCafeStockApp() {
               </div>
 
               {/* Action row */}
-              <div className="flex gap-2 pt-2 font-sans">
+              <div className="flex gap-2 pt-2">
                 <button 
                   onClick={() => {
                     setFormStockOut({ item: selectedItemDetail.id, quantity: '', purpose: 'Kitchen Use', remarks: '' });
@@ -1665,7 +1758,7 @@ export default function BumBumCafeStockApp() {
 
         {/* B. ITEM EDIT MASTER OVERLAY */}
         {editingItem && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[110] flex items-center justify-center p-4 font-sans">
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[110] flex items-center justify-center p-4 font-sans font-sans">
             <motion.form 
               onSubmit={handleEditItemSubmit}
               initial={{ opacity: 0, scale: 0.95 }}
@@ -1680,35 +1773,35 @@ export default function BumBumCafeStockApp() {
                 <button type="button" onClick={() => setEditingItem(null)} className="p-2.5 bg-neutral-100 dark:bg-neutral-800 rounded-xl"><X size={14} /></button>
               </div>
 
-              <div className="space-y-1.5 text-xs">
+              <div className="space-y-1.5 text-xs font-sans">
                 <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400 font-sans">Item Name</label>
                 <input 
                   type="text" 
                   value={editingItem.name} 
                   onChange={e => setEditingItem({...editingItem, name: e.target.value.toUpperCase()})}
-                  className="w-full p-2.5 rounded-xl border dark:bg-neutral-800 font-sans"
+                  className="w-full p-2.5 rounded-xl border dark:bg-neutral-800"
                   required
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-2 text-xs font-sans">
                 <div className="space-y-1.5">
-                  <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400 font-sans">Category</label>
+                  <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400 font-sans font-sans">Category</label>
                   <select 
                     value={editingItem.category} 
                     onChange={e => setEditingItem({...editingItem, category: e.target.value})}
-                    className="w-full p-2.5 rounded-xl border dark:bg-neutral-800 font-sans cursor-pointer"
+                    className="w-full p-2.5 rounded-xl border dark:bg-neutral-800"
                   >
                     {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
                   </select>
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400 font-sans">Purchase Price</label>
+                  <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400 font-sans font-sans">Purchase Price</label>
                   <input 
                     type="number" 
                     value={editingItem.purchasePrice} 
                     onChange={e => setEditingItem({...editingItem, purchasePrice: parseFloat(e.target.value)})}
-                    className="w-full p-2.5 rounded-xl border dark:bg-neutral-800 font-sans"
+                    className="w-full p-2.5 rounded-xl border dark:bg-neutral-800"
                     required
                   />
                 </div>
@@ -1716,22 +1809,22 @@ export default function BumBumCafeStockApp() {
 
               <div className="grid grid-cols-2 gap-2 text-xs font-sans">
                 <div className="space-y-1.5">
-                  <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400 font-sans">Min Stock Limit</label>
+                  <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400 font-sans font-sans font-sans">Min Stock Limit</label>
                   <input 
                     type="number" 
                     value={editingItem.minLimit} 
                     onChange={e => setEditingItem({...editingItem, minLimit: parseInt(e.target.value)})}
-                    className="w-full p-2.5 rounded-xl border dark:bg-neutral-800 font-sans"
+                    className="w-full p-2.5 rounded-xl border dark:bg-neutral-800"
                     required
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400 font-sans">Barcode</label>
+                  <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400 font-sans font-sans font-sans font-sans">Barcode</label>
                   <input 
                     type="text" 
                     value={editingItem.barcode || ""} 
                     onChange={e => setEditingItem({...editingItem, barcode: e.target.value})}
-                    className="w-full p-2.5 rounded-xl border dark:bg-neutral-800 font-sans"
+                    className="w-full p-2.5 rounded-xl border dark:bg-neutral-800"
                     placeholder="Barcode Number"
                   />
                 </div>
@@ -1746,7 +1839,7 @@ export default function BumBumCafeStockApp() {
 
         {/* C. SUPPLIER EDIT OVERLAY */}
         {editingSupplier && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[110] flex items-center justify-center p-4 font-sans">
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[110] flex items-center justify-center p-4 font-sans font-sans font-sans">
             <motion.form 
               onSubmit={handleSupplierEditSubmit}
               initial={{ opacity: 0, scale: 0.95 }}
@@ -1757,45 +1850,45 @@ export default function BumBumCafeStockApp() {
               }`}
             >
               <div className="flex justify-between items-center">
-                <h3 className="text-xs font-black uppercase tracking-widest text-[#FF6B00] font-sans">Edit Supplier Details</h3>
+                <h3 className="text-xs font-black uppercase tracking-widest text-[#FF6B00] font-sans font-sans font-sans">Edit Supplier Details</h3>
                 <button type="button" onClick={() => setEditingSupplier(null)} className="p-2.5 bg-neutral-100 dark:bg-neutral-800 rounded-xl"><X size={14} /></button>
               </div>
 
-              <div className="space-y-1.5 text-xs font-sans">
-                <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400 font-sans">Supplier Name</label>
+              <div className="space-y-1.5 text-xs font-sans font-sans font-sans">
+                <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400 font-sans font-sans font-sans">Supplier Name</label>
                 <input 
                   type="text" 
                   value={editingSupplier.name} 
                   onChange={e => setEditingSupplier({...editingSupplier, name: e.target.value})}
-                  className="w-full p-2.5 rounded-xl border dark:bg-neutral-800 font-sans"
+                  className="w-full p-2.5 rounded-xl border dark:bg-neutral-800 font-sans font-sans"
                   required
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-2 text-xs font-sans">
-                <div className="space-y-1.5">
-                  <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400 font-sans font-sans">Phone</label>
+              <div className="grid grid-cols-2 gap-2 text-xs font-sans font-sans font-sans">
+                <div className="space-y-1.5 font-sans font-sans">
+                  <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400 font-sans font-sans font-sans font-sans">Phone</label>
                   <input 
                     type="text" 
                     value={editingSupplier.phone} 
                     onChange={e => setEditingSupplier({...editingSupplier, phone: e.target.value})}
-                    className="w-full p-2.5 rounded-xl border dark:bg-neutral-800 font-sans"
+                    className="w-full p-2.5 rounded-xl border dark:bg-neutral-800 font-sans font-sans"
                     required
                   />
                 </div>
-                <div className="space-y-1.5">
-                  <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400 font-sans font-sans">Address / City</label>
+                <div className="space-y-1.5 font-sans">
+                  <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400 font-sans font-sans font-sans font-sans font-sans">Address / City</label>
                   <input 
                     type="text" 
                     value={editingSupplier.address} 
                     onChange={e => setEditingSupplier({...editingSupplier, address: e.target.value})}
-                    className="w-full p-2.5 rounded-xl border dark:bg-neutral-800 font-sans"
+                    className="w-full p-2.5 rounded-xl border dark:bg-neutral-800 font-sans font-sans"
                     required
                   />
                 </div>
               </div>
 
-              <button type="submit" className="w-full p-3 bg-blue-600 text-white font-black text-xs uppercase tracking-wider rounded-2xl shadow font-sans font-sans">
+              <button type="submit" className="w-full p-3 bg-blue-600 text-white font-black text-xs uppercase tracking-wider rounded-2xl shadow font-sans font-sans font-sans font-sans">
                 Save Changes ➔
               </button>
             </motion.form>
@@ -1804,7 +1897,7 @@ export default function BumBumCafeStockApp() {
 
         {/* D. INTERACTIVE REAL-TIME BARCODE SCANNER SIMULATOR */}
         {scannerActive && (
-          <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[120] flex items-center justify-center p-4 font-sans">
+          <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[120] flex items-center justify-center p-4 font-sans font-sans font-sans font-sans">
             <motion.div 
               initial={{ scale: 0.9 }}
               animate={{ scale: 1 }}
@@ -1827,7 +1920,7 @@ export default function BumBumCafeStockApp() {
                 </button>
               </div>
 
-              <div className="h-44 w-full bg-black/50 border border-dashed border-[#FF6B00]/40 rounded-3xl relative flex items-center justify-center overflow-hidden">
+              <div className="h-44 w-full bg-black/50 border border-dashed border-[#FF6B00]/40 rounded-3xl relative flex items-center justify-center overflow-hidden animate-pulse">
                 <span className="absolute top-1/2 left-0 right-0 h-0.5 bg-red-500 animate-bounce" />
                 <span className="text-[10px] text-neutral-500 uppercase tracking-widest font-black z-10 animate-pulse">Scanning Camera Feed Simulator</span>
               </div>
@@ -1835,11 +1928,11 @@ export default function BumBumCafeStockApp() {
               {!scannedProductDetected ? (
                 <form onSubmit={handleBarcodeManualScan} className="space-y-4 text-xs text-left">
                   <div className="space-y-1.5">
-                    <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400">Simulate Scan (Select Packed Material Barcode)</label>
+                    <label className="text-[8px] font-black uppercase tracking-wider text-neutral-500">Simulate Scan (Select Packed Material Barcode)</label>
                     <select 
                       onChange={e => setScannerManualBarcode(e.target.value)}
                       value={scannerManualBarcode}
-                      className="w-full p-3 rounded-2xl bg-neutral-800 border border-neutral-700 text-white cursor-pointer"
+                      className="w-full p-3 rounded-2xl bg-neutral-800 border border-neutral-700 text-white cursor-pointer font-sans"
                     >
                       <option value="">-- Choose Barcode --</option>
                       {inventory.map(i => (
@@ -1850,7 +1943,7 @@ export default function BumBumCafeStockApp() {
 
                   <button 
                     type="submit" 
-                    className="w-full p-3.5 bg-orange-600 hover:bg-orange-700 text-white rounded-2xl font-black uppercase tracking-wider font-sans"
+                    className="w-full p-3.5 bg-orange-600 hover:bg-orange-700 text-white rounded-2xl font-black uppercase tracking-wider font-sans font-sans font-sans"
                   >
                     Run Barcode Scan Simulator ➔
                   </button>
@@ -1863,7 +1956,7 @@ export default function BumBumCafeStockApp() {
                     <p className="text-[10px] text-neutral-400 mt-0.5">Stock Status: Godown ({scannedProductDetected.storeQty})</p>
                   </div>
 
-                  <div className="space-y-1.5 font-sans">
+                  <div className="space-y-1.5 font-sans font-sans">
                     <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400">Qty to Add ({scannedProductDetected.unit})</label>
                     <input 
                       type="number" 
@@ -1879,14 +1972,14 @@ export default function BumBumCafeStockApp() {
                   <div className="flex gap-2">
                     <button 
                       type="submit" 
-                      className="flex-1 p-3.5 bg-green-600 hover:bg-green-700 text-white rounded-2xl font-black uppercase tracking-wider font-sans"
+                      className="flex-1 p-3.5 bg-green-600 hover:bg-green-700 text-white rounded-2xl font-black uppercase tracking-wider font-sans font-sans"
                     >
                       Add Stock ➔
                     </button>
                     <button 
                       type="button" 
                       onClick={() => setScannedProductDetected(null)} 
-                      className="flex-1 p-3.5 bg-neutral-800 text-neutral-400 rounded-2xl font-black uppercase tracking-wider font-sans"
+                      className="flex-1 p-3.5 bg-neutral-800 text-neutral-400 rounded-2xl font-black uppercase tracking-wider font-sans font-sans"
                     >
                       Scan Again
                     </button>
@@ -1899,13 +1992,13 @@ export default function BumBumCafeStockApp() {
 
         {/* H. MODAL FORM: STOCK IN / INCOMING */}
         {showAddStockModal && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[99] flex items-center justify-center p-4 font-sans">
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[99] flex items-center justify-center p-4 font-sans font-sans">
             <motion.form 
               onSubmit={handleStockInSubmit}
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className={`w-full max-sm rounded-[2rem] p-6 space-y-4 border ${
+              className={`w-full max-w-sm rounded-[2rem] p-6 space-y-4 border ${
                 isDarkMode ? 'bg-[#0F0F0F] border-neutral-800 text-white' : 'bg-white border-neutral-100 text-neutral-900'
               }`}
             >
@@ -1914,7 +2007,7 @@ export default function BumBumCafeStockApp() {
                 <button type="button" onClick={() => setShowAddStockModal(false)} className="p-2.5 bg-neutral-100 dark:bg-neutral-800 rounded-xl"><X size={14} /></button>
               </div>
 
-              <div className="grid grid-cols-2 gap-2 text-xs font-sans">
+              <div className="grid grid-cols-2 gap-2 text-xs">
                 <div className="space-y-1">
                   <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400 font-sans">Item Name</label>
                   <input 
@@ -1939,9 +2032,9 @@ export default function BumBumCafeStockApp() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-2 text-xs font-sans">
+              <div className="grid grid-cols-2 gap-2 text-xs">
                 <div className="space-y-1">
-                  <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400 font-sans">Qty</label>
+                  <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400">Qty</label>
                   <input 
                     type="number" 
                     placeholder="e.g. 10"
@@ -1952,7 +2045,7 @@ export default function BumBumCafeStockApp() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400 font-sans">Unit</label>
+                  <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400">Unit</label>
                   <select 
                     value={formStockIn.unit}
                     onChange={e => setFormStockIn({...formStockIn, unit: e.target.value})}
@@ -1966,9 +2059,9 @@ export default function BumBumCafeStockApp() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-2 text-xs font-sans">
+              <div className="grid grid-cols-2 gap-2 text-xs">
                 <div className="space-y-1">
-                  <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400 font-sans">Purchase Price</label>
+                  <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400">Purchase Price</label>
                   <input 
                     type="number" 
                     placeholder="e.g. 440"
@@ -1979,18 +2072,18 @@ export default function BumBumCafeStockApp() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400 font-sans font-sans">Category</label>
+                  <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400 font-sans">Category</label>
                   <select 
                     value={formStockIn.category}
                     onChange={e => setFormStockIn({...formStockIn, category: e.target.value})}
-                    className="w-full p-3 rounded-xl border dark:bg-neutral-800 cursor-pointer font-sans"
+                    className="w-full p-3 rounded-xl border dark:bg-neutral-800 cursor-pointer"
                   >
                     {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
                   </select>
                 </div>
               </div>
 
-              <div className="space-y-1 text-xs font-sans">
+              <div className="space-y-1 text-xs">
                 <label className="font-black uppercase tracking-wider text-neutral-400 text-[8px] font-sans">Payment Method</label>
                 <select 
                   value={formStockIn.paymentType}
@@ -2002,7 +2095,7 @@ export default function BumBumCafeStockApp() {
                 </select>
               </div>
 
-              <button type="submit" className="w-full p-3 bg-green-600 hover:bg-green-700 text-white rounded-2xl font-black text-xs uppercase tracking-wider shadow font-sans font-sans">
+              <button type="submit" className="w-full p-3 bg-green-600 hover:bg-green-700 text-white rounded-2xl font-black text-xs uppercase tracking-wider shadow font-sans">
                 Complete Stock In ➔
               </button>
             </motion.form>
@@ -2022,8 +2115,8 @@ export default function BumBumCafeStockApp() {
               }`}
             >
               <div className="flex justify-between items-center border-b border-neutral-100 dark:border-neutral-800 pb-2">
-                <h3 className="text-xs font-black uppercase tracking-widest text-[#FF6B00] font-sans">Merchant Registration</h3>
-                <button type="button" onClick={() => setShowAddSupplierModal(false)} className="p-2 bg-neutral-100 dark:bg-neutral-800 rounded-xl"><X size={14} /></button>
+                <h3 className="text-xs font-black uppercase tracking-widest text-neutral-400 font-sans">Merchant Registration</h3>
+                <button type="button" onClick={() => setShowAddSupplierModal(false)} className="p-2.5 bg-neutral-100 dark:bg-neutral-800 rounded-xl"><X size={14} /></button>
               </div>
 
               <div className="space-y-1 text-xs">
@@ -2090,7 +2183,7 @@ export default function BumBumCafeStockApp() {
                 <select 
                   value={auditItemSelect}
                   onChange={e => setAuditItemSelect(e.target.value)}
-                  className="w-full p-3 rounded-xl border dark:bg-neutral-800 cursor-pointer"
+                  className="w-full p-3 rounded-xl border dark:bg-neutral-800 cursor-pointer animate-fade"
                   required
                 >
                   <option value="">Choose item...</option>
@@ -2124,7 +2217,7 @@ export default function BumBumCafeStockApp() {
               isDarkMode ? 'bg-[#0F0F0F] border-neutral-800 text-white' : 'bg-white border-neutral-100 text-neutral-900'
             }`}>
               <div className="flex justify-between items-center border-b border-neutral-100 dark:border-neutral-800 pb-2">
-                <p className="text-[10px] font-black uppercase tracking-widest text-[#FF6B00]">Asset Control Maintenance</p>
+                <p className="text-[10px] font-black uppercase tracking-widest text-[#FF6B00] font-sans">Asset Control Maintenance</p>
                 <button onClick={() => setSelectedEquipmentQR(null)} className="p-1.5 bg-neutral-100 dark:bg-neutral-800 rounded-xl"><X size={14} /></button>
               </div>
 
@@ -2193,7 +2286,7 @@ export default function BumBumCafeStockApp() {
             }`}
           >
             <MoreHorizontal size={18} />
-            <span className="text-[8px] font-black uppercase tracking-widest mt-1 block">More</span>
+            <span className="text-[8px] font-black uppercase tracking-widest mt-1 block font-sans">More</span>
           </button>
         </div>
       </nav>
