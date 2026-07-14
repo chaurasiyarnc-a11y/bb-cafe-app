@@ -1,4 +1,4 @@
-आपकी 
+
 
 'use client';
 
@@ -37,7 +37,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-// आपके GitHub पाथ (src/lib/firebase.ts) के अनुसार इम्पोर्ट:
+// आपके GitHub स्क्रीनशॉट (src/lib/firebase.ts) के अनुसार इम्पोर्ट पाथ:
 import { db } from '@/lib/firebase'; 
 import { 
   collection, 
@@ -122,121 +122,121 @@ const triggerHaptic = (ms = 35) => {
 };
 
 // ==========================================
-// 2. MASTER INITIAL INVENTORY SEED DATA (QTY INITIALIZED TO 0)
+// 2. MASTER INITIAL INVENTORY SEED DATA
 // ==========================================
 const INITIAL_INVENTORY: InventoryItem[] = [
   // --- Dairy ---
-  { id: "dry_1", name: "Doodh Milk", category: "Dairy", storeQty: 0, unit: "Ltr", purchasePrice: 60, minLimit: 10, supplier: "Sony Dairy", lastPurchaseDate: "2026-07-14", barcode: "890105800401" },
-  { id: "dry_2", name: "Dahi Curd", category: "Dairy", storeQty: 0, unit: "Kg", purchasePrice: 80, minLimit: 5, supplier: "Sony Dairy", lastPurchaseDate: "2026-07-14", barcode: "890105800402" },
-  { id: "dry_3", name: "Makkhan Butter", category: "Dairy", storeQty: 0, unit: "Kg", purchasePrice: 420, minLimit: 8, supplier: "Sony Dairy", lastPurchaseDate: "2026-07-14", barcode: "890105800240" },
-  { id: "dry_4", name: "Ghee", category: "Dairy", storeQty: 0, unit: "Kg", purchasePrice: 680, minLimit: 3, supplier: "Sony Dairy", lastPurchaseDate: "2026-07-14", barcode: "890105800239" },
-  { id: "dry_5", name: "Processed Cheese", category: "Dairy", storeQty: 0, unit: "Kg", purchasePrice: 420, minLimit: 5, supplier: "Sony Dairy", lastPurchaseDate: "2026-07-14", barcode: "890105800403" },
-  { id: "dry_6", name: "Mozzarella Cheese", category: "Dairy", storeQty: 0, unit: "Kg", purchasePrice: 440, minLimit: 5, supplier: "Sony Dairy", lastPurchaseDate: "2026-07-14", barcode: "890105800241" },
-  { id: "dry_7", name: "Paneer", category: "Dairy", storeQty: 0, unit: "Kg", purchasePrice: 320, minLimit: 5, supplier: "Sony Dairy", lastPurchaseDate: "2026-07-14", barcode: "890105800404" },
-  { id: "dry_8", name: "Fresh Cream", category: "Dairy", storeQty: 0, unit: "Kg", purchasePrice: 240, minLimit: 3, supplier: "Sony Dairy", lastPurchaseDate: "2026-07-14", barcode: "890105800405" },
-  { id: "dry_9", name: "Vanilla Ice Cream", category: "Dairy", storeQty: 0, unit: "Ltr", purchasePrice: 180, minLimit: 4, supplier: "Sony Dairy", lastPurchaseDate: "2026-07-14", barcode: "890105800406" },
+  { id: "dry_1", name: "Doodh Milk", category: "Dairy", storeQty: 40, unit: "Ltr", purchasePrice: 60, minLimit: 10, supplier: "Sony Dairy", lastPurchaseDate: "2026-07-14", barcode: "890105800401" },
+  { id: "dry_2", name: "Dahi Curd", category: "Dairy", storeQty: 15, unit: "Kg", purchasePrice: 80, minLimit: 5, supplier: "Sony Dairy", lastPurchaseDate: "2026-07-14", barcode: "890105800402" },
+  { id: "dry_3", name: "Makkhan Butter", category: "Dairy", storeQty: 24, unit: "Kg", purchasePrice: 420, minLimit: 8, supplier: "Sony Dairy", lastPurchaseDate: "2026-07-14", barcode: "890105800240" },
+  { id: "dry_4", name: "Ghee", category: "Dairy", storeQty: 10, unit: "Kg", purchasePrice: 680, minLimit: 3, supplier: "Sony Dairy", lastPurchaseDate: "2026-07-14", barcode: "890105800239" },
+  { id: "dry_5", name: "Processed Cheese", category: "Dairy", storeQty: 15, unit: "Kg", purchasePrice: 420, minLimit: 5, supplier: "Sony Dairy", lastPurchaseDate: "2026-07-14", barcode: "890105800403" },
+  { id: "dry_6", name: "Mozzarella Cheese", category: "Dairy", storeQty: 18, unit: "Kg", purchasePrice: 440, minLimit: 5, supplier: "Sony Dairy", lastPurchaseDate: "2026-07-14", barcode: "890105800241" },
+  { id: "dry_7", name: "Paneer", category: "Dairy", storeQty: 20, unit: "Kg", purchasePrice: 320, minLimit: 5, supplier: "Sony Dairy", lastPurchaseDate: "2026-07-14", barcode: "890105800404" },
+  { id: "dry_8", name: "Fresh Cream", category: "Dairy", storeQty: 10, unit: "Kg", purchasePrice: 240, minLimit: 3, supplier: "Sony Dairy", lastPurchaseDate: "2026-07-14", barcode: "890105800405" },
+  { id: "dry_9", name: "Vanilla Ice Cream", category: "Dairy", storeQty: 12, unit: "Ltr", purchasePrice: 180, minLimit: 4, supplier: "Sony Dairy", lastPurchaseDate: "2026-07-14", barcode: "890105800406" },
 
   // --- Vegetables ---
-  { id: "veg_1", name: "Pyaaj Onion", category: "Vegetables", storeQty: 0, unit: "Kg", purchasePrice: 30, minLimit: 15, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800407" },
-  { id: "veg_2", name: "Tamatar Tomato", category: "Vegetables", storeQty: 0, unit: "Kg", purchasePrice: 40, minLimit: 10, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800408" },
-  { id: "veg_3", name: "Aloo Potato", category: "Vegetables", storeQty: 0, unit: "Kg", purchasePrice: 25, minLimit: 15, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800409" },
-  { id: "veg_4", name: "Shimla Mirch Capsicum", category: "Vegetables", storeQty: 0, unit: "Kg", purchasePrice: 80, minLimit: 5, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800410" },
-  { id: "veg_5", name: "Patta Gobhi Cabbage", category: "Vegetables", storeQty: 0, unit: "Kg", purchasePrice: 30, minLimit: 8, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800411" },
-  { id: "veg_6", name: "Gajar Carrot", category: "Vegetables", storeQty: 0, unit: "Kg", purchasePrice: 40, minLimit: 5, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800412" },
-  { id: "veg_7", name: "Hari Mirch Green Chilli", category: "Vegetables", storeQty: 0, unit: "Kg", purchasePrice: 60, minLimit: 2, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800413" },
-  { id: "veg_8", name: "Adrak Ginger", category: "Vegetables", storeQty: 0, unit: "Kg", purchasePrice: 120, minLimit: 2, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800414" },
-  { id: "veg_9", name: "Lahsun Garlic", category: "Vegetables", storeQty: 0, unit: "Kg", purchasePrice: 150, minLimit: 2, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800415" },
-  { id: "veg_10", name: "Dhaniya Patti Coriander", category: "Vegetables", storeQty: 0, unit: "Kg", purchasePrice: 80, minLimit: 1, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800416" },
-  { id: "veg_11", name: "Pudina Mint", category: "Vegetables", storeQty: 0, unit: "Kg", purchasePrice: 100, minLimit: 1, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800417" },
-  { id: "veg_12", name: "Nimboo Lemon", category: "Vegetables", storeQty: 0, unit: "Pcs", purchasePrice: 3, minLimit: 20, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800418" },
-  { id: "veg_13", name: "Palak Spinach", category: "Vegetables", storeQty: 0, unit: "Kg", purchasePrice: 40, minLimit: 3, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800419" },
-  { id: "veg_14", name: "Phool Gobhi Cauliflower", category: "Vegetables", storeQty: 0, unit: "Kg", purchasePrice: 45, minLimit: 4, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800420" },
-  { id: "veg_15", name: "Matar Green Peas", category: "Vegetables", storeQty: 0, unit: "Kg", purchasePrice: 60, minLimit: 5, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800421" },
-  { id: "veg_16", name: "Baigan Brinjal", category: "Vegetables", storeQty: 0, unit: "Kg", purchasePrice: 30, minLimit: 3, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800422" },
-  { id: "veg_17", name: "Methi Fenugreek", category: "Vegetables", storeQty: 0, unit: "Kg", purchasePrice: 50, minLimit: 3, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800423" },
-  { id: "veg_18", name: "Kadi Patta Curry Leaves", category: "Vegetables", storeQty: 0, unit: "Kg", purchasePrice: 120, minLimit: 1, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800424" },
+  { id: "veg_1", name: "Pyaaj Onion", category: "Vegetables", storeQty: 50, unit: "Kg", purchasePrice: 30, minLimit: 15, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800407" },
+  { id: "veg_2", name: "Tamatar Tomato", category: "Vegetables", storeQty: 30, unit: "Kg", purchasePrice: 40, minLimit: 10, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800408" },
+  { id: "veg_3", name: "Aloo Potato", category: "Vegetables", storeQty: 60, unit: "Kg", purchasePrice: 25, minLimit: 15, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800409" },
+  { id: "veg_4", name: "Shimla Mirch Capsicum", category: "Vegetables", storeQty: 15, unit: "Kg", purchasePrice: 80, minLimit: 5, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800410" },
+  { id: "veg_5", name: "Patta Gobhi Cabbage", category: "Vegetables", storeQty: 20, unit: "Kg", purchasePrice: 30, minLimit: 8, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800411" },
+  { id: "veg_6", name: "Gajar Carrot", category: "Vegetables", storeQty: 15, unit: "Kg", purchasePrice: 40, minLimit: 5, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800412" },
+  { id: "veg_7", name: "Hari Mirch Green Chilli", category: "Vegetables", storeQty: 5, unit: "Kg", purchasePrice: 60, minLimit: 2, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800413" },
+  { id: "veg_8", name: "Adrak Ginger", category: "Vegetables", storeQty: 5, unit: "Kg", purchasePrice: 120, minLimit: 2, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800414" },
+  { id: "veg_9", name: "Lahsun Garlic", category: "Vegetables", storeQty: 5, unit: "Kg", purchasePrice: 150, minLimit: 2, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800415" },
+  { id: "veg_10", name: "Dhaniya Patti Coriander", category: "Vegetables", storeQty: 3, unit: "Kg", purchasePrice: 80, minLimit: 1, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800416" },
+  { id: "veg_11", name: "Pudina Mint", category: "Vegetables", storeQty: 2, unit: "Kg", purchasePrice: 100, minLimit: 1, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800417" },
+  { id: "veg_12", name: "Nimboo Lemon", category: "Vegetables", storeQty: 100, unit: "Pcs", purchasePrice: 3, minLimit: 20, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800418" },
+  { id: "veg_13", name: "Palak Spinach", category: "Vegetables", storeQty: 8, unit: "Kg", purchasePrice: 40, minLimit: 3, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800419" },
+  { id: "veg_14", name: "Phool Gobhi Cauliflower", category: "Vegetables", storeQty: 12, unit: "Kg", purchasePrice: 45, minLimit: 4, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800420" },
+  { id: "veg_15", name: "Matar Green Peas", category: "Vegetables", storeQty: 15, unit: "Kg", purchasePrice: 60, minLimit: 5, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800421" },
+  { id: "veg_16", name: "Baigan Brinjal", category: "Vegetables", storeQty: 10, unit: "Kg", purchasePrice: 30, minLimit: 3, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800422" },
+  { id: "veg_17", name: "Methi Fenugreek", category: "Vegetables", storeQty: 8, unit: "Kg", purchasePrice: 50, minLimit: 3, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800423" },
+  { id: "veg_18", name: "Kadi Patta Curry Leaves", category: "Vegetables", storeQty: 2, unit: "Kg", purchasePrice: 120, minLimit: 1, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800424" },
 
   // --- Grains & Bakery ---
-  { id: "grain_1", name: "Meda", category: "Grains & Bakery", storeQty: 0, unit: "Kg", purchasePrice: 40, minLimit: 20, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800304" },
-  { id: "grain_2", name: "Gehu Ka Atta Wheat Flour", category: "Grains & Bakery", storeQty: 0, unit: "Kg", purchasePrice: 45, minLimit: 25, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800425" },
-  { id: "grain_3", name: "Suji", category: "Grains & Bakery", storeQty: 0, unit: "Kg", purchasePrice: 50, minLimit: 10, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800426" },
-  { id: "grain_4", name: "Besan", category: "Grains & Bakery", storeQty: 0, unit: "Kg", purchasePrice: 85, minLimit: 12, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800235" },
-  { id: "grain_5", name: "Corn Flour", category: "Grains & Bakery", storeQty: 0, unit: "Kg", purchasePrice: 60, minLimit: 5, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800427" },
-  { id: "grain_6", name: "Bread Crumbs", category: "Grains & Bakery", storeQty: 0, unit: "Kg", purchasePrice: 90, minLimit: 5, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800428" },
-  { id: "grain_7", name: "Bread", category: "Grains & Bakery", storeQty: 0, unit: "Pcs", purchasePrice: 35, minLimit: 8, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800313" },
-  { id: "grain_8", name: "Burger Bun", category: "Grains & Bakery", storeQty: 0, unit: "Pcs", purchasePrice: 12, minLimit: 15, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800312" },
-  { id: "grain_9", name: "Pizza Base", category: "Grains & Bakery", storeQty: 0, unit: "Pcs", purchasePrice: 20, minLimit: 15, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800355" },
-  { id: "grain_10", name: "Momos Sheet", category: "Grains & Bakery", storeQty: 0, unit: "Pcs", purchasePrice: 2, minLimit: 30, supplier: "Narmada Packagings", lastPurchaseDate: "2026-07-14", barcode: "890105800429" },
-  { id: "grain_11", name: "Spring Roll Sheet", category: "Grains & Bakery", storeQty: 0, unit: "Pcs", purchasePrice: 3, minLimit: 30, supplier: "Narmada Packagings", lastPurchaseDate: "2026-07-14", barcode: "890105800430" },
-  { id: "grain_12", name: "Noodles", category: "Grains & Bakery", storeQty: 0, unit: "Kg", purchasePrice: 80, minLimit: 8, supplier: "Om Super Market", lastPurchaseDate: "2026-07-14", barcode: "890105800431" },
-  { id: "grain_13", name: "Pasta", category: "Grains & Bakery", storeQty: 0, unit: "Kg", purchasePrice: 120, minLimit: 8, supplier: "Om Super Market", lastPurchaseDate: "2026-07-14", barcode: "890105800432" },
-  { id: "grain_14", name: "Maggi", category: "Grains & Bakery", storeQty: 0, unit: "Pcs", purchasePrice: 12, minLimit: 12, supplier: "Om Super Market", lastPurchaseDate: "2026-07-14", barcode: "890105800433" },
+  { id: "grain_1", name: "Meda", category: "Grains & Bakery", storeQty: 100, unit: "Kg", purchasePrice: 40, minLimit: 20, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800304" },
+  { id: "grain_2", name: "Gehu Ka Atta Wheat Flour", category: "Grains & Bakery", storeQty: 120, unit: "Kg", purchasePrice: 45, minLimit: 25, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800425" },
+  { id: "grain_3", name: "Suji", category: "Grains & Bakery", storeQty: 30, unit: "Kg", purchasePrice: 50, minLimit: 10, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800426" },
+  { id: "grain_4", name: "Besan", category: "Grains & Bakery", storeQty: 45, unit: "Kg", purchasePrice: 85, minLimit: 12, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800235" },
+  { id: "grain_5", name: "Corn Flour", category: "Grains & Bakery", storeQty: 20, unit: "Kg", purchasePrice: 60, minLimit: 5, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800427" },
+  { id: "grain_6", name: "Bread Crumbs", category: "Grains & Bakery", storeQty: 15, unit: "Kg", purchasePrice: 90, minLimit: 5, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800428" },
+  { id: "grain_7", name: "Bread", category: "Grains & Bakery", storeQty: 20, unit: "Pcs", purchasePrice: 35, minLimit: 8, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800313" },
+  { id: "grain_8", name: "Burger Bun", category: "Grains & Bakery", storeQty: 50, unit: "Pcs", purchasePrice: 12, minLimit: 15, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800312" },
+  { id: "grain_9", name: "Pizza Base", category: "Grains & Bakery", storeQty: 40, unit: "Pcs", purchasePrice: 20, minLimit: 15, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800355" },
+  { id: "grain_10", name: "Momos Sheet", category: "Grains & Bakery", storeQty: 100, unit: "Pcs", purchasePrice: 2, minLimit: 30, supplier: "Narmada Packagings", lastPurchaseDate: "2026-07-14", barcode: "890105800429" },
+  { id: "grain_11", name: "Spring Roll Sheet", category: "Grains & Bakery", storeQty: 100, unit: "Pcs", purchasePrice: 3, minLimit: 30, supplier: "Narmada Packagings", lastPurchaseDate: "2026-07-14", barcode: "890105800430" },
+  { id: "grain_12", name: "Noodles", category: "Grains & Bakery", storeQty: 25, unit: "Kg", purchasePrice: 80, minLimit: 8, supplier: "Om Super Market", lastPurchaseDate: "2026-07-14", barcode: "890105800431" },
+  { id: "grain_13", name: "Pasta", category: "Grains & Bakery", storeQty: 30, unit: "Kg", purchasePrice: 120, minLimit: 8, supplier: "Om Super Market", lastPurchaseDate: "2026-07-14", barcode: "890105800432" },
+  { id: "grain_14", name: "Maggi", category: "Grains & Bakery", storeQty: 48, unit: "Pcs", purchasePrice: 12, minLimit: 12, supplier: "Om Super Market", lastPurchaseDate: "2026-07-14", barcode: "890105800433" },
 
   // --- Rice & Pulses ---
-  { id: "rice_1", name: "Basmati Rice", category: "Rice & Pulses", storeQty: 0, unit: "Kg", purchasePrice: 95, minLimit: 25, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800434" },
-  { id: "rice_2", name: "Sadharan Rice", category: "Rice & Pulses", storeQty: 0, unit: "Kg", purchasePrice: 45, minLimit: 30, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800231" },
-  { id: "rice_3", name: "Tuar Dal", category: "Rice & Pulses", storeQty: 0, unit: "Kg", purchasePrice: 145, minLimit: 15, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800233" },
-  { id: "rice_4", name: "Moong Dal", category: "Rice & Pulses", storeQty: 0, unit: "Kg", purchasePrice: 120, minLimit: 10, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800435" },
-  { id: "rice_5", name: "Chana Dal", category: "Rice & Pulses", storeQty: 0, unit: "Kg", purchasePrice: 90, minLimit: 10, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800436" },
-  { id: "rice_6", name: "Sabudana", category: "Rice & Pulses", storeQty: 0, unit: "Kg", purchasePrice: 80, minLimit: 8, supplier: "Om Super Market", lastPurchaseDate: "2026-07-14", barcode: "890105800437" },
-  { id: "rice_7", name: "Poha", category: "Rice & Pulses", storeQty: 0, unit: "Kg", purchasePrice: 65, minLimit: 10, supplier: "Om Super Market", lastPurchaseDate: "2026-07-14", barcode: "890105800314" },
+  { id: "rice_1", name: "Basmati Rice", category: "Rice & Pulses", storeQty: 100, unit: "Kg", purchasePrice: 95, minLimit: 25, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800434" },
+  { id: "rice_2", name: "Sadharan Rice", category: "Rice & Pulses", storeQty: 120, unit: "Kg", purchasePrice: 45, minLimit: 30, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800231" },
+  { id: "rice_3", name: "Tuar Dal", category: "Rice & Pulses", storeQty: 50, unit: "Kg", purchasePrice: 145, minLimit: 15, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800233" },
+  { id: "rice_4", name: "Moong Dal", category: "Rice & Pulses", storeQty: 40, unit: "Kg", purchasePrice: 120, minLimit: 10, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800435" },
+  { id: "rice_5", name: "Chana Dal", category: "Rice & Pulses", storeQty: 35, unit: "Kg", purchasePrice: 90, minLimit: 10, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800436" },
+  { id: "rice_6", name: "Sabudana", category: "Rice & Pulses", storeQty: 25, unit: "Kg", purchasePrice: 80, minLimit: 8, supplier: "Om Super Market", lastPurchaseDate: "2026-07-14", barcode: "890105800437" },
+  { id: "rice_7", name: "Poha", category: "Rice & Pulses", storeQty: 30, unit: "Kg", purchasePrice: 65, minLimit: 10, supplier: "Om Super Market", lastPurchaseDate: "2026-07-14", barcode: "890105800314" },
 
   // --- Dry Fruits ---
-  { id: "df_1", name: "Kaju Cashew", category: "Dry Fruits", storeQty: 0, unit: "Kg", purchasePrice: 850, minLimit: 3, supplier: "Om Super Market", lastPurchaseDate: "2026-07-14", barcode: "890105800438" },
-  { id: "df_2", name: "Badam Almond", category: "Dry Fruits", storeQty: 0, unit: "Kg", purchasePrice: 900, minLimit: 3, supplier: "Om Super Market", lastPurchaseDate: "2026-07-14", barcode: "890105800439" },
-  { id: "df_3", name: "Pista", category: "Dry Fruits", storeQty: 0, unit: "Kg", purchasePrice: 1100, minLimit: 2, supplier: "Om Super Market", lastPurchaseDate: "2026-07-14", barcode: "890105800440" },
-  { id: "df_4", name: "Kishmish Raisins", category: "Dry Fruits", storeQty: 0, unit: "Kg", purchasePrice: 280, minLimit: 3, supplier: "Om Super Market", lastPurchaseDate: "2026-07-14", barcode: "890105800441" },
+  { id: "df_1", name: "Kaju Cashew", category: "Dry Fruits", storeQty: 10, unit: "Kg", purchasePrice: 850, minLimit: 3, supplier: "Om Super Market", lastPurchaseDate: "2026-07-14", barcode: "890105800438" },
+  { id: "df_2", name: "Badam Almond", category: "Dry Fruits", storeQty: 10, unit: "Kg", purchasePrice: 900, minLimit: 3, supplier: "Om Super Market", lastPurchaseDate: "2026-07-14", barcode: "890105800439" },
+  { id: "df_3", name: "Pista", category: "Dry Fruits", storeQty: 5, unit: "Kg", purchasePrice: 1100, minLimit: 2, supplier: "Om Super Market", lastPurchaseDate: "2026-07-14", barcode: "890105800440" },
+  { id: "df_4", name: "Kishmish Raisins", category: "Dry Fruits", storeQty: 10, unit: "Kg", purchasePrice: 280, minLimit: 3, supplier: "Om Super Market", lastPurchaseDate: "2026-07-14", barcode: "890105800441" },
 
   // --- Oils ---
-  { id: "oil_1", name: "Refined Oil", category: "Oils", storeQty: 0, unit: "Ltr", purchasePrice: 110, minLimit: 15, supplier: "Sagar Distributors", lastPurchaseDate: "2026-07-14", barcode: "890105800237" },
-  { id: "oil_2", name: "Sarso Ka Tel Mustard Oil", category: "Oils", storeQty: 0, unit: "Ltr", purchasePrice: 140, minLimit: 8, supplier: "Sagar Distributors", lastPurchaseDate: "2026-07-14", barcode: "890105800442" },
+  { id: "oil_1", name: "Refined Oil", category: "Oils", storeQty: 40, unit: "Ltr", purchasePrice: 110, minLimit: 15, supplier: "Sagar Distributors", lastPurchaseDate: "2026-07-14", barcode: "890105800237" },
+  { id: "oil_2", name: "Sarso Ka Tel Mustard Oil", category: "Oils", storeQty: 20, unit: "Ltr", purchasePrice: 140, minLimit: 8, supplier: "Sagar Distributors", lastPurchaseDate: "2026-07-14", barcode: "890105800442" },
 
   // --- Spices ---
-  { id: "spice_1", name: "Namak Salt", category: "Spices", storeQty: 0, unit: "Kg", purchasePrice: 20, minLimit: 15, supplier: "Om Super Market", lastPurchaseDate: "2026-07-14", barcode: "890105800308" },
-  { id: "spice_2", name: "Kala Namak Black Salt", category: "Spices", storeQty: 0, unit: "Kg", purchasePrice: 45, minLimit: 3, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800443" },
-  { id: "spice_3", name: "Lal Mirch Powder Red Chilli", category: "Spices", storeQty: 0, unit: "Kg", purchasePrice: 280, minLimit: 5, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800309" },
-  { id: "spice_4", name: "Kashmiri Lal Mirch", category: "Spices", storeQty: 0, unit: "Kg", purchasePrice: 340, minLimit: 3, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800444" },
-  { id: "spice_5", name: "Haldi Turmeric", category: "Spices", storeQty: 0, unit: "Kg", purchasePrice: 180, minLimit: 5, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800330" },
-  { id: "spice_6", name: "Dhaniya Powder Coriander", category: "Spices", storeQty: 0, unit: "Kg", purchasePrice: 190, minLimit: 5, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800445" },
-  { id: "spice_7", name: "Jeera Cumin", category: "Spices", storeQty: 0, unit: "Kg", purchasePrice: 320, minLimit: 4, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800315" },
-  { id: "spice_8", name: "Chaat Masala", category: "Spices", storeQty: 0, unit: "Kg", purchasePrice: 280, minLimit: 4, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800446" },
-  { id: "spice_9", name: "Kali Mirch Black Pepper", category: "Spices", storeQty: 0, unit: "Kg", purchasePrice: 550, minLimit: 2, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800311" },
-  { id: "spice_10", name: "Oregano", category: "Spices", storeQty: 0, unit: "Kg", purchasePrice: 440, minLimit: 3, supplier: "Om Super Market", lastPurchaseDate: "2026-07-14", barcode: "890105800301" },
-  { id: "spice_11", name: "Chilli Flakes", category: "Spices", storeQty: 0, unit: "Kg", purchasePrice: 440, minLimit: 3, supplier: "Om Super Market", lastPurchaseDate: "2026-07-14", barcode: "890105800302" },
+  { id: "spice_1", name: "Namak Salt", category: "Spices", storeQty: 50, unit: "Kg", purchasePrice: 20, minLimit: 15, supplier: "Om Super Market", lastPurchaseDate: "2026-07-14", barcode: "890105800308" },
+  { id: "spice_2", name: "Kala Namak Black Salt", category: "Spices", storeQty: 10, unit: "Kg", purchasePrice: 45, minLimit: 3, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800443" },
+  { id: "spice_3", name: "Lal Mirch Powder Red Chilli", category: "Spices", storeQty: 15, unit: "Kg", purchasePrice: 280, minLimit: 5, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800309" },
+  { id: "spice_4", name: "Kashmiri Lal Mirch", category: "Spices", storeQty: 10, unit: "Kg", purchasePrice: 340, minLimit: 3, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800444" },
+  { id: "spice_5", name: "Haldi Turmeric", category: "Spices", storeQty: 20, unit: "Kg", purchasePrice: 180, minLimit: 5, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800330" },
+  { id: "spice_6", name: "Dhaniya Powder Coriander", category: "Spices", storeQty: 15, unit: "Kg", purchasePrice: 190, minLimit: 5, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800445" },
+  { id: "spice_7", name: "Jeera Cumin", category: "Spices", storeQty: 15, unit: "Kg", purchasePrice: 320, minLimit: 4, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800315" },
+  { id: "spice_8", name: "Chaat Masala", category: "Spices", storeQty: 15, unit: "Kg", purchasePrice: 280, minLimit: 4, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800446" },
+  { id: "spice_9", name: "Kali Mirch Black Pepper", category: "Spices", storeQty: 5, unit: "Kg", purchasePrice: 550, minLimit: 2, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800311" },
+  { id: "spice_10", name: "Oregano", category: "Spices", storeQty: 15, unit: "Kg", purchasePrice: 440, minLimit: 3, supplier: "Om Super Market", lastPurchaseDate: "2026-07-14", barcode: "890105800301" },
+  { id: "spice_11", name: "Chilli Flakes", category: "Spices", storeQty: 15, unit: "Kg", purchasePrice: 440, minLimit: 3, supplier: "Om Super Market", lastPurchaseDate: "2026-07-14", barcode: "890105800302" },
 
   // --- Sauces & Condiments ---
-  { id: "sauce_1", name: "Tomato Ketchup", category: "Sauces & Condiments", storeQty: 0, unit: "Pcs", purchasePrice: 95, minLimit: 10, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800346" },
-  { id: "sauce_2", name: "Schezwan Sauce", category: "Sauces & Condiments", storeQty: 0, unit: "Pcs", purchasePrice: 120, minLimit: 5, supplier: "Om Super Market", lastPurchaseDate: "2026-07-14", barcode: "890105800447" },
-  { id: "sauce_3", name: "Mayonnaise", category: "Sauces & Condiments", storeQty: 0, unit: "Pcs", purchasePrice: 140, minLimit: 8, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800336" },
-  { id: "sauce_4", name: "Pizza Sauce", category: "Sauces & Condiments", storeQty: 0, unit: "Pcs", purchasePrice: 160, minLimit: 8, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800338" },
-  { id: "sauce_5", name: "Sirka Vinegar", category: "Sauces & Condiments", storeQty: 0, unit: "Pcs", purchasePrice: 45, minLimit: 5, supplier: "Om Super Market", lastPurchaseDate: "2026-07-14", barcode: "890105800448" },
+  { id: "sauce_1", name: "Tomato Ketchup", category: "Sauces & Condiments", storeQty: 30, unit: "Pcs", purchasePrice: 95, minLimit: 10, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800346" },
+  { id: "sauce_2", name: "Schezwan Sauce", category: "Sauces & Condiments", storeQty: 25, unit: "Pcs", purchasePrice: 120, minLimit: 5, supplier: "Om Super Market", lastPurchaseDate: "2026-07-14", barcode: "890105800447" },
+  { id: "sauce_3", name: "Mayonnaise", category: "Sauces & Condiments", storeQty: 30, unit: "Pcs", purchasePrice: 140, minLimit: 8, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800336" },
+  { id: "sauce_4", name: "Pizza Sauce", category: "Sauces & Condiments", storeQty: 25, unit: "Pcs", purchasePrice: 160, minLimit: 8, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800338" },
+  { id: "sauce_5", name: "Sirka Vinegar", category: "Sauces & Condiments", storeQty: 20, unit: "Pcs", purchasePrice: 45, minLimit: 5, supplier: "Om Super Market", lastPurchaseDate: "2026-07-14", barcode: "890105800448" },
 
   // --- Beverage Materials ---
-  { id: "bev_1", name: "Chai Patti Tea Leaf", category: "Beverage Materials", storeQty: 0, unit: "Kg", purchasePrice: 280, minLimit: 5, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800449" },
-  { id: "bev_2", name: "Coffee", category: "Beverage Materials", storeQty: 0, unit: "Kg", purchasePrice: 480, minLimit: 3, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800450" },
-  { id: "bev_3", name: "Cheeni Sugar", category: "Beverage Materials", storeQty: 0, unit: "Kg", purchasePrice: 44, minLimit: 20, supplier: "Om Super Market", lastPurchaseDate: "2026-07-14", barcode: "890105800236" },
-  { id: "bev_4", name: "Chocolate Syrup", category: "Beverage Materials", storeQty: 0, unit: "Pcs", purchasePrice: 160, minLimit: 3, supplier: "Om Super Market", lastPurchaseDate: "2026-07-14", barcode: "890105800352" },
-  { id: "bev_5", name: "Soda Water", category: "Beverage Materials", storeQty: 0, unit: "Pcs", purchasePrice: 15, minLimit: 12, supplier: "Coca-Cola Agency", lastPurchaseDate: "2026-07-14", barcode: "890105800451" },
+  { id: "bev_1", name: "Chai Patti Tea Leaf", category: "Beverage Materials", storeQty: 25, unit: "Kg", purchasePrice: 280, minLimit: 5, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800449" },
+  { id: "bev_2", name: "Coffee", category: "Beverage Materials", storeQty: 15, unit: "Kg", purchasePrice: 480, minLimit: 3, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800450" },
+  { id: "bev_3", name: "Cheeni Sugar", category: "Beverage Materials", storeQty: 100, unit: "Kg", purchasePrice: 44, minLimit: 20, supplier: "Om Super Market", lastPurchaseDate: "2026-07-14", barcode: "890105800236" },
+  { id: "bev_4", name: "Chocolate Syrup", category: "Beverage Materials", storeQty: 10, unit: "Pcs", purchasePrice: 160, minLimit: 3, supplier: "Om Super Market", lastPurchaseDate: "2026-07-14", barcode: "890105800352" },
+  { id: "bev_5", name: "Soda Water", category: "Beverage Materials", storeQty: 48, unit: "Pcs", purchasePrice: 15, minLimit: 12, supplier: "Coca-Cola Agency", lastPurchaseDate: "2026-07-14", barcode: "890105800451" },
 
   // --- Pizza Toppings ---
-  { id: "top_1", name: "Sweet Corn Topping", category: "Pizza Toppings", storeQty: 0, unit: "Kg", purchasePrice: 120, minLimit: 5, supplier: "Sagar Distributors", lastPurchaseDate: "2026-07-14", barcode: "890105800452" },
-  { id: "top_2", name: "Olive Topping", category: "Pizza Toppings", storeQty: 0, unit: "Pcs", purchasePrice: 140, minLimit: 4, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800349" },
-  { id: "top_3", name: "Jalapeno Topping", category: "Pizza Toppings", storeQty: 0, unit: "Pcs", purchasePrice: 140, minLimit: 4, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800351" },
+  { id: "top_1", name: "Sweet Corn Topping", category: "Pizza Toppings", storeQty: 20, unit: "Kg", purchasePrice: 120, minLimit: 5, supplier: "Sagar Distributors", lastPurchaseDate: "2026-07-14", barcode: "890105800452" },
+  { id: "top_2", name: "Olive Topping", category: "Pizza Toppings", storeQty: 15, unit: "Pcs", purchasePrice: 140, minLimit: 4, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800349" },
+  { id: "top_3", name: "Jalapeno Topping", category: "Pizza Toppings", storeQty: 15, unit: "Pcs", purchasePrice: 140, minLimit: 4, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800351" },
 
   // --- Ready-to-Use Items ---
-  { id: "rtu_1", name: "Veg Patty", category: "Ready-to-Use Items", storeQty: 0, unit: "Pcs", purchasePrice: 18, minLimit: 20, supplier: "Sagar Distributors", lastPurchaseDate: "2026-07-12", barcode: "890175800250" },
-  { id: "rtu_2", name: "Papad", category: "Ready-to-Use Items", storeQty: 0, unit: "Pcs", purchasePrice: 5, minLimit: 10, supplier: "Om Super Market", lastPurchaseDate: "2026-07-14", barcode: "890175800453" },
+  { id: "rtu_1", name: "Veg Patty", category: "Ready-to-Use Items", storeQty: 100, unit: "Pcs", purchasePrice: 18, minLimit: 20, supplier: "Sagar Distributors", lastPurchaseDate: "2026-07-12", barcode: "890175800250" },
+  { id: "rtu_2", name: "Papad", category: "Ready-to-Use Items", storeQty: 50, unit: "Pcs", purchasePrice: 5, minLimit: 10, supplier: "Om Super Market", lastPurchaseDate: "2026-07-14", barcode: "890175800453" },
 
   // --- Packaging ---
-  { id: "pkg_1", name: "Pizza Box Small 6 Inch", category: "Packaging", storeQty: 0, unit: "Pcs", purchasePrice: 4.50, minLimit: 50, supplier: "Narmada Packagings", lastPurchaseDate: "2026-07-14", barcode: "890105800358" },
-  { id: "pkg_2", name: "Pizza Box Medium 8 Inch", category: "Packaging", storeQty: 0, unit: "Pcs", purchasePrice: 5.50, minLimit: 50, supplier: "Narmada Packagings", lastPurchaseDate: "2026-07-14", barcode: "890105800359" },
-  { id: "pkg_3", name: "Pizza Box Large 10 Inch", category: "Packaging", storeQty: 0, unit: "Pcs", purchasePrice: 7.50, minLimit: 100, supplier: "Narmada Packagings", lastPurchaseDate: "2026-07-14", barcode: "890105800357" },
-  { id: "pkg_4", name: "Burger Box", category: "Packaging", storeQty: 0, unit: "Pcs", purchasePrice: 3.50, minLimit: 50, supplier: "Narmada Packagings", lastPurchaseDate: "2026-07-14", barcode: "890105800454" },
-  { id: "pkg_5", name: "Paper Cup", category: "Packaging", storeQty: 0, unit: "Pcs", purchasePrice: 1.20, minLimit: 200, supplier: "Narmada Packagings", lastPurchaseDate: "2026-07-14", barcode: "890105800455" },
-  { id: "pkg_6", name: "Tissue", category: "Packaging", storeQty: 0, unit: "Pcs", purchasePrice: 0.20, minLimit: 400, supplier: "Narmada Packagings", lastPurchaseDate: "2026-07-14", barcode: "890105800243" },
+  { id: "pkg_1", name: "Pizza Box Small 6 Inch", category: "Packaging", storeQty: 200, unit: "Pcs", purchasePrice: 4.50, minLimit: 50, supplier: "Narmada Packagings", lastPurchaseDate: "2026-07-14", barcode: "890105800358" },
+  { id: "pkg_2", name: "Pizza Box Medium 8 Inch", category: "Packaging", storeQty: 300, unit: "Pcs", purchasePrice: 5.50, minLimit: 50, supplier: "Narmada Packagings", lastPurchaseDate: "2026-07-14", barcode: "890105800359" },
+  { id: "pkg_3", name: "Pizza Box Large 10 Inch", category: "Packaging", storeQty: 400, unit: "Pcs", purchasePrice: 7.50, minLimit: 100, supplier: "Narmada Packagings", lastPurchaseDate: "2026-07-14", barcode: "890105800357" },
+  { id: "pkg_4", name: "Burger Box", category: "Packaging", storeQty: 300, unit: "Pcs", purchasePrice: 3.50, minLimit: 50, supplier: "Narmada Packagings", lastPurchaseDate: "2026-07-14", barcode: "890105800454" },
+  { id: "pkg_5", name: "Paper Cup", category: "Packaging", storeQty: 1000, unit: "Pcs", purchasePrice: 1.20, minLimit: 200, supplier: "Narmada Packagings", lastPurchaseDate: "2026-07-14", barcode: "890105800455" },
+  { id: "pkg_6", name: "Tissue", category: "Packaging", storeQty: 2000, unit: "Pcs", purchasePrice: 0.20, minLimit: 400, supplier: "Narmada Packagings", lastPurchaseDate: "2026-07-14", barcode: "890105800243" },
 
   // --- Equipment ---
-  { id: "item_e1", name: "Deep Freeze 1 (Main Godown)", category: "Equipment", storeQty: 0, unit: "Pcs", purchasePrice: 28000, minLimit: 1, supplier: "Sagar Distributors", lastPurchaseDate: "2026-07-01", barcode: "890175800252" }
+  { id: "item_e1", name: "Deep Freeze 1 (Main Godown)", category: "Equipment", storeQty: 2, unit: "Pcs", purchasePrice: 28000, minLimit: 1, supplier: "Sagar Distributors", lastPurchaseDate: "2026-07-01", barcode: "890175800252" }
 ];
 
 export default function BumBumCafeStockApp() {
@@ -251,6 +251,9 @@ export default function BumBumCafeStockApp() {
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [selectedCategory, setSelectedCategory] = useState<string>("All");
   const [isDbSeeding, setIsDbSeeding] = useState<boolean>(false);
+
+  // local temporary edits tracker for stock quantities (for manual save and offline safety)
+  const [editedQties, setEditedQties] = useState<Record<string, number>>({});
 
   // Toast HUD State & Helper
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
@@ -803,20 +806,54 @@ export default function BumBumCafeStockApp() {
     }
   };
 
-  // Quick plus-minus adjustment for Main Store Qty directly
-  const adjustQuickStoreQty = async (id: string, adjustment: number) => {
+  // Quick plus-minus adjustment for Main Store Qty locally first
+  const adjustQuickStoreQty = (id: string, adjustment: number) => {
     triggerHaptic();
     const item = inventory.find(i => i.id === id);
     if (!item) return;
 
-    if (item.storeQty + adjustment < 0) return;
+    // Get current display quantity (either edited locally or already in db)
+    const currentVal = editedQties[id] !== undefined ? editedQties[id] : item.storeQty;
+    const newVal = Math.max(0, currentVal + adjustment);
+
+    setEditedQties(prev => ({
+      ...prev,
+      [id]: newVal
+    }));
+  };
+
+  // Reset individual item stock to 0 locally
+  const setStockToZero = (id: string) => {
+    triggerHaptic();
+    setEditedQties(prev => ({
+      ...prev,
+      [id]: 0
+    }));
+    toastMessage("मात्रा 0 सेट की गई! बदलाव लागू करने के लिए 'सेव' करें।", "info");
+  };
+
+  // Direct manual save to Firestore
+  const saveItemStockQty = async (id: string) => {
+    triggerHaptic();
+    const updatedQty = editedQties[id];
+    if (updatedQty === undefined) return;
 
     try {
       await updateDoc(doc(db, "godown_inventory", id), {
-        storeQty: increment(adjustment)
+        storeQty: updatedQty,
+        lastPurchaseDate: new Date().toISOString().split('T')[0]
       });
+
+      // Clear local changes indicator for this specific item
+      setEditedQties(prev => {
+        const copy = { ...prev };
+        delete copy[id];
+        return copy;
+      });
+
+      toastMessage("नया स्टॉक सफलतापूर्वक सेव हो गया!");
     } catch (err) {
-      toastMessage("Failed to update qty.", "error");
+      toastMessage("डेटाबेस में सेव करने में त्रुटि हुई।", "error");
     }
   };
 
@@ -1366,6 +1403,11 @@ export default function BumBumCafeStockApp() {
               {filteredInventory.map(item => {
                 const isLow = item.storeQty < item.minLimit;
                 const isItemSelected = selectedItemIds.includes(item.id);
+                
+                // Get current display quantity (either edited locally or already in db)
+                const displayQty = editedQties[item.id] !== undefined ? editedQties[item.id] : item.storeQty;
+                const isDirty = editedQties[item.id] !== undefined && editedQties[item.id] !== item.storeQty;
+
                 return (
                   <div 
                     key={item.id} 
@@ -1420,28 +1462,64 @@ export default function BumBumCafeStockApp() {
                         <label className="text-[9px] font-black text-neutral-400 uppercase tracking-wider block mb-1">
                           Current Stock (हाल की वैल्यू)
                         </label>
-                        <div className="flex items-center justify-center gap-2">
-                          <button onClick={(e) => { e.stopPropagation(); adjustQuickStoreQty(item.id, -1); }} className="p-2 bg-red-100 dark:bg-red-500/10 text-red-500 rounded-xl"><MinusCircle size={14} /></button>
-                          
-                          <input 
-                            type="number"
-                            value={item.storeQty}
-                            onClick={(e) => e.stopPropagation()}
-                            onChange={(e) => {
-                              const val = parseFloat(e.target.value) || 0;
-                              setInventory(prev => prev.map(inv => inv.id === item.id ? { ...inv, storeQty: val } : inv));
-                            }}
-                            className="w-20 text-center font-black text-sm p-1.5 rounded-xl border border-neutral-200 dark:bg-neutral-800 dark:border-neutral-700 text-neutral-900 dark:text-white"
-                          />
-                          <span className="text-xs font-bold text-neutral-400 font-sans">{item.unit}</span>
+                        <div className="flex flex-col gap-2.5">
+                          <div className="flex items-center justify-center gap-2">
+                            <button 
+                              onClick={(e) => { e.stopPropagation(); adjustQuickStoreQty(item.id, -1); }} 
+                              className="p-2 bg-red-100 dark:bg-red-500/10 text-red-500 rounded-xl"
+                            >
+                              <MinusCircle size={14} />
+                            </button>
+                            
+                            <input 
+                              type="number"
+                              value={displayQty}
+                              onClick={(e) => e.stopPropagation()}
+                              onChange={(e) => {
+                                const val = parseFloat(e.target.value);
+                                setEditedQties(prev => ({
+                                  ...prev,
+                                  [item.id]: isNaN(val) ? 0 : val
+                                }));
+                              }}
+                              className="w-20 text-center font-black text-sm p-1.5 rounded-xl border border-neutral-200 dark:bg-neutral-800 dark:border-neutral-700 text-neutral-900 dark:text-white"
+                            />
+                            <span className="text-xs font-bold text-neutral-400 font-sans">{item.unit}</span>
 
-                          <button onClick={(e) => { e.stopPropagation(); adjustQuickStoreQty(item.id, 1); }} className="p-2 bg-green-100 dark:bg-green-500/10 text-green-500 rounded-xl"><PlusCircle size={14} /></button>
+                            <button 
+                              onClick={(e) => { e.stopPropagation(); adjustQuickStoreQty(item.id, 1); }} 
+                              className="p-2 bg-green-100 dark:bg-green-500/10 text-green-500 rounded-xl"
+                            >
+                              <PlusCircle size={14} />
+                            </button>
+                          </div>
+
+                          {/* Quick Save and Reset Actions inside Card */}
+                          <div className="flex justify-center gap-2">
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); setStockToZero(item.id); }}
+                              className="px-2.5 py-1 bg-red-500/10 hover:bg-red-500 hover:text-white text-red-500 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all"
+                            >
+                              🗑️ स्टॉक 0 करें
+                            </button>
+                            
+                            {isDirty && (
+                              <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); saveItemStockQty(item.id); }}
+                                className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-[10px] font-black uppercase tracking-wider rounded-lg transition-all animate-pulse"
+                              >
+                                💾 सेव करें
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>
 
                     <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-wider">
-                      <span className="text-neutral-400 font-sans">Value: ₹{(item.storeQty * item.purchasePrice).toLocaleString()}</span>
+                      <span className="text-neutral-400 font-sans">Value: ₹{(displayQty * item.purchasePrice).toLocaleString()}</span>
                       
                       <div className="flex gap-2">
                         <button 
@@ -2756,3 +2834,4 @@ export default function BumBumCafeStockApp() {
     </div>
   );
 }
+
