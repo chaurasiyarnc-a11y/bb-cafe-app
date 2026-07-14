@@ -172,7 +172,9 @@ export default function BumBumCafeStockApp() {
   const [showAuditReconcileModal, setShowAuditReconcileModal] = useState<boolean>(false);
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
-
+  const [auditItemSelect, setAuditItemSelect] = useState<string>("");
+  const [auditPhysicalCount, setAuditPhysicalCount] = useState<string>("");
+  
   // Dynamic Category Forms
   const [categoryInput, setCategoryInput] = useState<string>("");
   const [editingCategoryIndex, setEditingCategoryIndex] = useState<number | null>(null);
