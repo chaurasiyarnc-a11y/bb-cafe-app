@@ -3019,7 +3019,7 @@ export default function BbCafeHome() {
 
       {/* VERIFIED SOCIAL POINTS CLAIM MODAL */}
       <AnimatePresence>
-        {isClaimOpen && claimingPlatform && (
+        {isClaimModalOpen && claimingPlatform && (
           <div className="fixed inset-0 bg-black/95 z-[260] flex items-center justify-center p-6">
             <motion.form 
               onSubmit={handleClaimSubmit}
