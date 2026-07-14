@@ -55,6 +55,7 @@ interface InventoryItem {
   expiryDate?: string;
   batchNumber?: string;
   barcode?: string;
+  totalConsumption?: number;
 }
 
 interface TransferLog {
@@ -128,28 +129,29 @@ const triggerHaptic = (ms = 35) => {
 };
 
 // ==========================================
-// 2. MASTER INVENTORY LIST (CLASSIFIED FROM KHATABOOK PDF)
+// 2. MASTER INITIAL INVENTORY SEED DATA
 // ==========================================
 const INITIAL_INVENTORY: InventoryItem[] = [
-  // Spices & Raw Materials
-  { id: "item_1", name: "OREGON SACHETS", category: "Raw Material", storeQty: 5, cafeQty: 0, unit: "Pcs", purchasePrice: 150, minLimit: 10, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800301" },
-  { id: "item_2", name: "CHILLI FLAKES", category: "Raw Material", storeQty: 2, cafeQty: 0, unit: "Pcs", purchasePrice: 150, minLimit: 10, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800302" },
-  { id: "item_3", name: "MEDA", category: "Raw Material", storeQty: 10, cafeQty: 2, unit: "Kg", purchasePrice: 40, minLimit: 15, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800303" },
-  { id: "item_4", name: "SUGER POWDER", category: "Raw Material", storeQty: 5, cafeQty: 1, unit: "Kg", purchasePrice: 45, minLimit: 8, supplier: "Om Super Market", lastPurchaseDate: "2026-07-14", barcode: "890105800304" },
-  { id: "item_5", name: "MOZZARELLA CHEESE", category: "Dairy", storeQty: 1, cafeQty: 2, unit: "Kg", purchasePrice: 490, minLimit: 5, supplier: "Sony Dairy", lastPurchaseDate: "2026-07-14", barcode: "890105800335", expiryDate: "2026-07-16" },
-  { id: "item_6", name: "MAYONNAISE", category: "Raw Material", storeQty: 2, cafeQty: 1, unit: "Pcs", purchasePrice: 160, minLimit: 5, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800336" },
-  { id: "item_7", name: "PIZZA PASTA SAUCE", category: "Raw Material", storeQty: 8, cafeQty: 2, unit: "Pcs", purchasePrice: 160, minLimit: 10, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800338" },
+  // --- INVENTORY FROM SUMMARY REPORT ---
+  { id: "rep_1", name: "OREGON SACHETS", category: "Raw Material", storeQty: 5, cafeQty: 0, unit: "Pcs", purchasePrice: 150, minLimit: 10, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800301" },
+  { id: "rep_2", name: "CHILLI FLAKES", category: "Raw Material", storeQty: 2, cafeQty: 0, unit: "Pcs", purchasePrice: 150, minLimit: 10, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800302" },
+  { id: "rep_3", name: "FRESH YEAST KOBO", category: "Raw Material", storeQty: 0, cafeQty: 0, unit: "Pcs", purchasePrice: 80, minLimit: 5, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800303" },
+  { id: "rep_4", name: "MEDA", category: "Raw Material", storeQty: 10, cafeQty: 0, unit: "Kg", purchasePrice: 40, minLimit: 15, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800304" },
+  { id: "rep_5", name: "SUGER POWDER", category: "Raw Material", storeQty: 0, cafeQty: 0, unit: "Kg", purchasePrice: 45, minLimit: 8, supplier: "Om Super Market", lastPurchaseDate: "2026-07-14", barcode: "890105800304" },
+  { id: "rep_6", name: "MOZZARELLA CHEESE", category: "Dairy", storeQty: 1, cafeQty: 2, unit: "Kg", purchasePrice: 490, minLimit: 5, supplier: "Sony Dairy", lastPurchaseDate: "2026-07-14", barcode: "890105800335", expiryDate: "2026-07-16" },
+  { id: "rep_7", name: "MAYONNAISE", category: "Raw Material", storeQty: 2, cafeQty: 1, unit: "Pcs", purchasePrice: 160, minLimit: 5, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800336" },
+  { id: "rep_8", name: "PIZZA PASTA SAUCE", category: "Raw Material", storeQty: 8, cafeQty: 2, unit: "Pcs", purchasePrice: 160, minLimit: 10, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800338" },
   
   // Packaging & Disposables
-  { id: "item_8", name: "PIZZA BOX LARGE 10\"", category: "Packaging", storeQty: 400, cafeQty: 50, unit: "Pcs", purchasePrice: 7.50, minLimit: 100, supplier: "Narmada Packagings", lastPurchaseDate: "2026-07-14", barcode: "890105800357" },
-  { id: "item_9", name: "PIZZA BOX 8\"", category: "Packaging", storeQty: 300, cafeQty: 30, unit: "Pcs", purchasePrice: 4.50, minLimit: 100, supplier: "Narmada Packagings", lastPurchaseDate: "2026-07-14", barcode: "890105800358" },
-  { id: "item_10", name: "SILVER CONTAINER 500ML", category: "Disposable", storeQty: 150, cafeQty: 20, unit: "Pcs", purchasePrice: 3.50, minLimit: 50, supplier: "Prabhat Polymer", lastPurchaseDate: "2026-07-14", barcode: "890105800319" },
-  { id: "item_11", name: "COLD COFFEE GLASS BIG SET", category: "Disposable", storeQty: 155, cafeQty: 15, unit: "Pcs", purchasePrice: 6.50, minLimit: 50, supplier: "Prabhat Polymer", lastPurchaseDate: "2026-07-14", barcode: "890105800334" },
+  { id: "rep_9", name: "PIZZA BOX LARGE 10\"", category: "Packaging", storeQty: 400, cafeQty: 50, unit: "Pcs", purchasePrice: 7.50, minLimit: 100, supplier: "Narmada Packagings", lastPurchaseDate: "2026-07-14", barcode: "890105800357" },
+  { id: "rep_10", name: "PIZZA BOX 8\"", category: "Packaging", storeQty: 300, cafeQty: 30, unit: "Pcs", purchasePrice: 4.50, minLimit: 100, supplier: "Narmada Packagings", lastPurchaseDate: "2026-07-14", barcode: "890105800358" },
+  { id: "rep_11", name: "SILVER CONTAINER 500ML", category: "Disposable", storeQty: 150, cafeQty: 20, unit: "Pcs", purchasePrice: 3.50, minLimit: 50, supplier: "Prabhat Polymer", lastPurchaseDate: "2026-07-14", barcode: "890105800319" },
+  { id: "rep_12", name: "COLD COFFEE GLASS BIG SET", category: "Disposable", storeQty: 155, cafeQty: 15, unit: "Pcs", purchasePrice: 6.50, minLimit: 50, supplier: "Prabhat Polymer", lastPurchaseDate: "2026-07-14", barcode: "890105800334" },
   
   // Frozen Material & Equipment
-  { id: "item_12", name: "FRENCH FRIES", category: "Frozen Material", storeQty: 40, cafeQty: 10, unit: "Kg", purchasePrice: 110, minLimit: 15, supplier: "Sagar Distributors", lastPurchaseDate: "2026-07-12", expiryDate: "2026-10-12", batchNumber: "B-FF890", barcode: "890175800249" },
-  { id: "item_13", name: "VEG PATTY", category: "Frozen Material", storeQty: 100, cafeQty: 25, unit: "Pcs", purchasePrice: 18, minLimit: 30, supplier: "Sagar Distributors", lastPurchaseDate: "2026-07-12", expiryDate: "2026-09-12", batchNumber: "B-VP441", barcode: "890175800250" },
-  { id: "item_14", name: "DEEP FREEZE", category: "Equipment", storeQty: 2, cafeQty: 1, unit: "Pcs", purchasePrice: 28000, minLimit: 1, supplier: "Sagar Distributors", lastPurchaseDate: "2026-07-01", barcode: "890175800252" }
+  { id: "item_13", name: "FRENCH FRIES", category: "Frozen Material", storeQty: 40, cafeQty: 10, unit: "Kg", purchasePrice: 110, minLimit: 15, supplier: "Sagar Distributors", lastPurchaseDate: "2026-07-12", expiryDate: "2026-10-12", batchNumber: "B-FF890", barcode: "890175800249" },
+  { id: "item_14", name: "VEG PATTY", category: "Frozen Material", storeQty: 100, cafeQty: 25, unit: "Pcs", purchasePrice: 18, minLimit: 30, supplier: "Sagar Distributors", lastPurchaseDate: "2026-07-12", expiryDate: "2026-09-12", batchNumber: "B-VP441", barcode: "890175800250" },
+  { id: "item_15", name: "DEEP FREEZE", category: "Equipment", storeQty: 2, cafeQty: 1, unit: "Pcs", purchasePrice: 28000, minLimit: 1, supplier: "Sagar Distributors", lastPurchaseDate: "2026-07-01", barcode: "890175800252" }
 ];
 
 export default function BumBumCafeStockApp() {
@@ -164,7 +166,7 @@ export default function BumBumCafeStockApp() {
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [selectedCategory, setSelectedCategory] = useState<string>("All");
   
-  // Panels & Drawers
+  // Slide-out panels & Drawers
   const [showNotifications, setShowNotifications] = useState<boolean>(false);
   const [selectedItemDetail, setSelectedItemDetail] = useState<InventoryItem | null>(null);
   const [scannerActive, setScannerActive] = useState<boolean>(false);
@@ -756,7 +758,6 @@ export default function BumBumCafeStockApp() {
     );
 
     if (variance !== 0) {
-      // Log as stock out variance adjust
       const newLog: StockOutLog = {
         id: `so_audit_${Date.now()}`,
         itemName: targetItem.name,
@@ -796,6 +797,30 @@ export default function BumBumCafeStockApp() {
     } else {
       toastMessage("तापमान रिकॉर्ड सुरक्षित किया गया।");
     }
+  };
+
+  // Export CSV/Excel Function
+  const triggerSimulationExport = (reportName: string) => {
+    const headers = ["Item Name", "Category", "Quantity", "Unit", "Total Value (INR)", "Status"];
+    const rows = inventory.map(item => [
+      item.name,
+      item.category,
+      item.storeQty + item.cafeQty,
+      item.unit,
+      (item.storeQty + item.cafeQty) * item.purchasePrice,
+      (item.storeQty + item.cafeQty) === 0 ? "Out of Stock" : (item.storeQty + item.cafeQty) < item.minLimit ? "Low Stock" : "Normal"
+    ]);
+
+    const csvContent = "data:text/csv;charset=utf-8," 
+      + [headers.join(","), ...rows.map(e => e.join(","))].join("\n");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `${reportName}_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toastMessage(`Downloaded: ${reportName} (CSV)!`);
   };
 
   return (
@@ -1512,11 +1537,11 @@ export default function BumBumCafeStockApp() {
               </div>
             )}
 
-            {/* D. MANAGE SUPPLIERS WITH CREDIT LEDGER */}
+            {/* D. MANAGE SUPPLIERS WITH ADD, EDIT & DELETE */}
             {currentView === 'suppliers_list' && (
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-xs font-black uppercase tracking-widest text-[#FF6B00]">Supplier Register & Credit</h3>
+                  <h3 className="text-xs font-black uppercase tracking-widest text-[#FF6B00]">Supplier Register</h3>
                   <button onClick={() => setCurrentView('more_home')} className="text-xs text-orange-500 font-bold uppercase tracking-wider">Back</button>
                 </div>
 
@@ -1691,13 +1716,13 @@ export default function BumBumCafeStockApp() {
 
                 <div className={`p-5 rounded-3xl border space-y-4 text-xs ${isDarkMode ? 'bg-[#1A1A1A] border-neutral-800' : 'bg-white border-neutral-100'}`}>
                   <div>
-                    <h4 className="font-bold text-sm">Align Stock discrepancies</h4>
+                    <h4 className="font-bold text-sm font-sans">Align Stock discrepancies</h4>
                     <p className="text-[9px] text-neutral-400 uppercase tracking-wide mt-0.5">Compare counted shelf stock against database numbers</p>
                   </div>
 
                   <button 
                     onClick={() => setShowAuditReconcileModal(true)}
-                    className="w-full p-3.5 bg-orange-500 hover:bg-orange-600 text-white rounded-2xl font-black uppercase text-xs tracking-wider"
+                    className="w-full p-3.5 bg-[#FF6B00] hover:bg-orange-600 text-white rounded-2xl font-black uppercase text-xs tracking-wider"
                   >
                     Start Stock Audit Alignment
                   </button>
@@ -1710,7 +1735,7 @@ export default function BumBumCafeStockApp() {
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <h3 className="text-xs font-black uppercase tracking-widest text-neutral-400">Equipment Register & Service</h3>
-                  <button onClick={() => setCurrentView('more_home')} className="text-xs text-orange-500 font-bold uppercase tracking-wider">Back</button>
+                  <button onClick={() => setCurrentView('more_home')} className="text-xs text-[#FF6B00] font-bold uppercase tracking-wider">Back</button>
                 </div>
 
                 <div className="grid grid-cols-1 gap-2.5 text-xs">
@@ -2073,7 +2098,7 @@ export default function BumBumCafeStockApp() {
               {!scannedProductDetected ? (
                 <form onSubmit={handleBarcodeManualScan} className="space-y-4 text-xs text-left">
                   <div className="space-y-1.5">
-                    <label className="text-[8px] font-black uppercase tracking-wider text-neutral-500">Simulate Scan (Select Packed Material Barcode)</label>
+                    <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400">Simulate Scan (Select Packed Material Barcode)</label>
                     <select 
                       onChange={e => setScannerManualBarcode(e.target.value)}
                       value={scannerManualBarcode}
@@ -2384,7 +2409,6 @@ export default function BumBumCafeStockApp() {
                 <p className="text-red-500 text-xs font-bold">Next Service Due: {selectedEquipmentQR.nextService}</p>
               </div>
 
-              {/* Simulated QR Code Layout */}
               <div className="p-4 bg-white rounded-3xl w-40 h-44 mx-auto flex items-center justify-center shadow-lg border border-neutral-100">
                 <QrCode size={120} className="text-black" />
               </div>
