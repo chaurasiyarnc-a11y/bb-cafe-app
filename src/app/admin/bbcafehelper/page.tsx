@@ -287,7 +287,16 @@ export default function BumBumCafeStockApp() {
       setIsDbSeeding(false);
     }
   };
-
+// Global search & categorized filtering
+  const filteredInventory = useMemo(() => {
+    return inventory.filter(item => {
+      const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                            item.supplier.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                            item.category.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesCategory = selectedCategory === "All" || item.category === selectedCategory;
+      return matchesSearch && matchesCategory;
+    });
+  }, [inventory, searchQuery, selectedCategory]);
   // Notifications pool
   const notificationsList = useMemo<NotificationItem[]>(() => {
     const list: NotificationItem[] = [];
