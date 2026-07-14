@@ -37,9 +37,8 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-// Firebase Firestore Imports
-// नोट: यदि आपका firebase configuration पाथ अलग है, तो कृपया नीचे दिए गए पाथ को तदनुसार बदलें।
-import { db } from './firebaseConfig'; 
+// आपके GitHub स्क्रीनशॉट (src/lib/firebase.ts) के अनुसार इम्पोर्ट पाथ:
+import { db } from '@/lib/firebase'; 
 import { 
   collection, 
   onSnapshot, 
