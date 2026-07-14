@@ -1,9 +1,4 @@
-कैटालॉग की सभी सामग्रियों (जैसे: Oregon sachets, Chilli flakes, Meda,
-Mayonnaise, Pizza Pasta Sauce, Sliced Olives, Pizza Boxes) को उनकी सटीक मात्रा
-(Stock Count), वास्तविक खरीद मूल्य (calculated per unit) और सही कैटेगरी के साथ
-मुख्य गोडाउन डेटाबेस में जोड़ दिया गया है।
 
-नीचे संवर्धित और पूर्णतः डिप्लॉयमेंट-रेडी कोड दिया गया है:
 
 'use client';
 
