@@ -1,6 +1,9 @@
-यहाँ संशोधित और पूर्ण कोड दिया गया है। आपकी माँग के अनुसार इसमें से Helper रोल
-(और उससे संबंधित सभी कोड/बटन) और Unused (अनुपयोगी) इम्पोर्ट्स व कोड को हटाकर ऐप
-को पूरी तरह से क्लीन और केवल एडमिन-केंद्रित (Admin-focused) बना दिया गया है:
+कैटालॉग की सभी सामग्रियों (जैसे: Oregon sachets, Chilli flakes, Meda,
+Mayonnaise, Pizza Pasta Sauce, Sliced Olives, Pizza Boxes) को उनकी सटीक मात्रा
+(Stock Count), वास्तविक खरीद मूल्य (calculated per unit) और सही कैटेगरी के साथ
+मुख्य गोडाउन डेटाबेस में जोड़ दिया गया है।
+
+नीचे संवर्धित और पूर्णतः डिप्लॉयमेंट-रेडी कोड दिया गया है:
 
 'use client';
 
@@ -115,35 +118,85 @@ const triggerHaptic = (ms = 35) => {
 // 2. MASTER INITIAL INVENTORY SEED DATA
 // ==========================================
 const INITIAL_INVENTORY: InventoryItem[] = [
-  { id: "item_1", name: "TABLE RICE", category: "Raw Material", storeQty: 120, cafeQty: 15, unit: "Kg", purchasePrice: 52, minLimit: 30, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-10", expiryDate: "2027-01-10", batchNumber: "B-TR889", barcode: "890105800231" },
-  { id: "item_2", name: "KHICHDI RICE", category: "Raw Material", storeQty: 80, cafeQty: 10, unit: "Kg", purchasePrice: 48, minLimit: 20, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-08", expiryDate: "2026-12-15", batchNumber: "B-KR112", barcode: "890105800232" },
-  { id: "item_3", name: "TUAR DAL", category: "Raw Material", storeQty: 50, cafeQty: 8, unit: "Kg", purchasePrice: 145, minLimit: 15, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-11", expiryDate: "2026-11-20", batchNumber: "B-TD402", barcode: "890105800233" },
-  { id: "item_4", name: "MUG FADA", category: "Raw Material", storeQty: 30, cafeQty: 5, unit: "Kg", purchasePrice: 110, minLimit: 10, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-12", expiryDate: "2026-10-30", batchNumber: "B-MF122", barcode: "890105800234" },
-  { id: "item_5", name: "BESAN", category: "Raw Material", storeQty: 45, cafeQty: 12, unit: "Kg", purchasePrice: 85, minLimit: 12, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-13", expiryDate: "2026-09-15", batchNumber: "B-BS009", barcode: "890105800235" },
-  { id: "item_6", name: "SUGER", category: "Raw Material", storeQty: 15, cafeQty: 2, unit: "Kg", purchasePrice: 44, minLimit: 25, supplier: "Om Super Market", lastPurchaseDate: "2026-07-02", expiryDate: "2027-07-02", batchNumber: "B-SU88", barcode: "890105800236" },
-  { id: "item_7", name: "OIL TIN", category: "Raw Material", storeQty: 12, cafeQty: 2, unit: "Tins", purchasePrice: 1950, minLimit: 5, supplier: "Sagar Distributors", lastPurchaseDate: "2026-07-05", expiryDate: "2027-05-01", batchNumber: "B-OT55", barcode: "890105800237" },
-  { id: "item_8", name: "SINGDANA", category: "Raw Material", storeQty: 20, cafeQty: 4, unit: "Kg", purchasePrice: 120, minLimit: 8, supplier: "Om Super Market", lastPurchaseDate: "2026-07-09", expiryDate: "2026-12-09", batchNumber: "B-SD02", barcode: "890105800238" },
-  { id: "item_9", name: "GHEE", category: "Dairy", storeQty: 10, cafeQty: 1, unit: "Kg", purchasePrice: 680, minLimit: 3, supplier: "Sony Dairy", lastPurchaseDate: "2026-07-11", expiryDate: "2026-11-11", batchNumber: "B-GH11", barcode: "890105800239" },
-  { id: "item_10", name: "BUTTER", category: "Dairy", storeQty: 24, cafeQty: 5, unit: "Kg", purchasePrice: 420, minLimit: 8, supplier: "Sony Dairy", lastPurchaseDate: "2026-07-12", expiryDate: "2026-07-15", batchNumber: "B-BT22", barcode: "890105800240" },
-  { id: "item_11", name: "CHEESE", category: "Dairy", storeQty: 18, cafeQty: 3, unit: "Kg", purchasePrice: 440, minLimit: 5, supplier: "Sony Dairy", lastPurchaseDate: "2026-07-12", expiryDate: "2026-07-16", batchNumber: "B-CH44", barcode: "890105800241" },
-  { id: "item_12", name: "GAS BOTAL", category: "Others", storeQty: 4, cafeQty: 1, unit: "Pcs", purchasePrice: 1150, minLimit: 2, supplier: "Bharat Gas", lastPurchaseDate: "2026-07-01", expiryDate: "2030-01-01", batchNumber: "B-GB11", barcode: "890105800242" },
+  // --- INVENTORY FROM SUMMARY REPORT ---
+  { id: "rep_1", name: "OREGON SACHETS", category: "Raw Material", storeQty: 5, cafeQty: 0, unit: "Pcs", purchasePrice: 120, minLimit: 10, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800301" },
+  { id: "rep_2", name: "CHILLI FLAKES", category: "Raw Material", storeQty: 2, cafeQty: 0, unit: "Pcs", purchasePrice: 120, minLimit: 10, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800302" },
+  { id: "rep_3", name: "FRESH YEAST KOBO", category: "Raw Material", storeQty: 0, cafeQty: 0, unit: "Pcs", purchasePrice: 80, minLimit: 5, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800303" },
+  { id: "rep_4", name: "MEDA", category: "Raw Material", storeQty: 10, cafeQty: 0, unit: "Kg", purchasePrice: 32, minLimit: 15, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800304" },
+  { id: "rep_5", name: "SUGER POWDER", category: "Raw Material", storeQty: 0, cafeQty: 0, unit: "Kg", purchasePrice: 38, minLimit: 10, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800305" },
+  { id: "rep_6", name: "MILK POWDER", category: "Raw Material", storeQty: 0, cafeQty: 0, unit: "Kg", purchasePrice: 140, minLimit: 5, supplier: "Sony Dairy", lastPurchaseDate: "2026-07-14", barcode: "890105800306" },
+  { id: "rep_7", name: "BREAD IMPROVER _1", category: "Raw Material", storeQty: 0, cafeQty: 0, unit: "Pcs", purchasePrice: 210, minLimit: 3, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800307" },
+  { id: "rep_8", name: "SALT", category: "Raw Material", storeQty: 0, cafeQty: 0, unit: "Kg", purchasePrice: 20, minLimit: 10, supplier: "Om Super Market", lastPurchaseDate: "2026-07-14", barcode: "890105800308" },
+  { id: "rep_9", name: "MIRCHI POWDER", category: "Raw Material", storeQty: 0, cafeQty: 0, unit: "Kg", purchasePrice: 420, minLimit: 5, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800309" },
+  { id: "rep_10", name: "MONO SODIUM GLUTAMATE", category: "Raw Material", storeQty: 0, cafeQty: 0, unit: "Kg", purchasePrice: 85, minLimit: 5, supplier: "Om Super Market", lastPurchaseDate: "2026-07-14", barcode: "890105800310" },
+  { id: "rep_11", name: "BLACK PEPPER", category: "Raw Material", storeQty: 0, cafeQty: 0, unit: "Kg", purchasePrice: 550, minLimit: 4, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800311" },
+  { id: "rep_12", name: "BURGER BUN", category: "Raw Material", storeQty: 0, cafeQty: 0, unit: "Pcs", purchasePrice: 6, minLimit: 30, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800312" },
+  { id: "rep_13", name: "SANDWICH BREAD", category: "Raw Material", storeQty: 0, cafeQty: 0, unit: "Pcs", purchasePrice: 55, minLimit: 12, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800313" },
+  { id: "rep_14", name: "NAMKEEN POHA", category: "Raw Material", storeQty: 0, cafeQty: 0, unit: "Kg", purchasePrice: 110, minLimit: 10, supplier: "Om Super Market", lastPurchaseDate: "2026-07-14", barcode: "890105800314" },
+  { id: "rep_15", name: "CUMIN SEEDS JEERA", category: "Raw Material", storeQty: 0, cafeQty: 0, unit: "Kg", purchasePrice: 320, minLimit: 5, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800315" },
+  { id: "rep_16", name: "FENNEL SEEDS SAUNF", category: "Raw Material", storeQty: 0, cafeQty: 0, unit: "Kg", purchasePrice: 240, minLimit: 5, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800316" },
+  { id: "rep_17", name: "MUSTARD SEEDS RAI", category: "Raw Material", storeQty: 0, cafeQty: 0, unit: "Kg", purchasePrice: 120, minLimit: 5, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800317" },
+  { id: "rep_18", name: "COCOA POWDER", category: "Raw Material", storeQty: 0, cafeQty: 0, unit: "Kg", purchasePrice: 380, minLimit: 3, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800318" },
   
-  // --- PACKAGING ---
-  { id: "item_13", name: "TEASSU PAPER", category: "Packaging", storeQty: 500, cafeQty: 150, unit: "Pcs", purchasePrice: 0.8, minLimit: 200, supplier: "Narmada Packagings", lastPurchaseDate: "2026-07-10", barcode: "890105800243" },
-  { id: "item_14", name: "THALI PLASTIC", category: "Disposable", storeQty: 150, cafeQty: 20, unit: "Pcs", purchasePrice: 4.5, minLimit: 50, supplier: "Narmada Packagings", lastPurchaseDate: "2026-07-11", barcode: "890105800244" },
-  { id: "item_15", name: "CONTENOR 500ML", category: "Disposable", storeQty: 400, cafeQty: 80, unit: "Pcs", purchasePrice: 5.2, minLimit: 100, supplier: "Prabhat Polymer", lastPurchaseDate: "2026-07-12", barcode: "890105800245" },
-  { id: "item_16", name: "CONTENOR 250ML", category: "Disposable", storeQty: 450, cafeQty: 90, unit: "Pcs", purchasePrice: 3.8, minLimit: 100, supplier: "Prabhat Polymer", lastPurchaseDate: "2026-07-12", barcode: "890105800246" },
+  // CONTAINER/FOILS DISPOSABLES
+  { id: "rep_19", name: "SILVER CONTAINER 500ML", category: "Disposable", storeQty: 0, cafeQty: 0, unit: "Pcs", purchasePrice: 4.5, minLimit: 100, supplier: "Prabhat Polymer", lastPurchaseDate: "2026-07-14", barcode: "890105800319" },
+  { id: "rep_20", name: "SILVER CONTAINER 200ML", category: "Disposable", storeQty: 0, cafeQty: 0, unit: "Pcs", purchasePrice: 3.2, minLimit: 100, supplier: "Prabhat Polymer", lastPurchaseDate: "2026-07-14", barcode: "890105800320" },
+  { id: "rep_21", name: "BUTTER PAPER ROLL", category: "Disposable", storeQty: 0, cafeQty: 0, unit: "Pcs", purchasePrice: 110, minLimit: 10, supplier: "Narmada Packagings", lastPurchaseDate: "2026-07-14", barcode: "890105800321" },
+  { id: "rep_22", name: "SILVER FOIL", category: "Disposable", storeQty: 0, cafeQty: 0, unit: "Pcs", purchasePrice: 120, minLimit: 10, supplier: "Narmada Packagings", lastPurchaseDate: "2026-07-14", barcode: "890105800322" },
+  { id: "rep_23", name: "PLASTIC CONTAINERS 200ML", category: "Disposable", storeQty: 0, cafeQty: 0, unit: "Pcs", purchasePrice: 2.8, minLimit: 100, supplier: "Prabhat Polymer", lastPurchaseDate: "2026-07-14", barcode: "890105800323" },
+  { id: "rep_24", name: "PLASTIC CONTAINERS 500ML", category: "Disposable", storeQty: 0, cafeQty: 0, unit: "Pcs", purchasePrice: 4.2, minLimit: 100, supplier: "Prabhat Polymer", lastPurchaseDate: "2026-07-14", barcode: "890105800324" },
+  { id: "rep_25", name: "PLASTIC SPOON", category: "Disposable", storeQty: 0, cafeQty: 0, unit: "Pcs", purchasePrice: 0.9, minLimit: 300, supplier: "Prabhat Polymer", lastPurchaseDate: "2026-07-14", barcode: "890105800325" },
+  { id: "rep_26", name: "PLASTIC FORKS", category: "Disposable", storeQty: 0, cafeQty: 0, unit: "Pcs", purchasePrice: 0.9, minLimit: 300, supplier: "Prabhat Polymer", lastPurchaseDate: "2026-07-14", barcode: "890105800326" },
+  { id: "rep_27", name: "PAPER PLATE 12NO", category: "Disposable", storeQty: 0, cafeQty: 0, unit: "Pcs", purchasePrice: 2.5, minLimit: 150, supplier: "Narmada Packagings", lastPurchaseDate: "2026-07-14", barcode: "890105800327" },
+  { id: "rep_28", name: "PAPER KATORI", category: "Disposable", storeQty: 0, cafeQty: 0, unit: "Pcs", purchasePrice: 0.7, minLimit: 200, supplier: "Narmada Packagings", lastPurchaseDate: "2026-07-14", barcode: "890105800328" },
+  { id: "rep_29", name: "PAPER PALT RICE", category: "Disposable", storeQty: 0, cafeQty: 0, unit: "Pcs", purchasePrice: 1.8, minLimit: 200, supplier: "Narmada Packagings", lastPurchaseDate: "2026-07-14", barcode: "890105800329" },
   
-  // --- BEVERAGES ---
-  { id: "item_17", name: "THUMSUP 750ML", category: "Beverages", storeQty: 48, cafeQty: 12, unit: "Pcs", purchasePrice: 40, minLimit: 24, supplier: "Coca-Cola Agency", lastPurchaseDate: "2026-07-05", expiryDate: "2026-11-05", batchNumber: "B-TS75", barcode: "890175800247" },
-  { id: "item_18", name: "SPRITE 750ML", category: "Beverages", storeQty: 36, cafeQty: 8, unit: "Pcs", purchasePrice: 40, minLimit: 24, supplier: "Coca-Cola Agency", lastPurchaseDate: "2026-07-05", expiryDate: "2026-11-05", batchNumber: "B-SP75", barcode: "890175800248" },
+  // CONDIMENTS & SAUCES
+  { id: "rep_30", name: "HALDI POWDER", category: "Raw Material", storeQty: 0, cafeQty: 0, unit: "Kg", purchasePrice: 210, minLimit: 5, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800330" },
+  { id: "rep_31", name: "KITCHEN KING MASALA", category: "Raw Material", storeQty: 0, cafeQty: 0, unit: "Pcs", purchasePrice: 72, minLimit: 10, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800331" },
+  { id: "rep_32", name: "NAMKEEN BHEL", category: "Raw Material", storeQty: 0, cafeQty: 0, unit: "Kg", purchasePrice: 130, minLimit: 10, supplier: "Om Super Market", lastPurchaseDate: "2026-07-14", barcode: "890105800332" },
+  { id: "rep_33", name: "MURMURA", category: "Raw Material", storeQty: 0, cafeQty: 0, unit: "Kg", purchasePrice: 65, minLimit: 10, supplier: "Om Super Market", lastPurchaseDate: "2026-07-14", barcode: "890105800333" },
+  { id: "rep_34", name: "COLD COFFEE GLASS BIG SET", category: "Disposable", storeQty: 155, cafeQty: 0, unit: "Pcs", purchasePrice: 6.5, minLimit: 50, supplier: "Prabhat Polymer", lastPurchaseDate: "2026-07-14", barcode: "890105800334" },
+  { id: "rep_35", name: "MOZZARELLA CHEESE", category: "Dairy", storeQty: 1, cafeQty: 0, unit: "Kg", purchasePrice: 490, minLimit: 5, supplier: "Sony Dairy", lastPurchaseDate: "2026-07-14", barcode: "890105800335" },
+  { id: "rep_36", name: "MAYONNAISE", category: "Raw Material", storeQty: 2, cafeQty: 0, unit: "Kg", purchasePrice: 80, minLimit: 4, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800336" },
+  { id: "rep_37", name: "1000 ICELAND SAUCE", category: "Raw Material", storeQty: 2, cafeQty: 0, unit: "Pcs", purchasePrice: 190, minLimit: 4, supplier: "Om Super Market", lastPurchaseDate: "2026-07-14", barcode: "890105800337" },
+  { id: "rep_38", name: "PIZZA PASTA SAUCE", category: "Raw Material", storeQty: 8, cafeQty: 0, unit: "Pcs", purchasePrice: 160, minLimit: 5, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800338" },
+  { id: "rep_39", name: "CREMICA TOMATO KETCHUP", category: "Raw Material", storeQty: 8, cafeQty: 0, unit: "Pcs", purchasePrice: 65, minLimit: 10, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800339" },
+  { id: "rep_40", name: "LIQUID CHEESE", category: "Dairy", storeQty: 6, cafeQty: 0, unit: "Kg", purchasePrice: 185, minLimit: 4, supplier: "Sony Dairy", lastPurchaseDate: "2026-07-14", barcode: "890105800340" },
+  { id: "rep_41", name: "TOMAKHAN MAYONNAISE", category: "Raw Material", storeQty: 0, cafeQty: 0, unit: "Pcs", purchasePrice: 220, minLimit: 3, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800341" },
+  { id: "rep_42", name: "VEG TANDOORI MAYONNAISE", category: "Raw Material", storeQty: 2, cafeQty: 0, unit: "Pcs", purchasePrice: 190, minLimit: 4, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800342" },
+  { id: "rep_43", name: "GARLIC CHILLI SAUCE", category: "Raw Material", storeQty: 1, cafeQty: 0, unit: "Pcs", purchasePrice: 160, minLimit: 3, supplier: "Om Super Market", lastPurchaseDate: "2026-07-14", barcode: "890105800343" },
+  { id: "rep_44", name: "JALAPENO CHEESE DRESSING", category: "Raw Material", storeQty: 1, cafeQty: 0, unit: "Pcs", purchasePrice: 240, minLimit: 3, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800344" },
+  { id: "rep_45", name: "BURGER MAYONNAISE", category: "Raw Material", storeQty: 0, cafeQty: 0, unit: "Pcs", purchasePrice: 190, minLimit: 3, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800345" },
+  { id: "rep_46", name: "TOMATO KETCHUP", category: "Raw Material", storeQty: 0, cafeQty: 0, unit: "Pcs", purchasePrice: 95, minLimit: 10, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800346" },
+  { id: "rep_47", name: "MSG", category: "Raw Material", storeQty: 6, cafeQty: 0, unit: "Kg", purchasePrice: 80, minLimit: 3, supplier: "Om Super Market", lastPurchaseDate: "2026-07-14", barcode: "890105800347" },
+  { id: "rep_48", name: "CALCIUM POWDER", category: "Raw Material", storeQty: 0, cafeQty: 0, unit: "Kg", purchasePrice: 180, minLimit: 3, supplier: "Om Super Market", lastPurchaseDate: "2026-07-14", barcode: "890105800348" },
+  { id: "rep_49", name: "SLICED BLACK OLIVES", category: "Raw Material", storeQty: 3, cafeQty: 0, unit: "Pcs", purchasePrice: 140, minLimit: 5, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800349" },
+  { id: "rep_50", name: "SLICED RED PAPRIKA", category: "Raw Material", storeQty: 1, cafeQty: 0, unit: "Pcs", purchasePrice: 140, minLimit: 5, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800350" },
+  { id: "rep_51", name: "JALAPENO SLICE", category: "Raw Material", storeQty: 3, cafeQty: 0, unit: "Pcs", purchasePrice: 140, minLimit: 5, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800351" },
+  { id: "rep_52", name: "CHOCOLATE SYRUP", category: "Raw Material", storeQty: 1, cafeQty: 0, unit: "Pcs", purchasePrice: 160, minLimit: 4, supplier: "Om Super Market", lastPurchaseDate: "2026-07-14", barcode: "890105800352" },
+  { id: "rep_53", name: "COLD COFFEE GLASS STRAW & CAP", category: "Disposable", storeQty: 75, cafeQty: 0, unit: "Pcs", purchasePrice: 5.0, minLimit: 50, supplier: "Prabhat Polymer", lastPurchaseDate: "2026-07-14", barcode: "890105800353" },
+  
+  // PIZZA BASE & BOXES
+  { id: "rep_54", name: "PIZZA BASE LARGE", category: "Raw Material", storeQty: 0, cafeQty: 0, unit: "Pcs", purchasePrice: 12, minLimit: 20, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800354" },
+  { id: "rep_55", name: "PIZZA BASE SMALL 6\"", category: "Raw Material", storeQty: 0, cafeQty: 0, unit: "Pcs", purchasePrice: 7, minLimit: 20, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800355" },
+  { id: "rep_56", name: "PIZZA BASE MEDIUM 8\"", category: "Raw Material", storeQty: 0, cafeQty: 0, unit: "Pcs", purchasePrice: 10, minLimit: 20, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800356" },
+  { id: "rep_57", name: "PIZZA BOX LARGE 10\"", category: "Packaging", storeQty: 400, cafeQty: 0, unit: "Pcs", purchasePrice: 7.50, minLimit: 100, supplier: "Narmada Packagings", lastPurchaseDate: "2026-07-14", barcode: "890105800357" },
+  { id: "rep_58", name: "PIZZA BOX 8\"", category: "Packaging", storeQty: 300, cafeQty: 0, unit: "Pcs", purchasePrice: 4.50, minLimit: 100, supplier: "Narmada Packagings", lastPurchaseDate: "2026-07-14", barcode: "890105800358" },
+  { id: "rep_59", name: "PIZZA BOX 7\"", category: "Packaging", storeQty: 800, cafeQty: 0, unit: "Pcs", purchasePrice: 3.60, minLimit: 150, supplier: "Narmada Packagings", lastPurchaseDate: "2026-07-14", barcode: "890105800359" },
+
+  // --- CORE SYSTEM EQUIPMENT & FROZEN PRE-SETS ---
+  { id: "item_19", name: "FRENCH FRIES", category: "Frozen Material", storeQty: 40, cafeQty: 10, unit: "Kg", purchasePrice: 110, minLimit: 15, supplier: "Sagar Distributors", lastPurchaseDate: "2026-07-12", expiryDate: "2026-10-12", batchNumber: "B-FF890", barcode: "890175800249" },
+  { id: "item_20", name: "VEG PATTY", category: "Frozen Material", storeQty: 100, cafeQty: 25, unit: "Pcs", purchasePrice: 18, minLimit: 30, supplier: "Sagar Distributors", lastPurchaseDate: "2026-07-12", expiryDate: "2026-09-12", batchNumber: "B-VP441", barcode: "890175800250" },
+  { id: "item_21", name: "PANEER POPPERS", category: "Frozen Material", storeQty: 60, cafeQty: 15, unit: "Pcs", purchasePrice: 15, minLimit: 20, supplier: "Sony Dairy", lastPurchaseDate: "2026-07-11", expiryDate: "2026-09-11", batchNumber: "B-PP902", barcode: "890175800251" },
+  { id: "item_22", name: "DEEP FREEZE", category: "Equipment", storeQty: 2, cafeQty: 1, unit: "Pcs", purchasePrice: 28000, minLimit: 1, supplier: "Sagar Distributors", lastPurchaseDate: "2026-07-01", barcode: "890175800252" }
 ];
 
 export default function BumBumCafeStockApp() {
   // Global States
   const [inventory, setInventory] = useState<InventoryItem[]>(INITIAL_INVENTORY);
   const [categories, setCategories] = useState<string[]>([
-    "Raw Material", "Packaging", "Disposable", "Beverages", "Dairy", "Cleaning", "Equipment", "Others"
+    "Raw Material", "Packaging", "Disposable", "Beverages", "Dairy", "Frozen Material", "Cleaning", "Equipment", "Others"
   ]);
   const [activeTab, setActiveTab] = useState<'home' | 'store' | 'cafe' | 'transfer' | 'more'>('home');
   const [currentView, setCurrentView] = useState<string>('dashboard');
@@ -356,6 +409,7 @@ export default function BumBumCafeStockApp() {
       })
     );
 
+    // Save purchase history audit with routed target location
     const newPurchase: PurchaseLog = {
       id: `p_${Date.now()}`,
       itemName: scannedProductDetected.name,
@@ -1990,7 +2044,7 @@ export default function BumBumCafeStockApp() {
                   <select 
                     value={formStockIn.unit}
                     onChange={e => setFormStockIn({...formStockIn, unit: e.target.value})}
-                    className="w-full p-2.5 rounded-xl border dark:bg-neutral-800"
+                    className="w-full p-3 rounded-xl border dark:bg-neutral-800 cursor-pointer"
                   >
                     <option value="Kg">Kg</option>
                     <option value="Pcs">Pcs</option>
