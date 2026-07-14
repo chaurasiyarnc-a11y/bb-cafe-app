@@ -43,7 +43,7 @@ interface InventoryItem {
   name: string;
   category: string;
   storeQty: number;
-  cafeQty: number;
+  cafeQty: number; '?'
   unit: string;
   purchasePrice: number;
   minLimit: number;
