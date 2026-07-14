@@ -4,6 +4,7 @@ import React, { useState, useMemo } from 'react';
 import { 
   Home, 
   Store, 
+  Flame, 
   MoreHorizontal, 
   Search, 
   Plus, 
@@ -29,7 +30,8 @@ import {
   ChevronRight, 
   Sparkles,
   Edit,
-  AlertTriangle
+  AlertTriangle,
+  Printer
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -102,6 +104,12 @@ interface TemperatureLog {
   time: string;
   temp: number;
   by: string;
+}
+
+interface PrintGroup {
+  id: string;
+  name: string;
+  itemIds: string[];
 }
 
 const triggerHaptic = (ms = 35) => {
@@ -234,12 +242,25 @@ export default function BumBumCafeStockApp() {
   const [categories, setCategories] = useState<string[]>([
     "Dairy", "Vegetables", "Grains & Bakery", "Rice & Pulses", "Dry Fruits", "Oils", "Spices", "Sauces & Condiments", "Beverage Materials", "Pizza Toppings", "Ready-to-Use Items", "Packaging", "Equipment", "Others"
   ]);
-  const [activeTab, setActiveTab] = useState<'home' | 'store' | 'more'>('home');
+  const [activeTab, setActiveTab] = useState<'home' | 'store' | 'print' | 'more'>('home');
   const [currentView, setCurrentView] = useState<string>('dashboard');
   const [isDarkMode, setIsDarkMode] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [selectedCategory, setSelectedCategory] = useState<string>("All");
   
+  // Custom Dynamic Print Groups State (Tập hợp in tùy chỉnh)
+  const [printGroups, setPrintGroups] = useState<PrintGroup[]>([
+    { id: "prg_1", name: "Daily Morning Audit", itemIds: ["dry_1", "dry_3", "grain_8"] },
+    { id: "prg_2", name: "Urgent Supplier Orders", itemIds: ["dry_6", "pkg_3", "pkg_6"] }
+  ]);
+
+  // Selection states for custom dynamic print routing
+  const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
+  const [isMultiSelectMode, setIsMultiSelectMode] = useState<boolean>(false);
+  const [showAddToGroupModal, setShowAddToGroupModal] = useState<boolean>(false);
+  const [newGroupNameInput, setNewGroupNameInput] = useState<string>("");
+  const [activePrintGroupId, setActivePrintGroup] = useState<string>("All");
+
   // Slide-out panels & Drawers
   const [showNotifications, setShowNotifications] = useState<boolean>(false);
   const [selectedItemDetail, setSelectedItemDetail] = useState<InventoryItem | null>(null);
@@ -340,10 +361,11 @@ export default function BumBumCafeStockApp() {
   }, [inventory]);
 
   // Handle Bottom Nav clicks (routing simulator)
-  const handleNavClick = (tab: 'home' | 'store' | 'more') => {
+  const handleNavClick = (tab: 'home' | 'store' | 'print' | 'more') => {
     setActiveTab(tab);
     if (tab === 'home') setCurrentView('dashboard');
     else if (tab === 'store') setCurrentView('main_store');
+    else if (tab === 'print') setCurrentView('print_items');
   };
 
   // Dashboard calculation selectors
@@ -445,7 +467,6 @@ export default function BumBumCafeStockApp() {
       })
     );
 
-    // Save purchase history audit without targetLocation
     const newPurchase: PurchaseLog = {
       id: `p_${Date.now()}`,
       itemName: scannedProductDetected.name,
@@ -521,7 +542,7 @@ export default function BumBumCafeStockApp() {
       .map(item => `• ${item.name} (${item.minLimit - item.storeQty} ${item.unit} Required)`)
       .join("\n");
 
-    const message = encodeURIComponent(`🔥 *BUM BUM CAFE - NEW ORDER REQ*\n\nप्रिय ${supplierName} टीम,\nकृपया हमारे गोडाउन के लिए निम्नलिखित कम स्टॉक माल का ऑर्डर भेजें:\n\n${orderText}\n\nधन्यवाद!\n-  मैनेजमेंट (Bum Bum Cafe)`);
+    const message = encodeURIComponent(`🔥 *BUM BUM CAFE - NEW ORDER REQ*\n\nप्रिय ${supplierName} टीम,\nकृपया हमारे गोडाउन के लिए निम्नलिखित कम स्टॉक माल का ऑर्डर भेजें:\n\n${orderText}\n\nधन्यवाद!\n- मैनेजमेंट (Bum Bum Cafe)`);
     window.open(`https://wa.me/919714293759?text=${message}`, '_blank');
     toastMessage("WhatsApp order drafted!");
   };
@@ -770,7 +791,7 @@ export default function BumBumCafeStockApp() {
       setStockOutHistory(prev => [newLog, ...prev]);
     }
 
-    toastMessage(`Audit recorded for ${targetItem.name}. Stock aligned!`, "success");
+    toastMessage("Audit recorded successfully. Stock aligned!", "success");
     setShowAuditReconcileModal(false);
     setAuditItemSelect("");
     setAuditPhysicalCount("");
@@ -847,6 +868,100 @@ export default function BumBumCafeStockApp() {
     link.click();
     document.body.removeChild(link);
     toastMessage("Category Wise CSV report generated!");
+  };
+
+  // Custom print group actions
+  const handlePrintGroup = (group: PrintGroup) => {
+    triggerHaptic();
+    const printWindow = window.open('', '_blank', 'width=600,height=800');
+    if (!printWindow) return toastMessage("Please allow pop-ups to print.");
+    
+    const matchedItems = inventory.filter(i => group.itemIds.includes(i.id));
+    const rowsHtml = matchedItems.map(item => `
+      <tr>
+        <td style="padding: 10px; border-bottom: 1px solid #ddd; text-align: left; font-family: sans-serif;">${item.name}</td>
+        <td style="padding: 10px; border-bottom: 1px solid #ddd; text-align: center; font-family: sans-serif;">${item.category}</td>
+        <td style="padding: 10px; border-bottom: 1px solid #ddd; text-align: right; font-weight: bold; font-family: sans-serif;">${item.storeQty} ${item.unit}</td>
+      </tr>
+    `).join('');
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Print_Group_${group.name}</title>
+          <style>
+            body { font-family: sans-serif; padding: 25px; color: #333; }
+            h2 { text-align: center; color: #FF6B00; margin-bottom: 2px; }
+            p { text-align: center; font-size: 10px; color: #666; margin-top: 0; }
+            table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+            th { background: #f5f5f5; padding: 10px; font-weight: bold; border-bottom: 2px solid #ddd; }
+          </style>
+        </head>
+        <body>
+          <h2>BUM BUM CAFE - ${group.name.toUpperCase()}</h2>
+          <p>Printed on: ${new Date().toLocaleString()}</p>
+          <table>
+            <thead>
+              <tr>
+                <th style="text-align: left;">Item Name</th>
+                <th style="text-align: center;">Category</th>
+                <th style="text-align: right;">Current Stock</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rowsHtml}
+            </tbody>
+          </table>
+          <script>window.onload = function() { window.print(); }</script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
+
+  const handleCreatePrintGroup = (e: React.FormEvent) => {
+    e.preventDefault();
+    triggerHaptic();
+    if (!newGroupNameInput.trim() || selectedItemIds.length === 0) {
+      toastMessage("Group name and selected items are required!", "error");
+      return;
+    }
+
+    const newGroup: PrintGroup = {
+      id: `prg_${Date.now()}`,
+      name: newGroupNameInput.trim(),
+      itemIds: [...selectedItemIds]
+    };
+
+    setPrintGroups(prev => [...prev, newGroup]);
+    setNewGroupNameInput("");
+    setSelectedItemIds([]);
+    setIsMultiSelectMode(false);
+    setShowAddToGroupModal(false);
+    toastMessage(`Created print category "${newGroup.name}"!`);
+  };
+
+  const handleToggleMultiSelect = (id: string) => {
+    triggerHaptic(10);
+    setSelectedItemIds(prev => 
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    );
+  };
+
+  const handleRemoveFromPrintGroup = (groupId: string, itemId: string) => {
+    triggerHaptic(30);
+    setPrintGroups(prev => 
+      prev.map(g => g.id === groupId ? { ...g, itemIds: g.itemIds.filter(id => id !== itemId) } : g)
+    );
+    toastMessage("Item removed from print list");
+  };
+
+  const handleDeletePrintGroup = (groupId: string) => {
+    triggerHaptic(50);
+    const confirm = window.confirm("क्या आप इस प्रिंट ग्रुप को हटाना चाहते हैं?");
+    if (!confirm) return;
+    setPrintGroups(prev => prev.filter(g => g.id !== groupId));
+    toastMessage("Print list deleted");
   };
 
   return (
@@ -1027,7 +1142,7 @@ export default function BumBumCafeStockApp() {
                   <span className="text-[9px] font-black uppercase tracking-wider block mt-1">Stock Out</span>
                 </div>
                 <div onClick={() => { setActiveTab('more'); setCurrentView('reports_list'); }} className={`p-3 rounded-2xl border ${isDarkMode ? 'bg-[#1A1A1A] border-neutral-800' : 'bg-white border-neutral-100'} shadow-sm cursor-pointer hover:border-orange-500 transition-all`}>
-                  <BarChart3 className="mx-auto text-[#FF6B00]" size={16} />
+                  <BarChart3 className="mx-auto text-emerald-500" size={16} />
                   <span className="text-[9px] font-black uppercase tracking-wider block mt-1">Reports</span>
                 </div>
               </div>
@@ -1082,28 +1197,65 @@ export default function BumBumCafeStockApp() {
               ))}
             </div>
 
-            {/* DYNAMIC CATEGORY-WISE EXCEL EXPORT BUTTON */}
-            <button
-              onClick={triggerCategoryWiseExport}
-              className="w-full p-3.5 bg-green-600/10 hover:bg-green-600/20 text-green-600 border border-green-600/20 text-xs font-black uppercase tracking-wider rounded-2xl flex items-center justify-center gap-2 transition-all shadow"
-            >
-              <FileSpreadsheet size={16} />
-              <span>📥 Export Category Wise (कैटेगरी अनुसार Excel)</span>
-            </button>
+            {/* CATEGORY-WISE PRINT EXPORT SHORTCUT & MULTI SELECT TRIGGER */}
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <button
+                onClick={triggerCategoryWiseExport}
+                className="p-3 bg-green-600/10 hover:bg-green-600/20 text-green-600 border border-green-600/20 font-black uppercase rounded-2xl flex items-center justify-center gap-1.5 transition-all shadow"
+              >
+                <FileSpreadsheet size={14} /> Export Category CSV
+              </button>
 
-            {/* INVENTORY CARD LIST GRID (DIRECT STOCK QUANTITY INPUT ADDED) */}
+              <button
+                onClick={() => {
+                  triggerHaptic();
+                  setIsMultiSelectMode(!isMultiSelectMode);
+                  setSelectedItemIds([]);
+                }}
+                className={`p-3 border font-black uppercase rounded-2xl flex items-center justify-center gap-1.5 transition-all shadow ${
+                  isMultiSelectMode 
+                    ? 'bg-orange-500 text-white border-orange-500' 
+                    : isDarkMode ? 'bg-neutral-900 border-neutral-800 text-neutral-400' : 'bg-white border-neutral-200 text-neutral-600'
+                }`}
+              >
+                <Layers size={14} /> {isMultiSelectMode ? "Stop Select" : "Multi Select"}
+              </button>
+            </div>
+
+            {/* INVENTORY CARD LIST GRID (DIRECT STOCK VALUE/QUANTITY ENTER OPTION BUILT-IN) */}
             <div className="space-y-3.5">
               {filteredInventory.map(item => {
                 const isLow = item.storeQty < item.minLimit;
+                const isItemSelected = selectedItemIds.includes(item.id);
                 return (
                   <div 
                     key={item.id} 
-                    className={`rounded-3xl border p-4 hover:shadow-lg transition-all ${
+                    onClick={() => {
+                      if (isMultiSelectMode) {
+                        handleToggleMultiSelect(item.id);
+                      }
+                    }}
+                    className={`rounded-3xl border p-4 transition-all relative ${
+                      isMultiSelectMode ? 'cursor-pointer' : ''
+                    } ${
                       isDarkMode ? 'bg-[#1A1A1A] border-neutral-800' : 'bg-white border-neutral-100'
-                    } ${isLow ? 'border-amber-500/40 bg-amber-500/[0.02]' : ''}`}
+                    } ${isLow ? 'border-amber-500/40 bg-amber-500/[0.02]' : ''} ${
+                      isItemSelected ? 'ring-2 ring-[#FF6B00] bg-orange-500/[0.02]' : ''
+                    }`}
                   >
+                    {isMultiSelectMode && (
+                      <div className="absolute top-4 right-4 h-5 w-5 rounded-full border border-neutral-300 dark:border-neutral-700 flex items-center justify-center">
+                        {isItemSelected && <div className="h-3 w-3 rounded-full bg-[#FF6B00]" />}
+                      </div>
+                    )}
+
                     <div className="flex justify-between items-start">
-                      <div onClick={() => setSelectedItemDetail(item)} className="cursor-pointer space-y-0.5 flex-1 pr-4">
+                      <div 
+                        onClick={() => {
+                          if (!isMultiSelectMode) setSelectedItemDetail(item);
+                        }} 
+                        className="cursor-pointer space-y-0.5 flex-1 pr-4"
+                      >
                         <div className="flex items-center gap-2">
                           <span className="text-sm font-black text-[#FF6B00] dark:text-orange-400">{item.name}</span>
                           {isLow && (
@@ -1114,7 +1266,6 @@ export default function BumBumCafeStockApp() {
                         </div>
                         <p className="text-[9px] text-neutral-400 font-bold uppercase tracking-wider">{item.category} • {item.supplier}</p>
                         {item.barcode && <p className="text-[8px] text-neutral-400 tracking-wider">Barcode: {item.barcode}</p>}
-                        {item.expiryDate && <p className="text-[8px] text-red-400 font-bold">Expiry: {item.expiryDate}</p>}
                       </div>
 
                       <div className="text-right">
@@ -1125,16 +1276,17 @@ export default function BumBumCafeStockApp() {
 
                     <div className="grid grid-cols-1 border-t border-b border-neutral-100 dark:border-neutral-800/80 my-3 py-2 text-center text-xs">
                       <div>
-                        {/* DIRECT QUANTITY INPUT BOX (DIRECT VALUE EDIT) */}
+                        {/* DIRECT IN-PLACE ENTRY BOX FOR STOCK QUANTITY/VALUE */}
                         <label className="text-[9px] font-black text-neutral-400 uppercase tracking-wider block mb-1">
-                          Enter Current Stock (हाल की वैल्यू)
+                          Current Stock (हाल की वैल्यू)
                         </label>
                         <div className="flex items-center justify-center gap-2">
-                          <button onClick={() => adjustQuickStoreQty(item.id, -1)} className="p-2 bg-red-100 dark:bg-red-500/10 text-red-500 rounded-xl"><MinusCircle size={14} /></button>
+                          <button onClick={(e) => { e.stopPropagation(); adjustQuickStoreQty(item.id, -1); }} className="p-2 bg-red-100 dark:bg-red-500/10 text-red-500 rounded-xl"><MinusCircle size={14} /></button>
                           
                           <input 
                             type="number"
                             value={item.storeQty}
+                            onClick={(e) => e.stopPropagation()}
                             onChange={(e) => {
                               const val = parseFloat(e.target.value) || 0;
                               setInventory(prev => prev.map(inv => inv.id === item.id ? { ...inv, storeQty: val } : inv));
@@ -1143,17 +1295,20 @@ export default function BumBumCafeStockApp() {
                           />
                           <span className="text-xs font-bold text-neutral-400">{item.unit}</span>
 
-                          <button onClick={() => adjustQuickStoreQty(item.id, 1)} className="p-2 bg-green-100 dark:bg-green-500/10 text-green-500 rounded-xl"><PlusCircle size={14} /></button>
+                          <button onClick={(e) => { e.stopPropagation(); adjustQuickStoreQty(item.id, 1); }} className="p-2 bg-green-100 dark:bg-green-500/10 text-green-500 rounded-xl"><PlusCircle size={14} /></button>
                         </div>
                       </div>
                     </div>
 
                     <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-wider">
-                      <span className="text-neutral-400">Value: ₹{(item.storeQty * item.purchasePrice).toLocaleString()}</span>
+                      <span className="text-neutral-400 font-sans">Value: ₹{(item.storeQty * item.purchasePrice).toLocaleString()}</span>
                       
                       <div className="flex gap-2">
                         <button 
-                          onClick={() => setSelectedItemDetail(item)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (!isMultiSelectMode) setSelectedItemDetail(item);
+                          }}
                           className="px-3 py-1.5 bg-neutral-100 dark:bg-neutral-800 text-neutral-400 rounded-xl hover:bg-neutral-200 transition-all font-black"
                         >
                           <span>Manage</span>
@@ -1163,6 +1318,136 @@ export default function BumBumCafeStockApp() {
                   </div>
                 );
               })}
+            </div>
+
+            {/* STICKY FLOATING BOTTOM TOOLBAR WHEN MULTI-SELECT ACTIVE */}
+            <AnimatePresence>
+              {isMultiSelectMode && selectedItemIds.length > 0 && (
+                <motion.div 
+                  initial={{ y: 80, opacity: 0 }}
+                  animate={{ y: 0, opacity: 1 }}
+                  exit={{ y: 80, opacity: 0 }}
+                  className="fixed bottom-20 left-4 right-4 z-[45] bg-[#FF6B00] text-white p-4 rounded-3xl shadow-xl flex items-center justify-between"
+                >
+                  <div>
+                    <p className="text-xs font-black uppercase tracking-widest">{selectedItemIds.length} Items Selected</p>
+                    <p className="text-[9px] text-orange-200 uppercase font-bold">Ready to map into Print Category</p>
+                  </div>
+                  <button 
+                    onClick={() => {
+                      triggerHaptic();
+                      setShowAddToGroupModal(true);
+                    }}
+                    className="px-4 py-2 bg-white text-[#FF6B00] rounded-xl font-black text-xs uppercase tracking-wider flex items-center gap-1.5 shadow"
+                  >
+                    <Layers size={13} /> Add to Print List
+                  </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        )}
+
+        {/* ==========================================
+            5. TAB 3: DYNAMIC CUSTOM PRINT GROUPS VIEW
+            ========================================== */}
+        {activeTab === 'print' && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-base font-black uppercase tracking-widest text-neutral-400">Custom Print Categories</h2>
+                <p className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider">Print or export selected stock categories</p>
+              </div>
+            </div>
+
+            {/* Print Category quick selectors */}
+            <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none font-sans">
+              <button
+                onClick={() => { triggerHaptic(); setActivePrintGroup("All"); }}
+                className={`px-3.5 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider border whitespace-nowrap transition-all ${
+                  activePrintGroupId === "All" 
+                    ? 'bg-orange-500 border-orange-500 text-white shadow-md' 
+                    : isDarkMode ? 'bg-neutral-900 border-neutral-800 text-neutral-400' : 'bg-white border-neutral-200 text-neutral-600'
+                }`}
+              >
+                All Lists
+              </button>
+              {printGroups.map(g => (
+                <button
+                  key={g.id}
+                  onClick={() => { triggerHaptic(); setActivePrintGroup(g.id); }}
+                  className={`px-3.5 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider border whitespace-nowrap transition-all ${
+                    activePrintGroupId === g.id 
+                      ? 'bg-orange-500 border-orange-500 text-white shadow-md' 
+                      : isDarkMode ? 'bg-neutral-900 border-neutral-800 text-neutral-400' : 'bg-white border-neutral-200 text-neutral-600'
+                  }`}
+                >
+                  {g.name}
+                </button>
+              ))}
+            </div>
+
+            {/* Print Groups rendering stack */}
+            <div className="space-y-4">
+              {printGroups
+                .filter(g => activePrintGroupId === "All" || g.id === activePrintGroupId)
+                .map(group => {
+                  const matchedItems = inventory.filter(i => group.itemIds.includes(i.id));
+                  return (
+                    <div key={group.id} className={`p-5 rounded-3xl border space-y-4 ${
+                      isDarkMode ? 'bg-[#1A1A1A] border-neutral-800' : 'bg-white border-neutral-100'
+                    }`}>
+                      <div className="flex justify-between items-center border-b border-neutral-50 dark:border-neutral-800/80 pb-2">
+                        <div>
+                          <p className="font-black text-sm uppercase text-[#FF6B00]">{group.name}</p>
+                          <p className="text-[9px] text-neutral-400 uppercase tracking-widest">{matchedItems.length} Materials Assigned</p>
+                        </div>
+                        <div className="flex gap-1.5">
+                          <button 
+                            onClick={() => handlePrintGroup(group)}
+                            className="p-2 bg-orange-500/10 hover:bg-orange-500 text-[#FF6B00] hover:text-white rounded-xl transition-all"
+                            title="Instant Print Receipt"
+                          >
+                            <Printer size={14} />
+                          </button>
+                          <button 
+                            onClick={() => handleDeletePrintGroup(group.id)}
+                            className="p-2 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white rounded-xl transition-all"
+                            title="Delete Group"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Display items assigned inside this print group */}
+                      <div className="space-y-2">
+                        {matchedItems.map(item => (
+                          <div key={item.id} className="flex justify-between items-center p-2.5 rounded-2xl bg-neutral-50 dark:bg-neutral-800/40 text-xs">
+                            <div>
+                              <p className="font-black">{item.name}</p>
+                              <p className="text-[9px] text-neutral-400 uppercase tracking-wider">{item.category}</p>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <span className="font-black text-[#FF6B00]">{item.storeQty} {item.unit}</span>
+                              <button 
+                                onClick={() => handleRemoveFromPrintGroup(group.id, item.id)}
+                                className="text-neutral-400 hover:text-red-500"
+                                title="Remove from list"
+                              >
+                                <X size={12} />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+
+                        {matchedItems.length === 0 && (
+                          <p className="text-center py-4 text-[10px] text-neutral-400 uppercase font-black">No items added to this print list...</p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
             </div>
           </div>
         )}
@@ -1182,11 +1467,11 @@ export default function BumBumCafeStockApp() {
                   </div>
                   <div>
                     <h2 className="text-sm font-black uppercase tracking-widest">More Operational Features</h2>
-                    <p className="text-[8px] text-neutral-400 font-bold uppercase tracking-wider">Access configurations, audits, and settings</p>
+                    <p className="text-[8px] text-neutral-400 font-bold uppercase tracking-wider font-sans">Access configurations, audits, and settings</p>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 gap-2 text-xs">
+                <div className="grid grid-cols-1 gap-2 text-xs font-sans">
                   {[
                     { id: 'stock_in', label: "Purchase / Stock In", desc: "Log invoices and stock incoming goods", icon: <PlusCircle size={16} /> },
                     { id: 'stock_out_logs', label: "Stock Out Logs", desc: "View wastage, damage, and staff use logs", icon: <MinusCircle size={16} /> },
@@ -1224,9 +1509,9 @@ export default function BumBumCafeStockApp() {
             {/* A. PURCHASE / STOCK IN SCREEN */}
             {currentView === 'stock_in' && (
               <div className="space-y-4">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between font-sans">
                   <h3 className="text-xs font-black uppercase tracking-widest text-neutral-400 font-sans">Purchase Log / Stock In</h3>
-                  <button onClick={() => setCurrentView('more_home')} className="text-xs text-orange-500 font-bold uppercase tracking-wider">Back</button>
+                  <button onClick={() => setCurrentView('more_home')} className="text-xs text-[#FF6B00] font-bold uppercase tracking-wider">Back</button>
                 </div>
 
                 <form onSubmit={handleStockInSubmit} className={`p-5 rounded-3xl border space-y-3 text-xs ${isDarkMode ? 'bg-[#1A1A1A] border-neutral-800' : 'bg-white border-neutral-100'}`}>
@@ -1343,7 +1628,7 @@ export default function BumBumCafeStockApp() {
                         <span className="font-bold">{log.itemName}</span>
                         <span className="text-green-500 font-bold">₹{log.price * log.qty}</span>
                       </div>
-                      <p className="text-[9px] text-neutral-400 uppercase font-sans">Qty: {log.qty} {log.unit} • Method: {log.paymentType} • {log.date}</p>
+                      <p className="text-[9px] text-neutral-400 uppercase font-sans font-sans">Qty: {log.qty} {log.unit} • Method: {log.paymentType} • {log.date}</p>
                     </div>
                   ))}
                 </div>
@@ -1355,7 +1640,7 @@ export default function BumBumCafeStockApp() {
               <div className="space-y-4 font-sans">
                 <div className="flex items-center justify-between">
                   <h3 className="text-xs font-black uppercase tracking-widest text-neutral-400 font-sans">Outward Dispatches</h3>
-                  <button onClick={() => setCurrentView('more_home')} className="text-xs text-orange-500 font-bold uppercase tracking-wider font-sans">Back</button>
+                  <button onClick={() => setCurrentView('more_home')} className="text-xs text-orange-500 font-bold uppercase tracking-wider">Back</button>
                 </div>
 
                 <div className="space-y-2.5">
@@ -1385,8 +1670,8 @@ export default function BumBumCafeStockApp() {
             {currentView === 'reports_list' && (
               <div className="space-y-4 font-sans">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-xs font-black uppercase tracking-widest text-neutral-400 font-sans font-sans">Reports Engine</h3>
-                  <button onClick={() => setCurrentView('more_home')} className="text-xs text-orange-500 font-bold uppercase tracking-wider font-sans">Back</button>
+                  <h3 className="text-xs font-black uppercase tracking-widest text-neutral-400 font-sans">Reports Engine</h3>
+                  <button onClick={() => setCurrentView('more_home')} className="text-xs text-orange-500 font-bold uppercase tracking-wider">Back</button>
                 </div>
 
                 <div className="grid grid-cols-1 gap-2 text-xs">
@@ -1405,7 +1690,7 @@ export default function BumBumCafeStockApp() {
                     >
                       <div>
                         <p className="font-bold">{rep.title}</p>
-                        <p className="text-[9px] text-neutral-400 uppercase tracking-wider mt-0.5 font-sans">Automated compilation engine</p>
+                        <p className="text-[9px] text-neutral-400 uppercase tracking-wider mt-0.5">Automated compilation engine</p>
                       </div>
 
                       <div className="flex gap-1.5">
@@ -1433,10 +1718,10 @@ export default function BumBumCafeStockApp() {
 
             {/* D. MANAGE SUPPLIERS WITH ADD, EDIT & DELETE */}
             {currentView === 'suppliers_list' && (
-              <div className="space-y-4 font-sans">
+              <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <h3 className="text-xs font-black uppercase tracking-widest text-[#FF6B00]">Supplier Register</h3>
-                  <button onClick={() => setCurrentView('more_home')} className="text-xs text-orange-500 font-bold uppercase tracking-wider font-sans">Back</button>
+                  <button onClick={() => setCurrentView('more_home')} className="text-xs text-orange-500 font-bold uppercase tracking-wider font-sans font-sans">Back</button>
                 </div>
 
                 <button 
@@ -1451,13 +1736,13 @@ export default function BumBumCafeStockApp() {
                     <div key={s.id} className={`p-4 rounded-3xl border flex flex-col gap-3 ${
                       isDarkMode ? 'bg-[#1A1A1A] border-neutral-800' : 'bg-white border-neutral-100'
                     }`}>
-                      <div className="flex justify-between items-start font-sans">
+                      <div className="flex justify-between items-start">
                         <div>
                           <p className="font-black text-[#FF6B00] text-sm">{s.name}</p>
-                          <p className="text-[9px] text-neutral-400 uppercase tracking-widest mt-0.5 font-sans font-sans">📞 {s.phone} • 📍 {s.address}</p>
-                          <p className="text-[10px] font-bold mt-1 text-red-500 uppercase tracking-wide font-sans">Pending Credit: ₹{s.pendingCredit.toLocaleString()}</p>
+                          <p className="text-[9px] text-neutral-400 uppercase tracking-widest mt-0.5">📞 {s.phone} • 📍 {s.address}</p>
+                          <p className="text-[10px] font-bold mt-1 text-red-500 uppercase tracking-wide">Pending Credit: ₹{s.pendingCredit.toLocaleString()}</p>
                         </div>
-                        <div className="flex gap-1.5 font-sans">
+                        <div className="flex gap-1.5">
                           <button 
                             onClick={() => setEditingSupplier(s)}
                             className="p-2 bg-blue-500/10 hover:bg-blue-500 text-blue-500 hover:text-white rounded-xl transition-all"
@@ -1478,7 +1763,7 @@ export default function BumBumCafeStockApp() {
                       {/* WHATSAPP REORDER QUICK TRIGGER BUTTON */}
                       <button
                         onClick={() => triggerWhatsAppOrder(s.name)}
-                        className="w-full py-2 bg-green-500/10 hover:bg-green-500 text-green-600 hover:text-white border border-green-500/20 text-[9px] font-black uppercase tracking-wider rounded-xl flex items-center justify-center gap-1.5 transition-all font-sans"
+                        className="w-full py-2 bg-green-500/10 hover:bg-green-500 text-green-600 hover:text-white border border-green-500/20 text-[9px] font-black uppercase tracking-wider rounded-xl flex items-center justify-center gap-1.5 transition-all"
                       >
                         <Share2 size={11} />
                         <span>Send Low Stock Reorder (WhatsApp)</span>
@@ -1491,7 +1776,7 @@ export default function BumBumCafeStockApp() {
 
             {/* E. MANAGE CATEGORIES (DYNAMIC LIST INSIDE TAB) */}
             {currentView === 'categories_manager' && (
-              <div className="space-y-4 font-sans">
+              <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <h3 className="text-xs font-black uppercase tracking-widest text-neutral-400 font-sans">Raw Material Categories</h3>
                   <button onClick={() => setCurrentView('more_home')} className="text-xs text-orange-500 font-bold uppercase tracking-wider font-sans">Back</button>
@@ -1506,7 +1791,7 @@ export default function BumBumCafeStockApp() {
                     className="flex-1 p-3 rounded-2xl border dark:bg-[#1A1A1A] dark:border-neutral-800"
                     required
                   />
-                  <button type="submit" className="px-5 py-3 bg-[#FF6B00] text-white rounded-2xl font-black uppercase font-sans">Add</button>
+                  <button type="submit" className="px-5 py-3 bg-[#FF6B00] text-white rounded-2xl font-black uppercase font-sans font-sans">Add</button>
                 </form>
 
                 {editingCategoryIndex !== null && (
@@ -1520,11 +1805,11 @@ export default function BumBumCafeStockApp() {
                       required
                     />
                     <button type="submit" className="px-4 py-2 bg-green-600 text-white rounded-xl font-bold uppercase font-sans">Update</button>
-                    <button type="button" onClick={() => setEditingCategoryIndex(null)} className="px-4 py-2 bg-neutral-200 dark:bg-neutral-800 text-neutral-400 rounded-xl font-sans">Cancel</button>
+                    <button type="button" onClick={() => setEditingCategoryIndex(null)} className="px-4 py-2 bg-neutral-200 dark:bg-neutral-800 text-neutral-400 rounded-xl font-sans font-sans font-sans">Cancel</button>
                   </form>
                 )}
 
-                <div className="grid grid-cols-1 gap-2 text-xs font-sans">
+                <div className="grid grid-cols-1 gap-2 text-xs">
                   {categories.map((cat, idx) => (
                     <div key={idx} className={`p-4 rounded-3xl border flex items-center justify-between ${
                       isDarkMode ? 'bg-[#1A1A1A] border-neutral-800' : 'bg-white border-neutral-100'
@@ -1575,7 +1860,7 @@ export default function BumBumCafeStockApp() {
                   <button type="submit" className="px-5 py-3 bg-[#FF6B00] text-white rounded-2xl font-black uppercase font-sans">Log</button>
                 </form>
 
-                <div className="space-y-2 font-sans">
+                <div className="space-y-2">
                   <h4 className="text-[10px] font-black uppercase tracking-wider text-neutral-400 font-sans">Today's Temperature Log Checksheet</h4>
                   {todayTempLog.map((log, idx) => (
                     <div key={idx} className={`p-4 rounded-3xl border flex items-center justify-between text-xs ${
@@ -1604,14 +1889,14 @@ export default function BumBumCafeStockApp() {
             {currentView === 'audit_manager' && (
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-xs font-black uppercase tracking-widest text-[#FF6B00] font-sans">Physical Stock Audit</h3>
+                  <h3 className="text-xs font-black uppercase tracking-widest text-[#FF6B00] font-sans font-sans">Physical Stock Audit</h3>
                   <button onClick={() => setCurrentView('more_home')} className="text-xs text-orange-500 font-bold uppercase tracking-wider font-sans font-sans">Back</button>
                 </div>
 
                 <div className={`p-5 rounded-3xl border space-y-4 text-xs ${isDarkMode ? 'bg-[#1A1A1A] border-neutral-800' : 'bg-white border-neutral-100'}`}>
                   <div>
                     <h4 className="font-bold text-sm font-sans">Align Stock discrepancies</h4>
-                    <p className="text-[9px] text-neutral-400 uppercase tracking-wide mt-0.5 font-sans font-sans">Compare counted shelf stock against database numbers</p>
+                    <p className="text-[9px] text-neutral-400 uppercase tracking-wide mt-0.5 font-sans font-sans font-sans">Compare counted shelf stock against database numbers</p>
                   </div>
 
                   <button 
@@ -1628,8 +1913,8 @@ export default function BumBumCafeStockApp() {
             {currentView === 'equipment_manager' && (
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-xs font-black uppercase tracking-widest text-neutral-400 font-sans font-sans">Equipment Register & Service</h3>
-                  <button onClick={() => setCurrentView('more_home')} className="text-xs text-orange-500 font-bold uppercase tracking-wider font-sans font-sans">Back</button>
+                  <h3 className="text-xs font-black uppercase tracking-widest text-neutral-400 font-sans font-sans font-sans font-sans font-sans font-sans font-sans font-sans">Equipment Register & Service</h3>
+                  <button onClick={() => setCurrentView('more_home')} className="text-xs text-orange-500 font-bold uppercase tracking-wider font-sans">Back</button>
                 </div>
 
                 <div className="grid grid-cols-1 gap-2.5 text-xs font-sans">
@@ -1640,19 +1925,19 @@ export default function BumBumCafeStockApp() {
                       <div className="flex justify-between items-start font-sans">
                         <div>
                           <p className="font-bold text-[#FF6B00] text-sm">{eq.name}</p>
-                          <p className="text-[9px] text-neutral-400 uppercase tracking-widest mt-0.5 font-sans font-sans font-sans">Last Service: {eq.lastService} • Next: {eq.nextService}</p>
+                          <p className="text-[9px] text-neutral-400 uppercase tracking-widest mt-0.5 font-sans font-sans">Last Service: {eq.lastService} • Next: {eq.nextService}</p>
                         </div>
-                        <span className={`px-2.5 py-1 rounded-full text-[8px] font-black uppercase font-sans font-sans ${
+                        <span className={`px-2.5 py-1 rounded-full text-[8px] font-black uppercase font-sans font-sans font-sans ${
                           eq.status === 'Good' ? 'bg-green-100 text-green-500' : 'bg-amber-100 text-amber-500'
                         }`}>
                           {eq.status}
                         </span>
                       </div>
 
-                      <div className="flex gap-2 border-t border-neutral-50 dark:border-neutral-800 pt-3 font-sans">
+                      <div className="flex gap-2 border-t border-neutral-50 dark:border-neutral-800 pt-3">
                         <button 
                           onClick={() => setSelectedEquipmentQR(eq)}
-                          className="flex-1 py-2 bg-neutral-100 dark:bg-neutral-800 text-neutral-400 font-bold rounded-xl flex items-center justify-center gap-1.5 font-sans font-sans"
+                          className="flex-1 py-2 bg-neutral-100 dark:bg-neutral-800 text-neutral-400 font-bold rounded-xl flex items-center justify-center gap-1.5 font-sans font-sans font-sans"
                         >
                           <QrCode size={12} /> Scan Machine QR
                         </button>
@@ -1673,8 +1958,8 @@ export default function BumBumCafeStockApp() {
             {currentView === 'app_settings' && (
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-xs font-black uppercase tracking-widest text-neutral-400 font-sans font-sans font-sans">Application Configuration</h3>
-                  <button onClick={() => setCurrentView('more_home')} className="text-xs text-orange-500 font-bold uppercase tracking-wider font-sans font-sans font-sans">Back</button>
+                  <h3 className="text-xs font-black uppercase tracking-widest text-neutral-400 font-sans font-sans">Application Configuration</h3>
+                  <button onClick={() => setCurrentView('more_home')} className="text-xs text-orange-500 font-bold uppercase tracking-wider font-sans font-sans">Back</button>
                 </div>
 
                 <div className={`p-5 rounded-3xl border space-y-4 text-xs ${isDarkMode ? 'bg-[#1A1A1A] border-neutral-800' : 'bg-white border-neutral-100'}`}>
@@ -1683,7 +1968,7 @@ export default function BumBumCafeStockApp() {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="font-black text-sm uppercase tracking-wide">Dark Mode Preference</p>
-                      <p className="text-[9px] text-neutral-400 uppercase tracking-wider font-sans font-sans font-sans">Optimal design for low light godowns</p>
+                      <p className="text-[9px] text-neutral-400 uppercase tracking-wider font-sans">Optimal design for low light godowns</p>
                     </div>
                     <button
                       onClick={() => setIsDarkMode(!isDarkMode)}
@@ -1696,10 +1981,10 @@ export default function BumBumCafeStockApp() {
                   {/* Offline Support Status */}
                   <div className="flex items-center justify-between border-t border-neutral-100 dark:border-neutral-800 pt-4">
                     <div>
-                      <p className="font-black text-sm uppercase tracking-wide font-sans font-sans">Offline PWA Auto-Sync</p>
-                      <p className="text-[9px] text-neutral-400 uppercase tracking-wider font-sans font-sans font-sans">Synchronize local cache dynamically</p>
+                      <p className="font-black text-sm uppercase tracking-wide font-sans">Offline PWA Auto-Sync</p>
+                      <p className="text-[9px] text-neutral-400 uppercase tracking-wider font-sans">Synchronize local cache dynamically</p>
                     </div>
-                    <span className="px-2.5 py-1 bg-green-500/10 text-green-500 font-black rounded-full text-[9px] uppercase tracking-wider flex items-center gap-1 font-sans font-sans font-sans">
+                    <span className="px-2.5 py-1 bg-green-500/10 text-green-500 font-black rounded-full text-[9px] uppercase tracking-wider flex items-center gap-1 font-sans">
                       <Wifi size={10} /> Online
                     </span>
                   </div>
@@ -1766,8 +2051,8 @@ export default function BumBumCafeStockApp() {
               </div>
 
               {/* Simulated Purchase Timeline */}
-              <div className="space-y-2.5 font-sans font-sans">
-                <h4 className="text-[10px] font-black uppercase tracking-widest text-neutral-400 font-sans">Activity & Delivery Audit</h4>
+              <div className="space-y-2.5 font-sans">
+                <h4 className="text-[10px] font-black uppercase tracking-widest text-neutral-400 font-sans font-sans">Activity & Delivery Audit</h4>
                 <div className="space-y-2">
                   <div className="flex items-center justify-between text-xs p-2.5 bg-neutral-50 dark:bg-neutral-800/50 rounded-xl">
                     <div className="flex items-center gap-2">
@@ -1827,13 +2112,13 @@ export default function BumBumCafeStockApp() {
                   type="text" 
                   value={editingItem.name} 
                   onChange={e => setEditingItem({...editingItem, name: e.target.value.toUpperCase()})}
-                  className="w-full p-2.5 rounded-xl border dark:bg-neutral-800 font-sans"
+                  className="w-full p-2.5 rounded-xl border dark:bg-neutral-800"
                   required
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-2 text-xs font-sans">
-                <div className="space-y-1.5 font-sans">
+                <div className="space-y-1.5">
                   <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400 font-sans">Category</label>
                   <select 
                     value={editingItem.category} 
@@ -1902,7 +2187,7 @@ export default function BumBumCafeStockApp() {
                 <button type="button" onClick={() => setEditingSupplier(null)} className="p-2.5 bg-neutral-100 dark:bg-neutral-800 rounded-xl"><X size={14} /></button>
               </div>
 
-              <div className="space-y-1.5 text-xs font-sans">
+              <div className="space-y-1.5 text-xs">
                 <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400">Supplier Name</label>
                 <input 
                   type="text" 
@@ -1913,7 +2198,7 @@ export default function BumBumCafeStockApp() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-2 text-xs font-sans">
+              <div className="grid grid-cols-2 gap-2 text-xs">
                 <div className="space-y-1.5">
                   <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400">Phone</label>
                   <input 
@@ -1925,7 +2210,7 @@ export default function BumBumCafeStockApp() {
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400 font-sans">Address / City</label>
+                  <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400">Address / City</label>
                   <input 
                     type="text" 
                     value={editingSupplier.address} 
@@ -1953,7 +2238,7 @@ export default function BumBumCafeStockApp() {
               className="w-full max-w-sm bg-neutral-900 border border-neutral-800 rounded-[2rem] p-6 text-white space-y-5 text-center relative overflow-hidden"
             >
               <div className="flex justify-between items-center border-b border-neutral-800 pb-3">
-                <p className="text-xs font-black uppercase tracking-widest text-[#FF6B00] flex items-center gap-1.5 font-sans">
+                <p className="text-xs font-black uppercase tracking-widest text-[#FF6B00] flex items-center gap-1.5">
                   <QrCode size={16} /> Packed Material Scanner
                 </p>
                 <button 
@@ -1970,17 +2255,17 @@ export default function BumBumCafeStockApp() {
 
               <div className="h-44 w-full bg-black/50 border border-dashed border-[#FF6B00]/40 rounded-3xl relative flex items-center justify-center overflow-hidden animate-pulse">
                 <span className="absolute top-1/2 left-0 right-0 h-0.5 bg-red-500 animate-bounce" />
-                <span className="text-[10px] text-neutral-500 uppercase tracking-widest font-black z-10 animate-pulse font-sans">Scanning Camera Feed Simulator</span>
+                <span className="text-[10px] text-neutral-500 uppercase tracking-widest font-black z-10 animate-pulse">Scanning Camera Feed Simulator</span>
               </div>
 
               {!scannedProductDetected ? (
-                <form onSubmit={handleBarcodeManualScan} className="space-y-4 text-xs text-left font-sans">
+                <form onSubmit={handleBarcodeManualScan} className="space-y-4 text-xs text-left">
                   <div className="space-y-1.5">
-                    <label className="text-[8px] font-black uppercase tracking-wider text-neutral-500 font-sans">Simulate Scan (Select Packed Material Barcode)</label>
+                    <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400">Simulate Scan (Select Packed Material Barcode)</label>
                     <select 
                       onChange={e => setScannerManualBarcode(e.target.value)}
                       value={scannerManualBarcode}
-                      className="w-full p-3 rounded-2xl bg-neutral-800 border border-neutral-700 text-white cursor-pointer font-sans"
+                      className="w-full p-3 rounded-2xl bg-neutral-800 border border-neutral-700 text-white cursor-pointer"
                     >
                       <option value="">-- Choose Barcode --</option>
                       {inventory.map(i => (
@@ -2004,7 +2289,7 @@ export default function BumBumCafeStockApp() {
                     <p className="text-[10px] text-neutral-400 mt-0.5">Stock Status: Godown ({scannedProductDetected.storeQty})</p>
                   </div>
 
-                  <div className="space-y-1.5 font-sans font-sans">
+                  <div className="space-y-1.5">
                     <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400">Qty to Add ({scannedProductDetected.unit})</label>
                     <input 
                       type="number" 
@@ -2051,13 +2336,13 @@ export default function BumBumCafeStockApp() {
               }`}
             >
               <div className="flex justify-between items-center">
-                <h3 className="text-xs font-black uppercase tracking-widest text-neutral-400 font-sans font-sans">Stock Receipt (Stock In)</h3>
+                <h3 className="text-xs font-black uppercase tracking-widest text-neutral-400 font-sans">Stock Receipt (Stock In)</h3>
                 <button type="button" onClick={() => setShowAddStockModal(false)} className="p-2.5 bg-neutral-100 dark:bg-neutral-800 rounded-xl"><X size={14} /></button>
               </div>
 
               <div className="grid grid-cols-2 gap-2 text-xs">
                 <div className="space-y-1">
-                  <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400 font-sans font-sans">Item Name</label>
+                  <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400 font-sans">Item Name</label>
                   <input 
                     type="text" 
                     placeholder="e.g. CHEESE"
@@ -2068,11 +2353,11 @@ export default function BumBumCafeStockApp() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400 font-sans font-sans">Supplier Name</label>
+                  <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400 font-sans">Supplier Name</label>
                   <select 
                     value={formStockIn.supplier}
                     onChange={e => setFormStockIn({...formStockIn, supplier: e.target.value})}
-                    className="w-full p-2.5 rounded-xl border dark:bg-neutral-800 cursor-pointer"
+                    className="w-full p-2.5 rounded-xl border dark:bg-neutral-800"
                   >
                     <option value="">Select Supplier</option>
                     {suppliers.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
@@ -2120,7 +2405,7 @@ export default function BumBumCafeStockApp() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400 font-sans">Category</label>
+                  <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400 font-sans font-sans">Category</label>
                   <select 
                     value={formStockIn.category}
                     onChange={e => setFormStockIn({...formStockIn, category: e.target.value})}
@@ -2132,18 +2417,18 @@ export default function BumBumCafeStockApp() {
               </div>
 
               <div className="space-y-1 text-xs">
-                <label className="font-black uppercase tracking-wider text-neutral-400 text-[8px] font-sans">Payment Method</label>
+                <label className="font-black uppercase tracking-wider text-neutral-400 text-[8px] font-sans font-sans">Payment Method</label>
                 <select 
                   value={formStockIn.paymentType}
                   onChange={e => setFormStockIn({...formStockIn, paymentType: e.target.value as any})}
-                  className="w-full p-3 rounded-xl border bg-orange-500/10 border-orange-500/20 text-[#FF6B00] font-black cursor-pointer"
+                  className="w-full p-3 rounded-xl border bg-orange-500/10 border-orange-500/20 text-[#FF6B00] font-black cursor-pointer font-sans"
                 >
                   <option value="Cash/UPI">Cash / UPI</option>
                   <option value="Credit Ledger">Supplier Credit Ledger</option>
                 </select>
               </div>
 
-              <button type="submit" className="w-full p-3 bg-green-600 hover:bg-green-700 text-white rounded-2xl font-black text-xs uppercase tracking-wider shadow">
+              <button type="submit" className="w-full p-3 bg-green-600 hover:bg-green-700 text-white rounded-2xl font-black text-xs uppercase tracking-wider shadow font-sans">
                 Complete Stock In ➔
               </button>
             </motion.form>
@@ -2152,7 +2437,7 @@ export default function BumBumCafeStockApp() {
 
         {/* I. MODAL FORM: ADD SUPPLIER */}
         {showAddSupplierModal && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[99] flex items-center justify-center p-4 font-sans font-sans">
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[99] flex items-center justify-center p-4 font-sans font-sans font-sans">
             <motion.form 
               onSubmit={handleSupplierAdd}
               initial={{ opacity: 0, scale: 0.95 }}
@@ -2163,8 +2448,8 @@ export default function BumBumCafeStockApp() {
               }`}
             >
               <div className="flex justify-between items-center border-b border-neutral-100 dark:border-neutral-800 pb-2">
-                <h3 className="text-xs font-black uppercase tracking-widest text-[#FF6B00] font-sans">Merchant Registration</h3>
-                <button type="button" onClick={() => setShowAddSupplierModal(false)} className="p-2 bg-neutral-100 dark:bg-neutral-800 rounded-xl"><X size={14} /></button>
+                <h3 className="text-xs font-black uppercase tracking-widest text-[#FF6B00] font-sans font-sans">Merchant Registration</h3>
+                <button type="button" onClick={() => setShowAddSupplierModal(false)} className="p-2.5 bg-neutral-100 dark:bg-neutral-800 rounded-xl"><X size={14} /></button>
               </div>
 
               <div className="space-y-1 text-xs">
@@ -2202,7 +2487,7 @@ export default function BumBumCafeStockApp() {
                 </div>
               </div>
 
-              <button type="submit" className="w-full p-3 bg-orange-500 hover:bg-orange-600 text-white rounded-2xl font-black text-xs uppercase tracking-wider shadow font-sans">
+              <button type="submit" className="w-full p-3 bg-orange-500 hover:bg-orange-600 text-white rounded-2xl font-black text-xs uppercase tracking-wider shadow font-sans font-sans">
                 Register Supplier ➔
               </button>
             </motion.form>
@@ -2221,7 +2506,7 @@ export default function BumBumCafeStockApp() {
                 isDarkMode ? 'bg-[#0F0F0F] border-neutral-800 text-white' : 'bg-white border-neutral-100 text-neutral-900'
               }`}
             >
-              <div className="flex justify-between items-center border-b border-neutral-100 dark:border-neutral-800 pb-2">
+              <div className="flex justify-between items-center">
                 <h3 className="text-xs font-black uppercase tracking-widest text-[#FF6B00] font-sans">Physical Count Audit</h3>
                 <button type="button" onClick={() => setShowAuditReconcileModal(false)} className="p-2.5 bg-neutral-100 dark:bg-neutral-800 rounded-xl"><X size={14} /></button>
               </div>
@@ -2239,8 +2524,8 @@ export default function BumBumCafeStockApp() {
                 </select>
               </div>
 
-              <div className="space-y-1 text-xs">
-                <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400 font-sans">Physically Counted Count on Shelves</label>
+              <div className="space-y-1 text-xs font-sans">
+                <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400">Physically Counted Count on Shelves</label>
                 <input 
                   type="number" 
                   placeholder="Enter counted physical quantity"
@@ -2271,8 +2556,8 @@ export default function BumBumCafeStockApp() {
 
               <div className="space-y-1.5">
                 <h3 className="font-black text-sm">{selectedEquipmentQR.name}</h3>
-                <p className="text-neutral-400 text-xs font-sans">Last Serviced: {selectedEquipmentQR.lastService}</p>
-                <p className="text-red-500 text-xs font-bold font-sans">Next Service Due: {selectedEquipmentQR.nextService}</p>
+                <p className="text-neutral-400 text-xs">Last Serviced: {selectedEquipmentQR.lastService}</p>
+                <p className="text-red-500 text-xs font-bold">Next Service Due: {selectedEquipmentQR.nextService}</p>
               </div>
 
               <div className="p-4 bg-white rounded-3xl w-40 h-44 mx-auto flex items-center justify-center shadow-lg border border-neutral-100">
@@ -2300,13 +2585,73 @@ export default function BumBumCafeStockApp() {
           </div>
         )}
 
+        {/* L. MODAL: ADD TO CUSTOM PRINT GROUP */}
+        {showAddToGroupModal && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[115] flex items-center justify-center p-4 font-sans font-sans">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className={`w-full max-w-sm rounded-[2rem] p-6 space-y-4 border ${
+                isDarkMode ? 'bg-[#0F0F0F] border-neutral-800 text-white' : 'bg-white border-neutral-100 text-neutral-900'
+              }`}
+            >
+              <div className="flex justify-between items-center border-b border-neutral-100 dark:border-neutral-800 pb-2">
+                <h3 className="text-xs font-black uppercase tracking-widest text-[#FF6B00]">Map Selected to Print Group</h3>
+                <button onClick={() => setShowAddToGroupModal(false)} className="p-1.5 bg-neutral-100 dark:bg-neutral-800 rounded-xl"><X size={14} /></button>
+              </div>
+
+              {/* Add to Existing Group */}
+              <div className="space-y-1.5">
+                <label className="text-[9px] font-black uppercase tracking-wider text-neutral-400">Select Existing Print Group</label>
+                <div className="grid grid-cols-1 gap-2 max-h-40 overflow-y-auto">
+                  {printGroups.map(group => (
+                    <button
+                      key={group.id}
+                      onClick={() => {
+                        triggerHaptic();
+                        // Append items without duplicating ids
+                        const updatedIds = Array.from(new Set([...group.itemIds, ...selectedItemIds]));
+                        setPrintGroups(prev => prev.map(g => g.id === group.id ? { ...g, itemIds: updatedIds } : g));
+                        setSelectedItemIds([]);
+                        setIsMultiSelectMode(false);
+                        setShowAddToGroupModal(false);
+                        toastMessage(`Items added to print category "${group.name}"!`);
+                      }}
+                      className="w-full p-3 rounded-2xl text-left bg-neutral-50 dark:bg-neutral-800/40 font-bold hover:bg-[#FF6B00] hover:text-white transition-all text-xs"
+                    >
+                      {group.name} ({group.itemIds.length} items)
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Create a New Group */}
+              <form onSubmit={handleCreatePrintGroup} className="space-y-2 border-t border-neutral-100 dark:border-neutral-800 pt-3 text-xs">
+                <label className="text-[9px] font-black uppercase tracking-wider text-neutral-400 block">Or Create New Print Group</label>
+                <div className="flex gap-2">
+                  <input 
+                    type="text" 
+                    placeholder="New Group Name (e.g. Bread Items)" 
+                    value={newGroupNameInput}
+                    onChange={e => setNewGroupNameInput(e.target.value)}
+                    className="flex-1 p-2.5 rounded-xl border dark:bg-[#1A1A1A] dark:border-neutral-800 text-xs"
+                    required
+                  />
+                  <button type="submit" className="px-4 py-2.5 bg-[#FF6B00] text-white rounded-xl font-black uppercase">Create</button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+
       </AnimatePresence>
 
       {/* FIXED PREMIUM BOTTOM NAVIGATION BAR */}
       <nav className={`fixed bottom-0 left-0 right-0 z-50 border-t backdrop-blur-md transition-colors duration-300 ${
         isDarkMode ? 'bg-[#0F0F0F]/90 border-neutral-800 text-white' : 'bg-white/90 border-neutral-100 text-neutral-800'
       }`}>
-        <div className="max-w-md mx-auto grid grid-cols-3 gap-1 py-2 text-center">
+        <div className="max-w-md mx-auto grid grid-cols-4 gap-1 py-2 text-center">
           <button 
             onClick={() => handleNavClick('home')}
             className={`flex flex-col items-center justify-center py-1 transition-all ${
@@ -2314,7 +2659,7 @@ export default function BumBumCafeStockApp() {
             }`}
           >
             <Home size={18} />
-            <span className="text-[8px] font-black uppercase tracking-widest mt-1 block font-sans">Home</span>
+            <span className="text-[8px] font-black uppercase tracking-widest mt-1 block">Home</span>
           </button>
 
           <button 
@@ -2324,7 +2669,17 @@ export default function BumBumCafeStockApp() {
             }`}
           >
             <Store size={18} />
-            <span className="text-[8px] font-black uppercase tracking-widest mt-1 block font-sans">Godown Stock</span>
+            <span className="text-[8px] font-black uppercase tracking-widest mt-1 block">Godown Stock</span>
+          </button>
+
+          <button 
+            onClick={() => handleNavClick('print')}
+            className={`flex flex-col items-center justify-center py-1 transition-all ${
+              activeTab === 'print' ? 'text-[#FF6B00]' : 'text-neutral-400 hover:text-neutral-600'
+            }`}
+          >
+            <Printer size={18} />
+            <span className="text-[8px] font-black uppercase tracking-widest mt-1 block font-sans">Print Items</span>
           </button>
 
           <button 
@@ -2334,7 +2689,7 @@ export default function BumBumCafeStockApp() {
             }`}
           >
             <MoreHorizontal size={18} />
-            <span className="text-[8px] font-black uppercase tracking-widest mt-1 block font-sans font-sans">More</span>
+            <span className="text-[8px] font-black uppercase tracking-widest mt-1 block font-sans">More</span>
           </button>
         </div>
       </nav>
