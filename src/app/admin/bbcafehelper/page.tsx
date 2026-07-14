@@ -1,6 +1,8 @@
+
+
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   Home, 
   Store, 
@@ -51,7 +53,6 @@ interface InventoryItem {
   expiryDate?: string;
   batchNumber?: string;
   barcode?: string;
-  totalConsumption?: number;
 }
 
 interface TransferLog {
@@ -111,7 +112,6 @@ const triggerHaptic = (ms = 35) => {
 // 2. MASTER INITIAL INVENTORY SEED DATA
 // ==========================================
 const INITIAL_INVENTORY: InventoryItem[] = [
-  // --- INVENTORY FROM SUMMARY REPORT ---
   { id: "rep_1", name: "OREGON SACHETS", category: "Raw Material", storeQty: 5, cafeQty: 0, unit: "Pcs", purchasePrice: 120, minLimit: 10, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800301" },
   { id: "rep_2", name: "CHILLI FLAKES", category: "Raw Material", storeQty: 2, cafeQty: 0, unit: "Pcs", purchasePrice: 120, minLimit: 10, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800302" },
   { id: "rep_3", name: "FRESH YEAST KOBO", category: "Raw Material", storeQty: 0, cafeQty: 0, unit: "Pcs", purchasePrice: 80, minLimit: 5, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800303" },
@@ -130,8 +130,6 @@ const INITIAL_INVENTORY: InventoryItem[] = [
   { id: "rep_16", name: "FENNEL SEEDS SAUNF", category: "Raw Material", storeQty: 0, cafeQty: 0, unit: "Kg", purchasePrice: 240, minLimit: 5, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800316" },
   { id: "rep_17", name: "MUSTARD SEEDS RAI", category: "Raw Material", storeQty: 0, cafeQty: 0, unit: "Kg", purchasePrice: 120, minLimit: 5, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800317" },
   { id: "rep_18", name: "COCOA POWDER", category: "Raw Material", storeQty: 0, cafeQty: 0, unit: "Kg", purchasePrice: 380, minLimit: 3, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800318" },
-  
-  // CONTAINER/FOILS DISPOSABLES
   { id: "rep_19", name: "SILVER CONTAINER 500ML", category: "Disposable", storeQty: 0, cafeQty: 0, unit: "Pcs", purchasePrice: 4.5, minLimit: 100, supplier: "Prabhat Polymer", lastPurchaseDate: "2026-07-14", barcode: "890105800319" },
   { id: "rep_20", name: "SILVER CONTAINER 200ML", category: "Disposable", storeQty: 0, cafeQty: 0, unit: "Pcs", purchasePrice: 3.2, minLimit: 100, supplier: "Prabhat Polymer", lastPurchaseDate: "2026-07-14", barcode: "890105800320" },
   { id: "rep_21", name: "BUTTER PAPER ROLL", category: "Disposable", storeQty: 0, cafeQty: 0, unit: "Pcs", purchasePrice: 110, minLimit: 10, supplier: "Narmada Packagings", lastPurchaseDate: "2026-07-14", barcode: "890105800321" },
@@ -143,8 +141,6 @@ const INITIAL_INVENTORY: InventoryItem[] = [
   { id: "rep_27", name: "PAPER PLATE 12NO", category: "Disposable", storeQty: 0, cafeQty: 0, unit: "Pcs", purchasePrice: 2.5, minLimit: 150, supplier: "Narmada Packagings", lastPurchaseDate: "2026-07-14", barcode: "890105800327" },
   { id: "rep_28", name: "PAPER KATORI", category: "Disposable", storeQty: 0, cafeQty: 0, unit: "Pcs", purchasePrice: 0.7, minLimit: 200, supplier: "Narmada Packagings", lastPurchaseDate: "2026-07-14", barcode: "890105800328" },
   { id: "rep_29", name: "PAPER PALT RICE", category: "Disposable", storeQty: 0, cafeQty: 0, unit: "Pcs", purchasePrice: 1.8, minLimit: 200, supplier: "Narmada Packagings", lastPurchaseDate: "2026-07-14", barcode: "890105800329" },
-  
-  // CONDIMENTS & SAUCES
   { id: "rep_30", name: "HALDI POWDER", category: "Raw Material", storeQty: 0, cafeQty: 0, unit: "Kg", purchasePrice: 210, minLimit: 5, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800330" },
   { id: "rep_31", name: "KITCHEN KING MASALA", category: "Raw Material", storeQty: 0, cafeQty: 0, unit: "Pcs", purchasePrice: 72, minLimit: 10, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800331" },
   { id: "rep_32", name: "NAMKEEN BHEL", category: "Raw Material", storeQty: 0, cafeQty: 0, unit: "Kg", purchasePrice: 130, minLimit: 10, supplier: "Om Super Market", lastPurchaseDate: "2026-07-14", barcode: "890105800332" },
@@ -169,16 +165,12 @@ const INITIAL_INVENTORY: InventoryItem[] = [
   { id: "rep_51", name: "JALAPENO SLICE", category: "Raw Material", storeQty: 3, cafeQty: 0, unit: "Pcs", purchasePrice: 140, minLimit: 5, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800351" },
   { id: "rep_52", name: "CHOCOLATE SYRUP", category: "Raw Material", storeQty: 1, cafeQty: 0, unit: "Pcs", purchasePrice: 160, minLimit: 4, supplier: "Om Super Market", lastPurchaseDate: "2026-07-14", barcode: "890105800352" },
   { id: "rep_53", name: "COLD COFFEE GLASS STRAW & CAP", category: "Disposable", storeQty: 75, cafeQty: 0, unit: "Pcs", purchasePrice: 5.0, minLimit: 50, supplier: "Prabhat Polymer", lastPurchaseDate: "2026-07-14", barcode: "890105800353" },
-  
-  // PIZZA BASE & BOXES
   { id: "rep_54", name: "PIZZA BASE LARGE", category: "Raw Material", storeQty: 0, cafeQty: 0, unit: "Pcs", purchasePrice: 12, minLimit: 20, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800354" },
   { id: "rep_55", name: "PIZZA BASE SMALL 6\"", category: "Raw Material", storeQty: 0, cafeQty: 0, unit: "Pcs", purchasePrice: 7, minLimit: 20, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800355" },
   { id: "rep_56", name: "PIZZA BASE MEDIUM 8\"", category: "Raw Material", storeQty: 0, cafeQty: 0, unit: "Pcs", purchasePrice: 10, minLimit: 20, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800356" },
   { id: "rep_57", name: "PIZZA BOX LARGE 10\"", category: "Packaging", storeQty: 400, cafeQty: 0, unit: "Pcs", purchasePrice: 7.50, minLimit: 100, supplier: "Narmada Packagings", lastPurchaseDate: "2026-07-14", barcode: "890105800357" },
   { id: "rep_58", name: "PIZZA BOX 8\"", category: "Packaging", storeQty: 300, cafeQty: 0, unit: "Pcs", purchasePrice: 4.50, minLimit: 100, supplier: "Narmada Packagings", lastPurchaseDate: "2026-07-14", barcode: "890105800358" },
   { id: "rep_59", name: "PIZZA BOX 7\"", category: "Packaging", storeQty: 800, cafeQty: 0, unit: "Pcs", purchasePrice: 3.60, minLimit: 150, supplier: "Narmada Packagings", lastPurchaseDate: "2026-07-14", barcode: "890105800359" },
-
-  // --- CORE SYSTEM EQUIPMENT & FROZEN PRE-SETS ---
   { id: "item_19", name: "FRENCH FRIES", category: "Frozen Material", storeQty: 40, cafeQty: 10, unit: "Kg", purchasePrice: 110, minLimit: 15, supplier: "Sagar Distributors", lastPurchaseDate: "2026-07-12", expiryDate: "2026-10-12", batchNumber: "B-FF890", barcode: "890175800249" },
   { id: "item_20", name: "VEG PATTY", category: "Frozen Material", storeQty: 100, cafeQty: 25, unit: "Pcs", purchasePrice: 18, minLimit: 30, supplier: "Sagar Distributors", lastPurchaseDate: "2026-07-12", expiryDate: "2026-09-12", batchNumber: "B-VP441", barcode: "890175800250" },
   { id: "item_21", name: "PANEER POPPERS", category: "Frozen Material", storeQty: 60, cafeQty: 15, unit: "Pcs", purchasePrice: 15, minLimit: 20, supplier: "Sony Dairy", lastPurchaseDate: "2026-07-11", expiryDate: "2026-09-11", batchNumber: "B-PP902", barcode: "890175800251" },
@@ -186,7 +178,6 @@ const INITIAL_INVENTORY: InventoryItem[] = [
 ];
 
 export default function BumBumCafeStockApp() {
-  // Global States
   const [inventory, setInventory] = useState<InventoryItem[]>(INITIAL_INVENTORY);
   const [categories, setCategories] = useState<string[]>([
     "Raw Material", "Packaging", "Disposable", "Beverages", "Dairy", "Frozen Material", "Cleaning", "Equipment", "Others"
@@ -206,7 +197,7 @@ export default function BumBumCafeStockApp() {
   const [scannedAddQty, setScannedAddQty] = useState<string>("");
   const [scannedLocation, setScannedLocation] = useState<"Main Store" | "Cafe Kitchen">("Main Store");
 
-  // Form Modals & Managers
+  // Form Modals
   const [showAddStockModal, setShowAddStockModal] = useState<boolean>(false);
   const [showStockOutModal, setShowStockOutModal] = useState<boolean>(false);
   const [showTransferModal, setShowTransferModal] = useState<boolean>(false);
@@ -219,18 +210,21 @@ export default function BumBumCafeStockApp() {
   const [editingCategoryIndex, setEditingCategoryIndex] = useState<number | null>(null);
   const [editingCategoryValue, setEditingCategoryValue] = useState<string>("");
 
-  // Sub-data tracking for History logs
+  // Report Category State
+  const [reportCategory, setReportCategory] = useState<string>("All");
+
+  // Sub-data logs
   const [transferHistory, setTransferHistory] = useState<TransferLog[]>([
-    { id: "tx_1", itemName: "TABLE RICE", qty: 25, unit: "Kg", direction: "Store ➜ Cafe", date: "2026-07-13", by: "Admin (System)", notes: "Regular daily kitchen stock refill" },
-    { id: "tx_2", itemName: "CHEESE", qty: 5, unit: "Kg", direction: "Store ➜ Cafe", date: "2026-07-13", by: "Admin (System)", notes: "Pizza toppings restocking" },
+    { id: "tx_1", itemName: "OREGON SACHETS", qty: 25, unit: "Pcs", direction: "Store ➜ Cafe", date: "2026-07-13", by: "Admin (System)", notes: "Regular daily kitchen stock refill" },
+    { id: "tx_2", itemName: "MOZZARELLA CHEESE", qty: 5, unit: "Kg", direction: "Store ➜ Cafe", date: "2026-07-13", by: "Admin (System)", notes: "Pizza toppings restocking" },
   ]);
   const [purchaseHistory, setPurchaseHistory] = useState<PurchaseLog[]>([
-    { id: "p_1", itemName: "TABLE RICE", qty: 100, unit: "Kg", price: 52, supplier: "Rajesh Traders", date: "2026-07-10", invoiceNo: "INV-2026-889", targetLocation: "Main Store" },
-    { id: "p_2", itemName: "CHEESE", qty: 15, unit: "Kg", price: 440, supplier: "Sony Dairy", date: "2026-07-12", invoiceNo: "INV-2026-904", targetLocation: "Cafe Kitchen" },
+    { id: "p_1", itemName: "OREGON SACHETS", qty: 100, unit: "Pcs", price: 52, supplier: "Rajesh Traders", date: "2026-07-10", invoiceNo: "INV-2026-889", targetLocation: "Main Store" },
+    { id: "p_2", itemName: "MOZZARELLA CHEESE", qty: 15, unit: "Kg", price: 440, supplier: "Sony Dairy", date: "2026-07-12", invoiceNo: "INV-2026-904", targetLocation: "Cafe Kitchen" },
   ]);
   const [stockOutHistory, setStockOutHistory] = useState<StockOutLog[]>([
-    { id: "so_1", itemName: "SUGER", qty: 1.5, purpose: "Waste", date: "2026-07-12", remarks: "Sugar spoiled by high humidity", financialLoss: 66 },
-    { id: "so_2", itemName: "THUMSUP 750ML", qty: 2, purpose: "Damage", date: "2026-07-11", remarks: "Bottles leaked during dispatch handling", financialLoss: 80 },
+    { id: "so_1", itemName: "SUGER POWDER", qty: 1.5, purpose: "Waste", date: "2026-07-12", remarks: "Sugar spoiled by high humidity", financialLoss: 66 },
+    { id: "so_2", itemName: "COLD COFFEE GLASS BIG SET", qty: 2, purpose: "Damage", date: "2026-07-11", remarks: "Leaked during dispatch handling", financialLoss: 80 },
   ]);
 
   const [suppliers, setSuppliers] = useState<Supplier[]>([
@@ -258,7 +252,62 @@ export default function BumBumCafeStockApp() {
   });
   const [formSupplier, setFormSupplier] = useState({ name: '', phone: '', address: '' });
 
-  // Notifications pool (Low stock, Out of Stock, and Expiry Date warnings)
+  // Safe client-side hydration for localStorage
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+    const savedInventory = localStorage.getItem('bum_bum_inventory_v2');
+    const savedSuppliers = localStorage.getItem('bum_bum_suppliers_v2');
+    const savedTransfers = localStorage.getItem('bum_bum_transfers_v2');
+    const savedPurchases = localStorage.getItem('bum_bum_purchases_v2');
+    const savedStockOuts = localStorage.getItem('bum_bum_stockouts_v2');
+
+    if (savedInventory) setInventory(JSON.parse(savedInventory));
+    if (savedSuppliers) setSuppliers(JSON.parse(savedSuppliers));
+    if (savedTransfers) setTransferHistory(JSON.parse(savedTransfers));
+    if (savedPurchases) setPurchaseHistory(JSON.parse(savedPurchases));
+    if (savedStockOuts) setStockOutHistory(JSON.parse(savedStockOuts));
+  }, []);
+
+  useEffect(() => {
+    if (isMounted) {
+      localStorage.setItem('bum_bum_inventory_v2', JSON.stringify(inventory));
+    }
+  }, [inventory, isMounted]);
+
+  useEffect(() => {
+    if (isMounted) {
+      localStorage.setItem('bum_bum_suppliers_v2', JSON.stringify(suppliers));
+    }
+  }, [suppliers, isMounted]);
+
+  useEffect(() => {
+    if (isMounted) {
+      localStorage.setItem('bum_bum_transfers_v2', JSON.stringify(transferHistory));
+    }
+  }, [transferHistory, isMounted]);
+
+  useEffect(() => {
+    if (isMounted) {
+      localStorage.setItem('bum_bum_purchases_v2', JSON.stringify(purchaseHistory));
+    }
+  }, [purchaseHistory, isMounted]);
+
+  useEffect(() => {
+    if (isMounted) {
+      localStorage.setItem('bum_bum_stockouts_v2', JSON.stringify(stockOutHistory));
+    }
+  }, [stockOutHistory, isMounted]);
+
+  // Toast System State
+  const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "info" } | null>(null);
+  const toastMessage = (message: string, type: "success" | "error" | "info" = "success") => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3000);
+  };
+
+  // Notifications pool
   const notificationsList = useMemo<NotificationItem[]>(() => {
     const list: NotificationItem[] = [];
     const today = new Date();
@@ -266,14 +315,12 @@ export default function BumBumCafeStockApp() {
     inventory.forEach(item => {
       const total = item.storeQty + item.cafeQty;
       
-      // 1. Stock levels
       if (total === 0) {
         list.push({ id: `notif_out_${item.id}`, type: "Out of Stock", text: `🚨 ${item.name} is completely out of stock!`, time: "Action Required" });
       } else if (total < item.minLimit) {
         list.push({ id: `notif_low_${item.id}`, type: "Low Stock", text: `⚠️ ${item.name} is running low (${total} ${item.unit} left)`, time: "Restock soon" });
       }
 
-      // 2. Expiry dates
       if (item.expiryDate) {
         const exp = new Date(item.expiryDate);
         const timeDiff = exp.getTime() - today.getTime();
@@ -287,7 +334,7 @@ export default function BumBumCafeStockApp() {
     return list;
   }, [inventory]);
 
-  // Handle Bottom Nav clicks (routing simulator)
+  // Handle Bottom Nav clicks
   const handleNavClick = (tab: 'home' | 'store' | 'cafe' | 'transfer' | 'more') => {
     setActiveTab(tab);
     if (tab === 'home') setCurrentView('dashboard');
@@ -296,31 +343,24 @@ export default function BumBumCafeStockApp() {
     else if (tab === 'transfer') setCurrentView('stock_transfer');
   };
 
-  // Dashboard calculation selectors
+  // Dashboard calculations
   const dashboardStats = useMemo(() => {
     let totalStockVal = 0;
     let mainStoreVal = 0;
     let cafeStockVal = 0;
-    let lowStockCount = 0;
-    let outOfStockCount = 0;
 
     inventory.forEach(item => {
-      const totalVal = (item.storeQty + item.cafeQty) * item.purchasePrice;
-      totalStockVal += totalVal;
+      totalStockVal += (item.storeQty + item.cafeQty) * item.purchasePrice;
       mainStoreVal += item.storeQty * item.purchasePrice;
       cafeStockVal += item.cafeQty * item.purchasePrice;
-
-      const combinedQty = item.storeQty + item.cafeQty;
-      if (combinedQty === 0) outOfStockCount++;
-      else if (combinedQty < item.minLimit) lowStockCount++;
     });
 
     const todayPurchases = purchaseHistory
-      .filter(p => p.date === "2026-07-14" || p.date === new Date().toISOString().split('T')[0])
+      .filter(p => p.date === new Date().toISOString().split('T')[0])
       .reduce((sum, p) => sum + (p.qty * p.price), 0);
 
     const todayWaste = stockOutHistory
-      .filter(s => s.date === "2026-07-14" || s.date === new Date().toISOString().split('T')[0])
+      .filter(s => s.date === new Date().toISOString().split('T')[0])
       .reduce((sum, s) => sum + s.qty, 0);
 
     const monthlyFinancialWastageLoss = stockOutHistory
@@ -331,8 +371,6 @@ export default function BumBumCafeStockApp() {
       totalStockVal,
       mainStoreVal,
       cafeStockVal,
-      lowStockCount,
-      outOfStockCount,
       todayPurchases,
       todayWaste,
       monthlyFinancialWastageLoss
@@ -350,14 +388,7 @@ export default function BumBumCafeStockApp() {
     });
   }, [inventory, searchQuery, selectedCategory]);
 
-  // Toast System State
-  const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "info" } | null>(null);
-  const toastMessage = (message: string, type: "success" | "error" | "info" = "success") => {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 3000);
-  };
-
-  // Barcode Scan Simulator with Match Logic & Location Targeting
+  // Barcode Scan Simulator
   const handleBarcodeManualScan = (e: React.FormEvent) => {
     e.preventDefault();
     triggerHaptic();
@@ -402,7 +433,6 @@ export default function BumBumCafeStockApp() {
       })
     );
 
-    // Save purchase history audit with routed target location
     const newPurchase: PurchaseLog = {
       id: `p_${Date.now()}`,
       itemName: scannedProductDetected.name,
@@ -462,24 +492,29 @@ export default function BumBumCafeStockApp() {
     toastMessage("Supplier Removed Successfully!");
   };
 
-  // WhatsApp low stock order generator based on specific supplier
+  // WHATSAPP REORDER BY SUPPLIER (SUPPLIER SPECIFIC WHATSAPP ROUTING - REFINE ADDITION)
   const triggerWhatsAppOrder = (supplierName: string) => {
+    // Find supplier phone
+    const supplierObj = suppliers.find(s => s.name === supplierName);
+    const phoneNum = supplierObj?.phone ? `91${supplierObj.phone}` : "919714293759"; // Fallback to test number
+
+    // Filter ONLY items assigned to this specific supplier that are below minimum limit
     const lowStockForSupplier = inventory.filter(item => 
       item.supplier === supplierName && (item.storeQty + item.cafeQty) < item.minLimit
     );
 
     if (lowStockForSupplier.length === 0) {
-      toastMessage(`${supplierName} के पास कोई भी कम स्टॉक सामग्री नहीं है!`, "info");
+      toastMessage(`${supplierName} ke liye koi low-stock material nahi hai!`, "info");
       return;
     }
 
     const orderText = lowStockForSupplier
-      .map(item => `• ${item.name} (${item.minLimit - (item.storeQty + item.cafeQty)} ${item.unit} Required)`)
+      .map(item => `• ${item.name} (${item.minLimit - (item.storeQty + item.cafeQty)} ${item.unit} Chahiye)`)
       .join("\n");
 
-    const message = encodeURIComponent(`🔥 *BUM BUM CAFE - NEW ORDER REQ*\n\nप्रिय ${supplierName} टीम,\nकृपया हमारे कैफ़े के लिए निम्नलिखित कम स्टॉक माल का ऑर्डर भेजें:\n\n${orderText}\n\nधन्यवाद!\n- मैनेजमेंट (Bum Bum Cafe)`);
-    window.open(`https://wa.me/919714293759?text=${message}`, '_blank');
-    toastMessage("WhatsApp order drafted!");
+    const message = encodeURIComponent(`☕ *BUM BUM CAFE - NAYA ORDER*\n\nNamaskar ${supplierName} Team,\nKripya hamare cafe ke liye niche likha low-stock material jald bhejein:\n\n${orderText}\n\nDhanyavaad!\n- Management (Bum Bum Cafe)`);
+    window.open(`https://wa.me/${phoneNum}?text=${message}`, '_blank');
+    toastMessage(`WhatsApp order forwarded to ${supplierName}!`);
   };
 
   // Item Delete Action
@@ -502,7 +537,7 @@ export default function BumBumCafeStockApp() {
       prev.map(item => item.id === editingItem.id ? editingItem : item)
     );
 
-    toastMessage("आइटम विवरण संशोधित किया गया!");
+    toastMessage("Item details updated!");
     setEditingItem(null);
     setSelectedItemDetail(null);
   };
@@ -547,7 +582,7 @@ export default function BumBumCafeStockApp() {
 
   const handleCategoryDelete = (catName: string) => {
     triggerHaptic(50);
-    const confirm = window.confirm(`क्या आप श्रेणी "${catName}" को हटाना चाहते हैं? इस श्रेणी की सभी सामग्री "Others" श्रेणी में चली जाएगी।`);
+    const confirm = window.confirm(`क्या आप श्रेणी "${catName}" को हटाna chahte hain? Sabhi material 'Others' category mein chale jayenge.`);
     if (!confirm) return;
 
     setCategories(prev => prev.filter(c => c !== catName));
@@ -555,10 +590,10 @@ export default function BumBumCafeStockApp() {
       prev.map(item => item.category === catName ? { ...item, category: "Others" } : item)
     );
 
-    toastMessage("श्रेणी हटा दी गई है।");
+    toastMessage("Category removed.");
   };
 
-  // Dynamic Stock-In handler (Routes to either Main Store or Cafe Kitchen dynamically)
+  // Dynamic Stock-In handler
   const handleStockInSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formStockIn.item || !formStockIn.quantity || !formStockIn.price) {
@@ -615,7 +650,7 @@ export default function BumBumCafeStockApp() {
     };
     setPurchaseHistory(prev => [newPurchase, ...prev]);
 
-    toastMessage(`Stocked In ${qtyNum} of ${formStockIn.item} successfully to ${target}!`);
+    toastMessage(`Stocked In successfully to ${target}!`);
     setShowAddStockModal(false);
     setFormStockIn({ 
       invoiceNo: '', supplier: '', item: '', category: 'Raw Material', quantity: '', unit: 'Kg', price: '', gst: '5', expiry: '', batch: '', uploadInvoice: '',
@@ -623,7 +658,7 @@ export default function BumBumCafeStockApp() {
     });
   };
 
-  // Dynamic Stock-Out Handler (Deducts Cafe stock)
+  // Dynamic Stock-Out Handler
   const handleStockOutSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formStockOut.item || !formStockOut.quantity) {
@@ -648,7 +683,7 @@ export default function BumBumCafeStockApp() {
     });
 
     if (stockIsShort) {
-      toastMessage("Insufficient quantity in Cafe Stock to dispatch!", "error");
+      toastMessage("Insufficient quantity in Cafe Stock!", "error");
       return;
     }
 
@@ -718,12 +753,13 @@ export default function BumBumCafeStockApp() {
       return;
     }
 
-    const matchName = inventory.find(i => i.id === formTransfer.item)?.name || "Unknown";
+    const matchItem = inventory.find(i => i.id === formTransfer.item);
+    const matchName = matchItem?.name || "Unknown";
     const newTx: TransferLog = {
       id: `tx_${Date.now()}`,
       itemName: matchName,
       qty: qtyNum,
-      unit: inventory.find(i => i.id === formTransfer.item)?.unit || "Pcs",
+      unit: matchItem?.unit || "Pcs",
       direction: dir,
       date: new Date().toISOString().split('T')[0],
       by: "Admin (System)",
@@ -736,16 +772,26 @@ export default function BumBumCafeStockApp() {
     setFormTransfer({ item: '', quantity: '', direction: 'Store ➜ Cafe', notes: '' });
   };
 
-  // Export CSV/Excel Function
-  const triggerSimulationExport = (reportName: string) => {
-    const headers = ["Item Name", "Category", "Quantity", "Unit", "Total Value (INR)", "Status"];
-    const rows = inventory.map(item => [
+  // CATEGORY-WISE CSV / EXCEL EXPORT (CATEGORY-WISE EXPORT - REFINE ADDITION)
+  const triggerCategorywiseExport = (reportName: string) => {
+    const targetInventory = reportCategory === "All" 
+      ? inventory 
+      : inventory.filter(item => item.category === reportCategory);
+
+    if (targetInventory.length === 0) {
+      toastMessage(`Category: ${reportCategory} ke under koi material nahi mila!`, "error");
+      return;
+    }
+
+    const headers = ["Item Name", "Category", "Godown Qty", "Cafe Qty", "Unit", "Total Value (INR)", "Supplier"];
+    const rows = targetInventory.map(item => [
       item.name,
       item.category,
-      item.storeQty + item.cafeQty,
+      item.storeQty,
+      item.cafeQty,
       item.unit,
       (item.storeQty + item.cafeQty) * item.purchasePrice,
-      (item.storeQty + item.cafeQty) === 0 ? "Out of Stock" : (item.storeQty + item.cafeQty) < item.minLimit ? "Low Stock" : "Normal"
+      item.supplier
     ]);
 
     const csvContent = "data:text/csv;charset=utf-8," 
@@ -753,15 +799,15 @@ export default function BumBumCafeStockApp() {
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `${reportName}_${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute("download", `${reportCategory}_Report_${new Date().toISOString().split('T')[0]}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    toastMessage(`Downloaded: ${reportName} (CSV)!`);
+    toastMessage(`Downloaded: ${reportCategory} sheet!`);
   };
 
   return (
-    <div className={`min-h-screen ${isDarkMode ? 'bg-[#0F0F0F] text-white' : 'bg-[#FAFAFA] text-neutral-900'} pb-24 font-sans relative transition-colors duration-300`}>
+    <div className={`min-h-screen ${isDarkMode ? 'bg-[#0F0F0F]' : 'bg-[#FAFAFA]'} text-neutral-900 pb-24 font-sans relative transition-colors duration-300`}>
 
       {/* Toast Notification HUD */}
       <AnimatePresence>
@@ -781,8 +827,8 @@ export default function BumBumCafeStockApp() {
         )}
       </AnimatePresence>
 
-      {/* PREMIUM HEADER */}
-      <header className={`sticky top-0 z-40 backdrop-blur-lg border-b ${isDarkMode ? 'bg-[#0F0F0F]/80 border-neutral-800' : 'bg-white/80 border-neutral-100'} p-4`}>
+      {/* HEADER */}
+      <header className={`sticky top-0 z-40 backdrop-blur-lg border-b ${isDarkMode ? 'bg-[#0F0F0F]/80 border-neutral-800 text-white' : 'bg-white/80 border-neutral-100'} p-4`}>
         <div className="max-w-md mx-auto flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-orange-500 to-amber-400 flex items-center justify-center text-white font-black shadow-lg shadow-orange-500/20">
@@ -798,7 +844,6 @@ export default function BumBumCafeStockApp() {
           </div>
 
           <div className="flex items-center gap-2">
-            {/* Barcode Scanner overlay trigger */}
             <button 
               onClick={() => setScannerActive(true)}
               className="p-2.5 bg-[#FF6B00]/5 border border-[#FF6B00]/20 hover:bg-[#FF6B00]/10 rounded-xl text-[#FF6B00] transition-all"
@@ -807,7 +852,6 @@ export default function BumBumCafeStockApp() {
               <QrCode size={16} className="animate-pulse" />
             </button>
 
-            {/* Notifications Trigger Bell */}
             <button 
               onClick={() => setShowNotifications(true)}
               className="p-2.5 bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-700 rounded-xl text-neutral-400 relative transition-all"
@@ -832,7 +876,7 @@ export default function BumBumCafeStockApp() {
         {activeTab === 'home' && currentView === 'dashboard' && (
           <div className="space-y-6">
             
-            {/* Quick Hero Banner */}
+            {/* Hero Banner */}
             <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-3xl p-5 text-white shadow-xl shadow-orange-500/25 relative overflow-hidden">
               <div className="absolute -right-10 -bottom-10 opacity-10 rotate-12">
                 <Flame size={160} />
@@ -855,32 +899,32 @@ export default function BumBumCafeStockApp() {
               </div>
             </div>
 
-            {/* DASHBOARD ANALYTICS CARDS */}
+            {/* DASHBOARD VALUATIONS */}
             <div className="space-y-3">
               <h3 className="text-xs font-black uppercase tracking-widest text-neutral-400 px-1">Inventory Valuations</h3>
               <div className="grid grid-cols-2 gap-3">
-                <div className={`p-4 rounded-3xl border ${isDarkMode ? 'bg-[#1A1A1A] border-neutral-800' : 'bg-white border-neutral-100'} shadow-sm`}>
+                <div className={`p-4 rounded-3xl border ${isDarkMode ? 'bg-[#1A1A1A] border-neutral-800 text-white' : 'bg-white border-neutral-100 text-neutral-900'} shadow-sm`}>
                   <p className="text-[8px] font-black uppercase tracking-wider text-neutral-400">Total Stock Value</p>
                   <h4 className="text-lg font-black text-[#FF6B00] mt-1">₹{dashboardStats.totalStockVal.toLocaleString()}</h4>
                 </div>
-                <div className={`p-4 rounded-3xl border ${isDarkMode ? 'bg-[#1A1A1A] border-neutral-800' : 'bg-white border-neutral-100'} shadow-sm`}>
+                <div className={`p-4 rounded-3xl border ${isDarkMode ? 'bg-[#1A1A1A] border-neutral-800 text-white' : 'bg-white border-neutral-100 text-neutral-900'} shadow-sm`}>
                   <p className="text-[8px] font-black uppercase tracking-wider text-neutral-400">Main Store Value</p>
                   <h4 className="text-lg font-black mt-1">₹{dashboardStats.mainStoreVal.toLocaleString()}</h4>
                 </div>
-                <div className={`p-4 rounded-3xl border ${isDarkMode ? 'bg-[#1A1A1A] border-neutral-800' : 'bg-white border-neutral-100'} shadow-sm`}>
+                <div className={`p-4 rounded-3xl border ${isDarkMode ? 'bg-[#1A1A1A] border-neutral-800 text-white' : 'bg-white border-neutral-100 text-neutral-900'} shadow-sm`}>
                   <p className="text-[8px] font-black uppercase tracking-wider text-neutral-400">Cafe Stock Value</p>
-                  <h4 className="text-lg font-black mt-1">₹{dashboardStats.cafeStockVal.toLocaleString()}</h4>
+                  <h4 className="text-lg font-black mt-1 text-[#FF6B00]">₹{dashboardStats.cafeStockVal.toLocaleString()}</h4>
                 </div>
-                <div className={`p-4 rounded-3xl border ${isDarkMode ? 'bg-[#1A1A1A] border-neutral-800' : 'bg-white border-neutral-100'} shadow-sm`}>
+                <div className={`p-4 rounded-3xl border ${isDarkMode ? 'bg-[#1A1A1A] border-neutral-800 text-white' : 'bg-white border-neutral-100 text-neutral-900'} shadow-sm`}>
                   <p className="text-[8px] font-black uppercase tracking-wider text-neutral-400">Monthly Wastage Loss</p>
                   <h4 className="text-lg font-black mt-1 text-red-500">₹{dashboardStats.monthlyFinancialWastageLoss.toLocaleString()}</h4>
                 </div>
               </div>
             </div>
 
-            {/* DAILY DEVIATION COUNTERS */}
+            {/* DAILY COUNTERS */}
             <div className="grid grid-cols-2 gap-3">
-              <div className={`p-4 rounded-3xl border ${isDarkMode ? 'bg-[#1A1A1A] border-neutral-800' : 'bg-white border-neutral-100'} shadow-sm flex items-center justify-between`}>
+              <div className={`p-4 rounded-3xl border ${isDarkMode ? 'bg-[#1A1A1A] border-neutral-800 text-white' : 'bg-white border-neutral-100 text-neutral-900'} shadow-sm flex items-center justify-between`}>
                 <div>
                   <p className="text-[8px] font-black uppercase tracking-wider text-neutral-400">Today Stock In</p>
                   <h4 className="text-base font-black text-green-500 mt-1">₹{dashboardStats.todayPurchases}</h4>
@@ -888,7 +932,7 @@ export default function BumBumCafeStockApp() {
                 <PlusCircle size={22} className="text-green-500" />
               </div>
 
-              <div className={`p-4 rounded-3xl border ${isDarkMode ? 'bg-[#1A1A1A] border-neutral-800' : 'bg-white border-neutral-100'} shadow-sm flex items-center justify-between`}>
+              <div className={`p-4 rounded-3xl border ${isDarkMode ? 'bg-[#1A1A1A] border-neutral-800 text-white' : 'bg-white border-neutral-100 text-neutral-900'} shadow-sm flex items-center justify-between`}>
                 <div>
                   <p className="text-[8px] font-black uppercase tracking-wider text-neutral-400">Today Waste Qty</p>
                   <h4 className="text-base font-black text-red-500 mt-1">{dashboardStats.todayWaste} Qty</h4>
@@ -897,8 +941,8 @@ export default function BumBumCafeStockApp() {
               </div>
             </div>
 
-            {/* LOW STOCK HUD LIST */}
-            <div className={`p-5 rounded-3xl border ${isDarkMode ? 'bg-[#1A1A1A] border-neutral-800' : 'bg-white border-neutral-100'} shadow-sm space-y-3`}>
+            {/* LOW STOCK HUB LIST */}
+            <div className={`p-5 rounded-3xl border ${isDarkMode ? 'bg-[#1A1A1A] border-neutral-800 text-white' : 'bg-white border-neutral-100 text-neutral-900'} shadow-sm space-y-3`}>
               <div className="flex items-center justify-between">
                 <span className="text-xs font-black uppercase tracking-widest text-neutral-400">Low / Out of Stock List</span>
                 <span className="bg-amber-100 dark:bg-amber-500/10 text-amber-600 px-2 py-0.5 rounded-full text-[9px] font-black uppercase">Critical</span>
@@ -929,19 +973,19 @@ export default function BumBumCafeStockApp() {
             <div className="space-y-3">
               <h3 className="text-xs font-black uppercase tracking-widest text-neutral-400 px-1">Quick Actions Panel</h3>
               <div className="grid grid-cols-4 gap-2 text-center text-xs">
-                <div onClick={() => setShowAddStockModal(true)} className={`p-3 rounded-2xl border ${isDarkMode ? 'bg-[#1A1A1A] border-neutral-800' : 'bg-white border-neutral-100'} shadow-sm cursor-pointer hover:border-orange-500 transition-all`}>
+                <div onClick={() => setShowAddStockModal(true)} className={`p-3 rounded-2xl border ${isDarkMode ? 'bg-[#1A1A1A] border-neutral-800 text-white' : 'bg-white border-neutral-100 text-neutral-900'} shadow-sm cursor-pointer hover:border-[#FF6B00] transition-all`}>
                   <Plus className="mx-auto text-[#FF6B00]" size={16} />
                   <span className="text-[9px] font-black uppercase tracking-wider block mt-1">Add Stock</span>
                 </div>
-                <div onClick={() => setShowStockOutModal(true)} className={`p-3 rounded-2xl border ${isDarkMode ? 'bg-[#1A1A1A] border-neutral-800' : 'bg-white border-neutral-100'} shadow-sm cursor-pointer hover:border-orange-500 transition-all`}>
+                <div onClick={() => setShowStockOutModal(true)} className={`p-3 rounded-2xl border ${isDarkMode ? 'bg-[#1A1A1A] border-neutral-800 text-white' : 'bg-white border-neutral-100 text-neutral-900'} shadow-sm cursor-pointer hover:border-red-500 transition-all`}>
                   <MinusCircle className="mx-auto text-red-500" size={16} />
                   <span className="text-[9px] font-black uppercase tracking-wider block mt-1">Stock Out</span>
                 </div>
-                <div onClick={() => setShowTransferModal(true)} className={`p-3 rounded-2xl border ${isDarkMode ? 'bg-[#1A1A1A] border-neutral-800' : 'bg-white border-neutral-100'} shadow-sm cursor-pointer hover:border-orange-500 transition-all`}>
+                <div onClick={() => setShowTransferModal(true)} className={`p-3 rounded-2xl border ${isDarkMode ? 'bg-[#1A1A1A] border-neutral-800 text-white' : 'bg-white border-neutral-100 text-neutral-900'} shadow-sm cursor-pointer hover:border-blue-500 transition-all`}>
                   <RefreshCw className="mx-auto text-blue-500" size={16} />
                   <span className="text-[9px] font-black uppercase tracking-wider block mt-1">Transfer</span>
                 </div>
-                <div onClick={() => { setActiveTab('more'); setCurrentView('reports_list'); }} className={`p-3 rounded-2xl border ${isDarkMode ? 'bg-[#1A1A1A] border-neutral-800' : 'bg-white border-neutral-100'} shadow-sm cursor-pointer hover:border-orange-500 transition-all`}>
+                <div onClick={() => { setActiveTab('more'); setCurrentView('reports_list'); }} className={`p-3 rounded-2xl border ${isDarkMode ? 'bg-[#1A1A1A] border-neutral-800 text-white' : 'bg-white border-neutral-100 text-neutral-900'} shadow-sm cursor-pointer hover:border-green-500 transition-all`}>
                   <BarChart3 className="mx-auto text-emerald-500" size={16} />
                   <span className="text-[9px] font-black uppercase tracking-wider block mt-1">Reports</span>
                 </div>
@@ -968,6 +1012,22 @@ export default function BumBumCafeStockApp() {
                 <Plus size={14} />
                 <span>Add Item</span>
               </button>
+            </div>
+
+            {/* LIVE SEARCH BAR */}
+            <div className="relative">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-400 animate-pulse" size={16} />
+              <input 
+                type="text" 
+                placeholder="Search items, categories or suppliers..." 
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                className={`w-full pl-10 pr-4 py-3 rounded-2xl text-xs border outline-none transition-all ${
+                  isDarkMode 
+                    ? 'bg-[#1A1A1A] border-neutral-800 text-white focus:border-[#FF6B00]' 
+                    : 'bg-white border-neutral-100 text-neutral-900 focus:border-[#FF6B00]'
+                }`}
+              />
             </div>
 
             {/* CATEGORY FILTER SWITCHES */}
@@ -1005,7 +1065,7 @@ export default function BumBumCafeStockApp() {
                   <div 
                     key={item.id} 
                     className={`rounded-3xl border p-4 hover:shadow-lg transition-all ${
-                      isDarkMode ? 'bg-[#1A1A1A] border-neutral-800' : 'bg-white border-neutral-100'
+                      isDarkMode ? 'bg-[#1A1A1A] border-neutral-800 text-white' : 'bg-white border-neutral-100 text-neutral-900'
                     } ${isLow ? 'border-amber-500/40 bg-amber-500/[0.02]' : ''}`}
                   >
                     <div className="flex justify-between items-start">
@@ -1020,7 +1080,6 @@ export default function BumBumCafeStockApp() {
                         </div>
                         <p className="text-[9px] text-neutral-400 font-bold uppercase tracking-wider">{item.category} • {item.supplier}</p>
                         {item.barcode && <p className="text-[8px] text-neutral-400 tracking-wider">Barcode: {item.barcode}</p>}
-                        {item.expiryDate && <p className="text-[8px] text-red-400 font-bold">Expiry: {item.expiryDate}</p>}
                       </div>
 
                       <div className="text-right">
@@ -1079,7 +1138,7 @@ export default function BumBumCafeStockApp() {
         {activeTab === 'cafe' && (
           <div className="space-y-6">
             <div>
-              <h2 className="text-base font-black uppercase tracking-widest text-neutral-400">Cafe Kitchen Stock</h2>
+              <h2 className="text-base font-black uppercase tracking-widest text-neutral-400 font-sans">Cafe Kitchen Stock</h2>
               <p className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider">Daily cooking ingredients & instant stock</p>
             </div>
 
@@ -1090,7 +1149,7 @@ export default function BumBumCafeStockApp() {
                   <div 
                     key={item.id} 
                     className={`rounded-3xl border p-4 ${
-                      isDarkMode ? 'bg-[#1A1A1A] border-neutral-800' : 'bg-white border-neutral-100'
+                      isDarkMode ? 'bg-[#1A1A1A] border-neutral-800 text-white' : 'bg-white border-neutral-100 text-neutral-900'
                     } ${isLow ? 'border-red-500/40 bg-red-500/[0.01]' : ''}`}
                   >
                     <div className="flex justify-between items-start">
@@ -1176,7 +1235,7 @@ export default function BumBumCafeStockApp() {
               
               <div className="space-y-2.5">
                 {transferHistory.map(log => (
-                  <div key={log.id} className={`p-4 rounded-3xl border ${isDarkMode ? 'bg-[#1A1A1A] border-neutral-800' : 'bg-white border-neutral-100'} text-xs space-y-2`}>
+                  <div key={log.id} className={`p-4 rounded-3xl border ${isDarkMode ? 'bg-[#1A1A1A] border-neutral-800 text-white' : 'bg-white border-neutral-100 text-neutral-900'} text-xs space-y-2`}>
                     <div className="flex justify-between items-center">
                       <span className="font-bold">{log.itemName}</span>
                       <span className="bg-blue-100 dark:bg-blue-500/10 text-blue-500 px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-wide">
@@ -1197,12 +1256,11 @@ export default function BumBumCafeStockApp() {
         )}
 
         {/* ==========================================
-            7. MORE OVERLAY / SIDEBAR DETAILS
+            7. MORE OVERLAY / CONFIGURATIONS
             ========================================== */}
         {activeTab === 'more' && (
           <div className="space-y-6">
             
-            {/* SIMULATED MENU FOR MORE SECTION */}
             {currentView === 'dashboard' || currentView === 'more_home' ? (
               <div className="space-y-4">
                 <div className="flex items-center gap-3 border-b border-neutral-100 dark:border-neutral-800 pb-3">
@@ -1210,7 +1268,7 @@ export default function BumBumCafeStockApp() {
                     ➕
                   </div>
                   <div>
-                    <h2 className="text-sm font-black uppercase tracking-widest">More Operational Features</h2>
+                    <h2 className="text-sm font-black uppercase tracking-widest text-neutral-500">More Operations</h2>
                     <p className="text-[8px] text-neutral-400 font-bold uppercase tracking-wider">Access configurations, audits, and settings</p>
                   </div>
                 </div>
@@ -1230,7 +1288,7 @@ export default function BumBumCafeStockApp() {
                         setCurrentView(option.id);
                       }}
                       className={`p-4 rounded-3xl border cursor-pointer hover:border-orange-500 flex items-center justify-between transition-all ${
-                        isDarkMode ? 'bg-[#1A1A1A] border-neutral-800' : 'bg-white border-neutral-100'
+                        isDarkMode ? 'bg-[#1A1A1A] border-neutral-800 text-white' : 'bg-white border-neutral-100 text-neutral-900'
                       }`}
                     >
                       <div className="flex items-center gap-3">
@@ -1255,7 +1313,7 @@ export default function BumBumCafeStockApp() {
                   <button onClick={() => setCurrentView('more_home')} className="text-xs text-orange-500 font-bold uppercase tracking-wider">Back</button>
                 </div>
 
-                <form onSubmit={handleStockInSubmit} className={`p-5 rounded-3xl border space-y-3 text-xs ${isDarkMode ? 'bg-[#1A1A1A] border-neutral-800' : 'bg-white border-neutral-100'}`}>
+                <form onSubmit={handleStockInSubmit} className={`p-5 rounded-3xl border space-y-3 text-xs ${isDarkMode ? 'bg-[#1A1A1A] border-neutral-800 text-white' : 'bg-white border-neutral-100 text-neutral-900'}`}>
                   <div className="space-y-1">
                     <label className="font-black uppercase tracking-wider text-neutral-400 text-[9px]">Invoice Number</label>
                     <input 
@@ -1263,7 +1321,7 @@ export default function BumBumCafeStockApp() {
                       placeholder="e.g. INV-2026-904"
                       value={formStockIn.invoiceNo}
                       onChange={e => setFormStockIn({...formStockIn, invoiceNo: e.target.value})}
-                      className="w-full p-3 rounded-2xl border dark:bg-neutral-800 dark:border-neutral-700" 
+                      className="w-full p-3 rounded-2xl border dark:bg-neutral-800 dark:border-neutral-700 outline-none focus:border-[#FF6B00]" 
                     />
                   </div>
 
@@ -1273,7 +1331,7 @@ export default function BumBumCafeStockApp() {
                       <select 
                         value={formStockIn.supplier}
                         onChange={e => setFormStockIn({...formStockIn, supplier: e.target.value})}
-                        className="w-full p-3 rounded-2xl border dark:bg-neutral-800 dark:border-neutral-700 cursor-pointer"
+                        className="w-full p-3 rounded-2xl border dark:bg-neutral-800 dark:border-neutral-700 cursor-pointer outline-none"
                       >
                         <option value="">Select Supplier</option>
                         {suppliers.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
@@ -1283,10 +1341,10 @@ export default function BumBumCafeStockApp() {
                       <label className="font-black uppercase tracking-wider text-neutral-400 text-[9px]">Item Name</label>
                       <input 
                         type="text" 
-                        placeholder="e.g. GUD"
+                        placeholder="e.g. OREGON SACHETS"
                         value={formStockIn.item}
                         onChange={e => setFormStockIn({...formStockIn, item: e.target.value})}
-                        className="w-full p-3 rounded-2xl border dark:bg-neutral-800" 
+                        className="w-full p-3 rounded-2xl border dark:bg-neutral-800 outline-none" 
                         required
                       />
                     </div>
@@ -1300,7 +1358,7 @@ export default function BumBumCafeStockApp() {
                         placeholder="e.g. 50"
                         value={formStockIn.quantity}
                         onChange={e => setFormStockIn({...formStockIn, quantity: e.target.value})}
-                        className="w-full p-3 rounded-2xl border dark:bg-neutral-800" 
+                        className="w-full p-3 rounded-2xl border dark:bg-neutral-800 outline-none" 
                         required
                       />
                     </div>
@@ -1309,7 +1367,7 @@ export default function BumBumCafeStockApp() {
                       <select 
                         value={formStockIn.unit}
                         onChange={e => setFormStockIn({...formStockIn, unit: e.target.value})}
-                        className="w-full p-3 rounded-2xl border dark:bg-neutral-800 cursor-pointer"
+                        className="w-full p-3 rounded-2xl border dark:bg-neutral-800 cursor-pointer outline-none"
                       >
                         <option value="Kg">Kg</option>
                         <option value="Pcs">Pcs</option>
@@ -1327,7 +1385,7 @@ export default function BumBumCafeStockApp() {
                         placeholder="e.g. 140"
                         value={formStockIn.price}
                         onChange={e => setFormStockIn({...formStockIn, price: e.target.value})}
-                        className="w-full p-3 rounded-2xl border dark:bg-neutral-800" 
+                        className="w-full p-3 rounded-2xl border dark:bg-neutral-800 outline-none" 
                         required
                       />
                     </div>
@@ -1336,20 +1394,19 @@ export default function BumBumCafeStockApp() {
                       <select 
                         value={formStockIn.category}
                         onChange={e => setFormStockIn({...formStockIn, category: e.target.value})}
-                        className="w-full p-3 rounded-2xl border dark:bg-neutral-800 cursor-pointer"
+                        className="w-full p-3 rounded-2xl border dark:bg-neutral-800 cursor-pointer outline-none"
                       >
                         {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
                       </select>
                     </div>
                   </div>
 
-                  {/* DIRECT STOCKING LOCATION TARGET SELECTOR */}
                   <div className="space-y-1">
                     <label className="font-black uppercase tracking-wider text-neutral-400 text-[9px]">Deliver Target Location</label>
                     <select 
                       value={formStockIn.targetLocation}
                       onChange={e => setFormStockIn({...formStockIn, targetLocation: e.target.value as any})}
-                      className="w-full p-3 rounded-2xl border bg-orange-500/10 border-orange-500/20 text-[#FF6B00] font-black cursor-pointer"
+                      className="w-full p-3 rounded-2xl border bg-orange-500/10 border-orange-500/20 text-[#FF6B00] font-black cursor-pointer outline-none"
                     >
                       <option value="Main Store">🏬 Main Godown (bulk store)</option>
                       <option value="Cafe Kitchen">🍕 Cafe Kitchen (instant use)</option>
@@ -1365,7 +1422,7 @@ export default function BumBumCafeStockApp() {
                 <div className="space-y-2">
                   <h4 className="text-xs font-black uppercase tracking-wider text-neutral-400 font-sans">Incoming Purchase Audit Log</h4>
                   {purchaseHistory.map(log => (
-                    <div key={log.id} className={`p-4 rounded-3xl border ${isDarkMode ? 'bg-[#1A1A1A] border-neutral-800' : 'bg-white border-neutral-100'} text-xs space-y-1`}>
+                    <div key={log.id} className={`p-4 rounded-3xl border ${isDarkMode ? 'bg-[#1A1A1A] border-neutral-800 text-white' : 'bg-white border-neutral-100 text-neutral-900'} text-xs space-y-1`}>
                       <div className="flex justify-between">
                         <span className="font-bold">{log.itemName}</span>
                         <span className="text-green-500 font-bold">₹{log.price * log.qty}</span>
@@ -1387,7 +1444,7 @@ export default function BumBumCafeStockApp() {
 
                 <div className="space-y-2.5">
                   {stockOutHistory.map(log => (
-                    <div key={log.id} className={`p-4 rounded-3xl border ${isDarkMode ? 'bg-[#1A1A1A] border-neutral-800' : 'bg-white border-neutral-100'} text-xs space-y-2`}>
+                    <div key={log.id} className={`p-4 rounded-3xl border ${isDarkMode ? 'bg-[#1A1A1A] border-neutral-800 text-white' : 'bg-white border-neutral-100 text-neutral-900'} text-xs space-y-2`}>
                       <div className="flex justify-between items-center">
                         <span className="font-bold">{log.itemName}</span>
                         <span className="bg-red-100 dark:bg-red-500/10 text-red-500 px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-wide">
@@ -1408,7 +1465,7 @@ export default function BumBumCafeStockApp() {
               </div>
             )}
 
-            {/* C. REPORTS PANEL WITH PDF/EXCEL TRIGGER */}
+            {/* C. REPORTS PANEL WITH CATEGORY SELECTOR (REFINE-ADDITION) */}
             {currentView === 'reports_list' && (
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
@@ -1416,28 +1473,39 @@ export default function BumBumCafeStockApp() {
                   <button onClick={() => setCurrentView('more_home')} className="text-xs text-orange-500 font-bold uppercase tracking-wider">Back</button>
                 </div>
 
+                {/* Category Selector Box for Exports */}
+                <div className={`p-4 rounded-3xl border space-y-2.5 ${isDarkMode ? 'bg-[#1A1A1A] border-neutral-800 text-white' : 'bg-white border-neutral-100 text-neutral-900'}`}>
+                  <label className="text-[10px] font-black uppercase tracking-wider text-neutral-400">Select Category to Export</label>
+                  <select 
+                    value={reportCategory}
+                    onChange={e => setReportCategory(e.target.value)}
+                    className="w-full p-3 rounded-2xl border dark:bg-neutral-800 dark:border-neutral-700 outline-none text-xs font-bold cursor-pointer"
+                  >
+                    <option value="All">All Categories</option>
+                    {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                  </select>
+                </div>
+
                 <div className="grid grid-cols-1 gap-2 text-xs">
                   {[
-                    { title: "Daily Store Audit Report", type: "Daily_Report" },
+                    { title: "Store Category-wise Stock Report", type: "Category_Stock" },
                     { title: "Weekly Consumption Analysis", type: "Weekly_Report" },
-                    { title: "Monthly Stock Valuation Ledger", type: "Monthly_Report" },
-                    { title: "Wastage and Discards Auditor", type: "Wastage_Report" },
-                    { title: "Inter-store Logistics Audit", type: "Transfer_Report" },
+                    { title: "Valuation Ledger Sheet", type: "Valuation_Ledger" },
                   ].map((rep, idx) => (
                     <div 
                       key={idx}
                       className={`p-4 rounded-3xl border flex items-center justify-between ${
-                        isDarkMode ? 'bg-[#1A1A1A] border-neutral-800' : 'bg-white border-neutral-100'
+                        isDarkMode ? 'bg-[#1A1A1A] border-neutral-800 text-white' : 'bg-white border-neutral-100 text-neutral-900'
                       }`}
                     >
                       <div>
                         <p className="font-bold">{rep.title}</p>
-                        <p className="text-[9px] text-neutral-400 uppercase tracking-wider mt-0.5">Automated compilation engine</p>
+                        <p className="text-[9px] text-neutral-400 uppercase tracking-wider mt-0.5">Filter: {reportCategory}</p>
                       </div>
 
                       <div className="flex gap-1.5">
                         <button 
-                          onClick={() => triggerSimulationExport(rep.type)}
+                          onClick={() => triggerCategorywiseExport(rep.type)}
                           className="px-2.5 py-1.5 bg-[#FF6B00]/10 text-[#FF6B00] rounded-xl flex items-center gap-1 font-bold text-[9px] uppercase hover:bg-[#FF6B00]/20"
                         >
                           <FileSpreadsheet size={12} /> Excel
@@ -1445,7 +1513,7 @@ export default function BumBumCafeStockApp() {
                         <button 
                           onClick={() => {
                             triggerHaptic();
-                            toastMessage("PDF Report successfully compiled!");
+                            toastMessage(`Category (${reportCategory}) PDF Compiled!`);
                           }}
                           className="px-2.5 py-1.5 bg-neutral-100 dark:bg-neutral-800 text-neutral-400 rounded-xl flex items-center gap-1 font-bold text-[9px] uppercase"
                         >
@@ -1458,7 +1526,7 @@ export default function BumBumCafeStockApp() {
               </div>
             )}
 
-            {/* D. MANAGE SUPPLIERS WITH ADD, EDIT & DELETE */}
+            {/* D. MANAGE SUPPLIERS */}
             {currentView === 'suppliers_list' && (
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
@@ -1470,13 +1538,13 @@ export default function BumBumCafeStockApp() {
                   onClick={() => setShowAddSupplierModal(true)}
                   className="w-full p-3 bg-[#FF6B00] hover:bg-orange-600 text-white rounded-2xl font-black text-xs uppercase tracking-wider flex items-center justify-center gap-1.5 shadow"
                 >
-                  <Plus size={14} /> Add New Supplier
+                  <Plus size={14} /> Add Supplier
                 </button>
 
                 <div className="grid grid-cols-1 gap-2.5 text-xs">
                   {suppliers.map((s) => (
                     <div key={s.id} className={`p-4 rounded-3xl border flex flex-col gap-3 ${
-                      isDarkMode ? 'bg-[#1A1A1A] border-neutral-800' : 'bg-white border-neutral-100'
+                      isDarkMode ? 'bg-[#1A1A1A] border-neutral-800 text-white' : 'bg-white border-neutral-100 text-neutral-900'
                     }`}>
                       <div className="flex justify-between items-start">
                         <div>
@@ -1501,7 +1569,7 @@ export default function BumBumCafeStockApp() {
                         </div>
                       </div>
 
-                      {/* WHATSAPP REORDER QUICK TRIGGER BUTTON */}
+                      {/* WHATSAPP REORDER ROUTED ACCORDING TO SUPPLIER PHONE (REFINE-ADDITION) */}
                       <button
                         onClick={() => triggerWhatsAppOrder(s.name)}
                         className="w-full py-2 bg-green-500/10 hover:bg-green-500 text-green-600 hover:text-white border border-green-500/20 text-[9px] font-black uppercase tracking-wider rounded-xl flex items-center justify-center gap-1.5 transition-all"
@@ -1515,7 +1583,7 @@ export default function BumBumCafeStockApp() {
               </div>
             )}
 
-            {/* E. MANAGE CATEGORIES (DYNAMIC LIST INSIDE TAB) */}
+            {/* E. MANAGE CATEGORIES */}
             {currentView === 'categories_manager' && (
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
@@ -1529,7 +1597,7 @@ export default function BumBumCafeStockApp() {
                     placeholder="New category name (e.g. Spices)" 
                     value={categoryInput}
                     onChange={e => setCategoryInput(e.target.value)}
-                    className="flex-1 p-3 rounded-2xl border dark:bg-[#1A1A1A] dark:border-neutral-800"
+                    className="flex-1 p-3 rounded-2xl border dark:bg-[#1A1A1A] dark:border-neutral-800 dark:text-white outline-none"
                     required
                   />
                   <button type="submit" className="px-5 py-3 bg-[#FF6B00] text-white rounded-2xl font-black uppercase">Add</button>
@@ -1542,7 +1610,7 @@ export default function BumBumCafeStockApp() {
                       placeholder="Edit category name..." 
                       value={editingCategoryValue}
                       onChange={e => setEditingCategoryValue(e.target.value)}
-                      className="flex-1 p-2.5 rounded-xl border dark:bg-neutral-800"
+                      className="flex-1 p-2.5 rounded-xl border dark:bg-neutral-800 dark:text-white"
                       required
                     />
                     <button type="submit" className="px-4 py-2 bg-green-600 text-white rounded-xl font-bold uppercase">Update</button>
@@ -1553,7 +1621,7 @@ export default function BumBumCafeStockApp() {
                 <div className="grid grid-cols-1 gap-2 text-xs">
                   {categories.map((cat, idx) => (
                     <div key={idx} className={`p-4 rounded-3xl border flex items-center justify-between ${
-                      isDarkMode ? 'bg-[#1A1A1A] border-neutral-800' : 'bg-white border-neutral-100'
+                      isDarkMode ? 'bg-[#1A1A1A] border-neutral-800 text-white' : 'bg-white border-neutral-100 text-neutral-900'
                     }`}>
                       <span className="font-bold">{cat}</span>
                       <div className="flex gap-2">
@@ -1589,9 +1657,8 @@ export default function BumBumCafeStockApp() {
                   <button onClick={() => setCurrentView('more_home')} className="text-xs text-orange-500 font-bold uppercase tracking-wider">Back</button>
                 </div>
 
-                <div className={`p-5 rounded-3xl border space-y-4 text-xs ${isDarkMode ? 'bg-[#1A1A1A] border-neutral-800' : 'bg-white border-neutral-100'}`}>
+                <div className={`p-5 rounded-3xl border space-y-4 text-xs ${isDarkMode ? 'bg-[#1A1A1A] border-neutral-800 text-white' : 'bg-white border-neutral-100 text-neutral-900'}`}>
                   
-                  {/* Theme Mode Toggle */}
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="font-black text-sm uppercase tracking-wide">Dark Mode Preference</p>
@@ -1605,7 +1672,6 @@ export default function BumBumCafeStockApp() {
                     </button>
                   </div>
 
-                  {/* Offline Support Status */}
                   <div className="flex items-center justify-between border-t border-neutral-100 dark:border-neutral-800 pt-4">
                     <div>
                       <p className="font-black text-sm uppercase tracking-wide">Offline PWA Auto-Sync</p>
@@ -1629,14 +1695,53 @@ export default function BumBumCafeStockApp() {
           ========================================== */}
       <AnimatePresence>
         
-        {/* A. PRODUCT ITEM SPECIFIC DETAILED DRAWER (WITH ITEM DELETE / EDIT INSIDE) */}
+        {/* A. NOTIFICATIONS PANEL DRAWER */}
+        {showNotifications && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-end justify-center">
+            <motion.div 
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              className={`w-full max-w-md rounded-t-[2.5rem] p-6 space-y-4 border-t ${
+                isDarkMode ? 'bg-[#0F0F0F] border-neutral-800 text-white' : 'bg-white border-neutral-200 text-neutral-900'
+              }`}
+            >
+              <div className="flex justify-between items-center">
+                <h3 className="text-sm font-black uppercase tracking-widest text-neutral-400">System Notifications</h3>
+                <button 
+                  onClick={() => setShowNotifications(false)}
+                  className="p-2.5 bg-neutral-100 dark:bg-neutral-800 text-neutral-400 rounded-xl"
+                >
+                  <X size={15} />
+                </button>
+              </div>
+
+              <div className="space-y-2 max-h-80 overflow-y-auto">
+                {notificationsList.length === 0 ? (
+                  <p className="text-xs text-neutral-400 text-center py-6">All systems normal. No alerts!</p>
+                ) : (
+                  notificationsList.map(notif => (
+                    <div key={notif.id} className="p-3 rounded-2xl bg-neutral-50 dark:bg-neutral-800/50 text-xs flex flex-col gap-1">
+                      <div className="flex justify-between items-center">
+                        <span className="font-bold text-orange-500">{notif.type}</span>
+                        <span className="text-[9px] text-neutral-400 font-bold uppercase">{notif.time}</span>
+                      </div>
+                      <p className="text-neutral-600 dark:text-neutral-300">{notif.text}</p>
+                    </div>
+                  ))
+                )}
+              </div>
+            </motion.div>
+          </div>
+        )}
+
+        {/* B. DETAILED DRAWER */}
         {selectedItemDetail && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[99] flex items-end justify-center">
             <motion.div 
               initial={{ y: "100%" }}
               animate={{ y: 0 }}
               exit={{ y: "100%" }}
-              transition={{ type: "spring", damping: 25, stiffness: 220 }}
               className={`w-full max-w-md rounded-t-[2.5rem] p-6 space-y-5 border-t ${
                 isDarkMode ? 'bg-[#0F0F0F] border-neutral-800 text-white' : 'bg-white border-neutral-200 text-neutral-900'
               }`}
@@ -1664,14 +1769,13 @@ export default function BumBumCafeStockApp() {
                   </button>
                   <button 
                     onClick={() => setSelectedItemDetail(null)}
-                    className="p-2.5 bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-700 text-neutral-400 rounded-xl"
+                    className="p-2.5 bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 text-neutral-400 rounded-xl"
                   >
                     <X size={15} />
                   </button>
                 </div>
               </div>
 
-              {/* Dynamic Qty Spread HUD */}
               <div className="grid grid-cols-2 gap-3.5 text-center text-xs">
                 <div className="p-4 bg-neutral-50 dark:bg-neutral-800/50 rounded-2xl">
                   <span className="text-[8px] font-black text-neutral-400 uppercase tracking-wider block">Main Godown</span>
@@ -1683,29 +1787,6 @@ export default function BumBumCafeStockApp() {
                 </div>
               </div>
 
-              {/* Simulated Purchase Timeline */}
-              <div className="space-y-2.5">
-                <h4 className="text-[10px] font-black uppercase tracking-widest text-neutral-400 font-sans font-sans">Activity & Delivery Audit</h4>
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-xs p-2.5 bg-neutral-50 dark:bg-neutral-800/50 rounded-xl">
-                    <div className="flex items-center gap-2">
-                      <Clock size={12} className="text-neutral-400" />
-                      <span>Last Inward Invoice Log</span>
-                    </div>
-                    <span className="text-neutral-400">{selectedItemDetail.lastPurchaseDate}</span>
-                  </div>
-
-                  <div className="flex items-center justify-between text-xs p-2.5 bg-neutral-50 dark:bg-neutral-800/50 rounded-xl">
-                    <div className="flex items-center gap-2">
-                      <Truck size={12} className="text-neutral-400" />
-                      <span>Supplier Agency Partner</span>
-                    </div>
-                    <span className="font-bold text-[#FF6B00]">{selectedItemDetail.supplier}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Action row */}
               <div className="flex gap-2 pt-2">
                 <button 
                   onClick={() => {
@@ -1732,7 +1813,7 @@ export default function BumBumCafeStockApp() {
           </div>
         )}
 
-        {/* B. ITEM EDIT MASTER OVERLAY */}
+        {/* C. ITEM EDIT MASTER OVERLAY */}
         {editingItem && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[110] flex items-center justify-center p-4">
             <motion.form 
@@ -1755,18 +1836,19 @@ export default function BumBumCafeStockApp() {
                   type="text" 
                   value={editingItem.name} 
                   onChange={e => setEditingItem({...editingItem, name: e.target.value.toUpperCase()})}
-                  className="w-full p-2.5 rounded-xl border dark:bg-neutral-800"
+                  className="w-full p-2.5 rounded-xl border dark:bg-neutral-800 outline-none"
                   required
                 />
               </div>
 
+              {/* Dynamic Category Option in Edit Modal */}
               <div className="grid grid-cols-2 gap-2 text-xs">
                 <div className="space-y-1.5">
                   <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400">Category</label>
                   <select 
                     value={editingItem.category} 
                     onChange={e => setEditingItem({...editingItem, category: e.target.value})}
-                    className="w-full p-2.5 rounded-xl border dark:bg-neutral-800"
+                    className="w-full p-2.5 rounded-xl border dark:bg-neutral-800 outline-none cursor-pointer"
                   >
                     {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
                   </select>
@@ -1777,7 +1859,7 @@ export default function BumBumCafeStockApp() {
                     type="number" 
                     value={editingItem.purchasePrice} 
                     onChange={e => setEditingItem({...editingItem, purchasePrice: parseFloat(e.target.value)})}
-                    className="w-full p-2.5 rounded-xl border dark:bg-neutral-800"
+                    className="w-full p-2.5 rounded-xl border dark:bg-neutral-800 outline-none"
                     required
                   />
                 </div>
@@ -1790,7 +1872,7 @@ export default function BumBumCafeStockApp() {
                     type="number" 
                     value={editingItem.minLimit} 
                     onChange={e => setEditingItem({...editingItem, minLimit: parseInt(e.target.value)})}
-                    className="w-full p-2.5 rounded-xl border dark:bg-neutral-800"
+                    className="w-full p-2.5 rounded-xl border dark:bg-neutral-800 outline-none"
                     required
                   />
                 </div>
@@ -1800,20 +1882,32 @@ export default function BumBumCafeStockApp() {
                     type="text" 
                     value={editingItem.barcode || ""} 
                     onChange={e => setEditingItem({...editingItem, barcode: e.target.value})}
-                    className="w-full p-2.5 rounded-xl border dark:bg-neutral-800"
-                    placeholder="Barcode Number"
+                    className="w-full p-2.5 rounded-xl border dark:bg-neutral-800 outline-none"
+                    placeholder="Barcode"
                   />
                 </div>
               </div>
 
-              <button type="submit" className="w-full p-3 bg-blue-600 text-white font-black text-xs uppercase tracking-wider rounded-2xl shadow">
+              {/* Dynamic Supplier Assignment Option in Edit */}
+              <div className="space-y-1.5 text-xs">
+                <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400">Supplier Agency Partner</label>
+                <select 
+                  value={editingItem.supplier}
+                  onChange={e => setEditingItem({...editingItem, supplier: e.target.value})}
+                  className="w-full p-2.5 rounded-xl border dark:bg-neutral-800 outline-none cursor-pointer"
+                >
+                  {suppliers.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
+                </select>
+              </div>
+
+              <button type="submit" className="w-full p-3 bg-[#FF6B00] text-white font-black text-xs uppercase tracking-wider rounded-2xl shadow">
                 Save Changes ➔
               </button>
             </motion.form>
           </div>
         )}
 
-        {/* C. SUPPLIER EDIT OVERLAY */}
+        {/* D. SUPPLIER EDIT OVERLAY */}
         {editingSupplier && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[110] flex items-center justify-center p-4">
             <motion.form 
@@ -1836,19 +1930,19 @@ export default function BumBumCafeStockApp() {
                   type="text" 
                   value={editingSupplier.name} 
                   onChange={e => setEditingSupplier({...editingSupplier, name: e.target.value})}
-                  className="w-full p-2.5 rounded-xl border dark:bg-neutral-800"
+                  className="w-full p-2.5 rounded-xl border dark:bg-neutral-800 outline-none"
                   required
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-2 text-xs">
                 <div className="space-y-1.5">
-                  <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400">Phone</label>
+                  <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400">Phone (digits only)</label>
                   <input 
                     type="text" 
                     value={editingSupplier.phone} 
                     onChange={e => setEditingSupplier({...editingSupplier, phone: e.target.value})}
-                    className="w-full p-2.5 rounded-xl border dark:bg-neutral-800"
+                    className="w-full p-2.5 rounded-xl border dark:bg-neutral-800 outline-none"
                     required
                   />
                 </div>
@@ -1858,7 +1952,7 @@ export default function BumBumCafeStockApp() {
                     type="text" 
                     value={editingSupplier.address} 
                     onChange={e => setEditingSupplier({...editingSupplier, address: e.target.value})}
-                    className="w-full p-2.5 rounded-xl border dark:bg-neutral-800"
+                    className="w-full p-2.5 rounded-xl border dark:bg-neutral-800 outline-none"
                     required
                   />
                 </div>
@@ -1871,7 +1965,7 @@ export default function BumBumCafeStockApp() {
           </div>
         )}
 
-        {/* D. INTERACTIVE REAL-TIME BARCODE SCANNER SIMULATOR */}
+        {/* E. INTERACTIVE REAL-TIME BARCODE SCANNER */}
         {scannerActive && (
           <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[120] flex items-center justify-center p-4">
             <motion.div 
@@ -1908,11 +2002,11 @@ export default function BumBumCafeStockApp() {
                     <select 
                       onChange={e => setScannerManualBarcode(e.target.value)}
                       value={scannerManualBarcode}
-                      className="w-full p-3 rounded-2xl bg-neutral-800 border border-neutral-700 text-white cursor-pointer"
+                      className="w-full p-3 rounded-2xl bg-neutral-800 border border-neutral-700 text-white cursor-pointer outline-none"
                     >
                       <option value="">-- Choose Barcode --</option>
                       {inventory.map(i => (
-                        <option key={i.id} value={i.barcode}>{i.name} (Barcode: {i.barcode || "N/A"})</option>
+                        <option key={i.id} value={i.barcode}>{i.name} ({i.barcode || "N/A"})</option>
                       ))}
                     </select>
                   </div>
@@ -1939,7 +2033,7 @@ export default function BumBumCafeStockApp() {
                       placeholder="e.g. 100" 
                       value={scannedAddQty} 
                       onChange={e => setScannedAddQty(e.target.value)} 
-                      className="w-full p-3.5 bg-neutral-800 border border-neutral-700 rounded-2xl text-white font-bold"
+                      className="w-full p-3.5 bg-neutral-800 border border-neutral-700 rounded-2xl text-white font-bold outline-none"
                       required
                       autoFocus
                     />
@@ -1950,7 +2044,7 @@ export default function BumBumCafeStockApp() {
                     <select 
                       value={scannedLocation}
                       onChange={e => setScannedLocation(e.target.value as any)}
-                      className="w-full p-3 rounded-2xl bg-neutral-800 border border-neutral-700 text-white cursor-pointer font-bold"
+                      className="w-full p-3 rounded-2xl bg-neutral-800 border border-neutral-700 text-white cursor-pointer font-bold outline-none"
                     >
                       <option value="Main Store">🏬 Main Godown (bulk store)</option>
                       <option value="Cafe Kitchen">🍕 Cafe Kitchen (instant kitchen use)</option>
@@ -1978,6 +2072,158 @@ export default function BumBumCafeStockApp() {
           </div>
         )}
 
+        {/* F. STOCK TRANSFER MODAL */}
+        {showTransferModal && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[99] flex items-center justify-center p-4">
+            <motion.form 
+              onSubmit={handleTransferSubmit}
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className={`w-full max-w-sm rounded-[2rem] p-6 space-y-4 border ${
+                isDarkMode ? 'bg-[#0F0F0F] border-neutral-800 text-white' : 'bg-white border-neutral-100 text-neutral-900'
+              }`}
+            >
+              <div className="flex justify-between items-center">
+                <h3 className="text-xs font-black uppercase tracking-widest text-[#FF6B00]">Stock Transfer Portal</h3>
+                <button type="button" onClick={() => setShowTransferModal(false)} className="p-2.5 bg-neutral-100 dark:bg-neutral-800 rounded-xl"><X size={14} /></button>
+              </div>
+
+              <div className="space-y-1 text-xs">
+                <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400">Select Material / Item</label>
+                <select 
+                  value={formTransfer.item}
+                  onChange={e => setFormTransfer({...formTransfer, item: e.target.value})}
+                  className="w-full p-3 rounded-xl border dark:bg-neutral-800 cursor-pointer outline-none"
+                  required
+                >
+                  <option value="">-- Select Material --</option>
+                  {inventory.map(i => (
+                    <option key={i.id} value={i.id}>{i.name} (Godown: {i.storeQty} | Cafe: {i.cafeQty})</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="space-y-1">
+                  <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400">Quantity</label>
+                  <input 
+                    type="number" 
+                    placeholder="e.g. 5"
+                    value={formTransfer.quantity}
+                    onChange={e => setFormTransfer({...formTransfer, quantity: e.target.value})}
+                    className="w-full p-2.5 rounded-xl border dark:bg-neutral-800 outline-none" 
+                    required
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400">Direction</label>
+                  <select 
+                    value={formTransfer.direction}
+                    onChange={e => setFormTransfer({...formTransfer, direction: e.target.value as any})}
+                    className="w-full p-2.5 rounded-xl border dark:bg-neutral-800 cursor-pointer outline-none"
+                  >
+                    <option value="Store ➜ Cafe">Godown ➜ Cafe</option>
+                    <option value="Cafe ➜ Store">Cafe ➜ Godown</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="space-y-1 text-xs">
+                <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400">Internal Remarks / Reason</label>
+                <input 
+                  type="text" 
+                  placeholder="Reason for stock transit"
+                  value={formTransfer.notes}
+                  onChange={e => setFormTransfer({...formTransfer, notes: e.target.value})}
+                  className="w-full p-3 rounded-xl border dark:bg-neutral-800 outline-none"
+                />
+              </div>
+
+              <button type="submit" className="w-full p-3 bg-[#FF6B00] hover:bg-orange-600 text-white font-black text-xs uppercase tracking-wider rounded-2xl shadow">
+                Initiate Transit Order ➔
+              </button>
+            </motion.form>
+          </div>
+        )}
+
+        {/* G. STOCK OUT MODAL */}
+        {showStockOutModal && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[99] flex items-center justify-center p-4">
+            <motion.form 
+              onSubmit={handleStockOutSubmit}
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className={`w-full max-w-sm rounded-[2rem] p-6 space-y-4 border ${
+                isDarkMode ? 'bg-[#0F0F0F] border-neutral-800 text-white' : 'bg-white border-neutral-100 text-neutral-900'
+              }`}
+            >
+              <div className="flex justify-between items-center">
+                <h3 className="text-xs font-black uppercase tracking-widest text-red-500">Log outward stock reduction</h3>
+                <button type="button" onClick={() => setShowStockOutModal(false)} className="p-2.5 bg-neutral-100 dark:bg-neutral-800 rounded-xl"><X size={14} /></button>
+              </div>
+
+              <div className="space-y-1 text-xs">
+                <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400">Select Item</label>
+                <select 
+                  value={formStockOut.item}
+                  onChange={e => setFormStockOut({...formStockOut, item: e.target.value})}
+                  className="w-full p-3 rounded-xl border dark:bg-neutral-800 cursor-pointer outline-none"
+                  required
+                >
+                  <option value="">-- Choose Item --</option>
+                  {inventory.map(i => (
+                    <option key={i.id} value={i.id}>{i.name} (Kitchen: {i.cafeQty})</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="space-y-1">
+                  <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400">Quantity</label>
+                  <input 
+                    type="number" 
+                    placeholder="e.g. 5"
+                    value={formStockOut.quantity}
+                    onChange={e => setFormStockOut({...formStockOut, quantity: e.target.value})}
+                    className="w-full p-2.5 rounded-xl border dark:bg-neutral-800 outline-none" 
+                    required
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400">Outward Purpose</label>
+                  <select 
+                    value={formStockOut.purpose}
+                    onChange={e => setFormStockOut({...formStockOut, purpose: e.target.value as any})}
+                    className="w-full p-2.5 rounded-xl border dark:bg-neutral-800 cursor-pointer outline-none"
+                  >
+                    <option value="Kitchen Use">Kitchen Use</option>
+                    <option value="Waste">Waste / Scrap</option>
+                    <option value="Damage">Transit Damage</option>
+                    <option value="Staff Use">Staff Meals</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="space-y-1 text-xs">
+                <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400">Remarks</label>
+                <input 
+                  type="text" 
+                  placeholder="Reason for write-off"
+                  value={formStockOut.remarks}
+                  onChange={e => setFormStockOut({...formStockOut, remarks: e.target.value})}
+                  className="w-full p-3 rounded-xl border dark:bg-neutral-800 outline-none"
+                />
+              </div>
+
+              <button type="submit" className="w-full p-3 bg-red-600 hover:bg-red-700 text-white font-black text-xs uppercase tracking-wider rounded-2xl shadow">
+                Confirm Dispatch ➔
+              </button>
+            </motion.form>
+          </div>
+        )}
+
         {/* H. MODAL FORM: STOCK IN / INCOMING */}
         {showAddStockModal && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[99] flex items-center justify-center p-4">
@@ -1986,7 +2232,7 @@ export default function BumBumCafeStockApp() {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className={`w-full max-sm rounded-[2rem] p-6 space-y-4 border ${
+              className={`w-full max-w-sm rounded-[2rem] p-6 space-y-4 border ${
                 isDarkMode ? 'bg-[#0F0F0F] border-neutral-800 text-white' : 'bg-white border-neutral-100 text-neutral-900'
               }`}
             >
@@ -2000,10 +2246,10 @@ export default function BumBumCafeStockApp() {
                   <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400">Item Name</label>
                   <input 
                     type="text" 
-                    placeholder="e.g. CHEESE"
+                    placeholder="e.g. MOZZARELLA CHEESE"
                     value={formStockIn.item}
                     onChange={e => setFormStockIn({...formStockIn, item: e.target.value})}
-                    className="w-full p-2.5 rounded-xl border dark:bg-neutral-800" 
+                    className="w-full p-2.5 rounded-xl border dark:bg-neutral-800 outline-none" 
                     required
                   />
                 </div>
@@ -2012,7 +2258,7 @@ export default function BumBumCafeStockApp() {
                   <select 
                     value={formStockIn.supplier}
                     onChange={e => setFormStockIn({...formStockIn, supplier: e.target.value})}
-                    className="w-full p-2.5 rounded-xl border dark:bg-neutral-800"
+                    className="w-full p-2.5 rounded-xl border dark:bg-neutral-800 outline-none cursor-pointer"
                   >
                     <option value="">Select Supplier</option>
                     {suppliers.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
@@ -2028,7 +2274,7 @@ export default function BumBumCafeStockApp() {
                     placeholder="e.g. 10"
                     value={formStockIn.quantity}
                     onChange={e => setFormStockIn({...formStockIn, quantity: e.target.value})}
-                    className="w-full p-2.5 rounded-xl border dark:bg-neutral-800" 
+                    className="w-full p-2.5 rounded-xl border dark:bg-neutral-800 outline-none" 
                     required
                   />
                 </div>
@@ -2037,7 +2283,7 @@ export default function BumBumCafeStockApp() {
                   <select 
                     value={formStockIn.unit}
                     onChange={e => setFormStockIn({...formStockIn, unit: e.target.value})}
-                    className="w-full p-3 rounded-xl border dark:bg-neutral-800 cursor-pointer"
+                    className="w-full p-3 rounded-xl border dark:bg-neutral-800 cursor-pointer outline-none"
                   >
                     <option value="Kg">Kg</option>
                     <option value="Pcs">Pcs</option>
@@ -2055,7 +2301,7 @@ export default function BumBumCafeStockApp() {
                     placeholder="e.g. 440"
                     value={formStockIn.price}
                     onChange={e => setFormStockIn({...formStockIn, price: e.target.value})}
-                    className="w-full p-2.5 rounded-xl border dark:bg-neutral-800" 
+                    className="w-full p-2.5 rounded-xl border dark:bg-neutral-800 outline-none" 
                     required
                   />
                 </div>
@@ -2064,7 +2310,7 @@ export default function BumBumCafeStockApp() {
                   <select 
                     value={formStockIn.category}
                     onChange={e => setFormStockIn({...formStockIn, category: e.target.value})}
-                    className="w-full p-3 rounded-xl border dark:bg-neutral-800 cursor-pointer"
+                    className="w-full p-3 rounded-xl border dark:bg-neutral-800 cursor-pointer outline-none"
                   >
                     {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
                   </select>
@@ -2076,7 +2322,7 @@ export default function BumBumCafeStockApp() {
                 <select 
                   value={formStockIn.targetLocation}
                   onChange={e => setFormStockIn({...formStockIn, targetLocation: e.target.value as any})}
-                  className="w-full p-3 rounded-xl border bg-orange-500/10 border-orange-500/20 text-[#FF6B00] font-black cursor-pointer"
+                  className="w-full p-3 rounded-xl border bg-orange-500/10 border-orange-500/20 text-[#FF6B00] font-black cursor-pointer outline-none"
                 >
                   <option value="Main Store">🏬 Main Godown (bulk store)</option>
                   <option value="Cafe Kitchen">🍕 Cafe Kitchen (instant use)</option>
@@ -2114,7 +2360,7 @@ export default function BumBumCafeStockApp() {
                   placeholder="e.g. Swastik Packaging Hub"
                   value={formSupplier.name}
                   onChange={e => setFormSupplier({...formSupplier, name: e.target.value})}
-                  className="w-full p-3 rounded-xl border dark:bg-neutral-800" 
+                  className="w-full p-3 rounded-xl border dark:bg-neutral-800 outline-none" 
                   required
                 />
               </div>
@@ -2127,7 +2373,7 @@ export default function BumBumCafeStockApp() {
                     placeholder="98765xxxxx"
                     value={formSupplier.phone}
                     onChange={e => setFormSupplier({...formSupplier, phone: e.target.value})}
-                    className="w-full p-2.5 rounded-xl border dark:bg-neutral-800" 
+                    className="w-full p-2.5 rounded-xl border dark:bg-neutral-800 outline-none" 
                   />
                 </div>
                 <div className="space-y-1">
@@ -2137,7 +2383,7 @@ export default function BumBumCafeStockApp() {
                     placeholder="City / Area"
                     value={formSupplier.address}
                     onChange={e => setFormSupplier({...formSupplier, address: e.target.value})}
-                    className="w-full p-2.5 rounded-xl border dark:bg-neutral-800" 
+                    className="w-full p-2.5 rounded-xl border dark:bg-neutral-800 outline-none" 
                   />
                 </div>
               </div>
@@ -2151,7 +2397,7 @@ export default function BumBumCafeStockApp() {
 
       </AnimatePresence>
 
-      {/* FIXED PREMIUM BOTTOM NAVIGATION BAR */}
+      {/* FIXED BOTTOM NAVIGATION BAR */}
       <nav className={`fixed bottom-0 left-0 right-0 z-50 border-t backdrop-blur-md transition-colors duration-300 ${
         isDarkMode ? 'bg-[#0F0F0F]/90 border-neutral-800 text-white' : 'bg-white/90 border-neutral-100 text-neutral-800'
       }`}>
