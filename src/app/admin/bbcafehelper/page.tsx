@@ -290,7 +290,7 @@ export default function BumBumCafeStockApp() {
     };
   }, []);
 
-  // Dashboard calculation selectors (FIXED)
+  // Dashboard calculation selectors
   const dashboardStats = useMemo(() => {
     let totalStockVal = 0;
     let mainStoreVal = 0;
@@ -329,6 +329,17 @@ export default function BumBumCafeStockApp() {
       monthlyFinancialWastageLoss
     };
   }, [inventory, purchaseHistory, stockOutHistory]);
+
+  // Global search & categorized filtering (RESTORED)
+  const filteredInventory = useMemo(() => {
+    return inventory.filter(item => {
+      const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                            item.supplier.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                            item.category.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesCategory = selectedCategory === "All" || item.category === selectedCategory;
+      return matchesSearch && matchesCategory;
+    });
+  }, [inventory, searchQuery, selectedCategory]);
 
   const handleSeedDatabase = async () => {
     triggerHaptic();
@@ -895,6 +906,88 @@ export default function BumBumCafeStockApp() {
     }
   };
 
+  const handlePrintGroup = (group: PrintGroup) => {
+    triggerHaptic();
+    const printWindow = window.open('', '_blank', 'width=600,height=800');
+    if (!printWindow) return toastMessage("Please allow pop-ups to print.");
+    
+    const matchedItems = inventory.filter(i => group.itemIds.includes(i.id));
+    const rowsHtml = matchedItems.map(item => {
+      const orderQty = printOrderQtys[`${group.id}_${item.id}`] || "0";
+      return `
+        <tr>
+          <td style="padding: 10px; border-bottom: 1px solid #ddd; text-align: left; font-family: sans-serif;">${item.name}</td>
+          <td style="padding: 10px; border-bottom: 1px solid #ddd; text-align: center; font-family: sans-serif;">${item.storeQty} ${item.unit}</td>
+          <td style="padding: 10px; border-bottom: 1px solid #ddd; text-align: right; font-weight: bold; font-family: sans-serif; color: #FF6B00;">${orderQty}</td>
+        </tr>
+      `;
+    }).join('');
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Print_Group_${group.name}</title>
+          <style>
+            body { font-family: sans-serif; padding: 25px; color: #333; }
+            h2 { text-align: center; color: #FF6B00; margin-bottom: 2px; }
+            p { text-align: center; font-size: 10px; color: #666; margin-top: 0; }
+            table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+            th { background: #f5f5f5; padding: 10px; font-weight: bold; border-bottom: 2px solid #ddd; }
+          </style>
+        </head>
+        <body>
+          <h2>BUM BUM CAFE - ${group.name.toUpperCase()}</h2>
+          <p>Printed on: ${new Date().toLocaleString()}</p>
+          <table>
+            <thead>
+              <tr>
+                <th style="text-align: left;">Item Name</th>
+                <th style="text-align: center;">Current Stock</th>
+                <th style="text-align: right;">Order Quantity (to buy)</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rowsHtml}
+            </tbody>
+          </table>
+          <script>window.onload = function() { window.print(); }</script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
+
+  const handleCreatePrintGroup = async (e: React.FormEvent) => {
+    e.preventDefault();
+    triggerHaptic();
+    if (!newGroupNameInput.trim() || selectedItemIds.length === 0) {
+      toastMessage("Group name and selected items are required!", "error");
+      return;
+    }
+
+    try {
+      await addDoc(collection(db, "print_groups"), {
+        name: newGroupNameInput.trim(),
+        itemIds: [...selectedItemIds]
+      });
+
+      setNewGroupNameInput("");
+      setSelectedItemIds([]);
+      setIsMultiSelectMode(false);
+      setShowAddToGroupModal(false);
+      toastMessage("Created print category!");
+    } catch (err) {
+      toastMessage("Failed to save print group.", "error");
+    }
+  };
+
+  const handleToggleMultiSelect = (id: string) => {
+    triggerHaptic(10);
+    setSelectedItemIds(prev => 
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    );
+  };
+
   return (
     <div className={`min-h-screen ${isDarkMode ? 'bg-[#0F0F0F] text-white' : 'bg-[#FAFAFA] text-neutral-900'} pb-24 font-sans relative transition-colors duration-300`}>
 
@@ -1124,7 +1217,7 @@ export default function BumBumCafeStockApp() {
               </button>
             </div>
 
-            {/* INVENTORY CARD LIST GRID */}
+            {/* INVENTORY CARD LIST GRID (RESTORED WITH FILTEREDINVENTORY) */}
             <div className="space-y-3.5">
               {filteredInventory.map(item => {
                 const isLow = item.storeQty < item.minLimit;
