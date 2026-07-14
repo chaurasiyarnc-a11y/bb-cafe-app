@@ -290,6 +290,58 @@ export default function BumBumCafeStockApp() {
     };
   }, []);
 
+  // Dashboard calculation selectors (FIXED)
+  const dashboardStats = useMemo(() => {
+    let totalStockVal = 0;
+    let mainStoreVal = 0;
+    let lowStockCount = 0;
+    let outOfStockCount = 0;
+
+    inventory.forEach(item => {
+      const totalVal = item.storeQty * item.purchasePrice;
+      totalStockVal += totalVal;
+      mainStoreVal += item.storeQty * item.purchasePrice;
+
+      const combinedQty = item.storeQty;
+      if (combinedQty === 0) outOfStockCount++;
+      else if (combinedQty < item.minLimit) lowStockCount++;
+    });
+
+    const todayPurchases = purchaseHistory
+      .filter(p => p.date === "2026-07-14" || p.date === new Date().toISOString().split('T')[0])
+      .reduce((sum, p) => sum + (p.qty * p.price), 0);
+
+    const todayWaste = stockOutHistory
+      .filter(s => s.date === "2026-07-14" || s.date === new Date().toISOString().split('T')[0])
+      .reduce((sum, s) => sum + s.qty, 0);
+
+    const monthlyFinancialWastageLoss = stockOutHistory
+      .filter(s => s.purpose === "Waste" || s.purpose === "Damage")
+      .reduce((sum, s) => sum + (s.financialLoss || 0), 0);
+
+    return {
+      totalStockVal,
+      mainStoreVal,
+      lowStockCount,
+      outOfStockCount,
+      todayPurchases,
+      todayWaste,
+      monthlyFinancialWastageLoss
+    };
+  }, [inventory, purchaseHistory, stockOutHistory]);
+
+  const handleSeedDatabase = async () => {
+    triggerHaptic();
+    setIsDbSeeding(true);
+    try {
+      toastMessage("Seeding Master Inventory...");
+    } catch (e) {
+      toastMessage("Setup failed.", "error");
+    } finally {
+      setIsDbSeeding(false);
+    }
+  };
+
   // Notifications pool
   const notificationsList = useMemo<NotificationItem[]>(() => {
     const list: NotificationItem[] = [];
@@ -357,7 +409,6 @@ export default function BumBumCafeStockApp() {
       setIsScannerProcessing(false);
 
       if (scannerMode === 'barcode') {
-        // Mock random item matched via Barcode
         const randomItem = inventory[Math.floor(Math.random() * inventory.length)] || inventory[0];
         setScannedItemsToVerify([
           {
@@ -372,7 +423,6 @@ export default function BumBumCafeStockApp() {
         ]);
         toastMessage("बारकोड से सामग्री की पहचान हो गई है!");
       } else {
-        // Mock Bill Mode extraction containing multiple items
         setScannedItemsToVerify([
           { itemId: "dry_1", name: "Doodh Milk", qty: 20, price: 60, unit: "Ltr", category: "Dairy", supplier: "Sony Dairy" },
           { itemId: "dry_2", name: "Dahi Curd", qty: 15, price: 80, unit: "Kg", category: "Dairy", supplier: "Sony Dairy" },
@@ -383,7 +433,6 @@ export default function BumBumCafeStockApp() {
     }, 2000);
   };
 
-  // Verification Screen Edit Handlers
   const handleUpdateVerifyItem = (index: number, field: 'qty' | 'price', val: number) => {
     setScannedItemsToVerify(prev => prev.map((item, i) => {
       if (i === index) {
@@ -413,12 +462,11 @@ export default function BumBumCafeStockApp() {
           supplier: sItem.supplier,
           minLimit: matchInInventory ? matchInInventory.minLimit : 10,
           lastPurchaseDate: new Date().toISOString().split('T')[0],
-          storeQty: increment(sItem.qty) // Increment stock directly
+          storeQty: increment(sItem.qty)
         };
 
         batch.set(itemRef, finalItemData, { merge: true });
 
-        // Add to history
         const logRef = doc(collection(db, "purchase_history"));
         batch.set(logRef, {
           itemName: sItem.name,
@@ -615,6 +663,44 @@ export default function BumBumCafeStockApp() {
     }
   };
 
+  // Stock out deduction
+  const handleStockOutSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formStockOut.item || !formStockOut.quantity) {
+      toastMessage("All fields are required!", "error");
+      return;
+    }
+
+    const qtyNum = parseFloat(formStockOut.quantity);
+    const targetItem = inventory.find(i => i.id === formStockOut.item);
+    if (!targetItem || targetItem.storeQty < qtyNum) {
+      toastMessage("Insufficient Godown Stock!", "error");
+      return;
+    }
+
+    try {
+      await setDoc(doc(db, "godown_inventory", targetItem.id), {
+        ...targetItem,
+        storeQty: increment(-qtyNum)
+      }, { merge: true });
+
+      await addDoc(collection(db, "stock_out_history"), {
+        itemName: targetItem.name,
+        qty: qtyNum,
+        purpose: formStockOut.purpose,
+        date: new Date().toISOString().split('T')[0],
+        remarks: formStockOut.remarks || "No remarks",
+        financialLoss: (formStockOut.purpose === "Waste" || formStockOut.purpose === "Damage") ? (qtyNum * targetItem.purchasePrice) : 0
+      });
+
+      toastMessage(`Deducted ${qtyNum} of ${targetItem.name}`);
+      setShowStockOutModal(false);
+      setFormStockOut({ item: '', quantity: '', purpose: 'Kitchen Use', remarks: '' });
+    } catch (err) {
+      toastMessage("Stock out failed.", "error");
+    }
+  };
+
   // Direct manual save to Firestore
   const saveItemStockQty = async (id: string) => {
     triggerHaptic();
@@ -659,7 +745,7 @@ export default function BumBumCafeStockApp() {
     }));
   };
 
-  // Reset stock to 0
+  // Reset individual item stock to 0
   const setStockToZero = (id: string) => {
     triggerHaptic();
     setEditedQties(prev => ({
@@ -736,6 +822,77 @@ export default function BumBumCafeStockApp() {
     link.click();
     document.body.removeChild(link);
     toastMessage("Category Wise CSV report generated!");
+  };
+
+  const handleCategoryAdd = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanCat = categoryInput.trim();
+    if (!cleanCat) return;
+
+    if (categories.includes(cleanCat)) {
+      toastMessage("यह श्रेणी पहले से मौजूद है!", "error");
+      return;
+    }
+
+    try {
+      await addDoc(collection(db, "categories"), { name: cleanCat });
+      setCategoryInput("");
+      toastMessage(`श्रेणी "${cleanCat}" जोड़ी गई!`);
+    } catch (err) {
+      toastMessage("Failed to save category.", "error");
+    }
+  };
+
+  const triggerSimulationExport = (reportName: string) => {
+    const headers = ["Item Name", "Category", "Quantity", "Unit", "Total Value (INR)", "Status"];
+    const rows = inventory.map(item => [
+      item.name,
+      item.category,
+      item.storeQty,
+      item.unit,
+      item.storeQty * item.purchasePrice,
+      item.storeQty === 0 ? "Out of Stock" : item.storeQty < item.minLimit ? "Low Stock" : "Normal"
+    ]);
+
+    const csvContent = "data:text/csv;charset=utf-8," 
+      + [headers.join(","), ...rows.map(e => e.join(","))].join("\n");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `${reportName}_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toastMessage(`Downloaded: ${reportName} (CSV)!`);
+  };
+
+  const handleRemoveFromPrintGroup = async (groupId: string, itemId: string) => {
+    triggerHaptic(30);
+    const targetGroup = printGroups.find(g => g.id === groupId);
+    if (!targetGroup) return;
+
+    try {
+      await setDoc(doc(db, "print_groups", groupId), {
+        ...targetGroup,
+        itemIds: targetGroup.itemIds.filter(id => id !== itemId)
+      }, { merge: true });
+      toastMessage("Item removed from print list");
+    } catch (err) {
+      toastMessage("Failed to update group.", "error");
+    }
+  };
+
+  const handleDeletePrintGroup = async (groupId: string) => {
+    triggerHaptic(50);
+    const confirm = window.confirm("क्या आप इस प्रिंट ग्रुप को हटाना चाहते हैं?");
+    if (!confirm) return;
+
+    try {
+      await deleteDoc(doc(db, "print_groups", groupId));
+      toastMessage("Print list deleted");
+    } catch (err) {
+      toastMessage("Failed to delete group.", "error");
+    }
   };
 
   return (
@@ -920,7 +1077,7 @@ export default function BumBumCafeStockApp() {
                       selectedCategory === cat 
                         ? 'bg-orange-500 border-orange-500 text-white shadow-md' 
                         : isDarkMode ? 'bg-neutral-900 border-neutral-800 text-neutral-400' : 'bg-white border-neutral-200 text-neutral-600'
-                    }`}
+                  }`}
                   >
                     {cat}
                   </button>
@@ -1281,6 +1438,25 @@ export default function BumBumCafeStockApp() {
                 </div>
 
                 <form onSubmit={handleStockInSubmit} className={`p-5 rounded-3xl border space-y-3 text-xs ${isDarkMode ? 'bg-[#1A1A1A] border-neutral-800' : 'bg-white border-neutral-100'}`}>
+                  {/* AI BILL SCANNER TRIGGER BAR - BOUND TO UNIFIED SCANNER */}
+                  <div className="p-4 bg-orange-500/10 border border-orange-500/20 rounded-2xl flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-[10px] font-black text-[#FF6B00] uppercase tracking-wider font-sans">📷 Smart AI Scanner</p>
+                      <p className="text-[8px] text-neutral-400 font-bold uppercase mt-0.5">Scan paper bills with live camera feed</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        triggerHaptic();
+                        setScannerActive(true);
+                        setScannerMode('bill');
+                      }}
+                      className="px-3.5 py-2 bg-[#FF6B00] text-white rounded-xl text-[9px] font-black uppercase tracking-wider shadow animate-pulse"
+                    >
+                      Scan Bill
+                    </button>
+                  </div>
+
                   <div className="space-y-1">
                     <label className="font-black uppercase tracking-wider text-neutral-400 text-[9px]">Invoice Number</label>
                     <input 
@@ -2186,6 +2362,183 @@ export default function BumBumCafeStockApp() {
                 Complete Stock In ➔
               </button>
             </motion.form>
+          </div>
+        )}
+
+        {/* H. MODAL FORM: STOCK OUT */}
+        {showStockOutModal && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[99] flex items-center justify-center p-4 font-sans">
+            <motion.form 
+              onSubmit={handleStockOutSubmit}
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className={`w-full max-w-sm rounded-[2rem] p-6 space-y-4 border ${
+                isDarkMode ? 'bg-[#0F0F0F] border-neutral-800 text-white' : 'bg-white border-neutral-100 text-neutral-900'
+              }`}
+            >
+              <div className="flex justify-between items-center border-b border-neutral-100 dark:border-neutral-800 pb-2">
+                <h3 className="text-xs font-black uppercase tracking-widest text-red-500 font-sans">Material Stock Out</h3>
+                <button type="button" onClick={() => setShowStockOutModal(false)} className="p-2.5 bg-neutral-100 dark:bg-neutral-800 rounded-xl"><X size={14} /></button>
+              </div>
+
+              <div className="space-y-1 text-xs">
+                <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400">Select Item</label>
+                <select 
+                  value={formStockOut.item}
+                  onChange={e => setFormStockOut({...formStockOut, item: e.target.value})}
+                  className="w-full p-3 rounded-xl border dark:bg-neutral-800 cursor-pointer"
+                  required
+                >
+                  <option value="">Choose item...</option>
+                  {inventory.map(i => <option key={i.id} value={i.id}>{i.name} (Available: {i.storeQty} {i.unit})</option>)}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="space-y-1">
+                  <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400">Quantity</label>
+                  <input 
+                    type="number" 
+                    placeholder="e.g. 5"
+                    value={formStockOut.quantity}
+                    onChange={e => setFormStockOut({...formStockOut, quantity: e.target.value})}
+                    className="w-full p-2.5 rounded-xl border dark:bg-neutral-800" 
+                    required
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400">Purpose</label>
+                  <select 
+                    value={formStockOut.purpose}
+                    onChange={e => setFormStockOut({...formStockOut, purpose: e.target.value as any})}
+                    className="w-full p-2.5 rounded-xl border dark:bg-neutral-800 cursor-pointer"
+                  >
+                    <option value="Kitchen Use">Kitchen Use</option>
+                    <option value="Waste">Waste</option>
+                    <option value="Damage">Damage</option>
+                    <option value="Staff Use">Staff Use</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="space-y-1 text-xs">
+                <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400">Remarks</label>
+                <input 
+                  type="text" 
+                  placeholder="Reason / Notes"
+                  value={formStockOut.remarks}
+                  onChange={e => setFormStockOut({...formStockOut, remarks: e.target.value})}
+                  className="w-full p-3 rounded-xl border dark:bg-neutral-800" 
+                />
+              </div>
+
+              <button type="submit" className="w-full p-3 bg-red-600 hover:bg-red-700 text-white rounded-2xl font-black text-xs uppercase tracking-wider shadow">
+                Deduct & Log Stock Out ➔
+              </button>
+            </motion.form>
+          </div>
+        )}
+
+        {/* I. MODAL FORM: ADD SUPPLIER */}
+        {showAddSupplierModal && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[99] flex items-center justify-center p-4 font-sans">
+            <motion.form 
+              onSubmit={handleSupplierAdd}
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className={`w-full max-w-sm rounded-[2rem] p-6 space-y-4 border ${
+                isDarkMode ? 'bg-[#0F0F0F] border-neutral-800 text-white' : 'bg-white border-neutral-100 text-neutral-900'
+              }`}
+            >
+              <div className="flex justify-between items-center border-b border-neutral-100 dark:border-neutral-800 pb-2">
+                <h3 className="text-xs font-black uppercase tracking-widest text-[#FF6B00] font-sans">Merchant Registration</h3>
+                <button type="button" onClick={() => setShowAddSupplierModal(false)} className="p-2.5 bg-neutral-100 dark:bg-neutral-800 rounded-xl"><X size={14} /></button>
+              </div>
+
+              <div className="space-y-1 text-xs font-sans">
+                <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400">Company / Supplier Name</label>
+                <input 
+                  type="text" 
+                  placeholder="e.g. Swastik Packaging Hub"
+                  value={formSupplier.name}
+                  onChange={e => setFormSupplier({...formSupplier, name: e.target.value})}
+                  className="w-full p-3 rounded-xl border dark:bg-neutral-800 font-sans" 
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 text-xs font-sans">
+                <div className="space-y-1">
+                  <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400">Phone</label>
+                  <input 
+                    type="text" 
+                    placeholder="98765xxxxx"
+                    value={formSupplier.phone}
+                    onChange={e => setFormSupplier({...formSupplier, phone: e.target.value})}
+                    className="w-full p-2.5 rounded-xl border dark:bg-neutral-800 font-sans" 
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400">Address</label>
+                  <input 
+                    type="text" 
+                    placeholder="City / Area"
+                    value={formSupplier.address}
+                    onChange={e => setFormSupplier({...formSupplier, address: e.target.value})}
+                    className="w-full p-2.5 rounded-xl border dark:bg-neutral-800 font-sans" 
+                  />
+                </div>
+              </div>
+
+              <button type="submit" className="w-full p-3 bg-orange-500 hover:bg-orange-600 text-white rounded-2xl font-black text-xs uppercase tracking-wider shadow font-sans">
+                Register Supplier ➔
+              </button>
+            </motion.form>
+          </div>
+        )}
+
+        {/* J. MODAL: ADD TO CUSTOM PRINT GROUP */}
+        {showAddToGroupModal && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[115] flex items-center justify-center p-4 font-sans">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className={`w-full max-w-sm rounded-[2rem] p-6 space-y-4 border ${
+                isDarkMode ? 'bg-[#0F0F0F] border-neutral-800 text-white' : 'bg-white border-neutral-100 text-neutral-900'
+              }`}
+            >
+              <div className="flex justify-between items-center border-b border-neutral-100 dark:border-neutral-800 pb-2">
+                <h3 className="text-xs font-black uppercase tracking-widest text-[#FF6B00]">Map Selected to Print Group</h3>
+                <button onClick={() => setShowAddToGroupModal(false)} className="p-1.5 bg-neutral-100 dark:bg-neutral-800 rounded-xl"><X size={14} /></button>
+              </div>
+
+              {/* Add to Existing Group */}
+              <div className="space-y-1.5 font-sans">
+                <label className="text-[9px] font-black uppercase tracking-wider text-neutral-400">Select Existing Print Group</label>
+                <div className="grid grid-cols-1 gap-2 max-h-40 overflow-y-auto">
+                  {printGroups.map(group => (
+                    <button
+                      key={group.id}
+                      onClick={() => {
+                        triggerHaptic();
+                        const updatedIds = Array.from(new Set([...group.itemIds, ...selectedItemIds]));
+                        setPrintGroups(prev => prev.map(g => g.id === group.id ? { ...g, itemIds: updatedIds } : g));
+                        setSelectedItemIds([]);
+                        setIsMultiSelectMode(false);
+                        setShowAddToGroupModal(false);
+                        toastMessage(`Items added to print category "${group.name}"!`);
+                      }}
+                      className="w-full p-3 rounded-2xl text-left bg-neutral-50 dark:bg-neutral-800/40 font-bold hover:bg-[#FF6B00] hover:text-white transition-all text-xs"
+                    >
+                      {group.name} ({group.itemIds.length} items)
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </motion.div>
           </div>
         )}
 
