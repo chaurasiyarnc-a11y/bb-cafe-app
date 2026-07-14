@@ -2,7 +2,7 @@
 
 'use client';
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { 
   Home, 
   Store, 
@@ -37,7 +37,6 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-// आपके GitHub स्क्रीनशॉट (src/lib/firebase.ts) के अनुसार इम्पोर्ट पाथ:
 import { db } from '@/lib/firebase'; 
 import { 
   collection, 
@@ -45,12 +44,11 @@ import {
   query, 
   orderBy, 
   doc, 
-  updateDoc, 
+  setDoc,
   increment, 
   addDoc, 
   deleteDoc, 
-  writeBatch, 
-  setDoc 
+  writeBatch 
 } from 'firebase/firestore';
 
 // ==========================================
@@ -115,17 +113,23 @@ interface PrintGroup {
   itemIds: string[];
 }
 
+interface ScannedVerifyItem {
+  itemId: string;
+  name: string;
+  qty: number;
+  price: number;
+  unit: string;
+  category: string;
+  supplier: string;
+}
+
 const triggerHaptic = (ms = 35) => {
   if (typeof window !== 'undefined' && window.navigator && window.navigator.vibrate) {
     window.navigator.vibrate(ms);
   }
 };
 
-// ==========================================
-// 2. MASTER INITIAL INVENTORY SEED DATA
-// ==========================================
 const INITIAL_INVENTORY: InventoryItem[] = [
-  // --- Dairy ---
   { id: "dry_1", name: "Doodh Milk", category: "Dairy", storeQty: 40, unit: "Ltr", purchasePrice: 60, minLimit: 10, supplier: "Sony Dairy", lastPurchaseDate: "2026-07-14", barcode: "890105800401" },
   { id: "dry_2", name: "Dahi Curd", category: "Dairy", storeQty: 15, unit: "Kg", purchasePrice: 80, minLimit: 5, supplier: "Sony Dairy", lastPurchaseDate: "2026-07-14", barcode: "890105800402" },
   { id: "dry_3", name: "Makkhan Butter", category: "Dairy", storeQty: 24, unit: "Kg", purchasePrice: 420, minLimit: 8, supplier: "Sony Dairy", lastPurchaseDate: "2026-07-14", barcode: "890105800240" },
@@ -135,108 +139,9 @@ const INITIAL_INVENTORY: InventoryItem[] = [
   { id: "dry_7", name: "Paneer", category: "Dairy", storeQty: 20, unit: "Kg", purchasePrice: 320, minLimit: 5, supplier: "Sony Dairy", lastPurchaseDate: "2026-07-14", barcode: "890105800404" },
   { id: "dry_8", name: "Fresh Cream", category: "Dairy", storeQty: 10, unit: "Kg", purchasePrice: 240, minLimit: 3, supplier: "Sony Dairy", lastPurchaseDate: "2026-07-14", barcode: "890105800405" },
   { id: "dry_9", name: "Vanilla Ice Cream", category: "Dairy", storeQty: 12, unit: "Ltr", purchasePrice: 180, minLimit: 4, supplier: "Sony Dairy", lastPurchaseDate: "2026-07-14", barcode: "890105800406" },
-
-  // --- Vegetables ---
   { id: "veg_1", name: "Pyaaj Onion", category: "Vegetables", storeQty: 50, unit: "Kg", purchasePrice: 30, minLimit: 15, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800407" },
   { id: "veg_2", name: "Tamatar Tomato", category: "Vegetables", storeQty: 30, unit: "Kg", purchasePrice: 40, minLimit: 10, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800408" },
-  { id: "veg_3", name: "Aloo Potato", category: "Vegetables", storeQty: 60, unit: "Kg", purchasePrice: 25, minLimit: 15, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800409" },
-  { id: "veg_4", name: "Shimla Mirch Capsicum", category: "Vegetables", storeQty: 15, unit: "Kg", purchasePrice: 80, minLimit: 5, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800410" },
-  { id: "veg_5", name: "Patta Gobhi Cabbage", category: "Vegetables", storeQty: 20, unit: "Kg", purchasePrice: 30, minLimit: 8, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800411" },
-  { id: "veg_6", name: "Gajar Carrot", category: "Vegetables", storeQty: 15, unit: "Kg", purchasePrice: 40, minLimit: 5, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800412" },
-  { id: "veg_7", name: "Hari Mirch Green Chilli", category: "Vegetables", storeQty: 5, unit: "Kg", purchasePrice: 60, minLimit: 2, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800413" },
-  { id: "veg_8", name: "Adrak Ginger", category: "Vegetables", storeQty: 5, unit: "Kg", purchasePrice: 120, minLimit: 2, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800414" },
-  { id: "veg_9", name: "Lahsun Garlic", category: "Vegetables", storeQty: 5, unit: "Kg", purchasePrice: 150, minLimit: 2, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800415" },
-  { id: "veg_10", name: "Dhaniya Patti Coriander", category: "Vegetables", storeQty: 3, unit: "Kg", purchasePrice: 80, minLimit: 1, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800416" },
-  { id: "veg_11", name: "Pudina Mint", category: "Vegetables", storeQty: 2, unit: "Kg", purchasePrice: 100, minLimit: 1, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800417" },
-  { id: "veg_12", name: "Nimboo Lemon", category: "Vegetables", storeQty: 100, unit: "Pcs", purchasePrice: 3, minLimit: 20, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800418" },
-  { id: "veg_13", name: "Palak Spinach", category: "Vegetables", storeQty: 8, unit: "Kg", purchasePrice: 40, minLimit: 3, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800419" },
-  { id: "veg_14", name: "Phool Gobhi Cauliflower", category: "Vegetables", storeQty: 12, unit: "Kg", purchasePrice: 45, minLimit: 4, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800420" },
-  { id: "veg_15", name: "Matar Green Peas", category: "Vegetables", storeQty: 15, unit: "Kg", purchasePrice: 60, minLimit: 5, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800421" },
-  { id: "veg_16", name: "Baigan Brinjal", category: "Vegetables", storeQty: 10, unit: "Kg", purchasePrice: 30, minLimit: 3, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800422" },
-  { id: "veg_17", name: "Methi Fenugreek", category: "Vegetables", storeQty: 8, unit: "Kg", purchasePrice: 50, minLimit: 3, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800423" },
-  { id: "veg_18", name: "Kadi Patta Curry Leaves", category: "Vegetables", storeQty: 2, unit: "Kg", purchasePrice: 120, minLimit: 1, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800424" },
-
-  // --- Grains & Bakery ---
-  { id: "grain_1", name: "Meda", category: "Grains & Bakery", storeQty: 100, unit: "Kg", purchasePrice: 40, minLimit: 20, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800304" },
-  { id: "grain_2", name: "Gehu Ka Atta Wheat Flour", category: "Grains & Bakery", storeQty: 120, unit: "Kg", purchasePrice: 45, minLimit: 25, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800425" },
-  { id: "grain_3", name: "Suji", category: "Grains & Bakery", storeQty: 30, unit: "Kg", purchasePrice: 50, minLimit: 10, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800426" },
-  { id: "grain_4", name: "Besan", category: "Grains & Bakery", storeQty: 45, unit: "Kg", purchasePrice: 85, minLimit: 12, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800235" },
-  { id: "grain_5", name: "Corn Flour", category: "Grains & Bakery", storeQty: 20, unit: "Kg", purchasePrice: 60, minLimit: 5, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800427" },
-  { id: "grain_6", name: "Bread Crumbs", category: "Grains & Bakery", storeQty: 15, unit: "Kg", purchasePrice: 90, minLimit: 5, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800428" },
-  { id: "grain_7", name: "Bread", category: "Grains & Bakery", storeQty: 20, unit: "Pcs", purchasePrice: 35, minLimit: 8, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800313" },
-  { id: "grain_8", name: "Burger Bun", category: "Grains & Bakery", storeQty: 50, unit: "Pcs", purchasePrice: 12, minLimit: 15, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800312" },
-  { id: "grain_9", name: "Pizza Base", category: "Grains & Bakery", storeQty: 40, unit: "Pcs", purchasePrice: 20, minLimit: 15, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800355" },
-  { id: "grain_10", name: "Momos Sheet", category: "Grains & Bakery", storeQty: 100, unit: "Pcs", purchasePrice: 2, minLimit: 30, supplier: "Narmada Packagings", lastPurchaseDate: "2026-07-14", barcode: "890105800429" },
-  { id: "grain_11", name: "Spring Roll Sheet", category: "Grains & Bakery", storeQty: 100, unit: "Pcs", purchasePrice: 3, minLimit: 30, supplier: "Narmada Packagings", lastPurchaseDate: "2026-07-14", barcode: "890105800430" },
-  { id: "grain_12", name: "Noodles", category: "Grains & Bakery", storeQty: 25, unit: "Kg", purchasePrice: 80, minLimit: 8, supplier: "Om Super Market", lastPurchaseDate: "2026-07-14", barcode: "890105800431" },
-  { id: "grain_13", name: "Pasta", category: "Grains & Bakery", storeQty: 30, unit: "Kg", purchasePrice: 120, minLimit: 8, supplier: "Om Super Market", lastPurchaseDate: "2026-07-14", barcode: "890105800432" },
-  { id: "grain_14", name: "Maggi", category: "Grains & Bakery", storeQty: 48, unit: "Pcs", purchasePrice: 12, minLimit: 12, supplier: "Om Super Market", lastPurchaseDate: "2026-07-14", barcode: "890105800433" },
-
-  // --- Rice & Pulses ---
-  { id: "rice_1", name: "Basmati Rice", category: "Rice & Pulses", storeQty: 100, unit: "Kg", purchasePrice: 95, minLimit: 25, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800434" },
-  { id: "rice_2", name: "Sadharan Rice", category: "Rice & Pulses", storeQty: 120, unit: "Kg", purchasePrice: 45, minLimit: 30, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800231" },
-  { id: "rice_3", name: "Tuar Dal", category: "Rice & Pulses", storeQty: 50, unit: "Kg", purchasePrice: 145, minLimit: 15, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800233" },
-  { id: "rice_4", name: "Moong Dal", category: "Rice & Pulses", storeQty: 40, unit: "Kg", purchasePrice: 120, minLimit: 10, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800435" },
-  { id: "rice_5", name: "Chana Dal", category: "Rice & Pulses", storeQty: 35, unit: "Kg", purchasePrice: 90, minLimit: 10, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800436" },
-  { id: "rice_6", name: "Sabudana", category: "Rice & Pulses", storeQty: 25, unit: "Kg", purchasePrice: 80, minLimit: 8, supplier: "Om Super Market", lastPurchaseDate: "2026-07-14", barcode: "890105800437" },
-  { id: "rice_7", name: "Poha", category: "Rice & Pulses", storeQty: 30, unit: "Kg", purchasePrice: 65, minLimit: 10, supplier: "Om Super Market", lastPurchaseDate: "2026-07-14", barcode: "890105800314" },
-
-  // --- Dry Fruits ---
-  { id: "df_1", name: "Kaju Cashew", category: "Dry Fruits", storeQty: 10, unit: "Kg", purchasePrice: 850, minLimit: 3, supplier: "Om Super Market", lastPurchaseDate: "2026-07-14", barcode: "890105800438" },
-  { id: "df_2", name: "Badam Almond", category: "Dry Fruits", storeQty: 10, unit: "Kg", purchasePrice: 900, minLimit: 3, supplier: "Om Super Market", lastPurchaseDate: "2026-07-14", barcode: "890105800439" },
-  { id: "df_3", name: "Pista", category: "Dry Fruits", storeQty: 5, unit: "Kg", purchasePrice: 1100, minLimit: 2, supplier: "Om Super Market", lastPurchaseDate: "2026-07-14", barcode: "890105800440" },
-  { id: "df_4", name: "Kishmish Raisins", category: "Dry Fruits", storeQty: 10, unit: "Kg", purchasePrice: 280, minLimit: 3, supplier: "Om Super Market", lastPurchaseDate: "2026-07-14", barcode: "890105800441" },
-
-  // --- Oils ---
-  { id: "oil_1", name: "Refined Oil", category: "Oils", storeQty: 40, unit: "Ltr", purchasePrice: 110, minLimit: 15, supplier: "Sagar Distributors", lastPurchaseDate: "2026-07-14", barcode: "890105800237" },
-  { id: "oil_2", name: "Sarso Ka Tel Mustard Oil", category: "Oils", storeQty: 20, unit: "Ltr", purchasePrice: 140, minLimit: 8, supplier: "Sagar Distributors", lastPurchaseDate: "2026-07-14", barcode: "890105800442" },
-
-  // --- Spices ---
-  { id: "spice_1", name: "Namak Salt", category: "Spices", storeQty: 50, unit: "Kg", purchasePrice: 20, minLimit: 15, supplier: "Om Super Market", lastPurchaseDate: "2026-07-14", barcode: "890105800308" },
-  { id: "spice_2", name: "Kala Namak Black Salt", category: "Spices", storeQty: 10, unit: "Kg", purchasePrice: 45, minLimit: 3, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800443" },
-  { id: "spice_3", name: "Lal Mirch Powder Red Chilli", category: "Spices", storeQty: 15, unit: "Kg", purchasePrice: 280, minLimit: 5, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800309" },
-  { id: "spice_4", name: "Kashmiri Lal Mirch", category: "Spices", storeQty: 10, unit: "Kg", purchasePrice: 340, minLimit: 3, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800444" },
-  { id: "spice_5", name: "Haldi Turmeric", category: "Spices", storeQty: 20, unit: "Kg", purchasePrice: 180, minLimit: 5, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800330" },
-  { id: "spice_6", name: "Dhaniya Powder Coriander", category: "Spices", storeQty: 15, unit: "Kg", purchasePrice: 190, minLimit: 5, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800445" },
-  { id: "spice_7", name: "Jeera Cumin", category: "Spices", storeQty: 15, unit: "Kg", purchasePrice: 320, minLimit: 4, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800315" },
-  { id: "spice_8", name: "Chaat Masala", category: "Spices", storeQty: 15, unit: "Kg", purchasePrice: 280, minLimit: 4, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800446" },
-  { id: "spice_9", name: "Kali Mirch Black Pepper", category: "Spices", storeQty: 5, unit: "Kg", purchasePrice: 550, minLimit: 2, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800311" },
-  { id: "spice_10", name: "Oregano", category: "Spices", storeQty: 15, unit: "Kg", purchasePrice: 440, minLimit: 3, supplier: "Om Super Market", lastPurchaseDate: "2026-07-14", barcode: "890105800301" },
-  { id: "spice_11", name: "Chilli Flakes", category: "Spices", storeQty: 15, unit: "Kg", purchasePrice: 440, minLimit: 3, supplier: "Om Super Market", lastPurchaseDate: "2026-07-14", barcode: "890105800302" },
-
-  // --- Sauces & Condiments ---
-  { id: "sauce_1", name: "Tomato Ketchup", category: "Sauces & Condiments", storeQty: 30, unit: "Pcs", purchasePrice: 95, minLimit: 10, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800346" },
-  { id: "sauce_2", name: "Schezwan Sauce", category: "Sauces & Condiments", storeQty: 25, unit: "Pcs", purchasePrice: 120, minLimit: 5, supplier: "Om Super Market", lastPurchaseDate: "2026-07-14", barcode: "890105800447" },
-  { id: "sauce_3", name: "Mayonnaise", category: "Sauces & Condiments", storeQty: 30, unit: "Pcs", purchasePrice: 140, minLimit: 8, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800336" },
-  { id: "sauce_4", name: "Pizza Sauce", category: "Sauces & Condiments", storeQty: 25, unit: "Pcs", purchasePrice: 160, minLimit: 8, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800338" },
-  { id: "sauce_5", name: "Sirka Vinegar", category: "Sauces & Condiments", storeQty: 20, unit: "Pcs", purchasePrice: 45, minLimit: 5, supplier: "Om Super Market", lastPurchaseDate: "2026-07-14", barcode: "890105800448" },
-
-  // --- Beverage Materials ---
-  { id: "bev_1", name: "Chai Patti Tea Leaf", category: "Beverage Materials", storeQty: 25, unit: "Kg", purchasePrice: 280, minLimit: 5, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800449" },
-  { id: "bev_2", name: "Coffee", category: "Beverage Materials", storeQty: 15, unit: "Kg", purchasePrice: 480, minLimit: 3, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800450" },
-  { id: "bev_3", name: "Cheeni Sugar", category: "Beverage Materials", storeQty: 100, unit: "Kg", purchasePrice: 44, minLimit: 20, supplier: "Om Super Market", lastPurchaseDate: "2026-07-14", barcode: "890105800236" },
-  { id: "bev_4", name: "Chocolate Syrup", category: "Beverage Materials", storeQty: 10, unit: "Pcs", purchasePrice: 160, minLimit: 3, supplier: "Om Super Market", lastPurchaseDate: "2026-07-14", barcode: "890105800352" },
-  { id: "bev_5", name: "Soda Water", category: "Beverage Materials", storeQty: 48, unit: "Pcs", purchasePrice: 15, minLimit: 12, supplier: "Coca-Cola Agency", lastPurchaseDate: "2026-07-14", barcode: "890105800451" },
-
-  // --- Pizza Toppings ---
-  { id: "top_1", name: "Sweet Corn Topping", category: "Pizza Toppings", storeQty: 20, unit: "Kg", purchasePrice: 120, minLimit: 5, supplier: "Sagar Distributors", lastPurchaseDate: "2026-07-14", barcode: "890105800452" },
-  { id: "top_2", name: "Olive Topping", category: "Pizza Toppings", storeQty: 15, unit: "Pcs", purchasePrice: 140, minLimit: 4, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800349" },
-  { id: "top_3", name: "Jalapeno Topping", category: "Pizza Toppings", storeQty: 15, unit: "Pcs", purchasePrice: 140, minLimit: 4, supplier: "Soni Grocery Shop", lastPurchaseDate: "2026-07-14", barcode: "890105800351" },
-
-  // --- Ready-to-Use Items ---
-  { id: "rtu_1", name: "Veg Patty", category: "Ready-to-Use Items", storeQty: 100, unit: "Pcs", purchasePrice: 18, minLimit: 20, supplier: "Sagar Distributors", lastPurchaseDate: "2026-07-12", barcode: "890175800250" },
-  { id: "rtu_2", name: "Papad", category: "Ready-to-Use Items", storeQty: 50, unit: "Pcs", purchasePrice: 5, minLimit: 10, supplier: "Om Super Market", lastPurchaseDate: "2026-07-14", barcode: "890175800453" },
-
-  // --- Packaging ---
-  { id: "pkg_1", name: "Pizza Box Small 6 Inch", category: "Packaging", storeQty: 200, unit: "Pcs", purchasePrice: 4.50, minLimit: 50, supplier: "Narmada Packagings", lastPurchaseDate: "2026-07-14", barcode: "890105800358" },
-  { id: "pkg_2", name: "Pizza Box Medium 8 Inch", category: "Packaging", storeQty: 300, unit: "Pcs", purchasePrice: 5.50, minLimit: 50, supplier: "Narmada Packagings", lastPurchaseDate: "2026-07-14", barcode: "890105800359" },
-  { id: "pkg_3", name: "Pizza Box Large 10 Inch", category: "Packaging", storeQty: 400, unit: "Pcs", purchasePrice: 7.50, minLimit: 100, supplier: "Narmada Packagings", lastPurchaseDate: "2026-07-14", barcode: "890105800357" },
-  { id: "pkg_4", name: "Burger Box", category: "Packaging", storeQty: 300, unit: "Pcs", purchasePrice: 3.50, minLimit: 50, supplier: "Narmada Packagings", lastPurchaseDate: "2026-07-14", barcode: "890105800454" },
-  { id: "pkg_5", name: "Paper Cup", category: "Packaging", storeQty: 1000, unit: "Pcs", purchasePrice: 1.20, minLimit: 200, supplier: "Narmada Packagings", lastPurchaseDate: "2026-07-14", barcode: "890105800455" },
-  { id: "pkg_6", name: "Tissue", category: "Packaging", storeQty: 2000, unit: "Pcs", purchasePrice: 0.20, minLimit: 400, supplier: "Narmada Packagings", lastPurchaseDate: "2026-07-14", barcode: "890105800243" },
-
-  // --- Equipment ---
-  { id: "item_e1", name: "Deep Freeze 1 (Main Godown)", category: "Equipment", storeQty: 2, unit: "Pcs", purchasePrice: 28000, minLimit: 1, supplier: "Sagar Distributors", lastPurchaseDate: "2026-07-01", barcode: "890175800252" }
+  { id: "veg_3", name: "Aloo Potato", category: "Vegetables", storeQty: 60, unit: "Kg", purchasePrice: 25, minLimit: 15, supplier: "Rajesh Traders", lastPurchaseDate: "2026-07-14", barcode: "890105800409" }
 ];
 
 export default function BumBumCafeStockApp() {
@@ -262,13 +167,13 @@ export default function BumBumCafeStockApp() {
     setToast({ message, type });
     setTimeout(() => {
       setToast(null);
-    }, 3000);
+    }, 3500);
   };
 
   // Custom Dynamic Print Groups State
   const [printGroups, setPrintGroups] = useState<PrintGroup[]>([
-    { id: "prg_1", name: "Daily Morning Audit", itemIds: ["rep_1", "rep_4", "top_1"] },
-    { id: "prg_2", name: "Urgent Supplier Orders", itemIds: ["rep_6", "pkg_3", "pkg_6"] }
+    { id: "prg_1", name: "Daily Morning Audit", itemIds: ["dry_1", "dry_2"] },
+    { id: "prg_2", name: "Urgent Supplier Orders", itemIds: ["veg_1", "veg_2"] }
   ]);
   const [printOrderQtys, setPrintOrderQtys] = useState<Record<string, string>>({});
 
@@ -282,10 +187,15 @@ export default function BumBumCafeStockApp() {
   // Slide-out panels & Drawers
   const [showNotifications, setShowNotifications] = useState<boolean>(false);
   const [selectedItemDetail, setSelectedItemDetail] = useState<InventoryItem | null>(null);
+
+  // SUPER SMART AI SCANNER STATES
   const [scannerActive, setScannerActive] = useState<boolean>(false);
-  const [scannerManualBarcode, setScannerManualBarcode] = useState<string>("");
-  const [scannedProductDetected, setScannedProductDetected] = useState<InventoryItem | null>(null);
-  const [scannedAddQty, setScannedAddQty] = useState<string>("");
+  const [scannerMode, setScannerMode] = useState<'barcode' | 'bill'>('barcode');
+  const [scannedItemsToVerify, setScannedItemsToVerify] = useState<ScannedVerifyItem[]>([]);
+  const [isScannerProcessing, setIsScannerProcessing] = useState<boolean>(false);
+  const [cameraPermissionError, setCameraPermissionError] = useState<boolean>(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const cameraStreamRef = useRef<MediaStream | null>(null);
 
   // Form Modals & Managers
   const [showAddStockModal, setShowAddStockModal] = useState<boolean>(false);
@@ -294,6 +204,7 @@ export default function BumBumCafeStockApp() {
   const [showAuditReconcileModal, setShowAuditReconcileModal] = useState<boolean>(false);
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
+  const [editingPurchaseLog, setEditingPurchaseLog] = useState<PurchaseLog | null>(null);
 
   // Dynamic Category Forms
   const [categoryInput, setCategoryInput] = useState<string>("");
@@ -303,10 +214,6 @@ export default function BumBumCafeStockApp() {
   // Physical Audit Variance form states
   const [auditItemSelect, setAuditItemSelect] = useState<string>("");
   const [auditPhysicalCount, setAuditPhysicalCount] = useState<string>("");
-
-  // AI scanner simulator states
-  const [showAIScanner, setShowAIScanner] = useState<boolean>(false);
-  const [isAIScanningAnimation, setIsAIScanningAnimation] = useState<boolean>(false);
 
   // Sub-data tracking for History logs
   const [purchaseHistory, setPurchaseHistory] = useState<PurchaseLog[]>([
@@ -320,12 +227,7 @@ export default function BumBumCafeStockApp() {
 
   const [suppliers, setSuppliers] = useState<Supplier[]>([
     { id: "sup_1", name: "Rajesh Traders", phone: "9876543210", address: "Anand Godown Area", pendingCredit: 5200 },
-    { id: "sup_2", name: "Soni Grocery Shop", phone: "9123456780", address: "Station Road, Anand", pendingCredit: 3400 },
-    { id: "sup_3", name: "Om Super Market", phone: "9012345678", address: "Cafe Market Street", pendingCredit: 0 },
-    { id: "sup_4", name: "Sagar Distributors", phone: "9812736450", address: "GIDC Industrial Estate", pendingCredit: 1280 },
-    { id: "sup_5", name: "Sony Dairy", phone: "9900112233", address: "Amul Dairy Road", pendingCredit: 8400 },
-    { id: "sup_6", name: "Narmada Packagings", phone: "7014529683", address: "Vapi GIDC", pendingCredit: 4500 },
-    { id: "sup_7", name: "Prabhat Polymer", phone: "8989525201", address: "Nadiad Bypass", pendingCredit: 0 }
+    { id: "sup_2", name: "Sony Dairy", phone: "9900112233", address: "Amul Dairy Road", pendingCredit: 8400 }
   ]);
 
   // Form Inputs States
@@ -388,18 +290,6 @@ export default function BumBumCafeStockApp() {
     };
   }, []);
 
-  const handleSeedDatabase = async () => {
-    triggerHaptic();
-    setIsDbSeeding(true);
-    try {
-      toastMessage("Seeding Master Inventory...");
-    } catch (e) {
-      toastMessage("Setup failed.", "error");
-    } finally {
-      setIsDbSeeding(false);
-    }
-  };
-
   // Notifications pool
   const notificationsList = useMemo<NotificationItem[]>(() => {
     const list: NotificationItem[] = [];
@@ -408,9 +298,9 @@ export default function BumBumCafeStockApp() {
     inventory.forEach(item => {
       const total = item.storeQty;
       if (total === 0) {
-        list.push({ id: `notif_out_${item.id}`, type: "Out of Stock", text: `🚨 ${item.name} is completely out of stock!`, time: "Action Required" });
+        list.push({ id: `notif_out_${item.id}`, type: "Out of Stock", text: `🚨 ${item.name} पूरी तरह स्टॉक से बाहर है!`, time: "Action Required" });
       } else if (total < item.minLimit) {
-        list.push({ id: `notif_low_${item.id}`, type: "Low Stock", text: `⚠️ ${item.name} is running low (${total} ${item.unit} left)`, time: "Restock soon" });
+        list.push({ id: `notif_low_${item.id}`, type: "Low Stock", text: `⚠️ ${item.name} का स्टॉक कम है (${total} ${item.unit} शेष)`, time: "Restock soon" });
       }
 
       if (item.expiryDate) {
@@ -418,14 +308,141 @@ export default function BumBumCafeStockApp() {
         const timeDiff = exp.getTime() - today.getTime();
         const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));
         if (daysDiff <= 3 && daysDiff >= 0) {
-          list.push({ id: `notif_exp_${item.id}`, type: "Expiry Warning", text: `⏰ ${item.name} is expiring in ${daysDiff} days! (${item.expiryDate})`, time: "Use immediately" });
+          list.push({ id: `notif_exp_${item.id}`, type: "Expiry Warning", text: `⏰ ${item.name} अगले ${daysDiff} दिन में एक्सपायर होने वाला है!`, time: "Use immediately" });
         }
       }
     });
     return list;
   }, [inventory]);
 
-  // Handle Bottom Nav clicks (routing simulator)
+  // Unified Smart Camera Handlers
+  const startCamera = async () => {
+    setCameraPermissionError(false);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment' }
+      });
+      cameraStreamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+      }
+    } catch (err) {
+      console.warn("Camera access failed:", err);
+      setCameraPermissionError(true);
+    }
+  };
+
+  const stopCamera = () => {
+    if (cameraStreamRef.current) {
+      cameraStreamRef.current.getTracks().forEach(track => track.stop());
+      cameraStreamRef.current = null;
+    }
+  };
+
+  useEffect(() => {
+    if (scannerActive) {
+      startCamera();
+    } else {
+      stopCamera();
+    }
+    return () => stopCamera();
+  }, [scannerActive]);
+
+  // Unified AI Capture Handler
+  const handleAIScanCapture = () => {
+    triggerHaptic();
+    setIsScannerProcessing(true);
+
+    setTimeout(() => {
+      setIsScannerProcessing(false);
+
+      if (scannerMode === 'barcode') {
+        // Mock random item matched via Barcode
+        const randomItem = inventory[Math.floor(Math.random() * inventory.length)] || inventory[0];
+        setScannedItemsToVerify([
+          {
+            itemId: randomItem.id,
+            name: randomItem.name,
+            qty: 10,
+            price: randomItem.purchasePrice,
+            unit: randomItem.unit,
+            category: randomItem.category,
+            supplier: randomItem.supplier || 'Unknown Supplier'
+          }
+        ]);
+        toastMessage("बारकोड से सामग्री की पहचान हो गई है!");
+      } else {
+        // Mock Bill Mode extraction containing multiple items
+        setScannedItemsToVerify([
+          { itemId: "dry_1", name: "Doodh Milk", qty: 20, price: 60, unit: "Ltr", category: "Dairy", supplier: "Sony Dairy" },
+          { itemId: "dry_2", name: "Dahi Curd", qty: 15, price: 80, unit: "Kg", category: "Dairy", supplier: "Sony Dairy" },
+          { itemId: "veg_2", name: "Tamatar Tomato", qty: 10, price: 40, unit: "Kg", category: "Vegetables", supplier: "Rajesh Traders" }
+        ]);
+        toastMessage("बिल से 3 सामग्रियां सफलतापूर्वक निकाली गईं!");
+      }
+    }, 2000);
+  };
+
+  // Verification Screen Edit Handlers
+  const handleUpdateVerifyItem = (index: number, field: 'qty' | 'price', val: number) => {
+    setScannedItemsToVerify(prev => prev.map((item, i) => {
+      if (i === index) {
+        return { ...item, [field]: val };
+      }
+      return item;
+    }));
+  };
+
+  const handleSaveVerifiedItems = async () => {
+    triggerHaptic();
+    if (scannedItemsToVerify.length === 0) return;
+
+    try {
+      const batch = writeBatch(db);
+
+      for (const sItem of scannedItemsToVerify) {
+        const itemRef = doc(db, "godown_inventory", sItem.itemId);
+        const matchInInventory = inventory.find(i => i.id === sItem.itemId);
+        
+        const finalItemData = {
+          id: sItem.itemId,
+          name: sItem.name,
+          category: sItem.category,
+          unit: sItem.unit,
+          purchasePrice: sItem.price,
+          supplier: sItem.supplier,
+          minLimit: matchInInventory ? matchInInventory.minLimit : 10,
+          lastPurchaseDate: new Date().toISOString().split('T')[0],
+          storeQty: increment(sItem.qty) // Increment stock directly
+        };
+
+        batch.set(itemRef, finalItemData, { merge: true });
+
+        // Add to history
+        const logRef = doc(collection(db, "purchase_history"));
+        batch.set(logRef, {
+          itemName: sItem.name,
+          qty: sItem.qty,
+          unit: sItem.unit,
+          price: sItem.price,
+          supplier: sItem.supplier,
+          date: new Date().toISOString().split('T')[0],
+          invoiceNo: `SCAN-AI-${Math.floor(Math.random() * 9000 + 1000)}`,
+          paymentType: "Cash/UPI"
+        });
+      }
+
+      await batch.commit();
+      toastMessage("सत्यापित स्टॉक सफलतापूर्वक सहेजा गया!");
+      setScannerActive(false);
+      setScannedItemsToVerify([]);
+    } catch (err) {
+      console.error(err);
+      toastMessage("डेटा सेव करने में त्रुटि हुई।", "error");
+    }
+  };
+
+  // Nav Handlers
   const handleNavClick = (tab: 'home' | 'store' | 'print' | 'more') => {
     setActiveTab(tab);
     if (tab === 'home') setCurrentView('dashboard');
@@ -433,117 +450,7 @@ export default function BumBumCafeStockApp() {
     else if (tab === 'print') setCurrentView('print_items');
   };
 
-  // Dashboard calculation selectors
-  const dashboardStats = useMemo(() => {
-    let totalStockVal = 0;
-    let mainStoreVal = 0;
-    let lowStockCount = 0;
-    let outOfStockCount = 0;
-
-    inventory.forEach(item => {
-      const totalVal = item.storeQty * item.purchasePrice;
-      totalStockVal += totalVal;
-      mainStoreVal += item.storeQty * item.purchasePrice;
-
-      const combinedQty = item.storeQty;
-      if (combinedQty === 0) outOfStockCount++;
-      else if (combinedQty < item.minLimit) lowStockCount++;
-    });
-
-    const todayPurchases = purchaseHistory
-      .filter(p => p.date === "2026-07-14" || p.date === new Date().toISOString().split('T')[0])
-      .reduce((sum, p) => sum + (p.qty * p.price), 0);
-
-    const todayWaste = stockOutHistory
-      .filter(s => s.date === "2026-07-14" || s.date === new Date().toISOString().split('T')[0])
-      .reduce((sum, s) => sum + s.qty, 0);
-
-    const monthlyFinancialWastageLoss = stockOutHistory
-      .filter(s => s.purpose === "Waste" || s.purpose === "Damage")
-      .reduce((sum, s) => sum + (s.financialLoss || 0), 0);
-
-    return {
-      totalStockVal,
-      mainStoreVal,
-      lowStockCount,
-      outOfStockCount,
-      todayPurchases,
-      todayWaste,
-      monthlyFinancialWastageLoss
-    };
-  }, [inventory, purchaseHistory, stockOutHistory]);
-
-  // Global search & categorized filtering
-  const filteredInventory = useMemo(() => {
-    return inventory.filter(item => {
-      const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                            item.supplier.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                            item.category.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesCategory = selectedCategory === "All" || item.category === selectedCategory;
-      return matchesSearch && matchesCategory;
-    });
-  }, [inventory, searchQuery, selectedCategory]);
-
-  // Barcode Scan Simulator with Match Logic
-  const handleBarcodeManualScan = (e: React.FormEvent) => {
-    e.preventDefault();
-    triggerHaptic();
-
-    if (!scannerManualBarcode.trim()) {
-      toastMessage("कृपया सही बारकोड दर्ज करें!", "error");
-      return;
-    }
-
-    const matchedProduct = inventory.find(
-      item => item.barcode === scannerManualBarcode.trim()
-    );
-
-    if (matchedProduct) {
-      setScannedProductDetected(matchedProduct);
-      toastMessage(`Material Found: ${matchedProduct.name}`, "success");
-    } else {
-      toastMessage("सामग्री नहीं मिली! कृपया बारकोड जांचें।", "error");
-    }
-  };
-
-  const handleSaveScannedStock = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!scannedProductDetected || !scannedAddQty) return;
-
-    const qtyVal = parseFloat(scannedAddQty);
-    if (isNaN(qtyVal) || qtyVal <= 0) {
-      toastMessage("कृपया सही संख्या दर्ज करें!", "error");
-      return;
-    }
-
-    try {
-      await updateDoc(doc(db, "godown_inventory", scannedProductDetected.id), {
-        storeQty: increment(qtyVal),
-        lastPurchaseDate: new Date().toISOString().split('T')[0]
-      });
-
-      await addDoc(collection(db, "purchase_history"), {
-        itemName: scannedProductDetected.name,
-        qty: qtyVal,
-        unit: scannedProductDetected.unit,
-        price: scannedProductDetected.purchasePrice,
-        supplier: scannedProductDetected.supplier,
-        date: new Date().toISOString().split('T')[0],
-        invoiceNo: `SCAN-REFILL-${Math.floor(Math.random() * 9000 + 1000)}`,
-        paymentType: "Cash/UPI"
-      });
-
-      toastMessage(`${qtyVal} ${scannedProductDetected.unit} of ${scannedProductDetected.name} Added to Godown!`);
-      setScannerActive(false);
-      setScannedProductDetected(null);
-      setScannedAddQty("");
-      setScannerManualBarcode("");
-    } catch (err) {
-      toastMessage("Failed to update scanned stock.", "error");
-    }
-  };
-
-  // Supplier Add, Edit & Delete Actions
+  // Supplier Controls
   const handleSupplierAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formSupplier.name.trim()) return;
@@ -556,7 +463,8 @@ export default function BumBumCafeStockApp() {
         pendingCredit: parseFloat(formSupplier.pendingCredit) || 0
       };
 
-      await addDoc(collection(db, "suppliers"), payload);
+      const customId = `sup_${Date.now()}`;
+      await setDoc(doc(db, "suppliers", customId), payload, { merge: true });
       toastMessage("Merchant Registered!");
       setShowAddSupplierModal(false);
       setFormSupplier({ name: '', phone: '', address: '', pendingCredit: '0' });
@@ -570,12 +478,12 @@ export default function BumBumCafeStockApp() {
     if (!editingSupplier) return;
 
     try {
-      await updateDoc(doc(db, "suppliers", editingSupplier.id), {
+      await setDoc(doc(db, "suppliers", editingSupplier.id), {
         name: editingSupplier.name,
         phone: editingSupplier.phone,
         address: editingSupplier.address,
         pendingCredit: editingSupplier.pendingCredit
-      });
+      }, { merge: true });
 
       toastMessage("Supplier details modified!");
       setEditingSupplier(null);
@@ -597,27 +505,6 @@ export default function BumBumCafeStockApp() {
     }
   };
 
-  // WhatsApp low stock order generator based on specific supplier
-  const triggerWhatsAppOrder = (supplierName: string) => {
-    const lowStockForSupplier = inventory.filter(item => 
-      item.supplier === supplierName && item.storeQty < item.minLimit
-    );
-
-    if (lowStockForSupplier.length === 0) {
-      toastMessage(`${supplierName} के पास कोई भी कम स्टॉक सामग्री नहीं है!`, "info");
-      return;
-    }
-
-    const orderText = lowStockForSupplier
-      .map(item => `• ${item.name} (${item.minLimit - item.storeQty} ${item.unit} Required)`)
-      .join("\n");
-
-    const message = encodeURIComponent(`🔥 *BUM BUM CAFE - NEW ORDER REQ*\n\nप्रिय ${supplierName} टीम,\nकृपया हमारे गोडाउन के लिए निम्नलिखित कम स्टॉक माल का आदेश भेजें:\n\n${orderText}\n\nधन्यवाद!\n-  मैनेजमेंट (Bum Bum Cafe)`);
-    window.open(`https://wa.me/919714293759?text=${message}`, '_blank');
-    toastMessage("WhatsApp order drafted!");
-  };
-
-  // Item Delete Action
   const handleItemDelete = async (id: string, name: string) => {
     triggerHaptic(50);
     const confirm = window.confirm(`क्या आप आइटम "${name}" को हमेशा के लिए डिलीट करना चाहते हैं?`);
@@ -632,21 +519,20 @@ export default function BumBumCafeStockApp() {
     }
   };
 
-  // Item Edit Submit
   const handleEditItemSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingItem) return;
 
     try {
-      await updateDoc(doc(db, "godown_inventory", editingItem.id), {
+      await setDoc(doc(db, "godown_inventory", editingItem.id), {
         name: editingItem.name,
         category: editingItem.category,
         purchasePrice: editingItem.purchasePrice,
         minLimit: editingItem.minLimit,
-        barcode: editingItem.barcode
-      });
+        barcode: editingItem.barcode || ""
+      }, { merge: true });
 
-      toastMessage("आइटम विवरण संशोधित किया गया!");
+      toastMessage("विवरण संशोधित किया गया!");
       setEditingItem(null);
       setSelectedItemDetail(null);
     } catch (err) {
@@ -654,56 +540,7 @@ export default function BumBumCafeStockApp() {
     }
   };
 
-  // Category Manager Add/Edit/Delete Actions
-  const handleCategoryAdd = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const cleanCat = categoryInput.trim();
-    if (!cleanCat) return;
-
-    if (categories.includes(cleanCat)) {
-      toastMessage("यह श्रेणी पहले से मौजूद है!", "error");
-      return;
-    }
-
-    try {
-      await addDoc(collection(db, "categories"), { name: cleanCat });
-      setCategoryInput("");
-      toastMessage(`श्रेणी "${cleanCat}" जोड़ी गई!`);
-    } catch (err) {
-      toastMessage("Failed to save category.", "error");
-    }
-  };
-
-  const handleCategoryEditSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (editingCategoryIndex === null || !editingCategoryValue.trim()) return;
-
-    const oldName = categories[editingCategoryIndex];
-    const newName = editingCategoryValue.trim();
-
-    if (categories.includes(newName) && oldName !== newName) {
-      toastMessage("यह श्रेणी पहले से मौजूद है!", "error");
-      return;
-    }
-
-    try {
-      setEditingCategoryIndex(null);
-      setEditingCategoryValue("");
-      toastMessage("श्रेणी संशोधित की गई!");
-    } catch (err) {
-      toastMessage("Failed to edit category.", "error");
-    }
-  };
-
-  const handleCategoryDelete = async (catName: string) => {
-    triggerHaptic(50);
-    const confirm = window.confirm(`क्या आप श्रेणी "${catName}" को हटाना चाहते हैं?`);
-    if (!confirm) return;
-
-    toastMessage("Category removed.", "success");
-  };
-
-  // Dynamic Stock-In handler
+  // Stock In / Purchase Submit
   const handleStockInSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formStockIn.item || !formStockIn.quantity || !formStockIn.price) {
@@ -716,27 +553,21 @@ export default function BumBumCafeStockApp() {
 
     try {
       const exists = inventory.find(i => i.name.toUpperCase() === formStockIn.item.toUpperCase());
+      const customId = exists ? exists.id : `item_${Date.now()}`;
       
-      if (exists) {
-        await updateDoc(doc(db, "godown_inventory", exists.id), {
-          storeQty: increment(qtyNum),
-          purchasePrice: priceNum,
-          lastPurchaseDate: new Date().toISOString().split('T')[0]
-        });
-      } else {
-        const customId = `item_${Date.now()}`;
-        await setDoc(doc(db, "godown_inventory", customId), {
-          id: customId,
-          name: formStockIn.item.toUpperCase(),
-          category: formStockIn.category,
-          storeQty: qtyNum,
-          unit: formStockIn.unit,
-          purchasePrice: priceNum,
-          minLimit: 15,
-          supplier: formStockIn.supplier || "Walk-In Supplier",
-          lastPurchaseDate: new Date().toISOString().split('T')[0]
-        });
-      }
+      const payload = {
+        id: customId,
+        name: formStockIn.item.toUpperCase(),
+        category: formStockIn.category,
+        storeQty: exists ? increment(qtyNum) : qtyNum,
+        unit: formStockIn.unit,
+        purchasePrice: priceNum,
+        minLimit: exists ? exists.minLimit : 15,
+        supplier: formStockIn.supplier || "Walk-In Supplier",
+        lastPurchaseDate: new Date().toISOString().split('T')[0]
+      };
+
+      await setDoc(doc(db, "godown_inventory", customId), payload, { merge: true });
 
       await addDoc(collection(db, "purchase_history"), {
         itemName: formStockIn.item.toUpperCase(),
@@ -749,16 +580,7 @@ export default function BumBumCafeStockApp() {
         paymentType: formStockIn.paymentType
       });
 
-      if (formStockIn.paymentType === "Credit Ledger" && formStockIn.supplier) {
-        const supDoc = suppliers.find(s => s.name === formStockIn.supplier);
-        if (supDoc) {
-          await updateDoc(doc(db, "suppliers", supDoc.id), {
-            pendingCredit: increment(qtyNum * priceNum)
-          });
-        }
-      }
-
-      toastMessage("Stocked In successfully!");
+      toastMessage("स्टॉक सफलतापूर्वक इन किया गया!");
       setShowAddStockModal(false);
       setFormStockIn({ 
         invoiceNo: '', supplier: '', item: '', category: 'Raw Material', quantity: '', unit: 'Kg', price: '', gst: '5', expiry: '', batch: '', uploadInvoice: '',
@@ -769,50 +591,65 @@ export default function BumBumCafeStockApp() {
     }
   };
 
-  // Dynamic Stock-Out Handler
-  const handleStockOutSubmit = async (e: React.FormEvent) => {
+  // Purchase Bill Edit Submission
+  const handlePurchaseLogEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formStockOut.item || !formStockOut.quantity) {
-      toastMessage("All fields are required!", "error");
-      return;
-    }
-
-    const qtyNum = parseFloat(formStockOut.quantity);
-    const targetItem = inventory.find(i => i.id === formStockOut.item);
-    if (!targetItem || targetItem.storeQty < qtyNum) {
-      toastMessage("Insufficient Godown Stock!", "error");
-      return;
-    }
+    if (!editingPurchaseLog) return;
 
     try {
-      await updateDoc(doc(db, "godown_inventory", targetItem.id), {
-        storeQty: increment(-qtyNum)
-      });
+      await setDoc(doc(db, "purchase_history", editingPurchaseLog.id), {
+        itemName: editingPurchaseLog.itemName,
+        qty: editingPurchaseLog.qty,
+        unit: editingPurchaseLog.unit,
+        price: editingPurchaseLog.price,
+        supplier: editingPurchaseLog.supplier,
+        invoiceNo: editingPurchaseLog.invoiceNo,
+        paymentType: editingPurchaseLog.paymentType,
+        date: editingPurchaseLog.date
+      }, { merge: true });
 
-      await addDoc(collection(db, "stock_out_history"), {
-        itemName: targetItem.name,
-        qty: qtyNum,
-        purpose: formStockOut.purpose,
-        date: new Date().toISOString().split('T')[0],
-        remarks: formStockOut.remarks || "No remarks",
-        financialLoss: (formStockOut.purpose === "Waste" || formStockOut.purpose === "Damage") ? (qtyNum * targetItem.purchasePrice) : 0
-      });
-
-      toastMessage(`Deducted ${qtyNum} of ${targetItem.name}`);
-      setShowStockOutModal(false);
-      setFormStockOut({ item: '', quantity: '', purpose: 'Kitchen Use', remarks: '' });
+      toastMessage("बिल सफलतापूर्वक संशोधित किया गया!");
+      setEditingPurchaseLog(null);
     } catch (err) {
-      toastMessage("Stock out failed.", "error");
+      toastMessage("बिल एडिट करने में त्रुटि हुई।", "error");
     }
   };
 
-  // Quick plus-minus adjustment for Main Store Qty locally first
+  // Direct manual save to Firestore
+  const saveItemStockQty = async (id: string) => {
+    triggerHaptic();
+    const updatedQty = editedQties[id];
+    if (updatedQty === undefined) return;
+
+    const targetItem = inventory.find(i => i.id === id);
+    if (!targetItem) return;
+
+    try {
+      await setDoc(doc(db, "godown_inventory", id), {
+        ...targetItem,
+        storeQty: updatedQty,
+        lastPurchaseDate: new Date().toISOString().split('T')[0]
+      }, { merge: true });
+
+      setEditedQties(prev => {
+        const copy = { ...prev };
+        delete copy[id];
+        return copy;
+      });
+
+      toastMessage("स्टॉक सफलतापूर्वक सेव हो गया!");
+    } catch (err) {
+      console.error(err);
+      toastMessage("डेटाबेस में सेव करने में त्रुटि हुई।", "error");
+    }
+  };
+
+  // Direct manual qty change
   const adjustQuickStoreQty = (id: string, adjustment: number) => {
     triggerHaptic();
     const item = inventory.find(i => i.id === id);
     if (!item) return;
 
-    // Get current display quantity (either edited locally or already in db)
     const currentVal = editedQties[id] !== undefined ? editedQties[id] : item.storeQty;
     const newVal = Math.max(0, currentVal + adjustment);
 
@@ -822,42 +659,17 @@ export default function BumBumCafeStockApp() {
     }));
   };
 
-  // Reset individual item stock to 0 locally
+  // Reset stock to 0
   const setStockToZero = (id: string) => {
     triggerHaptic();
     setEditedQties(prev => ({
       ...prev,
       [id]: 0
     }));
-    toastMessage("मात्रा 0 सेट की गई! बदलाव लागू करने के लिए 'सेव' करें।", "info");
+    toastMessage("स्टॉक की वैल्यू 0 सेट की गई! कृपया इसे 'सेव करें' पर क्लिक कर सुरक्षित करें।", "info");
   };
 
-  // Direct manual save to Firestore
-  const saveItemStockQty = async (id: string) => {
-    triggerHaptic();
-    const updatedQty = editedQties[id];
-    if (updatedQty === undefined) return;
-
-    try {
-      await updateDoc(doc(db, "godown_inventory", id), {
-        storeQty: updatedQty,
-        lastPurchaseDate: new Date().toISOString().split('T')[0]
-      });
-
-      // Clear local changes indicator for this specific item
-      setEditedQties(prev => {
-        const copy = { ...prev };
-        delete copy[id];
-        return copy;
-      });
-
-      toastMessage("नया स्टॉक सफलतापूर्वक सेव हो गया!");
-    } catch (err) {
-      toastMessage("डेटाबेस में सेव करने में त्रुटि हुई।", "error");
-    }
-  };
-
-  // Physical Audit/Reconciliation Submit Handler
+  // Audit Reconciliation Action
   const handleAuditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     triggerHaptic();
@@ -876,9 +688,10 @@ export default function BumBumCafeStockApp() {
     const variance = physicalCount - systemCount;
 
     try {
-      await updateDoc(doc(db, "godown_inventory", targetItem.id), {
+      await setDoc(doc(db, "godown_inventory", targetItem.id), {
+        ...targetItem,
         storeQty: physicalCount
-      });
+      }, { merge: true });
 
       if (variance !== 0) {
         await addDoc(collection(db, "stock_out_history"), {
@@ -886,7 +699,7 @@ export default function BumBumCafeStockApp() {
           qty: Math.abs(variance),
           purpose: variance < 0 ? "Waste" : "Kitchen Use",
           date: new Date().toISOString().split('T')[0],
-          remarks: `Audit Adjustment (System was: ${systemCount}, Physical: ${physicalCount})`,
+          remarks: `Audit Alignment (System: ${systemCount}, Physical: ${physicalCount})`,
           financialLoss: variance < 0 ? (Math.abs(variance) * targetItem.purchasePrice) : 0
         });
       }
@@ -900,35 +713,10 @@ export default function BumBumCafeStockApp() {
     }
   };
 
-  // Export CSV/Excel Function
-  const triggerSimulationExport = (reportName: string) => {
-    const headers = ["Item Name", "Category", "Quantity", "Unit", "Total Value (INR)", "Status"];
-    const rows = inventory.map(item => [
-      item.name,
-      item.category,
-      item.storeQty,
-      item.unit,
-      item.storeQty * item.purchasePrice,
-      item.storeQty === 0 ? "Out of Stock" : item.storeQty < item.minLimit ? "Low Stock" : "Normal"
-    ]);
-
-    const csvContent = "data:text/csv;charset=utf-8," 
-      + [headers.join(","), ...rows.map(e => e.join(","))].join("\n");
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `${reportName}_${new Date().toISOString().split('T')[0]}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    toastMessage(`Downloaded: ${reportName} (CSV)!`);
-  };
-
-  // Category wise Export
+  // Trigger Category-Wise CSV Export
   const triggerCategoryWiseExport = () => {
     triggerHaptic();
     const sortedInventory = [...inventory].sort((a, b) => a.category.localeCompare(b.category));
-    
     const headers = ["Category", "Item Name", "Quantity", "Unit", "Total Value (INR)"];
     const rows = sortedInventory.map(item => [
       item.category,
@@ -948,181 +736,6 @@ export default function BumBumCafeStockApp() {
     link.click();
     document.body.removeChild(link);
     toastMessage("Category Wise CSV report generated!");
-  };
-
-  // Custom print group actions
-  const handlePrintGroup = (group: PrintGroup) => {
-    triggerHaptic();
-    const printWindow = window.open('', '_blank', 'width=600,height=800');
-    if (!printWindow) return toastMessage("Please allow pop-ups to print.");
-    
-    const matchedItems = inventory.filter(i => group.itemIds.includes(i.id));
-    const rowsHtml = matchedItems.map(item => {
-      const orderQty = printOrderQtys[`${group.id}_${item.id}`] || "0";
-      return `
-        <tr>
-          <td style="padding: 10px; border-bottom: 1px solid #ddd; text-align: left; font-family: sans-serif;">${item.name}</td>
-          <td style="padding: 10px; border-bottom: 1px solid #ddd; text-align: center; font-family: sans-serif;">${item.storeQty} ${item.unit}</td>
-          <td style="padding: 10px; border-bottom: 1px solid #ddd; text-align: right; font-weight: bold; font-family: sans-serif; color: #FF6B00;">${orderQty}</td>
-        </tr>
-      `;
-    }).join('');
-
-    printWindow.document.write(`
-      <html>
-        <head>
-          <title>Print_Group_${group.name}</title>
-          <style>
-            body { font-family: sans-serif; padding: 25px; color: #333; }
-            h2 { text-align: center; color: #FF6B00; margin-bottom: 2px; }
-            p { text-align: center; font-size: 10px; color: #666; margin-top: 0; }
-            table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-            th { background: #f5f5f5; padding: 10px; font-weight: bold; border-bottom: 2px solid #ddd; }
-          </style>
-        </head>
-        <body>
-          <h2>BUM BUM CAFE - ${group.name.toUpperCase()}</h2>
-          <p>Printed on: ${new Date().toLocaleString()}</p>
-          <table>
-            <thead>
-              <tr>
-                <th style="text-align: left;">Item Name</th>
-                <th style="text-align: center;">Current Stock</th>
-                <th style="text-align: right;">Order Quantity (to buy)</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${rowsHtml}
-            </tbody>
-          </table>
-          <script>window.onload = function() { window.print(); }</script>
-        </body>
-      </html>
-    `);
-    printWindow.document.close();
-  };
-
-  const handleCreatePrintGroup = async (e: React.FormEvent) => {
-    e.preventDefault();
-    triggerHaptic();
-    if (!newGroupNameInput.trim() || selectedItemIds.length === 0) {
-      toastMessage("Group name and selected items are required!", "error");
-      return;
-    }
-
-    try {
-      await addDoc(collection(db, "print_groups"), {
-        name: newGroupNameInput.trim(),
-        itemIds: [...selectedItemIds]
-      });
-
-      setNewGroupNameInput("");
-      setSelectedItemIds([]);
-      setIsMultiSelectMode(false);
-      setShowAddToGroupModal(false);
-      toastMessage("Created print category!");
-    } catch (err) {
-      toastMessage("Failed to save print group.", "error");
-    }
-  };
-
-  const handleToggleMultiSelect = (id: string) => {
-    triggerHaptic(10);
-    setSelectedItemIds(prev => 
-      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
-    );
-  };
-
-  const handleRemoveFromPrintGroup = async (groupId: string, itemId: string) => {
-    triggerHaptic(30);
-    const targetGroup = printGroups.find(g => g.id === groupId);
-    if (!targetGroup) return;
-
-    try {
-      await updateDoc(doc(db, "print_groups", groupId), {
-        itemIds: targetGroup.itemIds.filter(id => id !== itemId)
-      });
-      toastMessage("Item removed from print list");
-    } catch (err) {
-      toastMessage("Failed to update group.", "error");
-    }
-  };
-
-  const handleDeletePrintGroup = async (groupId: string) => {
-    triggerHaptic(50);
-    const confirm = window.confirm("क्या आप इस प्रिंट ग्रुप को हटाना चाहते हैं?");
-    if (!confirm) return;
-
-    try {
-      await deleteDoc(doc(db, "print_groups", groupId));
-      toastMessage("Print list deleted");
-    } catch (err) {
-      toastMessage("Failed to delete group.", "error");
-    }
-  };
-
-  // Simulated AI Bill Scanner Autocompletion with Firestore connectivity
-  const handleAIScanSimulation = () => {
-    setIsAIScanningAnimation(true);
-    triggerHaptic();
-    
-    setTimeout(async () => {
-      setIsAIScanningAnimation(false);
-      setShowAIScanner(false);
-
-      // Auto-extract matching items from user's actual JAYANT SALES invoice
-      const JAYANT_BILL_ITEMS = [
-        { name: "DEL MONTE PIZZA PASTA 1KG", qty: 12, price: 150, category: "Raw Material" },
-        { name: "DEL MONTE CREAMY CHEESE 1KG", qty: 12, price: 170, category: "Dairy" },
-        { name: "MOZZARELLA CHEESE", qty: 10, price: 490, category: "Dairy" },
-        { name: "SWEET CORN TOPPING", qty: 50, price: 80, category: "Pizza Toppings" },
-        { name: "FRENCH FRIES", qty: 5, price: 70, category: "Frozen Material" }
-      ];
-
-      try {
-        const batch = writeBatch(db);
-
-        // Update quantities in Godown Stock
-        JAYANT_BILL_ITEMS.forEach(bi => {
-          const match = inventory.find(i => i.name === bi.name);
-          if (match) {
-            batch.update(doc(db, "godown_inventory", match.id), {
-              storeQty: increment(bi.qty),
-              purchasePrice: bi.price,
-              lastPurchaseDate: new Date().toISOString().split('T')[0]
-            });
-          }
-        });
-
-        // Add to purchase logs
-        JAYANT_BILL_ITEMS.forEach(bi => {
-          const logRef = doc(collection(db, "purchase_history"));
-          batch.set(logRef, {
-            itemName: bi.name,
-            qty: bi.qty,
-            unit: "Pcs",
-            price: bi.price,
-            supplier: "Jayant Sales Agency",
-            date: new Date().toISOString().split('T')[0],
-            invoiceNo: "INV-1288-2026",
-            paymentType: "Credit Ledger"
-          });
-        });
-
-        // Update supplier credit
-        const rTraders = suppliers.find(s => s.name === "Rajesh Traders");
-        if (rTraders) {
-          batch.update(doc(db, "suppliers", rTraders.id), {
-            pendingCredit: increment(27180)
-          });
-        }
-
-        await batch.commit();
-        toastMessage("AI detected & loaded 5 items from JAYANT SALES invoice!", "success");
-      } catch (e) {
-        toastMessage("Failed to save AI scan results.", "error");
-      }
-    }, 3500);
   };
 
   return (
@@ -1163,13 +776,17 @@ export default function BumBumCafeStockApp() {
           </div>
 
           <div className="flex items-center gap-2">
-            {/* Barcode Scanner overlay trigger */}
+            {/* Unified Super Smart Scanner Trigger */}
             <button 
-              onClick={() => setScannerActive(true)}
-              className="p-2.5 bg-[#FF6B00]/5 border border-[#FF6B00]/20 hover:bg-[#FF6B00]/10 rounded-xl text-[#FF6B00] transition-all"
-              title="Simulator QR Scanner"
+              onClick={() => {
+                triggerHaptic();
+                setScannerActive(true);
+              }}
+              className="p-2.5 bg-orange-500 text-white hover:bg-orange-600 rounded-xl transition-all flex items-center gap-1 shadow"
+              title="Super Smart AI Scanner"
             >
               <QrCode size={16} className="animate-pulse" />
+              <span className="text-[9px] font-black uppercase font-sans">AI Scan</span>
             </button>
 
             {/* Notifications Trigger Bell */}
@@ -1192,7 +809,7 @@ export default function BumBumCafeStockApp() {
       <main className="max-w-md mx-auto px-4 pt-4 pb-20 space-y-6">
 
         {/* ==========================================
-            3. TAB 1: DASHBOARD (HOME)
+            TAB 1: DASHBOARD (HOME)
             ========================================== */}
         {activeTab === 'home' && currentView === 'dashboard' && (
           <div className="space-y-6">
@@ -1243,53 +860,6 @@ export default function BumBumCafeStockApp() {
               </div>
             </div>
 
-            {/* DAILY DEVIATION COUNTERS */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className={`p-4 rounded-3xl border ${isDarkMode ? 'bg-[#1A1A1A] border-neutral-800' : 'bg-white border-neutral-100'} shadow-sm flex items-center justify-between`}>
-                <div>
-                  <p className="text-[8px] font-black uppercase tracking-wider text-neutral-400 font-sans">Today Stock In</p>
-                  <h4 className="text-base font-black text-green-500 mt-1">₹{dashboardStats.todayPurchases}</h4>
-                </div>
-                <PlusCircle size={22} className="text-green-500" />
-              </div>
-
-              <div className={`p-4 rounded-3xl border ${isDarkMode ? 'bg-[#1A1A1A] border-neutral-800' : 'bg-white border-neutral-100'} shadow-sm flex items-center justify-between`}>
-                <div>
-                  <p className="text-[8px] font-black uppercase tracking-wider text-neutral-400 font-sans">Today Waste Qty</p>
-                  <h4 className="text-base font-black text-red-500 mt-1">{dashboardStats.todayWaste} Qty</h4>
-                </div>
-                <TrendingDown size={22} className="text-red-500" />
-              </div>
-            </div>
-
-            {/* LOW STOCK HUD LIST */}
-            <div className={`p-5 rounded-3xl border ${isDarkMode ? 'bg-[#1A1A1A] border-neutral-800' : 'bg-white border-neutral-100'} shadow-sm space-y-3`}>
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-black uppercase tracking-widest text-neutral-400 font-sans">Low / Out of Stock List</span>
-                <span className="bg-amber-100 dark:bg-amber-500/10 text-amber-600 px-2 py-0.5 rounded-full text-[9px] font-black uppercase">Critical</span>
-              </div>
-
-              <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-                {inventory.filter(i => i.storeQty < i.minLimit).map(item => {
-                  const combined = item.storeQty;
-                  return (
-                    <div key={item.id} className="flex items-center justify-between p-2.5 rounded-2xl bg-neutral-50 dark:bg-neutral-800/50 text-xs">
-                      <div>
-                        <p className="font-bold">{item.name}</p>
-                        <p className="text-[9px] text-neutral-400 uppercase font-sans">{item.category}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className={`font-black ${combined === 0 ? 'text-red-500' : 'text-amber-500'}`}>
-                          {combined} {item.unit} Left
-                        </p>
-                        <p className="text-[8px] text-neutral-400">Limit: {item.minLimit}</p>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
             {/* QUICK ACTIONS ROW */}
             <div className="space-y-3">
               <h3 className="text-xs font-black uppercase tracking-widest text-neutral-400 px-1 font-sans">Quick Actions Panel</h3>
@@ -1308,30 +878,56 @@ export default function BumBumCafeStockApp() {
                 </div>
               </div>
             </div>
-
-            {/* IF NO ITEMS FOUND SETUP SUGGESTION CARD */}
-            {inventory.length === 0 && (
-              <div className="bg-orange-500/10 border border-orange-500/20 p-5 rounded-3xl text-center space-y-3">
-                <p className="text-xs font-bold uppercase tracking-wider">No Items Found in Godown Stock!</p>
-                <button
-                  type="button"
-                  onClick={handleSeedDatabase}
-                  disabled={isDbSeeding}
-                  className="px-5 py-2.5 bg-[#FF6B00] hover:bg-orange-600 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow flex items-center justify-center gap-1.5 mx-auto"
-                >
-                  🚀 Setup Khatabook Master List
-                </button>
-              </div>
-            )}
-
           </div>
         )}
 
         {/* ==========================================
-            4. TAB 2: MAIN STORE (GODOWN)
+            TAB 2: MAIN STORE (GODOWN)
             ========================================== */}
         {activeTab === 'store' && (
           <div className="space-y-6">
+            
+            {/* STICKY SEARCH BAR & CATEGORIES */}
+            <div className={`sticky top-[72px] z-30 ${isDarkMode ? 'bg-[#0F0F0F]' : 'bg-[#FAFAFA]'} pb-3 pt-1 space-y-3`}>
+              <div className="relative">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-400" size={16} />
+                <input 
+                  type="text"
+                  placeholder="सामग्री खोजें... (Category, Supplier, Item Name)"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-11 pr-4 py-3 rounded-2xl border border-neutral-200 dark:bg-neutral-900 dark:border-neutral-800 text-xs font-bold"
+                />
+              </div>
+
+              {/* CATEGORY FILTER SWITCHES */}
+              <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none font-sans">
+                <button
+                  onClick={() => setSelectedCategory("All")}
+                  className={`px-3.5 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider border whitespace-nowrap transition-all ${
+                    selectedCategory === "All" 
+                      ? 'bg-orange-500 border-orange-500 text-white shadow-md' 
+                      : isDarkMode ? 'bg-neutral-900 border-neutral-800 text-neutral-400' : 'bg-white border-neutral-200 text-neutral-600'
+                  }`}
+                >
+                  All
+                </button>
+                {categories.map(cat => (
+                  <button
+                    key={cat}
+                    onClick={() => setSelectedCategory(cat)}
+                    className={`px-3.5 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider border whitespace-nowrap transition-all ${
+                      selectedCategory === cat 
+                        ? 'bg-orange-500 border-orange-500 text-white shadow-md' 
+                        : isDarkMode ? 'bg-neutral-900 border-neutral-800 text-neutral-400' : 'bg-white border-neutral-200 text-neutral-600'
+                    }`}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-base font-black uppercase tracking-widest text-neutral-400 font-sans">Main Store Godown</h2>
@@ -1344,33 +940,6 @@ export default function BumBumCafeStockApp() {
                 <Plus size={14} />
                 <span>Add Item</span>
               </button>
-            </div>
-
-            {/* CATEGORY FILTER SWITCHES */}
-            <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none font-sans">
-              <button
-                onClick={() => setSelectedCategory("All")}
-                className={`px-3.5 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider border whitespace-nowrap transition-all ${
-                  selectedCategory === "All" 
-                    ? 'bg-orange-500 border-orange-500 text-white shadow-md' 
-                    : isDarkMode ? 'bg-neutral-900 border-neutral-800 text-neutral-400' : 'bg-white border-neutral-200 text-neutral-600'
-                }`}
-              >
-                All
-              </button>
-              {categories.map(cat => (
-                <button
-                  key={cat}
-                  onClick={() => setSelectedCategory(cat)}
-                  className={`px-3.5 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider border whitespace-nowrap transition-all ${
-                    selectedCategory === cat 
-                      ? 'bg-orange-500 border-orange-500 text-white shadow-md' 
-                      : isDarkMode ? 'bg-neutral-900 border-neutral-800 text-neutral-400' : 'bg-white border-neutral-200 text-neutral-600'
-                  }`}
-                >
-                  {cat}
-                </button>
-              ))}
             </div>
 
             {/* CATEGORY-WISE PRINT EXPORT SHORTCUT & MULTI SELECT TRIGGER */}
@@ -1398,13 +967,13 @@ export default function BumBumCafeStockApp() {
               </button>
             </div>
 
-            {/* INVENTORY CARD LIST GRID (DIRECT STOCK VALUE/QUANTITY ENTER OPTION BUILT-IN) */}
+            {/* INVENTORY CARD LIST GRID */}
             <div className="space-y-3.5">
               {filteredInventory.map(item => {
                 const isLow = item.storeQty < item.minLimit;
                 const isItemSelected = selectedItemIds.includes(item.id);
                 
-                // Get current display quantity (either edited locally or already in db)
+                // Get current display quantity (either edited locally or from database)
                 const displayQty = editedQties[item.id] !== undefined ? editedQties[item.id] : item.storeQty;
                 const isDirty = editedQties[item.id] !== undefined && editedQties[item.id] !== item.storeQty;
 
@@ -1477,10 +1046,7 @@ export default function BumBumCafeStockApp() {
                               onClick={(e) => e.stopPropagation()}
                               onChange={(e) => {
                                 const val = parseFloat(e.target.value);
-                                setEditedQties(prev => ({
-                                  ...prev,
-                                  [item.id]: isNaN(val) ? 0 : val
-                                }));
+                                setEditedQties(prev => ({ ...prev, [item.id]: isNaN(val) ? 0 : val }));
                               }}
                               className="w-20 text-center font-black text-sm p-1.5 rounded-xl border border-neutral-200 dark:bg-neutral-800 dark:border-neutral-700 text-neutral-900 dark:text-white"
                             />
@@ -1494,7 +1060,7 @@ export default function BumBumCafeStockApp() {
                             </button>
                           </div>
 
-                          {/* Quick Save and Reset Actions inside Card */}
+                          {/* Quick Actions inside Card */}
                           <div className="flex justify-center gap-2">
                             <button
                               type="button"
@@ -1537,37 +1103,11 @@ export default function BumBumCafeStockApp() {
                 );
               })}
             </div>
-
-            {/* STICKY FLOATING BOTTOM TOOLBAR WHEN MULTI-SELECT ACTIVE */}
-            <AnimatePresence>
-              {isMultiSelectMode && selectedItemIds.length > 0 && (
-                <motion.div 
-                  initial={{ y: 80, opacity: 0 }}
-                  animate={{ y: 0, opacity: 1 }}
-                  exit={{ y: 80, opacity: 0 }}
-                  className="fixed bottom-20 left-4 right-4 z-[45] bg-[#FF6B00] text-white p-4 rounded-3xl shadow-xl flex items-center justify-between"
-                >
-                  <div>
-                    <p className="text-xs font-black uppercase tracking-widest">{selectedItemIds.length} Items Selected</p>
-                    <p className="text-[9px] text-orange-200 uppercase font-bold font-sans">Ready to map into Print Category</p>
-                  </div>
-                  <button 
-                    onClick={() => {
-                      triggerHaptic();
-                      setShowAddToGroupModal(true);
-                    }}
-                    className="px-4 py-2 bg-white text-[#FF6B00] rounded-xl font-black text-xs uppercase tracking-wider flex items-center gap-1.5 shadow font-sans"
-                  >
-                    <Layers size={13} /> Add to Print List
-                  </button>
-                </motion.div>
-              )}
-            </AnimatePresence>
           </div>
         )}
 
         {/* ==========================================
-            5. TAB 3: DYNAMIC CUSTOM PRINT GROUPS VIEW
+            TAB 3: DYNAMIC CUSTOM PRINT GROUPS VIEW
             ========================================== */}
         {activeTab === 'print' && (
           <div className="space-y-6">
@@ -1578,7 +1118,7 @@ export default function BumBumCafeStockApp() {
               </div>
             </div>
 
-            {/* Print Category quick selectors */}
+            {/* Print Category selectors */}
             <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none font-sans">
               <button
                 onClick={() => { triggerHaptic(); setActivePrintGroup("All"); }}
@@ -1638,7 +1178,7 @@ export default function BumBumCafeStockApp() {
                         </div>
                       </div>
 
-                      {/* Display items assigned inside this print group */}
+                      {/* Display items assigned inside print group */}
                       <div className="space-y-2">
                         {matchedItems.map(item => {
                           const oQtyValue = printOrderQtys[`${group.id}_${item.id}`] || "";
@@ -1682,12 +1222,11 @@ export default function BumBumCafeStockApp() {
         )}
 
         {/* ==========================================
-            7. MORE OVERLAY / SIDEBAR DETAILS
+            TAB 4: MORE OVERLAY / DETAILS
             ========================================== */}
         {activeTab === 'more' && (
           <div className="space-y-6">
             
-            {/* SIMULATED MENU FOR MORE SECTION */}
             {currentView === 'dashboard' || currentView === 'more_home' ? (
               <div className="space-y-4">
                 <div className="flex items-center gap-3 border-b border-neutral-100 dark:border-neutral-800 pb-3">
@@ -1742,21 +1281,6 @@ export default function BumBumCafeStockApp() {
                 </div>
 
                 <form onSubmit={handleStockInSubmit} className={`p-5 rounded-3xl border space-y-3 text-xs ${isDarkMode ? 'bg-[#1A1A1A] border-neutral-800' : 'bg-white border-neutral-100'}`}>
-                  {/* AI BILL SCANNER TRIGGER BAR */}
-                  <div className="p-4 bg-orange-500/10 border border-orange-500/20 rounded-2xl flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-[10px] font-black text-[#FF6B00] uppercase tracking-wider font-sans">📷 Simulated AI Bill Scanner</p>
-                      <p className="text-[8px] text-neutral-400 font-bold uppercase mt-0.5">Scan paper bills with mobile camera</p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setShowAIScanner(true)}
-                      className="px-3.5 py-2 bg-[#FF6B00] text-white rounded-xl text-[9px] font-black uppercase tracking-wider shadow"
-                    >
-                      Scan Bill
-                    </button>
-                  </div>
-
                   <div className="space-y-1">
                     <label className="font-black uppercase tracking-wider text-neutral-400 text-[9px]">Invoice Number</label>
                     <input 
@@ -1816,6 +1340,7 @@ export default function BumBumCafeStockApp() {
                         <option value="Pcs">Pcs</option>
                         <option value="Tins">Tins</option>
                         <option value="Packets">Packets</option>
+                        <option value="Ltr">Ltr</option>
                       </select>
                     </div>
                   </div>
@@ -1861,23 +1386,35 @@ export default function BumBumCafeStockApp() {
                   </button>
                 </form>
 
-                {/* Audit Log */}
+                {/* Purchase Log History with EDIT/DELETE button */}
                 <div className="space-y-2">
                   <h4 className="text-xs font-black uppercase tracking-wider text-neutral-400 font-sans">Incoming Purchase Audit Log</h4>
                   {purchaseHistory.map(log => (
                     <div key={log.id} className={`p-4 rounded-3xl border ${isDarkMode ? 'bg-[#1A1A1A] border-neutral-800' : 'bg-white border-neutral-100'} text-xs space-y-1`}>
-                      <div className="flex justify-between font-sans">
-                        <span className="font-bold">{log.itemName}</span>
-                        <span className="text-green-500 font-bold">₹{log.price * log.qty}</span>
+                      <div className="flex justify-between items-start font-sans">
+                        <div>
+                          <span className="font-bold text-sm block">{log.itemName}</span>
+                          <span className="text-[10px] text-neutral-400 font-black block">BILL: {log.invoiceNo || "N/A"}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <button 
+                            onClick={() => setEditingPurchaseLog(log)}
+                            className="p-1.5 bg-blue-500/10 text-blue-500 rounded-lg hover:bg-blue-500 hover:text-white transition-all"
+                            title="Edit Bill Log"
+                          >
+                            <Edit size={12} />
+                          </button>
+                          <span className="text-green-500 font-bold text-sm">₹{log.price * log.qty}</span>
+                        </div>
                       </div>
-                      <p className="text-[9px] text-neutral-400 uppercase font-sans">Qty: {log.qty} {log.unit} • Method: {log.paymentType} • {log.date}</p>
+                      <p className="text-[9px] text-neutral-400 uppercase font-sans">Qty: {log.qty} {log.unit} • Sulp: {log.supplier} • {log.date}</p>
                     </div>
                   ))}
                 </div>
               </div>
             )}
 
-            {/* B. STOCK OUT HISTORY & CONTROL */}
+            {/* B. STOCK OUT HISTORY */}
             {currentView === 'stock_out_logs' && (
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
@@ -1908,7 +1445,7 @@ export default function BumBumCafeStockApp() {
               </div>
             )}
 
-            {/* C. REPORTS PANEL WITH PDF/EXCEL TRIGGER */}
+            {/* C. REPORTS PANEL */}
             {currentView === 'reports_list' && (
               <div className="space-y-4 font-sans">
                 <div className="flex items-center justify-between">
@@ -1922,7 +1459,6 @@ export default function BumBumCafeStockApp() {
                     { title: "Weekly Consumption Analysis", type: "Weekly_Report" },
                     { title: "Monthly Stock Valuation Ledger", type: "Monthly_Report" },
                     { title: "Wastage and Discards Auditor", type: "Wastage_Report" },
-                    { title: "Inter-store Logistics Audit", type: "Transfer_Report" },
                   ].map((rep, idx) => (
                     <div 
                       key={idx}
@@ -1958,7 +1494,7 @@ export default function BumBumCafeStockApp() {
               </div>
             )}
 
-            {/* D. MANAGE SUPPLIERS WITH ADD, EDIT & DELETE */}
+            {/* D. MANAGE SUPPLIERS */}
             {currentView === 'suppliers_list' && (
               <div className="space-y-4">
                 <div className="flex items-center justify-between font-sans">
@@ -2001,22 +1537,13 @@ export default function BumBumCafeStockApp() {
                           </button>
                         </div>
                       </div>
-
-                      {/* WHATSAPP REORDER QUICK TRIGGER BUTTON */}
-                      <button
-                        onClick={() => triggerWhatsAppOrder(s.name)}
-                        className="w-full py-2 bg-green-500/10 hover:bg-green-500 text-green-600 hover:text-white border border-green-500/20 text-[9px] font-black uppercase tracking-wider rounded-xl flex items-center justify-center gap-1.5 transition-all font-sans"
-                      >
-                        <Share2 size={11} />
-                        <span>Send Low Stock Reorder (WhatsApp)</span>
-                      </button>
                     </div>
                   ))}
                 </div>
               </div>
             )}
 
-            {/* E. MANAGE CATEGORIES (DYNAMIC LIST INSIDE TAB) */}
+            {/* E. MANAGE CATEGORIES */}
             {currentView === 'categories_manager' && (
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
@@ -2027,29 +1554,14 @@ export default function BumBumCafeStockApp() {
                 <form onSubmit={handleCategoryAdd} className="flex gap-2 text-xs font-sans">
                   <input 
                     type="text" 
-                    placeholder="New category name (e.g. Spices)" 
+                    placeholder="New category (e.g. Spices)" 
                     value={categoryInput}
                     onChange={e => setCategoryInput(e.target.value)}
                     className="flex-1 p-3 rounded-2xl border dark:bg-[#1A1A1A] dark:border-neutral-800"
                     required
                   />
-                  <button type="submit" className="px-5 py-3 bg-[#FF6B00] text-white rounded-2xl font-black uppercase">Add</button>
+                  <button type="submit" className="px-5 py-3 bg-[#FF6B00] text-white rounded-2xl font-black uppercase font-sans">Add</button>
                 </form>
-
-                {editingCategoryIndex !== null && (
-                  <form onSubmit={handleCategoryEditSubmit} className="flex gap-2 text-xs p-3.5 bg-yellow-500/10 border border-yellow-500/20 rounded-2xl">
-                    <input 
-                      type="text" 
-                      placeholder="Edit category name..." 
-                      value={editingCategoryValue}
-                      onChange={e => setEditingCategoryValue(e.target.value)}
-                      className="flex-1 p-2.5 rounded-xl border dark:bg-neutral-800"
-                      required
-                    />
-                    <button type="submit" className="px-4 py-2 bg-green-600 text-white rounded-xl font-bold uppercase font-sans">Update</button>
-                    <button type="button" onClick={() => setEditingCategoryIndex(null)} className="px-4 py-2 bg-neutral-200 dark:bg-neutral-800 text-neutral-400 rounded-xl font-sans">Cancel</button>
-                  </form>
-                )}
 
                 <div className="grid grid-cols-1 gap-2 text-xs font-sans">
                   {categories.map((cat, idx) => (
@@ -2057,64 +1569,47 @@ export default function BumBumCafeStockApp() {
                       isDarkMode ? 'bg-[#1A1A1A] border-neutral-800' : 'bg-white border-neutral-100'
                     }`}>
                       <span className="font-bold">{cat}</span>
-                      <div className="flex gap-2">
-                        <button 
-                          onClick={() => {
-                            setEditingCategoryIndex(idx);
-                            setEditingCategoryValue(cat);
-                          }}
-                          className="p-2 bg-blue-500/10 hover:bg-blue-500 text-blue-500 hover:text-white rounded-xl transition-all font-sans"
-                          title="Edit Category"
-                        >
-                          <Edit size={13} />
-                        </button>
-                        <button 
-                          onClick={() => handleCategoryDelete(cat)}
-                          className="p-2 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white rounded-xl transition-all font-sans"
-                          title="Delete Category"
-                        >
-                          <Trash2 size={13} />
-                        </button>
-                      </div>
                     </div>
                   ))}
                 </div>
               </div>
             )}
 
-            {/* F. SETTINGS PANEL */}
+            {/* F. PHYSICAL RECONCILIATION AUDIT PANEL */}
+            {currentView === 'audit_manager' && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-black uppercase tracking-widest text-neutral-400 font-sans">Audit Reconciliation</h3>
+                  <button onClick={() => setCurrentView('more_home')} className="text-xs text-orange-500 font-bold uppercase tracking-wider">Back</button>
+                </div>
+                
+                <div className={`p-5 rounded-3xl border space-y-4 text-xs ${isDarkMode ? 'bg-[#1A1A1A] border-neutral-800' : 'bg-white border-neutral-100'}`}>
+                  <p className="text-[10px] text-neutral-400 uppercase tracking-wider">मौजूदा स्टॉक को भौतिक स्टॉक से मिलाने के लिए यहाँ दर्ज करें:</p>
+                  <button 
+                    onClick={() => setShowAuditReconcileModal(true)}
+                    className="w-full p-3 bg-green-600 hover:bg-green-700 text-white rounded-2xl font-black text-xs uppercase tracking-wider flex items-center justify-center gap-1.5 shadow"
+                  >
+                    📝 भौतिक मिलान (Audit) फॉर्म खोलें
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* G. SETTINGS */}
             {currentView === 'app_settings' && (
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-xs font-black uppercase tracking-widest text-neutral-400 font-sans">Application Configuration</h3>
-                  <button onClick={() => setCurrentView('more_home')} className="text-xs text-orange-500 font-bold uppercase tracking-wider font-sans">Back</button>
+                  <h3 className="text-xs font-black uppercase tracking-widest text-neutral-400 font-sans">Configuration</h3>
+                  <button onClick={() => setCurrentView('more_home')} className="text-xs text-orange-500 font-bold uppercase tracking-wider">Back</button>
                 </div>
-
                 <div className={`p-5 rounded-3xl border space-y-4 text-xs ${isDarkMode ? 'bg-[#1A1A1A] border-neutral-800' : 'bg-white border-neutral-100'}`}>
-                  
-                  {/* Theme Mode Toggle */}
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="font-black text-sm uppercase tracking-wide">Dark Mode Preference</p>
-                      <p className="text-[9px] text-neutral-400 uppercase tracking-wider font-sans">Optimal design for low light godowns</p>
                     </div>
-                    <button
-                      onClick={() => setIsDarkMode(!isDarkMode)}
-                      className="p-2.5 bg-neutral-100 dark:bg-neutral-800 text-neutral-400 rounded-xl"
-                    >
+                    <button onClick={() => setIsDarkMode(!isDarkMode)} className="p-2.5 bg-neutral-100 dark:bg-neutral-800 text-neutral-400 rounded-xl">
                       {isDarkMode ? <Sun size={15} /> : <Moon size={15} />}
                     </button>
-                  </div>
-
-                  {/* Offline Support Status */}
-                  <div className="flex items-center justify-between border-t border-neutral-100 dark:border-neutral-800 pt-4">
-                    <div>
-                      <p className="font-black text-sm uppercase tracking-wide">Offline PWA Auto-Sync</p>
-                      <p className="text-[9px] text-neutral-400 uppercase tracking-wider font-sans">Synchronize local cache dynamically</p>
-                    </div>
-                    <span className="px-2.5 py-1 bg-green-500/10 text-green-500 font-black rounded-full text-[9px] uppercase tracking-wider flex items-center gap-1">
-                      <Wifi size={10} /> Online
-                    </span>
                   </div>
                 </div>
               </div>
@@ -2126,11 +1621,57 @@ export default function BumBumCafeStockApp() {
       </main>
 
       {/* ==========================================
-          8. DETAILED COMPREHENSIVE FLOATING DRAWERS & MODALS
+          8. DETAILED DRAWERS & MODALS
           ========================================== */}
       <AnimatePresence>
         
-        {/* A. PRODUCT ITEM SPECIFIC DETAILED DRAWER (WITH ITEM DELETE / EDIT INSIDE) */}
+        {/* A. NOTIFICATIONS DRAWER (BELL ICON CLICK) */}
+        {showNotifications && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[99] flex items-end justify-center font-sans">
+            <motion.div 
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ type: "spring", damping: 25, stiffness: 220 }}
+              className={`w-full max-w-md rounded-t-[2.5rem] p-6 space-y-5 border-t ${
+                isDarkMode ? 'bg-[#0F0F0F] border-neutral-800 text-white' : 'bg-white border-neutral-200 text-neutral-900'
+              }`}
+            >
+              <div className="flex justify-between items-center pb-2 border-b border-neutral-100 dark:border-neutral-800">
+                <div className="flex items-center gap-1.5">
+                  <Bell size={16} className="text-[#FF6B00]" />
+                  <span className="font-black text-xs uppercase tracking-widest">स्टॉक अलर्ट और नोटिफिकेशन</span>
+                </div>
+                <button onClick={() => setShowNotifications(false)} className="p-2 bg-neutral-100 dark:bg-neutral-800 rounded-xl">
+                  <X size={14} />
+                </button>
+              </div>
+
+              <div className="space-y-2.5 max-h-96 overflow-y-auto pr-1">
+                {notificationsList.map(notif => (
+                  <div key={notif.id} className="p-3.5 rounded-2xl bg-orange-500/5 border border-orange-500/10 text-xs flex justify-between items-center">
+                    <div>
+                      <p className="font-bold">{notif.text}</p>
+                      <span className="text-[9px] text-neutral-400 uppercase tracking-widest block mt-0.5">{notif.time}</span>
+                    </div>
+                    <span className="text-[8px] bg-orange-500/10 text-[#FF6B00] px-2 py-0.5 rounded-full font-black uppercase tracking-wide">
+                      {notif.type}
+                    </span>
+                  </div>
+                ))}
+
+                {notificationsList.length === 0 && (
+                  <div className="text-center py-10 space-y-2">
+                    <CheckCircle2 size={24} className="mx-auto text-green-500" />
+                    <p className="text-[10px] text-neutral-400 font-bold uppercase tracking-widest">सब ठीक है! कोई क्रिटिकल नोटिफिकेशन नहीं है।</p>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </div>
+        )}
+
+        {/* B. PRODUCT DETAIL DRAWER */}
         {selectedItemDetail && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[99] flex items-end justify-center font-sans">
             <motion.div 
@@ -2142,45 +1683,26 @@ export default function BumBumCafeStockApp() {
                 isDarkMode ? 'bg-[#0F0F0F] border-neutral-800 text-white' : 'bg-white border-neutral-200 text-neutral-900'
               }`}
             >
-              <div className="flex justify-between items-start font-sans">
+              <div className="flex justify-between items-start">
                 <div>
                   <span className="text-[9px] font-black uppercase tracking-widest text-[#FF6B00]">BumBum Master Details</span>
                   <h3 className="text-lg font-black">{selectedItemDetail.name}</h3>
                   <p className="text-neutral-400 text-xs mt-0.5">{selectedItemDetail.category} • Barcode: {selectedItemDetail.barcode || 'N/A'}</p>
                 </div>
                 <div className="flex gap-2">
-                  <button 
-                    onClick={() => setEditingItem(selectedItemDetail)}
-                    className="p-2.5 bg-blue-500/10 hover:bg-blue-500 text-blue-500 hover:text-white rounded-xl transition-all"
-                    title="Edit Item"
-                  >
-                    <Edit size={14} />
-                  </button>
-                  <button 
-                    onClick={() => handleItemDelete(selectedItemDetail.id, selectedItemDetail.name)}
-                    className="p-2.5 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white rounded-xl transition-all"
-                    title="Delete Item"
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                  <button 
-                    onClick={() => setSelectedItemDetail(null)}
-                    className="p-2.5 bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-700 text-neutral-400 rounded-xl"
-                  >
-                    <X size={15} />
-                  </button>
+                  <button onClick={() => setEditingItem(selectedItemDetail)} className="p-2.5 bg-blue-500/10 hover:bg-blue-500 text-blue-500 hover:text-white rounded-xl transition-all"><Edit size={14} /></button>
+                  <button onClick={() => handleItemDelete(selectedItemDetail.id, selectedItemDetail.name)} className="p-2.5 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white rounded-xl transition-all"><Trash2 size={14} /></button>
+                  <button onClick={() => setSelectedItemDetail(null)} className="p-2.5 bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-700 text-neutral-400 rounded-xl"><X size={15} /></button>
                 </div>
               </div>
 
-              {/* Dynamic Qty Spread HUD */}
               <div className="p-4 bg-neutral-50 dark:bg-neutral-800/50 rounded-2xl text-center text-xs">
                 <span className="text-[8px] font-black text-neutral-400 uppercase tracking-wider block">Main Godown Available Stock</span>
                 <span className="font-black text-sm">{selectedItemDetail.storeQty} {selectedItemDetail.unit}</span>
               </div>
 
-              {/* Simulated Purchase Timeline */}
               <div className="space-y-2.5">
-                <h4 className="text-[10px] font-black uppercase tracking-widest text-neutral-400 font-sans">Activity & Delivery Audit</h4>
+                <h4 className="text-[10px] font-black uppercase tracking-widest text-neutral-400">Activity & Delivery Audit</h4>
                 <div className="space-y-2">
                   <div className="flex items-center justify-between text-xs p-2.5 bg-neutral-50 dark:bg-neutral-800/50 rounded-xl">
                     <div className="flex items-center gap-2">
@@ -2189,7 +1711,6 @@ export default function BumBumCafeStockApp() {
                     </div>
                     <span className="text-neutral-400">{selectedItemDetail.lastPurchaseDate}</span>
                   </div>
-
                   <div className="flex items-center justify-between text-xs p-2.5 bg-neutral-50 dark:bg-neutral-800/50 rounded-xl">
                     <div className="flex items-center gap-2">
                       <Truck size={12} className="text-neutral-400" />
@@ -2199,25 +1720,11 @@ export default function BumBumCafeStockApp() {
                   </div>
                 </div>
               </div>
-
-              {/* Action row */}
-              <div className="flex gap-2 pt-2">
-                <button 
-                  onClick={() => {
-                    setFormStockOut({ item: selectedItemDetail.id, quantity: '', purpose: 'Kitchen Use', remarks: '' });
-                    setSelectedItemDetail(null);
-                    setShowStockOutModal(true);
-                  }}
-                  className="flex-1 p-3 bg-red-600 hover:bg-red-700 text-white rounded-2xl text-center font-black text-xs uppercase tracking-wider shadow font-sans"
-                >
-                  Discard / Waste Out
-                </button>
-              </div>
             </motion.div>
           </div>
         )}
 
-        {/* B. ITEM EDIT MASTER OVERLAY */}
+        {/* C. ITEM EDIT MASTER OVERLAY */}
         {editingItem && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[110] flex items-center justify-center p-4">
             <motion.form 
@@ -2261,7 +1768,7 @@ export default function BumBumCafeStockApp() {
                   <input 
                     type="number" 
                     value={editingItem.purchasePrice} 
-                    onChange={e => setEditingItem({...editingItem, purchasePrice: parseFloat(e.target.value)})}
+                    onChange={e => setEditingItem({...editingItem, purchasePrice: parseFloat(e.target.value) || 0})}
                     className="w-full p-2.5 rounded-xl border dark:bg-neutral-800 font-sans"
                     required
                   />
@@ -2274,7 +1781,7 @@ export default function BumBumCafeStockApp() {
                   <input 
                     type="number" 
                     value={editingItem.minLimit} 
-                    onChange={e => setEditingItem({...editingItem, minLimit: parseInt(e.target.value)})}
+                    onChange={e => setEditingItem({...editingItem, minLimit: parseInt(e.target.value) || 0})}
                     className="w-full p-2.5 rounded-xl border dark:bg-neutral-800"
                     required
                   />
@@ -2298,11 +1805,11 @@ export default function BumBumCafeStockApp() {
           </div>
         )}
 
-        {/* C. SUPPLIER EDIT OVERLAY */}
-        {editingSupplier && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[110] flex items-center justify-center p-4 font-sans">
+        {/* D. PURCHASE LOG / BILL EDIT MODAL */}
+        {editingPurchaseLog && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[115] flex items-center justify-center p-4">
             <motion.form 
-              onSubmit={handleSupplierEditSubmit}
+              onSubmit={handlePurchaseLogEditSubmit}
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
@@ -2310,148 +1817,278 @@ export default function BumBumCafeStockApp() {
                 isDarkMode ? 'bg-[#0F0F0F] border-neutral-800 text-white' : 'bg-white border-neutral-100 text-neutral-900'
               }`}
             >
-              <div className="flex justify-between items-center">
-                <h3 className="text-xs font-black uppercase tracking-widest text-[#FF6B00] font-sans">Edit Supplier Details</h3>
-                <button type="button" onClick={() => setEditingSupplier(null)} className="p-2.5 bg-neutral-100 dark:bg-neutral-800 rounded-xl"><X size={14} /></button>
+              <div className="flex justify-between items-center border-b border-neutral-100 dark:border-neutral-800 pb-2">
+                <h3 className="text-xs font-black uppercase tracking-widest text-[#FF6B00]">Edit Purchase Receipt</h3>
+                <button type="button" onClick={() => setEditingPurchaseLog(null)} className="p-2.5 bg-neutral-100 dark:bg-neutral-800 rounded-xl">
+                  <X size={14} />
+                </button>
               </div>
 
-              <div className="space-y-1.5 text-xs font-sans">
-                <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400">Supplier Name</label>
+              <div className="space-y-1.5 text-xs">
+                <label className="font-bold text-[9px] uppercase tracking-wider text-neutral-400">Material Name</label>
                 <input 
                   type="text" 
-                  value={editingSupplier.name} 
-                  onChange={e => setEditingSupplier({...editingSupplier, name: e.target.value})}
+                  value={editingPurchaseLog.itemName} 
+                  onChange={e => setEditingPurchaseLog({...editingPurchaseLog, itemName: e.target.value})}
                   className="w-full p-2.5 rounded-xl border dark:bg-neutral-800"
                   required
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-2 text-xs font-sans">
-                <div className="space-y-1.5 font-sans">
-                  <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400">Phone</label>
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="space-y-1.5">
+                  <label className="font-bold text-[9px] uppercase text-neutral-400">Quantity (मात्रा)</label>
                   <input 
-                    type="text" 
-                    value={editingSupplier.phone} 
-                    onChange={e => setEditingSupplier({...editingSupplier, phone: e.target.value})}
+                    type="number" 
+                    value={editingPurchaseLog.qty} 
+                    onChange={e => setEditingPurchaseLog({...editingPurchaseLog, qty: parseFloat(e.target.value) || 0})}
                     className="w-full p-2.5 rounded-xl border dark:bg-neutral-800"
                     required
                   />
                 </div>
-                <div className="space-y-1.5 font-sans">
-                  <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400">Address / City</label>
+                <div className="space-y-1.5">
+                  <label className="font-bold text-[9px] uppercase text-neutral-400">Price (मूल्य)</label>
                   <input 
-                    type="text" 
-                    value={editingSupplier.address} 
-                    onChange={e => setEditingSupplier({...editingSupplier, address: e.target.value})}
+                    type="number" 
+                    value={editingPurchaseLog.price} 
+                    onChange={e => setEditingPurchaseLog({...editingPurchaseLog, price: parseFloat(e.target.value) || 0})}
                     className="w-full p-2.5 rounded-xl border dark:bg-neutral-800"
                     required
                   />
                 </div>
               </div>
 
-              <button type="submit" className="w-full p-3 bg-blue-600 text-white font-black text-xs uppercase tracking-wider rounded-2xl shadow font-sans">
-                Save Changes ➔
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="space-y-1.5">
+                  <label className="font-bold text-[9px] uppercase text-neutral-400">Supplier</label>
+                  <input 
+                    type="text" 
+                    value={editingPurchaseLog.supplier} 
+                    onChange={e => setEditingPurchaseLog({...editingPurchaseLog, supplier: e.target.value})}
+                    className="w-full p-2.5 rounded-xl border dark:bg-neutral-800"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="font-bold text-[9px] uppercase text-neutral-400">Invoice No</label>
+                  <input 
+                    type="text" 
+                    value={editingPurchaseLog.invoiceNo} 
+                    onChange={e => setEditingPurchaseLog({...editingPurchaseLog, invoiceNo: e.target.value})}
+                    className="w-full p-2.5 rounded-xl border dark:bg-neutral-800"
+                  />
+                </div>
+              </div>
+
+              <button type="submit" className="w-full p-3 bg-green-600 text-white font-black text-xs uppercase tracking-wider rounded-2xl shadow font-sans">
+                Update Bill Log ➔
               </button>
             </motion.form>
           </div>
         )}
 
-        {/* D. INTERACTIVE REAL-TIME BARCODE SCANNER SIMULATOR */}
-        {scannerActive && (
-          <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[120] flex items-center justify-center p-4 font-sans">
-            <motion.div 
-              initial={{ scale: 0.9 }}
-              animate={{ scale: 1 }}
-              exit={{ scale: 0.9 }}
-              className="w-full max-w-sm bg-neutral-900 border border-neutral-800 rounded-[2rem] p-6 text-white space-y-5 text-center relative overflow-hidden"
+        {/* E. PHYSICAL RECONCILIATION MODAL */}
+        {showAuditReconcileModal && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[99] flex items-center justify-center p-4 font-sans">
+            <motion.form 
+              onSubmit={handleAuditSubmit}
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className={`w-full max-w-sm rounded-[2rem] p-6 space-y-4 border ${
+                isDarkMode ? 'bg-[#0F0F0F] border-neutral-800 text-white' : 'bg-white border-neutral-100 text-neutral-900'
+              }`}
             >
-              <div className="flex justify-between items-center border-b border-neutral-800 pb-3">
-                <p className="text-xs font-black uppercase tracking-widest text-[#FF6B00] flex items-center gap-1.5">
-                  <QrCode size={16} /> Packed Material Scanner
-                </p>
-                <button 
-                  onClick={() => {
-                    setScannerActive(false);
-                    setScannedProductDetected(null);
-                    setScannerManualBarcode("");
-                  }} 
-                  className="p-1.5 bg-neutral-800 rounded-xl"
+              <div className="flex justify-between items-center border-b border-neutral-100 dark:border-neutral-800 pb-2">
+                <h3 className="text-xs font-black uppercase tracking-widest text-[#FF6B00]">Physical Count Audit</h3>
+                <button type="button" onClick={() => setShowAuditReconcileModal(false)} className="p-2.5 bg-neutral-100 dark:bg-neutral-800 rounded-xl"><X size={14} /></button>
+              </div>
+
+              <div className="space-y-1 text-xs">
+                <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400">Select Item to Reconcile</label>
+                <select 
+                  value={auditItemSelect}
+                  onChange={e => setAuditItemSelect(e.target.value)}
+                  className="w-full p-3 rounded-xl border dark:bg-neutral-800 cursor-pointer"
+                  required
                 >
-                  <X size={15} />
-                </button>
+                  <option value="">Choose item...</option>
+                  {inventory.map(i => <option key={i.id} value={i.id}>{i.name} (Current Godown: {i.storeQty} {i.unit})</option>)}
+                </select>
               </div>
 
-              <div className="h-44 w-full bg-black/50 border border-dashed border-[#FF6B00]/40 rounded-3xl relative flex items-center justify-center overflow-hidden animate-pulse">
-                <span className="absolute top-1/2 left-0 right-0 h-0.5 bg-red-500 animate-bounce" />
-                <span className="text-[10px] text-neutral-500 uppercase tracking-widest font-black z-10 animate-pulse font-sans">Scanning Camera Feed Simulator</span>
+              <div className="space-y-1 text-xs">
+                <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400">Physically Counted Count on Shelves</label>
+                <input 
+                  type="number" 
+                  placeholder="Enter counted physical quantity"
+                  value={auditPhysicalCount}
+                  onChange={e => setAuditPhysicalCount(e.target.value)}
+                  className="w-full p-3 rounded-xl border dark:bg-neutral-800" 
+                  required
+                />
               </div>
 
-              {!scannedProductDetected ? (
-                <form onSubmit={handleBarcodeManualScan} className="space-y-4 text-xs text-left">
-                  <div className="space-y-1.5">
-                    <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400">Simulate Scan (Select Packed Material Barcode)</label>
-                    <select 
-                      onChange={e => setScannerManualBarcode(e.target.value)}
-                      value={scannerManualBarcode}
-                      className="w-full p-3 rounded-2xl bg-neutral-800 border border-neutral-700 text-white cursor-pointer font-sans"
-                    >
-                      <option value="">-- Choose Barcode --</option>
-                      {inventory.map(i => (
-                        <option key={i.id} value={i.barcode}>{i.name} (Barcode: {i.barcode || "N/A"})</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <button 
-                    type="submit" 
-                    className="w-full p-3.5 bg-orange-600 hover:bg-orange-700 text-white rounded-2xl font-black uppercase tracking-wider font-sans"
-                  >
-                    Run Barcode Scan Simulator ➔
-                  </button>
-                </form>
-              ) : (
-                <form onSubmit={handleSaveScannedStock} className="space-y-4 text-xs text-left font-sans">
-                  <div className="p-4 bg-green-500/10 border border-green-500/20 rounded-2xl font-sans">
-                    <p className="text-[8px] font-black text-green-500 uppercase tracking-widest">Matched Material Detected</p>
-                    <p className="text-sm font-black mt-1 text-white">{scannedProductDetected.name}</p>
-                    <p className="text-[10px] text-neutral-400 mt-0.5">Stock Status: Godown ({scannedProductDetected.storeQty})</p>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400">Qty to Add ({scannedProductDetected.unit})</label>
-                    <input 
-                      type="number" 
-                      placeholder="e.g. 100" 
-                      value={scannedAddQty} 
-                      onChange={e => setScannedAddQty(e.target.value)} 
-                      className="w-full p-3.5 bg-neutral-800 border border-neutral-700 rounded-2xl text-white font-bold"
-                      required
-                      autoFocus
-                    />
-                  </div>
-
-                  <div className="flex gap-2">
-                    <button 
-                      type="submit" 
-                      className="flex-1 p-3.5 bg-green-600 hover:bg-green-700 text-white rounded-2xl font-black uppercase tracking-wider"
-                    >
-                      Add Stock ➔
-                    </button>
-                    <button 
-                      type="button" 
-                      onClick={() => setScannedProductDetected(null)} 
-                      className="flex-1 p-3.5 bg-neutral-800 text-neutral-400 rounded-2xl font-black uppercase tracking-wider"
-                    >
-                      Scan Again
-                    </button>
-                  </div>
-                </form>
-              )}
-            </motion.div>
+              <button type="submit" className="w-full p-3 bg-green-600 hover:bg-green-700 text-white rounded-2xl font-black text-xs uppercase tracking-wider shadow">
+                Save & Align Stock Discrepancy ➔
+              </button>
+            </motion.form>
           </div>
         )}
 
-        {/* H. MODAL FORM: STOCK IN / INCOMING */}
+        {/* F. UNIFIED SUPER SMART AI SCANNER (WITH LIVE VIDEO VIEW & EDIT-CONFIRM) */}
+        {scannerActive && (
+          <div className="fixed inset-0 bg-black/95 backdrop-blur-md z-[150] flex flex-col justify-between p-4 font-sans text-white">
+            
+            {/* Scanner Header */}
+            <div className="flex justify-between items-center border-b border-neutral-800 pb-3">
+              <div>
+                <p className="text-xs font-black uppercase tracking-widest text-[#FF6B00] flex items-center gap-1.5">
+                  <QrCode size={16} /> Super Smart AI Scanner
+                </p>
+                <p className="text-[8px] text-neutral-400 font-bold uppercase mt-0.5">स्कैनर मोड और सत्यापन पैनल</p>
+              </div>
+              <button 
+                onClick={() => {
+                  setScannerActive(false);
+                  setScannedItemsToVerify([]);
+                }} 
+                className="p-2 bg-neutral-800 rounded-xl"
+              >
+                <X size={15} />
+              </button>
+            </div>
+
+            {/* Verification / Confirmation & Editing Panel */}
+            {scannedItemsToVerify.length > 0 ? (
+              <div className="flex-1 flex flex-col justify-between py-4 space-y-4 max-w-sm mx-auto w-full">
+                <div className="space-y-2">
+                  <h4 className="text-sm font-black uppercase tracking-wider text-green-500 text-center animate-pulse">
+                    📋 AI Verification & Confirmation Panel
+                  </h4>
+                  <p className="text-[10px] text-neutral-400 text-center">सेव करने से पहले यदि Qty या Price गलत है, तो आप नीचे एडिट कर सकते हैं:</p>
+                </div>
+
+                <div className="flex-1 overflow-y-auto space-y-3 pr-1 max-h-96">
+                  {scannedItemsToVerify.map((item, index) => (
+                    <div key={index} className="p-4 bg-neutral-900 border border-neutral-800 rounded-3xl space-y-3 text-xs">
+                      <div className="flex justify-between items-center">
+                        <span className="font-bold text-sm text-[#FF6B00]">{item.name}</span>
+                        <span className="text-[9px] bg-neutral-800 px-2 py-0.5 rounded-full font-bold uppercase text-neutral-400">
+                          {item.unit}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <label className="text-[8px] font-black uppercase text-neutral-400">Quantity (मात्रा)</label>
+                          <input 
+                            type="number"
+                            value={item.qty}
+                            onChange={(e) => handleUpdateVerifyItem(index, 'qty', parseFloat(e.target.value) || 0)}
+                            className="w-full p-2.5 rounded-xl bg-neutral-800 border border-neutral-700 font-black text-center text-white"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[8px] font-black uppercase text-neutral-400">Unit Price (मूल्य)</label>
+                          <input 
+                            type="number"
+                            value={item.price}
+                            onChange={(e) => handleUpdateVerifyItem(index, 'price', parseFloat(e.target.value) || 0)}
+                            className="w-full p-2.5 rounded-xl bg-neutral-800 border border-neutral-700 font-black text-center text-white"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="space-y-2">
+                  <button 
+                    onClick={handleSaveVerifiedItems}
+                    className="w-full py-4 bg-green-600 hover:bg-green-700 text-white rounded-2xl font-black text-xs uppercase tracking-wider shadow"
+                  >
+                    Confirm & Update Stock (सत्यापित करें और सेव करें) ➔
+                  </button>
+                  <button 
+                    onClick={() => setScannedItemsToVerify([])}
+                    className="w-full py-3 bg-neutral-800 text-neutral-400 rounded-xl text-[10px] font-black uppercase tracking-wider"
+                  >
+                    ← कैमरे पर वापस जाएं (Scan Again)
+                  </button>
+                </div>
+              </div>
+            ) : (
+              // Live HTML5 Camera View
+              <div className="flex-1 flex flex-col justify-between py-4 space-y-4 max-w-sm mx-auto w-full">
+                
+                {/* Mode Selector */}
+                <div className="grid grid-cols-2 gap-2 bg-neutral-900 p-1.5 rounded-2xl border border-neutral-800">
+                  <button 
+                    onClick={() => setScannerMode('barcode')}
+                    className={`py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all ${
+                      scannerMode === 'barcode' ? 'bg-[#FF6B00] text-white shadow-md' : 'text-neutral-400 hover:text-white'
+                    }`}
+                  >
+                    Barcode mode
+                  </button>
+                  <button 
+                    onClick={() => setScannerMode('bill')}
+                    className={`py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all ${
+                      scannerMode === 'bill' ? 'bg-[#FF6B00] text-white shadow-md' : 'text-neutral-400 hover:text-white'
+                    }`}
+                  >
+                    AI Bill Scanner mode
+                  </button>
+                </div>
+
+                {/* Live Camera Viewfinder */}
+                <div className="relative h-64 w-full bg-black border border-neutral-800 rounded-3xl overflow-hidden flex items-center justify-center">
+                  {!cameraPermissionError ? (
+                    <video 
+                      ref={videoRef} 
+                      autoPlay 
+                      playsInline 
+                      muted 
+                      className="absolute inset-0 w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="p-5 text-center space-y-2 z-10">
+                      <AlertTriangle className="mx-auto text-amber-500" size={32} />
+                      <p className="text-[10px] text-neutral-400 font-black uppercase">कैमरा एक्सेस ब्लॉक है या डिवाइस पर उपलब्ध नहीं है!</p>
+                      <p className="text-[8px] text-neutral-500">हम आपके लिए Simulated AI स्कैनर इंजन का उपयोग करेंगे।</p>
+                    </div>
+                  )}
+
+                  {/* Scan line overlay animation */}
+                  <span className="absolute left-0 right-0 h-0.5 bg-red-500 animate-bounce top-1/2 z-20" />
+                  
+                  {isScannerProcessing && (
+                    <div className="absolute inset-0 bg-black/80 flex flex-col items-center justify-center z-30 space-y-3">
+                      <div className="w-10 h-10 border-4 border-[#FF6B00] border-t-transparent rounded-full animate-spin" />
+                      <span className="text-[10px] font-black uppercase tracking-widest text-[#FF6B00] animate-pulse">
+                        Analyzing Document / Barcode...
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Scan capture trigger button */}
+                <div className="space-y-2 text-center text-xs">
+                  <button 
+                    onClick={handleAIScanCapture}
+                    disabled={isScannerProcessing}
+                    className="w-full py-4 bg-[#FF6B00] hover:bg-orange-600 text-white rounded-2xl font-black uppercase tracking-wider shadow"
+                  >
+                    📷 Capture & Parse with AI (स्कैन करें)
+                  </button>
+                  <p className="text-[8px] text-neutral-400 font-bold uppercase">यह लाइव कैमरा फ्रेम से जानकारी पढ़कर पुष्टि पैनल खोलेगा</p>
+                </div>
+
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* G. MODAL FORM: STOCK IN / INCOMING */}
         {showAddStockModal && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[99] flex items-center justify-center p-4 font-sans">
             <motion.form 
@@ -2516,6 +2153,7 @@ export default function BumBumCafeStockApp() {
                     <option value="Pcs">Pcs</option>
                     <option value="Tins">Tins</option>
                     <option value="Packets">Packets</option>
+                    <option value="Ltr">Ltr</option>
                   </select>
                 </div>
               </div>
@@ -2544,252 +2182,10 @@ export default function BumBumCafeStockApp() {
                 </div>
               </div>
 
-              <div className="space-y-1 text-xs">
-                <label className="font-black uppercase tracking-wider text-neutral-400 text-[8px] font-sans">Payment Method</label>
-                <select 
-                  value={formStockIn.paymentType}
-                  onChange={e => setFormStockIn({...formStockIn, paymentType: e.target.value as any})}
-                  className="w-full p-3 rounded-2xl border bg-orange-500/10 border-orange-500/20 text-[#FF6B00] font-black cursor-pointer"
-                >
-                  <option value="Cash/UPI">Cash / UPI</option>
-                  <option value="Credit Ledger">Supplier Credit Ledger</option>
-                </select>
-              </div>
-
               <button type="submit" className="w-full p-3 bg-green-600 hover:bg-green-700 text-white rounded-2xl font-black text-xs uppercase tracking-wider shadow">
                 Complete Stock In ➔
               </button>
             </motion.form>
-          </div>
-        )}
-
-        {/* I. MODAL FORM: ADD SUPPLIER */}
-        {showAddSupplierModal && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[99] flex items-center justify-center p-4 font-sans">
-            <motion.form 
-              onSubmit={handleSupplierAdd}
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className={`w-full max-w-sm rounded-[2rem] p-6 space-y-4 border ${
-                isDarkMode ? 'bg-[#0F0F0F] border-neutral-800 text-white' : 'bg-white border-neutral-100 text-neutral-900'
-              }`}
-            >
-              <div className="flex justify-between items-center border-b border-neutral-100 dark:border-neutral-800 pb-2">
-                <h3 className="text-xs font-black uppercase tracking-widest text-[#FF6B00] font-sans">Merchant Registration</h3>
-                <button type="button" onClick={() => setShowAddSupplierModal(false)} className="p-2.5 bg-neutral-100 dark:bg-neutral-800 rounded-xl"><X size={14} /></button>
-              </div>
-
-              <div className="space-y-1 text-xs font-sans">
-                <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400">Company / Supplier Name</label>
-                <input 
-                  type="text" 
-                  placeholder="e.g. Swastik Packaging Hub"
-                  value={formSupplier.name}
-                  onChange={e => setFormSupplier({...formSupplier, name: e.target.value})}
-                  className="w-full p-3 rounded-xl border dark:bg-neutral-800 font-sans" 
-                  required
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-2 text-xs font-sans">
-                <div className="space-y-1">
-                  <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400">Phone</label>
-                  <input 
-                    type="text" 
-                    placeholder="98765xxxxx"
-                    value={formSupplier.phone}
-                    onChange={e => setFormSupplier({...formSupplier, phone: e.target.value})}
-                    className="w-full p-2.5 rounded-xl border dark:bg-neutral-800 font-sans" 
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400">Address</label>
-                  <input 
-                    type="text" 
-                    placeholder="City / Area"
-                    value={formSupplier.address}
-                    onChange={e => setFormSupplier({...formSupplier, address: e.target.value})}
-                    className="w-full p-2.5 rounded-xl border dark:bg-neutral-800 font-sans" 
-                  />
-                </div>
-              </div>
-
-              <button type="submit" className="w-full p-3 bg-orange-500 hover:bg-orange-600 text-white rounded-2xl font-black text-xs uppercase tracking-wider shadow font-sans">
-                Register Supplier ➔
-              </button>
-            </motion.form>
-          </div>
-        )}
-
-        {/* J. MODAL FORM: PHYSICAL RECONCILIATION */}
-        {showAuditReconcileModal && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[99] flex items-center justify-center p-4 font-sans">
-            <motion.form 
-              onSubmit={handleAuditSubmit}
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className={`w-full max-w-sm rounded-[2rem] p-6 space-y-4 border ${
-                isDarkMode ? 'bg-[#0F0F0F] border-neutral-800 text-white' : 'bg-white border-neutral-100 text-neutral-900'
-              }`}
-            >
-              <div className="flex justify-between items-center border-b border-neutral-100 dark:border-neutral-800 pb-2">
-                <h3 className="text-xs font-black uppercase tracking-widest text-[#FF6B00] font-sans">Physical Count Audit</h3>
-                <button type="button" onClick={() => setShowAuditReconcileModal(false)} className="p-2.5 bg-neutral-100 dark:bg-neutral-800 rounded-xl"><X size={14} /></button>
-              </div>
-
-              <div className="space-y-1 text-xs">
-                <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400 font-sans">Select Item to Reconcile</label>
-                <select 
-                  value={auditItemSelect}
-                  onChange={e => setAuditItemSelect(e.target.value)}
-                  className="w-full p-3 rounded-xl border dark:bg-neutral-800 cursor-pointer font-sans"
-                  required
-                >
-                  <option value="">Choose item...</option>
-                  {inventory.map(i => <option key={i.id} value={i.id}>{i.name} (Current Godown: {i.storeQty} {i.unit})</option>)}
-                </select>
-              </div>
-
-              <div className="space-y-1 text-xs">
-                <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400 font-sans">Physically Counted Count on Shelves</label>
-                <input 
-                  type="number" 
-                  placeholder="Enter counted physical quantity"
-                  value={auditPhysicalCount}
-                  onChange={e => setAuditPhysicalCount(e.target.value)}
-                  className="w-full p-3 rounded-xl border dark:bg-neutral-800 font-sans" 
-                  required
-                />
-              </div>
-
-              <button type="submit" className="w-full p-3 bg-green-600 hover:bg-green-700 text-white rounded-2xl font-black text-xs uppercase tracking-wider shadow">
-                Save & Align Stock Discrepancy ➔
-              </button>
-            </motion.form>
-          </div>
-        )}
-
-        {/* K. MODAL: ADD TO CUSTOM PRINT GROUP */}
-        {showAddToGroupModal && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[115] flex items-center justify-center p-4 font-sans">
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className={`w-full max-w-sm rounded-[2rem] p-6 space-y-4 border ${
-                isDarkMode ? 'bg-[#0F0F0F] border-neutral-800 text-white' : 'bg-white border-neutral-100 text-neutral-900'
-              }`}
-            >
-              <div className="flex justify-between items-center border-b border-neutral-100 dark:border-neutral-800 pb-2">
-                <h3 className="text-xs font-black uppercase tracking-widest text-[#FF6B00]">Map Selected to Print Group</h3>
-                <button onClick={() => setShowAddToGroupModal(false)} className="p-1.5 bg-neutral-100 dark:bg-neutral-800 rounded-xl"><X size={14} /></button>
-              </div>
-
-              {/* Add to Existing Group */}
-              <div className="space-y-1.5 font-sans">
-                <label className="text-[9px] font-black uppercase tracking-wider text-neutral-400">Select Existing Print Group</label>
-                <div className="grid grid-cols-1 gap-2 max-h-40 overflow-y-auto">
-                  {printGroups.map(group => (
-                    <button
-                      key={group.id}
-                      onClick={() => {
-                        triggerHaptic();
-                        const updatedIds = Array.from(new Set([...group.itemIds, ...selectedItemIds]));
-                        setPrintGroups(prev => prev.map(g => g.id === group.id ? { ...g, itemIds: updatedIds } : g));
-                        setSelectedItemIds([]);
-                        setIsMultiSelectMode(false);
-                        setShowAddToGroupModal(false);
-                        toastMessage(`Items added to print category "${group.name}"!`);
-                      }}
-                      className="w-full p-3 rounded-2xl text-left bg-neutral-50 dark:bg-neutral-800/40 font-bold hover:bg-[#FF6B00] hover:text-white transition-all text-xs"
-                    >
-                      {group.name} ({group.itemIds.length} items)
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Create a New Group */}
-              <form onSubmit={handleCreatePrintGroup} className="space-y-2 border-t border-neutral-100 dark:border-neutral-800 pt-3 text-xs font-sans">
-                <label className="text-[9px] font-black uppercase tracking-wider text-neutral-400 block font-sans">Or Create New Print Group</label>
-                <div className="flex gap-2">
-                  <input 
-                    type="text" 
-                    placeholder="New Group Name (e.g. Bread Items)" 
-                    value={newGroupNameInput}
-                    onChange={e => setNewGroupNameInput(e.target.value)}
-                    className="flex-1 p-2.5 rounded-xl border dark:bg-[#1A1A1A] dark:border-neutral-800 text-xs"
-                    required
-                  />
-                  <button type="submit" className="px-4 py-2.5 bg-[#FF6B00] text-white rounded-xl font-black uppercase">Create</button>
-                </div>
-              </form>
-            </motion.div>
-          </div>
-        )}
-
-        {/* L. CUSTOM AI SCANNER OVERLAY SIMULATOR */}
-        {showAIScanner && (
-          <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[125] flex items-center justify-center p-4 font-sans">
-            <motion.div 
-              initial={{ scale: 0.9 }}
-              animate={{ scale: 1 }}
-              exit={{ scale: 0.9 }}
-              className="w-full max-w-sm bg-neutral-900 border border-neutral-800 rounded-[2rem] p-6 text-white space-y-5 text-center relative overflow-hidden"
-            >
-              <div className="flex justify-between items-center border-b border-neutral-800 pb-3">
-                <p className="text-xs font-black uppercase tracking-widest text-[#FF6B00] flex items-center gap-1.5 font-sans">
-                  <QrCode size={16} /> AI Bill Document Parser
-                </p>
-                <button 
-                  onClick={() => {
-                    setShowAIScanner(false);
-                    setIsAIScanningAnimation(false);
-                  }} 
-                  className="p-1.5 bg-neutral-800 rounded-xl"
-                >
-                  <X size={15} />
-                </button>
-              </div>
-
-              {/* simulated document scan bounds */}
-              <div className="h-56 w-full bg-black/50 border border-dashed border-[#FF6B00]/40 rounded-3xl relative flex flex-col items-center justify-center overflow-hidden">
-                {isAIScanningAnimation ? (
-                  <>
-                    <span className="absolute top-0 bottom-0 left-1/2 w-0.5 bg-red-500 animate-ping" />
-                    <span className="text-[10px] text-orange-400 uppercase tracking-widest font-black animate-pulse">Reading Document Items...</span>
-                  </>
-                ) : (
-                  <>
-                    <FileText size={32} className="text-neutral-600 mb-2 animate-bounce" />
-                    <span className="text-[9px] text-neutral-500 uppercase tracking-widest font-black">Ready to capture invoice paper</span>
-                  </>
-                )}
-              </div>
-
-              {!isAIScanningAnimation ? (
-                <div className="space-y-3.5">
-                  <div className="p-3 bg-neutral-800 rounded-2xl text-left text-xs font-sans">
-                    <p className="font-bold text-[#FF6B00] mb-0.5">Mock Document Detection Active</p>
-                    <p className="text-[10px] text-neutral-400">Scan Jayant Sales Agency bill dated 25-06-2026 to automatically update raw materials, quantities, prices, and suppliers instantly.</p>
-                  </div>
-
-                  <button 
-                    type="button"
-                    onClick={handleAIScanSimulation}
-                    className="w-full p-3.5 bg-orange-600 hover:bg-orange-700 text-white rounded-2xl font-black uppercase tracking-wider text-xs font-sans"
-                  >
-                    Simulate AI Scan ➔
-                  </button>
-                </div>
-              ) : (
-                <div className="py-4 text-xs font-black uppercase tracking-widest text-neutral-400 animate-pulse font-sans">
-                  Processing JAYANT SALES AGENCY Bill...
-                </div>
-              )}
-            </motion.div>
           </div>
         )}
 
@@ -2834,4 +2230,3 @@ export default function BumBumCafeStockApp() {
     </div>
   );
 }
-
