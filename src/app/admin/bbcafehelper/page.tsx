@@ -86,6 +86,7 @@ interface PurchaseLog {
   supplier: string;
   date: string;
   invoiceNo: string;
+  targetLocation: "Main Store" | "Cafe Kitchen";
 }
 
 interface StockOutLog {
@@ -95,6 +96,7 @@ interface StockOutLog {
   purpose: "Kitchen Use" | "Waste" | "Damage" | "Staff Use";
   date: string;
   remarks: string;
+  financialLoss?: number;
 }
 
 interface NotificationItem {
@@ -131,8 +133,8 @@ const INITIAL_INVENTORY: InventoryItem[] = [
   { id: "item_7", name: "OIL TIN", category: "Raw Material", storeQty: 12, cafeQty: 2, unit: "Tins", purchasePrice: 1950, minLimit: 5, supplier: "Sagar Distributors", lastPurchaseDate: "2026-07-05", expiryDate: "2027-05-01", batchNumber: "B-OT55", barcode: "890105800237" },
   { id: "item_8", name: "SINGDANA", category: "Raw Material", storeQty: 20, cafeQty: 4, unit: "Kg", purchasePrice: 120, minLimit: 8, supplier: "Om Super Market", lastPurchaseDate: "2026-07-09", expiryDate: "2026-12-09", batchNumber: "B-SD02", barcode: "890105800238" },
   { id: "item_9", name: "GHEE", category: "Dairy", storeQty: 10, cafeQty: 1, unit: "Kg", purchasePrice: 680, minLimit: 3, supplier: "Sony Dairy", lastPurchaseDate: "2026-07-11", expiryDate: "2026-11-11", batchNumber: "B-GH11", barcode: "890105800239" },
-  { id: "item_10", name: "BUTTER", category: "Dairy", storeQty: 24, cafeQty: 5, unit: "Kg", purchasePrice: 420, minLimit: 8, supplier: "Sony Dairy", lastPurchaseDate: "2026-07-12", expiryDate: "2026-10-12", batchNumber: "B-BT22", barcode: "890105800240" },
-  { id: "item_11", name: "CHEESE", category: "Dairy", storeQty: 18, cafeQty: 3, unit: "Kg", purchasePrice: 440, minLimit: 5, supplier: "Sony Dairy", lastPurchaseDate: "2026-07-12", expiryDate: "2026-10-15", batchNumber: "B-CH44", barcode: "890105800241" },
+  { id: "item_10", name: "BUTTER", category: "Dairy", storeQty: 24, cafeQty: 5, unit: "Kg", purchasePrice: 420, minLimit: 8, supplier: "Sony Dairy", lastPurchaseDate: "2026-07-12", expiryDate: "2026-07-15", batchNumber: "B-BT22", barcode: "890105800240" },
+  { id: "item_11", name: "CHEESE", category: "Dairy", storeQty: 18, cafeQty: 3, unit: "Kg", purchasePrice: 440, minLimit: 5, supplier: "Sony Dairy", lastPurchaseDate: "2026-07-12", expiryDate: "2026-07-16", batchNumber: "B-CH44", barcode: "890105800241" },
   { id: "item_12", name: "GAS BOTAL", category: "Others", storeQty: 4, cafeQty: 1, unit: "Pcs", purchasePrice: 1150, minLimit: 2, supplier: "Bharat Gas", lastPurchaseDate: "2026-07-01", expiryDate: "2030-01-01", batchNumber: "B-GB11", barcode: "890105800242" },
   
   // --- PACKAGING ---
@@ -166,6 +168,7 @@ export default function BumBumCafeStockApp() {
   const [scannerManualBarcode, setScannerManualBarcode] = useState<string>("");
   const [scannedProductDetected, setScannedProductAtDetected] = useState<InventoryItem | null>(null);
   const [scannedAddQty, setScannedAddQty] = useState<string>("");
+  const [scannedLocation, setScannedLocation] = useState<"Main Store" | "Cafe Kitchen">("Main Store");
 
   // Form Modals & Managers
   const [showAddStockModal, setShowAddStockModal] = useState<boolean>(false);
@@ -186,12 +189,12 @@ export default function BumBumCafeStockApp() {
     { id: "tx_2", itemName: "CHEESE", qty: 5, unit: "Kg", direction: "Store ➜ Cafe", date: "2026-07-13", by: "Rajesh (Helper)", notes: "Pizza toppings restocking" },
   ]);
   const [purchaseHistory, setPurchaseHistory] = useState<PurchaseLog[]>([
-    { id: "p_1", itemName: "TABLE RICE", qty: 100, unit: "Kg", price: 52, supplier: "Rajesh Traders", date: "2026-07-10", invoiceNo: "INV-2026-889" },
-    { id: "p_2", itemName: "CHEESE", qty: 15, unit: "Kg", price: 440, supplier: "Sony Dairy", date: "2026-07-12", invoiceNo: "INV-2026-904" },
+    { id: "p_1", itemName: "TABLE RICE", qty: 100, unit: "Kg", price: 52, supplier: "Rajesh Traders", date: "2026-07-10", invoiceNo: "INV-2026-889", targetLocation: "Main Store" },
+    { id: "p_2", itemName: "CHEESE", qty: 15, unit: "Kg", price: 440, supplier: "Sony Dairy", date: "2026-07-12", invoiceNo: "INV-2026-904", targetLocation: "Cafe Kitchen" },
   ]);
   const [stockOutHistory, setStockOutHistory] = useState<StockOutLog[]>([
-    { id: "so_1", itemName: "SUGER", qty: 1.5, purpose: "Waste", date: "2026-07-12", remarks: "Sugar spoiled by high humidity" },
-    { id: "so_2", itemName: "THUMSUP 750ML", qty: 2, purpose: "Damage", date: "2026-07-11", remarks: "Bottles leaked during dispatch handling" },
+    { id: "so_1", itemName: "SUGER", qty: 1.5, purpose: "Waste", date: "2026-07-12", remarks: "Sugar spoiled by high humidity", financialLoss: 66 },
+    { id: "so_2", itemName: "THUMSUP 750ML", qty: 2, purpose: "Damage", date: "2026-07-11", remarks: "Bottles leaked during dispatch handling", financialLoss: 80 },
   ]);
 
   const [suppliers, setSuppliers] = useState<Supplier[]>([
@@ -208,7 +211,8 @@ export default function BumBumCafeStockApp() {
 
   // Form Inputs States
   const [formStockIn, setFormStockIn] = useState({
-    invoiceNo: '', supplier: '', item: '', category: 'Raw Material', quantity: '', unit: 'Kg', price: '', gst: '5', expiry: '', batch: '', uploadInvoice: ''
+    invoiceNo: '', supplier: '', item: '', category: 'Raw Material', quantity: '', unit: 'Kg', price: '', gst: '5', expiry: '', batch: '', uploadInvoice: '',
+    targetLocation: 'Main Store' as "Main Store" | "Cafe Kitchen"
   });
   const [formStockOut, setFormStockOut] = useState({
     item: '', quantity: '', purpose: 'Kitchen Use' as "Kitchen Use" | "Waste" | "Damage" | "Staff Use", remarks: ''
@@ -218,15 +222,30 @@ export default function BumBumCafeStockApp() {
   });
   const [formSupplier, setFormSupplier] = useState({ name: '', phone: '', address: '' });
 
-  // Notifications pool
+  // Notifications pool (Low stock, Out of Stock, and Expiry Date warnings)
   const notificationsList = useMemo<NotificationItem[]>(() => {
     const list: NotificationItem[] = [];
+    const today = new Date();
+
     inventory.forEach(item => {
       const total = item.storeQty + item.cafeQty;
+      
+      // 1. Stock levels
       if (total === 0) {
         list.push({ id: `notif_out_${item.id}`, type: "Out of Stock", text: `🚨 ${item.name} is completely out of stock!`, time: "Action Required" });
       } else if (total < item.minLimit) {
         list.push({ id: `notif_low_${item.id}`, type: "Low Stock", text: `⚠️ ${item.name} is running low (${total} ${item.unit} left)`, time: "Restock soon" });
+      }
+
+      // 2. Expiry dates
+      if (item.expiryDate) {
+        const exp = new Date(item.expiryDate);
+        const timeDiff = exp.getTime() - today.getTime();
+        const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));
+        
+        if (daysDiff <= 3 && daysDiff >= 0) {
+          list.push({ id: `notif_exp_${item.id}`, type: "Expiry Warning", text: `⏰ ${item.name} is expiring in ${daysDiff} days! (${item.expiryDate})`, time: "Use immediately" });
+        }
       }
     });
     return list;
@@ -268,6 +287,10 @@ export default function BumBumCafeStockApp() {
       .filter(s => s.date === "2026-07-14" || s.date === new Date().toISOString().split('T')[0])
       .reduce((sum, s) => sum + s.qty, 0);
 
+    const monthlyFinancialWastageLoss = stockOutHistory
+      .filter(s => s.purpose === "Waste" || s.purpose === "Damage")
+      .reduce((sum, s) => sum + (s.financialLoss || 0), 0);
+
     return {
       totalStockVal,
       mainStoreVal,
@@ -275,7 +298,8 @@ export default function BumBumCafeStockApp() {
       lowStockCount,
       outOfStockCount,
       todayPurchases,
-      todayWaste
+      todayWaste,
+      monthlyFinancialWastageLoss
     };
   }, [inventory, purchaseHistory, stockOutHistory]);
 
@@ -297,7 +321,7 @@ export default function BumBumCafeStockApp() {
     setTimeout(() => setToast(null), 3000);
   };
 
-  // Barcode Scan Simulator with Match Logic
+  // Barcode Scan Simulator with Match Logic & Location Targeting
   const handleBarcodeManualScan = (e: React.FormEvent) => {
     e.preventDefault();
     triggerHaptic();
@@ -330,13 +354,19 @@ export default function BumBumCafeStockApp() {
     }
 
     setInventory(prev => 
-      prev.map(item => item.id === scannedProductDetected.id 
-        ? { ...item, storeQty: item.storeQty + qtyVal, lastPurchaseDate: new Date().toISOString().split('T')[0] } 
-        : item
-      )
+      prev.map(item => {
+        if (item.id === scannedProductDetected.id) {
+          if (scannedLocation === "Main Store") {
+            return { ...item, storeQty: item.storeQty + qtyVal, lastPurchaseDate: new Date().toISOString().split('T')[0] };
+          } else {
+            return { ...item, cafeQty: item.cafeQty + qtyVal, lastPurchaseDate: new Date().toISOString().split('T')[0] };
+          }
+        }
+        return item;
+      })
     );
 
-    // Save purchase history audit
+    // Save purchase history audit with routed target location
     const newPurchase: PurchaseLog = {
       id: `p_${Date.now()}`,
       itemName: scannedProductDetected.name,
@@ -345,11 +375,12 @@ export default function BumBumCafeStockApp() {
       price: scannedProductDetected.purchasePrice,
       supplier: scannedProductDetected.supplier,
       date: new Date().toISOString().split('T')[0],
-      invoiceNo: `SCANNED-REFILL-${Math.floor(Math.random() * 9000 + 1000)}`
+      invoiceNo: `SCAN-REFILL-${Math.floor(Math.random() * 9000 + 1000)}`,
+      targetLocation: scannedLocation
     };
     setPurchaseHistory(prev => [newPurchase, ...prev]);
 
-    toastMessage(`${qtyVal} ${scannedProductDetected.unit} of ${scannedProductDetected.name} Added!`);
+    toastMessage(`${qtyVal} ${scannedProductDetected.unit} of ${scannedProductDetected.name} Added to ${scannedLocation}!`);
     setScannerActive(false);
     setScannedProductAtDetected(null);
     setScannedAddQty("");
@@ -382,7 +413,6 @@ export default function BumBumCafeStockApp() {
       prev.map(sup => sup.id === editingSupplier.id ? editingSupplier : sup)
     );
 
-    // Cascade rename to inventory matching that supplier name if changed
     toastMessage("Supplier details modified!");
     setEditingSupplier(null);
   };
@@ -394,6 +424,26 @@ export default function BumBumCafeStockApp() {
 
     setSuppliers(prev => prev.filter(s => s.id !== id));
     toastMessage("Supplier Removed Successfully!");
+  };
+
+  // WhatsApp low stock order generator based on specific supplier
+  const triggerWhatsAppOrder = (supplierName: string) => {
+    const lowStockForSupplier = inventory.filter(item => 
+      item.supplier === supplierName && (item.storeQty + item.cafeQty) < item.minLimit
+    );
+
+    if (lowStockForSupplier.length === 0) {
+      toastMessage(`${supplierName} के पास कोई भी कम स्टॉक सामग्री नहीं है!`, "info");
+      return;
+    }
+
+    const orderText = lowStockForSupplier
+      .map(item => `• ${item.name} (${item.minLimit - (item.storeQty + item.cafeQty)} ${item.unit} Required)`)
+      .join("\n");
+
+    const message = encodeURIComponent(`🔥 *BUM BUM CAFE - NEW ORDER REQ*\n\nप्रिय ${supplierName} टीम,\nकृपया हमारे कैफ़े के लिए निम्नलिखित कम स्टॉक माल का ऑर्डर भेजें:\n\n${orderText}\n\nधन्यवाद!\n- मैनेजमेंट (Bum Bum Cafe)`);
+    window.open(`https://wa.me/919714293759?text=${message}`, '_blank');
+    toastMessage("WhatsApp order drafted!");
   };
 
   // Item Delete Action
@@ -472,7 +522,7 @@ export default function BumBumCafeStockApp() {
     toastMessage("श्रेणी हटा दी गई है।");
   };
 
-  // Dynamic Stock-In handler (Increments Inventory)
+  // Dynamic Stock-In handler (Routes to either Main Store or Cafe Kitchen dynamically)
   const handleStockInSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formStockIn.item || !formStockIn.quantity || !formStockIn.price) {
@@ -482,12 +532,19 @@ export default function BumBumCafeStockApp() {
 
     const qtyNum = parseFloat(formStockIn.quantity);
     const priceNum = parseFloat(formStockIn.price);
+    const target = formStockIn.targetLocation;
 
     setInventory(prev => {
       const exists = prev.find(i => i.name.toUpperCase() === formStockIn.item.toUpperCase());
       if (exists) {
         return prev.map(i => i.name.toUpperCase() === formStockIn.item.toUpperCase() 
-          ? { ...i, storeQty: i.storeQty + qtyNum, purchasePrice: priceNum, lastPurchaseDate: new Date().toISOString().split('T')[0] } 
+          ? { 
+              ...i, 
+              storeQty: target === "Main Store" ? i.storeQty + qtyNum : i.storeQty,
+              cafeQty: target === "Cafe Kitchen" ? i.cafeQty + qtyNum : i.cafeQty,
+              purchasePrice: priceNum, 
+              lastPurchaseDate: new Date().toISOString().split('T')[0] 
+            } 
           : i
         );
       } else {
@@ -497,8 +554,8 @@ export default function BumBumCafeStockApp() {
             id: `item_${Date.now()}`,
             name: formStockIn.item.toUpperCase(),
             category: formStockIn.category,
-            storeQty: qtyNum,
-            cafeQty: 0,
+            storeQty: target === "Main Store" ? qtyNum : 0,
+            cafeQty: target === "Cafe Kitchen" ? qtyNum : 0,
             unit: formStockIn.unit,
             purchasePrice: priceNum,
             minLimit: 15,
@@ -517,16 +574,20 @@ export default function BumBumCafeStockApp() {
       price: priceNum,
       supplier: formStockIn.supplier || "Walk-In",
       date: new Date().toISOString().split('T')[0],
-      invoiceNo: formStockIn.invoiceNo || "INV-TEMP"
+      invoiceNo: formStockIn.invoiceNo || "INV-TEMP",
+      targetLocation: target
     };
     setPurchaseHistory(prev => [newPurchase, ...prev]);
 
-    toastMessage(`Stocked In ${qtyNum} of ${formStockIn.item} successfully!`);
+    toastMessage(`Stocked In ${qtyNum} of ${formStockIn.item} successfully to ${target}!`);
     setShowAddStockModal(false);
-    setFormStockIn({ invoiceNo: '', supplier: '', item: '', category: 'Raw Material', quantity: '', unit: 'Kg', price: '', gst: '5', expiry: '', batch: '', uploadInvoice: '' });
+    setFormStockIn({ 
+      invoiceNo: '', supplier: '', item: '', category: 'Raw Material', quantity: '', unit: 'Kg', price: '', gst: '5', expiry: '', batch: '', uploadInvoice: '',
+      targetLocation: 'Main Store'
+    });
   };
 
-  // Dynamic Stock-Out Handler (Decrements Cafe stock)
+  // Dynamic Stock-Out Handler (Deducts Cafe stock)
   const handleStockOutSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formStockOut.item || !formStockOut.quantity) {
@@ -555,20 +616,38 @@ export default function BumBumCafeStockApp() {
       return;
     }
 
-    const matchName = inventory.find(i => i.id === formStockOut.item)?.name || "Unknown";
+    const matchedItem = inventory.find(i => i.id === formStockOut.item);
+    const matchName = matchedItem?.name || "Unknown";
+    const unitPrice = matchedItem?.purchasePrice || 0;
+
     const newLog: StockOutLog = {
       id: `so_${Date.now()}`,
       itemName: matchName,
       qty: qtyNum,
       purpose: formStockOut.purpose,
       date: new Date().toISOString().split('T')[0],
-      remarks: formStockOut.remarks || "No remarks"
+      remarks: formStockOut.remarks || "No remarks",
+      financialLoss: (formStockOut.purpose === "Waste" || formStockOut.purpose === "Damage") ? (qtyNum * unitPrice) : 0
     };
     setStockOutHistory(prev => [newLog, ...prev]);
 
     toastMessage(`Removed ${qtyNum} of ${matchName} (${formStockOut.purpose})`);
     setShowStockOutModal(false);
     setFormStockOut({ item: '', quantity: '', purpose: 'Kitchen Use', remarks: '' });
+  };
+
+  // Quick plus-minus adjustment for Main Store Qty directly
+  const adjustQuickStoreQty = (id: string, adjustment: number) => {
+    triggerHaptic();
+    setInventory(prev => 
+      prev.map(item => {
+        if (item.id === id) {
+          const finalVal = item.storeQty + adjustment;
+          return { ...item, storeQty: finalVal < 0 ? 0 : finalVal };
+        }
+        return item;
+      })
+    );
   };
 
   // Dynamic Transfer Handler
@@ -773,8 +852,8 @@ export default function BumBumCafeStockApp() {
                   <h4 className="text-lg font-black mt-1">₹{dashboardStats.cafeStockVal.toLocaleString()}</h4>
                 </div>
                 <div className={`p-4 rounded-3xl border ${isDarkMode ? 'bg-[#1A1A1A] border-neutral-800' : 'bg-white border-neutral-100'} shadow-sm`}>
-                  <p className="text-[8px] font-black uppercase tracking-wider text-neutral-400">Low Stock Alert</p>
-                  <h4 className="text-lg font-black mt-1 text-amber-500">{dashboardStats.lowStockCount} Items</h4>
+                  <p className="text-[8px] font-black uppercase tracking-wider text-neutral-400">Monthly Wastage Loss</p>
+                  <h4 className="text-lg font-black mt-1 text-red-500">₹{dashboardStats.monthlyFinancialWastageLoss.toLocaleString()}</h4>
                 </div>
               </div>
             </div>
@@ -923,6 +1002,7 @@ export default function BumBumCafeStockApp() {
                         </div>
                         <p className="text-[9px] text-neutral-400 font-bold uppercase tracking-wider">{item.category} • {item.supplier}</p>
                         {item.barcode && <p className="text-[8px] text-neutral-400 tracking-wider">Barcode: {item.barcode}</p>}
+                        {item.expiryDate && <p className="text-[8px] text-red-400 font-bold">Expiry: {item.expiryDate}</p>}
                       </div>
 
                       <div className="text-right">
@@ -935,6 +1015,10 @@ export default function BumBumCafeStockApp() {
                       <div>
                         <span className="text-[8px] font-black text-neutral-400 uppercase tracking-wider block">Main Godown</span>
                         <span className="font-black text-sm">{item.storeQty} {item.unit}</span>
+                        <div className="flex items-center justify-center gap-2 mt-1">
+                          <button onClick={() => adjustQuickStoreQty(item.id, -1)} className="p-1 bg-red-100 dark:bg-red-500/10 text-red-500 rounded-md"><MinusCircle size={10} /></button>
+                          <button onClick={() => adjustQuickStoreQty(item.id, 1)} className="p-1 bg-green-100 dark:bg-green-500/10 text-green-500 rounded-md"><PlusCircle size={10} /></button>
+                        </div>
                       </div>
                       <div className="border-l border-neutral-100 dark:border-neutral-800/80">
                         <span className="text-[8px] font-black text-neutral-400 uppercase tracking-wider block">Cafe Stock</span>
@@ -1119,7 +1203,7 @@ export default function BumBumCafeStockApp() {
                     { id: 'stock_out_logs', label: "Stock Out Logs", desc: "View wastage, damage, and staff use logs", icon: <MinusCircle size={16} /> },
                     { id: 'categories_manager', label: "Manage Categories", desc: "Add, Edit or Remove raw material categories", icon: <Layers size={16} /> },
                     { id: 'reports_list', label: "Reports & Analytics", desc: "Download simulated Excel & PDF stock sheets", icon: <BarChart3 size={16} /> },
-                    { id: 'suppliers_list', label: "Manage Suppliers", desc: "Add, configure, and delete supplier partners", icon: <Truck size={16} /> },
+                    { id: 'suppliers_list', label: "Manage Suppliers", desc: "Add, edit, delete, and trigger orders", icon: <Truck size={16} /> },
                     { id: 'users_roles', label: "Users & Roles", desc: "Change authorizations (Admin / Helper)", icon: <Users size={16} /> },
                     { id: 'app_settings', label: "App Settings", desc: "Theme control, auto-sync, database options", icon: <Settings size={16} /> },
                   ].map(option => (
@@ -1172,7 +1256,7 @@ export default function BumBumCafeStockApp() {
                       <select 
                         value={formStockIn.supplier}
                         onChange={e => setFormStockIn({...formStockIn, supplier: e.target.value})}
-                        className="w-full p-3 rounded-2xl border dark:bg-neutral-800 dark:border-neutral-700"
+                        className="w-full p-3 rounded-2xl border dark:bg-neutral-800 dark:border-neutral-700 cursor-pointer"
                       >
                         <option value="">Select Supplier</option>
                         {suppliers.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
@@ -1208,7 +1292,7 @@ export default function BumBumCafeStockApp() {
                       <select 
                         value={formStockIn.unit}
                         onChange={e => setFormStockIn({...formStockIn, unit: e.target.value})}
-                        className="w-full p-3 rounded-2xl border dark:bg-neutral-800"
+                        className="w-full p-3 rounded-2xl border dark:bg-neutral-800 cursor-pointer"
                       >
                         <option value="Kg">Kg</option>
                         <option value="Pcs">Pcs</option>
@@ -1220,7 +1304,7 @@ export default function BumBumCafeStockApp() {
 
                   <div className="grid grid-cols-2 gap-2">
                     <div className="space-y-1">
-                      <label className="font-black uppercase tracking-wider text-neutral-400 text-[9px]">Price per Unit (₹)</label>
+                      <label className="font-black uppercase tracking-wider text-neutral-400 text-[9px]">Purchase Price</label>
                       <input 
                         type="number" 
                         placeholder="e.g. 140"
@@ -1235,11 +1319,24 @@ export default function BumBumCafeStockApp() {
                       <select 
                         value={formStockIn.category}
                         onChange={e => setFormStockIn({...formStockIn, category: e.target.value})}
-                        className="w-full p-3 rounded-2xl border dark:bg-neutral-800"
+                        className="w-full p-3 rounded-2xl border dark:bg-neutral-800 cursor-pointer"
                       >
                         {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
                       </select>
                     </div>
+                  </div>
+
+                  {/* DIRECT STOCKING LOCATION TARGET SELECTOR */}
+                  <div className="space-y-1">
+                    <label className="font-black uppercase tracking-wider text-neutral-400 text-[9px]">Deliver Target Location</label>
+                    <select 
+                      value={formStockIn.targetLocation}
+                      onChange={e => setFormStockIn({...formStockIn, targetLocation: e.target.value as any})}
+                      className="w-full p-3 rounded-2xl border bg-orange-500/10 border-orange-500/20 text-[#FF6B00] font-black cursor-pointer"
+                    >
+                      <option value="Main Store">🏬 Main Godown (bulk store)</option>
+                      <option value="Cafe Kitchen">🍕 Cafe Kitchen (instant use)</option>
+                    </select>
                   </div>
 
                   <button type="submit" className="w-full bg-green-600 hover:bg-green-700 text-white p-3 rounded-2xl font-black uppercase tracking-wider shadow">
@@ -1256,7 +1353,7 @@ export default function BumBumCafeStockApp() {
                         <span className="font-bold">{log.itemName}</span>
                         <span className="text-green-500 font-bold">₹{log.price * log.qty}</span>
                       </div>
-                      <p className="text-[9px] text-neutral-400 uppercase font-sans">Qty: {log.qty} {log.unit} • Inv: {log.invoiceNo} • {log.date}</p>
+                      <p className="text-[9px] text-neutral-400 uppercase font-sans">Qty: {log.qty} {log.unit} • Delivered: {log.targetLocation} • {log.date}</p>
                     </div>
                   ))}
                 </div>
@@ -1283,6 +1380,9 @@ export default function BumBumCafeStockApp() {
                       <p className="text-neutral-500">{log.remarks}</p>
                       <div className="flex justify-between text-[9px] text-neutral-400 uppercase tracking-widest border-t border-neutral-50 dark:border-neutral-800/80 pt-2">
                         <span>Quantity: {log.qty}</span>
+                        {log.financialLoss && log.financialLoss > 0 ? (
+                          <span className="text-red-500 font-bold">Loss: ₹{log.financialLoss}</span>
+                        ) : null}
                         <span>{log.date}</span>
                       </div>
                     </div>
@@ -1345,7 +1445,7 @@ export default function BumBumCafeStockApp() {
             {currentView === 'suppliers_list' && (
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-xs font-black uppercase tracking-widest text-neutral-400">Supplier Register</h3>
+                  <h3 className="text-xs font-black uppercase tracking-widest text-[#FF6B00]">Supplier Register</h3>
                   <button onClick={() => setCurrentView('more_home')} className="text-xs text-orange-500 font-bold uppercase tracking-wider">Back</button>
                 </div>
 
@@ -1358,29 +1458,40 @@ export default function BumBumCafeStockApp() {
 
                 <div className="grid grid-cols-1 gap-2.5 text-xs">
                   {suppliers.map((s) => (
-                    <div key={s.id} className={`p-4 rounded-3xl border flex items-center justify-between ${
+                    <div key={s.id} className={`p-4 rounded-3xl border flex flex-col gap-3 ${
                       isDarkMode ? 'bg-[#1A1A1A] border-neutral-800' : 'bg-white border-neutral-100'
                     }`}>
-                      <div>
-                        <p className="font-black text-[#FF6B00] text-sm">{s.name}</p>
-                        <p className="text-[9px] text-neutral-400 uppercase tracking-widest mt-0.5">📞 {s.phone} • 📍 {s.address}</p>
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <p className="font-black text-[#FF6B00] text-sm">{s.name}</p>
+                          <p className="text-[9px] text-neutral-400 uppercase tracking-widest mt-0.5 font-sans">📞 {s.phone} • 📍 {s.address}</p>
+                        </div>
+                        <div className="flex gap-1.5">
+                          <button 
+                            onClick={() => setEditingSupplier(s)}
+                            className="p-2 bg-blue-500/10 hover:bg-blue-500 text-blue-500 hover:text-white rounded-xl transition-all"
+                            title="Edit Supplier"
+                          >
+                            <Edit size={13} />
+                          </button>
+                          <button 
+                            onClick={() => handleSupplierDelete(s.id, s.name)}
+                            className="p-2 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white rounded-xl transition-all"
+                            title="Delete Supplier"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
                       </div>
-                      <div className="flex gap-2">
-                        <button 
-                          onClick={() => setEditingSupplier(s)}
-                          className="p-2 bg-blue-500/10 hover:bg-blue-500 text-blue-500 hover:text-white rounded-xl transition-all"
-                          title="Edit Supplier"
-                        >
-                          <Edit size={13} />
-                        </button>
-                        <button 
-                          onClick={() => handleSupplierDelete(s.id, s.name)}
-                          className="p-2 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white rounded-xl transition-all"
-                          title="Delete Supplier"
-                        >
-                          <Trash2 size={13} />
-                        </button>
-                      </div>
+
+                      {/* WHATSAPP REORDER QUICK TRIGGER BUTTON */}
+                      <button
+                        onClick={() => triggerWhatsAppOrder(s.name)}
+                        className="w-full py-2 bg-green-500/10 hover:bg-green-500 text-green-600 hover:text-white border border-green-500/20 text-[9px] font-black uppercase tracking-wider rounded-xl flex items-center justify-center gap-1.5 transition-all"
+                      >
+                        <Share2 size={11} />
+                        <span>Send Low Stock Reorder (WhatsApp)</span>
+                      </button>
                     </div>
                   ))}
                 </div>
@@ -1395,7 +1506,6 @@ export default function BumBumCafeStockApp() {
                   <button onClick={() => setCurrentView('more_home')} className="text-xs text-orange-500 font-bold uppercase tracking-wider">Back</button>
                 </div>
 
-                {/* Add Category Form inline */}
                 <form onSubmit={handleCategoryAdd} className="flex gap-2 text-xs">
                   <input 
                     type="text" 
@@ -1408,7 +1518,6 @@ export default function BumBumCafeStockApp() {
                   <button type="submit" className="px-5 py-3 bg-[#FF6B00] text-white rounded-2xl font-black uppercase">Add</button>
                 </form>
 
-                {/* Edit Category inline panel */}
                 {editingCategoryIndex !== null && (
                   <form onSubmit={handleCategoryEditSubmit} className="flex gap-2 text-xs p-3.5 bg-yellow-500/10 border border-yellow-500/20 rounded-2xl">
                     <input 
@@ -1424,7 +1533,6 @@ export default function BumBumCafeStockApp() {
                   </form>
                 )}
 
-                {/* Categories listings */}
                 <div className="grid grid-cols-1 gap-2 text-xs">
                   {categories.map((cat, idx) => (
                     <div key={idx} className={`p-4 rounded-3xl border flex items-center justify-between ${
@@ -1782,7 +1890,7 @@ export default function BumBumCafeStockApp() {
           </div>
         )}
 
-        {/* D. INTERACTIVE REAL-TIME BARCODE SCANNER SIMULATOR (PACKED MATERIAL SPECIAL) */}
+        {/* D. INTERACTIVE REAL-TIME BARCODE SCANNER SIMULATOR (WITH DYNAMIC TARGET DIRECTION) */}
         {scannerActive && (
           <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[120] flex items-center justify-center p-4">
             <motion.div 
@@ -1807,7 +1915,6 @@ export default function BumBumCafeStockApp() {
                 </button>
               </div>
 
-              {/* Scanner Simulation Camera Grid UI */}
               <div className="h-44 w-full bg-black/50 border border-dashed border-[#FF6B00]/40 rounded-3xl relative flex items-center justify-center overflow-hidden">
                 <span className="absolute top-1/2 left-0 right-0 h-0.5 bg-red-500 animate-bounce" />
                 <span className="text-[10px] text-neutral-500 uppercase tracking-widest font-black z-10 animate-pulse">Scanning Camera Feed Simulator</span>
@@ -1841,11 +1948,11 @@ export default function BumBumCafeStockApp() {
                   <div className="p-4 bg-green-500/10 border border-green-500/20 rounded-2xl">
                     <p className="text-[8px] font-black text-green-500 uppercase tracking-widest">Matched Material Detected</p>
                     <p className="text-sm font-black mt-1 text-white">{scannedProductDetected.name}</p>
-                    <p className="text-[10px] text-neutral-400 mt-0.5">Godown Stock: {scannedProductDetected.storeQty} {scannedProductDetected.unit}</p>
+                    <p className="text-[10px] text-neutral-400 mt-0.5">Stock Status: Godown ({scannedProductDetected.storeQty}) | Kitchen ({scannedProductDetected.cafeQty})</p>
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400">Enter Qty to ADD to Godown ({scannedProductDetected.unit})</label>
+                    <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400">Qty to Add ({scannedProductDetected.unit})</label>
                     <input 
                       type="number" 
                       placeholder="e.g. 100" 
@@ -1855,6 +1962,19 @@ export default function BumBumCafeStockApp() {
                       required
                       autoFocus
                     />
+                  </div>
+
+                  {/* DYNAMIC TARGET LOCATION INPUT WITHIN SCANNER OVERLAY */}
+                  <div className="space-y-1.5">
+                    <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400">Select Target Delivery Location</label>
+                    <select 
+                      value={scannedLocation}
+                      onChange={e => setScannedLocation(e.target.value as any)}
+                      className="w-full p-3 rounded-2xl bg-neutral-800 border border-neutral-700 text-white cursor-pointer font-bold"
+                    >
+                      <option value="Main Store">🏬 Main Godown (bulk store)</option>
+                      <option value="Cafe Kitchen">🍕 Cafe Kitchen (instant kitchen use)</option>
+                    </select>
                   </div>
 
                   <div className="flex gap-2">
@@ -1969,6 +2089,18 @@ export default function BumBumCafeStockApp() {
                     {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
                   </select>
                 </div>
+              </div>
+
+              <div className="space-y-1 text-xs">
+                <label className="font-black uppercase tracking-wider text-neutral-400 text-[8px]">Deliver Target Location</label>
+                <select 
+                  value={formStockIn.targetLocation}
+                  onChange={e => setFormStockIn({...formStockIn, targetLocation: e.target.value as any})}
+                  className="w-full p-3 rounded-xl border bg-orange-500/10 border-orange-500/20 text-[#FF6B00] font-black cursor-pointer"
+                >
+                  <option value="Main Store">🏬 Main Godown (bulk store)</option>
+                  <option value="Cafe Kitchen">🍕 Cafe Kitchen (instant use)</option>
+                </select>
               </div>
 
               <button type="submit" className="w-full p-3 bg-green-600 hover:bg-green-700 text-white rounded-2xl font-black text-xs uppercase tracking-wider shadow">
