@@ -827,6 +827,7 @@ export default function BumBumCafeStockApp() {
   // Simulated AI Bill Scanner Autocompletion
   const handleAIScanSimulation = () => {
     setIsAIScanningAnimation(true);
+  const [isAIScanningAnimation, setIsAIScanningAnimation] = useState<boolean>(false);
     triggerHaptic();
     
     setTimeout(() => {
