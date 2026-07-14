@@ -1,3 +1,5 @@
+
+
 'use client';
 
 import React, { useState, useMemo } from 'react';
@@ -39,7 +41,8 @@ import {
   Clock, 
   Info,
   ChevronRight,
-  Sparkles
+  Sparkles,
+  Edit
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -49,7 +52,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 interface InventoryItem {
   id: string;
   name: string;
-  category: "Raw Material" | "Packaging" | "Disposable" | "Beverages" | "Cleaning" | "Equipment" | "Dairy" | "Others";
+  category: string;
   storeQty: number;
   cafeQty: number;
   unit: string;
@@ -101,6 +104,13 @@ interface NotificationItem {
   time: string;
 }
 
+interface Supplier {
+  id: string;
+  name: string;
+  phone: string;
+  address: string;
+}
+
 // Helper function for Vibration
 const triggerHaptic = (ms = 35) => {
   if (typeof window !== 'undefined' && window.navigator && window.navigator.vibrate) {
@@ -139,6 +149,9 @@ const INITIAL_INVENTORY: InventoryItem[] = [
 export default function BumBumCafeStockApp() {
   // Global States
   const [inventory, setInventory] = useState<InventoryItem[]>(INITIAL_INVENTORY);
+  const [categories, setCategories] = useState<string[]>([
+    "Raw Material", "Packaging", "Disposable", "Beverages", "Dairy", "Cleaning", "Equipment", "Others"
+  ]);
   const [activeTab, setActiveTab] = useState<'home' | 'store' | 'cafe' | 'transfer' | 'more'>('home');
   const [currentView, setCurrentView] = useState<string>('dashboard');
   const [isAdmin, setIsAdmin] = useState<boolean>(true);
@@ -149,14 +162,23 @@ export default function BumBumCafeStockApp() {
   // Slide-out panels & Drawers
   const [showNotifications, setShowNotifications] = useState<boolean>(false);
   const [selectedItemDetail, setSelectedItemDetail] = useState<InventoryItem | null>(null);
-  const [, setScannerActive] = useState<boolean>(false);
-  const [, setScannerResult] = useState<string | null>(null);
+  const [scannerActive, setScannerActive] = useState<boolean>(false);
+  const [scannerManualBarcode, setScannerManualBarcode] = useState<string>("");
+  const [scannedProductDetected, setScannedProductAtDetected] = useState<InventoryItem | null>(null);
+  const [scannedAddQty, setScannedAddQty] = useState<string>("");
 
-  // Form Modals
+  // Form Modals & Managers
   const [showAddStockModal, setShowAddStockModal] = useState<boolean>(false);
   const [showStockOutModal, setShowStockOutModal] = useState<boolean>(false);
   const [showTransferModal, setShowTransferModal] = useState<boolean>(false);
   const [showAddSupplierModal, setShowAddSupplierModal] = useState<boolean>(false);
+  const [showCategoryManager, setShowCategoryManager] = useState<boolean>(false);
+  const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
+
+  // Dynamic Category Forms
+  const [categoryInput, setCategoryInput] = useState<string>("");
+  const [editingCategoryIndex, setEditingCategoryIndex] = useState<number | null>(null);
+  const [editingCategoryValue, setEditingCategoryValue] = useState<string>("");
 
   // Sub-data tracking for History logs
   const [transferHistory, setTransferHistory] = useState<TransferLog[]>([
@@ -172,8 +194,16 @@ export default function BumBumCafeStockApp() {
     { id: "so_2", itemName: "THUMSUP 750ML", qty: 2, purpose: "Damage", date: "2026-07-11", remarks: "Bottles leaked during dispatch handling" },
   ]);
 
-  const [suppliers, setSuppliers] = useState<string[]>([
-    "Rajesh Traders", "Soni Grocery Shop", "Om Super Market", "Sagar Distributors", "Sony Dairy", "Bharat Gas", "Narmada Packagings", "Prabhat Polymer", "Coca-Cola Agency"
+  const [suppliers, setSuppliers] = useState<Supplier[]>([
+    { id: "sup_1", name: "Rajesh Traders", phone: "9876543210", address: "Anand Godown Area" },
+    { id: "sup_2", name: "Soni Grocery Shop", phone: "9123456780", address: "Station Road, Anand" },
+    { id: "sup_3", name: "Om Super Market", phone: "9012345678", address: "Cafe Market Street" },
+    { id: "sup_4", name: "Sagar Distributors", phone: "9812736450", address: "GIDC Industrial Estate" },
+    { id: "sup_5", name: "Sony Dairy", phone: "9900112233", address: "Amul Dairy Road" },
+    { id: "sup_6", name: "Bharat Gas", phone: "9426055112", address: "Bharat Terminal" },
+    { id: "sup_7", name: "Narmada Packagings", phone: "7014529683", address: "Vapi GIDC" },
+    { id: "sup_8", name: "Prabhat Polymer", phone: "8989525201", address: "Nadiad Bypass" },
+    { id: "sup_9", name: "Coca-Cola Agency", phone: "9515253545", address: "Baroda Highway" }
   ]);
 
   // Form Inputs States
@@ -260,24 +290,174 @@ export default function BumBumCafeStockApp() {
     });
   }, [inventory, searchQuery, selectedCategory]);
 
-  // Barcode Scanning Simulator
-  const handleScanSimulation = () => {
-    setScannerActive(true);
-    setScannerResult(null);
-    setTimeout(() => {
-      const randomProduct = inventory[Math.floor(Math.random() * inventory.length)];
-      setScannerResult(randomProduct.name);
-      setScannerActive(false);
-      setSelectedItemDetail(randomProduct);
-      toastMessage(`Scanned: ${randomProduct.name} successfully!`, "success");
-    }, 2500);
-  };
-
-  // Toast System
+  // Toast System State
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "info" } | null>(null);
   const toastMessage = (message: string, type: "success" | "error" | "info" = "success") => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3000);
+  };
+
+  // Barcode Scan Simulator with Match Logic
+  const handleBarcodeManualScan = (e: React.FormEvent) => {
+    e.preventDefault();
+    triggerHaptic();
+
+    if (!scannerManualBarcode.trim()) {
+      toastMessage("कृपया सही बारकोड दर्ज करें!", "error");
+      return;
+    }
+
+    const matchedProduct = inventory.find(
+      item => item.barcode === scannerManualBarcode.trim()
+    );
+
+    if (matchedProduct) {
+      setScannedProductAtDetected(matchedProduct);
+      toastMessage(`Material Found: ${matchedProduct.name}`, "success");
+    } else {
+      toastMessage("सामग्री नहीं मिली! कृपया बारकोड जांचें।", "error");
+    }
+  };
+
+  const handleSaveScannedStock = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!scannedProductDetected || !scannedAddQty) return;
+
+    const qtyVal = parseFloat(scannedAddQty);
+    if (isNaN(qtyVal) || qtyVal <= 0) {
+      toastMessage("कृपया सही संख्या दर्ज करें!", "error");
+      return;
+    }
+
+    setInventory(prev => 
+      prev.map(item => item.id === scannedProductDetected.id 
+        ? { ...item, storeQty: item.storeQty + qtyVal, lastPurchaseDate: new Date().toISOString().split('T')[0] } 
+        : item
+      )
+    );
+
+    // Save purchase history audit
+    const newPurchase: PurchaseLog = {
+      id: `p_${Date.now()}`,
+      itemName: scannedProductDetected.name,
+      qty: qtyVal,
+      unit: scannedProductDetected.unit,
+      price: scannedProductDetected.purchasePrice,
+      supplier: scannedProductDetected.supplier,
+      date: new Date().toISOString().split('T')[0],
+      invoiceNo: `SCANNED-REFILL-${Math.floor(Math.random() * 9000 + 1000)}`
+    };
+    setPurchaseHistory(prev => [newPurchase, ...prev]);
+
+    toastMessage(`${qtyVal} ${scannedProductDetected.unit} of ${scannedProductDetected.name} Added!`);
+    setScannerActive(false);
+    setScannedProductAtDetected(null);
+    setScannedAddQty("");
+    setScannerManualBarcode("");
+  };
+
+  // Supplier Add & Delete
+  const handleSupplierAdd = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formSupplier.name.trim()) return;
+
+    const newSupplier: Supplier = {
+      id: `sup_${Date.now()}`,
+      name: formSupplier.name.trim(),
+      phone: formSupplier.phone.trim() || "N/A",
+      address: formSupplier.address.trim() || "N/A"
+    };
+
+    setSuppliers(prev => [...prev, newSupplier]);
+    toastMessage("Merchant Registered!");
+    setShowAddSupplierModal(false);
+    setFormSupplier({ name: '', phone: '', address: '' });
+  };
+
+  const handleSupplierDelete = (id: string, name: string) => {
+    triggerHaptic(50);
+    const confirm = window.confirm(`क्या आप सप्लायर "${name}" को डिलीट करना चाहते हैं?`);
+    if (!confirm) return;
+
+    setSuppliers(prev => prev.filter(s => s.id !== id));
+    toastMessage("Supplier Removed Successfully!");
+  };
+
+  // Item Delete
+  const handleItemDelete = (id: string, name: string) => {
+    triggerHaptic(50);
+    const confirm = window.confirm(`क्या आप आइटम "${name}" को हमेशा के लिए डिलीट करना चाहते हैं?`);
+    if (!confirm) return;
+
+    setInventory(prev => prev.filter(item => item.id !== id));
+    setSelectedItemDetail(null);
+    toastMessage("Item Removed Successfully!");
+  };
+
+  // Item Edit Submit
+  const handleEditItemSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingItem) return;
+
+    setInventory(prev => 
+      prev.map(item => item.id === editingItem.id ? editingItem : item)
+    );
+
+    toastMessage("आइटम विवरण संशोधित किया गया!");
+    setEditingItem(null);
+    setSelectedItemDetail(null);
+  };
+
+  // Category Manager Add/Edit/Delete Actions
+  const handleCategoryAdd = (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanCat = categoryInput.trim();
+    if (!cleanCat) return;
+
+    if (categories.includes(cleanCat)) {
+      toastMessage("यह श्रेणी पहले से मौजूद है!", "error");
+      return;
+    }
+
+    setCategories(prev => [...prev, cleanCat]);
+    setCategoryInput("");
+    toastMessage(`श्रेणी "${cleanCat}" जोड़ी गई!`);
+  };
+
+  const handleCategoryEditSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (editingCategoryIndex === null || !editingCategoryValue.trim()) return;
+
+    const oldName = categories[editingCategoryIndex];
+    const newName = editingCategoryValue.trim();
+
+    if (categories.includes(newName) && oldName !== newName) {
+      toastMessage("यह श्रेणी पहले से मौजूद है!", "error");
+      return;
+    }
+
+    // Cascade category rename to existing inventory items
+    setCategories(prev => prev.map((cat, idx) => idx === editingCategoryIndex ? newName : cat));
+    setInventory(prev => 
+      prev.map(item => item.category === oldName ? { ...item, category: newName } : item)
+    );
+
+    setEditingCategoryIndex(null);
+    setEditingCategoryValue("");
+    toastMessage("श्रेणी संशोधित की गई!");
+  };
+
+  const handleCategoryDelete = (catName: string) => {
+    triggerHaptic(50);
+    const confirm = window.confirm(`क्या आप श्रेणी "${catName}" को हटाना चाहते हैं? इस श्रेणी की सभी सामग्री "Others" श्रेणी में चली जाएगी।`);
+    if (!confirm) return;
+
+    setCategories(prev => prev.filter(c => c !== catName));
+    setInventory(prev => 
+      prev.map(item => item.category === catName ? { ...item, category: "Others" } : item)
+    );
+
+    toastMessage("श्रेणी हटा दी गई है।");
   };
 
   // Dynamic Stock-In handler (Increments Inventory)
@@ -304,7 +484,7 @@ export default function BumBumCafeStockApp() {
           {
             id: `item_${Date.now()}`,
             name: formStockIn.item.toUpperCase(),
-            category: formStockIn.category as any,
+            category: formStockIn.category,
             storeQty: qtyNum,
             cafeQty: 0,
             unit: formStockIn.unit,
@@ -504,12 +684,12 @@ export default function BumBumCafeStockApp() {
               }`}
             >
               <UserCheck size={11} />
-              <span>{isAdmin ? 'Admin Mode' : 'Helper Mode'}</span>
+              <span>{isAdmin ? 'Admin' : 'Helper'}</span>
             </button>
 
-            {/* Quick Scanner Icon */}
+            {/* Barcode Scanner overlay trigger */}
             <button 
-              onClick={handleScanSimulation}
+              onClick={() => setScannerActive(true)}
               className="p-2.5 bg-[#FF6B00]/5 border border-[#FF6B00]/20 hover:bg-[#FF6B00]/10 rounded-xl text-[#FF6B00] transition-all"
               title="Simulator QR Scanner"
             >
@@ -670,18 +850,30 @@ export default function BumBumCafeStockApp() {
                 <h2 className="text-base font-black uppercase tracking-widest text-neutral-400">Main Store Godown</h2>
                 <p className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider">Bulk inventory control system</p>
               </div>
-              <button 
-                onClick={() => setShowAddStockModal(true)}
-                className="px-4 py-2 bg-[#FF6B00] hover:bg-orange-600 text-white font-black text-xs uppercase tracking-wider rounded-2xl flex items-center gap-1.5 shadow"
-              >
-                <Plus size={14} />
-                <span>Add Item</span>
-              </button>
+              {isAdmin && (
+                <button 
+                  onClick={() => setShowAddStockModal(true)}
+                  className="px-4 py-2 bg-[#FF6B00] hover:bg-orange-600 text-white font-black text-xs uppercase tracking-wider rounded-2xl flex items-center gap-1.5 shadow"
+                >
+                  <Plus size={14} />
+                  <span>Add Item</span>
+                </button>
+              )}
             </div>
 
             {/* CATEGORY FILTER SWITCHES */}
             <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
-              {["All", "Raw Material", "Packaging", "Disposable", "Beverages", "Dairy", "Others"].map(cat => (
+              <button
+                onClick={() => setSelectedCategory("All")}
+                className={`px-3.5 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider border whitespace-nowrap transition-all ${
+                  selectedCategory === "All" 
+                    ? 'bg-orange-500 border-orange-500 text-white shadow-md' 
+                    : isDarkMode ? 'bg-neutral-900 border-neutral-800 text-neutral-400' : 'bg-white border-neutral-200 text-neutral-600'
+                }`}
+              >
+                All
+              </button>
+              {categories.map(cat => (
                 <button
                   key={cat}
                   onClick={() => setSelectedCategory(cat)}
@@ -718,6 +910,7 @@ export default function BumBumCafeStockApp() {
                           )}
                         </div>
                         <p className="text-[9px] text-neutral-400 font-bold uppercase tracking-wider">{item.category} • {item.supplier}</p>
+                        {item.barcode && <p className="text-[8px] text-neutral-400 tracking-wider">Barcode: {item.barcode}</p>}
                       </div>
 
                       <div className="text-right">
@@ -755,7 +948,7 @@ export default function BumBumCafeStockApp() {
                           onClick={() => setSelectedItemDetail(item)}
                           className="px-3 py-1.5 bg-neutral-100 dark:bg-neutral-800 text-neutral-400 rounded-xl hover:bg-neutral-200 transition-all"
                         >
-                          <span>History</span>
+                          <span>Manage</span>
                         </button>
                       </div>
                     </div>
@@ -912,14 +1105,21 @@ export default function BumBumCafeStockApp() {
                   {[
                     { id: 'stock_in', label: "Purchase / Stock In", desc: "Log invoices and stock incoming goods", icon: <PlusCircle size={16} /> },
                     { id: 'stock_out_logs', label: "Stock Out Logs", desc: "View wastage, damage, and staff use logs", icon: <MinusCircle size={16} /> },
+                    { id: 'categories_manager', label: "Manage Categories", desc: "Add, Edit or Remove raw material categories", icon: <Layers size={16} /> },
                     { id: 'reports_list', label: "Reports & Analytics", desc: "Download simulated Excel & PDF stock sheets", icon: <BarChart3 size={16} /> },
-                    { id: 'suppliers_list', label: "Manage Suppliers", desc: "Configure and map supplier contacts", icon: <Truck size={16} /> },
+                    { id: 'suppliers_list', label: "Manage Suppliers", desc: "Add, configure, and delete supplier partners", icon: <Truck size={16} /> },
                     { id: 'users_roles', label: "Users & Roles", desc: "Change authorizations (Admin / Helper)", icon: <Users size={16} /> },
                     { id: 'app_settings', label: "App Settings", desc: "Theme control, auto-sync, database options", icon: <Settings size={16} /> },
                   ].map(option => (
                     <div 
                       key={option.id}
-                      onClick={() => setCurrentView(option.id)}
+                      onClick={() => {
+                        if (option.id === 'categories_manager') {
+                          setShowCategoryManager(true);
+                        } else {
+                          setCurrentView(option.id);
+                        }
+                      }}
                       className={`p-4 rounded-3xl border cursor-pointer hover:border-orange-500 flex items-center justify-between transition-all ${
                         isDarkMode ? 'bg-[#1A1A1A] border-neutral-800' : 'bg-white border-neutral-100'
                       }`}
@@ -942,7 +1142,7 @@ export default function BumBumCafeStockApp() {
             {currentView === 'stock_in' && (
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-xs font-black uppercase tracking-widest text-neutral-400">Purchase Log / Stock In</h3>
+                  <h3 className="text-xs font-black uppercase tracking-widest text-neutral-400 font-sans">Purchase Log / Stock In</h3>
                   <button onClick={() => setCurrentView('more_home')} className="text-xs text-orange-500 font-bold uppercase tracking-wider">Back</button>
                 </div>
 
@@ -967,7 +1167,7 @@ export default function BumBumCafeStockApp() {
                         className="w-full p-3 rounded-2xl border dark:bg-neutral-800 dark:border-neutral-700"
                       >
                         <option value="">Select Supplier</option>
-                        {suppliers.map(s => <option key={s} value={s}>{s}</option>)}
+                        {suppliers.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
                       </select>
                     </div>
                     <div className="space-y-1">
@@ -1023,16 +1223,13 @@ export default function BumBumCafeStockApp() {
                       />
                     </div>
                     <div className="space-y-1">
-                      <label className="font-black uppercase tracking-wider text-neutral-400 text-[9px]">GST (%)</label>
+                      <label className="font-black uppercase tracking-wider text-neutral-400 text-[9px]">Category</label>
                       <select 
-                        value={formStockIn.gst}
-                        onChange={e => setFormStockIn({...formStockIn, gst: e.target.value})}
+                        value={formStockIn.category}
+                        onChange={e => setFormStockIn({...formStockIn, category: e.target.value})}
                         className="w-full p-3 rounded-2xl border dark:bg-neutral-800"
                       >
-                        <option value="0">0%</option>
-                        <option value="5">5%</option>
-                        <option value="12">12%</option>
-                        <option value="18">18%</option>
+                        {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
                       </select>
                     </div>
                   </div>
@@ -1051,7 +1248,7 @@ export default function BumBumCafeStockApp() {
                         <span className="font-bold">{log.itemName}</span>
                         <span className="text-green-500 font-bold">₹{log.price * log.qty}</span>
                       </div>
-                      <p className="text-[9px] text-neutral-400 uppercase">Qty: {log.qty} {log.unit} • Inv: {log.invoiceNo} • {log.date}</p>
+                      <p className="text-[9px] text-neutral-400 uppercase font-sans">Qty: {log.qty} {log.unit} • Inv: {log.invoiceNo} • {log.date}</p>
                     </div>
                   ))}
                 </div>
@@ -1136,7 +1333,7 @@ export default function BumBumCafeStockApp() {
               </div>
             )}
 
-            {/* D. MANAGE SUPPLIERS */}
+            {/* D. MANAGE SUPPLIERS WITH DELETE ACCORDION */}
             {currentView === 'suppliers_list' && (
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
@@ -1146,21 +1343,27 @@ export default function BumBumCafeStockApp() {
 
                 <button 
                   onClick={() => setShowAddSupplierModal(true)}
-                  className="w-full p-3 bg-orange-500 hover:bg-orange-600 text-white rounded-2xl font-black text-xs uppercase tracking-wider flex items-center justify-center gap-1.5 shadow"
+                  className="w-full p-3 bg-[#FF6B00] hover:bg-orange-600 text-white rounded-2xl font-black text-xs uppercase tracking-wider flex items-center justify-center gap-1.5 shadow"
                 >
                   <Plus size={14} /> Add New Supplier
                 </button>
 
-                <div className="grid grid-cols-1 gap-2 text-xs">
-                  {suppliers.map((s, idx) => (
-                    <div key={idx} className={`p-4 rounded-3xl border flex items-center justify-between ${
+                <div className="grid grid-cols-1 gap-2.5 text-xs">
+                  {suppliers.map((s) => (
+                    <div key={s.id} className={`p-4 rounded-3xl border flex items-center justify-between ${
                       isDarkMode ? 'bg-[#1A1A1A] border-neutral-800' : 'bg-white border-neutral-100'
                     }`}>
                       <div>
-                        <p className="font-bold text-[#FF6B00]">{s}</p>
-                        <p className="text-[9px] text-neutral-400 uppercase tracking-widest mt-0.5">Verified Merchant Partner</p>
+                        <p className="font-black text-[#FF6B00] text-sm">{s.name}</p>
+                        <p className="text-[9px] text-neutral-400 uppercase tracking-widest mt-0.5">📞 {s.phone} • 📍 {s.address}</p>
                       </div>
-                      <ChevronRight size={14} className="text-neutral-400" />
+                      <button 
+                        onClick={() => handleSupplierDelete(s.id, s.name)}
+                        className="p-2 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white rounded-xl transition-all"
+                        title="Delete Supplier"
+                      >
+                        <Trash2 size={13} />
+                      </button>
                     </div>
                   ))}
                 </div>
@@ -1208,7 +1411,7 @@ export default function BumBumCafeStockApp() {
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <h3 className="text-xs font-black uppercase tracking-widest text-neutral-400">Application Configuration</h3>
-                  <button onClick={() => setCurrentView('more_home')} className="text-xs text-orange-500 font-bold uppercase tracking-wider">Back</button>
+                  <button onClick={() => setCurrentView('more_home')} className="text-xs text-[#FF6B00] font-bold uppercase tracking-wider">Back</button>
                 </div>
 
                 <div className={`p-5 rounded-3xl border space-y-4 text-xs ${isDarkMode ? 'bg-[#1A1A1A] border-neutral-800' : 'bg-white border-neutral-100'}`}>
@@ -1247,11 +1450,11 @@ export default function BumBumCafeStockApp() {
       </main>
 
       {/* ==========================================
-          8. DETAILED COMPREHENSIVE FLOATING DRAWERS
+          8. DETAILED COMPREHENSIVE FLOATING DRAWERS & MODALS
           ========================================== */}
       <AnimatePresence>
         
-        {/* A. PRODUCT ITEM SPECIFIC TIMELINE DETAILS */}
+        {/* A. PRODUCT ITEM SPECIFIC DETAILED DRAWER (WITH ITEM DELETE / EDIT INSIDE) */}
         {selectedItemDetail && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[99] flex items-end justify-center">
             <motion.div 
@@ -1269,12 +1472,28 @@ export default function BumBumCafeStockApp() {
                   <h3 className="text-lg font-black">{selectedItemDetail.name}</h3>
                   <p className="text-neutral-400 text-xs mt-0.5">{selectedItemDetail.category} • Barcode: {selectedItemDetail.barcode || 'N/A'}</p>
                 </div>
-                <button 
-                  onClick={() => setSelectedItemDetail(null)}
-                  className="p-2.5 bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-700 text-neutral-400 rounded-xl"
-                >
-                  <X size={15} />
-                </button>
+                <div className="flex gap-2">
+                  <button 
+                    onClick={() => setEditingItem(selectedItemDetail)}
+                    className="p-2.5 bg-blue-500/10 hover:bg-blue-500 text-blue-500 hover:text-white rounded-xl transition-all"
+                    title="Edit Item"
+                  >
+                    <Edit size={14} />
+                  </button>
+                  <button 
+                    onClick={() => handleItemDelete(selectedItemDetail.id, selectedItemDetail.name)}
+                    className="p-2.5 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white rounded-xl transition-all"
+                    title="Delete Item"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                  <button 
+                    onClick={() => setSelectedItemDetail(null)}
+                    className="p-2.5 bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-700 text-neutral-400 rounded-xl"
+                  >
+                    <X size={15} />
+                  </button>
+                </div>
               </div>
 
               {/* Dynamic Qty Spread HUD */}
@@ -1289,7 +1508,7 @@ export default function BumBumCafeStockApp() {
                 </div>
               </div>
 
-              {/* simulated purchase timeline */}
+              {/* Simulated Purchase Timeline */}
               <div className="space-y-2.5">
                 <h4 className="text-[10px] font-black uppercase tracking-widest text-neutral-400 font-sans">Activity & Delivery Audit</h4>
                 <div className="space-y-2">
@@ -1338,7 +1557,271 @@ export default function BumBumCafeStockApp() {
           </div>
         )}
 
-        {/* B. NOTIFICATIONS HUD PANEL */}
+        {/* B. ITEM EDIT MASTER OVERLAY */}
+        {editingItem && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[110] flex items-center justify-center p-4">
+            <motion.form 
+              onSubmit={handleEditItemSubmit}
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className={`w-full max-w-sm rounded-[2rem] p-6 space-y-4 border ${
+                isDarkMode ? 'bg-[#0F0F0F] border-neutral-800 text-white' : 'bg-white border-neutral-100 text-neutral-900'
+              }`}
+            >
+              <div className="flex justify-between items-center">
+                <h3 className="text-xs font-black uppercase tracking-widest text-[#FF6B00]">Edit Stock Item Details</h3>
+                <button type="button" onClick={() => setEditingItem(null)} className="p-2.5 bg-neutral-100 dark:bg-neutral-800 rounded-xl"><X size={14} /></button>
+              </div>
+
+              <div className="space-y-1.5 text-xs">
+                <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400">Item Name</label>
+                <input 
+                  type="text" 
+                  value={editingItem.name} 
+                  onChange={e => setEditingItem({...editingItem, name: e.target.value.toUpperCase()})}
+                  className="w-full p-2.5 rounded-xl border dark:bg-neutral-800"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="space-y-1.5">
+                  <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400">Category</label>
+                  <select 
+                    value={editingItem.category} 
+                    onChange={e => setEditingItem({...editingItem, category: e.target.value})}
+                    className="w-full p-2.5 rounded-xl border dark:bg-neutral-800"
+                  >
+                    {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400">Purchase Price</label>
+                  <input 
+                    type="number" 
+                    value={editingItem.purchasePrice} 
+                    onChange={e => setEditingItem({...editingItem, purchasePrice: parseFloat(e.target.value)})}
+                    className="w-full p-2.5 rounded-xl border dark:bg-neutral-800"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="space-y-1.5">
+                  <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400">Min Stock Limit</label>
+                  <input 
+                    type="number" 
+                    value={editingItem.minLimit} 
+                    onChange={e => setEditingItem({...editingItem, minLimit: parseInt(e.target.value)})}
+                    className="w-full p-2.5 rounded-xl border dark:bg-neutral-800"
+                    required
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400">Barcode</label>
+                  <input 
+                    type="text" 
+                    value={editingItem.barcode || ""} 
+                    onChange={e => setEditingItem({...editingItem, barcode: e.target.value})}
+                    className="w-full p-2.5 rounded-xl border dark:bg-neutral-800"
+                    placeholder="Barcode Number"
+                  />
+                </div>
+              </div>
+
+              <button type="submit" className="w-full p-3 bg-blue-600 text-white font-black text-xs uppercase tracking-wider rounded-2xl shadow">
+                Save Changes ➔
+              </button>
+            </motion.form>
+          </div>
+        )}
+
+        {/* C. INTERACTIVE REAL-TIME BARCODE SCANNER SIMULATOR (PACKED MATERIAL SPECIAL) */}
+        {scannerActive && (
+          <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[120] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ scale: 0.9 }}
+              animate={{ scale: 1 }}
+              exit={{ scale: 0.9 }}
+              className="w-full max-w-sm bg-neutral-900 border border-neutral-800 rounded-[2rem] p-6 text-white space-y-5 text-center relative overflow-hidden"
+            >
+              <div className="flex justify-between items-center border-b border-neutral-800 pb-3">
+                <p className="text-xs font-black uppercase tracking-widest text-[#FF6B00] flex items-center gap-1.5">
+                  <QrCode size={16} /> Packed Material Scanner
+                </p>
+                <button 
+                  onClick={() => {
+                    setScannerActive(false);
+                    setScannedProductAtDetected(null);
+                    setScannerManualBarcode("");
+                  }} 
+                  className="p-1.5 bg-neutral-800 rounded-xl"
+                >
+                  <X size={15} />
+                </button>
+              </div>
+
+              {/* Scanner Simulation Camera Grid UI */}
+              <div className="h-44 w-full bg-black/50 border border-dashed border-[#FF6B00]/40 rounded-3xl relative flex items-center justify-center overflow-hidden">
+                <span className="absolute top-1/2 left-0 right-0 h-0.5 bg-red-500 animate-bounce" />
+                <span className="text-[10px] text-neutral-500 uppercase tracking-widest font-black z-10 animate-pulse">Scanning Camera Feed Simulator</span>
+              </div>
+
+              {!scannedProductDetected ? (
+                <form onSubmit={handleBarcodeManualScan} className="space-y-4 text-xs text-left">
+                  <div className="space-y-1.5">
+                    <label className="text-[8px] font-black uppercase tracking-wider text-neutral-500">Simulate Scan (Select Packed Material Barcode)</label>
+                    <select 
+                      onChange={e => setScannerManualBarcode(e.target.value)}
+                      value={scannerManualBarcode}
+                      className="w-full p-3 rounded-2xl bg-neutral-800 border border-neutral-700 text-white cursor-pointer"
+                    >
+                      <option value="">-- Choose Barcode --</option>
+                      {inventory.map(i => (
+                        <option key={i.id} value={i.barcode}>{i.name} (Barcode: {i.barcode || "N/A"})</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <button 
+                    type="submit" 
+                    className="w-full p-3.5 bg-orange-600 hover:bg-orange-700 text-white rounded-2xl font-black uppercase tracking-wider"
+                  >
+                    Run Barcode Scan Simulator ➔
+                  </button>
+                </form>
+              ) : (
+                <form onSubmit={handleSaveScannedStock} className="space-y-4 text-xs text-left">
+                  <div className="p-4 bg-green-500/10 border border-green-500/20 rounded-2xl">
+                    <p className="text-[8px] font-black text-green-500 uppercase tracking-widest">Matched Material Detected</p>
+                    <p className="text-sm font-black mt-1 text-white">{scannedProductDetected.name}</p>
+                    <p className="text-[10px] text-neutral-400 mt-0.5">Godown Stock: {scannedProductDetected.storeQty} {scannedProductDetected.unit}</p>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400">Enter Qty to ADD to Godown ({scannedProductDetected.unit})</label>
+                    <input 
+                      type="number" 
+                      placeholder="e.g. 100" 
+                      value={scannedAddQty} 
+                      onChange={e => setScannedAddQty(e.target.value)} 
+                      className="w-full p-3.5 bg-neutral-800 border border-neutral-700 rounded-2xl text-white font-bold"
+                      required
+                      autoFocus
+                    />
+                  </div>
+
+                  <div className="flex gap-2">
+                    <button 
+                      type="submit" 
+                      className="flex-1 p-3.5 bg-green-600 hover:bg-green-700 text-white rounded-2xl font-black uppercase tracking-wider"
+                    >
+                      Add Stock ➔
+                    </button>
+                    <button 
+                      type="button" 
+                      onClick={() => setScannedProductAtDetected(null)} 
+                      className="flex-1 p-3.5 bg-neutral-800 text-neutral-400 rounded-2xl font-black uppercase tracking-wider"
+                    >
+                      Scan Again
+                    </button>
+                  </div>
+                </form>
+              )}
+            </motion.div>
+          </div>
+        )}
+
+        {/* D. RAW MATERIAL CATEGORIES MANAGER DYNAMIC POPUP (ADD, REMOVE, EDIT) */}
+        {showCategoryManager && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[110] flex items-end justify-center">
+            <motion.div 
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              className={`w-full max-w-md rounded-t-[2.5rem] p-6 space-y-4 border-t ${
+                isDarkMode ? 'bg-[#0F0F0F] border-neutral-800 text-white' : 'bg-white border-neutral-200 text-neutral-900'
+              }`}
+            >
+              <div className="flex justify-between items-center">
+                <div>
+                  <h3 className="text-xs font-black uppercase tracking-widest text-[#FF6B00]">Category Configuration Hub</h3>
+                  <p className="text-[8px] text-neutral-400 font-bold uppercase tracking-wider">Configure dynamic item classifications</p>
+                </div>
+                <button 
+                  onClick={() => {
+                    setShowCategoryManager(false);
+                    setEditingCategoryIndex(null);
+                  }} 
+                  className="p-2 bg-neutral-100 dark:bg-neutral-800 rounded-xl"
+                >
+                  <X size={15} />
+                </button>
+              </div>
+
+              {/* Add Category Form */}
+              <form onSubmit={handleCategoryAdd} className="flex gap-2 text-xs">
+                <input 
+                  type="text" 
+                  placeholder="New category name (e.g. Dry Fruits)" 
+                  value={categoryInput}
+                  onChange={e => setCategoryInput(e.target.value)}
+                  className="flex-1 p-3 rounded-2xl border dark:bg-neutral-800"
+                  required
+                />
+                <button type="submit" className="px-5 py-3 bg-[#FF6B00] text-white rounded-2xl font-black uppercase">Add</button>
+              </form>
+
+              {/* Edit Category Mode Form */}
+              {editingCategoryIndex !== null && (
+                <form onSubmit={handleCategoryEditSubmit} className="flex gap-2 text-xs p-3.5 bg-yellow-500/10 border border-yellow-500/20 rounded-2xl">
+                  <input 
+                    type="text" 
+                    placeholder="Edit category name..." 
+                    value={editingCategoryValue}
+                    onChange={e => setEditingCategoryValue(e.target.value)}
+                    className="flex-1 p-2.5 rounded-xl border dark:bg-neutral-800"
+                    required
+                  />
+                  <button type="submit" className="px-4 py-2 bg-green-600 text-white rounded-xl font-bold uppercase">Update</button>
+                  <button type="button" onClick={() => setEditingCategoryIndex(null)} className="px-4 py-2 bg-neutral-200 dark:bg-neutral-800 text-neutral-400 rounded-xl">Cancel</button>
+                </form>
+              )}
+
+              {/* Category Grid List with Action Buttons */}
+              <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                {categories.map((cat, idx) => (
+                  <div key={idx} className="flex items-center justify-between p-3 rounded-2xl bg-neutral-50 dark:bg-neutral-800/50 text-xs">
+                    <span className="font-bold">{cat}</span>
+                    <div className="flex gap-2">
+                      <button 
+                        onClick={() => {
+                          setEditingCategoryIndex(idx);
+                          setEditingCategoryValue(cat);
+                        }}
+                        className="p-1.5 bg-blue-500/10 hover:bg-blue-500 text-blue-500 hover:text-white rounded-lg transition-all"
+                        title="Edit Category Name"
+                      >
+                        <Edit size={12} />
+                      </button>
+                      <button 
+                        onClick={() => handleCategoryDelete(cat)}
+                        className="p-1.5 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white rounded-lg transition-all"
+                        title="Delete Category"
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+          </div>
+        )}
+
+        {/* E. NOTIFICATIONS HUD PANEL */}
         {showNotifications && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[99] flex items-end justify-center">
             <motion.div 
@@ -1352,7 +1835,7 @@ export default function BumBumCafeStockApp() {
             >
               <div className="flex justify-between items-center">
                 <h3 className="text-xs font-black uppercase tracking-widest text-neutral-400">Urgent Notifications Panel</h3>
-                <button onClick={() => setShowNotifications(false)} className="text-xs text-orange-500 font-bold uppercase tracking-wider">Close</button>
+                <button onClick={() => setShowNotifications(false)} className="text-xs text-[#FF6B00] font-bold uppercase tracking-wider">Close</button>
               </div>
 
               <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
@@ -1376,7 +1859,7 @@ export default function BumBumCafeStockApp() {
           </div>
         )}
 
-        {/* C. MODAL FORM: STOCK IN / INCOMING */}
+        {/* F. MODAL FORM: STOCK IN / INCOMING */}
         {showAddStockModal && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[99] flex items-center justify-center p-4">
             <motion.form 
@@ -1413,7 +1896,7 @@ export default function BumBumCafeStockApp() {
                     className="w-full p-2.5 rounded-xl border dark:bg-neutral-800"
                   >
                     <option value="">Select Supplier</option>
-                    {suppliers.map(s => <option key={s} value={s}>{s}</option>)}
+                    {suppliers.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
                   </select>
                 </div>
               </div>
@@ -1445,16 +1928,28 @@ export default function BumBumCafeStockApp() {
                 </div>
               </div>
 
-              <div className="space-y-1 text-xs">
-                <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400">Purchase Price per Unit</label>
-                <input 
-                  type="number" 
-                  placeholder="e.g. 440"
-                  value={formStockIn.price}
-                  onChange={e => setFormStockIn({...formStockIn, price: e.target.value})}
-                  className="w-full p-2.5 rounded-xl border dark:bg-neutral-800" 
-                  required
-                />
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="space-y-1">
+                  <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400">Purchase Price</label>
+                  <input 
+                    type="number" 
+                    placeholder="e.g. 440"
+                    value={formStockIn.price}
+                    onChange={e => setFormStockIn({...formStockIn, price: e.target.value})}
+                    className="w-full p-2.5 rounded-xl border dark:bg-neutral-800" 
+                    required
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400">Category</label>
+                  <select 
+                    value={formStockIn.category}
+                    onChange={e => setFormStockIn({...formStockIn, category: e.target.value})}
+                    className="w-full p-2.5 rounded-xl border dark:bg-neutral-800"
+                  >
+                    {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                  </select>
+                </div>
               </div>
 
               <button type="submit" className="w-full p-3 bg-green-600 hover:bg-green-700 text-white rounded-2xl font-black text-xs uppercase tracking-wider shadow">
@@ -1464,7 +1959,7 @@ export default function BumBumCafeStockApp() {
           </div>
         )}
 
-        {/* D. MODAL FORM: STOCK OUT */}
+        {/* G. MODAL FORM: STOCK OUT */}
         {showStockOutModal && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[99] flex items-center justify-center p-4">
             <motion.form 
@@ -1540,7 +2035,7 @@ export default function BumBumCafeStockApp() {
           </div>
         )}
 
-        {/* E. MODAL FORM: STOCK TRANSFER */}
+        {/* H. MODAL FORM: STOCK TRANSFER */}
         {showTransferModal && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[99] flex items-center justify-center p-4">
             <motion.form 
@@ -1613,18 +2108,11 @@ export default function BumBumCafeStockApp() {
           </div>
         )}
 
-        {/* F. MODAL FORM: ADD SUPPLIER */}
+        {/* I. MODAL FORM: ADD SUPPLIER */}
         {showAddSupplierModal && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[99] flex items-center justify-center p-4">
             <motion.form 
-              onSubmit={(e) => {
-                e.preventDefault();
-                if (!formSupplier.name) return;
-                setSuppliers(prev => [...prev, formSupplier.name]);
-                toastMessage("Supplier registered successfully!");
-                setShowAddSupplierModal(false);
-                setFormSupplier({ name: '', phone: '', address: '' });
-              }}
+              onSubmit={handleSupplierAdd}
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
@@ -1647,6 +2135,29 @@ export default function BumBumCafeStockApp() {
                   className="w-full p-3 rounded-xl border dark:bg-neutral-800" 
                   required
                 />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="space-y-1">
+                  <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400">Phone</label>
+                  <input 
+                    type="text" 
+                    placeholder="98765xxxxx"
+                    value={formSupplier.phone}
+                    onChange={e => setFormSupplier({...formSupplier, phone: e.target.value})}
+                    className="w-full p-2.5 rounded-xl border dark:bg-neutral-800" 
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400">Address</label>
+                  <input 
+                    type="text" 
+                    placeholder="City / Area"
+                    value={formSupplier.address}
+                    onChange={e => setFormSupplier({...formSupplier, address: e.target.value})}
+                    className="w-full p-2.5 rounded-xl border dark:bg-neutral-800" 
+                  />
+                </div>
               </div>
 
               <button type="submit" className="w-full p-3 bg-orange-500 hover:bg-orange-600 text-white rounded-2xl font-black text-xs uppercase tracking-wider shadow">
