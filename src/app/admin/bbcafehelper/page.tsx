@@ -825,14 +825,17 @@ export default function BumBumCafeStockApp() {
   };
 
   // Simulated AI Bill Scanner Autocompletion
+  
+  const [isAIScanningAnimation, setIsAIScanningAnimation] = useState<boolean>(false);
   const handleAIScanSimulation = () => {
     setIsAIScanningAnimation(true);
+    
     triggerHaptic();
     
     setTimeout(() => {
       setIsAIScanningAnimation(false);
       setShowAIScanner(false);
-      const [isAIScanningAnimation, setIsAIScanningAnimation] = useState<boolean>(false);
+      
       
       // Auto-extract matching items from user's actual JAYANT SALES invoice
       const JAYANT_BILL_ITEMS = [
@@ -883,6 +886,7 @@ export default function BumBumCafeStockApp() {
       toastMessage("AI detected & loaded 5 items from JAYANT SALES invoice!", "success");
     }, 3500);
   };
+  
 
   return (
     <div className={`min-h-screen ${isDarkMode ? 'bg-[#0F0F0F] text-white' : 'bg-[#FAFAFA] text-neutral-900'} pb-24 font-sans relative transition-colors duration-300`}>
