@@ -1,5 +1,3 @@
-
-
 'use client';
 
 import React, { useState, useMemo } from 'react';
@@ -1687,7 +1685,7 @@ export default function BumBumCafeStockApp() {
 
               {/* Simulated Purchase Timeline */}
               <div className="space-y-2.5">
-                <h4 className="text-[10px] font-black uppercase tracking-widest text-neutral-400 font-sans">Activity & Delivery Audit</h4>
+                <h4 className="text-[10px] font-black uppercase tracking-widest text-neutral-400 font-sans font-sans">Activity & Delivery Audit</h4>
                 <div className="space-y-2">
                   <div className="flex items-center justify-between text-xs p-2.5 bg-neutral-50 dark:bg-neutral-800/50 rounded-xl">
                     <div className="flex items-center gap-2">
@@ -1906,7 +1904,7 @@ export default function BumBumCafeStockApp() {
               {!scannedProductDetected ? (
                 <form onSubmit={handleBarcodeManualScan} className="space-y-4 text-xs text-left">
                   <div className="space-y-1.5">
-                    <label className="text-[8px] font-black uppercase tracking-wider text-neutral-500">Simulate Scan (Select Packed Material Barcode)</label>
+                    <label className="text-[8px] font-black uppercase tracking-wider text-neutral-400">Simulate Scan (Select Packed Material Barcode)</label>
                     <select 
                       onChange={e => setScannerManualBarcode(e.target.value)}
                       value={scannerManualBarcode}
@@ -1968,7 +1966,7 @@ export default function BumBumCafeStockApp() {
                     </button>
                     <button 
                       type="button" 
-                      onClick={() => setScannedProductAtDetected(null)} 
+                      onClick={() => setScannedProductDetected(null)} 
                       className="flex-1 p-3.5 bg-neutral-800 text-neutral-400 rounded-2xl font-black uppercase tracking-wider"
                     >
                       Scan Again
@@ -1988,7 +1986,7 @@ export default function BumBumCafeStockApp() {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className={`w-full max-w-sm rounded-[2rem] p-6 space-y-4 border ${
+              className={`w-full max-sm rounded-[2rem] p-6 space-y-4 border ${
                 isDarkMode ? 'bg-[#0F0F0F] border-neutral-800 text-white' : 'bg-white border-neutral-100 text-neutral-900'
               }`}
             >
