@@ -676,29 +676,7 @@ export default function BumBumCafeStockApp() {
     setAuditPhysicalCount("");
   };
 
-  // Deep Freeze Temp Log handler
-  const handleAddTempLog = (e: React.FormEvent) => {
-    e.preventDefault();
-    triggerHaptic();
-    const tempVal = parseFloat(newTempInput);
-    if (isNaN(tempVal)) return;
-
-    const newLog: TemperatureLog = {
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      temp: tempVal,
-      by: "Admin"
-    };
-
-    setTodayTempLog(prev => [newLog, ...prev]);
-    setNewTempInput("");
-
-    if (tempVal > -15) {
-      toastMessage("⚠️ डीप फ्रीजर तापमान सामान्य से अधिक गर्म है!", "error");
-    } else {
-      toastMessage("तापमान रिकॉर्ड सुरक्षित किया गया।");
-    }
-  };
-
+  
   // Export CSV/Excel Function
   const triggerSimulationExport = (reportName: string) => {
     const headers = ["Item Name", "Category", "Quantity", "Unit", "Total Value (INR)", "Status"];
