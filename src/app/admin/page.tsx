@@ -2187,12 +2187,12 @@ Report generated automatically by Bum Bum Cafe POS.`
                   <div className="space-y-3 bg-[#111]/40 p-4 rounded-2xl border border-white/5">
                     <p className="text-[10px] text-orange-400 font-extrabold uppercase">Prices (Leave blank if unavailable):</p>
                     <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Small (₹)</label><input type="number" value={priceSmall} onChange={(e) => priceSmall(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-white text-xs font-bold" /></div>
-                      <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Medium (₹)</label><input type="number" value={priceMedium} onChange={(e) => priceMedium(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-white text-xs font-bold" /></div>
-                      <div className="space-y-1"><label className="text-xs font-bold text-gray-405 uppercase">Large (₹)</label><input type="number" value={priceLarge} onChange={(e) => priceLarge(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-white text-xs font-bold" /></div>
-                      <div className="space-y-1"><label className="text-xs font-bold text-gray-455 uppercase">Extra Large (₹)</label><input type="number" value={priceXL} onChange={(e) => priceXL(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-white text-xs font-bold" /></div>
+                      <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Small (₹)</label><input type="number" value={priceSmall} onChange={(e) => setPriceSmall(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-white text-xs font-bold" /></div>
+                      <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Medium (₹)</label><input type="number" value={priceMedium} onChange={(e) => setPriceMedium(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-white text-xs font-bold" /></div>
+                      <div className="space-y-1"><label className="text-xs font-bold text-gray-405 uppercase">Large (₹)</label><input type="number" value={priceLarge} onChange={(e) => setPriceLarge(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-white text-xs font-bold" /></div>
+                      <div className="space-y-1"><label className="text-xs font-bold text-gray-455 uppercase">Extra Large (₹)</label><input type="number" value={priceXL} onChange={(e) => setPriceXL(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-white text-xs font-bold" /></div>
                     </div>
-                  </div>
+                  </div>e
                 )}
 
                 <button type="submit" className="w-full bg-green-600 text-white p-4 rounded-xl font-black text-sm uppercase">Save Product</button>
