@@ -158,14 +158,10 @@ export default function KitchenDisplaySystem() {
   useEffect(() => {
     if (isLocked) return;
 
-    // ध्यान रखें: यहाँ अपनी Firebase Web Push (VAPID) Key डालें जिसे आपने सेटिंग से जनरेट किया था
+    // आपकी वास्तविक VAPID Key यहाँ बिना किसी जांच-कंडीशन के सेट कर दी गई है
     const MY_VAPID_KEY = "BCKwFGxjNPQdsUFLasSoQonNesm5nVYy9uoikufCIZCsCFqhJNUWDP9j1Cqujd8VzqwRKn8I3R3exxo85RtPEn0"; 
 
-    if (MY_VAPID_KEY !== "BCKwFGxjNPQdsUFLasSoQonNesm5nVYy9uoikufCIZCsCFqhJNUWDP9j1Cqujd8VzqwRKn8I3R3exxo85RtPEn0") {
-      requestKitchenPermission(MY_VAPID_KEY);
-    } else {
-      console.warn("कृपया kitchen/page.tsx में 'BCKwFGxjNPQdsUFLasSoQonNesm5nVYy9uoikufCIZCsCFqhJNUWDP9j1Cqujd8VzqwRKn8I3R3exxo85RtPEn0' को अपनी वास्तविक VAPID की से बदलें।");
-    }
+    requestKitchenPermission(MY_VAPID_KEY);
   }, [isLocked]);
 
   // LOGIN: Verifies Entered PIN against personal Cook account in Firestore
