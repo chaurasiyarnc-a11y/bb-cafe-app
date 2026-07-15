@@ -2,7 +2,8 @@ importScripts('https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js'
 importScripts('https://www.gstatic.com/firebasejs/9.22.1/firebase-messaging-compat.js');
 
 firebase.initializeApp({
-  apiKey: "AIzaSyDmKC0xHHlAu1z0KqzuujqWlFMRM8hhiVc", // आपकी बिल्कुल नई और साफ़ चाबी यहाँ सेट है
+  // आपकी पुरानी मूल चाबी यहाँ पूरी तरह से री-सेट कर दी गई है
+  apiKey: "AIzaSyCaVEwWnh7_-uDWcvOlFmfymy7kiSxbyMI", 
   authDomain: "gen-lang-client-0229168883.firebaseapp.com",
   projectId: "gen-lang-client-0229168883",
   storageBucket: "gen-lang-client-0229168883.firebasestorage.app",
