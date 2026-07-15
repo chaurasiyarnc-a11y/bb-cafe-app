@@ -113,6 +113,45 @@ export default function KitchenDisplaySystem() {
     return () => unsubStore();
   }, [isLocked]);
 
+  // --- SCREEN AWAKE / KEEP SCREEN ON LOGIC ---
+  useEffect(() => {
+    if (isLocked) return;
+
+    let wakeLock: any = null;
+
+    const requestWakeLock = async () => {
+      try {
+        if ('wakeLock' in navigator) {
+          wakeLock = await (navigator as any).wakeLock.request('screen');
+          console.log('KDS Screen Wake Lock Activated ☀️');
+        }
+      } catch (err: any) {
+        console.warn('Wake Lock request failed:', err.message);
+      }
+    };
+
+    // Trigger wake lock initially when KDS is unlocked
+    requestWakeLock();
+
+    // Re-acquire wake lock if the app goes to background and comes back to screen
+    const handleVisibilityChange = async () => {
+      if (wakeLock !== null && document.visibilityState === 'visible') {
+        await requestWakeLock();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      if (wakeLock) {
+        wakeLock.release().then(() => {
+          wakeLock = null;
+        });
+      }
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [isLocked]);
+
   // LOGIN: Verifies Entered PIN against personal Cook account in Firestore
   const handlePinSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
