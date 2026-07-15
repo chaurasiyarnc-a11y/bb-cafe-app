@@ -1,53 +1,73 @@
-importScripts('https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js');
-importScripts('https://www.gstatic.com/firebasejs/9.23.0/firebase-messaging-compat.js');
+import { doc, updateDoc, setDoc } from 'firebase/firestore';
+import { db } from './firebase';
 
-// आपकी फ़ायरबेस सेटिंग्स यहाँ पहले से सेट हैं
-firebase.initializeApp({
-  apiKey: "AIzaSyCaVEWwnh7_-uDWcvO1Fmfymy7kiSxbyMI",
-  authDomain: "gen-lang-client-0229168883.firebaseapp.com",
-  projectId: "gen-lang-client-0229168883",
-  storageBucket: "gen-lang-client-0229168883.firebasestorage.app",
-  messagingSenderId: "1051643029309",
-  appId: "1:1051643029309:web:3f5a9f9b7f981eaf814754",
-  measurementId: "G-LSFXBMDTR3"
-});
+/**
+ * 1. डिलीवरी बॉय के लिए
+ */
+export const requestNotificationPermission = async (deliveryBoyId: string, vapidKey: string) => {
+  try {
+    if (typeof window === 'undefined') return;
+    if (!('Notification' in window)) return;
 
-const messaging = firebase.messaging();
+    const permission = await Notification.requestPermission();
+    if (permission === 'granted') {
+      const { getMessaging, getToken } = await import('firebase/messaging');
+      const { default: app } = await import('./firebase');
+      
+      const messaging = getMessaging(app);
+      
+      // ✅ रोबस्ट PWA सुधार: सर्विस वर्कर को सीधे रजिस्टर करके getToken को पास करें
+      const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+      const currentToken = await getToken(messaging, { 
+        vapidKey,
+        serviceWorkerRegistration: registration
+      });
 
-// जब ऐप बैकग्राउंड में हो तब नोटिफिकेशन हैंडलर
-messaging.onBackgroundMessage((payload) => {
-  console.log('[BG sw.js] Message received: ', payload);
-  
-  const notificationTitle = payload.notification.title || 'नया आर्डर तैयार है! 🛵';
-  const notificationOptions = {
-    body: payload.notification.body || 'कृपया आर्डर विवरण की जांच करें और वितरण के लिए निकलें।',
-    icon: '/icon-192x192.png',
-    badge: '/icon-192x192.png',
-    vibrate: [200, 100, 200, 100, 200, 100, 200], // जेब में फोन वाइब्रेट करने के लिए
-    data: {
-      url: payload.data?.url || '/delivery' // क्लिक करने पर खुलने वाला पेज
+      if (currentToken) {
+        await updateDoc(doc(db, "staff_members", deliveryBoyId), {
+          fcmToken: currentToken
+        });
+        return currentToken;
+      }
     }
-  };
+  } catch (error) {
+    console.error('Delivery notification setup failed:', error);
+  }
+};
 
-  self.registration.showNotification(notificationTitle, notificationOptions);
-});
+/**
+ * 2. किचन (KDS) के लिए
+ */
+export const requestKitchenPermission = async (vapidKey: string) => {
+  try {
+    if (typeof window === 'undefined') return;
+    if (!('Notification' in window)) return;
 
-// नोटिफिकेशन क्लिक हैंडलर
-self.addEventListener('notificationclick', (event) => {
-  event.notification.close();
-  const targetUrl = event.notification.data?.url || '/';
-  
-  event.waitUntil(
-    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
-      for (var i = 0; i < windowClients.length; i++) {
-        var client = windowClients[i];
-        if (client.url.includes(targetUrl) && 'focus' in client) {
-          return client.focus();
-        }
+    const permission = await Notification.requestPermission();
+    if (permission === 'granted') {
+      const { getMessaging, getToken } = await import('firebase/messaging');
+      const { default: app } = await import('./firebase');
+      
+      const messaging = getMessaging(app);
+      
+      // ✅ रोबस्ट PWA सुधार: सर्विस वर्कर को सीधे रजिस्टर करके getToken को पास करें
+      const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+      const currentToken = await getToken(messaging, { 
+        vapidKey,
+        serviceWorkerRegistration: registration
+      });
+
+      if (currentToken) {
+        console.log('Kitchen FCM Token Generated:', currentToken);
+        
+        await setDoc(doc(db, "settings", "kds_token"), {
+          fcmToken: currentToken
+        }, { merge: true });
+        
+        return currentToken;
       }
-      if (clients.openWindow) {
-        return clients.openWindow(targetUrl);
-      }
-    })
-  );
-});
+    }
+  } catch (error) {
+    console.error('Kitchen notification permission failed:', error);
+  }
+};
