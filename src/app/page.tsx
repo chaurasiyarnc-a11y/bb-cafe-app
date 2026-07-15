@@ -1,5 +1,4 @@
 
-
 'use client';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { db } from '../lib/firebase'; 
@@ -1357,7 +1356,7 @@ export default function BbCafeHome() {
     });
 
     playSoundEffect('add');
-    toast.success("आपका कस्टमाइज़्ड पिज्जा कर्ट में जोड़ा गया! 🍕");
+    toast.success("का कस्टमाइज़्ड पिज्जा कर्ट में जोड़ा गया! 🍕");
 
     setDiyVegSelection({ onion: false, text: false, capsicum: false, corn: false });
     setDiyPremiumToppings({ black_olive: false, jalapeno: false, red_peprica: false, paneer: false, mushroom: false });
@@ -2026,7 +2025,7 @@ export default function BbCafeHome() {
                     {index === 6 && isInlineBannerEnabled && (
                       <div className="w-full h-36 rounded-2xl overflow-hidden relative border border-white/5 bg-white/[0.02] my-2">
                         {(banners.length === 0 || bannerError) ? (
-                          <div className="w-full h-full bg-gradient-to-r from-yellow-600/35 to-orange-850/35 flex flex-col justify-center p-5 space-y-1">
+                          <div className="w-full h-full bg-gradient-to-r from-yellow-600/35 to-orange-855/35 flex flex-col justify-center p-5 space-y-1">
                             <span className="text-[8px] font-black uppercase text-yellow-400 bg-yellow-500/10 border border-yellow-500/20 px-2 py-0.5 rounded-full w-max">
                               {isHindi ? "ताज़ा स्वाद" : "Fresh Taste"}
                             </span>
@@ -2134,7 +2133,7 @@ export default function BbCafeHome() {
           <div className="grid grid-cols-2 gap-3 text-center text-[10px] font-black uppercase">
             <div className="dark:bg-white/[0.02] bg-white border dark:border-white/5 border-gray-200 p-4 rounded-2xl flex flex-col items-center justify-center space-y-1 shadow-md shadow-gray-200/30 dark:shadow-none transition-colors duration-200">
               <Clock className="text-orange-500" size={16} />
-              <p className="dark:text-gray-400 text-gray-500 text-[8px]">{isHindi ? "खुलने का समय" : "Open Timing"}</p>
+              <p className="dark:text-gray-400 text-gray-505 text-[8px]">{isHindi ? "खुलने का समय" : "Open Timing"}</p>
               <p className="dark:text-white text-neutral-800 text-[9px]">
                 {isHindi ? storeTimingHindi : storeTimingEnglish}
               </p>
@@ -2142,12 +2141,12 @@ export default function BbCafeHome() {
             
             <a href="https://maps.app.goo.gl/8pj1Xby3bbMn5qxu5" target="_blank" rel="noreferrer" className="dark:bg-white/[0.02] bg-white border dark:border-white/5 border-gray-200 p-4 rounded-2xl flex flex-col items-center justify-center space-y-1 hover:border-orange-500/30 shadow-md shadow-gray-200/30 dark:shadow-none transition-all duration-200">
               <MapPin className="text-green-500 animate-bounce" size={16} />
-              <p className="dark:text-gray-400 text-gray-500 text-[8px]">{isHindi ? "हमारा पता" : "Our Location"}</p>
+              <p className="dark:text-gray-400 text-gray-505 text-[8px]">{isHindi ? "हमारा पता" : "Our Location"}</p>
               <p className="text-yellow-600 dark:text-yellow-400 text-[9px] underline">Google Map 🗺️</p>
             </a>
           </div>
 
-          <div className="text-center text-[9px] text-gray-500 font-bold tracking-widest pt-2">
+          <div className="text-center text-[9px] text-gray-550 font-bold tracking-widest pt-2">
             © 2026 BUM BUM CAFE - MOHANDRA. ALL RIGHTS RESERVED.
           </div>
         </footer>
@@ -2333,7 +2332,7 @@ export default function BbCafeHome() {
 
               <div className="space-y-3 text-left">
                 <div>
-                  <label className="text-[9px] font-black uppercase text-gray-500">{isHindi ? "आपका नाम" : "Your Name"}</label>
+                  <label className="text-[9px] font-black uppercase text-gray-500">{isHindi ? "क्या नाम" : "Your Name"}</label>
                   <input type="text" placeholder={isHindi ? "अपना नाम दर्ज करें..." : "Enter your name..."} value={reviewName} onChange={(e) => setReviewName(e.target.value)} required className="w-full dark:bg-white/5 bg-gray-50 border dark:border-white/10 border-gray-200 p-3 rounded-lg text-xs dark:text-white text-neutral-900 focus:border-orange-500 outline-none font-bold" />
                 </div>
                 <div>
@@ -2678,7 +2677,7 @@ export default function BbCafeHome() {
         )}
       </AnimatePresence>
 
-      {/* CART DRAWER MODAL (With buttery-smooth spring transition and backdrop fade) */}
+      {/* CART DRAWER MODAL */}
       <AnimatePresence>
         {isCartOpen && (
           <motion.div 
@@ -3100,7 +3099,7 @@ export default function BbCafeHome() {
                 <button 
                   type="button" 
                   onClick={() => { triggerHaptic(); setIsClaimModalOpen(false); setClaimUsername(""); }} 
-                  className="bg-white/5 text-gray-400 p-3 rounded-xl font-black text-xs uppercase"
+                  className="bg-white/5 text-gray-405 p-3 rounded-xl font-black text-xs uppercase"
                 >
                   Cancel
                 </button>
