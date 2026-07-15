@@ -536,7 +536,7 @@ export default function AdminDashboard() {
       setIsVerified(true);
       setUserRole('admin');
       toast.success("Welcome back, Boss!");
-    } else if (passcode === passcode === passcodes.managerPin) {
+    } else if (passcode === passcodes.managerPin) {
       sessionStorage.setItem('bb_cafe_admin_verified', 'true');
       sessionStorage.setItem('bb_cafe_admin_role', 'manager');
       setIsVerified(true);
