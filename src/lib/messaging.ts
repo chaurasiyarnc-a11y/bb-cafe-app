@@ -1,6 +1,9 @@
 import { doc, updateDoc, setDoc } from 'firebase/firestore';
 import { db } from './firebase';
 
+// आपकी असली Firebase VAPID Key को हमने यहाँ पक्का (Define) कर दिया है
+const MY_VAPID_KEY = "BCKwFGxjNPQdsUFLasSoQonNesm5nVYy9uoikufClZCsCFqhJNUWDP9j1Cqujd8VzqwRKn8I3R3exxo85RtPEn0";
+
 /**
  * 1. डिलीवरी बॉय के लिए
  */
@@ -19,8 +22,10 @@ export const requestNotificationPermission = async (deliveryBoyId: string, vapid
       
       const messaging = getMessaging(app);
       const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+      
+      // यहाँ हमने MY_VAPID_KEY का इस्तेमाल किया है
       const currentToken = await getToken(messaging, { 
-        vapidKey,
+        vapidKey: MY_VAPID_KEY,
         serviceWorkerRegistration: registration
       });
 
@@ -65,8 +70,10 @@ export const requestKitchenPermission = async (vapidKey: string) => {
 
       // 3. टोकन जनरेट करें
       alert("🔑 फ़ायरबेस से टोकन जनरेट कर रहे हैं...");
+      
+      // यहाँ हमने MY_VAPID_KEY का इस्तेमाल किया है ताकि गलत की पास होने पर भी एरर न आए
       const currentToken = await getToken(messaging, { 
-        vapidKey,
+        vapidKey: MY_VAPID_KEY,
         serviceWorkerRegistration: registration
       });
 
