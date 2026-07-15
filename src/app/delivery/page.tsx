@@ -4,6 +4,8 @@ import { db } from '../../lib/firebase';
 import { collection, onSnapshot, query, doc, updateDoc, orderBy, getDoc, getDocs, where } from 'firebase/firestore';
 import { Phone, MapPin, Check, Loader2, Lock, User, Clock, WifiOff, X, Navigation } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
+// नया इम्पोर्ट: नोटिफिकेशन हेल्पर फ़ाइल से जोड़ा गया है
+import { requestNotificationPermission } from '../../lib/messaging';
 
 export default function DeliveryDashboard() {
   const [orders, setOrders] = useState<any[]>([]);
@@ -67,6 +69,21 @@ export default function DeliveryDashboard() {
     return () => unsub();
   }, [isLocked]);
 
+  // --- नया: डिलीवरी बॉय नोटिफिकेशन परमिशन रजिस्टर (FCM) ---
+  useEffect(() => {
+    if (isLocked) return;
+
+    // आपकी वास्तविक VAPID Key यहाँ बिना किसी चेक-कंडीशन के सेट कर दी गई है
+    const MY_VAPID_KEY = "BCKwFGxjNPQdsUFLasSoQonNesm5nVYy9uoikufCIZCsCFqhJNUWDP9j1Cqujd8VzqwRKn8I3R3exxo85RtPEn0"; 
+    
+    // लोकल स्टोरेज से वर्तमान लॉगिन डिलीवरी बॉय की ID निकालें
+    const riderId = localStorage.getItem('bb_delivery_boy_id');
+    
+    if (riderId) {
+      requestNotificationPermission(riderId, MY_VAPID_KEY);
+    }
+  }, [isLocked]);
+
   // LOGIN: Verifies Entered PIN against personal Rider account in Firestore
   const handlePinSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -81,9 +98,14 @@ export default function DeliveryDashboard() {
       toast.dismiss(toastId);
       
       if (!snap.empty) {
-        const rider = snap.docs[0].data();
+        const riderDoc = snap.docs[0];
+        const rider = riderDoc.data();
+        
         localStorage.setItem('bb_delivery_verified', 'true');
         localStorage.setItem('bb_delivery_boy_name', rider.name);
+        // नया: डिलीवरी बॉय का यूनिक डॉक्युमेंट ID सेव करें ताकि टोकन सही प्रोफ़ाइल में अपडेट हो सके
+        localStorage.setItem('bb_delivery_boy_id', riderDoc.id); 
+        
         setIsLocked(false);
         toast.success(`Welcome back, ${rider.name}! Terminal Unlocked! 🛵`);
       } else {
@@ -199,6 +221,7 @@ export default function DeliveryDashboard() {
             onClick={() => {
               localStorage.removeItem('bb_delivery_verified');
               localStorage.removeItem('bb_delivery_boy_name');
+              localStorage.removeItem('bb_delivery_boy_id'); // नया: इसे भी साफ़ करें
               setIsLocked(true);
             }} 
             className="p-2 bg-white/5 rounded-full text-gray-400 active:scale-90 transition-all"
