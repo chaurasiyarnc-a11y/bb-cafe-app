@@ -1,4 +1,5 @@
 
+
 'use client';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { db } from '../lib/firebase'; 
@@ -646,10 +647,7 @@ export default function BbCafeHome() {
           setWhatsappNumber(storeData.whatsappNumber);
         }
         if (storeData.latitude && storeData.longitude) {
-          setStoreCoordinates({ lat: Number(storeData.latitude), lng: Number(storeData.longitude) });
-        }
-        if (storeData.headerVideoUrl) {
-          setHeaderVideoUrl(storeData.headerVideoUrl);
+          setStoreCoordinates({ lat: Number(storeData.latitude), lng: Number(storeCoordinates.lng) });
         }
 
         if (storeData.timingHindi) {
@@ -1125,7 +1123,7 @@ export default function BbCafeHome() {
     let currentShares = Number(localStorage.getItem(shareCountKey) || 0);
 
     const refCode = getReferralCode();
-    const shareMessage = `🔥 *BAM BAM CAFE - Mohandra* 🔥\n\nमेरे स्पेशल इन्वाइट कोड *${refCode}* से आर्डर करें और... पॉइंट्स पाएं! 🎁\n👉 https://bb-cafe-app.vercel.app/?ref=${refCode}`;
+    const shareMessage = `🔥 *BAM BAM CAFE - Mohandra* 🔥\n\nमेरे स्पेशल इन्वाइट कोड *${refCode}* से आर्डर करें और...  पॉइंट्स पाएं! 🎁\n👉 https://bb-cafe-app.vercel.app/?ref=${refCode}`;
     const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(shareMessage)}`;
 
     window.open(whatsappUrl, '_blank');
@@ -1154,7 +1152,7 @@ export default function BbCafeHome() {
           toast.success("🎉 शानदार! आपने 5 दोस्तों के साथ ऐप शेयर करके +1 Loyalty Point कमा लिया है!");
         } catch (e) {}
       } else {
-        toast.success(`📤 शेयर किया गया! (${nextShares}/5 प्रोग्रेस। +1 पॉइंट के लिए ${5 - nextShares} और दोस्तों को शेयर करें!)`);
+        toast.success(`📤 शेयर किया गया! (${nextShares}/5 प्रोग्रेस।  +1 पॉइंट के लिए ${5 - nextShares} और दोस्तों को शेयर करें!)`);
       }
     } else {
       localStorage.setItem(shareCountKey, "1");
@@ -1462,7 +1460,7 @@ export default function BbCafeHome() {
       {closingMinutesLeft !== null && storeOpen && (
         <div className="bg-gradient-to-r from-amber-500 to-orange-600 text-white font-extrabold py-2 px-4 text-center text-[10px] flex items-center justify-center gap-1.5 shadow-md">
           <span>⏰</span>
-          <span>आर्डर चेतावनी:  बम बम कैफ़े अगले {closingMinutesLeft} minute में बंद होने वाला है! आर्डर जल्दी पूरा करें।</span>
+          <span>आर्डर चेतावनी:  बम बम कैफ़े अगले {closingMinutesLeft} minute में बंद होने वाला है!  आर्डर जल्दी पूरा करें।</span>
         </div>
       )}
 
@@ -1563,7 +1561,7 @@ export default function BbCafeHome() {
               placeholder={isHindi ? "पिज़्ज़ा, सैंडविच, पनीर स्पेशल खोजें..." : "Search pizza, sandwich, paneer special..."} 
               value={searchQuery} 
               onChange={(e) => setSearchQuery(e.target.value)} 
-              className="w-full dark:bg-neutral-800 bg-gray-100 dark:text-white text-neutral-900 py-2.5 px-11 rounded-xl outline-none text-xs font-semibold dark:placeholder-gray-400 placeholder-gray-500 border dark:border-neutral-700 border-gray-200 transition-colors duration-200" 
+              className="w-full dark:bg-neutral-800 bg-gray-100 dark:text-white text-neutral-900 py-2.5 px-11 rounded-xl outline-none text-xs font-semibold dark:placeholder-gray-400 placeholder-gray-550 border dark:border-neutral-700 border-gray-200 transition-colors duration-200" 
             />
           </div>
 
@@ -1597,7 +1595,7 @@ export default function BbCafeHome() {
       {!storeOpen && (
         <div className="bg-red-600 text-white font-black py-3 px-4 text-center text-xs flex items-center justify-center gap-2 shadow-lg border-b border-red-500">
           <span className="animate-pulse">⚠️</span>
-          <span>{isHindi ? "बम बम कैफ़े अभी बंद है। आप केवल हमारा मेनू देख सकते हैं।" : "Bum Bum Cafe is closed now. You can only view our menu."}</span>
+          <span>{isHindi ? "बम बम कैफ़े अभी बंद है।  आप केवल हमारा मेनू देख सकते हैं।" : "Bum Bum Cafe is closed now. You can only view our menu."}</span>
         </div>
       )}
 
@@ -1645,7 +1643,7 @@ export default function BbCafeHome() {
         {/* Dynamic Video Stories */}
         {stories.length > 0 && (
           <div className="space-y-1 px-1">
-            <p className="text-[8px] font-black uppercase tracking-wider text-orange-500">{isHindi ? "खूबसूरत फ़ूड रील्स" : "Daily Food Reels"}</p>
+            <p className="text-[8px] font-black uppercase tracking-wider text-orange-500">{isHindi ? "खूबसूरत  फ़ूड रील्स" : "Daily Food Reels"}</p>
             <div className="flex gap-4 overflow-x-auto py-1.5 scrollbar-none [&::-webkit-scrollbar]:hidden">
               {stories.map((story) => (
                 <button 
@@ -2531,7 +2529,7 @@ export default function BbCafeHome() {
                     <div className="space-y-1">
                       <p className="text-[8px] uppercase tracking-wider text-emerald-500 font-black">पर्यावरण संरक्षण ट्रैकर (Eco Impact)</p>
                       <h4 className="text-xs font-black dark:text-white text-neutral-900">
-                        {isHindi ? `आपने बचाए: ` : "You Saved: "}<span className="text-emerald-500 text-sm font-black">{ecoCutlerySaves} {isHindi ? "प्लास्टिक चम्मच 🌳" : "Plastic Cutlery 🌳"}</span>
+                        {isHindi ? `आपने बचाए: ` : "You Saved: "}<span className="text-emerald-500 text-sm font-black">{ecoCutlerySaves} {isHindi ? "प्लास्टिक चम्मच 🌳" : "Plastic Cultlery 🌳"}</span>
                       </h4>
                       <p className="text-[9px] text-gray-400 font-medium">{isHindi ? "चम्मच/टिश्यू न चुनकर आपने पर्यावरण की मदद की है।" : "By skipping plastic utensils, you actively protected nature!"}</p>
                     </div>
@@ -2648,7 +2646,7 @@ export default function BbCafeHome() {
                               </div>
                               
                               <div className="border-t border-dashed dark:border-neutral-800 border-gray-200 pt-2.5 flex justify-between items-center text-xs font-black">
-                                <span className="text-gray-505">{isHindi ? "कुल भुगतान राशि:" : "To Pay Amount:"}</span>
+                                <span className="text-gray-550">{isHindi ? "कुल भुगतान राशि:" : "To Pay Amount:"}</span>
                                 <span className="text-sm text-green-500 dark:text-green-400">₹{ord.total}</span>
                               </div>
 
@@ -2677,7 +2675,7 @@ export default function BbCafeHome() {
         )}
       </AnimatePresence>
 
-      {/* CART DRAWER MODAL */}
+      {/* CART DRAWER MODAL (With buttery-smooth spring transition and backdrop fade) */}
       <AnimatePresence>
         {isCartOpen && (
           <motion.div 
