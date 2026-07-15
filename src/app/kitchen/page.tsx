@@ -159,12 +159,12 @@ export default function KitchenDisplaySystem() {
     if (isLocked) return;
 
     // ध्यान रखें: यहाँ अपनी Firebase Web Push (VAPID) Key डालें जिसे आपने सेटिंग से जनरेट किया था
-    const MY_VAPID_KEY = "YOUR_GENERATED_VAPID_KEY_HERE"; 
+    const MY_VAPID_KEY = "BCKwFGxjNPQdsUFLasSoQonNesm5nVYy9uoikufCIZCsCFqhJNUWDP9j1Cqujd8VzqwRKn8I3R3exxo85RtPEn0"; 
 
-    if (MY_VAPID_KEY !== "YOUR_GENERATED_VAPID_KEY_HERE") {
+    if (MY_VAPID_KEY !== "BCKwFGxjNPQdsUFLasSoQonNesm5nVYy9uoikufCIZCsCFqhJNUWDP9j1Cqujd8VzqwRKn8I3R3exxo85RtPEn0") {
       requestKitchenPermission(MY_VAPID_KEY);
     } else {
-      console.warn("कृपया kitchen/page.tsx में 'YOUR_GENERATED_VAPID_KEY_HERE' को अपनी वास्तविक VAPID की से बदलें।");
+      console.warn("कृपया kitchen/page.tsx में 'BCKwFGxjNPQdsUFLasSoQonNesm5nVYy9uoikufCIZCsCFqhJNUWDP9j1Cqujd8VzqwRKn8I3R3exxo85RtPEn0' को अपनी वास्तविक VAPID की से बदलें।");
     }
   }, [isLocked]);
 
