@@ -103,6 +103,7 @@ export default function BbCafeHome() {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [storeOpen, setStoreOpen] = useState(true);
   const [isBannerEnabled, setIsBannerEnabled] = useState(true); 
+  const [isInlineBannerEnabled, setIsInlineBannerEnabled] = useState(true); // Inline banner config
   const [mounted, setMounted] = useState(false);
   const [isOnline, setIsOnline] = useState(true);
 
@@ -199,7 +200,6 @@ export default function BbCafeHome() {
   const [noCutlery, setNoCutlery] = useState(false);
   const [selectedArea, setSelectedArea] = useState(DELIVERY_AREAS[0]);
   const [favorites, setFavorites] = useState<string[]>([]);
-  const [showInvoice, setShowInvoice] = useState(false);
   const [lastPlacedOrder, setLastPlacedOrder] = useState<any>(null);
   const [confettiActive, setConfettiActive] = useState(false);
   const [shareCount, setShareCount] = useState<number>(0);
@@ -661,6 +661,13 @@ export default function BbCafeHome() {
           setIsBannerEnabled(storeData.showPromoBanner);
         }
 
+        // Inline Banner Config
+        if (storeData.isInlineBannerEnabled !== undefined) {
+          setIsInlineBannerEnabled(storeData.isInlineBannerEnabled);
+        } else if (storeData.showInlinePromo !== undefined) {
+          setIsInlineBannerEnabled(storeData.showInlinePromo);
+        }
+
         if (storeData.whatsappNumber) {
           setWhatsappNumber(storeData.whatsappNumber);
         }
@@ -1119,7 +1126,7 @@ export default function BbCafeHome() {
 
     setTimeout(() => {
       window.open(`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(msg)}`, '_blank');
-      setShowInvoice(true); 
+      // Direct redirect to WhatsApp completed, green invoice popup deleted as requested
       clearCart(); 
       setKetchupAddon(false);
       setOreganoAddon(false);
@@ -1499,7 +1506,7 @@ export default function BbCafeHome() {
       {closingMinutesLeft !== null && storeOpen && (
         <div className="bg-gradient-to-r from-amber-500 to-orange-600 text-white font-extrabold py-2 px-4 text-center text-[10px] flex items-center justify-center gap-1.5 shadow-md">
           <span>⏰</span>
-          <span>आर्डर चेतावनी: बम बम कैफ़े अगले {closingMinutesLeft} minute में बंद होने वाला है! आर्डर जल्दी पूरा करें।</span>
+          <span>आर्डर चेतावनी:  बम बम कैफ़े अगले {closingMinutesLeft} minute में बंद होने वाला है! आर्डर जल्दी पूरा करें।</span>
         </div>
       )}
 
@@ -1544,14 +1551,15 @@ export default function BbCafeHome() {
         </div>
       )}
 
-      {/* Floating Review Button */}
-      <div className="fixed right-3 top-1/2 -translate-y-1/2 z-50">
+      {/* Sticky Right Side Review Tab (Replaces floating button) */}
+      <div className="fixed right-0 top-1/2 -translate-y-1/2 z-50">
         <button 
           onClick={() => { triggerHaptic(); setIsReviewFormOpen(true); }}
-          className="p-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-full shadow-2xl border border-white/20 flex items-center justify-center transition-transform active:scale-95"
-          title={isHindi ? "समीक्षा लिखें" : "Write a Review"}
+          className="bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[10px] py-3 px-1.5 rounded-l-xl shadow-2xl border-l border-y border-white/20 flex flex-col items-center gap-1 transition-all active:translate-x-1"
+          style={{ writingMode: 'vertical-rl' }}
         >
-          <Star size={18} className="fill-white text-white" />
+          <Star size={14} className="fill-white text-white mb-1" />
+          <span className="uppercase tracking-wider font-bold">{isHindi ? "समीक्षा" : "Reviews"}</span>
         </button>
       </div>
 
@@ -2043,6 +2051,7 @@ export default function BbCafeHome() {
                       </div>
                     </motion.div>
 
+                    {/* Promo pass card positioned after 4th item */}
                     {index === 3 && (
                       <motion.div
                         initial={{ opacity: 0, y: 20 }}
@@ -2077,6 +2086,44 @@ export default function BbCafeHome() {
                         </div>
                       </motion.div>
                     )}
+
+                    {/* Secondary Promo Banner positioned after the 7th item (index === 6) */}
+                    {index === 6 && isInlineBannerEnabled && (
+                      <div className="w-full h-36 rounded-2xl overflow-hidden relative border border-white/5 bg-white/[0.02] my-2">
+                        {(banners.length === 0 || bannerError) ? (
+                          <div className="w-full h-full bg-gradient-to-r from-yellow-600/35 to-orange-850/35 flex flex-col justify-center p-5 space-y-1">
+                            <span className="text-[8px] font-black uppercase text-yellow-400 bg-yellow-500/10 border border-yellow-500/20 px-2 py-0.5 rounded-full w-max">
+                              {isHindi ? "ताज़ा स्वाद" : "Fresh Taste"}
+                            </span>
+                            <h3 className="text-sm font-black text-yellow-300">
+                              {isHindi ? "शुद्ध और हाइजीनिक फास्ट फूड" : "PURE & HYGIENIC FAST FOOD"}
+                            </h3>
+                            <p className="text-[9px] text-gray-400">
+                              {isHindi ? "मोहांद्रा में हमारा स्पेशल पनीर पिज़्ज़ा चखें!" : "Try our special Paneer Pizza in Mohandra Town!"}
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="w-full h-full relative">
+                            {isVideoUrl(banners[(bannerIndex + 1) % banners.length]?.url) ? (
+                              <video 
+                                src={banners[(bannerIndex + 1) % banners.length]?.url} 
+                                autoPlay 
+                                loop 
+                                muted 
+                                playsInline 
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <img 
+                                src={banners[(bannerIndex + 1) % banners.length]?.url} 
+                                className="w-full h-full object-cover" 
+                                alt="BAM BAM CAFE Secondary Promo"
+                              />
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </React.Fragment>
                 );
               })
@@ -2084,7 +2131,7 @@ export default function BbCafeHome() {
           </div>
         )}
 
-        {/* REVIEWS SECTION - Slider logic with vertical scroll bar if more than 10 reviews */}
+        {/* REVIEWS SECTION */}
         <div className="pt-6 space-y-4">
           <div className="flex justify-between items-center">
             <h3 className="text-sm font-black uppercase tracking-wider text-yellow-400 flex items-center gap-1">⭐ {isHindi ? "हमारे ग्राहकों के प्यारे शब्द" : "Feedback from our loved guests"}</h3>
@@ -2126,23 +2173,6 @@ export default function BbCafeHome() {
                   "We started BAM BAM CAFE with a simple dream - to serve hygienic, delicious, home-style fast food in Mohandra town. Every slice of pizza and plate of thali here is crafted with ultimate love, purity and hygiene. Feel free to dine-in or order online! ❤️"
                 }
               </p>
-
-              {/* Follow Rewards Block */}
-              <div className="pt-4 border-t border-white/5 w-full flex flex-col items-center gap-2">
-                <span className="text-[8px] font-black uppercase tracking-wider text-orange-400">{isHindi ? "सोशल मीडिया पर हमें फॉलो करें और पॉइंट्स कमाएं!" : "Follow us & Claim Rewards!"}</span>
-                <div className="flex flex-wrap justify-center gap-3">
-                  {SOCIAL_LINKS.map(plat => (
-                    <button
-                      key={plat.id}
-                      onClick={() => handleSocialClickWithClaim(plat)}
-                      className="flex items-center gap-1.5 px-3 py-2 rounded-xl dark:bg-white/5 bg-gray-100 hover:scale-105 transition-transform border dark:border-white/5 border-gray-200"
-                    >
-                      <span className="text-sm">{plat.icon}</span>
-                      <span className="text-[9px] font-black dark:text-gray-200 text-neutral-800">{plat.label.split(" ")[1]}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
             </div>
           </div>
 
@@ -2264,7 +2294,7 @@ export default function BbCafeHome() {
                 </div>
                 <div className="flex gap-2 pt-1 border-t border-white/5 mt-1.5">
                   <a 
-                    href={`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(`नमस्ते बम बम कैफ़े! कृपया मेरे आर्डर नंबर #${formatBillNumber(liveOrder.billNumber)} का लाइव स्टेटस बताएं।`)}`}
+                    href={`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(`नमस्ते  बम बम कैफ़े! कृपया मेरे आर्डर नंबर #${formatBillNumber(liveOrder.billNumber)} का लाइव स्टेटस बताएं।`)}`}
                     target="_blank"
                     rel="noreferrer"
                     className="flex-1 bg-white/5 hover:bg-white/10 text-center text-[10px] text-yellow-400 py-1.5 rounded-xl border border-white/5 transition-all"
@@ -2349,17 +2379,17 @@ export default function BbCafeHome() {
         )}
       </AnimatePresence>
 
-      {/* WRITING REVIEW POPUP */}
+      {/* WRITING REVIEW FORM MODAL WITH INTEGRATED EXIT OPTIONS */}
       <AnimatePresence>
         {isReviewFormOpen && (
           <div className="fixed inset-0 bg-black/95 z-[200] flex items-center justify-center p-6">
             <form onSubmit={handleReviewSubmit} className="dark:bg-[#111] bg-white w-full max-w-md p-6 rounded-3xl border dark:border-white/10 border-gray-200 text-center space-y-4 shadow-xl transition-colors duration-200">
               <div className="flex justify-between items-center pb-2 border-b dark:border-white/10 border-gray-100">
-                <h3 className="text-xl font-black text-orange-500 uppercase italic">Your Feedback</h3>
+                <h3 className="text-xl font-black text-orange-500 uppercase italic">{isHindi ? "आपकी समीक्षा" : "Your Feedback"}</h3>
                 <button 
                   type="button" 
                   onClick={() => { triggerHaptic(); setIsReviewFormOpen(false); }} 
-                  className="p-2 bg-red-100 hover:bg-red-500 hover:text-white text-red-600 rounded-full transition-all duration-200"
+                  className="p-2 bg-red-100 hover:bg-red-500 hover:text-white text-red-600 rounded-full transition-all duration-200 shadow"
                   title="Close Feedback"
                 >
                   <X size={18} />
@@ -2368,11 +2398,11 @@ export default function BbCafeHome() {
 
               <div className="space-y-3 text-left">
                 <div>
-                  <label className="text-[9px] font-black uppercase text-gray-500">Your Name</label>
-                  <input type="text" placeholder="Enter your name..." value={reviewName} onChange={(e) => setReviewName(e.target.value)} required className="w-full dark:bg-white/5 bg-gray-50 border dark:border-white/10 border-gray-200 p-3 rounded-lg text-xs dark:text-white text-neutral-900 focus:border-orange-500 outline-none font-bold" />
+                  <label className="text-[9px] font-black uppercase text-gray-500">{isHindi ? "आपका नाम" : "Your Name"}</label>
+                  <input type="text" placeholder={isHindi ? "अपना नाम दर्ज करें..." : "Enter your name..."} value={reviewName} onChange={(e) => setReviewName(e.target.value)} required className="w-full dark:bg-white/5 bg-gray-50 border dark:border-white/10 border-gray-200 p-3 rounded-lg text-xs dark:text-white text-neutral-900 focus:border-orange-500 outline-none font-bold" />
                 </div>
                 <div>
-                  <label className="text-[9px] font-black uppercase text-gray-500">Rating</label>
+                  <label className="text-[9px] font-black uppercase text-gray-500">{isHindi ? "रेटिंग" : "Rating"}</label>
                   <div className="flex gap-1 text-yellow-400 py-1">
                     {[1, 2, 3, 4, 5].map((star) => (
                       <Star key={star} size={20} fill={reviewRating >= star ? "currentColor" : "none"} onClick={() => setReviewRating(star)} className="cursor-pointer" />
@@ -2381,7 +2411,7 @@ export default function BbCafeHome() {
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[9px] font-black uppercase text-gray-500">पसंदीदा रिव्यू टच करें:</label>
+                  <label className="text-[9px] font-black uppercase text-gray-500">{isHindi ? "पसंदीदा समीक्षा टच करें:" : "Quick Suggestions:"}</label>
                   <div className="flex flex-wrap gap-1.5 py-1">
                     {SUGGESTED_REVIEWS.map((suggestion) => (
                       <button
@@ -2397,13 +2427,13 @@ export default function BbCafeHome() {
                 </div>
 
                 <div>
-                  <label className="text-[9px] font-black uppercase text-gray-500">Comments</label>
-                  <textarea placeholder="Khana kaisa laga?..." value={reviewComment} onChange={(e) => setReviewComment(e.target.value)} required rows={3} className="w-full dark:bg-white/5 bg-gray-50 border dark:border-white/10 border-gray-200 p-3 rounded-lg text-xs dark:text-white text-neutral-900 focus:border-orange-500 outline-none resize-none font-bold" />
+                  <label className="text-[9px] font-black uppercase text-gray-500">{isHindi ? "समीक्षा टिप्पणी" : "Comments"}</label>
+                  <textarea placeholder={isHindi ? "खाना कैसा लगा?..." : "How was the food?..."} value={reviewComment} onChange={(e) => setReviewComment(e.target.value)} required rows={3} className="w-full dark:bg-white/5 bg-gray-50 border dark:border-white/10 border-gray-200 p-3 rounded-lg text-xs dark:text-white text-neutral-900 focus:border-orange-500 outline-none resize-none font-bold" />
                 </div>
               </div>
               <div className="flex gap-2 pt-1">
-                <button type="submit" className="flex-1 bg-orange-500 text-black font-black p-3 rounded-lg text-xs uppercase">SUBMIT</button>
-                <button type="button" onClick={() => { triggerHaptic(); setIsReviewFormOpen(false); }} className="dark:bg-white/5 bg-gray-100 dark:text-gray-400 text-neutral-700 font-bold p-3 rounded-lg text-xs uppercase">CANCEL</button>
+                <button type="submit" className="flex-1 bg-orange-500 text-black font-black p-3 rounded-lg text-xs uppercase">{isHindi ? "जमा करें" : "SUBMIT"}</button>
+                <button type="button" onClick={() => { triggerHaptic(); setIsReviewFormOpen(false); }} className="dark:bg-white/5 bg-gray-100 dark:text-gray-400 text-neutral-700 font-bold p-3 rounded-lg text-xs uppercase">{isHindi ? "बंद करें" : "CANCEL"}</button>
               </div>
             </form>
           </div>
@@ -2420,7 +2450,7 @@ export default function BbCafeHome() {
               <p className="text-orange-500 font-black mb-4 uppercase text-[8px] text-center">{isHindi ? "ऑर्डर कस्टमाइज़ करें" : "Customize Your Order"}</p>
               
               <div className="space-y-3 mb-4">
-                <p className="text-[10px] font-bold text-gray-550 uppercase">{isHindi ? "1. साइज चुनें:" : "1. Select Portion Size:"}</p>
+                <p className="text-[10px] font-bold text-gray-555 uppercase">{isHindi ? "1. साइज चुनें:" : "1. Select Portion Size:"}</p>
                 <div className="grid grid-cols-2 gap-2">
                   {Object.entries(selectedProduct?.variants || {}).map(([size, price]: any) => (
                     <button 
@@ -2638,7 +2668,7 @@ export default function BbCafeHome() {
                           const inCartCost = cart.reduce((acc: number, i: any) => acc + (i.pointsCost || 0), 0);
                           const isAffordable = (customerPoints - inCartCost) >= rule.pointsCost;
                           return (
-                            <button key={rule.id} type="button" onClick={() => handleCustomerRedeem(`reward-${rule.id}`, `🎁 FREE ${rule.rewardName}`, rule.pointsCost)} disabled={!isAffordable} className={`py-2 px-2 rounded text-[9px] font-black uppercase border truncate transition-all ${isAffordable ? 'bg-yellow-400 text-black border-yellow-400 hover:bg-yellow-500' : 'bg-neutral-100 dark:bg-white/5 text-neutral-550 dark:text-gray-555 border-neutral-222 dark:border-white/5 cursor-not-allowed'}`}>🎁 {rule.rewardName} ({rule.pointsCost} P)</button>
+                            <button key={rule.id} type="button" onClick={() => handleCustomerRedeem(`reward-${rule.id}`, `🎁 FREE ${rule.rewardName}`, rule.pointsCost)} disabled={!isAffordable} className={`py-2 px-2 rounded text-[9px] font-black uppercase border truncate transition-all ${isAffordable ? 'bg-yellow-400 text-black border-yellow-400 hover:bg-yellow-500' : 'bg-neutral-100 dark:bg-white/5 text-neutral-555 dark:text-gray-555 border-neutral-222 dark:border-white/5 cursor-not-allowed'}`}>🎁 {rule.rewardName} ({rule.pointsCost} P)</button>
                           );
                         })}
                       </div>
@@ -2952,7 +2982,7 @@ export default function BbCafeHome() {
                   {paymentMethod === "upi" && (
                     <div className="bg-[#111] p-3 rounded-2xl border border-white/5 space-y-2 text-center text-[10px] font-bold text-gray-300">
                       <p className="text-yellow-400 uppercase tracking-wider">{isHindi ? "आसान ऑनलाइन पेमेंट" : "Instant UPI Checkout"}</p>
-                      <p>{isHindi ? "ऑर्डर बटन दबाते ही आपके फोन का PhonePe/Paytm ऐप खुल जाएगा। कृपया भुगतान के बाद स्क्रीनशॉट चैट पर भेजें!" : "Clicking the order button will open PhonePe/Paytm directly with pre-filled billing amount!"}</p>
+                      <p>{isHindi ? "ऑर्डर बटन दबाते ही आपके फोन का PhonePe/Paytm ऐप खुल जाएगा।  कृपया भुगतान के बाद स्क्रीनशॉट चैट पर भेजें!" : "Clicking the order button will open PhonePe/Paytm directly with pre-filled billing amount!"}</p>
                     </div>
                   )}
 
@@ -3115,79 +3145,6 @@ export default function BbCafeHome() {
                 </button>
               </div>
             </motion.form>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* DIGITAL GREEN INVOICE */}
-      <AnimatePresence>
-        {showInvoice && lastPlacedOrder && (
-          <div className="fixed inset-0 bg-black/95 z-[240] flex items-center justify-center p-6">
-            <div className="dark:bg-[#111] bg-white w-full max-w-md p-6 rounded-3xl border dark:border-white/10 border-gray-200 text-center space-y-4 max-h-[85vh] overflow-y-auto shadow-xl transition-colors duration-200">
-              <div className="flex justify-between items-center border-b border-white/5 pb-2">
-                <span className="text-[10px] font-black text-green-400">🌱 {isHindi ? "डिजिटल ग्रीन इनवॉइस" : "DIGITAL GREEN INVOICE"}</span>
-                <button onClick={() => { triggerHaptic(); setShowInvoice(false); }} className="text-gray-400"><X size={16} /></button>
-              </div>
-              <h4 className="text-xl font-black text-yellow-400 italic">BUM BUM CAFE</h4>
-              
-              <div className="text-left text-xs space-y-1.5 dark:text-gray-300 text-neutral-800 font-mono">
-                <p>{isHindi ? "ऑर्डर नंबर:" : "Order No:"} #{formatBillNumber(lastPlacedOrder.billNumber)}</p>
-                <p>{isHindi ? "टोकन नंबर:" : "Token No:"} #{lastPlacedOrder.tokenNumber}</p>
-                <p>{isHindi ? "ग्राहक:" : "Customer:"} {lastPlacedOrder.customerName}</p>
-                <p>{isHindi ? "फ़ोन:" : "Phone:"} {lastPlacedOrder.customerPhone}</p>
-                
-                <div className="bg-orange-500/10 border border-orange-500/20 p-2 rounded-xl text-center text-xs font-black text-orange-500 uppercase tracking-wider my-2.5">
-                  🔑 {isHindi ? "डिलीवरी पिन:" : "Delivery PIN:"} {lastPlacedOrder.deliveryPin} <span className="block text-[8px] text-gray-400 font-bold uppercase mt-1">(Rider ko ye PIN bata kar hi order receive karein)</span>
-                </div>
-
-                <div className="border-t border-dashed border-white/10 my-2" />
-                {lastPlacedOrder.items.map((it: any) => (
-                  <div key={it.id} className="flex flex-col">
-                    <div className="flex justify-between">
-                      <span>{it.name} x{it.quantity}</span>
-                      <span>₹{it.price * it.quantity}</span>
-                    </div>
-                    {it.note && (
-                      <span className="text-[9px] text-orange-400 italic font-sans">  └─ Note: {it.note}</span>
-                    )}
-                  </div>
-                ))}
-                {lastPlacedOrder.ketchupAddon && <div className="flex justify-between"><span>{isHindi ? "केचप" : "Extra Ketchup"}</span><span>₹10</span></div>}
-                {lastPlacedOrder.oreganoAddon && <div className="flex justify-between"><span>{isHindi ? "ऑरेगैनो" : "Extra Oregano"}</span><span>₹10</span></div>}
-                {lastPlacedOrder.chiliFlakesAddon && <div className="flex justify-between"><span>{isHindi ? "चिली फ्लेक्स" : "Extra Chili Flakes"}</span><span>₹10</span></div>}
-                <div className="border-t border-dashed border-white/10 my-2" />
-                <div className="flex justify-between text-yellow-300 font-black">
-                  <span>{isHindi ? "कुल योग" : "GRAND TOTAL"}</span>
-                  <span>₹{lastPlacedOrder.total}</span>
-                </div>
-              </div>
-
-              <div className="pt-2 flex flex-col gap-2">
-                <a 
-                  href={`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(`नमस्ते बम बम कैफ़े! कृपया मेरे आर्डर नंबर #${formatBillNumber(lastPlacedOrder.billNumber)} (टोकन नंबर: #${lastPlacedOrder.tokenNumber}) का लाइव स्टेटस बताएं।`)}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="bg-yellow-400 text-black py-2.5 rounded-xl text-xs font-black uppercase tracking-wider block text-center"
-                >
-                  🔍 {isHindi ? "चेक आर्डर स्टेटस (WA)" : "Check Order Status (WA)"}
-                </a>
-                <button 
-                  onClick={handleShareInvoice} 
-                  type="button" 
-                  className="bg-green-600 text-white py-2.5 rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 shadow"
-                >
-                  <Share2 size={12}/>
-                  <span>{isHindi ? "रसीद शेयर करें" : "Share Receipt"}</span>
-                </button>
-              </div>
-
-              <p className="text-[9px] text-green-600 dark:text-green-400 dark:bg-green-500/10 bg-green-50 p-2.5 rounded-xl font-bold">
-                🌱 पेपर रसीद के बिना DIGITAL इनवॉइस जनरेट किया गया है। धन्यवाद!
-              </p>
-              <button onClick={() => { triggerHaptic(); setShowInvoice(false); }} className="w-full bg-white text-black p-3 rounded-xl text-xs font-black uppercase">
-                CLOSE RECEIPT
-              </button>
-            </div>
           </div>
         )}
       </AnimatePresence>
