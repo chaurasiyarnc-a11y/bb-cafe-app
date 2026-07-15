@@ -154,15 +154,14 @@ export default function KitchenDisplaySystem() {
     };
   }, [isLocked]);
 
-  // --- नया: किचन नोटिफिकेशन परमिशन रजिस्टर (FCM) ---
+  // --- नया और संशोधित: किचन नोटिफिकेशन परमिशन रजिस्टर (FCM - On Mount) ---
   useEffect(() => {
-    if (isLocked) return;
-
-    // आपकी वास्तविक VAPID Key यहाँ बिना किसी जांच-कंडीशन के सेट कर दी गई है
+    // आपकी वास्तविक VAPID Key यहाँ सेट कर दी गई है
     const MY_VAPID_KEY = "BCKwFGxjNPQdsUFLasSoQonNesm5nVYy9uoikufCIZCsCFqhJNUWDP9j1Cqujd8VzqwRKn8I3R3exxo85RtPEn0"; 
 
+    // सीधा ऑन-माउंट रन करें ताकि यह पेज लोड होते ही तुरंत अनुमति की जांच करे
     requestKitchenPermission(MY_VAPID_KEY);
-  }, [isLocked]);
+  }, []); // [] का मतलब है कि यह पेज के खुलते ही तुरंत बिना किसी रुकावट के रन होगा
 
   // LOGIN: Verifies Entered PIN against personal Cook account in Firestore
   const handlePinSubmit = async (e: React.FormEvent) => {
