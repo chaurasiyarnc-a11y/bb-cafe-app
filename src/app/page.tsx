@@ -60,30 +60,6 @@ const DIY_PIZZA_PRICES: any = {
   }
 };
 
-const SOCIAL_LINKS = [
-  { id: 'facebook', label: '🔵 Facebook', icon: '📘', points: 1, url: 'https://www.facebook.com/bbcafe.in/' },
-  { id: 'instagram', label: '📸 Instagram', icon: '📸', points: 1, url: 'https://www.instagram.com/bbcafe.in/' },
-  { id: 'whatsapp_channel', label: '📢 WhatsApp Channel', icon: '📢', points: 1, url: 'https://whatsapp.com/channel/0029VaLhggoGE56natoQI43y' },
-  { id: 'snapchat', label: '👻 Snapchat', icon: '👻', points: 1, url: 'https://www.snapchat.com/add/bbcafe.in' },
-  { id: 'youtube', label: '🔴 YouTube', icon: '🎥', points: 1, url: 'https://www.youtube.com/@bbcafe.i' }
-];
-
-const QUICK_INSTRUCTION_TAGS = ["🌶️ Extra Spicy", "🧅 No Onion-Garlic", "🧀 Extra Cheese", "🔥 Well Baked", "🌱 Make it Mild"];
-
-const SUGGESTED_REVIEWS = [
-  "पिज्जा का स्वाद लाजवाब है! मज़ा आ गया 🍕😋",
-  "मोहांद्रा में सबसे बेस्ट सर्विस और स्वाद! ⭐⭐⭐⭐⭐",
-  "सुपर फास्ट डिलीवरी और शानदार पैकेजिंग! 🛵📦",
-  "साफ़-सफ़ाई और शुद्धता 10/10 है! 🧼👌"
-];
-
-const PERMANENT_REVIEWS = [
-  { id: "rev1", name: "Gaurav Soni", rating: 5, comment: "बम बम कैफे की पनीर पिज्जा सच में पूरे मोहांद्रा में बेस्ट है! एक्स्ट्रा चीज़ लव है। ⭐⭐⭐⭐⭐" },
-  { id: "rev2", name: "Anjali Patel", rating: 5, comment: "फास्ट फ़ूड की पैकिंग बहुत अच्छी थी, डिलीवरी बॉय का व्यवहार भी बहुत विनम्र था। ⭐⭐⭐⭐⭐" },
-  { id: "rev3", name: "Shubham Dwivedi", rating: 5, comment: "स्पेशल थाली का स्वाद एकदम घर जैसा है। सफ़ाई और शुद्धता लाजवाब है। ⭐⭐⭐⭐⭐" },
-  { id: "rev4", name: "Neha Chaurasia", rating: 5, comment: "इस क्षेत्र का सबसे अच्छा कैफे। पिज्जा विभाग ताज़ा है और क्रस्ट बहुत सॉफ्ट है! ⭐⭐⭐⭐⭐" }
-];
-
 export default function BbCafeHome() {
   const store = useCartStore() as any;
   const cart = store?.items || [];
@@ -150,7 +126,6 @@ export default function BbCafeHome() {
   const [banners, setBanners] = useState<any[]>([]);
   const [bannerIndex, setBannerIndex] = useState(0);
   const [bannerError, setBannerError] = useState(false);
-  const [headerVideoUrl, setHeaderVideoUrl] = useState("https://www.basewfp.com/wp-content/uploads/2024/06/Video-for-Homepage-s.mp4");
   
   const [reviews, setReviews] = useState<any[]>([]);
   
@@ -1384,7 +1359,7 @@ export default function BbCafeHome() {
     playSoundEffect('add');
     toast.success("आपका कस्टमाइज़्ड पिज्जा कर्ट में जोड़ा गया! 🍕");
 
-    setDiyVegSelection({ onion: false, tomato: false, capsicum: false, corn: false });
+    setDiyVegSelection({ onion: false, text: false, capsicum: false, corn: false });
     setDiyPremiumToppings({ black_olive: false, jalapeno: false, red_peprica: false, paneer: false, mushroom: false });
     setDiyChefNote("");
   };
@@ -1544,20 +1519,13 @@ export default function BbCafeHome() {
         </button>
       </div>
 
-      {/* PREMIUM HERO HEADER */}
-      <header className="relative pt-6 pb-4 px-4 overflow-hidden shadow-xl flex flex-col justify-end min-h-[140px]">
-        <video 
-          autoPlay 
-          loop 
-          muted 
-          playsInline 
-          key={headerVideoUrl}
-          className="absolute inset-0 w-full h-full object-cover z-0 select-none pointer-events-none"
-        >
-          <source src={headerVideoUrl} type="video/mp4" />
-          <img src="https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=600&q=80" className="absolute inset-0 w-full h-full object-cover" alt="Bum Bum Cafe Header" />
-        </video>
-
+      {/* PREMIUM HERO HEADER (Replaced video with static warm background image) */}
+      <header className="relative pt-6 pb-4 px-4 overflow-hidden shadow-xl flex flex-col justify-end min-h-[140px] bg-neutral-900">
+        <img 
+          src="https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=1200&q=80" 
+          className="absolute inset-0 w-full h-full object-cover select-none pointer-events-none" 
+          alt="Bum Bum Cafe Header Background" 
+        />
         <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/40 to-black/80 z-10" />
 
         <div className="relative z-20 max-w-[85%] mt-auto bg-black/35 backdrop-blur-sm p-2.5 rounded-xl border border-white/5 shadow-md">
@@ -1701,58 +1669,44 @@ export default function BbCafeHome() {
           </div>
         )}
         
-        {/* Promo Banner */}
-        {isBannerEnabled && (
+        {/* Promo Banner (Hides completely if banners array is empty or disabled) */}
+        {isBannerEnabled && banners.length > 0 && !bannerError && (
           <div className="w-full h-36 rounded-2xl overflow-hidden relative border border-white/5 bg-white/[0.02]">
-            {(banners.length === 0 || bannerError) ? (
-              <div className="w-full h-full bg-gradient-to-r from-orange-600/35 to-[#b33600]/35 flex flex-col justify-center p-5 space-y-1">
-                <span className="text-[8px] font-black uppercase text-orange-400 bg-orange-500/10 border border-orange-500/20 px-2 py-0.5 rounded-full w-max">
-                  {isHindi ? "विशेष ऑफर" : "Special Offer"}
-                </span>
-                <h3 className="text-lg font-black italic text-yellow-300">
-                  {isHindi ? "₹99 से ऊपर मुफ्त डिलीवरी का आनंद लें" : "GET FREE DELIVERY ABOVE ₹99"}
-                </h3>
-                <p className="text-[10px] text-gray-400">
-                  {isHindi ? "ताज़ा बेक्ड पिज्जा और स्वादिष्ट थाली का मज़ा लें!" : "Enjoy fresh baked pizza & delicious thalis!"}
-                </p>
-              </div>
-            ) : (
-              <AnimatePresence mode="wait">
-                <motion.div 
-                  key={bannerIndex}
-                  initial={{ opacity: 0, x: 70, scale: 0.95 }}
-                  animate={{ opacity: 1, x: 0, scale: 1 }}
-                  exit={{ opacity: 0, x: -70, scale: 0.95 }}
-                  transition={{ duration: 0.55, ease: "easeInOut" }}
-                  className="w-full h-full absolute inset-0"
-                >
-                  {isVideoUrl(banners[bannerIndex]?.url) ? (
-                    <video 
-                      src={banners[bannerIndex]?.url} 
-                      autoPlay 
-                      loop 
-                      muted 
-                      playsInline 
-                      className="w-full h-full object-cover"
-                      onError={() => setBannerError(true)}
-                    />
-                  ) : (
-                    <img 
-                      src={banners[bannerIndex]?.url} 
-                      className="w-full h-full object-cover" 
-                      onError={() => setBannerError(true)} 
-                      alt="BAM BAM CAFE Promo"
-                    />
-                  )}
-                </motion.div>
-              </AnimatePresence>
-            )}
+            <AnimatePresence mode="wait">
+              <motion.div 
+                key={bannerIndex}
+                initial={{ opacity: 0, x: 70, scale: 0.95 }}
+                animate={{ opacity: 1, x: 0, scale: 1 }}
+                exit={{ opacity: 0, x: -70, scale: 0.95 }}
+                transition={{ duration: 0.55, ease: "easeInOut" }}
+                className="w-full h-full absolute inset-0"
+              >
+                {isVideoUrl(banners[bannerIndex]?.url) ? (
+                  <video 
+                    src={banners[bannerIndex]?.url} 
+                    autoPlay 
+                    loop 
+                    muted 
+                    playsInline 
+                    className="w-full h-full object-cover"
+                    onError={() => setBannerError(true)}
+                  />
+                ) : (
+                  <img 
+                    src={banners[bannerIndex]?.url} 
+                    className="w-full h-full object-cover" 
+                    onError={() => setBannerError(true)} 
+                    alt="BAM BAM CAFE Promo"
+                  />
+                )}
+              </motion.div>
+            </AnimatePresence>
           </div>
         )}
 
-        {/* CATEGORY SLIDER */}
-        <div className="space-y-1">
-          <p className="text-[8px] font-black uppercase tracking-wider text-orange-500">{isHindi ? "आज की विशेष प्रेरणा" : "Inspiration for your first order"}</p>
+        {/* STICKY CATEGORY SLIDER (Locks smoothly under the search bar during scroll) */}
+        <div className="sticky top-[64px] z-30 bg-gray-50/95 dark:bg-[#050505]/95 backdrop-blur-md py-2.5 px-1 border-b border-gray-200 dark:border-white/5 transition-all duration-200 shadow-sm">
+          <p className="text-[8px] font-black uppercase tracking-wider text-orange-500 pl-1">{isHindi ? "आज की विशेष प्रेरणा" : "Inspiration for your first order"}</p>
           <div className="flex gap-5 overflow-x-auto py-2 px-1 scrollbar-none [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             <button onClick={() => setSelectedCategory("Favorites")} className="flex flex-col items-center flex-shrink-0 group outline-none">
               <div className={`w-14 h-14 rounded-full overflow-hidden border transition-all flex items-center justify-center ${selectedCategory === "Favorites" ? 'border-red-500 scale-105 shadow-md' : 'dark:border-white/10 border-gray-200 bg-white dark:bg-neutral-900'}`}>
@@ -1957,7 +1911,7 @@ export default function BbCafeHome() {
                 </div>
               ))
             ) : filteredMenu.length === 0 ? (
-              <p className="text-center text-gray-500 py-8 text-xs font-bold uppercase">No items found...</p>
+              <p className="text-center text-gray-555 py-8 text-xs font-bold uppercase font-sans">No items found...</p>
             ) : (
               filteredMenu.map((item, index) => {
                 const isItemAvailable = item.isAvailable !== false;
@@ -1966,7 +1920,7 @@ export default function BbCafeHome() {
                   <React.Fragment key={item.id}>
                     <motion.div 
                       layout 
-                      className={`group dark:bg-white/[0.02] bg-white rounded-2xl border dark:border-white/5 border-gray-200 overflow-hidden flex flex-col relative shadow-md shadow-gray-200/40 dark:shadow-none transition-all duration-300 hover:shadow-lg ${!isItemAvailable ? 'opacity-70' : ''}`}
+                      className={`group dark:bg-white/[0.02] bg-white rounded-2xl border dark:border-white/5 border-gray-200 overflow-hidden flex flex-col relative shadow-md shadow-gray-200/40 dark:shadow-none transition-all duration-350 hover:shadow-lg ${!isItemAvailable ? 'opacity-70' : ''}`}
                       initial={{ opacity: 0, y: 30 }}
                       whileInView={{ opacity: 1, y: 0 }}
                       viewport={{ once: true, margin: "-50px" }}
@@ -2007,14 +1961,14 @@ export default function BbCafeHome() {
                           </div>
                         </div>
                         <div className="flex justify-between items-center text-[9px] dark:text-gray-400 text-neutral-700 font-bold mt-0.5">
-                          <p className="uppercase text-[8px] dark:text-gray-500 text-gray-400">{item.category}</p><p>• 15-25 min</p>
+                          <p className="uppercase text-[8px] dark:text-gray-555 text-gray-455">{item.category}</p><p>• 15-25 min</p>
                         </div>
                         <div className="h-px dark:bg-white/5 bg-gray-100 my-2.5" />
                         <div className="flex justify-between items-end mt-0.5">
                           <div>
                             <p className="dark:text-gray-550 text-gray-400 text-[8px] font-black uppercase tracking-widest leading-none mb-1">{isHindi ? "कीमत" : "Price"}</p>
                             <p className="text-orange-700 dark:text-orange-500 font-black text-base leading-none">{getDisplayPrice(item)}</p>
-                            {item.variants && <span className="text-[8px] font-bold dark:text-gray-400 text-gray-500 mt-1 block">{isHindi ? "विकल्प उपलब्ध हैं" : "Options available"}</span>}
+                            {item.variants && <span className="text-[8px] font-bold dark:text-gray-400 text-gray-505 mt-1 block">{isHindi ? "विकल्प उपलब्ध हैं" : "Options available"}</span>}
                           </div>
                           
                           {storeOpen && isItemAvailable && (
@@ -2494,7 +2448,7 @@ export default function BbCafeHome() {
               <button type="button" onClick={handleNormalPizzaAdd} className="w-full bg-orange-500 text-black p-4 rounded-xl font-black text-xs uppercase animate-none">
                 {isHindi ? "कर्ट में जोड़ने की पुष्टि करें" : "Confirm Add To Cart"}
               </button>
-              <button type="button" onClick={() => { setSelectedProduct(null); setNormalPizzaSize(""); setNormalPizzaPrice(0); setChefNote(""); }} className="w-full mt-3 dark:text-gray-500 text-gray-400 font-black text-[10px] text-center uppercase">
+              <button type="button" onClick={() => { setSelectedProduct(null); setNormalPizzaSize(""); setNormalPizzaPrice(0); setChefNote(""); }} className="w-full mt-3 dark:text-gray-550 text-gray-400 font-black text-[10px] text-center uppercase">
                 {isHindi ? "बंद करें" : "Close"}
               </button>
             </motion.div>
@@ -2546,7 +2500,7 @@ export default function BbCafeHome() {
                       <input type="text" placeholder="Enter invite code..." value={tempRefCode} onChange={(e) => setTempRefCode(e.target.value)} className="w-full dark:bg-neutral-800 bg-gray-50 border dark:border-neutral-700 border-gray-200 p-3 rounded-xl font-bold dark:text-white text-neutral-900 outline-none focus:border-orange-500 text-xs" />
                     </div>
                   </div>
-                  <button type="submit" className="w-full bg-orange-50 text-black p-3.5 rounded-xl font-black text-xs uppercase shadow transition-all active:scale-95 mt-4">{isHindi ? "खाता बनाएं ➔" : "Create Account ➔"}</button>
+                  <button type="submit" className="w-full bg-orange-55 text-black p-3.5 rounded-xl font-black text-xs uppercase shadow transition-all active:scale-95 mt-4">{isHindi ? "खाता बनाएं ➔" : "Create Account ➔"}</button>
                 </form>
               ) : (
                 <div className="space-y-6">
@@ -2556,7 +2510,7 @@ export default function BbCafeHome() {
                       <p className="text-[8px] dark:text-gray-555 text-neutral-655 font-black uppercase">{isHindi ? "ग्राहक प्रोफ़ाइल" : "Customer Profile"}</p>
                       <h4 className="font-black text-base text-orange-500">{customerDetails.name}</h4>
                       <p className="text-xs dark:text-gray-400 text-neutral-700 font-semibold">{customerDetails.phone}</p>
-                      <p className="text-[9px] text-yellow-650 dark:text-yellow-400 font-bold mt-1 uppercase">{isHindi ? "इन्वाइट कोड:" : "Invite Code:"} {getReferralCode()}</p>
+                      <p className="text-[9px] text-yellow-655 dark:text-yellow-400 font-bold mt-1 uppercase">{isHindi ? "इन्वाइट कोड:" : "Invite Code:"} {getReferralCode()}</p>
                     </div>
                     <button 
                       onClick={() => { 
@@ -2695,309 +2649,6 @@ export default function BbCafeHome() {
                               </div>
                               
                               <div className="border-t border-dashed dark:border-neutral-800 border-gray-200 pt-2.5 flex justify-between items-center text-xs font-black">
-                                <span className="text-gray-500">{isHindi ? "कुल भुगतान राशि:" : "To Pay Amount:"}</span>
-                                <span className="text-sm text-green-500 dark:text-green-400">₹{ord.total}</span>
-                              </div>
-
-                              <a 
-                                href={`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(`नमस्ते बम बम कैफ़े! कृपया मेरे आर्डर नंबर #${formatBillNumber(ord.billNumber)} (टोकन नंबर: #${ord.tokenNumber}) का लाइव स्टेटस बताएं।`)}`}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="w-full bg-orange-500/10 text-orange-500 hover:bg-orange-500 hover:text-white dark:bg-white/5 hover:dark:bg-white/10 text-center text-[10px] font-black py-2.5 rounded-xl block border dark:border-neutral-800 border-orange-500/20 transition-all"
-                              >
-                                Track Live Status on WA 🔍
-                              </a>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    ) : (
-                      <p className="text-center text-gray-550 py-6 text-[10px] font-bold uppercase tracking-wider">
-                        {isHindi ? "अभी तक कोई आर्डर नहीं मिला। स्वादिष्ट आर्डर शुरू करें! 🍕" : "No orders found yet. Grab some food! 🍕"}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              )}
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* STANDARD CUSTOMIZATION MODAL FOR REGULAR PIZZAS */}
-      <AnimatePresence>
-        {selectedProduct && (
-          <div className="fixed inset-0 bg-black/95 z-[100] flex items-end">
-            <motion.div initial={{ y: 300 }} animate={{ y: 0 }} exit={{ y: 300 }} className="dark:bg-[#111] bg-white w-full p-6 rounded-t-3xl border-t dark:border-white/10 border-gray-200 max-w-lg mx-auto overflow-y-auto max-h-[95vh] shadow-2xl transition-colors duration-200">
-              <div className="w-12 h-1 bg-white/15 rounded-full mx-auto mb-4" />
-              <h3 className="text-xl font-black text-center text-neutral-900 dark:text-white">{selectedProduct?.name}</h3>
-              <p className="text-orange-500 font-black mb-4 uppercase text-[8px] text-center">{isHindi ? "ऑर्डर कस्टमाइज़ करें" : "Customize Your Order"}</p>
-              
-              <div className="space-y-3 mb-4">
-                <p className="text-[10px] font-bold text-gray-555 uppercase">{isHindi ? "1. साइज चुनें:" : "1. Select Portion Size:"}</p>
-                <div className="grid grid-cols-2 gap-2">
-                  {Object.entries(selectedProduct?.variants || {}).map(([size, price]: any) => (
-                    <button 
-                      type="button" 
-                      key={size} 
-                      onClick={() => { setNormalPizzaSize(size); setNormalPizzaPrice(Number(price)); }} 
-                      className={`p-3 rounded-xl flex flex-col items-center border transition-all ${normalPizzaSize.toLowerCase() === size.toLowerCase() ? 'bg-orange-500/10 border-orange-500 text-orange-500' : 'dark:bg-white/[0.03] bg-gray-50 dark:border-white/5 border-gray-200 dark:text-gray-400 text-neutral-800'}`}
-                    >
-                      <span className="capitalize text-xs font-black">{size}</span>
-                      <span className="font-extrabold text-[10px] mt-1 dark:text-white text-neutral-900">₹{price}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {normalPizzaSize && (selectedProduct?.category === "Special Pizza" || selectedProduct?.name?.toLowerCase().includes("pizza")) && (
-                <div className="space-y-3 mb-4 border-t border-white/5 pt-3">
-                  <p className="text-[10px] font-bold text-gray-555 uppercase">{isHindi ? "2. एक्स्ट्रा मसाला/टॉपिंग चुनें:" : "2. Select Add-ons:"}</p>
-                  <div className="grid grid-cols-2 gap-2">
-                    {Object.entries(PIZZA_ADDONS[normalPizzaSize.toLowerCase()] || {}).map(([addon, cost]) => {
-                      const isSelected = !!normalPizzaAddons[addon];
-                      return (
-                        <button
-                          type="button"
-                          key={addon}
-                          onClick={() => setNormalPizzaAddons(prev => ({ ...prev, [addon]: !prev[addon] }))}
-                          className={`p-2.5 rounded-xl border flex justify-between items-center text-[9px] font-bold ${isSelected ? 'border-orange-500 bg-orange-500/5 text-orange-400' : 'dark:border-white/5 border-gray-200 dark:bg-white/[0.02] bg-gray-50 dark:text-gray-300'}`}
-                        >
-                          <span>{addon}</span>
-                          <span className="text-orange-400 font-black">+₹{cost}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              <div className="space-y-2 mb-6 border-t border-white/5 pt-3">
-                <p className="text-[10px] font-bold text-gray-555 uppercase">{isHindi ? "शेफ के लिए विशेष निर्देश:" : "Special Note for Chef / Instructions:"}</p>
-                <div className="flex flex-wrap gap-1.5 pb-2">
-                  {QUICK_INSTRUCTION_TAGS.map((tag) => (
-                    <button
-                      type="button"
-                      key={tag}
-                      onClick={() => quickAppendInstruction(tag, "normal")}
-                      className="text-[9px] font-bold py-1 px-2 rounded-full border dark:border-white/5 border-gray-200 bg-neutral-100 dark:bg-neutral-800 dark:text-gray-300 text-neutral-800 hover:border-orange-500 transition-colors"
-                    >
-                      {tag}
-                    </button>
-                  ))}
-                </div>
-                <textarea 
-                  placeholder="e.g. Make it extra spicy, No onions, soft crust etc..." 
-                  value={chefNote} 
-                  onChange={(e) => setChefNote(e.target.value)} 
-                  className="w-full text-xs p-3 rounded-xl dark:bg-white/[0.03] bg-gray-50 border dark:border-white/5 border-gray-200 dark:text-white outline-none focus:border-orange-500 h-16 resize-none"
-                />
-              </div>
-
-              <button type="button" onClick={handleNormalPizzaAdd} className="w-full bg-orange-500 text-black p-4 rounded-xl font-black text-xs uppercase animate-none">
-                {isHindi ? "कर्ट में जोड़ने की पुष्टि करें" : "Confirm Add To Cart"}
-              </button>
-              <button type="button" onClick={() => { setSelectedProduct(null); setNormalPizzaSize(""); setNormalPizzaPrice(0); setChefNote(""); }} className="w-full mt-3 dark:text-gray-550 text-gray-400 font-black text-[10px] text-center uppercase">
-                {isHindi ? "बंद करें" : "Close"}
-              </button>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* COMPACT PROFILE, LOYALTY LEDGER, & ORDER HISTORY DRAWER */}
-      <AnimatePresence>
-        {isProfileOpen && (
-          <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-[115] flex items-end">
-            <motion.div 
-              initial={{ y: "100%" }} 
-              animate={{ y: 0 }} 
-              exit={{ y: "100%" }} 
-              className="dark:bg-[#0b0c10] bg-white w-full h-[90vh] rounded-t-3xl border-t dark:border-white/10 border-gray-200 overflow-y-auto pb-32 p-5 max-w-lg mx-auto relative shadow-2xl transition-colors duration-200"
-            >
-              <div className="w-12 h-1 bg-white/15 rounded-full mx-auto mb-4" />
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-black dark:text-white text-neutral-900 font-mono">{isHindi ? "मेरा खाता और लॉयल्टी" : "My Account & Loyalty"}</h2>
-                <div className="flex items-center gap-2">
-                  <button onClick={() => { triggerHaptic(); setIsProfileOpen(false); }} className="p-2.5 dark:bg-white/5 bg-gray-100 hover:dark:bg-white/10 hover:bg-gray-200 dark:text-white text-neutral-800 rounded-full transition-all"><X size={20} /></button>
-                </div>
-              </div>
-
-              {!customerDetails ? (
-                <form onSubmit={handleSaveDetails} className="space-y-4">
-                  <div className="text-center space-y-1.5 pb-2">
-                    <User className="mx-auto text-orange-500" size={32} />
-                    <h3 className="text-sm font-black dark:text-white text-neutral-900">{isHindi ? "प्रोफाइल सेटअप करें" : "Set Up Profile"}</h3>
-                    <p className="text-[10px] text-gray-400 font-semibold leading-normal">{isHindi ? "लॉयल्टी पॉइंट्स कमाने, सुरक्षित पिन सेटअप करने और आसान चेकआउट करने के लिए प्रोफाइल बनाएं!" : "Build your profile to unlock free loyalty codes, safety PIN checkout and fast orders!"}</p>
-                  </div>
-                  
-                  <div className="space-y-3 text-left">
-                    <div className="space-y-1">
-                      <label className="text-[9px] font-bold text-gray-555 uppercase">{isHindi ? "आपका नाम" : "Your Name"}</label>
-                      <input type="text" placeholder="Enter your name..." value={tempName} onChange={(e) => setTempName(e.target.value)} className="w-full dark:bg-neutral-800 bg-gray-50 border dark:border-neutral-700 border-gray-200 p-3 rounded-xl font-bold dark:text-white text-neutral-900 outline-none focus:border-orange-500 text-xs" required />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[9px] font-bold text-gray-555 uppercase">{isHindi ? "मोबाइल नंबर" : "Mobile Number"}</label>
-                      <input type="tel" maxLength={10} placeholder="10-digit Phone Number" value={tempPhone} onChange={(e) => setTempPhone(e.target.value)} className="w-full dark:bg-neutral-800 bg-gray-50 border dark:border-neutral-700 border-gray-200 p-3 rounded-xl font-bold dark:text-white text-neutral-900 outline-none focus:border-orange-500 text-xs" required />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[9px] font-bold text-gray-555 uppercase flex items-center gap-1"><Lock size={10}/> <span>{isHindi ? "सुरक्षा पिन बनाएँ (4-अंक)" : "Create 4-Digit Security PIN"}</span></label>
-                      <input type="password" maxLength={4} placeholder="e.g. 1234" value={tempPin} onChange={(e) => setTempPin(e.target.value)} className="w-full dark:bg-neutral-800 bg-gray-50 border dark:border-neutral-700 border-gray-200 p-3 rounded-xl font-bold dark:text-white text-neutral-900 outline-none focus:border-orange-500 text-xs text-center tracking-widest" required />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[9px] font-bold text-gray-555 uppercase">{isHindi ? "इनवाइट कोड (वैकल्पिक)" : "Referral Code (Optional)"}</label>
-                      <input type="text" placeholder="Enter invite code..." value={tempRefCode} onChange={(e) => setTempRefCode(e.target.value)} className="w-full dark:bg-neutral-800 bg-gray-50 border dark:border-neutral-700 border-gray-200 p-3 rounded-xl font-bold dark:text-white text-neutral-900 outline-none focus:border-orange-500 text-xs" />
-                    </div>
-                  </div>
-                  <button type="submit" className="w-full bg-orange-55 text-black p-3.5 rounded-xl font-black text-xs uppercase shadow transition-all active:scale-95 mt-4">{isHindi ? "खाता बनाएं ➔" : "Create Account ➔"}</button>
-                </form>
-              ) : (
-                <div className="space-y-6">
-                  {/* USER ACCOUNT VIEW */}
-                  <div className="dark:bg-white/[0.02] bg-gray-50 p-4 rounded-2xl border dark:border-white/5 border-gray-200 flex justify-between items-center transition-colors duration-200">
-                    <div>
-                      <p className="text-[8px] dark:text-gray-555 text-neutral-655 font-black uppercase">{isHindi ? "ग्राहक प्रोफ़ाइल" : "Customer Profile"}</p>
-                      <h4 className="font-black text-base text-orange-500">{customerDetails.name}</h4>
-                      <p className="text-xs dark:text-gray-400 text-neutral-700 font-semibold">{customerDetails.phone}</p>
-                      <p className="text-[9px] text-yellow-650 dark:text-yellow-400 font-bold mt-1 uppercase">{isHindi ? "इन्वाइट कोड:" : "Invite Code:"} {getReferralCode()}</p>
-                    </div>
-                    <button 
-                      onClick={() => { 
-                        triggerHaptic();
-                        localStorage.removeItem('bb_cafe_customer'); 
-                        setCustomerDetails(null); 
-                        setTempName(""); 
-                        setTempPhone(""); 
-                        setTempPin(""); 
-                      }} 
-                      className="text-[9px] bg-red-500/10 hover:bg-red-500 hover:text-white text-red-500 px-3 py-2 rounded-lg font-black uppercase flex items-center gap-1 transition-all"
-                    >
-                      <LogOut size={12}/> {isHindi ? "लॉगआउट" : "Logout"}
-                    </button>
-                  </div>
-
-                  {/* Eco-Hero Badge */}
-                  <div className="bg-gradient-to-r from-emerald-500/10 to-teal-500/10 border border-emerald-500/20 p-4 rounded-2xl flex items-center justify-between shadow-sm">
-                    <div className="space-y-1">
-                      <p className="text-[8px] uppercase tracking-wider text-emerald-500 font-black">पर्यावरण संरक्षण ट्रैकर (Eco Impact)</p>
-                      <h4 className="text-xs font-black dark:text-white text-neutral-900">
-                        {isHindi ? `आपने बचाए: ` : "You Saved: "}<span className="text-emerald-500 text-sm font-black">{ecoCutlerySaves} {isHindi ? "प्लास्टिक चम्मच 🌳" : "Plastic Cutlery 🌳"}</span>
-                      </h4>
-                      <p className="text-[9px] text-gray-400 font-medium">{isHindi ? "चम्मच/टिश्यू न चुनकर आपने पर्यावरण की मदद की है।" : "By skipping plastic utensils, you actively protected nature!"}</p>
-                    </div>
-                    {ecoCutlerySaves >= 3 && (
-                      <div className="bg-emerald-500 text-black px-3 py-1.5 rounded-full border border-emerald-400/30 font-black text-[9px] flex items-center gap-1 shadow animate-pulse">
-                        <Award size={12}/>
-                        <span>Eco-Hero 🍃</span>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* LOYALTY SCOREBOARD CARD */}
-                  <div className="dark:bg-yellow-400/5 bg-yellow-100 border border-yellow-300 dark:border-yellow-400/20 rounded-2xl p-4 space-y-3 transition-colors duration-200 shadow-md">
-                    <div className="flex justify-between items-center border-b dark:border-white/10 border-yellow-200 pb-2">
-                      <div className="flex items-center gap-1.5 text-yellow-600 dark:text-yellow-400 font-black text-xs uppercase"><Gift size={12}/> <span>{isHindi ? "बम बम लॉयल्टी क्लब" : "Bum Bum Loyalty Club"}</span></div>
-                      <span className={`text-[8px] font-black border px-2 py-0.5 rounded-full ${getCustomerTier(customerPoints).color}`}>
-                        {getCustomerTier(customerPoints).name}
-                      </span>
-                    </div>
-                    
-                    <div className="flex justify-between items-center">
-                      <div>
-                        <h4 className="text-2xl font-black dark:text-white text-neutral-900 leading-none">{customerPoints} <span className="text-[9px] dark:text-gray-555 text-neutral-700 font-black uppercase">Points</span></h4>
-                        <p className="text-[8px] dark:text-gray-400 text-neutral-700 font-bold mt-1">{isHindi ? "₹100 खर्च करें = 1 पॉइंट पाएं!" : "Spend ₹100 = Get 1 Loyalty Point!"}</p>
-                      </div>
-                      <div className="text-right text-[8px] dark:text-yellow-400 text-amber-900 font-black space-y-0.5 uppercase max-h-20 overflow-y-auto no-scrollbar">
-                        {loyaltyRules.map(rule => (<p key={rule.id}>🎁 {rule.pointsCost} Pts = {rule.rewardName}</p>))}
-                      </div>
-                    </div>
-
-                    {/* REDESIGNED POINTS PASSBOOK LEDGER */}
-                    {pointsHistory.length > 0 && (
-                      <div className="pt-4 border-t border-neutral-200 dark:border-neutral-800/80 space-y-3">
-                        <p className="text-xs font-black uppercase tracking-wider text-orange-500 flex items-center gap-1.5">
-                          <span>📜</span> {isHindi ? "पॉइंट्स पासबुक (लेन-देन विवरण):" : "Points Passbook & Ledger:"}
-                        </p>
-                        <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-                          {pointsHistory.map((h: any) => (
-                            <div key={h.id} className="flex justify-between items-center bg-gray-50 dark:bg-neutral-900 p-3 rounded-xl border dark:border-neutral-800/60 border-gray-100 shadow-sm transition-colors duration-200">
-                              <div className="space-y-1">
-                                <span className="text-xs font-black text-neutral-800 dark:text-gray-200 block">{h.description}</span>
-                                <span className="text-[9px] text-gray-400 font-bold block">
-                                  {h.timestamp?.toDate ? h.timestamp.toDate().toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' }) : new Date(h.timestamp).toLocaleString()}
-                                </span>
-                              </div>
-                              <span className={`px-2.5 py-1 rounded-lg text-xs font-black flex items-center gap-0.5 ${h.type === 'earn' ? 'bg-green-500/10 text-green-500 border border-green-500/20' : 'bg-red-500/10 text-red-500 border border-red-500/20'}`}>
-                                {h.type === 'earn' ? '+' : '-'}{h.points} Pts
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="pt-1.5 flex flex-col gap-2">
-                      <div className="flex justify-between items-center text-[9px]">
-                        <span className="dark:text-gray-400 text-neutral-700 font-black uppercase">{isHindi ? "शेयर प्रोग्रेस:" : "Share Progress:"}</span>
-                        <span className="text-yellow-600 dark:text-yellow-400 font-black bg-yellow-100 dark:bg-yellow-400/10 px-2 py-0.5 rounded border border-yellow-300 dark:border-yellow-400/20">{shareCount}/5 Shared</span>
-                      </div>
-                      <button type="button" onClick={handleShareApp} className="w-full bg-green-600 text-white font-black py-2.5 rounded-xl text-[10px] uppercase flex items-center justify-center gap-1 shadow-md transition-all">
-                        <Share2 size={12}/>
-                        <span>{isHindi ? "5 बार शेयर करके मुफ्त +1 पॉइंट कमाएं! 🎁" : "Share 5 times to earn +1 free point! 🎁"}</span>
-                      </button>
-                    </div>
-
-                    <div className="pt-2 border-t border-white/5 flex justify-between items-center">
-                      <span className="text-[9px] dark:text-gray-400 text-neutral-700 font-bold uppercase">{isHindi ? "दोस्त को गिफ्ट करें:" : "Gift points to a friend:"}</span>
-                      <button type="button" onClick={() => { triggerHaptic(); setIsGiftModalOpen(true); }} className="bg-yellow-500/10 text-yellow-500 border border-yellow-400/20 px-2.5 py-1 rounded text-[8px] font-black uppercase">🎁 Gift Points</button>
-                    </div>
-
-                    <div className="space-y-1.5 pt-2 border-t border-white/5">
-                      <p className="text-[9px] dark:text-gray-400 text-neutral-700 font-black uppercase">{isHindi ? "पॉइंट्स रिडीम करें (सीधे कार्ट में):" : "Redeem Points (Instantly adds to cart):"}</p>
-                      <div className="grid grid-cols-2 gap-1.5 max-h-24 overflow-y-auto no-scrollbar">
-                        {loyaltyRules.map(rule => {
-                          const inCartCost = cart.reduce((acc: number, i: any) => acc + (i.pointsCost || 0), 0);
-                          const isAffordable = (customerPoints - inCartCost) >= rule.pointsCost;
-                          return (
-                            <button key={rule.id} type="button" onClick={() => handleCustomerRedeem(`reward-${rule.id}`, `🎁 FREE ${rule.rewardName}`, rule.pointsCost)} disabled={!isAffordable} className={`py-2 px-2 rounded text-[9px] font-black uppercase border truncate transition-all ${isAffordable ? 'bg-yellow-400 text-black border-yellow-400 hover:bg-yellow-500' : 'bg-neutral-100 dark:bg-white/5 text-neutral-555 dark:text-gray-555 border-neutral-222 dark:border-white/5 cursor-not-allowed'}`}>🎁 {rule.rewardName} ({rule.pointsCost} P)</button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* REDESIGNED ORDER HISTORY WITH CARD SYSTEM */}
-                  <div className="space-y-4 pt-4 border-t border-neutral-200 dark:border-neutral-800/80 font-sans">
-                    <h3 className="text-sm font-black dark:text-gray-200 text-neutral-900 uppercase flex items-center gap-1.5">
-                      <History size={16} className="text-orange-500" />
-                      <span>{isHindi ? "मेरा आर्डर इतिहास (विवरण):" : "My Order History Ledger:"}</span>
-                    </h3>
-                    {pastOrders.length > 0 ? (
-                      <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
-                        {pastOrders.map((ord: any, index: number) => {
-                          const formattedDate = ord.timestamp?.toDate ? ord.timestamp.toDate().toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' }) : new Date(ord.timestamp).toLocaleString();
-                          return (
-                            <div key={index} className="bg-gray-50 dark:bg-neutral-900 border dark:border-neutral-800 border-gray-100 rounded-2xl p-4 space-y-3 shadow-md transition-colors duration-200">
-                              <div className="flex justify-between items-center border-b dark:border-neutral-800 border-gray-200 pb-2">
-                                <div className="flex flex-col gap-0.5">
-                                  <span className="text-xs font-black text-orange-500">Bill: #{formatBillNumber(ord.billNumber || 0)}</span>
-                                  <span className="text-[9px] text-gray-400 font-bold">{formattedDate}</span>
-                                </div>
-                                <span className="bg-green-600/10 text-green-500 dark:text-green-400 border border-green-500/20 px-2.5 py-1 rounded-lg text-[9px] font-black">
-                                  Token: #{ord.tokenNumber || "N/A"}
-                                </span>
-                              </div>
-                              
-                              <div className="space-y-1.5">
-                                {ord.items.map((it: any, i: number) => (
-                                  <div key={i} className="flex justify-between text-xs font-bold text-neutral-800 dark:text-gray-300">
-                                    <span>{it.name} <span className="text-orange-500 text-[10px]">x{it.quantity}</span></span>
-                                    <span>₹{it.price * it.quantity}</span>
-                                  </div>
-                                ))}
-                              </div>
-                              
-                              <div className="border-t border-dashed dark:border-neutral-800 border-gray-200 pt-2.5 flex justify-between items-center text-xs font-black">
                                 <span className="text-gray-505">{isHindi ? "कुल भुगतान राशि:" : "To Pay Amount:"}</span>
                                 <span className="text-sm text-green-500 dark:text-green-400">₹{ord.total}</span>
                               </div>
@@ -3024,6 +2675,299 @@ export default function BbCafeHome() {
               )}
             </motion.div>
           </div>
+        )}
+      </AnimatePresence>
+
+      {/* CART DRAWER MODAL (With buttery-smooth spring transition and backdrop fade) */}
+      <AnimatePresence>
+        {isCartOpen && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/75 backdrop-blur-sm z-[110] flex items-end"
+          >
+            <motion.div 
+              initial={{ y: "100%" }} 
+              animate={{ y: 0 }} 
+              exit={{ y: "100%" }} 
+              transition={{ type: "spring", damping: 25, stiffness: 220 }}
+              className="dark:bg-[#0b0c10] bg-white w-full h-[90vh] rounded-t-3xl border-t dark:border-white/10 border-gray-200 overflow-y-auto pb-32 p-5 max-w-lg mx-auto relative shadow-2xl transition-colors duration-200"
+            >
+              {/* STICKY LIVE BILL TOTAL AT THE TOP OF THE CART DRAWER */}
+              <div className="sticky top-0 z-30 bg-neutral-950/90 backdrop-blur-md p-3 rounded-2xl border border-white/5 flex justify-between items-center mb-4">
+                <span className="text-[10px] font-black uppercase text-gray-400">{isHindi ? "लाइव बिल टोटल:" : "LIVE BILL TOTAL:"}</span>
+                <span className="text-sm font-black text-yellow-400">₹{getTotalBillPrice()}</span>
+              </div>
+
+              <div className="w-12 h-1 bg-white/15 rounded-full mx-auto mb-4" />
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-black dark:text-white text-neutral-900 font-mono">{isHindi ? "आपका कर्ट आर्डर" : "Your Order Cart"}</h2>
+                <button onClick={() => { triggerHaptic(); setIsCartOpen(false); }} className="p-2.5 dark:bg-white/5 bg-gray-100 hover:dark:bg-white/10 hover:bg-gray-200 dark:text-white text-neutral-800 rounded-full transition-all"><X size={20} /></button>
+              </div>
+
+              {/* 1. CART ITEMS LIST */}
+              {cart.map((item: any) => (
+                <div key={item.id} className="flex flex-col dark:bg-white/[0.02] bg-white p-4 rounded-2xl mb-3 border dark:border-white/5 border-gray-200 shadow-sm transition-colors duration-200 gap-1.5">
+                  <div className="flex justify-between items-center">
+                    <div className="min-w-0 pr-3">
+                      <h4 className="font-bold text-xs dark:text-gray-100 text-neutral-900 truncate">{item?.name || "Item"}</h4>
+                      <p className="text-orange-500 font-black mt-1 text-[11px]">₹{item?.price || 0}</p>
+                    </div>
+                    <div className="flex items-center gap-2 bg-black/40 px-2 py-1 rounded-xl border border-white/10 flex-shrink-0">
+                      <button onClick={() => { triggerHaptic(); removeItem(item.id); }} className="w-6 h-6 flex items-center justify-center bg-red-500/10 text-red-500 rounded text-sm font-black">-</button>
+                      <span className="font-black text-xs px-1 dark:text-white text-neutral-900">{item.quantity}</span>
+                      {item.isReward ? (
+                        <button disabled className="w-6 h-6 flex items-center justify-center bg-white/5 text-gray-500 rounded text-sm font-black cursor-not-allowed">+</button>
+                      ) : (
+                        <button onClick={() => { triggerHaptic(); addItem(item); }} className="w-6 h-6 flex items-center justify-center bg-green-500/10 text-green-500 rounded text-sm font-black">+</button>
+                      )}
+                    </div>
+                  </div>
+                  {item.note && (
+                    <div className="bg-orange-500/5 border border-orange-500/10 rounded-lg p-2 text-[9px] text-orange-400 italic">
+                      👩‍🍳 Chef Instructions: {item.note}
+                    </div>
+                  )}
+                </div>
+              ))}
+
+              {/* 2. ORDER FULFILLMENT MODE BUTTONS */}
+              <div className="dark:bg-white/[0.02] bg-gray-50 p-4 rounded-2xl border dark:border-white/5 border-gray-200 space-y-2 mt-4 transition-colors duration-200">
+                <label className="text-[10px] font-black uppercase dark:text-gray-400 text-neutral-800">{isHindi ? "ऑर्डर का माध्यम चुनें:" : "Select Order Mode:"}</label>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    onClick={() => { triggerHaptic(); setFulfillmentType("delivery"); }}
+                    className={`py-3 px-1 rounded-xl border flex flex-col items-center justify-center gap-1.5 transition-all text-center ${fulfillmentType === "delivery" ? 'border-orange-500 bg-orange-500/10 text-orange-400' : 'dark:border-white/5 border-gray-200 dark:text-gray-300'}`}
+                  >
+                    <span className="text-base">🛵</span>
+                    <span className="text-[9px] font-black">{isHindi ? "होम डिलीवरी" : "Home Delivery"}</span>
+                  </button>
+                  <button
+                    onClick={() => { triggerHaptic(); setFulfillmentType("pickup"); }}
+                    className={`py-3 px-1 rounded-xl border flex flex-col items-center justify-center gap-1.5 transition-all text-center ${fulfillmentType === "pickup" ? 'border-orange-500 bg-orange-500/10 text-orange-400' : 'dark:border-white/5 border-gray-200 dark:text-gray-300'}`}
+                  >
+                    <span className="text-base">🛍️</span>
+                    <span className="text-[9px] font-black">{isHindi ? "सेल्फ-पिकअप" : "Self-Pickup"}</span>
+                  </button>
+                  <button
+                    onClick={() => { triggerHaptic(); setFulfillmentType("table"); }}
+                    className={`py-3 px-1 rounded-xl border flex flex-col items-center justify-center gap-1.5 transition-all text-center ${fulfillmentType === "table" ? 'border-orange-500 bg-orange-500/10 text-orange-400' : 'dark:border-white/5 border-gray-200 dark:text-gray-300'}`}
+                  >
+                    <span className="text-base">🍽️</span>
+                    <span className="text-[9px] font-black">{isHindi ? "टेबल ऑर्डर" : "Dine-In (Table)"}</span>
+                  </button>
+                </div>
+              </div>
+
+              <div className="mt-4 space-y-4">
+                {/* 3. UPSELL SUGGESTIONS */}
+                {upsellSuggestionItems.length > 0 && (
+                  <div className="dark:bg-purple-950/20 bg-purple-50 border border-purple-500/10 rounded-2xl p-4 space-y-2">
+                    <p className="text-[9px] font-black uppercase dark:text-purple-400 text-purple-800 tracking-wider">{isHindi ? "साथ में यह भी मंगाया गया 🥤" : "Frequently Bought Together 🥤"}</p>
+                    <div className="space-y-2">
+                      {upsellSuggestionItems.map((suggest) => (
+                        <div key={suggest.id} className="flex justify-between items-center text-[10px]">
+                          <div>
+                            <span className="font-bold block dark:text-white text-neutral-900">{suggest.name}</span>
+                            <span className="text-orange-600 font-extrabold">{getDisplayPrice(suggest)}</span>
+                          </div>
+                          <button onClick={() => { triggerHaptic(); addItem(suggest); }} className="bg-purple-500/20 text-purple-600 border border-purple-500/30 px-3 py-1 rounded-lg font-black uppercase animate-none">ADD</button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* 4. ADD EXTRA CONDIMENTS */}
+                <div className="dark:bg-white/[0.02] bg-gray-50 border dark:border-white/5 border-gray-200 rounded-2xl p-4 space-y-2 transition-colors duration-200">
+                  <p className="text-[9px] font-black uppercase dark:text-gray-400 text-neutral-800">{isHindi ? "आर्डर में एक्स्ट्रा मसाला जोड़ें:" : "Add Extra condiments to order:"}</p>
+                  <div className="grid grid-cols-3 gap-2">
+                    <button onClick={() => { triggerHaptic(); setKetchupAddon(!ketchupAddon); }} className={`p-2 rounded-xl border text-[9px] font-black ${ketchupAddon ? 'border-red-500 bg-red-500/5 text-red-600 animate-none' : 'dark:border-white/5 border-gray-200 bg-transparent dark:text-gray-400 text-neutral-800'}`}>
+                      {isHindi ? "केचप" : "Ketchup"} (+₹10)
+                    </button>
+                    <button onClick={() => { triggerHaptic(); setOreganoAddon(!oreganoAddon); }} className={`p-2 rounded-xl border text-[9px] font-black ${oreganoAddon ? 'border-yellow-500 bg-yellow-500/5 text-yellow-500 animate-none' : 'dark:border-white/5 border-gray-200 bg-transparent dark:text-gray-400 text-neutral-800'}`}>
+                      {isHindi ? "ऑरेगैनो" : "Oregano"} (+₹10)
+                    </button>
+                    <button onClick={() => { triggerHaptic(); setChiliFlakesAddon(!chiliFlakesAddon); }} className={`p-2 rounded-xl border text-[9px] font-black ${chiliFlakesAddon ? 'border-orange-500 bg-orange-500/5 text-orange-500 animate-none' : 'dark:border-white/5 border-gray-200 bg-transparent dark:text-gray-400 text-neutral-800'}`}>
+                      {isHindi ? "चिली फ्लेक्स" : "Chili Flakes"} (+₹10)
+                    </button>
+                  </div>
+                </div>
+
+                {/* 5. DELIVERY AREA ZONE SELECTOR */}
+                {fulfillmentType === "delivery" && (
+                  <div className="dark:bg-white/[0.02] bg-gray-50 border dark:border-white/5 border-gray-200 rounded-2xl p-4 space-y-2.5 transition-colors duration-200">
+                    <div className="bg-amber-500/10 text-amber-500 p-2.5 rounded-xl border border-amber-500/20 text-[9px] font-black flex items-start gap-1.5 leading-normal">
+                      <span>⚠️</span>
+                      <p>{isHindi ? "होम डिलीवरी केवल 12 KM के दायरे के अंदर ही दी जाती है।" : "Home Delivery is strictly available within 12 KM of the cafe."}</p>
+                    </div>
+
+                    <label className="text-[9px] font-black uppercase dark:text-gray-400 text-neutral-800">{isHindi ? "डिलीवरी का क्षेत्र चुनें (KM):" : "Select Delivery Zone (KM):"}</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {DELIVERY_AREAS.map((area) => {
+                        const isSelected = selectedArea.name === area.name;
+                        return (
+                          <button
+                            type="button"
+                            key={area.name}
+                            onClick={() => { triggerHaptic(); setSelectedArea(area); }}
+                            className={`p-3 rounded-xl border text-left flex flex-col justify-between transition-all duration-200 active:scale-95 ${
+                              isSelected 
+                                ? 'border-orange-500 bg-orange-500/10 text-orange-600 shadow-md animate-none' 
+                                : 'dark:border-white/5 border-gray-200 dark:bg-white/[0.01] bg-gray-50 dark:text-neutral-300 text-neutral-900 hover:border-gray-300 hover:dark:border-white/10'
+                            }`}
+                          >
+                            <span className="text-[9px] font-black leading-tight uppercase truncate">{area.name.replace("Mohandra ", "")}</span>
+                            <div className="flex justify-between items-center w-full mt-2">
+                              <span className="text-[8px] font-black dark:text-neutral-300 text-neutral-800">शुल्क: ₹{area.fee}</span>
+                              <span className="text-[8px] font-black bg-gray-100 dark:bg-white/5 px-1.5 py-0.5 rounded dark:text-yellow-400 text-amber-900">Min: ₹{area.minFree}</span>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    <div className="bg-orange-500/5 border border-orange-500/10 rounded-2xl p-4 space-y-2 mt-2">
+                      <div className="flex justify-between items-center text-[10px] font-black uppercase text-orange-500">
+                        <span>🚚 Free Delivery Target:</span>
+                        <span>{getCartSubtotal() >= selectedArea.minFree ? "Achieved! 🎉" : `Need ₹${selectedArea.minFree - getCartSubtotal()} more`}</span>
+                      </div>
+                      <div className="w-full bg-white/5 h-2 rounded-full overflow-hidden">
+                        <div className="bg-orange-500 h-full transition-all duration-300" style={{ width: `${getFreeDeliveryProgressPercent()}%` }} />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* 6. CONDITIONAL FULFILLMENT INPUTS */}
+                {fulfillmentType === "delivery" && (
+                  <div className="dark:bg-white/[0.02] bg-gray-50 p-4 rounded-2xl border dark:border-white/5 border-gray-200 space-y-2 transition-colors duration-200">
+                    <div className="flex items-center gap-1.5 text-orange-500"><MapPin size={14}/> <h3 className="font-black uppercase text-[10px]">{isHindi ? "डिलीवरी का पता" : "Delivery Address"}</h3></div>
+                    <div className="flex justify-between items-center mb-1">
+                      <button type="button" onClick={handleDetectLocation} className="text-[8px] bg-green-600 text-white font-black px-2 py-1 rounded flex items-center gap-1 shadow-sm uppercase animate-none">📍 {isHindi ? "लाइव लोकेशन" : "Live Location"}</button>
+                    </div>
+                    <textarea placeholder={isHindi ? "घर का पता, मुख्य लैंडमार्क के साथ..." : "Ghar ka address, Landmark ke saath..."} value={address} onChange={(e) => setAddress(e.target.value)} className="w-full dark:bg-black/40 bg-white border dark:border-white/10 border-gray-300 rounded-xl p-3 text-xs font-semibold dark:text-white text-neutral-900 outline-none resize-none h-16" />
+                  </div>
+                )}
+
+                {fulfillmentType === "table" && (
+                  <div className="dark:bg-white/[0.02] bg-gray-50 p-4 rounded-2xl border dark:border-white/5 border-gray-200 space-y-2 transition-colors duration-200">
+                    <div className="flex items-center gap-1.5 text-orange-500"><span>🍽️</span> <h3 className="font-black uppercase text-[10px]">{isHindi ? "टेबल नंबर दर्ज करें" : "Enter Table Number"}</h3></div>
+                    <input 
+                      type="text" 
+                      placeholder={isHindi ? "उदा. टेबल संख्या 5" : "e.g. Table No. 5"} 
+                      value={tableNumber} 
+                      onChange={(e) => setTableNumber(e.target.value)} 
+                      className="w-full dark:bg-black/40 bg-white border dark:border-white/10 border-gray-300 rounded-xl p-3 text-xs font-bold dark:text-white text-neutral-900 outline-none" 
+                    />
+                  </div>
+                )}
+
+                {/* 7. ECO FRIENDLY PACKAGING */}
+                <div className="dark:bg-green-950/10 bg-green-50/50 border dark:border-green-500/10 border-green-200/50 rounded-2xl p-4 flex justify-between items-center transition-colors duration-200">
+                  <div className="space-y-0.5">
+                    <p className="text-[10px] font-black text-green-600 uppercase tracking-tight">{isHindi ? "इको-फ्रेंडली पैकिंग" : "Eco-Friendly Packaging"}</p>
+                    <p className="text-[8px] dark:text-gray-400 text-neutral-700 font-bold">{isHindi ? "चम्मच / टिश्यू पेपर की आवश्यकता नहीं है" : "No spoon or tissue paper requested"}</p>
+                  </div>
+                  <input type="checkbox" checked={noCutlery} onChange={() => { triggerHaptic(); setNoCutlery(!noCutlery); }} className="w-4 h-4 accent-green-500" />
+                </div>
+
+                {/* PROMO/COUPON CODE INPUT SECTION */}
+                <div className="dark:bg-white/[0.02] bg-gray-50 border dark:border-white/5 border-gray-200 rounded-2xl p-4 space-y-2.5 transition-colors duration-200">
+                  <label className="text-[9px] font-black uppercase dark:text-gray-400 text-neutral-800">
+                    {isHindi ? "कूपन कोड / प्रोमो कोड:" : "Coupon Code / Promo Code:"}
+                  </label>
+                  <div className="flex gap-2">
+                    <input 
+                      type="text" 
+                      placeholder={isHindi ? "कूपन कोड डालें (उदा: SAVE50)" : "Enter code (e.g. SAVE50)"} 
+                      value={enteredCoupon} 
+                      onChange={(e) => setEnteredCoupon(e.target.value)} 
+                      className="flex-1 dark:bg-black/40 bg-white border dark:border-white/10 border-gray-300 rounded-xl px-3 py-2 text-xs font-bold dark:text-white text-neutral-900 outline-none uppercase" 
+                    />
+                    <button 
+                      type="button" 
+                      onClick={handleApplyCoupon} 
+                      className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-xl text-xs font-black transition-all active:scale-95"
+                    >
+                      {isHindi ? "लागू करें" : "Apply"}
+                    </button>
+                  </div>
+                  {appliedCoupon && (
+                    <div className="flex justify-between items-center bg-green-500/10 border border-green-500/20 px-3 py-1.5 rounded-xl text-[10px] text-green-400 font-bold mt-2">
+                      <span>✅ '{appliedCoupon.code}' Applied (-₹{appliedCoupon.discountValue})</span>
+                      <button 
+                        type="button" 
+                        onClick={() => { triggerHaptic(); setAppliedCoupon(null); setEnteredCoupon(""); }} 
+                        className="text-red-400 hover:text-red-500 font-black ml-2"
+                      >
+                        {isHindi ? "हटाएं" : "Remove"}
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* 8. PAY SUMMARY CARD */}
+                <div className="bg-gradient-to-b from-orange-600 to-orange-700 p-5 rounded-2xl text-white">
+                  <div className="flex justify-between font-bold mb-1.5 text-xs"><span>{isHindi ? "आइटम का टोटल" : "Items Total"}</span> <span>₹{getCartSubtotal()}</span></div>
+                  {getCartAddonsPrice() > 0 && <div className="flex justify-between font-bold mb-1.5 text-xs"><span>{isHindi ? "एक्स्ट्रा मसाला" : "Extra Condiments"}</span> <span>+₹{getCartAddonsPrice()}</span></div>}
+                  {appliedCoupon && (
+                    <div className="flex justify-between font-bold mb-1.5 text-xs text-green-200"><span>{isHindi ? "कूपन छूट" : "Coupon Discount"}</span> <span>-₹{appliedCoupon.discountValue}</span></div>
+                  )}
+                  {fulfillmentType === "delivery" && <div className="flex justify-between font-bold mb-3 text-xs opacity-90"><span>{isHindi ? "डिलीवरी शुल्क" : "Delivery Charge"}</span> <span>₹{getDeliveryCharge()}</span></div>}
+                  <div className="h-px bg-white/20 mb-3" />
+                  <div className="flex justify-between font-black text-xl"><span>{isHindi ? "भुगतान राशि" : "To Pay"}</span> <span>₹{getTotalBillPrice()}</span></div>
+                </div>
+
+                {/* 9. PAYMENT MODE TABS & WHATSAPP CHECKOUT */}
+                <div className="dark:bg-white/[0.02] bg-gray-50 border dark:border-white/5 border-gray-200 rounded-2xl p-4 space-y-2.5 transition-colors duration-200">
+                  <label className="text-[9px] font-black uppercase dark:text-gray-400 text-neutral-800">{isHindi ? "भुगतान का माध्यम चुनें:" : "Select Payment Method:"}</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => { triggerHaptic(); setPaymentMethod("cod"); }}
+                      className={`p-3 rounded-xl border flex flex-col items-center justify-center gap-1 transition-all ${paymentMethod === "cod" ? 'border-orange-500 bg-orange-500/10 text-orange-400' : 'dark:border-white/5 border-gray-200'}`}
+                    >
+                      <span className="text-sm">💵</span>
+                      <span className="text-[9px] font-black">{isHindi ? "कैश ऑन डिलीवरी" : "Cash on Delivery"}</span>
+                    </button>
+                    <button
+                      onClick={() => { triggerHaptic(); setPaymentMethod("upi"); }}
+                      className={`p-3 rounded-xl border flex flex-col items-center justify-center gap-1 transition-all ${paymentMethod === "upi" ? 'border-orange-500 bg-orange-500/10 text-orange-400' : 'dark:border-white/5 border-gray-200'}`}
+                    >
+                      <span className="text-sm">📱</span>
+                      <span className="text-[9px] font-black">{isHindi ? "ऑनलाइन भुगतान (UPI)" : "Pay Online (UPI)"}</span>
+                    </button>
+                  </div>
+
+                  {paymentMethod === "upi" && (
+                    <div className="bg-[#111] p-3 rounded-2xl border border-white/5 space-y-2 text-center text-[10px] font-bold text-gray-300">
+                      <p className="text-yellow-400 uppercase tracking-wider">{isHindi ? "आसान ऑनलाइन पेमेंट" : "Instant UPI Checkout"}</p>
+                      <p>{isHindi ? "ऑर्डर बटन दबाते ही आपके फोन का PhonePe/Paytm ऐप खुल जाएगा।  कृपया भुगतान के बाद स्क्रीनशॉट चैट पर भेजें!" : "Clicking the order button will open PhonePe/Paytm directly with pre-filled billing amount!"}</p>
+                    </div>
+                  )}
+
+                  {/* WHATSAPP TRIGGER */}
+                  <button 
+                    onClick={sendWhatsAppOrder} 
+                    type="button" 
+                    disabled={isSubmittingOrder} 
+                    className="w-full bg-green-600 hover:bg-green-700 p-4 rounded-2xl font-black text-sm text-white flex items-center justify-center gap-2 shadow-lg animate-none disabled:opacity-60 disabled:cursor-not-allowed mt-2"
+                  >
+                    {isSubmittingOrder ? (
+                      <span className="flex items-center gap-2">
+                        <Loader2 className="animate-spin" size={16} />
+                        Kripya thoda wait karein... ⏳
+                      </span>
+                    ) : (
+                      <span>{isHindi ? "व्हाट्सएप पर ऑर्डर भेजें ➔" : "ORDER ON WHATSAPP ➔"}</span>
+                    )}
+                  </button>
+                </div>
+
+              </div>
+            </motion.div>
+          </motion.div>
         )}
       </AnimatePresence>
 
@@ -3094,7 +3038,7 @@ export default function BbCafeHome() {
               <Gift className="mx-auto text-yellow-400" size={32} />
               <div>
                 <h3 className="text-lg font-black text-yellow-400 uppercase italic">Gift Loyalty Points</h3>
-                <p className="text-[9px] text-gray-500 font-semibold mt-0.5">अपने पॉइंट्स किसी दोस्त को गिफ्ट करें</p>
+                <p className="text-[9px] text-gray-555 font-semibold mt-0.5">अपने पॉइंट्स किसी दोस्त को गिफ्ट करें</p>
               </div>
               <div className="space-y-3 text-left">
                 <div className="space-y-1">
@@ -3114,12 +3058,12 @@ export default function BbCafeHome() {
                 <button type="submit" disabled={isGiftingLoading} className="flex-1 bg-yellow-400 text-black font-black p-3 rounded-xl text-xs uppercase flex items-center justify-center gap-1">
                   {isGiftingLoading ? <Loader2 className="animate-spin" size={14} /> : <span>Gift Points 🎁</span>}
                 </button>
-                <button type="button" onClick={() => { triggerHaptic(); setIsGiftModalOpen(false); setGiftPhone(""); setGiftPointsAmount(""); setGiftSenderPin(""); }} className="bg-white/5 text-gray-400 font-bold p-3 rounded-xl text-xs">CANCEL</button>
+                <button type="button" onClick={() => { triggerHaptic(); setIsGiftModalOpen(false); setGiftPhone(""); setGiftPointsAmount(""); setGiftSenderPin(""); }} className="bg-white/5 text-gray-405 font-bold p-3 rounded-xl text-xs">CANCEL</button>
               </div>
             </motion.form>
           </div>
         )}
-      </  AnimatePresence>
+      </AnimatePresence>
 
       {/* VERIFIED SOCIAL POINTS CLAIM MODAL */}
       <AnimatePresence>
