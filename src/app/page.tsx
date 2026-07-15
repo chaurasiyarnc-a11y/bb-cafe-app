@@ -63,7 +63,6 @@ const DIY_PIZZA_PRICES: any = {
 const SOCIAL_LINKS = [
   { id: 'facebook', label: '🔵 Facebook', icon: '📘', points: 1, url: 'https://www.facebook.com/bbcafe.in/' },
   { id: 'instagram', label: '📸 Instagram', icon: '📸', points: 1, url: 'https://www.instagram.com/bbcafe.in/' },
-  { id: 'whatsapp_msg', label: '🟢 WhatsApp Msg', icon: '💬', points: 1, url: 'https://wa.me/919714293759' },
   { id: 'whatsapp_channel', label: '📢 WhatsApp Channel', icon: '📢', points: 1, url: 'https://whatsapp.com/channel/0029VaLhggoGE56natoQI43y' },
   { id: 'snapchat', label: '👻 Snapchat', icon: '👻', points: 1, url: 'https://www.snapchat.com/add/bbcafe.in' },
   { id: 'youtube', label: '🔴 YouTube', icon: '🎥', points: 1, url: 'https://www.youtube.com/@bbcafe.i' }
@@ -103,7 +102,7 @@ export default function BbCafeHome() {
   
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [storeOpen, setStoreOpen] = useState(true);
-  const [isBannerEnabled, setIsBannerEnabled] = useState(true); // Dynamic Promo Banner Toggle
+  const [isBannerEnabled, setIsBannerEnabled] = useState(true); 
   const [mounted, setMounted] = useState(false);
   const [isOnline, setIsOnline] = useState(true);
 
@@ -604,7 +603,7 @@ export default function BbCafeHome() {
   useEffect(() => {
     setMounted(true);
 
-    // FontAwesome Dynamic Loader to support the exact raw HTML requested classes
+    // FontAwesome Dynamic Loader
     if (!document.getElementById("fa-css")) {
       const link = document.createElement("link");
       link.id = "fa-css";
@@ -1713,7 +1712,7 @@ export default function BbCafeHome() {
           </div>
         )}
         
-        {/* Promo Banner - Conditional Admin Toggle */}
+        {/* Promo Banner */}
         {isBannerEnabled && (
           <div className="w-full h-36 rounded-2xl overflow-hidden relative border border-white/5 bg-white/[0.02]">
             {(banners.length === 0 || bannerError) ? (
@@ -2024,7 +2023,7 @@ export default function BbCafeHome() {
                         <div className="h-px dark:bg-white/5 bg-gray-100 my-2.5" />
                         <div className="flex justify-between items-end mt-0.5">
                           <div>
-                            <p className="dark:text-gray-500 text-gray-400 text-[8px] font-black uppercase tracking-widest leading-none mb-1">{isHindi ? "कीमत" : "Price"}</p>
+                            <p className="dark:text-gray-550 text-gray-400 text-[8px] font-black uppercase tracking-widest leading-none mb-1">{isHindi ? "कीमत" : "Price"}</p>
                             <p className="text-orange-700 dark:text-orange-500 font-black text-base leading-none">{getDisplayPrice(item)}</p>
                             {item.variants && <span className="text-[8px] font-bold dark:text-gray-400 text-gray-500 mt-1 block">{isHindi ? "विकल्प उपलब्ध हैं" : "Options available"}</span>}
                           </div>
@@ -2147,14 +2146,23 @@ export default function BbCafeHome() {
             </div>
           </div>
 
-          {/* Social Icons Container (Exactly Above Time & Location Blocks) */}
+          {/* Social Icons Container (Directly in Public Folder Paths) */}
           <div className="social-icons flex justify-center gap-5 py-4 dark:bg-white/[0.02] bg-white border dark:border-white/5 border-gray-200 rounded-2xl shadow-sm">
-            <a href="https://www.facebook.com/bbcafe.in/" target="_blank" rel="noreferrer" title="Facebook" className="text-blue-600 hover:scale-110 transition-transform text-2xl"><i className="fab fa-facebook"></i></a>
-            <a href="https://www.instagram.com/bbcafe.in/" target="_blank" rel="noreferrer" title="Instagram" className="text-pink-600 hover:scale-110 transition-transform text-2xl"><i className="fab fa-instagram"></i></a>
-            <a href="https://wa.me/919714293759" target="_blank" rel="noreferrer" title="WhatsApp" className="text-green-500 hover:scale-110 transition-transform text-2xl"><i className="fab fa-whatsapp"></i></a>
-            <a href="https://whatsapp.com/channel/0029VaLhggoGE56natoQI43y" target="_blank" rel="noreferrer" title="WhatsApp Channel" className="text-green-600 hover:scale-110 transition-transform text-2xl"><i className="fas fa-bullhorn"></i></a>
-            <a href="https://www.snapchat.com/add/bbcafe.in" target="_blank" rel="noreferrer" title="Snapchat" className="text-yellow-500 hover:scale-110 transition-transform text-2xl"><i className="fab fa-snapchat"></i></a>
-            <a href="https://www.youtube.com/@bbcafe.i" target="_blank" rel="noreferrer" title="YouTube" className="text-red-600 hover:scale-110 transition-transform text-2xl"><i className="fab fa-youtube"></i></a>
+            <a href="https://www.facebook.com/bbcafe.in/" target="_blank" rel="noreferrer" title="Facebook" className="hover:scale-110 transition-transform">
+              <img src="/facebook.png" alt="Facebook" className="w-8 h-8 object-contain" />
+            </a>
+            <a href="https://www.instagram.com/bbcafe.in/" target="_blank" rel="noreferrer" title="Instagram" className="hover:scale-110 transition-transform">
+              <img src="/instagram.png" alt="Instagram" className="w-8 h-8 object-contain" />
+            </a>
+            <a href="https://whatsapp.com/channel/0029VaLhggoGE56natoQI43y" target="_blank" rel="noreferrer" title="WhatsApp Channel" className="hover:scale-110 transition-transform">
+              <img src="/whatsapp.png" alt="WhatsApp Channel" className="w-8 h-8 object-contain" />
+            </a>
+            <a href="https://www.snapchat.com/add/bbcafe.in" target="_blank" rel="noreferrer" title="Snapchat" className="hover:scale-110 transition-transform">
+              <img src="/snapchat.png" alt="Snapchat" className="w-8 h-8 object-contain" />
+            </a>
+            <a href="https://www.youtube.com/@bbcafe.i" target="_blank" rel="noreferrer" title="YouTube" className="hover:scale-110 transition-transform">
+              <img src="/youtube.png" alt="YouTube" className="w-8 h-8 object-contain" />
+            </a>
           </div>
 
           {/* Time & Location Grid */}
@@ -2430,7 +2438,7 @@ export default function BbCafeHome() {
 
               {normalPizzaSize && (selectedProduct?.category === "Special Pizza" || selectedProduct?.name?.toLowerCase().includes("pizza")) && (
                 <div className="space-y-3 mb-4 border-t border-white/5 pt-3">
-                  <p className="text-[10px] font-bold text-gray-550 uppercase">{isHindi ? "2. एक्स्ट्रा मसाला/टॉपिंग चुनें:" : "2. Select Add-ons:"}</p>
+                  <p className="text-[10px] font-bold text-gray-555 uppercase">{isHindi ? "2. एक्स्ट्रा मसाला/टॉपिंग चुनें:" : "2. Select Add-ons:"}</p>
                   <div className="grid grid-cols-2 gap-2">
                     {Object.entries(PIZZA_ADDONS[normalPizzaSize.toLowerCase()] || {}).map(([addon, cost]) => {
                       const isSelected = !!normalPizzaAddons[addon];
@@ -2511,19 +2519,19 @@ export default function BbCafeHome() {
                   
                   <div className="space-y-3 text-left">
                     <div className="space-y-1">
-                      <label className="text-[9px] font-bold text-gray-550 uppercase">{isHindi ? "आपका नाम" : "Your Name"}</label>
+                      <label className="text-[9px] font-bold text-gray-555 uppercase">{isHindi ? "आपका नाम" : "Your Name"}</label>
                       <input type="text" placeholder="Enter your name..." value={tempName} onChange={(e) => setTempName(e.target.value)} className="w-full dark:bg-neutral-800 bg-gray-50 border dark:border-neutral-700 border-gray-200 p-3 rounded-xl font-bold dark:text-white text-neutral-900 outline-none focus:border-orange-500 text-xs" required />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[9px] font-bold text-gray-550 uppercase">{isHindi ? "मोबाइल नंबर" : "Mobile Number"}</label>
+                      <label className="text-[9px] font-bold text-gray-555 uppercase">{isHindi ? "मोबाइल नंबर" : "Mobile Number"}</label>
                       <input type="tel" maxLength={10} placeholder="10-digit Phone Number" value={tempPhone} onChange={(e) => setTempPhone(e.target.value)} className="w-full dark:bg-neutral-800 bg-gray-50 border dark:border-neutral-700 border-gray-200 p-3 rounded-xl font-bold dark:text-white text-neutral-900 outline-none focus:border-orange-500 text-xs" required />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[9px] font-bold text-gray-550 uppercase flex items-center gap-1"><Lock size={10}/> <span>{isHindi ? "सुरक्षा पिन बनाएँ (4-अंक)" : "Create 4-Digit Security PIN"}</span></label>
+                      <label className="text-[9px] font-bold text-gray-555 uppercase flex items-center gap-1"><Lock size={10}/> <span>{isHindi ? "सुरक्षा पिन बनाएँ (4-अंक)" : "Create 4-Digit Security PIN"}</span></label>
                       <input type="password" maxLength={4} placeholder="e.g. 1234" value={tempPin} onChange={(e) => setTempPin(e.target.value)} className="w-full dark:bg-neutral-800 bg-gray-50 border dark:border-neutral-700 border-gray-200 p-3 rounded-xl font-bold dark:text-white text-neutral-900 outline-none focus:border-orange-500 text-xs text-center tracking-widest" required />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[9px] font-bold text-gray-550 uppercase">{isHindi ? "इनवाइट कोड (वैकल्पिक)" : "Referral Code (Optional)"}</label>
+                      <label className="text-[9px] font-bold text-gray-555 uppercase">{isHindi ? "इनवाइट कोड (वैकल्पिक)" : "Referral Code (Optional)"}</label>
                       <input type="text" placeholder="Enter invite code..." value={tempRefCode} onChange={(e) => setTempRefCode(e.target.value)} className="w-full dark:bg-neutral-800 bg-gray-50 border dark:border-neutral-700 border-gray-200 p-3 rounded-xl font-bold dark:text-white text-neutral-900 outline-none focus:border-orange-500 text-xs" />
                     </div>
                   </div>
@@ -2534,10 +2542,10 @@ export default function BbCafeHome() {
                   {/* USER ACCOUNT VIEW */}
                   <div className="dark:bg-white/[0.02] bg-gray-50 p-4 rounded-2xl border dark:border-white/5 border-gray-200 flex justify-between items-center transition-colors duration-200">
                     <div>
-                      <p className="text-[8px] dark:text-gray-500 text-neutral-600 font-black uppercase">{isHindi ? "ग्राहक प्रोफ़ाइल" : "Customer Profile"}</p>
+                      <p className="text-[8px] dark:text-gray-555 text-neutral-655 font-black uppercase">{isHindi ? "ग्राहक प्रोफ़ाइल" : "Customer Profile"}</p>
                       <h4 className="font-black text-base text-orange-500">{customerDetails.name}</h4>
                       <p className="text-xs dark:text-gray-400 text-neutral-700 font-semibold">{customerDetails.phone}</p>
-                      <p className="text-[9px] text-yellow-600 dark:text-yellow-400 font-bold mt-1 uppercase">{isHindi ? "इन्वाइट कोड:" : "Invite Code:"} {getReferralCode()}</p>
+                      <p className="text-[9px] text-yellow-650 dark:text-yellow-400 font-bold mt-1 uppercase">{isHindi ? "इन्वाइट कोड:" : "Invite Code:"} {getReferralCode()}</p>
                     </div>
                     <button 
                       onClick={() => { 
@@ -2582,7 +2590,7 @@ export default function BbCafeHome() {
                     
                     <div className="flex justify-between items-center">
                       <div>
-                        <h4 className="text-2xl font-black dark:text-white text-neutral-900 leading-none">{customerPoints} <span className="text-[9px] dark:text-gray-500 text-neutral-700 font-black uppercase">Points</span></h4>
+                        <h4 className="text-2xl font-black dark:text-white text-neutral-900 leading-none">{customerPoints} <span className="text-[9px] dark:text-gray-555 text-neutral-700 font-black uppercase">Points</span></h4>
                         <p className="text-[8px] dark:text-gray-400 text-neutral-700 font-bold mt-1">{isHindi ? "₹100 खर्च करें = 1 पॉइंट पाएं!" : "Spend ₹100 = Get 1 Loyalty Point!"}</p>
                       </div>
                       <div className="text-right text-[8px] dark:text-yellow-400 text-amber-900 font-black space-y-0.5 uppercase max-h-20 overflow-y-auto no-scrollbar">
@@ -2593,7 +2601,7 @@ export default function BbCafeHome() {
                     {/* Points Passbook Ledger */}
                     {pointsHistory.length > 0 && (
                       <div className="pt-2 border-t border-white/5 space-y-1.5">
-                        <p className="text-[9px] font-black uppercase dark:text-gray-400 text-neutral-700">{isHindi ? "📜 पॉइंट्स पासबुक (लेन-देन):" : "📜 Points Passbook History:"}</p>
+                        <p className="text-[9px] font-black uppercase dark:text-gray-400 text-neutral-700">{isHindi ? "📜  पॉइंट्स पासबुक (लेन-देन):" : "📜 Points Passbook History:"}</p>
                         <div className="space-y-1 max-h-24 overflow-y-auto pr-1 text-[8px] font-bold">
                           {pointsHistory.map((h: any) => (
                             <div key={h.id} className="flex justify-between items-center bg-black/10 dark:bg-white/5 p-1.5 rounded border dark:border-white/5 border-gray-200">
@@ -2630,7 +2638,7 @@ export default function BbCafeHome() {
                           const inCartCost = cart.reduce((acc: number, i: any) => acc + (i.pointsCost || 0), 0);
                           const isAffordable = (customerPoints - inCartCost) >= rule.pointsCost;
                           return (
-                            <button key={rule.id} type="button" onClick={() => handleCustomerRedeem(`reward-${rule.id}`, `🎁 FREE ${rule.rewardName}`, rule.pointsCost)} disabled={!isAffordable} className={`py-2 px-2 rounded text-[9px] font-black uppercase border truncate transition-all ${isAffordable ? 'bg-yellow-400 text-black border-yellow-400 hover:bg-yellow-500' : 'bg-neutral-100 dark:bg-white/5 text-neutral-500 dark:text-gray-500 border-neutral-200 dark:border-white/5 cursor-not-allowed'}`}>🎁 {rule.rewardName} ({rule.pointsCost} P)</button>
+                            <button key={rule.id} type="button" onClick={() => handleCustomerRedeem(`reward-${rule.id}`, `🎁 FREE ${rule.rewardName}`, rule.pointsCost)} disabled={!isAffordable} className={`py-2 px-2 rounded text-[9px] font-black uppercase border truncate transition-all ${isAffordable ? 'bg-yellow-400 text-black border-yellow-400 hover:bg-yellow-500' : 'bg-neutral-100 dark:bg-white/5 text-neutral-550 dark:text-gray-555 border-neutral-222 dark:border-white/5 cursor-not-allowed'}`}>🎁 {rule.rewardName} ({rule.pointsCost} P)</button>
                           );
                         })}
                       </div>
@@ -2703,7 +2711,7 @@ export default function BbCafeHome() {
 
               <div className="w-12 h-1 bg-white/15 rounded-full mx-auto mb-4" />
               <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-black dark:text-white text-neutral-900 font-mono">{isHindi ? "आपका कार्ट आर्डर" : "Your Order Cart"}</h2>
+                <h2 className="text-2xl font-black dark:text-white text-neutral-900 font-mono">{isHindi ? "आपका कर्ट आर्डर" : "Your Order Cart"}</h2>
                 <button onClick={() => { triggerHaptic(); setIsCartOpen(false); }} className="p-2.5 dark:bg-white/5 bg-gray-100 hover:dark:bg-white/10 hover:bg-gray-200 dark:text-white text-neutral-800 rounded-full transition-all"><X size={20} /></button>
               </div>
 
@@ -3039,7 +3047,7 @@ export default function BbCafeHome() {
               <Gift className="mx-auto text-yellow-400" size={32} />
               <div>
                 <h3 className="text-lg font-black text-yellow-400 uppercase italic">Gift Loyalty Points</h3>
-                <p className="text-[9px] text-gray-500 font-semibold mt-0.5">अपनेने पॉइंट्स किसी दोस्त को गिफ्ट करें</p>
+                <p className="text-[9px] text-gray-500 font-semibold mt-0.5">अपने पॉइंट्स किसी दोस्त को गिफ्ट करें</p>
               </div>
               <div className="space-y-3 text-left">
                 <div className="space-y-1">
@@ -3173,7 +3181,7 @@ export default function BbCafeHome() {
                 </button>
               </div>
 
-              <p className="text-[9px] text-green-650 dark:text-green-400 dark:bg-green-500/10 bg-green-50 p-2.5 rounded-xl font-bold">
+              <p className="text-[9px] text-green-600 dark:text-green-400 dark:bg-green-500/10 bg-green-50 p-2.5 rounded-xl font-bold">
                 🌱 पेपर रसीद के बिना DIGITAL इनवॉइस जनरेट किया गया है। धन्यवाद!
               </p>
               <button onClick={() => { triggerHaptic(); setShowInvoice(false); }} className="w-full bg-white text-black p-3 rounded-xl text-xs font-black uppercase">
