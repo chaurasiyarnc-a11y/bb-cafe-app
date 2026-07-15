@@ -75,6 +75,13 @@ const SOCIAL_LINKS = [
   { id: 'youtube', label: '🔴 YouTube', icon: '🎥', points: 1, url: 'https://www.youtube.com/@bbcafe.i' }
 ];
 
+const SUGGESTED_REVIEWS = [
+  "पिज्जा का स्वाद लाजवाब है! मज़ा आ गया 🍕😋",
+  "मोहांद्रा में सबसे बेस्ट सर्विस और स्वाद! ⭐⭐⭐⭐⭐",
+  "सुपर फास्ट डिलीवरी और शानदार पैकेजिंग! 🛵📦",
+  "साफ़-सफ़ाई और शुद्धता 10/10 है! 🧼👌"
+];
+
 export default function BbCafeHome() {
   const store = useCartStore() as any;
   const cart = store?.items || [];
