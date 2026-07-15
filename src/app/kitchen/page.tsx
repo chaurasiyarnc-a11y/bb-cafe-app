@@ -4,6 +4,8 @@ import { db } from '../../lib/firebase';
 import { collection, onSnapshot, query, doc, updateDoc, orderBy, getDoc, where, getDocs } from 'firebase/firestore';
 import { Clock, Check, Loader2, Play, Lock, AlertCircle, WifiOff, X } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
+// नया इम्पोर्ट: नोटिफिकेशन हेल्पर फ़ाइल से जोड़ा गया है
+import { requestKitchenPermission } from '../../lib/messaging';
 
 export default function KitchenDisplaySystem() {
   const [orders, setOrders] = useState<any[]>([]);
@@ -152,6 +154,20 @@ export default function KitchenDisplaySystem() {
     };
   }, [isLocked]);
 
+  // --- नया: किचन नोटिफिकेशन परमिशन रजिस्टर (FCM) ---
+  useEffect(() => {
+    if (isLocked) return;
+
+    // ध्यान रखें: यहाँ अपनी Firebase Web Push (VAPID) Key डालें जिसे आपने सेटिंग से जनरेट किया था
+    const MY_VAPID_KEY = "YOUR_GENERATED_VAPID_KEY_HERE"; 
+
+    if (MY_VAPID_KEY !== "YOUR_GENERATED_VAPID_KEY_HERE") {
+      requestKitchenPermission(MY_VAPID_KEY);
+    } else {
+      console.warn("कृपया kitchen/page.tsx में 'YOUR_GENERATED_VAPID_KEY_HERE' को अपनी वास्तविक VAPID की से बदलें।");
+    }
+  }, [isLocked]);
+
   // LOGIN: Verifies Entered PIN against personal Cook account in Firestore
   const handlePinSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -192,6 +208,45 @@ export default function KitchenDisplaySystem() {
     }
   };
 
+  // --- नया: डिलीवरी बॉय को पुश नोटिफिकेशन भेजने की क्रिया ---
+  const triggerDeliveryBoyNotification = async (orderId: string) => {
+    try {
+      // 1. डेटाबेस से ऑर्डर विवरण और असाइन डिलीवरी बॉय का नाम निकालें
+      const orderSnap = await getDoc(doc(db, "orders", orderId));
+      if (orderSnap.exists()) {
+        const orderData = orderSnap.data();
+        // आपके डेटाबेस स्ट्रक्चर के अनुसार आर्डर में असाइन डिलीवरी बॉय की ID (assignedTo या deliveryBoyId)
+        const assignedTo = orderData.assignedTo || orderData.deliveryBoyId;
+        const tokenNumber = orderData.tokenNumber || "N/A";
+
+        if (assignedTo) {
+          // 2. staff_members से उस डिलीवरी बॉय का FCM टोकन प्राप्त करें
+          const staffSnap = await getDoc(doc(db, "staff_members", assignedTo));
+          if (staffSnap.exists() && staffSnap.data().fcmToken) {
+            const dToken = staffSnap.data().fcmToken;
+
+            // 3. हमारे API रूट पर POST रिक्वेस्ट भेजें
+            await fetch('/api/send-notification', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                token: dToken,
+                title: "नया आर्डर तैयार है! 🛵",
+                body: `टोकन संख्या #${tokenNumber} डिलीवर करने के लिए तैयार है।`,
+                url: "/delivery"
+              })
+            });
+            console.log("FCM notification sent successfully to delivery boy!");
+          } else {
+            console.warn("Delivery boy fcmToken not found in staff_members.");
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Failed to send FCM notification to delivery boy:", error);
+    }
+  };
+
   const handleUpdateStatus = async (orderId: string, currentStatus: string) => {
     const nextStatusMap: { [key: string]: string } = {
       'pending': 'preparing',
@@ -204,6 +259,11 @@ export default function KitchenDisplaySystem() {
     try {
       await updateDoc(doc(db, "orders", orderId), { status: nextStatus });
       toast.success(`Status updated to ${nextStatus.replace('_', ' ')}!`);
+
+      // नया: जब स्टेटस 'preparing' (तैयार हो रहा है) से 'out_for_delivery' (तैयार है/वितरण पर है) होता है
+      if (currentStatus === 'preparing') {
+        triggerDeliveryBoyNotification(orderId);
+      }
     } catch (e) {
       toast.error("Failed to update status.");
     }
