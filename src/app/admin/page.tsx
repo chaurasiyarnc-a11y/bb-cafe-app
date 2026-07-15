@@ -222,7 +222,7 @@ const handlePrintRosterSOP = (product: any) => {
           ${stepsHtml}
         </div>
         <div class="warning-box">
-          ⚠️ रसोइया ध्यान दें: कैफ़े की गुणवत्ता बनाए रखने के लिए इस चार्ट के अनुसार ही सटीक मात्रा का उपयोग करें!
+          ⚠️ रसोइया ध्यान दें: कैफ़े की गुणवत्ता बनाए रखने के लिए इस  चार्ट के अनुसार ही सटीक मात्रा का उपयोग करें!
         </div>
         <div class="no-print" style="text-align: center; margin-top: 40px;">
           <button onclick="window.print()" style="padding: 14px 35px; font-size: 16px; font-weight: bold; background: #f97316; color: #fff; border: none; border-radius: 8px; cursor: pointer; text-transform: uppercase; letter-spacing: 1px;">Print Recipe Poster</button>
@@ -1905,7 +1905,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                 </div>
               </div>
 
-              {/* 4-Column stats grid with direct integration of the Rejected Orders metric */}
+              {/* 4-Column stats grid */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 border-t border-white/5 pt-4">
                 <div className="bg-white/[0.01] border border-white/5 p-3 rounded-2xl text-center">
                   <p className="text-[9px] font-bold text-gray-505 uppercase">Range Sales</p>
@@ -1945,7 +1945,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                     <span className="text-[8px] font-bold text-green-400 opacity-0 group-hover:opacity-100 transition-opacity">₹{day.sales}</span>
                     <div 
                       style={{ height: `${day.percentage}%` }} 
-                      className="w-full bg-gradient-to-t from-orange-600 to-orange-400 rounded-t-lg min-h-[4px] relative"
+                      className="w-gradient-to-t from-orange-600 to-orange-400 rounded-t-lg min-h-[4px] relative"
                     ></div>
                     <span className="text-[9px] font-bold text-gray-555 uppercase mt-1">{day.label}</span>
                   </div>
@@ -1987,7 +1987,7 @@ Report generated automatically by Bum Bum Cafe POS.`
               </button>
             </div>
 
-            {/* Permanent Financial Ledger with visual formatting for rejected/fake orders */}
+            {/* Permanent Financial Ledger */}
             <div className="space-y-4 font-mono">
               <h4 className="text-sm font-black text-gray-400 uppercase tracking-widest pt-2">📚 Permanent Financial Ledger</h4>
               {orders.length === 0 ? (
@@ -1997,7 +1997,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                   <div key={o.id} className={`p-5 rounded-3xl flex justify-between items-center relative overflow-hidden text-xs border ${o.status === 'rejected' ? 'bg-red-500/[0.02] border-red-500/20' : 'bg-[#111] border-white/5'}`}>
                     <div className="space-y-1 pr-4">
                       {o.status === 'rejected' && (
-                        <div className="mb-2 bg-red-500/10 text-red-500 border border-red-500/20 text-[8px] font-black uppercase px-2 py-0.5 rounded-md w-max">
+                        <div className="mb-2 bg-red-500/10 text-red-500 border border-red-500/20 text-[8px] font-black uppercase px-2.5 py-1 rounded-md w-max">
                           🚫 Rejected / Fake Order
                         </div>
                       )}
@@ -2007,7 +2007,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                       </div>
                       <h4 className="font-extrabold text-sm text-gray-300">Name: {o.customerName || "Customer"}</h4>
                       <p className="text-[11px] font-bold text-orange-500 font-sans">Mobile: {o.customerPhone || "N/A"}</p>
-                      <p className="text-[10px] text-gray-450 font-medium">Address: {o.address || "N/A"}</p>
+                      <p className="text-[10px] text-gray-455 font-medium">Address: {o.address || "N/A"}</p>
                       
                       <div className="border-t border-white/5 pt-2 mt-2 space-y-0.5">
                         {o.items?.map((item: any, idx: number) => (
@@ -2136,12 +2136,12 @@ Report generated automatically by Bum Bum Cafe POS.`
                 <h3 className="text-lg font-black text-orange-500 italic uppercase">Add Product Form</h3>
                 
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-gray-400 uppercase">Item Name</label>
+                  <label className="text-xs font-bold text-gray-405 uppercase">Item Name</label>
                   <input type="text" placeholder="e.g., Cheese Corn Pizza" value={newName} onChange={(e) => setNewName(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-white" required />
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-gray-400 uppercase">Category</label>
+                  <label className="text-xs font-bold text-gray-405 uppercase">Category</label>
                   <select value={newCategory} onChange={(e) => setNewCategory(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-white" required>
                     {categoryOptions.filter(c => c !== "All" && c !== "DIY Pizza").map(cat => (
                       <option key={cat} value={cat} className="bg-[#111]">{cat}</option>
@@ -2150,12 +2150,12 @@ Report generated automatically by Bum Bum Cafe POS.`
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-gray-400 uppercase">Image URL</label>
+                  <label className="text-xs font-bold text-gray-405 uppercase">Image URL</label>
                   <input type="url" placeholder="Paste image url link..." value={newImage} onChange={(e) => setNewImage(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-white" required />
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-gray-404 uppercase">Portion Option Type</label>
+                  <label className="text-xs font-bold text-gray-405 uppercase">Portion Option Type</label>
                   <select value={variantType} onChange={(e: any) => setVariantType(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-white">
                     <option value="none" className="bg-[#111]">None (Single Price)</option>
                     <option value="half_full" className="bg-[#111]">Half / Full</option>
@@ -2174,7 +2174,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                 {(variantType === 'half_full' || variantType === 'plain_butter') && (
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1">
-                      <label className="text-xs font-bold text-gray-400 uppercase">Half / Plain Price (₹)</label>
+                      <label className="text-xs font-bold text-gray-404 uppercase">Half / Plain Price (₹)</label>
                       <input type="number" placeholder="Price" value={halfPrice} onChange={(e) => setHalfPrice(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-white" />
                     </div>
                     <div className="space-y-1">
@@ -2186,7 +2186,7 @@ Report generated automatically by Bum Bum Cafe POS.`
 
                 {variantType === 'pizza_sizes' && (
                   <div className="space-y-3 bg-[#111]/40 p-4 rounded-2xl border border-white/5">
-                    <p className="text-[10px] text-orange-400 font-extrabold uppercase">Prices (Leave blank if unavailable):</p>
+                    <p className="text-[10px] text-orange-400 font-extrabold uppercase font-sans">Prices (Leave blank if unavailable):</p>
                     <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-1"><label className="text-xs font-bold text-gray-404 uppercase">Small (₹)</label><input type="number" value={priceSmall} onChange={(e) => setPriceSmall(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-white text-xs font-bold" /></div>
                       <div className="space-y-1"><label className="text-xs font-bold text-gray-404 uppercase">Medium (₹)</label><input type="number" value={priceMedium} onChange={(e) => setPriceMedium(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-white text-xs font-bold" /></div>
@@ -2581,7 +2581,7 @@ Report generated automatically by Bum Bum Cafe POS.`
               
               <div className="space-y-1">
                 <label className="text-xs font-bold text-gray-400 uppercase">Description</label>
-                <input type="text" placeholder="e.g. Freshly baked mozzarella cheese pull!" value={newReelDesc} onChange={(e) => setNewReelDesc(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-white outline-none" required />
+                <input type="text" placeholder="e.g. Freshly baked mozzarella cheese pull!" value={newReelDesc} onChange={(e) => setNewReelDesc(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs text-white outline-none" required />
               </div>
               
               <div className="space-y-1">
@@ -2815,7 +2815,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1">
                       <label className="text-[10px] font-bold text-gray-455 uppercase">Ingredient / Action (क्या डालें)</label>
-                      <input type="text" placeholder="e.g. Pizza Base / Cheese" value={rosterStepName} onChange={(e) => rosterStepName(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-xs font-bold text-white" required />
+                      <input type="text" placeholder="e.g. Pizza Base / Cheese" value={rosterStepName} onChange={(e) => setRosterStepName(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-xs font-bold text-white" required />
                     </div>
                     <div className="space-y-1">
                       <label className="text-[10px] font-bold text-gray-455 uppercase">Quantity / मात्रा</label>
@@ -3300,7 +3300,7 @@ Report generated automatically by Bum Bum Cafe POS.`
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-gray-400 uppercase">Write Promotional Message</label>
+              <label className="text-[10px] font-bold text-gray-405 uppercase">Write Promotional Message</label>
               <textarea 
                 value={broadcastMessage} 
                 onChange={(e) => setBroadcastMessage(e.target.value)} 
@@ -3344,8 +3344,8 @@ Report generated automatically by Bum Bum Cafe POS.`
                     return (
                       <div key={user.phone} className={`flex justify-between items-center p-2 rounded-xl text-xs font-bold border transition-colors ${isAlreadySent ? 'bg-green-500/[0.02] border-green-500/10' : 'bg-white/[0.01] border-white/5'}`}>
                         <div className="flex flex-col">
-                          <span className={`${isAlreadySent ? 'text-gray-500' : 'text-gray-350'}`}>{user.name} (+{user.phone})</span>
-                          <span className="text-[8px] text-gray-555 uppercase tracking-widest">{user.metrics.tier} • {user.points || 0} Pts</span>
+                          <span className={`${isAlreadySent ? 'text-gray-505' : 'text-gray-350'}`}>{user.name} (+{user.phone})</span>
+                          <span className="text-[8px] text-gray-505 uppercase tracking-widest">{user.metrics.tier} • {user.points || 0} Pts</span>
                         </div>
                         <div className="flex items-center gap-2">
                           {isAlreadySent ? (
@@ -3406,7 +3406,7 @@ Report generated automatically by Bum Bum Cafe POS.`
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs font-bold text-gray-400 uppercase">Option Type</label>
+              <label className="text-xs font-bold text-gray-404 uppercase">Option Type</label>
               <select value={editVariantType} onChange={(e: any) => setEditVariantType(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-white focus:border-orange-500">
                 <option value="none" className="bg-[#111]">None (Single Price)</option>
                 <option value="half_full" className="bg-[#111]">Half / Full</option>
@@ -3417,7 +3417,7 @@ Report generated automatically by Bum Bum Cafe POS.`
 
             {editVariantType === 'none' && (
               <div className="space-y-1">
-                <label className="text-xs font-bold text-gray-400 uppercase">Price (₹)</label>
+                <label className="text-xs font-bold text-gray-404 uppercase">Price (₹)</label>
                 <input type="number" value={editPrice} onChange={(e) => setEditPrice(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-white" />
               </div>
             )}
@@ -3432,17 +3432,17 @@ Report generated automatically by Bum Bum Cafe POS.`
             {editVariantType === 'pizza_sizes' && (
               <div className="space-y-3 bg-[#111]/40 p-4 rounded-2xl border border-white/5">
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Small Price</label><input type="number" value={editPriceSmall} onChange={(e) => setEditPriceSmall(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs font-bold text-white" /></div>
-                  <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Medium Price</label><input type="number" value={editPriceMedium} onChange={(e) => setEditPriceMedium(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs font-bold text-white" /></div>
-                  <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Large Price</label><input type="number" value={editPriceLarge} onChange={(e) => setEditPriceLarge(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs font-bold text-white" /></div>
-                  <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Extra Large</label><input type="number" value={editPriceXL} onChange={(e) => setEditPriceXL(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs font-bold text-white" /></div>
+                  <div className="space-y-1"><label className="text-xs font-bold text-gray-404 uppercase">Small Price</label><input type="number" value={editPriceSmall} onChange={(e) => setEditPriceSmall(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs font-bold text-white" /></div>
+                  <div className="space-y-1"><label className="text-xs font-bold text-gray-404 uppercase">Medium Price</label><input type="number" value={editPriceMedium} onChange={(e) => setEditPriceMedium(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs font-bold text-white" /></div>
+                  <div className="space-y-1"><label className="text-xs font-bold text-gray-404 uppercase">Large Price</label><input type="number" value={editPriceLarge} onChange={(e) => setEditPriceLarge(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs font-bold text-white" /></div>
+                  <div className="space-y-1"><label className="text-xs font-bold text-gray-404 uppercase">Extra Large</label><input type="number" value={editPriceXL} onChange={(e) => setEditPriceXL(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs font-bold text-white" /></div>
                 </div>
               </div>
             )}
 
             <div className="flex gap-2 pt-2">
               <button type="submit" className="flex-1 bg-green-600 text-white p-4 rounded-xl font-black text-sm uppercase">Update Item</button>
-              <button type="button" onClick={() => setEditingProduct(null)} className="bg-white/5 text-gray-405 p-4 rounded-xl font-black text-xs uppercase">Cancel</button>
+              <button type="button" onClick={() => setEditingProduct(null)} className="bg-white/5 text-gray-455 p-4 rounded-xl font-black text-xs uppercase">Cancel</button>
             </div>
           </form>
         </div>
