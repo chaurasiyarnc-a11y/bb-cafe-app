@@ -529,23 +529,23 @@ export default function AdminDashboard() {
   }, [isVerified]);
 
   const handlePasscodeLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (passcode === passcodes.adminPin) {
-      sessionStorage.setItem('bb_cafe_admin_verified', 'true');
-      sessionStorage.setItem('bb_cafe_admin_role', 'admin');
-      setIsVerified(true);
-      setUserRole('admin');
-      toast.success("Welcome back, Boss!");
-    } else if (passcode === passcodes.managerPin) {
-      sessionStorage.setItem('bb_cafe_admin_verified', 'true');
-      sessionStorage.setItem('bb_cafe_admin_role', 'manager');
-      setIsVerified(true);
-      setUserRole('manager');
-      toast.success("Logged in as Cafe Manager!");
-    } else {
-      toast.error("Incorrect Security Key!");
-    }
-  };
+  e.preventDefault();
+  if (passcode === passcodes.adminPin) {
+    sessionStorage.setItem('bb_cafe_admin_verified', 'true');
+    sessionStorage.setItem('bb_cafe_admin_role', 'admin');
+    setIsVerified(true);
+    setUserRole('admin');
+    toast.success("Welcome back, Boss!");
+  } else if (passcode === passcodes.managerPin) {
+    sessionStorage.setItem('bb_cafe_admin_verified', 'true');
+    sessionStorage.setItem('bb_cafe_admin_role', 'manager');
+    setIsVerified(true);
+    setUserRole('manager');
+    toast.success("Logged in as Cafe Manager!");
+  } else {
+    toast.error("Incorrect Security Key!");
+  }
+}; 
 
   const handleLogout = () => {
     sessionStorage.removeItem('bb_cafe_admin_verified');
@@ -1786,45 +1786,45 @@ Report generated automatically by Bum Bum Cafe POS.`
   }
 
   if (!isVerified) {
-    return (
-      <div className="bg-[#050505] min-h-screen text-white flex items-center justify-center p-4 font-sans">
-        <link rel="manifest" href="/admin-manifest.json" />
-        <Toaster />
-        <div className="w-full max-w-md bg-white/[0.02] border border-white/5 p-8 rounded-[2.5rem] space-y-6 shadow-2xl relative overflow-hidden">
-          <div className="absolute -top-10 -left-10 w-32 h-32 bg-orange-500/10 blur-3xl rounded-full"></div>
-          <div className="absolute -bottom-10 -right-10 w-32 h-32 bg-orange-500/10 blur-3xl rounded-full"></div>
-          
-          <div className="text-center space-y-2 relative z-10">
-            <div className="inline-flex p-4 bg-orange-500/10 rounded-full text-orange-500 mb-2">
-              <Lock size={28} />
-            </div>
-            <h2 className="text-2xl font-black text-orange-500 italic uppercase">Staff Portal</h2>
-            <p className="text-[10px] text-gray-500 font-bold tracking-widest uppercase">Bum Bum Cafe Mohandra</p>
+  return (
+    <div className="bg-[#050505] min-h-screen text-white flex items-center justify-center p-4 font-sans">
+      <link rel="manifest" href="/admin-manifest.json" />
+      <Toaster />
+      <div className="w-full max-w-md bg-white/[0.02] border border-white/5 p-8 rounded-[2.5rem] space-y-6 shadow-2xl relative overflow-hidden">
+        <div className="absolute -top-10 -left-10 w-32 h-32 bg-orange-500/10 blur-3xl rounded-full"></div>
+        <div className="absolute -bottom-10 -right-10 w-32 h-32 bg-orange-500/10 blur-3xl rounded-full"></div>
+        
+        <div className="text-center space-y-2 relative z-10">
+          <div className="inline-flex p-4 bg-orange-500/10 rounded-full text-orange-500 mb-2">
+            <Lock size={28} />
           </div>
-
-          <form onSubmit={handlePasscodeLogin} className="space-y-4 relative z-10">
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Terminal Access Key</label>
-              <input 
-                type="password" 
-                placeholder="Enter Access Key" 
-                value={passcode} 
-                onChange={(e) => setPasscode(e.target.value)} 
-                className="w-full bg-black/60 border border-white/10 rounded-2xl p-4 text-center outline-none focus:border-orange-500 text-sm font-bold text-white tracking-widest"
-                required 
-              />
-            </div>
-            <button 
-              type="submit" 
-              className="w-full bg-orange-500 hover:bg-orange-600 text-white p-4 rounded-2xl font-black text-xs uppercase tracking-wider transition-all duration-200 active:scale-[0.98] shadow-lg shadow-orange-500/10"
-            >
-              Authorize & Enter
-            </button>
-          </form>
+          <h2 className="text-2xl font-black text-orange-500 italic uppercase">Staff Portal</h2>
+          <p className="text-[10px] text-gray-505 font-bold tracking-widest uppercase">Bum Bum Cafe Mohandra</p>
         </div>
+
+        <form onSubmit={handlePasscodeLogin} className="space-y-4 relative z-10">
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Terminal Access Key</label>
+            <input 
+              type="password" 
+              placeholder="Enter Access Key" 
+              value={passcode} 
+              onChange={(e) => setPasscode(e.target.value)} 
+              className="w-full bg-black/60 border border-white/10 rounded-2xl p-4 text-center outline-none focus:border-orange-500 text-sm font-bold text-white tracking-widest"
+              required 
+            />
+          </div>
+          <button 
+            type="submit" 
+            className="w-full bg-orange-500 hover:bg-orange-600 text-white p-4 rounded-2xl font-black text-xs uppercase tracking-wider transition-all duration-200 active:scale-[0.98] shadow-lg shadow-orange-500/10"
+          >
+            Authorize & Enter
+          </button>
+        </form>
       </div>
-    );
-  }
+    </div>
+  );
+} 
 
   return (
     <div className="bg-[#050505] min-h-screen text-white pb-20 font-sans">
