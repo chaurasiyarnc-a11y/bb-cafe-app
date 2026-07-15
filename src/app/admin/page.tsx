@@ -1,4 +1,5 @@
 
+
 'use client';
   
 import React, { useState, useEffect, useMemo, useRef } from 'react';
@@ -529,23 +530,23 @@ export default function AdminDashboard() {
   }, [isVerified]);
 
   const handlePasscodeLogin = (e: React.FormEvent) => {
-  e.preventDefault();
-  if (passcode === passcodes.adminPin) {
-    sessionStorage.setItem('bb_cafe_admin_verified', 'true');
-    sessionStorage.setItem('bb_cafe_admin_role', 'admin');
-    setIsVerified(true);
-    setUserRole('admin');
-    toast.success("Welcome back, Boss!");
-  } else if (passcode === passcodes.managerPin) {
-    sessionStorage.setItem('bb_cafe_admin_verified', 'true');
-    sessionStorage.setItem('bb_cafe_admin_role', 'manager');
-    setIsVerified(true);
-    setUserRole('manager');
-    toast.success("Logged in as Cafe Manager!");
-  } else {
-    toast.error("Incorrect Security Key!");
-  }
-}; 
+    e.preventDefault();
+    if (passcode === passcodes.adminPin) {
+      sessionStorage.setItem('bb_cafe_admin_verified', 'true');
+      sessionStorage.setItem('bb_cafe_admin_role', 'admin');
+      setIsVerified(true);
+      setUserRole('admin');
+      toast.success("Welcome back, Boss!");
+    } else if (passcode === passcodes.managerPin) {
+      sessionStorage.setItem('bb_cafe_admin_verified', 'true');
+      sessionStorage.setItem('bb_cafe_admin_role', 'manager');
+      setIsVerified(true);
+      setUserRole('manager');
+      toast.success("Logged in as Cafe Manager!");
+    } else {
+      toast.error("Incorrect Security Key!");
+    }
+  };
 
   const handleLogout = () => {
     sessionStorage.removeItem('bb_cafe_admin_verified');
@@ -1775,7 +1776,8 @@ Report generated automatically by Bum Bum Cafe POS.`
     triggerWhatsAppBroadcast(nextTarget.phone);
     toast.success(`Opening WhatsApp for ${nextTarget.name}...`);
   };
-if (loading) {
+
+  if (loading) {
     return (
       <div className="bg-[#050505] min-h-screen text-white flex flex-col items-center justify-center font-sans">
         <Loader2 className="animate-spin text-orange-500 mb-2" size={32} />
@@ -1798,7 +1800,7 @@ if (loading) {
               <Lock size={28} />
             </div>
             <h2 className="text-2xl font-black text-orange-500 italic uppercase">Staff Portal</h2>
-            <p className="text-[10px] text-gray-505 font-bold tracking-widest uppercase">Bum Bum Cafe Mohandra</p>
+            <p className="text-[10px] text-gray-500 font-bold tracking-widest uppercase">Bum Bum Cafe Mohandra</p>
           </div>
 
           <form onSubmit={handlePasscodeLogin} className="space-y-4 relative z-10">
@@ -1872,10 +1874,10 @@ if (loading) {
             
             {/* Quick click dashboard filter buttons */}
             <div className="grid grid-cols-4 gap-2 bg-[#111] p-3 rounded-2xl border border-white/5">
-              <button onClick={() => applyQuickSalesFilter('today')} className="py-2.5 bg-orange-500/10 hover:bg-orange-500 text-orange-400 hover:text-white rounded-xl font-black text-[10px] uppercase transition-all">आज की सैल</button>
-              <button onClick={() => applyQuickSalesFilter('yesterday')} className="py-2.5 bg-orange-500/10 hover:bg-orange-500 text-orange-400 hover:text-white rounded-xl font-black text-[10px] uppercase transition-all">कल की सैल</button>
-              <button onClick={() => applyQuickSalesFilter('week')} className="py-2.5 bg-orange-500/10 hover:bg-orange-500 text-orange-400 hover:text-white rounded-xl font-black text-[10px] uppercase transition-all">हफ़्ते की सैल</button>
-              <button onClick={() => applyQuickSalesFilter('month')} className="py-2.5 bg-orange-500/10 hover:bg-orange-500 text-orange-400 hover:text-white rounded-xl font-black text-[10px] uppercase transition-all">महीने की सैल</button>
+              <button onClick={() => applyQuickSalesFilter('today')} className="py-2.5 bg-orange-500/10 hover:bg-orange-500 text-orange-400 hover:text-white rounded-xl font-black text-[10px] uppercase transition-all font-sans">आज की सैल</button>
+              <button onClick={() => applyQuickSalesFilter('yesterday')} className="py-2.5 bg-orange-500/10 hover:bg-orange-500 text-orange-400 hover:text-white rounded-xl font-black text-[10px] uppercase transition-all font-sans">कल की सैल</button>
+              <button onClick={() => applyQuickSalesFilter('week')} className="py-2.5 bg-orange-500/10 hover:bg-orange-500 text-orange-400 hover:text-white rounded-xl font-black text-[10px] uppercase transition-all font-sans">हफ़्ते की सैल</button>
+              <button onClick={() => applyQuickSalesFilter('month')} className="py-2.5 bg-orange-500/10 hover:bg-orange-500 text-orange-400 hover:text-white rounded-xl font-black text-[10px] uppercase transition-all font-sans">महीने की सैल</button>
             </div>
 
             <div className="bg-[#111] border border-white/5 p-5 rounded-3xl space-y-4">
@@ -1903,7 +1905,7 @@ if (loading) {
                 </div>
               </div>
 
-              {/* 4-Column stats grid */}
+              {/* 4-Column stats grid with direct integration of the Rejected Orders metric */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 border-t border-white/5 pt-4">
                 <div className="bg-white/[0.01] border border-white/5 p-3 rounded-2xl text-center">
                   <p className="text-[9px] font-bold text-gray-505 uppercase">Range Sales</p>
@@ -1985,7 +1987,7 @@ if (loading) {
               </button>
             </div>
 
-            {/* Permanent Financial Ledger */}
+            {/* Permanent Financial Ledger with visual formatting for rejected/fake orders */}
             <div className="space-y-4 font-mono">
               <h4 className="text-sm font-black text-gray-400 uppercase tracking-widest pt-2">📚 Permanent Financial Ledger</h4>
               {orders.length === 0 ? (
@@ -1995,7 +1997,7 @@ if (loading) {
                   <div key={o.id} className={`p-5 rounded-3xl flex justify-between items-center relative overflow-hidden text-xs border ${o.status === 'rejected' ? 'bg-red-500/[0.02] border-red-500/20' : 'bg-[#111] border-white/5'}`}>
                     <div className="space-y-1 pr-4">
                       {o.status === 'rejected' && (
-                        <div className="mb-2 bg-red-500/10 text-red-500 border border-red-500/20 text-[8px] font-black uppercase px-2.5 py-1 rounded-md w-max">
+                        <div className="mb-2 bg-red-500/10 text-red-500 border border-red-500/20 text-[8px] font-black uppercase px-2 py-0.5 rounded-md w-max">
                           🚫 Rejected / Fake Order
                         </div>
                       )}
@@ -2029,7 +2031,7 @@ if (loading) {
           </div>
         )}
 
-        {/* --- TAB 2: LIVE ORDERS WITH FILTER SEGMENTS --- */}
+        {/* --- TAB 2: LIVE ORDERS WITH FILTER segments --- */}
         {tab === 'orders' && (
           <div className="space-y-4">
             <div className="bg-[#111] border border-white/5 p-4 rounded-3xl grid grid-cols-3 gap-2">
@@ -2153,7 +2155,7 @@ if (loading) {
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-gray-400 uppercase">Portion Option Type</label>
+                  <label className="text-xs font-bold text-gray-404 uppercase">Portion Option Type</label>
                   <select value={variantType} onChange={(e: any) => setVariantType(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-white">
                     <option value="none" className="bg-[#111]">None (Single Price)</option>
                     <option value="half_full" className="bg-[#111]">Half / Full</option>
@@ -2176,7 +2178,7 @@ if (loading) {
                       <input type="number" placeholder="Price" value={halfPrice} onChange={(e) => setHalfPrice(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-white" />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-xs font-bold text-gray-400 uppercase">Full / Butter Price (₹)</label>
+                      <label className="text-xs font-bold text-gray-404 uppercase">Full / Butter Price (₹)</label>
                       <input type="number" placeholder="Price" value={fullPrice} onChange={(e) => setFullPrice(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-white" />
                     </div>
                   </div>
@@ -2186,12 +2188,12 @@ if (loading) {
                   <div className="space-y-3 bg-[#111]/40 p-4 rounded-2xl border border-white/5">
                     <p className="text-[10px] text-orange-400 font-extrabold uppercase">Prices (Leave blank if unavailable):</p>
                     <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Small (₹)</label><input type="number" value={priceSmall} onChange={(e) => setPriceSmall(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-white text-xs font-bold" /></div>
-                      <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Medium (₹)</label><input type="number" value={priceMedium} onChange={(e) => setPriceMedium(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-white text-xs font-bold" /></div>
+                      <div className="space-y-1"><label className="text-xs font-bold text-gray-404 uppercase">Small (₹)</label><input type="number" value={priceSmall} onChange={(e) => setPriceSmall(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-white text-xs font-bold" /></div>
+                      <div className="space-y-1"><label className="text-xs font-bold text-gray-404 uppercase">Medium (₹)</label><input type="number" value={priceMedium} onChange={(e) => setPriceMedium(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-white text-xs font-bold" /></div>
                       <div className="space-y-1"><label className="text-xs font-bold text-gray-405 uppercase">Large (₹)</label><input type="number" value={priceLarge} onChange={(e) => setPriceLarge(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-white text-xs font-bold" /></div>
                       <div className="space-y-1"><label className="text-xs font-bold text-gray-455 uppercase">Extra Large (₹)</label><input type="number" value={priceXL} onChange={(e) => setPriceXL(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-white text-xs font-bold" /></div>
                     </div>
-                  </div>e
+                  </div>
                 )}
 
                 <button type="submit" className="w-full bg-green-600 text-white p-4 rounded-xl font-black text-sm uppercase">Save Product</button>
@@ -2579,7 +2581,7 @@ if (loading) {
               
               <div className="space-y-1">
                 <label className="text-xs font-bold text-gray-400 uppercase">Description</label>
-                <input type="text" placeholder="e.g. Freshly baked mozzarella cheese pull!" value={newReelDesc} onChange={(e) => setNewReelDesc(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs text-white outline-none" required />
+                <input type="text" placeholder="e.g. Freshly baked mozzarella cheese pull!" value={newReelDesc} onChange={(e) => setNewReelDesc(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-white outline-none" required />
               </div>
               
               <div className="space-y-1">
@@ -2813,7 +2815,7 @@ if (loading) {
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1">
                       <label className="text-[10px] font-bold text-gray-455 uppercase">Ingredient / Action (क्या डालें)</label>
-                      <input type="text" placeholder="e.g. Pizza Base / Cheese" value={rosterStepName} onChange={(e) => setRosterStepName(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-xs font-bold text-white" required />
+                      <input type="text" placeholder="e.g. Pizza Base / Cheese" value={rosterStepName} onChange={(e) => rosterStepName(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-xs font-bold text-white" required />
                     </div>
                     <div className="space-y-1">
                       <label className="text-[10px] font-bold text-gray-455 uppercase">Quantity / मात्रा</label>
