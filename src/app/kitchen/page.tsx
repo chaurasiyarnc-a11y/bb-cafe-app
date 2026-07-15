@@ -156,8 +156,8 @@ export default function KitchenDisplaySystem() {
 
   // --- नया और संशोधित: किचन नोटिफिकेशन परमिशन रजिस्टर (FCM - On Mount) ---
   useEffect(() => {
-    // आपकी वास्तविक VAPID Key यहाँ सेट कर दी गई है
-    const MY_VAPID_KEY = "BCKwFGxjNPQdsUFLasSoQonNesm5nVYy9uoikufCIZCsCFqhJNUWDP9j1Cqujd8VzqwRKn8I3R3exxo85RtPEn0"; 
+    // यहाँ 'ufCIZCs' (बड़े 'I') की जगह 'ufClZCs' (छोटा 'l' - L) करके VAPID Key को सही कर दिया गया है
+    const MY_VAPID_KEY = "BCKwFGxjNPQdsUFLasSoQonNesm5nVYy9uoikufClZCsCFqhJNUWDP9j1Cqujd8VzqwRKn8I3R3exxo85RtPEn0"; 
 
     // सीधा ऑन-माउंट रन करें ताकि यह पेज लोड होते ही तुरंत अनुमति की जांच करे
     requestKitchenPermission(MY_VAPID_KEY);
