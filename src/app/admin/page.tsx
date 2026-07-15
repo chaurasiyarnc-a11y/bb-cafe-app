@@ -278,10 +278,11 @@ export default function AdminDashboard() {
   // Table QR Generator state
   const [genTableNum, setGenTableNum] = useState("1");
 
-  // Header Background Video State
+  // Header Background Video & Map Link State
   const [headerVideoInput, setHeaderVideoInput] = useState("");
   const [storeTimingHindi, setStoreTimingHindi] = useState("सुबह 10:00 से रात 11:00 बजे");
   const [storeTimingEnglish, setStoreTimingEnglish] = useState("10:00 AM to 11:00 PM");
+  const [googleMapUrl, setGoogleMapUrl] = useState("https://maps.app.goo.gl/8pj1Xby3bbMn5qxu5");
 
   const [reviews, setReviews] = useState<any[]>([]);
   const [coupons, setCoupons] = useState<any[]>([]);
@@ -429,7 +430,7 @@ export default function AdminDashboard() {
     const unsubOrders = onSnapshot(qOrders, (snap) => {
       const currentOrdersList = snap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-      // PLAY ALERT IF NEW ORDER ARRIVES (Requirement 2 / sound warning beep)
+      // PLAY ALERT IF NEW ORDER ARRIVES
       if (prevOrdersCountRef.current !== null && currentOrdersList.length > prevOrdersCountRef.current) {
         playNewOrderBeep();
         toast.success("🚨 ALERT: Naya Online Order Received!");
@@ -447,7 +448,7 @@ export default function AdminDashboard() {
       setCategories(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
 
-    // Dynamic Timing & Video Listener
+    // Dynamic Timing, Video & Map Link Listener
     const unsubStore = onSnapshot(doc(db, "settings", "store"), (d) => {
       if (d.exists()) {
         const storeData = d.data();
@@ -460,6 +461,9 @@ export default function AdminDashboard() {
         }
         if (storeData.timingEnglish) {
           setStoreTimingEnglish(storeData.timingEnglish);
+        }
+        if (storeData.googleMapUrl) {
+          setGoogleMapUrl(storeData.googleMapUrl);
         }
       }
     });
@@ -489,12 +493,10 @@ export default function AdminDashboard() {
       setLoyaltyRules(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
 
-    // Real-time Social Proofs Loader
     const unsubProofs = onSnapshot(collection(db, "social_proofs"), (snap) => {
       setSocialProofs(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
 
-    // Real-time Social Point Claims Loader
     const unsubClaims = onSnapshot(collection(db, "points_claims"), (snap) => {
       setPointsClaims(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
@@ -534,7 +536,7 @@ export default function AdminDashboard() {
       setIsVerified(true);
       setUserRole('admin');
       toast.success("Welcome back, Boss!");
-    } else if (passcode === passcodes.managerPin) {
+    } else if (passcode === passcode === passcodes.managerPin) {
       sessionStorage.setItem('bb_cafe_admin_verified', 'true');
       sessionStorage.setItem('bb_cafe_admin_role', 'manager');
       setIsVerified(true);
@@ -777,10 +779,8 @@ export default function AdminDashboard() {
       return orderDate >= startObj && orderDate <= endObj;
     });
 
-    // Filter out rejected or fake orders from range calculations
     const validRangeOrders = rangeOrders.filter(o => o.status !== "rejected" && o.status !== "fake");
 
-    // Count today's rejected orders
     const todayStr = new Date().toDateString();
     const todayRejectedCount = orders.filter(o => {
       if (!o.timestamp) return false;
@@ -818,7 +818,6 @@ export default function AdminDashboard() {
     const seenPhones = new Set();
     orders.forEach(o => { if (o.customerPhone) seenPhones.add(String(o.customerPhone)); });
     
-    // Filter out rejected orders from lifetime total business
     const totalBusiness = orders
       .filter(o => o.status !== "rejected" && o.status !== "fake")
       .reduce((acc, curr) => acc + (Number(curr.total) || 0), 0);
@@ -962,6 +961,7 @@ export default function AdminDashboard() {
       await addDoc(collection(db, "banners"), { 
         url: newBannerUrl, 
         title: newBannerTitle,
+        isVisible: true, 
         timestamp: new Date() 
       });
       setNewBannerUrl(""); setNewBannerTitle("");
@@ -974,6 +974,17 @@ export default function AdminDashboard() {
       await deleteDoc(doc(db, "banners", id));
       toast.success("Promo Banner Deleted!");
     } catch (err) { toast.error("Error deleting item"); }
+  };
+
+  const toggleBannerVisibility = async (banner: any) => {
+    try {
+      await updateDoc(doc(db, "banners", banner.id), {
+        isVisible: banner.isVisible !== false ? false : true
+      });
+      toast.success("Banner visibility status updated!");
+    } catch (err) {
+      toast.error("Error toggling banner visibility");
+    }
   };
 
   // Manage Food Reels/Stories Collection (With Cover URL Support)
@@ -1007,7 +1018,7 @@ export default function AdminDashboard() {
     }
   };
 
-  // Background Video & Timings Change Support
+  // Background Video, Location, & Timings Change Support
   const handleUpdateHeaderVideo = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!headerVideoInput) return toast.error("Please enter a valid video link!");
@@ -1019,19 +1030,20 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleUpdateStoreTimings = async (e: React.FormEvent) => {
+  const handleUpdateStoreTimingsAndLocation = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!storeTimingHindi || !storeTimingEnglish) {
-      return toast.error("Kripya dono languages me timing bharein!");
+    if (!storeTimingHindi || !storeTimingEnglish || !googleMapUrl) {
+      return toast.error("Kripya timing aur google map URL dono bharein!");
     }
     try {
       await setDoc(doc(db, "settings", "store"), {
         timingHindi: storeTimingHindi,
-        timingEnglish: storeTimingEnglish
+        timingEnglish: storeTimingEnglish,
+        googleMapUrl: googleMapUrl
       }, { merge: true });
-      toast.success("Store Timings successfully updated! ⏰");
+      toast.success("Store Timings & Google Map Location successfully updated! ⏰🗺️");
     } catch (err) {
-      toast.error("Failed to update timings.");
+      toast.error("Failed to update timings or location link.");
     }
   };
 
@@ -1092,10 +1104,11 @@ export default function AdminDashboard() {
     } catch (err) { toast.error("Failed to reject claim request."); }
   };
 
+  // Review approval फिक्स: sets both 'isApproved: true' & 'approved: true' to ensure homepage synchronization works properly.
   const handleApproveReview = async (id: string) => {
     try {
-      await updateDoc(doc(db, "reviews", id), { isApproved: true });
-      toast.success("Review Approved!");
+      await updateDoc(doc(db, "reviews", id), { isApproved: true, approved: true });
+      toast.success("Review Approved & Synced with Homepage! ✅");
     } catch (err) { toast.error("Error approving review"); }
   };
 
@@ -1106,7 +1119,7 @@ export default function AdminDashboard() {
     } catch (err) { toast.error("Error deleting review"); }
   };
 
-  // Bulletproof Coupon Saving via direct setDoc with UPPERCASE Code Document ID
+  // Bulletproof Coupon Saving
   const handleAddCoupon = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCouponCode || !newCouponValue) return;
@@ -1719,7 +1732,6 @@ Report generated automatically by Bum Bum Cafe POS.`
   if (!isVerified) {
     return (
       <div className="bg-[#050505] min-h-screen text-white flex items-center justify-center p-4 font-sans">
-        {/* Linked dedicated Admin manifest */}
         <link rel="manifest" href="/admin-manifest.json" />
         <Toaster />
         <div className="w-full max-w-md bg-white/[0.02] border border-white/5 p-8 rounded-[2.5rem] space-y-6 shadow-2xl relative overflow-hidden">
@@ -1760,7 +1772,6 @@ Report generated automatically by Bum Bum Cafe POS.`
 
   return (
     <div className="bg-[#050505] min-h-screen text-white pb-20 font-sans">
-      {/* Linked dedicated Admin manifest */}
       <link rel="manifest" href="/admin-manifest.json" />
       <Toaster />
       
@@ -1789,7 +1800,7 @@ Report generated automatically by Bum Bum Cafe POS.`
         <button onClick={() => setTab('loyalty')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'loyalty' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>🎁 Loyalty Rules</button>
         <button onClick={() => setTab('banners')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'banners' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>🖼️ Promo Banners</button>
         <button onClick={() => setTab('reels')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'reels' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>🎥 Food Reels</button>
-        <button onClick={() => setTab('header_video')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'header_video' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>🎬 Header & Timings</button>
+        <button onClick={() => setTab('header_video')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'header_video' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>🎬 Header, Timings & Location</button>
         <button onClick={() => setTab('coupons')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'coupons' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>🎟️ Coupons</button>
         <button onClick={() => setTab('reviews')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'reviews' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>⭐ Reviews</button>
         <button onClick={() => setTab('proofs')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'proofs' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>🔥 Order Alerts</button>
@@ -1809,7 +1820,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                 <p className="text-[10px] font-black uppercase text-orange-400 tracking-wider">🎯 Custom Date-Range Auditor</p>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="flex flex-col gap-1">
-                    <label className="text-[9px] font-bold text-gray-500 uppercase">Start Date</label>
+                    <label className="text-[9px] font-bold text-gray-505 uppercase">Start Date</label>
                     <input 
                       type="date" 
                       value={startDate} 
@@ -1818,7 +1829,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                     />
                   </div>
                   <div className="flex flex-col gap-1">
-                    <label className="text-[9px] font-bold text-gray-500 uppercase">End Date</label>
+                    <label className="text-[9px] font-bold text-gray-505 uppercase">End Date</label>
                     <input 
                       type="date" 
                       value={endDate} 
@@ -2096,7 +2107,7 @@ Report generated automatically by Bum Bum Cafe POS.`
 
                 {variantType === 'none' && (
                   <div className="space-y-1">
-                    <label className="text-xs font-bold text-gray-400 uppercase">Price (₹)</label>
+                    <label className="text-xs font-bold text-gray-404 uppercase">Price (₹)</label>
                     <input type="number" placeholder="Item Price" value={newPrice} onChange={(e) => setNewPrice(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-white" />
                   </div>
                 )}
@@ -2374,7 +2385,7 @@ Report generated automatically by Bum Bum Cafe POS.`
             </form>
 
             <div className="space-y-3">
-              <p className="text-xs font-bold text-gray-505 uppercase tracking-widest pl-1">Active Customer Reward Rules ({loyaltyRules.length})</p>
+              <p className="text-xs font-bold text-gray-555 uppercase tracking-widest pl-1">Active Customer Reward Rules ({loyaltyRules.length})</p>
               {loyaltyRules.length === 0 ? (
                 <p className="text-center text-xs font-bold text-gray-505 py-6">No custom rules configured yet...</p>
               ) : (
@@ -2401,7 +2412,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                       <p className="font-bold text-gray-300">
                         <span className="text-orange-400">{log.senderName || "Sender"}</span> (+{log.senderPhone})
                       </p>
-                      <p className="text-[10px] text-gray-500 mt-0.5">
+                      <p className="text-[10px] text-gray-505 mt-0.5">
                         ➡️ Gifted to: <span className="text-yellow-500 font-extrabold">+{log.recipientPhone}</span>
                       </p>
                     </div>
@@ -2464,12 +2475,26 @@ Report generated automatically by Bum Bum Cafe POS.`
                       <img src={b.url} className="w-full h-full object-cover opacity-80" alt="Banner" />
                     )}
                   </div>
-                  <div className="mt-2 text-[10px] space-y-0.5">
-                    <p className="font-black text-gray-200 truncate">{b.title || "Offer Banner"}</p>
+                  <div className="mt-2 text-[10px] space-y-0.5 flex justify-between items-center">
+                    <div className="truncate pr-2">
+                      <p className="font-black text-gray-200 truncate">{b.title || "Offer Banner"}</p>
+                      <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-full ${b.isVisible !== false ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-500'}`}>
+                        {b.isVisible !== false ? 'Active/Live' : 'Hidden'}
+                      </span>
+                    </div>
+                    <div className="flex gap-1 flex-shrink-0">
+                      <button 
+                        type="button"
+                        onClick={() => toggleBannerVisibility(b)} 
+                        className={`p-2 rounded-xl transition-all ${b.isVisible !== false ? 'bg-green-500/10 text-green-550' : 'bg-red-500/10 text-red-500'}`}
+                      >
+                        {b.isVisible !== false ? <Eye size={12}/> : <EyeOff size={12}/>}
+                      </button>
+                      <button onClick={() => handleDeleteBanner(b.id)} className="p-2 bg-red-500/20 text-red-500 rounded-xl hover:bg-red-500 active:text-black">
+                        <Trash size={12}/>
+                      </button>
+                    </div>
                   </div>
-                  <button onClick={() => handleDeleteBanner(b.id)} className="absolute top-4 right-4 p-2 bg-red-500/20 text-red-500 rounded-xl hover:bg-red-500 active:text-black">
-                    <Trash size={14}/>
-                  </button>
                 </div>
               ))}
             </div>
@@ -2549,11 +2574,11 @@ Report generated automatically by Bum Bum Cafe POS.`
           </div>
         )}
 
-        {/* --- TAB 7.6: MAIN BACKGROUND HEADER VIDEO & TIMINGS --- */}
+        {/* --- TAB 7.6: MAIN BACKGROUND HEADER VIDEO, TIMINGS & LOCATION --- */}
         {tab === 'header_video' && (
           <div className="space-y-6">
-            <h3 className="text-xl font-black text-orange-500 uppercase tracking-wider flex items-center gap-2">🎬 Store Settings (Video & Timings)</h3>
-            <p className="text-[10px] text-gray-555 uppercase tracking-widest font-black leading-relaxed font-mono">यहाँ से आप मुख्य होमपेज के पीछे चलने वाले वीडियो और फ़ुटर में दिखने वाली दुकान की टाइमिंग बदल सकते हैं।</p>
+            <h3 className="text-xl font-black text-orange-500 uppercase tracking-wider flex items-center gap-2">🎬 Store Settings (Video, Timings & Map)</h3>
+            <p className="text-[10px] text-gray-555 uppercase tracking-widest font-black leading-relaxed font-mono">यहाँ से आप मुख्य होमपेज के पीछे चलने वाले वीडियो, फ़ुटर में दिखने वाली दुकान की टाइमिंग और गूगल मैप लोकेशन बदल सकते हैं।</p>
 
             {/* 1. Header Video Form */}
             <form onSubmit={handleUpdateHeaderVideo} className="bg-white/[0.02] border border-white/5 p-6 rounded-[2.5rem] space-y-4">
@@ -2582,9 +2607,9 @@ Report generated automatically by Bum Bum Cafe POS.`
               <button type="submit" className="w-full bg-green-600 text-white p-4 rounded-xl font-black text-sm uppercase">Update Header Video 🎬</button>
             </form>
 
-            {/* 2. Store Timing Settings Form */}
-            <form onSubmit={handleUpdateStoreTimings} className="bg-white/[0.02] border border-white/5 p-6 rounded-[2.5rem] space-y-4">
-              <p className="text-xs font-black text-orange-400 uppercase tracking-wider">Restaurant Opening/Closing Timings (फ़ुटर टाइमिंग)</p>
+            {/* 2. Store Timing & Location Settings Form */}
+            <form onSubmit={handleUpdateStoreTimingsAndLocation} className="bg-white/[0.02] border border-white/5 p-6 rounded-[2.5rem] space-y-4">
+              <p className="text-xs font-black text-orange-400 uppercase tracking-wider">Restaurant Opening/Closing Timings & Map Link (फ़ुटर टाइमिंग व लोकेशन)</p>
               
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-gray-400 uppercase">Timing (Hindi / हिंदी)</label>
@@ -2610,7 +2635,19 @@ Report generated automatically by Bum Bum Cafe POS.`
                 />
               </div>
 
-              <button type="submit" className="w-full bg-green-600 text-white p-4 rounded-xl font-black text-sm uppercase">Update Store Timings ⏰</button>
+              <div className="space-y-1.5 pt-2 border-t border-white/5">
+                <label className="text-xs font-bold text-orange-400 uppercase">Google Map Link / लोकेशन लिंक 🗺️</label>
+                <input 
+                  type="url" 
+                  value={googleMapUrl} 
+                  onChange={(e) => setGoogleMapUrl(e.target.value)} 
+                  placeholder="e.g. https://maps.app.goo.gl/..."
+                  className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-xs font-black text-white" 
+                  required 
+                />
+              </div>
+
+              <button type="submit" className="w-full bg-green-600 text-white p-4 rounded-xl font-black text-sm uppercase">Update Timings & Map Location ⏰🗺️</button>
             </form>
           </div>
         )}
@@ -2735,10 +2772,10 @@ Report generated automatically by Bum Bum Cafe POS.`
                 <div className="space-y-3">
                   <p className="text-xs font-bold text-gray-455 uppercase pl-1">Active Recipe Steps</p>
                   {(rosterSelectedProduct.ingredients || []).length === 0 ? (
-                    <p className="text-center text-xs font-bold text-gray-600 py-6">No steps defined for this recipe.</p>
+                    <p className="text-center text-xs font-bold text-gray-655 py-6">No steps defined for this recipe.</p>
                   ) : (
                     rosterSelectedProduct.ingredients.map((item: any, idx: number) => (
-                      <div key={idx} className="bg-white/[0.02] border border-white/5 p-4 rounded-2xl flex justify-between items-center text-xs font-bold">
+                      <div key={idx} className="bg-white/[0.02] border border-white/5 p-4 rounded-2xl flex justify-between items-center text-xs font-bold font-mono">
                         <div className="flex items-center gap-3">
                           <span className="bg-orange-500/10 text-orange-500 w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black">
                             {item.step}
@@ -2746,7 +2783,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                           <div>
                             <p className="text-gray-300 uppercase">{item.name}</p>
                             <p className="text-[10px] text-orange-400 mt-0.5">Quantity: {item.quantity}</p>
-                            {item.note && <p className="text-[9px] text-gray-500 font-medium italic mt-0.5">Note: {item.note}</p>}
+                            {item.note && <p className="text-[9px] text-gray-555 font-medium italic mt-0.5">Note: {item.note}</p>}
                           </div>
                         </div>
                         <button onClick={() => handleDeleteRosterStep(idx)} className="p-2.5 bg-red-500/10 text-red-500 rounded-lg">
@@ -2814,7 +2851,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                       </span>
                     </div>
                     <div className="text-[10px] text-gray-400 font-semibold space-y-0.5">
-                      <p>प्लेटформа: <span className="text-white">{claim.platformLabel}</span></p>
+                      <p>प्लेटफॉर्म: <span className="text-white">{claim.platformLabel}</span></p>
                       <p>सोशल यूज़रनेम / हैंडल: <span className="text-yellow-400 font-black">{claim.socialUsername}</span></p>
                       <p>कस्टमर नंबर: <span className="text-white">+{claim.customerPhone}</span></p>
                       <p className="text-[9px] text-gray-655">{claim.timestamp?.toDate ? claim.timestamp.toDate().toLocaleString() : ""}</p>
@@ -2856,7 +2893,7 @@ Report generated automatically by Bum Bum Cafe POS.`
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-gray-400 uppercase">Admin LOGIN PIN</label>
+                  <label className="text-[10px] font-bold text-gray-404 uppercase">Admin LOGIN PIN</label>
                   <input 
                     type="password" 
                     value={newAdminPinInput}
@@ -2867,7 +2904,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-gray-400 uppercase">Manager LOGIN PIN</label>
+                  <label className="text-[10px] font-bold text-gray-404 uppercase">Manager LOGIN PIN</label>
                   <input 
                     type="password" 
                     value={newManagerPinInput}
@@ -2896,7 +2933,7 @@ Report generated automatically by Bum Bum Cafe POS.`
             <div className="bg-white/[0.02] border border-white/5 p-6 rounded-[2.5rem] space-y-5">
               <div>
                 <h4 className="text-sm font-black text-yellow-400 uppercase tracking-widest flex items-center gap-1.5">👥 Staff Accounts Registry</h4>
-                <p className="text-[9px] text-gray-500 font-bold uppercase mt-1 leading-relaxed">Yahan se aap sabhi Delivery boys aur Kitchen Cooks ke liye alag se unique PIN aur Name setup kar sakte hain:</p>
+                <p className="text-[9px] text-gray-555 font-bold uppercase mt-1 leading-relaxed">Yahan se aap sabhi Delivery boys aur Kitchen Cooks ke liye alag se unique PIN aur Name setup kar sakte hain:</p>
               </div>
 
               {/* Add Staff Member Form */}
@@ -2905,16 +2942,16 @@ Report generated automatically by Bum Bum Cafe POS.`
                   <p className="text-[9px] font-black text-orange-500 uppercase tracking-wider">➕ Add Staff Member / नया स्टाफ जोड़ें</p>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1">
-                      <label className="text-[9px] text-gray-500 uppercase">Staff Name</label>
+                      <label className="text-[9px] text-gray-555 uppercase">Staff Name</label>
                       <input type="text" placeholder="e.g. Ramesh" value={newStaffName} onChange={(e) => setNewStaffName(e.target.value)} className="w-full bg-neutral-900 border border-white/10 rounded-lg p-2.5 text-white outline-none" required />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[9px] text-gray-500 uppercase">Personal 4-digit PIN</label>
+                      <label className="text-[9px] text-gray-555 uppercase">Personal 4-digit PIN</label>
                       <input type="password" maxLength={4} placeholder="e.g. 1234" value={newStaffPin} onChange={(e) => setNewStaffPin(e.target.value)} className="w-full bg-neutral-900 border border-white/10 rounded-lg p-2.5 text-white outline-none text-center tracking-widest" required />
                     </div>
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[9px] text-gray-500 uppercase">Staff Role</label>
+                    <label className="text-[9px] text-gray-555 uppercase">Staff Role</label>
                     <select value={newStaffRole} onChange={(e) => setNewStaffRole(e.target.value)} className="w-full bg-neutral-900 border border-white/10 rounded-lg p-2.5 text-white outline-none cursor-pointer">
                       <option value="delivery">Rider / Delivery Boy 🛵</option>
                       <option value="kitchen">Cook / Kitchen Staff 👨‍🍳</option>
@@ -2928,16 +2965,16 @@ Report generated automatically by Bum Bum Cafe POS.`
                   <p className="text-[9px] font-black text-orange-500 uppercase tracking-wider">✏️ Edit Staff Member</p>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1">
-                      <label className="text-[9px] text-gray-500 uppercase">Staff Name</label>
+                      <label className="text-[9px] text-gray-555 uppercase">Staff Name</label>
                       <input type="text" value={editingStaffName} onChange={(e) => setEditingStaffName(e.target.value)} className="w-full bg-neutral-900 border border-white/10 rounded-lg p-2.5 text-white outline-none" required />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[9px] text-gray-500 uppercase">Personal 4-digit PIN</label>
+                      <label className="text-[9px] text-gray-555 uppercase">Personal 4-digit PIN</label>
                       <input type="password" maxLength={4} value={editingStaffPin} onChange={(e) => setEditingStaffPin(e.target.value)} className="w-full bg-neutral-900 border border-white/10 rounded-lg p-2.5 text-white outline-none text-center tracking-widest" required />
                     </div>
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[9px] text-gray-500 uppercase">Staff Role</label>
+                    <label className="text-[9px] text-gray-555 uppercase">Staff Role</label>
                     <select value={editingStaffRole} onChange={(e) => setEditingStaffRole(e.target.value)} className="w-full bg-neutral-900 border border-white/10 rounded-lg p-2.5 text-white outline-none cursor-pointer">
                       <option value="delivery">Rider / Delivery Boy 🛵</option>
                       <option value="kitchen">Cook / Kitchen Staff 👨‍🍳</option>
@@ -3248,7 +3285,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                       <div key={user.phone} className={`flex justify-between items-center p-2 rounded-xl text-xs font-bold border transition-colors ${isAlreadySent ? 'bg-green-500/[0.02] border-green-500/10' : 'bg-white/[0.01] border-white/5'}`}>
                         <div className="flex flex-col">
                           <span className={`${isAlreadySent ? 'text-gray-500' : 'text-gray-350'}`}>{user.name} (+{user.phone})</span>
-                          <span className="text-[8px] text-gray-505 uppercase tracking-widest">{user.metrics.tier} • {user.points || 0} Pts</span>
+                          <span className="text-[8px] text-gray-555 uppercase tracking-widest">{user.metrics.tier} • {user.points || 0} Pts</span>
                         </div>
                         <div className="flex items-center gap-2">
                           {isAlreadySent ? (
@@ -3262,7 +3299,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                           )}
                           <button 
                             onClick={() => triggerWhatsAppBroadcast(user.phone)}
-                            className={`font-black text-[9px] px-3 py-1.5 rounded-lg flex items-center gap-1 uppercase transition-all ${isAlreadySent ? 'bg-white/5 text-gray-505' : 'bg-green-600 hover:bg-green-700 text-white'}`}
+                            className={`font-black text-[9px] px-3 py-1.5 rounded-lg flex items-center gap-1 uppercase transition-all ${isAlreadySent ? 'bg-white/5 text-gray-555' : 'bg-green-600 hover:bg-green-700 text-white'}`}
                           >
                             <MessageSquare size={10}/> Send
                           </button>
