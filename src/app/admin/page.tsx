@@ -1,5 +1,4 @@
 
-
 'use client';
   
 import React, { useState, useEffect, useMemo, useRef } from 'react';
@@ -330,7 +329,7 @@ export default function AdminDashboard() {
   const [newAdminPinInput, setNewAdminPinInput] = useState("");
   const [newManagerPinInput, setNewManagerPinInput] = useState("");
 
-  // START & END DATE FILTERS
+  // START & END DATE FILTERS & ORDER PERIOD FILTERS
   const [startDate, setStartDate] = useState(() => {
     const d = new Date();
     d.setDate(d.getDate() - 7); 
@@ -338,6 +337,7 @@ export default function AdminDashboard() {
   });
   const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]); 
   const [ordersFilterDate, setOrdersFilterDate] = useState(new Date().toISOString().split('T')[0]);
+  const [orderPeriodFilter, setOrderPeriodFilter] = useState<'today' | 'yesterday' | 'week'>('today');
 
   // ADD PRODUCT STATES
   const [showAddForm, setShowAddForm] = useState(false);
@@ -611,15 +611,30 @@ export default function AdminDashboard() {
     return list;
   }, [categories]);
 
+  // Order filters system (Today, Yesterday, Week)
   const filteredOrdersList = useMemo(() => {
-    const targetDateStr = new Date(ordersFilterDate).toDateString();
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const yesterdayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+    const yesterdayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 23, 59, 59, 999);
+    const weekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7);
+
     const matched = orders.filter(o => {
       if (!o.timestamp) return false;
-      const orderDate = o.timestamp?.toDate ? o.timestamp.toDate().toDateString() : new Date(o.timestamp).toDateString();
-      return orderDate === targetDateStr;
+      const oDate = o.timestamp?.toDate ? o.timestamp.toDate() : new Date(o.timestamp);
+      
+      if (orderPeriodFilter === 'today') {
+        return oDate >= todayStart;
+      } else if (orderPeriodFilter === 'yesterday') {
+        return oDate >= yesterdayStart && oDate <= yesterdayEnd;
+      } else if (orderPeriodFilter === 'week') {
+        return oDate >= weekStart;
+      }
+      return false;
     });
+
     return matched.sort((a, b) => Number(b.billNumber || 0) - Number(a.billNumber || 0));
-  }, [orders, ordersFilterDate]);
+  }, [orders, orderPeriodFilter]);
 
   const handleUpdateCustomer = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -831,6 +846,47 @@ export default function AdminDashboard() {
 
   const auditStats = getAuditRangeAnalytics();
   const lifetimeStats = getLifetimeMetrics();
+
+  const applyQuickSalesFilter = (filterType: 'today' | 'yesterday' | 'week' | 'month') => {
+    const now = new Date();
+    let start = new Date();
+    let end = new Date();
+
+    if (filterType === 'today') {
+      start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      end = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    } else if (filterType === 'yesterday') {
+      start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+      end = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+    } else if (filterType === 'week') {
+      start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7);
+      end = now;
+    } else if (filterType === 'month') {
+      start = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
+      end = now;
+    }
+
+    setStartDate(start.toISOString().split('T')[0]);
+    setEndDate(end.toISOString().split('T')[0]);
+    toast.success(`${filterType.toUpperCase()} Filter Applied!`);
+  };
+
+  const handleResetSalesData = async () => {
+    if (!window.confirm("⚠️ चेतावनी: क्या आप वाकई सभी सेल डेटा (Orders) को डिलीट करके रीसेट करना चाहते हैं? इसे वापस नहीं लाया जा सकेगा!")) return;
+    const enteredPin = prompt("सुरक्षा के लिए अपना एडमिन पिन दर्ज करें:");
+    if (enteredPin !== passcodes.adminPin) {
+      return toast.error("गलत पिन दर्ज किया गया! रीसेट रद्द कर दिया गया।");
+    }
+    toast.loading("सेल डेटा रीसेट किया जा रहा है...", { id: "sales-reset" });
+    try {
+      const querySnap = await getDocs(collection(db, "orders"));
+      const deletePromises = querySnap.docs.map(d => deleteDoc(doc(db, "orders", d.id)));
+      await Promise.all(deletePromises);
+      toast.success("सभी सेल और ऑर्डर्स डेटा सफलतापूर्वक रीसेट कर दिया गया है! 🎉", { id: "sales-reset" });
+    } catch (err) {
+      toast.error("डेटा रीसेट करने में समस्या आई।", { id: "sales-reset" });
+    }
+  };
 
   const topSellingDishes = useMemo(() => {
     const countsMap: any = {};
@@ -1104,7 +1160,7 @@ export default function AdminDashboard() {
     } catch (err) { toast.error("Failed to reject claim request."); }
   };
 
-  // Review approval फिक्स: sets both 'isApproved: true' & 'approved: true' to ensure homepage synchronization works properly.
+  // Review approval फिक्स
   const handleApproveReview = async (id: string) => {
     try {
       await updateDoc(doc(db, "reviews", id), { isApproved: true, approved: true });
@@ -1200,7 +1256,7 @@ export default function AdminDashboard() {
         }
       }
       toast.dismiss("import");
-      toast.success(`Excel Import Success! ${importedCount} Added, ${skippedCount} Duplicates Merged.`);
+      toast.success("Excel Import Success!");
     } catch (e) {
       toast.dismiss("import");
       toast.error("Error seeding PDF items");
@@ -1209,7 +1265,7 @@ export default function AdminDashboard() {
 
   // Merge Duplicates
   const handleMergeDuplicates = async () => {
-    if (!window.confirm("क्या आप वाकई सभी डुप्लीकेट आइटम्स को मर्ज करके डिलीट करना चाहते हैं?")) return;
+    if (!window.confirm("क्या आप वाकई सभी डुप्लीकेट ऑइली आइटम्स को मर्ज करना चाहते हैं?")) return;
     toast.loading("Merging duplicates...", { id: "merge" });
 
     try {
@@ -1661,7 +1717,7 @@ Report generated automatically by Bum Bum Cafe POS.`
           successCount++;
         }
 
-        toast.success(`Successfully imported ${successCount} customers! (Failed/Skipped: ${failCount})`, { 
+        toast.success(`Successfully imported ${successCount} customers!`, { 
           id: "csv-import", 
           duration: 5000 
         });
@@ -1815,6 +1871,14 @@ Report generated automatically by Bum Bum Cafe POS.`
           <div className="space-y-6">
             <h3 className="text-xl font-black text-orange-500 uppercase tracking-wider flex items-center gap-2"><BarChart3 size={20}/> Sales Dashboard</h3>
             
+            {/* Quick click dashboard filter buttons */}
+            <div className="grid grid-cols-4 gap-2 bg-[#111] p-3 rounded-2xl border border-white/5">
+              <button onClick={() => applyQuickSalesFilter('today')} className="py-2.5 bg-orange-500/10 hover:bg-orange-500 text-orange-400 hover:text-white rounded-xl font-black text-[10px] uppercase transition-all">आज की सैल</button>
+              <button onClick={() => applyQuickSalesFilter('yesterday')} className="py-2.5 bg-orange-500/10 hover:bg-orange-500 text-orange-400 hover:text-white rounded-xl font-black text-[10px] uppercase transition-all">कल की सैल</button>
+              <button onClick={() => applyQuickSalesFilter('week')} className="py-2.5 bg-orange-500/10 hover:bg-orange-500 text-orange-400 hover:text-white rounded-xl font-black text-[10px] uppercase transition-all">हफ़्ते की सैल</button>
+              <button onClick={() => applyQuickSalesFilter('month')} className="py-2.5 bg-orange-500/10 hover:bg-orange-500 text-orange-400 hover:text-white rounded-xl font-black text-[10px] uppercase transition-all">महीने की सैल</button>
+            </div>
+
             <div className="bg-[#111] border border-white/5 p-5 rounded-3xl space-y-4">
               <div className="flex flex-col gap-3">
                 <p className="text-[10px] font-black uppercase text-orange-400 tracking-wider">🎯 Custom Date-Range Auditor</p>
@@ -1840,7 +1904,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                 </div>
               </div>
 
-              {/* 4-Column stats grid with direct integration of the Rejected Orders metric */}
+              {/* 4-Column stats grid */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 border-t border-white/5 pt-4">
                 <div className="bg-white/[0.01] border border-white/5 p-3 rounded-2xl text-center">
                   <p className="text-[9px] font-bold text-gray-505 uppercase">Range Sales</p>
@@ -1882,7 +1946,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                       style={{ height: `${day.percentage}%` }} 
                       className="w-full bg-gradient-to-t from-orange-600 to-orange-400 rounded-t-lg min-h-[4px] relative"
                     ></div>
-                    <span className="text-[9px] font-bold text-gray-505 uppercase mt-1">{day.label}</span>
+                    <span className="text-[9px] font-bold text-gray-555 uppercase mt-1">{day.label}</span>
                   </div>
                 ))}
               </div>
@@ -1903,9 +1967,10 @@ Report generated automatically by Bum Bum Cafe POS.`
               </div>
             </div>
 
+            {/* Reset All Sales Data Switch Button inside the grid */}
             <div className="grid grid-cols-2 gap-3 bg-[#111]/30 border border-white/5 p-4 rounded-[2rem] shadow-xl">
-              <button onClick={handleResetTokenCounter} className="bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/20 font-black text-xs py-4 px-3 rounded-2xl flex items-center justify-center gap-2 active:scale-95 transition-all uppercase font-mono">
-                Reset Tokens Counter
+              <button onClick={handleResetSalesData} className="bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/20 font-black text-xs py-4 px-3 rounded-2xl flex items-center justify-center gap-2 active:scale-95 transition-all uppercase font-mono">
+                Reset All Sales Data 🚫
               </button>
               <button onClick={handleSendDailyClosingReport} className="bg-green-600 hover:bg-green-700 text-white font-black text-xs py-4 px-3 rounded-2xl flex items-center justify-center gap-2 active:scale-95 transition-all uppercase shadow-md border border-green-500/10 font-mono">
                 📲 Send Report to Owner
@@ -1921,7 +1986,7 @@ Report generated automatically by Bum Bum Cafe POS.`
               </button>
             </div>
 
-            {/* Permanent Financial Ledger with visual formatting for rejected/fake orders */}
+            {/* Permanent Financial Ledger */}
             <div className="space-y-4 font-mono">
               <h4 className="text-sm font-black text-gray-400 uppercase tracking-widest pt-2">📚 Permanent Financial Ledger</h4>
               {orders.length === 0 ? (
@@ -1945,7 +2010,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                       
                       <div className="border-t border-white/5 pt-2 mt-2 space-y-0.5">
                         {o.items?.map((item: any, idx: number) => (
-                          <p key={idx} className="text-[11px] font-bold text-gray-400 font-sans">
+                          <p key={idx} className="text-[11px] font-bold text-gray-404 font-sans">
                             <span className="text-orange-500">×{item.quantity}</span> {item.name}
                           </p>
                         ))}
@@ -1965,24 +2030,17 @@ Report generated automatically by Bum Bum Cafe POS.`
           </div>
         )}
 
-        {/* --- TAB 2: LIVE ORDERS --- */}
+        {/* --- TAB 2: LIVE ORDERS WITH FILTER SEGMENTS --- */}
         {tab === 'orders' && (
           <div className="space-y-4">
-            <div className="bg-[#111] border border-white/5 p-5 rounded-3xl flex justify-between items-center">
-              <div>
-                <h4 className="font-black text-sm text-orange-500 uppercase tracking-wider">📦 Filter Daily Orders</h4>
-                <p className="text-[10px] text-gray-505 font-bold mt-0.5">Matching Token & Bill Sequences</p>
-              </div>
-              <input 
-                type="date" 
-                value={ordersFilterDate} 
-                onChange={(e) => setOrdersFilterDate(e.target.value)} 
-                className="bg-black/60 border border-white/10 rounded-xl p-3 text-xs font-bold text-orange-500 outline-none cursor-pointer"
-              />
+            <div className="bg-[#111] border border-white/5 p-4 rounded-3xl grid grid-cols-3 gap-2">
+              <button onClick={() => setOrderPeriodFilter('today')} className={`py-3 rounded-2xl font-black text-xs uppercase transition-all ${orderPeriodFilter === 'today' ? 'bg-orange-500 text-white shadow' : 'bg-white/5 text-gray-400'}`}>आज के ऑर्डर</button>
+              <button onClick={() => setOrderPeriodFilter('yesterday')} className={`py-3 rounded-2xl font-black text-xs uppercase transition-all ${orderPeriodFilter === 'yesterday' ? 'bg-orange-500 text-white shadow' : 'bg-white/5 text-gray-400'}`}>कल के ऑर्डर</button>
+              <button onClick={() => setOrderPeriodFilter('week')} className={`py-3 rounded-2xl font-black text-xs uppercase transition-all ${orderPeriodFilter === 'week' ? 'bg-orange-500 text-white shadow' : 'bg-white/5 text-gray-400'}`}>इस हफ़्ते के</button>
             </div>
 
             {filteredOrdersList.length === 0 ? (
-              <p className="text-center text-gray-655 py-20 font-bold uppercase tracking-widest text-xs">No active orders found for this date...</p>
+              <p className="text-center text-gray-655 py-20 font-bold uppercase tracking-widest text-xs">No active orders found for this segment...</p>
             ) : (
               filteredOrdersList.map((o) => (
                 <div key={o.id} className={`p-6 rounded-[2rem] border relative overflow-hidden ${o.status === 'rejected' ? 'bg-red-500/[0.02] border-red-500/20' : 'bg-white/[0.03] border-white/5'}`}>
@@ -2129,10 +2187,10 @@ Report generated automatically by Bum Bum Cafe POS.`
                   <div className="space-y-3 bg-[#111]/40 p-4 rounded-2xl border border-white/5">
                     <p className="text-[10px] text-orange-400 font-extrabold uppercase">Prices (Leave blank if unavailable):</p>
                     <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Small (₹)</label><input type="number" value={priceSmall} onChange={(e) => setPriceSmall(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-white text-xs font-bold" /></div>
-                      <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Medium (₹)</label><input type="number" value={priceMedium} onChange={(e) => setPriceMedium(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-white text-xs font-bold" /></div>
-                      <div className="space-y-1"><label className="text-xs font-bold text-gray-405 uppercase">Large (₹)</label><input type="number" value={priceLarge} onChange={(e) => setPriceLarge(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-white text-xs font-bold" /></div>
-                      <div className="space-y-1"><label className="text-xs font-bold text-gray-455 uppercase">Extra Large (₹)</label><input type="number" value={priceXL} onChange={(e) => setPriceXL(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-white text-xs font-bold" /></div>
+                      <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Small (₹)</label><input type="number" value={priceSmall} onChange={(e) => priceSmall(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-white text-xs font-bold" /></div>
+                      <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Medium (₹)</label><input type="number" value={priceMedium} onChange={(e) => priceMedium(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-white text-xs font-bold" /></div>
+                      <div className="space-y-1"><label className="text-xs font-bold text-gray-405 uppercase">Large (₹)</label><input type="number" value={priceLarge} onChange={(e) => priceLarge(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-white text-xs font-bold" /></div>
+                      <div className="space-y-1"><label className="text-xs font-bold text-gray-455 uppercase">Extra Large (₹)</label><input type="number" value={priceXL} onChange={(e) => priceXL(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-white text-xs font-bold" /></div>
                     </div>
                   </div>
                 )}
@@ -2306,11 +2364,11 @@ Report generated automatically by Bum Bum Cafe POS.`
                 <h4 className="text-sm font-black text-orange-500 uppercase">Edit Customer Profile</h4>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-gray-500 uppercase">Customer Name</label>
+                    <label className="text-[10px] font-bold text-gray-555 uppercase">Customer Name</label>
                     <input type="text" value={editCustomerName} onChange={(e) => setEditCustomerName(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-xs font-black text-white" required />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-gray-500 uppercase">Adjust Points</label>
+                    <label className="text-[10px] font-bold text-gray-555 uppercase">Adjust Points</label>
                     <input type="number" value={editCustomerPoints} onChange={(e) => setEditCustomerPoints(Number(e.target.value))} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-xs font-black text-white" required />
                   </div>
                 </div>
@@ -2340,7 +2398,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                           </div>
                           <p className="text-[10px] font-bold text-orange-500">+{user.phone}</p>
                           
-                          <div className="flex gap-3 text-[10px] text-gray-400 font-bold pt-1.5 border-t border-white/5 mt-2">
+                          <div className="flex gap-3 text-[10px] text-gray-405 font-bold pt-1.5 border-t border-white/5 mt-2">
                             <p>Orders: <span className="text-white font-black">{user.metrics.orderCount}</span></p>
                             <p>Total Spend: <span className="text-green-400 font-black">₹{user.metrics.totalSpend}</span></p>
                           </div>
@@ -2432,7 +2490,7 @@ Report generated automatically by Bum Bum Cafe POS.`
           </div>
         )}
 
-        {/* --- TAB 7: BANNERS MANAGER --- */}
+        {/* --- TAB 7: BANNERS MANAGER WITH ON/OFF SWITCH --- */}
         {tab === 'banners' && (
           <div className="space-y-6">
             <form onSubmit={handleAddBanner} className="bg-[#020202] border border-white/5 p-6 rounded-[2.5rem] space-y-4">
@@ -2475,23 +2533,24 @@ Report generated automatically by Bum Bum Cafe POS.`
                       <img src={b.url} className="w-full h-full object-cover opacity-80" alt="Banner" />
                     )}
                   </div>
-                  <div className="mt-2 text-[10px] space-y-0.5 flex justify-between items-center">
+                  <div className="mt-2 text-[10px] space-y-1 flex justify-between items-start">
                     <div className="truncate pr-2">
                       <p className="font-black text-gray-200 truncate">{b.title || "Offer Banner"}</p>
-                      <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-full ${b.isVisible !== false ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-500'}`}>
-                        {b.isVisible !== false ? 'Active/Live' : 'Hidden'}
+                      <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-full mt-1.5 inline-block ${b.isVisible !== false ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-500'}`}>
+                        {b.isVisible !== false ? 'Active/Live ✅' : 'Hidden 🚫'}
                       </span>
                     </div>
-                    <div className="flex gap-1 flex-shrink-0">
+                    <div className="flex gap-1.5 flex-shrink-0 pt-1">
                       <button 
                         type="button"
                         onClick={() => toggleBannerVisibility(b)} 
-                        className={`p-2 rounded-xl transition-all ${b.isVisible !== false ? 'bg-green-500/10 text-green-550' : 'bg-red-500/10 text-red-500'}`}
+                        className={`p-2 rounded-xl transition-all ${b.isVisible !== false ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}
+                        title={b.isVisible !== false ? "Hide Banner" : "Unhide/Show Banner"}
                       >
-                        {b.isVisible !== false ? <Eye size={12}/> : <EyeOff size={12}/>}
+                        {b.isVisible !== false ? <Eye size={14}/> : <EyeOff size={14}/>}
                       </button>
                       <button onClick={() => handleDeleteBanner(b.id)} className="p-2 bg-red-500/20 text-red-500 rounded-xl hover:bg-red-500 active:text-black">
-                        <Trash size={12}/>
+                        <Trash size={14}/>
                       </button>
                     </div>
                   </div>
@@ -2932,8 +2991,8 @@ Report generated automatically by Bum Bum Cafe POS.`
             {/* 2. DYNAMIC STAFF MANAGEMENT DIRECTORY */}
             <div className="bg-white/[0.02] border border-white/5 p-6 rounded-[2.5rem] space-y-5">
               <div>
-                <h4 className="text-sm font-black text-yellow-400 uppercase tracking-widest flex items-center gap-1.5">👥 Staff Accounts Registry</h4>
-                <p className="text-[9px] text-gray-555 font-bold uppercase mt-1 leading-relaxed">Yahan se aap sabhi Delivery boys aur Kitchen Cooks ke liye alag se unique PIN aur Name setup kar sakte hain:</p>
+                <h4 className="text-sm font-black text-yellow-400 uppercase tracking-widest flex items-center gap-1.5">👥 Staff Accounts Registry (Kitchen & Delivery)</h4>
+                <p className="text-[9px] text-gray-555 font-bold uppercase mt-1 leading-relaxed">यहाँ से आप Kitchen, Riders/Delivery और Cashier के लिए नया यूज़र बना सकते हैं, उनका PIN बदल सकते हैं व मैनेज कर सकते हैं:</p>
               </div>
 
               {/* Add Staff Member Form */}
@@ -2951,10 +3010,10 @@ Report generated automatically by Bum Bum Cafe POS.`
                     </div>
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[9px] text-gray-555 uppercase">Staff Role</label>
+                    <label className="text-[9px] text-gray-555 uppercase">Staff Role / विभाग</label>
                     <select value={newStaffRole} onChange={(e) => setNewStaffRole(e.target.value)} className="w-full bg-neutral-900 border border-white/10 rounded-lg p-2.5 text-white outline-none cursor-pointer">
-                      <option value="delivery">Rider / Delivery Boy 🛵</option>
-                      <option value="kitchen">Cook / Kitchen Staff 👨‍🍳</option>
+                      <option value="delivery">Rider / Delivery Boy 🛵 (Delivery User)</option>
+                      <option value="kitchen">Cook / Kitchen Staff 👨‍🍳 (Kitchen User)</option>
                       <option value="cashier">Cashier / Counter Manager 💼</option>
                     </select>
                   </div>
@@ -2962,14 +3021,14 @@ Report generated automatically by Bum Bum Cafe POS.`
                 </form>
               ) : (
                 <form onSubmit={handleUpdateStaff} className="bg-orange-500/5 border border-orange-500/20 p-4 rounded-2xl space-y-3.5 text-xs font-bold text-left">
-                  <p className="text-[9px] font-black text-orange-500 uppercase tracking-wider">✏️ Edit Staff Member</p>
+                  <p className="text-[9px] font-black text-orange-500 uppercase tracking-wider">✏️ Edit Staff Member & Change PIN</p>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1">
                       <label className="text-[9px] text-gray-555 uppercase">Staff Name</label>
                       <input type="text" value={editingStaffName} onChange={(e) => setEditingStaffName(e.target.value)} className="w-full bg-neutral-900 border border-white/10 rounded-lg p-2.5 text-white outline-none" required />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[9px] text-gray-555 uppercase">Personal 4-digit PIN</label>
+                      <label className="text-[9px] text-gray-555 uppercase">New 4-digit PIN</label>
                       <input type="password" maxLength={4} value={editingStaffPin} onChange={(e) => setEditingStaffPin(e.target.value)} className="w-full bg-neutral-900 border border-white/10 rounded-lg p-2.5 text-white outline-none text-center tracking-widest" required />
                     </div>
                   </div>
@@ -3028,7 +3087,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                               setEditingStaffPin(member.pin);
                             }}
                             className="p-2 bg-blue-500/10 text-blue-400 rounded-xl"
-                            title="Edit"
+                            title="Edit / Change PIN"
                           >
                             <Edit size={12}/>
                           </button>
@@ -3299,7 +3358,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                           )}
                           <button 
                             onClick={() => triggerWhatsAppBroadcast(user.phone)}
-                            className={`font-black text-[9px] px-3 py-1.5 rounded-lg flex items-center gap-1 uppercase transition-all ${isAlreadySent ? 'bg-white/5 text-gray-555' : 'bg-green-600 hover:bg-green-700 text-white'}`}
+                            className={`font-black text-[9px] px-3 py-1.5 rounded-lg flex items-center gap-1 uppercase transition-all ${isAlreadySent ? 'bg-white/5 text-gray-505' : 'bg-green-600 hover:bg-green-700 text-white'}`}
                           >
                             <MessageSquare size={10}/> Send
                           </button>
