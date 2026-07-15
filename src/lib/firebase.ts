@@ -4,8 +4,8 @@ import { getFirestore, enableMultiTabIndexedDbPersistence } from "firebase/fires
 import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
-  // आपकी पुरानी मूल चाबी यहाँ पूरी तरह से री-सेट कर दी गई है
-  apiKey: "AIzaSyCaVEwWnh7_-uDWcvOlFmfymy7kiSxbyMI", 
+  // अक्षरों की गलती को पूरी तरह से यहाँ ठीक कर दिया गया है (Ww के साथ)
+  apiKey: "AIzaSyCaVEWwnh7_-uDWcvOlFmfymy7kiSxbyMI", 
   authDomain: "gen-lang-client-0229168883.firebaseapp.com",
   projectId: "gen-lang-client-0229168883",
   storageBucket: "gen-lang-client-0229168883.firebasestorage.app",
