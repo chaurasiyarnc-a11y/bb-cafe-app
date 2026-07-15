@@ -1,11 +1,10 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
-import { getFirestore, enableMultiTabIndexedDbPersistence } from "firebase/firestore"; // enableMultiTabIndexedDbPersistence ko import kiya gaya hai
+import { getFirestore, enableMultiTabIndexedDbPersistence } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
-  // Yahan humne sahi API Key likh di hai (small 'l' ke sath):
-  apiKey: "AIzaSyCaVEWwnh7_-uDWcvO1Fmfymy7kiSxbyMI",
+  apiKey: "AIzaSyDmKC0xHHlAu1z0KqzuujqWlFMRM8hhiVc", // आपकी बिल्कुल नई और साफ़ चाबी यहाँ सेट है
   authDomain: "gen-lang-client-0229168883.firebaseapp.com",
   projectId: "gen-lang-client-0229168883",
   storageBucket: "gen-lang-client-0229168883.firebasestorage.app",
