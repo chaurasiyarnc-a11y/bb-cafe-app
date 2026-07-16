@@ -361,7 +361,7 @@ export default function BbCafeHome() {
     return total;
   }, [diySize, diySauce, diyMozzarella, diyVegSelection, diyPremiumToppings]);
 
-  // --- ACTIONS & MISSING LOGIC IMPLEMENTATIONS ---
+  // --- ACTIONS & ACTIONS RE-ROUTING ---
 
   const scrollToMenu = () => {
     triggerHaptic();
@@ -1339,7 +1339,7 @@ export default function BbCafeHome() {
 
     if (fulfillmentType === "table" && !tableNumber.trim()) {
       setIsSubmittingOrder(false);
-      return toast.error(isHindi ? "कृपया टेबल नंबर दर्ज करें!" : "Please enter table number!");
+      return toast.error(isHindi ? "कृपया टेबल चुनें!" : "Please select a table!");
     }
 
     // Force UPI screenshots strictly
@@ -1439,7 +1439,7 @@ export default function BbCafeHome() {
 
     const refCode = getReferralCode();
     
-    const modeLabel = fulfillmentType === "delivery" ? `Delivery (${selectedArea.name})` : fulfillmentType === "pickup" ? "Self-Pickup 🛍️" : `Dine-In (Table No. ${tableNumber}) 🍽️`;
+    const modeLabel = fulfillmentType === "delivery" ? `Delivery (${selectedArea.name})` : fulfillmentType === "pickup" ? "Self-Pickup 🛍️" : `Dine-In (Table: ${tableNumber}) 🍽️`;
     const payModeLabel = paymentMethod === "cod" ? "Cash on Delivery (COD) 💵" : "UPI Online Payment 📱";
 
     let msg = `🔥 *BAM BAM CAFE - NEW ORDER*\n\n*Bill No:* #${formattedBillStr}\n*Token No:* #${tokenNumber}\n*Customer:* ${customerDetails.name}\n*Phone:* ${customerDetails.phone}\n*Fulfillment Mode:* ${modeLabel}\n${fulfillmentType === 'delivery' ? `*Address:* ${address}\n` : ''}*Payment Method:* ${payModeLabel}\n\n*ITEMS:*\n${itemsText}\n*Subtotal:* ₹${subtotal + addOnsCost}\n*Coupon Discount:* -₹${couponDiscount}\n${fulfillmentType === 'delivery' ? `*Delivery:* ₹${deliveryCharge}\n` : ''}*TOTAL BILL: ₹${finalTotal}*\n\n🔑 *Delivery PIN:* ${deliveryPin} (Rider ko ye confirm karke hi order le)\n*Invite Code:* ${refCode}\n*Points Earned:* +${pointsEarned} Pts\n${totalPointsCost > 0 ? `*Points Redeemed:* -${totalPointsCost} Pts\n` : ''}`;
@@ -1802,7 +1802,7 @@ export default function BbCafeHome() {
         <div className="sticky top-[64px] z-30 bg-white/95 dark:bg-[#050505]/95 backdrop-blur-md py-2.5 px-1 border-b border-neutral-200 dark:border-white/5 transition-all duration-200 shadow-sm">
           <div className="flex gap-5 overflow-x-auto py-2 px-1 scrollbar-none [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             <button onClick={() => setSelectedCategory("Favorites")} className="flex flex-col items-center flex-shrink-0 group outline-none">
-              <div className={`w-14 h-14 rounded-full overflow-hidden border transition-all flex items-center justify-center ${selectedCategory === "Favorites" ? 'border-red-500 scale-105 shadow-md' : 'dark:border-white/10 border-neutral-300 bg-white dark:bg-neutral-900'}`}>
+              <div className={`w-14 h-14 rounded-full overflow-hidden border transition-all flex items-center justify-center ${selectedCategory === "Favorites" ? 'border-red-500 scale-105 shadow-md' : 'dark:border-neutral-300 bg-white dark:bg-neutral-900'}`}>
                 <Heart size={24} className={selectedCategory === "Favorites" ? 'text-red-500 fill-red-500' : 'text-neutral-500 dark:text-gray-400'} />
               </div>
               <span className={`text-[9px] font-black uppercase mt-1.5 truncate ${selectedCategory === "Favorites" ? 'text-red-500' : 'dark:text-gray-400 text-neutral-800'}`}>{isHindi ? "पसंदीदा" : "My Favorites"}</span>
@@ -2049,11 +2049,11 @@ export default function BbCafeHome() {
                       <div className="p-4 flex flex-col justify-between flex-1">
                         <div className="flex justify-between items-start gap-4">
                           <h4 className="font-black text-sm dark:text-gray-100 text-neutral-900 line-clamp-1">{item.name}</h4>
-                          <div className="bg-green-600 text-white font-extrabold text-[9px] px-2 py-0.5 rounded flex items-center gap-0.5">
-                            <span>4.9</span><span className="text-[8px]">★</span>
+                          <div className="bg-green-600 text-white font-extrabold text-[9px] px-2 py-0.5 rounded flex items-center gap-0.5 animate-none">
+                            <span>4.9</span><Star size={8} style={{ color: '#ffffff', fill: '#ffffff' }} />
                           </div>
                         </div>
-                        <div className="flex justify-between items-center text-[9px] text-neutral-700 dark:text-gray-400 font-bold mt-0.5">
+                        <div className="flex justify-between items-center text-[9px] text-neutral-750 dark:text-gray-400 font-bold mt-0.5">
                           <p className="uppercase text-[8px] text-neutral-600 dark:text-gray-400">{item.category}</p><p>• 15-25 min</p>
                         </div>
                         <div className="h-px dark:bg-white/5 bg-neutral-200 my-2.5" />
@@ -2070,7 +2070,7 @@ export default function BbCafeHome() {
                                 triggerHaptic();
                                 item.variants ? setSelectedProduct(item) : addItem(item); 
                               }} 
-                              className="px-4 py-2 bg-orange-500/10 text-orange-655 dark:text-orange-400 border border-orange-500/30 hover:bg-orange-500 hover:text-white rounded-lg font-black text-[10px] active:scale-95 transition-all uppercase flex items-center gap-1 shadow"
+                              className="px-4 py-2 bg-orange-500/10 text-orange-655 dark:text-orange-400 border border-orange-500/30 hover:bg-orange-500 hover:text-white rounded-lg font-black text-[10px] active:scale-95 transition-all uppercase flex items-center gap-1 shadow animate-none"
                             >
                               <Plus size={12} /> {isHindi ? "जोड़ें" : "ADD"}
                             </button>
@@ -2119,11 +2119,11 @@ export default function BbCafeHome() {
                     {index === 6 && isInlineBannerEnabled && (
                       <div className="w-full h-36 rounded-2xl overflow-hidden relative border border-white/5 bg-white/[0.02] my-2">
                         {(banners.length === 0 || bannerError) ? (
-                          <div className="w-full h-full bg-gradient-to-r from-yellow-600/35 to-orange-800/35 flex flex-col justify-center p-5 space-y-1">
+                          <div className="w-full h-full bg-gradient-to-r from-yellow-655/35 to-orange-800/35 flex flex-col justify-center p-5 space-y-1">
                             <span className="text-[8px] font-black uppercase text-yellow-400 bg-yellow-500/10 border border-yellow-500/20 px-2 py-0.5 rounded-full w-max">
                               {isHindi ? "ताज़ा स्वाद" : "Fresh Taste"}
                             </span>
-                            <h3 className="text-sm font-black text-yellow-300">
+                            <h3 className="text-sm font-black text-yellow-300 font-sans">
                               {isHindi ? "शुद्ध और हाइजीनिक फास्ट फूड" : "PURE & HYGIENIC FAST FOOD"}
                             </h3>
                             <p className="text-[9px] text-neutral-600 dark:text-gray-400">
@@ -2161,19 +2161,19 @@ export default function BbCafeHome() {
 
         {/* REVIEWS SECTION */}
         <div className="pt-6 space-y-4">
-          <div className="flex justify-between items-center">
+          <div className="flex justify-between items-center font-sans">
             <h3 className="text-sm font-black uppercase tracking-wider text-yellow-500 flex items-center gap-1">⭐ {isHindi ? "हमारे ग्राहकों के प्यारे शब्द" : "Feedback from our loved guests"}</h3>
             <span className="text-[9px] font-bold text-neutral-600 dark:text-gray-450">{isHindi ? "कुल समीक्षाएं" : "Total Reviews"} ({displayReviews.length})</span>
           </div>
           
-          <div className={hasManyReviews ? "max-h-[380px] overflow-y-auto pr-1 space-y-3.5 scrollbar-thin scrollbar-thumb-orange-500 scrollbar-track-transparent" : "space-y-3.5"}>
+          <div className={hasManyReviews ? "max-h-[380px] overflow-y-auto pr-1 space-y-3.5 scrollbar-thin scrollbar-thumb-orange-500 scrollbar-track-transparent font-sans" : "space-y-3.5 font-sans"}>
             {displayReviews.map((r: any) => (
               <div key={r.id} className="dark:bg-white/[0.02] bg-white border dark:border-white/5 border-neutral-200 p-4 rounded-2xl space-y-2 shadow-md shadow-neutral-200/30 dark:shadow-none transition-colors duration-200">
                 <div className="flex justify-between items-center">
                   <h4 className="font-black text-xs text-orange-650">{r.name}</h4>
-                  <div className="flex items-center gap-0.5 text-yellow-450">
+                  <div className="flex items-center gap-0.5">
                     {Array.from({ length: r.rating || 5 }).map((_, idx) => (
-                      <Star key={idx} size={8} fill="currentColor" />
+                      <Star key={idx} size={10} style={{ color: '#fbbf24', fill: '#fbbf24' }} />
                     ))}
                   </div>
                 </div>
@@ -2189,13 +2189,13 @@ export default function BbCafeHome() {
             <div className="absolute top-0 right-0 w-24 h-24 bg-green-500/5 rounded-full blur-2xl" />
             
             <div className="text-center space-y-3 relative z-10 flex flex-col items-center">
-              <span className="text-[9px] font-black uppercase tracking-widest text-green-500 bg-green-500/10 px-3 py-1 rounded-full border border-green-500/20">
+              <span className="text-[9px] font-black uppercase tracking-widest text-green-500 bg-green-500/10 px-3 py-1 rounded-full border border-green-500/20 font-sans">
                 {isHindi ? "हमारे बारे में" : "About Us"}
               </span>
               <h4 className="text-xl font-black italic text-yellow-350 tracking-tight font-serif">BUM BUM CAFE</h4>
-              <p className="text-[11px] font-bold text-green-600 dark:text-green-300">{isHindi ? "जहाँ स्वाद और सुकून मिलते हैं! ✨" : "Where Taste Meets Serenity! ✨"}</p>
+              <p className="text-[11px] font-bold text-green-600 dark:text-green-300 font-sans">{isHindi ? "जहाँ स्वाद और सुकून मिलते हैं! ✨" : "Where Taste Meets Serenity! ✨"}</p>
               
-              <p className="text-[11.5px] text-neutral-800 dark:text-gray-300 leading-relaxed max-w-sm mx-auto font-medium">
+              <p className="text-[11.5px] text-neutral-800 dark:text-gray-300 leading-relaxed max-w-sm mx-auto font-medium font-sans">
                 {isHindi ? 
                   "हमने BAM BAM CAFE की शुरुआत एक छोटे से सपने के साथ की थी—लोगों को घर जैसा स्वाद और कैफे वाला माहौल देने के लिए।  यहाँ हर कप कॉफी और हर स्लाइस पिज्जा प्यार और शुद्धता के साथ बनाया जाता है।  हमारी कोशिश है कि आप जब भी यहाँ आएँ, एक प्यारी मुस्कान के साथ वापस जाएँ।  ❤️" :
                   "We started BAM BAM CAFE with a simple dream - to serve hygienic, delicious, home-style fast food in Mohandra town. Every slice of pizza and plate of thali here is crafted with ultimate love, purity and hygiene. Feel free to dine-in or order online! ❤️"
@@ -2224,7 +2224,7 @@ export default function BbCafeHome() {
           </div>
 
           {/* Time & Location Grid */}
-          <div className="grid grid-cols-2 gap-3 text-center text-[10px] font-black uppercase">
+          <div className="grid grid-cols-2 gap-3 text-center text-[10px] font-black uppercase font-sans">
             <div className="dark:bg-white/[0.02] bg-white border dark:border-white/5 border-neutral-200 p-4 rounded-2xl flex flex-col items-center justify-center space-y-1 shadow-md shadow-neutral-200/30 dark:shadow-none transition-colors duration-200">
               <Clock className="text-orange-55" size={16} />
               <p className="text-neutral-600 dark:text-gray-400 text-[8px]">{isHindi ? "खुलने का समय" : "Open Timing"}</p>
@@ -2240,13 +2240,13 @@ export default function BbCafeHome() {
             </a>
           </div>
 
-          <div className="text-center text-[9px] text-neutral-500 dark:text-gray-450 font-bold tracking-widest pt-2">
+          <div className="text-center text-[9px] text-neutral-500 dark:text-gray-450 font-bold tracking-widest pt-2 font-mono">
             © 2026 BUM BUM CAFE - MOHANDRA. ALL RIGHTS RESERVED.
           </div>
         </footer>
       </main>
 
-      {/* STICKY FLOATING CART BUTTON / BOTTOM NAV */}
+      {/* STICKY FLOATING CART BUTTON */}
       <div className="fixed bottom-6 inset-x-0 z-[80] flex justify-center pointer-events-none">
         <div className="flex gap-4 pointer-events-auto">
           {cart.length > 0 && (
@@ -2259,13 +2259,13 @@ export default function BbCafeHome() {
             >
               <div className="relative">
                 <ShoppingBag size={18} />
-                <span className="absolute -top-2.5 -right-2.5 bg-yellow-400 text-black text-[9px] font-black h-5 w-5 rounded-full flex items-center justify-center border-2 border-orange-600">
+                <span className="absolute -top-2.5 -right-2.5 bg-yellow-400 text-black text-[9px] font-black h-5 w-5 rounded-full flex items-center justify-center border-2 border-orange-600 font-mono">
                   {cart.reduce((sum: number, item: any) => sum + item.quantity, 0)}
                 </span>
               </div>
-              <div className="text-left leading-none">
+              <div className="text-left leading-none font-sans">
                 <p className="text-[8px] uppercase tracking-wider text-orange-200">{isHindi ? "कर्ट देखें" : "View Cart"}</p>
-                <p className="text-xs font-black">₹{getTotalBillPrice()}</p>
+                <p className="text-xs font-black font-mono">₹{getTotalBillPrice()}</p>
               </div>
               <ChevronRight size={16} />
             </motion.button>
@@ -2319,7 +2319,7 @@ export default function BbCafeHome() {
 
             {liveOrder.status === 'rejected' ? (
               <div className="space-y-3 py-1">
-                <p className="text-red-400 text-[10px] leading-relaxed font-black">
+                <p className="text-red-400 text-[10px] leading-relaxed font-black font-sans">
                   {isHindi 
                     ? "🚨 आपका आर्डर कैफ़े द्वारा रद्द (Reject) कर दिया गया है! कृपया स्पष्टीकरण या दोबारा आर्डर के लिए कैफ़े में तुरंत संपर्क करें।"
                     : "🚨 Your order has been rejected by the cafe! Please call us immediately for confirmation or details."
@@ -2327,7 +2327,7 @@ export default function BbCafeHome() {
                 </p>
                 <a 
                   href="tel:+919714293759"
-                  className="w-full bg-red-600 hover:bg-red-700 text-white text-center text-[10px] py-2 rounded-xl block font-black uppercase transition-all"
+                  className="w-full bg-red-600 hover:bg-red-700 text-white text-center text-[10px] py-2 rounded-xl block font-black uppercase transition-all font-sans"
                 >
                   Call Cafe 📞
                 </a>
@@ -2352,7 +2352,7 @@ export default function BbCafeHome() {
                     href={`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(`नमस्ते  बम बम कैफ़े! कृपया मेरे आर्डर नंबर #${formatBillNumber(liveOrder.billNumber)} का लाइव स्टेटस बताएं।`)}`}
                     target="_blank"
                     rel="noreferrer"
-                    className="flex-1 bg-white/5 hover:bg-white/10 text-center text-[10px] text-yellow-400 py-1.5 rounded-xl border border-white/5 transition-all"
+                    className="flex-1 bg-white/5 hover:bg-white/10 text-center text-[10px] text-yellow-400 py-1.5 rounded-xl border border-white/5 transition-all font-sans"
                   >
                     Track Live Status (WA) 🔍
                   </a>
@@ -2368,7 +2368,7 @@ export default function BbCafeHome() {
         {activeStory && (
           <div className="fixed inset-0 bg-black z-[250] flex flex-col justify-between">
             <div className="absolute top-4 inset-x-0 px-4 z-[260] flex justify-between items-center bg-gradient-to-b from-black/80 to-transparent pb-10">
-              <span className="text-white text-xs font-black tracking-wider uppercase">{activeStory.title}</span>
+              <span className="text-white text-xs font-black tracking-wider uppercase font-sans">{activeStory.title}</span>
               <button 
                 onClick={() => { triggerHaptic(); setActiveStory(null); }} 
                 className="p-2 bg-white/10 rounded-full text-white"
@@ -2387,7 +2387,7 @@ export default function BbCafeHome() {
               />
             </div>
 
-            <div className="p-6 bg-gradient-to-t from-black via-black/80 to-transparent text-center space-y-4 z-[260]">
+            <div className="p-6 bg-gradient-to-t from-black via-black/80 to-transparent text-center space-y-4 z-[260] font-sans">
               <p className="text-xs text-gray-300 font-semibold">{activeStory.description}</p>
               <button 
                 onClick={() => handleQuickAddFromStory(activeStory.title, activeStory.price)}
@@ -2398,28 +2398,29 @@ export default function BbCafeHome() {
             </div>
           </div>
         )}
-      </ AnimatePresence>
+      </AnimatePresence>
 
       {/* REVIEWS DRAWER MODAL */}
       <AnimatePresence>
         {isReviewsDrawerOpen && (
           <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[120] overflow-y-auto">
             <div className="p-6 max-w-lg mx-auto pb-32">
-              <div className="flex justify-between items-center mb-8">
+              <div className="flex justify-between items-center mb-8 font-sans">
                 <div>
-                  <h2 className="text-2xl font-black text-white font-mono">All Reviews</h2>
+                  <h2 className="text-2xl font-black text-white font-mono font-bold">All Reviews</h2>
                   <p className="text-xs text-yellow-400 font-bold font-mono">Rating: 4.8/5.0 ★</p>
                 </div>
                 <button onClick={() => { triggerHaptic(); setIsReviewsDrawerOpen(false); }} className="p-2.5 bg-white/10 text-white rounded-full hover:bg-white/20 transition-colors"><X size={20} /></button>
               </div>
               
-              <div className="space-y-4">
+              <div className="space-y-4 font-sans">
                 {displayReviews.map((r: any) => (
                   <div key={r.id} className="dark:bg-white/[0.03] bg-white border dark:border-white/5 border-neutral-200 rounded-2xl p-5 space-y-2 shadow-sm transition-colors duration-200">
                     <div className="flex justify-between items-center">
                       <h4 className="font-black text-xs text-orange-650">{r.name}</h4>
-                      <div className="flex items-center gap-1 text-yellow-600 dark:text-yellow-450 bg-yellow-500/10 px-2 py-0.5 rounded text-[9px] font-mono">
-                        <Star size={8} fill="currentColor"/><span className="font-extrabold">{r.rating}</span>
+                      <div className="flex items-center gap-1 bg-amber-500/10 px-2 py-0.5 rounded text-[9px] font-mono">
+                        <Star size={10} style={{ color: '#fbbf24', fill: '#fbbf24' }} />
+                        <span className="font-extrabold text-amber-600 dark:text-amber-400">{r.rating}</span>
                       </div>
                     </div>
                     <p className="text-[11px] text-neutral-800 dark:text-gray-300 italic">"{r.comment}"</p>
@@ -2427,24 +2428,24 @@ export default function BbCafeHome() {
                 ))}
               </div>
               <div className="fixed bottom-6 left-0 w-full px-6 z-50">
-                <button onClick={() => { triggerHaptic(); setIsReviewFormOpen(true); }} className="w-full max-w-md mx-auto bg-orange-55 text-black py-3.5 rounded-2xl font-black text-xs uppercase">✍️ Write a Review</button>
+                <button onClick={() => { triggerHaptic(); setIsReviewFormOpen(true); }} className="w-full max-w-md mx-auto bg-orange-55 text-black py-3.5 rounded-2xl font-black text-xs uppercase font-sans">✍️ Write a Review</button>
               </div>
             </div>
           </div>
         )}
       </AnimatePresence>
 
-      {/* WRITING REVIEW FORM MODAL */}
+      {/* WRITING REVIEW FORM MODAL WITH INTEGRATED EXIT OPTIONS */}
       <AnimatePresence>
         {isReviewFormOpen && (
-          <div className="fixed inset-0 bg-black/95 z-[200] flex items-center justify-center p-6">
+          <div className="fixed inset-0 bg-black/95 z-[200] flex items-center justify-center p-6 font-sans">
             <form onSubmit={handleReviewSubmit} className="dark:bg-[#111] bg-white w-full max-w-md p-6 rounded-3xl border dark:border-white/10 border-neutral-200 text-center space-y-4 shadow-xl transition-colors duration-200">
               <div className="flex justify-between items-center pb-2 border-b dark:border-white/10 border-neutral-200">
                 <h3 className="text-xl font-black text-orange-55 uppercase italic">{isHindi ? "आपकी समीक्षा" : "Your Feedback"}</h3>
                 <button 
                   type="button" 
                   onClick={() => { triggerHaptic(); setIsReviewFormOpen(false); }} 
-                  className="p-2 bg-red-100 hover:bg-red-500 hover:text-white text-red-650 rounded-full transition-all duration-200 shadow"
+                  className="p-2 bg-red-100 hover:bg-red-500 hover:text-white text-red-655 rounded-full transition-all duration-200 shadow"
                   title="Close Feedback"
                 >
                   <X size={18} />
@@ -2453,27 +2454,33 @@ export default function BbCafeHome() {
 
               <div className="space-y-3 text-left">
                 <div>
-                  <label className="text-[9px] font-black uppercase text-neutral-650 dark:text-neutral-400">{isHindi ? "क्या नाम" : "Your Name"}</label>
-                  <input type="text" placeholder={isHindi ? "अपना नाम दर्ज करें..." : "Enter your name..."} value={reviewName} onChange={(e) => setReviewName(e.target.value)} required className="w-full dark:bg-white/5 bg-neutral-50 border dark:border-white/10 border-neutral-300 p-3 rounded-lg text-xs text-neutral-900 dark:text-white focus:border-orange-500 outline-none font-bold" />
+                  <label className="text-[9px] font-black uppercase text-neutral-700 dark:text-neutral-400">{isHindi ? "क्या नाम" : "Your Name"}</label>
+                  <input type="text" placeholder={isHindi ? "अपना नाम दर्ज करें..." : "Enter your name..."} value={reviewName} onChange={(e) => setReviewName(e.target.value)} required className="w-full dark:bg-white/5 bg-neutral-50 border dark:border-white/10 border-neutral-350 p-3 rounded-lg text-xs text-neutral-900 dark:text-white focus:border-orange-500 outline-none font-bold" />
                 </div>
                 <div>
-                  <label className="text-[9px] font-black uppercase text-neutral-655 dark:text-neutral-400">{isHindi ? "रेटिंग" : "Rating"}</label>
-                  <div className="flex gap-1 text-yellow-450 py-1">
+                  <label className="text-[9px] font-black uppercase text-neutral-700 dark:text-neutral-400">{isHindi ? "रेटिंग" : "Rating"}</label>
+                  <div className="flex gap-1 py-1">
                     {[1, 2, 3, 4, 5].map((star) => (
-                      <Star key={star} size={20} fill={reviewRating >= star ? "currentColor" : "none"} onClick={() => setReviewRating(star)} className="cursor-pointer" />
+                      <Star 
+                        key={star} 
+                        size={20} 
+                        style={{ color: '#fbbf24', fill: reviewRating >= star ? '#fbbf24' : 'none' }} 
+                        onClick={() => setReviewRating(star)} 
+                        className="cursor-pointer" 
+                      />
                     ))}
                   </div>
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[9px] font-black uppercase text-neutral-655 dark:text-neutral-400">{isHindi ? "पसंदीदा समीक्षा टच करें:" : "Quick Suggestions:"}</label>
+                  <label className="text-[9px] font-black uppercase text-neutral-700 dark:text-neutral-400">{isHindi ? "पसंदीदा समीक्षा टच करें:" : "Quick Suggestions:"}</label>
                   <div className="flex flex-wrap gap-1.5 py-1">
                     {SUGGESTED_REVIEWS.map((suggestion) => (
                       <button
                         type="button"
                         key={suggestion}
                         onClick={() => setReviewComment(suggestion)}
-                        className="dark:bg-white/5 bg-neutral-50 border dark:border-white/10 border-neutral-300 hover:border-orange-500/50 px-2 py-1 rounded-full text-[9px] text-neutral-850 dark:text-gray-300 font-bold transition-all text-left"
+                        className="dark:bg-white/5 bg-neutral-50 border dark:border-white/10 border-neutral-350 hover:border-orange-500/50 px-2 py-1 rounded-full text-[9px] text-neutral-850 dark:text-gray-300 font-bold transition-all text-left animate-none"
                       >
                         {suggestion}
                       </button>
@@ -2482,96 +2489,15 @@ export default function BbCafeHome() {
                 </div>
 
                 <div>
-                  <label className="text-[9px] font-black uppercase text-neutral-655 dark:text-neutral-400">{isHindi ? "समीक्षा टिप्पणी" : "Comments"}</label>
-                  <textarea placeholder={isHindi ? "खाना कैसा लगा?..." : "How was the food?..."} value={reviewComment} onChange={(e) => setReviewComment(e.target.value)} required rows={3} className="w-full dark:bg-white/5 bg-neutral-50 border dark:border-white/10 border-neutral-300 p-3 rounded-lg text-xs text-neutral-900 dark:text-white focus:border-orange-500 outline-none resize-none font-bold" />
+                  <label className="text-[9px] font-black uppercase text-neutral-700 dark:text-neutral-400">{isHindi ? "समीक्षा टिप्पणी" : "Comments"}</label>
+                  <textarea placeholder={isHindi ? "खाना कैसा लगा?..." : "How was the food?..."} value={reviewComment} onChange={(e) => setReviewComment(e.target.value)} required rows={3} className="w-full dark:bg-white/5 bg-neutral-50 border dark:border-white/10 border-neutral-350 p-3 rounded-lg text-xs text-neutral-900 dark:text-white focus:border-orange-500 outline-none resize-none font-bold" />
                 </div>
               </div>
-              <div className="flex gap-2 pt-1">
+              <div className="flex gap-2 pt-1 font-sans">
                 <button type="submit" className="flex-1 bg-orange-500 text-black font-black p-3 rounded-lg text-xs uppercase">{isHindi ? "जमा करें" : "SUBMIT"}</button>
                 <button type="button" onClick={() => { triggerHaptic(); setIsReviewFormOpen(false); }} className="dark:bg-white/5 bg-neutral-100 text-neutral-800 dark:text-gray-450 font-bold p-3 rounded-lg text-xs uppercase">{isHindi ? "बंद करें" : "CANCEL"}</button>
               </div>
             </form>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* STANDARD CUSTOMIZATION MODAL FOR REGULAR PIZZAS */}
-      <AnimatePresence>
-        {selectedProduct && (
-          <div className="fixed inset-0 bg-black/95 z-[100] flex items-end">
-            <motion.div initial={{ y: 300 }} animate={{ y: 0 }} exit={{ y: 300 }} className="dark:bg-[#111] bg-white w-full p-6 rounded-t-3xl border-t dark:border-white/10 border-neutral-200 max-w-lg mx-auto overflow-y-auto max-h-[95vh] shadow-2xl transition-colors duration-200">
-              <div className="w-12 h-1 bg-neutral-200 dark:bg-white/15 rounded-full mx-auto mb-4" />
-              <h3 className="text-xl font-black text-center text-neutral-900 dark:text-white font-mono">{selectedProduct?.name}</h3>
-              <p className="text-orange-55 font-black mb-4 uppercase text-[8px] text-center">{isHindi ? "ऑर्डर कस्टमाइज़ करें" : "Customize Your Order"}</p>
-              
-              <div className="space-y-3 mb-4">
-                <p className="text-[10px] font-bold text-neutral-650 dark:text-gray-400 uppercase">{isHindi ? "1. साइज चुनें:" : "1. Select Portion Size:"}</p>
-                <div className="grid grid-cols-2 gap-2">
-                  {Object.entries(selectedProduct?.variants || {}).map(([size, price]: any) => (
-                    <button 
-                      type="button" 
-                      key={size} 
-                      onClick={() => { setNormalPizzaSize(size); setNormalPizzaPrice(Number(price)); }} 
-                      className={`p-3 rounded-xl flex flex-col items-center border transition-all ${normalPizzaSize.toLowerCase() === size.toLowerCase() ? 'bg-orange-500/10 border-orange-500 text-orange-655 font-black shadow-sm' : 'dark:bg-white/[0.03] bg-neutral-50 dark:border-white/5 border-neutral-300 dark:text-gray-400 text-neutral-800'}`}
-                    >
-                      <span className="capitalize text-xs font-black">{size}</span>
-                      <span className="font-extrabold text-[10px] mt-1 dark:text-white text-neutral-900 font-mono">₹{price}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {normalPizzaSize && (selectedProduct?.category === "Special Pizza" || selectedProduct?.name?.toLowerCase().includes("pizza")) && (
-                <div className="space-y-3 mb-4 border-t border-neutral-200 dark:border-white/5 pt-3">
-                  <p className="text-[10px] font-bold text-neutral-655 dark:text-gray-400 uppercase">{isHindi ? "2. एक्स्ट्रा मसाला/टॉपिंग चुनें:" : "2. Select Add-ons:"}</p>
-                  <div className="grid grid-cols-2 gap-2">
-                    {Object.entries(PIZZA_ADDONS[normalPizzaSize.toLowerCase()] || {}).map(([addon, cost]) => {
-                      const isSelected = !!normalPizzaAddons[addon];
-                      return (
-                        <button
-                          type="button"
-                          key={addon}
-                          onClick={() => setNormalPizzaAddons(prev => ({ ...prev, [addon]: !prev[addon] }))}
-                          className={`p-2.5 rounded-xl border flex justify-between items-center text-[9px] font-bold ${isSelected ? 'border-orange-500 bg-orange-500/5 text-orange-655' : 'dark:border-white/5 border-neutral-300 dark:bg-white/[0.02] bg-neutral-50 dark:text-gray-300'}`}
-                        >
-                          <span>{addon}</span>
-                          <span className="text-orange-55 dark:text-orange-400 font-black font-mono">+₹{cost}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              <div className="space-y-2 mb-6 border-t border-neutral-200 dark:border-white/5 pt-3">
-                <p className="text-[10px] font-bold text-neutral-655 dark:text-gray-400 uppercase">{isHindi ? "शेफ के लिए विशेष निर्देश:" : "Special Note for Chef / Instructions:"}</p>
-                <div className="flex flex-wrap gap-1.5 pb-2">
-                  {QUICK_INSTRUCTION_TAGS.map((tag) => (
-                    <button
-                      type="button"
-                      key={tag}
-                      onClick={() => quickAppendInstruction(tag, "normal")}
-                      className="text-[9px] font-bold py-1 px-2 rounded-full border dark:border-white/5 border-neutral-300 bg-neutral-100 dark:bg-neutral-800 dark:text-gray-300 text-neutral-800 hover:border-orange-500 transition-colors"
-                    >
-                      {tag}
-                    </button>
-                  ))}
-                </div>
-                <textarea 
-                  placeholder="e.g. Make it extra spicy, No onions, soft crust etc..." 
-                  value={chefNote} 
-                  onChange={(e) => setChefNote(e.target.value)} 
-                  className="w-full text-xs p-3 rounded-xl dark:bg-white/[0.03] bg-neutral-50 border dark:border-white/5 border-neutral-300 dark:text-white outline-none focus:border-orange-500 h-16 resize-none text-neutral-900"
-                />
-              </div>
-
-              <button type="button" onClick={handleNormalPizzaAdd} className="w-full bg-orange-500 text-black p-4 rounded-xl font-black text-xs uppercase animate-none">
-                {isHindi ? "कर्ट में जोड़ने की पुष्टि करें" : "Confirm Add To Cart"}
-              </button>
-              <button type="button" onClick={() => { setSelectedProduct(null); setNormalPizzaSize(""); setNormalPizzaPrice(0); setChefNote(""); }} className="w-full mt-3 text-neutral-500 dark:text-gray-450 font-black text-[10px] text-center uppercase">
-                {isHindi ? "बंद करें" : "Close"}
-              </button>
-            </motion.div>
           </div>
         )}
       </AnimatePresence>
@@ -2584,11 +2510,11 @@ export default function BbCafeHome() {
               initial={{ y: "100%" }} 
               animate={{ y: 0 }} 
               exit={{ y: "100%" }} 
-              className="dark:bg-[#0b0c10] bg-white w-full h-[90vh] rounded-t-3xl border-t dark:border-white/10 border-neutral-200 overflow-y-auto pb-32 p-5 max-w-lg mx-auto relative shadow-2xl transition-colors duration-200"
+              className="dark:bg-[#0b0c10] bg-white w-full h-[90vh] rounded-t-3xl border-t dark:border-white/10 border-neutral-200 overflow-y-auto pb-32 p-5 max-w-lg mx-auto relative shadow-2xl transition-colors duration-200 font-sans"
             >
               <div className="w-12 h-1 bg-neutral-200 dark:bg-white/15 rounded-full mx-auto mb-4" />
               <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-black dark:text-white text-neutral-900 font-mono">{isHindi ? "मेरा खाता और लॉयल्टी" : "My Account & Loyalty"}</h2>
+                <h2 className="text-2xl font-black dark:text-white text-neutral-900 font-mono font-bold">{isHindi ? "मेरा खाता और लॉयल्टी" : "My Account & Loyalty"}</h2>
                 <div className="flex items-center gap-2">
                   <button onClick={() => { triggerHaptic(); setIsProfileOpen(false); }} className="p-2.5 bg-neutral-105 hover:bg-neutral-200 dark:bg-white/5 dark:hover:bg-white/10 dark:text-white text-neutral-800 rounded-full transition-all"><X size={20} /></button>
                 </div>
@@ -2612,11 +2538,11 @@ export default function BbCafeHome() {
                       <input type="tel" maxLength={10} placeholder="10-digit Phone Number" value={tempPhone} onChange={(e) => setTempPhone(e.target.value)} className="w-full dark:bg-neutral-800 bg-neutral-50 border dark:border-neutral-700 border-neutral-300 p-3 rounded-xl font-bold dark:text-white text-neutral-900 outline-none focus:border-orange-550 text-xs" required />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[9px] font-bold text-neutral-650 uppercase flex items-center gap-1"><Lock size={10}/> <span>{isHindi ? "सुरक्षा पिन बनाएँ (4-अंक)" : "Create 4-Digit Security PIN"}</span></label>
-                      <input type="password" maxLength={4} placeholder="e.g. 1234" value={tempPin} onChange={(e) => setTempPin(e.target.value)} className="w-full dark:bg-neutral-800 bg-neutral-50 border dark:border-neutral-700 border-neutral-300 p-3 rounded-xl font-bold dark:text-white text-neutral-900 outline-none focus:border-orange-500 text-xs text-center tracking-widest" required />
+                      <label className="text-[9px] font-bold text-neutral-655 uppercase flex items-center gap-1"><Lock size={10}/> <span>{isHindi ? "सुरक्षा पिन बनाएँ (4-अंक)" : "Create 4-Digit Security PIN"}</span></label>
+                      <input type="password" maxLength={4} placeholder="e.g. 1234" value={tempPin} onChange={(e) => setTempPin(e.target.value)} className="w-full dark:bg-neutral-800 bg-neutral-50 border dark:border-neutral-700 border-neutral-300 p-3 rounded-xl font-bold dark:text-white text-neutral-900 outline-none focus:border-orange-500 text-xs text-center tracking-widest font-mono" required />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[9px] font-bold text-neutral-650 uppercase">{isHindi ? "इनवाइट कोड (वैकल्पिक)" : "Referral Code (Optional)"}</label>
+                      <label className="text-[9px] font-bold text-neutral-655 uppercase">{isHindi ? "इनवाइट कोड (वैकल्पिक)" : "Referral Code (Optional)"}</label>
                       <input type="text" placeholder="Enter invite code..." value={tempRefCode} onChange={(e) => setTempRefCode(e.target.value)} className="w-full dark:bg-neutral-800 bg-neutral-50 border dark:border-neutral-700 border-neutral-300 p-3 rounded-xl font-bold dark:text-white text-neutral-900 outline-none focus:border-orange-500 text-xs" />
                     </div>
                   </div>
@@ -2641,7 +2567,7 @@ export default function BbCafeHome() {
                         setTempPhone(""); 
                         setTempPin(""); 
                       }} 
-                      className="text-[9px] bg-red-500/10 hover:bg-red-500 hover:text-white text-red-500 px-3 py-2 rounded-lg font-black uppercase flex items-center gap-1 transition-all"
+                      className="text-[9px] bg-red-500/10 hover:bg-red-500 hover:text-white text-red-500 px-3 py-2 rounded-lg font-black uppercase flex items-center gap-1 transition-all animate-none"
                     >
                       <LogOut size={12}/> {isHindi ? "लॉगआउट" : "Logout"}
                     </button>
@@ -2675,7 +2601,7 @@ export default function BbCafeHome() {
                     
                     <div className="flex justify-between items-center">
                       <div>
-                        <h4 className="text-2xl font-black dark:text-white text-neutral-900 leading-none font-mono">{customerPoints} <span className="text-[9px] dark:text-gray-450 text-neutral-700 font-black uppercase">Points</span></h4>
+                        <h4 className="text-2xl font-black dark:text-white text-neutral-900 leading-none font-mono">{customerPoints} <span className="text-[9px] dark:text-gray-450 text-neutral-700 font-black uppercase font-mono">Points</span></h4>
                         <p className="text-[8px] dark:text-gray-400 text-neutral-700 font-bold mt-1">{isHindi ? "₹100 खर्च करें = 1 पॉइंट पाएं!" : "Spend ₹100 = Get 1 Loyalty Point!"}</p>
                       </div>
                       <div className="text-right text-[8px] dark:text-yellow-400 text-amber-900 font-black space-y-0.5 uppercase max-h-20 overflow-y-auto no-scrollbar">
@@ -2712,7 +2638,7 @@ export default function BbCafeHome() {
                         <span className="dark:text-gray-400 text-neutral-700 font-black uppercase">{isHindi ? "शेयर प्रोग्रेस:" : "Share Progress:"}</span>
                         <span className="text-yellow-600 dark:text-yellow-400 font-black bg-yellow-100 dark:bg-yellow-400/10 px-2 py-0.5 rounded border border-yellow-350 dark:border-yellow-400/20 font-mono">{shareCount}/5 Shared</span>
                       </div>
-                      <button type="button" onClick={handleShareApp} className="w-full bg-green-600 text-white font-black py-2.5 rounded-xl text-[10px] uppercase flex items-center justify-center gap-1 shadow-md transition-all">
+                      <button type="button" onClick={handleShareApp} className="w-full bg-green-600 text-white font-black py-2.5 rounded-xl text-[10px] uppercase flex items-center justify-center gap-1 shadow-md transition-all animate-none">
                         <Share2 size={12}/>
                         <span>{isHindi ? "5 बार शेयर करके मुफ्त +1 पॉइंट कमाएं! 🎁" : "Share 5 times to earn +1 free point! 🎁"}</span>
                       </button>
@@ -2725,7 +2651,7 @@ export default function BbCafeHome() {
 
                     {/* SOCIAL MEDIA CLAIM SECTION */}
                     <div className="pt-2 border-t border-neutral-250 dark:border-neutral-800">
-                      <p className="text-[9px] dark:text-gray-400 text-neutral-700 font-black uppercase mb-1.5">{isHindi ? "सोशल मीडिया पर फॉलो करके पॉइंट्स कमाएं:" : "Earn Points by Following Us:"}</p>
+                      <p className="text-[9px] dark:text-gray-400 text-neutral-700 font-black uppercase mb-1.5">{isHindi ? "सोशल मीडिया पर फॉलो करके  पॉइंट्स कमाएं:" : "Earn Points by Following Us:"}</p>
                       <div className="flex flex-wrap gap-1.5">
                         {SOCIAL_LINKS.map((link) => (
                           <button
@@ -2737,7 +2663,7 @@ export default function BbCafeHome() {
                               setIsClaimModalOpen(true);
                               window.open(link.url, '_blank');
                             }}
-                            className="flex items-center gap-1 bg-neutral-100 dark:bg-white/5 border dark:border-white/10 border-neutral-200 px-2.5 py-1 rounded-full text-[9px] font-bold dark:text-gray-300 text-neutral-800 hover:border-yellow-450 transition-all"
+                            className="flex items-center gap-1 bg-neutral-100 dark:bg-white/5 border dark:border-white/10 border-neutral-200 px-2.5 py-1 rounded-full text-[9px] font-bold dark:text-gray-300 text-neutral-800 hover:border-yellow-450 transition-all animate-none"
                           >
                             <span>{link.icon}</span>
                             <span>{link.label.split(' ')[1]} (+{link.points} P)</span>
@@ -2753,7 +2679,7 @@ export default function BbCafeHome() {
                           const inCartCost = cart.reduce((acc: number, i: any) => acc + (i.pointsCost || 0), 0);
                           const isAffordable = (customerPoints - inCartCost) >= rule.pointsCost;
                           return (
-                            <button key={rule.id} type="button" onClick={() => handleCustomerRedeem(`reward-${rule.id}`, `🎁 FREE ${rule.rewardName}`, rule.pointsCost)} disabled={!isAffordable} className={`py-2 px-2 rounded text-[9px] font-black uppercase border truncate transition-all ${isAffordable ? 'bg-yellow-400 text-black border-yellow-450 hover:bg-yellow-500' : 'bg-neutral-100 dark:bg-white/5 text-neutral-500 dark:text-gray-450 border-neutral-200 dark:border-white/5 cursor-not-allowed'}`}>🎁 {rule.rewardName} ({rule.pointsCost} P)</button>
+                            <button key={rule.id} type="button" onClick={() => handleCustomerRedeem(`reward-${rule.id}`, `🎁 FREE ${rule.rewardName}`, rule.pointsCost)} disabled={!isAffordable} className={`py-2 px-2 rounded text-[9px] font-black uppercase border truncate transition-all ${isAffordable ? 'bg-yellow-400 text-black border-yellow-450 hover:bg-yellow-500' : 'bg-neutral-100 dark:bg-white/5 text-neutral-500 dark:text-gray-450 border-neutral-200 dark:border-white/5 cursor-not-allowed animate-none'}`}>🎁 {rule.rewardName} ({rule.pointsCost} P)</button>
                           );
                         })}
                       </div>
@@ -2761,8 +2687,8 @@ export default function BbCafeHome() {
                   </div>
 
                   {/* ORDER HISTORY */}
-                  <div className="space-y-4 pt-4 border-t border-neutral-250 dark:border-neutral-800 font-sans">
-                    <h3 className="text-sm font-black dark:text-gray-200 text-neutral-900 uppercase flex items-center gap-1.5">
+                  <div className="space-y-4 pt-4 border-t border-neutral-250 dark:border-neutral-850 font-sans">
+                    <h3 className="text-sm font-black dark:text-gray-200 text-neutral-900 uppercase flex items-center gap-1.5 font-bold">
                       <History size={16} className="text-orange-500" />
                       <span>{isHindi ? "मेरा आर्डर इतिहास (विवरण):" : "My Order History Ledger:"}</span>
                     </h3>
@@ -2774,7 +2700,7 @@ export default function BbCafeHome() {
                             <div key={index} className="bg-white dark:bg-neutral-900 border dark:border-neutral-800 border-neutral-200 rounded-2xl p-4 space-y-3 shadow-md transition-colors duration-200">
                               <div className="flex justify-between items-center border-b dark:border-neutral-800 border-neutral-200 pb-2 font-mono">
                                 <div className="flex flex-col gap-0.5">
-                                  <span className="text-xs font-black text-orange-55">Bill: #{formatBillNumber(ord.billNumber || 0)}</span>
+                                  <span className="text-xs font-black text-orange-55 font-bold">Bill: #{formatBillNumber(ord.billNumber || 0)}</span>
                                   <span className="text-[9px] text-neutral-500 dark:text-gray-400 font-bold">{formattedDate}</span>
                                 </div>
                                 <span className="bg-green-600/10 text-green-600 dark:text-green-400 border border-green-500/20 px-2.5 py-1 rounded-lg text-[9px] font-black font-mono">
@@ -2782,9 +2708,9 @@ export default function BbCafeHome() {
                                 </span>
                               </div>
                               
-                              <div className="space-y-1.5">
+                              <div className="space-y-1.5 font-sans">
                                 {ord.items.map((it: any, i: number) => (
-                                  <div key={i} className="flex justify-between text-xs font-bold text-neutral-800 dark:text-gray-300">
+                                  <div key={i} className="flex justify-between text-xs font-bold text-neutral-850 dark:text-gray-300">
                                     <span>{it.name} <span className="text-orange-500 text-[10px]">x{it.quantity}</span></span>
                                     <span>₹{it.price * it.quantity}</span>
                                   </div>
@@ -2793,14 +2719,14 @@ export default function BbCafeHome() {
                               
                               <div className="border-t border-dashed dark:border-neutral-800 border-neutral-200 pt-2.5 flex justify-between items-center text-xs font-black">
                                 <span className="text-neutral-500">{isHindi ? "कुल भुगतान राशि:" : "To Pay Amount:"}</span>
-                                <span className="text-sm text-green-600 dark:text-green-400">₹{ord.total}</span>
+                                <span className="text-sm text-green-600 dark:text-green-400 font-mono">₹{ord.total}</span>
                               </div>
 
                               <a 
                                 href={`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(`नमस्ते बम बम कैफ़े! कृपया मेरे आर्डर नंबर #${formatBillNumber(ord.billNumber)} (टोकन नंबर: #${ord.tokenNumber}) का लाइव स्टेटस बताएं।`)}`}
                                 target="_blank"
                                 rel="noreferrer"
-                                className="w-full bg-orange-500/10 text-orange-650 hover:bg-orange-500 hover:text-white dark:bg-white/5 hover:dark:bg-white/10 text-center text-[10px] font-black py-2.5 rounded-xl block border dark:border-neutral-800 border-orange-500/20 transition-all font-sans"
+                                className="w-full bg-orange-500/10 text-orange-655 hover:bg-orange-500 hover:text-white dark:bg-white/5 hover:dark:bg-white/10 text-center text-[10px] font-black py-2.5 rounded-xl block border dark:border-neutral-800 border-orange-500/20 transition-all font-sans"
                               >
                                 Track Live Status on WA 🔍
                               </a>
@@ -2810,7 +2736,7 @@ export default function BbCafeHome() {
                       </div>
                     ) : (
                       <p className="text-center text-neutral-500 py-6 text-[10px] font-bold uppercase tracking-wider">
-                        {isHindi ? "अभी तक कोई आर्डर नहीं मिला। स्वादिष्ट आर्डर शुरू करें! 🍕" : "No orders found yet. Grab some food! 🍕"}
+                        {isHindi ? "अभी तक कोई आर्डर नहीं मिला।  स्वादिष्ट आर्डर शुरू करें! 🍕" : "No orders found yet. Grab some food! 🍕"}
                       </p>
                     )}
                   </div>
@@ -2839,10 +2765,10 @@ export default function BbCafeHome() {
             >
               {/* STICKY TOP CONTAINER: TARGET PROGRESS BAR + LIVE BILL TOTAL */}
               <div className="sticky top-0 z-30 bg-white dark:bg-[#0b0c10] pb-3 border-b border-neutral-200 dark:border-white/5 space-y-2">
-                {/* Free Delivery Target Progress Bar (Sticky Top!) */}
+                {/* Free Delivery Target Progress Bar */}
                 {fulfillmentType === "delivery" && (
                   <div className="bg-orange-500/5 dark:bg-orange-500/10 border border-orange-500/20 rounded-xl p-2.5 space-y-1.5 text-[10px] font-sans">
-                    <div className="flex justify-between items-center font-black uppercase text-orange-650 dark:text-orange-400">
+                    <div className="flex justify-between items-center font-black uppercase text-orange-655 dark:text-orange-400">
                       <span>🚚 Free Delivery Target:</span>
                       <span>{getCartSubtotal() >= selectedArea.minFree ? "Achieved! 🎉" : `Need ₹${selectedArea.minFree - getCartSubtotal()} more`}</span>
                     </div>
@@ -2852,39 +2778,39 @@ export default function BbCafeHome() {
                   </div>
                 )}
 
-                {/* Live Bill Total card */}
+                {/* Live Bill Total sticky card */}
                 <div className="bg-neutral-100 dark:bg-neutral-950 p-3 rounded-2xl border border-neutral-200 dark:border-white/5 flex justify-between items-center">
                   <span className="text-[10px] font-black uppercase text-neutral-600 dark:text-gray-400">{isHindi ? "लाइव बिल टोटल:" : "LIVE BILL TOTAL:"}</span>
-                  <span className="text-sm font-black text-orange-655 dark:text-yellow-400 font-mono">₹{getTotalBillPrice()}</span>
+                  <span className="text-sm font-black text-orange-655 dark:text-yellow-400 font-mono font-bold">₹{getTotalBillPrice()}</span>
                 </div>
               </div>
 
-              <div className="w-12 h-1 bg-neutral-200 dark:bg-white/15 rounded-full mx-auto mb-4" />
+              <div className="w-12 h-1 bg-neutral-200 dark:bg-white/15 rounded-full mx-auto my-4" />
               <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-black text-neutral-900 dark:text-white font-mono">{isHindi ? "आपका कर्ट आर्डर" : "Your Order Cart"}</h2>
+                <h2 className="text-2xl font-black text-neutral-900 dark:text-white font-mono font-bold">{isHindi ? "आपका कर्ट आर्डर" : "Your Order Cart"}</h2>
                 <button onClick={() => { triggerHaptic(); setIsCartOpen(false); }} className="p-2.5 bg-neutral-105 hover:bg-neutral-200 dark:bg-white/5 dark:hover:bg-white/10 text-neutral-850 dark:text-white rounded-full transition-all"><X size={20} /></button>
               </div>
 
               {/* 1. CART ITEMS LIST */}
               {cart.map((item: any) => (
-                <div key={item.id} className="flex flex-col dark:bg-white/[0.02] bg-white p-4 rounded-2xl mb-3 border dark:border-white/5 border-neutral-200 shadow-sm transition-colors duration-200 gap-1.5">
+                <div key={item.id} className="flex flex-col dark:bg-white/[0.02] bg-white p-4 rounded-2xl mb-3 border dark:border-white/5 border-neutral-200 shadow-sm transition-colors duration-200 gap-1.5 font-sans">
                   <div className="flex justify-between items-center">
                     <div className="min-w-0 pr-3">
-                      <h4 className="font-bold text-xs text-neutral-900 dark:text-gray-100 truncate">{item?.name || "Item"}</h4>
+                      <h4 className="font-bold text-xs text-neutral-900 dark:text-gray-100 truncate font-bold">{item?.name || "Item"}</h4>
                       <p className="text-orange-55 font-black mt-1 text-[11px] font-mono">₹{item?.price || 0}</p>
                     </div>
                     <div className="flex items-center gap-2 bg-neutral-100 dark:bg-black/40 px-2 py-1 rounded-xl border border-neutral-300 dark:border-white/10 flex-shrink-0">
                       <button onClick={() => { triggerHaptic(); removeItem(item.id); }} className="w-6 h-6 flex items-center justify-center bg-red-500/10 text-red-500 rounded text-sm font-black">-</button>
                       <span className="font-black text-xs px-1 text-neutral-900 dark:text-white font-mono">{item.quantity}</span>
                       {item.isReward ? (
-                        <button disabled className="w-6 h-6 flex items-center justify-center bg-white/5 text-gray-500 rounded text-sm font-black cursor-not-allowed">+</button>
+                        <button disabled className="w-6 h-6 flex items-center justify-center bg-white/5 text-gray-550 rounded text-sm font-black cursor-not-allowed">+</button>
                       ) : (
                         <button onClick={() => { triggerHaptic(); addItem(item); }} className="w-6 h-6 flex items-center justify-center bg-green-500/10 text-green-500 rounded text-sm font-black">+</button>
                       )}
                     </div>
                   </div>
                   {item.note && (
-                    <div className="bg-orange-500/5 border border-orange-500/10 rounded-lg p-2 text-[9px] text-orange-655 dark:text-orange-400 italic font-sans">
+                    <div className="bg-orange-500/5 border border-orange-500/10 rounded-lg p-2 text-[9px] text-orange-655 dark:text-orange-400 italic">
                       👩‍🍳 Chef Instructions: {item.note}
                     </div>
                   )}
@@ -2893,43 +2819,43 @@ export default function BbCafeHome() {
 
               {/* 2. UPSELL SUGGESTIONS */}
               {upsellSuggestionItems.length > 0 && (
-                <div className="dark:bg-purple-950/20 bg-purple-50 border border-purple-500/10 rounded-2xl p-4 space-y-2 mt-4">
-                  <p className="text-[9px] font-black uppercase text-purple-850 dark:text-purple-400 tracking-wider font-sans">{isHindi ? "साथ में यह भी मंगाया गया 🥤" : "Frequently Bought Together 🥤"}</p>
+                <div className="dark:bg-purple-950/20 bg-purple-50 border border-purple-500/10 rounded-2xl p-4 space-y-2 mt-4 font-sans">
+                  <p className="text-[9px] font-black uppercase text-purple-850 dark:text-purple-400 tracking-wider font-bold">{isHindi ? "साथ में यह भी मंगाया गया 🥤" : "Frequently Bought Together 🥤"}</p>
                   <div className="space-y-2">
                     {upsellSuggestionItems.map((suggest) => (
                       <div key={suggest.id} className="flex justify-between items-center text-[10px]">
                         <div>
                           <span className="font-bold block text-neutral-900 dark:text-white">{suggest.name}</span>
-                          <span className="text-orange-650 font-extrabold font-mono">{getDisplayPrice(suggest)}</span>
+                          <span className="text-orange-650 font-extrabold font-mono">₹{getDisplayPrice(suggest)}</span>
                         </div>
-                        <button onClick={() => { triggerHaptic(); addItem(suggest); }} className="bg-purple-500/20 text-purple-650 border border-purple-500/30 px-3 py-1 rounded-lg font-black uppercase animate-none font-sans">ADD</button>
+                        <button onClick={() => { triggerHaptic(); addItem(suggest); }} className="bg-purple-500/20 text-purple-650 border border-purple-500/30 px-3 py-1 rounded-lg font-black uppercase animate-none">ADD</button>
                       </div>
                     ))}
                   </div>
                 </div>
               )}
 
-              {/* 3. ADD ADD-ONS TO ORDER (Extra Condiments - Repositioned here below upsell suggestions!) */}
+              {/* 3. ADD ADD-ONS TO ORDER (Extra Condiments) */}
               <div className="dark:bg-white/[0.02] bg-neutral-50 border dark:border-white/5 border-neutral-200 rounded-2xl p-4 space-y-2.5 transition-colors duration-200 mt-4 font-sans">
                 <p className="text-[9px] font-black uppercase text-neutral-850 dark:text-gray-400">{isHindi ? "ऐड-ऑन्स जोड़ें (Add-ons):" : "Add Add-ons to order:"}</p>
                 <div className="grid grid-cols-3 gap-2">
-                  <button onClick={() => { triggerHaptic(); setKetchupAddon(!ketchupAddon); }} className={`p-2 rounded-xl border text-[9.5px] font-black ${ketchupAddon ? 'border-red-500 bg-red-500/5 text-red-650' : 'border-neutral-300 dark:border-white/5 bg-transparent text-neutral-800 dark:text-gray-300'}`}>
+                  <button onClick={() => { triggerHaptic(); setKetchupAddon(!ketchupAddon); }} className={`p-2 rounded-xl border text-[9.5px] font-black ${ketchupAddon ? 'border-red-500 bg-red-500/5 text-red-650' : 'border-neutral-300 dark:border-white/5 bg-transparent text-neutral-800 dark:text-gray-300 animate-none'}`}>
                     {isHindi ? "केचप" : "Ketchup"} (+₹10)
                   </button>
-                  <button onClick={() => { triggerHaptic(); setOreganoAddon(!oreganoAddon); }} className={`p-2 rounded-xl border text-[9.5px] font-black ${oreganoAddon ? 'border-yellow-500 bg-yellow-500/5 text-yellow-600' : 'border-neutral-300 dark:border-white/5 bg-transparent text-neutral-800 dark:text-gray-300'}`}>
+                  <button onClick={() => { triggerHaptic(); setOreganoAddon(!oreganoAddon); }} className={`p-2 rounded-xl border text-[9.5px] font-black ${oreganoAddon ? 'border-yellow-500 bg-yellow-500/5 text-yellow-600' : 'border-neutral-300 dark:border-white/5 bg-transparent text-neutral-800 dark:text-gray-300 animate-none'}`}>
                     {isHindi ? "ऑरेगैनो" : "Oregano"} (+₹10)
                   </button>
-                  <button onClick={() => { triggerHaptic(); setChiliFlakesAddon(!chiliFlakesAddon); }} className={`p-2 rounded-xl border text-[9.5px] font-black ${chiliFlakesAddon ? 'border-orange-500 bg-orange-500/5 text-orange-655' : 'border-neutral-300 dark:border-white/5 bg-transparent text-neutral-800 dark:text-gray-300'}`}>
+                  <button onClick={() => { triggerHaptic(); setChiliFlakesAddon(!chiliFlakesAddon); }} className={`p-2 rounded-xl border text-[9.5px] font-black ${chiliFlakesAddon ? 'border-orange-500 bg-orange-500/5 text-orange-655' : 'border-neutral-300 dark:border-white/5 bg-transparent text-neutral-800 dark:text-gray-300 animate-none'}`}>
                     {isHindi ? "चिली फ्लेक्स" : "Chili Flakes"} (+₹10)
                   </button>
                 </div>
               </div>
 
-              {/* 4. CONDITIONAL FULFILLMENT INPUTS */}
+              {/* 4. CONDITIONAL FULFILLMENT INPUTS (Delivery Zone & Address) */}
               {fulfillmentType === "delivery" && (
                 <div className="space-y-4 mt-4 font-sans">
                   
-                  {/* Select Delivery Zone (KM) - Repositioned above address */}
+                  {/* Select Delivery Zone (KM) */}
                   <div className="bg-neutral-50 dark:bg-white/[0.02] border border-neutral-200 dark:border-white/5 rounded-2xl p-4 space-y-2.5 transition-colors duration-200">
                     <label className="text-[9px] font-black uppercase text-neutral-800 dark:text-gray-400">{isHindi ? "डिलीवरी का क्षेत्र चुनें (KM):" : "Select Delivery Zone (KM):"}</label>
                     <div className="grid grid-cols-2 gap-2">
@@ -2942,8 +2868,8 @@ export default function BbCafeHome() {
                             onClick={() => { triggerHaptic(); setSelectedArea(area); }}
                             className={`p-3 rounded-xl border text-left flex flex-col justify-between transition-all duration-200 active:scale-95 ${
                               isSelected 
-                                ? 'border-orange-500 bg-orange-500/10 text-orange-655 dark:text-orange-400 shadow-md animate-none font-black' 
-                                : 'border-neutral-300 dark:border-white/5 bg-white dark:bg-white/[0.01] text-neutral-800 dark:text-neutral-300 hover:border-neutral-400 hover:dark:border-white/10 font-bold'
+                                ? 'border-orange-500 bg-orange-500/10 text-orange-655 dark:text-orange-400 shadow-md animate-none' 
+                                : 'border-neutral-300 dark:border-white/5 bg-white dark:bg-white/[0.01] text-neutral-800 dark:text-neutral-300 hover:border-neutral-400 hover:dark:border-white/10'
                             }`}
                           >
                             <span className="text-[9px] font-black leading-tight uppercase truncate">{area.name.replace("Mohandra ", "")}</span>
@@ -2960,32 +2886,19 @@ export default function BbCafeHome() {
                   {/* Delivery Address text area */}
                   <div className="bg-neutral-50 dark:bg-white/[0.02] p-4 rounded-2xl border border-neutral-200 dark:border-white/5 space-y-2 transition-colors duration-200">
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1.5 text-orange-55"><MapPin size={14}/> <h3 className="font-black uppercase text-[10px]">{isHindi ? "डिलीवरी का पता" : "Delivery Address"}</h3></div>
-                      <button type="button" onClick={handleDetectLocation} className="text-[8px] bg-green-600 hover:bg-green-700 text-white font-black px-2 py-1 rounded flex items-center gap-1 shadow-sm uppercase animate-none">📍 {isHindi ? "लाइव लोकेशन" : "Live Location"}</button>
+                      <div className="flex items-center gap-1.5 text-orange-55"><MapPin size={14}/> <h3 className="font-black uppercase text-[10px] font-bold">{isHindi ? "डिलीवरी का पता" : "Delivery Address"}</h3></div>
+                      <button type="button" onClick={handleDetectLocation} className="text-[8px] bg-green-600 hover:bg-green-700 text-white font-black px-2 py-1 rounded flex items-center gap-1 shadow-sm uppercase animate-none font-bold">📍 {isHindi ? "लाइव लोकेशन" : "Live Location"}</button>
                     </div>
-                    <textarea placeholder={isHindi ? "घर का पता, मुख्य लैंडमार्क के साथ..." : "Ghar ka address, Landmark ke saath..."} value={address} onChange={(e) => setAddress(e.target.value)} className="w-full bg-white dark:bg-black/40 border border-neutral-300 dark:border-white/10 rounded-xl p-3 text-xs font-semibold text-neutral-900 dark:text-white outline-none resize-none h-16" />
+                    <textarea placeholder={isHindi ? "घर का पता, मुख्य लैंडमार्क के साथ..." : "Ghar ka address, Landmark ke saath..."} value={address} onChange={(e) => setAddress(e.target.value)} className="w-full bg-white dark:bg-black/40 border border-neutral-350 dark:border-white/10 rounded-xl p-3 text-xs font-semibold text-neutral-900 dark:text-white outline-none resize-none h-16" />
                   </div>
 
                 </div>
               )}
 
-              {fulfillmentType === "table" && (
-                <div className="bg-neutral-50 dark:bg-white/[0.02] p-4 rounded-2xl border border-neutral-200 dark:border-white/5 space-y-2 mt-4 transition-colors duration-200 font-sans">
-                  <div className="flex items-center gap-1.5 text-orange-55"><span>🍽️</span> <h3 className="font-black uppercase text-[10px]">{isHindi ? "टेबल नंबर दर्ज करें" : "Enter Table Number"}</h3></div>
-                  <input 
-                    type="text" 
-                    placeholder={isHindi ? "उदा. टेबल संख्या 5" : "e.g. Table No. 5"} 
-                    value={tableNumber} 
-                    onChange={(e) => setTableNumber(e.target.value)} 
-                    className="w-full bg-white dark:bg-black/40 border border-neutral-300 dark:border-white/10 rounded-xl p-3 text-xs font-bold text-neutral-900 dark:text-white outline-none" 
-                  />
-                </div>
-              )}
-
               {/* 5. ECO FRIENDLY PACKAGING */}
-              <div className="dark:bg-green-950/10 bg-green-50/50 border dark:border-green-500/10 border-green-200 rounded-2xl p-4 flex justify-between items-center transition-colors duration-200 mt-4 font-sans">
+              <div className="dark:bg-green-950/10 bg-green-50/50 border dark:border-green-500/10 border-green-200 rounded-2xl p-4 flex justify-between items-center transition-colors duration-200 mt-4 font-sans font-bold">
                 <div className="space-y-0.5">
-                  <p className="text-[10px] font-black text-green-700 dark:text-green-500 uppercase tracking-tight">{isHindi ? "इको-फ्रेंडली पैकिंग" : "Eco-Friendly Packaging"}</p>
+                  <p className="text-[10px] font-black text-green-700 dark:text-green-500 uppercase tracking-tight font-bold">{isHindi ? "इको-फ्रेंडली पैकिंग" : "Eco-Friendly Packaging"}</p>
                   <p className="text-[8px] text-neutral-700 dark:text-gray-400 font-bold">{isHindi ? "चम्मच / टिश्यू पेपर की आवश्यकता नहीं है" : "No spoon or tissue paper requested"}</p>
                 </div>
                 <input type="checkbox" checked={noCutlery} onChange={() => { triggerHaptic(); setNoCutlery(!noCutlery); }} className="w-4 h-4 accent-green-650" />
@@ -2993,7 +2906,7 @@ export default function BbCafeHome() {
 
               {/* 6. PROMO/COUPON CODE INPUT SECTION */}
               <div className="dark:bg-white/[0.02] bg-neutral-50 border dark:border-white/5 border-neutral-200 rounded-2xl p-4 space-y-2.5 transition-colors duration-200 mt-4 font-sans">
-                <label className="text-[9px] font-black uppercase text-neutral-850 dark:text-gray-400">
+                <label className="text-[9px] font-black uppercase text-neutral-850 dark:text-gray-400 font-bold">
                   {isHindi ? "कूपन कोड / प्रोमो कोड:" : "Coupon Code / Promo Code:"}
                 </label>
                 <div className="flex gap-2">
@@ -3002,12 +2915,12 @@ export default function BbCafeHome() {
                     placeholder={isHindi ? "कूपन कोड डालें (उदा: SAVE50)" : "Enter code (e.g. SAVE50)"} 
                     value={enteredCoupon} 
                     onChange={(e) => setEnteredCoupon(e.target.value)} 
-                    className="flex-1 bg-white dark:bg-black/40 border border-neutral-350 dark:border-white/10 rounded-xl px-3 py-2 text-xs font-bold text-neutral-900 dark:text-white outline-none uppercase" 
+                    className="flex-1 bg-white dark:bg-black/40 border border-neutral-350 dark:border-white/10 rounded-xl px-3 py-2 text-xs font-bold text-neutral-900 dark:text-white outline-none uppercase font-mono" 
                   />
                   <button 
                     type="button" 
                     onClick={handleApplyCoupon} 
-                    className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-xl text-xs font-black transition-all active:scale-95"
+                    className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-xl text-xs font-black transition-all active:scale-95 font-bold animate-none"
                   >
                     {isHindi ? "लागू करें" : "Apply"}
                   </button>
@@ -3026,32 +2939,89 @@ export default function BbCafeHome() {
                 )}
               </div>
 
-              {/* 7. SELECT ORDER MODE (Fulfillment buttons - Placed below coupon section!) */}
+              {/* 7. SELECT ORDER MODE (Fulfillment mode selection - with visual tables just below ডाइन-इन!) */}
               <div className="dark:bg-white/[0.02] bg-neutral-50 p-4 rounded-2xl border dark:border-white/5 border-neutral-200 space-y-2 mt-4 transition-colors duration-200 font-sans">
-                <label className="text-[10px] font-black uppercase text-neutral-850 dark:text-gray-400">{isHindi ? "ऑर्डर का माध्यम चुनें:" : "Select Order Mode:"}</label>
+                <label className="text-[10px] font-black uppercase text-neutral-850 dark:text-gray-400 font-bold">{isHindi ? "ऑर्डर का माध्यम चुनें:" : "Select Order Mode:"}</label>
                 <div className="grid grid-cols-3 gap-2">
                   <button
                     onClick={() => { triggerHaptic(); setFulfillmentType("delivery"); }}
-                    className={`py-3 px-1 rounded-xl border flex flex-col items-center justify-center gap-1.5 transition-all text-center ${fulfillmentType === "delivery" ? 'border-orange-500 bg-orange-500/10 text-orange-655 font-black shadow-sm' : 'border-neutral-300 dark:border-white/5 text-neutral-800 dark:text-gray-300 font-semibold'}`}
+                    className={`py-3 px-1 rounded-xl border flex flex-col items-center justify-center gap-1.5 transition-all text-center ${fulfillmentType === "delivery" ? 'border-orange-500 bg-orange-500/10 text-orange-655 font-black shadow-sm' : 'border-neutral-300 dark:border-white/5 text-neutral-850 dark:text-gray-300 font-semibold'}`}
                   >
                     <span className="text-base">🛵</span>
                     <span className="text-[9px] font-black">{isHindi ? "होम डिलीवरी" : "Home Delivery"}</span>
                   </button>
                   <button
                     onClick={() => { triggerHaptic(); setFulfillmentType("pickup"); }}
-                    className={`py-3 px-1 rounded-xl border flex flex-col items-center justify-center gap-1.5 transition-all text-center ${fulfillmentType === "pickup" ? 'border-orange-500 bg-orange-500/10 text-orange-655 font-black shadow-sm' : 'border-neutral-300 dark:border-white/5 text-neutral-800 dark:text-gray-300 font-semibold'}`}
+                    className={`py-3 px-1 rounded-xl border flex flex-col items-center justify-center gap-1.5 transition-all text-center ${fulfillmentType === "pickup" ? 'border-orange-500 bg-orange-500/10 text-orange-655 font-black shadow-sm' : 'border-neutral-300 dark:border-white/5 text-neutral-850 dark:text-gray-300 font-semibold'}`}
                   >
                     <span className="text-base">🛍️</span>
                     <span className="text-[9px] font-black">{isHindi ? "सेल्फ-पिकअप" : "Self-Pickup"}</span>
                   </button>
                   <button
                     onClick={() => { triggerHaptic(); setFulfillmentType("table"); }}
-                    className={`py-3 px-1 rounded-xl border flex flex-col items-center justify-center gap-1.5 transition-all text-center ${fulfillmentType === "table" ? 'border-orange-500 bg-orange-500/10 text-orange-655 font-black shadow-sm' : 'border-neutral-300 dark:border-white/5 text-neutral-800 dark:text-gray-300 font-semibold'}`}
+                    className={`py-3 px-1 rounded-xl border flex flex-col items-center justify-center gap-1.5 transition-all text-center ${fulfillmentType === "table" ? 'border-orange-500 bg-orange-500/10 text-orange-655 font-black shadow-sm' : 'border-neutral-300 dark:border-white/5 text-neutral-850 dark:text-gray-300 font-semibold'}`}
                   >
                     <span className="text-base">🍽️</span>
                     <span className="text-[9px] font-black">{isHindi ? "टेबल ऑर्डर" : "Dine-In (Table)"}</span>
                   </button>
                 </div>
+
+                {/* Dine-In Custom Table Capacity Grid Selector (Repositioned directly below Dine-In!) */}
+                {fulfillmentType === "table" && (
+                  <div className="mt-3 p-3 bg-neutral-100 dark:bg-neutral-900 rounded-xl border border-neutral-250 dark:border-white/5 space-y-3 font-sans transition-all duration-300">
+                    <p className="text-[10px] font-black uppercase text-orange-655 dark:text-orange-400 font-bold">{isHindi ? "🪑 बैठने की क्षमता के अनुसार टेबल चुनें:" : "🪑 Choose Available Table Capacity:"}</p>
+                    
+                    {/* 2-Seater Grid */}
+                    <div className="space-y-1.5">
+                      <span className="text-[8px] font-black text-neutral-600 dark:text-gray-400 uppercase tracking-wider">{isHindi ? "2 लोगों के बैठने के लिए (3 टेबल्स):" : "For 2 People (3 Tables Available):"}</span>
+                      <div className="grid grid-cols-3 gap-2">
+                        {["Table 1", "Table 2", "Table 3"].map((t) => {
+                          const isSelected = tableNumber === t;
+                          return (
+                            <button
+                              key={t}
+                              type="button"
+                              onClick={() => { triggerHaptic(); setTableNumber(t); }}
+                              className={`p-2.5 rounded-lg border text-[10px] font-black text-center transition-all ${
+                                isSelected 
+                                  ? 'border-orange-500 bg-orange-500/15 text-orange-600 dark:text-orange-400 shadow-sm' 
+                                  : 'border-neutral-300 dark:border-white/10 bg-white dark:bg-white/5 text-neutral-800 dark:text-neutral-300 hover:border-neutral-400'
+                              }`}
+                            >
+                              <span className="block">{t}</span>
+                              <span className="text-[7.5px] text-neutral-500 dark:text-gray-400 font-normal">👥 2 seats</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* 4-Seater Grid */}
+                    <div className="space-y-1.5 pt-1">
+                      <span className="text-[8px] font-black text-neutral-600 dark:text-gray-400 uppercase tracking-wider">{isHindi ? "4 लोगों के बैठने के लिए (3 टेबल्स):" : "For 4 People (3 Tables Available):"}</span>
+                      <div className="grid grid-cols-3 gap-2">
+                        {["Table 4", "Table 5", "Table 6"].map((t) => {
+                          const isSelected = tableNumber === t;
+                          return (
+                            <button
+                              key={t}
+                              type="button"
+                              onClick={() => { triggerHaptic(); setTableNumber(t); }}
+                              className={`p-2.5 rounded-lg border text-[10px] font-black text-center transition-all ${
+                                isSelected 
+                                  ? 'border-orange-500 bg-orange-500/15 text-orange-600 dark:text-orange-400 shadow-sm' 
+                                  : 'border-neutral-300 dark:border-white/10 bg-white dark:bg-white/5 text-neutral-800 dark:text-neutral-300 hover:border-neutral-400'
+                              }`}
+                            >
+                              <span className="block">{t}</span>
+                              <span className="text-[7.5px] text-neutral-500 dark:text-gray-400 font-normal">👥👥 4 seats</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* 8. PAY SUMMARY CARD */}
@@ -3059,16 +3029,16 @@ export default function BbCafeHome() {
                 <div className="flex justify-between font-bold mb-1.5 text-xs"><span>{isHindi ? "आइटम का टोटल" : "Items Total"}</span> <span>₹{getCartSubtotal()}</span></div>
                 {getCartAddonsPrice() > 0 && <div className="flex justify-between font-bold mb-1.5 text-xs"><span>{isHindi ? "अतिरिक्त ऐड-ऑन्स" : "Extra Add-ons"}</span> <span>+₹{getCartAddonsPrice()}</span></div>}
                 {appliedCoupon && (
-                  <div className="flex justify-between font-bold mb-1.5 text-xs text-green-200"><span>{isHindi ? "कूपन छूट" : "Coupon Discount"}</span> <span>-₹{appliedCoupon.discountValue}</span></div>
+                  <div className="flex justify-between font-bold mb-1.5 text-xs text-green-200 font-bold"><span>{isHindi ? "कूपन छूट" : "Coupon Discount"}</span> <span>-₹{appliedCoupon.discountValue}</span></div>
                 )}
                 {fulfillmentType === "delivery" && <div className="flex justify-between font-bold mb-3 text-xs opacity-90"><span>{isHindi ? "डिलीवरी शुल्क" : "Delivery Charge"}</span> <span>₹{getDeliveryCharge()}</span></div>}
                 <div className="h-px bg-white/20 mb-3" />
-                <div className="flex justify-between font-black text-xl font-mono"><span>{isHindi ? "भुगतान राशि" : "To Pay"}</span> <span>₹{getTotalBillPrice()}</span></div>
+                <div className="flex justify-between font-black text-xl font-bold font-mono"><span>{isHindi ? "भुगतान राशि" : "To Pay"}</span> <span>₹{getTotalBillPrice()}</span></div>
               </div>
 
               {/* 9. PAYMENT MODE TABS & WHATSAPP CHECKOUT */}
               <div className="dark:bg-white/[0.02] bg-neutral-50 border dark:border-white/5 border-neutral-200 rounded-2xl p-4 space-y-2.5 transition-colors duration-200 mt-4 font-sans">
-                <label className="text-[9px] font-black uppercase text-neutral-800 dark:text-gray-400">{isHindi ? "भुगतान का माध्यम चुनें:" : "Select Payment Method:"}</label>
+                <label className="text-[9px] font-black uppercase text-neutral-800 dark:text-gray-400 font-bold">{isHindi ? "भुगतान का माध्यम चुनें:" : "Select Payment Method:"}</label>
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     onClick={() => { triggerHaptic(); setPaymentMethod("cod"); }}
@@ -3092,7 +3062,7 @@ export default function BbCafeHome() {
 
                 {paymentMethod === "upi" && (
                   <div className="bg-[#111] p-3 rounded-2xl border border-white/5 space-y-2.5 text-center text-[10px] font-bold text-gray-300">
-                    <p className="text-yellow-400 uppercase tracking-wider">{isHindi ? "आसान ऑनलाइन पेमेंट" : "Instant UPI Checkout"}</p>
+                    <p className="text-yellow-400 uppercase tracking-wider font-bold">{isHindi ? "आसान ऑनलाइन पेमेंट" : "Instant UPI Checkout"}</p>
                     <p>{isHindi ? "कृपया आगे बढ़ने से पहले यूपीआई भुगतान पूरा करें और स्क्रीनशॉट अपलोड करें!" : "Kindly upload payment screenshot before ordering!"}</p>
                   </div>
                 )}
@@ -3102,7 +3072,7 @@ export default function BbCafeHome() {
                   onClick={handleCheckoutClick} 
                   type="button" 
                   disabled={isSubmittingOrder} 
-                  className="w-full bg-green-600 hover:bg-green-700 p-4 rounded-2xl font-black text-sm text-white flex items-center justify-center gap-2 shadow-lg transition-all active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed mt-2"
+                  className="w-full bg-green-600 hover:bg-green-700 p-4 rounded-2xl font-black text-sm text-white flex items-center justify-center gap-2 shadow-lg transition-all active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed mt-2 font-bold"
                 >
                   {isSubmittingOrder ? (
                     <span className="flex items-center gap-2">
@@ -3136,14 +3106,14 @@ export default function BbCafeHome() {
               <button 
                 type="button" 
                 onClick={() => { triggerHaptic(); setIsUpiPopupOpen(false); }}
-                className="absolute top-4 right-4 p-2 bg-red-100 hover:bg-red-600 hover:text-white text-red-650 rounded-full transition-all"
+                className="absolute top-4 right-4 p-2 bg-red-100 hover:bg-red-600 hover:text-white text-red-655 rounded-full transition-all shadow"
                 title="Close"
               >
                 <X size={16} />
               </button>
 
               <div className="space-y-1">
-                <h3 className="text-base font-black text-orange-55 uppercase italic">
+                <h3 className="text-base font-black text-orange-55 uppercase italic font-bold">
                   {isHindi ? "यूपीआई भुगतान गेटवे 📱" : "UPI Payment Gateway 📱"}
                 </h3>
                 <p className="text-[10.5px] text-neutral-650 dark:text-gray-400 font-semibold leading-relaxed">
@@ -3155,28 +3125,28 @@ export default function BbCafeHome() {
               <div className="grid grid-cols-2 gap-2.5 pt-2">
                 <button 
                   onClick={() => handleLaunchUpiPay('phonepe')}
-                  className="p-3 bg-neutral-50 dark:bg-white/[0.02] border dark:border-white/5 border-neutral-250 hover:border-purple-500 rounded-xl flex items-center justify-center gap-2 transition-all active:scale-95 text-neutral-800 dark:text-white"
+                  className="p-3 bg-neutral-50 dark:bg-white/[0.02] border dark:border-white/5 border-neutral-250 hover:border-purple-500 rounded-xl flex items-center justify-center gap-2 transition-all active:scale-95 text-neutral-800 dark:text-white font-bold animate-none"
                 >
                   <img src="/phonepe.png" className="w-5 h-5 object-contain" alt="PhonePe" />
                   <span className="text-[10px] font-black">PhonePe</span>
                 </button>
                 <button 
                   onClick={() => handleLaunchUpiPay('paytm')}
-                  className="p-3 bg-neutral-50 dark:bg-white/[0.02] border dark:border-white/5 border-neutral-250 hover:border-blue-500 rounded-xl flex items-center justify-center gap-2 transition-all active:scale-95 text-neutral-800 dark:text-white"
+                  className="p-3 bg-neutral-50 dark:bg-white/[0.02] border dark:border-white/5 border-neutral-250 hover:border-blue-500 rounded-xl flex items-center justify-center gap-2 transition-all active:scale-95 text-neutral-800 dark:text-white font-bold animate-none"
                 >
                   <img src="/paytm.png" className="w-5 h-5 object-contain" alt="Paytm" />
                   <span className="text-[10px] font-black">Paytm</span>
                 </button>
                 <button 
                   onClick={() => handleLaunchUpiPay('gpay')}
-                  className="p-3 bg-neutral-50 dark:bg-white/[0.02] border dark:border-white/5 border-neutral-250 hover:border-green-500 rounded-xl flex items-center justify-center gap-2 transition-all active:scale-95 text-neutral-800 dark:text-white"
+                  className="p-3 bg-neutral-50 dark:bg-white/[0.02] border dark:border-white/5 border-neutral-250 hover:border-green-500 rounded-xl flex items-center justify-center gap-2 transition-all active:scale-95 text-neutral-800 dark:text-white font-bold animate-none"
                 >
                   <img src="/youtube.png" className="w-5 h-5 object-contain" alt="Google Pay" />
                   <span className="text-[10px] font-black">GPay</span>
                 </button>
                 <button 
                   onClick={() => handleLaunchUpiPay('whatsapp')}
-                  className="p-3 bg-neutral-50 dark:bg-white/[0.02] border dark:border-white/5 border-neutral-250 hover:border-green-600 rounded-xl flex items-center justify-center gap-2 transition-all active:scale-95 text-neutral-800 dark:text-white"
+                  className="p-3 bg-neutral-50 dark:bg-white/[0.02] border dark:border-white/5 border-neutral-250 hover:border-green-600 rounded-xl flex items-center justify-center gap-2 transition-all active:scale-95 text-neutral-800 dark:text-white font-bold animate-none"
                 >
                   <img src="/whatsapp.png" className="w-5 h-5 object-contain" alt="WhatsApp Pay" />
                   <span className="text-[10px] font-black">WA Pay</span>
@@ -3185,7 +3155,7 @@ export default function BbCafeHome() {
 
               {/* Interactive Screenshot Attachment Area */}
               <div className="bg-neutral-105 dark:bg-black/40 border border-neutral-250 dark:border-white/10 p-3 rounded-2xl text-left space-y-2.5">
-                <label className="text-[9.5px] font-black uppercase text-orange-65 block">
+                <label className="text-[9.5px] font-black uppercase text-orange-65 block font-bold">
                   {isHindi ? "📸 भुगतान का स्क्रीनशॉट डालें (अनिवार्य):" : "📸 Upload Screenshot (Required):"}
                 </label>
                 
@@ -3209,7 +3179,7 @@ export default function BbCafeHome() {
                     <button 
                       type="button" 
                       onClick={() => { triggerHaptic(20); setPaymentScreenshot(null); }}
-                      className="absolute top-1 right-1 bg-red-600 text-white rounded-full p-1"
+                      className="absolute top-1 right-1 bg-red-600 text-white rounded-full p-1 animate-none"
                       title="Remove Screenshot"
                     >
                       <X size={10} />
@@ -3218,18 +3188,18 @@ export default function BbCafeHome() {
                 )}
               </div>
 
-              <div className="flex gap-2">
+              <div className="flex gap-2 font-bold">
                 <button 
                   onClick={sendWhatsAppOrder}
                   disabled={!paymentScreenshot || isSubmittingOrder}
-                  className="flex-1 bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-white p-3.5 rounded-xl font-black text-xs uppercase flex items-center justify-center gap-1"
+                  className="flex-1 bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-white p-3.5 rounded-xl font-black text-xs uppercase flex items-center justify-center gap-1 font-bold animate-none"
                 >
                   {isSubmittingOrder ? "Confirming..." : (isHindi ? "ऑर्डर सबमिट करें" : "Submit Order")}
                 </button>
                 <button 
                   type="button" 
                   onClick={() => setIsUpiPopupOpen(false)}
-                  className="bg-neutral-100 hover:bg-neutral-200 dark:bg-white/5 text-neutral-705 dark:text-gray-400 px-4 py-3.5 rounded-xl font-bold text-xs transition-all"
+                  className="bg-neutral-100 hover:bg-neutral-200 dark:bg-white/5 text-neutral-705 dark:text-gray-400 px-4 py-3.5 rounded-xl font-bold text-xs transition-all font-bold"
                 >
                   {isHindi ? "बंद करें" : "Cancel"}
                 </button>
@@ -3283,31 +3253,31 @@ export default function BbCafeHome() {
       <AnimatePresence>
         {isGiftModalOpen && (
           <div className="fixed inset-0 bg-black/95 z-[260] flex items-center justify-center p-6">
-            <motion.form onSubmit={handleGiftPoints} className="dark:bg-[#111] bg-white w-full max-w-md p-6 rounded-3xl border dark:border-white/10 border-neutral-200 text-center space-y-4 shadow-xl transition-colors duration-200">
+            <motion.form onSubmit={handleGiftPoints} className="dark:bg-[#111] bg-white w-full max-w-md p-6 rounded-3xl border dark:border-white/10 border-neutral-200 text-center space-y-4 shadow-xl transition-colors duration-200 font-sans">
               <Gift className="mx-auto text-yellow-400" size={32} />
               <div>
-                <h3 className="text-lg font-black text-yellow-400 uppercase italic font-mono">Gift Loyalty Points</h3>
+                <h3 className="text-lg font-black text-yellow-400 uppercase italic font-mono font-bold">Gift Loyalty Points</h3>
                 <p className="text-[9px] text-neutral-500 font-semibold mt-0.5">अपने पॉइंट्स किसी दोस्त को गिफ्ट करें</p>
               </div>
-              <div className="space-y-3 text-left font-sans">
+              <div className="space-y-3 text-left">
                 <div className="space-y-1">
-                  <label className="text-[9px] font-black uppercase text-neutral-700 dark:text-neutral-400">Friend's Phone Number</label>
+                  <label className="text-[9px] font-black uppercase text-neutral-700 dark:text-neutral-400 font-bold">Friend's Phone Number</label>
                   <input type="tel" maxLength={10} placeholder="e.g. 9876543210" value={giftPhone} onChange={(e) => setGiftPhone(e.target.value)} required className="w-full dark:bg-white/10 bg-neutral-50 border dark:border-white/10 border-neutral-300 p-3 rounded-xl text-xs font-bold text-neutral-900 dark:text-white outline-none text-center font-mono" />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[9px] font-black uppercase text-neutral-700 dark:text-neutral-400">Points to Gift (Your Pts: {customerPoints})</label>
+                  <label className="text-[9px] font-black uppercase text-neutral-700 dark:text-neutral-400 font-bold">Points to Gift (Your Pts: {customerPoints})</label>
                   <input type="number" placeholder="e.g. 10" value={giftPointsAmount} onChange={(e) => setGiftPointsAmount(e.target.value === "" ? "" : Number(e.target.value))} required className="w-full dark:bg-white/10 bg-neutral-50 border dark:border-white/10 border-neutral-300 p-3 rounded-xl text-xs font-bold text-neutral-900 dark:text-white outline-none text-center font-mono" />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[9px] font-black uppercase text-neutral-700 dark:text-neutral-400 flex items-center gap-1"><Lock size={10}/> <span>Your 4-Digit Security PIN (सुरक्षा पिन)</span></label>
+                  <label className="text-[9px] font-black uppercase text-neutral-700 dark:text-neutral-400 font-bold flex items-center gap-1"><Lock size={10}/> <span>Your 4-Digit Security PIN (सुरक्षा पिन)</span></label>
                   <input type="password" maxLength={4} placeholder="🔒 enter your pin" value={giftSenderPin} onChange={(e) => setGiftSenderPin(e.target.value)} required className="w-full dark:bg-white/10 bg-neutral-50 border dark:border-white/10 border-neutral-300 p-3 rounded-xl text-xs font-bold text-neutral-900 dark:text-white outline-none text-center tracking-widest font-mono" />
                 </div>
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-2 font-bold">
                 <button type="submit" disabled={isGiftingLoading} className="flex-1 bg-yellow-400 text-black font-black p-3 rounded-xl text-xs uppercase flex items-center justify-center gap-1">
                   {isGiftingLoading ? <Loader2 className="animate-spin" size={14} /> : <span>Gift Points 🎁</span>}
                 </button>
-                <button type="button" onClick={() => { triggerHaptic(); setIsGiftModalOpen(false); setGiftPhone(""); setGiftPointsAmount(""); setGiftSenderPin(""); }} className="bg-neutral-100 text-neutral-805 dark:bg-white/5 dark:text-gray-400 font-bold p-3 rounded-xl text-xs">CANCEL</button>
+                <button type="button" onClick={() => { triggerHaptic(); setIsGiftModalOpen(false); setGiftPhone(""); setGiftPointsAmount(""); setGiftSenderPin(""); }} className="bg-neutral-100 text-neutral-805 dark:bg-white/5 dark:text-gray-400 font-bold p-3 rounded-xl text-xs font-bold">CANCEL</button>
               </div>
             </motion.form>
           </div>
@@ -3320,36 +3290,36 @@ export default function BbCafeHome() {
           <div className="fixed inset-0 bg-black/95 z-[260] flex items-center justify-center p-6">
             <motion.form 
               onSubmit={handleClaimSubmit}
-              className="dark:bg-[#111] bg-white w-full max-w-sm p-6 rounded-3xl border dark:border-white/10 border-neutral-200 text-center space-y-4 shadow-xl"
+              className="dark:bg-[#111] bg-white w-full max-w-sm p-6 rounded-3xl border dark:border-white/10 border-neutral-200 text-center space-y-4 shadow-xl font-sans"
             >
               <div className="text-xl">{claimingPlatform.icon}</div>
               <div className="space-y-1">
-                <h3 className="text-base font-black text-orange-65 dark:text-orange-500 uppercase">वेरिफिकेशन दावा सबमिट करें</h3>
+                <h3 className="text-base font-black text-orange-65 dark:text-orange-500 uppercase font-bold">वेरिफिकेशन दावा सबमिट करें</h3>
                 <p className="text-[10px] text-neutral-600 dark:text-gray-400 leading-normal font-semibold">
-                  {claimingPlatform.label} पर फॉलो/सब्सक्राइब करने के बाद, नीचे अपना यूज़रनेम दर्ज करें।  हमारे एडमिन इसकी जांच करके आपका {claimingPlatform.points} पॉइंट क्रेडिट करेंगे!
+                  {claimingPlatform.label} पर फॉलो/सब्सक्राइब करने के बाद, नीचे अपना यूज़रनेम दर्ज करें। हमारे एडमिन इसकी जांच करके आपका {claimingPlatform.points} पॉइंट क्रेडिट करेंगे!
                 </p>
               </div>
 
               <div className="space-y-1 text-left">
-                <label className="text-[9px] font-black uppercase text-neutral-700 dark:text-neutral-400">Your Profile Handle / Username</label>
+                <label className="text-[9px] font-black uppercase text-neutral-700 dark:text-neutral-400 font-sans font-bold">Your Profile Handle / Username</label>
                 <input 
                   type="text" 
                   placeholder="e.g. @yourname" 
                   value={claimUsername} 
                   onChange={(e) => setClaimUsername(e.target.value)} 
                   required 
-                  className="w-full dark:bg-white/10 bg-neutral-50 border dark:border-white/10 border-neutral-300 p-3 rounded-xl text-xs font-bold text-neutral-900 dark:text-white outline-none text-center" 
+                  className="w-full dark:bg-white/10 bg-neutral-50 border dark:border-white/10 border-neutral-300 p-3 rounded-xl text-xs font-bold text-neutral-900 dark:text-white outline-none text-center font-mono" 
                 />
               </div>
 
-              <div className="flex gap-2">
-                <button type="submit" disabled={isClaimingLoading} className="flex-1 bg-yellow-400 text-black font-black p-3 rounded-xl text-xs uppercase flex items-center justify-center gap-1">
+              <div className="flex gap-2 font-bold">
+                <button type="submit" disabled={isClaimingLoading} className="flex-1 bg-yellow-400 text-black font-black p-3 rounded-xl text-xs uppercase flex items-center justify-center gap-1 font-bold animate-none">
                   {isClaimingLoading ? <Loader2 className="animate-spin" size={14} /> : <span>Claim Reward Request ➔</span>}
                 </button>
                 <button 
                   type="button" 
                   onClick={() => { triggerHaptic(); setIsClaimModalOpen(false); setClaimUsername(""); }} 
-                  className="bg-neutral-100 text-neutral-800 dark:bg-white/5 dark:text-gray-400 p-3 rounded-xl font-black text-xs uppercase"
+                  className="bg-neutral-100 text-neutral-800 dark:bg-white/5 dark:text-gray-400 p-3 rounded-xl font-black text-xs uppercase font-bold"
                 >
                   Cancel
                 </button>
