@@ -185,7 +185,7 @@ export default function BumBumCafeStockApp() {
   const [editingProduct, setEditingProduct] = useState<InventoryItem | null>(null);
 
   const [formAddProduct, setFormAddProduct] = useState({
-    name: '', storeQty: '0', kitchenQty: '0', unit: 'Kg', purchasePrice: '', minLimit: '10', category: 'OTHERS'
+    name: '', storeQty: '0', kitchenQty: '0', unit: 'Kg', purchasePrice: '', minLimit: '10', category: 'OTHERS', lastPurchaseDate: getLocalDateString(0)
   });
 
   const [formAddAsset, setFormAddAsset] = useState({
@@ -223,10 +223,8 @@ export default function BumBumCafeStockApp() {
 
   // Static Listeners
   useEffect(() => {
-    // Sync Users & PIN config
     const unsubUsers = onSnapshot(collection(db, "cafe_users"), (snap) => {
       if (snap.empty) {
-        // Seed default Admin User (Admin PIN: 1234)
         setDoc(doc(db, "cafe_users", "admin_default"), {
           id: "admin_default",
           name: "ADMIN",
@@ -339,7 +337,6 @@ export default function BumBumCafeStockApp() {
 
   const handleDeleteVerificationSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // Verify PIN against valid users list
     const matched = users.find(u => u.pin === deletePinInput.trim());
     if (matched) {
       if (deleteConfirmation) {
@@ -431,7 +428,7 @@ export default function BumBumCafeStockApp() {
     const matchedKitchen = stockOutHistory.filter(log => log.purpose === "Kitchen Use" && filterFn(log.date));
     const totalKitchenQty = matchedKitchen.reduce((sum, log) => sum + log.qty, 0);
 
-    const matchedWasteLogs = stockOutHistory.filter(log => (log.purpose === "Waste" || log.purpose === "Damage") && filterFn(log.date));
+    const matchedWasteLogs = stockOutHistory.filter(log => (log.purpose === "Waste" || log.purpose === "Damage" && filterFn(log.date)));
     const totalWasteLoss = matchedWasteLogs.reduce((sum, log) => sum + (log.financialLoss || 0), 0);
 
     return {
@@ -870,7 +867,7 @@ export default function BumBumCafeStockApp() {
         purchasePrice: parseFloat(formAddProduct.purchasePrice) || 0,
         minLimit: parseFloat(formAddProduct.minLimit) || 10,
         supplier: "Walk-In",
-        lastPurchaseDate: new Date().toISOString().split('T')[0],
+        lastPurchaseDate: formAddProduct.lastPurchaseDate || getLocalDateString(0),
         category: formAddProduct.category.toUpperCase()
       };
       await setDoc(doc(db, "godown_inventory", customId), payload);
@@ -881,14 +878,14 @@ export default function BumBumCafeStockApp() {
           itemName: payload.name,
           itemId: payload.id,
           qty: payload.storeQty,
-          date: getLocalDateString(0),
+          date: payload.lastPurchaseDate,
           remarks: "नया उत्पाद (प्रारंभिक आवक)"
         });
       }
 
       toastMessage("नया सामान सहेजा गया!");
       setShowAddProductModal(false);
-      setFormAddProduct({ name: '', storeQty: '0', kitchenQty: '0', unit: 'Kg', purchasePrice: '', minLimit: '10', category: 'OTHERS' });
+      setFormAddProduct({ name: '', storeQty: '0', kitchenQty: '0', unit: 'Kg', purchasePrice: '', minLimit: '10', category: 'OTHERS', lastPurchaseDate: getLocalDateString(0) });
     } catch {
       toastMessage("सामान जोड़ने में विफलता।", "error");
     }
@@ -1391,7 +1388,7 @@ export default function BumBumCafeStockApp() {
 
             <button 
               onClick={() => {
-                setFormAddProduct({ name: '', storeQty: '0', kitchenQty: '0', unit: 'Kg', purchasePrice: '', minLimit: '10', category: 'OTHERS' });
+                setFormAddProduct({ name: '', storeQty: '0', kitchenQty: '0', unit: 'Kg', purchasePrice: '', minLimit: '10', category: 'OTHERS', lastPurchaseDate: getLocalDateString(0) });
                 setShowAddProductModal(true);
               }}
               className="w-full py-2.5 bg-green-600 hover:bg-green-700 text-white text-xs font-black uppercase rounded-xl flex items-center justify-center gap-1.5 shadow"
@@ -1492,6 +1489,11 @@ export default function BumBumCafeStockApp() {
                           <span>📦 Godown: <span className="text-neutral-800 dark:text-neutral-200">{item.storeQty} {item.unit}</span></span>
                           <span>🍳 Kitchen: <span className="text-orange-500">{item.kitchenQty || 0} {item.unit}</span></span>
                         </div>
+                        {item.lastPurchaseDate && (
+                          <div className="mt-1 flex items-center gap-1 text-[8px] font-black text-neutral-400 uppercase tracking-wider">
+                            <span>📅 Last Purchase: {item.lastPurchaseDate}</span>
+                          </div>
+                        )}
                       </div>
                     </div>
 
@@ -2353,6 +2355,17 @@ export default function BumBumCafeStockApp() {
                     />
                   </div>
                 </div>
+
+                {/* PURCHASE DATE FIELD FOR ADDING PRODUCTS */}
+                <div className="space-y-1">
+                  <label className="text-[9px] text-neutral-400 font-bold uppercase">Purchase Date (खरीद की तारीख)</label>
+                  <input 
+                    type="date" 
+                    value={formAddProduct.lastPurchaseDate}
+                    onChange={e => setFormAddProduct({ ...formAddProduct, lastPurchaseDate: e.target.value })}
+                    className="w-full p-2.5 rounded-xl border dark:bg-[#181818] font-bold"
+                  />
+                </div>
               </div>
 
               <button type="submit" className="w-full py-3 bg-green-600 hover:bg-green-700 text-white rounded-xl font-bold text-xs uppercase shadow">
@@ -2458,6 +2471,17 @@ export default function BumBumCafeStockApp() {
                       required
                     />
                   </div>
+                </div>
+
+                {/* EDIT PURCHASE DATE FOR EDITING PRODUCTS */}
+                <div className="space-y-1">
+                  <label className="text-[9px] text-neutral-400 font-bold uppercase">Purchase Date (खरीद की तारीख)</label>
+                  <input 
+                    type="date" 
+                    value={editingProduct.lastPurchaseDate || getLocalDateString(0)}
+                    onChange={e => setEditingProduct({ ...editingProduct, lastPurchaseDate: e.target.value })}
+                    className="w-full p-2.5 rounded-xl border dark:bg-[#181818] font-bold"
+                  />
                 </div>
               </div>
 
