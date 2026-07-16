@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
@@ -184,6 +183,10 @@ export default function BumBumCafeStockApp() {
   const [newGroupNameInput, setNewGroupNameInput] = useState<string>("");
   const [activePrintGroupId, setActivePrintGroup] = useState<string>("All");
 
+  // --- NEW STATES FOR QUICK SELECTION PRINT FLOW ---
+  const [showQuickPrintModal, setShowQuickPrintModal] = useState<boolean>(false);
+  const [quickOrderQtys, setQuickOrderQtys] = useState<Record<string, string>>({});
+
   // Slide-out panels & Drawers
   const [showNotifications, setShowNotifications] = useState<boolean>(false);
   const [selectedItemDetail, setSelectedItemDetail] = useState<InventoryItem | null>(null);
@@ -312,7 +315,7 @@ export default function BumBumCafeStockApp() {
       .reduce((sum, p) => sum + (p.qty * p.price), 0);
 
     const todayWaste = stockOutHistory
-      .filter(s => s.date === "2026-07-14" || s.date === new Date().toISOString().split('T')[0])
+      .filter(s => s.date === "2026-07-12" || s.date === new Date().toISOString().split('T')[0])
       .reduce((sum, s) => sum + s.qty, 0);
 
     const monthlyFinancialWastageLoss = stockOutHistory
@@ -957,6 +960,58 @@ export default function BumBumCafeStockApp() {
     printWindow.document.close();
   };
 
+  // --- NEW: DIRECT PRINT SELECTION ACTION HANDLER ---
+  const handleDirectPrintSelected = () => {
+    triggerHaptic();
+    const printWindow = window.open('', '_blank', 'width=600,height=800');
+    if (!printWindow) return toastMessage("Please allow pop-ups to print.");
+
+    const matchedItems = inventory.filter(i => selectedItemIds.includes(i.id));
+    const rowsHtml = matchedItems.map(item => {
+      const orderQty = quickOrderQtys[item.id] || "0";
+      return `
+        <tr>
+          <td style="padding: 10px; border-bottom: 1px solid #ddd; text-align: left; font-family: sans-serif; font-weight: bold;">${item.name}</td>
+          <td style="padding: 10px; border-bottom: 1px solid #ddd; text-align: center; font-family: sans-serif;">${item.storeQty} ${item.unit}</td>
+          <td style="padding: 10px; border-bottom: 1px solid #ddd; text-align: right; font-weight: bold; font-family: sans-serif; color: #FF6B00;">${orderQty}</td>
+        </tr>
+      `;
+    }).join('');
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>BumBum_Cafe_Purchase_Order</title>
+          <style>
+            body { font-family: sans-serif; padding: 25px; color: #333; }
+            h2 { text-align: center; color: #FF6B00; margin-bottom: 2px; }
+            p { text-align: center; font-size: 11px; color: #666; margin-top: 0; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            th { background: #FF6B00; color: white; padding: 10px; font-weight: bold; border-bottom: 2px solid #ddd; }
+          </style>
+        </head>
+        <body>
+          <h2 style="margin-top:0;">BUM BUM CAFE - PURCHASE ORDER SHEET</h2>
+          <p>Generated on: ${new Date().toLocaleString()}</p>
+          <table>
+            <thead>
+              <tr>
+                <th style="text-align: left;">Item Name</th>
+                <th style="text-align: center;">Current Stock (हाल की मात्रा)</th>
+                <th style="text-align: right;">Required Qty (मंगाने की मात्रा)</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rowsHtml}
+            </tbody>
+          </table>
+          <script>window.onload = function() { window.print(); }</script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
+
   const handleCreatePrintGroup = async (e: React.FormEvent) => {
     e.preventDefault();
     triggerHaptic();
@@ -989,7 +1044,7 @@ export default function BumBumCafeStockApp() {
   };
 
   return (
-    <div className={`min-h-screen ${isDarkMode ? 'bg-[#0F0F0F] text-white' : 'bg-[#FAFAFA] text-neutral-900'} pb-24 font-sans relative transition-colors duration-300`}>
+    <div className={`min-h-screen ${isDarkMode ? 'bg-[#0F0F0F]' : 'bg-[#FAFAFA]' } text-neutral-900 pb-24 font-sans relative transition-colors duration-300`}>
 
       {/* Toast Notification HUD */}
       <AnimatePresence>
@@ -1091,19 +1146,19 @@ export default function BumBumCafeStockApp() {
             <div className="space-y-3">
               <h3 className="text-xs font-black uppercase tracking-widest text-neutral-400 px-1">Inventory Valuations</h3>
               <div className="grid grid-cols-2 gap-3">
-                <div className={`p-4 rounded-3xl border ${isDarkMode ? 'bg-[#1A1A1A] border-neutral-800' : 'bg-white border-neutral-100'} shadow-sm`}>
+                <div className={`p-4 rounded-3xl border ${isDarkMode ? 'bg-[#1A1A1A] border-neutral-800' : 'bg-white border-neutral-100' } shadow-sm`}>
                   <p className="text-[8px] font-black uppercase tracking-wider text-neutral-400">Total Godown Value</p>
                   <h4 className="text-lg font-black text-[#FF6B00] mt-1">₹{dashboardStats.totalStockVal.toLocaleString()}</h4>
                 </div>
-                <div className={`p-4 rounded-3xl border ${isDarkMode ? 'bg-[#1A1A1A] border-neutral-800' : 'bg-white border-neutral-100'} shadow-sm`}>
+                <div className={`p-4 rounded-3xl border ${isDarkMode ? 'bg-[#1A1A1A] border-neutral-800' : 'bg-white border-neutral-100' } shadow-sm`}>
                   <p className="text-[8px] font-black uppercase tracking-wider text-neutral-400">Wastage / Loss Value</p>
                   <h4 className="text-lg font-black text-red-500 mt-1">₹{dashboardStats.monthlyFinancialWastageLoss.toLocaleString()}</h4>
                 </div>
-                <div className={`p-4 rounded-3xl border ${isDarkMode ? 'bg-[#1A1A1A] border-neutral-800' : 'bg-white border-neutral-100'} shadow-sm`}>
+                <div className={`p-4 rounded-3xl border ${isDarkMode ? 'bg-[#1A1A1A] border-neutral-800' : 'bg-white border-neutral-100' } shadow-sm`}>
                   <p className="text-[8px] font-black uppercase tracking-wider text-neutral-400 font-sans">Critical Low Items</p>
                   <h4 className="text-lg font-black text-amber-500 mt-1">{dashboardStats.lowStockCount} Items</h4>
                 </div>
-                <div className={`p-4 rounded-3xl border ${isDarkMode ? 'bg-[#1A1A1A] border-neutral-800' : 'bg-white border-neutral-100'} shadow-sm`}>
+                <div className={`p-4 rounded-3xl border ${isDarkMode ? 'bg-[#1A1A1A] border-neutral-800' : 'bg-white border-neutral-100' } shadow-sm`}>
                   <p className="text-[8px] font-black uppercase tracking-wider text-neutral-400 font-sans">Out of Stock</p>
                   <h4 className="text-lg font-black text-red-500 mt-1">{dashboardStats.outOfStockCount} Items</h4>
                 </div>
@@ -1114,15 +1169,15 @@ export default function BumBumCafeStockApp() {
             <div className="space-y-3">
               <h3 className="text-xs font-black uppercase tracking-widest text-neutral-400 px-1 font-sans">Quick Actions Panel</h3>
               <div className="grid grid-cols-3 gap-2 text-center text-xs">
-                <div onClick={() => setShowAddStockModal(true)} className={`p-3 rounded-2xl border ${isDarkMode ? 'bg-[#1A1A1A] border-neutral-800' : 'bg-white border-neutral-100'} shadow-sm cursor-pointer hover:border-orange-500 transition-all`}>
+                <div onClick={() => setShowAddStockModal(true)} className={`p-3 rounded-2xl border ${isDarkMode ? 'bg-[#1A1A1A] border-neutral-800' : 'bg-white border-neutral-100' } shadow-sm cursor-pointer hover:border-orange-500 transition-all`}>
                   <Plus className="mx-auto text-[#FF6B00]" size={16} />
                   <span className="text-[9px] font-black uppercase tracking-wider block mt-1 font-sans">Add Stock</span>
                 </div>
-                <div onClick={() => setShowStockOutModal(true)} className={`p-3 rounded-2xl border ${isDarkMode ? 'bg-[#1A1A1A] border-neutral-800' : 'bg-white border-neutral-100'} shadow-sm cursor-pointer hover:border-orange-500 transition-all`}>
+                <div onClick={() => setShowStockOutModal(true)} className={`p-3 rounded-2xl border ${isDarkMode ? 'bg-[#1A1A1A] border-neutral-800' : 'bg-white border-neutral-100' } shadow-sm cursor-pointer hover:border-orange-500 transition-all`}>
                   <MinusCircle className="mx-auto text-red-500" size={16} />
                   <span className="text-[9px] font-black uppercase tracking-wider block mt-1 font-sans">Stock Out</span>
                 </div>
-                <div onClick={() => { setActiveTab('more'); setCurrentView('reports_list'); }} className={`p-3 rounded-2xl border ${isDarkMode ? 'bg-[#1A1A1A] border-neutral-800' : 'bg-white border-neutral-100'} shadow-sm cursor-pointer hover:border-orange-500 transition-all`}>
+                <div onClick={() => { setActiveTab('more'); setCurrentView('reports_list'); }} className={`p-3 rounded-2xl border ${isDarkMode ? 'bg-[#1A1A1A] border-neutral-800' : 'bg-white border-neutral-100' } shadow-sm cursor-pointer hover:border-orange-500 transition-all`}>
                   <BarChart3 className="mx-auto text-emerald-500" size={16} />
                   <span className="text-[9px] font-black uppercase tracking-wider block mt-1 font-sans">Reports</span>
                 </div>
@@ -1217,6 +1272,33 @@ export default function BumBumCafeStockApp() {
               </button>
             </div>
 
+            {/* DYNAMIC FLOATING ORDER BAR (ONLY SHOWS WHEN ITEMS ARE SELECTED) */}
+            {isMultiSelectMode && selectedItemIds.length > 0 && (
+              <motion.div 
+                initial={{ y: 80, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                exit={{ y: 80, opacity: 0 }}
+                className="fixed bottom-20 left-1/2 -translate-x-1/2 z-40 w-full max-w-sm px-4"
+              >
+                <div className="bg-[#FF6B00] text-white rounded-2xl p-4 shadow-2xl flex items-center justify-between border border-orange-400/30">
+                  <div>
+                    <p className="text-xs font-black uppercase tracking-wider">{selectedItemIds.length} Materials Selected</p>
+                    <p className="text-[9px] text-orange-100 font-medium font-sans">सामग्री मंगाने की सूची बनाएं</p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      triggerHaptic();
+                      setShowQuickPrintModal(true);
+                    }}
+                    className="px-4 py-2 bg-white text-[#FF6B00] font-black text-xs uppercase tracking-wider rounded-xl shadow hover:bg-orange-50 transition-all flex items-center gap-1.5"
+                  >
+                    <span>Order Sheet</span>
+                    <ChevronRight size={14} />
+                  </button>
+                </div>
+              </motion.div>
+            )}
+
             {/* INVENTORY CARD LIST GRID (RESTORED WITH FILTEREDINVENTORY) */}
             <div className="space-y-3.5">
               {filteredInventory.map(item => {
@@ -1235,7 +1317,7 @@ export default function BumBumCafeStockApp() {
                         handleToggleMultiSelect(item.id);
                       }
                     }}
-                    className={`rounded-3xl border p-4 hover:shadow-lg transition-all ${
+                    className={`rounded-3xl border p-4 relative hover:shadow-lg transition-all ${
                       isMultiSelectMode ? 'cursor-pointer' : ''
                     } ${
                       isDarkMode ? 'bg-[#1A1A1A] border-neutral-800' : 'bg-white border-neutral-100'
@@ -1244,7 +1326,7 @@ export default function BumBumCafeStockApp() {
                     }`}
                   >
                     {isMultiSelectMode && (
-                      <div className="absolute top-4 right-4 h-5 w-5 rounded-full border border-neutral-300 dark:border-neutral-700 flex items-center justify-center">
+                      <div className="absolute top-4 right-4 h-5 w-5 rounded-full border border-neutral-300 dark:border-neutral-700 flex items-center justify-center z-10">
                         {isItemSelected && <div className="h-3 w-3 rounded-full bg-[#FF6B00]" />}
                       </div>
                     )}
@@ -2323,7 +2405,7 @@ export default function BumBumCafeStockApp() {
                     <div className="p-5 text-center space-y-2 z-10">
                       <AlertTriangle className="mx-auto text-amber-500" size={32} />
                       <p className="text-[10px] text-neutral-400 font-black uppercase">कैमरा एक्सेस ब्लॉक है या डिवाइस पर उपलब्ध नहीं है!</p>
-                      <p className="text-[8px] text-neutral-500">हम आपके लिए Simulated AI स्कैनर इंजन का उपयोग करेंगे।</p>
+                      <p className="text-[8px] text-neutral-505">हम आपके लिए Simulated AI स्कैनर इंजन का उपयोग करेंगे।</p>
                     </div>
                   )}
 
@@ -2630,6 +2712,89 @@ export default function BumBumCafeStockApp() {
                     </button>
                   ))}
                 </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+
+        {/* --- NEW MODAL: DYNAMIC CUSTOM SELECTION ORDER SHEET MODAL (WITHOUT CREATING A PERMANENT PRINT GROUP) --- */}
+        {showQuickPrintModal && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[145] flex items-end justify-center font-sans">
+            <motion.div 
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ type: "spring", damping: 25, stiffness: 220 }}
+              className={`w-full max-w-md rounded-t-[2.5rem] p-6 space-y-5 border-t ${
+                isDarkMode ? 'bg-[#0F0F0F] border-neutral-800 text-white' : 'bg-white border-neutral-200 text-neutral-900'
+              }`}
+            >
+              <div className="flex justify-between items-center pb-2 border-b border-neutral-100 dark:border-neutral-800">
+                <div>
+                  <h3 className="text-xs font-black uppercase tracking-widest text-[#FF6B00]">Custom Purchase Order</h3>
+                  <p className="text-[9px] text-neutral-400 font-bold uppercase mt-0.5">मात्रा भरें और तुरंत प्रिंट निकालें</p>
+                </div>
+                <button 
+                  onClick={() => setShowQuickPrintModal(false)} 
+                  className="p-2 bg-neutral-100 dark:bg-neutral-800 rounded-xl"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+
+              {/* Items Table / Inputs */}
+              <div className="space-y-3.5 max-h-80 overflow-y-auto pr-1">
+                {inventory
+                  .filter(item => selectedItemIds.includes(item.id))
+                  .map(item => {
+                    const typedQty = quickOrderQtys[item.id] || "";
+                    return (
+                      <div 
+                        key={item.id} 
+                        className={`p-3 rounded-2xl flex justify-between items-center text-xs ${
+                          isDarkMode ? 'bg-neutral-900 border border-neutral-800' : 'bg-neutral-50'
+                        }`}
+                      >
+                        <div className="flex-1 pr-3">
+                          <p className="font-black text-sm text-[#FF6B00]">{item.name}</p>
+                          <p className="text-[9px] text-neutral-400 font-bold uppercase tracking-wider font-sans">
+                            Current Stock: {item.storeQty} {item.unit}
+                          </p>
+                        </div>
+
+                        {/* ORDER QUANTITY INPUT */}
+                        <div className="flex items-center gap-1.5">
+                          <input 
+                            type="text"
+                            placeholder="Qty (मात्रा)"
+                            value={typedQty}
+                            onChange={(e) => {
+                              setQuickOrderQtys(prev => ({
+                                ...prev,
+                                [item.id]: e.target.value
+                              }));
+                            }}
+                            className="w-24 p-2.5 rounded-xl border border-neutral-200 dark:bg-neutral-800 dark:border-neutral-700 text-center font-black text-xs text-[#FF6B00]"
+                          />
+                          <span className="text-[10px] font-bold text-neutral-400 w-8">{item.unit}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+
+              {/* Footer Actions */}
+              <div className="space-y-2 pt-2">
+                <button
+                  onClick={handleDirectPrintSelected}
+                  className="w-full py-4 bg-[#FF6B00] hover:bg-orange-600 text-white rounded-2xl font-black text-xs uppercase tracking-wider shadow-lg shadow-orange-500/20 flex items-center justify-center gap-2"
+                >
+                  <Printer size={16} />
+                  <span>Print / PDF Order Sheet</span>
+                </button>
+                <p className="text-[8px] text-center text-neutral-400 uppercase font-black tracking-wide">
+                  यह सीधे आपके चयनित सामान और लिखी हुई मात्रा को प्रिंट फॉर्मेट में खोल देगा
+                </p>
               </div>
             </motion.div>
           </div>
