@@ -1,11 +1,10 @@
 
-
 'use client';
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   Home, Store, Trash2, Search, Plus, X, BarChart3, QrCode, Bell, 
-  PlusCircle, MinusCircle, CheckCircle2, ChevronRight, Sparkles, AlertTriangle, Printer
+  PlusCircle, MinusCircle, CheckCircle2, ChevronRight, Sparkles, AlertTriangle, Printer, Edit
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -23,6 +22,8 @@ interface InventoryItem {
   purchasePrice: number;
   minLimit: number;
   barcode?: string;
+  supplier?: string;
+  lastPurchaseDate?: string;
 }
 
 interface StockOutLog {
@@ -33,6 +34,11 @@ interface StockOutLog {
   date: string;
   remarks: string;
   financialLoss?: number;
+}
+
+interface CategoryItem {
+  id: string;
+  name: string;
 }
 
 const triggerHaptic = (ms = 35) => {
@@ -48,11 +54,20 @@ const INITIAL_INVENTORY: InventoryItem[] = [
   { id: "veg_2", name: "Tamatar Tomato", category: "Vegetables", storeQty: 30, unit: "Kg", purchasePrice: 40, minLimit: 10, barcode: "890105800408" }
 ];
 
+const INITIAL_CATEGORIES: CategoryItem[] = [
+  { id: "cat_1", name: "Dairy" },
+  { id: "cat_2", name: "Vegetables" },
+  { id: "cat_3", name: "Sauces & Condiments" },
+  { id: "cat_4", name: "Others" }
+];
+
 export default function BumBumCafeStockApp() {
   const [inventory, setInventory] = useState<InventoryItem[]>(INITIAL_INVENTORY);
+  const [categories, setCategories] = useState<CategoryItem[]>(INITIAL_CATEGORIES);
   const [activeTab, setActiveTab] = useState<'home' | 'store' | 'waste'>('home');
   const [isDarkMode, setIsDarkMode] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>("");
+  const [selectedCategory, setSelectedCategory] = useState<string>("All");
   const [editedQties, setEditedQties] = useState<Record<string, number>>({});
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
 
@@ -69,6 +84,16 @@ export default function BumBumCafeStockApp() {
   const [manualBarcodeInput, setManualBarcodeInput] = useState<string>("");
   const videoRef = useRef<HTMLVideoElement>(null);
   const cameraStreamRef = useRef<MediaStream | null>(null);
+
+  // Custom Modals & Forms
+  const [showAddProductModal, setShowAddProductModal] = useState<boolean>(false);
+  const [editingProduct, setEditingProduct] = useState<InventoryItem | null>(null);
+  const [showCategoryModal, setShowCategoryModal] = useState<boolean>(false);
+  const [newCategoryName, setNewCategoryName] = useState<string>("");
+
+  const [formAddProduct, setFormAddProduct] = useState({
+    name: '', category: '', storeQty: '0', unit: 'Kg', purchasePrice: '', minLimit: '10', barcode: ''
+  });
 
   // Waste logs & modals
   const [showStockOutModal, setShowStockOutModal] = useState<boolean>(false);
@@ -94,7 +119,14 @@ export default function BumBumCafeStockApp() {
     const unsubStockOuts = onSnapshot(query(collection(db, "stock_out_history"), orderBy("date", "desc")), (snap) => {
       if (!snap.empty) setStockOutHistory(snap.docs.map(d => ({ id: d.id, ...d.data() } as StockOutLog)));
     });
-    return () => { unsubInventory(); unsubStockOuts(); };
+    const unsubCategories = onSnapshot(collection(db, "categories"), (snap) => {
+      if (!snap.empty) {
+        setCategories(snap.docs.map(d => ({ id: d.id, name: d.data().name as string })));
+      } else {
+        setCategories(INITIAL_CATEGORIES);
+      }
+    });
+    return () => { unsubInventory(); unsubStockOuts(); unsubCategories(); };
   }, []);
 
   // Live native browser Barcode detection loop
@@ -133,11 +165,13 @@ export default function BumBumCafeStockApp() {
   }, [inventory, stockOutHistory]);
 
   const filteredInventory = useMemo(() => {
-    return inventory.filter(item => 
-      item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.category.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-  }, [inventory, searchQuery]);
+    return inventory.filter(item => {
+      const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                            item.category.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesCategory = selectedCategory === "All" || item.category === selectedCategory;
+      return matchesSearch && matchesCategory;
+    });
+  }, [inventory, searchQuery, selectedCategory]);
 
   // Camera settings
   const startCamera = async () => {
@@ -226,6 +260,80 @@ export default function BumBumCafeStockApp() {
     setSelectedItemIds(prev => 
       prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
     );
+  };
+
+  // Add Dynamic Category
+  const handleAddCategory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCategoryName.trim()) return;
+    const exists = categories.find(c => c.name.toLowerCase() === newCategoryName.trim().toLowerCase());
+    if (exists) {
+      toastMessage("यह कैटेगरी पहले से बनी हुई है!", "error");
+      return;
+    }
+    try {
+      const customId = `cat_${Date.now()}`;
+      await setDoc(doc(db, "categories", customId), { name: newCategoryName.trim() });
+      setNewCategoryName("");
+      toastMessage("कैटेगरी सफलतापूर्वक जोड़ी गई!");
+    } catch {
+      toastMessage("कैटेगरी सेव करने में त्रुटि हुई।", "error");
+    }
+  };
+
+  // Delete Category
+  const handleDeleteCategory = async (id: string, name: string) => {
+    const confirm = window.confirm(`क्या आप "${name}" कैटेगरी को हटाना चाहते हैं?`);
+    if (!confirm) return;
+    try {
+      await deleteDoc(doc(db, "categories", id));
+      toastMessage("श्रेणी को हटा दिया गया!");
+    } catch {
+      toastMessage("हटाने में त्रुटि हुई।", "error");
+    }
+  };
+
+  // Add Product Submit
+  const handleAddProductSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formAddProduct.name || !formAddProduct.category) {
+      toastMessage("नाम और कैटेगरी आवश्यक हैं!", "error");
+      return;
+    }
+    try {
+      const customId = `item_${Date.now()}`;
+      const payload: InventoryItem = {
+        id: customId,
+        name: formAddProduct.name.toUpperCase().trim(),
+        category: formAddProduct.category,
+        storeQty: parseFloat(formAddProduct.storeQty) || 0,
+        unit: formAddProduct.unit,
+        purchasePrice: parseFloat(formAddProduct.purchasePrice) || 0,
+        minLimit: parseFloat(formAddProduct.minLimit) || 10,
+        barcode: formAddProduct.barcode.trim() || "",
+        supplier: "Walk-In",
+        lastPurchaseDate: new Date().toISOString().split('T')[0]
+      };
+      await setDoc(doc(db, "godown_inventory", customId), payload);
+      toastMessage("नया सामान सफलतापूर्वक दर्ज हुआ!");
+      setShowAddProductModal(false);
+      setFormAddProduct({ name: '', category: '', storeQty: '0', unit: 'Kg', purchasePrice: '', minLimit: '10', barcode: '' });
+    } catch {
+      toastMessage("सामान जोड़ने में विफलता।", "error");
+    }
+  };
+
+  // Edit Product Submit
+  const handleEditProductSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingProduct) return;
+    try {
+      await setDoc(doc(db, "godown_inventory", editingProduct.id), editingProduct, { merge: true });
+      toastMessage("सामान सफलतापूर्वक संशोधित हुआ!");
+      setEditingProduct(null);
+    } catch {
+      toastMessage("अपडेट करने में विफलता।", "error");
+    }
   };
 
   // Submit Wastage Log
@@ -368,6 +476,47 @@ export default function BumBumCafeStockApp() {
         {/* ==================== GODOWN STOCK TAB ==================== */}
         {activeTab === 'store' && (
           <div className="space-y-4">
+            
+            {/* CATEGORY FILTER SWITCHES WITH MANAGE BUTTON */}
+            <div className="space-y-2">
+              <div className="flex justify-between items-center">
+                <span className="text-[10px] font-black uppercase text-neutral-400">Categories</span>
+                <button 
+                  onClick={() => setShowCategoryModal(true)} 
+                  className="text-[10px] font-bold text-orange-600 uppercase flex items-center gap-1"
+                >
+                  📁 Manage
+                </button>
+              </div>
+              
+              <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-none font-sans">
+                <button
+                  onClick={() => setSelectedCategory("All")}
+                  className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border whitespace-nowrap transition-all ${
+                    selectedCategory === "All" 
+                      ? 'bg-[#FF6B00] text-white border-[#FF6B00]' 
+                      : isDarkMode ? 'bg-neutral-900 border-neutral-800 text-neutral-400' : 'bg-white border-neutral-200 text-neutral-600'
+                  }`}
+                >
+                  All
+                </button>
+                {categories.map(cat => (
+                  <button
+                    key={cat.id}
+                    onClick={() => setSelectedCategory(cat.name)}
+                    className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border whitespace-nowrap transition-all ${
+                      selectedCategory === cat.name 
+                        ? 'bg-[#FF6B00] text-white border-[#FF6B00]' 
+                        : isDarkMode ? 'bg-neutral-900 border-neutral-800 text-neutral-400' : 'bg-white border-neutral-200 text-neutral-600'
+                    }`}
+                  >
+                    {cat.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* SEARCH AND CONTROL ACTIONS */}
             <div className="flex items-center gap-2">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" size={14} />
@@ -388,6 +537,13 @@ export default function BumBumCafeStockApp() {
                 {isMultiSelectMode ? "Stop Select" : "Multi Select"}
               </button>
             </div>
+
+            <button 
+              onClick={() => setShowAddProductModal(true)}
+              className="w-full py-2.5 bg-green-600 hover:bg-green-700 text-white text-xs font-black uppercase rounded-xl flex items-center justify-center gap-1.5 shadow"
+            >
+              <Plus size={14} /> Add New Product (सामान जोड़ें)
+            </button>
 
             {/* FLOATING ACTION BOTTOM BANNER FOR MULTI-SELECT FLOW */}
             {isMultiSelectMode && selectedItemIds.length > 0 && (
@@ -432,7 +588,17 @@ export default function BumBumCafeStockApp() {
 
                     <div className="flex justify-between">
                       <div>
-                        <p className="font-bold text-sm text-orange-600">{item.name}</p>
+                        <div className="flex items-center gap-1.5">
+                          <p className="font-bold text-sm text-orange-600">{item.name}</p>
+                          {!isMultiSelectMode && (
+                            <button 
+                              onClick={(e) => { e.stopPropagation(); setEditingProduct(item); }}
+                              className="text-neutral-400 hover:text-orange-500"
+                            >
+                              <Edit size={12} />
+                            </button>
+                          )}
+                        </div>
                         <p className="text-[9px] text-neutral-400 uppercase tracking-widest">{item.category}</p>
                       </div>
                       <div className="text-right pr-6">
@@ -708,6 +874,260 @@ export default function BumBumCafeStockApp() {
               <button type="submit" className="w-full py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold text-xs uppercase shadow">
                 Save Wastage Record ➔
               </button>
+            </motion.form>
+          </div>
+        )}
+
+        {/* 4. DYNAMIC CATEGORY MANAGER MODAL */}
+        {showCategoryModal && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className={`w-full max-w-sm rounded-3xl p-6 space-y-4 ${isDarkMode ? 'bg-neutral-900 text-white' : 'bg-white text-neutral-900'}`}>
+              <div className="flex justify-between items-center border-b pb-2">
+                <div>
+                  <h3 className="text-xs font-black uppercase text-orange-500">Manage Categories</h3>
+                  <p className="text-[9px] text-neutral-400 uppercase font-bold">कैटेगरी बनाएं या हटाएँ</p>
+                </div>
+                <button onClick={() => setShowCategoryModal(false)} className="p-1.5 bg-neutral-100 dark:bg-neutral-800 rounded-xl"><X size={14} /></button>
+              </div>
+
+              <form onSubmit={handleAddCategory} className="flex gap-1.5 text-xs">
+                <input 
+                  type="text" 
+                  placeholder="जैसे: Pizza Toppings" 
+                  value={newCategoryName}
+                  onChange={e => setNewCategoryName(e.target.value)}
+                  className="flex-1 p-2.5 rounded-xl border dark:bg-neutral-800"
+                  required
+                />
+                <button type="submit" className="px-4 py-2.5 bg-orange-500 text-white font-bold rounded-xl uppercase">Add</button>
+              </form>
+
+              <div className="space-y-1.5 max-h-56 overflow-y-auto">
+                {categories.map(cat => (
+                  <div key={cat.id} className="flex justify-between items-center p-2.5 rounded-xl bg-neutral-50 dark:bg-neutral-800 text-xs">
+                    <span className="font-bold">{cat.name}</span>
+                    <button 
+                      onClick={() => handleDeleteCategory(cat.id, cat.name)}
+                      className="text-neutral-400 hover:text-red-500"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+          </div>
+        )}
+
+        {/* 5. ADD PRODUCT MODAL */}
+        {showAddProductModal && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <motion.form onSubmit={handleAddProductSubmit} initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className={`w-full max-w-sm rounded-3xl p-6 space-y-4 ${isDarkMode ? 'bg-neutral-900 text-white' : 'bg-white text-neutral-900'}`}>
+              <div className="flex justify-between items-center border-b pb-2">
+                <h3 className="text-xs font-black uppercase text-green-500">Add New Product</h3>
+                <button type="button" onClick={() => setShowAddProductModal(false)} className="p-1.5 bg-neutral-100 dark:bg-neutral-800 rounded-xl"><X size={14} /></button>
+              </div>
+
+              <div className="space-y-3 text-xs">
+                <div className="space-y-1">
+                  <label className="text-[9px] text-neutral-400 font-bold uppercase">Product Name (सामान का नाम)</label>
+                  <input 
+                    type="text" 
+                    placeholder="जैसे: AMUL BUTTER" 
+                    value={formAddProduct.name}
+                    onChange={e => setFormAddProduct({ ...formAddProduct, name: e.target.value })}
+                    className="w-full p-2.5 rounded-xl border dark:bg-neutral-800"
+                    required
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <label className="text-[9px] text-neutral-400 font-bold uppercase">Category (श्रेणी)</label>
+                    <select 
+                      value={formAddProduct.category}
+                      onChange={e => setFormAddProduct({ ...formAddProduct, category: e.target.value })}
+                      className="w-full p-2.5 rounded-xl border dark:bg-neutral-800 font-bold"
+                      required
+                    >
+                      <option value="">Select Category</option>
+                      {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                    </select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[9px] text-neutral-400 font-bold uppercase">Unit</label>
+                    <select 
+                      value={formAddProduct.unit}
+                      onChange={e => setFormAddProduct({ ...formAddProduct, unit: e.target.value })}
+                      className="w-full p-2.5 rounded-xl border dark:bg-neutral-800 font-bold"
+                    >
+                      <option value="Kg">Kg</option>
+                      <option value="Ltr">Ltr</option>
+                      <option value="Pcs">Pcs</option>
+                      <option value="Packets">Packets</option>
+                      <option value="Tins">Tins</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-1.5">
+                  <div className="space-y-1">
+                    <label className="text-[8px] text-neutral-400 font-bold uppercase">Initial Qty</label>
+                    <input 
+                      type="number" 
+                      value={formAddProduct.storeQty}
+                      onChange={e => setFormAddProduct({ ...formAddProduct, storeQty: e.target.value })}
+                      className="w-full p-2.5 rounded-xl border dark:bg-neutral-800"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[8px] text-neutral-400 font-bold uppercase">Price (INR)</label>
+                    <input 
+                      type="number" 
+                      placeholder="खरीद दर"
+                      value={formAddProduct.purchasePrice}
+                      onChange={e => setFormAddProduct({ ...formAddProduct, purchasePrice: e.target.value })}
+                      className="w-full p-2.5 rounded-xl border dark:bg-neutral-800"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[8px] text-neutral-400 font-bold uppercase">Min Stock</label>
+                    <input 
+                      type="number" 
+                      value={formAddProduct.minLimit}
+                      onChange={e => setFormAddProduct({ ...formAddProduct, minLimit: e.target.value })}
+                      className="w-full p-2.5 rounded-xl border dark:bg-neutral-800"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[9px] text-neutral-400 font-bold uppercase">Barcode (Optional)</label>
+                  <input 
+                    type="text" 
+                    placeholder="जैसे: EAN-13 नंबर या स्कैन कोड" 
+                    value={formAddProduct.barcode}
+                    onChange={e => setFormAddProduct({ ...formAddProduct, barcode: e.target.value })}
+                    className="w-full p-2.5 rounded-xl border dark:bg-neutral-800"
+                  />
+                </div>
+              </div>
+
+              <button type="submit" className="w-full py-3 bg-green-600 hover:bg-green-700 text-white rounded-xl font-bold text-xs uppercase shadow">
+                Save Product ➔
+              </button>
+            </motion.form>
+          </div>
+        )}
+
+        {/* 6. EDIT PRODUCT MODAL */}
+        {editingProduct && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <motion.form onSubmit={handleEditProductSubmit} initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className={`w-full max-w-sm rounded-3xl p-6 space-y-4 ${isDarkMode ? 'bg-neutral-900 text-white' : 'bg-white text-neutral-900'}`}>
+              <div className="flex justify-between items-center border-b pb-2">
+                <h3 className="text-xs font-black uppercase text-orange-500">Edit Product Details</h3>
+                <button type="button" onClick={() => setEditingProduct(null)} className="p-1.5 bg-neutral-100 dark:bg-neutral-800 rounded-xl"><X size={14} /></button>
+              </div>
+
+              <div className="space-y-3 text-xs">
+                <div className="space-y-1">
+                  <label className="text-[9px] text-neutral-400 font-bold uppercase">Product Name</label>
+                  <input 
+                    type="text" 
+                    value={editingProduct.name}
+                    onChange={e => setEditingProduct({ ...editingProduct, name: e.target.value.toUpperCase() })}
+                    className="w-full p-2.5 rounded-xl border dark:bg-neutral-800"
+                    required
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <label className="text-[9px] text-neutral-400 font-bold uppercase">Category</label>
+                    <select 
+                      value={editingProduct.category}
+                      onChange={e => setEditingProduct({ ...editingProduct, category: e.target.value })}
+                      className="w-full p-2.5 rounded-xl border dark:bg-neutral-800 font-bold"
+                      required
+                    >
+                      {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                    </select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[9px] text-neutral-400 font-bold uppercase">Unit</label>
+                    <select 
+                      value={editingProduct.unit}
+                      onChange={e => setEditingProduct({ ...editingProduct, unit: e.target.value })}
+                      className="w-full p-2.5 rounded-xl border dark:bg-neutral-800 font-bold"
+                    >
+                      <option value="Kg">Kg</option>
+                      <option value="Ltr">Ltr</option>
+                      <option value="Pcs">Pcs</option>
+                      <option value="Packets">Packets</option>
+                      <option value="Tins">Tins</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <label className="text-[9px] text-neutral-400 font-bold uppercase">Purchase Price (INR)</label>
+                    <input 
+                      type="number" 
+                      value={editingProduct.purchasePrice}
+                      onChange={e => setEditingProduct({ ...editingProduct, purchasePrice: parseFloat(e.target.value) || 0 })}
+                      className="w-full p-2.5 rounded-xl border dark:bg-neutral-800"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[9px] text-neutral-400 font-bold uppercase">Min Limit</label>
+                    <input 
+                      type="number" 
+                      value={editingProduct.minLimit}
+                      onChange={e => setEditingProduct({ ...editingProduct, minLimit: parseFloat(e.target.value) || 0 })}
+                      className="w-full p-2.5 rounded-xl border dark:bg-neutral-800"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[9px] text-neutral-400 font-bold uppercase">Barcode</label>
+                  <input 
+                    type="text" 
+                    value={editingProduct.barcode || ""}
+                    onChange={e => setEditingProduct({ ...editingProduct, barcode: e.target.value })}
+                    className="w-full p-2.5 rounded-xl border dark:bg-neutral-800"
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button 
+                  type="button" 
+                  onClick={async () => {
+                    const confirm = window.confirm(`क्या आप इस आइटम "${editingProduct.name}" को हमेशा के लिए डिलीट करना चाहते हैं?`);
+                    if (!confirm) return;
+                    try {
+                      await deleteDoc(doc(db, "godown_inventory", editingProduct.id));
+                      toastMessage("आइटम डिलीट कर दिया गया।");
+                      setEditingProduct(null);
+                    } catch {
+                      toastMessage("डिलीट करने में विफलता।", "error");
+                    }
+                  }}
+                  className="px-4 py-3 bg-red-100 text-red-600 rounded-xl font-bold text-xs uppercase"
+                >
+                  Delete
+                </button>
+                <button type="submit" className="flex-1 py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-xl font-bold text-xs uppercase shadow">
+                  Update ➔
+                </button>
+              </div>
             </motion.form>
           </div>
         )}
