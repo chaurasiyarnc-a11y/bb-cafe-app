@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   Home, Store, Trash2, Search, Plus, X, BarChart3, QrCode, 
-  PlusCircle, MinusCircle, ChevronRight, Sparkles, AlertTriangle, Printer, Edit, Layers, MessageCircle, Wrench
+  PlusCircle, MinusCircle, ChevronRight, Sparkles, AlertTriangle, Printer, Edit, Layers, MessageCircle, Wrench, Tag
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -22,11 +22,13 @@ interface InventoryItem {
   barcode?: string;
   supplier?: string;
   lastPurchaseDate?: string;
+  category?: string; // New Field
 }
 
 interface StockOutLog {
   id: string;
   itemName: string;
+  itemId?: string; // New Reference
   qty: number;
   purpose: "Kitchen Use" | "Waste" | "Damage" | "Staff Use";
   date: string;
@@ -96,14 +98,16 @@ const triggerHaptic = (ms = 35) => {
 };
 
 const INITIAL_INVENTORY: InventoryItem[] = [
-  { id: "dry_1", name: "Doodh Milk", storeQty: 40, unit: "Ltr", purchasePrice: 60, minLimit: 10, barcode: "890105800401" },
-  { id: "dry_2", name: "Dahi Curd", storeQty: 15, unit: "Kg", purchasePrice: 80, minLimit: 5, barcode: "890105800402" },
-  { id: "dry_3", name: "Makkhan Butter", storeQty: 24, unit: "Kg", purchasePrice: 420, minLimit: 8, barcode: "890105800240" },
-  { id: "veg_2", name: "Tamatar Tomato", storeQty: 30, unit: "Kg", purchasePrice: 40, minLimit: 10, barcode: "890105800408" }
+  { id: "dry_1", name: "DOODH MILK", storeQty: 40, unit: "Ltr", purchasePrice: 60, minLimit: 10, barcode: "890105800401", category: "DAIRY" },
+  { id: "dry_2", name: "DAHI CURD", storeQty: 15, unit: "Kg", purchasePrice: 80, minLimit: 5, barcode: "890105800402", category: "DAIRY" },
+  { id: "dry_3", name: "MAKKHAN BUTTER", storeQty: 24, unit: "Kg", purchasePrice: 420, minLimit: 8, barcode: "890105800240", category: "DAIRY" },
+  { id: "veg_2", name: "TAMATAR TOMATO", storeQty: 30, unit: "Kg", purchasePrice: 40, minLimit: 10, barcode: "890105800408", category: "VEGETABLES" }
 ];
 
 export default function BumBumCafeStockApp() {
   const [inventory, setInventory] = useState<InventoryItem[]>(INITIAL_INVENTORY);
+  const [categories, setCategories] = useState<string[]>(["DAIRY", "VEGETABLES", "DRY STOCK", "PACKAGING", "OTHERS"]);
+  const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>("All");
   const [orderLists, setOrderLists] = useState<OrderListMeta[]>([]);
   const [savedOrders, setSavedOrders] = useState<SavedOrderItem[]>([]);
   const [fixedAssets, setFixedAssets] = useState<FixedAsset[]>([]);
@@ -113,6 +117,10 @@ export default function BumBumCafeStockApp() {
   const [editedQties, setEditedQties] = useState<Record<string, string | number>>({});
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
 
+  // Buffer state to prevent excessive Firestore writes while typing order quantities
+  const [localOrderQties, setLocalOrderQties] = useState<Record<string, string>>({});
+  const [focusedOrderField, setFocusedOrderField] = useState<string | null>(null);
+
   // Print/Selection States
   const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
   const [isMultiSelectMode, setIsMultiSelectMode] = useState<boolean>(false);
@@ -120,6 +128,9 @@ export default function BumBumCafeStockApp() {
   // Multiple Lists State
   const [activeListId, setActiveListId] = useState<string>("");
   const [showSaveToListModal, setShowSaveToListModal] = useState<boolean>(false);
+  const [showBulkCategoryModal, setShowBulkCategoryModal] = useState<boolean>(false);
+  const [bulkTargetCategory, setBulkTargetCategory] = useState<string>("");
+  const [newCategoryInput, setNewCategoryInput] = useState<string>("");
   const [targetListId, setTargetListId] = useState<string>("");
   const [newListNameInput, setNewListNameInput] = useState<string>("");
 
@@ -141,7 +152,7 @@ export default function BumBumCafeStockApp() {
   const [editingProduct, setEditingProduct] = useState<InventoryItem | null>(null);
 
   const [formAddProduct, setFormAddProduct] = useState({
-    name: '', storeQty: '0', unit: 'Kg', purchasePrice: '', minLimit: '10', barcode: ''
+    name: '', storeQty: '0', unit: 'Kg', purchasePrice: '', minLimit: '10', barcode: '', category: 'OTHERS'
   });
 
   const [formAddAsset, setFormAddAsset] = useState({
@@ -151,8 +162,8 @@ export default function BumBumCafeStockApp() {
   // Waste logs & modals
   const [showStockOutModal, setShowStockOutModal] = useState<boolean>(false);
   const [stockOutHistory, setStockOutHistory] = useState<StockOutLog[]>([
-    { id: "so_1", itemName: "Doodh Milk", qty: 2, purpose: "Waste", date: "2026-07-15", remarks: "दूध फट गया", financialLoss: 120 },
-    { id: "so_2", itemName: "Tamatar Tomato", qty: 5, purpose: "Damage", date: "2026-07-16", remarks: "सड़े हुए टमाटर फेंके", financialLoss: 200 },
+    { id: "so_1", itemName: "DOODH MILK", qty: 2, purpose: "Waste", date: "2026-07-15", remarks: "दूध फट गया", financialLoss: 120 },
+    { id: "so_2", itemName: "TAMATAR TOMATO", qty: 5, purpose: "Damage", date: "2026-07-16", remarks: "सड़े हुए टमाटर फेंके", financialLoss: 200 },
   ]);
 
   const [formStockOut, setFormStockOut] = useState({
@@ -170,22 +181,50 @@ export default function BumBumCafeStockApp() {
     inventoryRef.current = inventory;
   }, [inventory]);
 
+  // Sync saved orders database changes with our local buffered state
+  useEffect(() => {
+    const updatedLocal: Record<string, string> = {};
+    savedOrders.forEach(o => {
+      if (focusedOrderField !== o.id) {
+        updatedLocal[o.id] = o.orderQty || "";
+      }
+    });
+    setLocalOrderQties(prev => ({ ...prev, ...updatedLocal }));
+  }, [savedOrders, focusedOrderField]);
+
   // Static Listeners
   useEffect(() => {
     const unsubInventory = onSnapshot(collection(db, "godown_inventory"), (snap) => {
       setInventory(snap.docs.map(d => ({ id: d.id, ...d.data() } as InventoryItem)));
-    });
+    }, (err) => console.error("Inventory load error", err));
+
+    const unsubCategories = onSnapshot(collection(db, "categories"), (snap) => {
+      if (!snap.empty) {
+        setCategories(snap.docs.map(d => d.data().name as string));
+      } else {
+        // Seed default categories
+        const defaults = ["DAIRY", "VEGETABLES", "DRY STOCK", "PACKAGING", "OTHERS"];
+        defaults.forEach(async (cat) => {
+          await setDoc(doc(db, "categories", cat.toLowerCase()), { name: cat });
+        });
+      }
+    }, (err) => console.error("Categories load error", err));
+
     const unsubStockOuts = onSnapshot(query(collection(db, "stock_out_history"), orderBy("date", "desc")), (snap) => {
       setStockOutHistory(snap.docs.map(d => ({ id: d.id, ...d.data() } as StockOutLog)));
-    });
+    }, (err) => console.error("Stockouts load error", err));
+
     const unsubSavedOrders = onSnapshot(collection(db, "saved_orders"), (snap) => {
       setSavedOrders(snap.docs.map(d => ({ id: d.id, ...d.data() } as SavedOrderItem)));
-    });
+    }, (err) => console.error("Saved orders load error", err));
+
     const unsubFixedAssets = onSnapshot(collection(db, "fixed_assets"), (snap) => {
       setFixedAssets(snap.docs.map(d => ({ id: d.id, ...d.data() } as FixedAsset)));
-    });
+    }, (err) => console.error("Fixed assets load error", err));
+
     return () => {
       unsubInventory();
+      unsubCategories();
       unsubStockOuts();
       unsubSavedOrders();
       unsubFixedAssets();
@@ -204,7 +243,7 @@ export default function BumBumCafeStockApp() {
       } else {
         setActiveListId("");
       }
-    });
+    }, (err) => console.error("Order lists error", err));
     return () => unsubOrderLists();
   }, [activeListId]);
 
@@ -289,10 +328,12 @@ export default function BumBumCafeStockApp() {
   }, [inventory, stockOutHistory]);
 
   const filteredInventory = useMemo(() => {
-    return inventory.filter(item => 
-      item.name.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-  }, [inventory, searchQuery]);
+    return inventory.filter(item => {
+      const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesCategory = selectedCategoryFilter === "All" || item.category === selectedCategoryFilter;
+      return matchesSearch && matchesCategory;
+    });
+  }, [inventory, searchQuery, selectedCategoryFilter]);
 
   const filteredAssets = useMemo(() => {
     return fixedAssets.filter(asset => 
@@ -336,7 +377,8 @@ export default function BumBumCafeStockApp() {
       unit: 'Kg',
       purchasePrice: '',
       minLimit: '10',
-      barcode: unrecognizedBarcode
+      barcode: unrecognizedBarcode,
+      category: 'OTHERS'
     });
     setScannerActive(false);
     setUnrecognizedBarcode(null);
@@ -373,7 +415,7 @@ export default function BumBumCafeStockApp() {
     setScannedItemsToVerify([]);
   };
 
-  // Adjust stock quantity in list
+  // Adjust stock quantity in list safely
   const adjustQty = (id: string, diff: number) => {
     triggerHaptic();
     const item = inventory.find(i => i.id === id);
@@ -387,7 +429,7 @@ export default function BumBumCafeStockApp() {
     const rawVal = editedQties[id];
     if (rawVal === undefined) return;
     const updated = typeof rawVal === 'string' ? parseFloat(rawVal) : rawVal;
-    if (isNaN(updated)) {
+    if (isNaN(updated) || updated < 0) {
       toastMessage("कृपया सही संख्या दर्ज करें।", "error");
       return;
     }
@@ -472,7 +514,47 @@ export default function BumBumCafeStockApp() {
     }
   };
 
-  // Update Specific Order Qty in Firestore on keychange
+  // MASS ASSIGN BULK CATEGORY LOGIC
+  const handleConfirmBulkCategory = async () => {
+    triggerHaptic();
+    if (selectedItemIds.length === 0) return;
+
+    let targetCategory = bulkTargetCategory;
+
+    if (targetCategory === "CREATE_NEW") {
+      if (!newCategoryInput.trim()) {
+        toastMessage("नया कैटेगरी नाम दर्ज करें!", "error");
+        return;
+      }
+      targetCategory = newCategoryInput.trim().toUpperCase();
+      // Save new category to DB
+      await setDoc(doc(db, "categories", targetCategory.toLowerCase()), { name: targetCategory });
+      setNewCategoryInput("");
+    }
+
+    if (!targetCategory) {
+      toastMessage("कृपया कैटेगरी चुनें!", "error");
+      return;
+    }
+
+    try {
+      const batch = writeBatch(db);
+      selectedItemIds.forEach(id => {
+        const itemRef = doc(db, "godown_inventory", id);
+        batch.set(itemRef, { category: targetCategory }, { merge: true });
+      });
+      await batch.commit();
+
+      setSelectedItemIds([]);
+      setIsMultiSelectMode(false);
+      setShowBulkCategoryModal(false);
+      toastMessage(`सफलतापूर्वक ${selectedItemIds.length} आइटम्स को ${targetCategory} में सेट किया गया!`);
+    } catch {
+      toastMessage("कैटेगरी अपडेट करने में विफलता।", "error");
+    }
+  };
+
+  // Commit dynamic Order Quantity safely on Blur or Enter key
   const handleUpdateOrderQty = async (compoundId: string, qty: string) => {
     try {
       await setDoc(doc(db, "saved_orders", compoundId), { orderQty: qty }, { merge: true });
@@ -531,7 +613,7 @@ export default function BumBumCafeStockApp() {
   const handleAddProductSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formAddProduct.name) {
-      toastMessage("सामान का नाम आवश्यक है!", "error");
+      toastMessage("सामान का name आवश्यक है!", "error");
       return;
     }
     try {
@@ -545,12 +627,13 @@ export default function BumBumCafeStockApp() {
         minLimit: parseFloat(formAddProduct.minLimit) || 10,
         barcode: formAddProduct.barcode.trim() || "",
         supplier: "Walk-In",
-        lastPurchaseDate: new Date().toISOString().split('T')[0]
+        lastPurchaseDate: new Date().toISOString().split('T')[0],
+        category: formAddProduct.category.toUpperCase()
       };
       await setDoc(doc(db, "godown_inventory", customId), payload);
       toastMessage("नया सामान सफलतापूर्वक दर्ज हुआ!");
       setShowAddProductModal(false);
-      setFormAddProduct({ name: '', storeQty: '0', unit: 'Kg', purchasePrice: '', minLimit: '10', barcode: '' });
+      setFormAddProduct({ name: '', storeQty: '0', unit: 'Kg', purchasePrice: '', minLimit: '10', barcode: '', category: 'OTHERS' });
     } catch {
       toastMessage("सामान जोड़ने में विफलता।", "error");
     }
@@ -609,6 +692,28 @@ export default function BumBumCafeStockApp() {
     }
   };
 
+  // Safe Cascade Delete Product Function
+  const handleDeleteProduct = async (id: string, name: string) => {
+    triggerHaptic();
+    const confirm = window.confirm(`क्या आप सच में इस आइटम "${name}" को हमेशा के लिए डिलीट करना चाहते हैं? इससे इसके सहेजे गए ऑर्डर्स भी डिलीट हो जायेंगे।`);
+    if (!confirm) return;
+    try {
+      const batch = writeBatch(db);
+      // Delete item
+      batch.delete(doc(db, "godown_inventory", id));
+      // Clean up orphaned saved orders
+      const relatedOrders = savedOrders.filter(o => o.itemId === id);
+      relatedOrders.forEach(order => {
+        batch.delete(doc(db, "saved_orders", order.id));
+      });
+      await batch.commit();
+      toastMessage("आइटम सफलतापूर्वक हटा दिया गया!");
+      setEditingProduct(null);
+    } catch {
+      toastMessage("हटाने में विफलता।", "error");
+    }
+  };
+
   // Submit Wastage Log
   const handleWasteSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -635,6 +740,7 @@ export default function BumBumCafeStockApp() {
       await setDoc(doc(db, "godown_inventory", item.id), { storeQty: increment(-qtyNum) }, { merge: true });
       await addDoc(collection(db, "stock_out_history"), {
         itemName: item.name,
+        itemId: item.id,
         qty: qtyNum,
         purpose: formStockOut.purpose,
         date: new Date().toISOString().split('T')[0],
@@ -652,7 +758,10 @@ export default function BumBumCafeStockApp() {
   // Direct print compiled saved orders list
   const handlePrintSavedList = () => {
     const printWindow = window.open('', '_blank', 'width=600,height=800');
-    if (!printWindow) return;
+    if (!printWindow) {
+      toastMessage("पॉपअप अवरुद्ध हो गया है! कृपया पॉपअप की अनुमति दें।", "error");
+      return;
+    }
 
     const activeList = orderLists.find(l => l.id === activeListId);
     const listTitle = activeList ? activeList.name : "BUM BUM CAFE ORDER SHEET";
@@ -731,7 +840,7 @@ export default function BumBumCafeStockApp() {
       {/* HUD Toast */}
       <AnimatePresence>
         {toast && (
-          <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="fixed top-4 left-1/2 -translate-x-1/2 z-[999] px-4 py-2.5 rounded-full bg-orange-500 text-white shadow-lg flex items-center gap-2 text-xs font-bold uppercase">
+          <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="fixed top-4 left-1/2 -translate-x-1/2 z-[999] px-4 py-2.5 rounded-full bg-orange-500 text-white shadow-lg flex items-center gap-2 text-xs font-bold uppercase text-center">
             <Sparkles size={14} /> <span>{toast.message}</span>
           </motion.div>
         )}
@@ -770,7 +879,7 @@ export default function BumBumCafeStockApp() {
               
               <div className="grid grid-cols-2 gap-3 mt-4 pt-4 border-t border-white/10">
                 <div onClick={() => { setActiveTab('store'); setIsMultiSelectMode(true); }} className="bg-white/10 p-3 rounded-2xl text-center cursor-pointer hover:bg-white/20 transition-all">
-                  <span className="text-xs font-bold block">📦 Multi Select</span>
+                  <span className="text-xs font-bold block">📦 Multi Select Mode</span>
                 </div>
                 <div onClick={() => { triggerHaptic(); setShowStockOutModal(true); }} className="bg-white/10 p-3 rounded-2xl text-center cursor-pointer hover:bg-white/20 transition-all">
                   <span className="text-xs font-bold block">⚠️ Log Waste</span>
@@ -821,9 +930,36 @@ export default function BumBumCafeStockApp() {
               </button>
             </div>
 
+            {/* CATEGORY FILTER TABS */}
+            <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-hide">
+              <button
+                onClick={() => setSelectedCategoryFilter("All")}
+                className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider shrink-0 border ${
+                  selectedCategoryFilter === "All"
+                    ? "bg-orange-500 border-orange-500 text-white"
+                    : isDarkMode ? "bg-neutral-900 border-neutral-800 text-neutral-400" : "bg-neutral-100 border-neutral-200 text-neutral-600"
+                }`}
+              >
+                All Items
+              </button>
+              {categories.map(cat => (
+                <button
+                  key={cat}
+                  onClick={() => setSelectedCategoryFilter(cat)}
+                  className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider shrink-0 border ${
+                    selectedCategoryFilter === cat
+                      ? "bg-orange-500 border-orange-500 text-white"
+                      : isDarkMode ? "bg-neutral-900 border-neutral-800 text-neutral-400" : "bg-neutral-100 border-neutral-200 text-neutral-600"
+                  }`}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+
             <button 
               onClick={() => {
-                setFormAddProduct({ name: '', storeQty: '0', unit: 'Kg', purchasePrice: '', minLimit: '10', barcode: '' });
+                setFormAddProduct({ name: '', storeQty: '0', unit: 'Kg', purchasePrice: '', minLimit: '10', barcode: '', category: 'OTHERS' });
                 setShowAddProductModal(true);
               }}
               className="w-full py-2.5 bg-green-600 hover:bg-green-700 text-white text-xs font-black uppercase rounded-xl flex items-center justify-center gap-1.5 shadow"
@@ -831,23 +967,44 @@ export default function BumBumCafeStockApp() {
               <Plus size={14} /> Add New Product (सामान जोड़ें)
             </button>
 
-            {/* FLOATING ACTION BOTTOM BANNER - ENHANCED Z-INDEX LAYER [100] */}
+            {/* FLOATING ACTION BOTTOM BANNER FOR MULTI SELECT WITH TWO ACTIONS */}
             {isMultiSelectMode && selectedItemIds.length > 0 && (
-              <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[100] w-full max-w-xs px-2">
-                <div className="bg-orange-600 text-white rounded-2xl p-3.5 shadow-2xl flex items-center justify-between border border-orange-400/30">
-                  <div>
-                    <p className="text-xs font-black">{selectedItemIds.length} Items Selected</p>
-                    <p className="text-[9px] text-orange-100 font-bold uppercase tracking-wider">सप्लायर आर्डर लिस्ट टैब में भेजें</p>
+              <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[100] w-full max-w-sm px-4">
+                <div className="bg-orange-600 text-white rounded-2xl p-4 shadow-2xl space-y-3 border border-orange-400/30">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <p className="text-xs font-black">{selectedItemIds.length} Items Selected</p>
+                      <p className="text-[8px] text-orange-100 font-bold uppercase tracking-wider">क्या कार्यवाही करना चाहते हैं?</p>
+                    </div>
+                    <button 
+                      onClick={() => { setSelectedItemIds([]); setIsMultiSelectMode(false); }}
+                      className="p-1 bg-white/20 hover:bg-white/30 text-white rounded-full"
+                    >
+                      <X size={14} />
+                    </button>
                   </div>
-                  <button 
-                    onClick={() => {
-                      triggerHaptic();
-                      setShowSaveToListModal(true);
-                    }}
-                    className="px-4 py-2 bg-white text-orange-600 font-black text-xs uppercase rounded-xl shadow-lg shadow-orange-950/20 active:scale-95 transition-all"
-                  >
-                    Save to Supplier Order ➔
-                  </button>
+                  
+                  <div className="grid grid-cols-2 gap-2">
+                    <button 
+                      onClick={() => {
+                        triggerHaptic();
+                        setShowSaveToListModal(true);
+                      }}
+                      className="py-2.5 bg-white text-orange-600 font-black text-[10px] uppercase rounded-xl shadow-md active:scale-95 transition-all text-center"
+                    >
+                      Supplier Order ➔
+                    </button>
+                    <button 
+                      onClick={() => {
+                        triggerHaptic();
+                        setBulkTargetCategory("");
+                        setShowBulkCategoryModal(true);
+                      }}
+                      className="py-2.5 bg-orange-850 border border-orange-400/50 hover:bg-orange-900 text-white font-black text-[10px] uppercase rounded-xl shadow-md active:scale-95 transition-all text-center flex items-center justify-center gap-1"
+                    >
+                      <Tag size={12} /> Set Category ➔
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
@@ -877,8 +1034,13 @@ export default function BumBumCafeStockApp() {
 
                     <div className="flex justify-between">
                       <div>
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex items-center gap-1.5 flex-wrap">
                           <p className="font-bold text-sm text-orange-600">{item.name}</p>
+                          {item.category && (
+                            <span className="px-1.5 py-0.5 text-[8px] bg-neutral-100 dark:bg-neutral-800 text-neutral-400 font-bold rounded-md uppercase">
+                              {item.category}
+                            </span>
+                          )}
                           {!isMultiSelectMode && (
                             <button 
                               onClick={(e) => { e.stopPropagation(); setEditingProduct(item); }}
@@ -888,7 +1050,7 @@ export default function BumBumCafeStockApp() {
                             </button>
                           )}
                         </div>
-                        {item.barcode && <p className="text-[8px] text-neutral-400 font-bold uppercase tracking-widest">Barcode: {item.barcode}</p>}
+                        {item.barcode && <p className="text-[8px] text-neutral-400 font-bold uppercase tracking-widest mt-1">Barcode: {item.barcode}</p>}
                       </div>
                       <div className="text-right pr-6">
                         <span className="text-xs text-neutral-400 font-bold">{item.storeQty} {item.unit}</span>
@@ -918,7 +1080,14 @@ export default function BumBumCafeStockApp() {
 
                       <div className="flex gap-1">
                         <button 
-                          onClick={(e) => { e.stopPropagation(); setEditedQties(prev => ({ ...prev, [item.id]: "0" })); toastMessage("0 सेट किया गया!", "info"); }}
+                          onClick={(e) => { 
+                            e.stopPropagation(); 
+                            const confirm = window.confirm(`क्या आप सच में ${item.name} के स्टॉक को 0 करना चाहते हैं? (बदलाव सेव करने के लिए बाद में 'सेव' बटन दबाएं)`);
+                            if (confirm) {
+                              setEditedQties(prev => ({ ...prev, [item.id]: "0" }));
+                              toastMessage("0 सेट किया गया!", "info");
+                            }
+                          }}
                           className="px-2 py-1 bg-red-100 dark:bg-red-500/10 text-red-500 text-[10px] font-bold rounded-lg"
                         >
                           🗑️ 0 करें
@@ -1103,38 +1272,54 @@ export default function BumBumCafeStockApp() {
             <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-1">
               {savedOrders
                 .filter(item => item.listId === activeListId)
-                .map(item => (
-                  <div 
-                    key={item.id} 
-                    className={`p-3.5 rounded-2xl border flex justify-between items-center text-xs ${
-                      isDarkMode ? 'bg-[#181818] border-neutral-800' : 'bg-white border-neutral-100'
-                    }`}
-                  >
-                    <div className="flex-1 pr-3">
-                      <p className="font-bold text-sm text-[#FF6B00]">{item.name}</p>
-                      <p className="text-[9px] text-neutral-400 font-bold uppercase">
-                        Current Stock: {item.storeQty} {item.unit}
-                      </p>
-                    </div>
+                .map(item => {
+                  const localValue = localOrderQties[item.id] !== undefined ? localOrderQties[item.id] : (item.orderQty || "");
+                  return (
+                    <div 
+                      key={item.id} 
+                      className={`p-3.5 rounded-2xl border flex justify-between items-center text-xs ${
+                        isDarkMode ? 'bg-[#181818] border-neutral-800' : 'bg-white border-neutral-100'
+                      }`}
+                    >
+                      <div className="flex-1 pr-3">
+                        <p className="font-bold text-sm text-[#FF6B00]">{item.name}</p>
+                        <p className="text-[9px] text-neutral-400 font-bold uppercase">
+                          Current Stock: {item.storeQty} {item.unit}
+                        </p>
+                      </div>
 
-                    <div className="flex items-center gap-2">
-                      <input 
-                        type="text"
-                        placeholder="Qty भरें"
-                        value={item.orderQty || ""}
-                        onChange={(e) => handleUpdateOrderQty(item.id, e.target.value)}
-                        className="w-24 p-2 rounded-xl border text-center font-bold text-xs bg-transparent text-neutral-900 dark:text-white"
-                      />
-                      <span className="text-[10px] font-bold text-neutral-400 w-8">{item.unit}</span>
-                      <button 
-                        onClick={() => handleRemoveFromSavedList(item.id)}
-                        className="text-neutral-400 hover:text-red-500"
-                      >
-                        <X size={14} />
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <input 
+                          type="text"
+                          placeholder="Qty भरें"
+                          value={localValue}
+                          onFocus={() => setFocusedOrderField(item.id)}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setLocalOrderQties(prev => ({ ...prev, [item.id]: val }));
+                          }}
+                          onBlur={() => {
+                            setFocusedOrderField(null);
+                            handleUpdateOrderQty(item.id, localValue);
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              (e.target as HTMLInputElement).blur();
+                            }
+                          }}
+                          className="w-24 p-2 rounded-xl border text-center font-bold text-xs bg-transparent text-neutral-900 dark:text-white"
+                        />
+                        <span className="text-[10px] font-bold text-neutral-400 w-8">{item.unit}</span>
+                        <button 
+                          onClick={() => handleRemoveFromSavedList(item.id)}
+                          className="text-neutral-400 hover:text-red-500 hover:scale-110 transition-transform"
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
 
               {savedOrders.filter(o => o.listId === activeListId).length === 0 && (
                 <div className="text-center py-10 space-y-2">
@@ -1445,11 +1630,24 @@ export default function BumBumCafeStockApp() {
 
                 <div className="grid grid-cols-2 gap-2">
                   <div className="space-y-1">
+                    <label className="text-[9px] text-neutral-400 font-bold uppercase">Category (कैटेगरी)</label>
+                    <select
+                      value={formAddProduct.category}
+                      onChange={e => setFormAddProduct({ ...formAddProduct, category: e.target.value })}
+                      className="w-full p-2.5 rounded-xl border dark:bg-[#181818] font-bold"
+                    >
+                      {categories.map(cat => (
+                        <option key={cat} value={cat}>{cat}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="space-y-1">
                     <label className="text-[9px] text-neutral-400 font-bold uppercase">Unit (इकाई)</label>
                     <select 
                       value={formAddProduct.unit}
                       onChange={e => setFormAddProduct({ ...formAddProduct, unit: e.target.value })}
-                      className="w-full p-2.5 rounded-xl border dark:bg-neutral-800 font-bold"
+                      className="w-full p-2.5 rounded-xl border dark:bg-[#181818] font-bold"
                     >
                       <option value="Kg">Kg</option>
                       <option value="Ltr">Ltr</option>
@@ -1458,7 +1656,9 @@ export default function BumBumCafeStockApp() {
                       <option value="Tins">Tins</option>
                     </select>
                   </div>
+                </div>
 
+                <div className="grid grid-cols-2 gap-2">
                   <div className="space-y-1">
                     <label className="text-[9px] text-neutral-400 font-bold uppercase">Price (INR)</label>
                     <input 
@@ -1470,9 +1670,7 @@ export default function BumBumCafeStockApp() {
                       required
                     />
                   </div>
-                </div>
 
-                <div className="grid grid-cols-2 gap-2">
                   <div className="space-y-1">
                     <label className="text-[9px] text-neutral-400 font-bold uppercase">Initial Qty</label>
                     <input 
@@ -1482,6 +1680,9 @@ export default function BumBumCafeStockApp() {
                       className="w-full p-2.5 rounded-xl border dark:bg-neutral-800"
                     />
                   </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
                   <div className="space-y-1">
                     <label className="text-[9px] text-neutral-400 font-bold uppercase">Min Stock Limit</label>
                     <input 
@@ -1491,17 +1692,16 @@ export default function BumBumCafeStockApp() {
                       className="w-full p-2.5 rounded-xl border dark:bg-neutral-800"
                     />
                   </div>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-[9px] text-neutral-400 font-bold uppercase">Barcode (बारकोड)</label>
-                  <input 
-                    type="text" 
-                    placeholder="जैसे: EAN-13 नंबर या स्कैन कोड" 
-                    value={formAddProduct.barcode}
-                    onChange={e => setFormAddProduct({ ...formAddProduct, barcode: e.target.value })}
-                    className="w-full p-2.5 rounded-xl border dark:bg-neutral-800 font-mono"
-                  />
+                  <div className="space-y-1">
+                    <label className="text-[9px] text-neutral-400 font-bold uppercase">Barcode (बारकोड)</label>
+                    <input 
+                      type="text" 
+                      placeholder="EAN-13 या स्कैन कोड" 
+                      value={formAddProduct.barcode}
+                      onChange={e => setFormAddProduct({ ...formAddProduct, barcode: e.target.value })}
+                      className="w-full p-2.5 rounded-xl border dark:bg-neutral-800 font-mono"
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -1535,6 +1735,19 @@ export default function BumBumCafeStockApp() {
 
                 <div className="grid grid-cols-2 gap-2">
                   <div className="space-y-1">
+                    <label className="text-[9px] text-neutral-400 font-bold uppercase">Category</label>
+                    <select
+                      value={editingProduct.category || "OTHERS"}
+                      onChange={e => setEditingProduct({ ...editingProduct, category: e.target.value })}
+                      className="w-full p-2.5 rounded-xl border dark:bg-[#181818] font-bold"
+                    >
+                      {categories.map(cat => (
+                        <option key={cat} value={cat}>{cat}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="space-y-1">
                     <label className="text-[9px] text-neutral-400 font-bold uppercase">Unit</label>
                     <select 
                       value={editingProduct.unit}
@@ -1548,7 +1761,9 @@ export default function BumBumCafeStockApp() {
                       <option value="Tins">Tins</option>
                     </select>
                   </div>
+                </div>
 
+                <div className="grid grid-cols-2 gap-2">
                   <div className="space-y-1">
                     <label className="text-[9px] text-neutral-400 font-bold uppercase">Purchase Price (INR)</label>
                     <input 
@@ -1559,9 +1774,7 @@ export default function BumBumCafeStockApp() {
                       required
                     />
                   </div>
-                </div>
 
-                <div className="grid grid-cols-2 gap-2">
                   <div className="space-y-1">
                     <label className="text-[9px] text-neutral-400 font-bold uppercase">Min Stock Limit</label>
                     <input 
@@ -1572,33 +1785,24 @@ export default function BumBumCafeStockApp() {
                       required
                     />
                   </div>
-                  <div className="space-y-1">
-                    <label className="text-[9px] text-neutral-400 font-bold uppercase">Barcode</label>
-                    <input 
-                      type="text" 
-                      value={editingProduct.barcode || ""}
-                      onChange={e => setEditingProduct({ ...editingProduct, barcode: e.target.value })}
-                      className="w-full p-2.5 rounded-xl border dark:bg-neutral-800 font-mono"
-                    />
-                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[9px] text-neutral-400 font-bold uppercase">Barcode</label>
+                  <input 
+                    type="text" 
+                    value={editingProduct.barcode || ""}
+                    onChange={e => setEditingProduct({ ...editingProduct, barcode: e.target.value })}
+                    className="w-full p-2.5 rounded-xl border dark:bg-neutral-800 font-mono"
+                  />
                 </div>
               </div>
 
               <div className="flex gap-2 pt-2">
                 <button 
                   type="button" 
-                  onClick={async () => {
-                    const confirm = window.confirm(`क्या आप इस आइटम "${editingProduct.name}" को हमेशा के लिए डिलीट करना चाहते हैं?`);
-                    if (!confirm) return;
-                    try {
-                      await deleteDoc(doc(db, "godown_inventory", editingProduct.id));
-                      toastMessage("आइटम डिलीट कर दिया गया।");
-                      setEditingProduct(null);
-                    } catch {
-                      toastMessage("डिलीट करने में विफलता।", "error");
-                    }
-                  }}
-                  className="px-4 py-3 bg-red-100 text-red-600 rounded-xl font-bold text-xs uppercase"
+                  onClick={() => handleDeleteProduct(editingProduct.id, editingProduct.name)}
+                  className="px-4 py-3 bg-red-100 text-red-600 hover:bg-red-200 rounded-xl font-bold text-xs uppercase"
                 >
                   Delete
                 </button>
@@ -1636,8 +1840,6 @@ export default function BumBumCafeStockApp() {
               </div>
 
               <div className="space-y-3.5 text-xs">
-                
-                {/* Dynamic List Selection Dropdown */}
                 <div className="space-y-1">
                   <label className="text-[9px] text-neutral-400 font-bold uppercase">Select Existing List (मौजूदा लिस्ट चुनें)</label>
                   <select
@@ -1654,7 +1856,6 @@ export default function BumBumCafeStockApp() {
                   </select>
                 </div>
 
-                {/* Conditional Text Input if "Create New" is selected */}
                 {targetListId === "CREATE_NEW" && (
                   <motion.div 
                     initial={{ opacity: 0, y: -10 }}
@@ -1679,7 +1880,7 @@ export default function BumBumCafeStockApp() {
               <div className="pt-2">
                 <button
                   onClick={handleConfirmSaveToList}
-                  className="w-full py-3 bg-[#FF6B00] hover:bg-orange-600 text-white rounded-xl font-bold text-xs uppercase shadow-lg shadow-orange-500/10"
+                  className="w-full py-3 bg-[#FF6B00] hover:bg-orange-600 text-white rounded-xl font-bold text-xs uppercase shadow-lg"
                 >
                   Confirm & Save (सहेजें) ➔
                 </button>
@@ -1688,7 +1889,83 @@ export default function BumBumCafeStockApp() {
           </div>
         )}
 
-        {/* 6. ADD FIXED ASSET MODAL */}
+        {/* 6. OVERLAY/MODAL: SET BULK CATEGORY FOR SELECTED ITEMS */}
+        {showBulkCategoryModal && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[110] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className={`w-full max-w-sm rounded-[2rem] p-6 space-y-4 border ${
+                isDarkMode ? 'bg-[#0F0F0F] border-neutral-800 text-white' : 'bg-white border-neutral-100 text-neutral-900'
+              }`}
+            >
+              <div className="flex justify-between items-center border-b pb-2.5">
+                <div>
+                  <h3 className="text-xs font-black uppercase text-orange-500">Change Category</h3>
+                  <p className="text-[9px] text-neutral-400 font-bold uppercase mt-0.5">चुने हुए सामानों को कैटेगरी में डालें</p>
+                </div>
+                <button 
+                  type="button" 
+                  onClick={() => setShowBulkCategoryModal(false)} 
+                  className="p-1.5 bg-neutral-100 dark:bg-neutral-800 rounded-xl"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+
+              <div className="space-y-3.5 text-xs">
+                <div className="space-y-1">
+                  <label className="text-[9px] text-neutral-400 font-bold uppercase">Select Category (कैटेगरी चुनें)</label>
+                  <select
+                    value={bulkTargetCategory}
+                    onChange={e => setBulkTargetCategory(e.target.value)}
+                    className={`w-full p-2.5 rounded-xl border font-bold ${
+                      isDarkMode ? 'bg-neutral-900 border-neutral-800 text-white' : 'bg-white border-neutral-200 text-neutral-900'
+                    }`}
+                  >
+                    <option value="">-- चुनें --</option>
+                    {categories.map(cat => (
+                      <option key={cat} value={cat}>{cat}</option>
+                    ))}
+                    <option value="CREATE_NEW">-- + CREATE NEW CATEGORY (नई कैटेगरी) --</option>
+                  </select>
+                </div>
+
+                {bulkTargetCategory === "CREATE_NEW" && (
+                  <motion.div 
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="space-y-1"
+                  >
+                    <label className="text-[9px] text-neutral-400 font-bold uppercase">New Category Name (नई कैटेगरी का नाम)</label>
+                    <input 
+                      type="text"
+                      placeholder="जैसे: FROZEN FOOD"
+                      value={newCategoryInput}
+                      onChange={e => setNewCategoryInput(e.target.value)}
+                      className={`w-full p-2.5 rounded-xl border font-bold uppercase ${
+                        isDarkMode ? 'bg-neutral-950 border-neutral-800 text-white' : 'bg-white border-neutral-200 text-neutral-900'
+                      }`}
+                      required
+                    />
+                  </motion.div>
+                )}
+              </div>
+
+              <div className="pt-2">
+                <button
+                  onClick={handleConfirmBulkCategory}
+                  className="w-full py-3 bg-[#FF6B00] hover:bg-orange-600 text-white rounded-xl font-bold text-xs uppercase shadow-lg"
+                >
+                  Set Category (कैटेगरी लागू करें) ➔
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+
+        {/* 7. ADD FIXED ASSET MODAL */}
         {showAddAssetModal && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <motion.form onSubmit={handleAddAssetSubmit} initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className={`w-full max-w-sm rounded-3xl p-6 space-y-4 ${isDarkMode ? 'bg-neutral-900 text-white' : 'bg-white text-neutral-900'}`}>
