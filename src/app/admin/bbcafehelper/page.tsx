@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
@@ -217,6 +218,14 @@ export default function BumBumCafeStockApp() {
     } catch (e) {
       toastMessage("त्रुटि हुई।", "error");
     }
+  };
+
+  // Toggle Selection function
+  const handleToggleMultiSelect = (id: string) => {
+    triggerHaptic(10);
+    setSelectedItemIds(prev => 
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    );
   };
 
   // Submit Wastage Log
