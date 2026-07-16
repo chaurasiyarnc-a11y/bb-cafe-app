@@ -1018,8 +1018,8 @@ export default function BumBumCafeStockApp() {
               <p className="text-[10px] text-orange-100 uppercase font-black mt-0.5">गोदाम और किचन संचालन ट्रैक करें</p>
             </div>
 
-            {/* STICKY DATE RANGE SELECTOR BAR (Today, Yesterday, Week, Month, Year Order) */}
-            <div className={`sticky top-[64px] z-30 py-2.5 space-y-2 backdrop-blur-md ${isDarkMode ? 'bg-[#0E0E0E]/90' : 'bg-[#FAFAFA]/90'} border-b border-dashed ${isDarkMode ? 'border-neutral-800' : 'border-neutral-205'} flex items-center justify-between gap-1`}>
+            {/* STICKY DATE RANGE SELECTOR BAR */}
+            <div className={`sticky top-[64px] z-30 py-2.5 space-y-2 backdrop-blur-md ${isDarkMode ? 'bg-[#0E0E0E]/90' : 'bg-[#FAFAFA]/90'} border-b border-dashed ${isDarkMode ? 'border-neutral-800' : 'border-neutral-200'} flex items-center justify-between gap-1`}>
               <span className="text-[9px] font-black uppercase text-neutral-400 shrink-0">चुनें:</span>
               <div className="flex gap-1 flex-1 justify-end flex-wrap">
                 {([
@@ -1072,7 +1072,7 @@ export default function BumBumCafeStockApp() {
               </div>
             </div>
 
-            {/* CATEGORY-WISE STOCK VALUE DISPLAY (Catagiri bose dasbord amount) */}
+            {/* CATEGORY-WISE STOCK VALUE DISPLAY */}
             <div className="space-y-2.5">
               <h3 className="text-xs font-black uppercase text-neutral-400 tracking-wider px-1">Category-wise Stock Value</h3>
               <div className="grid grid-cols-2 gap-2">
@@ -1145,8 +1145,8 @@ export default function BumBumCafeStockApp() {
         {activeTab === 'store' && (
           <div className="space-y-4">
             
-            {/* STICKY SEARCH & CATEGORY SELECTOR - Flex-wrap wrapper instead of slider */}
-            <div className={`sticky top-[64px] z-30 py-2.5 space-y-2.5 backdrop-blur-md ${isDarkMode ? 'bg-[#0E0E0E]/90' : 'bg-[#FAFAFA]/90'} border-b border-dashed ${isDarkMode ? 'border-neutral-800' : 'border-neutral-150'}`}>
+            {/* STICKY SEARCH & CATEGORY SELECTOR */}
+            <div className={`sticky top-[64px] z-30 py-2.5 space-y-2.5 backdrop-blur-md ${isDarkMode ? 'bg-[#0E0E0E]/90' : 'bg-[#FAFAFA]/90'} border-b border-dashed ${isDarkMode ? 'border-neutral-800' : 'border-neutral-200'}`}>
               
               <div className="flex items-center gap-2">
                 <div className="relative flex-1">
@@ -1169,7 +1169,7 @@ export default function BumBumCafeStockApp() {
                 </button>
               </div>
 
-              {/* NON-SLIDER CATEGORIES GRID (Pills flow vertically with the layout) */}
+              {/* NON-SLIDER CATEGORIES GRID */}
               <div className="space-y-1.5">
                 <div className="flex justify-between items-center px-0.5">
                   <span className="text-[8px] font-black uppercase text-neutral-400 tracking-wider">क्लिक कर फ़िल्टर करें:</span>
@@ -1181,7 +1181,6 @@ export default function BumBumCafeStockApp() {
                   </button>
                 </div>
                 
-                {/* flex-wrap used (no horizontal slider carousel scroll) */}
                 <div className="flex flex-wrap gap-1.5 w-full">
                   <button
                     onClick={() => setSelectedCategoryFilter("All")}
@@ -1226,7 +1225,7 @@ export default function BumBumCafeStockApp() {
               <span>Showing {filteredInventory.length} of {inventory.length} total</span>
             </div>
 
-            {/* FLOATING ACTION BOTTOM BANNER FOR MULTI SELECT WITH TWO ACTIONS */}
+            {/* FLOATING ACTION BOTTOM BANNER FOR MULTI SELECT */}
             {isMultiSelectMode && selectedItemIds.length > 0 && (
               <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[100] w-full max-w-sm px-4">
                 <div className="bg-orange-600 text-white rounded-2xl p-4 shadow-2xl space-y-3 border border-orange-400/30">
@@ -1259,7 +1258,7 @@ export default function BumBumCafeStockApp() {
                         setBulkTargetCategory("");
                         setShowBulkCategoryModal(true);
                       }}
-                      className="py-2.5 bg-orange-850 border border-orange-400/50 hover:bg-orange-900 text-white font-black text-[10px] uppercase rounded-xl shadow-md active:scale-95 transition-all text-center flex items-center justify-center gap-1"
+                      className="py-2.5 bg-orange-950 border border-orange-450 hover:bg-orange-900 text-white font-black text-[10px] uppercase rounded-xl shadow-md active:scale-95 transition-all text-center flex items-center justify-center gap-1"
                     >
                       <Tag size={12} /> Set Category ➔
                     </button>
@@ -1310,7 +1309,6 @@ export default function BumBumCafeStockApp() {
                           )}
                         </div>
                         
-                        {/* Stock breakdown display */}
                         <div className="mt-1.5 flex items-center gap-3 text-[10px] font-bold uppercase text-neutral-400">
                           <span>📦 Godown: <span className="text-neutral-800 dark:text-neutral-200">{item.storeQty} {item.unit}</span></span>
                           <span>🍳 Kitchen: <span className="text-orange-500">{item.kitchenQty || 0} {item.unit}</span></span>
@@ -1318,10 +1316,8 @@ export default function BumBumCafeStockApp() {
                       </div>
                     </div>
 
-                    {/* Action panel underneath stock info */}
                     <div className="mt-3.5 pt-3 border-t border-dashed border-neutral-200 dark:border-neutral-800 flex items-center justify-between flex-wrap gap-2">
                       
-                      {/* Counter inputs to adjust storeQty */}
                       <div className="flex items-center gap-1.5">
                         <button onClick={(e) => { e.stopPropagation(); adjustQty(item.id, -1); }} className="p-1 bg-red-100 dark:bg-red-500/10 text-red-500 rounded-lg">
                           <MinusCircle size={14} />
@@ -1350,7 +1346,6 @@ export default function BumBumCafeStockApp() {
                         )}
                       </div>
 
-                      {/* Kitchen manual send and consume buttons */}
                       <div className="flex items-center gap-1.5">
                         <button 
                           onClick={(e) => {
@@ -1390,8 +1385,7 @@ export default function BumBumCafeStockApp() {
         {activeTab === 'fixed_assets' && (
           <div className="space-y-4">
             
-            {/* STICKY SEARCH & ADD ACTIONS */}
-            <div className={`sticky top-[64px] z-30 py-2.5 space-y-2.5 backdrop-blur-md ${isDarkMode ? 'bg-[#0E0E0E]/90' : 'bg-[#FAFAFA]/90'} border-b border-dashed ${isDarkMode ? 'border-neutral-800' : 'border-neutral-105'}`}>
+            <div className={`sticky top-[64px] z-30 py-2.5 space-y-2.5 backdrop-blur-md ${isDarkMode ? 'bg-[#0E0E0E]/90' : 'bg-[#FAFAFA]/90'} border-b border-dashed ${isDarkMode ? 'border-neutral-800' : 'border-neutral-200'}`}>
               <div className="flex justify-between items-center">
                 <div>
                   <h2 className="text-sm font-black text-orange-600 uppercase">Fixed Assets (स्थिर संपत्तियां)</h2>
@@ -1405,7 +1399,6 @@ export default function BumBumCafeStockApp() {
                 </button>
               </div>
 
-              {/* Search Assets */}
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" size={14} />
                 <input 
@@ -1418,7 +1411,6 @@ export default function BumBumCafeStockApp() {
               </div>
             </div>
 
-            {/* List of Fixed Assets */}
             <div className="space-y-2.5 max-h-[50vh] overflow-y-auto pr-1">
               {filteredAssets.map(asset => (
                 <div key={asset.id} className={`p-4 rounded-2xl border ${isDarkMode ? 'bg-[#181818] border-neutral-800' : 'bg-white border-neutral-100'}`}>
@@ -1467,11 +1459,10 @@ export default function BumBumCafeStockApp() {
           </div>
         )}
 
-        {/* ==================== TAB 4: ORDER TO SUPPLIER (DYNAMIC MULTI-LISTS TAB) ==================== */}
+        {/* ==================== TAB 4: ORDER TO SUPPLIER (SUPPLIER SHEET) ==================== */}
         {activeTab === 'saved_list' && (
           <div className="space-y-4">
             
-            {/* STICKY SELECT & RENAME CONTAINER */}
             <div className={`sticky top-[64px] z-30 py-2.5 space-y-2.5 backdrop-blur-md ${isDarkMode ? 'bg-[#0E0E0E]/90' : 'bg-[#FAFAFA]/90'} border-b border-dashed ${isDarkMode ? 'border-neutral-800' : 'border-neutral-100'}`}>
               <div className="bg-neutral-50 dark:bg-neutral-900/40 p-3 rounded-2xl border border-neutral-100 dark:border-neutral-800 space-y-3">
                 <div className="flex items-center gap-2">
@@ -1550,7 +1541,6 @@ export default function BumBumCafeStockApp() {
               </div>
             </div>
 
-            {/* List Table of Saved orders (Filtered by activeListId) */}
             <div className="space-y-3 max-h-[48vh] overflow-y-auto pr-1">
               {savedOrders
                 .filter(item => item.listId === activeListId)
@@ -1648,7 +1638,6 @@ export default function BumBumCafeStockApp() {
               </button>
             </div>
 
-            {/* List of Wastage logs */}
             <div className="space-y-2.5">
               {stockOutHistory.map(log => (
                 <div key={log.id} className={`p-4 rounded-2xl border ${isDarkMode ? 'bg-[#181818] border-neutral-800' : 'bg-white border-neutral-100'}`}>
@@ -1712,7 +1701,6 @@ export default function BumBumCafeStockApp() {
                 </button>
               </div>
 
-              {/* Add New Category inside Modal */}
               <div className="flex gap-1.5 items-center">
                 <input 
                   type="text" 
@@ -1731,7 +1719,6 @@ export default function BumBumCafeStockApp() {
                 </button>
               </div>
 
-              {/* List of Existing Categories */}
               <div className="space-y-1.5 max-h-[35vh] overflow-y-auto pr-1">
                 {categories.map(cat => (
                   <div 
@@ -1739,7 +1726,7 @@ export default function BumBumCafeStockApp() {
                     className={`flex items-center justify-between p-2.5 rounded-xl border text-xs font-bold ${
                       cat.hidden 
                         ? 'opacity-40 border-dashed border-neutral-300 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-950/20' 
-                        : isDarkMode ? 'bg-neutral-900/60 border-neutral-850' : 'bg-neutral-50 border-neutral-100'
+                        : isDarkMode ? 'bg-neutral-900/60 border-neutral-800' : 'bg-neutral-50 border-neutral-100'
                     }`}
                   >
                     <span className="uppercase">{cat.name} {cat.hidden && "(Hidden)"}</span>
@@ -2157,7 +2144,7 @@ export default function BumBumCafeStockApp() {
           </div>
         )}
 
-        {/* 7. OVERLAY/MODAL: SET BULK CATEGORY FOR SELECTED ITEMS */}
+        {/* 7. OVERLAY/MODAL: SET BULK CATEGORY */}
         {showBulkCategoryModal && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[110] flex items-center justify-center p-4">
             <motion.div 
@@ -2321,10 +2308,85 @@ export default function BumBumCafeStockApp() {
           </div>
         )}
 
+        {/* 9. SUPPLIER ORDER MODAL (MISSING POPUP SAVED TO LIST) */}
+        {showSaveToListModal && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[110] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className={`w-full max-w-sm rounded-[2rem] p-6 space-y-4 border ${
+                isDarkMode ? 'bg-[#0F0F0F] border-neutral-800 text-white' : 'bg-white border-neutral-100 text-neutral-900'
+              }`}
+            >
+              <div className="flex justify-between items-center border-b pb-2.5">
+                <div>
+                  <h3 className="text-xs font-black uppercase text-orange-500">Save to Supplier Order</h3>
+                  <p className="text-[9px] text-neutral-400 font-bold uppercase mt-0.5">चुने हुए सामानों को लिस्ट में जोड़ें</p>
+                </div>
+                <button 
+                  type="button" 
+                  onClick={() => setShowSaveToListModal(false)} 
+                  className="p-1.5 bg-neutral-100 dark:bg-neutral-800 rounded-xl"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+
+              <div className="space-y-3.5 text-xs">
+                <div className="space-y-1">
+                  <label className="text-[9px] text-neutral-400 font-bold uppercase">Choose Order List (ऑर्डर लिस्ट चुनें)</label>
+                  <select
+                    value={targetListId}
+                    onChange={e => setTargetListId(e.target.value)}
+                    className={`w-full p-2.5 rounded-xl border font-bold ${
+                      isDarkMode ? 'bg-neutral-900 border-neutral-800 text-white' : 'bg-white border-neutral-200 text-neutral-900'
+                    }`}
+                  >
+                    {orderLists.map(list => (
+                      <option key={list.id} value={list.id}>{list.name}</option>
+                    ))}
+                    <option value="CREATE_NEW">-- + CREATE NEW ORDER LIST (नई लिस्ट बनाएं) --</option>
+                  </select>
+                </div>
+
+                {targetListId === "CREATE_NEW" && (
+                  <motion.div 
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="space-y-1"
+                  >
+                    <label className="text-[9px] text-neutral-400 font-bold uppercase">New List Name (नया लिस्ट नाम)</label>
+                    <input 
+                      type="text"
+                      placeholder="जैसे: WEEKLY MAIN ORDER"
+                      value={newListNameInput}
+                      onChange={e => setNewListNameInput(e.target.value)}
+                      className={`w-full p-2.5 rounded-xl border font-bold uppercase ${
+                        isDarkMode ? 'bg-neutral-950 border-neutral-800 text-white' : 'bg-white border-neutral-200 text-neutral-900'
+                      }`}
+                      required
+                    />
+                  </motion.div>
+                )}
+              </div>
+
+              <div className="pt-2">
+                <button
+                  onClick={handleConfirmSaveToList}
+                  className="w-full py-3 bg-[#FF6B00] hover:bg-orange-600 text-white rounded-xl font-bold text-xs uppercase shadow-lg"
+                >
+                  Confirm & Generate Sheet (लिस्ट में सहेजें) ➔
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+
       </AnimatePresence>
 
       {/* PREMIUM BOTTOM NAVIGATION */}
-      <nav className={`fixed bottom-0 left-0 right-0 z-50 border-t backdrop-blur-md ${isDarkMode ? 'bg-black/90 border-neutral-800 text-white' : 'bg-white/90 border-neutral-100 text-neutral-850'}`}>
+      <nav className={`fixed bottom-0 left-0 right-0 z-50 border-t backdrop-blur-md ${isDarkMode ? 'bg-black/90 border-neutral-800 text-white' : 'bg-white/90 border-neutral-100 text-neutral-900'}`}>
         <div className="max-w-md mx-auto grid grid-cols-5 gap-0.5 py-1.5 text-center text-[8px] font-black uppercase">
           <button onClick={() => { setActiveTab('home'); setIsMultiSelectMode(false); }} className={`flex flex-col items-center justify-center py-1 ${activeTab === 'home' ? 'text-[#FF6B00]' : 'text-neutral-400'}`}>
             <Home size={15} /> <span className="mt-0.5">Home</span>
