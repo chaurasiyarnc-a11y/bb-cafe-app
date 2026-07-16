@@ -5,7 +5,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   Home, Store, Trash2, Search, Plus, X, BarChart3, 
-  PlusCircle, MinusCircle, ChevronRight, Sparkles, AlertTriangle, Printer, Edit, Layers, MessageCircle, Wrench, Tag, Eye, EyeOff, Settings, Utensils
+  PlusCircle, MinusCircle, ChevronRight, Sparkles, AlertTriangle, Printer, Edit, Layers, MessageCircle, Wrench, Tag, Eye, EyeOff, Settings, Calendar, Lock, UserPlus
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -18,7 +18,7 @@ interface InventoryItem {
   id: string;
   name: string;
   storeQty: number;
-  kitchenQty: number; // Kitchen Current Stock
+  kitchenQty: number; 
   unit: string;
   purchasePrice: number;
   minLimit: number;
@@ -60,7 +60,7 @@ interface OrderListMeta {
 }
 
 interface SavedOrderItem {
-  id: string; // compound: itemId_listId
+  id: string; 
   itemId: string;
   listId: string;
   name: string;
@@ -79,13 +79,19 @@ interface FixedAsset {
   remarks?: string;
 }
 
+interface UserPin {
+  id: string;
+  name: string;
+  pin: string;
+  role: 'admin' | 'staff';
+}
+
 const triggerHaptic = (ms = 35) => {
   if (typeof window !== 'undefined' && window.navigator && window.navigator.vibrate) {
     window.navigator.vibrate(ms);
   }
 };
 
-// Safe Local Date String Generator to avoid UTC rollover bugs
 const getLocalDateString = (offsetDays = 0) => {
   const d = new Date();
   d.setDate(d.getDate() - offsetDays);
@@ -117,8 +123,26 @@ export default function BumBumCafeStockApp() {
   const [editedQties, setEditedQties] = useState<Record<string, string | number>>({});
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
 
-  // Dashboard date filter state (today, yesterday, week, month, year)
-  const [dashboardDateRange, setDashboardDateRange] = useState<'today' | 'yesterday' | 'week' | 'month' | 'year'>('today');
+  // Users & PIN Authentication system
+  const [users, setUsers] = useState<UserPin[]>([]);
+  const [currentUser, setCurrentUser] = useState<UserPin | null>(null);
+  const [pinInput, setPinInput] = useState<string>("");
+  const [authError, setAuthError] = useState<string>("");
+  const [showAdminPanel, setShowAdminPanel] = useState<boolean>(false);
+  const [newUserForm, setNewUserForm] = useState({ name: '', pin: '', role: 'staff' as 'admin' | 'staff' });
+
+  // Delete Action Protection states
+  const [deleteConfirmation, setDeleteConfirmation] = useState<{
+    message: string;
+    action: () => void;
+  } | null>(null);
+  const [deletePinInput, setDeletePinInput] = useState<string>("");
+  const [deletePinError, setDeletePinError] = useState<string>("");
+
+  // Dashboard date filter state
+  const [dashboardDateRange, setDashboardDateRange] = useState<'today' | 'yesterday' | 'week' | 'month' | 'year' | 'custom'>('today');
+  const [startDate, setStartDate] = useState<string>(getLocalDateString(6)); // Default 1 week ago
+  const [endDate, setEndDate] = useState<string>(getLocalDateString(0));     // Default today
 
   // Buffer state to prevent excessive Firestore writes while typing order quantities
   const [localOrderQties, setLocalOrderQties] = useState<Record<string, string>>({});
@@ -199,6 +223,21 @@ export default function BumBumCafeStockApp() {
 
   // Static Listeners
   useEffect(() => {
+    // Sync Users & PIN config
+    const unsubUsers = onSnapshot(collection(db, "cafe_users"), (snap) => {
+      if (snap.empty) {
+        // Seed default Admin User (Admin PIN: 1234)
+        setDoc(doc(db, "cafe_users", "admin_default"), {
+          id: "admin_default",
+          name: "ADMIN",
+          pin: "1234",
+          role: "admin"
+        });
+      } else {
+        setUsers(snap.docs.map(d => ({ id: d.id, ...d.data() } as UserPin)));
+      }
+    }, (err) => console.error("Users load error", err));
+
     const unsubInventory = onSnapshot(collection(db, "godown_inventory"), (snap) => {
       setInventory(snap.docs.map(d => ({ 
         id: d.id, 
@@ -236,6 +275,7 @@ export default function BumBumCafeStockApp() {
     }, (err) => console.error("Fixed assets load error", err));
 
     return () => {
+      unsubUsers();
       unsubInventory();
       unsubCategories();
       unsubStockIns();
@@ -272,6 +312,93 @@ export default function BumBumCafeStockApp() {
     }
   }, [showSaveToListModal, orderLists, activeListId, targetListId]);
 
+  // User Authentication Logic
+  const handleLoginSubmit = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const matched = users.find(u => u.pin === pinInput.trim());
+    if (matched) {
+      setCurrentUser(matched);
+      setPinInput("");
+      setAuthError("");
+      toastMessage(`स्वागत है, ${matched.name}!`, 'success');
+    } else {
+      setAuthError("गलत पिन! कृपया पुनः प्रयास करें।");
+      triggerHaptic(60);
+    }
+  };
+
+  // Safe deletion validation wrapper
+  const confirmDeleteWithPin = (message: string, actionToExecute: () => void) => {
+    setDeleteConfirmation({
+      message,
+      action: actionToExecute
+    });
+    setDeletePinInput("");
+    setDeletePinError("");
+  };
+
+  const handleDeleteVerificationSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    // Verify PIN against valid users list
+    const matched = users.find(u => u.pin === deletePinInput.trim());
+    if (matched) {
+      if (deleteConfirmation) {
+        deleteConfirmation.action();
+      }
+      setDeleteConfirmation(null);
+      setDeletePinInput("");
+      setDeletePinError("");
+    } else {
+      setDeletePinError("गलत सुरक्षा पिन! डिलीट करने की अनुमति नहीं है।");
+      triggerHaptic(65);
+    }
+  };
+
+  // Admin Pin Management methods
+  const handleAddNewUserSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newUserForm.name || !newUserForm.pin) {
+      toastMessage("सभी फ़ील्ड भरें!", "error");
+      return;
+    }
+    try {
+      const uId = `user_${Date.now()}`;
+      await setDoc(doc(db, "cafe_users", uId), {
+        id: uId,
+        name: newUserForm.name.toUpperCase().trim(),
+        pin: newUserForm.pin.trim(),
+        role: newUserForm.role
+      });
+      toastMessage("नया यूजर/पिन सहेजा गया!");
+      setNewUserForm({ name: '', pin: '', role: 'staff' });
+    } catch {
+      toastMessage("सहेजने में विफलता।", "error");
+    }
+  };
+
+  const handleUpdateUserPin = async (userId: string, newPin: string) => {
+    if (!newPin.trim()) return;
+    try {
+      await setDoc(doc(db, "cafe_users", userId), { pin: newPin.trim() }, { merge: true });
+      toastMessage("पिन बदल दिया गया!");
+    } catch {
+      toastMessage("अपडेट करने में असमर्थ।", "error");
+    }
+  };
+
+  const handleRemoveUser = async (userId: string) => {
+    if (userId === "admin_default") {
+      toastMessage("डिफ़ॉल्ट एडमिन को हटाया नहीं जा सकता!", "error");
+      return;
+    }
+    try {
+      await deleteDoc(doc(db, "cafe_users", userId));
+      toastMessage("यूज़र को हटाया गया।");
+    } catch {
+      toastMessage("हटाने में असमर्थ।", "error");
+    }
+  };
+
   // Calculations & Date-Filtered Analytics
   const getFilteredLedgerStats = useMemo(() => {
     const todayStr = getLocalDateString(0);
@@ -281,8 +408,8 @@ export default function BumBumCafeStockApp() {
     const now = new Date();
     const currentYear = now.getFullYear();
     const currentMonth = String(now.getMonth() + 1).padStart(2, '0');
-    const monthPrefix = `${currentYear}-${currentMonth}`; // e.g. "2026-07"
-    const yearPrefix = `${currentYear}`; // e.g. "2026"
+    const monthPrefix = `${currentYear}-${currentMonth}`; 
+    const yearPrefix = `${currentYear}`; 
 
     let filterFn = (dateStr: string) => dateStr === todayStr;
 
@@ -294,17 +421,16 @@ export default function BumBumCafeStockApp() {
       filterFn = (dateStr: string) => dateStr.startsWith(monthPrefix);
     } else if (dashboardDateRange === 'year') {
       filterFn = (dateStr: string) => dateStr.startsWith(yearPrefix);
+    } else if (dashboardDateRange === 'custom') {
+      filterFn = (dateStr: string) => dateStr >= startDate && dateStr <= endDate;
     }
 
-    // 1. Stock Inward (Maal Aaya)
     const matchedInward = stockInHistory.filter(log => filterFn(log.date));
     const totalInwardQty = matchedInward.reduce((sum, log) => sum + log.qty, 0);
 
-    // 2. Kitchen Sent Out (Kitchen Gaya)
     const matchedKitchen = stockOutHistory.filter(log => log.purpose === "Kitchen Use" && filterFn(log.date));
     const totalKitchenQty = matchedKitchen.reduce((sum, log) => sum + log.qty, 0);
 
-    // 3. Wastage loss
     const matchedWasteLogs = stockOutHistory.filter(log => (log.purpose === "Waste" || log.purpose === "Damage") && filterFn(log.date));
     const totalWasteLoss = matchedWasteLogs.reduce((sum, log) => sum + (log.financialLoss || 0), 0);
 
@@ -316,21 +442,20 @@ export default function BumBumCafeStockApp() {
       matchedKitchen,
       matchedWasteLogs
     };
-  }, [dashboardDateRange, stockInHistory, stockOutHistory]);
+  }, [dashboardDateRange, startDate, endDate, stockInHistory, stockOutHistory]);
 
   // Static general stock metrics
   const stats = useMemo(() => {
     const totalVal = inventory.reduce((sum, item) => sum + (item.storeQty * item.purchasePrice), 0);
     const lowCount = inventory.filter(item => item.storeQty < item.minLimit).length;
     
-    // Total calculation for Fixed Assets
     const totalFixedQty = fixedAssets.reduce((sum, asset) => sum + (asset.quantity || 0), 0);
     const totalFixedVal = fixedAssets.reduce((sum, asset) => sum + ((asset.quantity || 1) * (asset.cost || 0)), 0);
 
     return { totalVal, lowCount, totalFixedQty, totalFixedVal };
   }, [inventory, fixedAssets]);
 
-  // CATEGORY-WISE STOCK VALUE CALCULATIONS
+  // Category-wise stock calculations
   const categoryStockValues = useMemo(() => {
     const values: Record<string, number> = {};
     inventory.forEach(item => {
@@ -341,7 +466,7 @@ export default function BumBumCafeStockApp() {
     return values;
   }, [inventory]);
 
-  // Combined chronologic flow ledger (Inward + Kitchen flow timeline)
+  // Combined timeline flow
   const stockFlowTimeline = useMemo(() => {
     const list: { id: string; name: string; qty: number; unit: string; type: 'IN' | 'OUT'; date: string; remarks?: string }[] = [];
     
@@ -374,7 +499,6 @@ export default function BumBumCafeStockApp() {
     return list.sort((a, b) => b.date.localeCompare(a.date));
   }, [getFilteredLedgerStats, inventory]);
 
-  // Filter Categories to only show visible (unhidden) in selection
   const visibleCategories = useMemo(() => {
     return categories.filter(c => !c.hidden);
   }, [categories]);
@@ -400,7 +524,6 @@ export default function BumBumCafeStockApp() {
     );
   }, [fixedAssets, searchQuery]);
 
-  // Adjust stock quantity in list safely
   const adjustQty = (id: string, diff: number) => {
     triggerHaptic();
     const item = inventory.find(i => i.id === id);
@@ -420,11 +543,8 @@ export default function BumBumCafeStockApp() {
     }
     try {
       const originalItem = inventory.find(i => i.id === id);
-      
-      // Perform write to Godown Stock
       await setDoc(doc(db, "godown_inventory", id), { storeQty: updated }, { merge: true });
 
-      // Automatically trace and log "Maal Inward" if stock increased manually
       if (originalItem && updated > originalItem.storeQty) {
         const diff = updated - originalItem.storeQty;
         const logId = `in_${id}_${Date.now()}`;
@@ -445,7 +565,6 @@ export default function BumBumCafeStockApp() {
     }
   };
 
-  // Toggle Selection function
   const handleToggleMultiSelect = (id: string) => {
     triggerHaptic(10);
     setSelectedItemIds(prev => 
@@ -453,7 +572,6 @@ export default function BumBumCafeStockApp() {
     );
   };
 
-  // SAVE SELECTED ITEMS TO CHOSEN / NEW DATABASE ORDER LIST
   const handleConfirmSaveToList = async () => {
     triggerHaptic();
     if (selectedItemIds.length === 0) return;
@@ -514,7 +632,6 @@ export default function BumBumCafeStockApp() {
     }
   };
 
-  // MASS ASSIGN BULK CATEGORY LOGIC
   const handleConfirmBulkCategory = async () => {
     triggerHaptic();
     if (selectedItemIds.length === 0) return;
@@ -554,7 +671,6 @@ export default function BumBumCafeStockApp() {
     }
   };
 
-  // CATEGORY OPERATIONS PANEL HANDLERS
   const handleAddNewCategoryInModal = async () => {
     if (!addCategoryModalInput.trim()) {
       toastMessage("कैटेगरी का नाम दर्ज करें!", "error");
@@ -580,18 +696,18 @@ export default function BumBumCafeStockApp() {
     }
   };
 
-  const handleRemoveCategory = async (cat: CategoryItem) => {
-    const confirm = window.confirm(`क्या आप सच में "${cat.name}" कैटेगरी को हटाना चाहते हैं?`);
-    if (!confirm) return;
-    try {
-      await deleteDoc(doc(db, "categories", cat.id));
-      toastMessage("कैटेगरी हटा दी गई।");
-    } catch {
-      toastMessage("कैटेगरी हटाने में विफलता।", "error");
-    }
+  // PIN Protected Category Removal
+  const handleRemoveCategory = (cat: CategoryItem) => {
+    confirmDeleteWithPin(`क्या आप सच में "${cat.name}" कैटेगरी को हटाना चाहते हैं?`, async () => {
+      try {
+        await deleteDoc(doc(db, "categories", cat.id));
+        toastMessage("कैटेगरी हटा दी गई।");
+      } catch {
+        toastMessage("कैटेगरी हटाने में विफलता।", "error");
+      }
+    });
   };
 
-  // KITCHEN TRANSFERS AND CONSUMPTION SUBMITS
   const handleTransferToKitchenSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!transferItem || !transferQtyInput) return;
@@ -611,13 +727,11 @@ export default function BumBumCafeStockApp() {
       const batch = writeBatch(db);
       const itemRef = doc(db, "godown_inventory", transferItem.id);
       
-      // Deduct from godown, add to kitchen
       batch.set(itemRef, {
         storeQty: increment(-qty),
         kitchenQty: increment(qty)
       }, { merge: true });
 
-      // Save a trace log
       const logRef = doc(collection(db, "stock_out_history"));
       batch.set(logRef, {
         id: logRef.id,
@@ -659,12 +773,10 @@ export default function BumBumCafeStockApp() {
       const batch = writeBatch(db);
       const itemRef = doc(db, "godown_inventory", consumeItem.id);
 
-      // Deduct from kitchen qty
       batch.set(itemRef, {
         kitchenQty: increment(-qty)
       }, { merge: true });
 
-      // Save as Kitchen Use / Consumption Log
       const logRef = doc(collection(db, "stock_out_history"));
       batch.set(logRef, {
         id: logRef.id,
@@ -688,7 +800,6 @@ export default function BumBumCafeStockApp() {
     }
   };
 
-  // Commit dynamic Order Quantity safely on Blur or Enter key
   const handleUpdateOrderQty = async (compoundId: string, qty: string) => {
     try {
       await setDoc(doc(db, "saved_orders", compoundId), { orderQty: qty }, { merge: true });
@@ -697,7 +808,6 @@ export default function BumBumCafeStockApp() {
     }
   };
 
-  // Rename Order List Name
   const handleUpdateListName = async (newName: string) => {
     if (!newName.trim() || !activeListId) return;
     try {
@@ -708,40 +818,41 @@ export default function BumBumCafeStockApp() {
     }
   };
 
-  // Delete Individual Saved item
-  const handleRemoveFromSavedList = async (compoundId: string) => {
+  // PIN Protected single saved item deletion
+  const handleRemoveFromSavedList = (compoundId: string, name: string) => {
     triggerHaptic();
-    try {
-      await deleteDoc(doc(db, "saved_orders", compoundId));
-    } catch {
-      toastMessage("हटाने में त्रुटि हुई।", "error");
-    }
+    confirmDeleteWithPin(`क्या आप इस लिस्ट आइटम "${name}" को हटाना चाहते हैं?`, async () => {
+      try {
+        await deleteDoc(doc(db, "saved_orders", compoundId));
+        toastMessage("लिस्ट से सामान हटाया गया।");
+      } catch {
+        toastMessage("हटाने में त्रुटि हुई।", "error");
+      }
+    });
   };
 
-  // Clear/Delete entire Order List
-  const handleDeleteActiveList = async () => {
+  // PIN Protected complete list deletion
+  const handleDeleteActiveList = () => {
     triggerHaptic();
     if (!activeListId) return;
-    const confirm = window.confirm("क्या आप इस पूरी लिस्ट को डिलीट करना चाहते हैं? इसमें मौजूद सभी सामान हटा दिए जायेंगे।");
-    if (!confirm) return;
+    confirmDeleteWithPin("क्या आप इस पूरी लिस्ट को हमेशा के लिए डिलीट करना चाहते हैं?", async () => {
+      try {
+        const batch = writeBatch(db);
+        const itemsToDelete = savedOrders.filter(o => o.listId === activeListId);
+        itemsToDelete.forEach(item => {
+          batch.delete(doc(db, "saved_orders", item.id));
+        });
+        batch.delete(doc(db, "order_lists", activeListId));
+        await batch.commit();
 
-    try {
-      const batch = writeBatch(db);
-      const itemsToDelete = savedOrders.filter(o => o.listId === activeListId);
-      itemsToDelete.forEach(item => {
-        batch.delete(doc(db, "saved_orders", item.id));
-      });
-      batch.delete(doc(db, "order_lists", activeListId));
-      await batch.commit();
-
-      setActiveListId("");
-      toastMessage("लिस्ट डिलीट कर दी गई!");
-    } catch {
-      toastMessage("डिलीट करने में त्रुटि हुई।", "error");
-    }
+        setActiveListId("");
+        toastMessage("लिस्ट हमेशा के लिए डिलीट कर दी गई!");
+      } catch {
+        toastMessage("डिलीट करने में त्रुटि हुई।", "error");
+      }
+    });
   };
 
-  // Add Product Submit
   const handleAddProductSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formAddProduct.name) {
@@ -764,7 +875,6 @@ export default function BumBumCafeStockApp() {
       };
       await setDoc(doc(db, "godown_inventory", customId), payload);
 
-      // Log automatically as initial Inward Maal
       if (payload.storeQty > 0) {
         await setDoc(doc(db, "stock_in_history", `in_${customId}`), {
           id: `in_${customId}`,
@@ -772,11 +882,11 @@ export default function BumBumCafeStockApp() {
           itemId: payload.id,
           qty: payload.storeQty,
           date: getLocalDateString(0),
-          remarks: "नया उत्पाद (प्रारंभिक स्टॉक आवक)"
+          remarks: "नया उत्पाद (प्रारंभिक आवक)"
         });
       }
 
-      toastMessage("नया सामान सफलतापूर्वक दर्ज हुआ!");
+      toastMessage("नया सामान सहेजा गया!");
       setShowAddProductModal(false);
       setFormAddProduct({ name: '', storeQty: '0', kitchenQty: '0', unit: 'Kg', purchasePrice: '', minLimit: '10', category: 'OTHERS' });
     } catch {
@@ -784,7 +894,6 @@ export default function BumBumCafeStockApp() {
     }
   };
 
-  // Add Fixed Asset Submit
   const handleAddAssetSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formAddAsset.name) {
@@ -811,20 +920,19 @@ export default function BumBumCafeStockApp() {
     }
   };
 
-  // Delete Fixed Asset
-  const handleDeleteAsset = async (id: string, name: string) => {
+  // PIN Protected Asset Deletion
+  const handleDeleteAsset = (id: string, name: string) => {
     triggerHaptic();
-    const confirm = window.confirm(`क्या आप इस एसेट "${name}" को हमेशा के लिए डिलीट करना चाहते हैं?`);
-    if (!confirm) return;
-    try {
-      await deleteDoc(doc(db, "fixed_assets", id));
-      toastMessage("एसेट सफलतापूर्वक हटा दिया गया!");
-    } catch {
-      toastMessage("हटाने में विफलता।", "error");
-    }
+    confirmDeleteWithPin(`क्या आप इस एसेट "${name}" को डिलीट करना चाहते हैं?`, async () => {
+      try {
+        await deleteDoc(doc(db, "fixed_assets", id));
+        toastMessage("एसेट सफलतापूर्वक हटा दिया गया!");
+      } catch {
+        toastMessage("हटाने में विफलता।", "error");
+      }
+    });
   };
 
-  // Edit Product Submit
   const handleEditProductSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingProduct) return;
@@ -837,27 +945,26 @@ export default function BumBumCafeStockApp() {
     }
   };
 
-  // Safe Cascade Delete Product Function
-  const handleDeleteProduct = async (id: string, name: string) => {
+  // PIN Protected Inventory Product Deletion
+  const handleDeleteProduct = (id: string, name: string) => {
     triggerHaptic();
-    const confirm = window.confirm(`क्या आप सच में इस आइटम "${name}" को हमेशा के लिए डिलीट करना चाहते हैं? इससे इसके सहेजे गए ऑर्डर्स भी डिलीट हो जायेंगे।`);
-    if (!confirm) return;
-    try {
-      const batch = writeBatch(db);
-      batch.delete(doc(db, "godown_inventory", id));
-      const relatedOrders = savedOrders.filter(o => o.itemId === id);
-      relatedOrders.forEach(order => {
-        batch.delete(doc(db, "saved_orders", order.id));
-      });
-      await batch.commit();
-      toastMessage("आइटम सफलतापूर्वक हटा दिया गया!");
-      setEditingProduct(null);
-    } catch {
-      toastMessage("हटाने में विफलता।", "error");
-    }
+    confirmDeleteWithPin(`क्या आप सच में इस आइटम "${name}" को हमेशा के लिए डिलीट करना चाहते हैं? इससे सभी संबंधित ऑर्डर्स भी डिलीट हो जायेंगे।`, async () => {
+      try {
+        const batch = writeBatch(db);
+        batch.delete(doc(db, "godown_inventory", id));
+        const relatedOrders = savedOrders.filter(o => o.itemId === id);
+        relatedOrders.forEach(order => {
+          batch.delete(doc(db, "saved_orders", order.id));
+        });
+        await batch.commit();
+        toastMessage("आइटम सफलतापूर्वक हटा दिया गया!");
+        setEditingProduct(null);
+      } catch {
+        toastMessage("हटाने में विफलता।", "error");
+      }
+    });
   };
 
-  // Submit Wastage Log
   const handleWasteSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formStockOut.item || !formStockOut.quantity) {
@@ -898,7 +1005,6 @@ export default function BumBumCafeStockApp() {
     }
   };
 
-  // Direct print compiled saved orders list
   const handlePrintSavedList = () => {
     const printWindow = window.open('', '_blank', 'width=600,height=800');
     if (!printWindow) {
@@ -941,7 +1047,6 @@ export default function BumBumCafeStockApp() {
     printWindow.document.close();
   };
 
-  // WHATSAPP SHARE GENERATOR
   const handleWhatsAppShare = () => {
     triggerHaptic();
     if (!activeListId) return;
@@ -977,6 +1082,40 @@ export default function BumBumCafeStockApp() {
     return list ? list.name : "BUM BUM CAFE ORDER SHEET";
   }, [orderLists, activeListId]);
 
+  // Lockscreen Screen overlay if NOT Authenticated
+  if (!currentUser) {
+    return (
+      <div className={`min-h-screen flex items-center justify-center p-4 ${isDarkMode ? 'bg-black text-white' : 'bg-neutral-50 text-neutral-900'}`}>
+        <div className="w-full max-w-sm p-8 rounded-[2.5rem] border shadow-2xl bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800 space-y-6 text-center">
+          <div className="space-y-2">
+            <span className="text-5xl block animate-pulse">🔒</span>
+            <h2 className="text-xl font-black text-orange-600 uppercase tracking-widest">BUM BUM CAFE</h2>
+            <p className="text-[10px] text-neutral-400 font-bold uppercase tracking-wider">आगे बढ़ने के लिए अपना पिन दर्ज करें</p>
+          </div>
+
+          <form onSubmit={handleLoginSubmit} className="space-y-4">
+            <input
+              type="password"
+              maxLength={6}
+              placeholder="ENTER PIN"
+              value={pinInput}
+              onChange={e => setPinInput(e.target.value)}
+              className="w-full text-center text-3xl tracking-[0.5em] font-black p-4 rounded-2xl border bg-neutral-50 dark:bg-neutral-800 border-neutral-300 dark:border-neutral-700 focus:outline-none focus:ring-2 focus:ring-orange-500"
+              autoFocus
+            />
+            {authError && <p className="text-xs text-red-500 font-bold">{authError}</p>}
+            <button
+              type="submit"
+              className="w-full py-4 bg-orange-500 hover:bg-orange-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow transition-all active:scale-98"
+            >
+              सत्यापित करें (Unlock) ➔
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={`min-h-screen ${isDarkMode ? 'bg-[#0E0E0E]' : 'bg-[#FAFAFA]'} pb-24 font-sans relative ${isDarkMode ? 'text-white' : 'text-neutral-900'}`}>
       
@@ -989,16 +1128,36 @@ export default function BumBumCafeStockApp() {
         )}
       </AnimatePresence>
 
-      {/* HEADER - Fixed Height: h-16 (64px) */}
+      {/* HEADER */}
       <header className={`sticky top-0 z-40 h-16 border-b px-4 backdrop-blur-md ${isDarkMode ? 'bg-black/80 border-neutral-800' : 'bg-white/80 border-neutral-100'} flex items-center justify-between`}>
         <div className="flex items-center gap-2">
           <span className="text-2xl">☕</span>
           <div>
             <h1 className="text-xs font-black text-orange-600 tracking-wider">BUM BUM CAFE</h1>
-            <p className="text-[9px] text-neutral-400 font-bold uppercase">Godown Control</p>
+            <p className="text-[9px] text-neutral-400 font-bold uppercase">Welcome, {currentUser.name}</p>
           </div>
         </div>
+        
         <div className="flex items-center gap-1.5">
+          {currentUser.role === 'admin' && (
+            <button 
+              onClick={() => setShowAdminPanel(true)} 
+              className="p-2 bg-neutral-100 dark:bg-neutral-800 rounded-xl text-xs flex items-center gap-1 text-orange-500"
+              title="Manage Users & PINs"
+            >
+              <Settings size={14} />
+              <span className="hidden xs:inline text-[9px] font-black uppercase">पिन प्रबंधन</span>
+            </button>
+          )}
+
+          <button 
+            onClick={() => { setCurrentUser(null); toastMessage("सफलतापूर्वक लॉगआउट!"); }} 
+            className="p-2 bg-red-100 dark:bg-red-950/40 text-red-600 rounded-xl text-xs"
+            title="Lock App"
+          >
+            <Lock size={13} />
+          </button>
+
           <button onClick={() => setIsDarkMode(!isDarkMode)} className="p-2 bg-neutral-100 dark:bg-neutral-800 rounded-xl text-xs">
             {isDarkMode ? '☀️' : '🌙'}
           </button>
@@ -1011,37 +1170,58 @@ export default function BumBumCafeStockApp() {
         {/* ==================== TAB 1: HOME / DASHBOARD ==================== */}
         {activeTab === 'home' && (
           <div className="space-y-4">
-            
-            {/* Minimal Dynamic Header Card */}
-            <div className="bg-gradient-to-tr from-orange-500 to-amber-500 rounded-3xl p-5 text-white shadow-lg">
-              <h2 className="text-sm font-black uppercase tracking-wider">BumBum Dashboard</h2>
-              <p className="text-[10px] text-orange-100 uppercase font-black mt-0.5">गोदाम और किचन संचालन ट्रैक करें</p>
-            </div>
 
             {/* STICKY DATE RANGE SELECTOR BAR */}
-            <div className={`sticky top-[64px] z-30 py-2.5 space-y-2 backdrop-blur-md ${isDarkMode ? 'bg-[#0E0E0E]/90' : 'bg-[#FAFAFA]/90'} border-b border-dashed ${isDarkMode ? 'border-neutral-800' : 'border-neutral-200'} flex items-center justify-between gap-1`}>
-              <span className="text-[9px] font-black uppercase text-neutral-400 shrink-0">चुनें:</span>
-              <div className="flex gap-1 flex-1 justify-end flex-wrap">
-                {([
-                  { range: 'today', label: 'आज' },
-                  { range: 'yesterday', label: 'कल' },
-                  { range: 'week', label: '1 हफ़्ता' },
-                  { range: 'month', label: 'महीना' },
-                  { range: 'year', label: 'साल' }
-                ] as const).map((opt) => (
-                  <button
-                    key={opt.range}
-                    onClick={() => { triggerHaptic(15); setDashboardDateRange(opt.range); }}
-                    className={`px-2.5 py-1.5 rounded-full text-[9px] font-black uppercase tracking-wider shrink-0 transition-all ${
-                      dashboardDateRange === opt.range 
-                        ? 'bg-orange-500 text-white shadow' 
-                        : isDarkMode ? 'bg-neutral-900 text-neutral-400' : 'bg-neutral-100 text-neutral-600'
-                    }`}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
+            <div className={`sticky top-[64px] z-30 py-2.5 space-y-2.5 backdrop-blur-md ${isDarkMode ? 'bg-[#0E0E0E]/90' : 'bg-[#FAFAFA]/90'} border-b border-dashed ${isDarkMode ? 'border-neutral-800' : 'border-neutral-200'}`}>
+              <div className="flex items-center justify-between gap-1">
+                <span className="text-[9px] font-black uppercase text-neutral-400 shrink-0">चुनें:</span>
+                <div className="flex gap-1 flex-1 justify-end flex-wrap">
+                  {([
+                    { range: 'today', label: 'आज' },
+                    { range: 'yesterday', label: 'कल' },
+                    { range: 'week', label: '1 हफ़्ता' },
+                    { range: 'month', label: 'महीना' },
+                    { range: 'year', label: 'साल' },
+                    { range: 'custom', label: 'कैलेंडर 📅' }
+                  ] as const).map((opt) => (
+                    <button
+                      key={opt.range}
+                      onClick={() => { triggerHaptic(15); setDashboardDateRange(opt.range); }}
+                      className={`px-2.5 py-1.5 rounded-full text-[9px] font-black uppercase tracking-wider shrink-0 transition-all ${
+                        dashboardDateRange === opt.range 
+                          ? 'bg-orange-500 text-white shadow' 
+                          : isDarkMode ? 'bg-neutral-900 text-neutral-400' : 'bg-neutral-100 text-neutral-600'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
               </div>
+
+              {/* CALENDAR DATE RANGE SELECTOR (When Custom Selected) */}
+              {dashboardDateRange === 'custom' && (
+                <div className="grid grid-cols-2 gap-2 p-3 bg-neutral-100 dark:bg-neutral-900 rounded-2xl border border-neutral-200 dark:border-neutral-800 text-xs">
+                  <div className="space-y-1">
+                    <label className="text-[9px] text-neutral-400 font-bold uppercase">शुरुआती तारीख (From)</label>
+                    <input 
+                      type="date" 
+                      value={startDate} 
+                      onChange={e => setStartDate(e.target.value)}
+                      className="w-full p-2 rounded-xl border dark:bg-neutral-800 dark:border-neutral-700"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[9px] text-neutral-400 font-bold uppercase">अंतिम तारीख (To)</label>
+                    <input 
+                      type="date" 
+                      value={endDate} 
+                      onChange={e => setEndDate(e.target.value)}
+                      className="w-full p-2 rounded-xl border dark:bg-neutral-800 dark:border-neutral-700"
+                    />
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Dynamic Date-Filtered Ledger Metrics */}
@@ -1169,7 +1349,7 @@ export default function BumBumCafeStockApp() {
                 </button>
               </div>
 
-              {/* NON-SLIDER CATEGORIES GRID */}
+              {/* CATEGORIES SELECTION GRID */}
               <div className="space-y-1.5">
                 <div className="flex justify-between items-center px-0.5">
                   <span className="text-[8px] font-black uppercase text-neutral-400 tracking-wider">क्लिक कर फ़िल्टर करें:</span>
@@ -1219,7 +1399,6 @@ export default function BumBumCafeStockApp() {
               <Plus size={14} /> Add New Product (सामान जोड़ें)
             </button>
 
-            {/* TOTAL ITEMS COUNTER */}
             <div className="flex justify-between items-center text-[10px] font-black uppercase text-neutral-400 px-1 border-b border-neutral-100 dark:border-neutral-800/65 pb-2">
               <span>STOCK ITEMS LIST</span>
               <span>Showing {filteredInventory.length} of {inventory.length} total</span>
@@ -1526,7 +1705,7 @@ export default function BumBumCafeStockApp() {
                               setIsEditingListName(true);
                             }}
                             className="p-1 hover:bg-neutral-200 dark:hover:bg-neutral-800 rounded-lg text-neutral-400 hover:text-orange-500 transition-all"
-                            title="ऑर्डर लिस्ट का नाम बदलें"
+                            title="नाम बदलें"
                           >
                             <Edit size={12} />
                           </button>
@@ -1583,7 +1762,7 @@ export default function BumBumCafeStockApp() {
                         />
                         <span className="text-[10px] font-bold text-neutral-400 w-8">{item.unit}</span>
                         <button 
-                          onClick={() => handleRemoveFromSavedList(item.id)}
+                          onClick={() => handleRemoveFromSavedList(item.id, item.name)}
                           className="text-neutral-400 hover:text-red-500 hover:scale-110 transition-transform"
                         >
                           <X size={14} />
@@ -1596,7 +1775,7 @@ export default function BumBumCafeStockApp() {
               {savedOrders.filter(o => o.listId === activeListId).length === 0 && (
                 <div className="text-center py-10 space-y-2">
                   <span className="text-2xl block">🛒</span>
-                  <p className="text-xs text-neutral-400 font-bold uppercase">लिस्ट खाली है या कोई लिस्ट एक्टिव नहीं है। Godown में जाकर सामान सेलेक्ट करें!</p>
+                  <p className="text-xs text-neutral-400 font-bold uppercase">लिस्ट खाली है। Godown में जाकर सामान सेलेक्ट करें!</p>
                 </div>
               )}
             </div>
@@ -1675,6 +1854,160 @@ export default function BumBumCafeStockApp() {
 
       {/* ==================== SCREEN MODALS ==================== */}
       <AnimatePresence>
+
+        {/* 0. SECURITY DELETE PIN VERIFICATION MODAL */}
+        {deleteConfirmation && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[200] flex items-center justify-center p-4">
+            <motion.form 
+              onSubmit={handleDeleteVerificationSubmit}
+              initial={{ opacity: 0, scale: 0.95 }} 
+              animate={{ opacity: 1, scale: 1 }} 
+              exit={{ opacity: 0, scale: 0.95 }}
+              className={`w-full max-w-sm rounded-[2.5rem] p-6 space-y-5 border text-center ${
+                isDarkMode ? 'bg-neutral-900 border-neutral-800 text-white' : 'bg-white border-neutral-100 text-neutral-900'
+              }`}
+            >
+              <div className="space-y-1">
+                <span className="text-4xl block">🛡️</span>
+                <h3 className="text-sm font-black text-red-500 uppercase tracking-wider">सुरक्षा प्रमाणीकरण आवश्यक</h3>
+                <p className="text-xs text-neutral-400">{deleteConfirmation.message}</p>
+              </div>
+
+              <div className="space-y-3 text-xs text-left">
+                <label className="text-[9px] text-neutral-400 font-black uppercase">प्रशासक या यूज़र पिन दर्ज करें (Enter PIN)</label>
+                <input 
+                  type="password"
+                  maxLength={6}
+                  placeholder="••••"
+                  value={deletePinInput}
+                  onChange={e => setDeletePinInput(e.target.value)}
+                  className="w-full text-center text-xl tracking-[1em] p-2.5 rounded-xl border font-black dark:bg-neutral-800 focus:ring-2 focus:ring-red-500"
+                  required
+                />
+                {deletePinError && <p className="text-[10px] text-red-500 font-bold text-center">{deletePinError}</p>}
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setDeleteConfirmation(null)}
+                  className="flex-1 py-3 bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-700 rounded-xl text-xs font-black uppercase"
+                >
+                  रद्द करें
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-black uppercase shadow-lg"
+                >
+                  सत्यापित करें ➔
+                </button>
+              </div>
+            </motion.form>
+          </div>
+        )}
+
+        {/* A. ADMIN PIN / USER SETTINGS PANEL MODAL */}
+        {showAdminPanel && currentUser.role === 'admin' && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }} 
+              animate={{ opacity: 1, scale: 1 }} 
+              exit={{ opacity: 0, scale: 0.95 }} 
+              className={`w-full max-w-sm rounded-[2rem] p-6 space-y-4 border ${
+                isDarkMode ? 'bg-[#0F0F0F] border-neutral-800 text-white' : 'bg-white border-neutral-100 text-neutral-900'
+              }`}
+            >
+              <div className="flex justify-between items-center border-b pb-2.5">
+                <div>
+                  <h3 className="text-xs font-black uppercase text-orange-500">User & PIN settings</h3>
+                  <p className="text-[9px] text-neutral-400 font-bold uppercase mt-0.5">नया यूजर जोड़ें या पिन बदलें</p>
+                </div>
+                <button 
+                  type="button" 
+                  onClick={() => setShowAdminPanel(false)} 
+                  className="p-1.5 bg-neutral-100 dark:bg-neutral-800 rounded-xl"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+
+              {/* Add New User form */}
+              <form onSubmit={handleAddNewUserSubmit} className="space-y-2.5 p-3 rounded-2xl bg-neutral-50 dark:bg-neutral-900 border border-neutral-200/50 dark:border-neutral-800 text-xs">
+                <p className="font-black text-[9px] text-neutral-400 uppercase tracking-wider flex items-center gap-1">
+                  <UserPlus size={10} /> Add New User / PIN
+                </p>
+                <div className="space-y-1.5">
+                  <input 
+                    type="text" 
+                    placeholder="NAME (जैसे: SUNIL)"
+                    value={newUserForm.name}
+                    onChange={e => setNewUserForm({ ...newUserForm, name: e.target.value })}
+                    className="w-full p-2 rounded-xl border uppercase font-bold dark:bg-neutral-800"
+                    required
+                  />
+                  <div className="grid grid-cols-2 gap-2">
+                    <input 
+                      type="text" 
+                      placeholder="PIN (अंक/शब्द)"
+                      maxLength={6}
+                      value={newUserForm.pin}
+                      onChange={e => setNewUserForm({ ...newUserForm, pin: e.target.value })}
+                      className="w-full p-2 rounded-xl border font-bold dark:bg-neutral-800 text-center"
+                      required
+                    />
+                    <select 
+                      value={newUserForm.role}
+                      onChange={e => setNewUserForm({ ...newUserForm, role: e.target.value as any })}
+                      className="w-full p-2 rounded-xl border font-bold dark:bg-neutral-800"
+                    >
+                      <option value="staff">Staff (स्टाफ)</option>
+                      <option value="admin">Admin (एडमिन)</option>
+                    </select>
+                  </div>
+                </div>
+                <button 
+                  type="submit" 
+                  className="w-full py-2 bg-green-600 text-white font-black text-[10px] uppercase rounded-xl tracking-wider"
+                >
+                  Add User ➔
+                </button>
+              </form>
+
+              {/* Active Users List */}
+              <div className="space-y-2 max-h-[25vh] overflow-y-auto pr-1">
+                <p className="font-black text-[9px] text-neutral-400 uppercase tracking-wider px-1">सक्रिय यूजर्स सूची</p>
+                {users.map(u => (
+                  <div key={u.id} className="flex items-center justify-between p-2.5 rounded-xl border border-neutral-100 dark:border-neutral-800 text-xs font-bold bg-neutral-50/50 dark:bg-neutral-900/40">
+                    <div>
+                      <span className="uppercase text-[#FF6B00]">{u.name}</span>
+                      <span className="ml-1 px-1.5 py-0.5 text-[7px] bg-neutral-200 dark:bg-neutral-800 text-neutral-500 rounded font-black uppercase">
+                        {u.role}
+                      </span>
+                    </div>
+                    
+                    <div className="flex items-center gap-2">
+                      <input 
+                        type="text" 
+                        defaultValue={u.pin}
+                        onBlur={(e) => handleUpdateUserPin(u.id, e.target.value)}
+                        placeholder="PIN"
+                        className="w-14 p-1 rounded border text-center dark:bg-neutral-800"
+                      />
+                      <button 
+                        type="button"
+                        onClick={() => handleRemoveUser(u.id)}
+                        className="p-1 hover:bg-red-100 text-red-500 rounded"
+                        title="हटाएं"
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+          </div>
+        )}
 
         {/* 1. MANAGE CATEGORIES MODAL */}
         {showManageCategoriesModal && (
@@ -1769,7 +2102,7 @@ export default function BumBumCafeStockApp() {
             >
               <div className="flex justify-between items-center border-b pb-2">
                 <div>
-                  <h3 className="text-xs font-black uppercase text-orange-500">Send To Kitchen (किचन में भेजें)</h3>
+                  <h3 className="text-xs font-black uppercase text-orange-500">Send To Kitchen</h3>
                   <p className="text-[9px] text-neutral-400 font-bold mt-0.5">{transferItem.name}</p>
                 </div>
                 <button type="button" onClick={() => setShowTransferModal(false)} className="p-1.5 bg-neutral-100 dark:bg-neutral-800 rounded-xl"><X size={14} /></button>
@@ -1781,7 +2114,7 @@ export default function BumBumCafeStockApp() {
               </div>
 
               <div className="space-y-1 text-xs">
-                <label className="text-[9px] text-neutral-400 font-black uppercase">Quantity to Send (भेजने की मात्रा)</label>
+                <label className="text-[9px] text-neutral-400 font-black uppercase">Quantity to Send</label>
                 <div className="flex items-center gap-2">
                   <input 
                     type="number" 
@@ -1814,7 +2147,7 @@ export default function BumBumCafeStockApp() {
             >
               <div className="flex justify-between items-center border-b pb-2">
                 <div>
-                  <h3 className="text-xs font-black uppercase text-neutral-400">Consume Kitchen Stock (किचन उपयोग)</h3>
+                  <h3 className="text-xs font-black uppercase text-neutral-400">Consume Kitchen Stock</h3>
                   <p className="text-[9px] text-neutral-400 font-bold mt-0.5">{consumeItem.name}</p>
                 </div>
                 <button type="button" onClick={() => setShowConsumeModal(false)} className="p-1.5 bg-neutral-100 dark:bg-neutral-800 rounded-xl"><X size={14} /></button>
@@ -1826,7 +2159,7 @@ export default function BumBumCafeStockApp() {
 
               <div className="space-y-3 text-xs">
                 <div className="space-y-1">
-                  <label className="text-[9px] text-neutral-400 font-black uppercase">Quantity Used (उपयोग की गई मात्रा)</label>
+                  <label className="text-[9px] text-neutral-400 font-black uppercase">Quantity Used</label>
                   <div className="flex items-center gap-2">
                     <input 
                       type="number" 
@@ -1841,7 +2174,7 @@ export default function BumBumCafeStockApp() {
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[9px] text-neutral-400 font-black uppercase">Remarks / Note (विवरण)</label>
+                  <label className="text-[9px] text-neutral-400 font-black uppercase">Remarks / Note</label>
                   <input 
                     type="text"
                     placeholder="जैसे: आज का खाना बनाने में उपयोग"
@@ -1869,7 +2202,7 @@ export default function BumBumCafeStockApp() {
               </div>
 
               <div className="space-y-1 text-xs">
-                <label className="text-[9px] text-neutral-400 font-bold uppercase">Select Item (आइटम चुनें)</label>
+                <label className="text-[9px] text-neutral-400 font-bold uppercase">Select Item</label>
                 <select 
                   value={formStockOut.item} 
                   onChange={e => setFormStockOut({ ...formStockOut, item: e.target.value })} 
@@ -1901,7 +2234,7 @@ export default function BumBumCafeStockApp() {
                     className="w-full p-2.5 rounded-xl border dark:bg-neutral-800"
                   >
                     <option value="Waste">Waste (खराब)</option>
-                    <option value="Damage">Damage (टूटा/क्षतिग्रस्त)</option>
+                    <option value="Damage">Damage (क्षतिग्रस्त)</option>
                   </select>
                 </div>
               </div>
@@ -1910,7 +2243,7 @@ export default function BumBumCafeStockApp() {
                 <label className="text-[9px] text-neutral-400 font-bold uppercase">Remarks (कारण)</label>
                 <input 
                   type="text" 
-                  placeholder="जैसे: दूध फट गया, टमाटर सड़ गया" 
+                  placeholder="जैसे: दूध फट गया" 
                   value={formStockOut.remarks} 
                   onChange={e => setFormStockOut({ ...formStockOut, remarks: e.target.value })} 
                   className="w-full p-2.5 rounded-xl border dark:bg-neutral-800" 
@@ -1948,7 +2281,7 @@ export default function BumBumCafeStockApp() {
 
                 <div className="grid grid-cols-2 gap-2">
                   <div className="space-y-1">
-                    <label className="text-[9px] text-neutral-400 font-bold uppercase">Category (कैटेगरी)</label>
+                    <label className="text-[9px] text-neutral-400 font-bold uppercase">Category</label>
                     <select
                       value={formAddProduct.category}
                       onChange={e => setFormAddProduct({ ...formAddProduct, category: e.target.value })}
@@ -2183,7 +2516,7 @@ export default function BumBumCafeStockApp() {
                     {categories.map(cat => (
                       <option key={cat.id} value={cat.name}>{cat.name}</option>
                     ))}
-                    <option value="CREATE_NEW">-- + CREATE NEW CATEGORY (नई कैटेगरी) --</option>
+                    <option value="CREATE_NEW">-- + CREATE NEW CATEGORY --</option>
                   </select>
                 </div>
 
@@ -2193,7 +2526,7 @@ export default function BumBumCafeStockApp() {
                     animate={{ opacity: 1, y: 0 }}
                     className="space-y-1"
                   >
-                    <label className="text-[9px] text-neutral-400 font-bold uppercase">New Category Name (नई कैटेगरी का नाम)</label>
+                    <label className="text-[9px] text-neutral-400 font-bold uppercase">New Category Name</label>
                     <input 
                       type="text"
                       placeholder="जैसे: FROZEN FOOD"
@@ -2213,7 +2546,7 @@ export default function BumBumCafeStockApp() {
                   onClick={handleConfirmBulkCategory}
                   className="w-full py-3 bg-[#FF6B00] hover:bg-orange-600 text-white rounded-xl font-bold text-xs uppercase shadow-lg"
                 >
-                  Set Category (कैटेगरी लागू करें) ➔
+                  Set Category ➔
                 </button>
               </div>
             </motion.div>
@@ -2231,10 +2564,10 @@ export default function BumBumCafeStockApp() {
 
               <div className="space-y-3 text-xs">
                 <div className="space-y-1">
-                  <label className="text-[9px] text-neutral-400 font-bold uppercase">Asset Name (संपत्ति का नाम)</label>
+                  <label className="text-[9px] text-neutral-400 font-bold uppercase">Asset Name</label>
                   <input 
                     type="text" 
-                    placeholder="जैसे: Oven, Fridge, Table, Kursi, Mixi" 
+                    placeholder="जैसे: Oven, Fridge, Table" 
                     value={formAddAsset.name}
                     onChange={e => setFormAddAsset({ ...formAddAsset, name: e.target.value })}
                     className="w-full p-2.5 rounded-xl border dark:bg-neutral-800"
@@ -2293,7 +2626,7 @@ export default function BumBumCafeStockApp() {
                   <label className="text-[9px] text-neutral-400 font-bold uppercase">Remarks (विवरण)</label>
                   <input 
                     type="text" 
-                    placeholder="जैसे: मॉडल नंबर, सप्लायर या कोई अन्य नोट" 
+                    placeholder="मॉडल नंबर, सप्लायर आदि" 
                     value={formAddAsset.remarks}
                     onChange={e => setFormAddAsset({ ...formAddAsset, remarks: e.target.value })}
                     className="w-full p-2.5 rounded-xl border dark:bg-neutral-800"
@@ -2335,7 +2668,7 @@ export default function BumBumCafeStockApp() {
 
               <div className="space-y-3.5 text-xs">
                 <div className="space-y-1">
-                  <label className="text-[9px] text-neutral-400 font-bold uppercase">Choose Order List (ऑर्डर लिस्ट चुनें)</label>
+                  <label className="text-[9px] text-neutral-400 font-bold uppercase">Choose Order List</label>
                   <select
                     value={targetListId}
                     onChange={e => setTargetListId(e.target.value)}
@@ -2346,7 +2679,7 @@ export default function BumBumCafeStockApp() {
                     {orderLists.map(list => (
                       <option key={list.id} value={list.id}>{list.name}</option>
                     ))}
-                    <option value="CREATE_NEW">-- + CREATE NEW ORDER LIST (नई लिस्ट बनाएं) --</option>
+                    <option value="CREATE_NEW">-- + CREATE NEW ORDER LIST --</option>
                   </select>
                 </div>
 
@@ -2356,7 +2689,7 @@ export default function BumBumCafeStockApp() {
                     animate={{ opacity: 1, y: 0 }}
                     className="space-y-1"
                   >
-                    <label className="text-[9px] text-neutral-400 font-bold uppercase">New List Name (नया लिस्ट नाम)</label>
+                    <label className="text-[9px] text-neutral-400 font-bold uppercase">New List Name</label>
                     <input 
                       type="text"
                       placeholder="जैसे: WEEKLY MAIN ORDER"
@@ -2376,7 +2709,7 @@ export default function BumBumCafeStockApp() {
                   onClick={handleConfirmSaveToList}
                   className="w-full py-3 bg-[#FF6B00] hover:bg-orange-600 text-white rounded-xl font-bold text-xs uppercase shadow-lg"
                 >
-                  Confirm & Generate Sheet (लिस्ट में सहेजें) ➔
+                  Confirm & Generate Sheet ➔
                 </button>
               </div>
             </motion.div>
@@ -2408,4 +2741,3 @@ export default function BumBumCafeStockApp() {
     </div>
   );
 }
-
