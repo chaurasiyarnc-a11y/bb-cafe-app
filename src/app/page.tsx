@@ -23,10 +23,9 @@ const CATEGORY_IMAGES: { [key: string]: string } = {
 };
 
 const DELIVERY_AREAS = [
-  { name: "Mohandra Town", fee: 20, minFree: 99, range: "0-1 KM" },
-  { name: "Mohandra Ward 1-5 (Within 2 Km)", fee: 20, minFree: 199, range: "1-2 KM" },
-  { name: "Nearby Area (Within 5 Km)", fee: 40, minFree: 499, range: "2-5 KM" },
-  { name: "Out of Town (5 to 12 Km)", fee: 60, minFree: 999, range: "5-12 KM" }
+  { name: "Mohandra Town", fee: 20, minFree: 99, range: "0-2 KM" },
+  { name: "Within 5 KM (Bum Bum Cafe से 5km के दायरे में)", fee: 50, minFree: 499, range: "2-5 KM" },
+  { name: "Within 12 KM (12km के दायरे में)", fee: 99, minFree: 999, range: "5-12 KM" }
 ];
 
 const HINGLISH_DICT: { [key: string]: string } = {
@@ -54,17 +53,11 @@ const DIY_PIZZA_PRICES: any = {
   },
   large: {
     base: 30, sauce: 30, mozzarella: 100,
-    veggies: { onion: 20, text: 20, capsicum: 20, corn: 20 },
+    veggies: { text: 20, capsicum: 20, corn: 20 },
     black_olive: 50, jalapeno: 50, red_peprica: 40, paneer: 50, mushroom: 50
   }
 };
 
-const PERMANENT_REVIEWS = [
-  { id: "rev1", name: "Gaurav Soni", rating: 5, comment: "बम बम कैफे की पनीर पिज्जा सच में पूरे मोहांद्रा में बेस्ट है! एक्स्ट्रा चीज़ लव है। ⭐⭐⭐⭐⭐" },
-  { id: "rev2", name: "Anjali Patel", rating: 5, comment: "फास्ट फ़ूड की पैकिंग बहुत अच्छी थी, डिलीवरी बॉय का व्यवहार भी बहुत विनम्र था। ⭐⭐⭐⭐⭐" },
-  { id: "rev3", name: "Shubham Dwivedi", rating: 5, comment: "स्पेशल थाली का स्वाद एकदम घर जैसा है। सफ़ाई और शुद्धता लाजवाब है। ⭐⭐⭐⭐⭐" },
-  { id: "rev4", name: "Neha Chaurasia", rating: 5, comment: "इस क्षेत्र का सबसे अच्छा कैफे। पिज्जा विभाग ताज़ा है और क्रस्ट बहुत सॉफ्ट है! ⭐⭐⭐⭐⭐" }
-];
 const QUICK_INSTRUCTION_TAGS = ["🌶️ Extra Spicy", "🧅 No Onion-Garlic", "🧀 Extra Cheese", "🔥 Well Baked", "🌱 Make it Mild"];
 
 const SOCIAL_LINKS = [
@@ -80,6 +73,13 @@ const SUGGESTED_REVIEWS = [
   "मोहांद्रा में सबसे बेस्ट सर्विस और स्वाद! ⭐⭐⭐⭐⭐",
   "सुपर फास्ट डिलीवरी और शानदार पैकेजिंग! 🛵📦",
   "साफ़-सफ़ाई और शुद्धता 10/10 है! 🧼👌"
+];
+
+const PERMANENT_REVIEWS = [
+  { id: "rev1", name: "Gaurav Soni", rating: 5, comment: "बम बम कैफे की पनीर पिज्जा सच में पूरे मोहांद्रा में बेस्ट है! एक्स्ट्रा चीज़ लव है। ⭐⭐⭐⭐⭐" },
+  { id: "rev2", name: "Anjali Patel", rating: 5, comment: "फास्ट फ़ूड की पैकिंग बहुत अच्छी थी, डिलीवरी बॉय का व्यवहार भी बहुत विनम्र था। ⭐⭐⭐⭐⭐" },
+  { id: "rev3", name: "Shubham Dwivedi", rating: 5, comment: "स्पेशल थाली का स्वाद एकदम घर जैसा है। सफ़ाई और शुद्धता लाजवाब है। ⭐⭐⭐⭐⭐" },
+  { id: "rev4", name: "Neha Chaurasia", rating: 5, comment: "इस क्षेत्र का सबसे अच्छा कैफे। पिज्जा विभाग ताज़ा है और क्रस्ट बहुत सॉफ्ट है! ⭐⭐⭐⭐⭐" }
 ];
 
 export default function BbCafeHome() {
@@ -206,9 +206,10 @@ export default function BbCafeHome() {
   const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
   const [isSubmittingOrder, setIsSubmittingOrder] = useState(false);
 
-  // UPI payment screenshot state & compressing loader
+  // UPI Payment states
   const [paymentScreenshot, setPaymentScreenshot] = useState<string | null>(null);
   const [isCompressing, setIsCompressing] = useState(false);
+  const [isUpiPopupOpen, setIsUpiPopupOpen] = useState(false);
 
   // UI States
   const [showGreeting, setShowGreeting] = useState(true);
@@ -865,18 +866,15 @@ export default function BbCafeHome() {
         const calculatedDistance = calculateDistanceInKm(latitude, longitude, mohandraLat, mohandraLng);
         setDistanceKm(Number(calculatedDistance.toFixed(2)));
 
-        if (calculatedDistance <= 1.0) {
+        if (calculatedDistance <= 2.0) {
           setSelectedArea(DELIVERY_AREAS[0]); 
           toast.success(`सटीक दूरी: ${calculatedDistance.toFixed(2)} KM। आपके लिए 'Mohandra Town' क्षेत्र चुना गया है।`);
-        } else if (calculatedDistance <= 2.0) {
-          setSelectedArea(DELIVERY_AREAS[1]); 
-          toast.success(`सटीक दूरी: ${calculatedDistance.toFixed(2)} KM। आपके लिए 'Mohandra Ward 1-5' क्षेत्र चुना गया है।`);
         } else if (calculatedDistance <= 5.0) {
-          setSelectedArea(DELIVERY_AREAS[2]); 
-          toast.success(`सटीक दूरी: ${calculatedDistance.toFixed(2)} KM। आपके लिए 'Nearby Area (Within 5 Km)' क्षेत्र चुना गया है।`);
+          setSelectedArea(DELIVERY_AREAS[1]); 
+          toast.success(`सटीक दूरी: ${calculatedDistance.toFixed(2)} KM। आपके लिए 'Bum Bum Cafe से 5km के दायरे में' क्षेत्र चुना गया है।`);
         } else {
-          setSelectedArea(DELIVERY_AREAS[3]); 
-          toast.success(`सटीक दूरी: ${calculatedDistance.toFixed(2)} KM। आपके लिए 'Out of Town' क्षेत्र चुना गया है।`);
+          setSelectedArea(DELIVERY_AREAS[2]); 
+          toast.success(`सटीक दूरी: ${calculatedDistance.toFixed(2)} KM। आपके लिए '12km के दायरे में' क्षेत्र चुना गया है।`);
         }
       },
       () => {
@@ -889,7 +887,7 @@ export default function BbCafeHome() {
   const handleGiftPoints = async (e: React.FormEvent) => {
     e.preventDefault();
     triggerHaptic();
-    if (!customerDetails?.phone) return toast.error("कृपया पहले अपनी  डिटेल्स जोड़ें!");
+    if (!customerDetails?.phone) return toast.error("कृपया पहले अपनी डिटेल्स जोड़ें!");
     const senderPhoneRaw = customerDetails.phone.replace("+91", "").trim();
     const friendPhoneRaw = String(giftPhone).replace("+91", "").trim();
     const pointsToGift = Number(giftPointsAmount);
@@ -995,6 +993,32 @@ export default function BbCafeHome() {
     toast.success(`${name} Cart में जोड़ दिया गया है!`);
   };
 
+  const handleLaunchUpiPay = (app: 'phonepe' | 'paytm' | 'gpay' | 'whatsapp') => {
+    triggerHaptic();
+    const baseSub = getCartSubtotal();
+    const addPrice = getCartAddonsPrice();
+    const delivery = getDeliveryCharge();
+    const couponDiscount = appliedCoupon ? Number(appliedCoupon.discountValue) : 0;
+    const finalTotal = Math.max(0, baseSub + addPrice - couponDiscount) + delivery;
+    
+    const upiId = "q231198993@ybl";
+    const merchantName = "BUM BUM CAFE";
+    const note = `OrderBill_UPI`;
+    
+    let deepLink = `upi://pay?pa=${upiId}&pn=${encodeURIComponent(merchantName)}&am=${finalTotal}&cu=INR&tn=${note}`;
+    
+    if (app === 'phonepe') {
+      deepLink = `phonepe://pay?pa=${upiId}&pn=${encodeURIComponent(merchantName)}&am=${finalTotal}&cu=INR&tn=${note}`;
+    } else if (app === 'paytm') {
+      deepLink = `paytmmp://pay?pa=${upiId}&pn=${encodeURIComponent(merchantName)}&am=${finalTotal}&cu=INR&tn=${note}`;
+    } else if (app === 'gpay') {
+      deepLink = `tez://upi/pay?pa=${upiId}&pn=${encodeURIComponent(merchantName)}&am=${finalTotal}&cu=INR&tn=${note}`;
+    }
+    
+    window.location.href = deepLink;
+    toast.success(isHindi ? "भुगतान एप्लिकेशन खोला जा रहा है..." : "Opening payment app...");
+  };
+
   const sendWhatsAppOrder = async () => {
     triggerHaptic();
     
@@ -1018,10 +1042,10 @@ export default function BbCafeHome() {
       return toast.error(isHindi ? "कृपया टेबल नंबर दर्ज करें!" : "Please enter table number!");
     }
 
-    // UPI screenshots strictly enforced
+    // Force UPI screenshots strictly
     if (paymentMethod === "upi" && !paymentScreenshot) {
       setIsSubmittingOrder(false);
-      return toast.error(isHindi ? "कृपया आगे बढ़ने से पहले यूपीआई भुगतान का स्क्रीनशॉट अपलोड करें!" : "Please upload UPI payment screenshot before ordering!");
+      return toast.error(isHindi ? "कृपया आगे बढ़ने से पहले यूपीआई भुगतान का स्क्रीनशॉट अपलोड करें!" : "Please upload UPI payment screenshot!");
     }
 
     const tokenNumber = Math.floor(1000 + Math.random() * 9000);
@@ -1061,7 +1085,7 @@ export default function BbCafeHome() {
       items: cart, subtotal, discount: couponDiscount, total: finalTotal, timestamp: new Date(), status: 'pending',
       deliveryArea: fulfillmentType === "delivery" ? selectedArea.name : fulfillmentType.toUpperCase(), noCutlery, ketchupAddon, oreganoAddon, chiliFlakesAddon,
       fulfillmentType, tableNumber: fulfillmentType === "table" ? tableNumber : "", paymentMethod,
-      paymentScreenshot: paymentScreenshot || "" // Securely attach screenshot inside order document
+      paymentScreenshot: paymentScreenshot || ""
     };
 
     try {
@@ -1115,11 +1139,6 @@ export default function BbCafeHome() {
 
     const refCode = getReferralCode();
     
-    if (paymentMethod === "upi") {
-      const upiUrl = `upi://pay?pa=q231198993@ybl&pn=BUM%20BUM%20CAFE&am=${finalTotal}&cu=INR&tn=OrderBill_${formattedBillStr}`;
-      window.location.href = upiUrl;
-    }
-
     const modeLabel = fulfillmentType === "delivery" ? `Delivery (${selectedArea.name})` : fulfillmentType === "pickup" ? "Self-Pickup 🛍️" : `Dine-In (Table No. ${tableNumber}) 🍽️`;
     const payModeLabel = paymentMethod === "cod" ? "Cash on Delivery (COD) 💵" : "UPI Online Payment 📱";
 
@@ -1146,283 +1165,9 @@ export default function BbCafeHome() {
       setEnteredCoupon(""); 
       setIsCartOpen(false);
       setIsSubmittingOrder(false); 
-      setPaymentScreenshot(null); // Reset screenshot on success
+      setPaymentScreenshot(null);
+      setIsUpiPopupOpen(false);
     }, 1500);
-  };
-
-  const handleShareApp = async () => {
-    triggerHaptic();
-    if (!customerDetails?.phone) {
-      toast.error("पॉइंट्स कमाने के लिए पहले Name aur Phone दर्ज करें!");
-      setIsProfileOpen(true);
-      return;
-    }
-
-    const phoneClean = customerDetails.phone.replace("+91", "").trim();
-    const shareCountKey = `bb_shares_${phoneClean}`;
-    let currentShares = Number(localStorage.getItem(shareCountKey) || 0);
-
-    const refCode = getReferralCode();
-    const shareMessage = `🔥 *BAM BAM CAFE - Mohandra* 🔥\n\nमेरे स्पेशल इन्वाइट कोड *${refCode}* से आर्डर करें और...  पॉइंट्स पाएं! 🎁\n👉 https://bb-cafe-app.vercel.app/?ref=${refCode}`;
-    const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(shareMessage)}`;
-
-    window.open(whatsappUrl, '_blank');
-
-    if (currentShares < 5) {
-      const nextShares = currentShares + 1;
-      localStorage.setItem(shareCountKey, String(nextShares));
-      setShareCount(nextShares);
-
-      if (nextShares === 5) {
-        try {
-          const pointsRef = doc(db, "customer_points", phoneClean);
-          await setDoc(pointsRef, {
-            points: increment(1),
-            lastActive: new Date()
-          }, { merge: true });
-
-          await addDoc(collection(db, "customer_points", phoneClean, "history"), {
-            type: 'earn',
-            points: 1,
-            description: `Shared app 5 times! 📤`,
-            timestamp: new Date()
-          });
-
-          setCustomerPoints(prev => prev + 1);
-          toast.success("🎉 शानदार!  आपने 5 दोस्तों के साथ ऐप शेयर करके +1 Loyalty Point कमा लिया है!");
-        } catch (e) {}
-      } else {
-        toast.success(`📤 शेयर किया गया! (${nextShares}/5 प्रोग्रेस।  +1 पॉइंट के लिए ${5 - nextShares} और दोस्तों को शेयर करें!)`);
-      }
-    } else {
-      localStorage.setItem(shareCountKey, "1");
-      setShareCount(1);
-      toast.success("📤 नया शेयर प्रोग्रेस शुरू हुआ! (1/5 पूरा)");
-    }
-  };
-
-  const handleSocialClickWithClaim = (platform: any) => {
-    triggerHaptic();
-    window.open(platform.url, '_blank');
-
-    if (!customerDetails?.phone) {
-      toast.error("पॉइंट्स क्लेम करने के लिए कृपया पहले अपना Name aur Phone दर्ज करें!");
-      setIsProfileOpen(true);
-      return;
-    }
-
-    setClaimingPlatform(platform);
-    setIsClaimModalOpen(true);
-  };
-
-  const handleClaimSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    triggerHaptic();
-    if (!claimUsername.trim()) return toast.error("कृपया अपना यूज़रनेम / हैंडल दर्ज करें!");
-
-    setIsClaimingLoading(true);
-    const phoneRaw = customerDetails!.phone.replace("+91", "").trim();
-
-    try {
-      await addDoc(collection(db, "points_claims"), {
-        customerName: customerDetails!.name,
-        customerPhone: phoneRaw,
-        platformId: claimingPlatform.id,
-        platformLabel: claimingPlatform.label,
-        socialUsername: claimUsername.trim(),
-        status: "pending",
-        pointsToReward: claimingPlatform.points,
-        timestamp: new Date()
-      });
-
-      toast.success("✅ दावा (Claim Request) सफलतापूर्वक सबमिट किया गया! एडमिन जांच के बाद पॉइंट क्रेडिट कर देंगे।");
-      setIsClaimModalOpen(false);
-      setClaimUsername("");
-    } catch (err) {
-      toast.error("दावा सबमिट करने में समस्या आई।");
-    } finally {
-      setIsClaimingLoading(false);
-    }
-  };
-
-  const handleSaveDetails = async (e: React.FormEvent) => {
-    e.preventDefault();
-    triggerHaptic();
-    if (!tempName || tempName.trim().length < 3) return toast.error("Please enter your real name");
-    
-    const phoneClean = tempPhone.trim().replace(/\D/g, "").replace(/^91/, "");
-    if (phoneClean.length < 10) return toast.error("Please enter 10-digit number");
-    
-    if (!tempPin || tempPin.length !== 4 || isNaN(Number(tempPin))) {
-      return toast.error("सुरक्षा के लिए 4-अंकों का न्यूमेरिकल पिन दर्ज करें!");
-    }
-    
-    let devToken = localStorage.getItem('bb_device_token');
-    if (!devToken) {
-      devToken = Math.random().toString(36).substring(2) + Date.now().toString(36);
-      localStorage.setItem('bb_device_token', devToken);
-    }
-
-    const details: any = { name: tempName, phone: `+91${phoneClean}`, pin: tempPin };
-
-    if (tempRefCode) {
-      const refCodeClean = tempRefCode.trim().toUpperCase();
-      details.refCode = refCodeClean;
-
-      try {
-        const q = query(collection(db, "customer_points"), where("inviteCode", "==", refCodeClean));
-        const querySnap = await getDocs(q);
-        
-        if (!querySnap.empty) {
-          const inviterDoc = querySnap.docs[0];
-          const inviterPhone = inviterDoc.id;
-
-          const myProfileSnap = await getDoc(doc(db, "customer_points", phoneClean));
-          if (!myProfileSnap.exists()) {
-            await runTransaction(db, async (transaction) => {
-              transaction.update(doc(db, "customer_points", inviterPhone), {
-                points: increment(5)
-              });
-
-              const inviteHistoryRef = doc(collection(db, "customer_points", inviterPhone, "history"));
-              transaction.set(inviteHistoryRef, {
-                type: 'earn',
-                points: 5,
-                description: `Invited new friend: ${tempName} 🎉`,
-                timestamp: new Date()
-              });
-            });
-            toast.success("सफलतापूर्वक इनवाइट कोड लागू किया गया! आपके दोस्त को 5 ऑयल्टी पॉइंट्स मिले।");
-          }
-        }
-      } catch (err) {
-        console.error("Referral process error:", err);
-      }
-    }
-
-    const namePart = tempName.trim().split(" ")[0].substring(0, 4).toUpperCase();
-    const phonePart = phoneClean.slice(-4);
-    const computedInviteCode = `${namePart}${phonePart}`;
-
-    try {
-      await setDoc(doc(db, "customer_points", phoneClean), {
-        name: tempName,
-        phone: phoneClean,
-        inviteCode: computedInviteCode,
-        pin: tempPin,
-        deviceToken: devToken,
-        lastActive: new Date()
-      }, { merge: true });
-    } catch (err) {}
-    
-    localStorage.setItem('bb_cafe_customer', JSON.stringify(details));
-    setCustomerDetails(details); 
-    toast.success(`Welcome ${tempName}! Your invite code: ${computedInviteCode}`);
-  };
-
-  const handleToggleFavorite = (id: string, e: any) => {
-    triggerHaptic();
-    e.stopPropagation();
-    let updated;
-    if (favorites.includes(id)) {
-      updated = favorites.filter(f => f !== id);
-      toast.success("पसंदीदा सूची से हटाया गया।");
-    } else {
-      updated = [...favorites, id];
-      toast.success("पसंदीदा सूची में जोड़ा गया! ❤️");
-    }
-    setFavorites(updated);
-    localStorage.setItem('bb_favorites', JSON.stringify(updated));
-  };
-
-  const handleNormalPizzaAdd = () => {
-    triggerHaptic();
-    if (!normalPizzaSize) return toast.error("Please select a size!");
-
-    const sizeAddons = PIZZA_ADDONS[normalPizzaSize.toLowerCase()] || {};
-    let addonsTotal = 0;
-    const activeAddonNames: string[] = [];
-
-    Object.entries(normalPizzaAddons).forEach(([addonName, isSelected]) => {
-      if (isSelected) {
-        const addonCost = sizeAddons[addonName] || 0;
-        addonsTotal += addonCost;
-        activeAddonNames.push(`${addonName} (+₹${addonCost})`);
-      }
-    });
-
-    let finalName = `${selectedProduct.name} (${normalPizzaSize})`;
-    if (activeAddonNames.length > 0) {
-      finalName += ` [${activeAddonNames.join(", ")}]`;
-    }
-
-    const uniqueCartId = `${selectedProduct.id}-${normalPizzaSize}-${Object.keys(normalPizzaAddons).filter(k => normalPizzaAddons[k]).join("-")}`;
-
-    addItem({
-      ...selectedProduct,
-      id: uniqueCartId,
-      name: finalName,
-      price: Number(normalPizzaPrice) + addonsTotal,
-      note: chefNote ? chefNote.trim() : ""
-    });
-
-    playSoundEffect('add');
-    toast.success("Added to cart!");
-    setSelectedProduct(null);
-    setNormalPizzaSize("");
-    setNormalPizzaPrice(0);
-    setNormalPizzaAddons({});
-    setChefNote("");
-  };
-
-  const handleAddDiyPizzaToCart = () => {
-    triggerHaptic();
-    const sizeLabels: any = { small: "Small Base", medium: "Medium Base", large: "Large Base" };
-    
-    const activeVeggies = Object.entries(diyVegSelection).filter(([_, val]) => val).map(([key]) => key.toUpperCase());
-    const activePremiums = Object.entries(diyPremiumToppings).filter(([_, val]) => val).map(([key]) => key.replace('_', ' ').toUpperCase());
-    
-    const toppingsStr = [...activeVeggies, ...activePremiums].join(", ");
-    const finalDiyName = `🍕 DIY Custom Pizza [${sizeLabels[diySize]}]${toppingsStr ? ` - Toppings: ${toppingsStr}` : ''}`;
-    const uniqueDiyId = `diy-pizza-${diySize}-${Object.keys(diyVegSelection).filter(k => diyVegSelection[k]).join("")}-${Object.keys(diyPremiumToppings).filter(k => diyPremiumToppings[k]).join("")}`;
-
-    addItem({
-      id: uniqueDiyId,
-      name: finalDiyName,
-      price: calculatedDiyPizzaPrice,
-      note: diyChefNote ? diyChefNote.trim() : ""
-    });
-
-    playSoundEffect('add');
-    toast.success("का कस्टमाइज़्ड पिज्जा कर्ट में जोड़ा गया! 🍕");
-
-    setDiyVegSelection({ onion: false, text: false, capsicum: false, corn: false });
-    setDiyPremiumToppings({ black_olive: false, jalapeno: false, red_peprica: false, paneer: false, mushroom: false });
-    setDiyChefNote("");
-  };
-
-  const handleReviewSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    triggerHaptic();
-    if (!reviewName.trim() || !reviewComment.trim()) {
-      return toast.error("कृपया सभी आवश्यक फ़ील्ड भरें!");
-    }
-    try {
-      await addDoc(collection(db, "reviews"), {
-        name: reviewName,
-        comment: reviewComment,
-        rating: reviewRating,
-        isApproved: false, 
-        timestamp: new Date()
-      });
-      toast.success("आपका रिव्यू सबमिट हो गया है! यह एडमिन अप्रूवल के बाद दिखेगा। ❤️");
-      setReviewName("");
-      setReviewComment("");
-      setReviewRating(5);
-      setIsReviewFormOpen(false);
-    } catch (err) {
-      toast.error("रिव्यू सबमिट करने में कोई समस्या आई।");
-    }
   };
 
   const handleScreenshotChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1435,7 +1180,7 @@ export default function BbCafeHome() {
       const img = new Image();
       img.onload = () => {
         const canvas = document.createElement('canvas');
-        const MAX_WIDTH = 600; // Resize to max 600px width for fast upload and Firestore size limit
+        const MAX_WIDTH = 600; 
         const scale = MAX_WIDTH / img.width;
         canvas.width = MAX_WIDTH;
         canvas.height = img.height * scale;
@@ -1443,7 +1188,7 @@ export default function BbCafeHome() {
         const ctx = canvas.getContext('2d');
         if (ctx) {
           ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-          const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7); // Compress quality to 70%
+          const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7); 
           setPaymentScreenshot(compressedBase64);
           toast.success(isHindi ? "स्क्रीनशॉट सफलतापूर्वक अपलोड और कंप्रेस हो गया!" : "Screenshot uploaded & compressed successfully!");
         }
@@ -1454,39 +1199,16 @@ export default function BbCafeHome() {
     reader.readAsDataURL(file);
   };
 
-  const scrollToMenu = () => {
-    triggerHaptic();
-    if (menuRef && menuRef.current) {
-      menuRef.current.scrollIntoView({ behavior: 'smooth' });
-    }
-  };
-
-  const handleQuickAddFromStory = (productName: string, price: number) => {
-    triggerHaptic();
-    const matchedItem = menu.find(item => item.name.toLowerCase().includes(productName.toLowerCase()));
-    if (matchedItem) {
-      addItem(matchedItem);
-      playSoundEffect('add');
-      toast.success(`${matchedItem.name} added to cart!`);
+  const handleCheckoutClick = () => {
+    if (paymentMethod === 'upi') {
+      setIsUpiPopupOpen(true);
     } else {
-      addItem({ id: `st-prod-${Date.now()}`, name: productName, price: price });
-      playSoundEffect('add');
-      toast.success(`${productName} added to cart!`);
+      sendWhatsAppOrder();
     }
-    setActiveStory(null);
   };
 
-  const handleReelEnded = () => {
-    setActiveStory(null);
-  };
-
-  const quickAppendInstruction = (tag: string, type = "normal") => {
-    triggerHaptic(20);
-    if (type === "diy") {
-      setDiyChefNote(prev => prev ? `${prev}, ${tag}` : tag);
-    } else {
-      setChefNote(prev => prev ? `${prev}, ${tag}` : tag);
-    }
+  const handleShareInvoice = () => {
+    toast.error(isHindi ? "यह रसीद उपलब्ध नहीं है।" : "Invoice not generated.");
   };
 
   const displayReviews = useMemo(() => {
@@ -1772,11 +1494,10 @@ export default function BbCafeHome() {
 
         {/* STICKY CATEGORY SLIDER (Locks smoothly under the search bar during scroll) */}
         <div className="sticky top-[64px] z-30 bg-gray-50/95 dark:bg-[#050505]/95 backdrop-blur-md py-2.5 px-1 border-b border-gray-200 dark:border-white/5 transition-all duration-200 shadow-sm">
-          <p className="text-[8px] font-black uppercase tracking-wider text-orange-500 pl-1">{isHindi ? "आज की विशेष प्रेरणा" : "Inspiration for your first order"}</p>
           <div className="flex gap-5 overflow-x-auto py-2 px-1 scrollbar-none [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             <button onClick={() => setSelectedCategory("Favorites")} className="flex flex-col items-center flex-shrink-0 group outline-none">
               <div className={`w-14 h-14 rounded-full overflow-hidden border transition-all flex items-center justify-center ${selectedCategory === "Favorites" ? 'border-red-500 scale-105 shadow-md' : 'dark:border-white/10 border-gray-200 bg-white dark:bg-neutral-900'}`}>
-                <Heart size={24} className={selectedCategory === "Favorites" ? 'text-red-500 fill-red-500' : 'text-gray-400'} />
+                <Heart size={24} className={selectedCategory === "Favorites" ? 'text-red-500 fill-red-555 text-red-500' : 'text-gray-400'} />
               </div>
               <span className={`text-[9px] font-black uppercase mt-1.5 truncate ${selectedCategory === "Favorites" ? 'text-red-500' : 'dark:text-gray-400 text-neutral-800'}`}>{isHindi ? "पसंदीदा" : "My Favorites"}</span>
             </button>
@@ -1891,7 +1612,7 @@ export default function BbCafeHome() {
 
             {/* Step 4: Premium Ingredients */}
             <div className="space-y-2.5 pt-2">
-              <label className="text-[10px] font-black uppercase text-orange-500">{isHindi ? "4. प्रीमियम एक्स्ट्रा टॉपिंग:" : "4. Premium Extra Toppings:"}</label>
+              <label className="text-[10px] font-black uppercase text-orange-500">{isHindi ? "4. प्रीमियम एक्स्ट्रा  टॉपिंग:" : "4. Premium Extra Toppings:"}</label>
               <div className="grid grid-cols-2 gap-2">
                 {[
                   { id: 'black_olive', label: 'Black Olive' },
@@ -2016,7 +1737,7 @@ export default function BbCafeHome() {
                         )}
 
                         <button onClick={(e) => handleToggleFavorite(item.id, e)} className="absolute top-3 right-3 bg-black/60 backdrop-blur-md p-1.5 rounded-full border border-white/10 text-white hover:text-red-500 transition-colors">
-                          <Heart size={14} className={favorites.includes(item.id) ? "fill-red-500 text-red-500" : "text-white"} />
+                          <Heart size={14} className={favorites.includes(item.id) ? "fill-red-505 text-red-500" : "text-white"} />
                         </button>
                       </div>
                       <div className="p-4 flex flex-col justify-between flex-1">
@@ -2032,7 +1753,7 @@ export default function BbCafeHome() {
                         <div className="h-px dark:bg-white/5 bg-gray-100 my-2.5" />
                         <div className="flex justify-between items-end mt-0.5">
                           <div>
-                            <p className="dark:text-gray-555 text-gray-400 text-[8px] font-black uppercase tracking-widest leading-none mb-1">{isHindi ? "कीमत" : "Price"}</p>
+                            <p className="dark:text-gray-550 text-gray-400 text-[8px] font-black uppercase tracking-widest leading-none mb-1">{isHindi ? "कीमत" : "Price"}</p>
                             <p className="text-orange-700 dark:text-orange-500 font-black text-base leading-none">{getDisplayPrice(item)}</p>
                             {item.variants && <span className="text-[8px] font-bold dark:text-gray-400 text-gray-505 mt-1 block">{isHindi ? "विकल्प उपलब्ध हैं" : "Options available"}</span>}
                           </div>
@@ -2075,7 +1796,7 @@ export default function BbCafeHome() {
                             </h4>
                             <p className="text-[10px] text-orange-100 font-bold leading-normal">
                               {customerDetails ? (
-                                isHindi ? "आपका प्रोमो पास एक्टिवेटेड है! ✅ हर ₹100 पर 1 पॉइंट कमाएं।  यहाँ क्लिक करके अपने रिवॉर्ड्स देखें ➔" : "Your promo pass is active! ✅ Earn 1 point per ₹100. Click here to view rewards ➔"
+                                isHindi ? "आपका प्रोमो पास एक्टिवेटेड है! ✅ हर ₹100 पर 1 पॉइंट कमाएं।  यहाँ क्लिक करके अपने  रिवॉर्ड्स देखें ➔" : "Your promo pass is active! ✅ Earn 1 point per ₹100. Click here to view rewards ➔"
                               ) : (
                                 isHindi ? "अपना Name और Number दर्ज करके इस पास को एक्टिवेट करें! 🎁 हर ₹100 पर 1 पॉइंट कमाएं।  टच करें ➔" : "Enter your Name & Number to activate this pass! 🎁 Earn 1 point per ₹100. Tap to activate ➔"
                               )}
@@ -2200,7 +1921,7 @@ export default function BbCafeHome() {
           <div className="grid grid-cols-2 gap-3 text-center text-[10px] font-black uppercase">
             <div className="dark:bg-white/[0.02] bg-white border dark:border-white/5 border-gray-200 p-4 rounded-2xl flex flex-col items-center justify-center space-y-1 shadow-md shadow-gray-200/30 dark:shadow-none transition-colors duration-200">
               <Clock className="text-orange-500" size={16} />
-              <p className="dark:text-gray-400 text-gray-550 text-[8px]">{isHindi ? "खुलने का समय" : "Open Timing"}</p>
+              <p className="dark:text-gray-400 text-gray-552 text-[8px]">{isHindi ? "खुलने का समय" : "Open Timing"}</p>
               <p className="dark:text-white text-neutral-800 text-[9px]">
                 {isHindi ? storeTimingHindi : storeTimingEnglish}
               </p>
@@ -2378,7 +2099,7 @@ export default function BbCafeHome() {
             </div>
           </div>
         )}
-      </  AnimatePresence>
+      </AnimatePresence>
 
       {/* WRITING REVIEW FORM MODAL WITH INTEGRATED EXIT OPTIONS */}
       <AnimatePresence>
@@ -2715,7 +2436,7 @@ export default function BbCafeHome() {
                               </div>
                               
                               <div className="border-t border-dashed dark:border-neutral-800 border-gray-200 pt-2.5 flex justify-between items-center text-xs font-black">
-                                <span className="text-gray-550">{isHindi ? "कुल भुगतान राशि:" : "To Pay Amount:"}</span>
+                                <span className="text-gray-505">{isHindi ? "कुल भुगतान राशि:" : "To Pay Amount:"}</span>
                                 <span className="text-sm text-green-500 dark:text-green-400">₹{ord.total}</span>
                               </div>
 
@@ -2827,49 +2548,11 @@ export default function BbCafeHome() {
               </div>
 
               <div className="mt-4 space-y-4">
-                {/* 3. UPSELL SUGGESTIONS */}
-                {upsellSuggestionItems.length > 0 && (
-                  <div className="dark:bg-purple-950/20 bg-purple-50 border border-purple-500/10 rounded-2xl p-4 space-y-2">
-                    <p className="text-[9px] font-black uppercase dark:text-purple-400 text-purple-800 tracking-wider">{isHindi ? "साथ में यह भी मंगाया गया 🥤" : "Frequently Bought Together 🥤"}</p>
-                    <div className="space-y-2">
-                      {upsellSuggestionItems.map((suggest) => (
-                        <div key={suggest.id} className="flex justify-between items-center text-[10px]">
-                          <div>
-                            <span className="font-bold block dark:text-white text-neutral-900">{suggest.name}</span>
-                            <span className="text-orange-600 font-extrabold">{getDisplayPrice(suggest)}</span>
-                          </div>
-                          <button onClick={() => { triggerHaptic(); addItem(suggest); }} className="bg-purple-500/20 text-purple-600 border border-purple-500/30 px-3 py-1 rounded-lg font-black uppercase animate-none">ADD</button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* 4. ADD EXTRA CONDIMENTS */}
-                <div className="dark:bg-white/[0.02] bg-gray-50 border dark:border-white/5 border-gray-200 rounded-2xl p-4 space-y-2 transition-colors duration-200">
-                  <p className="text-[9px] font-black uppercase dark:text-gray-400 text-neutral-800">{isHindi ? "आर्डर में एक्स्ट्रा मसाला जोड़ें:" : "Add Extra condiments to order:"}</p>
-                  <div className="grid grid-cols-3 gap-2">
-                    <button onClick={() => { triggerHaptic(); setKetchupAddon(!ketchupAddon); }} className={`p-2 rounded-xl border text-[9px] font-black ${ketchupAddon ? 'border-red-500 bg-red-500/5 text-red-600 animate-none' : 'dark:border-white/5 border-gray-200 bg-transparent dark:text-gray-400 text-neutral-800'}`}>
-                      {isHindi ? "केचप" : "Ketchup"} (+₹10)
-                    </button>
-                    <button onClick={() => { triggerHaptic(); setOreganoAddon(!oreganoAddon); }} className={`p-2 rounded-xl border text-[9px] font-black ${oreganoAddon ? 'border-yellow-500 bg-yellow-500/5 text-yellow-550 animate-none' : 'dark:border-white/5 border-gray-200 bg-transparent dark:text-gray-400 text-neutral-800'}`}>
-                      {isHindi ? "ऑरेगैनो" : "Oregano"} (+₹10)
-                    </button>
-                    <button onClick={() => { triggerHaptic(); setChiliFlakesAddon(!chiliFlakesAddon); }} className={`p-2 rounded-xl border text-[9px] font-black ${chiliFlakesAddon ? 'border-orange-500 bg-orange-500/5 text-orange-500 animate-none' : 'dark:border-white/5 border-gray-200 bg-transparent dark:text-gray-400 text-neutral-800'}`}>
-                      {isHindi ? "चिली फ्लेक्स" : "Chili Flakes"} (+₹10)
-                    </button>
-                  </div>
-                </div>
-
-                {/* 5. DELIVERY AREA ZONE SELECTOR */}
+                
+                {/* 3. FREE DELIVERY PROGRESS BAR (Repositioned above suggestions) */}
                 {fulfillmentType === "delivery" && (
                   <div className="dark:bg-white/[0.02] bg-gray-50 border dark:border-white/5 border-gray-200 rounded-2xl p-4 space-y-2.5 transition-colors duration-200">
-                    <div className="bg-amber-500/10 text-amber-500 p-2.5 rounded-xl border border-amber-500/20 text-[9px] font-black flex items-start gap-1.5 leading-normal">
-                      <span>⚠️</span>
-                      <p>{isHindi ? "होम डिलीवरी केवल 12 KM के दायरे के अंदर ही दी जाती है।" : "Home Delivery is strictly available within 12 KM of the cafe."}</p>
-                    </div>
-
-                    <label className="text-[9px] font-black uppercase dark:text-gray-400 text-neutral-800">{isHindi ? "डिलीवरी का क्षेत्र चुनें (KM):" : "Select Delivery Zone (KM):"}</label>
+                    <label className="text-[9px] font-black uppercase dark:text-gray-400 text-neutral-850">{isHindi ? "डिलीवरी का क्षेत्र चुनें (KM):" : "Select Delivery Zone (KM):"}</label>
                     <div className="grid grid-cols-2 gap-2">
                       {DELIVERY_AREAS.map((area) => {
                         const isSelected = selectedArea.name === area.name;
@@ -2906,6 +2589,40 @@ export default function BbCafeHome() {
                   </div>
                 )}
 
+                {/* 4. UPSELL SUGGESTIONS */}
+                {upsellSuggestionItems.length > 0 && (
+                  <div className="dark:bg-purple-950/20 bg-purple-50 border border-purple-500/10 rounded-2xl p-4 space-y-2">
+                    <p className="text-[9px] font-black uppercase dark:text-purple-400 text-purple-800 tracking-wider">{isHindi ? "साथ में यह भी मंगाया गया 🥤" : "Frequently Bought Together 🥤"}</p>
+                    <div className="space-y-2">
+                      {upsellSuggestionItems.map((suggest) => (
+                        <div key={suggest.id} className="flex justify-between items-center text-[10px]">
+                          <div>
+                            <span className="font-bold block dark:text-white text-neutral-900">{suggest.name}</span>
+                            <span className="text-orange-600 font-extrabold">{getDisplayPrice(suggest)}</span>
+                          </div>
+                          <button onClick={() => { triggerHaptic(); addItem(suggest); }} className="bg-purple-500/20 text-purple-600 border border-purple-500/30 px-3 py-1 rounded-lg font-black uppercase animate-none">ADD</button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* 5. ADD EXTRA CONDIMENTS */}
+                <div className="dark:bg-white/[0.02] bg-gray-50 border dark:border-white/5 border-gray-200 rounded-2xl p-4 space-y-2 transition-colors duration-200">
+                  <p className="text-[9px] font-black uppercase dark:text-gray-400 text-neutral-800">{isHindi ? "आर्डर में एक्स्ट्रा मसाला जोड़ें:" : "Add Extra condiments to order:"}</p>
+                  <div className="grid grid-cols-3 gap-2">
+                    <button onClick={() => { triggerHaptic(); setKetchupAddon(!ketchupAddon); }} className={`p-2 rounded-xl border text-[9px] font-black ${ketchupAddon ? 'border-red-500 bg-red-500/5 text-red-600 animate-none' : 'dark:border-white/5 border-gray-200 bg-transparent dark:text-gray-400 text-neutral-800'}`}>
+                      {isHindi ? "केचप" : "Ketchup"} (+₹10)
+                    </button>
+                    <button onClick={() => { triggerHaptic(); setOreganoAddon(!oreganoAddon); }} className={`p-2 rounded-xl border text-[9px] font-black ${oreganoAddon ? 'border-yellow-500 bg-yellow-500/5 text-yellow-555 animate-none' : 'dark:border-white/5 border-gray-200 bg-transparent dark:text-gray-400 text-neutral-800'}`}>
+                      {isHindi ? "ऑरेगैनो" : "Oregano"} (+₹10)
+                    </button>
+                    <button onClick={() => { triggerHaptic(); setChiliFlakesAddon(!chiliFlakesAddon); }} className={`p-2 rounded-xl border text-[9px] font-black ${chiliFlakesAddon ? 'border-orange-500 bg-orange-500/5 text-orange-500 animate-none' : 'dark:border-white/5 border-gray-200 bg-transparent dark:text-gray-400 text-neutral-800'}`}>
+                      {isHindi ? "चिली फ्लेक्स" : "Chili Flakes"} (+₹10)
+                    </button>
+                  </div>
+                </div>
+
                 {/* 6. CONDITIONAL FULFILLMENT INPUTS */}
                 {fulfillmentType === "delivery" && (
                   <div className="dark:bg-white/[0.02] bg-gray-50 p-4 rounded-2xl border dark:border-white/5 border-gray-200 space-y-2 transition-colors duration-200">
@@ -2941,7 +2658,7 @@ export default function BbCafeHome() {
 
                 {/* PROMO/COUPON CODE INPUT SECTION */}
                 <div className="dark:bg-white/[0.02] bg-gray-50 border dark:border-white/5 border-gray-200 rounded-2xl p-4 space-y-2.5 transition-colors duration-200">
-                  <label className="text-[9px] font-black uppercase dark:text-gray-400 text-neutral-850">
+                  <label className="text-[9px] font-black uppercase dark:text-gray-400 text-neutral-800">
                     {isHindi ? "कूपन कोड / प्रोमो कोड:" : "Coupon Code / Promo Code:"}
                   </label>
                   <div className="flex gap-2">
@@ -3007,50 +2724,15 @@ export default function BbCafeHome() {
                   </div>
 
                   {paymentMethod === "upi" && (
-                    <div className="bg-[#111] p-3 rounded-2xl border border-white/5 space-y-3 text-center text-[10px] font-bold text-gray-300">
+                    <div className="bg-[#111] p-3 rounded-2xl border border-white/5 space-y-3.5 text-center text-[10px] font-bold text-gray-300">
                       <p className="text-yellow-400 uppercase tracking-wider">{isHindi ? "आसान ऑनलाइन पेमेंट" : "Instant UPI Checkout"}</p>
-                      <p>{isHindi ? "ऑर्डर बटन दबाते ही आपके फोन का PhonePe/Paytm ऐप खुल जाएगा। कृपया भुगतान के बाद स्क्रीनशॉट यहाँ अपलोड करें!" : "Clicking the order button will open PhonePe/Paytm directly with pre-filled billing amount!"}</p>
-                      
-                      {/* UPI Payment Screenshot Upload Container */}
-                      <div className="bg-black/40 border border-white/10 p-3 rounded-xl space-y-2 text-left">
-                        <label className="text-[10px] font-black uppercase text-orange-500 block mb-1">
-                          {isHindi ? "📸 भुगतान का स्क्रीनशॉट अपलोड करें (आवश्यक):" : "📸 Upload Payment Screenshot (Required):"}
-                        </label>
-                        
-                        <input 
-                          type="file" 
-                          accept="image/*" 
-                          onChange={handleScreenshotChange}
-                          className="w-full text-xs text-gray-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[10px] file:font-black file:bg-orange-500 file:text-black file:cursor-pointer hover:file:bg-orange-600 outline-none"
-                        />
-                        
-                        {isCompressing && (
-                          <div className="flex items-center gap-1.5 text-orange-400 text-[9px] font-bold">
-                            <Loader2 className="animate-spin" size={10} />
-                            <span>Processing & compressing image...</span>
-                          </div>
-                        )}
-                        
-                        {paymentScreenshot && (
-                          <div className="relative w-24 h-24 border border-white/10 rounded-xl overflow-hidden mt-1 bg-black/60 flex items-center justify-center">
-                            <img src={paymentScreenshot} className="w-full h-full object-cover" alt="Payment Proof" />
-                            <button 
-                              type="button" 
-                              onClick={() => { triggerHaptic(20); setPaymentScreenshot(null); }}
-                              className="absolute top-1 right-1 bg-red-600 text-white rounded-full p-1"
-                              title="Remove Screenshot"
-                            >
-                              <X size={10} />
-                            </button>
-                          </div>
-                        )}
-                      </div>
+                      <p>{isHindi ? "कृपया आगे बढ़ने से पहले यूपीआई भुगतान पूरा करें और स्क्रीनशॉट अपलोड करें!" : "Kindly upload payment screenshot before ordering!"}</p>
                     </div>
                   )}
 
-                  {/* WHATSAPP TRIGGER */}
+                  {/* ORDER BUTTON */}
                   <button 
-                    onClick={sendWhatsAppOrder} 
+                    onClick={handleCheckoutClick} 
                     type="button" 
                     disabled={isSubmittingOrder} 
                     className="w-full bg-green-600 hover:bg-green-700 p-4 rounded-2xl font-black text-sm text-white flex items-center justify-center gap-2 shadow-lg animate-none disabled:opacity-60 disabled:cursor-not-allowed mt-2"
@@ -3069,6 +2751,122 @@ export default function BbCafeHome() {
               </div>
             </motion.div>
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* DETAILED INTERACTIVE UPI APP & SCREENSHOT POPUP */}
+      <AnimatePresence>
+        {isUpiPopupOpen && (
+          <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-[130] flex items-center justify-center p-6">
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="dark:bg-[#111] bg-white border dark:border-white/10 border-gray-200 p-6 rounded-[2.5rem] w-full max-w-sm relative shadow-2xl space-y-5 text-center"
+            >
+              <button 
+                type="button" 
+                onClick={() => { triggerHaptic(); setIsUpiPopupOpen(false); }}
+                className="absolute top-4 right-4 p-2 bg-red-150 hover:bg-red-600 hover:text-white text-red-600 rounded-full transition-all"
+                title="Close"
+              >
+                <X size={16} />
+              </button>
+
+              <div className="space-y-1">
+                <h3 className="text-base font-black text-orange-500 uppercase italic">
+                  {isHindi ? "यूपीआई भुगतान गेटवे 📱" : "UPI Payment Gateway 📱"}
+                </h3>
+                <p className="text-[10px] text-gray-400 font-semibold leading-relaxed">
+                  {isHindi ? "कृपया नीचे दिए गए किसी भी ऐप को चुनकर ₹" + getTotalBillPrice() + " का भुगतान पूरा करें, फिर स्क्रीनशॉट अपलोड करें!" : "Choose an app to pay ₹" + getTotalBillPrice() + " and upload the screenshot below:"}
+                </p>
+              </div>
+
+              {/* UPI Apps Grid */}
+              <div className="grid grid-cols-2 gap-2.5 pt-2">
+                <button 
+                  onClick={() => handleLaunchUpiPay('phonepe')}
+                  className="p-3 bg-white/[0.02] border dark:border-white/5 border-gray-200 hover:border-purple-500 rounded-xl flex items-center justify-center gap-2 transition-all active:scale-95"
+                >
+                  <img src="/phonepe.png" className="w-5 h-5 object-contain" alt="PhonePe" />
+                  <span className="text-[10px] font-black">PhonePe</span>
+                </button>
+                <button 
+                  onClick={() => handleLaunchUpiPay('paytm')}
+                  className="p-3 bg-white/[0.02] border dark:border-white/5 border-gray-200 hover:border-blue-500 rounded-xl flex items-center justify-center gap-2 transition-all active:scale-95"
+                >
+                  <img src="/paytm.png" className="w-5 h-5 object-contain" alt="Paytm" />
+                  <span className="text-[10px] font-black">Paytm</span>
+                </button>
+                <button 
+                  onClick={() => handleLaunchUpiPay('gpay')}
+                  className="p-3 bg-white/[0.02] border dark:border-white/5 border-gray-200 hover:border-green-500 rounded-xl flex items-center justify-center gap-2 transition-all active:scale-95"
+                >
+                  <img src="/youtube.png" className="w-5 h-5 object-contain" alt="Google Pay" />
+                  <span className="text-[10px] font-black">GPay</span>
+                </button>
+                <button 
+                  onClick={() => handleLaunchUpiPay('whatsapp')}
+                  className="p-3 bg-white/[0.02] border dark:border-white/5 border-gray-200 hover:border-green-600 rounded-xl flex items-center justify-center gap-2 transition-all active:scale-95"
+                >
+                  <img src="/whatsapp.png" className="w-5 h-5 object-contain" alt="WhatsApp Pay" />
+                  <span className="text-[10px] font-black">WA Pay</span>
+                </button>
+              </div>
+
+              {/* Interactive Screenshot Attachment Area */}
+              <div className="bg-black/40 border border-white/10 p-3 rounded-2xl text-left space-y-2.5">
+                <label className="text-[9px] font-black uppercase text-orange-500 block">
+                  {isHindi ? "📸 भुगतान का स्क्रीनशॉट डालें (अनिवार्य):" : "📸 Upload Screenshot (Required):"}
+                </label>
+                
+                <input 
+                  type="file" 
+                  accept="image/*" 
+                  onChange={handleScreenshotChange}
+                  className="w-full text-xs text-gray-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[9px] file:font-black file:bg-orange-500 file:text-black file:cursor-pointer hover:file:bg-orange-600 outline-none"
+                />
+                
+                {isCompressing && (
+                  <div className="flex items-center gap-1.5 text-orange-400 text-[9px] font-bold">
+                    <Loader2 className="animate-spin" size={10} />
+                    <span>Compressing Image, please wait...</span>
+                  </div>
+                )}
+                
+                {paymentScreenshot && (
+                  <div className="relative w-20 h-24 border border-white/10 rounded-xl overflow-hidden mt-1 bg-black/60 flex items-center justify-center mx-auto">
+                    <img src={paymentScreenshot} className="w-full h-full object-cover" alt="Attachment Preview" />
+                    <button 
+                      type="button" 
+                      onClick={() => { triggerHaptic(20); setPaymentScreenshot(null); }}
+                      className="absolute top-1 right-1 bg-red-600 text-white rounded-full p-1"
+                      title="Remove Screenshot"
+                    >
+                      <X size={10} />
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex gap-2">
+                <button 
+                  onClick={sendWhatsAppOrder}
+                  disabled={!paymentScreenshot || isSubmittingOrder}
+                  className="flex-1 bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-white p-3.5 rounded-xl font-black text-xs uppercase"
+                >
+                  {isSubmittingOrder ? "Confirming..." : (isHindi ? "ऑर्डर सबमिट करें" : "Submit Order")}
+                </button>
+                <button 
+                  type="button" 
+                  onClick={() => setIsUpiPopupOpen(false)}
+                  className="bg-white/5 text-gray-400 px-4 py-3.5 rounded-xl font-bold text-xs"
+                >
+                  {isHindi ? "बंद करें" : "Cancel"}
+                </button>
+              </div>
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
 
@@ -3111,25 +2909,6 @@ export default function BbCafeHome() {
           </div>
         )}
       </AnimatePresence>
-
-      {/* FLOATING CART BUTTON */}
-      {cart.length > 0 && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-full max-w-sm px-4">
-          <button
-            onClick={() => { triggerHaptic(); setIsCartOpen(true); }}
-            className="w-full bg-yellow-400 hover:bg-yellow-500 text-black py-4 px-5 rounded-2xl font-black text-xs uppercase flex justify-between items-center shadow-2xl active:scale-95 transition-all"
-          >
-            <div className="flex items-center gap-2">
-              <ShoppingBag size={18} />
-              <span>{cart.reduce((acc: number, item: any) => acc + item.quantity, 0)} Items Added</span>
-            </div>
-            <div className="flex items-center gap-0.5 bg-black/10 px-2 py-1 rounded-lg">
-              <span>{isHindi ? "कार्ट देखें" : "View Cart"}</span>
-              <ChevronRight size={12} />
-            </div>
-          </button>
-        </div>
-      )}
 
       {/* SECURED GIFT POINTS MODAL */}
       <AnimatePresence>
