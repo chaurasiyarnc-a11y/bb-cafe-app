@@ -2,8 +2,8 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
-  Home, Store, Trash2, Search, Plus, X, BarChart3, QrCode, 
-  PlusCircle, MinusCircle, ChevronRight, Sparkles, AlertTriangle, Printer, Edit, Layers, MessageCircle, Wrench, Tag
+  Home, Store, Trash2, Search, Plus, X, BarChart3, 
+  PlusCircle, MinusCircle, ChevronRight, Sparkles, AlertTriangle, Printer, Edit, Layers, MessageCircle, Wrench, Tag, Eye, EyeOff, Settings
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -19,16 +19,21 @@ interface InventoryItem {
   unit: string;
   purchasePrice: number;
   minLimit: number;
-  barcode?: string;
   supplier?: string;
   lastPurchaseDate?: string;
-  category?: string; // New Field
+  category?: string;
+}
+
+interface CategoryItem {
+  id: string;
+  name: string;
+  hidden: boolean;
 }
 
 interface StockOutLog {
   id: string;
   itemName: string;
-  itemId?: string; // New Reference
+  itemId?: string;
   qty: number;
   purpose: "Kitchen Use" | "Waste" | "Damage" | "Staff Use";
   date: string;
@@ -52,14 +57,6 @@ interface SavedOrderItem {
   orderQty: string;
 }
 
-interface ScannedItem {
-  id: string;
-  name: string;
-  qty: number;
-  unit: string;
-  price: number;
-}
-
 interface FixedAsset {
   id: string;
   name: string;
@@ -70,27 +67,6 @@ interface FixedAsset {
   remarks?: string;
 }
 
-// Dynamics CDN loader for Real Barcode Scanner (html5-qrcode)
-const loadHtml5Qrcode = (): Promise<any> => {
-  return new Promise((resolve, reject) => {
-    if (typeof window === 'undefined') return reject();
-    if ((window as any).Html5Qrcode) {
-      resolve((window as any).Html5Qrcode);
-      return;
-    }
-    const script = document.createElement('script');
-    script.src = "https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js";
-    script.async = true;
-    script.onload = () => {
-      resolve((window as any).Html5Qrcode);
-    };
-    script.onerror = (e) => {
-      reject(e);
-    };
-    document.head.appendChild(script);
-  });
-};
-
 const triggerHaptic = (ms = 35) => {
   if (typeof window !== 'undefined' && window.navigator && window.navigator.vibrate) {
     window.navigator.vibrate(ms);
@@ -98,15 +74,15 @@ const triggerHaptic = (ms = 35) => {
 };
 
 const INITIAL_INVENTORY: InventoryItem[] = [
-  { id: "dry_1", name: "DOODH MILK", storeQty: 40, unit: "Ltr", purchasePrice: 60, minLimit: 10, barcode: "890105800401", category: "DAIRY" },
-  { id: "dry_2", name: "DAHI CURD", storeQty: 15, unit: "Kg", purchasePrice: 80, minLimit: 5, barcode: "890105800402", category: "DAIRY" },
-  { id: "dry_3", name: "MAKKHAN BUTTER", storeQty: 24, unit: "Kg", purchasePrice: 420, minLimit: 8, barcode: "890105800240", category: "DAIRY" },
-  { id: "veg_2", name: "TAMATAR TOMATO", storeQty: 30, unit: "Kg", purchasePrice: 40, minLimit: 10, barcode: "890105800408", category: "VEGETABLES" }
+  { id: "dry_1", name: "DOODH MILK", storeQty: 40, unit: "Ltr", purchasePrice: 60, minLimit: 10, category: "DAIRY" },
+  { id: "dry_2", name: "DAHI CURD", storeQty: 15, unit: "Kg", purchasePrice: 80, minLimit: 5, category: "DAIRY" },
+  { id: "dry_3", name: "MAKKHAN BUTTER", storeQty: 24, unit: "Kg", purchasePrice: 420, minLimit: 8, category: "DAIRY" },
+  { id: "veg_2", name: "TAMATAR TOMATO", storeQty: 30, unit: "Kg", purchasePrice: 40, minLimit: 10, category: "VEGETABLES" }
 ];
 
 export default function BumBumCafeStockApp() {
   const [inventory, setInventory] = useState<InventoryItem[]>(INITIAL_INVENTORY);
-  const [categories, setCategories] = useState<string[]>(["DAIRY", "VEGETABLES", "DRY STOCK", "PACKAGING", "OTHERS"]);
+  const [categories, setCategories] = useState<CategoryItem[]>([]);
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>("All");
   const [orderLists, setOrderLists] = useState<OrderListMeta[]>([]);
   const [savedOrders, setSavedOrders] = useState<SavedOrderItem[]>([]);
@@ -121,7 +97,7 @@ export default function BumBumCafeStockApp() {
   const [localOrderQties, setLocalOrderQties] = useState<Record<string, string>>({});
   const [focusedOrderField, setFocusedOrderField] = useState<string | null>(null);
 
-  // Print/Selection States
+  // Selection States
   const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
   const [isMultiSelectMode, setIsMultiSelectMode] = useState<boolean>(false);
 
@@ -129,22 +105,18 @@ export default function BumBumCafeStockApp() {
   const [activeListId, setActiveListId] = useState<string>("");
   const [showSaveToListModal, setShowSaveToListModal] = useState<boolean>(false);
   const [showBulkCategoryModal, setShowBulkCategoryModal] = useState<boolean>(false);
+  const [showManageCategoriesModal, setShowManageCategoriesModal] = useState<boolean>(false);
   const [bulkTargetCategory, setBulkTargetCategory] = useState<string>("");
   const [newCategoryInput, setNewCategoryInput] = useState<string>("");
   const [targetListId, setTargetListId] = useState<string>("");
   const [newListNameInput, setNewListNameInput] = useState<string>("");
 
+  // Category Setting Input
+  const [addCategoryModalInput, setAddCategoryModalInput] = useState<string>("");
+
   // Rename Active List States
   const [isEditingListName, setIsEditingListName] = useState<boolean>(false);
   const [tempListNameInput, setTempListNameInput] = useState<string>("");
-
-  // Scanner States
-  const [scannerActive, setScannerActive] = useState<boolean>(false);
-  const [scannedItemsToVerify, setScannedItemsToVerify] = useState<ScannedItem[]>([]);
-  const [unrecognizedBarcode, setUnrecognizedBarcode] = useState<string | null>(null);
-  const [isScannerProcessing, setIsScannerProcessing] = useState<boolean>(false);
-  const [manualBarcodeInput, setManualBarcodeInput] = useState<string>("");
-  const html5QrCodeRef = useRef<any>(null);
 
   // Custom Modals & Forms
   const [showAddProductModal, setShowAddProductModal] = useState<boolean>(false);
@@ -152,7 +124,7 @@ export default function BumBumCafeStockApp() {
   const [editingProduct, setEditingProduct] = useState<InventoryItem | null>(null);
 
   const [formAddProduct, setFormAddProduct] = useState({
-    name: '', storeQty: '0', unit: 'Kg', purchasePrice: '', minLimit: '10', barcode: '', category: 'OTHERS'
+    name: '', storeQty: '0', unit: 'Kg', purchasePrice: '', minLimit: '10', category: 'OTHERS'
   });
 
   const [formAddAsset, setFormAddAsset] = useState({
@@ -175,7 +147,7 @@ export default function BumBumCafeStockApp() {
     setTimeout(() => setToast(null), 3000);
   };
 
-  // Keep inventory reference updated to prevent stale closures in Scanner
+  // Keep inventory reference updated
   const inventoryRef = useRef<InventoryItem[]>(inventory);
   useEffect(() => {
     inventoryRef.current = inventory;
@@ -200,12 +172,12 @@ export default function BumBumCafeStockApp() {
 
     const unsubCategories = onSnapshot(collection(db, "categories"), (snap) => {
       if (!snap.empty) {
-        setCategories(snap.docs.map(d => d.data().name as string));
+        setCategories(snap.docs.map(d => ({ id: d.id, ...d.data() } as CategoryItem)));
       } else {
-        // Seed default categories
         const defaults = ["DAIRY", "VEGETABLES", "DRY STOCK", "PACKAGING", "OTHERS"];
         defaults.forEach(async (cat) => {
-          await setDoc(doc(db, "categories", cat.toLowerCase()), { name: cat });
+          const catId = cat.toLowerCase().replace(/\s+/g, '_');
+          await setDoc(doc(db, "categories", catId), { id: catId, name: cat, hidden: false });
         });
       }
     }, (err) => console.error("Categories load error", err));
@@ -258,65 +230,6 @@ export default function BumBumCafeStockApp() {
     }
   }, [showSaveToListModal, orderLists, activeListId, targetListId]);
 
-  // Real Camera Barcode Scanner initialization using html5-qrcode
-  useEffect(() => {
-    let active = true;
-    if (scannerActive) {
-      setIsScannerProcessing(true);
-      loadHtml5Qrcode().then((Html5QrcodeClass) => {
-        if (!active) return;
-        setIsScannerProcessing(false);
-        try {
-          const scannerInstance = new Html5QrcodeClass("reader");
-          html5QrCodeRef.current = scannerInstance;
-          
-          scannerInstance.start(
-            { facingMode: "environment" },
-            {
-              fps: 15,
-              qrbox: (width: number, height: number) => {
-                return { width: Math.min(width * 0.8, 260), height: 160 };
-              }
-            },
-            (decodedText: string) => {
-              handleDetectedBarcode(decodedText);
-            },
-            () => {
-              // Frame scanning error is ignored to keep loop alive
-            }
-          ).catch((err: any) => {
-            console.warn("Camera start err", err);
-            toastMessage("कैमरा लोड करने में समस्या।", "error");
-          });
-        } catch (e) {
-          console.error(e);
-        }
-      }).catch(() => {
-        setIsScannerProcessing(false);
-        toastMessage("स्कैनर लाइब्रेरी लोड करने में विफल।", "error");
-      });
-    } else {
-      stopCamera();
-    }
-
-    return () => {
-      active = false;
-      stopCamera();
-    };
-  }, [scannerActive]);
-
-  const stopCamera = () => {
-    if (html5QrCodeRef.current) {
-      const scanner = html5QrCodeRef.current;
-      if (scanner.isScanning) {
-        scanner.stop().then(() => {
-          scanner.clear();
-        }).catch((e: any) => console.log(e));
-      }
-      html5QrCodeRef.current = null;
-    }
-  };
-
   // Calculations
   const stats = useMemo(() => {
     const totalVal = inventory.reduce((sum, item) => sum + (item.storeQty * item.purchasePrice), 0);
@@ -324,96 +237,40 @@ export default function BumBumCafeStockApp() {
     const wasteLoss = stockOutHistory
       .filter(s => s.purpose === "Waste" || s.purpose === "Damage")
       .reduce((sum, s) => sum + (s.financialLoss || 0), 0);
-    return { totalVal, lowCount, wasteLoss };
-  }, [inventory, stockOutHistory]);
+    
+    // Total calculation for Fixed Assets (Value and Quantity)
+    const totalFixedQty = fixedAssets.reduce((sum, asset) => sum + (asset.quantity || 0), 0);
+    const totalFixedVal = fixedAssets.reduce((sum, asset) => sum + ((asset.quantity || 1) * (asset.cost || 0)), 0);
+
+    return { totalVal, lowCount, wasteLoss, totalFixedQty, totalFixedVal };
+  }, [inventory, stockOutHistory, fixedAssets]);
+
+  // Filter Categories to only show visible (unhidden) tabs in selection
+  const visibleCategories = useMemo(() => {
+    return categories.filter(c => !c.hidden);
+  }, [categories]);
 
   const filteredInventory = useMemo(() => {
     return inventory.filter(item => {
       const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesCategory = selectedCategoryFilter === "All" || item.category === selectedCategoryFilter;
-      return matchesSearch && matchesCategory;
+      
+      // Filter out products belonging to hidden categories if selecting "All"
+      const itemCatObj = categories.find(c => c.name === item.category);
+      const isCategoryHidden = itemCatObj ? itemCatObj.hidden : false;
+
+      if (selectedCategoryFilter === "All") {
+        return matchesSearch && !isCategoryHidden;
+      } else {
+        return matchesSearch && item.category === selectedCategoryFilter;
+      }
     });
-  }, [inventory, searchQuery, selectedCategoryFilter]);
+  }, [inventory, searchQuery, selectedCategoryFilter, categories]);
 
   const filteredAssets = useMemo(() => {
     return fixedAssets.filter(asset => 
       asset.name.toLowerCase().includes(searchQuery.toLowerCase())
     );
   }, [fixedAssets, searchQuery]);
-
-  // Process manual or scanned barcode
-  const handleDetectedBarcode = (code: string) => {
-    triggerHaptic(80);
-    
-    // Stop camera temporarily once scanned
-    if (html5QrCodeRef.current && html5QrCodeRef.current.isScanning) {
-      html5QrCodeRef.current.stop().catch(() => {});
-    }
-
-    const foundItem = inventoryRef.current.find(i => i.barcode === code);
-    if (foundItem) {
-      setUnrecognizedBarcode(null);
-      setScannedItemsToVerify([{
-        id: foundItem.id,
-        name: foundItem.name,
-        qty: 1,
-        unit: foundItem.unit,
-        price: foundItem.purchasePrice
-      }]);
-      toastMessage(`सामग्री मिली: ${foundItem.name}`);
-    } else {
-      setScannedItemsToVerify([]);
-      setUnrecognizedBarcode(code);
-      toastMessage(`नया बारकोड पाया गया: ${code}`, "info");
-    }
-  };
-
-  // Trigger modal to add completely new product pre-filling scanned barcode
-  const handleAddNewItemFromScanner = () => {
-    if (!unrecognizedBarcode) return;
-    setFormAddProduct({
-      name: '',
-      storeQty: '0',
-      unit: 'Kg',
-      purchasePrice: '',
-      minLimit: '10',
-      barcode: unrecognizedBarcode,
-      category: 'OTHERS'
-    });
-    setScannerActive(false);
-    setUnrecognizedBarcode(null);
-    setScannedItemsToVerify([]);
-    setShowAddProductModal(true);
-  };
-
-  // Demo Scan for testing (Supports both existing and random registration)
-  const simulateBarcodeScan = () => {
-    setIsScannerProcessing(true);
-    setTimeout(() => {
-      setIsScannerProcessing(false);
-      // 30% chance of generating a brand new barcode, otherwise scan existing
-      if (Math.random() < 0.3 || inventory.length === 0) {
-        const randomNewBarcode = `89010580${Math.floor(1000 + Math.random() * 9000)}`;
-        handleDetectedBarcode(randomNewBarcode);
-      } else {
-        const randomItem = inventory[Math.floor(Math.random() * inventory.length)];
-        handleDetectedBarcode(randomItem.barcode || "890105800401");
-      }
-    }, 1000);
-  };
-
-  const saveVerifiedScan = async () => {
-    if (scannedItemsToVerify.length === 0) return;
-    const batch = writeBatch(db);
-    for (const item of scannedItemsToVerify) {
-      const itemRef = doc(db, "godown_inventory", item.id);
-      batch.set(itemRef, { storeQty: increment(item.qty) }, { merge: true });
-    }
-    await batch.commit();
-    toastMessage("स्टॉक अपडेट कर दिया गया!");
-    setScannerActive(false);
-    setScannedItemsToVerify([]);
-  };
 
   // Adjust stock quantity in list safely
   const adjustQty = (id: string, diff: number) => {
@@ -458,7 +315,6 @@ export default function BumBumCafeStockApp() {
     let targetId = targetListId;
 
     try {
-      // 1. If user wants a new list, create it first
       if (targetId === "CREATE_NEW") {
         if (!newListNameInput.trim()) {
           toastMessage("नया लिस्ट नाम दर्ज करें!", "error");
@@ -473,7 +329,6 @@ export default function BumBumCafeStockApp() {
         setNewListNameInput("");
       }
 
-      // 2. Fallback if no list is chosen or created
       if (!targetId) {
         targetId = `list_${Date.now()}`;
         await setDoc(doc(db, "order_lists", targetId), {
@@ -483,7 +338,6 @@ export default function BumBumCafeStockApp() {
         });
       }
 
-      // 3. Save selected items into saved_orders referencing listId
       const batch = writeBatch(db);
       for (const id of selectedItemIds) {
         const item = inventory.find(i => i.id === id);
@@ -527,8 +381,8 @@ export default function BumBumCafeStockApp() {
         return;
       }
       targetCategory = newCategoryInput.trim().toUpperCase();
-      // Save new category to DB
-      await setDoc(doc(db, "categories", targetCategory.toLowerCase()), { name: targetCategory });
+      const catId = targetCategory.toLowerCase().replace(/\s+/g, '_');
+      await setDoc(doc(db, "categories", catId), { id: catId, name: targetCategory, hidden: false });
       setNewCategoryInput("");
     }
 
@@ -551,6 +405,43 @@ export default function BumBumCafeStockApp() {
       toastMessage(`सफलतापूर्वक ${selectedItemIds.length} आइटम्स को ${targetCategory} में सेट किया गया!`);
     } catch {
       toastMessage("कैटेगरी अपडेट करने में विफलता।", "error");
+    }
+  };
+
+  // CATEGORY OPERATIONS PANEL HANDLERS
+  const handleAddNewCategoryInModal = async () => {
+    if (!addCategoryModalInput.trim()) {
+      toastMessage("कैटेगरी का नाम दर्ज करें!", "error");
+      return;
+    }
+    try {
+      const formattedName = addCategoryModalInput.trim().toUpperCase();
+      const catId = formattedName.toLowerCase().replace(/\s+/g, '_');
+      await setDoc(doc(db, "categories", catId), { id: catId, name: formattedName, hidden: false });
+      setAddCategoryModalInput("");
+      toastMessage("कैटेगरी जोड़ी गई!");
+    } catch {
+      toastMessage("कैटेगरी जोड़ने में विफलता।", "error");
+    }
+  };
+
+  const handleToggleCategoryHide = async (cat: CategoryItem) => {
+    try {
+      await setDoc(doc(db, "categories", cat.id), { hidden: !cat.hidden }, { merge: true });
+      toastMessage(cat.hidden ? `${cat.name} अब चालू है!` : `${cat.name} अब छिपा दी गई है!`, "info");
+    } catch {
+      toastMessage("कैटेगरी अपडेट करने में विफलता।", "error");
+    }
+  };
+
+  const handleRemoveCategory = async (cat: CategoryItem) => {
+    const confirm = window.confirm(`क्या आप सच में "${cat.name}" कैटेगरी को हटाना चाहते हैं?`);
+    if (!confirm) return;
+    try {
+      await deleteDoc(doc(db, "categories", cat.id));
+      toastMessage("कैटेगरी हटा दी गई।");
+    } catch {
+      toastMessage("कैटेगरी हटाने में विफलता।", "error");
     }
   };
 
@@ -593,12 +484,10 @@ export default function BumBumCafeStockApp() {
 
     try {
       const batch = writeBatch(db);
-      // Delete all items of this list
       const itemsToDelete = savedOrders.filter(o => o.listId === activeListId);
       itemsToDelete.forEach(item => {
         batch.delete(doc(db, "saved_orders", item.id));
       });
-      // Delete list metadata
       batch.delete(doc(db, "order_lists", activeListId));
       await batch.commit();
 
@@ -613,7 +502,7 @@ export default function BumBumCafeStockApp() {
   const handleAddProductSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formAddProduct.name) {
-      toastMessage("सामान का name आवश्यक है!", "error");
+      toastMessage("सामान का नाम आवश्यक है!", "error");
       return;
     }
     try {
@@ -625,7 +514,6 @@ export default function BumBumCafeStockApp() {
         unit: formAddProduct.unit,
         purchasePrice: parseFloat(formAddProduct.purchasePrice) || 0,
         minLimit: parseFloat(formAddProduct.minLimit) || 10,
-        barcode: formAddProduct.barcode.trim() || "",
         supplier: "Walk-In",
         lastPurchaseDate: new Date().toISOString().split('T')[0],
         category: formAddProduct.category.toUpperCase()
@@ -633,7 +521,7 @@ export default function BumBumCafeStockApp() {
       await setDoc(doc(db, "godown_inventory", customId), payload);
       toastMessage("नया सामान सफलतापूर्वक दर्ज हुआ!");
       setShowAddProductModal(false);
-      setFormAddProduct({ name: '', storeQty: '0', unit: 'Kg', purchasePrice: '', minLimit: '10', barcode: '', category: 'OTHERS' });
+      setFormAddProduct({ name: '', storeQty: '0', unit: 'Kg', purchasePrice: '', minLimit: '10', category: 'OTHERS' });
     } catch {
       toastMessage("सामान जोड़ने में विफलता।", "error");
     }
@@ -699,9 +587,7 @@ export default function BumBumCafeStockApp() {
     if (!confirm) return;
     try {
       const batch = writeBatch(db);
-      // Delete item
       batch.delete(doc(db, "godown_inventory", id));
-      // Clean up orphaned saved orders
       const relatedOrders = savedOrders.filter(o => o.itemId === id);
       relatedOrders.forEach(order => {
         batch.delete(doc(db, "saved_orders", order.id));
@@ -846,24 +732,19 @@ export default function BumBumCafeStockApp() {
         )}
       </AnimatePresence>
 
-      {/* HEADER */}
-      <header className={`sticky top-0 z-40 border-b p-4 backdrop-blur-md ${isDarkMode ? 'bg-black/80 border-neutral-800' : 'bg-white/80 border-neutral-100'}`}>
-        <div className="max-w-md mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="text-2xl">☕</span>
-            <div>
-              <h1 className="text-xs font-black text-orange-600 tracking-wider">BUM BUM CAFE</h1>
-              <p className="text-[9px] text-neutral-400 font-bold uppercase">Godown Control</p>
-            </div>
+      {/* HEADER - Fixed Height: h-16 (64px) */}
+      <header className={`sticky top-0 z-40 h-16 border-b px-4 backdrop-blur-md ${isDarkMode ? 'bg-black/80 border-neutral-800' : 'bg-white/80 border-neutral-100'} flex items-center justify-between`}>
+        <div className="flex items-center gap-2">
+          <span className="text-2xl">☕</span>
+          <div>
+            <h1 className="text-xs font-black text-orange-600 tracking-wider">BUM BUM CAFE</h1>
+            <p className="text-[9px] text-neutral-400 font-bold uppercase">Godown Control</p>
           </div>
-          <div className="flex items-center gap-1.5">
-            <button onClick={() => setScannerActive(true)} className="p-2 bg-orange-500 text-white rounded-xl flex items-center gap-1 text-[10px] font-black uppercase">
-              <QrCode size={14} /> <span>Scan</span>
-            </button>
-            <button onClick={() => setIsDarkMode(!isDarkMode)} className="p-2 bg-neutral-100 dark:bg-neutral-800 rounded-xl text-xs">
-              {isDarkMode ? '☀️' : '🌙'}
-            </button>
-          </div>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <button onClick={() => setIsDarkMode(!isDarkMode)} className="p-2 bg-neutral-100 dark:bg-neutral-800 rounded-xl text-xs">
+            {isDarkMode ? '☀️' : '🌙'}
+          </button>
         </div>
       </header>
 
@@ -887,18 +768,33 @@ export default function BumBumCafeStockApp() {
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-2">
-              <div className={`p-3 rounded-2xl border text-center ${isDarkMode ? 'bg-[#181818] border-neutral-800' : 'bg-white border-neutral-100'}`}>
-                <p className="text-[8px] font-black text-neutral-400 uppercase">Total Stock Val</p>
-                <p className="text-xs font-black text-orange-500 mt-1">₹{stats.totalVal.toLocaleString()}</p>
+            {/* Dashboard Stats Panel */}
+            <div className="space-y-2">
+              <div className="grid grid-cols-3 gap-2">
+                <div className={`p-3 rounded-2xl border text-center ${isDarkMode ? 'bg-[#181818] border-neutral-800' : 'bg-white border-neutral-100'}`}>
+                  <p className="text-[8px] font-black text-neutral-400 uppercase">Total Stock Val</p>
+                  <p className="text-xs font-black text-orange-500 mt-1">₹{stats.totalVal.toLocaleString()}</p>
+                </div>
+                <div className={`p-3 rounded-2xl border text-center ${isDarkMode ? 'bg-[#181818] border-neutral-800' : 'bg-white border-neutral-100'}`}>
+                  <p className="text-[8px] font-black text-neutral-400 uppercase">Wastage Loss</p>
+                  <p className="text-xs font-black text-red-500 mt-1">₹{stats.wasteLoss.toLocaleString()}</p>
+                </div>
+                <div className={`p-3 rounded-2xl border text-center ${isDarkMode ? 'bg-[#181818] border-neutral-800' : 'bg-white border-neutral-100'}`}>
+                  <p className="text-[8px] font-black text-neutral-400 uppercase">Low Stock</p>
+                  <p className="text-xs font-black text-amber-500 mt-1">{stats.lowCount} items</p>
+                </div>
               </div>
-              <div className={`p-3 rounded-2xl border text-center ${isDarkMode ? 'bg-[#181818] border-neutral-800' : 'bg-white border-neutral-100'}`}>
-                <p className="text-[8px] font-black text-neutral-400 uppercase">Wastage Loss</p>
-                <p className="text-xs font-black text-red-500 mt-1">₹{stats.wasteLoss.toLocaleString()}</p>
-              </div>
-              <div className={`p-3 rounded-2xl border text-center ${isDarkMode ? 'bg-[#181818] border-neutral-800' : 'bg-white border-neutral-100'}`}>
-                <p className="text-[8px] font-black text-neutral-400 uppercase">Low Stock</p>
-                <p className="text-xs font-black text-amber-500 mt-1">{stats.lowCount} items</p>
+
+              {/* Fixed Items Stats Added */}
+              <div className="grid grid-cols-2 gap-2">
+                <div className={`p-3 rounded-2xl border text-center ${isDarkMode ? 'bg-[#181818] border-neutral-800' : 'bg-white border-neutral-100'}`}>
+                  <p className="text-[8px] font-black text-neutral-400 uppercase">Fixed Assets Value</p>
+                  <p className="text-xs font-black text-blue-500 mt-1">₹{stats.totalFixedVal.toLocaleString()}</p>
+                </div>
+                <div className={`p-3 rounded-2xl border text-center ${isDarkMode ? 'bg-[#181818] border-neutral-800' : 'bg-white border-neutral-100'}`}>
+                  <p className="text-[8px] font-black text-neutral-400 uppercase">Fixed Assets Qty</p>
+                  <p className="text-xs font-black text-blue-500 mt-1">{stats.totalFixedQty} Units</p>
+                </div>
               </div>
             </div>
           </div>
@@ -908,64 +804,85 @@ export default function BumBumCafeStockApp() {
         {activeTab === 'store' && (
           <div className="space-y-4">
             
-            {/* SEARCH AND CONTROL ACTIONS */}
-            <div className="flex items-center gap-2">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" size={14} />
-                <input 
-                  type="text" 
-                  placeholder="आइटम खोजें..." 
-                  value={searchQuery}
-                  onChange={e => setSearchQuery(e.target.value)}
-                  className={`w-full pl-9 pr-4 py-2 text-xs rounded-xl border ${isDarkMode ? 'bg-neutral-900 border-neutral-800' : 'bg-white border-neutral-200'}`}
-                />
-              </div>
-              <button 
-                onClick={() => { setIsMultiSelectMode(!isMultiSelectMode); setSelectedItemIds([]); }}
-                className={`px-3 py-2 text-xs font-bold rounded-xl border transition-all ${
-                  isMultiSelectMode ? 'bg-orange-500 text-white border-orange-500' : isDarkMode ? 'bg-neutral-800 border-neutral-700' : 'bg-white border-neutral-200'
-                }`}
-              >
-                {isMultiSelectMode ? "Stop Select" : "Multi Select"}
-              </button>
-            </div>
-
-            {/* CATEGORY FILTER TABS */}
-            <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-hide">
-              <button
-                onClick={() => setSelectedCategoryFilter("All")}
-                className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider shrink-0 border ${
-                  selectedCategoryFilter === "All"
-                    ? "bg-orange-500 border-orange-500 text-white"
-                    : isDarkMode ? "bg-neutral-900 border-neutral-800 text-neutral-400" : "bg-neutral-100 border-neutral-200 text-neutral-600"
-                }`}
-              >
-                All Items
-              </button>
-              {categories.map(cat => (
-                <button
-                  key={cat}
-                  onClick={() => setSelectedCategoryFilter(cat)}
-                  className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider shrink-0 border ${
-                    selectedCategoryFilter === cat
-                      ? "bg-orange-500 border-orange-500 text-white"
-                      : isDarkMode ? "bg-neutral-900 border-neutral-800 text-neutral-400" : "bg-neutral-100 border-neutral-200 text-neutral-600"
+            {/* STICKY SEARCH & CATEGORY SELECTOR - Sticks directly below 64px header */}
+            <div className={`sticky top-[64px] z-30 py-2 space-y-2.5 backdrop-blur-md ${isDarkMode ? 'bg-[#0E0E0E]/90' : 'bg-[#FAFAFA]/90'} border-b border-dashed ${isDarkMode ? 'border-neutral-800' : 'border-neutral-100'}`}>
+              
+              <div className="flex items-center gap-2">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" size={14} />
+                  <input 
+                    type="text" 
+                    placeholder="आइटम खोजें..." 
+                    value={searchQuery}
+                    onChange={e => setSearchQuery(e.target.value)}
+                    className={`w-full pl-9 pr-4 py-2 text-xs rounded-xl border ${isDarkMode ? 'bg-neutral-900 border-neutral-800 text-white' : 'bg-white border-neutral-200 text-neutral-950'}`}
+                  />
+                </div>
+                <button 
+                  onClick={() => { setIsMultiSelectMode(!isMultiSelectMode); setSelectedItemIds([]); }}
+                  className={`px-3 py-2 text-xs font-bold rounded-xl border transition-all ${
+                    isMultiSelectMode ? 'bg-orange-500 text-white border-orange-500' : isDarkMode ? 'bg-neutral-800 border-neutral-700 text-neutral-300' : 'bg-white border-neutral-200 text-neutral-700'
                   }`}
                 >
-                  {cat}
+                  {isMultiSelectMode ? "Stop Select" : "Multi Select"}
                 </button>
-              ))}
+              </div>
+
+              {/* CATEGORY FILTER TABS + MANAGEMENT GEAR BUTTON */}
+              <div className="flex items-center gap-1.5 w-full">
+                <div className="flex gap-1.5 overflow-x-auto pb-1 flex-1 scrollbar-hide">
+                  <button
+                    onClick={() => setSelectedCategoryFilter("All")}
+                    className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider shrink-0 border ${
+                      selectedCategoryFilter === "All"
+                        ? "bg-orange-500 border-orange-500 text-white"
+                        : isDarkMode ? "bg-neutral-900 border-neutral-800 text-neutral-400" : "bg-neutral-100 border-neutral-200 text-neutral-600"
+                    }`}
+                  >
+                    All Items
+                  </button>
+                  {visibleCategories.map(cat => (
+                    <button
+                      key={cat.id}
+                      onClick={() => setSelectedCategoryFilter(cat.name)}
+                      className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider shrink-0 border ${
+                        selectedCategoryFilter === cat.name
+                          ? "bg-orange-500 border-orange-500 text-white"
+                          : isDarkMode ? "bg-neutral-900 border-neutral-800 text-neutral-400" : "bg-neutral-100 border-neutral-200 text-neutral-600"
+                      }`}
+                    >
+                      {cat.name}
+                    </button>
+                  ))}
+                </div>
+                
+                <button 
+                  onClick={() => setShowManageCategoriesModal(true)}
+                  className={`p-1.5 rounded-xl border transition-all shrink-0 ${
+                    isDarkMode ? 'bg-neutral-900 border-neutral-800 text-neutral-400 hover:text-white' : 'bg-white border-neutral-200 text-neutral-500 hover:text-orange-500'
+                  }`}
+                  title="Manage Categories"
+                >
+                  <Settings size={15} />
+                </button>
+              </div>
             </div>
 
             <button 
               onClick={() => {
-                setFormAddProduct({ name: '', storeQty: '0', unit: 'Kg', purchasePrice: '', minLimit: '10', barcode: '', category: 'OTHERS' });
+                setFormAddProduct({ name: '', storeQty: '0', unit: 'Kg', purchasePrice: '', minLimit: '10', category: 'OTHERS' });
                 setShowAddProductModal(true);
               }}
               className="w-full py-2.5 bg-green-600 hover:bg-green-700 text-white text-xs font-black uppercase rounded-xl flex items-center justify-center gap-1.5 shadow"
             >
               <Plus size={14} /> Add New Product (सामान जोड़ें)
             </button>
+
+            {/* TOTAL ITEMS AND SHOWING COUNTER */}
+            <div className="flex justify-between items-center text-[10px] font-black uppercase text-neutral-400 px-1 border-b border-neutral-100 dark:border-neutral-800/65 pb-2">
+              <span>STOCK ITEMS</span>
+              <span>Showing {filteredInventory.length} of {inventory.length} total</span>
+            </div>
 
             {/* FLOATING ACTION BOTTOM BANNER FOR MULTI SELECT WITH TWO ACTIONS */}
             {isMultiSelectMode && selectedItemIds.length > 0 && (
@@ -1050,7 +967,6 @@ export default function BumBumCafeStockApp() {
                             </button>
                           )}
                         </div>
-                        {item.barcode && <p className="text-[8px] text-neutral-400 font-bold uppercase tracking-widest mt-1">Barcode: {item.barcode}</p>}
                       </div>
                       <div className="text-right pr-6">
                         <span className="text-xs text-neutral-400 font-bold">{item.storeQty} {item.unit}</span>
@@ -1112,33 +1028,37 @@ export default function BumBumCafeStockApp() {
         {/* ==================== TAB 3: FIXED ASSETS ==================== */}
         {activeTab === 'fixed_assets' && (
           <div className="space-y-4">
-            <div className="flex justify-between items-center">
-              <div>
-                <h2 className="text-sm font-black text-orange-600 uppercase">Fixed Assets (स्थिर संपत्तियां)</h2>
-                <p className="text-[10px] text-neutral-400">फ्रिज, ओवन, कुर्सी, टेबल, मिक्सी आदि की सूची</p>
+            
+            {/* STICKY SEARCH & ADD ACTIONS */}
+            <div className={`sticky top-[64px] z-30 py-2.5 space-y-2.5 backdrop-blur-md ${isDarkMode ? 'bg-[#0E0E0E]/90' : 'bg-[#FAFAFA]/90'} border-b border-dashed ${isDarkMode ? 'border-neutral-800' : 'border-neutral-100'}`}>
+              <div className="flex justify-between items-center">
+                <div>
+                  <h2 className="text-sm font-black text-orange-600 uppercase">Fixed Assets (स्थिर संपत्तियां)</h2>
+                  <p className="text-[10px] text-neutral-400">उपकरण, फ्रिज, ओवन आदि</p>
+                </div>
+                <button 
+                  onClick={() => setShowAddAssetModal(true)}
+                  className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-xl text-xs font-black uppercase flex items-center gap-1 shadow"
+                >
+                  <Plus size={14} /> Add Asset
+                </button>
               </div>
-              <button 
-                onClick={() => setShowAddAssetModal(true)}
-                className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-xl text-xs font-black uppercase flex items-center gap-1 shadow"
-              >
-                <Plus size={14} /> Add Asset
-              </button>
-            </div>
 
-            {/* Search Assets */}
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" size={14} />
-              <input 
-                type="text" 
-                placeholder="एसेट्स खोजें..." 
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-                className={`w-full pl-9 pr-4 py-2 text-xs rounded-xl border ${isDarkMode ? 'bg-neutral-900 border-neutral-800' : 'bg-white border-neutral-200'}`}
-              />
+              {/* Search Assets */}
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" size={14} />
+                <input 
+                  type="text" 
+                  placeholder="एसेट्स खोजें..." 
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  className={`w-full pl-9 pr-4 py-2 text-xs rounded-xl border ${isDarkMode ? 'bg-neutral-900 border-neutral-800 text-white' : 'bg-white border-neutral-200 text-neutral-950'}`}
+                />
+              </div>
             </div>
 
             {/* List of Fixed Assets */}
-            <div className="space-y-2.5 max-h-[55vh] overflow-y-auto pr-1">
+            <div className="space-y-2.5 max-h-[50vh] overflow-y-auto pr-1">
               {filteredAssets.map(asset => (
                 <div key={asset.id} className={`p-4 rounded-2xl border ${isDarkMode ? 'bg-[#181818] border-neutral-800' : 'bg-white border-neutral-100'}`}>
                   <div className="flex justify-between items-start">
@@ -1190,86 +1110,87 @@ export default function BumBumCafeStockApp() {
         {activeTab === 'saved_list' && (
           <div className="space-y-4">
             
-            {/* MULTIPLE LISTS DROPDOWN AND RENAMING HEADER */}
-            <div className="bg-neutral-50 dark:bg-neutral-900/40 p-4 rounded-2xl border border-neutral-100 dark:border-neutral-800 space-y-3.5">
-              
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-black uppercase text-neutral-400">Choose Active List:</span>
-                <select 
-                  value={activeListId}
-                  onChange={e => {
-                    triggerHaptic();
-                    setActiveListId(e.target.value);
-                  }}
-                  className={`flex-1 p-2 text-xs font-bold rounded-xl border ${
-                    isDarkMode ? 'bg-neutral-800 border-neutral-700 text-white' : 'bg-white border-neutral-200 text-neutral-900'
-                  }`}
-                >
-                  <option value="">-- No Active List --</option>
-                  {orderLists.map(list => (
-                    <option key={list.id} value={list.id}>{list.name}</option>
-                  ))}
-                </select>
-                {activeListId && (
-                  <button 
-                    onClick={handleDeleteActiveList}
-                    className="p-2 bg-red-100 dark:bg-red-500/10 text-red-500 rounded-xl"
-                    title="पूरी लिस्ट डिलीट करें"
+            {/* STICKY SELECT & RENAME CONTAINER */}
+            <div className={`sticky top-[64px] z-30 py-2.5 space-y-2.5 backdrop-blur-md ${isDarkMode ? 'bg-[#0E0E0E]/90' : 'bg-[#FAFAFA]/90'} border-b border-dashed ${isDarkMode ? 'border-neutral-800' : 'border-neutral-100'}`}>
+              <div className="bg-neutral-50 dark:bg-neutral-900/40 p-3 rounded-2xl border border-neutral-100 dark:border-neutral-800 space-y-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-black uppercase text-neutral-400 shrink-0">Choose List:</span>
+                  <select 
+                    value={activeListId}
+                    onChange={e => {
+                      triggerHaptic();
+                      setActiveListId(e.target.value);
+                    }}
+                    className={`flex-1 p-2 text-xs font-bold rounded-xl border ${
+                      isDarkMode ? 'bg-neutral-800 border-neutral-700 text-white' : 'bg-white border-neutral-200 text-neutral-900'
+                    }`}
                   >
-                    <Trash2 size={14} />
-                  </button>
-                )}
-              </div>
-
-              {activeListId && (
-                <div className="border-t border-dashed border-neutral-200 dark:border-neutral-800 pt-3">
-                  {isEditingListName ? (
-                    <div className="flex items-center gap-1.5 w-full">
-                      <input 
-                        type="text" 
-                        value={tempListNameInput} 
-                        onChange={e => setTempListNameInput(e.target.value)}
-                        className={`flex-1 p-2 rounded-xl border text-xs font-bold ${isDarkMode ? 'bg-neutral-800 border-neutral-700 text-white' : 'bg-white border-neutral-200 text-neutral-900'}`}
-                        required
-                      />
-                      <button 
-                        onClick={() => {
-                          handleUpdateListName(tempListNameInput);
-                          setIsEditingListName(false);
-                        }}
-                        className="px-3.5 py-2 bg-green-600 text-white rounded-xl text-[10px] font-black uppercase tracking-wider"
-                      >
-                        Save
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <h2 className="text-xs font-black text-orange-600 uppercase tracking-widest leading-relaxed">
-                          {activeListName}
-                        </h2>
-                        <button 
-                          onClick={() => {
-                            setTempListNameInput(activeListName);
-                            setIsEditingListName(true);
-                          }}
-                          className="p-1 hover:bg-neutral-200 dark:hover:bg-neutral-800 rounded-lg text-neutral-400 hover:text-orange-500 transition-all"
-                          title="ऑर्डर लिस्ट का नाम बदलें"
-                        >
-                          <Edit size={12} />
-                        </button>
-                      </div>
-                      <span className="text-[8px] text-neutral-400 font-bold uppercase tracking-wide">
-                        {savedOrders.filter(o => o.listId === activeListId).length} Items listed
-                      </span>
-                    </div>
+                    <option value="">-- No Active List --</option>
+                    {orderLists.map(list => (
+                      <option key={list.id} value={list.id}>{list.name}</option>
+                    ))}
+                  </select>
+                  {activeListId && (
+                    <button 
+                      onClick={handleDeleteActiveList}
+                      className="p-2 bg-red-100 dark:bg-red-500/10 text-red-500 rounded-xl shrink-0"
+                      title="पूरी लिस्ट डिलीट करें"
+                    >
+                      <Trash2 size={14} />
+                    </button>
                   )}
                 </div>
-              )}
+
+                {activeListId && (
+                  <div className="border-t border-dashed border-neutral-200 dark:border-neutral-800 pt-2">
+                    {isEditingListName ? (
+                      <div className="flex items-center gap-1.5 w-full">
+                        <input 
+                          type="text" 
+                          value={tempListNameInput} 
+                          onChange={e => setTempListNameInput(e.target.value)}
+                          className={`flex-1 p-2 rounded-xl border text-xs font-bold ${isDarkMode ? 'bg-neutral-800 border-neutral-700 text-white' : 'bg-white border-neutral-200 text-neutral-900'}`}
+                          required
+                        />
+                        <button 
+                          onClick={() => {
+                            handleUpdateListName(tempListNameInput);
+                            setIsEditingListName(false);
+                          }}
+                          className="px-3.5 py-2 bg-green-600 text-white rounded-xl text-[10px] font-black uppercase tracking-wider"
+                        >
+                          Save
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <h2 className="text-xs font-black text-orange-600 uppercase tracking-widest leading-relaxed">
+                            {activeListName}
+                          </h2>
+                          <button 
+                            onClick={() => {
+                              setTempListNameInput(activeListName);
+                              setIsEditingListName(true);
+                            }}
+                            className="p-1 hover:bg-neutral-200 dark:hover:bg-neutral-800 rounded-lg text-neutral-400 hover:text-orange-500 transition-all"
+                            title="ऑर्डर लिस्ट का नाम बदलें"
+                          >
+                            <Edit size={12} />
+                          </button>
+                        </div>
+                        <span className="text-[8px] text-neutral-400 font-bold uppercase tracking-wide">
+                          {savedOrders.filter(o => o.listId === activeListId).length} Items
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* List Table of Saved orders (Filtered by activeListId) */}
-            <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-1">
+            <div className="space-y-3 max-h-[48vh] overflow-y-auto pr-1">
               {savedOrders
                 .filter(item => item.listId === activeListId)
                 .map(item => {
@@ -1405,139 +1326,86 @@ export default function BumBumCafeStockApp() {
       {/* ==================== SCREEN MODALS ==================== */}
       <AnimatePresence>
 
-        {/* 1. REAL CAMERA BARCODE SCANNER WINDOW */}
-        {scannerActive && (
-          <div className="fixed inset-0 bg-black z-[150] flex flex-col justify-between p-4 text-white">
-            <div className="flex justify-between items-center border-b border-neutral-800 pb-3">
-              <div>
-                <p className="text-xs font-black uppercase text-orange-500">📷 Real Camera Scanner</p>
-                <p className="text-[9px] text-neutral-400">सामान का बारकोड स्कैन करें</p>
+        {/* 1. MANAGE CATEGORIES MODAL (ADD, REMOVE, HIDE/UNHIDE) */}
+        {showManageCategoriesModal && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }} 
+              animate={{ opacity: 1, scale: 1 }} 
+              exit={{ opacity: 0, scale: 0.95 }} 
+              className={`w-full max-w-sm rounded-[2rem] p-6 space-y-4 border ${
+                isDarkMode ? 'bg-[#0F0F0F] border-neutral-800 text-white' : 'bg-white border-neutral-100 text-neutral-900'
+              }`}
+            >
+              <div className="flex justify-between items-center border-b pb-2.5">
+                <div>
+                  <h3 className="text-xs font-black uppercase text-orange-500">Manage Categories</h3>
+                  <p className="text-[9px] text-neutral-400 font-bold uppercase mt-0.5">कैटेगरी जोड़ें, हटाएं या छिपाएं</p>
+                </div>
+                <button 
+                  type="button" 
+                  onClick={() => setShowManageCategoriesModal(false)} 
+                  className="p-1.5 bg-neutral-100 dark:bg-neutral-800 rounded-xl"
+                >
+                  <X size={14} />
+                </button>
               </div>
-              <button 
-                onClick={() => { 
-                  setScannerActive(false); 
-                  setScannedItemsToVerify([]); 
-                  setUnrecognizedBarcode(null); 
-                }} 
-                className="p-2 bg-neutral-900 rounded-xl"
-              >
-                <X size={15} />
-              </button>
-            </div>
 
-            {/* SCANNER LOGIC VIEWS */}
-            {scannedItemsToVerify.length > 0 ? (
-              /* Scenario A: Scanned Item exists in Database */
-              <div className="flex-1 flex flex-col justify-center space-y-4 max-w-sm mx-auto w-full">
-                <div className="p-4 bg-neutral-900 border border-neutral-800 rounded-2xl space-y-3">
-                  <div className="flex justify-between">
-                    <span className="font-bold text-[#FF6B00] text-sm">{scannedItemsToVerify[0].name}</span>
-                  </div>
-                  <div className="space-y-1.5 text-xs">
-                    <label className="text-[9px] text-neutral-400 font-bold block uppercase">Quantity to Add (जोड़ने की मात्रा)</label>
-                    <input 
-                      type="number"
-                      value={scannedItemsToVerify[0].qty}
-                      onChange={e => setScannedItemsToVerify([{ ...scannedItemsToVerify[0], qty: parseFloat(e.target.value) || 0 }])}
-                      className="w-full p-2.5 bg-neutral-800 rounded-xl text-center font-black text-white"
-                    />
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  <button 
-                    onClick={() => {
-                      setScannedItemsToVerify([]);
-                      setUnrecognizedBarcode(null);
-                      // Restart Scanning Stream
-                      if (html5QrCodeRef.current && !html5QrCodeRef.current.isScanning) {
-                        html5QrCodeRef.current.start(
-                          { facingMode: "environment" },
-                          { fps: 15, qrbox: (w: number, h: number) => ({ width: Math.min(w * 0.8, 260), height: 160 }) },
-                          handleDetectedBarcode,
-                          () => {}
-                        ).catch(() => {});
-                      }
-                    }} 
-                    className="flex-1 py-3 bg-neutral-800 hover:bg-neutral-700 rounded-xl font-bold text-xs uppercase"
-                  >
-                    Scan Again
-                  </button>
-                  <button onClick={saveVerifiedScan} className="flex-1 py-3 bg-green-600 rounded-xl font-black text-xs uppercase">
-                    Verify & Add
-                  </button>
-                </div>
+              {/* Add New Category inside Modal */}
+              <div className="flex gap-1.5 items-center">
+                <input 
+                  type="text" 
+                  placeholder="जैसे: DESSERTS"
+                  value={addCategoryModalInput}
+                  onChange={e => setAddCategoryModalInput(e.target.value)}
+                  className={`flex-1 p-2 rounded-xl text-xs font-bold border uppercase ${
+                    isDarkMode ? 'bg-neutral-900 border-neutral-800 text-white' : 'bg-white border-neutral-200 text-neutral-900'
+                  }`}
+                />
+                <button 
+                  onClick={handleAddNewCategoryInModal}
+                  className="px-3 py-2 bg-green-600 text-white text-xs font-black uppercase rounded-xl shadow shrink-0"
+                >
+                  Add
+                </button>
               </div>
-            ) : unrecognizedBarcode ? (
-              /* Scenario B: Unrecognized Barcode -> Create New Product with pre-filled barcode */
-              <div className="flex-1 flex flex-col justify-center space-y-4 max-w-sm mx-auto w-full">
-                <div className="p-5 bg-neutral-900 border border-red-500/30 rounded-2xl text-center space-y-3">
-                  <span className="text-3xl">⚠️</span>
-                  <p className="text-sm font-bold text-red-400">यह बारकोड गोदाम में मौजूद नहीं है!</p>
-                  <p className="text-xs text-neutral-300">
-                    Barcode: <span className="font-mono text-white bg-neutral-800 px-2 py-1 rounded font-bold">{unrecognizedBarcode}</span>
-                  </p>
-                  <p className="text-[10px] text-neutral-500">क्या आप इस बारकोड के साथ नया सामान जोड़ना चाहते हैं?</p>
-                </div>
-                
-                <div className="flex gap-2">
-                  <button 
-                    onClick={() => {
-                      setUnrecognizedBarcode(null);
-                      if (html5QrCodeRef.current && !html5QrCodeRef.current.isScanning) {
-                        html5QrCodeRef.current.start(
-                          { facingMode: "environment" },
-                          { fps: 15, qrbox: (w: number, h: number) => ({ width: Math.min(w * 0.8, 260), height: 160 }) },
-                          handleDetectedBarcode,
-                          () => {}
-                        ).catch(() => {});
-                      }
-                    }} 
-                    className="flex-1 py-3 bg-neutral-800 hover:bg-neutral-700 rounded-xl font-bold text-xs uppercase"
-                  >
-                    Scan Again
-                  </button>
-                  <button 
-                    onClick={handleAddNewItemFromScanner} 
-                    className="flex-1 py-3 bg-orange-500 hover:bg-orange-600 rounded-xl font-black text-xs uppercase"
-                  >
-                    + Register New Item
-                  </button>
-                </div>
-              </div>
-            ) : (
-              /* Scenario C: Scanning Camera screen active feed */
-              <div className="flex-1 flex flex-col justify-between py-4 max-w-sm mx-auto w-full">
-                <div className="space-y-1">
-                  <input 
-                    type="text" 
-                    placeholder="Type/Paste Barcode manually..." 
-                    value={manualBarcodeInput}
-                    onChange={e => setManualBarcodeInput(e.target.value)}
-                    onKeyDown={e => { if (e.key === 'Enter') { handleDetectedBarcode(manualBarcodeInput); setManualBarcodeInput(""); } }}
-                    className="w-full p-2.5 bg-neutral-900 border border-neutral-800 rounded-xl text-center text-xs text-white font-mono"
-                  />
-                </div>
 
-                {/* Real-time HTML5 Camera scanning overlay */}
-                <div className="relative h-60 w-full bg-neutral-950 border border-neutral-800 rounded-3xl overflow-hidden flex items-center justify-center">
-                  <div id="reader" className="absolute inset-0 w-full h-full [&_video]:object-cover [&_video]:w-full [&_video]:h-full z-0" />
-                  <span className="absolute left-0 right-0 h-0.5 bg-red-500 animate-bounce top-1/2 pointer-events-none z-10" />
-                  
-                  {isScannerProcessing && (
-                    <div className="absolute inset-0 bg-black/80 flex flex-col items-center justify-center space-y-2 z-20">
-                      <span className="text-[10px] font-bold text-orange-500 animate-pulse">STARTING REAL CAMERA...</span>
+              {/* List of Existing Categories with controls */}
+              <div className="space-y-1.5 max-h-[35vh] overflow-y-auto pr-1">
+                {categories.map(cat => (
+                  <div 
+                    key={cat.id} 
+                    className={`flex items-center justify-between p-2.5 rounded-xl border text-xs font-bold ${
+                      cat.hidden 
+                        ? 'opacity-40 border-dashed border-neutral-300 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-950/20' 
+                        : isDarkMode ? 'bg-neutral-900/60 border-neutral-850' : 'bg-neutral-50 border-neutral-100'
+                    }`}
+                  >
+                    <span className="uppercase">{cat.name} {cat.hidden && "(Hidden)"}</span>
+                    <div className="flex items-center gap-1.5">
+                      <button 
+                        onClick={() => handleToggleCategoryHide(cat)}
+                        className={`p-1.5 rounded-lg transition-all ${
+                          cat.hidden 
+                            ? 'bg-neutral-200 dark:bg-neutral-800 text-neutral-500' 
+                            : 'bg-orange-100 text-orange-600 hover:bg-orange-200'
+                        }`}
+                        title={cat.hidden ? "Unhide Category" : "Hide Category"}
+                      >
+                        {cat.hidden ? <EyeOff size={13} /> : <Eye size={13} />}
+                      </button>
+                      <button 
+                        onClick={() => handleRemoveCategory(cat)}
+                        className="p-1.5 bg-red-100 hover:bg-red-200 text-red-500 rounded-lg transition-all"
+                        title="Delete Category"
+                      >
+                        <Trash2 size={13} />
+                      </button>
                     </div>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <button onClick={simulateBarcodeScan} className="w-full py-3 bg-neutral-800 hover:bg-neutral-700 rounded-xl text-[10px] font-black uppercase">
-                    ⚡ Demo Scan Emulator (आइटम स्कैन सिमुलेशन)
-                  </button>
-                  <p className="text-[8px] text-neutral-400 text-center font-black">यदि ब्राउज़र कैमरा बारकोड नहीं पढ़ पा रहा, तो ऊपर डेमो क्लिक करके टेस्ट करें</p>
-                </div>
+                  </div>
+                ))}
               </div>
-            )}
+            </motion.div>
           </div>
         )}
 
@@ -1637,7 +1505,7 @@ export default function BumBumCafeStockApp() {
                       className="w-full p-2.5 rounded-xl border dark:bg-[#181818] font-bold"
                     >
                       {categories.map(cat => (
-                        <option key={cat} value={cat}>{cat}</option>
+                        <option key={cat.id} value={cat.name}>{cat.name}</option>
                       ))}
                     </select>
                   </div>
@@ -1682,26 +1550,14 @@ export default function BumBumCafeStockApp() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="space-y-1">
-                    <label className="text-[9px] text-neutral-400 font-bold uppercase">Min Stock Limit</label>
-                    <input 
-                      type="number" 
-                      value={formAddProduct.minLimit}
-                      onChange={e => setFormAddProduct({ ...formAddProduct, minLimit: e.target.value })}
-                      className="w-full p-2.5 rounded-xl border dark:bg-neutral-800"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[9px] text-neutral-400 font-bold uppercase">Barcode (बारकोड)</label>
-                    <input 
-                      type="text" 
-                      placeholder="EAN-13 या स्कैन कोड" 
-                      value={formAddProduct.barcode}
-                      onChange={e => setFormAddProduct({ ...formAddProduct, barcode: e.target.value })}
-                      className="w-full p-2.5 rounded-xl border dark:bg-neutral-800 font-mono"
-                    />
-                  </div>
+                <div className="space-y-1">
+                  <label className="text-[9px] text-neutral-400 font-bold uppercase">Min Stock Limit</label>
+                  <input 
+                    type="number" 
+                    value={formAddProduct.minLimit}
+                    onChange={e => setFormAddProduct({ ...formAddProduct, minLimit: e.target.value })}
+                    className="w-full p-2.5 rounded-xl border dark:bg-neutral-800"
+                  />
                 </div>
               </div>
 
@@ -1742,7 +1598,7 @@ export default function BumBumCafeStockApp() {
                       className="w-full p-2.5 rounded-xl border dark:bg-[#181818] font-bold"
                     >
                       {categories.map(cat => (
-                        <option key={cat} value={cat}>{cat}</option>
+                        <option key={cat.id} value={cat.name}>{cat.name}</option>
                       ))}
                     </select>
                   </div>
@@ -1785,16 +1641,6 @@ export default function BumBumCafeStockApp() {
                       required
                     />
                   </div>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-[9px] text-neutral-400 font-bold uppercase">Barcode</label>
-                  <input 
-                    type="text" 
-                    value={editingProduct.barcode || ""}
-                    onChange={e => setEditingProduct({ ...editingProduct, barcode: e.target.value })}
-                    className="w-full p-2.5 rounded-xl border dark:bg-neutral-800 font-mono"
-                  />
                 </div>
               </div>
 
@@ -1926,7 +1772,7 @@ export default function BumBumCafeStockApp() {
                   >
                     <option value="">-- चुनें --</option>
                     {categories.map(cat => (
-                      <option key={cat} value={cat}>{cat}</option>
+                      <option key={cat.id} value={cat.name}>{cat.name}</option>
                     ))}
                     <option value="CREATE_NEW">-- + CREATE NEW CATEGORY (नई कैटेगरी) --</option>
                   </select>
