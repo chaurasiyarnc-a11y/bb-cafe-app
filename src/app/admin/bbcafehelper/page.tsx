@@ -1,9 +1,11 @@
+
+
 'use client';
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   Home, Store, Trash2, Search, Plus, X, BarChart3, 
-  PlusCircle, MinusCircle, ChevronRight, Sparkles, AlertTriangle, Printer, Edit, Layers, MessageCircle, Wrench, Tag, Eye, EyeOff, Settings
+  PlusCircle, MinusCircle, ChevronRight, Sparkles, AlertTriangle, Printer, Edit, Layers, MessageCircle, Wrench, Tag, Eye, EyeOff, Settings, Utensils
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -16,6 +18,7 @@ interface InventoryItem {
   id: string;
   name: string;
   storeQty: number;
+  kitchenQty: number; // Kitchen Current Stock
   unit: string;
   purchasePrice: number;
   minLimit: number;
@@ -74,10 +77,10 @@ const triggerHaptic = (ms = 35) => {
 };
 
 const INITIAL_INVENTORY: InventoryItem[] = [
-  { id: "dry_1", name: "DOODH MILK", storeQty: 40, unit: "Ltr", purchasePrice: 60, minLimit: 10, category: "DAIRY" },
-  { id: "dry_2", name: "DAHI CURD", storeQty: 15, unit: "Kg", purchasePrice: 80, minLimit: 5, category: "DAIRY" },
-  { id: "dry_3", name: "MAKKHAN BUTTER", storeQty: 24, unit: "Kg", purchasePrice: 420, minLimit: 8, category: "DAIRY" },
-  { id: "veg_2", name: "TAMATAR TOMATO", storeQty: 30, unit: "Kg", purchasePrice: 40, minLimit: 10, category: "VEGETABLES" }
+  { id: "dry_1", name: "DOODH MILK", storeQty: 40, kitchenQty: 0, unit: "Ltr", purchasePrice: 60, minLimit: 10, category: "DAIRY" },
+  { id: "dry_2", name: "DAHI CURD", storeQty: 15, kitchenQty: 0, unit: "Kg", purchasePrice: 80, minLimit: 5, category: "DAIRY" },
+  { id: "dry_3", name: "MAKKHAN BUTTER", storeQty: 24, kitchenQty: 0, unit: "Kg", purchasePrice: 420, minLimit: 8, category: "DAIRY" },
+  { id: "veg_2", name: "TAMATAR TOMATO", storeQty: 30, kitchenQty: 0, unit: "Kg", purchasePrice: 40, minLimit: 10, category: "VEGETABLES" }
 ];
 
 export default function BumBumCafeStockApp() {
@@ -114,6 +117,16 @@ export default function BumBumCafeStockApp() {
   // Category Setting Input
   const [addCategoryModalInput, setAddCategoryModalInput] = useState<string>("");
 
+  // Kitchen stock management states
+  const [showTransferModal, setShowTransferModal] = useState<boolean>(false);
+  const [transferItem, setTransferItem] = useState<InventoryItem | null>(null);
+  const [transferQtyInput, setTransferQtyInput] = useState<string>("");
+
+  const [showConsumeModal, setShowConsumeModal] = useState<boolean>(false);
+  const [consumeItem, setConsumeItem] = useState<InventoryItem | null>(null);
+  const [consumeQtyInput, setConsumeQtyInput] = useState<string>("");
+  const [consumeRemarksInput, setConsumeRemarksInput] = useState<string>("");
+
   // Rename Active List States
   const [isEditingListName, setIsEditingListName] = useState<boolean>(false);
   const [tempListNameInput, setTempListNameInput] = useState<string>("");
@@ -124,7 +137,7 @@ export default function BumBumCafeStockApp() {
   const [editingProduct, setEditingProduct] = useState<InventoryItem | null>(null);
 
   const [formAddProduct, setFormAddProduct] = useState({
-    name: '', storeQty: '0', unit: 'Kg', purchasePrice: '', minLimit: '10', category: 'OTHERS'
+    name: '', storeQty: '0', kitchenQty: '0', unit: 'Kg', purchasePrice: '', minLimit: '10', category: 'OTHERS'
   });
 
   const [formAddAsset, setFormAddAsset] = useState({
@@ -167,7 +180,11 @@ export default function BumBumCafeStockApp() {
   // Static Listeners
   useEffect(() => {
     const unsubInventory = onSnapshot(collection(db, "godown_inventory"), (snap) => {
-      setInventory(snap.docs.map(d => ({ id: d.id, ...d.data() } as InventoryItem)));
+      setInventory(snap.docs.map(d => ({ 
+        id: d.id, 
+        kitchenQty: 0, // Fallback default
+        ...d.data() 
+      } as InventoryItem)));
     }, (err) => console.error("Inventory load error", err));
 
     const unsubCategories = onSnapshot(collection(db, "categories"), (snap) => {
@@ -238,14 +255,14 @@ export default function BumBumCafeStockApp() {
       .filter(s => s.purpose === "Waste" || s.purpose === "Damage")
       .reduce((sum, s) => sum + (s.financialLoss || 0), 0);
     
-    // Total calculation for Fixed Assets (Value and Quantity)
+    // Total calculation for Fixed Assets
     const totalFixedQty = fixedAssets.reduce((sum, asset) => sum + (asset.quantity || 0), 0);
     const totalFixedVal = fixedAssets.reduce((sum, asset) => sum + ((asset.quantity || 1) * (asset.cost || 0)), 0);
 
     return { totalVal, lowCount, wasteLoss, totalFixedQty, totalFixedVal };
   }, [inventory, stockOutHistory, fixedAssets]);
 
-  // Filter Categories to only show visible (unhidden) tabs in selection
+  // Filter Categories to only show visible (unhidden) in selection
   const visibleCategories = useMemo(() => {
     return categories.filter(c => !c.hidden);
   }, [categories]);
@@ -254,7 +271,6 @@ export default function BumBumCafeStockApp() {
     return inventory.filter(item => {
       const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase());
       
-      // Filter out products belonging to hidden categories if selecting "All"
       const itemCatObj = categories.find(c => c.name === item.category);
       const isCategoryHidden = itemCatObj ? itemCatObj.hidden : false;
 
@@ -265,6 +281,19 @@ export default function BumBumCafeStockApp() {
       }
     });
   }, [inventory, searchQuery, selectedCategoryFilter, categories]);
+
+  // Group items dynamically by Category for beautiful grid layouts
+  const groupedInventory = useMemo(() => {
+    const groups: Record<string, InventoryItem[]> = {};
+    filteredInventory.forEach(item => {
+      const cat = item.category || "OTHERS";
+      if (!groups[cat]) {
+        groups[cat] = [];
+      }
+      groups[cat].push(item);
+    });
+    return groups;
+  }, [filteredInventory]);
 
   const filteredAssets = useMemo(() => {
     return fixedAssets.filter(asset => 
@@ -445,6 +474,103 @@ export default function BumBumCafeStockApp() {
     }
   };
 
+  // KITCHEN TRANSFERS AND CONSUMPTION SUBMITS
+  const handleTransferToKitchenSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!transferItem || !transferQtyInput) return;
+
+    const qty = parseFloat(transferQtyInput);
+    if (isNaN(qty) || qty <= 0) {
+      toastMessage("कृपया सही संख्या दर्ज करें!", "error");
+      return;
+    }
+
+    if (transferItem.storeQty < qty) {
+      toastMessage("गोदाम में पर्याप्त स्टॉक नहीं है!", "error");
+      return;
+    }
+
+    try {
+      const batch = writeBatch(db);
+      const itemRef = doc(db, "godown_inventory", transferItem.id);
+      
+      // Deduct from godown, add to kitchen
+      batch.set(itemRef, {
+        storeQty: increment(-qty),
+        kitchenQty: increment(qty)
+      }, { merge: true });
+
+      // Save a trace log
+      const logRef = doc(collection(db, "stock_out_history"));
+      batch.set(logRef, {
+        id: logRef.id,
+        itemName: transferItem.name,
+        itemId: transferItem.id,
+        qty: qty,
+        purpose: "Kitchen Use",
+        date: new Date().toISOString().split('T')[0],
+        remarks: "गोदाम से किचन भेजा गया",
+        financialLoss: 0
+      });
+
+      await batch.commit();
+      toastMessage(`${qty} ${transferItem.unit} किचन में भेजा गया!`);
+      setShowTransferModal(false);
+      setTransferItem(null);
+      setTransferQtyInput("");
+    } catch {
+      toastMessage("ट्रांसफर में त्रुटि!", "error");
+    }
+  };
+
+  const handleConsumeKitchenSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!consumeItem || !consumeQtyInput) return;
+
+    const qty = parseFloat(consumeQtyInput);
+    if (isNaN(qty) || qty <= 0) {
+      toastMessage("कृपया सही संख्या दर्ज करें!", "error");
+      return;
+    }
+
+    if (consumeItem.kitchenQty < qty) {
+      toastMessage("किचन में पर्याप्त स्टॉक नहीं है!", "error");
+      return;
+    }
+
+    try {
+      const batch = writeBatch(db);
+      const itemRef = doc(db, "godown_inventory", consumeItem.id);
+
+      // Deduct from kitchen qty
+      batch.set(itemRef, {
+        kitchenQty: increment(-qty)
+      }, { merge: true });
+
+      // Save as Kitchen Use / Consumption Log
+      const logRef = doc(collection(db, "stock_out_history"));
+      batch.set(logRef, {
+        id: logRef.id,
+        itemName: consumeItem.name,
+        itemId: consumeItem.id,
+        qty: qty,
+        purpose: "Kitchen Use",
+        date: new Date().toISOString().split('T')[0],
+        remarks: consumeRemarksInput.trim() || "किचन में उपयोग किया गया",
+        financialLoss: 0
+      });
+
+      await batch.commit();
+      toastMessage(`${qty} ${consumeItem.unit} उपयोग दर्ज किया गया!`);
+      setShowConsumeModal(false);
+      setConsumeItem(null);
+      setConsumeQtyInput("");
+      setConsumeRemarksInput("");
+    } catch {
+      toastMessage("दर्ज करने में त्रुटि!", "error");
+    }
+  };
+
   // Commit dynamic Order Quantity safely on Blur or Enter key
   const handleUpdateOrderQty = async (compoundId: string, qty: string) => {
     try {
@@ -511,6 +637,7 @@ export default function BumBumCafeStockApp() {
         id: customId,
         name: formAddProduct.name.toUpperCase().trim(),
         storeQty: parseFloat(formAddProduct.storeQty) || 0,
+        kitchenQty: parseFloat(formAddProduct.kitchenQty) || 0,
         unit: formAddProduct.unit,
         purchasePrice: parseFloat(formAddProduct.purchasePrice) || 0,
         minLimit: parseFloat(formAddProduct.minLimit) || 10,
@@ -521,7 +648,7 @@ export default function BumBumCafeStockApp() {
       await setDoc(doc(db, "godown_inventory", customId), payload);
       toastMessage("नया सामान सफलतापूर्वक दर्ज हुआ!");
       setShowAddProductModal(false);
-      setFormAddProduct({ name: '', storeQty: '0', unit: 'Kg', purchasePrice: '', minLimit: '10', category: 'OTHERS' });
+      setFormAddProduct({ name: '', storeQty: '0', kitchenQty: '0', unit: 'Kg', purchasePrice: '', minLimit: '10', category: 'OTHERS' });
     } catch {
       toastMessage("सामान जोड़ने में विफलता।", "error");
     }
@@ -785,7 +912,7 @@ export default function BumBumCafeStockApp() {
                 </div>
               </div>
 
-              {/* Fixed Items Stats Added */}
+              {/* Fixed Items Stats */}
               <div className="grid grid-cols-2 gap-2">
                 <div className={`p-3 rounded-2xl border text-center ${isDarkMode ? 'bg-[#181818] border-neutral-800' : 'bg-white border-neutral-100'}`}>
                   <p className="text-[8px] font-black text-neutral-400 uppercase">Fixed Assets Value</p>
@@ -804,8 +931,8 @@ export default function BumBumCafeStockApp() {
         {activeTab === 'store' && (
           <div className="space-y-4">
             
-            {/* STICKY SEARCH & CATEGORY SELECTOR - Sticks directly below 64px header */}
-            <div className={`sticky top-[64px] z-30 py-2 space-y-2.5 backdrop-blur-md ${isDarkMode ? 'bg-[#0E0E0E]/90' : 'bg-[#FAFAFA]/90'} border-b border-dashed ${isDarkMode ? 'border-neutral-800' : 'border-neutral-100'}`}>
+            {/* STICKY SEARCH & CATEGORY CONTROLLER */}
+            <div className={`sticky top-[64px] z-30 py-2.5 space-y-2.5 backdrop-blur-md ${isDarkMode ? 'bg-[#0E0E0E]/90' : 'bg-[#FAFAFA]/90'} border-b border-dashed ${isDarkMode ? 'border-neutral-800' : 'border-neutral-100'}`}>
               
               <div className="flex items-center gap-2">
                 <div className="relative flex-1">
@@ -828,37 +955,27 @@ export default function BumBumCafeStockApp() {
                 </button>
               </div>
 
-              {/* CATEGORY FILTER TABS + MANAGEMENT GEAR BUTTON */}
-              <div className="flex items-center gap-1.5 w-full">
-                <div className="flex gap-1.5 overflow-x-auto pb-1 flex-1 scrollbar-hide">
-                  <button
-                    onClick={() => setSelectedCategoryFilter("All")}
-                    className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider shrink-0 border ${
-                      selectedCategoryFilter === "All"
-                        ? "bg-orange-500 border-orange-500 text-white"
-                        : isDarkMode ? "bg-neutral-900 border-neutral-800 text-neutral-400" : "bg-neutral-100 border-neutral-200 text-neutral-600"
+              {/* CLEAN JUMP DROPDOWN FILTER & MANAGE GEAR */}
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-1.5 flex-1">
+                  <span className="text-[10px] font-black text-neutral-400 uppercase tracking-wider shrink-0">Filter:</span>
+                  <select
+                    value={selectedCategoryFilter}
+                    onChange={e => setSelectedCategoryFilter(e.target.value)}
+                    className={`w-full p-2 text-xs font-bold rounded-xl border uppercase ${
+                      isDarkMode ? 'bg-neutral-900 border-neutral-800 text-white' : 'bg-white border-neutral-200 text-neutral-950'
                     }`}
                   >
-                    All Items
-                  </button>
-                  {visibleCategories.map(cat => (
-                    <button
-                      key={cat.id}
-                      onClick={() => setSelectedCategoryFilter(cat.name)}
-                      className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider shrink-0 border ${
-                        selectedCategoryFilter === cat.name
-                          ? "bg-orange-500 border-orange-500 text-white"
-                          : isDarkMode ? "bg-neutral-900 border-neutral-800 text-neutral-400" : "bg-neutral-100 border-neutral-200 text-neutral-600"
-                      }`}
-                    >
-                      {cat.name}
-                    </button>
-                  ))}
+                    <option value="All">All Categories (सभी सामान)</option>
+                    {visibleCategories.map(cat => (
+                      <option key={cat.id} value={cat.name}>{cat.name}</option>
+                    ))}
+                  </select>
                 </div>
-                
+
                 <button 
                   onClick={() => setShowManageCategoriesModal(true)}
-                  className={`p-1.5 rounded-xl border transition-all shrink-0 ${
+                  className={`p-2 rounded-xl border transition-all shrink-0 ${
                     isDarkMode ? 'bg-neutral-900 border-neutral-800 text-neutral-400 hover:text-white' : 'bg-white border-neutral-200 text-neutral-500 hover:text-orange-500'
                   }`}
                   title="Manage Categories"
@@ -870,7 +987,7 @@ export default function BumBumCafeStockApp() {
 
             <button 
               onClick={() => {
-                setFormAddProduct({ name: '', storeQty: '0', unit: 'Kg', purchasePrice: '', minLimit: '10', category: 'OTHERS' });
+                setFormAddProduct({ name: '', storeQty: '0', kitchenQty: '0', unit: 'Kg', purchasePrice: '', minLimit: '10', category: 'OTHERS' });
                 setShowAddProductModal(true);
               }}
               className="w-full py-2.5 bg-green-600 hover:bg-green-700 text-white text-xs font-black uppercase rounded-xl flex items-center justify-center gap-1.5 shadow"
@@ -878,9 +995,9 @@ export default function BumBumCafeStockApp() {
               <Plus size={14} /> Add New Product (सामान जोड़ें)
             </button>
 
-            {/* TOTAL ITEMS AND SHOWING COUNTER */}
+            {/* TOTAL ITEMS COUNTER */}
             <div className="flex justify-between items-center text-[10px] font-black uppercase text-neutral-400 px-1 border-b border-neutral-100 dark:border-neutral-800/65 pb-2">
-              <span>STOCK ITEMS</span>
+              <span>STOCK ITEMS LIST</span>
               <span>Showing {filteredInventory.length} of {inventory.length} total</span>
             </div>
 
@@ -926,101 +1043,131 @@ export default function BumBumCafeStockApp() {
               </div>
             )}
 
-            {/* STOCK ITEM CARDS */}
-            <div className="space-y-2.5">
-              {filteredInventory.map(item => {
-                const isSelected = selectedItemIds.includes(item.id);
-                const displayQty = editedQties[item.id] !== undefined ? editedQties[item.id] : item.storeQty;
-                const isDirty = editedQties[item.id] !== undefined && parseFloat(editedQties[item.id] as string) !== item.storeQty;
-
-                return (
-                  <div 
-                    key={item.id} 
-                    onClick={() => { if (isMultiSelectMode) handleToggleMultiSelect(item.id); }}
-                    className={`p-3.5 rounded-2xl border transition-all relative ${
-                      isMultiSelectMode ? 'cursor-pointer' : ''
-                    } ${isDarkMode ? 'bg-[#181818] border-neutral-800' : 'bg-white border-neutral-100'} ${
-                      isSelected ? 'ring-2 ring-orange-500 bg-orange-500/[0.01]' : ''
-                    }`}
-                  >
-                    {isMultiSelectMode && (
-                      <div className="absolute top-3.5 right-3.5 w-4 h-4 rounded-full border border-neutral-300 flex items-center justify-center z-10">
-                        {isSelected && <div className="w-2.5 h-2.5 rounded-full bg-orange-500" />}
-                      </div>
-                    )}
-
-                    <div className="flex justify-between">
-                      <div>
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <p className="font-bold text-sm text-orange-600">{item.name}</p>
-                          {item.category && (
-                            <span className="px-1.5 py-0.5 text-[8px] bg-neutral-100 dark:bg-neutral-800 text-neutral-400 font-bold rounded-md uppercase">
-                              {item.category}
-                            </span>
-                          )}
-                          {!isMultiSelectMode && (
-                            <button 
-                              onClick={(e) => { e.stopPropagation(); setEditingProduct(item); }}
-                              className="text-neutral-400 hover:text-orange-500"
-                            >
-                              <Edit size={12} />
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                      <div className="text-right pr-6">
-                        <span className="text-xs text-neutral-400 font-bold">{item.storeQty} {item.unit}</span>
-                      </div>
-                    </div>
-
-                    {/* Dynamic counter editing inside card */}
-                    <div className="mt-3 pt-2.5 border-t border-dashed border-neutral-200 dark:border-neutral-800 flex items-center justify-between">
-                      <div className="flex items-center gap-1.5">
-                        <button onClick={(e) => { e.stopPropagation(); adjustQty(item.id, -1); }} className="p-1 bg-red-100 dark:bg-red-500/10 text-red-500 rounded-lg">
-                          <MinusCircle size={14} />
-                        </button>
-                        <input 
-                          type="number" 
-                          value={displayQty}
-                          onClick={e => e.stopPropagation()}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            setEditedQties(prev => ({ ...prev, [item.id]: val }));
-                          }}
-                          className="w-12 text-center text-xs font-bold border border-neutral-200 dark:bg-neutral-800 dark:border-neutral-700 rounded p-1"
-                        />
-                        <button onClick={(e) => { e.stopPropagation(); adjustQty(item.id, 1); }} className="p-1 bg-green-100 dark:bg-green-500/10 text-green-500 rounded-lg">
-                          <PlusCircle size={14} />
-                        </button>
-                      </div>
-
-                      <div className="flex gap-1">
-                        <button 
-                          onClick={(e) => { 
-                            e.stopPropagation(); 
-                            const confirm = window.confirm(`क्या आप सच में ${item.name} के स्टॉक को 0 करना चाहते हैं? (बदलाव सेव करने के लिए बाद में 'सेव' बटन दबाएं)`);
-                            if (confirm) {
-                              setEditedQties(prev => ({ ...prev, [item.id]: "0" }));
-                              toastMessage("0 सेट किया गया!", "info");
-                            }
-                          }}
-                          className="px-2 py-1 bg-red-100 dark:bg-red-500/10 text-red-500 text-[10px] font-bold rounded-lg"
-                        >
-                          🗑️ 0 करें
-                        </button>
-                        {isDirty && (
-                          <button 
-                            onClick={(e) => { e.stopPropagation(); saveQty(item.id); }}
-                            className="px-2 py-1 bg-green-600 text-white text-[10px] font-bold rounded-lg"
-                          >
-                            💾 सेव
-                          </button>
-                        )}
-                      </div>
-                    </div>
+            {/* STOCK ITEM CARDS - Grouped Under Category Sections */}
+            <div className="space-y-6">
+              {Object.entries(groupedInventory).map(([categoryName, items]) => (
+                <div key={categoryName} className="space-y-3">
+                  {/* Styled Category Header */}
+                  <div className="flex items-center gap-2 pt-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-orange-500" />
+                    <h3 className="text-xs font-black uppercase text-neutral-400 tracking-wider">
+                      {categoryName} ({items.length})
+                    </h3>
+                    <div className="flex-1 h-[1px] bg-neutral-200 dark:bg-neutral-800" />
                   </div>
-                );
-              })}
+
+                  {/* Category Items */}
+                  <div className="space-y-2.5">
+                    {items.map(item => {
+                      const isSelected = selectedItemIds.includes(item.id);
+                      const displayQty = editedQties[item.id] !== undefined ? editedQties[item.id] : item.storeQty;
+                      const isDirty = editedQties[item.id] !== undefined && parseFloat(editedQties[item.id] as string) !== item.storeQty;
+
+                      return (
+                        <div 
+                          key={item.id} 
+                          onClick={() => { if (isMultiSelectMode) handleToggleMultiSelect(item.id); }}
+                          className={`p-3.5 rounded-2xl border transition-all relative ${
+                            isMultiSelectMode ? 'cursor-pointer' : ''
+                          } ${isDarkMode ? 'bg-[#181818] border-neutral-800' : 'bg-white border-neutral-100'} ${
+                            isSelected ? 'ring-2 ring-orange-500 bg-orange-500/[0.01]' : ''
+                          }`}
+                        >
+                          {isMultiSelectMode && (
+                            <div className="absolute top-3.5 right-3.5 w-4 h-4 rounded-full border border-neutral-300 flex items-center justify-center z-10">
+                              {isSelected && <div className="w-2.5 h-2.5 rounded-full bg-orange-500" />}
+                            </div>
+                          )}
+
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <p className="font-bold text-sm text-orange-600">{item.name}</p>
+                                {!isMultiSelectMode && (
+                                  <button 
+                                    onClick={(e) => { e.stopPropagation(); setEditingProduct(item); }}
+                                    className="text-neutral-400 hover:text-orange-500"
+                                  >
+                                    <Edit size={12} />
+                                  </button>
+                                )}
+                              </div>
+                              
+                              {/* Stock Breakdown (Godown and Kitchen display side-by-side) */}
+                              <div className="mt-1.5 flex items-center gap-3 text-[10px] font-bold uppercase text-neutral-400">
+                                <span>📦 Godown: <span className="text-neutral-800 dark:text-neutral-200">{item.storeQty} {item.unit}</span></span>
+                                <span>🍳 Kitchen: <span className="text-orange-500">{item.kitchenQty || 0} {item.unit}</span></span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Action panel underneath stock info */}
+                          <div className="mt-3.5 pt-3 border-t border-dashed border-neutral-200 dark:border-neutral-800 flex items-center justify-between flex-wrap gap-2">
+                            
+                            {/* Counter inputs to adjust storeQty */}
+                            <div className="flex items-center gap-1.5">
+                              <button onClick={(e) => { e.stopPropagation(); adjustQty(item.id, -1); }} className="p-1 bg-red-100 dark:bg-red-500/10 text-red-500 rounded-lg">
+                                <MinusCircle size={14} />
+                              </button>
+                              <input 
+                                type="number" 
+                                value={displayQty}
+                                onClick={e => e.stopPropagation()}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setEditedQties(prev => ({ ...prev, [item.id]: val }));
+                                }}
+                                className="w-12 text-center text-xs font-bold border border-neutral-200 dark:bg-neutral-800 dark:border-neutral-700 rounded p-1"
+                              />
+                              <button onClick={(e) => { e.stopPropagation(); adjustQty(item.id, 1); }} className="p-1 bg-green-100 dark:bg-green-500/10 text-green-500 rounded-lg">
+                                <PlusCircle size={14} />
+                              </button>
+
+                              {isDirty && (
+                                <button 
+                                  onClick={(e) => { e.stopPropagation(); saveQty(item.id); }}
+                                  className="px-2 py-1 bg-green-600 text-white text-[10px] font-black rounded-lg"
+                                >
+                                  💾 सेव
+                                </button>
+                              )}
+                            </div>
+
+                            {/* Kitchen manual send and consume buttons */}
+                            <div className="flex items-center gap-1.5">
+                              <button 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setTransferItem(item);
+                                  setTransferQtyInput("");
+                                  setShowTransferModal(true);
+                                }}
+                                className="px-2 py-1 bg-orange-100 hover:bg-orange-200 dark:bg-orange-500/10 dark:text-orange-400 text-orange-600 text-[9px] font-black uppercase rounded-lg flex items-center gap-1 transition-all"
+                              >
+                                🍳 Send To Kitchen
+                              </button>
+                              
+                              <button 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setConsumeItem(item);
+                                  setConsumeQtyInput("");
+                                  setConsumeRemarksInput("");
+                                  setShowConsumeModal(true);
+                                }}
+                                className="px-2 py-1 bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-300 text-neutral-600 text-[9px] font-black uppercase rounded-lg flex items-center gap-1 transition-all"
+                              >
+                                🍽️ Use
+                              </button>
+                            </div>
+
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         )}
@@ -1276,46 +1423,46 @@ export default function BumBumCafeStockApp() {
           <div className="space-y-4">
             <div className="flex justify-between items-center">
               <div>
-                <h2 className="text-sm font-black text-orange-600 uppercase">Wastage Details Log</h2>
-                <p className="text-[10px] text-neutral-400">कचरा और खराब हुए सामानों की विस्तृत सूची</p>
+                <h2 className="text-sm font-black text-orange-600 uppercase">Wastage & Consumption Logs</h2>
+                <p className="text-[10px] text-neutral-400">कचरा, खराब और किचन उपयोग विवरण</p>
               </div>
               <button 
                 onClick={() => setShowStockOutModal(true)} 
                 className="px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white rounded-xl text-xs font-black uppercase flex items-center gap-1 shadow"
               >
-                <Plus size={14} /> New Waste
+                <Plus size={14} /> Log Wastage
               </button>
             </div>
 
             {/* List of Wastage logs */}
             <div className="space-y-2.5">
-              {stockOutHistory
-                .filter(log => log.purpose === "Waste" || log.purpose === "Damage")
-                .map(log => (
-                  <div key={log.id} className={`p-4 rounded-2xl border ${isDarkMode ? 'bg-[#181818] border-neutral-800' : 'bg-white border-neutral-100'}`}>
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <p className="font-bold text-sm text-neutral-800 dark:text-neutral-100">{log.itemName}</p>
-                        <p className="text-[9px] text-neutral-400 font-bold uppercase mt-0.5">{log.date}</p>
-                      </div>
-                      <span className="px-2 py-0.5 bg-red-100 dark:bg-red-500/10 text-red-500 rounded-full text-[8px] font-black uppercase tracking-wider">
-                        {log.purpose}
-                      </span>
+              {stockOutHistory.map(log => (
+                <div key={log.id} className={`p-4 rounded-2xl border ${isDarkMode ? 'bg-[#181818] border-neutral-800' : 'bg-white border-neutral-100'}`}>
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <p className="font-bold text-sm text-neutral-800 dark:text-neutral-100">{log.itemName}</p>
+                      <p className="text-[9px] text-neutral-400 font-bold uppercase mt-0.5">{log.date}</p>
                     </div>
-                    
-                    <p className="text-xs text-neutral-500 mt-2 italic">“{log.remarks}”</p>
-                    
-                    <div className="flex justify-between mt-3 pt-2.5 border-t border-neutral-100 dark:border-neutral-800 text-[10px] font-bold text-neutral-400 uppercase">
-                      <span>मात्रा: {log.qty} Units</span>
-                      {log.financialLoss ? (
-                        <span className="text-red-500">वित्तीय नुकसान: ₹{log.financialLoss}</span>
-                      ) : null}
-                    </div>
+                    <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-wider ${
+                      log.purpose === 'Kitchen Use' ? 'bg-orange-100 text-orange-600 dark:bg-orange-500/10' : 'bg-red-100 text-red-500 dark:bg-red-500/10'
+                    }`}>
+                      {log.purpose}
+                    </span>
                   </div>
-                ))}
+                  
+                  <p className="text-xs text-neutral-500 mt-2 italic">“{log.remarks}”</p>
+                  
+                  <div className="flex justify-between mt-3 pt-2.5 border-t border-neutral-100 dark:border-neutral-800 text-[10px] font-bold text-neutral-400 uppercase">
+                    <span>मात्रा: {log.qty} Units</span>
+                    {log.financialLoss ? (
+                      <span className="text-red-500">वित्तीय नुकसान: ₹{log.financialLoss}</span>
+                    ) : null}
+                  </div>
+                </div>
+              ))}
 
               {stockOutHistory.length === 0 && (
-                <p className="text-center py-10 text-xs text-neutral-400 uppercase font-black">कोई नुकसान रिकॉर्ड नहीं मिला।</p>
+                <p className="text-center py-10 text-xs text-neutral-400 uppercase font-black">कोई रिकॉर्ड नहीं मिला।</p>
               )}
             </div>
           </div>
@@ -1326,7 +1473,7 @@ export default function BumBumCafeStockApp() {
       {/* ==================== SCREEN MODALS ==================== */}
       <AnimatePresence>
 
-        {/* 1. MANAGE CATEGORIES MODAL (ADD, REMOVE, HIDE/UNHIDE) */}
+        {/* 1. MANAGE CATEGORIES MODAL */}
         {showManageCategoriesModal && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <motion.div 
@@ -1370,7 +1517,7 @@ export default function BumBumCafeStockApp() {
                 </button>
               </div>
 
-              {/* List of Existing Categories with controls */}
+              {/* List of Existing Categories */}
               <div className="space-y-1.5 max-h-[35vh] overflow-y-auto pr-1">
                 {categories.map(cat => (
                   <div 
@@ -1409,7 +1556,109 @@ export default function BumBumCafeStockApp() {
           </div>
         )}
 
-        {/* 2. NEW WASTAGE SUBMISSION MODAL */}
+        {/* 2. SEND TO KITCHEN MODAL */}
+        {showTransferModal && transferItem && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <motion.form 
+              onSubmit={handleTransferToKitchenSubmit} 
+              initial={{ opacity: 0, scale: 0.95 }} 
+              animate={{ opacity: 1, scale: 1 }} 
+              exit={{ opacity: 0, scale: 0.95 }} 
+              className={`w-full max-w-sm rounded-[2rem] p-6 space-y-4 border ${isDarkMode ? 'bg-neutral-900 text-white' : 'bg-white text-neutral-900'}`}
+            >
+              <div className="flex justify-between items-center border-b pb-2">
+                <div>
+                  <h3 className="text-xs font-black uppercase text-orange-500">Send To Kitchen (किचन में भेजें)</h3>
+                  <p className="text-[9px] text-neutral-400 font-bold mt-0.5">{transferItem.name}</p>
+                </div>
+                <button type="button" onClick={() => setShowTransferModal(false)} className="p-1.5 bg-neutral-100 dark:bg-neutral-800 rounded-xl"><X size={14} /></button>
+              </div>
+
+              <div className="p-3 bg-neutral-100 dark:bg-neutral-950/60 rounded-xl text-xs space-y-1 text-neutral-400 font-bold">
+                <p>गोदाम स्टॉक: <span className="text-neutral-800 dark:text-neutral-200">{transferItem.storeQty} {transferItem.unit}</span></p>
+                <p>किचन स्टॉक: <span className="text-orange-500">{transferItem.kitchenQty || 0} {transferItem.unit}</span></p>
+              </div>
+
+              <div className="space-y-1 text-xs">
+                <label className="text-[9px] text-neutral-400 font-black uppercase">Quantity to Send (भेजने की मात्रा)</label>
+                <div className="flex items-center gap-2">
+                  <input 
+                    type="number" 
+                    placeholder="मात्रा दर्ज करें"
+                    value={transferQtyInput}
+                    onChange={e => setTransferQtyInput(e.target.value)}
+                    className="flex-1 p-2.5 rounded-xl border dark:bg-neutral-800 text-center text-sm font-black text-orange-600"
+                    required
+                  />
+                  <span className="font-bold text-neutral-400 w-12">{transferItem.unit}</span>
+                </div>
+              </div>
+
+              <button type="submit" className="w-full py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-xl font-black text-xs uppercase shadow">
+                Confirm Transfer ➔
+              </button>
+            </motion.form>
+          </div>
+        )}
+
+        {/* 3. CONSUME KITCHEN STOCK MODAL */}
+        {showConsumeModal && consumeItem && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <motion.form 
+              onSubmit={handleConsumeKitchenSubmit} 
+              initial={{ opacity: 0, scale: 0.95 }} 
+              animate={{ opacity: 1, scale: 1 }} 
+              exit={{ opacity: 0, scale: 0.95 }} 
+              className={`w-full max-w-sm rounded-[2rem] p-6 space-y-4 border ${isDarkMode ? 'bg-neutral-900 text-white' : 'bg-white text-neutral-900'}`}
+            >
+              <div className="flex justify-between items-center border-b pb-2">
+                <div>
+                  <h3 className="text-xs font-black uppercase text-neutral-400">Consume Kitchen Stock (किचन उपयोग)</h3>
+                  <p className="text-[9px] text-neutral-400 font-bold mt-0.5">{consumeItem.name}</p>
+                </div>
+                <button type="button" onClick={() => setShowConsumeModal(false)} className="p-1.5 bg-neutral-100 dark:bg-neutral-800 rounded-xl"><X size={14} /></button>
+              </div>
+
+              <div className="p-3 bg-orange-100/10 rounded-xl text-xs space-y-1 text-neutral-400 font-bold">
+                <p>किचन में उपलब्ध: <span className="text-orange-500 font-black">{consumeItem.kitchenQty || 0} {consumeItem.unit}</span></p>
+              </div>
+
+              <div className="space-y-3 text-xs">
+                <div className="space-y-1">
+                  <label className="text-[9px] text-neutral-400 font-black uppercase">Quantity Used (उपयोग की गई मात्रा)</label>
+                  <div className="flex items-center gap-2">
+                    <input 
+                      type="number" 
+                      placeholder="मात्रा दर्ज करें"
+                      value={consumeQtyInput}
+                      onChange={e => setConsumeQtyInput(e.target.value)}
+                      className="flex-1 p-2.5 rounded-xl border dark:bg-neutral-800 text-center text-sm font-black text-neutral-900 dark:text-white"
+                      required
+                    />
+                    <span className="font-bold text-neutral-400 w-12">{consumeItem.unit}</span>
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[9px] text-neutral-400 font-black uppercase">Remarks / Note (विवरण)</label>
+                  <input 
+                    type="text"
+                    placeholder="जैसे: आज का खाना बनाने में उपयोग"
+                    value={consumeRemarksInput}
+                    onChange={e => setConsumeRemarksInput(e.target.value)}
+                    className="w-full p-2.5 rounded-xl border dark:bg-neutral-800"
+                  />
+                </div>
+              </div>
+
+              <button type="submit" className="w-full py-3 bg-neutral-800 hover:bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 rounded-xl font-black text-xs uppercase shadow">
+                Save Usage Log ➔
+              </button>
+            </motion.form>
+          </div>
+        )}
+
+        {/* 4. NEW WASTAGE LOG MODAL */}
         {showStockOutModal && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <motion.form onSubmit={handleWasteSubmit} initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className={`w-full max-w-sm rounded-3xl p-6 space-y-4 ${isDarkMode ? 'bg-neutral-900 text-white' : 'bg-white text-neutral-900'}`}>
@@ -1474,7 +1723,7 @@ export default function BumBumCafeStockApp() {
           </div>
         )}
 
-        {/* 3. ADD PRODUCT MODAL */}
+        {/* 5. ADD PRODUCT MODAL */}
         {showAddProductModal && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <motion.form onSubmit={handleAddProductSubmit} initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className={`w-full max-w-sm rounded-3xl p-6 space-y-4 ${isDarkMode ? 'bg-neutral-900 text-white' : 'bg-white text-neutral-900'}`}>
@@ -1540,7 +1789,7 @@ export default function BumBumCafeStockApp() {
                   </div>
 
                   <div className="space-y-1">
-                    <label className="text-[9px] text-neutral-400 font-bold uppercase">Initial Qty</label>
+                    <label className="text-[9px] text-neutral-400 font-bold uppercase">Godown Qty</label>
                     <input 
                       type="number" 
                       value={formAddProduct.storeQty}
@@ -1550,14 +1799,25 @@ export default function BumBumCafeStockApp() {
                   </div>
                 </div>
 
-                <div className="space-y-1">
-                  <label className="text-[9px] text-neutral-400 font-bold uppercase">Min Stock Limit</label>
-                  <input 
-                    type="number" 
-                    value={formAddProduct.minLimit}
-                    onChange={e => setFormAddProduct({ ...formAddProduct, minLimit: e.target.value })}
-                    className="w-full p-2.5 rounded-xl border dark:bg-neutral-800"
-                  />
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <label className="text-[9px] text-neutral-400 font-bold uppercase">Initial Kitchen Qty</label>
+                    <input 
+                      type="number" 
+                      value={formAddProduct.kitchenQty}
+                      onChange={e => setFormAddProduct({ ...formAddProduct, kitchenQty: e.target.value })}
+                      className="w-full p-2.5 rounded-xl border dark:bg-neutral-800"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[9px] text-neutral-400 font-bold uppercase">Min Stock Limit</label>
+                    <input 
+                      type="number" 
+                      value={formAddProduct.minLimit}
+                      onChange={e => setFormAddProduct({ ...formAddProduct, minLimit: e.target.value })}
+                      className="w-full p-2.5 rounded-xl border dark:bg-neutral-800"
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -1568,7 +1828,7 @@ export default function BumBumCafeStockApp() {
           </div>
         )}
 
-        {/* 4. EDIT PRODUCT MODAL */}
+        {/* 6. EDIT PRODUCT MODAL */}
         {editingProduct && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <motion.form onSubmit={handleEditProductSubmit} initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className={`w-full max-w-sm rounded-3xl p-6 space-y-4 ${isDarkMode ? 'bg-neutral-900 text-white' : 'bg-white text-neutral-900'}`}>
@@ -1642,6 +1902,29 @@ export default function BumBumCafeStockApp() {
                     />
                   </div>
                 </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <label className="text-[9px] text-neutral-400 font-bold uppercase">Godown Qty</label>
+                    <input 
+                      type="number" 
+                      value={editingProduct.storeQty}
+                      onChange={e => setEditingProduct({ ...editingProduct, storeQty: parseFloat(e.target.value) || 0 })}
+                      className="w-full p-2.5 rounded-xl border dark:bg-neutral-800"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[9px] text-neutral-400 font-bold uppercase">Kitchen Qty</label>
+                    <input 
+                      type="number" 
+                      value={editingProduct.kitchenQty || 0}
+                      onChange={e => setEditingProduct({ ...editingProduct, kitchenQty: parseFloat(e.target.value) || 0 })}
+                      className="w-full p-2.5 rounded-xl border dark:bg-neutral-800"
+                      required
+                    />
+                  </div>
+                </div>
               </div>
 
               <div className="flex gap-2 pt-2">
@@ -1660,82 +1943,7 @@ export default function BumBumCafeStockApp() {
           </div>
         )}
 
-        {/* 5. OVERLAY/MODAL: CHOOSE OR CREATE MULTIPLE ORDER LIST ON MULTI-SAVE */}
-        {showSaveToListModal && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[110] flex items-center justify-center p-4">
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className={`w-full max-w-sm rounded-[2rem] p-6 space-y-4 border ${
-                isDarkMode ? 'bg-[#0F0F0F] border-neutral-800 text-white' : 'bg-white border-neutral-100 text-neutral-900'
-              }`}
-            >
-              <div className="flex justify-between items-center border-b pb-2.5">
-                <div>
-                  <h3 className="text-xs font-black uppercase text-orange-500">Save Selected Items</h3>
-                  <p className="text-[9px] text-neutral-400 font-bold uppercase mt-0.5">ऑर्डर लिस्ट चुनें या नई लिस्ट बनाएं</p>
-                </div>
-                <button 
-                  type="button" 
-                  onClick={() => setShowSaveToListModal(false)} 
-                  className="p-1.5 bg-neutral-100 dark:bg-neutral-800 rounded-xl"
-                >
-                  <X size={14} />
-                </button>
-              </div>
-
-              <div className="space-y-3.5 text-xs">
-                <div className="space-y-1">
-                  <label className="text-[9px] text-neutral-400 font-bold uppercase">Select Existing List (मौजूदा लिस्ट चुनें)</label>
-                  <select
-                    value={targetListId}
-                    onChange={e => setTargetListId(e.target.value)}
-                    className={`w-full p-2.5 rounded-xl border font-bold ${
-                      isDarkMode ? 'bg-neutral-900 border-neutral-800 text-white' : 'bg-white border-neutral-200 text-neutral-900'
-                    }`}
-                  >
-                    {orderLists.map(list => (
-                      <option key={list.id} value={list.id}>{list.name}</option>
-                    ))}
-                    <option value="CREATE_NEW">-- + CREATE NEW LIST (नई लिस्ट बनाएं) --</option>
-                  </select>
-                </div>
-
-                {targetListId === "CREATE_NEW" && (
-                  <motion.div 
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="space-y-1"
-                  >
-                    <label className="text-[9px] text-neutral-400 font-bold uppercase">New List Name (नई लिस्ट का नाम)</label>
-                    <input 
-                      type="text"
-                      placeholder="जैसे: DAIRY ORDER JULY"
-                      value={newListNameInput}
-                      onChange={e => setNewListNameInput(e.target.value)}
-                      className={`w-full p-2.5 rounded-xl border font-bold uppercase ${
-                        isDarkMode ? 'bg-neutral-950 border-neutral-800 text-white' : 'bg-white border-neutral-200 text-neutral-900'
-                      }`}
-                      required
-                    />
-                  </motion.div>
-                )}
-              </div>
-
-              <div className="pt-2">
-                <button
-                  onClick={handleConfirmSaveToList}
-                  className="w-full py-3 bg-[#FF6B00] hover:bg-orange-600 text-white rounded-xl font-bold text-xs uppercase shadow-lg"
-                >
-                  Confirm & Save (सहेजें) ➔
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-
-        {/* 6. OVERLAY/MODAL: SET BULK CATEGORY FOR SELECTED ITEMS */}
+        {/* 7. OVERLAY/MODAL: SET BULK CATEGORY FOR SELECTED ITEMS */}
         {showBulkCategoryModal && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[110] flex items-center justify-center p-4">
             <motion.div 
@@ -1811,7 +2019,7 @@ export default function BumBumCafeStockApp() {
           </div>
         )}
 
-        {/* 7. ADD FIXED ASSET MODAL */}
+        {/* 8. ADD FIXED ASSET MODAL */}
         {showAddAssetModal && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <motion.form onSubmit={handleAddAssetSubmit} initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className={`w-full max-w-sm rounded-3xl p-6 space-y-4 ${isDarkMode ? 'bg-neutral-900 text-white' : 'bg-white text-neutral-900'}`}>
@@ -1902,7 +2110,7 @@ export default function BumBumCafeStockApp() {
       </AnimatePresence>
 
       {/* PREMIUM BOTTOM NAVIGATION */}
-      <nav className={`fixed bottom-0 left-0 right-0 z-50 border-t backdrop-blur-md ${isDarkMode ? 'bg-black/90 border-neutral-800 text-white' : 'bg-white/90 border-neutral-100 text-neutral-800'}`}>
+      <nav className={`fixed bottom-0 left-0 right-0 z-50 border-t backdrop-blur-md ${isDarkMode ? 'bg-black/90 border-neutral-800 text-white' : 'bg-white/90 border-neutral-100 text-neutral-850'}`}>
         <div className="max-w-md mx-auto grid grid-cols-5 gap-0.5 py-1.5 text-center text-[8px] font-black uppercase">
           <button onClick={() => { setActiveTab('home'); setIsMultiSelectMode(false); }} className={`flex flex-col items-center justify-center py-1 ${activeTab === 'home' ? 'text-[#FF6B00]' : 'text-neutral-400'}`}>
             <Home size={15} /> <span className="mt-0.5">Home</span>
@@ -1917,7 +2125,7 @@ export default function BumBumCafeStockApp() {
             <Layers size={15} /> <span className="mt-0.5">Order to Supplier</span>
           </button>
           <button onClick={() => { setActiveTab('waste'); setIsMultiSelectMode(false); }} className={`flex flex-col items-center justify-center py-1 ${activeTab === 'waste' ? 'text-[#FF6B00]' : 'text-neutral-400'}`}>
-            <AlertTriangle size={15} /> <span className="mt-0.5">Wastage Logs</span>
+            <AlertTriangle size={15} /> <span className="mt-0.5">Logs & Waste</span>
           </button>
         </div>
       </nav>
