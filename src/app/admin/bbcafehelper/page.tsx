@@ -128,8 +128,6 @@ export default function BumBumCafeStockApp() {
   const [currentUser, setCurrentUser] = useState<UserPin | null>(null);
   const [pinInput, setPinInput] = useState<string>("");
   const [authError, setAuthError] = useState<string>("");
-  const [showAdminPanel, setShowAdminPanel] = useState<boolean>(false);
-  const [newUserForm, setNewUserForm] = useState({ name: '', pin: '', role: 'staff' as 'admin' | 'staff' });
 
   // Delete Action Protection states
   const [deleteConfirmation, setDeleteConfirmation] = useState<{
@@ -141,8 +139,8 @@ export default function BumBumCafeStockApp() {
 
   // Dashboard date filter state
   const [dashboardDateRange, setDashboardDateRange] = useState<'today' | 'yesterday' | 'week' | 'month' | 'year' | 'custom'>('today');
-  const [startDate, setStartDate] = useState<string>(getLocalDateString(6)); // Default 1 week ago
-  const [endDate, setEndDate] = useState<string>(getLocalDateString(0));     // Default today
+  const [startDate, setStartDate] = useState<string>(getLocalDateString(6)); 
+  const [endDate, setEndDate] = useState<string>(getLocalDateString(0));     
 
   // Buffer state to prevent excessive Firestore writes while typing order quantities
   const [localOrderQties, setLocalOrderQties] = useState<Record<string, string>>({});
@@ -351,51 +349,6 @@ export default function BumBumCafeStockApp() {
     }
   };
 
-  // Admin Pin Management methods
-  const handleAddNewUserSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newUserForm.name || !newUserForm.pin) {
-      toastMessage("सभी फ़ील्ड भरें!", "error");
-      return;
-    }
-    try {
-      const uId = `user_${Date.now()}`;
-      await setDoc(doc(db, "cafe_users", uId), {
-        id: uId,
-        name: newUserForm.name.toUpperCase().trim(),
-        pin: newUserForm.pin.trim(),
-        role: newUserForm.role
-      });
-      toastMessage("नया यूजर/पिन सहेजा गया!");
-      setNewUserForm({ name: '', pin: '', role: 'staff' });
-    } catch {
-      toastMessage("सहेजने में विफलता।", "error");
-    }
-  };
-
-  const handleUpdateUserPin = async (userId: string, newPin: string) => {
-    if (!newPin.trim()) return;
-    try {
-      await setDoc(doc(db, "cafe_users", userId), { pin: newPin.trim() }, { merge: true });
-      toastMessage("पिन बदल दिया गया!");
-    } catch {
-      toastMessage("अपडेट करने में असमर्थ।", "error");
-    }
-  };
-
-  const handleRemoveUser = async (userId: string) => {
-    if (userId === "admin_default") {
-      toastMessage("डिफ़ॉल्ट एडमिन को हटाया नहीं जा सकता!", "error");
-      return;
-    }
-    try {
-      await deleteDoc(doc(db, "cafe_users", userId));
-      toastMessage("यूज़र को हटाया गया।");
-    } catch {
-      toastMessage("हटाने में असमर्थ।", "error");
-    }
-  };
-
   // Calculations & Date-Filtered Analytics
   const getFilteredLedgerStats = useMemo(() => {
     const todayStr = getLocalDateString(0);
@@ -428,7 +381,7 @@ export default function BumBumCafeStockApp() {
     const matchedKitchen = stockOutHistory.filter(log => log.purpose === "Kitchen Use" && filterFn(log.date));
     const totalKitchenQty = matchedKitchen.reduce((sum, log) => sum + log.qty, 0);
 
-    const matchedWasteLogs = stockOutHistory.filter(log => (log.purpose === "Waste" || log.purpose === "Damage" && filterFn(log.date)));
+    const matchedWasteLogs = stockOutHistory.filter(log => (log.purpose === "Waste" || log.purpose === "Damage") && filterFn(log.date));
     const totalWasteLoss = matchedWasteLogs.reduce((sum, log) => sum + (log.financialLoss || 0), 0);
 
     return {
@@ -850,17 +803,29 @@ export default function BumBumCafeStockApp() {
     });
   };
 
+  // Add Product Submit (With strict duplication checks)
   const handleAddProductSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formAddProduct.name) {
       toastMessage("सामान का नाम आवश्यक है!", "error");
       return;
     }
+
+    const cleanName = formAddProduct.name.toUpperCase().trim();
+    // No Duplicates allowed between Godown Stock and Fixed Assets
+    const existsInInventory = inventory.some(i => i.name.toUpperCase().trim() === cleanName);
+    const existsInAssets = fixedAssets.some(a => a.name.toUpperCase().trim() === cleanName);
+    if (existsInInventory || existsInAssets) {
+      toastMessage("यह नाम पहले से गोदाम स्टॉक या स्थिर एसेट्स (Fixed Assets) में मौजूद है!", "error");
+      triggerHaptic(65);
+      return;
+    }
+
     try {
       const customId = `item_${Date.now()}`;
       const payload: InventoryItem = {
         id: customId,
-        name: formAddProduct.name.toUpperCase().trim(),
+        name: cleanName,
         storeQty: parseFloat(formAddProduct.storeQty) || 0,
         kitchenQty: parseFloat(formAddProduct.kitchenQty) || 0,
         unit: formAddProduct.unit,
@@ -891,17 +856,29 @@ export default function BumBumCafeStockApp() {
     }
   };
 
+  // Add Fixed Asset Submit (With strict duplication checks)
   const handleAddAssetSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formAddAsset.name) {
       toastMessage("एसेट का नाम आवश्यक है!", "error");
       return;
     }
+
+    const cleanName = formAddAsset.name.toUpperCase().trim();
+    // No Duplicates allowed between Godown Stock and Fixed Assets
+    const existsInInventory = inventory.some(i => i.name.toUpperCase().trim() === cleanName);
+    const existsInAssets = fixedAssets.some(a => a.name.toUpperCase().trim() === cleanName);
+    if (existsInInventory || existsInAssets) {
+      toastMessage("यह नाम पहले से गोदाम स्टॉक या स्थिर एसेट्स (Fixed Assets) में मौजूद है!", "error");
+      triggerHaptic(65);
+      return;
+    }
+
     try {
       const customId = `asset_${Date.now()}`;
       const payload: FixedAsset = {
         id: customId,
-        name: formAddAsset.name.toUpperCase().trim(),
+        name: cleanName,
         quantity: parseFloat(formAddAsset.quantity) || 1,
         purchaseDate: formAddAsset.purchaseDate || new Date().toISOString().split('T')[0],
         cost: parseFloat(formAddAsset.cost) || 0,
@@ -930,9 +907,20 @@ export default function BumBumCafeStockApp() {
     });
   };
 
+  // Edit Product Submit with Duplication check
   const handleEditProductSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingProduct) return;
+
+    const cleanName = editingProduct.name.toUpperCase().trim();
+    const existsInInventory = inventory.some(i => i.id !== editingProduct.id && i.name.toUpperCase().trim() === cleanName);
+    const existsInAssets = fixedAssets.some(a => a.name.toUpperCase().trim() === cleanName);
+    if (existsInInventory || existsInAssets) {
+      toastMessage("यह नाम पहले से अन्य किसी सामान या स्थिर संपत्ति में मौजूद है!", "error");
+      triggerHaptic(65);
+      return;
+    }
+
     try {
       await setDoc(doc(db, "godown_inventory", editingProduct.id), editingProduct, { merge: true });
       toastMessage("सामान सफलतापूर्वक संशोधित हुआ!");
@@ -1136,17 +1124,6 @@ export default function BumBumCafeStockApp() {
         </div>
         
         <div className="flex items-center gap-1.5">
-          {currentUser.role === 'admin' && (
-            <button 
-              onClick={() => setShowAdminPanel(true)} 
-              className="p-2 bg-neutral-100 dark:bg-neutral-800 rounded-xl text-xs flex items-center gap-1 text-orange-500"
-              title="Manage Users & PINs"
-            >
-              <Settings size={14} />
-              <span className="hidden xs:inline text-[9px] font-black uppercase">पिन प्रबंधन</span>
-            </button>
-          )}
-
           <button 
             onClick={() => { setCurrentUser(null); toastMessage("सफलतापूर्वक लॉगआउट!"); }} 
             className="p-2 bg-red-100 dark:bg-red-950/40 text-red-600 rounded-xl text-xs"
@@ -1908,109 +1885,6 @@ export default function BumBumCafeStockApp() {
           </div>
         )}
 
-        {/* A. ADMIN PIN / USER SETTINGS PANEL MODAL */}
-        {showAdminPanel && currentUser.role === 'admin' && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }} 
-              animate={{ opacity: 1, scale: 1 }} 
-              exit={{ opacity: 0, scale: 0.95 }} 
-              className={`w-full max-w-sm rounded-[2rem] p-6 space-y-4 border ${
-                isDarkMode ? 'bg-[#0F0F0F] border-neutral-800 text-white' : 'bg-white border-neutral-100 text-neutral-900'
-              }`}
-            >
-              <div className="flex justify-between items-center border-b pb-2.5">
-                <div>
-                  <h3 className="text-xs font-black uppercase text-orange-500">User & PIN settings</h3>
-                  <p className="text-[9px] text-neutral-400 font-bold uppercase mt-0.5">नया यूजर जोड़ें या पिन बदलें</p>
-                </div>
-                <button 
-                  type="button" 
-                  onClick={() => setShowAdminPanel(false)} 
-                  className="p-1.5 bg-neutral-100 dark:bg-neutral-800 rounded-xl"
-                >
-                  <X size={14} />
-                </button>
-              </div>
-
-              {/* Add New User form */}
-              <form onSubmit={handleAddNewUserSubmit} className="space-y-2.5 p-3 rounded-2xl bg-neutral-50 dark:bg-neutral-900 border border-neutral-200/50 dark:border-neutral-800 text-xs">
-                <p className="font-black text-[9px] text-neutral-400 uppercase tracking-wider flex items-center gap-1">
-                  <UserPlus size={10} /> Add New User / PIN
-                </p>
-                <div className="space-y-1.5">
-                  <input 
-                    type="text" 
-                    placeholder="NAME (जैसे: SUNIL)"
-                    value={newUserForm.name}
-                    onChange={e => setNewUserForm({ ...newUserForm, name: e.target.value })}
-                    className="w-full p-2 rounded-xl border uppercase font-bold dark:bg-neutral-800"
-                    required
-                  />
-                  <div className="grid grid-cols-2 gap-2">
-                    <input 
-                      type="text" 
-                      placeholder="PIN (अंक/शब्द)"
-                      maxLength={6}
-                      value={newUserForm.pin}
-                      onChange={e => setNewUserForm({ ...newUserForm, pin: e.target.value })}
-                      className="w-full p-2 rounded-xl border font-bold dark:bg-neutral-800 text-center"
-                      required
-                    />
-                    <select 
-                      value={newUserForm.role}
-                      onChange={e => setNewUserForm({ ...newUserForm, role: e.target.value as any })}
-                      className="w-full p-2 rounded-xl border font-bold dark:bg-neutral-800"
-                    >
-                      <option value="staff">Staff (स्टाफ)</option>
-                      <option value="admin">Admin (एडमिन)</option>
-                    </select>
-                  </div>
-                </div>
-                <button 
-                  type="submit" 
-                  className="w-full py-2 bg-green-600 text-white font-black text-[10px] uppercase rounded-xl tracking-wider"
-                >
-                  Add User ➔
-                </button>
-              </form>
-
-              {/* Active Users List */}
-              <div className="space-y-2 max-h-[25vh] overflow-y-auto pr-1">
-                <p className="font-black text-[9px] text-neutral-400 uppercase tracking-wider px-1">सक्रिय यूजर्स सूची</p>
-                {users.map(u => (
-                  <div key={u.id} className="flex items-center justify-between p-2.5 rounded-xl border border-neutral-100 dark:border-neutral-800 text-xs font-bold bg-neutral-50/50 dark:bg-neutral-900/40">
-                    <div>
-                      <span className="uppercase text-[#FF6B00]">{u.name}</span>
-                      <span className="ml-1 px-1.5 py-0.5 text-[7px] bg-neutral-200 dark:bg-neutral-800 text-neutral-500 rounded font-black uppercase">
-                        {u.role}
-                      </span>
-                    </div>
-                    
-                    <div className="flex items-center gap-2">
-                      <input 
-                        type="text" 
-                        defaultValue={u.pin}
-                        onBlur={(e) => handleUpdateUserPin(u.id, e.target.value)}
-                        placeholder="PIN"
-                        className="w-14 p-1 rounded border text-center dark:bg-neutral-800"
-                      />
-                      <button 
-                        type="button"
-                        onClick={() => handleRemoveUser(u.id)}
-                        className="p-1 hover:bg-red-100 text-red-500 rounded"
-                        title="हटाएं"
-                      >
-                        <Trash2 size={12} />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </motion.div>
-          </div>
-        )}
-
         {/* 1. MANAGE CATEGORIES MODAL */}
         {showManageCategoriesModal && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -2356,7 +2230,7 @@ export default function BumBumCafeStockApp() {
                   </div>
                 </div>
 
-                {/* PURCHASE DATE FIELD FOR ADDING PRODUCTS */}
+                {/* PURCHASE DATE FIELD */}
                 <div className="space-y-1">
                   <label className="text-[9px] text-neutral-400 font-bold uppercase">Purchase Date (खरीद की तारीख)</label>
                   <input 
