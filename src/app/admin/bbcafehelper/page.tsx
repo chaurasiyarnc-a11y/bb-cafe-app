@@ -117,8 +117,8 @@ export default function BumBumCafeStockApp() {
   const [editedQties, setEditedQties] = useState<Record<string, string | number>>({});
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
 
-  // Dashboard dynamic date range state (today, yesterday, parso, week)
-  const [dashboardDateRange, setDashboardDateRange] = useState<'today' | 'yesterday' | 'parso' | 'week'>('today');
+  // Dashboard date filter state (today, yesterday, week, month, year)
+  const [dashboardDateRange, setDashboardDateRange] = useState<'today' | 'yesterday' | 'week' | 'month' | 'year'>('today');
 
   // Buffer state to prevent excessive Firestore writes while typing order quantities
   const [localOrderQties, setLocalOrderQties] = useState<Record<string, string>>({});
@@ -276,17 +276,24 @@ export default function BumBumCafeStockApp() {
   const getFilteredLedgerStats = useMemo(() => {
     const todayStr = getLocalDateString(0);
     const yesterdayStr = getLocalDateString(1);
-    const parsoStr = getLocalDateString(2);
     const weekAgoStr = getLocalDateString(6);
+
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = String(now.getMonth() + 1).padStart(2, '0');
+    const monthPrefix = `${currentYear}-${currentMonth}`; // e.g. "2026-07"
+    const yearPrefix = `${currentYear}`; // e.g. "2026"
 
     let filterFn = (dateStr: string) => dateStr === todayStr;
 
     if (dashboardDateRange === 'yesterday') {
       filterFn = (dateStr: string) => dateStr === yesterdayStr;
-    } else if (dashboardDateRange === 'parso') {
-      filterFn = (dateStr: string) => dateStr === parsoStr;
     } else if (dashboardDateRange === 'week') {
       filterFn = (dateStr: string) => dateStr >= weekAgoStr && dateStr <= todayStr;
+    } else if (dashboardDateRange === 'month') {
+      filterFn = (dateStr: string) => dateStr.startsWith(monthPrefix);
+    } else if (dashboardDateRange === 'year') {
+      filterFn = (dateStr: string) => dateStr.startsWith(yearPrefix);
     }
 
     // 1. Stock Inward (Maal Aaya)
@@ -311,6 +318,7 @@ export default function BumBumCafeStockApp() {
     };
   }, [dashboardDateRange, stockInHistory, stockOutHistory]);
 
+  // Static general stock metrics
   const stats = useMemo(() => {
     const totalVal = inventory.reduce((sum, item) => sum + (item.storeQty * item.purchasePrice), 0);
     const lowCount = inventory.filter(item => item.storeQty < item.minLimit).length;
@@ -321,6 +329,17 @@ export default function BumBumCafeStockApp() {
 
     return { totalVal, lowCount, totalFixedQty, totalFixedVal };
   }, [inventory, fixedAssets]);
+
+  // CATEGORY-WISE STOCK VALUE CALCULATIONS
+  const categoryStockValues = useMemo(() => {
+    const values: Record<string, number> = {};
+    inventory.forEach(item => {
+      const cat = item.category || "OTHERS";
+      const itemVal = (item.storeQty || 0) * (item.purchasePrice || 0);
+      values[cat] = (values[cat] || 0) + itemVal;
+    });
+    return values;
+  }, [inventory]);
 
   // Combined chronologic flow ledger (Inward + Kitchen flow timeline)
   const stockFlowTimeline = useMemo(() => {
@@ -999,26 +1018,29 @@ export default function BumBumCafeStockApp() {
               <p className="text-[10px] text-orange-100 uppercase font-black mt-0.5">गोदाम और किचन संचालन ट्रैक करें</p>
             </div>
 
-            {/* STICKY DATE RANGE SELECTOR BAR */}
-            <div className={`sticky top-[64px] z-30 py-2.5 space-y-2 backdrop-blur-md ${isDarkMode ? 'bg-[#0E0E0E]/90' : 'bg-[#FAFAFA]/90'} border-b border-dashed ${isDarkMode ? 'border-neutral-800' : 'border-neutral-200'} flex items-center justify-between gap-1`}>
+            {/* STICKY DATE RANGE SELECTOR BAR (Today, Yesterday, Week, Month, Year Order) */}
+            <div className={`sticky top-[64px] z-30 py-2.5 space-y-2 backdrop-blur-md ${isDarkMode ? 'bg-[#0E0E0E]/90' : 'bg-[#FAFAFA]/90'} border-b border-dashed ${isDarkMode ? 'border-neutral-800' : 'border-neutral-205'} flex items-center justify-between gap-1`}>
               <span className="text-[9px] font-black uppercase text-neutral-400 shrink-0">चुनें:</span>
-              <div className="flex gap-1.5 flex-1 justify-end">
-                {(['today', 'yesterday', 'parso', 'week'] as const).map((range) => {
-                  const label = range === 'today' ? 'आज' : range === 'yesterday' ? 'कल' : range === 'parso' ? 'परसों' : '1 हफ़्ता';
-                  return (
-                    <button
-                      key={range}
-                      onClick={() => { triggerHaptic(15); setDashboardDateRange(range); }}
-                      className={`px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider shrink-0 transition-all ${
-                        dashboardDateRange === range 
-                          ? 'bg-orange-500 text-white shadow' 
-                          : isDarkMode ? 'bg-neutral-900 text-neutral-400' : 'bg-neutral-100 text-neutral-600'
-                      }`}
-                    >
-                      {label}
-                    </button>
-                  );
-                })}
+              <div className="flex gap-1 flex-1 justify-end flex-wrap">
+                {([
+                  { range: 'today', label: 'आज' },
+                  { range: 'yesterday', label: 'कल' },
+                  { range: 'week', label: '1 हफ़्ता' },
+                  { range: 'month', label: 'महीना' },
+                  { range: 'year', label: 'साल' }
+                ] as const).map((opt) => (
+                  <button
+                    key={opt.range}
+                    onClick={() => { triggerHaptic(15); setDashboardDateRange(opt.range); }}
+                    className={`px-2.5 py-1.5 rounded-full text-[9px] font-black uppercase tracking-wider shrink-0 transition-all ${
+                      dashboardDateRange === opt.range 
+                        ? 'bg-orange-500 text-white shadow' 
+                        : isDarkMode ? 'bg-neutral-900 text-neutral-400' : 'bg-neutral-100 text-neutral-600'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
               </div>
             </div>
 
@@ -1050,7 +1072,30 @@ export default function BumBumCafeStockApp() {
               </div>
             </div>
 
-            {/* UNIFIED STOCK FLOW TIMELINE LEDGER (माल आया और किचन में गया) */}
+            {/* CATEGORY-WISE STOCK VALUE DISPLAY (Catagiri bose dasbord amount) */}
+            <div className="space-y-2.5">
+              <h3 className="text-xs font-black uppercase text-neutral-400 tracking-wider px-1">Category-wise Stock Value</h3>
+              <div className="grid grid-cols-2 gap-2">
+                {categories.map(cat => {
+                  const value = categoryStockValues[cat.name] || 0;
+                  return (
+                    <div 
+                      key={cat.id} 
+                      className={`p-3 rounded-2xl border flex items-center justify-between text-xs transition-all ${
+                        isDarkMode ? 'bg-[#181818]/50 border-neutral-800' : 'bg-white border-neutral-100'
+                      }`}
+                    >
+                      <div>
+                        <p className="font-bold text-neutral-400 uppercase text-[9px]">{cat.name}</p>
+                        <p className="font-black mt-1 text-[#FF6B00]">₹{value.toLocaleString()}</p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* UNIFIED STOCK FLOW TIMELINE LEDGER */}
             <div className="space-y-2.5">
               <div className="flex justify-between items-center px-1">
                 <h3 className="text-xs font-black uppercase text-neutral-400 tracking-wider">Inward & Outward Flow Timeline</h3>
@@ -1059,7 +1104,7 @@ export default function BumBumCafeStockApp() {
                 </span>
               </div>
 
-              <div className="space-y-1.5 max-h-[40vh] overflow-y-auto pr-1">
+              <div className="space-y-1.5 max-h-[30vh] overflow-y-auto pr-1">
                 {stockFlowTimeline.map((item) => (
                   <div 
                     key={item.id} 
@@ -1136,7 +1181,7 @@ export default function BumBumCafeStockApp() {
                   </button>
                 </div>
                 
-                {/* flex-wrap used as requested (no horizontal slider carousel scroll) */}
+                {/* flex-wrap used (no horizontal slider carousel scroll) */}
                 <div className="flex flex-wrap gap-1.5 w-full">
                   <button
                     onClick={() => setSelectedCategoryFilter("All")}
@@ -1223,7 +1268,7 @@ export default function BumBumCafeStockApp() {
               </div>
             )}
 
-            {/* STOCK ITEM FLAT LIST (No nested groupings) */}
+            {/* STOCK ITEM FLAT LIST */}
             <div className="space-y-2.5">
               {filteredInventory.map(item => {
                 const isSelected = selectedItemIds.includes(item.id);
@@ -1265,7 +1310,7 @@ export default function BumBumCafeStockApp() {
                           )}
                         </div>
                         
-                        {/* Stock breakdown display (Godown and Kitchen display side-by-side) */}
+                        {/* Stock breakdown display */}
                         <div className="mt-1.5 flex items-center gap-3 text-[10px] font-bold uppercase text-neutral-400">
                           <span>📦 Godown: <span className="text-neutral-800 dark:text-neutral-200">{item.storeQty} {item.unit}</span></span>
                           <span>🍳 Kitchen: <span className="text-orange-500">{item.kitchenQty || 0} {item.unit}</span></span>
@@ -1346,7 +1391,7 @@ export default function BumBumCafeStockApp() {
           <div className="space-y-4">
             
             {/* STICKY SEARCH & ADD ACTIONS */}
-            <div className={`sticky top-[64px] z-30 py-2.5 space-y-2.5 backdrop-blur-md ${isDarkMode ? 'bg-[#0E0E0E]/90' : 'bg-[#FAFAFA]/90'} border-b border-dashed ${isDarkMode ? 'border-neutral-800' : 'border-neutral-100'}`}>
+            <div className={`sticky top-[64px] z-30 py-2.5 space-y-2.5 backdrop-blur-md ${isDarkMode ? 'bg-[#0E0E0E]/90' : 'bg-[#FAFAFA]/90'} border-b border-dashed ${isDarkMode ? 'border-neutral-800' : 'border-neutral-105'}`}>
               <div className="flex justify-between items-center">
                 <div>
                   <h2 className="text-sm font-black text-orange-600 uppercase">Fixed Assets (स्थिर संपत्तियां)</h2>
