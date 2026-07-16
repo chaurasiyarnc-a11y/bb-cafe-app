@@ -58,6 +58,27 @@ interface ScannedItem {
   price: number;
 }
 
+// Dynamics CDN loader for Real Barcode Scanner (html5-qrcode)
+const loadHtml5Qrcode = (): Promise<any> => {
+  return new Promise((resolve, reject) => {
+    if (typeof window === 'undefined') return reject();
+    if ((window as any).Html5Qrcode) {
+      resolve((window as any).Html5Qrcode);
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = "https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js";
+    script.async = true;
+    script.onload = () => {
+      resolve((window as any).Html5Qrcode);
+    };
+    script.onerror = (e) => {
+      reject(e);
+    };
+    document.head.appendChild(script);
+  });
+};
+
 const triggerHaptic = (ms = 35) => {
   if (typeof window !== 'undefined' && window.navigator && window.navigator.vibrate) {
     window.navigator.vibrate(ms);
@@ -98,10 +119,10 @@ export default function BumBumCafeStockApp() {
   // Scanner States
   const [scannerActive, setScannerActive] = useState<boolean>(false);
   const [scannedItemsToVerify, setScannedItemsToVerify] = useState<ScannedItem[]>([]);
+  const [unrecognizedBarcode, setUnrecognizedBarcode] = useState<string | null>(null);
   const [isScannerProcessing, setIsScannerProcessing] = useState<boolean>(false);
   const [manualBarcodeInput, setManualBarcodeInput] = useState<string>("");
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const cameraStreamRef = useRef<MediaStream | null>(null);
+  const html5QrCodeRef = useRef<any>(null);
 
   // Custom Modals & Forms
   const [showAddProductModal, setShowAddProductModal] = useState<boolean>(false);
@@ -133,7 +154,7 @@ export default function BumBumCafeStockApp() {
     inventoryRef.current = inventory;
   }, [inventory]);
 
-  // Static Listeners (Loads once to reduce reads)
+  // Static Listeners
   useEffect(() => {
     const unsubInventory = onSnapshot(collection(db, "godown_inventory"), (snap) => {
       setInventory(snap.docs.map(d => ({ id: d.id, ...d.data() } as InventoryItem)));
@@ -178,30 +199,64 @@ export default function BumBumCafeStockApp() {
     }
   }, [showSaveToListModal, orderLists, activeListId, targetListId]);
 
-  // Live native browser Barcode detection loop
+  // Real Camera Barcode Scanner initialization using html5-qrcode
   useEffect(() => {
-    let intervalId: any;
+    let active = true;
     if (scannerActive) {
-      startCamera();
-      intervalId = setInterval(async () => {
-        if (typeof window !== 'undefined' && 'BarcodeDetector' in window && videoRef.current) {
-          try {
-            // @ts-ignore
-            const detector = new window.BarcodeDetector({ formats: ['code_128', 'ean_13', 'upc_a'] });
-            const barcodes = await detector.detect(videoRef.current);
-            if (barcodes.length > 0) {
-              handleDetectedBarcode(barcodes[0].rawValue);
+      setIsScannerProcessing(true);
+      loadHtml5Qrcode().then((Html5QrcodeClass) => {
+        if (!active) return;
+        setIsScannerProcessing(false);
+        try {
+          const scannerInstance = new Html5QrcodeClass("reader");
+          html5QrCodeRef.current = scannerInstance;
+          
+          scannerInstance.start(
+            { facingMode: "environment" },
+            {
+              fps: 15,
+              qrbox: (width: number, height: number) => {
+                return { width: Math.min(width * 0.8, 260), height: 160 };
+              }
+            },
+            (decodedText: string) => {
+              handleDetectedBarcode(decodedText);
+            },
+            () => {
+              // Frame scanning error is ignored to keep loop alive
             }
-          } catch (e) {
-            console.error(e);
-          }
+          ).catch((err: any) => {
+            console.warn("Camera start err", err);
+            toastMessage("कैमरा लोड करने में समस्या।", "error");
+          });
+        } catch (e) {
+          console.error(e);
         }
-      }, 600);
+      }).catch(() => {
+        setIsScannerProcessing(false);
+        toastMessage("स्कैनर लाइब्रेरी लोड करने में विफल।", "error");
+      });
     } else {
       stopCamera();
     }
-    return () => { clearInterval(intervalId); stopCamera(); };
+
+    return () => {
+      active = false;
+      stopCamera();
+    };
   }, [scannerActive]);
+
+  const stopCamera = () => {
+    if (html5QrCodeRef.current) {
+      const scanner = html5QrCodeRef.current;
+      if (scanner.isScanning) {
+        scanner.stop().then(() => {
+          scanner.clear();
+        }).catch((e: any) => console.log(e));
+      }
+      html5QrCodeRef.current = null;
+    }
+  };
 
   // Calculations
   const stats = useMemo(() => {
@@ -219,29 +274,18 @@ export default function BumBumCafeStockApp() {
     );
   }, [inventory, searchQuery]);
 
-  // Camera settings
-  const startCamera = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-      cameraStreamRef.current = stream;
-      if (videoRef.current) videoRef.current.srcObject = stream;
-    } catch (err) {
-      console.warn("कैमरा लोड नहीं हुआ।");
-    }
-  };
-
-  const stopCamera = () => {
-    if (cameraStreamRef.current) {
-      cameraStreamRef.current.getTracks().forEach(track => track.stop());
-      cameraStreamRef.current = null;
-    }
-  };
-
   // Process manual or scanned barcode
   const handleDetectedBarcode = (code: string) => {
     triggerHaptic(80);
+    
+    // Stop camera temporarily once scanned
+    if (html5QrCodeRef.current && html5QrCodeRef.current.isScanning) {
+      html5QrCodeRef.current.stop().catch(() => {});
+    }
+
     const foundItem = inventoryRef.current.find(i => i.barcode === code);
     if (foundItem) {
+      setUnrecognizedBarcode(null);
       setScannedItemsToVerify([{
         id: foundItem.id,
         name: foundItem.name,
@@ -251,21 +295,42 @@ export default function BumBumCafeStockApp() {
       }]);
       toastMessage(`सामग्री मिली: ${foundItem.name}`);
     } else {
-      toastMessage(`अपरिचित बारकोड: ${code}`, "error");
+      setScannedItemsToVerify([]);
+      setUnrecognizedBarcode(code);
+      toastMessage(`नया बारकोड पाया गया: ${code}`, "info");
     }
   };
 
-  // Demo Scan for unsupported devices
+  // Trigger modal to add completely new product pre-filling scanned barcode
+  const handleAddNewItemFromScanner = () => {
+    if (!unrecognizedBarcode) return;
+    setFormAddProduct({
+      name: '',
+      storeQty: '0',
+      unit: 'Kg',
+      purchasePrice: '',
+      minLimit: '10',
+      barcode: unrecognizedBarcode
+    });
+    setScannerActive(false);
+    setUnrecognizedBarcode(null);
+    setScannedItemsToVerify([]);
+    setShowAddProductModal(true);
+  };
+
+  // Demo Scan for testing (Supports both existing and random registration)
   const simulateBarcodeScan = () => {
-    if (inventory.length === 0) {
-      toastMessage("गोदाम में कोई सामान उपलब्ध नहीं है!", "error");
-      return;
-    }
     setIsScannerProcessing(true);
     setTimeout(() => {
       setIsScannerProcessing(false);
-      const randomItem = inventory[Math.floor(Math.random() * inventory.length)];
-      handleDetectedBarcode(randomItem.barcode || "890105800401");
+      // 30% chance of generating a brand new barcode, otherwise scan existing
+      if (Math.random() < 0.3 || inventory.length === 0) {
+        const randomNewBarcode = `89010580${Math.floor(1000 + Math.random() * 9000)}`;
+        handleDetectedBarcode(randomNewBarcode);
+      } else {
+        const randomItem = inventory[Math.floor(Math.random() * inventory.length)];
+        handleDetectedBarcode(randomItem.barcode || "890105800401");
+      }
     }, 1000);
   };
 
@@ -691,7 +756,10 @@ export default function BumBumCafeStockApp() {
             </div>
 
             <button 
-              onClick={() => setShowAddProductModal(true)}
+              onClick={() => {
+                setFormAddProduct({ name: '', storeQty: '0', unit: 'Kg', purchasePrice: '', minLimit: '10', barcode: '' });
+                setShowAddProductModal(true);
+              }}
               className="w-full py-2.5 bg-green-600 hover:bg-green-700 text-white text-xs font-black uppercase rounded-xl flex items-center justify-center gap-1.5 shadow"
             >
               <Plus size={14} /> Add New Product (सामान जोड़ें)
@@ -1009,18 +1077,29 @@ export default function BumBumCafeStockApp() {
       {/* ==================== SCREEN MODALS ==================== */}
       <AnimatePresence>
 
-        {/* 1. REAL AI BARCODE SCANNER CONTAINER */}
+        {/* 1. REAL CAMERA BARCODE SCANNER WINDOW */}
         {scannerActive && (
           <div className="fixed inset-0 bg-black z-[150] flex flex-col justify-between p-4 text-white">
             <div className="flex justify-between items-center border-b border-neutral-800 pb-3">
               <div>
-                <p className="text-xs font-black uppercase text-orange-500">📷 Smart AI Scanner</p>
-                <p className="text-[9px] text-neutral-400">कैमरा से बारकोड स्कैन करें या नीचे डेमो ट्राई करें</p>
+                <p className="text-xs font-black uppercase text-orange-500">📷 Real Camera Scanner</p>
+                <p className="text-[9px] text-neutral-400">सामान का बारकोड स्कैन करें</p>
               </div>
-              <button onClick={() => { setScannerActive(false); setScannedItemsToVerify([]); }} className="p-2 bg-neutral-900 rounded-xl"><X size={15} /></button>
+              <button 
+                onClick={() => { 
+                  setScannerActive(false); 
+                  setScannedItemsToVerify([]); 
+                  setUnrecognizedBarcode(null); 
+                }} 
+                className="p-2 bg-neutral-900 rounded-xl"
+              >
+                <X size={15} />
+              </button>
             </div>
 
+            {/* SCANNER LOGIC VIEWS */}
             {scannedItemsToVerify.length > 0 ? (
+              /* Scenario A: Scanned Item exists in Database */
               <div className="flex-1 flex flex-col justify-center space-y-4 max-w-sm mx-auto w-full">
                 <div className="p-4 bg-neutral-900 border border-neutral-800 rounded-2xl space-y-3">
                   <div className="flex justify-between">
@@ -1036,30 +1115,89 @@ export default function BumBumCafeStockApp() {
                     />
                   </div>
                 </div>
-                <button onClick={saveVerifiedScan} className="w-full py-3 bg-green-600 rounded-xl font-black text-xs uppercase">
-                  Verify & Add Stock
-                </button>
+                <div className="flex gap-2">
+                  <button 
+                    onClick={() => {
+                      setScannedItemsToVerify([]);
+                      setUnrecognizedBarcode(null);
+                      // Restart Scanning Stream
+                      if (html5QrCodeRef.current && !html5QrCodeRef.current.isScanning) {
+                        html5QrCodeRef.current.start(
+                          { facingMode: "environment" },
+                          { fps: 15, qrbox: (w: number, h: number) => ({ width: Math.min(w * 0.8, 260), height: 160 }) },
+                          handleDetectedBarcode,
+                          () => {}
+                        ).catch(() => {});
+                      }
+                    }} 
+                    className="flex-1 py-3 bg-neutral-800 hover:bg-neutral-700 rounded-xl font-bold text-xs uppercase"
+                  >
+                    Scan Again
+                  </button>
+                  <button onClick={saveVerifiedScan} className="flex-1 py-3 bg-green-600 rounded-xl font-black text-xs uppercase">
+                    Verify & Add
+                  </button>
+                </div>
+              </div>
+            ) : unrecognizedBarcode ? (
+              /* Scenario B: Unrecognized Barcode -> Create New Product with pre-filled barcode */
+              <div className="flex-1 flex flex-col justify-center space-y-4 max-w-sm mx-auto w-full">
+                <div className="p-5 bg-neutral-900 border border-red-500/30 rounded-2xl text-center space-y-3">
+                  <span className="text-3xl">⚠️</span>
+                  <p className="text-sm font-bold text-red-400">यह बारकोड गोदाम में मौजूद नहीं है!</p>
+                  <p className="text-xs text-neutral-300">
+                    Barcode: <span className="font-mono text-white bg-neutral-800 px-2 py-1 rounded font-bold">{unrecognizedBarcode}</span>
+                  </p>
+                  <p className="text-[10px] text-neutral-500">क्या आप इस बारकोड के साथ नया सामान जोड़ना चाहते हैं?</p>
+                </div>
+                
+                <div className="flex gap-2">
+                  <button 
+                    onClick={() => {
+                      setUnrecognizedBarcode(null);
+                      if (html5QrCodeRef.current && !html5QrCodeRef.current.isScanning) {
+                        html5QrCodeRef.current.start(
+                          { facingMode: "environment" },
+                          { fps: 15, qrbox: (w: number, h: number) => ({ width: Math.min(w * 0.8, 260), height: 160 }) },
+                          handleDetectedBarcode,
+                          () => {}
+                        ).catch(() => {});
+                      }
+                    }} 
+                    className="flex-1 py-3 bg-neutral-800 hover:bg-neutral-700 rounded-xl font-bold text-xs uppercase"
+                  >
+                    Scan Again
+                  </button>
+                  <button 
+                    onClick={handleAddNewItemFromScanner} 
+                    className="flex-1 py-3 bg-orange-500 hover:bg-orange-600 rounded-xl font-black text-xs uppercase"
+                  >
+                    + Register New Item
+                  </button>
+                </div>
               </div>
             ) : (
+              /* Scenario C: Scanning Camera screen active feed */
               <div className="flex-1 flex flex-col justify-between py-4 max-w-sm mx-auto w-full">
-                {/* Manual text scanner entry for laser scanner support */}
                 <div className="space-y-1">
                   <input 
                     type="text" 
-                    placeholder="Type/Paste Barcode and press Enter..." 
+                    placeholder="Type/Paste Barcode manually..." 
                     value={manualBarcodeInput}
                     onChange={e => setManualBarcodeInput(e.target.value)}
                     onKeyDown={e => { if (e.key === 'Enter') { handleDetectedBarcode(manualBarcodeInput); setManualBarcodeInput(""); } }}
-                    className="w-full p-2.5 bg-neutral-900 border border-neutral-800 rounded-xl text-center text-xs text-white"
+                    className="w-full p-2.5 bg-neutral-900 border border-neutral-800 rounded-xl text-center text-xs text-white font-mono"
                   />
                 </div>
 
+                {/* Real-time HTML5 Camera scanning overlay */}
                 <div className="relative h-60 w-full bg-neutral-950 border border-neutral-800 rounded-3xl overflow-hidden flex items-center justify-center">
-                  <video ref={videoRef} autoPlay playsInline muted className="absolute inset-0 w-full h-full object-cover" />
-                  <span className="absolute left-0 right-0 h-0.5 bg-red-500 animate-bounce top-1/2" />
+                  <div id="reader" className="absolute inset-0 w-full h-full [&_video]:object-cover [&_video]:w-full [&_video]:h-full z-0" />
+                  <span className="absolute left-0 right-0 h-0.5 bg-red-500 animate-bounce top-1/2 pointer-events-none z-10" />
+                  
                   {isScannerProcessing && (
-                    <div className="absolute inset-0 bg-black/80 flex flex-col items-center justify-center space-y-2">
-                      <span className="text-[10px] font-bold text-orange-500 animate-pulse">PROCESSING AI FEED...</span>
+                    <div className="absolute inset-0 bg-black/80 flex flex-col items-center justify-center space-y-2 z-20">
+                      <span className="text-[10px] font-bold text-orange-500 animate-pulse">STARTING REAL CAMERA...</span>
                     </div>
                   )}
                 </div>
@@ -1213,13 +1351,13 @@ export default function BumBumCafeStockApp() {
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[9px] text-neutral-400 font-bold uppercase">Barcode (Optional)</label>
+                  <label className="text-[9px] text-neutral-400 font-bold uppercase">Barcode (बारकोड)</label>
                   <input 
                     type="text" 
                     placeholder="जैसे: EAN-13 नंबर या स्कैन कोड" 
                     value={formAddProduct.barcode}
                     onChange={e => setFormAddProduct({ ...formAddProduct, barcode: e.target.value })}
-                    className="w-full p-2.5 rounded-xl border dark:bg-neutral-800"
+                    className="w-full p-2.5 rounded-xl border dark:bg-neutral-800 font-mono"
                   />
                 </div>
               </div>
@@ -1297,7 +1435,7 @@ export default function BumBumCafeStockApp() {
                       type="text" 
                       value={editingProduct.barcode || ""}
                       onChange={e => setEditingProduct({ ...editingProduct, barcode: e.target.value })}
-                      className="w-full p-2.5 rounded-xl border dark:bg-neutral-800"
+                      className="w-full p-2.5 rounded-xl border dark:bg-neutral-800 font-mono"
                     />
                   </div>
                 </div>
