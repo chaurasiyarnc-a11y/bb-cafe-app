@@ -5,7 +5,7 @@
   "id": "/admin/bbcafehelper/",
   "scope": "/admin/bbcafehelper/",
   "start_url": "/admin/bbcafehelper",
-  "name": "Bum Bum Cafe Godown",
+  "name": "BB Godown",
   "short_name": "BumBumCafe",
   "description": "Stock and Godown Management App for Bum Bum Cafe",
   "icons": [
