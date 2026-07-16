@@ -33,6 +33,15 @@ interface CategoryItem {
   hidden: boolean;
 }
 
+interface StockInLog {
+  id: string;
+  itemName: string;
+  itemId: string;
+  qty: number;
+  date: string;
+  remarks?: string;
+}
+
 interface StockOutLog {
   id: string;
   itemName: string;
@@ -76,6 +85,16 @@ const triggerHaptic = (ms = 35) => {
   }
 };
 
+// Safe Local Date String Generator to avoid UTC rollover bugs
+const getLocalDateString = (offsetDays = 0) => {
+  const d = new Date();
+  d.setDate(d.getDate() - offsetDays);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 const INITIAL_INVENTORY: InventoryItem[] = [
   { id: "dry_1", name: "DOODH MILK", storeQty: 40, kitchenQty: 0, unit: "Ltr", purchasePrice: 60, minLimit: 10, category: "DAIRY" },
   { id: "dry_2", name: "DAHI CURD", storeQty: 15, kitchenQty: 0, unit: "Kg", purchasePrice: 80, minLimit: 5, category: "DAIRY" },
@@ -90,11 +109,16 @@ export default function BumBumCafeStockApp() {
   const [orderLists, setOrderLists] = useState<OrderListMeta[]>([]);
   const [savedOrders, setSavedOrders] = useState<SavedOrderItem[]>([]);
   const [fixedAssets, setFixedAssets] = useState<FixedAsset[]>([]);
+  const [stockInHistory, setStockInHistory] = useState<StockInLog[]>([]);
+  const [stockOutHistory, setStockOutHistory] = useState<StockOutLog[]>([]);
   const [activeTab, setActiveTab] = useState<'home' | 'store' | 'fixed_assets' | 'saved_list' | 'waste'>('home');
   const [isDarkMode, setIsDarkMode] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [editedQties, setEditedQties] = useState<Record<string, string | number>>({});
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+
+  // Dashboard dynamic date range state (today, yesterday, parso, week)
+  const [dashboardDateRange, setDashboardDateRange] = useState<'today' | 'yesterday' | 'parso' | 'week'>('today');
 
   // Buffer state to prevent excessive Firestore writes while typing order quantities
   const [localOrderQties, setLocalOrderQties] = useState<Record<string, string>>({});
@@ -146,10 +170,6 @@ export default function BumBumCafeStockApp() {
 
   // Waste logs & modals
   const [showStockOutModal, setShowStockOutModal] = useState<boolean>(false);
-  const [stockOutHistory, setStockOutHistory] = useState<StockOutLog[]>([
-    { id: "so_1", itemName: "DOODH MILK", qty: 2, purpose: "Waste", date: "2026-07-15", remarks: "दूध फट गया", financialLoss: 120 },
-    { id: "so_2", itemName: "TAMATAR TOMATO", qty: 5, purpose: "Damage", date: "2026-07-16", remarks: "सड़े हुए टमाटर फेंके", financialLoss: 200 },
-  ]);
 
   const [formStockOut, setFormStockOut] = useState({
     item: '', quantity: '', purpose: 'Waste' as "Kitchen Use" | "Waste" | "Damage" | "Staff Use", remarks: ''
@@ -182,7 +202,7 @@ export default function BumBumCafeStockApp() {
     const unsubInventory = onSnapshot(collection(db, "godown_inventory"), (snap) => {
       setInventory(snap.docs.map(d => ({ 
         id: d.id, 
-        kitchenQty: 0, // Fallback default
+        kitchenQty: 0, 
         ...d.data() 
       } as InventoryItem)));
     }, (err) => console.error("Inventory load error", err));
@@ -199,6 +219,10 @@ export default function BumBumCafeStockApp() {
       }
     }, (err) => console.error("Categories load error", err));
 
+    const unsubStockIns = onSnapshot(query(collection(db, "stock_in_history"), orderBy("date", "desc")), (snap) => {
+      setStockInHistory(snap.docs.map(d => ({ id: d.id, ...d.data() } as StockInLog)));
+    }, (err) => console.error("StockIns load error", err));
+
     const unsubStockOuts = onSnapshot(query(collection(db, "stock_out_history"), orderBy("date", "desc")), (snap) => {
       setStockOutHistory(snap.docs.map(d => ({ id: d.id, ...d.data() } as StockOutLog)));
     }, (err) => console.error("Stockouts load error", err));
@@ -214,6 +238,7 @@ export default function BumBumCafeStockApp() {
     return () => {
       unsubInventory();
       unsubCategories();
+      unsubStockIns();
       unsubStockOuts();
       unsubSavedOrders();
       unsubFixedAssets();
@@ -247,20 +272,88 @@ export default function BumBumCafeStockApp() {
     }
   }, [showSaveToListModal, orderLists, activeListId, targetListId]);
 
-  // Calculations
+  // Calculations & Date-Filtered Analytics
+  const getFilteredLedgerStats = useMemo(() => {
+    const todayStr = getLocalDateString(0);
+    const yesterdayStr = getLocalDateString(1);
+    const parsoStr = getLocalDateString(2);
+    const weekAgoStr = getLocalDateString(6);
+
+    let filterFn = (dateStr: string) => dateStr === todayStr;
+
+    if (dashboardDateRange === 'yesterday') {
+      filterFn = (dateStr: string) => dateStr === yesterdayStr;
+    } else if (dashboardDateRange === 'parso') {
+      filterFn = (dateStr: string) => dateStr === parsoStr;
+    } else if (dashboardDateRange === 'week') {
+      filterFn = (dateStr: string) => dateStr >= weekAgoStr && dateStr <= todayStr;
+    }
+
+    // 1. Stock Inward (Maal Aaya)
+    const matchedInward = stockInHistory.filter(log => filterFn(log.date));
+    const totalInwardQty = matchedInward.reduce((sum, log) => sum + log.qty, 0);
+
+    // 2. Kitchen Sent Out (Kitchen Gaya)
+    const matchedKitchen = stockOutHistory.filter(log => log.purpose === "Kitchen Use" && filterFn(log.date));
+    const totalKitchenQty = matchedKitchen.reduce((sum, log) => sum + log.qty, 0);
+
+    // 3. Wastage loss
+    const matchedWasteLogs = stockOutHistory.filter(log => (log.purpose === "Waste" || log.purpose === "Damage") && filterFn(log.date));
+    const totalWasteLoss = matchedWasteLogs.reduce((sum, log) => sum + (log.financialLoss || 0), 0);
+
+    return {
+      totalInwardQty,
+      totalKitchenQty,
+      totalWasteLoss,
+      matchedInward,
+      matchedKitchen,
+      matchedWasteLogs
+    };
+  }, [dashboardDateRange, stockInHistory, stockOutHistory]);
+
   const stats = useMemo(() => {
     const totalVal = inventory.reduce((sum, item) => sum + (item.storeQty * item.purchasePrice), 0);
     const lowCount = inventory.filter(item => item.storeQty < item.minLimit).length;
-    const wasteLoss = stockOutHistory
-      .filter(s => s.purpose === "Waste" || s.purpose === "Damage")
-      .reduce((sum, s) => sum + (s.financialLoss || 0), 0);
     
     // Total calculation for Fixed Assets
     const totalFixedQty = fixedAssets.reduce((sum, asset) => sum + (asset.quantity || 0), 0);
     const totalFixedVal = fixedAssets.reduce((sum, asset) => sum + ((asset.quantity || 1) * (asset.cost || 0)), 0);
 
-    return { totalVal, lowCount, wasteLoss, totalFixedQty, totalFixedVal };
-  }, [inventory, stockOutHistory, fixedAssets]);
+    return { totalVal, lowCount, totalFixedQty, totalFixedVal };
+  }, [inventory, fixedAssets]);
+
+  // Combined chronologic flow ledger (Inward + Kitchen flow timeline)
+  const stockFlowTimeline = useMemo(() => {
+    const list: { id: string; name: string; qty: number; unit: string; type: 'IN' | 'OUT'; date: string; remarks?: string }[] = [];
+    
+    getFilteredLedgerStats.matchedInward.forEach(log => {
+      const item = inventory.find(i => i.id === log.itemId);
+      list.push({
+        id: log.id,
+        name: log.itemName,
+        qty: log.qty,
+        unit: item?.unit || 'Units',
+        type: 'IN',
+        date: log.date,
+        remarks: log.remarks
+      });
+    });
+
+    getFilteredLedgerStats.matchedKitchen.forEach(log => {
+      const item = inventory.find(i => i.id === log.itemId);
+      list.push({
+        id: log.id,
+        name: log.itemName,
+        qty: log.qty,
+        unit: item?.unit || 'Units',
+        type: 'OUT',
+        date: log.date,
+        remarks: log.remarks
+      });
+    });
+
+    return list.sort((a, b) => b.date.localeCompare(a.date));
+  }, [getFilteredLedgerStats, inventory]);
 
   // Filter Categories to only show visible (unhidden) in selection
   const visibleCategories = useMemo(() => {
@@ -281,19 +374,6 @@ export default function BumBumCafeStockApp() {
       }
     });
   }, [inventory, searchQuery, selectedCategoryFilter, categories]);
-
-  // Group items dynamically by Category for beautiful grid layouts
-  const groupedInventory = useMemo(() => {
-    const groups: Record<string, InventoryItem[]> = {};
-    filteredInventory.forEach(item => {
-      const cat = item.category || "OTHERS";
-      if (!groups[cat]) {
-        groups[cat] = [];
-      }
-      groups[cat].push(item);
-    });
-    return groups;
-  }, [filteredInventory]);
 
   const filteredAssets = useMemo(() => {
     return fixedAssets.filter(asset => 
@@ -320,7 +400,25 @@ export default function BumBumCafeStockApp() {
       return;
     }
     try {
+      const originalItem = inventory.find(i => i.id === id);
+      
+      // Perform write to Godown Stock
       await setDoc(doc(db, "godown_inventory", id), { storeQty: updated }, { merge: true });
+
+      // Automatically trace and log "Maal Inward" if stock increased manually
+      if (originalItem && updated > originalItem.storeQty) {
+        const diff = updated - originalItem.storeQty;
+        const logId = `in_${id}_${Date.now()}`;
+        await setDoc(doc(db, "stock_in_history", logId), {
+          id: logId,
+          itemName: originalItem.name,
+          itemId: id,
+          qty: diff,
+          date: getLocalDateString(0),
+          remarks: "गोदाम स्टॉक बढ़ोतरी दर्ज"
+        });
+      }
+
       setEditedQties(prev => { const copy = { ...prev }; delete copy[id]; return copy; });
       toastMessage("स्टॉक सेव हो गया!");
     } catch (e) {
@@ -508,7 +606,7 @@ export default function BumBumCafeStockApp() {
         itemId: transferItem.id,
         qty: qty,
         purpose: "Kitchen Use",
-        date: new Date().toISOString().split('T')[0],
+        date: getLocalDateString(0),
         remarks: "गोदाम से किचन भेजा गया",
         financialLoss: 0
       });
@@ -555,7 +653,7 @@ export default function BumBumCafeStockApp() {
         itemId: consumeItem.id,
         qty: qty,
         purpose: "Kitchen Use",
-        date: new Date().toISOString().split('T')[0],
+        date: getLocalDateString(0),
         remarks: consumeRemarksInput.trim() || "किचन में उपयोग किया गया",
         financialLoss: 0
       });
@@ -646,6 +744,19 @@ export default function BumBumCafeStockApp() {
         category: formAddProduct.category.toUpperCase()
       };
       await setDoc(doc(db, "godown_inventory", customId), payload);
+
+      // Log automatically as initial Inward Maal
+      if (payload.storeQty > 0) {
+        await setDoc(doc(db, "stock_in_history", `in_${customId}`), {
+          id: `in_${customId}`,
+          itemName: payload.name,
+          itemId: payload.id,
+          qty: payload.storeQty,
+          date: getLocalDateString(0),
+          remarks: "नया उत्पाद (प्रारंभिक स्टॉक आवक)"
+        });
+      }
+
       toastMessage("नया सामान सफलतापूर्वक दर्ज हुआ!");
       setShowAddProductModal(false);
       setFormAddProduct({ name: '', storeQty: '0', kitchenQty: '0', unit: 'Kg', purchasePrice: '', minLimit: '10', category: 'OTHERS' });
@@ -756,7 +867,7 @@ export default function BumBumCafeStockApp() {
         itemId: item.id,
         qty: qtyNum,
         purpose: formStockOut.purpose,
-        date: new Date().toISOString().split('T')[0],
+        date: getLocalDateString(0),
         remarks: formStockOut.remarks || "N/A",
         financialLoss: qtyNum * item.purchasePrice
       });
@@ -848,7 +959,7 @@ export default function BumBumCafeStockApp() {
   }, [orderLists, activeListId]);
 
   return (
-    <div className={`min-h-screen ${isDarkMode ? 'bg-[#0E0E0E] text-white' : 'bg-[#FAFAFA] text-neutral-900'} pb-24 font-sans relative`}>
+    <div className={`min-h-screen ${isDarkMode ? 'bg-[#0E0E0E]' : 'bg-[#FAFAFA]'} pb-24 font-sans relative ${isDarkMode ? 'text-white' : 'text-neutral-900'}`}>
       
       {/* HUD Toast */}
       <AnimatePresence>
@@ -881,49 +992,107 @@ export default function BumBumCafeStockApp() {
         {/* ==================== TAB 1: HOME / DASHBOARD ==================== */}
         {activeTab === 'home' && (
           <div className="space-y-4">
+            
+            {/* Minimal Dynamic Header Card */}
             <div className="bg-gradient-to-tr from-orange-500 to-amber-500 rounded-3xl p-5 text-white shadow-lg">
-              <h2 className="text-lg font-black uppercase tracking-wider">BumBum Dashboard</h2>
-              <p className="text-xs text-orange-100">स्टॉक और वेस्टेज रिपोर्ट ट्रैक करें</p>
-              
-              <div className="grid grid-cols-2 gap-3 mt-4 pt-4 border-t border-white/10">
-                <div onClick={() => { setActiveTab('store'); setIsMultiSelectMode(true); }} className="bg-white/10 p-3 rounded-2xl text-center cursor-pointer hover:bg-white/20 transition-all">
-                  <span className="text-xs font-bold block">📦 Multi Select Mode</span>
-                </div>
-                <div onClick={() => { triggerHaptic(); setShowStockOutModal(true); }} className="bg-white/10 p-3 rounded-2xl text-center cursor-pointer hover:bg-white/20 transition-all">
-                  <span className="text-xs font-bold block">⚠️ Log Waste</span>
-                </div>
+              <h2 className="text-sm font-black uppercase tracking-wider">BumBum Dashboard</h2>
+              <p className="text-[10px] text-orange-100 uppercase font-black mt-0.5">गोदाम और किचन संचालन ट्रैक करें</p>
+            </div>
+
+            {/* STICKY DATE RANGE SELECTOR BAR */}
+            <div className={`sticky top-[64px] z-30 py-2.5 space-y-2 backdrop-blur-md ${isDarkMode ? 'bg-[#0E0E0E]/90' : 'bg-[#FAFAFA]/90'} border-b border-dashed ${isDarkMode ? 'border-neutral-800' : 'border-neutral-200'} flex items-center justify-between gap-1`}>
+              <span className="text-[9px] font-black uppercase text-neutral-400 shrink-0">चुनें:</span>
+              <div className="flex gap-1.5 flex-1 justify-end">
+                {(['today', 'yesterday', 'parso', 'week'] as const).map((range) => {
+                  const label = range === 'today' ? 'आज' : range === 'yesterday' ? 'कल' : range === 'parso' ? 'परसों' : '1 हफ़्ता';
+                  return (
+                    <button
+                      key={range}
+                      onClick={() => { triggerHaptic(15); setDashboardDateRange(range); }}
+                      className={`px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider shrink-0 transition-all ${
+                        dashboardDateRange === range 
+                          ? 'bg-orange-500 text-white shadow' 
+                          : isDarkMode ? 'bg-neutral-900 text-neutral-400' : 'bg-neutral-100 text-neutral-600'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
-            {/* Dashboard Stats Panel */}
-            <div className="space-y-2">
-              <div className="grid grid-cols-3 gap-2">
-                <div className={`p-3 rounded-2xl border text-center ${isDarkMode ? 'bg-[#181818] border-neutral-800' : 'bg-white border-neutral-100'}`}>
-                  <p className="text-[8px] font-black text-neutral-400 uppercase">Total Stock Val</p>
-                  <p className="text-xs font-black text-orange-500 mt-1">₹{stats.totalVal.toLocaleString()}</p>
-                </div>
-                <div className={`p-3 rounded-2xl border text-center ${isDarkMode ? 'bg-[#181818] border-neutral-800' : 'bg-white border-neutral-100'}`}>
-                  <p className="text-[8px] font-black text-neutral-400 uppercase">Wastage Loss</p>
-                  <p className="text-xs font-black text-red-500 mt-1">₹{stats.wasteLoss.toLocaleString()}</p>
-                </div>
-                <div className={`p-3 rounded-2xl border text-center ${isDarkMode ? 'bg-[#181818] border-neutral-800' : 'bg-white border-neutral-100'}`}>
-                  <p className="text-[8px] font-black text-neutral-400 uppercase">Low Stock</p>
-                  <p className="text-xs font-black text-amber-500 mt-1">{stats.lowCount} items</p>
-                </div>
+            {/* Dynamic Date-Filtered Ledger Metrics */}
+            <div className="grid grid-cols-3 gap-2">
+              <div className={`p-3 rounded-2xl border text-center ${isDarkMode ? 'bg-[#181818] border-neutral-800' : 'bg-white border-neutral-100'}`}>
+                <p className="text-[8px] font-black text-neutral-400 uppercase">सामान आया (IN)</p>
+                <p className="text-xs font-black text-green-500 mt-1">{getFilteredLedgerStats.totalInwardQty} Units</p>
               </div>
-
-              {/* Fixed Items Stats */}
-              <div className="grid grid-cols-2 gap-2">
-                <div className={`p-3 rounded-2xl border text-center ${isDarkMode ? 'bg-[#181818] border-neutral-800' : 'bg-white border-neutral-100'}`}>
-                  <p className="text-[8px] font-black text-neutral-400 uppercase">Fixed Assets Value</p>
-                  <p className="text-xs font-black text-blue-500 mt-1">₹{stats.totalFixedVal.toLocaleString()}</p>
-                </div>
-                <div className={`p-3 rounded-2xl border text-center ${isDarkMode ? 'bg-[#181818] border-neutral-800' : 'bg-white border-neutral-100'}`}>
-                  <p className="text-[8px] font-black text-neutral-400 uppercase">Fixed Assets Qty</p>
-                  <p className="text-xs font-black text-blue-500 mt-1">{stats.totalFixedQty} Units</p>
-                </div>
+              <div className={`p-3 rounded-2xl border text-center ${isDarkMode ? 'bg-[#181818] border-neutral-800' : 'bg-white border-neutral-100'}`}>
+                <p className="text-[8px] font-black text-neutral-400 uppercase">किचन गया (OUT)</p>
+                <p className="text-xs font-black text-orange-500 mt-1">{getFilteredLedgerStats.totalKitchenQty} Units</p>
+              </div>
+              <div className={`p-3 rounded-2xl border text-center ${isDarkMode ? 'bg-[#181818] border-neutral-800' : 'bg-white border-neutral-100'}`}>
+                <p className="text-[8px] font-black text-neutral-400 uppercase">नुकसान (Loss)</p>
+                <p className="text-xs font-black text-red-500 mt-1">₹{getFilteredLedgerStats.totalWasteLoss.toLocaleString()}</p>
               </div>
             </div>
+
+            {/* General Database Static metrics */}
+            <div className="grid grid-cols-2 gap-2">
+              <div className={`p-3 rounded-2xl border text-center ${isDarkMode ? 'bg-[#181818] border-neutral-800' : 'bg-white border-neutral-100'}`}>
+                <p className="text-[8px] font-black text-neutral-400 uppercase">Total Godown stock value</p>
+                <p className="text-xs font-black text-neutral-700 dark:text-neutral-200 mt-1">₹{stats.totalVal.toLocaleString()}</p>
+              </div>
+              <div className={`p-3 rounded-2xl border text-center ${isDarkMode ? 'bg-[#181818] border-neutral-800' : 'bg-white border-neutral-100'}`}>
+                <p className="text-[8px] font-black text-neutral-400 uppercase">Fixed Assets Value</p>
+                <p className="text-xs font-black text-blue-500 mt-1">₹{stats.totalFixedVal.toLocaleString()}</p>
+              </div>
+            </div>
+
+            {/* UNIFIED STOCK FLOW TIMELINE LEDGER (माल आया और किचन में गया) */}
+            <div className="space-y-2.5">
+              <div className="flex justify-between items-center px-1">
+                <h3 className="text-xs font-black uppercase text-neutral-400 tracking-wider">Inward & Outward Flow Timeline</h3>
+                <span className="text-[8px] px-2 py-0.5 rounded-full bg-neutral-100 dark:bg-neutral-800 font-bold uppercase">
+                  {stockFlowTimeline.length} Entries Found
+                </span>
+              </div>
+
+              <div className="space-y-1.5 max-h-[40vh] overflow-y-auto pr-1">
+                {stockFlowTimeline.map((item) => (
+                  <div 
+                    key={item.id} 
+                    className={`p-3 rounded-xl border flex items-center justify-between text-xs font-bold ${
+                      isDarkMode ? 'bg-[#181818]/65 border-neutral-800' : 'bg-white border-neutral-100'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className={`w-2 h-2 rounded-full ${item.type === 'IN' ? 'bg-green-500' : 'bg-orange-500'}`} />
+                      <div>
+                        <p className={item.type === 'IN' ? 'text-green-500' : 'text-orange-500'}>
+                          {item.name}
+                        </p>
+                        <p className="text-[8px] text-neutral-400 font-bold uppercase mt-0.5">
+                          {item.type === 'IN' ? '📥 गोदाम में आवक' : '🍳 किचन स्थानांतरण'}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-black">
+                        {item.type === 'IN' ? '+' : '-'}{item.qty} {item.unit}
+                      </p>
+                      <p className="text-[7px] text-neutral-400 font-bold">{item.date}</p>
+                    </div>
+                  </div>
+                ))}
+
+                {stockFlowTimeline.length === 0 && (
+                  <p className="text-center py-8 text-xs text-neutral-400 uppercase font-black">इस तिथि सीमा के लिए कोई लेन-देन नहीं मिला।</p>
+                )}
+              </div>
+            </div>
+
           </div>
         )}
 
@@ -931,8 +1100,8 @@ export default function BumBumCafeStockApp() {
         {activeTab === 'store' && (
           <div className="space-y-4">
             
-            {/* STICKY SEARCH & CATEGORY CONTROLLER */}
-            <div className={`sticky top-[64px] z-30 py-2.5 space-y-2.5 backdrop-blur-md ${isDarkMode ? 'bg-[#0E0E0E]/90' : 'bg-[#FAFAFA]/90'} border-b border-dashed ${isDarkMode ? 'border-neutral-800' : 'border-neutral-100'}`}>
+            {/* STICKY SEARCH & CATEGORY SELECTOR - Flex-wrap wrapper instead of slider */}
+            <div className={`sticky top-[64px] z-30 py-2.5 space-y-2.5 backdrop-blur-md ${isDarkMode ? 'bg-[#0E0E0E]/90' : 'bg-[#FAFAFA]/90'} border-b border-dashed ${isDarkMode ? 'border-neutral-800' : 'border-neutral-150'}`}>
               
               <div className="flex items-center gap-2">
                 <div className="relative flex-1">
@@ -955,33 +1124,44 @@ export default function BumBumCafeStockApp() {
                 </button>
               </div>
 
-              {/* CLEAN JUMP DROPDOWN FILTER & MANAGE GEAR */}
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-1.5 flex-1">
-                  <span className="text-[10px] font-black text-neutral-400 uppercase tracking-wider shrink-0">Filter:</span>
-                  <select
-                    value={selectedCategoryFilter}
-                    onChange={e => setSelectedCategoryFilter(e.target.value)}
-                    className={`w-full p-2 text-xs font-bold rounded-xl border uppercase ${
-                      isDarkMode ? 'bg-neutral-900 border-neutral-800 text-white' : 'bg-white border-neutral-200 text-neutral-950'
+              {/* NON-SLIDER CATEGORIES GRID (Pills flow vertically with the layout) */}
+              <div className="space-y-1.5">
+                <div className="flex justify-between items-center px-0.5">
+                  <span className="text-[8px] font-black uppercase text-neutral-400 tracking-wider">क्लिक कर फ़िल्टर करें:</span>
+                  <button 
+                    onClick={() => setShowManageCategoriesModal(true)}
+                    className="text-[8px] text-orange-500 hover:underline uppercase font-black"
+                  >
+                    🛠️ Manage Categories
+                  </button>
+                </div>
+                
+                {/* flex-wrap used as requested (no horizontal slider carousel scroll) */}
+                <div className="flex flex-wrap gap-1.5 w-full">
+                  <button
+                    onClick={() => setSelectedCategoryFilter("All")}
+                    className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-wider border transition-all ${
+                      selectedCategoryFilter === "All"
+                        ? "bg-orange-500 border-orange-500 text-white"
+                        : isDarkMode ? "bg-neutral-900 border-neutral-800 text-neutral-400" : "bg-neutral-100 border-neutral-200 text-neutral-600"
                     }`}
                   >
-                    <option value="All">All Categories (सभी सामान)</option>
-                    {visibleCategories.map(cat => (
-                      <option key={cat.id} value={cat.name}>{cat.name}</option>
-                    ))}
-                  </select>
+                    All Items
+                  </button>
+                  {visibleCategories.map(cat => (
+                    <button
+                      key={cat.id}
+                      onClick={() => setSelectedCategoryFilter(cat.name)}
+                      className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-wider border transition-all ${
+                        selectedCategoryFilter === cat.name
+                          ? "bg-orange-500 border-orange-500 text-white"
+                          : isDarkMode ? "bg-neutral-900 border-neutral-800 text-neutral-400" : "bg-neutral-100 border-neutral-200 text-neutral-600"
+                      }`}
+                    >
+                      {cat.name}
+                    </button>
+                  ))}
                 </div>
-
-                <button 
-                  onClick={() => setShowManageCategoriesModal(true)}
-                  className={`p-2 rounded-xl border transition-all shrink-0 ${
-                    isDarkMode ? 'bg-neutral-900 border-neutral-800 text-neutral-400 hover:text-white' : 'bg-white border-neutral-200 text-neutral-500 hover:text-orange-500'
-                  }`}
-                  title="Manage Categories"
-                >
-                  <Settings size={15} />
-                </button>
               </div>
             </div>
 
@@ -1043,131 +1223,120 @@ export default function BumBumCafeStockApp() {
               </div>
             )}
 
-            {/* STOCK ITEM CARDS - Grouped Under Category Sections */}
-            <div className="space-y-6">
-              {Object.entries(groupedInventory).map(([categoryName, items]) => (
-                <div key={categoryName} className="space-y-3">
-                  {/* Styled Category Header */}
-                  <div className="flex items-center gap-2 pt-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-orange-500" />
-                    <h3 className="text-xs font-black uppercase text-neutral-400 tracking-wider">
-                      {categoryName} ({items.length})
-                    </h3>
-                    <div className="flex-1 h-[1px] bg-neutral-200 dark:bg-neutral-800" />
-                  </div>
+            {/* STOCK ITEM FLAT LIST (No nested groupings) */}
+            <div className="space-y-2.5">
+              {filteredInventory.map(item => {
+                const isSelected = selectedItemIds.includes(item.id);
+                const displayQty = editedQties[item.id] !== undefined ? editedQties[item.id] : item.storeQty;
+                const isDirty = editedQties[item.id] !== undefined && parseFloat(editedQties[item.id] as string) !== item.storeQty;
 
-                  {/* Category Items */}
-                  <div className="space-y-2.5">
-                    {items.map(item => {
-                      const isSelected = selectedItemIds.includes(item.id);
-                      const displayQty = editedQties[item.id] !== undefined ? editedQties[item.id] : item.storeQty;
-                      const isDirty = editedQties[item.id] !== undefined && parseFloat(editedQties[item.id] as string) !== item.storeQty;
+                return (
+                  <div 
+                    key={item.id} 
+                    onClick={() => { if (isMultiSelectMode) handleToggleMultiSelect(item.id); }}
+                    className={`p-3.5 rounded-2xl border transition-all relative ${
+                      isMultiSelectMode ? 'cursor-pointer' : ''
+                    } ${isDarkMode ? 'bg-[#181818] border-neutral-800' : 'bg-white border-neutral-100'} ${
+                      isSelected ? 'ring-2 ring-orange-500 bg-orange-500/[0.01]' : ''
+                    }`}
+                  >
+                    {isMultiSelectMode && (
+                      <div className="absolute top-3.5 right-3.5 w-4 h-4 rounded-full border border-neutral-300 flex items-center justify-center z-10">
+                        {isSelected && <div className="w-2.5 h-2.5 rounded-full bg-orange-500" />}
+                      </div>
+                    )}
 
-                      return (
-                        <div 
-                          key={item.id} 
-                          onClick={() => { if (isMultiSelectMode) handleToggleMultiSelect(item.id); }}
-                          className={`p-3.5 rounded-2xl border transition-all relative ${
-                            isMultiSelectMode ? 'cursor-pointer' : ''
-                          } ${isDarkMode ? 'bg-[#181818] border-neutral-800' : 'bg-white border-neutral-100'} ${
-                            isSelected ? 'ring-2 ring-orange-500 bg-orange-500/[0.01]' : ''
-                          }`}
-                        >
-                          {isMultiSelectMode && (
-                            <div className="absolute top-3.5 right-3.5 w-4 h-4 rounded-full border border-neutral-300 flex items-center justify-center z-10">
-                              {isSelected && <div className="w-2.5 h-2.5 rounded-full bg-orange-500" />}
-                            </div>
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <p className="font-bold text-sm text-orange-600">{item.name}</p>
+                          {item.category && (
+                            <span className="px-1.5 py-0.5 text-[8px] bg-neutral-100 dark:bg-neutral-800 text-neutral-400 font-bold rounded-md uppercase">
+                              {item.category}
+                            </span>
                           )}
-
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <div className="flex items-center gap-1.5 flex-wrap">
-                                <p className="font-bold text-sm text-orange-600">{item.name}</p>
-                                {!isMultiSelectMode && (
-                                  <button 
-                                    onClick={(e) => { e.stopPropagation(); setEditingProduct(item); }}
-                                    className="text-neutral-400 hover:text-orange-500"
-                                  >
-                                    <Edit size={12} />
-                                  </button>
-                                )}
-                              </div>
-                              
-                              {/* Stock Breakdown (Godown and Kitchen display side-by-side) */}
-                              <div className="mt-1.5 flex items-center gap-3 text-[10px] font-bold uppercase text-neutral-400">
-                                <span>📦 Godown: <span className="text-neutral-800 dark:text-neutral-200">{item.storeQty} {item.unit}</span></span>
-                                <span>🍳 Kitchen: <span className="text-orange-500">{item.kitchenQty || 0} {item.unit}</span></span>
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Action panel underneath stock info */}
-                          <div className="mt-3.5 pt-3 border-t border-dashed border-neutral-200 dark:border-neutral-800 flex items-center justify-between flex-wrap gap-2">
-                            
-                            {/* Counter inputs to adjust storeQty */}
-                            <div className="flex items-center gap-1.5">
-                              <button onClick={(e) => { e.stopPropagation(); adjustQty(item.id, -1); }} className="p-1 bg-red-100 dark:bg-red-500/10 text-red-500 rounded-lg">
-                                <MinusCircle size={14} />
-                              </button>
-                              <input 
-                                type="number" 
-                                value={displayQty}
-                                onClick={e => e.stopPropagation()}
-                                onChange={(e) => {
-                                  const val = e.target.value;
-                                  setEditedQties(prev => ({ ...prev, [item.id]: val }));
-                                }}
-                                className="w-12 text-center text-xs font-bold border border-neutral-200 dark:bg-neutral-800 dark:border-neutral-700 rounded p-1"
-                              />
-                              <button onClick={(e) => { e.stopPropagation(); adjustQty(item.id, 1); }} className="p-1 bg-green-100 dark:bg-green-500/10 text-green-500 rounded-lg">
-                                <PlusCircle size={14} />
-                              </button>
-
-                              {isDirty && (
-                                <button 
-                                  onClick={(e) => { e.stopPropagation(); saveQty(item.id); }}
-                                  className="px-2 py-1 bg-green-600 text-white text-[10px] font-black rounded-lg"
-                                >
-                                  💾 सेव
-                                </button>
-                              )}
-                            </div>
-
-                            {/* Kitchen manual send and consume buttons */}
-                            <div className="flex items-center gap-1.5">
-                              <button 
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setTransferItem(item);
-                                  setTransferQtyInput("");
-                                  setShowTransferModal(true);
-                                }}
-                                className="px-2 py-1 bg-orange-100 hover:bg-orange-200 dark:bg-orange-500/10 dark:text-orange-400 text-orange-600 text-[9px] font-black uppercase rounded-lg flex items-center gap-1 transition-all"
-                              >
-                                🍳 Send To Kitchen
-                              </button>
-                              
-                              <button 
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setConsumeItem(item);
-                                  setConsumeQtyInput("");
-                                  setConsumeRemarksInput("");
-                                  setShowConsumeModal(true);
-                                }}
-                                className="px-2 py-1 bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-300 text-neutral-600 text-[9px] font-black uppercase rounded-lg flex items-center gap-1 transition-all"
-                              >
-                                🍽️ Use
-                              </button>
-                            </div>
-
-                          </div>
+                          {!isMultiSelectMode && (
+                            <button 
+                              onClick={(e) => { e.stopPropagation(); setEditingProduct(item); }}
+                              className="text-neutral-400 hover:text-orange-500"
+                            >
+                              <Edit size={12} />
+                            </button>
+                          )}
                         </div>
-                      );
-                    })}
+                        
+                        {/* Stock breakdown display (Godown and Kitchen display side-by-side) */}
+                        <div className="mt-1.5 flex items-center gap-3 text-[10px] font-bold uppercase text-neutral-400">
+                          <span>📦 Godown: <span className="text-neutral-800 dark:text-neutral-200">{item.storeQty} {item.unit}</span></span>
+                          <span>🍳 Kitchen: <span className="text-orange-500">{item.kitchenQty || 0} {item.unit}</span></span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Action panel underneath stock info */}
+                    <div className="mt-3.5 pt-3 border-t border-dashed border-neutral-200 dark:border-neutral-800 flex items-center justify-between flex-wrap gap-2">
+                      
+                      {/* Counter inputs to adjust storeQty */}
+                      <div className="flex items-center gap-1.5">
+                        <button onClick={(e) => { e.stopPropagation(); adjustQty(item.id, -1); }} className="p-1 bg-red-100 dark:bg-red-500/10 text-red-500 rounded-lg">
+                          <MinusCircle size={14} />
+                        </button>
+                        <input 
+                          type="number" 
+                          value={displayQty}
+                          onClick={e => e.stopPropagation()}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setEditedQties(prev => ({ ...prev, [item.id]: val }));
+                          }}
+                          className="w-12 text-center text-xs font-bold border border-neutral-200 dark:bg-neutral-800 dark:border-neutral-700 rounded p-1"
+                        />
+                        <button onClick={(e) => { e.stopPropagation(); adjustQty(item.id, 1); }} className="p-1 bg-green-100 dark:bg-green-500/10 text-green-500 rounded-lg">
+                          <PlusCircle size={14} />
+                        </button>
+
+                        {isDirty && (
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); saveQty(item.id); }}
+                            className="px-2 py-1 bg-green-600 text-white text-[10px] font-black rounded-lg"
+                          >
+                            💾 सेव
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Kitchen manual send and consume buttons */}
+                      <div className="flex items-center gap-1.5">
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setTransferItem(item);
+                            setTransferQtyInput("");
+                            setShowTransferModal(true);
+                          }}
+                          className="px-2 py-1 bg-orange-100 hover:bg-orange-200 dark:bg-orange-500/10 dark:text-orange-400 text-orange-600 text-[9px] font-black uppercase rounded-lg flex items-center gap-1 transition-all"
+                        >
+                          🍳 Send To Kitchen
+                        </button>
+                        
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setConsumeItem(item);
+                            setConsumeQtyInput("");
+                            setConsumeRemarksInput("");
+                            setShowConsumeModal(true);
+                          }}
+                          className="px-2 py-1 bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-300 text-neutral-600 text-[9px] font-black uppercase rounded-lg flex items-center gap-1 transition-all"
+                        >
+                          🍽️ Use
+                        </button>
+                      </div>
+
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}
