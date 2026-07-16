@@ -68,6 +68,11 @@ export default function BumBumCafeStockApp() {
   const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
   const [isMultiSelectMode, setIsMultiSelectMode] = useState<boolean>(false);
 
+  // Order List Name Configuration States
+  const [orderListName, setOrderListName] = useState<string>("BUM BUM CAFE ORDER SHEET");
+  const [isEditingListName, setIsEditingListName] = useState<boolean>(false);
+  const [tempListNameInput, setTempListNameInput] = useState<string>("");
+
   // Scanner States
   const [scannerActive, setScannerActive] = useState<boolean>(false);
   const [scannedItemsToVerify, setScannedItemsToVerify] = useState<any[]>([]);
@@ -111,7 +116,12 @@ export default function BumBumCafeStockApp() {
     const unsubSavedOrders = onSnapshot(collection(db, "saved_orders"), (snap) => {
       setSavedOrders(snap.docs.map(d => ({ id: d.id, ...d.data() } as SavedOrderItem)));
     });
-    return () => { unsubInventory(); unsubStockOuts(); unsubSavedOrders(); };
+    const unsubListName = onSnapshot(doc(db, "config", "order_list_config"), (docSnap) => {
+      if (docSnap.exists()) {
+        setOrderListName(docSnap.data().name || "BUM BUM CAFE ORDER SHEET");
+      }
+    });
+    return () => { unsubInventory(); unsubStockOuts(); unsubSavedOrders(); unsubListName(); };
   }, []);
 
   // Live native browser Barcode detection loop
@@ -281,6 +291,17 @@ export default function BumBumCafeStockApp() {
     }
   };
 
+  // Rename Saved Order List Name
+  const handleUpdateListName = async (newName: string) => {
+    if (!newName.trim()) return;
+    try {
+      await setDoc(doc(db, "config", "order_list_config"), { name: newName.trim() }, { merge: true });
+      toastMessage("ऑर्डर लिस्ट का नाम बदला गया!");
+    } catch {
+      toastMessage("नाम बदलने में त्रुटि हुई।", "error");
+    }
+  };
+
   // Delete Individual Saved item
   const handleRemoveFromSavedList = async (id: string) => {
     triggerHaptic();
@@ -397,7 +418,7 @@ export default function BumBumCafeStockApp() {
       <html>
         <head><title>BumBum_Cafe_Order_Sheet</title></head>
         <body style="font-family:sans-serif; padding:25px;">
-          <h2 style="color:#FF6B00; text-align:center;">BUM BUM CAFE - PURCHASE ORDER SHEET</h2>
+          <h2 style="color:#FF6B00; text-align:center; text-transform: uppercase;">${orderListName}</h2>
           <p style="text-align:center; color:#666; font-size:12px;">Generated on: ${new Date().toLocaleString()}</p>
           <table style="width:100%; border-collapse:collapse; margin-top:20px;">
             <thead>
@@ -491,7 +512,7 @@ export default function BumBumCafeStockApp() {
           <div className="space-y-4">
             
             {/* SEARCH AND CONTROL ACTIONS */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 animate-none">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" size={14} />
                 <input 
@@ -519,17 +540,17 @@ export default function BumBumCafeStockApp() {
               <Plus size={14} /> Add New Product (सामान जोड़ें)
             </button>
 
-            {/* FLOATING ACTION BOTTOM BANNER FOR MULTI-SELECT SAVING TO TAB */}
+            {/* FLOATING ACTION BOTTOM BANNER FOR MULTI-SELECT - FORCED HIGHEST Z-INDEX OVER ITEMS */}
             {isMultiSelectMode && selectedItemIds.length > 0 && (
-              <div className="fixed bottom-16 left-1/2 -translate-x-1/2 z-45 w-full max-w-xs px-2">
-                <div className="bg-orange-600 text-white rounded-2xl p-3 shadow-2xl flex items-center justify-between border border-orange-400/20 animate-pulse">
+              <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[100] w-full max-w-xs px-2 pointer-events-auto">
+                <div className="bg-orange-600 text-white rounded-2xl p-3.5 shadow-2xl flex items-center justify-between border border-orange-400/30">
                   <div>
                     <p className="text-xs font-black">{selectedItemIds.length} Items Selected</p>
-                    <p className="text-[9px] text-orange-100">ऑर्डर लिस्ट टैब में भेजें</p>
+                    <p className="text-[9px] text-orange-100 font-bold uppercase tracking-wider">ऑर्डर लिस्ट टैब में भेजें</p>
                   </div>
                   <button 
                     onClick={handleSaveToOrderList}
-                    className="px-3.5 py-1.5 bg-white text-orange-600 font-black text-xs uppercase rounded-xl shadow"
+                    className="px-4 py-2 bg-white text-orange-600 font-black text-xs uppercase rounded-xl shadow-lg shadow-orange-950/20 active:scale-95 transition-all"
                   >
                     Save to Order Tab ➔
                   </button>
@@ -551,11 +572,11 @@ export default function BumBumCafeStockApp() {
                     className={`p-3.5 rounded-2xl border transition-all relative ${
                       isMultiSelectMode ? 'cursor-pointer' : ''
                     } ${isDarkMode ? 'bg-[#181818] border-neutral-800' : 'bg-white border-neutral-100'} ${
-                      isSelected ? 'ring-2 ring-orange-500' : ''
+                      isSelected ? 'ring-2 ring-orange-500 bg-orange-500/[0.01]' : ''
                     }`}
                   >
                     {isMultiSelectMode && (
-                      <div className="absolute top-3.5 right-3.5 w-4 h-4 rounded-full border border-neutral-300 flex items-center justify-center">
+                      <div className="absolute top-3.5 right-3.5 w-4 h-4 rounded-full border border-neutral-300 flex items-center justify-center z-10">
                         {isSelected && <div className="w-2.5 h-2.5 rounded-full bg-orange-500" />}
                       </div>
                     )}
@@ -628,15 +649,53 @@ export default function BumBumCafeStockApp() {
         {/* ==================== TAB 3: SAVED ORDER LIST (NEW ORDER TAB) ==================== */}
         {activeTab === 'saved_list' && (
           <div className="space-y-4">
-            <div className="flex justify-between items-center">
-              <div>
-                <h2 className="text-sm font-black text-orange-600 uppercase">Saved Order List</h2>
-                <p className="text-[10px] text-neutral-400">चुने हुए सामान और मंगवाने वाली मात्रा</p>
+            
+            {/* SAVED LIST NAME / TITLE EDIT CONTROLS */}
+            <div className="flex justify-between items-center bg-neutral-50 dark:bg-neutral-900/40 p-4 rounded-2xl border border-neutral-100 dark:border-neutral-800">
+              <div className="flex-1 mr-3">
+                {isEditingListName ? (
+                  <div className="flex items-center gap-1.5 w-full">
+                    <input 
+                      type="text" 
+                      value={tempListNameInput} 
+                      onChange={e => setTempListNameInput(e.target.value)}
+                      className={`flex-1 p-2 rounded-xl border text-xs font-bold ${isDarkMode ? 'bg-neutral-800 border-neutral-700 text-white' : 'bg-white border-neutral-200 text-neutral-900'}`}
+                      required
+                    />
+                    <button 
+                      onClick={() => {
+                        handleUpdateListName(tempListNameInput);
+                        setIsEditingListName(false);
+                      }}
+                      className="px-3.5 py-2 bg-green-600 text-white rounded-xl text-[10px] font-black uppercase tracking-wider"
+                    >
+                      Save
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-xs font-black text-orange-600 uppercase tracking-widest leading-relaxed">
+                      {orderListName}
+                    </h2>
+                    <button 
+                      onClick={() => {
+                        setTempListNameInput(orderListName);
+                        setIsEditingListName(true);
+                      }}
+                      className="p-1 hover:bg-neutral-200 dark:hover:bg-neutral-800 rounded-lg text-neutral-400 hover:text-orange-500 transition-all"
+                      title="ऑर्डर लिस्ट का नाम बदलें"
+                    >
+                      <Edit size={12} />
+                    </button>
+                  </div>
+                )}
+                <p className="text-[8px] text-neutral-400 font-bold uppercase tracking-wide mt-1">ऑर्डर लिस्ट नाम (यह प्रिंट में भी दिखाई देगा)</p>
               </div>
+
               {savedOrders.length > 0 && (
                 <button 
                   onClick={handleClearAllSavedList}
-                  className="px-3 py-1 text-[10px] bg-red-100 dark:bg-red-500/10 text-red-500 rounded-lg font-bold"
+                  className="px-3 py-1.5 text-[9px] bg-red-100 dark:bg-red-500/10 text-red-500 rounded-lg font-black uppercase tracking-wider whitespace-nowrap"
                 >
                   Clear All
                 </button>
