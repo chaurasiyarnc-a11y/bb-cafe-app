@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   Home, Store, Trash2, Search, Plus, X, BarChart3, QrCode, 
-  PlusCircle, MinusCircle, ChevronRight, Sparkles, AlertTriangle, Printer, Edit, Layers, MessageCircle
+  PlusCircle, MinusCircle, ChevronRight, Sparkles, AlertTriangle, Printer, Edit, Layers, MessageCircle, Wrench
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -58,6 +58,16 @@ interface ScannedItem {
   price: number;
 }
 
+interface FixedAsset {
+  id: string;
+  name: string;
+  quantity: number;
+  purchaseDate?: string;
+  cost?: number;
+  condition: "Working" | "Needs Repair" | "Broken";
+  remarks?: string;
+}
+
 // Dynamics CDN loader for Real Barcode Scanner (html5-qrcode)
 const loadHtml5Qrcode = (): Promise<any> => {
   return new Promise((resolve, reject) => {
@@ -96,7 +106,8 @@ export default function BumBumCafeStockApp() {
   const [inventory, setInventory] = useState<InventoryItem[]>(INITIAL_INVENTORY);
   const [orderLists, setOrderLists] = useState<OrderListMeta[]>([]);
   const [savedOrders, setSavedOrders] = useState<SavedOrderItem[]>([]);
-  const [activeTab, setActiveTab] = useState<'home' | 'store' | 'saved_list' | 'waste'>('home');
+  const [fixedAssets, setFixedAssets] = useState<FixedAsset[]>([]);
+  const [activeTab, setActiveTab] = useState<'home' | 'store' | 'fixed_assets' | 'saved_list' | 'waste'>('home');
   const [isDarkMode, setIsDarkMode] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [editedQties, setEditedQties] = useState<Record<string, string | number>>({});
@@ -126,10 +137,15 @@ export default function BumBumCafeStockApp() {
 
   // Custom Modals & Forms
   const [showAddProductModal, setShowAddProductModal] = useState<boolean>(false);
+  const [showAddAssetModal, setShowAddAssetModal] = useState<boolean>(false);
   const [editingProduct, setEditingProduct] = useState<InventoryItem | null>(null);
 
   const [formAddProduct, setFormAddProduct] = useState({
     name: '', storeQty: '0', unit: 'Kg', purchasePrice: '', minLimit: '10', barcode: ''
+  });
+
+  const [formAddAsset, setFormAddAsset] = useState({
+    name: '', quantity: '1', purchaseDate: '', cost: '', condition: 'Working' as "Working" | "Needs Repair" | "Broken", remarks: ''
   });
 
   // Waste logs & modals
@@ -165,10 +181,14 @@ export default function BumBumCafeStockApp() {
     const unsubSavedOrders = onSnapshot(collection(db, "saved_orders"), (snap) => {
       setSavedOrders(snap.docs.map(d => ({ id: d.id, ...d.data() } as SavedOrderItem)));
     });
+    const unsubFixedAssets = onSnapshot(collection(db, "fixed_assets"), (snap) => {
+      setFixedAssets(snap.docs.map(d => ({ id: d.id, ...d.data() } as FixedAsset)));
+    });
     return () => {
       unsubInventory();
       unsubStockOuts();
       unsubSavedOrders();
+      unsubFixedAssets();
     };
   }, []);
 
@@ -273,6 +293,12 @@ export default function BumBumCafeStockApp() {
       item.name.toLowerCase().includes(searchQuery.toLowerCase())
     );
   }, [inventory, searchQuery]);
+
+  const filteredAssets = useMemo(() => {
+    return fixedAssets.filter(asset => 
+      asset.name.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }, [fixedAssets, searchQuery]);
 
   // Process manual or scanned barcode
   const handleDetectedBarcode = (code: string) => {
@@ -527,6 +553,46 @@ export default function BumBumCafeStockApp() {
       setFormAddProduct({ name: '', storeQty: '0', unit: 'Kg', purchasePrice: '', minLimit: '10', barcode: '' });
     } catch {
       toastMessage("सामान जोड़ने में विफलता।", "error");
+    }
+  };
+
+  // Add Fixed Asset Submit
+  const handleAddAssetSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formAddAsset.name) {
+      toastMessage("एसेट का नाम आवश्यक है!", "error");
+      return;
+    }
+    try {
+      const customId = `asset_${Date.now()}`;
+      const payload: FixedAsset = {
+        id: customId,
+        name: formAddAsset.name.toUpperCase().trim(),
+        quantity: parseFloat(formAddAsset.quantity) || 1,
+        purchaseDate: formAddAsset.purchaseDate || new Date().toISOString().split('T')[0],
+        cost: parseFloat(formAddAsset.cost) || 0,
+        condition: formAddAsset.condition,
+        remarks: formAddAsset.remarks || ""
+      };
+      await setDoc(doc(db, "fixed_assets", customId), payload);
+      toastMessage("नया एसेट दर्ज हो गया!");
+      setShowAddAssetModal(false);
+      setFormAddAsset({ name: '', quantity: '1', purchaseDate: '', cost: '', condition: 'Working', remarks: '' });
+    } catch {
+      toastMessage("एसेट जोड़ने में त्रुटि।", "error");
+    }
+  };
+
+  // Delete Fixed Asset
+  const handleDeleteAsset = async (id: string, name: string) => {
+    triggerHaptic();
+    const confirm = window.confirm(`क्या आप इस एसेट "${name}" को हमेशा के लिए डिलीट करना चाहते हैं?`);
+    if (!confirm) return;
+    try {
+      await deleteDoc(doc(db, "fixed_assets", id));
+      toastMessage("एसेट सफलतापूर्वक हटा दिया गया!");
+    } catch {
+      toastMessage("हटाने में विफलता।", "error");
     }
   };
 
@@ -874,7 +940,84 @@ export default function BumBumCafeStockApp() {
           </div>
         )}
 
-        {/* ==================== TAB 3: ORDER TO SUPPLIER (DYNAMIC MULTI-LISTS TAB) ==================== */}
+        {/* ==================== TAB 3: FIXED ASSETS ==================== */}
+        {activeTab === 'fixed_assets' && (
+          <div className="space-y-4">
+            <div className="flex justify-between items-center">
+              <div>
+                <h2 className="text-sm font-black text-orange-600 uppercase">Fixed Assets (स्थिर संपत्तियां)</h2>
+                <p className="text-[10px] text-neutral-400">फ्रिज, ओवन, कुर्सी, टेबल, मिक्सी आदि की सूची</p>
+              </div>
+              <button 
+                onClick={() => setShowAddAssetModal(true)}
+                className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-xl text-xs font-black uppercase flex items-center gap-1 shadow"
+              >
+                <Plus size={14} /> Add Asset
+              </button>
+            </div>
+
+            {/* Search Assets */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" size={14} />
+              <input 
+                type="text" 
+                placeholder="एसेट्स खोजें..." 
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                className={`w-full pl-9 pr-4 py-2 text-xs rounded-xl border ${isDarkMode ? 'bg-neutral-900 border-neutral-800' : 'bg-white border-neutral-200'}`}
+              />
+            </div>
+
+            {/* List of Fixed Assets */}
+            <div className="space-y-2.5 max-h-[55vh] overflow-y-auto pr-1">
+              {filteredAssets.map(asset => (
+                <div key={asset.id} className={`p-4 rounded-2xl border ${isDarkMode ? 'bg-[#181818] border-neutral-800' : 'bg-white border-neutral-100'}`}>
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <p className="font-bold text-sm text-neutral-800 dark:text-neutral-100">{asset.name}</p>
+                      <p className="text-[9px] text-neutral-400 font-bold uppercase mt-0.5">मात्रा: {asset.quantity} Units</p>
+                    </div>
+                    
+                    <div className="flex items-center gap-2">
+                      <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-wider ${
+                        asset.condition === 'Working' ? 'bg-green-100 text-green-600' :
+                        asset.condition === 'Needs Repair' ? 'bg-amber-100 text-amber-600' : 'bg-red-100 text-red-600'
+                      }`}>
+                        {asset.condition}
+                      </span>
+                      <button 
+                        onClick={() => handleDeleteAsset(asset.id, asset.name)}
+                        className="p-1 hover:bg-red-100 dark:hover:bg-red-500/10 text-neutral-400 hover:text-red-500 rounded-lg transition-all"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-between items-end mt-3 pt-2.5 border-t border-dashed border-neutral-100 dark:border-neutral-800 text-[10px] text-neutral-400 font-bold uppercase">
+                    <div>
+                      {asset.purchaseDate && <p>तारीख: {asset.purchaseDate}</p>}
+                      {asset.cost ? <p className="mt-0.5">लागत: ₹{asset.cost.toLocaleString()}</p> : null}
+                    </div>
+                    {asset.remarks && (
+                      <p className="text-xs text-neutral-500 font-normal italic lowercase max-w-[60%] truncate">
+                        “{asset.remarks}”
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ))}
+
+              {filteredAssets.length === 0 && (
+                <div className="text-center py-10">
+                  <p className="text-xs text-neutral-400 uppercase font-black">कोई एसेट रिकॉर्ड नहीं मिला।</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ==================== TAB 4: ORDER TO SUPPLIER (DYNAMIC MULTI-LISTS TAB) ==================== */}
         {activeTab === 'saved_list' && (
           <div className="space-y-4">
             
@@ -1022,7 +1165,7 @@ export default function BumBumCafeStockApp() {
           </div>
         )}
 
-        {/* ==================== TAB 4: WASTAGE DETAILS ==================== */}
+        {/* ==================== TAB 5: WASTAGE DETAILS ==================== */}
         {activeTab === 'waste' && (
           <div className="space-y-4">
             <div className="flex justify-between items-center">
@@ -1545,16 +1688,107 @@ export default function BumBumCafeStockApp() {
           </div>
         )}
 
+        {/* 6. ADD FIXED ASSET MODAL */}
+        {showAddAssetModal && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <motion.form onSubmit={handleAddAssetSubmit} initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className={`w-full max-w-sm rounded-3xl p-6 space-y-4 ${isDarkMode ? 'bg-neutral-900 text-white' : 'bg-white text-neutral-900'}`}>
+              <div className="flex justify-between items-center border-b pb-2">
+                <h3 className="text-xs font-black uppercase text-green-500">Add Fixed Asset (संपत्ति जोड़ें)</h3>
+                <button type="button" onClick={() => setShowAddAssetModal(false)} className="p-1.5 bg-neutral-100 dark:bg-neutral-800 rounded-xl"><X size={14} /></button>
+              </div>
+
+              <div className="space-y-3 text-xs">
+                <div className="space-y-1">
+                  <label className="text-[9px] text-neutral-400 font-bold uppercase">Asset Name (संपत्ति का नाम)</label>
+                  <input 
+                    type="text" 
+                    placeholder="जैसे: Oven, Fridge, Table, Kursi, Mixi" 
+                    value={formAddAsset.name}
+                    onChange={e => setFormAddAsset({ ...formAddAsset, name: e.target.value })}
+                    className="w-full p-2.5 rounded-xl border dark:bg-neutral-800"
+                    required
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <label className="text-[9px] text-neutral-400 font-bold uppercase">Quantity (संख्या)</label>
+                    <input 
+                      type="number" 
+                      value={formAddAsset.quantity}
+                      onChange={e => setFormAddAsset({ ...formAddAsset, quantity: e.target.value })}
+                      className="w-full p-2.5 rounded-xl border dark:bg-neutral-800"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[9px] text-neutral-400 font-bold uppercase">Cost / लागत (₹)</label>
+                    <input 
+                      type="number" 
+                      placeholder="कुल कीमत"
+                      value={formAddAsset.cost}
+                      onChange={e => setFormAddAsset({ ...formAddAsset, cost: e.target.value })}
+                      className="w-full p-2.5 rounded-xl border dark:bg-neutral-800"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <label className="text-[9px] text-neutral-400 font-bold uppercase">Purchase Date</label>
+                    <input 
+                      type="date" 
+                      value={formAddAsset.purchaseDate}
+                      onChange={e => setFormAddAsset({ ...formAddAsset, purchaseDate: e.target.value })}
+                      className="w-full p-2.5 rounded-xl border dark:bg-[#181818]"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[9px] text-neutral-400 font-bold uppercase">Condition (स्थिति)</label>
+                    <select 
+                      value={formAddAsset.condition}
+                      onChange={e => setFormAddAsset({ ...formAddAsset, condition: e.target.value as any })}
+                      className="w-full p-2.5 rounded-xl border dark:bg-[#181818] font-bold"
+                    >
+                      <option value="Working">Working (चालू)</option>
+                      <option value="Needs Repair">Needs Repair (सुधार की जरूरत)</option>
+                      <option value="Broken">Broken (खराब)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[9px] text-neutral-400 font-bold uppercase">Remarks (विवरण)</label>
+                  <input 
+                    type="text" 
+                    placeholder="जैसे: मॉडल नंबर, सप्लायर या कोई अन्य नोट" 
+                    value={formAddAsset.remarks}
+                    onChange={e => setFormAddAsset({ ...formAddAsset, remarks: e.target.value })}
+                    className="w-full p-2.5 rounded-xl border dark:bg-neutral-800"
+                  />
+                </div>
+              </div>
+
+              <button type="submit" className="w-full py-3 bg-green-600 hover:bg-green-700 text-white rounded-xl font-bold text-xs uppercase shadow">
+                Save Asset ➔
+              </button>
+            </motion.form>
+          </div>
+        )}
+
       </AnimatePresence>
 
       {/* PREMIUM BOTTOM NAVIGATION */}
       <nav className={`fixed bottom-0 left-0 right-0 z-50 border-t backdrop-blur-md ${isDarkMode ? 'bg-black/90 border-neutral-800 text-white' : 'bg-white/90 border-neutral-100 text-neutral-800'}`}>
-        <div className="max-w-md mx-auto grid grid-cols-4 gap-0.5 py-1.5 text-center text-[9px] font-black uppercase">
+        <div className="max-w-md mx-auto grid grid-cols-5 gap-0.5 py-1.5 text-center text-[8px] font-black uppercase">
           <button onClick={() => { setActiveTab('home'); setIsMultiSelectMode(false); }} className={`flex flex-col items-center justify-center py-1 ${activeTab === 'home' ? 'text-[#FF6B00]' : 'text-neutral-400'}`}>
             <Home size={15} /> <span className="mt-0.5">Home</span>
           </button>
           <button onClick={() => { setActiveTab('store'); }} className={`flex flex-col items-center justify-center py-1 ${activeTab === 'store' ? 'text-[#FF6B00]' : 'text-neutral-400'}`}>
             <Store size={15} /> <span className="mt-0.5">Godown</span>
+          </button>
+          <button onClick={() => { setActiveTab('fixed_assets'); setIsMultiSelectMode(false); }} className={`flex flex-col items-center justify-center py-1 ${activeTab === 'fixed_assets' ? 'text-[#FF6B00]' : 'text-neutral-400'}`}>
+            <Wrench size={15} /> <span className="mt-0.5">Fixed Assets</span>
           </button>
           <button onClick={() => { setActiveTab('saved_list'); setIsMultiSelectMode(false); }} className={`flex flex-col items-center justify-center py-1 ${activeTab === 'saved_list' ? 'text-[#FF6B00]' : 'text-neutral-400'}`}>
             <Layers size={15} /> <span className="mt-0.5">Order to Supplier</span>
