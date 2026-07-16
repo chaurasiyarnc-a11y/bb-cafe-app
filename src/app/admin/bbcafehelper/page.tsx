@@ -1,10 +1,9 @@
-
 'use client';
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
-  Home, Store, Trash2, Search, Plus, X, BarChart3, QrCode, Bell, 
-  PlusCircle, MinusCircle, CheckCircle2, ChevronRight, Sparkles, AlertTriangle, Printer, Edit
+  Home, Store, Trash2, Search, Plus, X, BarChart3, QrCode, 
+  PlusCircle, MinusCircle, ChevronRight, Sparkles, AlertTriangle, Printer, Edit, Layers
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -16,7 +15,6 @@ import {
 interface InventoryItem {
   id: string;
   name: string;
-  category: string;
   storeQty: number;
   unit: string;
   purchasePrice: number;
@@ -36,9 +34,12 @@ interface StockOutLog {
   financialLoss?: number;
 }
 
-interface CategoryItem {
+interface SavedOrderItem {
   id: string;
   name: string;
+  storeQty: number;
+  unit: string;
+  orderQty: string;
 }
 
 const triggerHaptic = (ms = 35) => {
@@ -48,34 +49,24 @@ const triggerHaptic = (ms = 35) => {
 };
 
 const INITIAL_INVENTORY: InventoryItem[] = [
-  { id: "dry_1", name: "Doodh Milk", category: "Dairy", storeQty: 40, unit: "Ltr", purchasePrice: 60, minLimit: 10, barcode: "890105800401" },
-  { id: "dry_2", name: "Dahi Curd", category: "Dairy", storeQty: 15, unit: "Kg", purchasePrice: 80, minLimit: 5, barcode: "890105800402" },
-  { id: "dry_3", name: "Makkhan Butter", category: "Dairy", storeQty: 24, unit: "Kg", purchasePrice: 420, minLimit: 8, barcode: "890105800240" },
-  { id: "veg_2", name: "Tamatar Tomato", category: "Vegetables", storeQty: 30, unit: "Kg", purchasePrice: 40, minLimit: 10, barcode: "890105800408" }
-];
-
-const INITIAL_CATEGORIES: CategoryItem[] = [
-  { id: "cat_1", name: "Dairy" },
-  { id: "cat_2", name: "Vegetables" },
-  { id: "cat_3", name: "Sauces & Condiments" },
-  { id: "cat_4", name: "Others" }
+  { id: "dry_1", name: "Doodh Milk", storeQty: 40, unit: "Ltr", purchasePrice: 60, minLimit: 10, barcode: "890105800401" },
+  { id: "dry_2", name: "Dahi Curd", storeQty: 15, unit: "Kg", purchasePrice: 80, minLimit: 5, barcode: "890105800402" },
+  { id: "dry_3", name: "Makkhan Butter", storeQty: 24, unit: "Kg", purchasePrice: 420, minLimit: 8, barcode: "890105800240" },
+  { id: "veg_2", name: "Tamatar Tomato", storeQty: 30, unit: "Kg", purchasePrice: 40, minLimit: 10, barcode: "890105800408" }
 ];
 
 export default function BumBumCafeStockApp() {
   const [inventory, setInventory] = useState<InventoryItem[]>(INITIAL_INVENTORY);
-  const [categories, setCategories] = useState<CategoryItem[]>(INITIAL_CATEGORIES);
-  const [activeTab, setActiveTab] = useState<'home' | 'store' | 'waste'>('home');
+  const [savedOrders, setSavedOrders] = useState<SavedOrderItem[]>([]);
+  const [activeTab, setActiveTab] = useState<'home' | 'store' | 'saved_list' | 'waste'>('home');
   const [isDarkMode, setIsDarkMode] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>("");
-  const [selectedCategory, setSelectedCategory] = useState<string>("All");
   const [editedQties, setEditedQties] = useState<Record<string, number>>({});
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
 
   // Print/Selection States
   const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
   const [isMultiSelectMode, setIsMultiSelectMode] = useState<boolean>(false);
-  const [showQuickPrintModal, setShowQuickPrintModal] = useState<boolean>(false);
-  const [quickOrderQtys, setQuickOrderQtys] = useState<Record<string, string>>({});
 
   // Scanner States
   const [scannerActive, setScannerActive] = useState<boolean>(false);
@@ -88,11 +79,9 @@ export default function BumBumCafeStockApp() {
   // Custom Modals & Forms
   const [showAddProductModal, setShowAddProductModal] = useState<boolean>(false);
   const [editingProduct, setEditingProduct] = useState<InventoryItem | null>(null);
-  const [showCategoryModal, setShowCategoryModal] = useState<boolean>(false);
-  const [newCategoryName, setNewCategoryName] = useState<string>("");
 
   const [formAddProduct, setFormAddProduct] = useState({
-    name: '', category: '', storeQty: '0', unit: 'Kg', purchasePrice: '', minLimit: '10', barcode: ''
+    name: '', storeQty: '0', unit: 'Kg', purchasePrice: '', minLimit: '10', barcode: ''
   });
 
   // Waste logs & modals
@@ -119,14 +108,10 @@ export default function BumBumCafeStockApp() {
     const unsubStockOuts = onSnapshot(query(collection(db, "stock_out_history"), orderBy("date", "desc")), (snap) => {
       if (!snap.empty) setStockOutHistory(snap.docs.map(d => ({ id: d.id, ...d.data() } as StockOutLog)));
     });
-    const unsubCategories = onSnapshot(collection(db, "categories"), (snap) => {
-      if (!snap.empty) {
-        setCategories(snap.docs.map(d => ({ id: d.id, name: d.data().name as string })));
-      } else {
-        setCategories(INITIAL_CATEGORIES);
-      }
+    const unsubSavedOrders = onSnapshot(collection(db, "saved_orders"), (snap) => {
+      setSavedOrders(snap.docs.map(d => ({ id: d.id, ...d.data() } as SavedOrderItem)));
     });
-    return () => { unsubInventory(); unsubStockOuts(); unsubCategories(); };
+    return () => { unsubInventory(); unsubStockOuts(); unsubSavedOrders(); };
   }, []);
 
   // Live native browser Barcode detection loop
@@ -165,13 +150,10 @@ export default function BumBumCafeStockApp() {
   }, [inventory, stockOutHistory]);
 
   const filteredInventory = useMemo(() => {
-    return inventory.filter(item => {
-      const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                            item.category.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesCategory = selectedCategory === "All" || item.category === selectedCategory;
-      return matchesSearch && matchesCategory;
-    });
-  }, [inventory, searchQuery, selectedCategory]);
+    return inventory.filter(item => 
+      item.name.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }, [inventory, searchQuery]);
 
   // Camera settings
   const startCamera = async () => {
@@ -201,8 +183,7 @@ export default function BumBumCafeStockApp() {
         name: foundItem.name,
         qty: 1,
         unit: foundItem.unit,
-        price: foundItem.purchasePrice,
-        category: foundItem.category
+        price: foundItem.purchasePrice
       }]);
       toastMessage(`सामग्री मिली: ${foundItem.name}`);
     } else {
@@ -262,42 +243,76 @@ export default function BumBumCafeStockApp() {
     );
   };
 
-  // Add Dynamic Category
-  const handleAddCategory = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newCategoryName.trim()) return;
-    const exists = categories.find(c => c.name.toLowerCase() === newCategoryName.trim().toLowerCase());
-    if (exists) {
-      toastMessage("यह कैटेगरी पहले से बनी हुई है!", "error");
-      return;
-    }
+  // SAVE SELECTED ITEMS TO DATABASE ORDER LIST TAB
+  const handleSaveToOrderList = async () => {
+    triggerHaptic();
+    if (selectedItemIds.length === 0) return;
     try {
-      const customId = `cat_${Date.now()}`;
-      await setDoc(doc(db, "categories", customId), { name: newCategoryName.trim() });
-      setNewCategoryName("");
-      toastMessage("कैटेगरी सफलतापूर्वक जोड़ी गई!");
+      const batch = writeBatch(db);
+      for (const id of selectedItemIds) {
+        const item = inventory.find(i => i.id === id);
+        if (item) {
+          const orderRef = doc(db, "saved_orders", id);
+          batch.set(orderRef, {
+            id: item.id,
+            name: item.name,
+            storeQty: item.storeQty,
+            unit: item.unit,
+            orderQty: "" // Default blank quantity, editable in Order List Tab
+          }, { merge: true });
+        }
+      }
+      await batch.commit();
+      setSelectedItemIds([]);
+      setIsMultiSelectMode(false);
+      toastMessage("सामान ऑर्डर लिस्ट टैब में सहेजे गए!");
+      setActiveTab('saved_list'); // Switch automatically to the Saved Tab
     } catch {
-      toastMessage("कैटेगरी सेव करने में त्रुटि हुई।", "error");
+      toastMessage("ऑर्डर लिस्ट में सहेजने में विफल।", "error");
     }
   };
 
-  // Delete Category
-  const handleDeleteCategory = async (id: string, name: string) => {
-    const confirm = window.confirm(`क्या आप "${name}" कैटेगरी को हटाना चाहते हैं?`);
-    if (!confirm) return;
+  // Update Specific Order Qty in Firestore on keychange
+  const handleUpdateOrderQty = async (id: string, qty: string) => {
     try {
-      await deleteDoc(doc(db, "categories", id));
-      toastMessage("श्रेणी को हटा दिया गया!");
+      await setDoc(doc(db, "saved_orders", id), { orderQty: qty }, { merge: true });
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  // Delete Individual Saved item
+  const handleRemoveFromSavedList = async (id: string) => {
+    triggerHaptic();
+    try {
+      await deleteDoc(doc(db, "saved_orders", id));
     } catch {
       toastMessage("हटाने में त्रुटि हुई।", "error");
+    }
+  };
+
+  // Clear Entire Saved List
+  const handleClearAllSavedList = async () => {
+    triggerHaptic();
+    const confirm = window.confirm("क्या आप ऑर्डर लिस्ट के सभी सामान हटाना चाहते हैं?");
+    if (!confirm) return;
+    try {
+      const batch = writeBatch(db);
+      savedOrders.forEach(item => {
+        batch.delete(doc(db, "saved_orders", item.id));
+      });
+      await batch.commit();
+      toastMessage("ऑर्डर लिस्ट खाली कर दी गई!");
+    } catch {
+      toastMessage("क्लियर करने में त्रुटि हुई।", "error");
     }
   };
 
   // Add Product Submit
   const handleAddProductSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formAddProduct.name || !formAddProduct.category) {
-      toastMessage("नाम और कैटेगरी आवश्यक हैं!", "error");
+    if (!formAddProduct.name) {
+      toastMessage("सामान का नाम आवश्यक है!", "error");
       return;
     }
     try {
@@ -305,7 +320,7 @@ export default function BumBumCafeStockApp() {
       const payload: InventoryItem = {
         id: customId,
         name: formAddProduct.name.toUpperCase().trim(),
-        category: formAddProduct.category,
+        category: "Staples", // Default fallback
         storeQty: parseFloat(formAddProduct.storeQty) || 0,
         unit: formAddProduct.unit,
         purchasePrice: parseFloat(formAddProduct.purchasePrice) || 0,
@@ -317,7 +332,7 @@ export default function BumBumCafeStockApp() {
       await setDoc(doc(db, "godown_inventory", customId), payload);
       toastMessage("नया सामान सफलतापूर्वक दर्ज हुआ!");
       setShowAddProductModal(false);
-      setFormAddProduct({ name: '', category: '', storeQty: '0', unit: 'Kg', purchasePrice: '', minLimit: '10', barcode: '' });
+      setFormAddProduct({ name: '', storeQty: '0', unit: 'Kg', purchasePrice: '', minLimit: '10', barcode: '' });
     } catch {
       toastMessage("सामान जोड़ने में विफलता।", "error");
     }
@@ -366,17 +381,16 @@ export default function BumBumCafeStockApp() {
     }
   };
 
-  // Direct print compiled order list
-  const handlePrintSelected = () => {
+  // Direct print compiled saved orders list
+  const handlePrintSavedList = () => {
     const printWindow = window.open('', '_blank', 'width=600,height=800');
     if (!printWindow) return;
 
-    const matched = inventory.filter(i => selectedItemIds.includes(i.id));
-    const rows = matched.map(item => `
+    const rows = savedOrders.map(item => `
       <tr>
         <td style="padding:10px; border-bottom:1px solid #ddd; font-weight:bold;">${item.name}</td>
         <td style="padding:10px; border-bottom:1px solid #ddd; text-align:center;">${item.storeQty} ${item.unit}</td>
-        <td style="padding:10px; border-bottom:1px solid #ddd; text-align:right; font-weight:bold; color:#FF6B00;">${quickOrderQtys[item.id] || "0"}</td>
+        <td style="padding:10px; border-bottom:1px solid #ddd; text-align:right; font-weight:bold; color:#FF6B00;">${item.orderQty || "0"}</td>
       </tr>
     `).join('');
 
@@ -439,7 +453,7 @@ export default function BumBumCafeStockApp() {
       {/* MAIN CONTAINER */}
       <main className="max-w-md mx-auto px-4 pt-4 space-y-4">
         
-        {/* ==================== HOME / DASHBOARD TAB ==================== */}
+        {/* ==================== TAB 1: HOME / DASHBOARD ==================== */}
         {activeTab === 'home' && (
           <div className="space-y-4">
             <div className="bg-gradient-to-tr from-orange-500 to-amber-500 rounded-3xl p-5 text-white shadow-lg">
@@ -448,7 +462,7 @@ export default function BumBumCafeStockApp() {
               
               <div className="grid grid-cols-2 gap-3 mt-4 pt-4 border-t border-white/10">
                 <div onClick={() => { setActiveTab('store'); setIsMultiSelectMode(true); }} className="bg-white/10 p-3 rounded-2xl text-center cursor-pointer hover:bg-white/20 transition-all">
-                  <span className="text-xs font-bold block">📦 Multi Print</span>
+                  <span className="text-xs font-bold block">📦 Multi Select</span>
                 </div>
                 <div onClick={() => { triggerHaptic(); setShowStockOutModal(true); }} className="bg-white/10 p-3 rounded-2xl text-center cursor-pointer hover:bg-white/20 transition-all">
                   <span className="text-xs font-bold block">⚠️ Log Waste</span>
@@ -473,49 +487,10 @@ export default function BumBumCafeStockApp() {
           </div>
         )}
 
-        {/* ==================== GODOWN STOCK TAB ==================== */}
+        {/* ==================== TAB 2: GODOWN STOCK ==================== */}
         {activeTab === 'store' && (
           <div className="space-y-4">
             
-            {/* CATEGORY FILTER SWITCHES WITH MANAGE BUTTON */}
-            <div className="space-y-2">
-              <div className="flex justify-between items-center">
-                <span className="text-[10px] font-black uppercase text-neutral-400">Categories</span>
-                <button 
-                  onClick={() => setShowCategoryModal(true)} 
-                  className="text-[10px] font-bold text-orange-600 uppercase flex items-center gap-1"
-                >
-                  📁 Manage
-                </button>
-              </div>
-              
-              <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-none font-sans">
-                <button
-                  onClick={() => setSelectedCategory("All")}
-                  className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border whitespace-nowrap transition-all ${
-                    selectedCategory === "All" 
-                      ? 'bg-[#FF6B00] text-white border-[#FF6B00]' 
-                      : isDarkMode ? 'bg-neutral-900 border-neutral-800 text-neutral-400' : 'bg-white border-neutral-200 text-neutral-600'
-                  }`}
-                >
-                  All
-                </button>
-                {categories.map(cat => (
-                  <button
-                    key={cat.id}
-                    onClick={() => setSelectedCategory(cat.name)}
-                    className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border whitespace-nowrap transition-all ${
-                      selectedCategory === cat.name 
-                        ? 'bg-[#FF6B00] text-white border-[#FF6B00]' 
-                        : isDarkMode ? 'bg-neutral-900 border-neutral-800 text-neutral-400' : 'bg-white border-neutral-200 text-neutral-600'
-                    }`}
-                  >
-                    {cat.name}
-                  </button>
-                ))}
-              </div>
-            </div>
-
             {/* SEARCH AND CONTROL ACTIONS */}
             <div className="flex items-center gap-2">
               <div className="relative flex-1">
@@ -545,19 +520,19 @@ export default function BumBumCafeStockApp() {
               <Plus size={14} /> Add New Product (सामान जोड़ें)
             </button>
 
-            {/* FLOATING ACTION BOTTOM BANNER FOR MULTI-SELECT FLOW */}
+            {/* FLOATING ACTION BOTTOM BANNER FOR MULTI-SELECT SAVING TO TAB */}
             {isMultiSelectMode && selectedItemIds.length > 0 && (
-              <div className="fixed bottom-16 left-1/2 -translate-x-1/2 z-40 w-full max-w-xs px-2">
-                <div className="bg-orange-600 text-white rounded-2xl p-3 shadow-2xl flex items-center justify-between border border-orange-400/20">
+              <div className="fixed bottom-16 left-1/2 -translate-x-1/2 z-45 w-full max-w-xs px-2">
+                <div className="bg-orange-600 text-white rounded-2xl p-3 shadow-2xl flex items-center justify-between border border-orange-400/20 animate-pulse">
                   <div>
                     <p className="text-xs font-black">{selectedItemIds.length} Items Selected</p>
-                    <p className="text-[9px] text-orange-100">मात्रा भरें और मंगाएं</p>
+                    <p className="text-[9px] text-orange-100">ऑर्डर लिस्ट टैब में भेजें</p>
                   </div>
                   <button 
-                    onClick={() => setShowQuickPrintModal(true)}
+                    onClick={handleSaveToOrderList}
                     className="px-3.5 py-1.5 bg-white text-orange-600 font-black text-xs uppercase rounded-xl shadow"
                   >
-                    Proceed ➔
+                    Save to Order Tab ➔
                   </button>
                 </div>
               </div>
@@ -599,7 +574,7 @@ export default function BumBumCafeStockApp() {
                             </button>
                           )}
                         </div>
-                        <p className="text-[9px] text-neutral-400 uppercase tracking-widest">{item.category}</p>
+                        {item.barcode && <p className="text-[8px] text-neutral-400 font-bold uppercase tracking-widest">Barcode: {item.barcode}</p>}
                       </div>
                       <div className="text-right pr-6">
                         <span className="text-xs text-neutral-400 font-bold">{item.storeQty} {item.unit}</span>
@@ -651,7 +626,80 @@ export default function BumBumCafeStockApp() {
           </div>
         )}
 
-        {/* ==================== WASTAGE DETAILS TAB ==================== */}
+        {/* ==================== TAB 3: SAVED ORDER LIST (NEW ORDER TAB) ==================== */}
+        {activeTab === 'saved_list' && (
+          <div className="space-y-4">
+            <div className="flex justify-between items-center">
+              <div>
+                <h2 className="text-sm font-black text-orange-600 uppercase">Saved Order List</h2>
+                <p className="text-[10px] text-neutral-400">चुने हुए सामान और मंगवाने वाली मात्रा</p>
+              </div>
+              {savedOrders.length > 0 && (
+                <button 
+                  onClick={handleClearAllSavedList}
+                  className="px-3 py-1 text-[10px] bg-red-100 dark:bg-red-500/10 text-red-500 rounded-lg font-bold"
+                >
+                  Clear All
+                </button>
+              )}
+            </div>
+
+            {/* List Table of Saved orders */}
+            <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
+              {savedOrders.map(item => (
+                <div 
+                  key={item.id} 
+                  className={`p-3.5 rounded-2xl border flex justify-between items-center text-xs ${
+                    isDarkMode ? 'bg-[#181818] border-neutral-800' : 'bg-white border-neutral-100'
+                  }`}
+                >
+                  <div className="flex-1 pr-3">
+                    <p className="font-bold text-sm text-[#FF6B00]">{item.name}</p>
+                    <p className="text-[9px] text-neutral-400 font-bold uppercase">
+                      Current Stock: {item.storeQty} {item.unit}
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <input 
+                      type="text"
+                      placeholder="Qty भरें"
+                      value={item.orderQty || ""}
+                      onChange={(e) => handleUpdateOrderQty(item.id, e.target.value)}
+                      className="w-24 p-2 rounded-xl border text-center font-bold text-xs bg-transparent text-neutral-900 dark:text-white"
+                    />
+                    <span className="text-[10px] font-bold text-neutral-400 w-8">{item.unit}</span>
+                    <button 
+                      onClick={() => handleRemoveFromSavedList(item.id)}
+                      className="text-neutral-400 hover:text-red-500"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+
+              {savedOrders.length === 0 && (
+                <div className="text-center py-10 space-y-2">
+                  <span className="text-2xl block">🛒</span>
+                  <p className="text-xs text-neutral-400 font-bold uppercase">लिस्ट खाली है। Godown में जाकर सामान सेलेक्ट करें!</p>
+                </div>
+              )}
+            </div>
+
+            {savedOrders.length > 0 && (
+              <button 
+                onClick={handlePrintSavedList}
+                className="w-full py-4 bg-[#FF6B00] hover:bg-orange-600 text-white rounded-2xl font-black text-xs uppercase shadow-lg shadow-orange-500/20 flex items-center justify-center gap-2"
+              >
+                <Printer size={16} />
+                <span>Print Saved Order Sheet</span>
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* ==================== TAB 4: WASTAGE DETAILS ==================== */}
         {activeTab === 'waste' && (
           <div className="space-y-4">
             <div className="flex justify-between items-center">
@@ -705,48 +753,8 @@ export default function BumBumCafeStockApp() {
 
       {/* ==================== SCREEN MODALS ==================== */}
       <AnimatePresence>
-        
-        {/* 1. DYNAMIC FILL AND PRINT ORDER MODAL */}
-        {showQuickPrintModal && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end justify-center">
-            <motion.div initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} className={`w-full max-w-md rounded-t-[2rem] p-6 space-y-4 ${isDarkMode ? 'bg-neutral-900 text-white' : 'bg-white text-neutral-900'}`}>
-              <div className="flex justify-between items-center border-b pb-2">
-                <div>
-                  <h3 className="text-xs font-black uppercase text-[#FF6B00]">Custom Purchase Order</h3>
-                  <p className="text-[9px] text-neutral-400 uppercase font-bold">मंगाने वाली मात्रा यहाँ दर्ज करें</p>
-                </div>
-                <button onClick={() => setShowQuickPrintModal(false)} className="p-1.5 bg-neutral-100 dark:bg-neutral-800 rounded-xl"><X size={14} /></button>
-              </div>
 
-              <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
-                {inventory.filter(i => selectedItemIds.includes(i.id)).map(item => (
-                  <div key={item.id} className="flex justify-between items-center p-3 rounded-xl bg-neutral-50 dark:bg-neutral-800 text-xs">
-                    <div>
-                      <p className="font-bold text-sm text-[#FF6B00]">{item.name}</p>
-                      <p className="text-[9px] text-neutral-400 font-bold uppercase">Stock: {item.storeQty} {item.unit}</p>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <input 
-                        type="text"
-                        placeholder="मात्रा लिखें"
-                        value={quickOrderQtys[item.id] || ""}
-                        onChange={e => setQuickOrderQtys(prev => ({ ...prev, [item.id]: e.target.value }))}
-                        className="w-24 p-2 rounded-lg border text-center font-bold text-xs"
-                      />
-                      <span className="text-[10px] text-neutral-400 w-8 font-bold">{item.unit}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <button onClick={handlePrintSelected} className="w-full py-3 bg-[#FF6B00] text-white rounded-xl font-bold text-xs uppercase flex items-center justify-center gap-2 shadow">
-                <Printer size={14} /> <span>Print Order Sheet</span>
-              </button>
-            </motion.div>
-          </div>
-        )}
-
-        {/* 2. REAL AI BARCODE SCANNER CONTAINER */}
+        {/* 1. REAL AI BARCODE SCANNER CONTAINER */}
         {scannerActive && (
           <div className="fixed inset-0 bg-black z-50 flex flex-col justify-between p-4 text-white">
             <div className="flex justify-between items-center border-b border-neutral-800 pb-3">
@@ -762,7 +770,6 @@ export default function BumBumCafeStockApp() {
                 <div className="p-4 bg-neutral-900 border border-neutral-800 rounded-2xl space-y-3">
                   <div className="flex justify-between">
                     <span className="font-bold text-[#FF6B00] text-sm">{scannedItemsToVerify[0].name}</span>
-                    <span className="text-[10px] text-neutral-400">{scannedItemsToVerify[0].category}</span>
                   </div>
                   <div className="space-y-1.5 text-xs">
                     <label className="text-[9px] text-neutral-400 font-bold block uppercase">Quantity to Add (जोड़ने की मात्रा)</label>
@@ -813,7 +820,7 @@ export default function BumBumCafeStockApp() {
           </div>
         )}
 
-        {/* 3. NEW WASTAGE SUBMISSION MODAL */}
+        {/* 2. NEW WASTAGE SUBMISSION MODAL */}
         {showStockOutModal && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <motion.form onSubmit={handleWasteSubmit} initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className={`w-full max-w-sm rounded-3xl p-6 space-y-4 ${isDarkMode ? 'bg-neutral-900 text-white' : 'bg-white text-neutral-900'}`}>
@@ -878,48 +885,7 @@ export default function BumBumCafeStockApp() {
           </div>
         )}
 
-        {/* 4. DYNAMIC CATEGORY MANAGER MODAL */}
-        {showCategoryModal && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className={`w-full max-w-sm rounded-3xl p-6 space-y-4 ${isDarkMode ? 'bg-neutral-900 text-white' : 'bg-white text-neutral-900'}`}>
-              <div className="flex justify-between items-center border-b pb-2">
-                <div>
-                  <h3 className="text-xs font-black uppercase text-orange-500">Manage Categories</h3>
-                  <p className="text-[9px] text-neutral-400 uppercase font-bold">कैटेगरी बनाएं या हटाएँ</p>
-                </div>
-                <button onClick={() => setShowCategoryModal(false)} className="p-1.5 bg-neutral-100 dark:bg-neutral-800 rounded-xl"><X size={14} /></button>
-              </div>
-
-              <form onSubmit={handleAddCategory} className="flex gap-1.5 text-xs">
-                <input 
-                  type="text" 
-                  placeholder="जैसे: Pizza Toppings" 
-                  value={newCategoryName}
-                  onChange={e => setNewCategoryName(e.target.value)}
-                  className="flex-1 p-2.5 rounded-xl border dark:bg-neutral-800"
-                  required
-                />
-                <button type="submit" className="px-4 py-2.5 bg-orange-500 text-white font-bold rounded-xl uppercase">Add</button>
-              </form>
-
-              <div className="space-y-1.5 max-h-56 overflow-y-auto">
-                {categories.map(cat => (
-                  <div key={cat.id} className="flex justify-between items-center p-2.5 rounded-xl bg-neutral-50 dark:bg-neutral-800 text-xs">
-                    <span className="font-bold">{cat.name}</span>
-                    <button 
-                      onClick={() => handleDeleteCategory(cat.id, cat.name)}
-                      className="text-neutral-400 hover:text-red-500"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </motion.div>
-          </div>
-        )}
-
-        {/* 5. ADD PRODUCT MODAL */}
+        {/* 3. ADD PRODUCT MODAL */}
         {showAddProductModal && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <motion.form onSubmit={handleAddProductSubmit} initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className={`w-full max-w-sm rounded-3xl p-6 space-y-4 ${isDarkMode ? 'bg-neutral-900 text-white' : 'bg-white text-neutral-900'}`}>
@@ -943,20 +909,7 @@ export default function BumBumCafeStockApp() {
 
                 <div className="grid grid-cols-2 gap-2">
                   <div className="space-y-1">
-                    <label className="text-[9px] text-neutral-400 font-bold uppercase">Category (श्रेणी)</label>
-                    <select 
-                      value={formAddProduct.category}
-                      onChange={e => setFormAddProduct({ ...formAddProduct, category: e.target.value })}
-                      className="w-full p-2.5 rounded-xl border dark:bg-neutral-800 font-bold"
-                      required
-                    >
-                      <option value="">Select Category</option>
-                      {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
-                    </select>
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-[9px] text-neutral-400 font-bold uppercase">Unit</label>
+                    <label className="text-[9px] text-neutral-400 font-bold uppercase">Unit (इकाई)</label>
                     <select 
                       value={formAddProduct.unit}
                       onChange={e => setFormAddProduct({ ...formAddProduct, unit: e.target.value })}
@@ -969,20 +922,9 @@ export default function BumBumCafeStockApp() {
                       <option value="Tins">Tins</option>
                     </select>
                   </div>
-                </div>
 
-                <div className="grid grid-cols-3 gap-1.5">
                   <div className="space-y-1">
-                    <label className="text-[8px] text-neutral-400 font-bold uppercase">Initial Qty</label>
-                    <input 
-                      type="number" 
-                      value={formAddProduct.storeQty}
-                      onChange={e => setFormAddProduct({ ...formAddProduct, storeQty: e.target.value })}
-                      className="w-full p-2.5 rounded-xl border dark:bg-neutral-800"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[8px] text-neutral-400 font-bold uppercase">Price (INR)</label>
+                    <label className="text-[9px] text-neutral-400 font-bold uppercase">Price (INR)</label>
                     <input 
                       type="number" 
                       placeholder="खरीद दर"
@@ -992,8 +934,20 @@ export default function BumBumCafeStockApp() {
                       required
                     />
                   </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
                   <div className="space-y-1">
-                    <label className="text-[8px] text-neutral-400 font-bold uppercase">Min Stock</label>
+                    <label className="text-[9px] text-neutral-400 font-bold uppercase">Initial Qty</label>
+                    <input 
+                      type="number" 
+                      value={formAddProduct.storeQty}
+                      onChange={e => setFormAddProduct({ ...formAddProduct, storeQty: e.target.value })}
+                      className="w-full p-2.5 rounded-xl border dark:bg-neutral-800"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[9px] text-neutral-400 font-bold uppercase">Min Stock Limit</label>
                     <input 
                       type="number" 
                       value={formAddProduct.minLimit}
@@ -1022,7 +976,7 @@ export default function BumBumCafeStockApp() {
           </div>
         )}
 
-        {/* 6. EDIT PRODUCT MODAL */}
+        {/* 4. EDIT PRODUCT MODAL */}
         {editingProduct && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <motion.form onSubmit={handleEditProductSubmit} initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className={`w-full max-w-sm rounded-3xl p-6 space-y-4 ${isDarkMode ? 'bg-neutral-900 text-white' : 'bg-white text-neutral-900'}`}>
@@ -1045,23 +999,11 @@ export default function BumBumCafeStockApp() {
 
                 <div className="grid grid-cols-2 gap-2">
                   <div className="space-y-1">
-                    <label className="text-[9px] text-neutral-400 font-bold uppercase">Category</label>
-                    <select 
-                      value={editingProduct.category}
-                      onChange={e => setEditingProduct({ ...editingProduct, category: e.target.value })}
-                      className="w-full p-2.5 rounded-xl border dark:bg-neutral-800 font-bold"
-                      required
-                    >
-                      {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
-                    </select>
-                  </div>
-
-                  <div className="space-y-1">
                     <label className="text-[9px] text-neutral-400 font-bold uppercase">Unit</label>
                     <select 
                       value={editingProduct.unit}
                       onChange={e => setEditingProduct({ ...editingProduct, unit: e.target.value })}
-                      className="w-full p-2.5 rounded-xl border dark:bg-neutral-800 font-bold"
+                      className="w-full p-2.5 rounded-xl border dark:bg-[#181818] font-bold"
                     >
                       <option value="Kg">Kg</option>
                       <option value="Ltr">Ltr</option>
@@ -1070,9 +1012,7 @@ export default function BumBumCafeStockApp() {
                       <option value="Tins">Tins</option>
                     </select>
                   </div>
-                </div>
 
-                <div className="grid grid-cols-2 gap-2">
                   <div className="space-y-1">
                     <label className="text-[9px] text-neutral-400 font-bold uppercase">Purchase Price (INR)</label>
                     <input 
@@ -1083,8 +1023,11 @@ export default function BumBumCafeStockApp() {
                       required
                     />
                   </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
                   <div className="space-y-1">
-                    <label className="text-[9px] text-neutral-400 font-bold uppercase">Min Limit</label>
+                    <label className="text-[9px] text-neutral-400 font-bold uppercase">Min Stock Limit</label>
                     <input 
                       type="number" 
                       value={editingProduct.minLimit}
@@ -1093,16 +1036,15 @@ export default function BumBumCafeStockApp() {
                       required
                     />
                   </div>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-[9px] text-neutral-400 font-bold uppercase">Barcode</label>
-                  <input 
-                    type="text" 
-                    value={editingProduct.barcode || ""}
-                    onChange={e => setEditingProduct({ ...editingProduct, barcode: e.target.value })}
-                    className="w-full p-2.5 rounded-xl border dark:bg-neutral-800"
-                  />
+                  <div className="space-y-1">
+                    <label className="text-[9px] text-neutral-400 font-bold uppercase">Barcode</label>
+                    <input 
+                      type="text" 
+                      value={editingProduct.barcode || ""}
+                      onChange={e => setEditingProduct({ ...editingProduct, barcode: e.target.value })}
+                      className="w-full p-2.5 rounded-xl border dark:bg-neutral-800"
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -1136,15 +1078,18 @@ export default function BumBumCafeStockApp() {
 
       {/* PREMIUM BOTTOM NAVIGATION */}
       <nav className={`fixed bottom-0 left-0 right-0 z-50 border-t backdrop-blur-md ${isDarkMode ? 'bg-black/90 border-neutral-800 text-white' : 'bg-white/90 border-neutral-100 text-neutral-800'}`}>
-        <div className="max-w-md mx-auto grid grid-cols-3 gap-1 py-1.5 text-center text-[10px] font-black uppercase">
-          <button onClick={() => { setActiveTab('home'); setIsMultiSelectMode(false); }} className={`flex flex-col items-center justify-center py-1 ${activeTab === 'home' ? 'text-orange-500' : 'text-neutral-400'}`}>
-            <Home size={16} /> <span className="mt-0.5">Home</span>
+        <div className="max-w-md mx-auto grid grid-cols-4 gap-0.5 py-1.5 text-center text-[9px] font-black uppercase">
+          <button onClick={() => { setActiveTab('home'); setIsMultiSelectMode(false); }} className={`flex flex-col items-center justify-center py-1 ${activeTab === 'home' ? 'text-[#FF6B00]' : 'text-neutral-400'}`}>
+            <Home size={15} /> <span className="mt-0.5">Home</span>
           </button>
-          <button onClick={() => { setActiveTab('store'); }} className={`flex flex-col items-center justify-center py-1 ${activeTab === 'store' ? 'text-orange-500' : 'text-neutral-400'}`}>
-            <Store size={16} /> <span className="mt-0.5">Godown</span>
+          <button onClick={() => { setActiveTab('store'); }} className={`flex flex-col items-center justify-center py-1 ${activeTab === 'store' ? 'text-[#FF6B00]' : 'text-neutral-400'}`}>
+            <Store size={15} /> <span className="mt-0.5">Godown</span>
           </button>
-          <button onClick={() => { setActiveTab('waste'); setIsMultiSelectMode(false); }} className={`flex flex-col items-center justify-center py-1 ${activeTab === 'waste' ? 'text-orange-500' : 'text-neutral-400'}`}>
-            <AlertTriangle size={16} /> <span className="mt-0.5">Wastage Logs</span>
+          <button onClick={() => { setActiveTab('saved_list'); setIsMultiSelectMode(false); }} className={`flex flex-col items-center justify-center py-1 ${activeTab === 'saved_list' ? 'text-[#FF6B00]' : 'text-neutral-400'}`}>
+            <Layers size={15} /> <span className="mt-0.5">Saved List</span>
+          </button>
+          <button onClick={() => { setActiveTab('waste'); setIsMultiSelectMode(false); }} className={`flex flex-col items-center justify-center py-1 ${activeTab === 'waste' ? 'text-[#FF6B00]' : 'text-neutral-400'}`}>
+            <AlertTriangle size={15} /> <span className="mt-0.5">Wastage Logs</span>
           </button>
         </div>
       </nav>
