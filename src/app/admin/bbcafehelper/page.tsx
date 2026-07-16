@@ -320,7 +320,6 @@ export default function BumBumCafeStockApp() {
       const payload: InventoryItem = {
         id: customId,
         name: formAddProduct.name.toUpperCase().trim(),
-        category: "Staples", // Default fallback
         storeQty: parseFloat(formAddProduct.storeQty) || 0,
         unit: formAddProduct.unit,
         purchasePrice: parseFloat(formAddProduct.purchasePrice) || 0,
