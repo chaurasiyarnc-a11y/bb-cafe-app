@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   Home, Store, Trash2, Search, Plus, X, BarChart3, QrCode, 
-  PlusCircle, MinusCircle, ChevronRight, Sparkles, AlertTriangle, Printer, Edit, Layers
+  PlusCircle, MinusCircle, ChevronRight, Sparkles, AlertTriangle, Printer, Edit, Layers, MessageCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -34,8 +34,16 @@ interface StockOutLog {
   financialLoss?: number;
 }
 
-interface SavedOrderItem {
+interface OrderListMeta {
   id: string;
+  name: string;
+  date: string;
+}
+
+interface SavedOrderItem {
+  id: string; // compound: itemId_listId
+  itemId: string;
+  listId: string;
   name: string;
   storeQty: number;
   unit: string;
@@ -57,6 +65,7 @@ const INITIAL_INVENTORY: InventoryItem[] = [
 
 export default function BumBumCafeStockApp() {
   const [inventory, setInventory] = useState<InventoryItem[]>(INITIAL_INVENTORY);
+  const [orderLists, setOrderLists] = useState<OrderListMeta[]>([]);
   const [savedOrders, setSavedOrders] = useState<SavedOrderItem[]>([]);
   const [activeTab, setActiveTab] = useState<'home' | 'store' | 'saved_list' | 'waste'>('home');
   const [isDarkMode, setIsDarkMode] = useState<boolean>(false);
@@ -68,8 +77,13 @@ export default function BumBumCafeStockApp() {
   const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
   const [isMultiSelectMode, setIsMultiSelectMode] = useState<boolean>(false);
 
-  // Order List Name Configuration States
-  const [orderListName, setOrderListName] = useState<string>("BUM BUM CAFE ORDER SHEET");
+  // Multiple Lists State
+  const [activeListId, setActiveListId] = useState<string>("");
+  const [showSaveToListModal, setShowSaveToListModal] = useState<boolean>(false);
+  const [targetListId, setTargetListId] = useState<string>("");
+  const [newListNameInput, setNewListNameInput] = useState<string>("");
+
+  // Rename Active List States
   const [isEditingListName, setIsEditingListName] = useState<boolean>(false);
   const [tempListNameInput, setTempListNameInput] = useState<string>("");
 
@@ -116,13 +130,21 @@ export default function BumBumCafeStockApp() {
     const unsubSavedOrders = onSnapshot(collection(db, "saved_orders"), (snap) => {
       setSavedOrders(snap.docs.map(d => ({ id: d.id, ...d.data() } as SavedOrderItem)));
     });
-    const unsubListName = onSnapshot(doc(db, "config", "order_list_config"), (docSnap) => {
-      if (docSnap.exists()) {
-        setOrderListName(docSnap.data().name || "BUM BUM CAFE ORDER SHEET");
+    const unsubOrderLists = onSnapshot(collection(db, "order_lists"), (snap) => {
+      if (!snap.empty) {
+        const lists = snap.docs.map(d => ({ id: d.id, ...d.data() } as OrderListMeta));
+        setOrderLists(lists);
+        // Auto set active list if none selected
+        if (!activeListId && lists.length > 0) {
+          setActiveListId(lists[0].id);
+        }
+      } else {
+        // Fallback default list
+        setOrderLists([]);
       }
     });
-    return () => { unsubInventory(); unsubStockOuts(); unsubSavedOrders(); unsubListName(); };
-  }, []);
+    return () => { unsubInventory(); unsubStockOuts(); unsubSavedOrders(); unsubOrderLists(); };
+  }, [activeListId]);
 
   // Live native browser Barcode detection loop
   useEffect(() => {
@@ -253,49 +275,84 @@ export default function BumBumCafeStockApp() {
     );
   };
 
-  // SAVE SELECTED ITEMS TO DATABASE ORDER LIST TAB
-  const handleSaveToOrderList = async () => {
+  // SAVE SELECTED ITEMS TO CHOSEN / NEW DATABASE ORDER LIST
+  const handleConfirmSaveToList = async () => {
     triggerHaptic();
     if (selectedItemIds.length === 0) return;
+
+    let targetId = targetListId;
+
     try {
+      // 1. If user wants a new list, create it first
+      if (targetId === "CREATE_NEW") {
+        if (!newListNameInput.trim()) {
+          toastMessage("नया लिस्ट नाम दर्ज करें!", "error");
+          return;
+        }
+        targetId = `list_${Date.now()}`;
+        await setDoc(doc(db, "order_lists", targetId), {
+          id: targetId,
+          name: newListNameInput.trim().toUpperCase(),
+          date: new Date().toISOString().split('T')[0]
+        });
+        setNewListNameInput("");
+      }
+
+      // 2. Fallback if no list is chosen or created
+      if (!targetId) {
+        targetId = `list_${Date.now()}`;
+        await setDoc(doc(db, "order_lists", targetId), {
+          id: targetId,
+          name: "GENERAL ORDER LIST",
+          date: new Date().toISOString().split('T')[0]
+        });
+      }
+
+      // 3. Save selected items into saved_orders referencing listId
       const batch = writeBatch(db);
       for (const id of selectedItemIds) {
         const item = inventory.find(i => i.id === id);
         if (item) {
-          const orderRef = doc(db, "saved_orders", id);
+          const compoundId = `${id}_${targetId}`;
+          const orderRef = doc(db, "saved_orders", compoundId);
           batch.set(orderRef, {
-            id: item.id,
+            id: compoundId,
+            itemId: item.id,
+            listId: targetId,
             name: item.name,
             storeQty: item.storeQty,
             unit: item.unit,
-            orderQty: "" // Default blank quantity, editable in Order List Tab
+            orderQty: "" 
           }, { merge: true });
         }
       }
       await batch.commit();
+      
       setSelectedItemIds([]);
       setIsMultiSelectMode(false);
-      toastMessage("सामान ऑर्डर लिस्ट टैब में सहेजे गए!");
-      setActiveTab('saved_list'); // Switch automatically to the Saved Tab
+      setShowSaveToListModal(false);
+      setActiveListId(targetId);
+      toastMessage("ऑर्डर लिस्ट में सामान सफलतापूर्वक जोड़े गए!");
+      setActiveTab('saved_list'); 
     } catch {
-      toastMessage("ऑर्डर लिस्ट में सहेजने में विफल।", "error");
+      toastMessage("ऑर्डर लिस्ट सहेजने में विफल।", "error");
     }
   };
 
   // Update Specific Order Qty in Firestore on keychange
-  const handleUpdateOrderQty = async (id: string, qty: string) => {
+  const handleUpdateOrderQty = async (compoundId: string, qty: string) => {
     try {
-      await setDoc(doc(db, "saved_orders", id), { orderQty: qty }, { merge: true });
+      await setDoc(doc(db, "saved_orders", compoundId), { orderQty: qty }, { merge: true });
     } catch (e) {
       console.error(e);
     }
   };
 
-  // Rename Saved Order List Name
+  // Rename Order List Name
   const handleUpdateListName = async (newName: string) => {
-    if (!newName.trim()) return;
+    if (!newName.trim() || !activeListId) return;
     try {
-      await setDoc(doc(db, "config", "order_list_config"), { name: newName.trim() }, { merge: true });
+      await setDoc(doc(db, "order_lists", activeListId), { name: newName.trim().toUpperCase() }, { merge: true });
       toastMessage("ऑर्डर लिस्ट का नाम बदला गया!");
     } catch {
       toastMessage("नाम बदलने में त्रुटि हुई।", "error");
@@ -303,29 +360,37 @@ export default function BumBumCafeStockApp() {
   };
 
   // Delete Individual Saved item
-  const handleRemoveFromSavedList = async (id: string) => {
+  const handleRemoveFromSavedList = async (compoundId: string) => {
     triggerHaptic();
     try {
-      await deleteDoc(doc(db, "saved_orders", id));
+      await deleteDoc(doc(db, "saved_orders", compoundId));
     } catch {
       toastMessage("हटाने में त्रुटि हुई।", "error");
     }
   };
 
-  // Clear Entire Saved List
-  const handleClearAllSavedList = async () => {
+  // Clear/Delete entire Order List
+  const handleDeleteActiveList = async () => {
     triggerHaptic();
-    const confirm = window.confirm("क्या आप ऑर्डर लिस्ट के सभी सामान हटाना चाहते हैं?");
+    if (!activeListId) return;
+    const confirm = window.confirm("क्या आप इस पूरी लिस्ट को डिलीट करना चाहते हैं? इसमें मौजूद सभी सामान हटा दिए जायेंगे।");
     if (!confirm) return;
+
     try {
       const batch = writeBatch(db);
-      savedOrders.forEach(item => {
+      // Delete all items of this list
+      const itemsToDelete = savedOrders.filter(o => o.listId === activeListId);
+      itemsToDelete.forEach(item => {
         batch.delete(doc(db, "saved_orders", item.id));
       });
+      // Delete list metadata
+      batch.delete(doc(db, "order_lists", activeListId));
       await batch.commit();
-      toastMessage("ऑर्डर लिस्ट खाली कर दी गई!");
+
+      setActiveListId("");
+      toastMessage("लिस्ट डिलीट कर दी गई!");
     } catch {
-      toastMessage("क्लियर करने में त्रुटि हुई।", "error");
+      toastMessage("डिलीट करने में त्रुटि हुई।", "error");
     }
   };
 
@@ -406,7 +471,11 @@ export default function BumBumCafeStockApp() {
     const printWindow = window.open('', '_blank', 'width=600,height=800');
     if (!printWindow) return;
 
-    const rows = savedOrders.map(item => `
+    const activeList = orderLists.find(l => l.id === activeListId);
+    const listTitle = activeList ? activeList.name : "BUM BUM CAFE ORDER SHEET";
+    const matchedItems = savedOrders.filter(o => o.listId === activeListId);
+
+    const rows = matchedItems.map(item => `
       <tr>
         <td style="padding:10px; border-bottom:1px solid #ddd; font-weight:bold;">${item.name}</td>
         <td style="padding:10px; border-bottom:1px solid #ddd; text-align:center;">${item.storeQty} ${item.unit}</td>
@@ -416,9 +485,9 @@ export default function BumBumCafeStockApp() {
 
     printWindow.document.write(`
       <html>
-        <head><title>BumBum_Cafe_Order_Sheet</title></head>
+        <head><title>Order_Sheet_${listTitle.replace(/\s+/g, '_')}</title></head>
         <body style="font-family:sans-serif; padding:25px;">
-          <h2 style="color:#FF6B00; text-align:center; text-transform: uppercase;">${orderListName}</h2>
+          <h2 style="color:#FF6B00; text-align:center; text-transform: uppercase;">${listTitle}</h2>
           <p style="text-align:center; color:#666; font-size:12px;">Generated on: ${new Date().toLocaleString()}</p>
           <table style="width:100%; border-collapse:collapse; margin-top:20px;">
             <thead>
@@ -436,6 +505,42 @@ export default function BumBumCafeStockApp() {
     `);
     printWindow.document.close();
   };
+
+  // WHATSAPP SHARE GENERATOR
+  const handleWhatsAppShare = () => {
+    triggerHaptic();
+    if (!activeListId) return;
+
+    const activeList = orderLists.find(l => l.id === activeListId);
+    const listTitle = activeList ? activeList.name : "ORDER SHEET";
+    const matchedItems = savedOrders.filter(o => o.listId === activeListId);
+
+    if (matchedItems.length === 0) {
+      toastMessage("इस लिस्ट में कोई सामान नहीं है!", "error");
+      return;
+    }
+
+    let text = `*BUM BUM CAFE - ${listTitle.toUpperCase()}*\n`;
+    text += `Date: ${new Date().toLocaleDateString('en-GB')}\n\n`;
+    text += `Please deliver the following items:\n`;
+    text += `--------------------------------\n`;
+
+    matchedItems.forEach(item => {
+      const qty = item.orderQty || "0";
+      text += `• *${item.name}*: ${qty} ${item.unit}\n`;
+    });
+
+    text += `--------------------------------\n`;
+    text += `Thank you!`;
+
+    const waUrl = `https://wa.me/?text=${encodeURIComponent(text)}`;
+    window.open(waUrl, '_blank');
+  };
+
+  const activeListName = useMemo(() => {
+    const list = orderLists.find(l => l.id === activeListId);
+    return list ? list.name : "BUM BUM CAFE ORDER SHEET";
+  }, [orderLists, activeListId]);
 
   return (
     <div className={`min-h-screen ${isDarkMode ? 'bg-[#0E0E0E] text-white' : 'bg-[#FAFAFA] text-neutral-900'} pb-24 font-sans relative`}>
@@ -512,7 +617,7 @@ export default function BumBumCafeStockApp() {
           <div className="space-y-4">
             
             {/* SEARCH AND CONTROL ACTIONS */}
-            <div className="flex items-center gap-2 animate-none">
+            <div className="flex items-center gap-2">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" size={14} />
                 <input 
@@ -540,16 +645,20 @@ export default function BumBumCafeStockApp() {
               <Plus size={14} /> Add New Product (सामान जोड़ें)
             </button>
 
-            {/* FLOATING ACTION BOTTOM BANNER FOR MULTI-SELECT - FORCED HIGHEST Z-INDEX OVER ITEMS */}
+            {/* FLOATING ACTION BOTTOM BANNER - ENHANCED Z-INDEX LAYER [100] */}
             {isMultiSelectMode && selectedItemIds.length > 0 && (
-              <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[100] w-full max-w-xs px-2 pointer-events-auto">
+              <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[100] w-full max-w-xs px-2">
                 <div className="bg-orange-600 text-white rounded-2xl p-3.5 shadow-2xl flex items-center justify-between border border-orange-400/30">
                   <div>
                     <p className="text-xs font-black">{selectedItemIds.length} Items Selected</p>
                     <p className="text-[9px] text-orange-100 font-bold uppercase tracking-wider">ऑर्डर लिस्ट टैब में भेजें</p>
                   </div>
                   <button 
-                    onClick={handleSaveToOrderList}
+                    onClick={() => {
+                      triggerHaptic();
+                      setShowSaveToListModal(true);
+                      setTargetListId(activeListId || (orderLists[0]?.id || ""));
+                    }}
                     className="px-4 py-2 bg-white text-orange-600 font-black text-xs uppercase rounded-xl shadow-lg shadow-orange-950/20 active:scale-95 transition-all"
                   >
                     Save to Order Tab ➔
@@ -646,113 +755,150 @@ export default function BumBumCafeStockApp() {
           </div>
         )}
 
-        {/* ==================== TAB 3: SAVED ORDER LIST (NEW ORDER TAB) ==================== */}
+        {/* ==================== TAB 3: SAVED ORDER LISTS (DYNAMIC MULTI-LISTS TAB) ==================== */}
         {activeTab === 'saved_list' && (
           <div className="space-y-4">
             
-            {/* SAVED LIST NAME / TITLE EDIT CONTROLS */}
-            <div className="flex justify-between items-center bg-neutral-50 dark:bg-neutral-900/40 p-4 rounded-2xl border border-neutral-100 dark:border-neutral-800">
-              <div className="flex-1 mr-3">
-                {isEditingListName ? (
-                  <div className="flex items-center gap-1.5 w-full">
-                    <input 
-                      type="text" 
-                      value={tempListNameInput} 
-                      onChange={e => setTempListNameInput(e.target.value)}
-                      className={`flex-1 p-2 rounded-xl border text-xs font-bold ${isDarkMode ? 'bg-neutral-800 border-neutral-700 text-white' : 'bg-white border-neutral-200 text-neutral-900'}`}
-                      required
-                    />
-                    <button 
-                      onClick={() => {
-                        handleUpdateListName(tempListNameInput);
-                        setIsEditingListName(false);
-                      }}
-                      className="px-3.5 py-2 bg-green-600 text-white rounded-xl text-[10px] font-black uppercase tracking-wider"
-                    >
-                      Save
-                    </button>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2">
-                    <h2 className="text-xs font-black text-orange-600 uppercase tracking-widest leading-relaxed">
-                      {orderListName}
-                    </h2>
-                    <button 
-                      onClick={() => {
-                        setTempListNameInput(orderListName);
-                        setIsEditingListName(true);
-                      }}
-                      className="p-1 hover:bg-neutral-200 dark:hover:bg-neutral-800 rounded-lg text-neutral-400 hover:text-orange-500 transition-all"
-                      title="ऑर्डर लिस्ट का नाम बदलें"
-                    >
-                      <Edit size={12} />
-                    </button>
-                  </div>
-                )}
-                <p className="text-[8px] text-neutral-400 font-bold uppercase tracking-wide mt-1">ऑर्डर लिस्ट नाम (यह प्रिंट में भी दिखाई देगा)</p>
-              </div>
-
-              {savedOrders.length > 0 && (
-                <button 
-                  onClick={handleClearAllSavedList}
-                  className="px-3 py-1.5 text-[9px] bg-red-100 dark:bg-red-500/10 text-red-500 rounded-lg font-black uppercase tracking-wider whitespace-nowrap"
-                >
-                  Clear All
-                </button>
-              )}
-            </div>
-
-            {/* List Table of Saved orders */}
-            <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
-              {savedOrders.map(item => (
-                <div 
-                  key={item.id} 
-                  className={`p-3.5 rounded-2xl border flex justify-between items-center text-xs ${
-                    isDarkMode ? 'bg-[#181818] border-neutral-800' : 'bg-white border-neutral-100'
+            {/* MULTIPLE LISTS DROPDOWN AND RENAMING HEADER */}
+            <div className="bg-neutral-50 dark:bg-neutral-900/40 p-4 rounded-2xl border border-neutral-100 dark:border-neutral-800 space-y-3.5">
+              
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-black uppercase text-neutral-400">Choose Active List:</span>
+                <select 
+                  value={activeListId}
+                  onChange={e => {
+                    triggerHaptic();
+                    setActiveListId(e.target.value);
+                  }}
+                  className={`flex-1 p-2 text-xs font-bold rounded-xl border ${
+                    isDarkMode ? 'bg-neutral-800 border-neutral-700 text-white' : 'bg-white border-neutral-200 text-neutral-900'
                   }`}
                 >
-                  <div className="flex-1 pr-3">
-                    <p className="font-bold text-sm text-[#FF6B00]">{item.name}</p>
-                    <p className="text-[9px] text-neutral-400 font-bold uppercase">
-                      Current Stock: {item.storeQty} {item.unit}
-                    </p>
-                  </div>
+                  <option value="">-- No Active List --</option>
+                  {orderLists.map(list => (
+                    <option key={list.id} value={list.id}>{list.name}</option>
+                  ))}
+                </select>
+                {activeListId && (
+                  <button 
+                    onClick={handleDeleteActiveList}
+                    className="p-2 bg-red-100 dark:bg-red-500/10 text-red-500 rounded-xl"
+                    title="पूरी लिस्ट डिलीट करें"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                )}
+              </div>
 
-                  <div className="flex items-center gap-2">
-                    <input 
-                      type="text"
-                      placeholder="Qty भरें"
-                      value={item.orderQty || ""}
-                      onChange={(e) => handleUpdateOrderQty(item.id, e.target.value)}
-                      className="w-24 p-2 rounded-xl border text-center font-bold text-xs bg-transparent text-neutral-900 dark:text-white"
-                    />
-                    <span className="text-[10px] font-bold text-neutral-400 w-8">{item.unit}</span>
-                    <button 
-                      onClick={() => handleRemoveFromSavedList(item.id)}
-                      className="text-neutral-400 hover:text-red-500"
-                    >
-                      <X size={14} />
-                    </button>
-                  </div>
-                </div>
-              ))}
-
-              {savedOrders.length === 0 && (
-                <div className="text-center py-10 space-y-2">
-                  <span className="text-2xl block">🛒</span>
-                  <p className="text-xs text-neutral-400 font-bold uppercase">लिस्ट खाली है। Godown में जाकर सामान सेलेक्ट करें!</p>
+              {activeListId && (
+                <div className="border-t border-dashed border-neutral-200 dark:border-neutral-800 pt-3">
+                  {isEditingListName ? (
+                    <div className="flex items-center gap-1.5 w-full">
+                      <input 
+                        type="text" 
+                        value={tempListNameInput} 
+                        onChange={e => setTempListNameInput(e.target.value)}
+                        className={`flex-1 p-2 rounded-xl border text-xs font-bold ${isDarkMode ? 'bg-neutral-800 border-neutral-700 text-white' : 'bg-white border-neutral-200 text-neutral-900'}`}
+                        required
+                      />
+                      <button 
+                        onClick={() => {
+                          handleUpdateListName(tempListNameInput);
+                          setIsEditingListName(false);
+                        }}
+                        className="px-3.5 py-2 bg-green-600 text-white rounded-xl text-[10px] font-black uppercase tracking-wider"
+                      >
+                        Save
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <h2 className="text-xs font-black text-orange-600 uppercase tracking-widest leading-relaxed">
+                          {activeListName}
+                        </h2>
+                        <button 
+                          onClick={() => {
+                            setTempListNameInput(activeListName);
+                            setIsEditingListName(true);
+                          }}
+                          className="p-1 hover:bg-neutral-200 dark:hover:bg-neutral-800 rounded-lg text-neutral-400 hover:text-orange-500 transition-all"
+                          title="ऑर्डर लिस्ट का नाम बदलें"
+                        >
+                          <Edit size={12} />
+                        </button>
+                      </div>
+                      <span className="text-[8px] text-neutral-400 font-bold uppercase tracking-wide">
+                        {savedOrders.filter(o => o.listId === activeListId).length} Items listed
+                      </span>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
 
-            {savedOrders.length > 0 && (
-              <button 
-                onClick={handlePrintSavedList}
-                className="w-full py-4 bg-[#FF6B00] hover:bg-orange-600 text-white rounded-2xl font-black text-xs uppercase shadow-lg shadow-orange-500/20 flex items-center justify-center gap-2"
-              >
-                <Printer size={16} />
-                <span>Print Saved Order Sheet</span>
-              </button>
+            {/* List Table of Saved orders (Filtered by activeListId) */}
+            <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-1">
+              {savedOrders
+                .filter(item => item.listId === activeListId)
+                .map(item => (
+                  <div 
+                    key={item.id} 
+                    className={`p-3.5 rounded-2xl border flex justify-between items-center text-xs ${
+                      isDarkMode ? 'bg-[#181818] border-neutral-800' : 'bg-white border-neutral-100'
+                    }`}
+                  >
+                    <div className="flex-1 pr-3">
+                      <p className="font-bold text-sm text-[#FF6B00]">{item.name}</p>
+                      <p className="text-[9px] text-neutral-400 font-bold uppercase">
+                        Current Stock: {item.storeQty} {item.unit}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <input 
+                        type="text"
+                        placeholder="Qty भरें"
+                        value={item.orderQty || ""}
+                        onChange={(e) => handleUpdateOrderQty(item.id, e.target.value)}
+                        className="w-24 p-2 rounded-xl border text-center font-bold text-xs bg-transparent text-neutral-900 dark:text-white"
+                      />
+                      <span className="text-[10px] font-bold text-neutral-400 w-8">{item.unit}</span>
+                      <button 
+                        onClick={() => handleRemoveFromSavedList(item.id)}
+                        className="text-neutral-400 hover:text-red-500"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+
+              {savedOrders.filter(o => o.listId === activeListId).length === 0 && (
+                <div className="text-center py-10 space-y-2">
+                  <span className="text-2xl block">🛒</span>
+                  <p className="text-xs text-neutral-400 font-bold uppercase">लिस्ट खाली है या कोई लिस्ट एक्टिव नहीं है। Godown में जाकर सामान सेलेक्ट करें!</p>
+                </div>
+              )}
+            </div>
+
+            {savedOrders.filter(o => o.listId === activeListId).length > 0 && (
+              <div className="grid grid-cols-2 gap-2 pt-2">
+                <button 
+                  onClick={handlePrintSavedList}
+                  className="py-3.5 bg-neutral-800 hover:bg-neutral-900 text-white rounded-2xl font-black text-xs uppercase flex items-center justify-center gap-1.5 shadow"
+                >
+                  <Printer size={15} />
+                  <span>Print Sheet</span>
+                </button>
+                <button 
+                  onClick={handleWhatsAppShare}
+                  className="py-3.5 bg-green-600 hover:bg-green-700 text-white rounded-2xl font-black text-xs uppercase flex items-center justify-center gap-1.5 shadow"
+                >
+                  <MessageCircle size={15} />
+                  <span>Send WhatsApp</span>
+                </button>
+              </div>
             )}
           </div>
         )}
@@ -1129,6 +1275,84 @@ export default function BumBumCafeStockApp() {
                 </button>
               </div>
             </motion.form>
+          </div>
+        )}
+
+        {/* 5. OVERLAY/MODAL: CHOOSE OR CREATE MULTIPLE ORDER LIST ON MULTI-SAVE */}
+        {showSaveToListModal && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[110] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className={`w-full max-w-sm rounded-[2rem] p-6 space-y-4 border ${
+                isDarkMode ? 'bg-[#0F0F0F] border-neutral-800 text-white' : 'bg-white border-neutral-100 text-neutral-900'
+              }`}
+            >
+              <div className="flex justify-between items-center border-b pb-2.5">
+                <div>
+                  <h3 className="text-xs font-black uppercase text-orange-500">Save Selected Items</h3>
+                  <p className="text-[9px] text-neutral-400 font-bold uppercase mt-0.5">ऑर्डर लिस्ट चुनें या नई लिस्ट बनाएं</p>
+                </div>
+                <button 
+                  type="button" 
+                  onClick={() => setShowSaveToListModal(false)} 
+                  className="p-1.5 bg-neutral-100 dark:bg-neutral-800 rounded-xl"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+
+              <div className="space-y-3.5 text-xs">
+                
+                {/* Dynamic List Selection Dropdown */}
+                <div className="space-y-1">
+                  <label className="text-[9px] text-neutral-400 font-bold uppercase">Select Existing List (मौजूदा लिस्ट चुनें)</label>
+                  <select
+                    value={targetListId}
+                    onChange={e => setTargetListId(e.target.value)}
+                    className={`w-full p-2.5 rounded-xl border font-bold ${
+                      isDarkMode ? 'bg-neutral-900 border-neutral-800 text-white' : 'bg-white border-neutral-200 text-neutral-900'
+                    }`}
+                  >
+                    {orderLists.map(list => (
+                      <option key={list.id} value={list.id}>{list.name}</option>
+                    ))}
+                    <option value="CREATE_NEW">-- + CREATE NEW LIST (नई लिस्ट बनाएं) --</option>
+                  </select>
+                </div>
+
+                {/* Conditional Text Input if "Create New" is selected */}
+                {targetListId === "CREATE_NEW" && (
+                  <motion.div 
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="space-y-1"
+                  >
+                    <label className="text-[9px] text-neutral-400 font-bold uppercase">New List Name (नई लिस्ट का नाम)</label>
+                    <input 
+                      type="text"
+                      placeholder="जैसे: DAIRY ORDER JULY"
+                      value={newListNameInput}
+                      onChange={e => setNewListNameInput(e.target.value)}
+                      className={`w-full p-2.5 rounded-xl border font-bold uppercase ${
+                        isDarkMode ? 'bg-neutral-950 border-neutral-800 text-white' : 'bg-white border-neutral-200 text-neutral-900'
+                      }`}
+                      required
+                    />
+                  </motion.div>
+                )}
+              </div>
+
+              <div className="pt-2">
+                <button
+                  onClick={handleConfirmSaveToList}
+                  className="w-full py-3 bg-[#FF6B00] hover:bg-orange-600 text-white rounded-xl font-bold text-xs uppercase shadow-lg shadow-orange-500/10"
+                >
+                  Confirm & Save (सहेजें) ➔
+                </button>
+              </div>
+            </motion.div>
           </div>
         )}
 
