@@ -50,6 +50,14 @@ interface SavedOrderItem {
   orderQty: string;
 }
 
+interface ScannedItem {
+  id: string;
+  name: string;
+  qty: number;
+  unit: string;
+  price: number;
+}
+
 const triggerHaptic = (ms = 35) => {
   if (typeof window !== 'undefined' && window.navigator && window.navigator.vibrate) {
     window.navigator.vibrate(ms);
@@ -70,7 +78,7 @@ export default function BumBumCafeStockApp() {
   const [activeTab, setActiveTab] = useState<'home' | 'store' | 'saved_list' | 'waste'>('home');
   const [isDarkMode, setIsDarkMode] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>("");
-  const [editedQties, setEditedQties] = useState<Record<string, number>>({});
+  const [editedQties, setEditedQties] = useState<Record<string, string | number>>({});
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
 
   // Print/Selection States
@@ -89,7 +97,7 @@ export default function BumBumCafeStockApp() {
 
   // Scanner States
   const [scannerActive, setScannerActive] = useState<boolean>(false);
-  const [scannedItemsToVerify, setScannedItemsToVerify] = useState<any[]>([]);
+  const [scannedItemsToVerify, setScannedItemsToVerify] = useState<ScannedItem[]>([]);
   const [isScannerProcessing, setIsScannerProcessing] = useState<boolean>(false);
   const [manualBarcodeInput, setManualBarcodeInput] = useState<string>("");
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -119,32 +127,56 @@ export default function BumBumCafeStockApp() {
     setTimeout(() => setToast(null), 3000);
   };
 
-  // Sync with Firestore
+  // Keep inventory reference updated to prevent stale closures in Scanner
+  const inventoryRef = useRef<InventoryItem[]>(inventory);
+  useEffect(() => {
+    inventoryRef.current = inventory;
+  }, [inventory]);
+
+  // Static Listeners (Loads once to reduce reads)
   useEffect(() => {
     const unsubInventory = onSnapshot(collection(db, "godown_inventory"), (snap) => {
-      if (!snap.empty) setInventory(snap.docs.map(d => ({ id: d.id, ...d.data() } as InventoryItem)));
+      setInventory(snap.docs.map(d => ({ id: d.id, ...d.data() } as InventoryItem)));
     });
     const unsubStockOuts = onSnapshot(query(collection(db, "stock_out_history"), orderBy("date", "desc")), (snap) => {
-      if (!snap.empty) setStockOutHistory(snap.docs.map(d => ({ id: d.id, ...d.data() } as StockOutLog)));
+      setStockOutHistory(snap.docs.map(d => ({ id: d.id, ...d.data() } as StockOutLog)));
     });
     const unsubSavedOrders = onSnapshot(collection(db, "saved_orders"), (snap) => {
       setSavedOrders(snap.docs.map(d => ({ id: d.id, ...d.data() } as SavedOrderItem)));
     });
+    return () => {
+      unsubInventory();
+      unsubStockOuts();
+      unsubSavedOrders();
+    };
+  }, []);
+
+  // Dynamic order lists synchronization and active selection logic
+  useEffect(() => {
     const unsubOrderLists = onSnapshot(collection(db, "order_lists"), (snap) => {
-      if (!snap.empty) {
-        const lists = snap.docs.map(d => ({ id: d.id, ...d.data() } as OrderListMeta));
-        setOrderLists(lists);
-        // Auto set active list if none selected
-        if (!activeListId && lists.length > 0) {
+      const lists = snap.docs.map(d => ({ id: d.id, ...d.data() } as OrderListMeta));
+      setOrderLists(lists);
+      if (lists.length > 0) {
+        if (!activeListId || !lists.some(l => l.id === activeListId)) {
           setActiveListId(lists[0].id);
         }
       } else {
-        // Fallback default list
-        setOrderLists([]);
+        setActiveListId("");
       }
     });
-    return () => { unsubInventory(); unsubStockOuts(); unsubSavedOrders(); unsubOrderLists(); };
+    return () => unsubOrderLists();
   }, [activeListId]);
+
+  // Handle default selection in Order List modal
+  useEffect(() => {
+    if (showSaveToListModal && !targetListId) {
+      if (orderLists.length > 0) {
+        setTargetListId(activeListId || orderLists[0].id);
+      } else {
+        setTargetListId("CREATE_NEW");
+      }
+    }
+  }, [showSaveToListModal, orderLists, activeListId, targetListId]);
 
   // Live native browser Barcode detection loop
   useEffect(() => {
@@ -208,7 +240,7 @@ export default function BumBumCafeStockApp() {
   // Process manual or scanned barcode
   const handleDetectedBarcode = (code: string) => {
     triggerHaptic(80);
-    const foundItem = inventory.find(i => i.barcode === code);
+    const foundItem = inventoryRef.current.find(i => i.barcode === code);
     if (foundItem) {
       setScannedItemsToVerify([{
         id: foundItem.id,
@@ -225,6 +257,10 @@ export default function BumBumCafeStockApp() {
 
   // Demo Scan for unsupported devices
   const simulateBarcodeScan = () => {
+    if (inventory.length === 0) {
+      toastMessage("गोदाम में कोई सामान उपलब्ध नहीं है!", "error");
+      return;
+    }
     setIsScannerProcessing(true);
     setTimeout(() => {
       setIsScannerProcessing(false);
@@ -251,13 +287,19 @@ export default function BumBumCafeStockApp() {
     triggerHaptic();
     const item = inventory.find(i => i.id === id);
     if (!item) return;
-    const current = editedQties[id] !== undefined ? editedQties[id] : item.storeQty;
-    setEditedQties(prev => ({ ...prev, [id]: Math.max(0, current + diff) }));
+    const currentVal = editedQties[id] !== undefined ? editedQties[id] : item.storeQty;
+    const currentNum = typeof currentVal === 'string' ? (parseFloat(currentVal) || 0) : currentVal;
+    setEditedQties(prev => ({ ...prev, [id]: Math.max(0, currentNum + diff) }));
   };
 
   const saveQty = async (id: string) => {
-    const updated = editedQties[id];
-    if (updated === undefined) return;
+    const rawVal = editedQties[id];
+    if (rawVal === undefined) return;
+    const updated = typeof rawVal === 'string' ? parseFloat(rawVal) : rawVal;
+    if (isNaN(updated)) {
+      toastMessage("कृपया सही संख्या दर्ज करें।", "error");
+      return;
+    }
     try {
       await setDoc(doc(db, "godown_inventory", id), { storeQty: updated }, { merge: true });
       setEditedQties(prev => { const copy = { ...prev }; delete copy[id]; return copy; });
@@ -439,11 +481,21 @@ export default function BumBumCafeStockApp() {
   // Submit Wastage Log
   const handleWasteSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formStockOut.item || !formStockOut.quantity) return;
+    if (!formStockOut.item || !formStockOut.quantity) {
+      toastMessage("कृपया सभी फ़ील्ड भरें!", "error");
+      return;
+    }
 
     const qtyNum = parseFloat(formStockOut.quantity);
+    if (isNaN(qtyNum) || qtyNum <= 0) {
+      toastMessage("कृपया सही मात्रा दर्ज करें!", "error");
+      return;
+    }
+
     const item = inventory.find(i => i.id === formStockOut.item);
-    if (!item || item.storeQty < qtyNum) {
+    if (!item) return;
+
+    if (item.storeQty < qtyNum) {
       toastMessage("स्टॉक में पर्याप्त मात्रा नहीं है!", "error");
       return;
     }
@@ -657,7 +709,6 @@ export default function BumBumCafeStockApp() {
                     onClick={() => {
                       triggerHaptic();
                       setShowSaveToListModal(true);
-                      setTargetListId(activeListId || (orderLists[0]?.id || ""));
                     }}
                     className="px-4 py-2 bg-white text-orange-600 font-black text-xs uppercase rounded-xl shadow-lg shadow-orange-950/20 active:scale-95 transition-all"
                   >
@@ -672,7 +723,7 @@ export default function BumBumCafeStockApp() {
               {filteredInventory.map(item => {
                 const isSelected = selectedItemIds.includes(item.id);
                 const displayQty = editedQties[item.id] !== undefined ? editedQties[item.id] : item.storeQty;
-                const isDirty = editedQties[item.id] !== undefined && editedQties[item.id] !== item.storeQty;
+                const isDirty = editedQties[item.id] !== undefined && parseFloat(editedQties[item.id] as string) !== item.storeQty;
 
                 return (
                   <div 
@@ -721,8 +772,8 @@ export default function BumBumCafeStockApp() {
                           value={displayQty}
                           onClick={e => e.stopPropagation()}
                           onChange={(e) => {
-                            const val = parseFloat(e.target.value);
-                            setEditedQties(prev => ({ ...prev, [item.id]: isNaN(val) ? 0 : val }));
+                            const val = e.target.value;
+                            setEditedQties(prev => ({ ...prev, [item.id]: val }));
                           }}
                           className="w-12 text-center text-xs font-bold border border-neutral-200 dark:bg-neutral-800 dark:border-neutral-700 rounded p-1"
                         />
@@ -733,7 +784,7 @@ export default function BumBumCafeStockApp() {
 
                       <div className="flex gap-1">
                         <button 
-                          onClick={(e) => { e.stopPropagation(); setEditedQties(prev => ({ ...prev, [item.id]: 0 })); toastMessage("0 सेट किया गया!", "info"); }}
+                          onClick={(e) => { e.stopPropagation(); setEditedQties(prev => ({ ...prev, [item.id]: "0" })); toastMessage("0 सेट किया गया!", "info"); }}
                           className="px-2 py-1 bg-red-100 dark:bg-red-500/10 text-red-500 text-[10px] font-bold rounded-lg"
                         >
                           🗑️ 0 करें
@@ -960,7 +1011,7 @@ export default function BumBumCafeStockApp() {
 
         {/* 1. REAL AI BARCODE SCANNER CONTAINER */}
         {scannerActive && (
-          <div className="fixed inset-0 bg-black z-50 flex flex-col justify-between p-4 text-white">
+          <div className="fixed inset-0 bg-black z-[150] flex flex-col justify-between p-4 text-white">
             <div className="flex justify-between items-center border-b border-neutral-800 pb-3">
               <div>
                 <p className="text-xs font-black uppercase text-orange-500">📷 Smart AI Scanner</p>
