@@ -323,7 +323,7 @@ export default function BumBumCafeStockApp() {
     }
   };
 
-  // Safe deletion validation wrapper
+  // Safe deletion validation wrapper [2]
   const confirmDeleteWithPin = (message: string, actionToExecute: () => void) => {
     setDeleteConfirmation({
       message,
@@ -646,7 +646,7 @@ export default function BumBumCafeStockApp() {
     }
   };
 
-  // PIN Protected Category Removal
+  // PIN Protected Category Removal [2]
   const handleRemoveCategory = (cat: CategoryItem) => {
     confirmDeleteWithPin(`क्या आप सच में "${cat.name}" कैटेगरी को हटाना चाहते हैं?`, async () => {
       try {
@@ -768,7 +768,7 @@ export default function BumBumCafeStockApp() {
     }
   };
 
-  // PIN Protected single saved item deletion
+  // PIN Protected single saved item deletion [2]
   const handleRemoveFromSavedList = (compoundId: string, name: string) => {
     triggerHaptic();
     confirmDeleteWithPin(`क्या आप इस लिस्ट आइटम "${name}" को हटाना चाहते हैं?`, async () => {
@@ -781,7 +781,7 @@ export default function BumBumCafeStockApp() {
     });
   };
 
-  // PIN Protected complete list deletion
+  // PIN Protected complete list deletion [2]
   const handleDeleteActiveList = () => {
     triggerHaptic();
     if (!activeListId) return;
@@ -803,7 +803,7 @@ export default function BumBumCafeStockApp() {
     });
   };
 
-  // Add Product Submit (With strict duplication checks)
+  // Add Product Submit (With strict duplication checks) [2]
   const handleAddProductSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formAddProduct.name) {
@@ -812,7 +812,7 @@ export default function BumBumCafeStockApp() {
     }
 
     const cleanName = formAddProduct.name.toUpperCase().trim();
-    // No Duplicates allowed between Godown Stock and Fixed Assets
+    // No Duplicates allowed between Godown Stock and Fixed Assets [2]
     const existsInInventory = inventory.some(i => i.name.toUpperCase().trim() === cleanName);
     const existsInAssets = fixedAssets.some(a => a.name.toUpperCase().trim() === cleanName);
     if (existsInInventory || existsInAssets) {
@@ -856,7 +856,7 @@ export default function BumBumCafeStockApp() {
     }
   };
 
-  // Add Fixed Asset Submit (With strict duplication checks)
+  // Add Fixed Asset Submit (With strict duplication checks) [2]
   const handleAddAssetSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formAddAsset.name) {
@@ -865,7 +865,7 @@ export default function BumBumCafeStockApp() {
     }
 
     const cleanName = formAddAsset.name.toUpperCase().trim();
-    // No Duplicates allowed between Godown Stock and Fixed Assets
+    // No Duplicates allowed between Godown Stock and Fixed Assets [2]
     const existsInInventory = inventory.some(i => i.name.toUpperCase().trim() === cleanName);
     const existsInAssets = fixedAssets.some(a => a.name.toUpperCase().trim() === cleanName);
     if (existsInInventory || existsInAssets) {
@@ -894,7 +894,7 @@ export default function BumBumCafeStockApp() {
     }
   };
 
-  // PIN Protected Asset Deletion
+  // PIN Protected Asset Deletion [2]
   const handleDeleteAsset = (id: string, name: string) => {
     triggerHaptic();
     confirmDeleteWithPin(`क्या आप इस एसेट "${name}" को डिलीट करना चाहते हैं?`, async () => {
@@ -907,7 +907,7 @@ export default function BumBumCafeStockApp() {
     });
   };
 
-  // Edit Product Submit with Duplication check
+  // Edit Product Submit with Duplication check [2]
   const handleEditProductSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingProduct) return;
@@ -916,7 +916,7 @@ export default function BumBumCafeStockApp() {
     const existsInInventory = inventory.some(i => i.id !== editingProduct.id && i.name.toUpperCase().trim() === cleanName);
     const existsInAssets = fixedAssets.some(a => a.name.toUpperCase().trim() === cleanName);
     if (existsInInventory || existsInAssets) {
-      toastMessage("यह नाम पहले से अन्य किसी सामान या स्थिर संपत्ति में मौजूद है!", "error");
+      toastMessage("यह नाम पहले से अन्य किसी सामान या स्थिर एसेट में मौजूद है!", "error");
       triggerHaptic(65);
       return;
     }
@@ -930,7 +930,7 @@ export default function BumBumCafeStockApp() {
     }
   };
 
-  // PIN Protected Inventory Product Deletion
+  // PIN Protected Inventory Product Deletion [2]
   const handleDeleteProduct = (id: string, name: string) => {
     triggerHaptic();
     confirmDeleteWithPin(`क्या आप सच में इस आइटम "${name}" को हमेशा के लिए डिलीट करना चाहते हैं? इससे सभी संबंधित ऑर्डर्स भी डिलीट हो जायेंगे।`, async () => {
@@ -1067,7 +1067,7 @@ export default function BumBumCafeStockApp() {
     return list ? list.name : "BUM BUM CAFE ORDER SHEET";
   }, [orderLists, activeListId]);
 
-  // Lockscreen Screen overlay if NOT Authenticated
+  // Lockscreen Screen overlay if NOT Authenticated [2]
   if (!currentUser) {
     return (
       <div className={`min-h-screen flex items-center justify-center p-4 ${isDarkMode ? 'bg-black text-white' : 'bg-neutral-50 text-neutral-900'}`}>
