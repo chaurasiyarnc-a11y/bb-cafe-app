@@ -1459,7 +1459,7 @@ export default function BumBumCafeStockApp() {
           </div>
         )}
 
-        {/* ==================== TAB 4: ORDER TO SUPPLIER (SUPPLIER SHEET) ==================== */}
+        {/* ==================== TAB 4: ORDER TO SUPPLIER ==================== */}
         {activeTab === 'saved_list' && (
           <div className="space-y-4">
             
@@ -2176,7 +2176,7 @@ export default function BumBumCafeStockApp() {
                     value={bulkTargetCategory}
                     onChange={e => setBulkTargetCategory(e.target.value)}
                     className={`w-full p-2.5 rounded-xl border font-bold ${
-                      isDarkMode ? 'bg-neutral-900 border-neutral-800 text-white' : 'bg-white border-neutral-200 text-neutral-900'
+                      isDarkMode ? 'bg-neutral-950 border-neutral-800 text-white' : 'bg-white border-neutral-200 text-neutral-900'
                     }`}
                   >
                     <option value="">-- चुनें --</option>
@@ -2308,7 +2308,7 @@ export default function BumBumCafeStockApp() {
           </div>
         )}
 
-        {/* 9. SUPPLIER ORDER MODAL (MISSING POPUP SAVED TO LIST) */}
+        {/* 9. SUPPLIER ORDER MODAL */}
         {showSaveToListModal && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[110] flex items-center justify-center p-4">
             <motion.div 
@@ -2408,3 +2408,4 @@ export default function BumBumCafeStockApp() {
     </div>
   );
 }
+
