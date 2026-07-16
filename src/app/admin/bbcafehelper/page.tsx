@@ -771,7 +771,7 @@ export default function BumBumCafeStockApp() {
                 <div className="bg-orange-600 text-white rounded-2xl p-3.5 shadow-2xl flex items-center justify-between border border-orange-400/30">
                   <div>
                     <p className="text-xs font-black">{selectedItemIds.length} Items Selected</p>
-                    <p className="text-[9px] text-orange-100 font-bold uppercase tracking-wider">ऑर्डर लिस्ट टैब में भेजें</p>
+                    <p className="text-[9px] text-orange-100 font-bold uppercase tracking-wider">सप्लायर आर्डर लिस्ट टैब में भेजें</p>
                   </div>
                   <button 
                     onClick={() => {
@@ -780,7 +780,7 @@ export default function BumBumCafeStockApp() {
                     }}
                     className="px-4 py-2 bg-white text-orange-600 font-black text-xs uppercase rounded-xl shadow-lg shadow-orange-950/20 active:scale-95 transition-all"
                   >
-                    Save to Order Tab ➔
+                    Save to Supplier Order ➔
                   </button>
                 </div>
               </div>
@@ -874,7 +874,7 @@ export default function BumBumCafeStockApp() {
           </div>
         )}
 
-        {/* ==================== TAB 3: SAVED ORDER LISTS (DYNAMIC MULTI-LISTS TAB) ==================== */}
+        {/* ==================== TAB 3: ORDER TO SUPPLIER (DYNAMIC MULTI-LISTS TAB) ==================== */}
         {activeTab === 'saved_list' && (
           <div className="space-y-4">
             
@@ -1557,7 +1557,7 @@ export default function BumBumCafeStockApp() {
             <Store size={15} /> <span className="mt-0.5">Godown</span>
           </button>
           <button onClick={() => { setActiveTab('saved_list'); setIsMultiSelectMode(false); }} className={`flex flex-col items-center justify-center py-1 ${activeTab === 'saved_list' ? 'text-[#FF6B00]' : 'text-neutral-400'}`}>
-            <Layers size={15} /> <span className="mt-0.5">Saved List</span>
+            <Layers size={15} /> <span className="mt-0.5">Order to Supplier</span>
           </button>
           <button onClick={() => { setActiveTab('waste'); setIsMultiSelectMode(false); }} className={`flex flex-col items-center justify-center py-1 ${activeTab === 'waste' ? 'text-[#FF6B00]' : 'text-neutral-400'}`}>
             <AlertTriangle size={15} /> <span className="mt-0.5">Wastage Logs</span>
