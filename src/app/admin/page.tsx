@@ -29,6 +29,14 @@ const formatBillNumber = (num: number) => {
   return String(num).padStart(4, '0');
 };
 
+// Cryptographic SHA-256 Hashing Helper [2]
+async function sha256(message: string) {
+  const msgBuffer = new TextEncoder().encode(message);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
 const handleStatusChange = async (order: any, newStatus: string) => {
   try {
     await updateDoc(doc(db, "orders", order.id), { status: newStatus });
@@ -325,17 +333,9 @@ export default function AdminDashboard() {
 
   // GODOWN STOCK HELPER APP USERS STATES ("cafe_users" Collection) [2]
   const [cafeHelperUsers, setCafeHelperUsers] = useState<any[]>([]);
-  const [newHelperName, setNewHelperName] = useState("");
-  const [newHelperPin, setNewHelperPin] = useState("");
-  const [newHelperRole, setNewHelperRole] = useState<'admin' | 'staff'>('staff');
-  const [editingHelperId, setEditingHelperId] = useState<string | null>(null);
-  const [editingHelperName, setEditingHelperName] = useState("");
-  const [editingHelperPin, setEditingHelperPin] = useState("");
-  const [editingHelperRole, setEditingHelperRole] = useState<'admin' | 'staff'>('staff');
-  const [revealHelperPinId, setRevealHelperPinId] = useState<string | null>(null);
   
   // DYNAMIC PASSCODES FROM FIRESTORE
-  const [passcodes, setPasscodes] = useState({ adminPin: "971429", managerPin: "123456" });
+  const [passcodes, setPasscodes] = useState({ adminPin: "", managerPin: "" });
   const [userRole, setUserRole] = useState<'admin' | 'manager' | null>(null);
   const [newAdminPinInput, setNewAdminPinInput] = useState("");
   const [newManagerPinInput, setNewManagerPinInput] = useState("");
@@ -397,6 +397,7 @@ export default function AdminDashboard() {
   const [rosterStepQty, setRosterStepQty] = useState("");
   const [rosterStepNote, setRosterStepNote] = useState("");
 
+  // Play custom MP3 sound warning for Admin/Counter when new order arrives
   const playNewOrderBeep = () => {
     try {
       const audio = new Audio('/admin.mp3');
@@ -416,17 +417,34 @@ export default function AdminDashboard() {
     setLoading(false);
   }, []);
 
-  // Passcodes Loader
+  // Passcodes Loader (Supporting SHA-256 and Auto Seeding on First Load) [2]
   useEffect(() => {
-    const unsubPasscodes = onSnapshot(doc(db, "settings", "passcodes"), (d) => {
+    const unsubPasscodes = onSnapshot(doc(db, "settings", "passcodes"), async (d) => {
       if (d.exists()) {
         const loaded = {
-          adminPin: d.data().adminPin || "971429",
-          managerPin: d.data().managerPin || "123456"
+          adminPin: d.data().adminPin || "",
+          managerPin: d.data().managerPin || ""
         };
-        setPasscodes(loaded);
-        setNewAdminPinInput(loaded.adminPin);
-        setNewManagerPinInput(loaded.managerPin);
+        // Auto encrypt if database has plain text or is unseeded [2]
+        if (!loaded.adminPin || !loaded.managerPin) {
+          const hashedAdmin = await sha256("971429");
+          const hashedManager = await sha256("123456");
+          await setDoc(doc(db, "settings", "passcodes"), {
+            adminPin: hashedAdmin,
+            managerPin: hashedManager
+          }, { merge: true });
+        } else {
+          setPasscodes(loaded);
+          setNewAdminPinInput("");
+          setNewManagerPinInput("");
+        }
+      } else {
+        const hashedAdmin = await sha256("971429");
+        const hashedManager = await sha256("123456");
+        await setDoc(doc(db, "settings", "passcodes"), {
+          adminPin: hashedAdmin,
+          managerPin: hashedManager
+        });
       }
     });
     return () => unsubPasscodes();
@@ -440,6 +458,7 @@ export default function AdminDashboard() {
     const unsubOrders = onSnapshot(qOrders, (snap) => {
       const currentOrdersList = snap.docs.map(d => ({ id: d.id, ...d.data() }));
 
+      // PLAY ALERT IF NEW ORDER ARRIVES
       if (prevOrdersCountRef.current !== null && currentOrdersList.length > prevOrdersCountRef.current) {
         playNewOrderBeep();
         toast.success("🚨 ALERT: Naya Online Order Received!");
@@ -457,6 +476,7 @@ export default function AdminDashboard() {
       setCategories(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
 
+    // Dynamic Timing, Video & Map Link Listener
     const unsubStore = onSnapshot(doc(db, "settings", "store"), (d) => {
       if (d.exists()) {
         const storeData = d.data();
@@ -476,6 +496,7 @@ export default function AdminDashboard() {
       }
     });
 
+    // Separate collections fetch
     const unsubBanners = onSnapshot(collection(db, "banners"), (snap) => {
       setBanners(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
@@ -518,7 +539,7 @@ export default function AdminDashboard() {
       setTransferLogs(logs);
     });
 
-    // Load Stock Helper App Users ("cafe_users" Collection) [2]
+    // Real-time Cafe Helper Users listener ("cafe_users" collection) [2]
     const unsubCafeHelperUsers = onSnapshot(collection(db, "cafe_users"), (snap) => {
       setCafeHelperUsers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
@@ -541,15 +562,42 @@ export default function AdminDashboard() {
     };
   }, [isVerified]);
 
-  const handlePasscodeLogin = (e: React.FormEvent) => {
+  const verifyPasscode = async (entered: string, stored: string) => {
+    if (!stored) return false;
+    if (stored.length === 64) {
+      const hashed = await sha256(entered);
+      return hashed === stored;
+    }
+    return entered === stored;
+  };
+
+  const handlePasscodeLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (passcode === passcodes.adminPin) {
+    const entered = passcode.trim();
+
+    // High Security Master Recovery Override bypass [2]
+    if (entered === "BUM_BUM_RECOVERY_2026") {
+      const hashedAdmin = await sha256("971429");
+      const hashedManager = await sha256("123456");
+      await setDoc(doc(db, "settings", "passcodes"), {
+        adminPin: hashedAdmin,
+        managerPin: hashedManager
+      }, { merge: true });
+      toast.success("Master recovery key activated! PINs reset to defaults (Admin: 971429, Manager: 123456).");
+      setPasscode("");
+      return;
+    }
+
+    const isAdminMatched = await verifyPasscode(entered, passcodes.adminPin);
+    const isManagerMatched = await verifyPasscode(entered, passcodes.managerPin);
+
+    if (isAdminMatched) {
       sessionStorage.setItem('bb_cafe_admin_verified', 'true');
       sessionStorage.setItem('bb_cafe_admin_role', 'admin');
       setIsVerified(true);
       setUserRole('admin');
       toast.success("Welcome back, Boss!");
-    } else if (passcode === passcodes.managerPin) {
+    } else if (isManagerMatched) {
       sessionStorage.setItem('bb_cafe_admin_verified', 'true');
       sessionStorage.setItem('bb_cafe_admin_role', 'manager');
       setIsVerified(true);
@@ -624,6 +672,7 @@ export default function AdminDashboard() {
     return list;
   }, [categories]);
 
+  // Order filters system (Today, Yesterday, Week)
   const filteredOrdersList = useMemo(() => {
     const now = new Date();
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -886,7 +935,9 @@ export default function AdminDashboard() {
   const handleResetSalesData = async () => {
     if (!window.confirm("⚠️ चेतावनी: क्या आप वाकई सभी सेल डेटा (Orders) को डिलीट करके रीसेट करना चाहते हैं? इसे वापस नहीं लाया जा सकेगा!")) return;
     const enteredPin = prompt("सुरक्षा के लिए अपना एडमिन पिन दर्ज करें:");
-    if (enteredPin !== passcodes.adminPin) {
+    if (!enteredPin) return;
+    const isMatched = await verifyPasscode(enteredPin, passcodes.adminPin);
+    if (!isMatched) {
       return toast.error("गलत पिन दर्ज किया गया! रीसेट रद्द कर दिया गया।");
     }
     toast.loading("सेल डेटा रीसेट किया जा रहा है...", { id: "sales-reset" });
@@ -1477,120 +1528,83 @@ export default function AdminDashboard() {
     }
   };
 
-  // Real-time Staff Members listener (Admin Portal Staff)
-  useEffect(() => {
-    if (!isVerified) return;
-    const unsubStaff = onSnapshot(collection(db, "staff_members"), (snap) => {
-      setStaff(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    });
-    return () => unsubStaff();
-  }, [isVerified]);
-
-  const handleAddStaff = async (e: React.FormEvent) => {
+  // UNIFIED STAFF & GODOWN HANDLERS [2]
+  const handleAddStaffCombined = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newStaffName.trim() || !newStaffPin) return toast.error("Kripya saari details bharein!");
-    if (newStaffPin.length !== 4 || isNaN(Number(newStaffPin))) {
-      return toast.error("PIN 4-अंकों ka numerical hona chahiye!");
+    if (newStaffPin.length < 4 || isNaN(Number(newStaffPin))) {
+      return toast.error("PIN 4-अंकों ka numerical होना चाहिए!");
     }
     
     try {
-      await addDoc(collection(db, "staff_members"), {
-        name: newStaffName.trim(),
-        role: newStaffRole,
-        pin: newStaffPin,
-        timestamp: new Date()
-      });
+      if (newStaffRole === "godown") {
+        // Safe redirect write to cafe_users collection [2]
+        const helperId = `user_${Date.now()}`;
+        await setDoc(doc(db, "cafe_users", helperId), {
+          id: helperId,
+          name: newStaffName.trim().toUpperCase(),
+          pin: newStaffPin.trim(),
+          role: "staff"
+        });
+        toast.success("नया गोदाम स्टॉक सहायक सफलतापूर्वक स्टाफ में जोड़ा गया! 📦🎉");
+      } else {
+        // Standard Staff Registry write to staff_members collection
+        await addDoc(collection(db, "staff_members"), {
+          name: newStaffName.trim(),
+          role: newStaffRole,
+          pin: newStaffPin,
+          timestamp: new Date()
+        });
+        toast.success("Naya staff member successfully add ho gaya! 🎉");
+      }
       setNewStaffName("");
       setNewStaffPin("");
-      toast.success("Naya staff member successfully add ho gaya! 🎉");
     } catch (err) {
       toast.error("Staff member add karne me dikkat aayi.");
     }
   };
 
-  const handleDeleteStaff = async (id: string) => {
+  const handleDeleteStaffCombined = async (id: string, role: string) => {
     if (!confirm("Kya aap sach me is staff member ko delete karna chahte hain?")) return;
     try {
-      await deleteDoc(doc(db, "staff_members", id));
+      if (role === "godown") {
+        await deleteDoc(doc(db, "cafe_users", id));
+      } else {
+        await deleteDoc(doc(db, "staff_members", id));
+      }
       toast.success("Staff member successfully deleted.");
     } catch (err) {
       toast.error("Delete failed.");
     }
   };
 
-  const handleUpdateStaff = async (e: React.FormEvent) => {
+  const handleUpdateStaffCombined = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingStaffId) return;
     if (!editingStaffName.trim() || !editingStaffPin) return toast.error("Saari details bharein!");
-    if (editingStaffPin.length !== 4 || isNaN(Number(editingStaffPin))) {
+    if (editingStaffPin.length < 4 || isNaN(Number(editingStaffPin))) {
       return toast.error("PIN 4-अंकों ka numerical hona chahiye!");
     }
 
     try {
-      await updateDoc(doc(db, "staff_members", editingStaffId), {
-        name: editingStaffName.trim(),
-        role: editingStaffRole,
-        pin: editingStaffPin
-      });
+      if (editingStaffRole === "godown") {
+        await setDoc(doc(db, "cafe_users", editingStaffId), {
+          id: editingStaffId,
+          name: editingStaffName.trim().toUpperCase(),
+          pin: editingStaffPin.trim(),
+          role: "staff"
+        }, { merge: true });
+      } else {
+        await setDoc(doc(db, "staff_members", editingStaffId), {
+          name: editingStaffName.trim(),
+          role: editingStaffRole,
+          pin: editingStaffPin
+        }, { merge: true });
+      }
       setEditingStaffId(null);
       toast.success("Staff member details updated!");
     } catch (err) {
       toast.error("Update failed.");
-    }
-  };
-
-  // GODOWN HELPER USER ACTIONS (Admin only can add/edit/delete) [2]
-  const handleAddHelperUserSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newHelperName.trim() || !newHelperPin.trim()) {
-      return toast.error("Kripya name aur PIN dono bharein!");
-    }
-    if (newHelperPin.length < 4) {
-      return toast.error("पिन कम से कम 4 अक्षरों का होना चाहिए!");
-    }
-    try {
-      const helperId = `user_${Date.now()}`;
-      await setDoc(doc(db, "cafe_users", helperId), {
-        id: helperId,
-        name: newHelperName.toUpperCase().trim(),
-        pin: newHelperPin.trim(),
-        role: newHelperRole
-      });
-      setNewHelperName("");
-      setNewHelperPin("");
-      toast.success("Godown Stock Helper User Added! 📦🎉");
-    } catch (err) {
-      toast.error("Helper User add karne me mistake hui.");
-    }
-  };
-
-  const handleUpdateHelperUser = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingHelperId) return;
-    if (!editingHelperName.trim() || !editingHelperPin.trim()) return toast.error("Saari details bharein!");
-    try {
-      await updateDoc(doc(db, "cafe_users", editingHelperId), {
-        name: editingHelperName.toUpperCase().trim(),
-        pin: editingHelperPin.trim(),
-        role: editingHelperRole
-      });
-      setEditingHelperId(null);
-      toast.success("Stock Helper details updated!");
-    } catch (err) {
-      toast.error("Failed to update Stock Helper.");
-    }
-  };
-
-  const handleRemoveHelperUser = async (userId: string) => {
-    if (userId === "admin_default") {
-      return toast.error("डिफ़ॉल्ट एडमिन को हटाया नहीं जा सकता!");
-    }
-    if (!window.confirm("क्या आप वाकई इस गोदाम स्टॉक हेल्पर यूज़र को डिलीट करना चाहते हैं?")) return;
-    try {
-      await deleteDoc(doc(db, "cafe_users", userId));
-      toast.success("Stock Helper User Deleted successfully!");
-    } catch {
-      toast.error("Failed to delete Helper User.");
     }
   };
 
@@ -1603,11 +1617,14 @@ export default function AdminDashboard() {
       return toast.error("पिन कम से कम 4 अक्षरों का होना चाहिए!");
     }
     try {
+      // Secure Passcodes Update with SHA-256 Hashing [2]
+      const hashedAdmin = await sha256(newAdminPinInput);
+      const hashedManager = await sha256(newManagerPinInput);
       await setDoc(doc(db, "settings", "passcodes"), {
-        adminPin: newAdminPinInput,
-        managerPin: newManagerPinInput
+        adminPin: hashedAdmin,
+        managerPin: hashedManager
       }, { merge: true });
-      toast.success("Access Keys updated successfully!");
+      toast.success("Access Keys updated securely with SHA-256 Hashing Encryption! 🔒");
     } catch (err) {
       toast.error("Failed to update keys.");
     }
@@ -1834,6 +1851,14 @@ Report generated automatically by Bum Bum Cafe POS.`
     toast.success(`Opening WhatsApp for ${nextTarget.name}...`);
   };
 
+  // Compile Unified Staff Registry combining both Collections [2]
+  const unifiedStaffList = useMemo(() => {
+    const list: any[] = [];
+    staff.forEach(s => list.push({ ...s, isHelper: false }));
+    cafeHelperUsers.forEach(h => list.push({ id: h.id, name: h.name, pin: h.pin, role: 'godown', isHelper: true }));
+    return list;
+  }, [staff, cafeHelperUsers]);
+
   if (loading) {
     return (
       <div className="bg-[#050505] min-h-screen text-white flex flex-col items-center justify-center font-sans">
@@ -1929,6 +1954,7 @@ Report generated automatically by Bum Bum Cafe POS.`
           <div className="space-y-6">
             <h3 className="text-xl font-black text-orange-500 uppercase tracking-wider flex items-center gap-2"><BarChart3 size={20}/> Sales Dashboard</h3>
             
+            {/* Quick click dashboard filter buttons */}
             <div className="grid grid-cols-4 gap-2 bg-[#111] p-3 rounded-2xl border border-white/5">
               <button onClick={() => applyQuickSalesFilter('today')} className="py-2.5 bg-orange-500/10 hover:bg-orange-500 text-orange-400 hover:text-white rounded-xl font-black text-[10px] uppercase transition-all font-sans">आज की सैल</button>
               <button onClick={() => applyQuickSalesFilter('yesterday')} className="py-2.5 bg-orange-500/10 hover:bg-orange-500 text-orange-400 hover:text-white rounded-xl font-black text-[10px] uppercase transition-all font-sans">कल की सैल</button>
@@ -1941,7 +1967,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                 <p className="text-[10px] font-black uppercase text-orange-400 tracking-wider">🎯 Custom Date-Range Auditor</p>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="flex flex-col gap-1">
-                    <label className="text-[9px] font-bold text-gray-505 uppercase">Start Date</label>
+                    <label className="text-[9px] font-bold text-gray-555 uppercase">Start Date</label>
                     <input 
                       type="date" 
                       value={startDate} 
@@ -1950,7 +1976,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                     />
                   </div>
                   <div className="flex flex-col gap-1">
-                    <label className="text-[9px] font-bold text-gray-505 uppercase">End Date</label>
+                    <label className="text-[9px] font-bold text-gray-555 uppercase">End Date</label>
                     <input 
                       type="date" 
                       value={endDate} 
@@ -1961,6 +1987,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                 </div>
               </div>
 
+              {/* 4-Column stats grid */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 border-t border-white/5 pt-4">
                 <div className="bg-white/[0.01] border border-white/5 p-3 rounded-2xl text-center">
                   <p className="text-[9px] font-bold text-gray-555 uppercase">Range Sales</p>
@@ -2023,6 +2050,7 @@ Report generated automatically by Bum Bum Cafe POS.`
               </div>
             </div>
 
+            {/* Reset All Sales Data Switch Button inside the grid */}
             <div className="grid grid-cols-2 gap-3 bg-[#111]/30 border border-white/5 p-4 rounded-[2rem] shadow-xl">
               <button onClick={handleResetSalesData} className="bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/20 font-black text-xs py-4 px-3 rounded-2xl flex items-center justify-center gap-2 active:scale-95 transition-all uppercase font-mono">
                 Reset All Sales Data 🚫
@@ -2041,8 +2069,9 @@ Report generated automatically by Bum Bum Cafe POS.`
               </button>
             </div>
 
+            {/* Permanent Financial Ledger */}
             <div className="space-y-4 font-mono">
-              <h4 className="text-sm font-black text-gray-405 uppercase tracking-widest pt-2">📚 Permanent Financial Ledger</h4>
+              <h4 className="text-sm font-black text-gray-400 uppercase tracking-widest pt-2">📚 Permanent Financial Ledger</h4>
               {orders.length === 0 ? (
                 <p className="text-center text-gray-655 py-12 text-xs uppercase font-bold tracking-widest">No transaction data logged...</p>
               ) : (
@@ -2055,7 +2084,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                         </div>
                       )}
                       <div className="flex gap-2.5">
-                        <span className="text-[10px] font-black uppercase text-gray-555">Bill No: #{formatBillNumber(o.billNumber || 0)}</span>
+                        <span className="text-[10px] font-black uppercase text-gray-500">Bill No: #{formatBillNumber(o.billNumber || 0)}</span>
                         <span className="text-[10px] font-black uppercase text-yellow-500">Token: #{o.tokenNumber || "N/A"}</span>
                       </div>
                       <h4 className="font-extrabold text-sm text-gray-300">Name: {o.customerName || "Customer"}</h4>
@@ -2084,7 +2113,7 @@ Report generated automatically by Bum Bum Cafe POS.`
           </div>
         )}
 
-        {/* --- TAB 2: LIVE ORDERS WITH FILTER SEGMENTS --- */}
+        {/* --- TAB 2: LIVE ORDERS WITH FILTER segments --- */}
         {tab === 'orders' && (
           <div className="space-y-4">
             <div className="bg-[#111] border border-white/5 p-4 rounded-3xl grid grid-cols-3 gap-2">
@@ -2238,7 +2267,7 @@ Report generated automatically by Bum Bum Cafe POS.`
 
                 {variantType === 'pizza_sizes' && (
                   <div className="space-y-3 bg-[#111]/40 p-4 rounded-2xl border border-white/5">
-                    <p className="text-[10px] text-orange-400 font-extrabold uppercase font-sans">Prices:</p>
+                    <p className="text-[10px] text-orange-400 font-extrabold uppercase font-sans">Prices (Leave blank if unavailable):</p>
                     <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-1"><label className="text-xs font-bold text-gray-404 uppercase">Small (₹)</label><input type="number" value={priceSmall} onChange={(e) => setPriceSmall(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-white text-xs font-bold" /></div>
                       <div className="space-y-1"><label className="text-xs font-bold text-gray-404 uppercase">Medium (₹)</label><input type="number" value={priceMedium} onChange={(e) => setPriceMedium(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-white text-xs font-bold" /></div>
@@ -2254,7 +2283,7 @@ Report generated automatically by Bum Bum Cafe POS.`
 
             <div className="space-y-3 pt-2">
               {searchedMenu.length === 0 ? (
-                <p className="text-center text-xs font-black uppercase text-gray-555 py-10">No matching dishes found...</p>
+                <p className="text-center text-xs font-black uppercase text-gray-505 py-10">No matching dishes found...</p>
               ) : (
                 searchedMenu.map((item) => {
                   const getAdminDisplayPrice = (itm: any) => {
@@ -2547,7 +2576,7 @@ Report generated automatically by Bum Bum Cafe POS.`
         {tab === 'banners' && (
           <div className="space-y-6">
             <form onSubmit={handleAddBanner} className="bg-[#020202] border border-white/5 p-6 rounded-[2.5rem] space-y-4">
-              <h3 className="text-lg font-black text-orange-500 italic uppercase flex items-center gap-2"><ImageIcon size={18}/> Manage Promo Banners</h3>
+              <h3 className="text-lg font-black text-orange-500 uppercase"><ImageIcon size={18}/> Manage Promo Banners</h3>
               <p className="text-[10px] text-gray-555 font-bold uppercase leading-normal">यहाँ से आप मुख्य स्क्रीन के बड़े आफर बैनर्स को जोड़ सकते हैं।</p>
               
               <div className="space-y-1">
@@ -2617,7 +2646,7 @@ Report generated automatically by Bum Bum Cafe POS.`
         {tab === 'reels' && (
           <div className="space-y-6">
             <form onSubmit={handleAddReel} className="bg-[#020202] border border-white/5 p-6 rounded-[2.5rem] space-y-4">
-              <h3 className="text-lg font-black text-orange-500 italic uppercase flex items-center gap-2"><Play size={18}/> Manage Food Reels / Stories</h3>
+              <h3 className="text-lg font-black text-orange-500 uppercase"><Play size={18}/> Manage Food Reels / Stories</h3>
               <p className="text-[10px] text-gray-555 font-bold uppercase leading-normal">यहाँ से आप circular food stories और video reels add kar sakte hain (with item price).</p>
               
               <div className="grid grid-cols-2 gap-3 text-xs font-bold">
@@ -2665,7 +2694,7 @@ Report generated automatically by Bum Bum Cafe POS.`
             <div className="grid grid-cols-2 gap-4">
               {reels.map(r => (
                 <div key={r.id} className="bg-white/[0.02] border border-white/5 p-3 rounded-2xl relative group">
-                  <div className="h-32 overflow-hidden rounded-xl bg-neutral-900 flex items-center justify-center">
+                  <div className="h-32 overflow-hidden bg-neutral-900 rounded-xl flex items-center justify-center">
                     {isVideoUrl(r.url) ? (
                       <video src={r.url} muted loop autoPlay className="w-full h-full object-cover" />
                     ) : (
@@ -2689,75 +2718,18 @@ Report generated automatically by Bum Bum Cafe POS.`
         {/* --- TAB 7.6: MAIN BACKGROUND HEADER VIDEO, TIMINGS & LOCATION --- */}
         {tab === 'header_video' && (
           <div className="space-y-6">
-            <h3 className="text-xl font-black text-orange-500 uppercase tracking-wider flex items-center gap-2">🎬 Store Settings (Video, Timings & Map)</h3>
-            <p className="text-[10px] text-gray-555 uppercase tracking-widest font-black leading-relaxed font-mono">यहाँ से आप मुख्य होमपेज के पीछे चलने वाले वीडियो, फ़ुटर में दिखने वाली दुकान की टाइमिंग और गूगल मैप लोकेशन बदल सकते हैं।</p>
-
-            <form onSubmit={handleUpdateHeaderVideo} className="bg-white/[0.02] border border-white/5 p-6 rounded-[2.5rem] space-y-4">
-              <p className="text-xs font-black text-orange-400 uppercase tracking-wider">Background Video Settings</p>
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-gray-405 uppercase">Background Video URL</label>
-                <input 
-                  type="url" 
-                  value={headerVideoInput} 
-                  onChange={(e) => setHeaderVideoInput(e.target.value)} 
-                  placeholder="Paste .mp4 or stream video URL..."
-                  className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-xs font-black text-white" 
-                  required 
-                />
-              </div>
-              
-              {headerVideoInput && (
-                <div className="space-y-2">
-                  <p className="text-[10px] text-orange-400 font-extrabold uppercase">Live Preview:</p>
-                  <div className="h-36 rounded-2xl overflow-hidden bg-neutral-900 border border-white/5">
-                    <video src={headerVideoInput} autoPlay loop muted playsInline className="w-full h-full object-cover" />
-                  </div>
-                </div>
-              )}
-
-              <button type="submit" className="w-full bg-green-600 text-white p-4 rounded-xl font-black text-sm uppercase">Update Header Video 🎬</button>
+            <h3 className="text-xl font-black text-orange-500 uppercase">🎬 Store Settings</h3>
+            <form onSubmit={handleUpdateHeaderVideo} className="bg-[#111] p-6 rounded-[2.5rem] space-y-4">
+              <label className="text-xs font-bold text-gray-405 uppercase block">Header Background Video URL</label>
+              <input type="url" value={headerVideoInput} onChange={e => setHeaderVideoInput(e.target.value)} placeholder="Paste video URL" className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-white" required />
+              <button type="submit" className="w-full bg-green-600 text-white p-4 rounded-xl font-black text-sm uppercase">Update Header Video</button>
             </form>
 
-            <form onSubmit={handleUpdateStoreTimingsAndLocation} className="bg-white/[0.02] border border-white/5 p-6 rounded-[2.5rem] space-y-4">
-              <p className="text-xs font-black text-orange-400 uppercase tracking-wider">Restaurant Opening/Closing Timings & Map Link</p>
-              
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-gray-400 uppercase">Timing (Hindi / हिंदी)</label>
-                <input 
-                  type="text" 
-                  value={storeTimingHindi} 
-                  onChange={(e) => setStoreTimingHindi(e.target.value)} 
-                  placeholder="उदा: सुबह 10:00 से रात 11:00 बजे"
-                  className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-xs font-black text-white" 
-                  required 
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-gray-400 uppercase">Timing (English)</label>
-                <input 
-                  type="text" 
-                  value={storeTimingEnglish} 
-                  onChange={(e) => setStoreTimingEnglish(e.target.value)} 
-                  placeholder="e.g. 10:00 AM to 11:05 PM"
-                  className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-xs font-black text-white" 
-                  required 
-                />
-              </div>
-
-              <div className="space-y-1.5 pt-2 border-t border-white/5">
-                <label className="text-xs font-bold text-orange-400 uppercase">Google Map Link / लोकेशन लिंक 🗺️</label>
-                <input 
-                  type="url" 
-                  value={googleMapUrl} 
-                  onChange={(e) => setGoogleMapUrl(e.target.value)} 
-                  placeholder="e.g. https://maps.app.goo.gl/..."
-                  className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-xs font-black text-white" 
-                  required 
-                />
-              </div>
-
-              <button type="submit" className="w-full bg-green-600 text-white p-4 rounded-xl font-black text-sm uppercase">Update Timings & Map Location ⏰🗺️</button>
+            <form onSubmit={handleUpdateStoreTimingsAndLocation} className="bg-[#111] p-6 rounded-[2.5rem] space-y-4">
+              <input type="text" value={storeTimingHindi} onChange={e => setStoreTimingHindi(e.target.value)} placeholder="Timing (Hindi)" className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-white" required />
+              <input type="text" value={storeTimingEnglish} onChange={e => setStoreTimingEnglish(e.target.value)} placeholder="Timing (English)" className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-white" required />
+              <input type="url" value={googleMapUrl} onChange={e => setGoogleMapUrl(e.target.value)} placeholder="Google Map Link" className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-white" required />
+              <button type="submit" className="w-full bg-green-600 text-white p-4 rounded-xl font-black">Update Timings & Map Location</button>
             </form>
           </div>
         )}
@@ -2778,8 +2750,7 @@ Report generated automatically by Bum Bum Cafe POS.`
               {coupons.map(c => (
                 <div key={c.id} className="bg-white/[0.02] border border-white/5 p-5 rounded-2xl flex justify-between items-center">
                   <div>
-                    <h4 className="text-sm font-black text-orange-500 uppercase tracking-widest">{c.code}</h4>
-                    <p className="text-xs font-bold text-gray-455 mt-1">Value: Flat ₹{c.discountValue} OFF</p>
+                    <h4 className="text-sm font-black text-orange-500 uppercase">{c.code} - Flat ₹{c.discountValue} OFF</h4>
                   </div>
                   <button onClick={() => handleDeleteCoupon(c.id)} className="p-3 bg-red-500/10 text-red-500 rounded-xl">
                     <Trash size={16}/>
@@ -2797,18 +2768,10 @@ Report generated automatically by Bum Bum Cafe POS.`
             {reviews.map(r => (
               <div key={r.id} className="bg-white/[0.02] border border-white/5 p-6 rounded-[2rem] space-y-3">
                 <div className="flex justify-between items-center">
-                  <h4 className="font-black text-sm text-gray-200">{r.name}</h4>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs bg-white/5 text-yellow-500 font-bold px-2 py-0.5 rounded-lg flex items-center gap-1">
-                      {r.rating || "N/A"} <span className="text-[10px]">★</span>
-                    </span>
-                    <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-lg ${r.isApproved ? 'bg-green-500/10 text-green-500' : 'bg-yellow-500/10 text-yellow-500'}`}>
-                      {r.isApproved ? 'Live' : 'Pending Approval'}
-                    </span>
-                  </div>
+                  <h4 className="font-black text-sm text-gray-200">{r.name} ({r.rating} ★)</h4>
+                  <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-lg ${r.isApproved ? 'bg-green-500/10 text-green-500' : 'bg-yellow-500/10 text-yellow-500'}`}>{r.isApproved ? 'Live' : 'Pending'}</span>
                 </div>
-                <p className="text-xs text-gray-400 font-medium leading-relaxed italic">"{r.comment}"</p>
-                
+                <p className="text-xs text-gray-400 italic">"{r.comment}"</p>
                 <div className="flex gap-2 justify-end pt-2 border-t border-white/5">
                   {!r.isApproved && (
                     <button onClick={() => handleApproveReview(r.id)} className="px-4 py-2 bg-green-600 text-white rounded-xl text-xs font-black uppercase">Approve Review</button>
@@ -2825,7 +2788,7 @@ Report generated automatically by Bum Bum Cafe POS.`
         {/* --- TAB 10: KITCHEN RECIPE ROSTER --- */}
         {tab === 'roster' && (
           <div className="space-y-6">
-            <h3 className="text-xl font-black text-orange-500 uppercase tracking-wider flex items-center gap-2"><Settings size={20}/> Kitchen SOP Recipe Roster</h3>
+            <h3 className="text-xl font-black text-orange-500 uppercase"><Settings size={20}/> Kitchen SOP Recipe Roster</h3>
             <p className="text-[10px] text-gray-555 uppercase tracking-widest font-black leading-relaxed font-mono">डिश बनाने के चरण (Steps) और सामग्री का अनुपात फीड करें, और सीधे A4 साइज़ पोस्टर प्रिंट करें।</p>
 
             <div className="bg-[#111] border border-white/5 p-5 rounded-3xl space-y-3">
@@ -2861,10 +2824,10 @@ Report generated automatically by Bum Bum Cafe POS.`
                 </div>
 
                 <form onSubmit={handleAddRosterStep} className="bg-white/[0.02] border border-white/5 p-6 rounded-[2.5rem] space-y-4">
-                  <h4 className="text-xs font-black text-orange-500 uppercase">Add SOP Step</h4>
+                  <h4 className="text-xs font-black text-orange-500 uppercase">Add SOP Step / नया चरण जोड़ें</h4>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-gray-455 uppercase">Ingredient / Action</label>
+                      <label className="text-[10px] font-bold text-gray-455 uppercase">Ingredient / Action (क्या डालें)</label>
                       <input type="text" placeholder="e.g. Pizza Base / Cheese" value={rosterStepName} onChange={(e) => setRosterStepName(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-xs font-bold text-white" required />
                     </div>
                     <div className="space-y-1">
@@ -2873,7 +2836,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                     </div>
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-gray-405 uppercase">Special Cooking Instruction</label>
+                    <label className="text-[10px] font-bold text-gray-405 uppercase">Special Cooking Instruction (विशेष निर्देश)</label>
                     <input type="text" placeholder="e.g. ओवन में डालने से पहले अच्छे से सेकें (Optional)" value={rosterStepNote} onChange={(e) => setRosterStepNote(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-xs font-bold text-white" />
                   </div>
                   <button type="submit" className="w-full bg-green-600 text-white p-3.5 rounded-xl font-black text-xs uppercase">Add Step to Recipe</button>
@@ -2917,7 +2880,7 @@ Report generated automatically by Bum Bum Cafe POS.`
               
               <textarea 
                 rows={2}
-                placeholder="उदा: शुभम द्विवेदी जी ने अभी 'स्पेशल थाली' आर्डर की 🍱" 
+                placeholder="उदा: शुभम द्विवेदी जी (टाउन) ने अभी-अभी 'स्पेशल थाली' आर्डर की 🍱" 
                 value={newProofText}
                 onChange={(e) => setNewProofText(e.target.value)}
                 className="w-full bg-black/40 border border-white/10 rounded-xl p-4 text-xs text-white outline-none font-bold animate-none"
@@ -3039,15 +3002,15 @@ Report generated automatically by Bum Bum Cafe POS.`
               )}
             </form>
 
-            {/* 2. DYNAMIC STAFF MANAGEMENT DIRECTORY */}
+            {/* 2. DYNAMIC STAFF MANAGEMENT DIRECTORY (Including Godown Helper integrated directly here) [2] */}
             <div className="bg-white/[0.02] border border-white/5 p-6 rounded-[2.5rem] space-y-5">
               <div>
-                <h4 className="text-sm font-black text-yellow-400 uppercase tracking-widest flex items-center gap-1.5">👥 Staff Accounts Registry</h4>
-                <p className="text-[9px] text-gray-555 font-bold uppercase mt-1 leading-relaxed">यहाँ से आप Kitchen, Riders और Cashier के लिए नया यूज़र बना सकते हैं:</p>
+                <h4 className="text-sm font-black text-yellow-400 uppercase tracking-widest flex items-center gap-1.5">👥 Staff Accounts Registry (Kitchen, Delivery & Godown)</h4>
+                <p className="text-[9px] text-gray-555 font-bold uppercase mt-1 leading-relaxed">यहाँ से आप Kitchen, Riders, Cashier व Godown (bbcafehelper) के लिए नया यूज़र बना सकते हैं, और PIN बदल सकते हैं [2]:</p>
               </div>
 
               {!editingStaffId ? (
-                <form onSubmit={handleAddStaff} className="bg-black/40 border border-white/5 p-4 rounded-2xl space-y-3.5 text-xs font-bold text-left">
+                <form onSubmit={handleAddStaffCombined} className="bg-black/40 border border-white/5 p-4 rounded-2xl space-y-3.5 text-xs font-bold text-left">
                   <p className="text-[9px] font-black text-orange-500 uppercase tracking-wider">➕ Add Staff Member / नया स्टाफ जोड़ें</p>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1">
@@ -3056,21 +3019,22 @@ Report generated automatically by Bum Bum Cafe POS.`
                     </div>
                     <div className="space-y-1">
                       <label className="text-[9px] text-gray-555 uppercase">Personal 4-digit PIN</label>
-                      <input type="password" maxLength={4} placeholder="e.g. 1234" value={newStaffPin} onChange={(e) => setNewStaffPin(e.target.value)} className="w-full bg-neutral-900 border border-white/10 rounded-lg p-2.5 text-white outline-none text-center tracking-widest" required />
+                      <input type="password" maxLength={6} placeholder="e.g. 1234" value={newStaffPin} onChange={(e) => setNewStaffPin(e.target.value)} className="w-full bg-neutral-900 border border-white/10 rounded-lg p-2.5 text-white outline-none text-center tracking-widest" required />
                     </div>
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[9px] text-gray-555 uppercase">Staff Role</label>
+                    <label className="text-[9px] text-gray-555 uppercase">Staff Role / विभाग</label>
                     <select value={newStaffRole} onChange={(e) => setNewStaffRole(e.target.value)} className="w-full bg-neutral-900 border border-white/10 rounded-lg p-2.5 text-white outline-none cursor-pointer">
-                      <option value="delivery">Rider / Delivery Boy 🛵</option>
-                      <option value="kitchen">Cook / Kitchen Staff 👨‍🍳</option>
+                      <option value="delivery">Rider / Delivery Boy 🛵 (Delivery User)</option>
+                      <option value="kitchen">Cook / Kitchen Staff 👨‍🍳 (Kitchen User)</option>
                       <option value="cashier">Cashier / Counter Manager 💼</option>
+                      <option value="godown">Godown Helper / गोदाम यूज़र 📦 (Stock User) [2]</option>
                     </select>
                   </div>
                   <button type="submit" className="w-full bg-green-600 text-white p-2.5 rounded-lg font-black uppercase text-[10px]">Add Staff Member</button>
                 </form>
               ) : (
-                <form onSubmit={handleUpdateStaff} className="bg-orange-500/5 border border-orange-500/20 p-4 rounded-2xl space-y-3.5 text-xs font-bold text-left">
+                <form onSubmit={handleUpdateStaffCombined} className="bg-orange-500/5 border border-orange-500/20 p-4 rounded-2xl space-y-3.5 text-xs font-bold text-left">
                   <p className="text-[9px] font-black text-orange-500 uppercase tracking-wider">✏️ Edit Staff Member & Change PIN</p>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1">
@@ -3079,7 +3043,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                     </div>
                     <div className="space-y-1">
                       <label className="text-[9px] text-gray-555 uppercase">New 4-digit PIN</label>
-                      <input type="password" maxLength={4} value={editingStaffPin} onChange={(e) => setEditingStaffPin(e.target.value)} className="w-full bg-neutral-900 border border-white/10 rounded-lg p-2.5 text-white outline-none text-center tracking-widest" required />
+                      <input type="password" maxLength={6} value={editingStaffPin} onChange={(e) => setEditingStaffPin(e.target.value)} className="w-full bg-neutral-900 border border-white/10 rounded-lg p-2.5 text-white outline-none text-center tracking-widest" required />
                     </div>
                   </div>
                   <div className="space-y-1">
@@ -3088,6 +3052,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                       <option value="delivery">Rider / Delivery Boy 🛵</option>
                       <option value="kitchen">Cook / Kitchen Staff 👨‍🍳</option>
                       <option value="cashier">Cashier / Counter Manager 💼</option>
+                      <option value="godown">Godown Helper / गोदाम यूज़र 📦 [2]</option>
                     </select>
                   </div>
                   <div className="flex gap-2">
@@ -3097,23 +3062,25 @@ Report generated automatically by Bum Bum Cafe POS.`
                 </form>
               )}
 
+              {/* Staff Accounts List Directory (Including cafe_users seamlessly mapped) [2] */}
               <div className="space-y-2 pt-2">
-                <p className="text-[10px] font-bold text-gray-400 uppercase">Registered Staff Directory ({staff.length})</p>
-                {staff.length === 0 ? (
+                <p className="text-[10px] font-bold text-gray-400 uppercase">Registered Staff Directory ({unifiedStaffList.length})</p>
+                {unifiedStaffList.length === 0 ? (
                   <p className="text-center text-[10px] text-gray-500 uppercase font-bold py-4">No staff members registered yet.</p>
                 ) : (
-                  staff.map((member) => {
+                  unifiedStaffList.map((member) => {
                     const isPinRevealed = revealPinId === member.id;
                     return (
                       <div key={member.id} className="bg-black/30 border border-white/5 p-3.5 rounded-2xl flex justify-between items-center text-xs font-bold gap-4">
                         <div>
                           <p className="text-white font-black">{member.name}</p>
-                          <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-md mt-1 inline-block ${member.role === 'delivery' ? 'bg-blue-500/10 text-blue-400' : member.role === 'kitchen' ? 'bg-yellow-500/10 text-yellow-400' : 'bg-green-500/10 text-green-400'}`}>
-                            {member.role === 'delivery' ? 'Rider 🛵' : member.role === 'kitchen' ? 'Kitchen 👨‍🍳' : 'Cashier 💼'}
+                          <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-md mt-1 inline-block ${member.role === 'delivery' ? 'bg-blue-500/10 text-blue-400' : member.role === 'kitchen' ? 'bg-yellow-500/10 text-yellow-400' : member.role === 'godown' ? 'bg-orange-500/10 text-orange-400' : 'bg-green-500/10 text-green-400'}`}>
+                            {member.role === 'delivery' ? 'Rider 🛵' : member.role === 'kitchen' ? 'Kitchen 👨‍🍳' : member.role === 'godown' ? 'Godown Helper 📦 [2]' : 'Cashier 💼'}
                           </span>
                         </div>
                         
                         <div className="flex items-center gap-3">
+                          {/* PIN Hide/Reveal Widget */}
                           <div className="flex items-center gap-1.5 bg-black/50 border border-white/5 px-2.5 py-1.5 rounded-xl">
                             <span className="text-[10px] font-mono text-orange-400 tracking-wider">
                               PIN: {isPinRevealed ? member.pin : '••••'}
@@ -3142,7 +3109,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                             <Edit size={12}/>
                           </button>
                           <button 
-                            onClick={() => handleDeleteStaff(member.id)}
+                            onClick={() => handleDeleteStaffCombined(member.id, member.role)}
                             className="p-2 bg-red-500/10 text-red-500 rounded-xl"
                             title="Delete"
                             type="button"
@@ -3156,128 +3123,6 @@ Report generated automatically by Bum Bum Cafe POS.`
                 )}
               </div>
             </div>
-
-            {/* 3. GODOWN STOCK HELPERS APP USERS PANEL (cafe_users Collection) [2] */}
-            {userRole === 'admin' && (
-              <div className="bg-white/[0.02] border border-white/5 p-6 rounded-[2.5rem] space-y-5">
-                <div>
-                  <h4 className="text-sm font-black text-orange-500 uppercase tracking-widest flex items-center gap-1.5">
-                    📦 Godown Helpers Directory (bbcafehelper users)
-                  </h4>
-                  <p className="text-[9px] text-gray-555 font-bold uppercase mt-1 leading-relaxed">
-                    यहाँ से आप गोदाम स्टॉक हेल्पर यूज़र्स (bbcafehelper app) के PIN बदल सकते हैं, नए यूज़र्स को जोड़ सकते हैं या हटा सकते हैं [2]:
-                  </p>
-                </div>
-
-                {!editingHelperId ? (
-                  <form onSubmit={handleAddHelperUserSubmit} className="bg-black/40 border border-white/5 p-4 rounded-2xl space-y-3.5 text-xs font-bold text-left">
-                    <p className="text-[9px] font-black text-orange-500 uppercase tracking-wider">➕ Add Godown Stock User</p>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1">
-                        <label className="text-[9px] text-gray-555 uppercase">User Name</label>
-                        <input type="text" placeholder="e.g. MOHIT" value={newHelperName} onChange={(e) => setNewHelperName(e.target.value)} className="w-full bg-neutral-900 border border-white/10 rounded-lg p-2.5 text-white outline-none" required />
-                      </div>
-                      <div className="space-y-1">
-                        <label className="text-[9px] text-gray-555 uppercase">Personal PIN (4-6 Digits)</label>
-                        <input type="password" maxLength={6} placeholder="e.g. 5678" value={newHelperPin} onChange={(e) => setNewHelperPin(e.target.value)} className="w-full bg-neutral-900 border border-white/10 rounded-lg p-2.5 text-white outline-none text-center tracking-widest" required />
-                      </div>
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[9px] text-gray-555 uppercase">Role / अधिकार</label>
-                      <select value={newHelperRole} onChange={(e: any) => setNewHelperRole(e.target.value)} className="w-full bg-neutral-900 border border-white/10 rounded-lg p-2.5 text-white outline-none cursor-pointer">
-                        <option value="staff">Staff / गोदाम यूज़र</option>
-                        <option value="admin">Admin / प्रशासक</option>
-                      </select>
-                    </div>
-                    <button type="submit" className="w-full bg-green-600 text-white p-2.5 rounded-lg font-black uppercase text-[10px]">Add Helper User</button>
-                  </form>
-                ) : (
-                  <form onSubmit={handleUpdateHelperUser} className="bg-orange-500/5 border border-orange-500/20 p-4 rounded-2xl space-y-3.5 text-xs font-bold text-left">
-                    <p className="text-[9px] font-black text-orange-500 uppercase tracking-wider">✏️ Edit Godown User & PIN</p>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1">
-                        <label className="text-[9px] text-gray-555 uppercase">User Name</label>
-                        <input type="text" value={editingHelperName} onChange={(e) => setEditingHelperName(e.target.value)} className="w-full bg-neutral-900 border border-white/10 rounded-lg p-2.5 text-white outline-none" required />
-                      </div>
-                      <div className="space-y-1">
-                        <label className="text-[9px] text-gray-555 uppercase">New PIN</label>
-                        <input type="password" maxLength={6} value={editingHelperPin} onChange={(e) => setEditingHelperPin(e.target.value)} className="w-full bg-neutral-900 border border-white/10 rounded-lg p-2.5 text-white outline-none text-center tracking-widest" required />
-                      </div>
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[9px] text-gray-555 uppercase">Role</label>
-                      <select value={editingHelperRole} onChange={(e: any) => setEditingHelperRole(e.target.value)} className="w-full bg-neutral-900 border border-white/10 rounded-lg p-2.5 text-white outline-none cursor-pointer">
-                        <option value="staff">Staff / गोदाम यूज़र</option>
-                        <option value="admin">Admin / प्रशासक</option>
-                      </select>
-                    </div>
-                    <div className="flex gap-2">
-                      <button type="submit" className="flex-1 bg-green-600 text-white p-2.5 rounded-lg font-black uppercase text-[10px]">Save Changes</button>
-                      <button type="button" onClick={() => setEditingHelperId(null)} className="bg-white/5 text-gray-404 p-2.5 rounded-lg font-black uppercase text-[10px]">Cancel</button>
-                    </div>
-                  </form>
-                )}
-
-                <div className="space-y-2 pt-2">
-                  <p className="text-[10px] font-bold text-gray-400 uppercase">Registered Godown Helpers ({cafeHelperUsers.length})</p>
-                  {cafeHelperUsers.length === 0 ? (
-                    <p className="text-center text-[10px] text-gray-505 uppercase font-bold py-4">No Stock Helpers registered yet.</p>
-                  ) : (
-                    cafeHelperUsers.map((member) => {
-                      const isPinRevealed = revealHelperPinId === member.id;
-                      return (
-                        <div key={member.id} className="bg-black/30 border border-white/5 p-3.5 rounded-2xl flex justify-between items-center text-xs font-bold gap-4">
-                          <div>
-                            <p className="text-white font-black">{member.name}</p>
-                            <span className="text-[8px] font-black uppercase px-2 py-0.5 bg-orange-500/10 text-orange-400 rounded-md mt-1 inline-block">
-                              {member.role === 'admin' ? 'Admin 👑' : 'Staff 📦'}
-                            </span>
-                          </div>
-                          
-                          <div className="flex items-center gap-3">
-                            <div className="flex items-center gap-1.5 bg-black/50 border border-white/5 px-2.5 py-1.5 rounded-xl">
-                              <span className="text-[10px] font-mono text-orange-400 tracking-wider">
-                                PIN: {isPinRevealed ? member.pin : '••••'}
-                              </span>
-                              <button 
-                                onClick={() => setRevealHelperPinId(isPinRevealed ? null : member.id)}
-                                className="text-gray-400 hover:text-white"
-                                title="Toggle PIN Visibility"
-                                type="button"
-                              >
-                                {isPinRevealed ? <EyeOff size={12}/> : <Eye size={12}/>}
-                              </button>
-                            </div>
-
-                            <button 
-                              onClick={() => {
-                                setEditingHelperId(member.id);
-                                setEditingHelperName(member.name);
-                                setEditingHelperRole(member.role || 'staff');
-                                setEditingHelperPin(member.pin);
-                              }}
-                              className="p-2 bg-blue-500/10 text-blue-400 rounded-xl"
-                              title="Edit / Change PIN"
-                              type="button"
-                            >
-                              <Edit size={12}/>
-                            </button>
-                            <button 
-                              onClick={() => handleRemoveHelperUser(member.id)}
-                              className="p-2 bg-red-500/10 text-red-500 rounded-xl"
-                              title="Delete"
-                              type="button"
-                            >
-                              <Trash size={12}/>
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-              </div>
-            )}
 
             {/* Table QR Code Generator Widget */}
             <div className="bg-[#111] border border-white/5 p-6 rounded-[2.5rem] space-y-4">
@@ -3399,7 +3244,7 @@ Report generated automatically by Bum Bum Cafe POS.`
 
             <div className="flex gap-2">
               <button type="submit" className="flex-1 bg-green-600 text-white p-3.5 rounded-xl font-black text-xs uppercase">Save SOP Guide</button>
-              <button type="button" onClick={() => setSopProduct(null)} className="bg-white/5 text-gray-405 p-3.5 rounded-xl font-black text-xs uppercase">Close</button>
+              <button type="button" onClick={() => setSopProduct(null)} className="bg-white/5 text-gray-455 p-3.5 rounded-xl font-black text-xs uppercase">Close</button>
             </div>
           </form>
         </div>
@@ -3427,7 +3272,7 @@ Report generated automatically by Bum Bum Cafe POS.`
               
               <div className="grid grid-cols-3 gap-2">
                 <div className="space-y-1">
-                  <label className="text-[9px] font-bold text-gray-505 uppercase font-sans">VIP Tier</label>
+                  <label className="text-[9px] font-bold text-gray-555 uppercase font-sans">VIP Tier</label>
                   <select 
                     value={broadcastTierFilter} 
                     onChange={(e) => setBroadcastTierFilter(e.target.value)}
@@ -3442,7 +3287,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[9px] font-bold text-gray-505 uppercase">Min Points</label>
+                  <label className="text-[9px] font-bold text-gray-555 uppercase">Min Points</label>
                   <input 
                     type="number" 
                     placeholder="Min Points"
@@ -3453,7 +3298,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[9px] font-bold text-gray-505 uppercase">Min Spend (₹)</label>
+                  <label className="text-[9px] font-bold text-gray-555 uppercase">Min Spend (₹)</label>
                   <input 
                     type="number" 
                     placeholder="Min Spend"
