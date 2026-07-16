@@ -19,7 +19,6 @@ const SOCIAL_LINKS = [
   { id: 'snapchat', label: '👻 Snapchat', icon: '👻', points: 1, url: 'https://www.snapchat.com/add/bbcafe.in' }
 ];
 
-// Helper to determine if a URL points to a video
 const isVideoUrl = (url: string): boolean => {
   if (!url) return false;
   const cleanUrl = url.toLowerCase().split('?')[0];
@@ -323,6 +322,17 @@ export default function AdminDashboard() {
   const [editingStaffRole, setEditingStaffRole] = useState("delivery");
   const [editingStaffPin, setEditingStaffPin] = useState("");
   const [revealPinId, setRevealPinId] = useState<string | null>(null);
+
+  // GODOWN STOCK HELPER APP USERS STATES ("cafe_users" Collection) [2]
+  const [cafeHelperUsers, setCafeHelperUsers] = useState<any[]>([]);
+  const [newHelperName, setNewHelperName] = useState("");
+  const [newHelperPin, setNewHelperPin] = useState("");
+  const [newHelperRole, setNewHelperRole] = useState<'admin' | 'staff'>('staff');
+  const [editingHelperId, setEditingHelperId] = useState<string | null>(null);
+  const [editingHelperName, setEditingHelperName] = useState("");
+  const [editingHelperPin, setEditingHelperPin] = useState("");
+  const [editingHelperRole, setEditingHelperRole] = useState<'admin' | 'staff'>('staff');
+  const [revealHelperPinId, setRevealHelperPinId] = useState<string | null>(null);
   
   // DYNAMIC PASSCODES FROM FIRESTORE
   const [passcodes, setPasscodes] = useState({ adminPin: "971429", managerPin: "123456" });
@@ -387,7 +397,6 @@ export default function AdminDashboard() {
   const [rosterStepQty, setRosterStepQty] = useState("");
   const [rosterStepNote, setRosterStepNote] = useState("");
 
-  // Play custom MP3 sound warning for Admin/Counter when new order arrives
   const playNewOrderBeep = () => {
     try {
       const audio = new Audio('/admin.mp3');
@@ -431,7 +440,6 @@ export default function AdminDashboard() {
     const unsubOrders = onSnapshot(qOrders, (snap) => {
       const currentOrdersList = snap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-      // PLAY ALERT IF NEW ORDER ARRIVES
       if (prevOrdersCountRef.current !== null && currentOrdersList.length > prevOrdersCountRef.current) {
         playNewOrderBeep();
         toast.success("🚨 ALERT: Naya Online Order Received!");
@@ -449,7 +457,6 @@ export default function AdminDashboard() {
       setCategories(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
 
-    // Dynamic Timing, Video & Map Link Listener
     const unsubStore = onSnapshot(doc(db, "settings", "store"), (d) => {
       if (d.exists()) {
         const storeData = d.data();
@@ -469,7 +476,6 @@ export default function AdminDashboard() {
       }
     });
 
-    // Separate collections fetch
     const unsubBanners = onSnapshot(collection(db, "banners"), (snap) => {
       setBanners(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
@@ -512,6 +518,11 @@ export default function AdminDashboard() {
       setTransferLogs(logs);
     });
 
+    // Load Stock Helper App Users ("cafe_users" Collection) [2]
+    const unsubCafeHelperUsers = onSnapshot(collection(db, "cafe_users"), (snap) => {
+      setCafeHelperUsers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+
     return () => {
       unsubOrders();
       unsubProducts();
@@ -526,6 +537,7 @@ export default function AdminDashboard() {
       unsubProofs();
       unsubClaims();
       unsubTransfers();
+      unsubCafeHelperUsers();
     };
   }, [isVerified]);
 
@@ -612,7 +624,6 @@ export default function AdminDashboard() {
     return list;
   }, [categories]);
 
-  // Order filters system (Today, Yesterday, Week)
   const filteredOrdersList = useMemo(() => {
     const now = new Date();
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -1010,7 +1021,6 @@ export default function AdminDashboard() {
     }
   };
 
-  // Manage Circular Food Reels/Stories & Banners Separately
   const handleAddBanner = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newBannerUrl || !newBannerTitle) return toast.error("Please enter a media link and title!");
@@ -1044,7 +1054,6 @@ export default function AdminDashboard() {
     }
   };
 
-  // Manage Food Reels/Stories Collection (With Cover URL Support)
   const handleAddReel = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newReelUrl || !newReelTitle || !newReelPrice) {
@@ -1075,7 +1084,6 @@ export default function AdminDashboard() {
     }
   };
 
-  // Background Video, Location, & Timings Change Support
   const handleUpdateHeaderVideo = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!headerVideoInput) return toast.error("Please enter a valid video link!");
@@ -1104,7 +1112,6 @@ export default function AdminDashboard() {
     }
   };
 
-  // Manage Social Proof Alerts CRUD
   const handleAddSocialProof = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newProofText.trim()) return toast.error("Please enter alert text!");
@@ -1125,7 +1132,6 @@ export default function AdminDashboard() {
     } catch (err) { toast.error("Error deleting alert"); }
   };
 
-  // Verification Loop for Point claims
   const handleVerifyClaimApproval = async (claim: any) => {
     try {
       await runTransaction(db, async (transaction) => {
@@ -1161,7 +1167,6 @@ export default function AdminDashboard() {
     } catch (err) { toast.error("Failed to reject claim request."); }
   };
 
-  // Review approval फिक्स
   const handleApproveReview = async (id: string) => {
     try {
       await updateDoc(doc(db, "reviews", id), { isApproved: true, approved: true });
@@ -1176,7 +1181,6 @@ export default function AdminDashboard() {
     } catch (err) { toast.error("Error deleting review"); }
   };
 
-  // Bulletproof Coupon Saving
   const handleAddCoupon = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCouponCode || !newCouponValue) return;
@@ -1224,7 +1228,6 @@ export default function AdminDashboard() {
     }
   };
 
-  // Bulk Import
   const handleBulkImport = async () => {
     if (!window.confirm("BUM BUM CAFE PDF ke items ko database mein add karein?")) return;
     toast.loading("Importing menu items...", { id: "import" });
@@ -1264,7 +1267,6 @@ export default function AdminDashboard() {
     }
   };
 
-  // Merge Duplicates
   const handleMergeDuplicates = async () => {
     if (!window.confirm("क्या आप वाकई सभी डुप्लीकेट ऑइली आइटम्स को मर्ज करना चाहते हैं?")) return;
     toast.loading("Merging duplicates...", { id: "merge" });
@@ -1475,7 +1477,7 @@ export default function AdminDashboard() {
     }
   };
 
-  // Real-time Staff Members listener
+  // Real-time Staff Members listener (Admin Portal Staff)
   useEffect(() => {
     if (!isVerified) return;
     const unsubStaff = onSnapshot(collection(db, "staff_members"), (snap) => {
@@ -1534,6 +1536,61 @@ export default function AdminDashboard() {
       toast.success("Staff member details updated!");
     } catch (err) {
       toast.error("Update failed.");
+    }
+  };
+
+  // GODOWN HELPER USER ACTIONS (Admin only can add/edit/delete) [2]
+  const handleAddHelperUserSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newHelperName.trim() || !newHelperPin.trim()) {
+      return toast.error("Kripya name aur PIN dono bharein!");
+    }
+    if (newHelperPin.length < 4) {
+      return toast.error("पिन कम से कम 4 अक्षरों का होना चाहिए!");
+    }
+    try {
+      const helperId = `user_${Date.now()}`;
+      await setDoc(doc(db, "cafe_users", helperId), {
+        id: helperId,
+        name: newHelperName.toUpperCase().trim(),
+        pin: newHelperPin.trim(),
+        role: newHelperRole
+      });
+      setNewHelperName("");
+      setNewHelperPin("");
+      toast.success("Godown Stock Helper User Added! 📦🎉");
+    } catch (err) {
+      toast.error("Helper User add karne me mistake hui.");
+    }
+  };
+
+  const handleUpdateHelperUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingHelperId) return;
+    if (!editingHelperName.trim() || !editingHelperPin.trim()) return toast.error("Saari details bharein!");
+    try {
+      await updateDoc(doc(db, "cafe_users", editingHelperId), {
+        name: editingHelperName.toUpperCase().trim(),
+        pin: editingHelperPin.trim(),
+        role: editingHelperRole
+      });
+      setEditingHelperId(null);
+      toast.success("Stock Helper details updated!");
+    } catch (err) {
+      toast.error("Failed to update Stock Helper.");
+    }
+  };
+
+  const handleRemoveHelperUser = async (userId: string) => {
+    if (userId === "admin_default") {
+      return toast.error("डिफ़ॉल्ट एडमिन को हटाया नहीं जा सकता!");
+    }
+    if (!window.confirm("क्या आप वाकई इस गोदाम स्टॉक हेल्पर यूज़र को डिलीट करना चाहते हैं?")) return;
+    try {
+      await deleteDoc(doc(db, "cafe_users", userId));
+      toast.success("Stock Helper User Deleted successfully!");
+    } catch {
+      toast.error("Failed to delete Helper User.");
     }
   };
 
@@ -1800,12 +1857,12 @@ Report generated automatically by Bum Bum Cafe POS.`
               <Lock size={28} />
             </div>
             <h2 className="text-2xl font-black text-orange-500 italic uppercase">Staff Portal</h2>
-            <p className="text-[10px] text-gray-500 font-bold tracking-widest uppercase">Bum Bum Cafe Mohandra</p>
+            <p className="text-[10px] text-gray-505 font-bold tracking-widest uppercase">Bum Bum Cafe Mohandra</p>
           </div>
 
           <form onSubmit={handlePasscodeLogin} className="space-y-4 relative z-10">
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Terminal Access Key</label>
+              <label className="text-xs font-bold text-gray-404 uppercase tracking-wider">Terminal Access Key</label>
               <input 
                 type="password" 
                 placeholder="Enter Access Key" 
@@ -1857,7 +1914,7 @@ Report generated automatically by Bum Bum Cafe POS.`
         <button onClick={() => setTab('loyalty')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'loyalty' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>🎁 Loyalty Rules</button>
         <button onClick={() => setTab('banners')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'banners' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>🖼️ Promo Banners</button>
         <button onClick={() => setTab('reels')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'reels' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>🎥 Food Reels</button>
-        <button onClick={() => setTab('header_video')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'header_video' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>🎬 Header, Timings & Location</button>
+        <button onClick={() => setTab('header_video')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'header_video' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>🎬 Header Settings</button>
         <button onClick={() => setTab('coupons')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'coupons' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>🎟️ Coupons</button>
         <button onClick={() => setTab('reviews')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'reviews' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>⭐ Reviews</button>
         <button onClick={() => setTab('proofs')} className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${tab === 'proofs' ? 'bg-orange-500 text-white shadow-lg' : 'bg-white/5 text-gray-500'}`}>🔥 Order Alerts</button>
@@ -1872,7 +1929,6 @@ Report generated automatically by Bum Bum Cafe POS.`
           <div className="space-y-6">
             <h3 className="text-xl font-black text-orange-500 uppercase tracking-wider flex items-center gap-2"><BarChart3 size={20}/> Sales Dashboard</h3>
             
-            {/* Quick click dashboard filter buttons */}
             <div className="grid grid-cols-4 gap-2 bg-[#111] p-3 rounded-2xl border border-white/5">
               <button onClick={() => applyQuickSalesFilter('today')} className="py-2.5 bg-orange-500/10 hover:bg-orange-500 text-orange-400 hover:text-white rounded-xl font-black text-[10px] uppercase transition-all font-sans">आज की सैल</button>
               <button onClick={() => applyQuickSalesFilter('yesterday')} className="py-2.5 bg-orange-500/10 hover:bg-orange-500 text-orange-400 hover:text-white rounded-xl font-black text-[10px] uppercase transition-all font-sans">कल की सैल</button>
@@ -1905,14 +1961,13 @@ Report generated automatically by Bum Bum Cafe POS.`
                 </div>
               </div>
 
-              {/* 4-Column stats grid */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 border-t border-white/5 pt-4">
                 <div className="bg-white/[0.01] border border-white/5 p-3 rounded-2xl text-center">
-                  <p className="text-[9px] font-bold text-gray-505 uppercase">Range Sales</p>
+                  <p className="text-[9px] font-bold text-gray-555 uppercase">Range Sales</p>
                   <h3 className="text-base font-black text-green-400 mt-1">₹{auditStats.rangeRevenue}</h3>
                 </div>
                 <div className="bg-white/[0.01] border border-white/5 p-3 rounded-2xl text-center">
-                  <p className="text-[9px] font-bold text-gray-505 uppercase">Range Orders</p>
+                  <p className="text-[9px] font-bold text-gray-555 uppercase">Range Orders</p>
                   <h3 className="text-base font-black text-yellow-400 mt-1">{auditStats.rangeCount}</h3>
                 </div>
                 <div className="bg-white/[0.01] border border-white/5 p-3 rounded-2xl text-center">
@@ -1945,7 +2000,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                     <span className="text-[8px] font-bold text-green-400 opacity-0 group-hover:opacity-100 transition-opacity">₹{day.sales}</span>
                     <div 
                       style={{ height: `${day.percentage}%` }} 
-                      className="w-gradient-to-t from-orange-600 to-orange-400 rounded-t-lg min-h-[4px] relative"
+                      className="w-full bg-gradient-to-t from-orange-600 to-orange-400 rounded-t-lg min-h-[4px] relative"
                     ></div>
                     <span className="text-[9px] font-bold text-gray-555 uppercase mt-1">{day.label}</span>
                   </div>
@@ -1968,7 +2023,6 @@ Report generated automatically by Bum Bum Cafe POS.`
               </div>
             </div>
 
-            {/* Reset All Sales Data Switch Button inside the grid */}
             <div className="grid grid-cols-2 gap-3 bg-[#111]/30 border border-white/5 p-4 rounded-[2rem] shadow-xl">
               <button onClick={handleResetSalesData} className="bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/20 font-black text-xs py-4 px-3 rounded-2xl flex items-center justify-center gap-2 active:scale-95 transition-all uppercase font-mono">
                 Reset All Sales Data 🚫
@@ -1987,9 +2041,8 @@ Report generated automatically by Bum Bum Cafe POS.`
               </button>
             </div>
 
-            {/* Permanent Financial Ledger */}
             <div className="space-y-4 font-mono">
-              <h4 className="text-sm font-black text-gray-400 uppercase tracking-widest pt-2">📚 Permanent Financial Ledger</h4>
+              <h4 className="text-sm font-black text-gray-405 uppercase tracking-widest pt-2">📚 Permanent Financial Ledger</h4>
               {orders.length === 0 ? (
                 <p className="text-center text-gray-655 py-12 text-xs uppercase font-bold tracking-widest">No transaction data logged...</p>
               ) : (
@@ -2002,7 +2055,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                         </div>
                       )}
                       <div className="flex gap-2.5">
-                        <span className="text-[10px] font-black uppercase text-gray-500">Bill No: #{formatBillNumber(o.billNumber || 0)}</span>
+                        <span className="text-[10px] font-black uppercase text-gray-555">Bill No: #{formatBillNumber(o.billNumber || 0)}</span>
                         <span className="text-[10px] font-black uppercase text-yellow-500">Token: #{o.tokenNumber || "N/A"}</span>
                       </div>
                       <h4 className="font-extrabold text-sm text-gray-300">Name: {o.customerName || "Customer"}</h4>
@@ -2016,7 +2069,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                           </p>
                         ))}
                       </div>
-                      <p className="text-[9px] font-semibold text-gray-600 mt-2 font-sans">{o.timestamp?.toDate ? o.timestamp.toDate().toLocaleString() : 'Just now'}</p>
+                      <p className="text-[9px] font-semibold text-gray-655 mt-2 font-sans">{o.timestamp?.toDate ? o.timestamp.toDate().toLocaleString() : 'Just now'}</p>
                     </div>
                     <div className="text-right flex-shrink-0">
                       <p className={`font-black text-lg leading-none ${o.status === 'rejected' ? 'line-through text-red-500' : 'text-green-400'}`}>₹{o.total}</p>
@@ -2031,7 +2084,7 @@ Report generated automatically by Bum Bum Cafe POS.`
           </div>
         )}
 
-        {/* --- TAB 2: LIVE ORDERS WITH FILTER segments --- */}
+        {/* --- TAB 2: LIVE ORDERS WITH FILTER SEGMENTS --- */}
         {tab === 'orders' && (
           <div className="space-y-4">
             <div className="bg-[#111] border border-white/5 p-4 rounded-3xl grid grid-cols-3 gap-2">
@@ -2117,7 +2170,6 @@ Report generated automatically by Bum Bum Cafe POS.`
               </div>
             </div>
 
-            {/* Sticky Search bar directly aligned under sticky header */}
             <div className="sticky top-[73px] z-30 bg-[#050505]/95 backdrop-blur-md py-4 border-b border-white/5 rounded-b-3xl shadow-lg">
               <div className="relative group max-w-lg mx-auto">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
@@ -2186,7 +2238,7 @@ Report generated automatically by Bum Bum Cafe POS.`
 
                 {variantType === 'pizza_sizes' && (
                   <div className="space-y-3 bg-[#111]/40 p-4 rounded-2xl border border-white/5">
-                    <p className="text-[10px] text-orange-400 font-extrabold uppercase font-sans">Prices (Leave blank if unavailable):</p>
+                    <p className="text-[10px] text-orange-400 font-extrabold uppercase font-sans">Prices:</p>
                     <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-1"><label className="text-xs font-bold text-gray-404 uppercase">Small (₹)</label><input type="number" value={priceSmall} onChange={(e) => setPriceSmall(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-white text-xs font-bold" /></div>
                       <div className="space-y-1"><label className="text-xs font-bold text-gray-404 uppercase">Medium (₹)</label><input type="number" value={priceMedium} onChange={(e) => setPriceMedium(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-white text-xs font-bold" /></div>
@@ -2202,7 +2254,7 @@ Report generated automatically by Bum Bum Cafe POS.`
 
             <div className="space-y-3 pt-2">
               {searchedMenu.length === 0 ? (
-                <p className="text-center text-xs font-black uppercase text-gray-505 py-10">No matching dishes found...</p>
+                <p className="text-center text-xs font-black uppercase text-gray-555 py-10">No matching dishes found...</p>
               ) : (
                 searchedMenu.map((item) => {
                   const getAdminDisplayPrice = (itm: any) => {
@@ -2491,12 +2543,12 @@ Report generated automatically by Bum Bum Cafe POS.`
           </div>
         )}
 
-        {/* --- TAB 7: BANNERS MANAGER WITH ON/OFF SWITCH --- */}
+        {/* --- TAB 7: BANNERS MANAGER --- */}
         {tab === 'banners' && (
           <div className="space-y-6">
             <form onSubmit={handleAddBanner} className="bg-[#020202] border border-white/5 p-6 rounded-[2.5rem] space-y-4">
               <h3 className="text-lg font-black text-orange-500 italic uppercase flex items-center gap-2"><ImageIcon size={18}/> Manage Promo Banners</h3>
-              <p className="text-[10px] text-gray-555 font-bold uppercase leading-normal">यहाँ से आप मुख्य स्क्रीन के बड़े आफर बैनर्स (Image या Video) को जोड़ सकते हैं।</p>
+              <p className="text-[10px] text-gray-555 font-bold uppercase leading-normal">यहाँ से आप मुख्य स्क्रीन के बड़े आफर बैनर्स को जोड़ सकते हैं।</p>
               
               <div className="space-y-1">
                 <label className="text-xs font-bold text-gray-400 uppercase">Banner Title</label>
@@ -2545,7 +2597,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                       <button 
                         type="button"
                         onClick={() => toggleBannerVisibility(b)} 
-                        className={`p-2 rounded-xl transition-all ${b.isVisible !== false ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}
+                        className={`p-2 rounded-xl transition-all ${b.isVisible !== false ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-500'}`}
                         title={b.isVisible !== false ? "Hide Banner" : "Unhide/Show Banner"}
                       >
                         {b.isVisible !== false ? <Eye size={14}/> : <EyeOff size={14}/>}
@@ -2640,7 +2692,6 @@ Report generated automatically by Bum Bum Cafe POS.`
             <h3 className="text-xl font-black text-orange-500 uppercase tracking-wider flex items-center gap-2">🎬 Store Settings (Video, Timings & Map)</h3>
             <p className="text-[10px] text-gray-555 uppercase tracking-widest font-black leading-relaxed font-mono">यहाँ से आप मुख्य होमपेज के पीछे चलने वाले वीडियो, फ़ुटर में दिखने वाली दुकान की टाइमिंग और गूगल मैप लोकेशन बदल सकते हैं।</p>
 
-            {/* 1. Header Video Form */}
             <form onSubmit={handleUpdateHeaderVideo} className="bg-white/[0.02] border border-white/5 p-6 rounded-[2.5rem] space-y-4">
               <p className="text-xs font-black text-orange-400 uppercase tracking-wider">Background Video Settings</p>
               <div className="space-y-1">
@@ -2667,9 +2718,8 @@ Report generated automatically by Bum Bum Cafe POS.`
               <button type="submit" className="w-full bg-green-600 text-white p-4 rounded-xl font-black text-sm uppercase">Update Header Video 🎬</button>
             </form>
 
-            {/* 2. Store Timing & Location Settings Form */}
             <form onSubmit={handleUpdateStoreTimingsAndLocation} className="bg-white/[0.02] border border-white/5 p-6 rounded-[2.5rem] space-y-4">
-              <p className="text-xs font-black text-orange-400 uppercase tracking-wider">Restaurant Opening/Closing Timings & Map Link (फ़ुटर टाइमिंग व लोकेशन)</p>
+              <p className="text-xs font-black text-orange-400 uppercase tracking-wider">Restaurant Opening/Closing Timings & Map Link</p>
               
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-gray-400 uppercase">Timing (Hindi / हिंदी)</label>
@@ -2689,7 +2739,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                   type="text" 
                   value={storeTimingEnglish} 
                   onChange={(e) => setStoreTimingEnglish(e.target.value)} 
-                  placeholder="e.g. 10:00 AM to 11:00 PM"
+                  placeholder="e.g. 10:00 AM to 11:05 PM"
                   className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-xs font-black text-white" 
                   required 
                 />
@@ -2776,7 +2826,7 @@ Report generated automatically by Bum Bum Cafe POS.`
         {tab === 'roster' && (
           <div className="space-y-6">
             <h3 className="text-xl font-black text-orange-500 uppercase tracking-wider flex items-center gap-2"><Settings size={20}/> Kitchen SOP Recipe Roster</h3>
-            <p className="text-[10px] text-gray-555 uppercase tracking-widest font-black leading-relaxed font-mono">डिश बनाने के चरण (Steps) और सामग्री का अनुपात फीड करें, और रसोई की दीवार पर चिपकाने के लिए सीधे A4 साइज़ पोस्टर प्रिंट करें।</p>
+            <p className="text-[10px] text-gray-555 uppercase tracking-widest font-black leading-relaxed font-mono">डिश बनाने के चरण (Steps) और सामग्री का अनुपात फीड करें, और सीधे A4 साइज़ पोस्टर प्रिंट करें।</p>
 
             <div className="bg-[#111] border border-white/5 p-5 rounded-3xl space-y-3">
               <label className="text-xs font-bold text-gray-405 uppercase block">Select Dish / डिश चुनें</label>
@@ -2811,10 +2861,10 @@ Report generated automatically by Bum Bum Cafe POS.`
                 </div>
 
                 <form onSubmit={handleAddRosterStep} className="bg-white/[0.02] border border-white/5 p-6 rounded-[2.5rem] space-y-4">
-                  <h4 className="text-xs font-black text-orange-500 uppercase">Add SOP Step / नया चरण जोड़ें</h4>
+                  <h4 className="text-xs font-black text-orange-500 uppercase">Add SOP Step</h4>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-gray-455 uppercase">Ingredient / Action (क्या डालें)</label>
+                      <label className="text-[10px] font-bold text-gray-455 uppercase">Ingredient / Action</label>
                       <input type="text" placeholder="e.g. Pizza Base / Cheese" value={rosterStepName} onChange={(e) => setRosterStepName(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-xs font-bold text-white" required />
                     </div>
                     <div className="space-y-1">
@@ -2823,7 +2873,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                     </div>
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-gray-405 uppercase">Special Cooking Instruction (विशेष निर्देश)</label>
+                    <label className="text-[10px] font-bold text-gray-405 uppercase">Special Cooking Instruction</label>
                     <input type="text" placeholder="e.g. ओवन में डालने से पहले अच्छे से सेकें (Optional)" value={rosterStepNote} onChange={(e) => setRosterStepNote(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-xs font-bold text-white" />
                   </div>
                   <button type="submit" className="w-full bg-green-600 text-white p-3.5 rounded-xl font-black text-xs uppercase">Add Step to Recipe</button>
@@ -2867,7 +2917,7 @@ Report generated automatically by Bum Bum Cafe POS.`
               
               <textarea 
                 rows={2}
-                placeholder="उदा: शुभम द्विवेदी जी (टाउन) ने अभी-अभी 'स्पेशल थाली' आर्डर की 🍱" 
+                placeholder="उदा: शुभम द्विवेदी जी ने अभी 'स्पेशल थाली' आर्डर की 🍱" 
                 value={newProofText}
                 onChange={(e) => setNewProofText(e.target.value)}
                 className="w-full bg-black/40 border border-white/10 rounded-xl p-4 text-xs text-white outline-none font-bold animate-none"
@@ -2895,7 +2945,7 @@ Report generated automatically by Bum Bum Cafe POS.`
           <div className="space-y-6">
             <div>
               <h3 className="text-xl font-black text-orange-500 uppercase tracking-wider flex items-center gap-2">📢 Points Claims Manager</h3>
-              <p className="text-[10px] text-gray-505 font-bold uppercase mt-1">वेरिफाई करें कि क्या यूज़र ने आपको वाकई सोशल मीडिया पर फॉलो किया है</p>
+              <p className="text-[10px] text-gray-505 font-bold uppercase mt-1">वेरिफाई करें कि क्या यूज़र ने आपको सोशल मीडिया पर फॉलो किया है</p>
             </div>
 
             <div className="space-y-3">
@@ -2922,7 +2972,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                           onClick={() => handleVerifyClaimApproval(claim)} 
                           className="flex-1 bg-green-600 text-white font-black py-1.5 rounded text-[9px] uppercase flex items-center justify-center gap-1 shadow-md"
                         >
-                          <CheckCircle size={10}/> Accept (+1 Point)
+                          <CheckCircle2 size={10}/> Accept (+1 Point)
                         </button>
                         <button 
                           onClick={() => handleRejectClaim(claim.id)} 
@@ -2992,11 +3042,10 @@ Report generated automatically by Bum Bum Cafe POS.`
             {/* 2. DYNAMIC STAFF MANAGEMENT DIRECTORY */}
             <div className="bg-white/[0.02] border border-white/5 p-6 rounded-[2.5rem] space-y-5">
               <div>
-                <h4 className="text-sm font-black text-yellow-400 uppercase tracking-widest flex items-center gap-1.5">👥 Staff Accounts Registry (Kitchen & Delivery)</h4>
-                <p className="text-[9px] text-gray-555 font-bold uppercase mt-1 leading-relaxed">यहाँ से आप Kitchen, Riders/Delivery और Cashier के लिए नया यूज़र बना सकते हैं, उनका PIN बदल सकते हैं व मैनेज कर सकते हैं:</p>
+                <h4 className="text-sm font-black text-yellow-400 uppercase tracking-widest flex items-center gap-1.5">👥 Staff Accounts Registry</h4>
+                <p className="text-[9px] text-gray-555 font-bold uppercase mt-1 leading-relaxed">यहाँ से आप Kitchen, Riders और Cashier के लिए नया यूज़र बना सकते हैं:</p>
               </div>
 
-              {/* Add Staff Member Form */}
               {!editingStaffId ? (
                 <form onSubmit={handleAddStaff} className="bg-black/40 border border-white/5 p-4 rounded-2xl space-y-3.5 text-xs font-bold text-left">
                   <p className="text-[9px] font-black text-orange-500 uppercase tracking-wider">➕ Add Staff Member / नया स्टाफ जोड़ें</p>
@@ -3011,10 +3060,10 @@ Report generated automatically by Bum Bum Cafe POS.`
                     </div>
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[9px] text-gray-555 uppercase">Staff Role / विभाग</label>
+                    <label className="text-[9px] text-gray-555 uppercase">Staff Role</label>
                     <select value={newStaffRole} onChange={(e) => setNewStaffRole(e.target.value)} className="w-full bg-neutral-900 border border-white/10 rounded-lg p-2.5 text-white outline-none cursor-pointer">
-                      <option value="delivery">Rider / Delivery Boy 🛵 (Delivery User)</option>
-                      <option value="kitchen">Cook / Kitchen Staff 👨‍🍳 (Kitchen User)</option>
+                      <option value="delivery">Rider / Delivery Boy 🛵</option>
+                      <option value="kitchen">Cook / Kitchen Staff 👨‍🍳</option>
                       <option value="cashier">Cashier / Counter Manager 💼</option>
                     </select>
                   </div>
@@ -3048,7 +3097,6 @@ Report generated automatically by Bum Bum Cafe POS.`
                 </form>
               )}
 
-              {/* Staff Accounts List Directory */}
               <div className="space-y-2 pt-2">
                 <p className="text-[10px] font-bold text-gray-400 uppercase">Registered Staff Directory ({staff.length})</p>
                 {staff.length === 0 ? (
@@ -3066,7 +3114,6 @@ Report generated automatically by Bum Bum Cafe POS.`
                         </div>
                         
                         <div className="flex items-center gap-3">
-                          {/* PIN Hide/Reveal Widget */}
                           <div className="flex items-center gap-1.5 bg-black/50 border border-white/5 px-2.5 py-1.5 rounded-xl">
                             <span className="text-[10px] font-mono text-orange-400 tracking-wider">
                               PIN: {isPinRevealed ? member.pin : '••••'}
@@ -3075,6 +3122,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                               onClick={() => setRevealPinId(isPinRevealed ? null : member.id)}
                               className="text-gray-400 hover:text-white"
                               title="Toggle PIN Visibility"
+                              type="button"
                             >
                               {isPinRevealed ? <EyeOff size={12}/> : <Eye size={12}/>}
                             </button>
@@ -3089,6 +3137,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                             }}
                             className="p-2 bg-blue-500/10 text-blue-400 rounded-xl"
                             title="Edit / Change PIN"
+                            type="button"
                           >
                             <Edit size={12}/>
                           </button>
@@ -3096,6 +3145,7 @@ Report generated automatically by Bum Bum Cafe POS.`
                             onClick={() => handleDeleteStaff(member.id)}
                             className="p-2 bg-red-500/10 text-red-500 rounded-xl"
                             title="Delete"
+                            type="button"
                           >
                             <Trash size={12}/>
                           </button>
@@ -3106,6 +3156,128 @@ Report generated automatically by Bum Bum Cafe POS.`
                 )}
               </div>
             </div>
+
+            {/* 3. GODOWN STOCK HELPERS APP USERS PANEL (cafe_users Collection) [2] */}
+            {userRole === 'admin' && (
+              <div className="bg-white/[0.02] border border-white/5 p-6 rounded-[2.5rem] space-y-5">
+                <div>
+                  <h4 className="text-sm font-black text-orange-500 uppercase tracking-widest flex items-center gap-1.5">
+                    📦 Godown Helpers Directory (bbcafehelper users)
+                  </h4>
+                  <p className="text-[9px] text-gray-555 font-bold uppercase mt-1 leading-relaxed">
+                    यहाँ से आप गोदाम स्टॉक हेल्पर यूज़र्स (bbcafehelper app) के PIN बदल सकते हैं, नए यूज़र्स को जोड़ सकते हैं या हटा सकते हैं [2]:
+                  </p>
+                </div>
+
+                {!editingHelperId ? (
+                  <form onSubmit={handleAddHelperUserSubmit} className="bg-black/40 border border-white/5 p-4 rounded-2xl space-y-3.5 text-xs font-bold text-left">
+                    <p className="text-[9px] font-black text-orange-500 uppercase tracking-wider">➕ Add Godown Stock User</p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <label className="text-[9px] text-gray-555 uppercase">User Name</label>
+                        <input type="text" placeholder="e.g. MOHIT" value={newHelperName} onChange={(e) => setNewHelperName(e.target.value)} className="w-full bg-neutral-900 border border-white/10 rounded-lg p-2.5 text-white outline-none" required />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[9px] text-gray-555 uppercase">Personal PIN (4-6 Digits)</label>
+                        <input type="password" maxLength={6} placeholder="e.g. 5678" value={newHelperPin} onChange={(e) => setNewHelperPin(e.target.value)} className="w-full bg-neutral-900 border border-white/10 rounded-lg p-2.5 text-white outline-none text-center tracking-widest" required />
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[9px] text-gray-555 uppercase">Role / अधिकार</label>
+                      <select value={newHelperRole} onChange={(e: any) => setNewHelperRole(e.target.value)} className="w-full bg-neutral-900 border border-white/10 rounded-lg p-2.5 text-white outline-none cursor-pointer">
+                        <option value="staff">Staff / गोदाम यूज़र</option>
+                        <option value="admin">Admin / प्रशासक</option>
+                      </select>
+                    </div>
+                    <button type="submit" className="w-full bg-green-600 text-white p-2.5 rounded-lg font-black uppercase text-[10px]">Add Helper User</button>
+                  </form>
+                ) : (
+                  <form onSubmit={handleUpdateHelperUser} className="bg-orange-500/5 border border-orange-500/20 p-4 rounded-2xl space-y-3.5 text-xs font-bold text-left">
+                    <p className="text-[9px] font-black text-orange-500 uppercase tracking-wider">✏️ Edit Godown User & PIN</p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <label className="text-[9px] text-gray-555 uppercase">User Name</label>
+                        <input type="text" value={editingHelperName} onChange={(e) => setEditingHelperName(e.target.value)} className="w-full bg-neutral-900 border border-white/10 rounded-lg p-2.5 text-white outline-none" required />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[9px] text-gray-555 uppercase">New PIN</label>
+                        <input type="password" maxLength={6} value={editingHelperPin} onChange={(e) => setEditingHelperPin(e.target.value)} className="w-full bg-neutral-900 border border-white/10 rounded-lg p-2.5 text-white outline-none text-center tracking-widest" required />
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[9px] text-gray-555 uppercase">Role</label>
+                      <select value={editingHelperRole} onChange={(e: any) => setEditingHelperRole(e.target.value)} className="w-full bg-neutral-900 border border-white/10 rounded-lg p-2.5 text-white outline-none cursor-pointer">
+                        <option value="staff">Staff / गोदाम यूज़र</option>
+                        <option value="admin">Admin / प्रशासक</option>
+                      </select>
+                    </div>
+                    <div className="flex gap-2">
+                      <button type="submit" className="flex-1 bg-green-600 text-white p-2.5 rounded-lg font-black uppercase text-[10px]">Save Changes</button>
+                      <button type="button" onClick={() => setEditingHelperId(null)} className="bg-white/5 text-gray-404 p-2.5 rounded-lg font-black uppercase text-[10px]">Cancel</button>
+                    </div>
+                  </form>
+                )}
+
+                <div className="space-y-2 pt-2">
+                  <p className="text-[10px] font-bold text-gray-400 uppercase">Registered Godown Helpers ({cafeHelperUsers.length})</p>
+                  {cafeHelperUsers.length === 0 ? (
+                    <p className="text-center text-[10px] text-gray-505 uppercase font-bold py-4">No Stock Helpers registered yet.</p>
+                  ) : (
+                    cafeHelperUsers.map((member) => {
+                      const isPinRevealed = revealHelperPinId === member.id;
+                      return (
+                        <div key={member.id} className="bg-black/30 border border-white/5 p-3.5 rounded-2xl flex justify-between items-center text-xs font-bold gap-4">
+                          <div>
+                            <p className="text-white font-black">{member.name}</p>
+                            <span className="text-[8px] font-black uppercase px-2 py-0.5 bg-orange-500/10 text-orange-400 rounded-md mt-1 inline-block">
+                              {member.role === 'admin' ? 'Admin 👑' : 'Staff 📦'}
+                            </span>
+                          </div>
+                          
+                          <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-1.5 bg-black/50 border border-white/5 px-2.5 py-1.5 rounded-xl">
+                              <span className="text-[10px] font-mono text-orange-400 tracking-wider">
+                                PIN: {isPinRevealed ? member.pin : '••••'}
+                              </span>
+                              <button 
+                                onClick={() => setRevealHelperPinId(isPinRevealed ? null : member.id)}
+                                className="text-gray-400 hover:text-white"
+                                title="Toggle PIN Visibility"
+                                type="button"
+                              >
+                                {isPinRevealed ? <EyeOff size={12}/> : <Eye size={12}/>}
+                              </button>
+                            </div>
+
+                            <button 
+                              onClick={() => {
+                                setEditingHelperId(member.id);
+                                setEditingHelperName(member.name);
+                                setEditingHelperRole(member.role || 'staff');
+                                setEditingHelperPin(member.pin);
+                              }}
+                              className="p-2 bg-blue-500/10 text-blue-400 rounded-xl"
+                              title="Edit / Change PIN"
+                              type="button"
+                            >
+                              <Edit size={12}/>
+                            </button>
+                            <button 
+                              onClick={() => handleRemoveHelperUser(member.id)}
+                              className="p-2 bg-red-500/10 text-red-500 rounded-xl"
+                              title="Delete"
+                              type="button"
+                            >
+                              <Trash size={12}/>
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Table QR Code Generator Widget */}
             <div className="bg-[#111] border border-white/5 p-6 rounded-[2.5rem] space-y-4">
