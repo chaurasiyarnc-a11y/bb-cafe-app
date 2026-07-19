@@ -64,7 +64,7 @@ export default function AdminDashboard() {
   const [isVerified, setIsVerified] = useState(false);
   const [loading, setLoading] = useState(true);
   const [passcode, setPasscode] = useState("");
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false); // मोबाइल मेन्यू स्टेट
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   
   // टाइपस्क्रिप्ट टैब एलीआस लिस्ट
   const [tab, setTab] = useState<'dashboard' | 'orders' | 'menu' | 'categories' | 'customers' | 'loyalty' | 'banners' | 'reels' | 'header_video' | 'reviews' | 'coupons' | 'roster' | 'proofs' | 'claims' | 'security' | 'settings'>('dashboard');
@@ -111,8 +111,8 @@ export default function AdminDashboard() {
     } catch (e) {}
   };
 
-  // त्वरित सेल्स फ़िल्टर लागू करना
-  const applyQuickSalesFilter = (type: 'today' | 'yesterday' | 'week') => {
+  // त्वरित सेल्स फ़िल्टर लागू करना (यहाँ "month" का सपोर्ट जोड़ दिया गया है)
+  const applyQuickSalesFilter = (type: 'today' | 'yesterday' | 'week' | 'month') => {
     const today = new Date();
     if (type === 'today') {
       const todayStr = today.toISOString().split('T')[0];
@@ -128,6 +128,11 @@ export default function AdminDashboard() {
       const weekAgo = new Date();
       weekAgo.setDate(today.getDate() - 7);
       setStartDate(weekAgo.toISOString().split('T')[0]);
+      setEndDate(today.toISOString().split('T')[0]);
+    } else if (type === 'month') {
+      const monthAgo = new Date();
+      monthAgo.setMonth(today.getMonth() - 1);
+      setStartDate(monthAgo.toISOString().split('T')[0]);
       setEndDate(today.toISOString().split('T')[0]);
     }
     toast.success(`Filter Applied: ${type.toUpperCase()}`);
@@ -623,7 +628,7 @@ Thank you for your order, *${order.customerName || 'Guest'}*! Visit Again! 😊`
     { id: 'menu', label: 'Menu List', icon: UtensilsCrossed },
     { id: 'customers', label: 'Customers', icon: Users },
     { id: 'loyalty', label: 'Loyalty System', icon: Award },
-    { id: 'settings', label: 'Settings', icon: Settings, highlight: true } // Settings को हाईलाइट करने के लिए विशेष फ्लैग
+    { id: 'settings', label: 'Settings', icon: Settings, highlight: true }
   ];
 
   return (
@@ -695,7 +700,7 @@ Thank you for your order, *${order.customerName || 'Guest'}*! Visit Again! 😊`
                 key={item.id}
                 onClick={() => {
                   setTab(item.id as any);
-                  setMobileMenuOpen(false); // मोबाइल पर क्लिक होने पर बंद करें
+                  setMobileMenuOpen(false);
                 }}
                 className={`w-full flex items-center justify-between px-4 py-3.5 rounded-2xl text-xs font-bold transition-all uppercase tracking-wider ${
                   isActive 
