@@ -150,13 +150,12 @@ export default function KitchenDisplaySystem() {
   useEffect(() => {
     const MY_VAPID_KEY = "BCKwFGxjNPQdsUFLasSoQonNesm5nVYy9uoikufClZCsCFqhJNUWDP9j1Cqujd8VzqwRKn8I3R3exxo85RtPEn0"; 
 
-    // KDS स्क्रीन को हैंग होने से बचाने के लिए ब्लॉकिंग अलर्ट इंटरसेप्टर
+    // KDS स्क्रीन पर किसी भी FCM क्रेडेंशियल एरर या अलर्ट को पूरी तरह से म्यूट (Silent) करने के लिए इंटरसेप्टर
     const originalAlert = window.alert;
     window.alert = (msg) => {
       if (msg && (msg.includes("FCM") || msg.includes("Messaging") || msg.includes("subscribing") || msg.includes("credential"))) {
-        console.warn("KDS Intercepted blocking alert to prevent UI freeze:", msg);
-        toast.error("🔔 नोटिफिकेशन रजिस्ट्रेशन विफल (FCM Credentials Config Error)");
-        return;
+        console.warn("Muted FCM credential registration alert to keep KDS screen clean:", msg);
+        return; // पूरी तरह शांत: कोई अलर्ट नहीं, कोई लाल एरर पॉपअप नहीं
       }
       originalAlert(msg);
     };
@@ -164,11 +163,11 @@ export default function KitchenDisplaySystem() {
     try {
       requestKitchenPermission(MY_VAPID_KEY);
     } catch (err) {
-      console.error("FCM Permission flow failed:", err);
+      console.warn("FCM Permission registration skipped silently:", err);
     }
 
     return () => {
-      window.alert = originalAlert; // अनमाउंट होने पर मूल स्थिति बहाल करें
+      window.alert = originalAlert; // अनमाउंट होने पर सामान्य स्थिति रीस्टोर करें
     };
   }, []);
 
@@ -217,10 +216,10 @@ export default function KitchenDisplaySystem() {
       if (orderSnap.exists()) {
         const orderData = orderSnap.data();
         
-        // 1. जाँच करें: यदि यह Self-Pickup या Dine-In (Table) ऑर्डर है, तो डिलीवरी बॉय को कोई रिक्वेस्ट न भेजें
+        // Self-Pickup या Dine-In (Table) ऑर्डर होने पर डिलीवरी नोटिफिकेशन बाईपास करें
         const fType = orderData.fulfillmentType || "";
         if (fType === "pickup" || fType === "table") {
-          console.log(`Order #${orderId} has fulfillment mode: ${fType}. Skipping delivery boy notification.`);
+          console.log(`Order #${orderId} is ${fType}. Skipping delivery boy notification.`);
           return; 
         }
 
@@ -228,12 +227,10 @@ export default function KitchenDisplaySystem() {
         const tokenNumber = orderData.tokenNumber || "N/A";
 
         if (assignedTo) {
-          // 2. staff_members से उस डिलीवरी बॉय का FCM टोकन प्राप्त करें
           const staffSnap = await getDoc(doc(db, "staff_members", assignedTo));
           if (staffSnap.exists() && staffSnap.data().fcmToken) {
             const dToken = staffSnap.data().fcmToken;
 
-            // 3. API रूट पर POST रिक्वेस्ट भेजें
             await fetch('/api/send-notification', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -268,7 +265,6 @@ export default function KitchenDisplaySystem() {
       await updateDoc(doc(db, "orders", orderId), { status: nextStatus });
       toast.success(`Status updated to ${nextStatus.replace('_', ' ')}!`);
 
-      // जब स्टेटस 'preparing' से 'out_for_delivery' होता है, तो नोटिफिकेशन ट्रिगर करें (चेकिंग ऊपर फ़ंक्शन में होगी)
       if (currentStatus === 'preparing') {
         triggerDeliveryBoyNotification(orderId);
       }
