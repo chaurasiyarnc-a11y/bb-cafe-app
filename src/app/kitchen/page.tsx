@@ -150,12 +150,27 @@ export default function KitchenDisplaySystem() {
   useEffect(() => {
     const MY_VAPID_KEY = "BCKwFGxjNPQdsUFLasSoQonNesm5nVYy9uoikufClZCsCFqhJNUWDP9j1Cqujd8VzqwRKn8I3R3exxo85RtPEn0"; 
 
-    // KDS स्क्रीन पर किसी भी FCM क्रेडेंशियल एरर या अलर्ट को पूरी तरह से म्यूट (Silent) करने के लिए इंटरसेप्टर
+    // KDS स्क्रीन पर किसी भी FCM, सर्विस वर्कर, टोकन या परमिशन के अलर्ट को पूरी तरह से म्यूट (Silent) करने के लिए इंटरसेप्टर
     const originalAlert = window.alert;
     window.alert = (msg) => {
-      if (msg && (msg.includes("FCM") || msg.includes("Messaging") || msg.includes("subscribing") || msg.includes("credential"))) {
-        console.warn("Muted FCM credential registration alert to keep KDS screen clean:", msg);
-        return; // पूरी तरह शांत: कोई अलर्ट नहीं, कोई लाल एरर पॉपअप नहीं
+      if (
+        msg && 
+        (
+          msg.includes("FCM") || 
+          msg.includes("Messaging") || 
+          msg.includes("subscribing") || 
+          msg.includes("credential") ||
+          msg.includes("टोकन") ||
+          msg.includes("सर्विस वर्कर") ||
+          msg.includes("परमिशन") ||
+          msg.includes("रजिस्टर") ||
+          msg.includes("फ़ायरबेस") ||
+          msg.includes("status") ||
+          msg.includes("granted")
+        )
+      ) {
+        console.log("Muted KDS popup alert silently:", msg);
+        return; // म्यूट कर दिया! कोई ब्राउज़र डायलॉग नहीं दिखेगा।
       }
       originalAlert(msg);
     };
