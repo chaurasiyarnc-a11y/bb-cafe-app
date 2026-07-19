@@ -1,10 +1,9 @@
 'use client';
 import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../../lib/firebase';
-import { collection, onSnapshot, query, doc, updateDoc, orderBy, getDoc, where, getDocs } from 'firebase/firestore';
-import { Clock, Check, Loader2, Play, Lock, AlertCircle, WifiOff, X } from 'lucide-react';
+import { collection, onSnapshot, query, doc, updateDoc, getDoc, where, getDocs } from 'firebase/firestore';
+import { Clock, Check, Loader2, Play, Lock, WifiOff, X } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
-// नया इम्पोर्ट: नोटिफिकेशन हेल्पर फ़ाइल से जोड़ा गया है
 import { requestKitchenPermission } from '../../lib/messaging';
 
 export default function KitchenDisplaySystem() {
@@ -49,7 +48,7 @@ export default function KitchenDisplaySystem() {
     };
     fetchPins();
 
-    // Register Service Worker for PWA (Browser installation ke liye)
+    // Register Service Worker for PWA
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/sw.js')
         .then((reg) => console.log('KDS Service Worker Registered Successfully!', reg.scope))
@@ -57,11 +56,10 @@ export default function KitchenDisplaySystem() {
     }
   }, []);
 
-  // Real-time simple query with Client-side filtering & Database-level optimization (Daily Orders Only!)
+  // Real-time simple query with Client-side filtering (Daily Orders Only!)
   useEffect(() => {
     if (isLocked) return;
 
-    // OPTIMIZATION: Database se sirf wahi orders bhejenge jo active hain
     const qSimple = query(
       collection(db, "orders"),
       where("status", "in", ["pending", "preparing", "out_for_delivery"])
@@ -70,25 +68,21 @@ export default function KitchenDisplaySystem() {
     const unsub = onSnapshot(qSimple, (snap) => {
       const activeOrdersList = snap.docs.map(d => ({ id: d.id, ...d.data() as any }));
       
-      // Aaj ka din shuru hone ka sateek samay (00:00 AM) nikalna
       const todayStart = new Date();
       todayStart.setHours(0, 0, 0, 0);
 
-      // Client-side filtering for active & today's orders only (Daily orders filter)
       const kitchenOrders = activeOrdersList.filter((o: any) => {
         if (!o.timestamp) return false;
         const orderDate = o.timestamp?.toDate ? o.timestamp.toDate() : new Date(o.timestamp);
         return orderDate >= todayStart;
       });
 
-      // CLIENT-SIDE SORTING: Order sequence list ko time ke hisab se manually line me lagana
       kitchenOrders.sort((a, b) => {
         const tA = a.timestamp?.toDate ? a.timestamp.toDate() : new Date(a.timestamp || 0);
         const tB = b.timestamp?.toDate ? b.timestamp.toDate() : new Date(b.timestamp || 0);
         return tA.getTime() - tB.getTime();
       });
       
-      // Sound alert logic for daily new orders
       if (prevOrdersCountRef.current !== null && kitchenOrders.length > prevOrdersCountRef.current) {
         playAlertSound();
         toast.success("🚨 रसोई घर: नया आर्डर आया है!");
@@ -132,10 +126,8 @@ export default function KitchenDisplaySystem() {
       }
     };
 
-    // Trigger wake lock initially when KDS is unlocked
     requestWakeLock();
 
-    // Re-acquire wake lock if the app goes to background and comes back to screen
     const handleVisibilityChange = async () => {
       if (wakeLock !== null && document.visibilityState === 'visible') {
         await requestWakeLock();
@@ -154,21 +146,37 @@ export default function KitchenDisplaySystem() {
     };
   }, [isLocked]);
 
-  // --- नया और संशोधित: किचन नोटिफिकेशन परमिशन रजिस्टर (FCM - On Mount) ---
+  // --- किचन नोटिफिकेशन परमिशन रजिस्टर (FCM - On Mount) ---
   useEffect(() => {
-    // यहाँ 'ufCIZCs' (बड़े 'I') की जगह 'ufClZCs' (छोटा 'l' - L) करके VAPID Key को सही कर दिया गया है
     const MY_VAPID_KEY = "BCKwFGxjNPQdsUFLasSoQonNesm5nVYy9uoikufClZCsCFqhJNUWDP9j1Cqujd8VzqwRKn8I3R3exxo85RtPEn0"; 
 
-    // सीधा ऑन-माउंट रन करें ताकि यह पेज लोड होते ही तुरंत अनुमति की जांच करे
-    requestKitchenPermission(MY_VAPID_KEY);
-  }, []); // [] का मतलब है कि यह पेज के खुलते ही तुरंत बिना किसी रुकावट के रन होगा
+    // KDS स्क्रीन को हैंग होने से बचाने के लिए ब्लॉकिंग अलर्ट इंटरसेप्टर
+    const originalAlert = window.alert;
+    window.alert = (msg) => {
+      if (msg && (msg.includes("FCM") || msg.includes("Messaging") || msg.includes("subscribing") || msg.includes("credential"))) {
+        console.warn("KDS Intercepted blocking alert to prevent UI freeze:", msg);
+        toast.error("🔔 नोटिफिकेशन रजिस्ट्रेशन विफल (FCM Credentials Config Error)");
+        return;
+      }
+      originalAlert(msg);
+    };
+
+    try {
+      requestKitchenPermission(MY_VAPID_KEY);
+    } catch (err) {
+      console.error("FCM Permission flow failed:", err);
+    }
+
+    return () => {
+      window.alert = originalAlert; // अनमाउंट होने पर मूल स्थिति बहाल करें
+    };
+  }, []);
 
   // LOGIN: Verifies Entered PIN against personal Cook account in Firestore
   const handlePinSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const toastId = toast.loading("Verifying kitchen credentials...");
     try {
-      // 1. MASTER ADMIN PIN OVERRIDE (Backup bypass)
       if (pinInput === passcodes.adminPin) {
         toast.dismiss(toastId);
         localStorage.setItem('bb_kds_verified', 'true');
@@ -178,7 +186,6 @@ export default function KitchenDisplaySystem() {
         return;
       }
 
-      // 2. PERSONAL COOK PIN CHECK
       const q = query(
         collection(db, "staff_members"),
         where("pin", "==", pinInput),
@@ -203,14 +210,20 @@ export default function KitchenDisplaySystem() {
     }
   };
 
-  // --- नया: डिलीवरी बॉय को पुश नोटिफिकेशन भेजने की क्रिया ---
+  // --- डिलीवरी बॉय को पुश नोटिफिकेशन भेजने की क्रिया (केवल Delivery ऑर्डर्स के लिए) ---
   const triggerDeliveryBoyNotification = async (orderId: string) => {
     try {
-      // 1. डेटाबेस से ऑर्डर विवरण और असाइन डिलीवरी बॉय का नाम निकालें
       const orderSnap = await getDoc(doc(db, "orders", orderId));
       if (orderSnap.exists()) {
         const orderData = orderSnap.data();
-        // आपके डेटाबेस स्ट्रक्चर के अनुसार आर्डर में असाइन डिलीवरी बॉय की ID (assignedTo या deliveryBoyId)
+        
+        // 1. जाँच करें: यदि यह Self-Pickup या Dine-In (Table) ऑर्डर है, तो डिलीवरी बॉय को कोई रिक्वेस्ट न भेजें
+        const fType = orderData.fulfillmentType || "";
+        if (fType === "pickup" || fType === "table") {
+          console.log(`Order #${orderId} has fulfillment mode: ${fType}. Skipping delivery boy notification.`);
+          return; 
+        }
+
         const assignedTo = orderData.assignedTo || orderData.deliveryBoyId;
         const tokenNumber = orderData.tokenNumber || "N/A";
 
@@ -220,7 +233,7 @@ export default function KitchenDisplaySystem() {
           if (staffSnap.exists() && staffSnap.data().fcmToken) {
             const dToken = staffSnap.data().fcmToken;
 
-            // 3. हमारे API रूट पर POST रिक्वेस्ट भेजें
+            // 3. API रूट पर POST रिक्वेस्ट भेजें
             await fetch('/api/send-notification', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -255,7 +268,7 @@ export default function KitchenDisplaySystem() {
       await updateDoc(doc(db, "orders", orderId), { status: nextStatus });
       toast.success(`Status updated to ${nextStatus.replace('_', ' ')}!`);
 
-      // नया: जब स्टेटस 'preparing' (तैयार हो रहा है) से 'out_for_delivery' (तैयार है/वितरण पर है) होता है
+      // जब स्टेटस 'preparing' से 'out_for_delivery' होता है, तो नोटिफिकेशन ट्रिगर करें (चेकिंग ऊपर फ़ंक्शन में होगी)
       if (currentStatus === 'preparing') {
         triggerDeliveryBoyNotification(orderId);
       }
@@ -264,7 +277,7 @@ export default function KitchenDisplaySystem() {
     }
   };
 
-  // NEW FUNCTION: Mark order as Fake / Rejected
+  // Mark order as Fake / Rejected
   const handleRejectOrder = async (orderId: string) => {
     triggerHaptic(50);
     if (!window.confirm("क्या आप वाकई इस आर्डर को 'फेक आर्डर' मानकर रिजेक्ट करना चाहते हैं?")) return;
@@ -298,7 +311,6 @@ export default function KitchenDisplaySystem() {
   if (isLocked) {
     return (
       <div className="bg-[#050505] min-h-screen text-white flex items-center justify-center p-4">
-        {/* Linked dedicated Kitchen manifest */}
         <link rel="manifest" href="/kitchen-manifest.json" />
         <Toaster />
         <div className="w-full max-w-sm bg-white/[0.02] border border-white/5 p-8 rounded-[2.5rem] space-y-6 shadow-2xl text-center relative overflow-hidden">
@@ -335,7 +347,6 @@ export default function KitchenDisplaySystem() {
   if (loading) {
     return (
       <div className="bg-[#050505] min-h-screen text-white flex flex-col items-center justify-center">
-        {/* Linked dedicated Kitchen manifest */}
         <link rel="manifest" href="/kitchen-manifest.json" />
         <Loader2 className="animate-spin text-orange-500 mb-2" size={32} />
         <p className="text-[10px] font-black uppercase tracking-widest text-gray-500">Kitchen Display Syncing...</p>
@@ -345,7 +356,6 @@ export default function KitchenDisplaySystem() {
 
   return (
     <div className="bg-[#080808] min-h-screen text-white p-6 font-sans">
-      {/* Linked dedicated Kitchen manifest */}
       <link rel="manifest" href="/kitchen-manifest.json" />
       <Toaster />
       <header className="border-b border-white/5 pb-4 mb-6 flex justify-between items-center">
@@ -356,7 +366,6 @@ export default function KitchenDisplaySystem() {
           <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Kitchen Order Screen • Real-time Cooking</p>
         </div>
         <div className="flex items-center gap-3">
-          {/* Cafe Open/Close Status Toggle Button */}
           <button
             onClick={handleToggleStoreStatus}
             className={`px-4 py-2 rounded-full text-xs font-black uppercase transition-all shadow border ${isStoreOpen ? 'bg-green-600/10 text-green-500 border-green-500/20' : 'bg-red-600/10 text-red-500 border-red-500/20'}`}
