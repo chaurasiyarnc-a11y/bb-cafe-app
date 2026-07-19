@@ -426,126 +426,27 @@ export default function AdminDashboard() {
     printWindow.document.close();
   };
 
-  const applyQuickSalesFilter = (filterType: 'today' | 'yesterday' | 'week' | 'month') => {
-    const now = new Date();
-    let start = new Date();
-    let end = new Date();
-
-    if (filterType === 'today') {
-      start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      end = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    } else if (filterType === 'yesterday') {
-      start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
-      end = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
-    } else if (filterType === 'week') {
-      start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7);
-      end = now;
-    } else if (filterType === 'month') {
-      start = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
-      end = now;
-    }
-
-    setStartDate(start.toISOString().split('T')[0]);
-    setEndDate(end.toISOString().split('T')[0]);
-    toast.success(`${filterType.toUpperCase()} Filter Applied!`);
-  };
-
-  const handleResetSalesData = async () => {
-    if (!window.confirm("⚠️ चेतावनी: क्या आप वाकई सभी सेल डेटा (Orders) को डिलीट करके रीसेट करना चाहते हैं? इसे वापस नहीं लाया जा सकेगा!")) return;
-    const enteredPin = prompt("सुरक्षा के लिए अपना एडमिन पिन दर्ज करें:");
-    if (!enteredPin) return;
-    const isMatched = await verifyPasscode(enteredPin, passcodes.adminPin);
-    if (!isMatched) {
-      return toast.error("गलत पिन दर्ज किया गया! रीसेट रद्द कर दिया गया।");
-    }
-    toast.loading("सेल डेटा रीसेट किया जा रहा है...", { id: "sales-reset" });
-    try {
-      const querySnap = await getDocs(collection(db, "orders"));
-      const deletePromises = querySnap.docs.map(d => deleteDoc(doc(db, "orders", d.id)));
-      await Promise.all(deletePromises);
-      toast.success("सभी सेल डेटा रीसेट कर दिया गया है! 🎉", { id: "sales-reset" });
-    } catch (err) {
-      toast.error("डेटा रीसेट करने में समस्या आई।", { id: "sales-reset" });
-    }
-  };
-
-  const handleSendDailyClosingReport = () => {
-    const countsMap: any = {};
-    orders.forEach(o => {
-      o.items?.forEach((item: any) => {
-        if (!item.name) return;
-        countsMap[item.name] = (countsMap[item.name] || 0) + (Number(item.quantity) || 1);
-      });
-    });
-    const topDishes = Object.entries(countsMap)
-      .map(([name, qty]: any) => ({ name, qty }))
-      .sort((a, b) => b.qty - a.qty)
-      .slice(0, 5);
-
-    const formattedDate = new Date(endDate).toLocaleDateString('en-IN');
-    const topDishesText = topDishes.map((d: any, idx: number) => `${idx + 1}. ${d.name} (${d.qty} times)`).join('\n') || 'None';
-
-    const rangeOrders = orders.filter(o => {
-      const oDate = o.timestamp?.toDate ? o.timestamp.toDate() : new Date(o.timestamp);
-      const startObj = new Date(startDate); startObj.setHours(0,0,0,0);
-      const endObj = new Date(endDate); endObj.setHours(23,59,59,999);
-      return oDate >= startObj && oDate <= endObj && o.status !== "rejected";
-    });
-
-    const rangeRevenue = rangeOrders.reduce((sum, o) => sum + (o.total || 0), 0);
+  // व्हाट्सएप पर बिल भेजने का रीयल-टाइम ट्रिगर
+  const handleSendWhatsAppBill = (order: any) => {
+    const phone = String(order.customerPhone || "").replace("+91", "").trim();
+    if (!phone) return toast.error("Customer phone not found!");
+    const formattedBillNo = formatBillNumber(order.billNumber || 0);
+    const itemsText = order.items?.map((i: any) => `• ${i.name} (x${i.quantity}) - ₹${i.price * i.quantity}`).join('\n') || '';
 
     const message = encodeURIComponent(
-`*BUM BUM CAFE - DAILY CLOSING REPORT*
-*Date:* ${formattedDate}
---------------------------------------
-*Total Orders:* ${rangeOrders.length}
-*Total Revenue:* *₹${rangeRevenue}*
+`*BUM BUM CAFE - INVOICE*
+--------------------------
+*Bill No:* #${formattedBillNo}
+*Token :* #${order.tokenNumber || 'N/A'}
+--------------------------
+${itemsText}
+--------------------------
+*Subtotal:* ₹${order.subtotal || order.total}
+${order.discount ? `*Discount:* -₹${order.discount}\n` : ''}*Grand Total:* *₹${order.total}*
 
-*Top Selling Dishes today:*
-${topDishesText}
---------------------------------------
-Report generated automatically by Bum Bum Cafe POS.`
+Thank you for your order, *${order.customerName || 'Guest'}*! Visit Again! 😊`
     );
-
-    window.open(`https://wa.me/919714293759?text=${message}`, '_blank');
-  };
-
-  const handleExportOrders = () => {
-    const formattedData = orders.map(o => {
-      const itemsSummary = o.items?.map((i: any) => `${i.name} (x${i.quantity})`).join(' | ') || '';
-      const orderDate = o.timestamp?.toDate ? o.timestamp.toDate().toLocaleString() : new Date(o.timestamp).toLocaleString();
-      return {
-        ...o,
-        itemsSummary,
-        date: orderDate,
-        formattedBill: formatBillNumber(o.billNumber || 0)
-      };
-    });
-    const headers = ['Bill No', 'Token No', 'Customer Name', 'Phone Number', 'Delivery Address', 'Items summary', 'Subtotal (₹)', 'Discount Applied (₹)', 'Total Paid (₹)', 'Status', 'Order Date & Time'];
-    const keys = ['formattedBill', 'tokenNumber', 'customerName', 'customerPhone', 'address', 'itemsSummary', 'subtotal', 'discount', 'total', 'status', 'date'];
-    triggerCsvDownload(formattedData, `BumBumCafe_SalesLedger_${new Date().toLocaleDateString()}`, headers, keys);
-  };
-
-  const handleExportCustomers = () => {
-    const seen = new Set();
-    const formattedData: any[] = [];
-    orders.forEach(o => {
-      if (!o.customerPhone) return;
-      const phone = String(o.customerPhone);
-      if (!seen.has(phone)) {
-        seen.add(phone);
-        const formattedDate = o.timestamp?.toDate ? o.timestamp.toDate().toLocaleString() : new Date(o.timestamp).toLocaleString();
-        formattedData.push({
-          name: o.customerName || "Customer",
-          phone: o.customerPhone,
-          address: o.address || "N/A",
-          lastActive: formattedDate
-        });
-      }
-    });
-    const headers = ['Customer Name', 'Mobile Number', 'Last Registered Address', 'Last Active Order Date'];
-    const keys = ['name', 'phone', 'address', 'lastActive'];
-    triggerCsvDownload(formattedData, `BumBumCafe_CustomersDirectory_${new Date().toLocaleDateString()}`, headers, keys);
+    window.open(`https://wa.me/91${phone}?text=${message}`, '_blank');
   };
 
   const toggleStore = async () => {
@@ -619,7 +520,7 @@ Report generated automatically by Bum Bum Cafe POS.`
         </div>
       </header>
 
-      {/* --- मुख्य नेविगेशन टैब्स (Tabs menu) --- */}
+      {/* --- मुख्य नेविगेशन टैब्स --- */}
       <div className="p-4 flex gap-2 overflow-x-auto no-scrollbar border-b border-white/5">
         {[
           { id: 'dashboard', label: '📊 Dashboard' },
@@ -641,7 +542,7 @@ Report generated automatically by Bum Bum Cafe POS.`
         ))}
       </div>
 
-      {/* --- टैब कंटेंट्स की रेंडरिंग (Tab renders) --- */}
+      {/* --- टैब कंटेंट्स की रेंडरिंग --- */}
       <main className="p-4 max-w-2xl mx-auto">
         
         {/* 1. डैशबोर्ड टैब */}
@@ -698,7 +599,7 @@ Report generated automatically by Bum Bum Cafe POS.`
           />
         )}
 
-        {/* 6. मास्टर सेटिंग्स टैब (सारे बचे हुए मॉड्यूल्स) */}
+        {/* 6. मास्टर सेटिंग्स टैब */}
         {tab === 'settings' && (
           <SettingsTab 
             banners={banners}
