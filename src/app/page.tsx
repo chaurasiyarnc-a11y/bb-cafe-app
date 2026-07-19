@@ -1,4 +1,4 @@
- 
+
 
 'use client';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
@@ -138,11 +138,9 @@ export default function BbCafeHome() {
   const [tableNumber, setTableNumber] = useState("Table 1"); 
   const [paymentMethod, setPaymentMethod] = useState<"cod" | "upi">("cod");
 
-  // Changed Language Default to ENGLISH (false) as requested [1]
   const [isHindi, setIsHindi] = useState(false);
   const [customerPoints, setCustomerPoints] = useState<number>(0);
 
-  // Social follow counts initialization with local cache fallback [1]
   const [socialCounts, setSocialCounts] = useState<any>(() => {
     if (typeof window !== 'undefined') {
       const cached = localStorage.getItem('bb_cached_social_counts');
@@ -272,7 +270,7 @@ export default function BbCafeHome() {
   // UI States
   const [showGreeting, setShowGreeting] = useState(true);
 
-  // --- HELPERS, CALCULATIONS & GENERAL UTILS (Declared sequentially for safe scope compile) ---
+  // --- HELPERS, CALCULATIONS & GENERAL UTILS ---
 
   const triggerHaptic = (ms = 35) => {
     if (typeof window !== 'undefined' && window.navigator && window.navigator.vibrate) {
@@ -1028,7 +1026,224 @@ export default function BbCafeHome() {
     }, 1500);
   };
 
-  // --- Real-time Watchers for Dynamic Points, Ledger & Order Status only ---
+  // --- NEW ADDED HANDLERS TO RESOLVE CODE INTEGRITY ---
+
+  const handleScreenshotChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    triggerHaptic();
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsCompressing(true);
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setPaymentScreenshot(reader.result as string);
+      setIsCompressing(false);
+      toast.success(isHindi ? "स्क्रीनशॉट लोड हो गया है!" : "Screenshot attached successfully!");
+    };
+    reader.onerror = () => {
+      setIsCompressing(false);
+      toast.error(isHindi ? "फाइल लोड करने में समस्या आई।" : "Error loading file.");
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleDetectLocation = () => {
+    triggerHaptic();
+    if (typeof window === "undefined" || !navigator.geolocation) {
+      toast.error(isHindi ? "जियोलोकेशन आपके डिवाइस पर समर्थित नहीं है।" : "Geolocation is not supported by your device.");
+      return;
+    }
+
+    const toastId = toast.loading(isHindi ? "लोकेशन खोजी जा रही है..." : "Detecting live location...");
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        const distance = calculateDistanceInKm(latitude, longitude, storeCoordinates.lat, storeCoordinates.lng);
+        setDistanceKm(Number(distance.toFixed(2)));
+
+        setAddress(isHindi ? `लाइव लोकेशन: अक्षांश: ${latitude.toFixed(4)}, देशांतर: ${longitude.toFixed(4)}` : `Live Location: Lat: ${latitude.toFixed(4)}, Lng: ${longitude.toFixed(4)}`);
+        toast.dismiss(toastId);
+        toast.success(isHindi ? "लोकेशन सफलतापूर्वक डिटेक्ट की गई!" : "Location successfully detected!");
+      },
+      (error) => {
+        toast.dismiss(toastId);
+        toast.error(isHindi ? "लोकेशन एक्सेस करने में असमर्थ।" : "Unable to retrieve your location.");
+      },
+      { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+    );
+  };
+
+  const handleShareApp = async () => {
+    triggerHaptic();
+    const shareText = isHindi 
+      ? `बम बम कैफ़े से स्वादिष्ट भोजन आर्डर करें! मेरा इनवाइट कोड इस्तेमाल करें: ${getReferralCode()} 🍕` 
+      : `Order delicious food from Bum Bum Cafe! Use my invite code: ${getReferralCode()} 🍕`;
+    
+    const shareUrl = typeof window !== 'undefined' ? window.location.href : 'https://bbcafe.in';
+
+    const performClipboardCopy = () => {
+      navigator.clipboard.writeText(`${shareText} ${shareUrl}`);
+      toast.success(isHindi ? "शेयर लिंक क्लिपबोर्ड पर कॉपी हो गया!" : "Share link copied to clipboard!");
+      updateShareCount();
+    };
+
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'Bum Bum Cafe',
+          text: shareText,
+          url: shareUrl,
+        });
+        updateShareCount();
+      } catch (err) {
+        performClipboardCopy();
+      }
+    } else {
+      performClipboardCopy();
+    }
+  };
+
+  const updateShareCount = async () => {
+    const nextCount = shareCount + 1;
+    setShareCount(nextCount);
+    if (nextCount % 5 === 0 && customerDetails?.phone) {
+      const phoneClean = customerDetails.phone.replace("+91", "").trim();
+      const userDocRef = doc(db, "customer_points", phoneClean);
+      try {
+        await setDoc(userDocRef, {
+          points: increment(1)
+        }, { merge: true });
+        
+        await addDoc(collection(db, "customer_points", phoneClean, "history"), {
+          type: 'earn',
+          points: 1,
+          description: `Shared app 5 times! 🎁`,
+          timestamp: new Date()
+        });
+        setCustomerPoints(p => p + 1);
+        toast.success(isHindi ? "मुफ़्त +1 पॉइंट आपके अकाउंट में जोड़ा गया!" : "Free +1 point added to your account!");
+      } catch (err) {
+        console.error(err);
+      }
+    }
+  };
+
+  const handleCustomerRedeem = (ruleId: string, rewardName: string, pointsCost: number) => {
+    triggerHaptic();
+    if (!customerDetails?.phone) {
+      toast.error(isHindi ? "कृपया पहले प्रोफाइल बनाएं!" : "Please create profile first!");
+      return;
+    }
+    
+    addItem({
+      id: ruleId,
+      name: rewardName,
+      price: 0,
+      quantity: 1,
+      isReward: true,
+      pointsCost: pointsCost,
+      category: "Special"
+    });
+    
+    toast.success(isHindi ? `${rewardName} आपके कार्ट में मुफ़्त जोड़ा गया!` : `${rewardName} added to your cart for free!`);
+  };
+
+  const handleAddDiyPizzaToCart = () => {
+    triggerHaptic();
+    if (calculatedDiyPizzaPrice <= 0) {
+      toast.error(isHindi ? "कृपया कोई आकार और सामग्री चुनें!" : "Please choose a size and toppings!");
+      return;
+    }
+
+    const toppingsList: string[] = [];
+    Object.entries(diyVegSelection).forEach(([v, selected]) => { if (selected) toppingsList.push(v); });
+    Object.entries(diyPremiumToppings).forEach(([t, selected]) => { if (selected) toppingsList.push(t); });
+    
+    const description = `${diySize.toUpperCase()} Base, Sauce: ${diySauce ? 'Yes' : 'No'}, Cheese: ${diyMozzarella ? 'Yes' : 'No'}, Toppings: ${toppingsList.join(', ') || 'None'}`;
+
+    addItem({
+      id: `diy-pizza-${Date.now()}`,
+      name: isHindi ? `डीआईवाई पिज्जा (${diySize})` : `DIY Pizza (${diySize})`,
+      price: calculatedDiyPizzaPrice,
+      quantity: 1,
+      note: diyChefNote || description,
+      category: "DIY Pizza"
+    });
+
+    setDiySize("small");
+    setDiySauce(true);
+    setDiyMozzarella(true);
+    setDiyVegSelection({ onion: false, tomato: false, capsicum: false, corn: false });
+    setDiyPremiumToppings({ black_olive: false, jalapeno: false, red_peprica: false, paneer: false, mushroom: false });
+    setDiyChefNote("");
+
+    toast.success(isHindi ? "आपका कस्टम पिज्जा कार्ट में जोड़ा गया!" : "Your custom Pizza has been added to cart!");
+  };
+
+  const handleNormalPizzaAdd = () => {
+    triggerHaptic();
+    if (!normalPizzaSize) {
+      toast.error(isHindi ? "कृपया साइज चुनें!" : "Please select size!");
+      return;
+    }
+
+    let finalPrice = normalPizzaPrice;
+    const selectedAddons: string[] = [];
+    
+    Object.entries(normalPizzaAddons).forEach(([addon, isSelected]) => {
+      if (isSelected) {
+        const cost = PIZZA_ADDONS[normalPizzaSize.toLowerCase()]?.[addon] || 0;
+        finalPrice += cost;
+        selectedAddons.push(addon);
+      }
+    });
+
+    const noteParts = [];
+    if (selectedAddons.length > 0) noteParts.push(`Add-ons: ${selectedAddons.join(', ')}`);
+    if (chefNote) noteParts.push(`Note: ${chefNote}`);
+
+    addItem({
+      id: `${selectedProduct.id}-${normalPizzaSize.toLowerCase()}`,
+      name: `${selectedProduct.name} (${normalPizzaSize.toUpperCase()})`,
+      price: finalPrice,
+      quantity: 1,
+      note: noteParts.join(' | '),
+      category: selectedProduct.category
+    });
+
+    setSelectedProduct(null);
+    setNormalPizzaSize("");
+    setNormalPizzaPrice(0);
+    setNormalPizzaAddons({});
+    setChefNote("");
+
+    toast.success(isHindi ? "कस्टमाइज्ड पिज्जा कार्ट में जोड़ा गया!" : "Customized Pizza added to cart!");
+  };
+
+  const handleReelEnded = () => {
+    triggerHaptic();
+    setActiveStory(null);
+  };
+
+  const handleQuickAddFromStory = (title: string, price: number) => {
+    triggerHaptic();
+    const matchedItem = menu.find(item => item.name?.toLowerCase() === title?.toLowerCase());
+    if (matchedItem) {
+      addItem(matchedItem);
+    } else {
+      addItem({
+        id: `story-${title.replace(/\s+/g, '-').toLowerCase()}`,
+        name: title,
+        price: price,
+        quantity: 1,
+        category: "Fast Food"
+      });
+    }
+    setActiveStory(null);
+    toast.success(isHindi ? "आइटम कार्ट में जोड़ा गया!" : "Item added to cart!");
+  };
+
+  // --- Real-time Watchers ---
   useEffect(() => {
     if (!customerDetails?.phone) {
       setCustomerPoints(0);
@@ -1102,7 +1317,7 @@ export default function BbCafeHome() {
     return () => clearInterval(interval);
   }, []);
 
-  // --- INITIAL MOUNT & SWR BACKGROUND DATABASE SYNCHRONIZER (No UI Blocks) ---
+  // --- INITIAL MOUNT & SWR BACKGROUND DATABASE SYNCHRONIZER ---
   useEffect(() => {
     setMounted(true);
 
@@ -1154,10 +1369,8 @@ export default function BbCafeHome() {
       } catch (e) {}
     }
 
-    // Dynamic SWR Fetchers (One-time getDocs call inside Background Thread)
     const fetchFreshDbData = async () => {
       try {
-        // 1. Fetch settings
         const storeSnap = await getDoc(doc(db, "settings", "store"));
         if (storeSnap.exists()) {
           const storeData = storeSnap.data();
@@ -1173,43 +1386,36 @@ export default function BbCafeHome() {
           if (storeData.timingEnglish) setStoreTimingEnglish(storeData.timingEnglish);
         }
 
-        // 2. Fetch products
         const productsSnap = await getDocs(collection(db, "products"));
         const items = productsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter((i: any) => i.isVisible !== false);
         setMenu(shuffleArray(items));
         localStorage.setItem('bb_cached_menu', JSON.stringify(items));
 
-        // 3. Fetch categories
         const catsSnap = await getDocs(collection(db, "categories"));
         const cats = catsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
         setDbCategories(cats);
         localStorage.setItem('bb_cached_categories', JSON.stringify(cats));
 
-        // 4. Fetch banners
         const bannersSnap = await getDocs(collection(db, "banners"));
         const banData = bannersSnap.docs.map(d => ({ id: d.id, ...d.data() }));
         setBanners(banData);
         localStorage.setItem('bb_cached_banners', JSON.stringify(banData));
 
-        // 5. Fetch reels
         const reelsSnap = await getDocs(collection(db, "reels"));
         const reelData = reelsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
         setStories(reelData);
         localStorage.setItem('bb_cached_reels', JSON.stringify(reelData));
 
-        // 6. Fetch reviews
         const revsSnap = await getDocs(collection(db, "reviews"));
         const revData = revsSnap.docs.map(d => ({ id: d.id, ...d.data() as any })).filter((r: any) => r.isApproved === true || r.isApproved === "approved" || r.approved === true);
         setReviews(revData);
         localStorage.setItem('bb_cached_reviews', JSON.stringify(revData));
 
-        // 7. Fetch loyalty rules
         const rulesSnap = await getDocs(collection(db, "loyalty_rules"));
         const ruleData = rulesSnap.docs.map(d => ({ id: d.id, ...d.data() }));
         setLoyaltyRules(ruleData);
         localStorage.setItem('bb_cached_loyalty_rules', JSON.stringify(ruleData));
 
-        // 8. Fetch dynamic follower counts [1]
         const socialSnap = await getDoc(doc(db, "settings", "social_counts"));
         if (socialSnap.exists()) {
           const data = socialSnap.data();
@@ -1319,7 +1525,7 @@ export default function BbCafeHome() {
         </button>
       </div>
 
-      {/* PREMIUM HERO HEADER (Plain background without image) */}
+      {/* PREMIUM HERO HEADER */}
       <header className="relative pt-6 pb-4 px-4 overflow-hidden shadow-md flex flex-col justify-end min-h-[120px] bg-neutral-950 border-b dark:border-white/5 border-neutral-200">
         <div className="relative z-20 max-w-[85%] mt-auto bg-black/40 backdrop-blur-sm p-2.5 rounded-xl border border-white/10 shadow-md">
           <motion.div
@@ -1741,7 +1947,7 @@ export default function BbCafeHome() {
                         )}
 
                         <button onClick={(e) => handleToggleFavorite(item.id, e)} className="absolute top-3 right-3 bg-black/60 backdrop-blur-md p-1.5 rounded-full border border-white/10 text-white hover:text-red-555 transition-colors">
-                          <Heart size={14} className={favorites.includes(item.id) ? "fill-red-550 text-red-550" : "text-white"} />
+                          <Heart size={14} className={favorites.includes(item.id) ? "fill-red-555 text-red-550" : "text-white"} />
                         </button>
                       </div>
                       <div className="p-4 flex flex-col justify-between flex-1 font-sans font-bold">
@@ -1758,7 +1964,6 @@ export default function BbCafeHome() {
                         <div className="flex justify-between items-end mt-0.5">
                           <div>
                             <p className="text-neutral-505 dark:text-neutral-405 text-[8px] font-black uppercase tracking-widest leading-none mb-1">Price</p>
-                            {/* Rupee duplication fixed by removing the hardcoded '₹' in front of getDisplayPrice */}
                             <p className="text-orange-700 dark:text-orange-500 font-black text-base leading-none font-mono font-bold">{getDisplayPrice(item)}</p>
                             {item.variants && <span className="text-[8px] font-bold text-neutral-600 dark:text-gray-400 mt-1 block">{isHindi ? "विकल्प उपलब्ध हैं" : "Options available"}</span>}
                           </div>
@@ -1823,7 +2028,7 @@ export default function BbCafeHome() {
                               {isHindi ? "ताज़ा स्वाद" : "Fresh Taste"}
                             </span>
                             <h3 className="text-sm font-black text-yellow-300">
-                              {isHindi ? "शुद्ध और हाइजीनिक फास्ट फूड" : "PURE & HYGIENIC FAST FOOD"}
+                              {isHindi ? "शुद्ध और हाइजीनिक Fast Food" : "PURE & HYGIENIC FAST FOOD"}
                             </h3>
                             <p className="text-[9px] text-neutral-605 dark:text-gray-400 font-bold">
                               {isHindi ? "मोहांद्रा में हमारा स्पेशल पनीर पिज़्ज़ा चखें!" : "Try our special Paneer Pizza in Mohandra Town!"}
@@ -1906,7 +2111,7 @@ export default function BbCafeHome() {
             </div>
           </div>
 
-          {/* Social Icons Container with dynamically fetched Follower Counts [1] */}
+          {/* Social Icons Container with dynamically fetched Follower Counts */}
           <div className="social-icons flex flex-wrap justify-center gap-6 py-5 dark:bg-white/[0.02] bg-white border dark:border-white/5 border-neutral-200 rounded-2xl shadow-sm">
             {SOCIAL_LINKS.map((link) => (
               <a 
@@ -2197,7 +2402,7 @@ export default function BbCafeHome() {
               </div>
               <div className="flex gap-2 pt-1 font-bold">
                 <button type="submit" className="flex-1 bg-orange-500 text-black font-black p-3 rounded-lg text-xs uppercase">{isHindi ? "जमा करें" : "SUBMIT"}</button>
-                <button type="button" onClick={() => { triggerHaptic(); setIsReviewFormOpen(false); }} className="dark:bg-white/5 bg-neutral-105 text-neutral-805 dark:text-gray-400 font-bold p-3 rounded-lg text-xs uppercase">{isHindi ? "बंद करें" : "CANCEL"}</button>
+                <button type="button" onClick={() => { triggerHaptic(); setIsReviewFormOpen(false); }} className="dark:bg-white/5 bg-neutral-105 text-neutral-855 dark:text-gray-400 font-bold p-3 rounded-lg text-xs uppercase">{isHindi ? "बंद करें" : "CANCEL"}</button>
               </div>
             </form>
           </div>
@@ -2405,7 +2610,7 @@ export default function BbCafeHome() {
                                   {h.timestamp?.toDate ? h.timestamp.toDate().toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' }) : new Date(h.timestamp).toLocaleString()}
                                 </span>
                               </div>
-                              <span className={`px-2.5 py-1 rounded-lg text-xs font-black flex items-center gap-0.5 font-mono font-bold ${h.type === 'earn' ? 'bg-green-500/10 text-green-600 dark:text-green-400 border border-green-500/20' : 'bg-red-500/10 text-red-550 border border-red-500/20'}`}>
+                              <span className={`px-2.5 py-1 rounded-lg text-xs font-black flex items-center gap-0.5 font-mono font-bold ${h.type === 'earn' ? 'bg-green-500/10 text-green-600 dark:text-green-400 border border-green-500/20' : 'bg-red-500/10 text-red-555 border border-red-500/20'}`}>
                                 {h.type === 'earn' ? '+' : '-'}{h.points} Pts
                               </span>
                             </div>
@@ -2469,7 +2674,6 @@ export default function BbCafeHome() {
                       <span>{isHindi ? "मेरा आर्डर इतिहास (विवरण):" : "My Order History Ledger:"}</span>
                     </h3>
                     {pastOrders.length > 0 ? (
-                      /* Limit and scrolling completely removed (max-h-72 overflow-y-auto) so that history shows fully at the bottom */
                       <div className="space-y-4 pr-1">
                         {pastOrders.map((ord: any, index: number) => {
                           const formattedDate = ord.timestamp?.toDate ? ord.timestamp.toDate().toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' }) : new Date(ord.timestamp).toLocaleString();
@@ -2540,7 +2744,7 @@ export default function BbCafeHome() {
               transition={{ type: "spring", damping: 25, stiffness: 220 }}
               className="dark:bg-[#0b0c10] bg-white w-full h-[90vh] rounded-t-3xl border-t dark:border-white/10 border-neutral-200 overflow-y-auto pb-32 p-5 max-w-lg mx-auto relative shadow-2xl transition-colors duration-200 font-sans"
             >
-              {/* STICKY TOP CONTAINER: TARGET PROGRESS BAR + LIVE BILL TOTAL */}
+              {/* STICKY TOP CONTAINER */}
               <div className="sticky top-0 z-30 bg-white dark:bg-[#0b0c10] pb-3 border-b border-neutral-200 dark:border-white/5 space-y-2">
                 {/* Free Delivery Target Progress Bar */}
                 {fulfillmentType === "delivery" && (
@@ -2603,7 +2807,6 @@ export default function BbCafeHome() {
                       <div key={suggest.id} className="flex justify-between items-center text-[10px]">
                         <div>
                           <span className="font-bold block text-neutral-900 dark:text-white">{suggest.name}</span>
-                          {/* Rupee symbol duplication resolved */}
                           <span className="text-orange-655 font-extrabold font-mono font-bold">{getDisplayPrice(suggest)}</span>
                         </div>
                         <button onClick={() => { triggerHaptic(); addItem(suggest); }} className="bg-purple-500/20 text-purple-655 border border-purple-500/30 px-3 py-1 rounded-lg font-black uppercase font-bold">ADD</button>
@@ -2613,7 +2816,7 @@ export default function BbCafeHome() {
                 </div>
               )}
 
-              {/* 4. SELECT ORDER MODE (Shifted above Delivery Zone / Address for logical UX) */}
+              {/* 4. SELECT ORDER MODE */}
               <div className="dark:bg-white/[0.02] bg-neutral-50 p-4 rounded-2xl border dark:border-white/5 border-neutral-200 space-y-2.5 transition-colors duration-200 mt-4 font-sans font-bold">
                 <label className="text-[10px] font-black uppercase text-neutral-800 dark:text-gray-400 font-bold">{isHindi ? "ऑर्डर का माध्यम चुनें:" : "Select Order Mode:"}</label>
                 <div className="grid grid-cols-3 gap-2">
@@ -2641,7 +2844,7 @@ export default function BbCafeHome() {
                 </div>
               </div>
 
-              {/* 3. ADD ADD-ONS (Shown only if Pizza, Sandwich, Burger, Momos, Fries/Chips are present in the cart) */}
+              {/* 3. ADD ADD-ONS */}
               {showAddonsSection && (
                 <div className="dark:bg-white/[0.02] bg-neutral-50 border dark:border-white/5 border-neutral-200 rounded-2xl p-4 space-y-2.5 transition-colors duration-200 mt-4 font-sans font-bold">
                   <p className="text-[9px] font-black uppercase text-neutral-800 dark:text-gray-400 font-bold">{isHindi ? "ऐड-ऑन्स जोड़ें (Add-ons):" : "Add Add-ons to order:"}</p>
@@ -2659,7 +2862,7 @@ export default function BbCafeHome() {
                 </div>
               )}
 
-              {/* 5. CONDITIONAL FULFILLMENT INPUTS (Controlled dynamically below the Mode Selector) */}
+              {/* 5. CONDITIONAL FULFILLMENT INPUTS */}
               {fulfillmentType === "delivery" && (
                 <div className="space-y-4 mt-4 font-sans font-bold">
                   
@@ -2714,7 +2917,7 @@ export default function BbCafeHome() {
                 </div>
               )}
 
-              {/* Dine-In Custom Table Capacity Grid Selector (The duplicate simple input text box was removed) */}
+              {/* Dine-In Custom Table Capacity Grid Selector */}
               {fulfillmentType === "table" && (
                 <div className="mt-3 p-3 bg-neutral-105 dark:bg-neutral-900 rounded-xl border border-neutral-200 dark:border-white/5 space-y-3 font-sans transition-all duration-300">
                   <p className="text-[10px] font-black uppercase text-orange-655 dark:text-orange-400 font-bold">{isHindi ? "🪑 उपलब्ध टेबल चुनें:" : "🪑 Choose Available Table:"}</p>
@@ -3056,7 +3259,7 @@ export default function BbCafeHome() {
               <img src={claimingPlatform.icon} className="w-10 h-10 object-contain mx-auto" alt="" loading="lazy" />
               <div className="space-y-1">
                 <h3 className="text-base font-black text-orange-655 dark:text-orange-500 uppercase font-bold">वेरिफिकेशन दावा सबमिट करें</h3>
-                <p className="text-[10px] text-neutral-605 leading-normal font-semibold">
+                <p className="text-[10px] text-neutral-655 leading-normal font-semibold">
                   {claimingPlatform.label} पर फॉलो/सब्सक्राइब करने के बाद, नीचे अपना यूज़रनेम दर्ज करें। हमारे एडमिन इसकी जांच करके आपका {claimingPlatform.points} पॉइंट क्रेडिट करेंगे!
                 </p>
               </div>
@@ -3080,7 +3283,7 @@ export default function BbCafeHome() {
                 <button 
                   type="button" 
                   onClick={() => { triggerHaptic(); setIsClaimModalOpen(false); setClaimUsername(""); }} 
-                  className="bg-neutral-105 text-neutral-805 dark:bg-white/5 dark:text-gray-400 p-3 rounded-xl font-black text-xs uppercase font-bold font-sans"
+                  className="bg-neutral-105 text-neutral-855 dark:bg-white/5 dark:text-gray-400 p-3 rounded-xl font-black text-xs uppercase font-bold font-sans"
                 >
                   Cancel
                 </button>
