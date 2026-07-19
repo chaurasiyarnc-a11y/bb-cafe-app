@@ -2,8 +2,21 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../../lib/firebase'; 
-import { collection, onSnapshot, query, orderBy, doc, updateDoc, setDoc, deleteDoc, getDocs } from 'firebase/firestore';
-import { Power, LogOut, Loader2, Lock } from 'lucide-react';
+import { collection, onSnapshot, query, orderBy, doc, updateDoc, setDoc } from 'firebase/firestore';
+import { 
+  Power, 
+  LogOut, 
+  Loader2, 
+  Lock, 
+  LayoutDashboard, 
+  ShoppingBag, 
+  UtensilsCrossed, 
+  Users, 
+  Award, 
+  Settings, 
+  Menu as MenuIcon, 
+  X 
+} from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 
 // यूटिलिटी फ़ंक्शंस
@@ -51,6 +64,7 @@ export default function AdminDashboard() {
   const [isVerified, setIsVerified] = useState(false);
   const [loading, setLoading] = useState(true);
   const [passcode, setPasscode] = useState("");
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false); // मोबाइल मेन्यू स्टेट
   
   // टाइपस्क्रिप्ट टैब एलीआस लिस्ट
   const [tab, setTab] = useState<'dashboard' | 'orders' | 'menu' | 'categories' | 'customers' | 'loyalty' | 'banners' | 'reels' | 'header_video' | 'reviews' | 'coupons' | 'roster' | 'proofs' | 'claims' | 'security' | 'settings'>('dashboard');
@@ -97,6 +111,107 @@ export default function AdminDashboard() {
     } catch (e) {}
   };
 
+  // त्वरित सेल्स फ़िल्टर लागू करना
+  const applyQuickSalesFilter = (type: 'today' | 'yesterday' | 'week') => {
+    const today = new Date();
+    if (type === 'today') {
+      const todayStr = today.toISOString().split('T')[0];
+      setStartDate(todayStr);
+      setEndDate(todayStr);
+    } else if (type === 'yesterday') {
+      const yesterday = new Date();
+      yesterday.setDate(today.getDate() - 1);
+      const yesterdayStr = yesterday.toISOString().split('T')[0];
+      setStartDate(yesterdayStr);
+      setEndDate(yesterdayStr);
+    } else if (type === 'week') {
+      const weekAgo = new Date();
+      weekAgo.setDate(today.getDate() - 7);
+      setStartDate(weekAgo.toISOString().split('T')[0]);
+      setEndDate(today.toISOString().split('T')[0]);
+    }
+    toast.success(`Filter Applied: ${type.toUpperCase()}`);
+  };
+
+  // सेल्स रेंज रीसेट करना
+  const handleResetSalesData = () => {
+    const d = new Date();
+    d.setDate(d.getDate() - 7); 
+    setStartDate(d.toISOString().split('T')[0]);
+    setEndDate(new Date().toISOString().split('T')[0]);
+    toast.success("Filters reset to last 7 days.");
+  };
+
+  // दैनिक क्लोजिंग रिपोर्ट जेनरेट करना
+  const handleSendDailyClosingReport = () => {
+    const todayStr = new Date().toISOString().split('T')[0];
+    const todayOrders = orders.filter(o => {
+      if (!o.timestamp) return false;
+      const oDate = o.timestamp?.toDate ? o.timestamp.toDate() : new Date(o.timestamp);
+      return oDate.toISOString().split('T')[0] === todayStr;
+    });
+
+    const totalSales = todayOrders.reduce((sum, o) => sum + (Number(o.total) || 0), 0);
+    const totalOrdersCount = todayOrders.length;
+    const deliveredOrders = todayOrders.filter(o => o.status === 'delivered').length;
+
+    const reportText = encodeURIComponent(
+`*BUM BUM CAFE - DAILY CLOSING REPORT (${todayStr})*
+----------------------------------
+*Total Orders Today :* ${totalOrdersCount}
+*Delivered Orders   :* ${deliveredOrders}
+*Total Revenue Today:* ₹${totalSales}
+----------------------------------
+Report Generated at: ${new Date().toLocaleTimeString()}`
+    );
+
+    window.open(`https://wa.me/919714293759?text=${reportText}`, '_blank');
+    toast.success("Closing Report Sent via WhatsApp!");
+  };
+
+  // एक्सेल रिपोर्ट ऑर्डर्स एक्सपोर्ट
+  const handleExportOrders = () => {
+    const filteredOrders = orders.filter(o => {
+      if (!o.timestamp) return false;
+      const oDate = o.timestamp?.toDate ? o.timestamp.toDate() : new Date(o.timestamp);
+      const oStr = oDate.toISOString().split('T')[0];
+      return oStr >= startDate && oStr <= endDate;
+    });
+
+    const headers = ["Bill Number", "Token Number", "Customer Name", "Phone", "Total Amount", "Status", "Date"];
+    const keys = ["billNumber", "tokenNumber", "customerName", "customerPhone", "total", "status", "timestamp"];
+
+    const dataToExport = filteredOrders.map(o => {
+      let dateStr = "";
+      if (o.timestamp) {
+        const d = o.timestamp.toDate ? o.timestamp.toDate() : new Date(o.timestamp);
+        dateStr = d.toLocaleString();
+      }
+      return {
+        ...o,
+        billNumber: formatBillNumber(o.billNumber || 0),
+        timestamp: dateStr
+      };
+    });
+
+    triggerCsvDownload(dataToExport, `orders_report_${startDate}_to_${endDate}`, headers, keys);
+  };
+
+  // एक्सेल रिपोर्ट कस्टमर्स एक्सपोर्ट
+  const handleExportCustomers = () => {
+    const headers = ["ID/Phone", "Name", "Points", "Tier"];
+    const keys = ["id", "name", "points", "tier"];
+    
+    const dataToExport = loyaltyUsers.map(u => ({
+      id: u.id || "",
+      name: u.name || "Guest",
+      points: u.points || 0,
+      tier: u.tier || "Bronze"
+    }));
+
+    triggerCsvDownload(dataToExport, "customers_report", headers, keys);
+  };
+
   useEffect(() => {
     const adminSession = sessionStorage.getItem('bb_cafe_admin_verified');
     const adminRole = sessionStorage.getItem('bb_cafe_admin_role') as 'admin' | 'manager' | null;
@@ -137,7 +252,7 @@ export default function AdminDashboard() {
     return () => unsubPasscodes();
   }, []);
 
-  // रीयल-टाइम लिसनर्स
+  // रीयल-टाइम डेटाबेस लिसनर्स (SWR और रीयल-टाइम सिंक)
   useEffect(() => {
     if (!isVerified) return;
 
@@ -426,7 +541,7 @@ export default function AdminDashboard() {
     printWindow.document.close();
   };
 
-  // व्हाट्सएप पर बिल भेजने का रीयल-टाइम ट्रिगर
+  // व्हाट्सएप बिल सेंडर
   const handleSendWhatsAppBill = (order: any) => {
     const phone = String(order.customerPhone || "").replace("+91", "").trim();
     if (!phone) return toast.error("Customer phone not found!");
@@ -447,30 +562,6 @@ ${order.discount ? `*Discount:* -₹${order.discount}\n` : ''}*Grand Total:* *�
 Thank you for your order, *${order.customerName || 'Guest'}*! Visit Again! 😊`
     );
     window.open(`https://wa.me/91${phone}?text=${message}`, '_blank');
-  };
-
-  const applyQuickSalesFilter = (filterType: 'today' | 'yesterday' | 'week' | 'month') => {
-    const now = new Date();
-    let start = new Date();
-    let end = new Date();
-
-    if (filterType === 'today') {
-      start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      end = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    } else if (filterType === 'yesterday') {
-      start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
-      end = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
-    } else if (filterType === 'week') {
-      start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7);
-      end = now;
-    } else if (filterType === 'month') {
-      start = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
-      end = now;
-    }
-
-    setStartDate(start.toISOString().split('T')[0]);
-    setEndDate(end.toISOString().split('T')[0]);
-    toast.success(`${filterType.toUpperCase()} Filter Applied!`);
   };
 
   const toggleStore = async () => {
@@ -525,121 +616,222 @@ Thank you for your order, *${order.customerName || 'Guest'}*! Visit Again! 😊`
     );
   }
 
+  // साइडबार टैब कॉन्फ़िगरेशन सूची
+  const navItems = [
+    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { id: 'orders', label: `Orders (${orders.length})`, icon: ShoppingBag },
+    { id: 'menu', label: 'Menu List', icon: UtensilsCrossed },
+    { id: 'customers', label: 'Customers', icon: Users },
+    { id: 'loyalty', label: 'Loyalty System', icon: Award },
+    { id: 'settings', label: 'Settings', icon: Settings, highlight: true } // Settings को हाईलाइट करने के लिए विशेष फ्लैग
+  ];
+
   return (
-    <div className="bg-[#050505] min-h-screen text-white pb-20 font-sans">
+    <div className="bg-[#050505] min-h-screen text-white font-sans flex flex-col md:flex-row relative">
       <link rel="manifest" href="/admin-manifest.json" />
       <Toaster />
-      
-      {/* मुख्य हेडर */}
-      <header className="p-6 bg-white/[0.03] border-b border-white/5 flex justify-between items-center sticky top-0 z-40 backdrop-blur-md">
-        <div>
-          <h1 className="text-xl font-black text-orange-500 italic uppercase">Admin Control</h1>
-          <p className="text-[10px] text-gray-500 font-bold tracking-widest uppercase">Bum Bum Cafe Mohandra ({userRole === 'admin' ? 'Boss' : 'Manager'})</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <button onClick={toggleStore} className={`px-4 py-2 rounded-full text-[10px] font-black flex items-center gap-2 transition-all border ${storeOpen ? 'bg-green-500/10 text-green-500 border-green-500/20' : 'bg-red-500/10 text-red-500 border-red-500/20'}`}>
-            <Power size={14} /> {storeOpen ? "ONLINE" : "OFFLINE"}
+
+      {/* --- मोबाइल के लिए टॉप हेडर (Mobile Header Only) --- */}
+      <header className="md:hidden w-full p-4 bg-white/[0.03] border-b border-white/5 flex justify-between items-center sticky top-0 z-40 backdrop-blur-md">
+        <div className="flex items-center gap-2">
+          <button 
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)} 
+            className="p-2 bg-white/5 rounded-xl hover:bg-white/10"
+          >
+            {mobileMenuOpen ? <X size={20} /> : <MenuIcon size={20} />}
           </button>
-          <button onClick={handleLogout} className="p-2 bg-white/5 rounded-full text-gray-400 active:scale-90 transition-all"><LogOut size={18}/></button>
+          <div>
+            <h1 className="text-sm font-black text-orange-500 italic uppercase">BUM BUM CAFE</h1>
+            <p className="text-[8px] text-gray-500 font-bold uppercase tracking-widest">Control Center</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <button onClick={toggleStore} className={`px-3 py-1.5 rounded-full text-[8px] font-black flex items-center gap-1.5 border ${storeOpen ? 'bg-green-500/10 text-green-500 border-green-500/20' : 'bg-red-500/10 text-red-500 border-red-500/20'}`}>
+            <Power size={10} /> {storeOpen ? "ON" : "OFF"}
+          </button>
+          <button onClick={handleLogout} className="p-1.5 bg-white/5 rounded-full text-gray-400 active:scale-90"><LogOut size={14}/></button>
         </div>
       </header>
 
-      {/* --- मुख्य नेविगेशन टैब्स --- */}
-      <div className="p-4 flex gap-2 overflow-x-auto no-scrollbar border-b border-white/5">
-        {[
-          { id: 'dashboard', label: '📊 Dashboard' },
-          { id: 'orders', label: `📦 Orders (${orders.length})` },
-          { id: 'menu', label: '🍔 Menu List' },
-          { id: 'customers', label: `👥 Customers` },
-          { id: 'loyalty', label: '🎁 Loyalty' },
-          { id: 'settings', label: '⚙️ Settings' }
-        ].map((t) => (
+      {/* --- लेफ्ट साइडबार पैनल (Left Sidebar Panel) --- */}
+      <aside className={`
+        fixed inset-y-0 left-0 z-50 w-64 bg-[#0a0a0a] border-r border-white/5 flex flex-col justify-between transition-transform duration-300 ease-in-out
+        md:sticky md:top-0 md:h-screen md:translate-x-0
+        ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+      `}>
+        {/* साइडबार हेडर */}
+        <div className="p-6 border-b border-white/5">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="text-xl font-black text-orange-500 italic uppercase tracking-wider">Bum Bum Cafe</h2>
+              <p className="text-[10px] text-gray-500 font-bold tracking-widest uppercase">{userRole === 'admin' ? 'Owner / Boss' : 'Manager Portal'}</p>
+            </div>
+            {/* मोबाइल पर क्लोज बटन */}
+            <button onClick={() => setMobileMenuOpen(false)} className="md:hidden text-gray-400 p-1 bg-white/5 rounded-lg">
+              <X size={18} />
+            </button>
+          </div>
+
+          {/* स्टोर स्टेटस */}
           <button 
-            key={t.id}
-            onClick={() => setTab(t.id as any)} 
-            className={`px-5 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap uppercase transition-all ${
-              tab === t.id ? 'bg-orange-500 text-white shadow-lg animate-none' : 'bg-white/5 text-gray-500 hover:text-white'
+            onClick={toggleStore} 
+            className={`w-full py-2.5 rounded-xl text-[10px] font-black flex items-center justify-center gap-2 transition-all border ${
+              storeOpen 
+                ? 'bg-green-500/10 text-green-500 border-green-500/20 hover:bg-green-500/20' 
+                : 'bg-red-500/10 text-red-500 border-red-500/20 hover:bg-red-500/20'
             }`}
           >
-            {t.label}
+            <Power size={12} /> STORE STATUS: {storeOpen ? "ONLINE" : "OFFLINE"}
           </button>
-        ))}
-      </div>
+        </div>
 
-      {/* --- टैब कंटेंट्स की रेंडरिंग --- */}
-      <main className="p-4 max-w-2xl mx-auto">
-        
-        {/* 1. डैशबोर्ड टैब */}
-        {tab === 'dashboard' && (
-          <DashboardStats 
-            orders={orders}
-            startDate={startDate}
-            setStartDate={setStartDate}
-            endDate={endDate}
-            setEndDate={setEndDate}
-            applyQuickSalesFilter={applyQuickSalesFilter}
-            handleResetSalesData={handleResetSalesData}
-            handleSendDailyClosingReport={handleSendDailyClosingReport}
-            handleExportOrders={handleExportOrders}
-            handleExportCustomers={handleExportCustomers}
-            setSelectedCustomerHistory={() => {}}
-          />
-        )}
+        {/* साइडबार नेविगेशन लिंक्स */}
+        <nav className="flex-1 px-4 py-6 space-y-1.5 overflow-y-auto no-scrollbar">
+          {navItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = tab === item.id;
+            return (
+              <button
+                key={item.id}
+                onClick={() => {
+                  setTab(item.id as any);
+                  setMobileMenuOpen(false); // मोबाइल पर क्लिक होने पर बंद करें
+                }}
+                className={`w-full flex items-center justify-between px-4 py-3.5 rounded-2xl text-xs font-bold transition-all uppercase tracking-wider ${
+                  isActive 
+                    ? 'bg-orange-500 text-white shadow-lg' 
+                    : item.highlight 
+                      ? 'bg-white/[0.03] text-orange-400 hover:bg-white/[0.06] border border-orange-500/20'
+                      : 'text-gray-400 hover:text-white hover:bg-white/5'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <Icon size={16} />
+                  <span>{item.label}</span>
+                </div>
+                {item.highlight && !isActive && (
+                  <span className="w-2 h-2 rounded-full bg-orange-500 animate-pulse" />
+                )}
+              </button>
+            );
+          })}
+        </nav>
 
-        {/* 2. लाइव ऑर्डर्स टैब */}
-        {tab === 'orders' && (
-          <OrdersTab 
-            orders={orders}
-            orderPeriodFilter={orderPeriodFilter}
-            setOrderPeriodFilter={setOrderPeriodFilter}
-            handlePrintReceipt={handlePrintReceipt}
-            handleSendWhatsAppBill={handleSendWhatsAppBill}
-            handleStatusChange={handleStatusChange}
-            formatBillNumber={formatBillNumber}
-          />
-        )}
+        {/* साइडबार फुटर */}
+        <div className="p-6 border-t border-white/5 bg-white/[0.01]">
+          <div className="flex items-center justify-between">
+            <div className="flex flex-col">
+              <span className="text-[10px] text-gray-500 font-bold uppercase">Authorized As</span>
+              <span className="text-xs font-black text-white/80 uppercase">{userRole}</span>
+            </div>
+            <button 
+              onClick={handleLogout} 
+              className="p-3 bg-white/5 hover:bg-red-500/10 hover:text-red-500 rounded-2xl transition-all"
+              title="Logout from admin panel"
+            >
+              <LogOut size={16} />
+            </button>
+          </div>
+        </div>
+      </aside>
 
-        {/* 3. मेन्यू लिस्ट टैब */}
-        {tab === 'menu' && (
-          <MenuTab 
-            menu={menu}
-            categories={categories}
-          />
-        )}
+      {/* मोबाइल पर साइडबार खुला होने पर ब्लैक ओवरले */}
+      {mobileMenuOpen && (
+        <div 
+          onClick={() => setMobileMenuOpen(false)} 
+          className="fixed inset-0 bg-black/60 z-40 md:hidden backdrop-blur-sm"
+        />
+      )}
 
-        {/* 4. कस्टमर्स मैनेजमेंट टैब */}
-        {tab === 'customers' && (
-          <CustomersTab 
-            loyaltyUsers={loyaltyUsers}
-            orders={orders}
-          />
-        )}
+      {/* --- मुख्य दाईं ओर का कंटेंट पैनल (Right Main Content Area) --- */}
+      <main className="flex-1 w-full flex flex-col min-h-screen overflow-x-hidden">
+        <div className="p-4 md:p-8 max-w-4xl w-full mx-auto">
+          
+          {/* एक्टिव टैब हेडर (डेस्कटॉप पर मुख्य टैब टाइटल दिखाने के लिए) */}
+          <div className="hidden md:flex justify-between items-center mb-8 pb-6 border-b border-white/5">
+            <div>
+              <p className="text-[10px] text-gray-500 font-black tracking-widest uppercase">Bum Bum Cafe Admin</p>
+              <h2 className="text-2xl font-black text-white uppercase italic">
+                {navItems.find(n => n.id === tab)?.label || tab}
+              </h2>
+            </div>
+            <div className="text-[10px] font-bold text-gray-400 bg-white/5 px-4 py-2 rounded-xl">
+              System Sync: Live 🟢
+            </div>
+          </div>
 
-        {/* 5. लॉयल्टी और ट्रांसफर लॉग्स टैब */}
-        {tab === 'loyalty' && (
-          <LoyaltyTab 
-            loyaltyRules={loyaltyRules}
-            transferLogs={transferLogs}
-          />
-        )}
+          {/* 1. डैशबोर्ड टैब */}
+          {tab === 'dashboard' && (
+            <DashboardStats 
+              orders={orders}
+              startDate={startDate}
+              setStartDate={setStartDate}
+              endDate={endDate}
+              setEndDate={setEndDate}
+              applyQuickSalesFilter={applyQuickSalesFilter}
+              handleResetSalesData={handleResetSalesData}
+              handleSendDailyClosingReport={handleSendDailyClosingReport}
+              handleExportOrders={handleExportOrders}
+              handleExportCustomers={handleExportCustomers}
+              setSelectedCustomerHistory={() => {}}
+            />
+          )}
 
-        {/* 6. मास्टर सेटिंग्स टैब */}
-        {tab === 'settings' && (
-          <SettingsTab 
-            banners={banners}
-            reels={reels}
-            coupons={coupons}
-            reviews={reviews}
-            socialProofs={socialProofs}
-            pointsClaims={pointsClaims}
-            staff={staff}
-            cafeHelperUsers={cafeHelperUsers}
-            passcodes={passcodes}
-            userRole={userRole}
-            storeOpen={storeOpen}
-          />
-        )}
+          {/* 2. लाइव ऑर्डर्स टैब */}
+          {tab === 'orders' && (
+            <OrdersTab 
+              orders={orders}
+              orderPeriodFilter={orderPeriodFilter}
+              setOrderPeriodFilter={setOrderPeriodFilter}
+              handlePrintReceipt={handlePrintReceipt}
+              handleSendWhatsAppBill={handleSendWhatsAppBill}
+              handleStatusChange={handleStatusChange}
+              formatBillNumber={formatBillNumber}
+            />
+          )}
 
+          {/* 3. मेन्यू लिस्ट टैब */}
+          {tab === 'menu' && (
+            <MenuTab 
+              menu={menu}
+              categories={categories}
+            />
+          )}
+
+          {/* 4. कस्टमर्स मैनेजमेंट टैब */}
+          {tab === 'customers' && (
+            <CustomersTab 
+              loyaltyUsers={loyaltyUsers}
+              orders={orders}
+            />
+          )}
+
+          {/* 5. लॉयल्टी और ट्रांसफर लॉग्स टैब */}
+          {tab === 'loyalty' && (
+            <LoyaltyTab 
+              loyaltyRules={loyaltyRules}
+              transferLogs={transferLogs}
+            />
+          )}
+
+          {/* 6. मास्टर सेटिंग्स टैब */}
+          {tab === 'settings' && (
+            <SettingsTab 
+              banners={banners}
+              reels={reels}
+              coupons={coupons}
+              reviews={reviews}
+              socialProofs={socialProofs}
+              pointsClaims={pointsClaims}
+              staff={staff}
+              cafeHelperUsers={cafeHelperUsers}
+              passcodes={passcodes}
+              userRole={userRole}
+              storeOpen={storeOpen}
+            />
+          )}
+
+        </div>
       </main>
     </div>
   );
