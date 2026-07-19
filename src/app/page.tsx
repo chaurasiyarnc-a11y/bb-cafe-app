@@ -92,9 +92,15 @@ export default function BbCafeHome() {
 
   const menuRef = useRef<HTMLDivElement | null>(null);
 
-  // --- STATE VARIABLES ---
-  const [menu, setMenu] = useState<any[]>([]);
-  const [menuLoading, setMenuLoading] = useState(true);
+  // --- STATE VARIABLES (Optimized with Local Cache SWR Initialization) ---
+  const [menu, setMenu] = useState<any[]>(() => {
+    if (typeof window !== 'undefined') {
+      const cached = localStorage.getItem('bb_cached_menu');
+      return cached ? JSON.parse(cached) : [];
+    }
+    return [];
+  });
+  const [menuLoading, setMenuLoading] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
@@ -111,15 +117,12 @@ export default function BbCafeHome() {
   const [upiId, setUpiId] = useState("9714293759@paytm");
   const [storeCoordinates, setStoreCoordinates] = useState({ lat: 24.2863, lng: 80.1245 });
 
-  // Store Timings
   const [storeTimingHindi, setStoreTimingHindi] = useState("सुबह 10:00 से रात 11:00 बजे");
   const [storeTimingEnglish, setStoreTimingEnglish] = useState("10:00 AM to 11:00 PM");
 
   const [pointsHistory, setPointsHistory] = useState<any[]>([]);
   const [pastOrders, setPastOrders] = useState<any[]>([]);
-
   const [liveOrder, setLiveOrder] = useState<any | null>(null);
-
   const [closingMinutesLeft, setClosingMinutesLeft] = useState<number | null>(null);
 
   const [customerDetails, setCustomerDetails] = useState<{ name: string, phone: string, refCode?: string, pin?: string } | null>(null);
@@ -132,14 +135,19 @@ export default function BbCafeHome() {
 
   // Fulfillment and payment
   const [fulfillmentType, setFulfillmentType] = useState<"delivery" | "pickup" | "table">("delivery");
-  const [tableNumber, setTableNumber] = useState("");
+  const [tableNumber, setTableNumber] = useState("Table 1"); // Default pre-set table
   const [paymentMethod, setPaymentMethod] = useState<"cod" | "upi">("cod");
 
-  // Multi-language Toggle State (Default to Hindi)
   const [isHindi, setIsHindi] = useState(true);
-
   const [customerPoints, setCustomerPoints] = useState<number>(0);
-  const [loyaltyRules, setLoyaltyRules] = useState<any[]>([]);
+  
+  const [loyaltyRules, setLoyaltyRules] = useState<any[]>(() => {
+    if (typeof window !== 'undefined') {
+      const cached = localStorage.getItem('bb_cached_loyalty_rules');
+      return cached ? JSON.parse(cached) : [];
+    }
+    return [];
+  });
 
   const [isGiftModalOpen, setIsGiftModalOpen] = useState(false);
   const [giftPhone, setGiftPhone] = useState("");
@@ -147,12 +155,31 @@ export default function BbCafeHome() {
   const [giftSenderPin, setGiftSenderPin] = useState(""); 
   const [isGiftingLoading, setIsGiftingLoading] = useState(false);
 
-  const [dbCategories, setDbCategories] = useState<any[]>([]);
-  const [banners, setBanners] = useState<any[]>([]);
+  const [dbCategories, setDbCategories] = useState<any[]>(() => {
+    if (typeof window !== 'undefined') {
+      const cached = localStorage.getItem('bb_cached_categories');
+      return cached ? JSON.parse(cached) : [];
+    }
+    return [];
+  });
+  
+  const [banners, setBanners] = useState<any[]>(() => {
+    if (typeof window !== 'undefined') {
+      const cached = localStorage.getItem('bb_cached_banners');
+      return cached ? JSON.parse(cached) : [];
+    }
+    return [];
+  });
   const [bannerIndex, setBannerIndex] = useState(0);
   const [bannerError, setBannerError] = useState(false);
   
-  const [reviews, setReviews] = useState<any[]>([]);
+  const [reviews, setReviews] = useState<any[]>(() => {
+    if (typeof window !== 'undefined') {
+      const cached = localStorage.getItem('bb_cached_reviews');
+      return cached ? JSON.parse(cached) : [];
+    }
+    return [];
+  });
   
   const [isReviewsDrawerOpen, setIsReviewsDrawerOpen] = useState(false);
   const [isReviewFormOpen, setIsReviewFormOpen] = useState(false);
@@ -178,7 +205,13 @@ export default function BbCafeHome() {
   const [diyChefNote, setDiyChefNote] = useState<string>("");
 
   // Reels/Stories States
-  const [stories, setStories] = useState<any[]>([]);
+  const [stories, setStories] = useState<any[]>(() => {
+    if (typeof window !== 'undefined') {
+      const cached = localStorage.getItem('bb_cached_reels');
+      return cached ? JSON.parse(cached) : [];
+    }
+    return [];
+  });
   const [activeStory, setActiveStory] = useState<any | null>(null);
 
   // Social Proof Alerts States
@@ -319,7 +352,6 @@ export default function BbCafeHome() {
 
   const formatBillNumber = (num: number) => String(num).padStart(4, '0');
 
-  // Dynamic multi-field image fallback selector to solve missing images on both categories & products [1]
   const getCategoryImage = (catName: string) => {
     const found = dbCategories.find(c => String(c.name).toLowerCase().trim() === String(catName).toLowerCase().trim());
     if (found) {
@@ -372,26 +404,9 @@ export default function BbCafeHome() {
     return total;
   }, [diySize, diySauce, diyMozzarella, diyVegSelection, diyPremiumToppings]);
 
-  const activeTheme = useMemo(() => {
-    const today = new Date();
-    const month = today.getMonth() + 1; 
-    
-    if (month === 10 || month === 11) {
-      return { bg: "from-amber-650 to-red-955", accent: "text-yellow-350", name: "शुभ दीपावली उत्सव 🪔" };
-    }
-    if (month === 3) {
-      return { bg: "from-pink-500 to-purple-800", accent: "text-white", name: "होली रंगोत्सव स्पेशल 🎨" };
-    }
-    if (month === 8) {
-      return { bg: "from-rose-600 to-amber-800", accent: "text-yellow-350", name: "रक्षाबंधन विशेष स्नेह 💖" };
-    }
-    return { bg: "from-[#ff5e00] to-[#b33600]", accent: "text-yellow-300", name: "BUM BUM CAFE - Mohandra" };
-  }, []);
-
   const greetingText = useMemo(() => {
     const now = new Date();
     const hours = now.getHours();
-    const month = now.getMonth() + 1; 
     
     let timeGreeting = "नमस्ते";
     if (hours >= 5 && hours < 12) {
@@ -404,26 +419,14 @@ export default function BbCafeHome() {
       timeGreeting = "शुभ रात्रि 🌙";
     }
 
-    let festiveGreeting = "";
-    if (month === 10 || month === 11) {
-      festiveGreeting = "शुभ दीपावली उत्सव 🪔";
-    } else if (month === 3) {
-      festiveGreeting = "हैप्पी होली रंगोत्सव 🎨";
-    } else if (month === 8) {
-      festiveGreeting = "रक्षाबंधन की हार्दिक शुभकामनाएं 💖";
-    }
-
-    const finalGreeting = festiveGreeting ? `${festiveGreeting}! ${timeGreeting}` : timeGreeting;
     const customerName = customerDetails?.name ? customerDetails.name : "";
-
     if (customerName) {
-      return `नमस्ते ${customerName} जी, ${finalGreeting}! आज बम बम कैफ़े आपके लिए क्या बनाए? 😊`;
+      return `नमस्ते ${customerName} जी, ${timeGreeting}! आज बम बम कैफ़े आपके लिए क्या बनाए? 😊`;
     } else {
-      return `नमस्ते, ${finalGreeting}! आज बम बम कैफ़े आपके लिए क्या बनाए? 😊`;
+      return `नमस्ते, ${timeGreeting}! आज बम बम कैफ़े आपके लिए क्या बनाए? 😊`;
     }
   }, [customerDetails]);
 
-  // Unique document ID base deduplication to prevent missing items
   const deduplicatedMenu = useMemo(() => {
     const seen = new Set();
     const hiddenCategoryNames = new Set(dbCategories.filter((c: any) => c.isVisible === false).map((c: any) => String(c.name).toLowerCase().trim()));
@@ -438,7 +441,6 @@ export default function BbCafeHome() {
     });
   }, [menu, dbCategories]);
 
-  // Search Debouncer logic to improve performance
   useEffect(() => {
     const handler = setTimeout(() => {
       const words = searchQuery.toLowerCase().trim().split(/\s+/);
@@ -448,7 +450,6 @@ export default function BbCafeHome() {
     return () => clearTimeout(handler);
   }, [searchQuery]);
 
-  // Case-insensitive category matching + smart word-by-word search validation [1]
   const filteredMenu = useMemo(() => {
     const searchWords = debouncedSearchQuery.split(/\s+/).filter(Boolean);
 
@@ -457,7 +458,6 @@ export default function BbCafeHome() {
       const itemCategory = item?.category ? String(item.category) : "";
       
       const isFavoriteFilter = selectedCategory === "Favorites";
-      
       const itemCatClean = itemCategory.toLowerCase().trim();
       const selectedCatClean = selectedCategory.toLowerCase().trim();
       
@@ -466,12 +466,10 @@ export default function BbCafeHome() {
         : (selectedCatClean === "all" || itemCatClean === selectedCatClean);
         
       const matchesSearch = searchWords.every(word => itemName.includes(word));
-        
       return matchesCategory && matchesSearch;
     });
   }, [deduplicatedMenu, selectedCategory, favorites, debouncedSearchQuery]);
 
-  // Strict dynamic list mapping to preserve all FALLBACK_CATEGORIES and append new ones safely [1]
   const visibleCategories = useMemo(() => {
     const dbCatsMap = new Map();
     dbCategories.forEach(c => {
@@ -482,7 +480,6 @@ export default function BbCafeHome() {
 
     const result: string[] = [];
 
-    // 1. Process fallback categories (preserved unless explicitly hidden in Firestore) [1]
     FALLBACK_CATEGORIES.forEach(catName => {
       const cleanName = catName.toLowerCase().trim();
       if (dbCatsMap.has(cleanName)) {
@@ -495,7 +492,6 @@ export default function BbCafeHome() {
       }
     });
 
-    // 2. Append custom categories from DB that are not already handled in fallback [1]
     dbCategories.forEach(c => {
       if (c && c.name && c.isVisible !== false) {
         const cleanName = String(c.name).toLowerCase().trim();
@@ -506,7 +502,6 @@ export default function BbCafeHome() {
       }
     });
 
-    // 3. Keep virtual tags "All" and "DIY Pizza" precisely positioned at front
     const listWithoutSpecial = result.filter(c => c !== "All" && c !== "DIY Pizza");
     const finalized = ["All", "DIY Pizza", ...listWithoutSpecial];
 
@@ -521,7 +516,6 @@ export default function BbCafeHome() {
     }).slice(0, 2);
   }, [menu, cart]);
 
-  // Address Recovery Helper
   const lastDeliveryAddress = useMemo(() => {
     const found = pastOrders.find(o => o.fulfillmentType === "delivery" && o.address);
     return found ? found.address : "";
@@ -589,7 +583,6 @@ export default function BbCafeHome() {
     playSoundEffect('add');
     toast.success(isHindi ? "कस्टम पिज्जा कार्ट में जोड़ा गया!" : "Custom Pizza added to cart!");
     
-    // Reset state
     setDiyVegSelection({ onion: false, tomato: false, capsicum: false, corn: false });
     setDiyPremiumToppings({ black_olive: false, jalapeno: false, red_peprica: false, paneer: false, mushroom: false });
     setDiyChefNote("");
@@ -628,7 +621,6 @@ export default function BbCafeHome() {
     playSoundEffect('add');
     toast.success(isHindi ? `${selectedProduct.name} कार्ट में जोड़ा गया!` : `${selectedProduct.name} added to cart!`);
     
-    // Reset states
     setSelectedProduct(null);
     setNormalPizzaSize("");
     setNormalPizzaPrice(0);
@@ -958,22 +950,23 @@ export default function BbCafeHome() {
     }
   };
 
+  // --- Optimized UPI Redirection Link Scheme to Prevent Mobile Safari/Chrome popup blocks ---
   const handleLaunchUpiPay = (platform: string) => {
     triggerHaptic();
     const amount = getTotalBillPrice();
     const merchantName = "Bum Bum Cafe";
     const transactionNote = `BumBumCafe Order`;
     
-    let upiUrl = `upi://pay?pa=${upiId}&pn=${encodeURIComponent(merchantName)}&am=${amount}&cu=INR&tn=${encodeURIComponent(transactionNote)}`;
+    const standardUpi = `upi://pay?pa=${upiId}&pn=${encodeURIComponent(merchantName)}&am=${amount}&cu=INR&tn=${encodeURIComponent(transactionNote)}`;
     
     if (platform === 'phonepe') {
-      window.open(`phonepe://pay?pa=${upiId}&pn=${encodeURIComponent(merchantName)}&am=${amount}&cu=INR&tn=${encodeURIComponent(transactionNote)}`, '_blank');
+      window.location.href = `phonepe://pay?pa=${upiId}&pn=${encodeURIComponent(merchantName)}&am=${amount}&cu=INR&tn=${encodeURIComponent(transactionNote)}`;
     } else if (platform === 'paytm') {
-      window.open(`paytmmp://pay?pa=${upiId}&pn=${encodeURIComponent(merchantName)}&am=${amount}&cu=INR&tn=${encodeURIComponent(transactionNote)}`, '_blank');
+      window.location.href = `paytmmp://pay?pa=${upiId}&pn=${encodeURIComponent(merchantName)}&am=${amount}&cu=INR&tn=${encodeURIComponent(transactionNote)}`;
     } else if (platform === 'gpay') {
-      window.open(`tez://upi/pay?pa=${upiId}&pn=${encodeURIComponent(merchantName)}&am=${amount}&cu=INR&tn=${encodeURIComponent(transactionNote)}`, '_blank');
+      window.location.href = `tez://upi/pay?pa=${upiId}&pn=${encodeURIComponent(merchantName)}&am=${amount}&cu=INR&tn=${encodeURIComponent(transactionNote)}`;
     } else {
-      window.open(upiUrl, '_blank');
+      window.location.href = standardUpi;
     }
   };
 
@@ -1086,7 +1079,7 @@ export default function BbCafeHome() {
       return toast.error("Please enter full address!");
     }
 
-    if (fulfillmentType === "table" && !tableNumber.trim()) {
+    if (fulfillmentType === "table" && !tableNumber) {
       setIsSubmittingOrder(false);
       return toast.error(isHindi ? "कृपया टेबल चुनें!" : "Please select a table!");
     }
@@ -1188,7 +1181,9 @@ export default function BbCafeHome() {
     const refCode = getReferralCode();
     
     const modeLabel = fulfillmentType === "delivery" ? `Delivery (${selectedArea.name})` : fulfillmentType === "pickup" ? "Self-Pickup 🛍️" : `Dine-In (Table: ${tableNumber}) 🍽️`;
-    const payModeLabel = paymentMethod === "cod" ? "Cash on Delivery (COD) 💵" : "UPI Online Payment 📱";
+    const payModeLabel = paymentMethod === "cod" 
+      ? (fulfillmentType === "delivery" ? "Cash on Delivery (COD) 💵" : "Cash at Counter 💵")
+      : "UPI Online Payment 📱";
 
     let msg = `🔥 *BAM BAM CAFE - NEW ORDER*\n\n*Bill No:* #${formattedBillStr}\n*Token No:* #${tokenNumber}\n*Customer:* ${customerDetails.name}\n*Phone:* ${customerDetails.phone}\n*Fulfillment Mode:* ${modeLabel}\n${fulfillmentType === 'delivery' ? `*Address:* ${address}\n` : ''}*Payment Method:* ${payModeLabel}\n\n*ITEMS:*\n${itemsText}\n*Subtotal:* ₹${subtotal + addOnsCost}\n*Coupon Discount:* -₹${couponDiscount}\n${fulfillmentType === 'delivery' ? `*Delivery:* ₹${deliveryCharge}\n` : ''}*TOTAL BILL: ₹${finalTotal}*\n\n🔑 *Delivery PIN:* ${deliveryPin} (Rider ko ye confirm karke hi order le)\n*Invite Code:* ${refCode}\n*Points Earned:* +${pointsEarned} Pts\n${totalPointsCost > 0 ? `*Points Redeemed:* -${totalPointsCost} Pts\n` : ''}`;
     
@@ -1256,7 +1251,7 @@ export default function BbCafeHome() {
     reader.readAsDataURL(file);
   };
 
-  // --- Real-Time User Listeners (Points, Ledger & Live Tracking) ---
+  // --- Real-time Watchers for Dynamic Points, Ledger & Order Status only ---
   useEffect(() => {
     if (!customerDetails?.phone) {
       setCustomerPoints(0);
@@ -1309,7 +1304,6 @@ export default function BbCafeHome() {
     };
   }, [customerDetails?.phone]);
 
-  // Social Proof Simulation Engine (Delayed & Randomized)
   useEffect(() => {
     const fakeProofs = [
       { text: "Ramesh from Mohandra recently ordered Special Thali! 🍛" },
@@ -1331,7 +1325,7 @@ export default function BbCafeHome() {
     return () => clearInterval(interval);
   }, []);
 
-  // --- INITIAL COMPONENT LIFECYCLE MOUNT OBSERVERS ---
+  // --- INITIAL MOUNT & SWR BACKGROUND DATABASE SYNCHRONIZER (No UI Blocks) ---
   useEffect(() => {
     setMounted(true);
 
@@ -1383,114 +1377,67 @@ export default function BbCafeHome() {
       } catch (e) {}
     }
 
-    const unsubStore = onSnapshot(doc(db, "settings", "store"), (d) => { 
-      if (d.exists()) {
-        const storeData = d.data();
-        setStoreOpen(storeData.isOpen);
-        
-        if (storeData.isBannerEnabled !== undefined) {
-          setIsBannerEnabled(storeData.isBannerEnabled);
-        } else if (storeData.showPromoBanner !== undefined) {
-          setIsBannerEnabled(storeData.showPromoBanner);
-        }
-
-        if (storeData.isInlineBannerEnabled !== undefined) {
-          setIsInlineBannerEnabled(storeData.isInlineBannerEnabled);
-        } else if (storeData.showInlinePromo !== undefined) {
-          setIsInlineBannerEnabled(storeData.showInlinePromo);
-        }
-
-        if (storeData.whatsappNumber) {
-          setWhatsappNumber(storeData.whatsappNumber);
-        }
-        if (storeData.upiId) {
-          setUpiId(storeData.upiId);
-        }
-        if (storeData.latitude && storeData.longitude) {
-          setStoreCoordinates({ lat: Number(storeData.latitude), lng: Number(storeData.longitude) });
-        }
-
-        if (storeData.timingHindi) {
-          setStoreTimingHindi(storeData.timingHindi);
-        } else if (storeData.openingTime && storeData.closingTime) {
-          setStoreTimingHindi(`सुबह ${storeData.openingTime} से रात ${storeData.closingTime}`);
-        }
-
-        if (storeData.timingEnglish) {
-          setStoreTimingEnglish(storeData.timingEnglish);
-        } else if (storeData.openingTime && storeData.closingTime) {
-          setStoreTimingEnglish(`${storeData.openingTime} to ${storeData.closingTime}`);
-        }
-        
-        if (storeData.closingTime) {
-          try {
-            const [closeH, closeM] = storeData.closingTime.split(':').map(Number);
-            const now = new Date();
-            const closeDate = new Date();
-            closeDate.setHours(closeH, closeM, 0, 0);
-            
-            const diffMs = closeDate.getTime() - now.getTime();
-            const diffMins = Math.floor(diffMs / 60000);
-            
-            if (diffMins > 0 && diffMins <= 60) {
-              setClosingMinutesLeft(diffMins);
-            } else {
-              setClosingMinutesLeft(null);
-            }
-          } catch (e) {
-            setClosingMinutesLeft(null);
+    // Dynamic SWR Fetchers (One-time getDocs call inside Background Thread)
+    const fetchFreshDbData = async () => {
+      try {
+        // 1. Fetch settings
+        const storeSnap = await getDoc(doc(db, "settings", "store"));
+        if (storeSnap.exists()) {
+          const storeData = storeSnap.data();
+          setStoreOpen(storeData.isOpen);
+          setIsBannerEnabled(storeData.isBannerEnabled ?? storeData.showPromoBanner ?? true);
+          setIsInlineBannerEnabled(storeData.isInlineBannerEnabled ?? storeData.showInlinePromo ?? true);
+          if (storeData.whatsappNumber) setWhatsappNumber(storeData.whatsappNumber);
+          if (storeData.upiId) setUpiId(storeData.upiId);
+          if (storeData.latitude && storeData.longitude) {
+            setStoreCoordinates({ lat: Number(storeData.latitude), lng: Number(storeData.longitude) });
           }
+          if (storeData.timingHindi) setStoreTimingHindi(storeData.timingHindi);
+          if (storeData.timingEnglish) setStoreTimingEnglish(storeData.timingEnglish);
         }
+
+        // 2. Fetch products
+        const productsSnap = await getDocs(collection(db, "products"));
+        const items = productsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter((i: any) => i.isVisible !== false);
+        setMenu(shuffleArray(items));
+        localStorage.setItem('bb_cached_menu', JSON.stringify(items));
+
+        // 3. Fetch categories
+        const catsSnap = await getDocs(collection(db, "categories"));
+        const cats = catsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+        setDbCategories(cats);
+        localStorage.setItem('bb_cached_categories', JSON.stringify(cats));
+
+        // 4. Fetch banners
+        const bannersSnap = await getDocs(collection(db, "banners"));
+        const banData = bannersSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+        setBanners(banData);
+        localStorage.setItem('bb_cached_banners', JSON.stringify(banData));
+
+        // 5. Fetch reels
+        const reelsSnap = await getDocs(collection(db, "reels"));
+        const reelData = reelsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+        setStories(reelData);
+        localStorage.setItem('bb_cached_reels', JSON.stringify(reelData));
+
+        // 6. Fetch reviews
+        const revsSnap = await getDocs(collection(db, "reviews"));
+        const revData = revsSnap.docs.map(d => ({ id: d.id, ...d.data() as any })).filter((r: any) => r.isApproved === true || r.isApproved === "approved" || r.approved === true);
+        setReviews(revData);
+        localStorage.setItem('bb_cached_reviews', JSON.stringify(revData));
+
+        // 7. Fetch loyalty rules
+        const rulesSnap = await getDocs(collection(db, "loyalty_rules"));
+        const ruleData = rulesSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+        setLoyaltyRules(ruleData);
+        localStorage.setItem('bb_cached_loyalty_rules', JSON.stringify(ruleData));
+
+      } catch (err) {
+        console.warn("Background fetch warning (Offline Mode Active):", err);
       }
-    });
-    
-    setMenuLoading(true);
-    const unsubMenu = onSnapshot(query(collection(db, "products")), (snap) => {
-      const items = snap.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter((i: any) => i.isVisible !== false);
-      
-      setMenu(prev => {
-        if (prev.length === 0) {
-          return shuffleArray(items);
-        } else {
-          return items.map(newItem => {
-            const matched = prev.find(p => p.id === newItem.id);
-            return matched ? { ...matched, ...newItem } : newItem;
-          });
-        }
-      });
-      setMenuLoading(false);
-      localStorage.setItem('bb_cached_menu', JSON.stringify(items)); 
-    }, () => {
-      const localCached = localStorage.getItem('bb_cached_menu');
-      if (localCached) {
-        setMenu(shuffleArray(JSON.parse(localCached)));
-      }
-      setMenuLoading(false);
-    });
+    };
 
-    const unsubCats = onSnapshot(collection(db, "categories"), (snap) => { setDbCategories(snap.docs.map(d => ({ id: d.id, ...d.data() }))); });
-    
-    const unsubBanners = onSnapshot(collection(db, "banners"), (snap) => { 
-      setBanners(snap.docs.map(d => ({ id: d.id, ...d.data() }))); 
-    });
-    const unsubStories = onSnapshot(collection(db, "reels"), (snap) => { 
-      setStories(snap.docs.map(d => ({ id: d.id, ...d.data() }))); 
-    });
-
-    const unsubReviews = onSnapshot(collection(db, "reviews"), (snap) => {
-      const fetched = snap.docs.map(d => ({ id: d.id, ...d.data() as any }));
-      const approved = fetched.filter((r: any) => 
-        r.isApproved === true || 
-        r.isApproved === "true" || 
-        r.isApproved === "approved" || 
-        r.isApproved === "Approved" ||
-        r.approved === true ||
-        r.approved === "true"
-      );
-      setReviews(approved);
-    });
-
-    const unsubRules = onSnapshot(collection(db, "loyalty_rules"), (snap) => { setLoyaltyRules(snap.docs.map(d => ({ id: d.id, ...d.data() }))); });
+    fetchFreshDbData();
 
     return () => { 
       if (typeof window !== "undefined") {
@@ -1498,13 +1445,6 @@ export default function BbCafeHome() {
         window.removeEventListener("offline", handleOffline);
         window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
       }
-      unsubStore(); 
-      unsubMenu(); 
-      unsubCats(); 
-      unsubBanners(); 
-      unsubStories();
-      unsubReviews(); 
-      unsubRules(); 
     };
   }, []);
 
@@ -1559,7 +1499,7 @@ export default function BbCafeHome() {
       
       {confettiActive && (
         <div className="fixed inset-0 pointer-events-none z-[999] overflow-hidden">
-          {Array.from({ length: 100 }).map((_, i) => (
+          {Array.from({ length: 105 }).map((_, i) => (
             <motion.div
               key={i}
               className="absolute w-2 h-2 rounded-full"
@@ -1721,7 +1661,7 @@ export default function BbCafeHome() {
                 >
                   <div className="w-16 h-16 rounded-full p-0.5 bg-gradient-to-tr from-yellow-400 via-orange-500 to-red-600 relative">
                     <div className="w-full h-full rounded-full overflow-hidden border-2 border-white dark:border-neutral-900 bg-neutral-800 flex items-center justify-center relative">
-                      <img src={story.coverUrl || story.url} className="w-full h-full object-cover" alt={story.title} />
+                      <img src={story.coverUrl || story.url} className="w-full h-full object-cover" alt={story.title} loading="lazy" />
                       <div className="absolute inset-0 bg-black/10 flex items-center justify-center">
                         <Play size={14} className="text-white fill-white" />
                       </div>
@@ -1762,6 +1702,7 @@ export default function BbCafeHome() {
                     className="w-full h-full object-cover" 
                     onError={() => setBannerError(true)} 
                     alt="BAM BAM CAFE Promo"
+                    loading="lazy"
                   />
                 )}
               </motion.div>
@@ -1787,7 +1728,7 @@ export default function BbCafeHome() {
                     {cat === "DIY Pizza" ? (
                       <div className="w-full h-full flex items-center justify-center text-lg bg-gradient-to-tr from-yellow-500 to-red-500 text-white">🍕</div>
                     ) : (
-                      <img src={getCategoryImage(cat)} className="w-full h-full object-cover" alt={cat} />
+                      <img src={getCategoryImage(cat)} className="w-full h-full object-cover" alt={cat} loading="lazy" />
                     )}
                   </div>
                   <span className={`text-[9px] font-black uppercase mt-1.5 truncate max-w-[70px] text-center ${isActive ? 'dark:text-orange-500 text-orange-700' : 'dark:text-gray-400 text-neutral-800'}`}>
@@ -1991,11 +1932,11 @@ export default function BbCafeHome() {
                       transition={{ duration: 0.45, ease: "easeOut" }}
                     >
                       <div className="relative h-44 w-full overflow-hidden font-sans">
-                        {/* Dynamic multi-field product image fallback selection */}
                         <img 
                           src={item.image || item.imageUrl || item.url || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=500&q=80"} 
                           className="w-full h-full object-cover origin-center transition-transform duration-700 ease-out group-hover:scale-110" 
                           alt={item.name} 
+                          loading="lazy"
                         />
                         
                         <div className="absolute top-3 left-3 bg-black/50 backdrop-blur-md px-2.5 py-1 rounded-lg border border-white/10 flex items-center gap-1 text-[8px] font-black uppercase text-green-400 font-bold">
@@ -2118,6 +2059,7 @@ export default function BbCafeHome() {
                                 src={banners[(bannerIndex + 1) % banners.length]?.url} 
                                 className="w-full h-full object-cover" 
                                 alt="BAM BAM CAFE Secondary Promo"
+                                loading="lazy"
                               />
                             )}
                           </div>
@@ -2142,7 +2084,7 @@ export default function BbCafeHome() {
             {displayReviews.map((r: any) => (
               <div key={r.id} className="dark:bg-white/[0.02] bg-white border dark:border-white/5 border-neutral-200 p-4 rounded-2xl space-y-2 shadow-md shadow-neutral-200/30 dark:shadow-none transition-colors duration-200">
                 <div className="flex justify-between items-center">
-                  <h4 className="font-black text-xs text-orange-600 font-bold">{r.name}</h4>
+                  <h4 className="font-black text-xs text-orange-605 font-bold">{r.name}</h4>
                   <div className="flex items-center gap-0.5">
                     <Star size={10} style={{ color: '#fbbf24', fill: '#fbbf24' }} />
                     <Star size={10} style={{ color: '#fbbf24', fill: '#fbbf24' }} />
@@ -2181,19 +2123,19 @@ export default function BbCafeHome() {
           {/* Social Icons Container */}
           <div className="social-icons flex justify-center gap-5 py-4 dark:bg-white/[0.02] bg-white border dark:border-white/5 border-neutral-200 rounded-2xl shadow-sm">
             <a href="https://www.facebook.com/bbcafe.in/" target="_blank" rel="noreferrer" title="Facebook" className="hover:scale-110 transition-transform">
-              <img src="/facebook.png" alt="Facebook" className="w-8 h-8 object-contain" />
+              <img src="/facebook.png" alt="Facebook" className="w-8 h-8 object-contain" loading="lazy" />
             </a>
             <a href="https://www.instagram.com/bbcafe.in/" target="_blank" rel="noreferrer" title="Instagram" className="hover:scale-110 transition-transform">
-              <img src="/instagram.png" alt="Instagram" className="w-8 h-8 object-contain" />
+              <img src="/instagram.png" alt="Instagram" className="w-8 h-8 object-contain" loading="lazy" />
             </a>
             <a href="https://whatsapp.com/channel/0029VaLhggoGE56natoQI43y" target="_blank" rel="noreferrer" title="WhatsApp Channel" className="hover:scale-110 transition-transform">
-              <img src="/whatsapp.png" alt="WhatsApp Channel" className="w-8 h-8 object-contain" />
+              <img src="/whatsapp.png" alt="WhatsApp Channel" className="w-8 h-8 object-contain" loading="lazy" />
             </a>
             <a href="https://www.snapchat.com/add/bbcafe.in" target="_blank" rel="noreferrer" title="Snapchat" className="hover:scale-110 transition-transform">
-              <img src="/snapchat.png" alt="Snapchat" className="w-8 h-8 object-contain" />
+              <img src="/snapchat.png" alt="Snapchat" className="w-8 h-8 object-contain" loading="lazy" />
             </a>
             <a href="https://www.youtube.com/@bbcafe.i" target="_blank" rel="noreferrer" title="YouTube" className="hover:scale-110 transition-transform">
-              <img src="/youtube.png" alt="YouTube" className="w-8 h-8 object-contain" />
+              <img src="/youtube.png" alt="YouTube" className="w-8 h-8 object-contain" loading="lazy" />
             </a>
           </div>
 
@@ -2214,7 +2156,7 @@ export default function BbCafeHome() {
             </a>
           </div>
 
-          <div className="text-center text-[9px] text-neutral-500 dark:text-gray-400 font-bold tracking-widest pt-2 font-mono">
+          <div className="text-center text-[9px] text-neutral-505 dark:text-gray-400 font-bold tracking-widest pt-2 font-mono">
             © 2026 BUM BUM CAFE - MOHANDRA. ALL RIGHTS RESERVED.
           </div>
         </footer>
@@ -2419,7 +2361,7 @@ export default function BbCafeHome() {
                 <button 
                   type="button" 
                   onClick={() => { triggerHaptic(); setIsReviewFormOpen(false); }} 
-                  className="p-2 bg-red-100 hover:bg-red-500 hover:text-white text-red-650 rounded-full transition-all duration-200 shadow"
+                  className="p-2 bg-red-105 hover:bg-red-500 hover:text-white text-red-650 rounded-full transition-all duration-200 shadow"
                   title="Close Feedback"
                 >
                   <X size={18} />
@@ -2635,7 +2577,7 @@ export default function BbCafeHome() {
                       <h4 className="text-xs font-black dark:text-white text-neutral-900 font-bold">
                         {isHindi ? `आपने बचाए: ` : "You Saved: "}<span className="text-emerald-500 text-sm font-black">{ecoCutlerySaves} {isHindi ? "प्लास्टिक चम्मच 🌳" : "Plastic Cutlery 🌳"}</span>
                       </h4>
-                      <p className="text-[9px] text-neutral-500 dark:text-gray-400 font-medium">{isHindi ? "चम्मच/टिश्यू न चुनकर आपने पर्यावरण की मदद की है।" : "By skipping plastic utensils, you actively protected nature!"}</p>
+                      <p className="text-[9px] text-neutral-505 dark:text-gray-400 font-medium">{isHindi ? "चम्मच/टिश्यू न चुनकर आपने पर्यावरण की मदद की है।" : "By skipping plastic utensils, you actively protected nature!"}</p>
                     </div>
                     {ecoCutlerySaves >= 3 && (
                       <div className="bg-emerald-500 text-black px-3 py-1.5 rounded-full border border-emerald-400/30 font-black text-[9px] flex items-center gap-1 shadow animate-pulse font-bold">
@@ -2714,7 +2656,7 @@ export default function BbCafeHome() {
                             }}
                             className="flex items-center gap-1 bg-neutral-105 dark:bg-white/5 border dark:border-white/10 border-neutral-200 px-2.5 py-1 rounded-full text-[9px] font-bold dark:text-gray-300 text-neutral-800 hover:border-yellow-400 transition-all"
                           >
-                            <img src={link.icon} className="w-3.5 h-3.5 object-contain flex-shrink-0" alt="" />
+                            <img src={link.icon} className="w-3.5 h-3.5 object-contain flex-shrink-0" alt="" loading="lazy" />
                             <span>{link.label.split(' ')[1]} (+{link.points} P)</span>
                           </button>
                         ))}
@@ -2848,7 +2790,7 @@ export default function BbCafeHome() {
                       <p className="text-orange-500 font-black mt-1 text-[11px] font-mono">₹{item?.price || 0}</p>
                     </div>
                     <div className="flex items-center gap-2 bg-neutral-100 dark:bg-black/40 px-2 py-1 rounded-xl border border-neutral-300 dark:border-white/10 flex-shrink-0">
-                      <button onClick={() => { triggerHaptic(); removeItem(item.id); }} className="w-6 h-6 flex items-center justify-center bg-red-500/10 text-red-500 rounded text-sm font-black">-</button>
+                      <button onClick={() => { triggerHaptic(); removeItem(item.id); }} className="w-6 h-6 flex items-center justify-center bg-red-500/10 text-red-550 rounded text-sm font-black">-</button>
                       <span className="font-black text-xs px-1 text-neutral-900 dark:text-white font-mono">{item.quantity}</span>
                       {item.isReward ? (
                         <button disabled className="w-6 h-6 flex items-center justify-center bg-white/5 text-gray-550 rounded text-sm font-black cursor-not-allowed">+</button>
@@ -2858,7 +2800,7 @@ export default function BbCafeHome() {
                     </div>
                   </div>
                   {item.note && (
-                    <div className="bg-orange-500/5 border border-orange-500/10 rounded-lg p-2 text-[9px] text-orange-650 dark:text-orange-400 italic">
+                    <div className="bg-orange-500/5 border border-orange-500/10 rounded-lg p-2 text-[9px] text-orange-655 dark:text-orange-400 italic">
                       👩‍🍳 Chef Instructions: {item.note}
                     </div>
                   )}
@@ -2899,7 +2841,35 @@ export default function BbCafeHome() {
                 </div>
               </div>
 
-              {/* 4. CONDITIONAL FULFILLMENT INPUTS */}
+              {/* 4. SELECT ORDER MODE (Shifted above Delivery Zone / Address for logical UX) */}
+              <div className="dark:bg-white/[0.02] bg-neutral-50 p-4 rounded-2xl border dark:border-white/5 border-neutral-200 space-y-2.5 transition-colors duration-200 mt-4 font-sans font-bold">
+                <label className="text-[10px] font-black uppercase text-neutral-800 dark:text-gray-400 font-bold">{isHindi ? "ऑर्डर का माध्यम चुनें:" : "Select Order Mode:"}</label>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    onClick={() => { triggerHaptic(); setFulfillmentType("delivery"); }}
+                    className={`py-3 px-1 rounded-xl border flex flex-col items-center justify-center gap-1.5 transition-all text-center ${fulfillmentType === "delivery" ? 'border-orange-500 bg-orange-500/10 text-orange-655 font-black shadow-sm' : 'border-neutral-300 dark:border-white/5 text-neutral-800 dark:text-gray-300 font-semibold'}`}
+                  >
+                    <span className="text-base">🛵</span>
+                    <span className="text-[9px] font-black">{isHindi ? "होम डिलीवरी" : "Home Delivery"}</span>
+                  </button>
+                  <button
+                    onClick={() => { triggerHaptic(); setFulfillmentType("pickup"); }}
+                    className={`py-3 px-1 rounded-xl border flex flex-col items-center justify-center gap-1.5 transition-all text-center ${fulfillmentType === "pickup" ? 'border-orange-500 bg-orange-500/10 text-orange-655 font-black shadow-sm' : 'border-neutral-300 dark:border-white/5 text-neutral-800 dark:text-gray-300 font-semibold'}`}
+                  >
+                    <span className="text-base">🛍️</span>
+                    <span className="text-[9px] font-black">{isHindi ? "सेल्फ-पिकअप" : "Self-Pickup"}</span>
+                  </button>
+                  <button
+                    onClick={() => { triggerHaptic(); setFulfillmentType("table"); }}
+                    className={`py-3 px-1 rounded-xl border flex flex-col items-center justify-center gap-1.5 transition-all text-center ${fulfillmentType === "table" ? 'border-orange-500 bg-orange-500/10 text-orange-655 font-black shadow-sm' : 'border-neutral-300 dark:border-white/5 text-neutral-800 dark:text-gray-300 font-semibold'}`}
+                  >
+                    <span className="text-base">🍽️</span>
+                    <span className="text-[9px] font-black">{isHindi ? "टेबल ऑर्डर" : "Dine-In (Table)"}</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* 5. CONDITIONAL FULFILLMENT INPUTS (Controlled dynamically below the Mode Selector) */}
               {fulfillmentType === "delivery" && (
                 <div className="space-y-4 mt-4 font-sans font-bold">
                   
@@ -2954,20 +2924,64 @@ export default function BbCafeHome() {
                 </div>
               )}
 
+              {/* Dine-In Custom Table Capacity Grid Selector (The duplicate simple input text box was removed) */}
               {fulfillmentType === "table" && (
-                <div className="bg-neutral-50 dark:bg-white/[0.02] p-4 rounded-2xl border border-neutral-200 dark:border-white/5 space-y-2 mt-4 transition-colors duration-200 font-sans font-bold">
-                  <div className="flex items-center gap-1.5 text-orange-500"><span>🍽️</span> <h3 className="font-black uppercase text-[10px] font-bold">{isHindi ? "टेबल नंबर दर्ज करें" : "Enter Table Number"}</h3></div>
-                  <input 
-                    type="text" 
-                    placeholder={isHindi ? "उदा. टेबल संख्या 5" : "e.g. Table No. 5"} 
-                    value={tableNumber} 
-                    onChange={(e) => setTableNumber(e.target.value)} 
-                    className="w-full bg-white dark:bg-black/40 border border-neutral-300 dark:border-white/10 rounded-xl p-3 text-xs font-bold text-neutral-900 dark:text-white outline-none" 
-                  />
+                <div className="mt-3 p-3 bg-neutral-105 dark:bg-neutral-900 rounded-xl border border-neutral-200 dark:border-white/5 space-y-3 font-sans transition-all duration-300">
+                  <p className="text-[10px] font-black uppercase text-orange-655 dark:text-orange-400 font-bold">{isHindi ? "🪑 उपलब्ध टेबल चुनें:" : "🪑 Choose Available Table:"}</p>
+                  
+                  {/* 2-Seater Grid */}
+                  <div className="space-y-1.5">
+                    <span className="text-[8px] font-black text-neutral-650 dark:text-gray-400 uppercase tracking-wider">{isHindi ? "2 लोगों के बैठने के लिए (3 टेबल्स):" : "For 2 People (3 Tables Available):"}</span>
+                    <div className="grid grid-cols-3 gap-2">
+                      {["Table 1", "Table 2", "Table 3"].map((t) => {
+                        const isSelected = tableNumber === t;
+                        return (
+                          <button
+                            key={t}
+                            type="button"
+                            onClick={() => { triggerHaptic(); setTableNumber(t); }}
+                            className={`p-2.5 rounded-lg border text-[10px] font-black text-center transition-all ${
+                              isSelected 
+                                ? 'border-orange-500 bg-orange-500/15 text-orange-600 dark:text-orange-400 shadow-sm font-black' 
+                                : 'border-neutral-300 dark:border-white/10 bg-white dark:bg-white/5 text-neutral-800 dark:text-neutral-300 hover:border-neutral-400'
+                            }`}
+                          >
+                            <span className="block">{t}</span>
+                            <span className="text-[7.5px] text-neutral-500 dark:text-gray-400 font-normal">👥 2 seats</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* 4-Seater Grid */}
+                  <div className="space-y-1.5 pt-1">
+                    <span className="text-[8px] font-black text-neutral-655 dark:text-gray-400 uppercase tracking-wider">{isHindi ? "4 लोगों के बैठने के लिए (3 टेबल्स):" : "For 4 People (3 Tables Available):"}</span>
+                    <div className="grid grid-cols-3 gap-2">
+                      {["Table 4", "Table 5", "Table 6"].map((t) => {
+                        const isSelected = tableNumber === t;
+                        return (
+                          <button
+                            key={t}
+                            type="button"
+                            onClick={() => { triggerHaptic(); setTableNumber(t); }}
+                            className={`p-2.5 rounded-lg border text-[10px] font-black text-center transition-all ${
+                              isSelected 
+                                ? 'border-orange-500 bg-orange-500/15 text-orange-600 dark:text-orange-400 shadow-sm font-black' 
+                                : 'border-neutral-300 dark:border-white/10 bg-white dark:bg-white/5 text-neutral-800 dark:text-neutral-300 hover:border-neutral-400'
+                            }`}
+                          >
+                            <span className="block">{t}</span>
+                            <span className="text-[7.5px] text-neutral-500 dark:text-gray-400 font-normal">👥👥 4 seats</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </div>
               )}
 
-              {/* 5. ECO FRIENDLY PACKAGING */}
+              {/* 6. ECO FRIENDLY PACKAGING */}
               <div className="dark:bg-green-950/10 bg-green-50/50 border dark:border-green-500/10 border-green-200 rounded-2xl p-4 flex justify-between items-center transition-colors duration-200 mt-4 font-sans font-bold">
                 <div className="space-y-0.5">
                   <p className="text-[10px] font-black text-green-700 dark:text-green-500 uppercase tracking-tight font-bold">{isHindi ? "इको-फ्रेंडली पैकिंग" : "Eco-Friendly Packaging"}</p>
@@ -2976,7 +2990,7 @@ export default function BbCafeHome() {
                 <input type="checkbox" checked={noCutlery} onChange={() => { triggerHaptic(); setNoCutlery(!noCutlery); }} className="w-4 h-4 accent-green-600" />
               </div>
 
-              {/* 6. PROMO/COUPON CODE INPUT SECTION */}
+              {/* 7. PROMO/COUPON CODE INPUT SECTION */}
               <div className="dark:bg-white/[0.02] bg-neutral-50 border dark:border-white/5 border-neutral-200 rounded-2xl p-4 space-y-2.5 transition-colors duration-200 mt-4 font-sans font-bold">
                 <label className="text-[9px] font-black uppercase text-neutral-800 dark:text-gray-400 font-bold">
                   {isHindi ? "कूपन कोड / प्रोमो कोड:" : "Coupon Code / Promo Code:"}
@@ -3011,91 +3025,6 @@ export default function BbCafeHome() {
                 )}
               </div>
 
-              {/* 7. SELECT ORDER MODE */}
-              <div className="dark:bg-white/[0.02] bg-neutral-50 p-4 rounded-2xl border dark:border-white/5 border-neutral-200 space-y-2 mt-4 transition-colors duration-200 font-sans font-bold">
-                <label className="text-[10px] font-black uppercase text-neutral-800 dark:text-gray-400 font-bold">{isHindi ? "ऑर्डर का माध्यम चुनें:" : "Select Order Mode:"}</label>
-                <div className="grid grid-cols-3 gap-2">
-                  <button
-                    onClick={() => { triggerHaptic(); setFulfillmentType("delivery"); }}
-                    className={`py-3 px-1 rounded-xl border flex flex-col items-center justify-center gap-1.5 transition-all text-center ${fulfillmentType === "delivery" ? 'border-orange-500 bg-orange-500/10 text-orange-655 font-black shadow-sm' : 'border-neutral-300 dark:border-white/5 text-neutral-800 dark:text-gray-300 font-semibold'}`}
-                  >
-                    <span className="text-base">🛵</span>
-                    <span className="text-[9px] font-black">{isHindi ? "होम डिलीवरी" : "Home Delivery"}</span>
-                  </button>
-                  <button
-                    onClick={() => { triggerHaptic(); setFulfillmentType("pickup"); }}
-                    className={`py-3 px-1 rounded-xl border flex flex-col items-center justify-center gap-1.5 transition-all text-center ${fulfillmentType === "pickup" ? 'border-orange-500 bg-orange-500/10 text-orange-655 font-black shadow-sm' : 'border-neutral-300 dark:border-white/5 text-neutral-800 dark:text-gray-300 font-semibold'}`}
-                  >
-                    <span className="text-base">🛍️</span>
-                    <span className="text-[9px] font-black">{isHindi ? "सेल्फ-पिकअप" : "Self-Pickup"}</span>
-                  </button>
-                  <button
-                    onClick={() => { triggerHaptic(); setFulfillmentType("table"); }}
-                    className={`py-3 px-1 rounded-xl border flex flex-col items-center justify-center gap-1.5 transition-all text-center ${fulfillmentType === "table" ? 'border-orange-500 bg-orange-500/10 text-orange-655 font-black shadow-sm' : 'border-neutral-300 dark:border-white/5 text-neutral-800 dark:text-gray-300 font-semibold'}`}
-                  >
-                    <span className="text-base">🍽️</span>
-                    <span className="text-[9px] font-black">{isHindi ? "टेबल ऑर्डर" : "Dine-In (Table)"}</span>
-                  </button>
-                </div>
-
-                {/* Dine-In Custom Table Capacity Grid Selector */}
-                {fulfillmentType === "table" && (
-                  <div className="mt-3 p-3 bg-neutral-105 dark:bg-neutral-900 rounded-xl border border-neutral-200 dark:border-white/5 space-y-3 font-sans transition-all duration-300">
-                    <p className="text-[10px] font-black uppercase text-orange-655 dark:text-orange-400 font-bold">{isHindi ? "🪑 उपलब्ध टेबल चुनें:" : "🪑 Choose Available Table:"}</p>
-                    
-                    {/* 2-Seater Grid */}
-                    <div className="space-y-1.5">
-                      <span className="text-[8px] font-black text-neutral-650 dark:text-gray-400 uppercase tracking-wider">{isHindi ? "2 लोगों के बैठने के लिए (3 टेबल्स):" : "For 2 People (3 Tables Available):"}</span>
-                      <div className="grid grid-cols-3 gap-2">
-                        {["Table 1", "Table 2", "Table 3"].map((t) => {
-                          const isSelected = tableNumber === t;
-                          return (
-                            <button
-                              key={t}
-                              type="button"
-                              onClick={() => { triggerHaptic(); setTableNumber(t); }}
-                              className={`p-2.5 rounded-lg border text-[10px] font-black text-center transition-all ${
-                                isSelected 
-                                  ? 'border-orange-500 bg-orange-500/15 text-orange-600 dark:text-orange-400 shadow-sm font-black' 
-                                  : 'border-neutral-300 dark:border-white/10 bg-white dark:bg-white/5 text-neutral-800 dark:text-neutral-300 hover:border-neutral-400'
-                              }`}
-                            >
-                              <span className="block">{t}</span>
-                              <span className="text-[7.5px] text-neutral-500 dark:text-gray-400 font-normal">👥 2 seats</span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    {/* 4-Seater Grid */}
-                    <div className="space-y-1.5 pt-1">
-                      <span className="text-[8px] font-black text-neutral-655 dark:text-gray-400 uppercase tracking-wider">{isHindi ? "4 लोगों के बैठने के लिए (3 टेबल्स):" : "For 4 People (3 Tables Available):"}</span>
-                      <div className="grid grid-cols-3 gap-2">
-                        {["Table 4", "Table 5", "Table 6"].map((t) => {
-                          const isSelected = tableNumber === t;
-                          return (
-                            <button
-                              key={t}
-                              type="button"
-                              onClick={() => { triggerHaptic(); setTableNumber(t); }}
-                              className={`p-2.5 rounded-lg border text-[10px] font-black text-center transition-all ${
-                                isSelected 
-                                  ? 'border-orange-500 bg-orange-500/15 text-orange-600 dark:text-orange-400 shadow-sm font-black' 
-                                  : 'border-neutral-300 dark:border-white/10 bg-white dark:bg-white/5 text-neutral-800 dark:text-neutral-300 hover:border-neutral-400'
-                              }`}
-                            >
-                              <span className="block">{t}</span>
-                              <span className="text-[7.5px] text-neutral-500 dark:text-gray-400 font-normal">👥👥 4 seats</span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-
               {/* 8. PAY SUMMARY CARD */}
               <div className="bg-gradient-to-b from-orange-600 to-orange-700 p-5 rounded-2xl text-white mt-4 font-mono font-bold">
                 <div className="flex justify-between font-bold mb-1.5 text-xs"><span>{isHindi ? "आइटम का टोटल" : "Items Total"}</span> <span>₹{getCartSubtotal()}</span></div>
@@ -3117,7 +3046,12 @@ export default function BbCafeHome() {
                     className={`p-3 rounded-xl border flex flex-col items-center justify-center gap-1 transition-all ${paymentMethod === "cod" ? 'border-orange-500 bg-orange-500/10 text-orange-655 font-black shadow-sm' : 'border-neutral-300 dark:border-white/5 text-neutral-800 dark:text-gray-300 font-bold'}`}
                   >
                     <span className="text-sm">💵</span>
-                    <span className="text-[9px] font-black">{isHindi ? "कैश ऑन डिलीवरी" : "Cash on Delivery"}</span>
+                    <span className="text-[9px] font-black">
+                      {fulfillmentType === "delivery" 
+                        ? (isHindi ? "कैश ऑन डिलीवरी" : "Cash on Delivery") 
+                        : (isHindi ? "कैश काउंटर पेमेंट" : "Cash at Counter")
+                      }
+                    </span>
                   </button>
                   <button
                     onClick={() => { 
@@ -3178,7 +3112,7 @@ export default function BbCafeHome() {
               <button 
                 type="button" 
                 onClick={() => { triggerHaptic(); setIsUpiPopupOpen(false); }}
-                className="absolute top-4 right-4 p-2 bg-red-105 hover:bg-red-600 hover:text-white text-red-605 rounded-full transition-all shadow"
+                className="absolute top-4 right-4 p-2 bg-red-105 hover:bg-red-600 hover:text-white text-red-655 rounded-full transition-all shadow"
                 title="Close"
               >
                 <X size={16} />
@@ -3213,7 +3147,8 @@ export default function BbCafeHome() {
                   onClick={() => handleLaunchUpiPay('gpay')}
                   className="p-3 bg-neutral-50 dark:bg-white/[0.02] border dark:border-white/5 border-neutral-200 hover:border-green-500 rounded-xl flex items-center justify-center gap-2 transition-all active:scale-95 text-neutral-800 dark:text-white font-bold"
                 >
-                  <img src="/youtube.png" className="w-5 h-5 object-contain" alt="Google Pay" />
+                  {/* Google Pay custom design mapping */}
+                  <div className="w-5 h-5 bg-gradient-to-tr from-blue-500 via-red-500 to-yellow-500 rounded-full flex items-center justify-center text-[8px] text-white font-black">G</div>
                   <span className="text-[10px] font-black font-sans">GPay</span>
                 </button>
                 <button 
@@ -3235,7 +3170,7 @@ export default function BbCafeHome() {
                   type="file" 
                   accept="image/png, image/jpeg" 
                   onChange={handleScreenshotChange}
-                  className="w-full text-xs text-neutral-600 dark:text-gray-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[9px] file:font-black file:bg-orange-500 file:text-black file:cursor-pointer hover:file:bg-orange-600 outline-none"
+                  className="w-full text-xs text-neutral-605 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[9px] file:font-black file:bg-orange-500 file:text-black file:cursor-pointer hover:file:bg-orange-600 outline-none"
                 />
                 
                 {isCompressing && (
@@ -3271,7 +3206,7 @@ export default function BbCafeHome() {
                 <button 
                   type="button" 
                   onClick={() => setIsUpiPopupOpen(false)}
-                  className="bg-neutral-100 hover:bg-neutral-200 dark:bg-white/5 text-neutral-700 dark:text-gray-400 px-4 py-3.5 rounded-xl font-bold text-xs transition-all font-bold"
+                  className="bg-neutral-100 hover:bg-neutral-200 dark:bg-white/5 text-neutral-705 dark:text-gray-400 px-4 py-3.5 rounded-xl font-bold text-xs transition-all font-bold"
                 >
                   {isHindi ? "बंद करें" : "Cancel"}
                 </button>
@@ -3364,7 +3299,7 @@ export default function BbCafeHome() {
               onSubmit={handleClaimSubmit}
               className="dark:bg-[#111] bg-white w-full max-sm p-6 rounded-3xl border dark:border-white/10 border-neutral-200 text-center space-y-4 shadow-xl font-sans"
             >
-              <img src={claimingPlatform.icon} className="w-10 h-10 object-contain mx-auto" alt="" />
+              <img src={claimingPlatform.icon} className="w-10 h-10 object-contain mx-auto" alt="" loading="lazy" />
               <div className="space-y-1">
                 <h3 className="text-base font-black text-orange-650 dark:text-orange-500 uppercase font-bold">वेरिफिकेशन दावा सबमिट करें</h3>
                 <p className="text-[10px] text-neutral-600 dark:text-gray-400 leading-normal font-semibold">
