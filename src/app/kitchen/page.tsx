@@ -16,7 +16,14 @@ export default function KitchenDisplaySystem() {
   // कैफ़े ओपन/क्लोज के लिए स्टोर की स्थिति का स्टेट
   const [isStoreOpen, setIsStoreOpen] = useState(true);
 
+  // --- प्रिंटर सेटिंग्स स्टेट्स ---
+  const [printerMethod, setPrinterMethod] = useState<"none" | "browser" | "rawbt">("none");
+  const [autoPrintOnAccept, setAutoPrintOnAccept] = useState<boolean>(false);
+  const [printTargetOrder, setPrintTargetOrder] = useState<any | null>(null);
+
   const prevOrdersCountRef = useRef<number | null>(null);
+
+  const formatBillNumber = (num: number) => String(num).padStart(4, '0');
 
   // Play custom MP3 sound alert for kitchen when new order arrives
   const playAlertSound = () => {
@@ -47,6 +54,17 @@ export default function KitchenDisplaySystem() {
       }
     };
     fetchPins();
+
+    // Safely Load Printer Config from LocalStorage
+    try {
+      const savedPrinter = localStorage.getItem('bb_kds_printer_method') as any;
+      if (savedPrinter) setPrinterMethod(savedPrinter);
+      
+      const savedAutoPrint = localStorage.getItem('bb_kds_autoprint') === 'true';
+      setAutoPrintOnAccept(savedAutoPrint);
+    } catch (e) {
+      console.warn("Error reading printer config", e);
+    }
 
     // Register Service Worker for PWA
     if ('serviceWorker' in navigator) {
@@ -186,6 +204,79 @@ export default function KitchenDisplaySystem() {
     };
   }, []);
 
+  // --- प्रिंटिंग हेल्पर फ़ंक्शंस (Auto-Print & Manual) ---
+  const handlePrinterChange = (method: "none" | "browser" | "rawbt") => {
+    setPrinterMethod(method);
+    localStorage.setItem('bb_kds_printer_method', method);
+    toast.success(`Printer set to: ${method.toUpperCase()}`);
+  };
+
+  const handleAutoPrintToggle = () => {
+    const next = !autoPrintOnAccept;
+    setAutoPrintOnAccept(next);
+    localStorage.setItem('bb_kds_autoprint', String(next));
+    toast.success(`Auto-Print: ${next ? "ENABLED" : "DISABLED"}`);
+  };
+
+  const generatePlainTextReceipt = (order: any) => {
+    const line = "--------------------------------\n";
+    const dLine = "================================\n";
+    const dateStr = order.timestamp?.toDate 
+      ? order.timestamp.toDate().toLocaleString('en-IN') 
+      : new Date(order.timestamp).toLocaleString();
+    
+    let text = "";
+    text += dLine;
+    text += "          BUM BUM CAFE          \n";
+    text += dLine;
+    text += `TOKEN: #${order.tokenNumber || "N/A"}\n`;
+    text += `Bill No: #${formatBillNumber(order.billNumber || 0)}\n`;
+    text += `Date: ${dateStr}\n`;
+    text += line;
+    text += `Mode: ${order.fulfillmentType?.toUpperCase() || ""}\n`;
+    if (order.fulfillmentType === "table") {
+      text += `Table: ${order.tableNumber || "N/A"}\n`;
+    }
+    text += `Cust: ${order.customerName || ""}\n`;
+    text += `Phone: ${order.customerPhone || ""}\n`;
+    if (order.address) {
+      text += `Addr: ${order.address}\n`;
+    }
+    text += line;
+    text += "ITEMS:\n";
+    order.items?.forEach((item: any) => {
+      text += `x${item.quantity} ${item.name.padEnd(20).substring(0, 18)} Rs.${item.price * item.quantity}\n`;
+      if (item.note) {
+        text += `   └─ Note: ${item.note}\n`;
+      }
+    });
+    text += line;
+    text += `Subtotal: Rs.${order.subtotal || 0}\n`;
+    if (order.discount > 0) {
+      text += `Discount: -Rs.${order.discount}\n`;
+    }
+    text += `Total Pay: Rs.${order.total || 0}\n`;
+    text += dLine;
+    text += "     Thank You! Visit Again     \n";
+    text += dLine;
+    return text;
+  };
+
+  const triggerPrint = (order: any) => {
+    if (printerMethod === "none") return;
+    triggerHaptic(20);
+
+    if (printerMethod === "browser") {
+      setPrintTargetOrder(order);
+      setTimeout(() => {
+        window.print();
+      }, 150);
+    } else if (printerMethod === "rawbt") {
+      const textStr = generatePlainTextReceipt(order);
+      window.location.href = "rawbt:" + encodeURIComponent(textStr);
+    }
+  };
+
   // LOGIN: Verifies Entered PIN against personal Cook account in Firestore
   const handlePinSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -268,19 +359,35 @@ export default function KitchenDisplaySystem() {
   };
 
   const handleUpdateStatus = async (orderId: string, currentStatus: string) => {
-    const nextStatusMap: { [key: string]: string } = {
-      'pending': 'preparing',
-      'preparing': 'out_for_delivery',
-      'out_for_delivery': 'delivered'
-    };
-    const nextStatus = nextStatusMap[currentStatus];
+    const order = orders.find(o => o.id === orderId);
+    if (!order) return;
+
+    const fType = order.fulfillmentType || "delivery";
+
+    // डायनामिक स्टेटस बदलाव (Fulfillment Type के आधार पर)
+    let nextStatus = "";
+    if (currentStatus === 'pending') {
+      nextStatus = 'preparing';
+    } else if (currentStatus === 'preparing') {
+      // Self-Pickup (pickup) और Dine-In (table) ऑर्डर्स सीधे Delivered (पूर्ण) हो जाएंगे
+      nextStatus = (fType === "pickup" || fType === "table") ? 'delivered' : 'out_for_delivery';
+    } else if (currentStatus === 'out_for_delivery') {
+      nextStatus = 'delivered';
+    }
+
     if (!nextStatus) return;
 
     try {
       await updateDoc(doc(db, "orders", orderId), { status: nextStatus });
       toast.success(`Status updated to ${nextStatus.replace('_', ' ')}!`);
 
-      if (currentStatus === 'preparing') {
+      // आर्डर एक्सेप्ट (Pending -> Preparing) होते ही ऑटो-प्रिंट ट्रिगर करें
+      if (currentStatus === 'pending' && autoPrintOnAccept) {
+        triggerPrint(order);
+      }
+
+      // केवल Delivery वाले ऑर्डर्स होने पर ही डिलीवरी बॉय को पुश नोटिफिकेशन जाएगा
+      if (currentStatus === 'preparing' && fType === 'delivery') {
         triggerDeliveryBoyNotification(orderId);
       }
     } catch (e) {
@@ -369,13 +476,62 @@ export default function KitchenDisplaySystem() {
     <div className="bg-[#080808] min-h-screen text-white p-6 font-sans">
       <link rel="manifest" href="/kitchen-manifest.json" />
       <Toaster />
-      <header className="border-b border-white/5 pb-4 mb-6 flex justify-between items-center">
+
+      {/* थर्मल प्रिंटर मीडिया ओवरराइड CSS - पूरे वेबपेज को हाइड करके केवल 58mm का बिल प्रिंट करने के लिए */}
+      <style dangerouslySetInnerHTML={{__html: `
+        @media print {
+          body * {
+            visibility: hidden !important;
+          }
+          #print-receipt-section, #print-receipt-section * {
+            visibility: visible !important;
+          }
+          #print-receipt-section {
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 58mm !important;
+            margin: 0 !important;
+            padding: 5px !important;
+            background: white !important;
+            color: black !important;
+          }
+        }
+      `}} />
+
+      <header className="border-b border-white/5 pb-4 mb-6 flex flex-wrap gap-4 justify-between items-center">
         <div>
           <h1 className="text-2xl font-black text-orange-500 italic uppercase">
             Bum Bum Cafe - KDS {typeof window !== 'undefined' && localStorage.getItem('bb_kds_cook_name') ? `- Chef ${localStorage.getItem('bb_kds_cook_name')}` : ''}
           </h1>
           <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Kitchen Order Screen • Real-time Cooking</p>
         </div>
+
+        {/* प्रिंटर कॉन्फ़िगरेशन पैनल */}
+        <div className="flex flex-wrap items-center gap-2 bg-white/[0.02] border border-white/5 p-2 rounded-2xl">
+          <div className="flex items-center gap-1.5 px-2">
+            <span className="text-[10px] uppercase font-bold text-gray-400">🖨️ Printer:</span>
+            <select
+              value={printerMethod}
+              onChange={(e) => handlePrinterChange(e.target.value as any)}
+              className="bg-black/60 border border-white/10 rounded-lg px-2 py-1 text-xs text-orange-400 font-bold focus:outline-none focus:border-orange-500"
+            >
+              <option value="none">Disabled (बंद)</option>
+              <option value="browser">Browser / Kiosk</option>
+              <option value="rawbt">RawBT (Android App)</option>
+            </select>
+          </div>
+          
+          {printerMethod !== "none" && (
+            <button
+              onClick={handleAutoPrintToggle}
+              className={`px-3 py-1 rounded-lg text-xs font-bold transition-all border ${autoPrintOnAccept ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' : 'bg-white/5 text-gray-400 border-white/10'}`}
+            >
+              {autoPrintOnAccept ? "✓ Auto-Print: ON" : "✗ Auto-Print: OFF"}
+            </button>
+          )}
+        </div>
+
         <div className="flex items-center gap-3">
           <button
             onClick={handleToggleStoreStatus}
@@ -456,11 +612,29 @@ export default function KitchenDisplaySystem() {
                   {o.status === 'pending' ? (
                     <>👨‍🍳 Start Cooking (तैयारी शुरू करें)</>
                   ) : o.status === 'preparing' ? (
-                    <>🛵 Mark Ready (भेजने के लिए तैयार)</>
+                    o.fulfillmentType === "pickup" ? (
+                      <>🛍️ Mark Ready & Handover (पैक करके सौंपें)</>
+                    ) : o.fulfillmentType === "table" ? (
+                      <>🍽️ Mark Served (टेबल पर परोसें)</>
+                    ) : (
+                      <>🛵 Mark Ready (भेजने के लिए तैयार)</>
+                    )
                   ) : (
                     <>✅ Order Delivered (डिलीवर हो गया)</>
                   )}
                 </button>
+
+                {/* मैनुअल पर्ची प्रिंट करने का बटन (अगर सेटिंग्स में प्रिंटर ऑन है) */}
+                {printerMethod !== "none" && (
+                  <button
+                    type="button"
+                    onClick={() => triggerPrint(o)}
+                    className="w-full py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider text-orange-400 hover:text-orange-500 hover:bg-orange-500/10 border border-orange-500/20 transition-all flex items-center justify-center gap-1.5 mt-1.5"
+                    title="Print Bill Receipt"
+                  >
+                    <span>🖨️ Print Bill Receipt (पर्ची प्रिंट करें)</span>
+                  </button>
+                )}
 
                 {/* Reject/Fake Order Button */}
                 <button
@@ -474,6 +648,55 @@ export default function KitchenDisplaySystem() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* --- हिडन प्रिंटिंग रसीद ब्लॉक (केवल Browser Print ट्रिगर होने पर रेंडर होगा) --- */}
+      {printTargetOrder && (
+        <div id="print-receipt-section" className="hidden print:block text-black bg-white p-4 font-mono text-xs w-[58mm] leading-tight mx-auto text-left">
+          <div className="text-center font-bold text-sm uppercase border-b-2 border-dashed border-black pb-2 mb-2">
+            BUM BUM CAFE
+          </div>
+          <div className="space-y-1 text-[10px]">
+            <p className="font-bold text-xs text-center">TOKEN: #{printTargetOrder.tokenNumber || "N/A"}</p>
+            <p className="text-center">Bill No: #{formatBillNumber(printTargetOrder.billNumber || 0)}</p>
+            <p className="text-center">Date: {printTargetOrder.timestamp?.toDate ? printTargetOrder.timestamp.toDate().toLocaleString('en-IN') : new Date(printTargetOrder.timestamp).toLocaleString()}</p>
+            <div className="border-t border-dashed border-black my-2"></div>
+            <p className="font-bold">Mode: {printTargetOrder.fulfillmentType?.toUpperCase()}</p>
+            {printTargetOrder.fulfillmentType === "table" && <p>Table No: {printTargetOrder.tableNumber}</p>}
+            <p>Customer: {printTargetOrder.customerName}</p>
+            <p>Phone: {printTargetOrder.customerPhone}</p>
+            {printTargetOrder.address && <p className="line-clamp-2">Address: {printTargetOrder.address}</p>}
+            <div className="border-t border-dashed border-black my-2"></div>
+            <p className="font-bold uppercase text-[10px] mb-1">ITEMS:</p>
+            {printTargetOrder.items?.map((item: any, idx: number) => (
+              <div key={idx} className="space-y-0.5 mb-1.5">
+                <div className="flex justify-between font-bold">
+                  <span>{item.name} (x{item.quantity})</span>
+                  <span>₹{item.price * item.quantity}</span>
+                </div>
+                {item.note && <p className="text-[9px] italic pl-2">└─ Note: {item.note}</p>}
+              </div>
+            ))}
+            <div className="border-t border-dashed border-black my-2"></div>
+            <div className="flex justify-between">
+              <span>Subtotal:</span>
+              <span>₹{printTargetOrder.subtotal || 0}</span>
+            </div>
+            {printTargetOrder.discount > 0 && (
+              <div className="flex justify-between">
+                <span>Discount:</span>
+                <span>-₹{printTargetOrder.discount}</span>
+              </div>
+            )}
+            <div className="flex justify-between font-bold text-sm border-t border-dashed border-black pt-1 mt-1">
+              <span>Total Pay:</span>
+              <span>₹{printTargetOrder.total || 0}</span>
+            </div>
+          </div>
+          <div className="text-center text-[9px] border-t-2 border-dashed border-black pt-2 mt-4">
+            *** Thank you! Visit Again ***
+          </div>
         </div>
       )}
     </div>
