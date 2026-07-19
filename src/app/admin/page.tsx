@@ -137,7 +137,7 @@ export default function AdminDashboard() {
     return () => unsubPasscodes();
   }, []);
 
-  // रीयल-टाइम डेटाबेस लिसनर्स (SWR और रीयल-टाइम सिंक)
+  // रीयल-टाइम लिसनर्स
   useEffect(() => {
     if (!isVerified) return;
 
@@ -447,6 +447,30 @@ ${order.discount ? `*Discount:* -₹${order.discount}\n` : ''}*Grand Total:* *�
 Thank you for your order, *${order.customerName || 'Guest'}*! Visit Again! 😊`
     );
     window.open(`https://wa.me/91${phone}?text=${message}`, '_blank');
+  };
+
+  const applyQuickSalesFilter = (filterType: 'today' | 'yesterday' | 'week' | 'month') => {
+    const now = new Date();
+    let start = new Date();
+    let end = new Date();
+
+    if (filterType === 'today') {
+      start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      end = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    } else if (filterType === 'yesterday') {
+      start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+      end = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+    } else if (filterType === 'week') {
+      start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7);
+      end = now;
+    } else if (filterType === 'month') {
+      start = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
+      end = now;
+    }
+
+    setStartDate(start.toISOString().split('T')[0]);
+    setEndDate(end.toISOString().split('T')[0]);
+    toast.success(`${filterType.toUpperCase()} Filter Applied!`);
   };
 
   const toggleStore = async () => {
