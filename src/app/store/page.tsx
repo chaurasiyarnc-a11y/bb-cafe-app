@@ -142,6 +142,9 @@ export default function BumBumCafeStockApp() {
   const [startDate, setStartDate] = useState<string>(getLocalDateString(6)); 
   const [endDate, setEndDate] = useState<string>(getLocalDateString(0));     
 
+  // Stock Ledger Filters state
+  const [ledgerFilter, setLedgerFilter] = useState<'All' | 'IN' | 'OUT'>('All');
+
   // Buffer state to prevent excessive Firestore writes while typing order quantities
   const [localOrderQties, setLocalOrderQties] = useState<Record<string, string>>({});
   const [focusedOrderField, setFocusedOrderField] = useState<string | null>(null);
@@ -323,7 +326,7 @@ export default function BumBumCafeStockApp() {
     }
   };
 
-  // Safe deletion validation wrapper [2]
+  // Safe deletion validation wrapper
   const confirmDeleteWithPin = (message: string, actionToExecute: () => void) => {
     setDeleteConfirmation({
       message,
@@ -449,6 +452,47 @@ export default function BumBumCafeStockApp() {
     return list.sort((a, b) => b.date.localeCompare(a.date));
   }, [getFilteredLedgerStats, inventory]);
 
+  // Unified ledger for Tab 5 (Logs & Waste)
+  const unifiedLedger = useMemo(() => {
+    const list: {
+      id: string;
+      itemName: string;
+      qty: number;
+      type: 'IN' | 'OUT';
+      purpose: string;
+      date: string;
+      remarks: string;
+      financialLoss?: number;
+    }[] = [];
+
+    stockInHistory.forEach(log => {
+      list.push({
+        id: log.id,
+        itemName: log.itemName,
+        qty: log.qty,
+        type: 'IN',
+        purpose: 'Stock In (आवक)',
+        date: log.date,
+        remarks: log.remarks || 'N/A'
+      });
+    });
+
+    stockOutHistory.forEach(log => {
+      list.push({
+        id: log.id,
+        itemName: log.itemName,
+        qty: log.qty,
+        type: 'OUT',
+        purpose: log.purpose,
+        date: log.date,
+        remarks: log.remarks || 'N/A',
+        financialLoss: log.financialLoss
+      });
+    });
+
+    return list.sort((a, b) => b.date.localeCompare(a.date));
+  }, [stockInHistory, stockOutHistory]);
+
   const visibleCategories = useMemo(() => {
     return categories.filter(c => !c.hidden);
   }, [categories]);
@@ -483,6 +527,7 @@ export default function BumBumCafeStockApp() {
     setEditedQties(prev => ({ ...prev, [id]: Math.max(0, currentNum + diff) }));
   };
 
+  // Secure & Robust Batch Saving with bidirectional logs
   const saveQty = async (id: string) => {
     const rawVal = editedQties[id];
     if (rawVal === undefined) return;
@@ -493,23 +538,44 @@ export default function BumBumCafeStockApp() {
     }
     try {
       const originalItem = inventory.find(i => i.id === id);
-      await setDoc(doc(db, "godown_inventory", id), { storeQty: updated }, { merge: true });
+      if (!originalItem) return;
 
-      if (originalItem && updated > originalItem.storeQty) {
-        const diff = updated - originalItem.storeQty;
-        const logId = `in_${id}_${Date.now()}`;
-        await setDoc(doc(db, "stock_in_history", logId), {
-          id: logId,
+      const batch = writeBatch(db);
+      const itemRef = doc(db, "godown_inventory", id);
+      
+      batch.set(itemRef, { storeQty: updated }, { merge: true });
+
+      const diff = updated - originalItem.storeQty;
+
+      if (diff > 0) {
+        // Log positive adjustment as Inward Purchase
+        const logRef = doc(collection(db, "stock_in_history"));
+        batch.set(logRef, {
+          id: logRef.id,
           itemName: originalItem.name,
           itemId: id,
           qty: diff,
           date: getLocalDateString(0),
-          remarks: "गोदाम स्टॉक बढ़ोतरी दर्ज"
+          remarks: "गोदाम स्टॉक बढ़ोतरी दर्ज (Manual Adjustment)"
+        });
+      } else if (diff < 0) {
+        // Log negative adjustment as Stock Damage Correction
+        const logRef = doc(collection(db, "stock_out_history"));
+        batch.set(logRef, {
+          id: logRef.id,
+          itemName: originalItem.name,
+          itemId: id,
+          qty: Math.abs(diff),
+          purpose: "Damage",
+          date: getLocalDateString(0),
+          remarks: "मैन्युअल स्टॉक सुधार (घटोत्तरी)",
+          financialLoss: Math.abs(diff) * (originalItem.purchasePrice || 0)
         });
       }
 
+      await batch.commit();
       setEditedQties(prev => { const copy = { ...prev }; delete copy[id]; return copy; });
-      toastMessage("स्टॉक सेव हो गया!");
+      toastMessage("स्टॉक सफलतापूर्वक अपडेट और लॉग किया गया!");
     } catch (e) {
       toastMessage("त्रुटि हुई।", "error");
     }
@@ -646,7 +712,6 @@ export default function BumBumCafeStockApp() {
     }
   };
 
-  // PIN Protected Category Removal [2]
   const handleRemoveCategory = (cat: CategoryItem) => {
     confirmDeleteWithPin(`क्या आप सच में "${cat.name}" कैटेगरी को हटाना चाहते हैं?`, async () => {
       try {
@@ -768,7 +833,6 @@ export default function BumBumCafeStockApp() {
     }
   };
 
-  // PIN Protected single saved item deletion [2]
   const handleRemoveFromSavedList = (compoundId: string, name: string) => {
     triggerHaptic();
     confirmDeleteWithPin(`क्या आप इस लिस्ट आइटम "${name}" को हटाना चाहते हैं?`, async () => {
@@ -781,7 +845,6 @@ export default function BumBumCafeStockApp() {
     });
   };
 
-  // PIN Protected complete list deletion [2]
   const handleDeleteActiveList = () => {
     triggerHaptic();
     if (!activeListId) return;
@@ -803,7 +866,6 @@ export default function BumBumCafeStockApp() {
     });
   };
 
-  // Add Product Submit (With strict duplication checks) [2]
   const handleAddProductSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formAddProduct.name) {
@@ -812,7 +874,6 @@ export default function BumBumCafeStockApp() {
     }
 
     const cleanName = formAddProduct.name.toUpperCase().trim();
-    // No Duplicates allowed between Godown Stock and Fixed Assets [2]
     const existsInInventory = inventory.some(i => i.name.toUpperCase().trim() === cleanName);
     const existsInAssets = fixedAssets.some(a => a.name.toUpperCase().trim() === cleanName);
     if (existsInInventory || existsInAssets) {
@@ -856,7 +917,6 @@ export default function BumBumCafeStockApp() {
     }
   };
 
-  // Add Fixed Asset Submit (With strict duplication checks) [2]
   const handleAddAssetSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formAddAsset.name) {
@@ -865,7 +925,6 @@ export default function BumBumCafeStockApp() {
     }
 
     const cleanName = formAddAsset.name.toUpperCase().trim();
-    // No Duplicates allowed between Godown Stock and Fixed Assets [2]
     const existsInInventory = inventory.some(i => i.name.toUpperCase().trim() === cleanName);
     const existsInAssets = fixedAssets.some(a => a.name.toUpperCase().trim() === cleanName);
     if (existsInInventory || existsInAssets) {
@@ -894,7 +953,6 @@ export default function BumBumCafeStockApp() {
     }
   };
 
-  // PIN Protected Asset Deletion [2]
   const handleDeleteAsset = (id: string, name: string) => {
     triggerHaptic();
     confirmDeleteWithPin(`क्या आप इस एसेट "${name}" को डिलीट करना चाहते हैं?`, async () => {
@@ -907,7 +965,6 @@ export default function BumBumCafeStockApp() {
     });
   };
 
-  // Edit Product Submit with Duplication check [2]
   const handleEditProductSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingProduct) return;
@@ -930,7 +987,6 @@ export default function BumBumCafeStockApp() {
     }
   };
 
-  // PIN Protected Inventory Product Deletion [2]
   const handleDeleteProduct = (id: string, name: string) => {
     triggerHaptic();
     confirmDeleteWithPin(`क्या आप सच में इस आइटम "${name}" को हमेशा के लिए डिलीट करना चाहते हैं? इससे सभी संबंधित ऑर्डर्स भी डिलीट हो जायेंगे।`, async () => {
@@ -1067,7 +1123,6 @@ export default function BumBumCafeStockApp() {
     return list ? list.name : "BUM BUM CAFE ORDER SHEET";
   }, [orderLists, activeListId]);
 
-  // Lockscreen Screen overlay if NOT Authenticated [2]
   if (!currentUser) {
     return (
       <div className={`min-h-screen flex items-center justify-center p-4 ${isDarkMode ? 'bg-black text-white' : 'bg-neutral-50 text-neutral-900'}`}>
@@ -1173,7 +1228,7 @@ export default function BumBumCafeStockApp() {
                 </div>
               </div>
 
-              {/* CALENDAR DATE RANGE SELECTOR (When Custom Selected) */}
+              {/* CALENDAR DATE RANGE SELECTOR */}
               {dashboardDateRange === 'custom' && (
                 <div className="grid grid-cols-2 gap-2 p-3 bg-neutral-100 dark:bg-neutral-900 rounded-2xl border border-neutral-200 dark:border-neutral-800 text-xs">
                   <div className="space-y-1">
@@ -1426,6 +1481,7 @@ export default function BumBumCafeStockApp() {
                 const isSelected = selectedItemIds.includes(item.id);
                 const displayQty = editedQties[item.id] !== undefined ? editedQties[item.id] : item.storeQty;
                 const isDirty = editedQties[item.id] !== undefined && parseFloat(editedQties[item.id] as string) !== item.storeQty;
+                const isLowStock = item.storeQty < item.minLimit;
 
                 return (
                   <div 
@@ -1435,7 +1491,7 @@ export default function BumBumCafeStockApp() {
                       isMultiSelectMode ? 'cursor-pointer' : ''
                     } ${isDarkMode ? 'bg-[#181818] border-neutral-800' : 'bg-white border-neutral-100'} ${
                       isSelected ? 'ring-2 ring-orange-500 bg-orange-500/[0.01]' : ''
-                    }`}
+                    } ${isLowStock ? 'border-red-500 bg-red-500/[0.02]' : ''}`}
                   >
                     {isMultiSelectMode && (
                       <div className="absolute top-3.5 right-3.5 w-4 h-4 rounded-full border border-neutral-300 flex items-center justify-center z-10">
@@ -1450,6 +1506,11 @@ export default function BumBumCafeStockApp() {
                           {item.category && (
                             <span className="px-1.5 py-0.5 text-[8px] bg-neutral-100 dark:bg-neutral-800 text-neutral-400 font-bold rounded-md uppercase">
                               {item.category}
+                            </span>
+                          )}
+                          {isLowStock && (
+                            <span className="px-1.5 py-0.5 text-[8px] bg-red-100 dark:bg-red-950/40 text-red-600 font-bold rounded-md uppercase flex items-center gap-0.5">
+                              ⚠️ LOW STOCK
                             </span>
                           )}
                           {!isMultiSelectMode && (
@@ -1780,13 +1841,14 @@ export default function BumBumCafeStockApp() {
           </div>
         )}
 
-        {/* ==================== TAB 5: WASTAGE DETAILS ==================== */}
+        {/* ==================== TAB 5: UNIFIED TRANSACTION LEDGER ==================== */}
         {activeTab === 'waste' && (
           <div className="space-y-4">
+            
             <div className="flex justify-between items-center">
               <div>
-                <h2 className="text-sm font-black text-orange-600 uppercase">Wastage & Consumption Logs</h2>
-                <p className="text-[10px] text-neutral-400">कचरा, खराब और किचन उपयोग विवरण</p>
+                <h2 className="text-sm font-black text-orange-600 uppercase">Stock Ledger (बहीखाता)</h2>
+                <p className="text-[10px] text-neutral-400">आने और जाने वाले सामान का पूरा इतिहास</p>
               </div>
               <button 
                 onClick={() => setShowStockOutModal(true)} 
@@ -1796,34 +1858,88 @@ export default function BumBumCafeStockApp() {
               </button>
             </div>
 
-            <div className="space-y-2.5">
-              {stockOutHistory.map(log => (
-                <div key={log.id} className={`p-4 rounded-2xl border ${isDarkMode ? 'bg-[#181818] border-neutral-800' : 'bg-white border-neutral-100'}`}>
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <p className="font-bold text-sm text-neutral-800 dark:text-neutral-100">{log.itemName}</p>
-                      <p className="text-[9px] text-neutral-400 font-bold uppercase mt-0.5">{log.date}</p>
-                    </div>
-                    <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-wider ${
-                      log.purpose === 'Kitchen Use' ? 'bg-orange-100 text-orange-600 dark:bg-orange-500/10' : 'bg-red-100 text-red-500 dark:bg-red-500/10'
-                    }`}>
-                      {log.purpose}
-                    </span>
-                  </div>
-                  
-                  <p className="text-xs text-neutral-500 mt-2 italic">“{log.remarks}”</p>
-                  
-                  <div className="flex justify-between mt-3 pt-2.5 border-t border-neutral-100 dark:border-neutral-800 text-[10px] font-bold text-neutral-400 uppercase">
-                    <span>मात्रा: {log.qty} Units</span>
-                    {log.financialLoss ? (
-                      <span className="text-red-500">वित्तीय नुकसान: ₹{log.financialLoss}</span>
-                    ) : null}
-                  </div>
-                </div>
-              ))}
+            {/* Filter segments */}
+            <div className="flex gap-1.5 p-1 bg-neutral-100 dark:bg-neutral-900 rounded-xl text-xs">
+              <button 
+                onClick={() => setLedgerFilter('All')}
+                className={`flex-1 py-1.5 text-center font-bold rounded-lg transition-all ${
+                  ledgerFilter === 'All' ? 'bg-orange-500 text-white shadow' : 'text-neutral-400'
+                }`}
+              >
+                सभी (All)
+              </button>
+              <button 
+                onClick={() => setLedgerFilter('IN')}
+                className={`flex-1 py-1.5 text-center font-bold rounded-lg transition-all ${
+                  ledgerFilter === 'IN' ? 'bg-green-600 text-white shadow' : 'text-neutral-400'
+                }`}
+              >
+                📥 आवक (IN)
+              </button>
+              <button 
+                onClick={() => setLedgerFilter('OUT')}
+                className={`flex-1 py-1.5 text-center font-bold rounded-lg transition-all ${
+                  ledgerFilter === 'OUT' ? 'bg-red-600 text-white shadow' : 'text-neutral-400'
+                }`}
+              >
+                📤 जावक (OUT)
+              </button>
+            </div>
 
-              {stockOutHistory.length === 0 && (
-                <p className="text-center py-10 text-xs text-neutral-400 uppercase font-black">कोई रिकॉर्ड नहीं मिला।</p>
+            {/* Ledger List */}
+            <div className="space-y-2.5 max-h-[55vh] overflow-y-auto pr-1">
+              {unifiedLedger
+                .filter(log => {
+                  if (ledgerFilter === 'IN') return log.type === 'IN';
+                  if (ledgerFilter === 'OUT') return log.type === 'OUT';
+                  return true;
+                })
+                .map(log => (
+                  <div 
+                    key={log.id} 
+                    className={`p-3.5 rounded-2xl border flex flex-col justify-between ${
+                      isDarkMode ? 'bg-[#181818] border-neutral-800' : 'bg-white border-neutral-100'
+                    }`}
+                  >
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <p className="font-bold text-sm text-neutral-800 dark:text-neutral-100">{log.itemName}</p>
+                        <p className="text-[9px] text-neutral-400 font-bold uppercase mt-0.5">📅 {log.date}</p>
+                      </div>
+                      
+                      <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-wider ${
+                        log.type === 'IN' 
+                          ? 'bg-green-100 text-green-600 dark:bg-green-500/10 dark:text-green-400' 
+                          : log.purpose === 'Kitchen Use' 
+                            ? 'bg-orange-100 text-orange-600 dark:bg-orange-500/10' 
+                            : 'bg-red-100 text-red-500 dark:bg-red-500/10'
+                      }`}>
+                        {log.type === 'IN' ? '📥 STOCK IN' : `📤 ${log.purpose}`}
+                      </span>
+                    </div>
+                    
+                    {log.remarks && (
+                      <p className="text-xs text-neutral-500 mt-2 italic">“{log.remarks}”</p>
+                    )}
+                    
+                    <div className="flex justify-between items-center mt-3 pt-2.5 border-t border-neutral-100 dark:border-neutral-800 text-[10px] font-bold text-neutral-400 uppercase">
+                      <span>मात्रा: <strong className={log.type === 'IN' ? 'text-green-500' : 'text-orange-500'}>{log.qty} Units</strong></span>
+                      {log.financialLoss ? (
+                        <span className="text-red-500 font-black">नुकसान: ₹{log.financialLoss}</span>
+                      ) : null}
+                    </div>
+                  </div>
+                ))}
+
+              {unifiedLedger.filter(log => {
+                if (ledgerFilter === 'IN') return log.type === 'IN';
+                if (ledgerFilter === 'OUT') return log.type === 'OUT';
+                return true;
+              }).length === 0 && (
+                <div className="text-center py-12">
+                  <span className="text-3xl block">📋</span>
+                  <p className="text-xs text-neutral-400 uppercase font-black mt-2">कोई लेन-देन रिकॉर्ड नहीं मिला।</p>
+                </div>
               )}
             </div>
           </div>
