@@ -2,26 +2,28 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../../lib/firebase'; 
-import { collection, onSnapshot, query, orderBy, doc, updateDoc, setDoc, deleteDoc, getDocs, getDoc } from 'firebase/firestore';
+import { collection, onSnapshot, query, orderBy, doc, updateDoc, setDoc, deleteDoc, getDocs } from 'firebase/firestore';
 import { Power, LogOut, Loader2, Lock } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 
-// नव-निर्मित यूटिलिटी फ़ंक्शंस
+// यूटिलिटी फ़ंक्शंस
 import { sha256, formatBillNumber } from '../../lib/utils';
 
 // चाइल्ड मॉड्यूल कंपोनेंट्स
-import DashboardStats from '../../components/admin/DashboardStats';
-import OrdersTab from '../../components/admin/OrdersTab';
-import MenuTab from '../../components/admin/MenuTab';
-import CustomersTab from '../../components/admin/CustomersTab';
-import LoyaltyTab from '../../components/admin/LoyaltyTab';
-import SettingsTab from '../../components/admin/SettingsTab';
+import DashboardStats from '@/components/admin/DashboardStats';
+import OrdersTab from '@/components/admin/OrdersTab';
+import MenuTab from '@/components/admin/MenuTab';
+import CustomersTab from '@/components/admin/CustomersTab';
+import LoyaltyTab from '@/components/admin/LoyaltyTab';
+import SettingsTab from '@/components/admin/SettingsTab';
 
 export default function AdminDashboard() {
   const [isVerified, setIsVerified] = useState(false);
   const [loading, setLoading] = useState(true);
   const [passcode, setPasscode] = useState("");
-  const [tab, setTab] = useState<'dashboard' | 'orders' | 'menu' | 'categories' | 'customers' | 'loyalty' | 'banners' | 'reels' | 'header_video' | 'reviews' | 'coupons' | 'roster' | 'proofs' | 'claims' | 'security'>('dashboard');
+  
+  // टाइपस्क्रिप्ट एरर को ठीक करने के लिए अंत में 'settings' जोड़ा गया है
+  const [tab, setTab] = useState<'dashboard' | 'orders' | 'menu' | 'categories' | 'customers' | 'loyalty' | 'banners' | 'reels' | 'header_video' | 'reviews' | 'coupons' | 'roster' | 'proofs' | 'claims' | 'security' | 'settings'>('dashboard');
   
   const [orders, setOrders] = useState<any[]>([]);
   const [menu, setMenu] = useState<any[]>([]);
@@ -289,7 +291,7 @@ export default function AdminDashboard() {
     }
   };
 
-  // बिल प्रिंटिंग हेल्पर फ़ंक्शन (नॉन-ब्लॉकिंग विंडो रेंडर)
+  // बिल प्रिंटिंग हेल्पर फ़ंक्शन
   const handlePrintReceipt = (order: any) => {
     const printWindow = window.open('', '_blank', 'width=600,height=800');
     if (!printWindow) {
@@ -438,7 +440,6 @@ export default function AdminDashboard() {
   };
 
   const handleSendDailyClosingReport = () => {
-    // टॉप 5 बेस्ट सेलिंग डिशेज की संक्षिप्त रिपोर्ट
     const countsMap: any = {};
     orders.forEach(o => {
       o.items?.forEach((item: any) => {
@@ -477,32 +478,6 @@ Report generated automatically by Bum Bum Cafe POS.`
     );
 
     window.open(`https://wa.me/919714293759?text=${message}`, '_blank');
-  };
-
-  const triggerCsvDownload = (data: any[], filename: string, headers: string[], keys: string[]) => {
-    if (data.length === 0) return toast.error("No data available to export!");
-    const csvRows = [];
-    csvRows.push(headers.join(','));
-    data.forEach(item => {
-      const values = keys.map(key => {
-        let value = item[key];
-        if (value === undefined || value === null) value = '';
-        const escaped = String(value).replace(/"/g, '""'); 
-        return `"${escaped}"`; 
-      });
-      csvRows.push(values.join(','));
-    });
-    const csvString = csvRows.join('\r\n');
-    const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csvString], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute("download", `${filename}.csv`);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    toast.success("Excel Data Exported!");
   };
 
   const handleExportOrders = () => {
