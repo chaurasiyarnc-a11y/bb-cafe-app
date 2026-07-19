@@ -3,17 +3,9 @@
 import React from 'react';
 import { Plus } from 'lucide-react';
 
-interface StockLedgerProps {
-  isDarkMode: boolean;
-  ledgerFilter: 'All' | 'IN' | 'OUT';
-  setLedgerFilter: (val: 'All' | 'IN' | 'OUT') => void;
-  unifiedLedger: any[];
-  setShowStockOutModal: (val: boolean) => void;
-}
-
 export default function StockLedger({
   isDarkMode, ledgerFilter, setLedgerFilter, unifiedLedger, setShowStockOutModal
-}: StockLedgerProps) {
+}: any) {
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
@@ -44,7 +36,7 @@ export default function StockLedger({
             if (ledgerFilter === 'OUT') return log.type === 'OUT';
             return true;
           })
-          .map((log) => (
+          .map((log: any) => (
             <div key={log.id} className={`p-3.5 rounded-2xl border flex flex-col justify-between ${isDarkMode ? 'bg-[#181818] border-neutral-800' : 'bg-white border-neutral-100'}`}>
               <div className="flex justify-between items-start">
                 <div>
