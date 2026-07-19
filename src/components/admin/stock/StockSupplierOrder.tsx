@@ -3,51 +3,13 @@
 import React from 'react';
 import { Trash2, Edit, X, Printer, MessageCircle } from 'lucide-react';
 
-interface OrderListMeta {
-  id: string;
-  name: string;
-  date: string;
-}
-
-interface SavedOrderItem {
-  id: string;
-  itemId: string;
-  listId: string;
-  name: string;
-  storeQty: number;
-  unit: string;
-  orderQty: string;
-}
-
-interface StockSupplierOrderProps {
-  isDarkMode: boolean;
-  orderLists: OrderListMeta[];
-  savedOrders: SavedOrderItem[];
-  activeListId: string;
-  setActiveListId: (val: string) => void;
-  handleDeleteActiveList: () => void;
-  isEditingListName: boolean;
-  setIsEditingListName: (val: boolean) => void;
-  tempListNameInput: string;
-  setTempListNameInput: (val: string) => void;
-  handleUpdateListName: (val: string) => void;
-  activeListName: string;
-  localOrderQties: Record<string, string>;
-  setLocalOrderQties: (val: any) => void;
-  setFocusedOrderField: (val: string | null) => void;
-  handleUpdateOrderQty: (compoundId: string, qty: string) => void;
-  handleRemoveFromSavedList: (compoundId: string, name: string) => void;
-  handlePrintSavedList: () => void;
-  handleWhatsAppShare: () => void;
-}
-
 export default function StockSupplierOrder({
   isDarkMode, orderLists, savedOrders, activeListId, setActiveListId, handleDeleteActiveList,
   isEditingListName, setIsEditingListName, tempListNameInput, setTempListNameInput, handleUpdateListName,
   activeListName, localOrderQties, setLocalOrderQties, setFocusedOrderField, handleUpdateOrderQty,
   handleRemoveFromSavedList, handlePrintSavedList, handleWhatsAppShare
-}: StockSupplierOrderProps) {
-  const listItems = savedOrders.filter((o) => o.listId === activeListId);
+}: any) {
+  const listItems = savedOrders.filter((o: any) => o.listId === activeListId);
 
   return (
     <div className="space-y-4">
@@ -60,7 +22,7 @@ export default function StockSupplierOrder({
               className={`flex-1 p-2 text-xs font-bold rounded-xl border ${isDarkMode ? 'bg-neutral-800 border-neutral-700 text-white' : 'bg-white border-neutral-200 text-neutral-900'}`}
             >
               <option value="">-- No Active List --</option>
-              {orderLists.map((list) => (
+              {orderLists.map((list: any) => (
                 <option key={list.id} value={list.id}>{list.name}</option>
               ))}
             </select>
@@ -89,7 +51,7 @@ export default function StockSupplierOrder({
       </div>
 
       <div className="space-y-3 max-h-[48vh] overflow-y-auto pr-1">
-        {listItems.map((item) => {
+        {listItems.map((item: any) => {
           const localValue = localOrderQties[item.id] !== undefined ? localOrderQties[item.id] : (item.orderQty || "");
           return (
             <div key={item.id} className={`p-3.5 rounded-2xl border flex justify-between items-center text-xs ${isDarkMode ? 'bg-[#181818] border-neutral-800' : 'bg-white border-neutral-100'}`}>
