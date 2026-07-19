@@ -3,25 +3,9 @@
 import React from 'react';
 import { Search, Plus, Trash2 } from 'lucide-react';
 
-interface FixedAsset {
-  id: string;
-  name: string;
-  quantity: number;
-  condition: "Working" | "Needs Repair" | "Broken";
-}
-
-interface StockAssetsProps {
-  isDarkMode: boolean;
-  searchQuery: string;
-  setSearchQuery: (val: string) => void;
-  filteredAssets: FixedAsset[];
-  setShowAddAssetModal: (val: boolean) => void;
-  handleDeleteAsset: (id: string, name: string) => void;
-}
-
 export default function StockAssets({
   isDarkMode, searchQuery, setSearchQuery, filteredAssets, setShowAddAssetModal, handleDeleteAsset
-}: StockAssetsProps) {
+}: any) {
   return (
     <div className="space-y-4">
       <div className={`sticky top-[64px] z-30 py-2.5 space-y-2.5 backdrop-blur-md ${isDarkMode ? 'bg-[#0E0E0E]/90' : 'bg-[#FAFAFA]/90'} border-b border-dashed ${isDarkMode ? 'border-neutral-800' : 'border-neutral-200'}`}>
@@ -44,7 +28,7 @@ export default function StockAssets({
       </div>
 
       <div className="space-y-2.5 max-h-[50vh] overflow-y-auto pr-1">
-        {filteredAssets.map((asset) => (
+        {filteredAssets.map((asset: any) => (
           <div key={asset.id} className={`p-4 rounded-2xl border ${isDarkMode ? 'bg-[#181818] border-neutral-800' : 'bg-white border-neutral-100'}`}>
             <div className="flex justify-between items-start">
               <div>
