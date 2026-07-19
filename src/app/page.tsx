@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { db } from '../lib/firebase'; 
 import { collection, onSnapshot, query, addDoc, doc, setDoc, increment, runTransaction, getDoc, getDocs, where, limit, orderBy } from 'firebase/firestore';
-import { ShoppingBag, Plus, Search, X, MapPin, Phone, User, Sparkles, Star, Percent, Gift, Loader2, Share2, Heart, Clock, ChevronRight, WifiOff, History, LogOut, Lock, Video, Award, Check, Play, Navigation, Globe } from 'lucide-react';
+import { ShoppingBag, Plus, Search, X, MapPin, Phone, User, Sparkles, Star, Gift, Loader2, Heart, Clock, ChevronRight, WifiOff, History, LogOut, Lock, Award, Play, Globe } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
 import { useCartStore } from '../store/useCartStore';
@@ -41,7 +41,7 @@ const PIZZA_ADDONS: { [size: string]: { [addon: string]: number } } = {
   "extra large": { "Veg Add-on": 30, "Paneer": 50, "Black Olives": 50, "Jalapeno": 50, "Extra Cheese": 60, "Mushroom": 50 }
 };
 
-const DIY_PIZZA_PRICES: any = {
+const DIY_PIZZA_PRICES: Record<string, any> = {
   small: {
     base: 15, sauce: 10, mozzarella: 40,
     veggies: { onion: 10, tomato: 10, capsicum: 10, corn: 10 },
@@ -93,13 +93,7 @@ export default function BbCafeHome() {
   const menuRef = useRef<HTMLDivElement | null>(null);
 
   // --- STATE VARIABLES ---
-  const [menu, setMenu] = useState<any[]>(() => {
-    if (typeof window !== 'undefined') {
-      const cached = localStorage.getItem('bb_cached_menu');
-      return cached ? JSON.parse(cached) : [];
-    }
-    return [];
-  });
+  const [menu, setMenu] = useState<any[]>([]);
   const [menuLoading, setMenuLoading] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
@@ -141,65 +135,26 @@ export default function BbCafeHome() {
   const [isHindi, setIsHindi] = useState(false);
   const [customerPoints, setCustomerPoints] = useState<number>(0);
 
-  const [socialCounts, setSocialCounts] = useState<any>(() => {
-    if (typeof window !== 'undefined') {
-      const cached = localStorage.getItem('bb_cached_social_counts');
-      return cached ? JSON.parse(cached) : {
-        facebook: "500+ Followers",
-        instagram: "1.2K+ Followers",
-        whatsapp_channel: "1K+ Channel Members",
-        snapchat: "200+ Subs",
-        youtube: "1.5K+ Subs"
-      };
-    }
-    return {
-      facebook: "500+ Followers",
-      instagram: "1.2K+ Followers",
-      whatsapp_channel: "1K+ Channel Members",
-      snapchat: "200+ Subs",
-      youtube: "1.5K+ Subs"
-    };
+  const [socialCounts, setSocialCounts] = useState<any>({
+    facebook: "500+ Followers",
+    instagram: "1.2K+ Followers",
+    whatsapp_channel: "1K+ Channel Members",
+    snapchat: "200+ Subs",
+    youtube: "1.5K+ Subs"
   });
   
-  const [loyaltyRules, setLoyaltyRules] = useState<any[]>(() => {
-    if (typeof window !== 'undefined') {
-      const cached = localStorage.getItem('bb_cached_loyalty_rules');
-      return cached ? JSON.parse(cached) : [];
-    }
-    return [];
-  });
-
+  const [loyaltyRules, setLoyaltyRules] = useState<any[]>([]);
   const [isGiftModalOpen, setIsGiftModalOpen] = useState(false);
   const [giftPhone, setGiftPhone] = useState("");
   const [giftPointsAmount, setGiftPointsAmount] = useState<number | "">("");
   const [giftSenderPin, setGiftSenderPin] = useState(""); 
   const [isGiftingLoading, setIsGiftingLoading] = useState(false);
 
-  const [dbCategories, setDbCategories] = useState<any[]>(() => {
-    if (typeof window !== 'undefined') {
-      const cached = localStorage.getItem('bb_cached_categories');
-      return cached ? JSON.parse(cached) : [];
-    }
-    return [];
-  });
-  
-  const [banners, setBanners] = useState<any[]>(() => {
-    if (typeof window !== 'undefined') {
-      const cached = localStorage.getItem('bb_cached_banners');
-      return cached ? JSON.parse(cached) : [];
-    }
-    return [];
-  });
+  const [dbCategories, setDbCategories] = useState<any[]>([]);
+  const [banners, setBanners] = useState<any[]>([]);
   const [bannerIndex, setBannerIndex] = useState(0);
   const [bannerError, setBannerError] = useState(false);
-  
-  const [reviews, setReviews] = useState<any[]>(() => {
-    if (typeof window !== 'undefined') {
-      const cached = localStorage.getItem('bb_cached_reviews');
-      return cached ? JSON.parse(cached) : [];
-    }
-    return [];
-  });
+  const [reviews, setReviews] = useState<any[]>([]);
   
   const [isReviewsDrawerOpen, setIsReviewsDrawerOpen] = useState(false);
   const [isReviewFormOpen, setIsReviewFormOpen] = useState(false);
@@ -225,13 +180,7 @@ export default function BbCafeHome() {
   const [diyChefNote, setDiyChefNote] = useState<string>("");
 
   // Reels/Stories States
-  const [stories, setStories] = useState<any[]>(() => {
-    if (typeof window !== 'undefined') {
-      const cached = localStorage.getItem('bb_cached_reels');
-      return cached ? JSON.parse(cached) : [];
-    }
-    return [];
-  });
+  const [stories, setStories] = useState<any[]>([]);
   const [activeStory, setActiveStory] = useState<any | null>(null);
 
   // Social Proof Alerts States
@@ -253,7 +202,7 @@ export default function BbCafeHome() {
   const [noCutlery, setNoCutlery] = useState(false);
   const [selectedArea, setSelectedArea] = useState(DELIVERY_AREAS[0]);
   const [favorites, setFavorites] = useState<string[]>([]);
-  const [lastPlacedOrder, setLastPlacedOrder] = useState<any>(null);
+  const [, setLastPlacedOrder] = useState<any>(null);
   const [confettiActive, setConfettiActive] = useState(false);
   const [shareCount, setShareCount] = useState<number>(0);
   const [distanceKm, setDistanceKm] = useState<number | null>(null);
@@ -268,7 +217,7 @@ export default function BbCafeHome() {
   const [isUpiPopupOpen, setIsUpiPopupOpen] = useState(false);
 
   // UI States
-  const [showGreeting, setShowGreeting] = useState(true);
+  const [showGreeting] = useState(true);
 
   // --- HELPERS, CALCULATIONS & GENERAL UTILS ---
 
@@ -364,7 +313,7 @@ export default function BbCafeHome() {
   };
 
   const getCustomerTier = (points: number) => {
-    if (points >= 50) return { name: "Platinum Member 👑", color: "text-cyan-700 border-cyan-500/40 bg-cyan-100/50 dark:text-cyan-400 dark:border-cyan-400/30 dark:bg-cyan-400/10" };
+    if (points >= 50) return { name: "Platinum Member 👑", color: "text-cyan-705 border-cyan-500/40 bg-cyan-100/50 dark:text-cyan-400 dark:border-cyan-400/30 dark:bg-cyan-400/10" };
     if (points >= 20) return { name: "Gold Member 🌟", color: "text-yellow-800 border-yellow-500/40 bg-yellow-100/50 dark:text-yellow-400 dark:border-yellow-400/30 dark:bg-yellow-400/10" };
     return { name: "Bronze Member 🥉", color: "text-orange-700 border-orange-500/40 bg-orange-100/50 dark:text-orange-400 dark:border-orange-400/30 dark:bg-orange-400/10" };
   };
@@ -1065,7 +1014,7 @@ export default function BbCafeHome() {
         toast.dismiss(toastId);
         toast.success(isHindi ? "लोकेशन सफलतापूर्वक डिटेक्ट की गई!" : "Location successfully detected!");
       },
-      (error) => {
+      () => {
         toast.dismiss(toastId);
         toast.error(isHindi ? "लोकेशन एक्सेस करने में असमर्थ।" : "Unable to retrieve your location.");
       },
@@ -1177,7 +1126,7 @@ export default function BbCafeHome() {
     setDiyPremiumToppings({ black_olive: false, jalapeno: false, red_peprica: false, paneer: false, mushroom: false });
     setDiyChefNote("");
 
-    toast.success(isHindi ? "आपका कस्टम पिज्जा कार्ट में जोड़ा गया!" : "Your custom Pizza has been added to cart!");
+    toast.success(isHindi ? "कास्ट पिज्जा कार्ट में जोड़ा गया!" : "Your custom Pizza has been added to cart!");
   };
 
   const handleNormalPizzaAdd = () => {
@@ -1258,13 +1207,14 @@ export default function BbCafeHome() {
       if (snap.exists()) {
         setCustomerPoints(snap.data().points || 0);
       }
-    });
+    }, (error) => console.warn("Points live check subscription bypassed:", error));
 
     const unsubHistory = onSnapshot(
       query(collection(db, "customer_points", phoneClean, "history"), orderBy("timestamp", "desc")),
       (snap) => {
         setPointsHistory(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-      }
+      },
+      (error) => console.warn("Points history subscription bypassed:", error)
     );
 
     const unsubLive = onSnapshot(
@@ -1286,7 +1236,8 @@ export default function BbCafeHome() {
         } else {
           setLiveOrder(null);
         }
-      }
+      },
+      (error) => console.warn("Live order subscription bypassed (index may be building):", error)
     );
 
     return () => {
@@ -1295,6 +1246,25 @@ export default function BbCafeHome() {
       unsubLive();
     };
   }, [customerDetails?.phone]);
+
+  // --- Search Debouncing & Hinglish Optimizer ---
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const cleanQuery = searchQuery.toLowerCase().trim();
+      const translatedWords = cleanQuery.split(/\s+/).map(word => HINGLISH_DICT[word] || word);
+      setDebouncedSearchQuery(translatedWords.join(" "));
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // --- Banner Cycle Auto-Carousel Timer ---
+  useEffect(() => {
+    if (banners.length <= 1) return;
+    const interval = setInterval(() => {
+      setBannerIndex((prev) => (prev + 1) % banners.length);
+    }, 4000);
+    return () => clearInterval(interval);
+  }, [banners]);
 
   useEffect(() => {
     const fakeProofs = [
@@ -1312,7 +1282,7 @@ export default function BbCafeHome() {
       setSocialAlertIndex(randomIndex);
       setShowSocialAlert(true);
       setTimeout(() => setShowSocialAlert(false), 5000);
-    }, 35500);
+    }, 24000);
 
     return () => clearInterval(interval);
   }, []);
@@ -1340,9 +1310,31 @@ export default function BbCafeHome() {
       window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
     }
 
-    const savedDetails = localStorage.getItem('bb_cafe_customer');
-    if (savedDetails) {
-      try {
+    // Safely hydrate states from local cache inside useEffect (Prevents Next.js Hydration Mismatch)
+    try {
+      const cachedMenu = localStorage.getItem('bb_cached_menu');
+      if (cachedMenu) setMenu(JSON.parse(cachedMenu));
+
+      const cachedSocial = localStorage.getItem('bb_cached_social_counts');
+      if (cachedSocial) setSocialCounts(JSON.parse(cachedSocial));
+
+      const cachedRules = localStorage.getItem('bb_cached_loyalty_rules');
+      if (cachedRules) setLoyaltyRules(JSON.parse(cachedRules));
+
+      const cachedCats = localStorage.getItem('bb_cached_categories');
+      if (cachedCats) setDbCategories(JSON.parse(cachedCats));
+
+      const cachedBanners = localStorage.getItem('bb_cached_banners');
+      if (cachedBanners) setBanners(JSON.parse(cachedBanners));
+
+      const cachedReels = localStorage.getItem('bb_cached_reels');
+      if (cachedReels) setStories(JSON.parse(cachedReels));
+
+      const cachedReviews = localStorage.getItem('bb_cached_reviews');
+      if (cachedReviews) setReviews(JSON.parse(cachedReviews));
+
+      const savedDetails = localStorage.getItem('bb_cafe_customer');
+      if (savedDetails) {
         const parsed = JSON.parse(savedDetails);
         if (parsed && parsed.name && parsed.phone) {
           setCustomerDetails(parsed);
@@ -1350,26 +1342,19 @@ export default function BbCafeHome() {
           setTempPhone(parsed.phone.replace("+91", ""));
           if (parsed.pin) setTempPin(parsed.pin);
         }
-      } catch (err) {
-        console.error("Failed to load customer details", err);
       }
-    }
 
-    const cachedPast = localStorage.getItem('bb_past_orders');
-    if (cachedPast) {
-      try {
-        setPastOrders(JSON.parse(cachedPast));
-      } catch (e) {}
-    }
+      const cachedPast = localStorage.getItem('bb_past_orders');
+      if (cachedPast) setPastOrders(JSON.parse(cachedPast));
 
-    const cachedFavs = localStorage.getItem('bb_favorites');
-    if (cachedFavs) {
-      try {
-        setFavorites(JSON.parse(cachedFavs));
-      } catch (e) {}
+      const cachedFavs = localStorage.getItem('bb_favorites');
+      if (cachedFavs) setFavorites(JSON.parse(cachedFavs));
+    } catch (e) {
+      console.warn("Local storage cache load bypassed:", e);
     }
 
     const fetchFreshDbData = async () => {
+      setMenuLoading(true);
       try {
         const storeSnap = await getDoc(doc(db, "settings", "store"));
         if (storeSnap.exists()) {
@@ -1384,6 +1369,7 @@ export default function BbCafeHome() {
           }
           if (storeData.timingHindi) setStoreTimingHindi(storeData.timingHindi);
           if (storeData.timingEnglish) setStoreTimingEnglish(storeData.timingEnglish);
+          if (storeData.closingMinutesLeft !== undefined) setClosingMinutesLeft(storeData.closingMinutesLeft);
         }
 
         const productsSnap = await getDocs(collection(db, "products"));
@@ -1425,6 +1411,8 @@ export default function BbCafeHome() {
 
       } catch (err) {
         console.warn("Background fetch warning (Offline Mode Active):", err);
+      } finally {
+        setMenuLoading(false);
       }
     };
 
@@ -1438,6 +1426,15 @@ export default function BbCafeHome() {
       }
     };
   }, []);
+
+  if (!mounted) {
+    return (
+      <div className="min-h-screen bg-neutral-950 flex flex-col items-center justify-center text-white">
+        <Loader2 className="animate-spin text-orange-500 mb-2" size={32} />
+        <span className="text-xs font-bold uppercase tracking-wider">Bum Bum Cafe Loading...</span>
+      </div>
+    );
+  }
 
   return (
     <div className="dark:bg-[#050505] bg-neutral-50 min-h-screen dark:text-white text-neutral-800 pb-32 font-sans relative overflow-x-clip transition-colors duration-200">
@@ -1560,7 +1557,7 @@ export default function BbCafeHome() {
               placeholder={isHindi ? "पिज़्ज़ा, सैंडविच, पनीर स्पेशल खोजें..." : "Search pizza, sandwich, paneer special..."} 
               value={searchQuery} 
               onChange={(e) => setSearchQuery(e.target.value)} 
-              className="w-full dark:bg-neutral-800 bg-neutral-105 dark:text-white text-neutral-900 py-2.5 px-11 rounded-xl outline-none text-xs font-semibold dark:placeholder-gray-400 placeholder-neutral-650 border dark:border-neutral-700 border-neutral-300 transition-colors duration-200 shadow-sm" 
+              className="w-full dark:bg-neutral-800 bg-neutral-100 dark:text-white text-neutral-900 py-2.5 px-11 rounded-xl outline-none text-xs font-semibold dark:placeholder-gray-400 placeholder-neutral-500 border dark:border-neutral-700 border-neutral-300 transition-colors duration-200 shadow-sm" 
             />
           </div>
 
@@ -1583,7 +1580,7 @@ export default function BbCafeHome() {
 
           <button 
             onClick={() => { triggerHaptic(); setIsProfileOpen(true); }}
-            className="p-2.5 dark:bg-neutral-800 bg-neutral-105 dark:text-white text-neutral-900 rounded-xl border dark:border-neutral-700 border-neutral-300 hover:border-orange-500 hover:text-orange-500 transition-colors shadow flex-shrink-0"
+            className="p-2.5 dark:bg-neutral-800 bg-neutral-100 dark:text-white text-neutral-900 rounded-xl border dark:border-neutral-700 border-neutral-300 hover:border-orange-500 hover:text-orange-500 transition-colors shadow flex-shrink-0"
             title="My Profile & Loyalty Rewards"
           >
             <User size={18} />
@@ -1706,9 +1703,9 @@ export default function BbCafeHome() {
           <div className="flex gap-5 overflow-x-auto py-2 px-1 scrollbar-none [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             <button onClick={() => setSelectedCategory("Favorites")} className="flex flex-col items-center flex-shrink-0 group outline-none">
               <div className={`w-14 h-14 rounded-full overflow-hidden border transition-all flex items-center justify-center ${selectedCategory === "Favorites" ? 'border-red-500 scale-105 shadow-md' : 'dark:border-neutral-300 bg-white dark:bg-neutral-900'}`}>
-                <Heart size={24} className={selectedCategory === "Favorites" ? 'text-red-550 fill-red-500' : 'text-neutral-500 dark:text-gray-400'} />
+                <Heart size={24} className={selectedCategory === "Favorites" ? 'text-red-500 fill-red-500' : 'text-neutral-500 dark:text-gray-400'} />
               </div>
-              <span className={`text-[9px] font-black uppercase mt-1.5 truncate ${selectedCategory === "Favorites" ? 'text-red-550' : 'dark:text-gray-400 text-neutral-800'}`}>{isHindi ? "पसंदीदा" : "My Favorites"}</span>
+              <span className={`text-[9px] font-black uppercase mt-1.5 truncate ${selectedCategory === "Favorites" ? 'text-red-500' : 'dark:text-gray-400 text-neutral-800'}`}>{isHindi ? "पसंदीदा" : "My Favorites"}</span>
             </button>
 
             {visibleCategories.map((cat) => {
@@ -1749,7 +1746,7 @@ export default function BbCafeHome() {
             className="dark:bg-[#0f1115] bg-white border dark:border-white/5 border-neutral-200 rounded-3xl p-5 shadow-xl space-y-6 max-w-sm mx-auto font-sans"
           >
             <div className="text-center space-y-1">
-              <span className="bg-orange-500/10 text-orange-655 dark:text-orange-500 px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest font-sans font-bold">
+              <span className="bg-orange-500/10 text-orange-600 dark:text-orange-500 px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest font-sans font-bold">
                 DIY Pizza Tab
               </span>
               <h3 className="text-lg font-black text-neutral-900 dark:text-white font-sans font-bold">{isHindi ? "अपने मन का पिज़्ज़ा बनाएं 🍕" : "Create Custom Pizza 🍕"}</h3>
@@ -1812,7 +1809,7 @@ export default function BbCafeHome() {
                       className={`p-2.5 rounded-xl border flex justify-between items-center text-[10px] font-black capitalize transition-all ${isSelected ? 'border-orange-500 bg-orange-500/5 text-orange-600' : 'dark:border-white/5 border-neutral-300'}`}
                     >
                       <span>{veg}</span>
-                      <span className="font-extrabold text-orange-655 font-mono">+₹{cost}</span>
+                      <span className="font-extrabold text-orange-600 font-mono">+₹{cost}</span>
                     </button>
                   );
                 })}
@@ -1839,7 +1836,7 @@ export default function BbCafeHome() {
                       className={`p-2.5 rounded-xl border flex justify-between items-center text-[10px] font-black transition-all ${isSelected ? 'border-orange-500 bg-orange-500/5 text-orange-600' : 'dark:border-white/5 border-neutral-300'}`}
                     >
                       <span>{item.label}</span>
-                      <span className="font-extrabold text-orange-655 font-mono">+₹{cost}</span>
+                      <span className="font-extrabold text-orange-600 font-mono">+₹{cost}</span>
                     </button>
                   );
                 })}
@@ -1855,7 +1852,7 @@ export default function BbCafeHome() {
                     type="button"
                     key={tag}
                     onClick={() => quickAppendInstruction(tag, "diy")}
-                    className="text-[9px] font-bold py-1 px-2.5 rounded-full border dark:border-white/5 border-neutral-300 bg-neutral-105 dark:bg-neutral-800 dark:text-gray-300 text-neutral-800 hover:border-orange-500 transition-colors"
+                    className="text-[9px] font-bold py-1 px-2.5 rounded-full border dark:border-white/5 border-neutral-300 bg-neutral-100 dark:bg-neutral-800 dark:text-gray-300 text-neutral-800 hover:border-orange-500 transition-colors"
                   >
                     {tag}
                   </button>
@@ -1946,8 +1943,8 @@ export default function BbCafeHome() {
                           </div>
                         )}
 
-                        <button onClick={(e) => handleToggleFavorite(item.id, e)} className="absolute top-3 right-3 bg-black/60 backdrop-blur-md p-1.5 rounded-full border border-white/10 text-white hover:text-red-555 transition-colors">
-                          <Heart size={14} className={favorites.includes(item.id) ? "fill-red-555 text-red-550" : "text-white"} />
+                        <button onClick={(e) => handleToggleFavorite(item.id, e)} className="absolute top-3 right-3 bg-black/60 backdrop-blur-md p-1.5 rounded-full border border-white/10 text-white hover:text-red-500 transition-colors">
+                          <Heart size={14} className={favorites.includes(item.id) ? "fill-red-500 text-red-500" : "text-white"} />
                         </button>
                       </div>
                       <div className="p-4 flex flex-col justify-between flex-1 font-sans font-bold">
@@ -1957,13 +1954,13 @@ export default function BbCafeHome() {
                             <span>4.9</span><Star size={8} style={{ color: '#ffffff', fill: '#ffffff' }} />
                           </div>
                         </div>
-                        <div className="flex justify-between items-center text-[9px] text-neutral-600 dark:text-gray-400 font-bold mt-0.5 font-sans">
-                          <p className="uppercase text-[8px] text-neutral-600 dark:text-gray-400">{item.category}</p><p>• 15-25 min</p>
+                        <div className="flex justify-between items-center text-[9px] text-neutral-500 dark:text-gray-400 font-bold mt-0.5 font-sans">
+                          <p className="uppercase text-[8px] text-neutral-500 dark:text-gray-400">{item.category}</p><p>• 15-25 min</p>
                         </div>
                         <div className="h-px dark:bg-white/5 bg-neutral-200 my-2.5" />
                         <div className="flex justify-between items-end mt-0.5">
                           <div>
-                            <p className="text-neutral-505 dark:text-neutral-405 text-[8px] font-black uppercase tracking-widest leading-none mb-1">Price</p>
+                            <p className="text-neutral-500 dark:text-neutral-400 text-[8px] font-black uppercase tracking-widest leading-none mb-1">Price</p>
                             <p className="text-orange-700 dark:text-orange-500 font-black text-base leading-none font-mono font-bold">{getDisplayPrice(item)}</p>
                             {item.variants && <span className="text-[8px] font-bold text-neutral-600 dark:text-gray-400 mt-1 block">{isHindi ? "विकल्प उपलब्ध हैं" : "Options available"}</span>}
                           </div>
@@ -2023,15 +2020,15 @@ export default function BbCafeHome() {
                     {index === 6 && isInlineBannerEnabled && (
                       <div className="w-full h-36 rounded-2xl overflow-hidden relative border border-white/5 bg-white/[0.02] my-2 font-sans font-bold">
                         {(banners.length === 0 || bannerError) ? (
-                          <div className="w-full h-full bg-gradient-to-r from-yellow-600/35 to-orange-850/35 flex flex-col justify-center p-5 space-y-1 font-sans">
+                          <div className="w-full h-full bg-gradient-to-r from-yellow-600/35 to-orange-900/30 flex flex-col justify-center p-5 space-y-1 font-sans">
                             <span className="text-[8px] font-black uppercase text-yellow-400 bg-yellow-500/10 border border-yellow-500/20 px-2 py-0.5 rounded-full w-max font-bold">
                               {isHindi ? "ताज़ा स्वाद" : "Fresh Taste"}
                             </span>
                             <h3 className="text-sm font-black text-yellow-300">
                               {isHindi ? "शुद्ध और हाइजीनिक Fast Food" : "PURE & HYGIENIC FAST FOOD"}
                             </h3>
-                            <p className="text-[9px] text-neutral-605 dark:text-gray-400 font-bold">
-                              {isHindi ? "मोहांद्रा में हमारा स्पेशल पनीर पिज़्ज़ा चखें!" : "Try our special Paneer Pizza in Mohandra Town!"}
+                            <p className="text-[9px] text-neutral-600 dark:text-gray-400 font-bold">
+                              {isHindi ? "मोहांद्रा में हमारा स्पेशल पनीर पिज्जा चखें!" : "Try our special Paneer Pizza in Mohandra Town!"}
                             </p>
                           </div>
                         ) : (
@@ -2073,9 +2070,9 @@ export default function BbCafeHome() {
           
           <div className={hasManyReviews ? "max-h-[380px] overflow-y-auto pr-1 space-y-3.5 scrollbar-thin scrollbar-thumb-orange-500 scrollbar-track-transparent font-sans" : "space-y-3.5 font-sans"}>
             {displayReviews.map((r: any) => (
-              <div key={r.id} className="dark:bg-white/[0.02] bg-white border dark:border-white/5 border-neutral-200 p-4 rounded-2xl space-y-2 shadow-md shadow-neutral-200/30 dark:shadow-none transition-colors duration-200">
+              <div key={r.id} className="dark:bg-white/[0.02] bg-white border dark:border-white/5 border-neutral-200 p-4 rounded-2xl space-y-2 shadow-md shadow-neutral-200/30 dark:shadow-none transition-colors duration-205">
                 <div className="flex justify-between items-center">
-                  <h4 className="font-black text-xs text-orange-605 font-bold">{r.name}</h4>
+                  <h4 className="font-black text-xs text-orange-600 font-bold">{r.name}</h4>
                   <div className="flex items-center gap-0.5">
                     <Star size={10} style={{ color: '#fbbf24', fill: '#fbbf24' }} />
                     <Star size={10} style={{ color: '#fbbf24', fill: '#fbbf24' }} />
@@ -2099,7 +2096,7 @@ export default function BbCafeHome() {
               <span className="text-[9px] font-black uppercase tracking-widest text-green-500 bg-green-500/10 px-3 py-1 rounded-full border border-green-500/20">
                 {isHindi ? "हमारे बारे में" : "About Us"}
               </span>
-              <h4 className="text-xl font-black italic text-yellow-355 font-bold font-serif">BUM BUM CAFE</h4>
+              <h4 className="text-xl font-black italic text-yellow-500 font-bold font-serif">BUM BUM CAFE</h4>
               <p className="text-[11px] font-bold text-green-600 dark:text-green-300">{isHindi ? "जहाँ स्वाद और सुकून मिलते हैं! ✨" : "Where Taste Meets Serenity! ✨"}</p>
               
               <p className="text-[11.5px] text-neutral-800 dark:text-gray-300 leading-relaxed max-w-sm mx-auto font-medium">
@@ -2123,7 +2120,7 @@ export default function BbCafeHome() {
                 className="flex flex-col items-center gap-1 hover:scale-105 transition-transform"
               >
                 <img src={link.icon} alt="" className="w-8 h-8 object-contain" loading="lazy" />
-                <span className="text-[8px] font-bold text-neutral-550 dark:text-gray-400 mt-0.5">
+                <span className="text-[8px] font-bold text-neutral-500 dark:text-gray-400 mt-0.5">
                   {socialCounts[link.id] || "Follow"}
                 </span>
               </a>
@@ -2147,7 +2144,7 @@ export default function BbCafeHome() {
             </a>
           </div>
 
-          <div className="text-center text-[9px] text-neutral-505 dark:text-gray-400 font-bold tracking-widest pt-2 font-mono">
+          <div className="text-center text-[9px] text-neutral-500 dark:text-gray-400 font-bold tracking-widest pt-2 font-mono">
             © 2026 BUM BUM CAFE - MOHANDRA. ALL RIGHTS RESERVED.
           </div>
         </footer>
@@ -2324,10 +2321,10 @@ export default function BbCafeHome() {
                 {displayReviews.map((r: any) => (
                   <div key={r.id} className="dark:bg-white/[0.03] bg-white border dark:border-white/5 border-neutral-200 p-5 space-y-2 shadow-sm transition-colors duration-200 font-sans">
                     <div className="flex justify-between items-center">
-                      <h4 className="font-black text-xs text-orange-605 font-bold">{r.name}</h4>
+                      <h4 className="font-black text-xs text-orange-600 font-bold">{r.name}</h4>
                       <div className="flex items-center gap-1 bg-amber-500/10 px-2 py-0.5 rounded text-[9px] font-mono font-bold">
                         <Star size={10} style={{ color: '#fbbf24', fill: '#fbbf24' }} />
-                        <span className="font-extrabold text-amber-600 dark:text-amber-400 font-sans font-bold">{r.rating}</span>
+                        <span className="font-extrabold text-amber-600 dark:text-amber-400 dark:font-sans font-bold">{r.rating}</span>
                       </div>
                     </div>
                     <p className="text-[11px] text-neutral-800 dark:text-gray-300 italic">"{r.comment}"</p>
@@ -2348,11 +2345,11 @@ export default function BbCafeHome() {
           <div className="fixed inset-0 bg-black/95 z-[200] flex items-center justify-center p-6 font-sans">
             <form onSubmit={handleReviewSubmit} className="dark:bg-[#111] bg-white w-full max-w-md p-6 rounded-3xl border dark:border-white/10 border-neutral-200 text-center space-y-4 shadow-xl transition-colors duration-200">
               <div className="flex justify-between items-center pb-2 border-b dark:border-white/10 border-neutral-200">
-                <h3 className="text-xl font-black text-orange-55 uppercase italic">{isHindi ? "आपकी समीक्षा" : "Your Feedback"}</h3>
+                <h3 className="text-xl font-black text-orange-500 uppercase italic">{isHindi ? "आपकी समीक्षा" : "Your Feedback"}</h3>
                 <button 
                   type="button" 
                   onClick={() => { triggerHaptic(); setIsReviewFormOpen(false); }} 
-                  className="p-2 bg-red-105 hover:bg-red-500 hover:text-white text-red-655 rounded-full transition-all duration-200 shadow"
+                  className="p-2 bg-red-100 hover:bg-red-500 hover:text-white text-red-600 rounded-full transition-all duration-200 shadow"
                   title="Close Feedback"
                 >
                   <X size={18} />
@@ -2402,7 +2399,7 @@ export default function BbCafeHome() {
               </div>
               <div className="flex gap-2 pt-1 font-bold">
                 <button type="submit" className="flex-1 bg-orange-500 text-black font-black p-3 rounded-lg text-xs uppercase">{isHindi ? "जमा करें" : "SUBMIT"}</button>
-                <button type="button" onClick={() => { triggerHaptic(); setIsReviewFormOpen(false); }} className="dark:bg-white/5 bg-neutral-105 text-neutral-855 dark:text-gray-400 font-bold p-3 rounded-lg text-xs uppercase">{isHindi ? "बंद करें" : "CANCEL"}</button>
+                <button type="button" onClick={() => { triggerHaptic(); setIsReviewFormOpen(false); }} className="dark:bg-white/5 bg-neutral-100 text-neutral-800 dark:text-gray-400 font-bold p-3 rounded-lg text-xs uppercase">{isHindi ? "बंद करें" : "CANCEL"}</button>
               </div>
             </form>
           </div>
@@ -2465,7 +2462,7 @@ export default function BbCafeHome() {
                       type="button"
                       key={tag}
                       onClick={() => quickAppendInstruction(tag, "normal")}
-                      className="text-[9px] font-bold py-1 px-2 rounded-full border dark:border-white/5 border-neutral-300 bg-neutral-105 dark:bg-neutral-800 dark:text-gray-300 text-neutral-800 hover:border-orange-500 transition-colors"
+                      className="text-[9px] font-bold py-1 px-2 rounded-full border dark:border-white/5 border-neutral-300 bg-neutral-100 dark:bg-neutral-800 dark:text-gray-300 text-neutral-800 hover:border-orange-500 transition-colors"
                     >
                       {tag}
                     </button>
@@ -2475,14 +2472,14 @@ export default function BbCafeHome() {
                   placeholder="e.g. Make it extra spicy, No onions, soft crust etc..." 
                   value={chefNote} 
                   onChange={(e) => setChefNote(e.target.value)} 
-                  className="w-full text-xs p-3 rounded-xl dark:bg-white/[0.03] bg-neutral-55 border dark:border-white/5 border-neutral-300 text-neutral-900 outline-none focus:border-orange-500 h-16 resize-none"
+                  className="w-full text-xs p-3 rounded-xl dark:bg-white/[0.03] bg-neutral-50 border dark:border-white/5 border-neutral-300 text-neutral-900 outline-none focus:border-orange-500 h-16 resize-none"
                 />
               </div>
 
               <button type="button" onClick={handleNormalPizzaAdd} className="w-full bg-orange-500 text-black p-4 rounded-xl font-black text-xs uppercase font-bold">
                 {isHindi ? "कर्ट में जोड़ने की पुष्टि करें" : "Confirm Add To Cart"}
               </button>
-              <button type="button" onClick={() => { setSelectedProduct(null); setNormalPizzaSize(""); setNormalPizzaPrice(0); setChefNote(""); }} className="w-full mt-3 text-neutral-550 dark:text-gray-400 font-black text-[10px] text-center uppercase font-bold">
+              <button type="button" onClick={() => { setSelectedProduct(null); setNormalPizzaSize(""); setNormalPizzaPrice(0); setChefNote(""); }} className="w-full mt-3 text-neutral-500 dark:text-gray-400 font-black text-[10px] text-center uppercase font-bold">
                 {isHindi ? "बंद करें" : "Close"}
               </button>
             </motion.div>
@@ -2544,7 +2541,7 @@ export default function BbCafeHome() {
                       <p className="text-[8px] dark:text-gray-400 text-neutral-600 font-black uppercase">Customer Profile</p>
                       <h4 className="font-black text-base text-orange-500 font-bold">{customerDetails.name}</h4>
                       <p className="text-xs dark:text-gray-400 text-neutral-700 font-semibold font-mono">{customerDetails.phone}</p>
-                      <p className="text-[9px] text-yellow-650 dark:text-yellow-400 font-bold mt-1 uppercase font-mono">{isHindi ? "इन्वाइट कोड:" : "Invite Code:"} {getReferralCode()}</p>
+                      <p className="text-[9px] text-yellow-600 dark:text-yellow-400 font-bold mt-1 uppercase font-mono">{isHindi ? "इन्वाइट कोड:" : "Invite Code:"} {getReferralCode()}</p>
                     </div>
                     <button 
                       onClick={() => { 
@@ -2568,7 +2565,7 @@ export default function BbCafeHome() {
                       <h4 className="text-xs font-black dark:text-white text-neutral-900 font-bold">
                         {isHindi ? `आपने बचाए: ` : "You Saved: "}<span className="text-emerald-500 text-sm font-black">{ecoCutlerySaves} {isHindi ? "प्लास्टिक चम्मच 🌳" : "Plastic Cutlery 🌳"}</span>
                       </h4>
-                      <p className="text-[9px] text-neutral-505 dark:text-gray-400 font-medium">{isHindi ? "चम्मच/टिश्यू न चुनकर आपने पर्यावरण की मदद की है।" : "By skipping plastic utensils, you actively protected nature!"}</p>
+                      <p className="text-[9px] text-neutral-500 dark:text-gray-400 font-medium">{isHindi ? "चम्मच/टिश्यू न चुनकर आपने पर्यावरण की मदद की है।" : "By skipping plastic utensils, you actively protected nature!"}</p>
                     </div>
                     {ecoCutlerySaves >= 3 && (
                       <div className="bg-emerald-500 text-black px-3 py-1.5 rounded-full border border-emerald-400/30 font-black text-[9px] flex items-center gap-1 shadow animate-pulse font-bold">
@@ -2597,7 +2594,7 @@ export default function BbCafeHome() {
                     </div>
 
                     {pointsHistory.length > 0 && (
-                      <div className="pt-4 border-t border-neutral-200 dark:border-neutral-850 space-y-3 font-sans">
+                      <div className="pt-4 border-t border-neutral-200 dark:border-neutral-800 space-y-3 font-sans">
                         <p className="text-xs font-black uppercase tracking-wider text-orange-500 flex items-center gap-1.5 font-bold font-sans">
                           <span>📜</span> {isHindi ? "पॉइंट्स पासबुक (लेन-देन विवरण):" : "Points Passbook & Ledger:"}
                         </p>
@@ -2606,11 +2603,11 @@ export default function BbCafeHome() {
                             <div key={h.id} className="flex justify-between items-center bg-white dark:bg-neutral-900 p-3 rounded-xl border dark:border-neutral-800 border-neutral-200 shadow-sm transition-colors duration-200">
                               <div className="space-y-1">
                                 <span className="text-xs font-black text-neutral-800 dark:text-gray-200 block font-bold">{h.description}</span>
-                                <span className="text-[9px] text-neutral-505 dark:text-gray-400 font-bold block font-mono">
+                                <span className="text-[9px] text-neutral-500 dark:text-gray-400 font-bold block font-mono">
                                   {h.timestamp?.toDate ? h.timestamp.toDate().toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' }) : new Date(h.timestamp).toLocaleString()}
                                 </span>
                               </div>
-                              <span className={`px-2.5 py-1 rounded-lg text-xs font-black flex items-center gap-0.5 font-mono font-bold ${h.type === 'earn' ? 'bg-green-500/10 text-green-600 dark:text-green-400 border border-green-500/20' : 'bg-red-500/10 text-red-555 border border-red-500/20'}`}>
+                              <span className={`px-2.5 py-1 rounded-lg text-xs font-black flex items-center gap-0.5 font-mono font-bold ${h.type === 'earn' ? 'bg-green-500/10 text-green-600 dark:text-green-400 border border-green-500/20' : 'bg-red-500/10 text-red-500 border border-red-500/20'}`}>
                                 {h.type === 'earn' ? '+' : '-'}{h.points} Pts
                               </span>
                             </div>
@@ -2629,7 +2626,7 @@ export default function BbCafeHome() {
 
                     <div className="pt-2 border-t border-neutral-200 dark:border-neutral-800 flex justify-between items-center font-sans">
                       <span className="text-[9px] dark:text-gray-400 text-neutral-700 font-bold uppercase">{isHindi ? "दोस्त को गिफ्ट करें:" : "Gift points to a friend:"}</span>
-                      <button type="button" onClick={() => { triggerHaptic(); setIsGiftModalOpen(true); }} className="bg-yellow-500/10 text-yellow-655 border border-yellow-400/20 px-2.5 py-1 rounded text-[8px] font-black uppercase font-bold">🎁 Gift Points</button>
+                      <button type="button" onClick={() => { triggerHaptic(); setIsGiftModalOpen(true); }} className="bg-yellow-500/10 text-yellow-600 border border-yellow-400/20 px-2.5 py-1 rounded text-[8px] font-black uppercase font-bold">🎁 Gift Points</button>
                     </div>
 
                     <div className="pt-2 border-t border-neutral-200 dark:border-neutral-800">
@@ -2645,7 +2642,7 @@ export default function BbCafeHome() {
                               setIsClaimModalOpen(true);
                               window.open(link.url, '_blank');
                             }}
-                            className="flex items-center gap-1 bg-neutral-105 dark:bg-white/5 border dark:border-white/10 border-neutral-200 px-2.5 py-1 rounded-full text-[9px] font-bold dark:text-gray-300 text-neutral-800 hover:border-yellow-400 transition-all"
+                            className="flex items-center gap-1 bg-neutral-100 dark:bg-white/5 border dark:border-white/10 border-neutral-200 px-2.5 py-1 rounded-full text-[9px] font-bold dark:text-gray-300 text-neutral-800 hover:border-yellow-400 transition-all"
                           >
                             <img src={link.icon} className="w-3.5 h-3.5 object-contain flex-shrink-0" alt="" loading="lazy" />
                             <span>{link.label.split(' ')[1]} (+{link.points} P)</span>
@@ -2654,14 +2651,14 @@ export default function BbCafeHome() {
                       </div>
                     </div>
 
-                    <div className="space-y-1.5 pt-2 border-t border-neutral-200 dark:border-neutral-850 font-sans">
+                    <div className="space-y-1.5 pt-2 border-t border-neutral-200 dark:border-neutral-800 font-sans">
                       <p className="text-[9px] dark:text-gray-400 text-neutral-700 font-black uppercase mb-1.5 font-bold">{isHindi ? "पॉइंट्स रिडीम करें (सीधे कार्ट में):" : "Redeem Points (Instantly adds to cart):"}</p>
                       <div className="grid grid-cols-2 gap-1.5 max-h-24 overflow-y-auto no-scrollbar font-mono">
                         {loyaltyRules.map(rule => {
                           const inCartCost = cart.reduce((acc: number, i: any) => acc + (i.pointsCost || 0), 0);
                           const isAffordable = (customerPoints - inCartCost) >= rule.pointsCost;
                           return (
-                            <button key={rule.id} type="button" onClick={() => handleCustomerRedeem(`reward-${rule.id}`, `🎁 FREE ${rule.rewardName}`, rule.pointsCost)} disabled={!isAffordable} className={`py-2 px-2 rounded text-[9px] font-black uppercase border truncate transition-all ${isAffordable ? 'bg-yellow-400 text-black border-yellow-500 hover:bg-yellow-500 font-bold' : 'bg-neutral-105 dark:bg-white/5 text-neutral-505 dark:text-gray-400 border-neutral-200 dark:border-white/5 cursor-not-allowed'}`}>🎁 {rule.rewardName} ({rule.pointsCost} P)</button>
+                            <button key={rule.id} type="button" onClick={() => handleCustomerRedeem(`reward-${rule.id}`, `🎁 FREE ${rule.rewardName}`, rule.pointsCost)} disabled={!isAffordable} className={`py-2 px-2 rounded text-[9px] font-black uppercase border truncate transition-all ${isAffordable ? 'bg-yellow-400 text-black border-yellow-500 hover:bg-yellow-500 font-bold' : 'bg-neutral-100 dark:bg-white/5 text-neutral-500 dark:text-gray-400 border-neutral-200 dark:border-white/5 cursor-not-allowed'}`}>🎁 {rule.rewardName} ({rule.pointsCost} P)</button>
                           );
                         })}
                       </div>
@@ -2679,10 +2676,10 @@ export default function BbCafeHome() {
                           const formattedDate = ord.timestamp?.toDate ? ord.timestamp.toDate().toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' }) : new Date(ord.timestamp).toLocaleString();
                           return (
                             <div key={index} className="bg-white dark:bg-neutral-900 border dark:border-neutral-800 border-neutral-200 rounded-2xl p-4 space-y-3 shadow-md transition-colors duration-200 font-sans">
-                              <div className="flex justify-between items-center border-b dark:border-neutral-850 border-neutral-200 pb-2 font-mono font-sans font-bold">
+                              <div className="flex justify-between items-center border-b dark:border-neutral-800 border-neutral-200 pb-2 font-mono font-sans font-bold">
                                 <div className="flex flex-col gap-0.5">
                                   <span className="text-xs font-black text-orange-500 font-bold">Bill: #{formatBillNumber(ord.billNumber || 0)}</span>
-                                  <span className="text-[9px] text-neutral-505 dark:text-gray-400 font-bold">{formattedDate}</span>
+                                  <span className="text-[9px] text-neutral-500 dark:text-gray-400 font-bold">{formattedDate}</span>
                                 </div>
                                 <span className="bg-green-600/10 text-green-600 dark:text-green-400 border border-green-500/20 px-2.5 py-1 rounded-lg text-[9px] font-black font-mono font-bold">
                                   Token: #{ord.tokenNumber || "N/A"}
@@ -2699,7 +2696,7 @@ export default function BbCafeHome() {
                               </div>
                               
                               <div className="border-t border-dashed dark:border-neutral-800 border-neutral-200 pt-2.5 flex justify-between items-center text-xs font-black font-sans font-bold">
-                                <span className="text-neutral-505">{isHindi ? "कुल भुगतान राशि:" : "To Pay Amount:"}</span>
+                                <span className="text-neutral-500">{isHindi ? "कुल भुगतान राशि:" : "To Pay Amount:"}</span>
                                 <span className="text-sm text-green-600 dark:text-green-400 font-mono font-bold">₹{ord.total}</span>
                               </div>
 
@@ -2716,7 +2713,7 @@ export default function BbCafeHome() {
                         })}
                       </div>
                     ) : (
-                      <p className="text-center text-neutral-505 py-6 text-[10px] font-bold uppercase tracking-wider font-sans">
+                      <p className="text-center text-neutral-500 py-6 text-[10px] font-bold uppercase tracking-wider font-sans">
                         {isHindi ? "अभी तक कोई आर्डर नहीं मिला।  स्वादिष्ट आर्डर शुरू करें! 🍕" : "No orders found yet. Grab some food! 🍕"}
                       </p>
                     )}
@@ -2749,7 +2746,7 @@ export default function BbCafeHome() {
                 {/* Free Delivery Target Progress Bar */}
                 {fulfillmentType === "delivery" && (
                   <div className="bg-orange-500/5 dark:bg-orange-500/10 border border-orange-500/20 rounded-xl p-2.5 space-y-1.5 text-[10px] font-sans font-bold">
-                    <div className="flex justify-between items-center font-black uppercase text-orange-605 dark:text-orange-400">
+                    <div className="flex justify-between items-center font-black uppercase text-orange-600 dark:text-orange-400">
                       <span>🚚 Free Delivery Target:</span>
                       <span>{getCartSubtotal() >= selectedArea.minFree ? "Achieved! 🎉" : `Need ₹${selectedArea.minFree - getCartSubtotal()} more`}</span>
                     </div>
@@ -2760,16 +2757,16 @@ export default function BbCafeHome() {
                 )}
 
                 {/* Live Bill Total card */}
-                <div className="bg-neutral-105 dark:bg-neutral-950 p-3 rounded-2xl border border-neutral-200 dark:border-white/5 flex justify-between items-center font-mono font-bold">
+                <div className="bg-neutral-100 dark:bg-neutral-950 p-3 rounded-2xl border border-neutral-200 dark:border-white/5 flex justify-between items-center font-mono font-bold">
                   <span className="text-[10px] font-black uppercase text-neutral-600 dark:text-gray-400 font-sans font-bold">{isHindi ? "लाइव बिल टोटल:" : "LIVE BILL TOTAL:"}</span>
-                  <span className="text-sm font-black text-orange-605 dark:text-yellow-400 font-mono font-bold">₹{getTotalBillPrice()}</span>
+                  <span className="text-sm font-black text-orange-600 dark:text-yellow-400 font-mono font-bold">₹{getTotalBillPrice()}</span>
                 </div>
               </div>
 
               <div className="w-12 h-1 bg-neutral-200 dark:bg-white/15 rounded-full mx-auto mb-4" />
               <div className="flex justify-between items-center mb-6">
                 <h2 className="text-2xl font-black text-neutral-900 dark:text-white font-mono font-bold">{isHindi ? "आपका कर्ट आर्डर" : "Your Order Cart"}</h2>
-                <button onClick={() => { triggerHaptic(); setIsCartOpen(false); }} className="p-2.5 bg-neutral-105 hover:bg-neutral-200 dark:bg-white/5 dark:hover:bg-white/10 text-neutral-800 dark:text-white rounded-full transition-all"><X size={20} /></button>
+                <button onClick={() => { triggerHaptic(); setIsCartOpen(false); }} className="p-2.5 bg-neutral-100 hover:bg-neutral-200 dark:bg-white/5 dark:hover:bg-white/10 text-neutral-800 dark:text-white rounded-full transition-all"><X size={20} /></button>
               </div>
 
               {/* 1. CART ITEMS LIST */}
@@ -2781,17 +2778,17 @@ export default function BbCafeHome() {
                       <p className="text-orange-500 font-black mt-1 text-[11px] font-mono">₹{item?.price || 0}</p>
                     </div>
                     <div className="flex items-center gap-2 bg-neutral-100 dark:bg-black/40 px-2 py-1 rounded-xl border border-neutral-300 dark:border-white/10 flex-shrink-0">
-                      <button onClick={() => { triggerHaptic(); removeItem(item.id); }} className="w-6 h-6 flex items-center justify-center bg-red-500/10 text-red-555 rounded text-sm font-black">-</button>
+                      <button onClick={() => { triggerHaptic(); removeItem(item.id); }} className="w-6 h-6 flex items-center justify-center bg-red-500/10 text-red-500 rounded text-sm font-black">-</button>
                       <span className="font-black text-xs px-1 text-neutral-900 dark:text-white font-mono">{item.quantity}</span>
                       {item.isReward ? (
-                        <button disabled className="w-6 h-6 flex items-center justify-center bg-white/5 text-gray-550 rounded text-sm font-black cursor-not-allowed">+</button>
+                        <button disabled className="w-6 h-6 flex items-center justify-center bg-white/5 text-gray-400 rounded text-sm font-black cursor-not-allowed">+</button>
                       ) : (
                         <button onClick={() => { triggerHaptic(); addItem(item); }} className="w-6 h-6 flex items-center justify-center bg-green-500/10 text-green-500 rounded text-sm font-black">+</button>
                       )}
                     </div>
                   </div>
                   {item.note && (
-                    <div className="bg-orange-500/5 border border-orange-500/10 rounded-lg p-2 text-[9px] text-orange-655 dark:text-orange-400 italic">
+                    <div className="bg-orange-500/5 border border-orange-500/10 rounded-lg p-2 text-[9px] text-orange-600 dark:text-orange-400 italic">
                       👩‍🍳 Chef Instructions: {item.note}
                     </div>
                   )}
@@ -2807,9 +2804,9 @@ export default function BbCafeHome() {
                       <div key={suggest.id} className="flex justify-between items-center text-[10px]">
                         <div>
                           <span className="font-bold block text-neutral-900 dark:text-white">{suggest.name}</span>
-                          <span className="text-orange-655 font-extrabold font-mono font-bold">{getDisplayPrice(suggest)}</span>
+                          <span className="text-orange-600 font-extrabold font-mono font-bold">{getDisplayPrice(suggest)}</span>
                         </div>
-                        <button onClick={() => { triggerHaptic(); addItem(suggest); }} className="bg-purple-500/20 text-purple-655 border border-purple-500/30 px-3 py-1 rounded-lg font-black uppercase font-bold">ADD</button>
+                        <button onClick={() => { triggerHaptic(); addItem(suggest); }} className="bg-purple-500/20 text-purple-600 border border-purple-500/30 px-3 py-1 rounded-lg font-black uppercase font-bold">ADD</button>
                       </div>
                     ))}
                   </div>
@@ -2822,21 +2819,21 @@ export default function BbCafeHome() {
                 <div className="grid grid-cols-3 gap-2">
                   <button
                     onClick={() => { triggerHaptic(); setFulfillmentType("delivery"); }}
-                    className={`py-3 px-1 rounded-xl border flex flex-col items-center justify-center gap-1.5 transition-all text-center ${fulfillmentType === "delivery" ? 'border-orange-500 bg-orange-500/10 text-orange-655 font-black shadow-sm' : 'border-neutral-300 dark:border-white/5 text-neutral-800 dark:text-gray-300 font-semibold'}`}
+                    className={`py-3 px-1 rounded-xl border flex flex-col items-center justify-center gap-1.5 transition-all text-center ${fulfillmentType === "delivery" ? 'border-orange-500 bg-orange-500/10 text-orange-600 font-black shadow-sm' : 'border-neutral-300 dark:border-white/5 text-neutral-800 dark:text-gray-300 font-semibold'}`}
                   >
                     <span className="text-base">🛵</span>
                     <span className="text-[9px] font-black">{isHindi ? "होम डिलीवरी" : "Home Delivery"}</span>
                   </button>
                   <button
                     onClick={() => { triggerHaptic(); setFulfillmentType("pickup"); }}
-                    className={`py-3 px-1 rounded-xl border flex flex-col items-center justify-center gap-1.5 transition-all text-center ${fulfillmentType === "pickup" ? 'border-orange-500 bg-orange-500/10 text-orange-655 font-black shadow-sm' : 'border-neutral-300 dark:border-white/5 text-neutral-800 dark:text-gray-300 font-semibold'}`}
+                    className={`py-3 px-1 rounded-xl border flex flex-col items-center justify-center gap-1.5 transition-all text-center ${fulfillmentType === "pickup" ? 'border-orange-500 bg-orange-500/10 text-orange-600 font-black shadow-sm' : 'border-neutral-300 dark:border-white/5 text-neutral-800 dark:text-gray-300 font-semibold'}`}
                   >
                     <span className="text-base">🛍️</span>
                     <span className="text-[9px] font-black">{isHindi ? "सेल्फ-पिकअप" : "Self-Pickup"}</span>
                   </button>
                   <button
                     onClick={() => { triggerHaptic(); setFulfillmentType("table"); }}
-                    className={`py-3 px-1 rounded-xl border flex flex-col items-center justify-center gap-1.5 transition-all text-center ${fulfillmentType === "table" ? 'border-orange-500 bg-orange-500/10 text-orange-655 font-black shadow-sm' : 'border-neutral-300 dark:border-white/5 text-neutral-800 dark:text-gray-300 font-semibold'}`}
+                    className={`py-3 px-1 rounded-xl border flex flex-col items-center justify-center gap-1.5 transition-all text-center ${fulfillmentType === "table" ? 'border-orange-500 bg-orange-500/10 text-orange-600 font-black shadow-sm' : 'border-neutral-300 dark:border-white/5 text-neutral-800 dark:text-gray-300 font-semibold'}`}
                   >
                     <span className="text-base">🍽️</span>
                     <span className="text-[9px] font-black">{isHindi ? "टेबल ऑर्डर" : "Dine-In (Table)"}</span>
@@ -2849,13 +2846,13 @@ export default function BbCafeHome() {
                 <div className="dark:bg-white/[0.02] bg-neutral-50 border dark:border-white/5 border-neutral-200 rounded-2xl p-4 space-y-2.5 transition-colors duration-200 mt-4 font-sans font-bold">
                   <p className="text-[9px] font-black uppercase text-neutral-800 dark:text-gray-400 font-bold">{isHindi ? "ऐड-ऑन्स जोड़ें (Add-ons):" : "Add Add-ons to order:"}</p>
                   <div className="grid grid-cols-3 gap-2">
-                    <button onClick={() => { triggerHaptic(); setKetchupAddon(!ketchupAddon); }} className={`p-2 rounded-xl border text-[9.5px] font-black ${ketchupAddon ? 'border-red-500 bg-red-500/5 text-red-655' : 'border-neutral-300 dark:border-white/5 bg-transparent text-neutral-800 dark:text-gray-300'}`}>
+                    <button onClick={() => { triggerHaptic(); setKetchupAddon(!ketchupAddon); }} className={`p-2 rounded-xl border text-[9.5px] font-black ${ketchupAddon ? 'border-red-500 bg-red-500/5 text-red-600' : 'border-neutral-300 dark:border-white/5 bg-transparent text-neutral-800 dark:text-gray-300'}`}>
                       {isHindi ? "केचप" : "Ketchup"} (+₹10)
                     </button>
-                    <button onClick={() => { triggerHaptic(); setOreganoAddon(!oreganoAddon); }} className={`p-2 rounded-xl border text-[9.5px] font-black ${oreganoAddon ? 'border-yellow-500 bg-yellow-500/5 text-yellow-600' : 'border-neutral-300 dark:border-white/5 bg-transparent text-neutral-800 dark:text-gray-300'}`}>
+                    <button onClick={() => { triggerHaptic(); setPageanoAddon: setOreganoAddon(!oreganoAddon); }} className={`p-2 rounded-xl border text-[9.5px] font-black ${oreganoAddon ? 'border-yellow-500 bg-yellow-500/5 text-yellow-600' : 'border-neutral-300 dark:border-white/5 bg-transparent text-neutral-800 dark:text-gray-300'}`}>
                       {isHindi ? "ऑरेगैनो" : "Oregano"} (+₹10)
                     </button>
-                    <button onClick={() => { triggerHaptic(); setChiliFlakesAddon(!chiliFlakesAddon); }} className={`p-2 rounded-xl border text-[9.5px] font-black ${chiliFlakesAddon ? 'border-orange-500 bg-orange-500/5 text-orange-655' : 'border-neutral-300 dark:border-white/5 bg-transparent text-neutral-800 dark:text-gray-300'}`}>
+                    <button onClick={() => { triggerHaptic(); setChiliFlakesAddon(!chiliFlakesAddon); }} className={`p-2 rounded-xl border text-[9.5px] font-black ${chiliFlakesAddon ? 'border-orange-500 bg-orange-500/5 text-orange-600' : 'border-neutral-300 dark:border-white/5 bg-transparent text-neutral-800 dark:text-gray-300'}`}>
                       {isHindi ? "चिली फ्लेक्स" : "Chili Flakes"} (+₹10)
                     </button>
                   </div>
@@ -2879,7 +2876,7 @@ export default function BbCafeHome() {
                             onClick={() => { triggerHaptic(); setSelectedArea(area); }}
                             className={`p-3 rounded-xl border text-left flex flex-col justify-between transition-all duration-200 active:scale-95 ${
                               isSelected 
-                                ? 'border-orange-500 bg-orange-500/10 text-orange-655 dark:text-orange-400 shadow-md font-black' 
+                                ? 'border-orange-500 bg-orange-500/10 text-orange-600 dark:text-orange-400 shadow-md font-black' 
                                 : 'border-neutral-300 dark:border-white/5 bg-white dark:bg-white/[0.01] text-neutral-800 dark:text-neutral-300 hover:border-neutral-400 hover:dark:border-white/10'
                             }`}
                           >
@@ -2919,12 +2916,12 @@ export default function BbCafeHome() {
 
               {/* Dine-In Custom Table Capacity Grid Selector */}
               {fulfillmentType === "table" && (
-                <div className="mt-3 p-3 bg-neutral-105 dark:bg-neutral-900 rounded-xl border border-neutral-200 dark:border-white/5 space-y-3 font-sans transition-all duration-300">
-                  <p className="text-[10px] font-black uppercase text-orange-655 dark:text-orange-400 font-bold">{isHindi ? "🪑 उपलब्ध टेबल चुनें:" : "🪑 Choose Available Table:"}</p>
+                <div className="mt-3 p-3 bg-neutral-100 dark:bg-neutral-900 rounded-xl border border-neutral-200 dark:border-white/5 space-y-3 font-sans transition-all duration-300">
+                  <p className="text-[10px] font-black uppercase text-orange-600 dark:text-orange-400 font-bold">{isHindi ? "🪑 उपलब्ध टेबल चुनें:" : "🪑 Choose Available Table:"}</p>
                   
                   {/* 2-Seater Grid */}
                   <div className="space-y-1.5">
-                    <span className="text-[8px] font-black text-neutral-650 dark:text-gray-400 uppercase tracking-wider">{isHindi ? "2 लोगों के बैठने के लिए (3 टेबल्स):" : "For 2 People (3 Tables Available):"}</span>
+                    <span className="text-[8px] font-black text-neutral-600 dark:text-gray-400 uppercase tracking-wider">{isHindi ? "2 लोगों के बैठने के लिए (3 टेबल्स):" : "For 2 People (3 Tables Available):"}</span>
                     <div className="grid grid-cols-3 gap-2">
                       {["Table 1", "Table 2", "Table 3"].map((t) => {
                         const isSelected = tableNumber === t;
@@ -2949,7 +2946,7 @@ export default function BbCafeHome() {
 
                   {/* 4-Seater Grid */}
                   <div className="space-y-1.5 pt-1">
-                    <span className="text-[8px] font-black text-neutral-655 dark:text-gray-400 uppercase tracking-wider">{isHindi ? "4 लोगों के बैठने के लिए (3 टेबल्स):" : "For 4 People (3 Tables Available):"}</span>
+                    <span className="text-[8px] font-black text-neutral-600 dark:text-gray-400 uppercase tracking-wider">{isHindi ? "4 लोगों के बैठने के लिए (3 टेबल्स):" : "For 4 People (3 Tables Available):"}</span>
                     <div className="grid grid-cols-3 gap-2">
                       {["Table 4", "Table 5", "Table 6"].map((t) => {
                         const isSelected = tableNumber === t;
@@ -3001,7 +2998,7 @@ export default function BbCafeHome() {
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     onClick={() => { triggerHaptic(); setPaymentMethod("cod"); }}
-                    className={`p-3 rounded-xl border flex flex-col items-center justify-center gap-1 transition-all ${paymentMethod === "cod" ? 'border-orange-500 bg-orange-500/10 text-orange-655 font-black shadow-sm' : 'border-neutral-300 dark:border-white/5 text-neutral-800 dark:text-gray-300 font-bold'}`}
+                    className={`p-3 rounded-xl border flex flex-col items-center justify-center gap-1 transition-all ${paymentMethod === "cod" ? 'border-orange-500 bg-orange-500/10 text-orange-600 font-black shadow-sm' : 'border-neutral-300 dark:border-white/5 text-neutral-800 dark:text-gray-300 font-bold'}`}
                   >
                     <span className="text-sm">💵</span>
                     <span className="text-[9px] font-black">
@@ -3017,7 +3014,7 @@ export default function BbCafeHome() {
                       setPaymentMethod("upi"); 
                       setIsUpiPopupOpen(true); 
                     }}
-                    className={`p-3 rounded-xl border flex flex-col items-center justify-center gap-1 transition-all ${paymentMethod === "upi" ? 'border-orange-500 bg-orange-500/10 text-orange-655 font-black shadow-sm' : 'border-neutral-300 dark:border-white/5 text-neutral-800 dark:text-gray-300 font-bold'}`}
+                    className={`p-3 rounded-xl border flex flex-col items-center justify-center gap-1 transition-all ${paymentMethod === "upi" ? 'border-orange-500 bg-orange-500/10 text-orange-600 font-black shadow-sm' : 'border-neutral-300 dark:border-white/5 text-neutral-800 dark:text-gray-300 font-bold'}`}
                   >
                     <span className="text-sm">📱</span>
                     <span className="text-[9px] font-black">{isHindi ? "ऑनलाइन भुगतान (UPI)" : "Pay Online (UPI)"}</span>
@@ -3070,17 +3067,17 @@ export default function BbCafeHome() {
               <button 
                 type="button" 
                 onClick={() => { triggerHaptic(); setIsUpiPopupOpen(false); }}
-                className="absolute top-4 right-4 p-2 bg-red-105 hover:bg-red-600 hover:text-white text-red-655 rounded-full transition-all shadow"
+                className="absolute top-4 right-4 p-2 bg-red-100 hover:bg-red-600 hover:text-white text-red-600 rounded-full transition-all shadow"
                 title="Close"
               >
                 <X size={16} />
               </button>
 
               <div className="space-y-1">
-                <h3 className="text-base font-black text-orange-55 uppercase italic font-bold">
+                <h3 className="text-base font-black text-orange-500 uppercase italic font-bold">
                   {isHindi ? "यूपीआई भुगतान गेटवे 📱" : "UPI Payment Gateway 📱"}
                 </h3>
-                <p className="text-[10.5px] text-neutral-605 dark:text-gray-400 font-semibold leading-relaxed">
+                <p className="text-[10.5px] text-neutral-600 dark:text-gray-400 font-semibold leading-relaxed">
                   {isHindi ? "कृपया नीचे दिए गए किसी भी ऐप को चुनकर ₹" + getTotalBillPrice() + " का भुगतान पूरा करें, फिर स्क्रीनशॉट अपलोड करें!" : "Choose an app to pay ₹" + getTotalBillPrice() + " and upload the screenshot below:"}
                 </p>
               </div>
@@ -3127,7 +3124,7 @@ export default function BbCafeHome() {
                   type="file" 
                   accept="image/png, image/jpeg" 
                   onChange={handleScreenshotChange}
-                  className="w-full text-xs text-neutral-655 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[9px] file:font-black file:bg-orange-500 file:text-black file:cursor-pointer hover:file:bg-orange-600 outline-none"
+                  className="w-full text-xs text-neutral-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[9px] file:font-black file:bg-orange-500 file:text-black file:cursor-pointer hover:file:bg-orange-600 outline-none"
                 />
                 
                 {isCompressing && (
@@ -3163,7 +3160,7 @@ export default function BbCafeHome() {
                 <button 
                   type="button" 
                   onClick={() => setIsUpiPopupOpen(false)}
-                  className="bg-neutral-105 hover:bg-neutral-200 dark:bg-white/5 text-neutral-705 dark:text-gray-400 px-4 py-3.5 rounded-xl font-bold text-xs transition-all font-bold"
+                  className="bg-neutral-100 hover:bg-neutral-200 dark:bg-white/5 text-neutral-700 dark:text-gray-400 px-4 py-3.5 rounded-xl font-bold text-xs transition-all font-bold"
                 >
                   {isHindi ? "बंद करें" : "Cancel"}
                 </button>
@@ -3221,7 +3218,7 @@ export default function BbCafeHome() {
               <Gift className="mx-auto text-yellow-400" size={32} />
               <div>
                 <h3 className="text-lg font-black text-yellow-400 uppercase italic font-mono font-bold">Gift Loyalty Points</h3>
-                <p className="text-[9px] text-neutral-505 font-semibold mt-0.5 font-sans">अपने पॉइंट्स किसी दोस्त को गिफ्ट करें</p>
+                <p className="text-[9px] text-neutral-600 font-semibold mt-0.5 font-sans">अपने पॉइंट्स किसी दोस्त को गिफ्ट करें</p>
               </div>
               <div className="space-y-3 text-left">
                 <div className="space-y-1">
@@ -3241,7 +3238,7 @@ export default function BbCafeHome() {
                 <button type="submit" disabled={isGiftingLoading} className="flex-1 bg-yellow-400 text-black font-black p-3 rounded-xl text-xs uppercase flex items-center justify-center gap-1 font-bold">
                   {isGiftingLoading ? <Loader2 className="animate-spin" size={14} /> : <span>Gift Points 🎁</span>}
                 </button>
-                <button type="button" onClick={() => { triggerHaptic(); setIsGiftModalOpen(false); setGiftPhone(""); setGiftPointsAmount(""); setGiftSenderPin(""); }} className="bg-neutral-105 text-neutral-800 dark:bg-white/5 dark:text-gray-400 font-bold p-3 rounded-xl text-xs font-bold">CANCEL</button>
+                <button type="button" onClick={() => { triggerHaptic(); setIsGiftModalOpen(false); setGiftPhone(""); setGiftPointsAmount(""); setGiftSenderPin(""); }} className="bg-neutral-100 text-neutral-800 dark:bg-white/5 dark:text-gray-400 font-bold p-3 rounded-xl text-xs font-bold">CANCEL</button>
               </div>
             </motion.form>
           </div>
@@ -3258,8 +3255,8 @@ export default function BbCafeHome() {
             >
               <img src={claimingPlatform.icon} className="w-10 h-10 object-contain mx-auto" alt="" loading="lazy" />
               <div className="space-y-1">
-                <h3 className="text-base font-black text-orange-655 dark:text-orange-500 uppercase font-bold">वेरिफिकेशन दावा सबमिट करें</h3>
-                <p className="text-[10px] text-neutral-655 leading-normal font-semibold">
+                <h3 className="text-base font-black text-orange-600 dark:text-orange-500 uppercase font-bold">वेरिफिकेशन दावा सबमिट करें</h3>
+                <p className="text-[10px] text-neutral-600 leading-normal font-semibold">
                   {claimingPlatform.label} पर फॉलो/सब्सक्राइब करने के बाद, नीचे अपना यूज़रनेम दर्ज करें। हमारे एडमिन इसकी जांच करके आपका {claimingPlatform.points} पॉइंट क्रेडिट करेंगे!
                 </p>
               </div>
@@ -3283,7 +3280,7 @@ export default function BbCafeHome() {
                 <button 
                   type="button" 
                   onClick={() => { triggerHaptic(); setIsClaimModalOpen(false); setClaimUsername(""); }} 
-                  className="bg-neutral-105 text-neutral-855 dark:bg-white/5 dark:text-gray-400 p-3 rounded-xl font-black text-xs uppercase font-bold font-sans"
+                  className="bg-neutral-100 text-neutral-800 dark:bg-white/5 dark:text-gray-400 p-3 rounded-xl font-black text-xs uppercase font-bold font-sans"
                 >
                   Cancel
                 </button>
