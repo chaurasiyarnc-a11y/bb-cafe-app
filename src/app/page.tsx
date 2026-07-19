@@ -1,4 +1,5 @@
 
+
 'use client';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { db } from '../lib/firebase'; 
@@ -318,9 +319,12 @@ export default function BbCafeHome() {
 
   const formatBillNumber = (num: number) => String(num).padStart(4, '0');
 
+  // Multi-field image fallback selector to solve missing images on both categories & products
   const getCategoryImage = (catName: string) => {
-    const found = dbCategories.find(c => c.name === catName);
-    if (found && found.image) return found.image;
+    const found = dbCategories.find(c => String(c.name).toLowerCase().trim() === String(catName).toLowerCase().trim());
+    if (found) {
+      return found.image || found.imageUrl || found.coverUrl || found.cover || found.url || CATEGORY_IMAGES[catName] || CATEGORY_IMAGES[found.name] || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=150&q=80";
+    }
     return CATEGORY_IMAGES[catName] || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=150&q=80";
   };
 
@@ -419,6 +423,7 @@ export default function BbCafeHome() {
     }
   }, [customerDetails]);
 
+  // Unique document ID base deduplication to prevent missing items
   const deduplicatedMenu = useMemo(() => {
     const seen = new Set();
     const hiddenCategoryNames = new Set(dbCategories.filter((c: any) => c.isVisible === false).map((c: any) => String(c.name).toLowerCase().trim()));
@@ -426,9 +431,9 @@ export default function BbCafeHome() {
     return menu.filter(item => {
       const itemCatClean = item?.category ? String(item.category).toLowerCase().trim() : "";
       if (hiddenCategoryNames.has(itemCatClean)) return false;
-      const nameKey = item?.name ? String(item.name).toLowerCase().trim() : item.id;
-      if (seen.has(nameKey)) return false;
-      seen.add(nameKey);
+      const idKey = String(item.id).trim();
+      if (seen.has(idKey)) return false;
+      seen.add(idKey);
       return true;
     });
   }, [menu, dbCategories]);
@@ -443,17 +448,26 @@ export default function BbCafeHome() {
     return () => clearTimeout(handler);
   }, [searchQuery]);
 
+  // Highly robust case-insensitive category matching + smart word-by-word search validation
   const filteredMenu = useMemo(() => {
+    const searchWords = debouncedSearchQuery.split(/\s+/).filter(Boolean);
+
     return deduplicatedMenu.filter(item => {
       const itemName = item?.name ? String(item.name).toLowerCase() : "";
       const itemCategory = item?.category ? String(item.category) : "";
       
       const isFavoriteFilter = selectedCategory === "Favorites";
+      
+      const itemCatClean = itemCategory.toLowerCase().trim();
+      const selectedCatClean = selectedCategory.toLowerCase().trim();
+      
       const matchesCategory = isFavoriteFilter 
         ? favorites.includes(item.id) 
-        : (selectedCategory === "All" || itemCategory === selectedCategory);
+        : (selectedCatClean === "all" || itemCatClean === selectedCatClean);
         
-      return matchesCategory && itemName.includes(debouncedSearchQuery);
+      const matchesSearch = searchWords.every(word => itemName.includes(word));
+        
+      return matchesCategory && matchesSearch;
     });
   }, [deduplicatedMenu, selectedCategory, favorites, debouncedSearchQuery]);
 
@@ -907,7 +921,7 @@ export default function BbCafeHome() {
     triggerHaptic();
     if (!customerDetails) {
       setIsProfileOpen(true);
-      toast.error(isHindi ? "कृपया पहले अपनी प्रोफाइल सेटअप करें!" : "Please set up your profile first!");
+      toast.error(isHindi ? "कृपया पहले अपनी प्रोफाइल कस्टमाइज़ करें!" : "Please set up your profile first!");
       return;
     }
     if (paymentMethod === "upi") {
@@ -941,7 +955,7 @@ export default function BbCafeHome() {
     triggerHaptic();
     
     if (!customerDetails?.phone) {
-      toast.error(isHindi ? "कृपया पहले अपनी प्रोफाइल सेटअप करें!" : "Please set up your profile first!");
+      toast.error(isHindi ? "कृपया पहले अपनी प्रोफाइल कस्टमाइज़ करें!" : "Please set up your profile first!");
       return;
     }
     
@@ -1776,7 +1790,7 @@ export default function BbCafeHome() {
             className="dark:bg-[#0f1115] bg-white border dark:border-white/5 border-neutral-200 rounded-3xl p-5 shadow-xl space-y-6 max-w-sm mx-auto font-sans"
           >
             <div className="text-center space-y-1">
-              <span className="bg-orange-500/10 text-orange-650 dark:text-orange-500 px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest font-sans font-bold">
+              <span className="bg-orange-500/10 text-orange-655 dark:text-orange-500 px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest font-sans font-bold">
                 DIY Pizza Tab
               </span>
               <h3 className="text-lg font-black text-neutral-900 dark:text-white font-sans font-bold">{isHindi ? "अपने मन का पिज़्ज़ा बनाएं 🍕" : "Create Custom Pizza 🍕"}</h3>
@@ -1839,7 +1853,7 @@ export default function BbCafeHome() {
                       className={`p-2.5 rounded-xl border flex justify-between items-center text-[10px] font-black capitalize transition-all ${isSelected ? 'border-orange-500 bg-orange-500/5 text-orange-600' : 'dark:border-white/5 border-neutral-300'}`}
                     >
                       <span>{veg}</span>
-                      <span className="font-extrabold text-orange-650 font-mono">+₹{cost}</span>
+                      <span className="font-extrabold text-orange-655 font-mono">+₹{cost}</span>
                     </button>
                   );
                 })}
@@ -1866,7 +1880,7 @@ export default function BbCafeHome() {
                       className={`p-2.5 rounded-xl border flex justify-between items-center text-[10px] font-black transition-all ${isSelected ? 'border-orange-500 bg-orange-500/5 text-orange-600' : 'dark:border-white/5 border-neutral-300'}`}
                     >
                       <span>{item.label}</span>
-                      <span className="font-extrabold text-orange-650 font-mono">+₹{cost}</span>
+                      <span className="font-extrabold text-orange-655 font-mono">+₹{cost}</span>
                     </button>
                   );
                 })}
@@ -1950,8 +1964,9 @@ export default function BbCafeHome() {
                       transition={{ duration: 0.45, ease: "easeOut" }}
                     >
                       <div className="relative h-44 w-full overflow-hidden font-sans">
+                        {/* Dynamic multi-field product image fallback selection */}
                         <img 
-                          src={item.image || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=500&q=80"} 
+                          src={item.image || item.imageUrl || item.url || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=500&q=80"} 
                           className="w-full h-full object-cover origin-center transition-transform duration-700 ease-out group-hover:scale-110" 
                           alt={item.name} 
                         />
@@ -2124,7 +2139,7 @@ export default function BbCafeHome() {
               <span className="text-[9px] font-black uppercase tracking-widest text-green-500 bg-green-500/10 px-3 py-1 rounded-full border border-green-500/20">
                 {isHindi ? "हमारे बारे में" : "About Us"}
               </span>
-              <h4 className="text-xl font-black italic text-yellow-350 font-bold font-serif">BUM BUM CAFE</h4>
+              <h4 className="text-xl font-black italic text-yellow-355 font-bold font-serif">BUM BUM CAFE</h4>
               <p className="text-[11px] font-bold text-green-600 dark:text-green-300">{isHindi ? "जहाँ स्वाद और सुकून मिलते हैं! ✨" : "Where Taste Meets Serenity! ✨"}</p>
               
               <p className="text-[11.5px] text-neutral-800 dark:text-gray-300 leading-relaxed max-w-sm mx-auto font-medium">
@@ -2654,7 +2669,7 @@ export default function BbCafeHome() {
 
                     <div className="pt-2 border-t border-neutral-200 dark:border-neutral-800 flex justify-between items-center font-sans">
                       <span className="text-[9px] dark:text-gray-400 text-neutral-700 font-bold uppercase">{isHindi ? "दोस्त को गिफ्ट करें:" : "Gift points to a friend:"}</span>
-                      <button type="button" onClick={() => { triggerHaptic(); setIsGiftModalOpen(true); }} className="bg-yellow-500/10 text-yellow-650 border border-yellow-400/20 px-2.5 py-1 rounded text-[8px] font-black uppercase font-bold">🎁 Gift Points</button>
+                      <button type="button" onClick={() => { triggerHaptic(); setIsGiftModalOpen(true); }} className="bg-yellow-500/10 text-yellow-655 border border-yellow-400/20 px-2.5 py-1 rounded text-[8px] font-black uppercase font-bold">🎁 Gift Points</button>
                     </div>
 
                     <div className="pt-2 border-t border-neutral-200 dark:border-neutral-800">
@@ -2670,7 +2685,7 @@ export default function BbCafeHome() {
                               setIsClaimModalOpen(true);
                               window.open(link.url, '_blank');
                             }}
-                            className="flex items-center gap-1 bg-neutral-100 dark:bg-white/5 border dark:border-white/10 border-neutral-200 px-2.5 py-1 rounded-full text-[9px] font-bold dark:text-gray-300 text-neutral-800 hover:border-yellow-400 transition-all"
+                            className="flex items-center gap-1 bg-neutral-105 dark:bg-white/5 border dark:border-white/10 border-neutral-200 px-2.5 py-1 rounded-full text-[9px] font-bold dark:text-gray-300 text-neutral-800 hover:border-yellow-400 transition-all"
                           >
                             <img src={link.icon} className="w-3.5 h-3.5 object-contain flex-shrink-0" alt="" />
                             <span>{link.label.split(' ')[1]} (+{link.points} P)</span>
@@ -2686,7 +2701,7 @@ export default function BbCafeHome() {
                           const inCartCost = cart.reduce((acc: number, i: any) => acc + (i.pointsCost || 0), 0);
                           const isAffordable = (customerPoints - inCartCost) >= rule.pointsCost;
                           return (
-                            <button key={rule.id} type="button" onClick={() => handleCustomerRedeem(`reward-${rule.id}`, `🎁 FREE ${rule.rewardName}`, rule.pointsCost)} disabled={!isAffordable} className={`py-2 px-2 rounded text-[9px] font-black uppercase border truncate transition-all ${isAffordable ? 'bg-yellow-400 text-black border-yellow-500 hover:bg-yellow-500 font-bold' : 'bg-neutral-100 dark:bg-white/5 text-neutral-500 dark:text-gray-400 border-neutral-200 dark:border-white/5 cursor-not-allowed'}`}>🎁 {rule.rewardName} ({rule.pointsCost} P)</button>
+                            <button key={rule.id} type="button" onClick={() => handleCustomerRedeem(`reward-${rule.id}`, `🎁 FREE ${rule.rewardName}`, rule.pointsCost)} disabled={!isAffordable} className={`py-2 px-2 rounded text-[9px] font-black uppercase border truncate transition-all ${isAffordable ? 'bg-yellow-400 text-black border-yellow-500 hover:bg-yellow-500 font-bold' : 'bg-neutral-105 dark:bg-white/5 text-neutral-500 dark:text-gray-400 border-neutral-200 dark:border-white/5 cursor-not-allowed'}`}>🎁 {rule.rewardName} ({rule.pointsCost} P)</button>
                           );
                         })}
                       </div>
@@ -2724,7 +2739,7 @@ export default function BbCafeHome() {
                               </div>
                               
                               <div className="border-t border-dashed dark:border-neutral-800 border-neutral-200 pt-2.5 flex justify-between items-center text-xs font-black font-sans font-bold">
-                                <span className="text-neutral-505">{isHindi ? "कुल भुगतान राशि:" : "To Pay Amount:"}</span>
+                                <span className="text-neutral-500">{isHindi ? "कुल भुगतान राशि:" : "To Pay Amount:"}</span>
                                 <span className="text-sm text-green-600 dark:text-green-400 font-mono font-bold">₹{ord.total}</span>
                               </div>
 
@@ -2732,7 +2747,7 @@ export default function BbCafeHome() {
                                 href={`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(`नमस्ते बम बम कैफ़े! कृपया मेरे आर्डर नंबर #${formatBillNumber(ord.billNumber)} (टोकन नंबर: #${ord.tokenNumber}) का लाइव स्टेटस बताएं।`)}`}
                                 target="_blank"
                                 rel="noreferrer"
-                                className="w-full bg-orange-500/10 text-orange-600 hover:bg-orange-505 hover:text-white dark:bg-white/5 hover:dark:bg-white/10 text-center text-[10px] font-black py-2.5 rounded-xl block border dark:border-neutral-800 border-orange-500/20 transition-all font-sans font-bold"
+                                className="w-full bg-orange-500/10 text-orange-600 hover:bg-orange-500 hover:text-white dark:bg-white/5 hover:dark:bg-white/10 text-center text-[10px] font-black py-2.5 rounded-xl block border dark:border-neutral-800 border-orange-500/20 transition-all font-sans font-bold"
                               >
                                 Track Live Status on WA 🔍
                               </a>
@@ -2741,7 +2756,7 @@ export default function BbCafeHome() {
                         })}
                       </div>
                     ) : (
-                      <p className="text-center text-neutral-505 py-6 text-[10px] font-bold uppercase tracking-wider font-sans">
+                      <p className="text-center text-neutral-500 py-6 text-[10px] font-bold uppercase tracking-wider font-sans">
                         {isHindi ? "अभी तक कोई आर्डर नहीं मिला।  स्वादिष्ट आर्डर शुरू करें! 🍕" : "No orders found yet. Grab some food! 🍕"}
                       </p>
                     )}
@@ -2961,7 +2976,7 @@ export default function BbCafeHome() {
                     <button 
                       type="button" 
                       onClick={() => { triggerHaptic(); setAppliedCoupon(null); setEnteredCoupon(""); }} 
-                      className="text-red-500 hover:text-red-650 font-black ml-2 font-mono"
+                      className="text-red-500 hover:text-red-655 font-black ml-2 font-mono"
                     >
                       {isHindi ? "हटाएं" : "Remove"}
                     </button>
