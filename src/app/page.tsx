@@ -92,7 +92,7 @@ export default function BbCafeHome() {
 
   const menuRef = useRef<HTMLDivElement | null>(null);
 
-  // --- STATE VARIABLES (Optimized with Local Cache SWR Initialization) ---
+  // --- STATE VARIABLES ---
   const [menu, setMenu] = useState<any[]>(() => {
     if (typeof window !== 'undefined') {
       const cached = localStorage.getItem('bb_cached_menu');
@@ -272,7 +272,7 @@ export default function BbCafeHome() {
   // UI States
   const [showGreeting, setShowGreeting] = useState(true);
 
-  // --- HELPERS & CALCULATION FUNCTIONS ---
+  // --- HELPERS, CALCULATIONS & GENERAL UTILS (Declared sequentially for safe scope compile) ---
 
   const triggerHaptic = (ms = 35) => {
     if (typeof window !== 'undefined' && window.navigator && window.navigator.vibrate) {
@@ -302,6 +302,35 @@ export default function BbCafeHome() {
         osc.stop(audioCtx.currentTime + 0.5);
       }
     } catch (e) {}
+  };
+
+  const shuffleArray = (array: any[]) => {
+    const shuffled = [...array];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled;
+  };
+
+  const isVideoUrl = (url: string) => {
+    if (!url) return false;
+    const cleanUrl = url.toLowerCase().split('?')[0];
+    return cleanUrl.endsWith('.mp4') || cleanUrl.endsWith('.webm') || cleanUrl.includes('/video') || cleanUrl.includes('video');
+  };
+
+  const formatBillNumber = (num: number) => String(num).padStart(4, '0');
+
+  const calculateDistanceInKm = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+    const R = 6371; 
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = 
+      Math.sin(dLat/2) * Math.sin(dLat/2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+      Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
   };
 
   const getCartSubtotal = () => cart.reduce((acc: number, i: any) => acc + (i.price * i.quantity), 0);
@@ -354,26 +383,6 @@ export default function BbCafeHome() {
     return `₹${item?.price || 0}`;
   };
 
-  const isVideoUrl = (url: string) => {
-    if (!url) return false;
-    const cleanUrl = url.toLowerCase().split('?')[0];
-    return cleanUrl.endsWith('.mp4') || cleanUrl.endsWith('.webm') || cleanUrl.includes('/video') || cleanUrl.includes('video');
-  };
-
-  const calculateDistanceInKm = (lat1: number, lon1: number, lat2: number, lon2: number) => {
-    const R = 6371; 
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = 
-      Math.sin(dLat/2) * Math.sin(dLat/2) +
-      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
-      Math.sin(dLon/2) * Math.sin(dLon/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    return R * c;
-  };
-
-  const formatBillNumber = (num: number) => String(num).padStart(4, '0');
-
   const getCategoryImage = (catName: string) => {
     const found = dbCategories.find(c => String(c.name).toLowerCase().trim() === String(catName).toLowerCase().trim());
     if (found) {
@@ -387,15 +396,6 @@ export default function BbCafeHome() {
     const namePart = customerDetails.name.trim().split(" ")[0].substring(0, 4).toUpperCase();
     const phonePart = customerDetails.phone.slice(-4);
     return `${namePart}${phonePart}`;
-  };
-
-  const shuffleArray = (array: any[]) => {
-    const shuffled = [...array];
-    for (let i = shuffled.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-    }
-    return shuffled;
   };
 
   // --- CALCULATION MEMOS ---
@@ -462,15 +462,6 @@ export default function BbCafeHome() {
       return true;
     });
   }, [menu, dbCategories]);
-
-  useEffect(() => {
-    const handler = setTimeout(() => {
-      const words = searchQuery.toLowerCase().trim().split(/\s+/);
-      const mappedWords = words.map(word => HINGLISH_DICT[word] || word);
-      setDebouncedSearchQuery(mappedWords.join(" "));
-    }, 250);
-    return () => clearTimeout(handler);
-  }, [searchQuery]);
 
   const filteredMenu = useMemo(() => {
     const searchWords = debouncedSearchQuery.split(/\s+/).filter(Boolean);
@@ -560,7 +551,27 @@ export default function BbCafeHome() {
     });
   }, [cart]);
 
-  // --- ACTIONS ---
+  // --- Optimized UPI Redirection Link Scheme to Prevent Mobile Safari/Chrome popup blocks ---
+  const handleLaunchUpiPay = (platform: string) => {
+    triggerHaptic();
+    const amount = getTotalBillPrice();
+    const merchantName = "Bum Bum Cafe";
+    const transactionNote = `BumBumCafe Order`;
+    
+    const standardUpi = `upi://pay?pa=${upiId}&pn=${encodeURIComponent(merchantName)}&am=${amount}&cu=INR&tn=${encodeURIComponent(transactionNote)}`;
+    
+    if (platform === 'phonepe') {
+      window.location.href = `phonepe://pay?pa=${upiId}&pn=${encodeURIComponent(merchantName)}&am=${amount}&cu=INR&tn=${encodeURIComponent(transactionNote)}`;
+    } else if (platform === 'paytm') {
+      window.location.href = `paytmmp://pay?pa=${upiId}&pn=${encodeURIComponent(merchantName)}&am=${amount}&cu=INR&tn=${encodeURIComponent(transactionNote)}`;
+    } else if (platform === 'gpay') {
+      window.location.href = `tez://upi/pay?pa=${upiId}&pn=${encodeURIComponent(merchantName)}&am=${amount}&cu=INR&tn=${encodeURIComponent(transactionNote)}`;
+    } else {
+      window.location.href = standardUpi;
+    }
+  };
+
+  // --- EVENT HANDLERS ---
 
   const scrollToMenu = () => {
     triggerHaptic();
@@ -584,111 +595,6 @@ export default function BbCafeHome() {
       localStorage.setItem('bb_favorites', JSON.stringify(next));
       return next;
     });
-  };
-
-  const handleAddDiyPizzaToCart = () => {
-    triggerHaptic();
-    const selectedVeggies = Object.entries(diyVegSelection)
-      .filter(([_, active]) => active)
-      .map(([name]) => name)
-      .join(', ');
-    const selectedToppings = Object.entries(diyPremiumToppings)
-      .filter(([_, active]) => active)
-      .map(([name]) => name)
-      .join(', ');
-    
-    const noteParts = [];
-    if (selectedVeggies) noteParts.push(`Veggies: ${selectedVeggies}`);
-    if (selectedToppings) noteParts.push(`Toppings: ${selectedToppings}`);
-    if (diyChefNote) noteParts.push(`Note: ${diyChefNote}`);
-    
-    const item = {
-      id: `diy-pizza-${Date.now()}`,
-      name: `DIY Pizza (${diySize.toUpperCase()}) 🍕`,
-      price: calculatedDiyPizzaPrice,
-      quantity: 1,
-      note: noteParts.join(' | ') || "Customized Pizza"
-    };
-    
-    addItem(item);
-    playSoundEffect('add');
-    toast.success(isHindi ? "कस्टम पिज्जा कार्ट में जोड़ा गया!" : "Custom Pizza added to cart!");
-    
-    setDiyVegSelection({ onion: false, tomato: false, capsicum: false, corn: false });
-    setDiyPremiumToppings({ black_olive: false, jalapeno: false, red_peprica: false, paneer: false, mushroom: false });
-    setDiyChefNote("");
-  };
-
-  const handleNormalPizzaAdd = () => {
-    triggerHaptic();
-    if (!normalPizzaSize) {
-      toast.error(isHindi ? "कृपया आकार चुनें!" : "Please select a size!");
-      return;
-    }
-    
-    const selectedAddons = Object.entries(normalPizzaAddons)
-      .filter(([_, active]) => active)
-      .map(([name]) => name);
-      
-    const addonsPrice = selectedAddons.reduce((acc, addon) => {
-      return acc + (PIZZA_ADDONS[normalPizzaSize.toLowerCase()]?.[addon] || 0);
-    }, 0);
-    
-    const finalPrice = normalPizzaPrice + addonsPrice;
-    
-    const noteParts = [];
-    if (selectedAddons.length > 0) noteParts.push(`Add-ons: ${selectedAddons.join(', ')}`);
-    if (chefNote) noteParts.push(`Note: ${chefNote}`);
-    
-    const cartItem = {
-      id: `${selectedProduct.id}-${normalPizzaSize}`,
-      name: `${selectedProduct.name} (${normalPizzaSize.toUpperCase()})`,
-      price: finalPrice,
-      quantity: 1,
-      note: noteParts.join(' | ')
-    };
-    
-    addItem(cartItem);
-    playSoundEffect('add');
-    toast.success(isHindi ? `${selectedProduct.name} कार्ट में जोड़ा गया!` : `${selectedProduct.name} added to cart!`);
-    
-    setSelectedProduct(null);
-    setNormalPizzaSize("");
-    setNormalPizzaPrice(0);
-    setNormalPizzaAddons({});
-    setChefNote("");
-  };
-
-  const handleReelEnded = () => {
-    const currentIndex = stories.findIndex(s => s.id === activeStory.id);
-    if (currentIndex !== -1 && currentIndex < stories.length - 1) {
-      setActiveStory(stories[currentIndex + 1]);
-    } else {
-      setActiveStory(null);
-    }
-  };
-
-  const handleQuickAddFromStory = (title: string, price: number) => {
-    triggerHaptic();
-    const matchedItem = menu.find(m => m.name.toLowerCase() === title.toLowerCase());
-    if (matchedItem) {
-      if (matchedItem.variants) {
-        setSelectedProduct(matchedItem);
-        setActiveStory(null);
-        return;
-      }
-      addItem(matchedItem);
-    } else {
-      addItem({
-        id: `reel-${Date.now()}`,
-        name: title,
-        price: price,
-        quantity: 1
-      });
-    }
-    playSoundEffect('add');
-    toast.success(isHindi ? "रील्स से आइटम कार्ट में जोड़ा गया!" : "Added from reels!");
-    setActiveStory(null);
   };
 
   const handleReviewSubmit = async (e: React.FormEvent) => {
@@ -768,57 +674,6 @@ export default function BbCafeHome() {
     }
   };
 
-  const handleShareApp = async () => {
-    triggerHaptic();
-    const shareText = `हे! मोहांद्रा में बम बम कैफे से स्वादिष्ट पिज्जा और थाली ऑर्डर करें। ऑर्डर करने पर लॉयल्टी पॉइंट्स भी मिलते हैं! ऐप इंस्टॉल करें: https://bb-cafe-app.vercel.app/ मेरा इनवाइट कोड: ${getReferralCode()}`;
-    
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: 'Bum Bum Cafe',
-          text: shareText,
-          url: 'https://bb-cafe-app.vercel.app/'
-        });
-        
-        const nextCount = shareCount + 1;
-        setShareCount(nextCount);
-        if (nextCount >= 5) {
-          setShareCount(0);
-          if (customerDetails?.phone) {
-            const phoneClean = customerDetails.phone.replace("+91", "");
-            await setDoc(doc(db, "customer_points", phoneClean), {
-              points: increment(1)
-            }, { merge: true });
-            toast.success(isHindi ? "बधाई हो! आपने 5 बार शेयर करके 1 मुफ्त पॉइंट कमाया! 🎉" : "Congratulations! You earned 1 free point for sharing 5 times! 🎉");
-          }
-        } else {
-          toast.success(isHindi ? `शेयर पूरा हुआ! ${5 - nextCount} बार और शेयर करें पॉइंट पाने के लिए।` : `Shared! Share ${5 - nextCount} more times to earn a point.`);
-        }
-      } catch (e) {
-        // Cancelled
-      }
-    } else {
-      try {
-        await navigator.clipboard.writeText(shareText);
-        toast.success(isHindi ? "शेयर संदेश क्लिपबोर्ड पर कॉपी हो गया! दोस्तों को भेजें।" : "Share text copied to clipboard! Share with friends.");
-        const nextCount = shareCount + 1;
-        setShareCount(nextCount);
-        if (nextCount >= 5) {
-          setShareCount(0);
-          if (customerDetails?.phone) {
-            const phoneClean = customerDetails.phone.replace("+91", "");
-            await setDoc(doc(db, "customer_points", phoneClean), {
-              points: increment(1)
-            }, { merge: true });
-            toast.success(isHindi ? "बधाई हो! आपने 5 बार शेयर करके 1 मुफ्त पॉइंट कमाया! 🎉" : "Congratulations! You earned 1 free point for sharing 5 times! 🎉");
-          }
-        }
-      } catch (err) {
-        toast.error("Sharing failed.");
-      }
-    }
-  };
-
   const handleClaimSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     triggerHaptic();
@@ -851,34 +706,6 @@ export default function BbCafeHome() {
     }
   };
 
-  const handleCustomerRedeem = async (id: string, name: string, pointsCost: number) => {
-    triggerHaptic();
-    const currentPointsInCart = cart.reduce((acc: number, item: any) => acc + (item.pointsCost || 0), 0);
-    if (customerPoints - currentPointsInCart < pointsCost) return toast.error("आपके पास पर्याप्त ऑयल्टी पॉइंट्स उपलब्ध नहीं हैं!");
-    
-    const enteredPin = prompt("सुरक्षा के लिए अपना 4-अंकों का सुरक्षा पिन (PIN) दर्ज करें:");
-    if (!enteredPin) return;
-
-    if (!customerDetails?.phone) return;
-    const phoneClean = customerDetails.phone.replace("+91", "").trim();
-    
-    try {
-      const userSnap = await getDoc(doc(db, "customer_points", phoneClean));
-      if (userSnap.exists()) {
-        const dbPin = userSnap.data().pin;
-        if (dbPin && dbPin !== enteredPin) {
-          return toast.error("गलत सुरक्षा पिन! रीडीम रद्द किया गया।");
-        }
-      }
-    } catch (e) {
-      return toast.error("पिन वेरिफिकेशन विफल रहा।");
-    }
-
-    addItem({ id, name, price: 0, pointsCost, isReward: true });
-    playSoundEffect('add');
-    toast.success(`${name} Cart में जोड़ दिया गया है!`);
-  };
-
   const handleDismissInstallBanner = () => {
     triggerHaptic();
     setShowInstallBanner(false);
@@ -898,38 +725,6 @@ export default function BbCafeHome() {
     } else {
       setIsInstallModalOpen(true);
     }
-  };
-
-  const handleDetectLocation = () => {
-    triggerHaptic();
-    if (!navigator.geolocation) {
-      toast.error(isHindi ? "भौगोलिक स्थान आपके ब्राउज़र द्वारा समर्थित नहीं है!" : "Geolocation is not supported by your browser!");
-      return;
-    }
-    const toastId = toast.loading(isHindi ? "स्थान का पता लगाया जा रहा है..." : "Detecting location...");
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const { latitude, longitude } = position.coords;
-        const km = calculateDistanceInKm(latitude, longitude, storeCoordinates.lat, storeCoordinates.lng);
-        setDistanceKm(Number(km.toFixed(1)));
-        toast.dismiss(toastId);
-        toast.success(isHindi ? "सफलतापूर्वक स्थान का पता लगा लिया गया!" : "Location detected successfully!");
-        
-        if (km <= 2) {
-          setSelectedArea(DELIVERY_AREAS[0]);
-        } else if (km <= 5) {
-          setSelectedArea(DELIVERY_AREAS[1]);
-        } else if (km <= 12) {
-          setSelectedArea(DELIVERY_AREAS[2]);
-        } else {
-          toast.error(isHindi ? "आप हमारी डिलीवरी सीमा (12 KM) से बाहर हैं!" : "You are outside our delivery range (12 KM)!");
-        }
-      },
-      () => {
-        toast.dismiss(toastId);
-        toast.error(isHindi ? "स्थान का पता लगाने में विफल!" : "Failed to detect location!");
-      }
-    );
   };
 
   const handleApplyCoupon = async () => {
@@ -978,6 +773,97 @@ export default function BbCafeHome() {
       setIsUpiPopupOpen(true);
     } else {
       sendWhatsAppOrder();
+    }
+  };
+
+  const handleGiftPoints = async (e: React.FormEvent) => {
+    e.preventDefault();
+    triggerHaptic();
+    
+    if (!customerDetails?.phone) {
+      toast.error(isHindi ? "कृपया पहले अपनी प्रोफाइल कस्टमाइज़ करें!" : "Please set up your profile first!");
+      return;
+    }
+    
+    const senderPhoneClean = customerDetails.phone.replace("+91", "").trim();
+    const receiverPhoneClean = giftPhone.trim();
+    const pointsToGift = Number(giftPointsAmount);
+
+    if (!receiverPhoneClean || receiverPhoneClean.length !== 10) {
+      toast.error(isHindi ? "गिफ्ट प्राप्तकर्ता का नंबर 10 अंकों का होना चाहिए!" : "Friend's number must be 10 digits!");
+      return;
+    }
+    if (senderPhoneClean === receiverPhoneClean) {
+      toast.error(isHindi ? "आप स्वयं को पॉइंट्स गिफ्ट नहीं कर सकते!" : "You cannot gift points to yourself!");
+      return;
+    }
+    if (isNaN(pointsToGift) || pointsToGift <= 0) {
+      toast.error(isHindi ? "कृपया सही पॉइंट्स संख्या दर्ज करें!" : "Please enter a valid amount of points!");
+      return;
+    }
+    if (customerPoints < pointsToGift) {
+      toast.error(isHindi ? "आपके पास पर्याप्त पॉइंट्स उपलब्ध नहीं हैं!" : "You do not have enough points!");
+      return;
+    }
+    if (giftSenderPin !== customerDetails.pin) {
+      toast.error(isHindi ? "सुरक्षा पिन गलत है!" : "Invalid security PIN!");
+      return;
+    }
+
+    setIsGiftingLoading(true);
+    const toastId = toast.loading(isHindi ? "पॉइंट्स ट्रांसफर किए जा रहे हैं..." : "Transferring points...");
+
+    try {
+      const receiverDocRef = doc(db, "customer_points", receiverPhoneClean);
+      const receiverSnap = await getDoc(receiverDocRef);
+
+      if (!receiverSnap.exists()) {
+        toast.dismiss(toastId);
+        toast.error(isHindi ? "गिफ्ट पाने वाले का नंबर पंजीकृत नहीं है!" : "The receiver's number is not registered!");
+        setIsGiftingLoading(false);
+        return;
+      }
+
+      const senderDocRef = doc(db, "customer_points", senderPhoneClean);
+
+      await runTransaction(db, async (transaction) => {
+        const senderSnap = await transaction.get(senderDocRef);
+        if (!senderSnap.exists()) throw new Error("Sender records not found.");
+        
+        const currentSenderPoints = senderSnap.data().points || 0;
+        if (currentSenderPoints < pointsToGift) throw new Error("Insufficient points balance.");
+
+        transaction.update(senderDocRef, { points: increment(-pointsToGift) });
+        transaction.update(receiverDocRef, { points: increment(pointsToGift) });
+      });
+
+      await addDoc(collection(db, "customer_points", senderPhoneClean, "history"), {
+        type: 'redeem',
+        points: pointsToGift,
+        description: `Gifted points to ${receiverPhoneClean} 🎁`,
+        timestamp: new Date()
+      });
+
+      await addDoc(collection(db, "customer_points", receiverPhoneClean, "history"), {
+        type: 'earn',
+        points: pointsToGift,
+        description: `Received points from ${senderPhoneClean} 🎁`,
+        timestamp: new Date()
+      });
+
+      setCustomerPoints(prev => prev - pointsToGift);
+      toast.dismiss(toastId);
+      toast.success(isHindi ? "पॉइंट्स गिफ्ट कर दिए गए!" : "Points gifted successfully!");
+      
+      setIsGiftModalOpen(false);
+      setGiftPhone("");
+      setGiftPointsAmount("");
+      setGiftSenderPin("");
+    } catch (err: any) {
+      toast.dismiss(toastId);
+      toast.error(isHindi ? `स्थानांतरण विफल: ${err.message}` : `Transfer failed: ${err.message}`);
+    } finally {
+      setIsGiftingLoading(false);
     }
   };
 
@@ -1142,35 +1028,6 @@ export default function BbCafeHome() {
     }, 1500);
   };
 
-  const handleScreenshotChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setIsCompressing(true);
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        const MAX_WIDTH = 600; 
-        const scale = MAX_WIDTH / img.width;
-        canvas.width = MAX_WIDTH;
-        canvas.height = img.height * scale;
-
-        const ctx = canvas.getContext('2d');
-        if (ctx) {
-          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-          const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7); 
-          setPaymentScreenshot(compressedBase64);
-          toast.success(isHindi ? "स्क्रीनशॉट सफलतापूर्वक अपलोड और कंप्रेस हो गया!" : "Screenshot uploaded & compressed successfully!");
-        }
-        setIsCompressing(false);
-      };
-      img.src = event.target?.result as string;
-    };
-    reader.readAsDataURL(file);
-  };
-
   // --- Real-time Watchers for Dynamic Points, Ledger & Order Status only ---
   useEffect(() => {
     if (!customerDetails?.phone) {
@@ -1240,7 +1097,7 @@ export default function BbCafeHome() {
       setSocialAlertIndex(randomIndex);
       setShowSocialAlert(true);
       setTimeout(() => setShowSocialAlert(false), 5000);
-    }, 35000);
+    }, 35500);
 
     return () => clearInterval(interval);
   }, []);
@@ -1883,7 +1740,7 @@ export default function BbCafeHome() {
                           </div>
                         )}
 
-                        <button onClick={(e) => handleToggleFavorite(item.id, e)} className="absolute top-3 right-3 bg-black/60 backdrop-blur-md p-1.5 rounded-full border border-white/10 text-white hover:text-red-550 transition-colors">
+                        <button onClick={(e) => handleToggleFavorite(item.id, e)} className="absolute top-3 right-3 bg-black/60 backdrop-blur-md p-1.5 rounded-full border border-white/10 text-white hover:text-red-555 transition-colors">
                           <Heart size={14} className={favorites.includes(item.id) ? "fill-red-550 text-red-550" : "text-white"} />
                         </button>
                       </div>
@@ -1900,7 +1757,7 @@ export default function BbCafeHome() {
                         <div className="h-px dark:bg-white/5 bg-neutral-200 my-2.5" />
                         <div className="flex justify-between items-end mt-0.5">
                           <div>
-                            <p className="text-neutral-500 dark:text-neutral-405 text-[8px] font-black uppercase tracking-widest leading-none mb-1">Price</p>
+                            <p className="text-neutral-505 dark:text-neutral-405 text-[8px] font-black uppercase tracking-widest leading-none mb-1">Price</p>
                             {/* Rupee duplication fixed by removing the hardcoded '₹' in front of getDisplayPrice */}
                             <p className="text-orange-700 dark:text-orange-500 font-black text-base leading-none font-mono font-bold">{getDisplayPrice(item)}</p>
                             {item.variants && <span className="text-[8px] font-bold text-neutral-600 dark:text-gray-400 mt-1 block">{isHindi ? "विकल्प उपलब्ध हैं" : "Options available"}</span>}
@@ -2060,7 +1917,7 @@ export default function BbCafeHome() {
                 title={link.label} 
                 className="flex flex-col items-center gap-1 hover:scale-105 transition-transform"
               >
-                <img src={link.icon} alt="" className="w-8 h-8 object-contain" />
+                <img src={link.icon} alt="" className="w-8 h-8 object-contain" loading="lazy" />
                 <span className="text-[8px] font-bold text-neutral-550 dark:text-gray-400 mt-0.5">
                   {socialCounts[link.id] || "Follow"}
                 </span>
@@ -2290,7 +2147,7 @@ export default function BbCafeHome() {
                 <button 
                   type="button" 
                   onClick={() => { triggerHaptic(); setIsReviewFormOpen(false); }} 
-                  className="p-2 bg-red-105 hover:bg-red-500 hover:text-white text-red-650 rounded-full transition-all duration-200 shadow"
+                  className="p-2 bg-red-105 hover:bg-red-500 hover:text-white text-red-655 rounded-full transition-all duration-200 shadow"
                   title="Close Feedback"
                 >
                   <X size={18} />
@@ -2340,7 +2197,7 @@ export default function BbCafeHome() {
               </div>
               <div className="flex gap-2 pt-1 font-bold">
                 <button type="submit" className="flex-1 bg-orange-500 text-black font-black p-3 rounded-lg text-xs uppercase">{isHindi ? "जमा करें" : "SUBMIT"}</button>
-                <button type="button" onClick={() => { triggerHaptic(); setIsReviewFormOpen(false); }} className="dark:bg-white/5 bg-neutral-105 text-neutral-800 dark:text-gray-400 font-bold p-3 rounded-lg text-xs uppercase">{isHindi ? "बंद करें" : "CANCEL"}</button>
+                <button type="button" onClick={() => { triggerHaptic(); setIsReviewFormOpen(false); }} className="dark:bg-white/5 bg-neutral-105 text-neutral-805 dark:text-gray-400 font-bold p-3 rounded-lg text-xs uppercase">{isHindi ? "बंद करें" : "CANCEL"}</button>
               </div>
             </form>
           </div>
@@ -2688,7 +2545,7 @@ export default function BbCafeHome() {
                 {/* Free Delivery Target Progress Bar */}
                 {fulfillmentType === "delivery" && (
                   <div className="bg-orange-500/5 dark:bg-orange-500/10 border border-orange-500/20 rounded-xl p-2.5 space-y-1.5 text-[10px] font-sans font-bold">
-                    <div className="flex justify-between items-center font-black uppercase text-orange-600 dark:text-orange-400">
+                    <div className="flex justify-between items-center font-black uppercase text-orange-605 dark:text-orange-400">
                       <span>🚚 Free Delivery Target:</span>
                       <span>{getCartSubtotal() >= selectedArea.minFree ? "Achieved! 🎉" : `Need ₹${selectedArea.minFree - getCartSubtotal()} more`}</span>
                     </div>
@@ -3005,7 +2862,7 @@ export default function BbCafeHome() {
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
-              className="dark:bg-[#111] bg-white border dark:border-white/10 border-neutral-200 p-6 rounded-[2.5rem] w-full max-w-sm relative shadow-2xl space-y-5 text-center font-sans"
+              className="dark:bg-[#111] bg-white border dark:border-white/10 border-neutral-200 p-6 rounded-[2.5rem] w-full max-sm relative shadow-2xl space-y-5 text-center font-sans"
             >
               <button 
                 type="button" 
@@ -3067,7 +2924,7 @@ export default function BbCafeHome() {
                   type="file" 
                   accept="image/png, image/jpeg" 
                   onChange={handleScreenshotChange}
-                  className="w-full text-xs text-neutral-605 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[9px] file:font-black file:bg-orange-500 file:text-black file:cursor-pointer hover:file:bg-orange-600 outline-none"
+                  className="w-full text-xs text-neutral-655 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[9px] file:font-black file:bg-orange-500 file:text-black file:cursor-pointer hover:file:bg-orange-600 outline-none"
                 />
                 
                 {isCompressing && (
@@ -3198,8 +3055,8 @@ export default function BbCafeHome() {
             >
               <img src={claimingPlatform.icon} className="w-10 h-10 object-contain mx-auto" alt="" loading="lazy" />
               <div className="space-y-1">
-                <h3 className="text-base font-black text-orange-650 dark:text-orange-500 uppercase font-bold">वेरिफिकेशन दावा सबमिट करें</h3>
-                <p className="text-[10px] text-neutral-600 dark:text-gray-400 leading-normal font-semibold">
+                <h3 className="text-base font-black text-orange-655 dark:text-orange-500 uppercase font-bold">वेरिफिकेशन दावा सबमिट करें</h3>
+                <p className="text-[10px] text-neutral-605 leading-normal font-semibold">
                   {claimingPlatform.label} पर फॉलो/सब्सक्राइब करने के बाद, नीचे अपना यूज़रनेम दर्ज करें। हमारे एडमिन इसकी जांच करके आपका {claimingPlatform.points} पॉइंट क्रेडिट करेंगे!
                 </p>
               </div>
@@ -3223,7 +3080,7 @@ export default function BbCafeHome() {
                 <button 
                   type="button" 
                   onClick={() => { triggerHaptic(); setIsClaimModalOpen(false); setClaimUsername(""); }} 
-                  className="bg-neutral-105 text-neutral-800 dark:bg-white/5 dark:text-gray-400 p-3 rounded-xl font-black text-xs uppercase font-bold font-sans"
+                  className="bg-neutral-105 text-neutral-805 dark:bg-white/5 dark:text-gray-400 p-3 rounded-xl font-black text-xs uppercase font-bold font-sans"
                 >
                   Cancel
                 </button>
