@@ -103,7 +103,7 @@ const triggerHaptic = (ms = 35) => {
   }
 };
 
-export default function AdminStockPage() {
+export default function StoreStockPage() {
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [categories, setCategories] = useState<CategoryItem[]>([]);
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>("All");
@@ -147,7 +147,7 @@ export default function AdminStockPage() {
   const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
   const [isMultiSelectMode, setIsMultiSelectMode] = useState<boolean>(false);
 
-  const [activeListId, setActiveListId] = useState<string>("");
+  const [activeListId, setActiveListId] = useState<string>("general_list");
   const [showSaveToListModal, setShowSaveToListModal] = useState<boolean>(false);
   const [showBulkCategoryModal, setShowBulkCategoryModal] = useState<boolean>(false);
   const [showManageCategoriesModal, setShowManageCategoriesModal] = useState<boolean>(false);
@@ -329,6 +329,11 @@ export default function AdminStockPage() {
     stockOutHistory.forEach(log => list.push({ id: log.id, itemName: log.itemName, qty: log.qty, type: 'OUT', purpose: log.purpose, date: log.date, remarks: log.remarks || 'N/A', financialLoss: log.financialLoss }));
     return list.sort((a, b) => b.date.localeCompare(a.date));
   }, [stockInHistory, stockOutHistory]);
+
+  const activeListName = useMemo(() => {
+    const list = orderLists.find(l => l.id === activeListId);
+    return list ? list.name : "BUM BUM CAFE ORDER SHEET";
+  }, [orderLists, activeListId]);
 
   const visibleCategories = useMemo(() => categories.filter(c => !c.hidden), [categories]);
   const filteredInventory = useMemo(() => {
@@ -554,25 +559,77 @@ export default function AdminStockPage() {
     setEditingProduct(null);
   };
 
-  if (!currentUser) {
-    return (
-      <div className={`min-h-screen flex items-center justify-center p-4 ${isDarkMode ? 'bg-black text-white' : 'bg-neutral-50 text-neutral-900'}`}>
-        <div className="w-full max-w-sm p-8 rounded-[2.5rem] border shadow-2xl bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800 space-y-6 text-center">
-          <span className="text-5xl block">🔒</span>
-          <h2 className="text-xl font-black text-orange-600 uppercase tracking-widest">BUM BUM CAFE</h2>
-          <form onSubmit={handleLoginSubmit} className="space-y-4">
-            <input
-              type="password" maxLength={6} placeholder="ENTER PIN" value={pinInput} onChange={e => setPinInput(e.target.value)}
-              className="w-full text-center text-3xl tracking-[0.5em] font-black p-4 rounded-2xl border bg-neutral-50 dark:bg-neutral-800 focus:ring-2 focus:ring-orange-500"
-              autoFocus
-            />
-            {authError && <p className="text-xs text-red-500 font-bold">{authError}</p>}
-            <button type="submit" className="w-full py-4 bg-orange-500 text-white rounded-2xl font-black text-xs uppercase transition-all">सत्यापित करें ➔</button>
-          </form>
-        </div>
-      </div>
-    );
-  }
+  const handlePrintSavedList = () => {
+    const printWindow = window.open('', '_blank', 'width=600,height=800');
+    if (!printWindow) {
+      toastMessage("पॉपअप अवरुद्ध हो गया है! कृपया पॉपअप की अनुमति दें।", "error");
+      return;
+    }
+
+    const activeList = orderLists.find(l => l.id === activeListId);
+    const listTitle = activeList ? activeList.name : "BUM BUM CAFE ORDER SHEET";
+    const matchedItems = savedOrders.filter(o => o.listId === activeListId);
+
+    const rows = matchedItems.map(item => `
+      <tr>
+        <td style="padding:10px; border-bottom:1px solid #ddd; font-weight:bold;">${item.name}</td>
+        <td style="padding:10px; border-bottom:1px solid #ddd; text-align:center;">${item.storeQty} ${item.unit}</td>
+        <td style="padding:10px; border-bottom:1px solid #ddd; text-align:right; font-weight:bold; color:#FF6B00;">${item.orderQty || "0"}</td>
+      </tr>
+    `).join('');
+
+    printWindow.document.write(`
+      <html>
+        <head><title>Order_Sheet_${listTitle.replace(/\s+/g, '_')}</title></head>
+        <body style="font-family:sans-serif; padding:25px;">
+          <h2 style="color:#FF6B00; text-align:center; text-transform: uppercase;">${listTitle}</h2>
+          <p style="text-align:center; color:#666; font-size:12px;">Generated on: ${new Date().toLocaleString()}</p>
+          <table style="width:100%; border-collapse:collapse; margin-top:20px;">
+            <thead>
+              <tr style="background:#FF6B00; color:white;">
+                <th style="padding:10px; text-align:left;">Item Name</th>
+                <th style="padding:10px; text-align:center;">Current Stock</th>
+                <th style="padding:10px; text-align:right;">Order Qty</th>
+              </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>
+          <script>window.onload = function() { window.print(); }</script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
+
+  const handleWhatsAppShare = () => {
+    triggerHaptic();
+    if (!activeListId) return;
+
+    const activeList = orderLists.find(l => l.id === activeListId);
+    const listTitle = activeList ? activeList.name : "ORDER SHEET";
+    const matchedItems = savedOrders.filter(o => o.listId === activeListId);
+
+    if (matchedItems.length === 0) {
+      toastMessage("इस लिस्ट में कोई सामान नहीं है!", "error");
+      return;
+    }
+
+    let text = `*BUM BUM CAFE - ${listTitle.toUpperCase()}*\n`;
+    text += `Date: ${new Date().toLocaleDateString('en-GB')}\n\n`;
+    text += `Please deliver the following items:\n`;
+    text += `--------------------------------\n`;
+
+    matchedItems.forEach(item => {
+      const qty = item.orderQty || "0";
+      text += `• *${item.name}*: ${qty} ${item.unit}\n`;
+    });
+
+    text += `--------------------------------\n`;
+    text += `Thank you!`;
+
+    const waUrl = `https://wa.me/?text=${encodeURIComponent(text)}`;
+    window.open(waUrl, '_blank');
+  };
 
   return (
     <div className={`min-h-screen ${isDarkMode ? 'bg-[#0E0E0E]' : 'bg-[#FAFAFA]'} pb-24 font-sans relative ${isDarkMode ? 'text-white' : 'text-neutral-900'}`}>
@@ -635,7 +692,7 @@ export default function AdminStockPage() {
             handleUpdateListName={handleUpdateListName} activeListName={activeListName}
             localOrderQties={localOrderQties} setLocalOrderQties={setLocalOrderQties}
             setFocusedOrderField={setFocusedOrderField} handleUpdateOrderQty={handleUpdateOrderQty}
-            handleRemoveFromSavedList={handleRemoveFromSavedList} handlePrintSavedList={() => {}}
+            handleRemoveFromSavedList={handleRemoveFromSavedList} handlePrintSavedList={handlePrintSavedList}
             handleWhatsAppShare={handleWhatsAppShare}
           />
         )}
