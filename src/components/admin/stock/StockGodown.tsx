@@ -3,58 +3,15 @@
 import React from 'react';
 import { Search, Plus, Edit, MinusCircle, PlusCircle } from 'lucide-react';
 
-interface InventoryItem {
-  id: string;
-  name: string;
-  storeQty: number;
-  kitchenQty: number;
-  unit: string;
-  purchasePrice: number;
-  minLimit: number;
-  category?: string;
-  lastPurchaseDate?: string;
-}
-
-interface CategoryItem {
-  id: string;
-  name: string;
-  hidden: boolean;
-}
-
-interface StockGodownProps {
-  isDarkMode: boolean;
-  searchQuery: string;
-  setSearchQuery: (val: string) => void;
-  isMultiSelectMode: boolean;
-  setIsMultiSelectMode: (val: boolean) => void;
-  selectedItemIds: string[];
-  setSelectedItemIds: (val: any) => void;
-  selectedCategoryFilter: string;
-  setSelectedCategoryFilter: (val: string) => void;
-  visibleCategories: CategoryItem[];
-  filteredInventory: InventoryItem[];
-  editedQties: Record<string, string | number>;
-  setEditedQties: (val: any) => void;
-  adjustQty: (id: string, diff: number) => void;
-  saveQty: (id: string) => void;
-  handleToggleMultiSelect: (id: string) => void;
-  setShowManageCategoriesModal: (val: boolean) => void;
-  setShowAddProductModal: (val: boolean) => void;
-  setEditingProduct: (item: InventoryItem | null) => void;
-  setTransferItem: (item: InventoryItem | null) => void;
-  setShowTransferModal: (val: boolean) => void;
-  setConsumeItem: (item: InventoryItem | null) => void;
-  setShowConsumeModal: (val: boolean) => void;
-}
-
 export default function StockGodown({
   isDarkMode, searchQuery, setSearchQuery, isMultiSelectMode, setIsMultiSelectMode, selectedItemIds, setSelectedItemIds,
   selectedCategoryFilter, setSelectedCategoryFilter, visibleCategories, filteredInventory, editedQties, setEditedQties,
   adjustQty, saveQty, handleToggleMultiSelect, setShowManageCategoriesModal, setShowAddProductModal, setEditingProduct,
   setTransferItem, setShowTransferModal, setConsumeItem, setShowConsumeModal
-}: StockGodownProps) {
+}: any) {
   return (
     <div className="space-y-4">
+      {/* Search and Filters */}
       <div className={`sticky top-[64px] z-30 py-2.5 space-y-2.5 backdrop-blur-md ${isDarkMode ? 'bg-[#0E0E0E]/90' : 'bg-[#FAFAFA]/90'} border-b border-dashed ${isDarkMode ? 'border-neutral-800' : 'border-neutral-200'}`}>
         <div className="flex items-center gap-2">
           <div className="relative flex-1">
@@ -89,7 +46,7 @@ export default function StockGodown({
             >
               All Items
             </button>
-            {visibleCategories.map((cat) => (
+            {visibleCategories.map((cat: any) => (
               <button
                 key={cat.id} onClick={() => setSelectedCategoryFilter(cat.name)}
                 className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-wider border transition-all ${
@@ -107,8 +64,9 @@ export default function StockGodown({
         <Plus size={14} /> Add New Product (सामान जोड़ें)
       </button>
 
+      {/* Item List */}
       <div className="space-y-2.5">
-        {filteredInventory.map((item) => {
+        {filteredInventory.map((item: any) => {
           const isSelected = selectedItemIds.includes(item.id);
           const displayQty = editedQties[item.id] !== undefined ? editedQties[item.id] : item.storeQty;
           const isDirty = editedQties[item.id] !== undefined && parseFloat(editedQties[item.id] as string) !== item.storeQty;
