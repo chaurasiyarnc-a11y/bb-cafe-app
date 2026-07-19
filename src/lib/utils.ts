@@ -1,7 +1,8 @@
 // Cryptographic SHA-256 Hashing Helper (पिन को सुरक्षित हैश करने के लिए)
 export async function sha256(message: string): Promise<string> {
   const msgBuffer = new TextEncoder().encode(message);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', hashBuffer);
+  // त्रुटि सुधार: यहाँ 'hashBuffer' की जगह 'msgBuffer' का उपयोग किया गया है
+  const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
   const hashArray = Array.from(new Uint8Array(hashBuffer));
   return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 }
