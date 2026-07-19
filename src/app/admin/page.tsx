@@ -17,12 +17,42 @@ import CustomersTab from '@/components/admin/CustomersTab';
 import LoyaltyTab from '@/components/admin/LoyaltyTab';
 import SettingsTab from '@/components/admin/SettingsTab';
 
+// CSV/Excel डाउनलोड कराने का ग्लोबल हेल्पर फ़ंक्शन
+const triggerCsvDownload = (data: any[], filename: string, headers: string[], keys: string[]) => {
+  if (data.length === 0) return toast.error("No data available to export!");
+
+  const csvRows = [];
+  csvRows.push(headers.join(','));
+  
+  data.forEach(item => {
+    const values = keys.map(key => {
+      let value = item[key];
+      if (value === undefined || value === null) value = '';
+      const escaped = String(value).replace(/"/g, '""'); 
+      return `"${escaped}"`; 
+    });
+    csvRows.push(values.join(','));
+  });
+
+  const csvString = csvRows.join('\r\n');
+  const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csvString], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.setAttribute("href", url);
+  link.setAttribute("download", `${filename}.csv`);
+  link.style.visibility = 'hidden';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  toast.success("Excel Data Exported!");
+};
+
 export default function AdminDashboard() {
   const [isVerified, setIsVerified] = useState(false);
   const [loading, setLoading] = useState(true);
   const [passcode, setPasscode] = useState("");
   
-  // टाइपस्क्रिप्ट एरर को ठीक करने के लिए अंत में 'settings' जोड़ा गया है
+  // टाइपस्क्रिप्ट टैब एलीआस लिस्ट
   const [tab, setTab] = useState<'dashboard' | 'orders' | 'menu' | 'categories' | 'customers' | 'loyalty' | 'banners' | 'reels' | 'header_video' | 'reviews' | 'coupons' | 'roster' | 'proofs' | 'claims' | 'security' | 'settings'>('dashboard');
   
   const [orders, setOrders] = useState<any[]>([]);
@@ -516,28 +546,6 @@ Report generated automatically by Bum Bum Cafe POS.`
     const headers = ['Customer Name', 'Mobile Number', 'Last Registered Address', 'Last Active Order Date'];
     const keys = ['name', 'phone', 'address', 'lastActive'];
     triggerCsvDownload(formattedData, `BumBumCafe_CustomersDirectory_${new Date().toLocaleDateString()}`, headers, keys);
-  };
-
-  const handleSendWhatsAppBill = (order: any) => {
-    const phone = String(order.customerPhone || "").replace("+91", "").trim();
-    if (!phone) return toast.error("Customer phone not found!");
-    const formattedBillNo = formatBillNumber(order.billNumber || 0);
-    const itemsText = order.items?.map((i: any) => `• ${i.name} (x${i.quantity}) - ₹${i.price * i.quantity}`).join('\n') || '';
-
-    const message = encodeURIComponent(
-`*BUM BUM CAFE - INVOICE*
---------------------------
-*Bill No:* #${formattedBillNo}
-*Token :* #${order.tokenNumber || 'N/A'}
---------------------------
-${itemsText}
---------------------------
-*Subtotal:* ₹${order.subtotal || order.total}
-${order.discount ? `*Discount:* -₹${order.discount}\n` : ''}*Grand Total:* *₹${order.total}*
-
-Thank you for your order, *${order.customerName || 'Guest'}*! Visit Again! 😊`
-    );
-    window.open(`https://wa.me/91${phone}?text=${message}`, '_blank');
   };
 
   const toggleStore = async () => {
