@@ -326,7 +326,7 @@ export default function BbCafeHome() {
   };
 
   const getCustomerTier = (points: number) => {
-    if (points >= 50) return { name: "Platinum Member 👑", color: "text-cyan-705 border-cyan-500/40 bg-cyan-100/50 dark:text-cyan-400 dark:border-cyan-400/30 dark:bg-cyan-400/10" };
+    if (points >= 50) return { name: "Platinum Member 👑", color: "text-cyan-700 border-cyan-500/40 bg-cyan-100/50 dark:text-cyan-400 dark:border-cyan-400/30 dark:bg-cyan-400/10" };
     if (points >= 20) return { name: "Gold Member 🌟", color: "text-yellow-800 border-yellow-500/40 bg-yellow-100/50 dark:text-yellow-400 dark:border-yellow-400/30 dark:bg-yellow-400/10" };
     return { name: "Bronze Member 🥉", color: "text-orange-700 border-orange-500/40 bg-orange-100/50 dark:text-orange-400 dark:border-orange-400/30 dark:bg-orange-400/10" };
   };
@@ -2352,7 +2352,7 @@ export default function BbCafeHome() {
                 />
               </div>
 
-              <button type="submit" className="w-full bg-orange-500 text-black p-4 rounded-xl font-black text-xs uppercase">
+              <button type="button" onClick={handleNormalPizzaAdd} className="w-full bg-orange-500 text-black p-4 rounded-xl font-black text-xs uppercase">
                 {isHindi ? "कर्ट में जोड़ने की पुष्टि करें" : "Confirm Add To Cart"}
               </button>
               <button type="button" onClick={() => { setSelectedProduct(null); setNormalPizzaSize(""); setNormalPizzaPrice(0); setChefNote(""); }} className="w-full mt-3 text-neutral-500 dark:text-gray-400 font-black text-[10px] text-center uppercase">
@@ -2720,6 +2720,64 @@ export default function BbCafeHome() {
           </div>
         )}
       </AnimatePresence>
+
+      {/* --- CART DRAWER SUB-COMPONENT INVOCATION --- */}
+      <CartDrawer 
+        isOpen={isCartOpen}
+        onClose={() => setIsCartOpen(false)}
+        cart={cart}
+        addItem={addItem}
+        removeItem={removeItem}
+        clearCart={clearCart}
+        subtotal={getCartSubtotal()}
+        total={getTotalBillPrice()}
+        fulfillmentType={fulfillmentType}
+        setFulfillmentType={setFulfillmentType}
+        tableNumber={tableNumber}
+        setTableNumber={setTableNumber}
+        paymentMethod={paymentMethod}
+        setPaymentMethod={setPaymentMethod}
+        selectedArea={selectedArea}
+        setSelectedArea={setSelectedArea}
+        deliveryAreas={DELIVERY_AREAS}
+        address={address}
+        setAddress={setAddress}
+        isHindi={isHindi}
+        onCheckout={handleCheckoutClick}
+        customerDetails={customerDetails}
+        appliedCoupon={appliedCoupon}
+        setAppliedCoupon={setAppliedCoupon}
+        enteredCoupon={enteredCoupon}
+        setEnteredCoupon={setEnteredCoupon}
+        handleApplyCoupon={handleApplyCoupon}
+        ketchupAddon={ketchupAddon}
+        setKetchupAddon={setKetchupAddon}
+        oreganoAddon={oreganoAddon}
+        setOreganoAddon={setOreganoAddon}
+        chiliFlakesAddon={chiliFlakesAddon}
+        setChiliFlakesAddon={setChiliFlakesAddon}
+        noCutlery={noCutlery}
+        setNoCutlery={setNoCutlery}
+        showAddonsSection={showAddonsSection}
+        isSubmittingOrder={isSubmittingOrder}
+        handleDetectLocation={handleDetectLocation}
+        distanceKm={distanceKm}
+        lastDeliveryAddress={lastDeliveryAddress}
+      />
+
+      {/* --- UPI PAYMENT MODAL SUB-COMPONENT INVOCATION --- */}
+      <UpiPaymentModal 
+        isOpen={isUpiPopupOpen}
+        onClose={() => setIsUpiPopupOpen(false)}
+        amount={getTotalBillPrice()}
+        upiId={upiId}
+        onPaymentSuccess={sendWhatsAppOrder}
+        paymentScreenshot={paymentScreenshot}
+        handleScreenshotChange={handleScreenshotChange}
+        isCompressing={isCompressing}
+        isHindi={isHindi}
+        handleLaunchUpiPay={handleLaunchUpiPay}
+      />
 
     </div>
   );
