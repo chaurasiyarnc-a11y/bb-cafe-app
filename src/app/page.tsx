@@ -193,6 +193,12 @@ export default function BbCafeHome() {
   const [socialAlertIndex, setSocialAlertIndex] = useState(0);
   const [showSocialAlert, setShowSocialAlert] = useState(false);
 
+  // Social Media Point Claims States - री-ऐड किया गया है
+  const [isClaimModalOpen, setIsClaimModalOpen] = useState(false);
+  const [claimingPlatform, setClaimingPlatform] = useState<any>(null); // लाइन वापस जोड़ी गई
+  const [claimUsername, setClaimUsername] = useState("");
+  const [isClaimingLoading, setIsClaimingLoading] = useState(false);
+
   // Cart Specific Add-ons
   const [ketchupAddon, setKetchupAddon] = useState(false);
   const [oreganoAddon, setOreganoAddon] = useState(false);
@@ -612,27 +618,6 @@ export default function BbCafeHome() {
     } catch (err) {
       toast.dismiss(toastId);
       toast.error(isHindi ? "प्रोफाइल सहेजने में त्रुटि आई!" : "Error saving profile!");
-    }
-  };
-
-  const handleDismissInstallBanner = () => {
-    triggerHaptic();
-    setShowInstallBanner(false);
-    localStorage.setItem('bb_app_installed_or_dismissed', 'true');
-  };
-
-  const handleInstallClick = async () => {
-    triggerHaptic();
-    if (deferredPrompt) {
-      deferredPrompt.prompt();
-      const { outcome } = await deferredPrompt.userChoice;
-      if (outcome === 'accepted') {
-        localStorage.setItem('bb_app_installed_or_dismissed', 'true');
-        setShowInstallBanner(false);
-      }
-      setDeferredPrompt(null);
-    } else {
-      setIsInstallModalOpen(true);
     }
   };
 
