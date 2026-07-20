@@ -429,6 +429,32 @@ export default function BbCafeHome() {
   }, [cart]);
 
   // --- ACTIONS & HANDLERS ---
+  const scrollToMenu = () => {
+    triggerHaptic();
+    menuRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  const openCart = () => {
+    triggerHaptic();
+    setIsCartOpen(true);
+    // Zustand store में संभावित विज़िबिलिटी को सिंक करें
+    if (store?.setIsCartOpen) store.setIsCartOpen(true);
+    if (store?.setCartOpen) store.setCartOpen(true);
+    if (store?.setIsOpen) store.setIsOpen(true);
+    if (store?.toggleCart) store.toggleCart(true);
+    if (store?.toggle) store.toggle(true);
+  };
+
+  const closeCart = () => {
+    triggerHaptic();
+    setIsCartOpen(false);
+    if (store?.setIsCartOpen) store.setIsCartOpen(false);
+    if (store?.setCartOpen) store.setCartOpen(false);
+    if (store?.setIsOpen) store.setIsOpen(false);
+    if (store?.toggleCart) store.toggleCart(false);
+    if (store?.toggle) store.toggle(false);
+  };
+
   const handleToggleFavorite = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     triggerHaptic();
@@ -673,6 +699,50 @@ export default function BbCafeHome() {
     if (!customerDetails?.phone) return toast.error("कृपया पहले प्रोफाइल बनाएं!");
     addItem({ id: ruleId, name: rewardName, price: 0, quantity: 1, isReward: true, pointsCost: pointsCost, category: "Special" });
     toast.success(`${rewardName} आपके कार्ट में मुफ़्त जोड़ा गया!`);
+  };
+
+  const handleDismissInstallBanner = () => {
+    triggerHaptic();
+    setShowInstallBanner(false);
+    localStorage.setItem('bb_app_installed_or_dismissed', 'true');
+  };
+
+  const handleInstallClick = async () => {
+    triggerHaptic();
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === 'accepted') {
+        localStorage.setItem('bb_app_installed_or_dismissed', 'true');
+        setShowInstallBanner(false);
+      }
+      setDeferredPrompt(null);
+    } else {
+      setIsInstallModalOpen(true);
+    }
+  };
+
+  const handleReelEnded = () => {
+    triggerHaptic();
+    setActiveStory(null);
+  };
+
+  const handleQuickAddFromStory = (title: string, price: number) => {
+    triggerHaptic();
+    const matchedItem = menu.find(item => item.name?.toLowerCase() === title?.toLowerCase());
+    if (matchedItem) {
+      addItem(matchedItem);
+    } else {
+      addItem({
+        id: `story-${title.replace(/\s+/g, '-').toLowerCase()}`,
+        name: title,
+        price: price,
+        quantity: 1,
+        category: "Fast Food"
+      });
+    }
+    setActiveStory(null);
+    toast.success("आइटम कार्ट में जोड़ा गया!");
   };
 
   // --- LIFECYCLES ---
@@ -1034,7 +1104,7 @@ export default function BbCafeHome() {
       {/* STICKY BOTTOM CART FOOTER */}
       <div className="fixed bottom-6 inset-x-0 z-[80] flex justify-center pointer-events-none">
         {cart.length > 0 && (
-          <motion.button initial={{ scale: 0, y: 50 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0, y: 50 }} onClick={() => { triggerHaptic(); setIsCartOpen(true); }} className="bg-orange-600 hover:bg-orange-700 text-white font-black px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 border border-orange-500/30 pointer-events-auto">
+          <motion.button initial={{ scale: 0, y: 50 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0, y: 50 }} onClick={openCart} className="bg-orange-600 hover:bg-orange-700 text-white font-black px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 border border-orange-500/30 pointer-events-auto">
             <div className="relative">
               <ShoppingBag size={18} />
               <span className="absolute -top-2.5 -right-2.5 bg-yellow-400 text-black text-[9px] font-black h-5 w-5 rounded-full flex items-center justify-center border-2 border-orange-600">
@@ -1117,8 +1187,8 @@ export default function BbCafeHome() {
         isCartOpen={isCartOpen}
         open={isCartOpen}
         show={isCartOpen}
-        onClose={() => setIsCartOpen(false)}
-        close={() => setIsCartOpen(false)}
+        onClose={closeCart}
+        close={closeCart}
         setIsCartOpen={setIsCartOpen}
         setIsOpen={setIsCartOpen}
 
@@ -1321,7 +1391,7 @@ function InstallGuideModal({ isOpen, onClose, isHindi, triggerHaptic }: any) {
   if (!isOpen) return null;
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[270] flex items-center justify-center p-6">
-      <div className="dark:bg-[#111] bg-white w-full max-w-sm p-6 rounded-3xl border dark:border-white/10 border-neutral-200 text-center space-y-4 shadow-2xl">
+      <div className="dark:bg-[#111] bg-white w-full max-sm p-6 rounded-3xl border dark:border-white/10 border-neutral-200 text-center space-y-4 shadow-2xl">
         <Sparkles className="mx-auto text-yellow-400 animate-bounce" size={32} />
         <div>
           <h3 className="text-base font-black">📲 आसान इंस्टॉलेशन गाइड</h3>
@@ -1373,7 +1443,7 @@ function SocialClaimModal({ isOpen, onClose, isHindi, claimingPlatform, claimUse
   if (!isOpen || !claimingPlatform) return null;
   return (
     <div className="fixed inset-0 bg-black/95 z-[260] flex items-center justify-center p-6">
-      <form onSubmit={handleClaimSubmit} className="dark:bg-[#111] bg-white w-full max-w-sm p-6 rounded-3xl border dark:border-white/10 border-neutral-200 text-center space-y-4">
+      <form onSubmit={handleClaimSubmit} className="dark:bg-[#111] bg-white w-full max-sm p-6 rounded-3xl border dark:border-white/10 border-neutral-200 text-center space-y-4">
         <img src={claimingPlatform.icon} className="w-10 h-10 object-contain mx-auto" alt="" />
         <h3 className="text-base font-black text-orange-500 uppercase">वेरिफिकेशन दावा सबमिट करें</h3>
         <p className="text-[10px] text-neutral-400 font-semibold leading-normal">
