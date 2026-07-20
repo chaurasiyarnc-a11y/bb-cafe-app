@@ -63,7 +63,7 @@ interface CartDrawerProps {
   getFreeDeliveryProgressPercent: () => number;
   getTotalBillPrice: () => number;
   getDisplayPrice: (item: any) => string;
-  triggerHaptic: () => void;
+  triggerHaptic: (ms?: number) => void; // यहाँ ठीक किया गया
   showAddonsSection: boolean;
 }
 
@@ -199,6 +199,7 @@ export default function CartDrawer({
               <button onClick={() => { triggerHaptic(); setKetchupAddon(!ketchupAddon); }} className={`p-2 rounded-xl border text-[9.5px] font-black ${ketchupAddon ? 'border-red-500 bg-red-500/5 text-red-600' : 'border-neutral-300 dark:border-white/5 bg-transparent text-neutral-800 dark:text-gray-300'}`}>
                 {isHindi ? "केचप" : "Ketchup"} (+₹10)
               </button>
+              {/* यहाँ ठीक किया गया */}
               <button onClick={() => { triggerHaptic(); setOreganoAddon(!oreganoAddon); }} className={`p-2 rounded-xl border text-[9.5px] font-black ${oreganoAddon ? 'border-yellow-500 bg-yellow-500/5 text-yellow-600' : 'border-neutral-300 dark:border-white/5 bg-transparent text-neutral-800 dark:text-gray-300'}`}>
                 {isHindi ? "ऑरेगैनो" : "Oregano"} (+₹10)
               </button>
