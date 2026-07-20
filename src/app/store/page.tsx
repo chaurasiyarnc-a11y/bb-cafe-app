@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Home, Store, Wrench, Layers, AlertTriangle, Lock, X } from 'lucide-react';
+import { Home, Store, Wrench, Layers, AlertTriangle, Lock, X, Eye, EyeOff, Trash2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 import { db } from '@/lib/firebase'; 
@@ -123,7 +123,7 @@ export default function StoreStockPage() {
   const [pinInput, setPinInput] = useState<string>("");
   const [authError, setAuthError] = useState<string>("");
 
-  // session restore on reload [1]
+  // session restore on reload
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const savedUser = localStorage.getItem('bum_bum_cafe_user');
@@ -238,6 +238,7 @@ export default function StoreStockPage() {
       localStorage.setItem('bum_bum_cafe_user', JSON.stringify(matched));
       setPinInput("");
       setAuthError("");
+      toastMessage("सफलतापूर्वक लॉगिन किया गया!", "success");
     } else {
       setAuthError("गलत पिन!");
     }
@@ -246,6 +247,7 @@ export default function StoreStockPage() {
   const handleLogout = () => {
     setCurrentUser(null);
     localStorage.removeItem('bum_bum_cafe_user');
+    toastMessage("लॉगआउट कर दिया गया है।", "info");
   };
 
   const confirmDeleteWithPin = (message: string, actionToExecute: () => void) => {
@@ -260,6 +262,7 @@ export default function StoreStockPage() {
     if (matched) {
       if (deleteConfirmation) deleteConfirmation.action();
       setDeleteConfirmation(null);
+      toastMessage("सफलतापूर्वक हटा दिया गया!", "success");
     } else {
       setDeletePinError("गलत पिन!");
     }
@@ -377,6 +380,7 @@ export default function StoreStockPage() {
       }
       await batch.commit();
       setEditedQties(prev => { const copy = { ...prev }; delete copy[id]; return copy; });
+      toastMessage("मात्रा सफलतापूर्वक अपडेट की गई!", "success");
     } catch {}
   };
 
@@ -408,6 +412,7 @@ export default function StoreStockPage() {
       setShowSaveToListModal(false);
       setActiveListId(targetId);
       setActiveTab('saved_list'); 
+      toastMessage("लिस्ट में आइटम जोड़ दिए गए हैं!", "success");
     } catch {}
   };
 
@@ -427,6 +432,7 @@ export default function StoreStockPage() {
       setSelectedItemIds([]);
       setIsMultiSelectMode(false);
       setShowBulkCategoryModal(false);
+      toastMessage("श्रेणी सफलतापूर्वक बदल दी गई!", "success");
     } catch {}
   };
 
@@ -437,6 +443,7 @@ export default function StoreStockPage() {
       const catId = formattedName.toLowerCase().replace(/\s+/g, '_');
       await setDoc(doc(db, "categories", catId), { id: catId, name: formattedName, hidden: false });
       setAddCategoryModalInput("");
+      toastMessage("नई श्रेणी जोड़ी गई!", "success");
     } catch {}
   };
 
@@ -462,6 +469,7 @@ export default function StoreStockPage() {
       batch.set(logRef, { id: logRef.id, itemName: transferItem.name, itemId: transferItem.id, qty, purpose: "Kitchen Use", date: getLocalDateString(0), remarks: "किचन स्थानांतरण", financialLoss: 0 });
       await batch.commit();
       setShowTransferModal(false);
+      toastMessage("सामग्री किचन में भेज दी गई है!", "success");
     } catch {}
   };
 
@@ -477,6 +485,7 @@ export default function StoreStockPage() {
       batch.set(logRef, { id: logRef.id, itemName: consumeItem.name, itemId: consumeItem.id, qty, purpose: "Kitchen Use", date: getLocalDateString(0), remarks: consumeRemarksInput || "किचन उपयोग", financialLoss: 0 });
       await batch.commit();
       setShowConsumeModal(false);
+      toastMessage("किचन स्टॉक अपडेट किया गया!", "success");
     } catch {}
   };
 
@@ -515,6 +524,7 @@ export default function StoreStockPage() {
       unit: formAddProduct.unit, purchasePrice: parseFloat(formAddProduct.purchasePrice) || 0, minLimit: parseFloat(formAddProduct.minLimit) || 10, category: formAddProduct.category.toUpperCase()
     });
     setShowAddProductModal(false);
+    toastMessage("नया उत्पाद जोड़ा गया!", "success");
   };
 
   const handleAddAssetSubmit = async (e: React.FormEvent) => {
@@ -526,6 +536,7 @@ export default function StoreStockPage() {
       id: customId, name: cleanName, quantity: parseFloat(formAddAsset.quantity) || 1, cost: parseFloat(formAddAsset.cost) || 0, condition: formAddAsset.condition, remarks: formAddAsset.remarks
     });
     setShowAddAssetModal(false);
+    toastMessage("नया एसेट जोड़ा गया!", "success");
   };
 
   const handleWasteSubmit = async (e: React.FormEvent) => {
@@ -538,6 +549,7 @@ export default function StoreStockPage() {
       itemName: item.name, itemId: item.id, qty: qtyNum, purpose: formStockOut.purpose, date: getLocalDateString(0), remarks: formStockOut.remarks, financialLoss: qtyNum * item.purchasePrice
     });
     setShowStockOutModal(false);
+    toastMessage("नुकसान/कचरा दर्ज किया गया!", "success");
   };
 
   const handleDeleteAsset = (id: string, name: string) => {
@@ -549,6 +561,7 @@ export default function StoreStockPage() {
   const handleDeleteProduct = (id: string, name: string) => {
     confirmDeleteWithPin(`क्या आप इस सामान "${name}" को हटाना चाहते हैं?`, async () => {
       await deleteDoc(doc(db, "godown_inventory", id));
+      setEditingProduct(null);
     });
   };
 
@@ -557,6 +570,7 @@ export default function StoreStockPage() {
     if (!editingProduct) return;
     await setDoc(doc(db, "godown_inventory", editingProduct.id), editingProduct, { merge: true });
     setEditingProduct(null);
+    toastMessage("विवरण अपडेट किया गया!", "success");
   };
 
   const handlePrintSavedList = () => {
@@ -630,6 +644,48 @@ export default function StoreStockPage() {
     const waUrl = `https://wa.me/?text=${encodeURIComponent(text)}`;
     window.open(waUrl, '_blank');
   };
+
+  // यदि कोई यूजर लॉगिन नहीं है तो सुरक्षित PIN गेट दिखाएं
+  if (!currentUser) {
+    return (
+      <div className={`min-h-screen flex items-center justify-center p-4 ${isDarkMode ? 'bg-[#0E0E0E] text-white' : 'bg-[#FAFAFA] text-neutral-900'}`}>
+        <motion.form 
+          initial={{ opacity: 0, y: 20 }} 
+          animate={{ opacity: 1, y: 0 }} 
+          onSubmit={handleLoginSubmit} 
+          className={`w-full max-w-sm rounded-[2.5rem] p-8 space-y-6 border text-center shadow-xl ${isDarkMode ? 'bg-neutral-900 border-neutral-800' : 'bg-white border-neutral-100'}`}
+        >
+          <div className="space-y-2">
+            <span className="text-5xl block">☕</span>
+            <h1 className="text-xl font-black text-orange-600 tracking-wider uppercase">BUM BUM CAFE</h1>
+            <p className="text-[10px] text-neutral-400 font-bold uppercase">इन्वेंटरी मैनेजमेंट पोर्टल</p>
+          </div>
+          
+          <div className="space-y-3">
+            <label className="text-[10px] text-neutral-400 font-bold uppercase block">प्रवेश के लिए अपना पिन डालें</label>
+            <input 
+              type="password" 
+              maxLength={6} 
+              placeholder="••••" 
+              value={pinInput} 
+              onChange={e => setPinInput(e.target.value)} 
+              className="w-full text-center text-2xl tracking-[1em] p-3 rounded-2xl border font-black bg-neutral-50 dark:bg-neutral-800 border-neutral-200 dark:border-neutral-700 focus:outline-none focus:ring-2 focus:ring-orange-500" 
+              required 
+              autoFocus
+            />
+            {authError && <p className="text-xs text-red-500 font-bold">{authError}</p>}
+          </div>
+
+          <button 
+            type="submit" 
+            className="w-full py-4 bg-orange-600 hover:bg-orange-700 text-white rounded-2xl text-xs font-black tracking-wider uppercase shadow-lg transition-colors"
+          >
+            प्रवेश करें ➔
+          </button>
+        </motion.form>
+      </div>
+    );
+  }
 
   return (
     <div className={`min-h-screen ${isDarkMode ? 'bg-[#0E0E0E]' : 'bg-[#FAFAFA]'} pb-24 font-sans relative ${isDarkMode ? 'text-white' : 'text-neutral-900'}`}>
@@ -922,6 +978,23 @@ export default function StoreStockPage() {
           </div>
         )}
 
+      </AnimatePresence>
+
+      {/* TOAST ALERT */}
+      <AnimatePresence>
+        {toast && (
+          <motion.div
+            initial={{ opacity: 0, y: 50 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 50 }}
+            className="fixed bottom-24 left-4 right-4 z-50 max-w-sm mx-auto flex items-center gap-2.5 p-4 rounded-2xl bg-neutral-900 text-white dark:bg-white dark:text-black shadow-2xl border border-neutral-800 dark:border-neutral-200"
+          >
+            <span className="text-base">
+              {toast.type === 'success' ? '✅' : toast.type === 'error' ? '❌' : 'ℹ️'}
+            </span>
+            <p className="text-xs font-bold">{toast.message}</p>
+          </motion.div>
+        )}
       </AnimatePresence>
 
       {/* BOTTOM NAVIGATION BAR */}
