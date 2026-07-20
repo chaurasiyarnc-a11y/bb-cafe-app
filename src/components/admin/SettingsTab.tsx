@@ -5,7 +5,7 @@ import { collection, addDoc, doc, setDoc, deleteDoc, updateDoc, runTransaction, 
 import { Trash, Eye, EyeOff, ImageIcon, Play, Settings, X, Percent, CheckCircle2, XCircle, Lock, Edit, Check } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { isVideoUrl, sha256 } from '../../lib/utils'; // अपनी लोकेशन के अनुसार पाथ सेट करें
-
+import SocialCountsEditor from './SocialCountsEditor'; // या सही पाथ दें
 interface SettingsTabProps {
   banners: any[];
   reels: any[];
