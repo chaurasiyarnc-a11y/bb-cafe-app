@@ -2777,6 +2777,7 @@ export default function BbCafeHome() {
             sendWhatsAppOrder={sendWhatsAppOrder}
             isSubmittingOrder={isSubmittingOrder}
             triggerHaptic={triggerHaptic}
+            upiId={upiId}
              // Passed down to safely support copy & QR code
           />
         )}
