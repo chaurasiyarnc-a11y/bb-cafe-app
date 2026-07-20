@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { db } from '../lib/firebase'; 
 import { collection, onSnapshot, query, addDoc, doc, setDoc, increment, runTransaction, getDoc, getDocs, where, limit, orderBy } from 'firebase/firestore';
-import { getStorage, ref, uploadString, getDownloadURL } from 'firebase/storage'; // Added for Screenshot URL upload (Option A)
+import { getStorage, ref, uploadString, getDownloadURL } from 'firebase/storage'; 
 import { ShoppingBag, Plus, Search, X, MapPin, Phone, User, Sparkles, Star, Gift, Loader2, Heart, Clock, ChevronRight, WifiOff, History, LogOut, Lock, Award, Play, Globe } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
@@ -116,7 +116,7 @@ export default function BbCafeHome() {
 
   const [whatsappNumber, setWhatsappNumber] = useState("919714293759");
   
-  // कैफ़े की मुख्य UPI ID सेट की गई
+  // कैफ़े की मुख्य UPI ID
   const [upiId, setUpiId] = useState("Q231198993@ybl");
   
   const [storeCoordinates, setStoreCoordinates] = useState({ lat: 24.2863, lng: 80.1245 });
@@ -535,6 +535,15 @@ export default function BbCafeHome() {
     const merchantName = "Bum Bum Cafe";
     const transactionNote = `BumBumCafe Order`;
     
+    // --- UPI ID COPY FALLBACK FOR MERCHANT GUIDELINE BLOCKS ---
+    try {
+      navigator.clipboard.writeText(upiId);
+      toast.success(isHindi 
+        ? `यूपीआई आईडी (${upiId}) कॉपी हो गई है! पेमेंट ऐप में इसे पेस्ट कर सकते हैं।` 
+        : `UPI ID (${upiId}) copied! You can paste it in your payment app if redirection fails.`
+      );
+    } catch (err) {}
+    
     const standardUpi = `upi://pay?pa=${upiId}&pn=${encodeURIComponent(merchantName)}&am=${amount}&cu=INR&tn=${encodeURIComponent(transactionNote)}`;
     
     if (platform === 'phonepe') {
@@ -852,86 +861,91 @@ export default function BbCafeHome() {
     if (isSubmittingOrder) return;
     setIsSubmittingOrder(true);
 
-    if (!customerDetails) { 
-      setIsProfileOpen(true); 
-      toast.error("ऑर्डर करने के लिए पहले अपनी प्रोफाइल बनाएं! 👤");
-      setIsSubmittingOrder(false);
-      return; 
-    }
-
-    if (fulfillmentType === "delivery" && (!address || address.trim().length < 10)) {
-      setIsSubmittingOrder(false);
-      return toast.error("Please enter full address!");
-    }
-
-    if (fulfillmentType === "table" && !tableNumber) {
-      setIsSubmittingOrder(false);
-      return toast.error(isHindi ? "कृपया टेबल चुनें!" : "Please select a table!");
-    }
-
-    if (paymentMethod === "upi" && !paymentScreenshot) {
-      setIsSubmittingOrder(false);
-      return toast.error(isHindi ? "कृपया आगे बढ़ने से पहले यूपीआई भुगतान का स्क्रीनशॉट अपलोड करें!" : "Please upload UPI payment screenshot!");
-    }
-
-    const tokenNumber = Math.floor(1000 + Math.random() * 9000);
-    const deliveryPin = Math.floor(1000 + Math.random() * 9000);
-
-    let billNumber = 1;
-    const counterDocRef = doc(db, "settings", "store_bill_counter");
-
+    // --- ENTIRE LOGIC IN TRY-CATCH-FINALLY TO INSURE SUBMITTING ALWAYS RESETS ---
     try {
-      await runTransaction(db, async (transaction) => {
-        const counterDoc = await transaction.get(counterDocRef);
-        if (!counterDoc.exists()) {
-          transaction.set(counterDocRef, { nextBillNumber: 2 });
-          billNumber = 1;
-        } else {
-          billNumber = counterDoc.data().nextBillNumber || 1;
-          transaction.update(counterDocRef, { nextBillNumber: billNumber + 1 });
-        }
-      });
-    } catch (e) { 
-      billNumber = Math.floor((Date.now() / 1000) % 100000); 
-    }
-
-    const formattedBillStr = formatBillNumber(billNumber);
-    const subtotal = getCartSubtotal();
-    const addOnsCost = getCartAddonsPrice();
-    const deliveryCharge = getDeliveryCharge();
-    const couponDiscount = getCouponDiscountAmount();
-    const finalTotal = getTotalBillPrice();
-    
-    const pointsEarned = Math.floor(finalTotal / 100);
-    const totalPointsCost = cart.reduce((acc: number, i: any) => acc + (i.pointsCost || 0), 0);
-
-    // --- OPTION A: SCREENSHOT UPLOAD TO FIREBASE STORAGE (JPG) ---
-    let screenshotUrl = "";
-    if (paymentMethod === "upi" && paymentScreenshot) {
-      const toastId = toast.loading(isHindi ? "स्क्रीनशॉट अपलोड हो रहा है..." : "Uploading screenshot...");
-      try {
-        const storage = getStorage();
-        const storageRef = ref(storage, `payment_screenshots/bill_${formattedBillStr}_${Date.now()}.jpg`);
-        const uploadResult = await uploadString(storageRef, paymentScreenshot, 'data_url');
-        screenshotUrl = await getDownloadURL(uploadResult.ref);
-        toast.dismiss(toastId);
-      } catch (err) {
-        console.error("Firebase Storage Upload Error:", err);
-        toast.dismiss(toastId);
+      if (!customerDetails) { 
+        setIsProfileOpen(true); 
+        toast.error("ऑर्डर करने के लिए पहले अपनी प्रोफाइल बनाएं! 👤");
+        return; 
       }
-    }
 
-    const orderObj = {
-      billNumber, tokenNumber, deliveryPin, customerName: customerDetails.name, customerPhone: customerDetails.phone,
-      address: fulfillmentType === "delivery" ? address : `Mode: ${fulfillmentType.toUpperCase()} ${fulfillmentType === 'table' ? `Table: ${tableNumber}` : ''}`, 
-      items: cart, subtotal, discount: couponDiscount, total: finalTotal, timestamp: new Date(), status: 'pending',
-      deliveryArea: fulfillmentType === "delivery" ? selectedArea.name : fulfillmentType.toUpperCase(), noCutlery, ketchupAddon, oreganoAddon, chiliFlakesAddon,
-      fulfillmentType, tableNumber: fulfillmentType === "table" ? tableNumber : "", paymentMethod,
-      paymentScreenshot: paymentScreenshot || "",
-      screenshotUrl: screenshotUrl || ""
-    };
+      if (fulfillmentType === "delivery" && (!address || address.trim().length < 10)) {
+        return toast.error("Please enter full address!");
+      }
 
-    try {
+      if (fulfillmentType === "table" && !tableNumber) {
+        return toast.error(isHindi ? "कृपया टेबल चुनें!" : "Please select a table!");
+      }
+
+      if (paymentMethod === "upi" && !paymentScreenshot) {
+        return toast.error(isHindi ? "कृपया आगे बढ़ने से पहले यूपीआई भुगतान का स्क्रीनशॉट अपलोड करें!" : "Please upload UPI payment screenshot!");
+      }
+
+      const tokenNumber = Math.floor(1000 + Math.random() * 9000);
+      const deliveryPin = Math.floor(1000 + Math.random() * 9000);
+
+      let billNumber = 1;
+      const counterDocRef = doc(db, "settings", "store_bill_counter");
+
+      try {
+        await runTransaction(db, async (transaction) => {
+          const counterDoc = await transaction.get(counterDocRef);
+          if (!counterDoc.exists()) {
+            transaction.set(counterDocRef, { nextBillNumber: 2 });
+            billNumber = 1;
+          } else {
+            billNumber = counterDoc.data().nextBillNumber || 1;
+            transaction.update(counterDocRef, { nextBillNumber: billNumber + 1 });
+          }
+        });
+      } catch (e) { 
+        billNumber = Math.floor((Date.now() / 1000) % 100000); 
+      }
+
+      const formattedBillStr = formatBillNumber(billNumber);
+      const subtotal = getCartSubtotal();
+      const addOnsCost = getCartAddonsPrice();
+      const deliveryCharge = getDeliveryCharge();
+      const couponDiscount = getCouponDiscountAmount();
+      const finalTotal = getTotalBillPrice();
+      
+      const pointsEarned = Math.floor(finalTotal / 100);
+      const totalPointsCost = cart.reduce((acc: number, i: any) => acc + (i.pointsCost || 0), 0);
+
+      // --- SCREENSHOT UPLOAD TO FIREBASE STORAGE (WITH 3.5s STRICT TIMEOUT) ---
+      let screenshotUrl = "";
+      if (paymentMethod === "upi" && paymentScreenshot) {
+        const toastId = toast.loading(isHindi ? "स्क्रीनशॉट अपलोड हो रहा है..." : "Uploading screenshot...");
+        try {
+          const storage = getStorage();
+          const storageRef = ref(storage, `payment_screenshots/bill_${formattedBillStr}_${Date.now()}.jpg`);
+          
+          const uploadPromise = uploadString(storageRef, paymentScreenshot, 'data_url').then(async (uploadResult) => {
+            return await getDownloadURL(uploadResult.ref);
+          });
+          
+          const timeoutPromise = new Promise<string>((_, reject) => 
+            setTimeout(() => reject(new Error("Timeout")), 3500)
+          );
+
+          screenshotUrl = await Promise.race([uploadPromise, timeoutPromise]);
+          toast.dismiss(toastId);
+        } catch (err) {
+          console.warn("Storage upload bypassed (Proceeding with local base64):", err);
+          toast.dismiss(toastId);
+        }
+      }
+
+      const orderObj = {
+        billNumber, tokenNumber, deliveryPin, customerName: customerDetails.name, customerPhone: customerDetails.phone,
+        address: fulfillmentType === "delivery" ? address : `Mode: ${fulfillmentType.toUpperCase()} ${fulfillmentType === 'table' ? `Table: ${tableNumber}` : ''}`, 
+        items: cart, subtotal, discount: couponDiscount, total: finalTotal, timestamp: new Date(), status: 'pending',
+        deliveryArea: fulfillmentType === "delivery" ? selectedArea.name : fulfillmentType.toUpperCase(), noCutlery, ketchupAddon, oreganoAddon, chiliFlakesAddon,
+        fulfillmentType, tableNumber: fulfillmentType === "table" ? tableNumber : "", paymentMethod,
+        paymentScreenshot: paymentScreenshot || "",
+        screenshotUrl: screenshotUrl || ""
+      };
+
       await addDoc(collection(db, "orders"), orderObj);
       const phoneClean = customerDetails.phone.replace("+91", "");
       if (pointsEarned > 0 || totalPointsCost > 0) {
@@ -956,107 +970,106 @@ export default function BbCafeHome() {
           });
         }
       }
-    } catch (e) {
-      toast.error("Database sync failed. Kripya dobara try karein.");
-      setIsSubmittingOrder(false); 
-      return;
-    }
 
-    const updatedPastOrders = [orderObj, ...pastOrders];
-    setPastOrders(updatedPastOrders);
-    localStorage.setItem('bb_past_orders', JSON.stringify(updatedPastOrders));
-    setLastPlacedOrder(orderObj);
+      const updatedPastOrders = [orderObj, ...pastOrders];
+      setPastOrders(updatedPastOrders);
+      localStorage.setItem('bb_past_orders', JSON.stringify(updatedPastOrders));
+      setLastPlacedOrder(orderObj);
 
-    let itemsText = "";
-    cart.forEach((i: any) => {
-      itemsText += `• ${i.name || "Item"} x${i.quantity || 1} - ₹${(i.price || 0) * (i.quantity || 1)}\n`;
-      if (i.note) {
-        itemsText += `  └─ *Note:* ${i.note}\n`;
+      let itemsText = "";
+      cart.forEach((i: any) => {
+        itemsText += `• ${i.name || "Item"} x${i.quantity || 1} - ₹${(i.price || 0) * (i.quantity || 1)}\n`;
+        if (i.note) {
+          itemsText += `  └─ *Note:* ${i.note}\n`;
+        }
+      });
+      
+      if (ketchupAddon) itemsText += `• Extra Tomato Ketchup x1 - ₹10\n`;
+      if (oreganoAddon) itemsText += `• Extra Oregano x1 - ₹10\n`;
+      if (chiliFlakesAddon) itemsText += `• Extra Chili Flakes x1 - ₹10\n`;
+      if (noCutlery) itemsText += `🌱 (Eco-Friendly: No plastic cutlery requested)\n`;
+
+      const refCode = getReferralCode();
+      
+      const modeLabel = fulfillmentType === "delivery" ? `Delivery (${selectedArea.name})` : fulfillmentType === "pickup" ? "Self-Pickup 🛍️" : `Dine-In (Table: ${tableNumber}) 🍽️`;
+      const payModeLabel = paymentMethod === "cod" 
+        ? (fulfillmentType === "delivery" ? "Cash on Delivery (COD) 💵" : "Cash at Counter 💵")
+        : "UPI Online Payment 📱";
+
+      // --- CONSTRUCT DYNAMIC MESSAGES ---
+      let msg = `🔥 *BAM BAM CAFE - NEW ORDER*\n\n`;
+      msg += `*Bill No:* #${formattedBillStr}\n`;
+      msg += `*Token No:* #${tokenNumber}\n`;
+      msg += `*Customer:* ${customerDetails.name}\n`;
+      msg += `*Phone:* ${customerDetails.phone}\n`;
+      msg += `*Fulfillment Mode:* ${modeLabel}\n`;
+      
+      if (fulfillmentType === 'delivery') {
+        msg += `*Address:* ${address}\n`;
       }
-    });
-    
-    if (ketchupAddon) itemsText += `• Extra Tomato Ketchup x1 - ₹10\n`;
-    if (oreganoAddon) itemsText += `• Extra Oregano x1 - ₹10\n`;
-    if (chiliFlakesAddon) itemsText += `• Extra Chili Flakes x1 - ₹10\n`;
-    if (noCutlery) itemsText += `🌱 (Eco-Friendly: No plastic cutlery requested)\n`;
+      msg += `*Payment Method:* ${payModeLabel}\n\n`;
 
-    const refCode = getReferralCode();
-    
-    const modeLabel = fulfillmentType === "delivery" ? `Delivery (${selectedArea.name})` : fulfillmentType === "pickup" ? "Self-Pickup 🛍️" : `Dine-In (Table: ${tableNumber}) 🍽️`;
-    const payModeLabel = paymentMethod === "cod" 
-      ? (fulfillmentType === "delivery" ? "Cash on Delivery (COD) 💵" : "Cash at Counter 💵")
-      : "UPI Online Payment 📱";
-
-    // --- CONDITIONALLY CONSTRUCT MESSAGE TEXT FOR WHATSAPP ---
-    let msg = `🔥 *BAM BAM CAFE - NEW ORDER*\n\n`;
-    msg += `*Bill No:* #${formattedBillStr}\n`;
-    msg += `*Token No:* #${tokenNumber}\n`;
-    msg += `*Customer:* ${customerDetails.name}\n`;
-    msg += `*Phone:* ${customerDetails.phone}\n`;
-    msg += `*Fulfillment Mode:* ${modeLabel}\n`;
-    
-    if (fulfillmentType === 'delivery') {
-      msg += `*Address:* ${address}\n`;
-    }
-    msg += `*Payment Method:* ${payModeLabel}\n\n`;
-
-    msg += `*ITEMS:*\n${itemsText}\n`;
-    msg += `*Subtotal:* ₹${subtotal + addOnsCost}\n`;
-    msg += `*Coupon Discount:* -₹${couponDiscount}\n`;
-    
-    if (fulfillmentType === 'delivery') {
-      msg += `*Delivery:* ₹${deliveryCharge}\n`;
-    }
-    msg += `*TOTAL BILL: ₹${finalTotal}*\n\n`;
-
-    if (fulfillmentType === 'delivery') {
-      msg += `🔑 *Delivery PIN:* ${deliveryPin} (Rider ko ye confirm karke hi order le)\n`;
-    }
-    
-    msg += `*Invite Code:* ${refCode}\n`;
-    msg += `*Points Earned:* +${pointsEarned} Pts\n`;
-    
-    if (totalPointsCost > 0) {
-      msg += `*Points Redeemed:* -${totalPointsCost} Pts\n`;
-    }
-    
-    if (paymentMethod === "upi") {
-      if (screenshotUrl) {
-        msg += `\n📸 *Payment Screenshot Link (JPG):*\n${screenshotUrl}\n`;
-      } else {
-        msg += `\n📸 *भुगतान स्क्रीनशॉट:* बिल #${formattedBillStr} के साथ डेटाबेस में सफलतापूर्वक सेव कर दिया गया है!\n`;
+      msg += `*ITEMS:*\n${itemsText}\n`;
+      msg += `*Subtotal:* ₹${subtotal + addOnsCost}\n`;
+      msg += `*Coupon Discount:* -₹${couponDiscount}\n`;
+      
+      if (fulfillmentType === 'delivery') {
+        msg += `*Delivery:* ₹${deliveryCharge}\n`;
       }
+      msg += `*TOTAL BILL: ₹${finalTotal}*\n\n`;
+
+      if (fulfillmentType === 'delivery') {
+        msg += `🔑 *Delivery PIN:* ${deliveryPin} (Rider ko ye confirm karke hi order le)\n`;
+      }
+      
+      msg += `*Invite Code:* ${refCode}\n`;
+      msg += `*Points Earned:* +${pointsEarned} Pts\n`;
+      if (totalPointsCost > 0) {
+        msg += `*Points Redeemed:* -${totalPointsCost} Pts\n`;
+      }
+
+      if (paymentMethod === "upi") {
+        if (screenshotUrl) {
+          msg += `\n📸 *Payment Screenshot Link (JPG):*\n${screenshotUrl}\n`;
+        } else {
+          msg += `\n📸 *भुगतान स्क्रीनशॉट:* बिल #${formattedBillStr} के साथ डेटाबेस में सफलतापूर्वक सेव कर दिया गया है!\n`;
+        }
+      }
+
+      msg += `\n_Confirm order by replying 'YES'_`;
+      
+      playSoundEffect('success');
+      setConfettiActive(true);
+      setTimeout(() => setConfettiActive(false), 5000);
+
+      try {
+        await navigator.clipboard.writeText(msg);
+        toast.success(isHindi ? "ऑर्डर विवरण कॉपी कर लिया गया है!" : "Order details copied to clipboard!");
+      } catch (err) {}
+
+      setTimeout(() => {
+        window.open(`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(msg)}`, '_blank');
+        clearCart(); 
+        setKetchupAddon(false);
+        setOreganoAddon(false);
+        setChiliFlakesAddon(false);
+        setNoCutlery(false);
+        setAppliedCoupon(null); 
+        setEnteredCoupon(""); 
+        setIsCartOpen(false);
+        setPaymentScreenshot(null);
+        setIsUpiPopupOpen(false);
+      }, 1500);
+
+    } catch (error) {
+      console.error("Critical submission error caught:", error);
+      toast.error(isHindi ? "ऑर्डर जमा करने में समस्या आई! दोबारा कोशिश करें।" : "Error submitting order. Please try again.");
+    } finally {
+      setIsSubmittingOrder(false); // ALWAYS RESET SUBMITTING STATE
     }
-
-    msg += `\n_Confirm order by replying 'YES'_`;
-    
-    playSoundEffect('success');
-    setConfettiActive(true);
-    setTimeout(() => setConfettiActive(false), 5000);
-
-    try {
-      await navigator.clipboard.writeText(msg);
-      toast.success(isHindi ? "ऑर्डर विवरण कॉपी कर लिया गया है!" : "Order details copied to clipboard!");
-    } catch (err) {}
-
-    setTimeout(() => {
-      window.open(`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(msg)}`, '_blank');
-      clearCart(); 
-      setKetchupAddon(false);
-      setOreganoAddon(false);
-      setChiliFlakesAddon(false);
-      setNoCutlery(false);
-      setAppliedCoupon(null); 
-      setEnteredCoupon(""); 
-      setIsCartOpen(false);
-      setIsSubmittingOrder(false); 
-      setPaymentScreenshot(null);
-      setIsUpiPopupOpen(false);
-    }, 1500);
   };
 
-  // --- NEW ADDED HANDLERS TO RESOLVE CODE INTEGRITY ---
-
+  // --- HTML5 CANVAS BASED REAL-TIME COMPRESSION (SOLVES 1MB FIRESTORE CRASH) ---
   const handleScreenshotChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     triggerHaptic();
     const file = e.target.files?.[0];
@@ -1064,11 +1077,48 @@ export default function BbCafeHome() {
 
     setIsCompressing(true);
     const reader = new FileReader();
-    reader.onloadend = () => {
-      setPaymentScreenshot(reader.result as string);
-      setIsCompressing(false);
-      toast.success(isHindi ? "स्क्रीनशॉट लोड हो गया है!" : "Screenshot attached successfully!");
+    
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+
+        // Downscale image dimensions if exceeding 800px
+        const MAX_DIM = 800;
+        if (width > MAX_DIM || height > MAX_DIM) {
+          if (width > height) {
+            height = Math.round((height * MAX_DIM) / width);
+            width = MAX_DIM;
+          } else {
+            width = Math.round((width * MAX_DIM) / height);
+            height = MAX_DIM;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          // Compress heavily as JPEG with 0.6 quality (converts 4MB to ~60KB)
+          const compressedBase64 = canvas.toDataURL('image/jpeg', 0.6);
+          setPaymentScreenshot(compressedBase64);
+          toast.success(isHindi ? "स्क्रीनशॉट लोड और कंप्रेस हो गया!" : "Screenshot compressed & loaded!");
+        } else {
+          setPaymentScreenshot(event.target?.result as string);
+        }
+        setIsCompressing(false);
+      };
+      img.onerror = () => {
+        setIsCompressing(false);
+        toast.error("Error compression screen");
+      };
+      img.src = event.target?.result as string;
     };
+
     reader.onerror = () => {
       setIsCompressing(false);
       toast.error(isHindi ? "फाइल लोड करने में समस्या आई।" : "Error loading file.");
@@ -1090,7 +1140,7 @@ export default function BbCafeHome() {
         const distance = calculateDistanceInKm(latitude, longitude, storeCoordinates.lat, storeCoordinates.lng);
         setDistanceKm(Number(distance.toFixed(2)));
 
-        setAddress(isHindi ? `लाइव लोकेशन: अक्षांश: ${latitude.toFixed(4)}, देशांतर: ${longitude.toFixed(4)}` : `Live Location: Lat: ${latitude.toFixed(4)}, Lng: ${longitude.toFixed(4)}`);
+        setAddress(isHindi ? `My GPS Location: https://www.google.com/maps?q=${latitude.toFixed(6)},${longitude.toFixed(6)}` : `My GPS Location: https://www.google.com/maps?q=${latitude.toFixed(6)},${longitude.toFixed(6)}`);
         toast.dismiss(toastId);
         toast.success(isHindi ? "लोकेशन सफलतापूर्वक डिटेक्ट की गई!" : "Location successfully detected!");
       },
@@ -1735,7 +1785,7 @@ export default function BbCafeHome() {
                     </div>
                   </div>
                   <span className="text-[8px] font-bold dark:text-gray-300 text-neutral-800 mt-1 max-w-[70px] truncate">{story.title}</span>
-                </                button>
+                </button>
               ))}
             </div>
           </div>
@@ -2727,6 +2777,7 @@ export default function BbCafeHome() {
             sendWhatsAppOrder={sendWhatsAppOrder}
             isSubmittingOrder={isSubmittingOrder}
             triggerHaptic={triggerHaptic}
+            upiId={upiId} // Passed down to safely support copy & QR code
           />
         )}
       </AnimatePresence>
