@@ -1,4 +1,3 @@
-आपकी 
 
 'use client';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
@@ -9,24 +8,24 @@ import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
 import { useCartStore } from '../store/useCartStore';
 
-// सब-कंपोनेंट इम्पोर्ट्स (छोटे अक्षरों वाले home फोल्डर से)
-import CategorySlider from '../components/admin/home/CategorySlider';
-import DiyPizzaBuilder from '../components/admin/home/DiyPizzaBuilder';
-import CartDrawer from '../components/admin/home/CartDrawer';
-import UpiPaymentModal from '../components/admin/home/UpiPaymentModal';
+// सब-कंपोनेंट्स इम्पोर्ट्स
+import CategorySlider from '../components/home/CategorySlider';
+import DiyPizzaBuilder from '../components/home/DiyPizzaBuilder';
+import CartDrawer from '../components/home/CartDrawer';
+import UpiPaymentModal from '../components/home/UpiPaymentModal';
 
 const FALLBACK_CATEGORIES = ["All", "Special Pizza", "Special Thali", "Paneer Special", "Special Mix veg", "Fast Food", "Super Cool", "Indian Bread", "Special Rice"];
 
 const CATEGORY_IMAGES: { [key: string]: string } = {
-  "All": "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=120&q=70",
-  "Special Pizza": "https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=120&q=70",
-  "Special Thali": "https://images.unsplash.com/photo-1626777552726-4a6b54c97e46?auto=format&fit=crop&w=120&q=70",
-  "Paneer Special": "https://images.unsplash.com/photo-1631452180519-c014fe946bc7?auto=format&fit=crop&w=120&q=70",
-  "Special Mix veg": "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=120&q=70",
-  "Fast Food": "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=120&q=70",
-  "Super Cool": "https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?auto=format&fit=crop&w=120&q=70",
-  "Indian Bread": "https://images.unsplash.com/photo-1589301760014-d929f3979dbc?auto=format&fit=crop&w=120&q=70",
-  "Special Rice": "https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?auto=format&fit=crop&w=120&q=70"
+  "All": "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=150&q=80",
+  "Special Pizza": "https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=150&q=80",
+  "Special Thali": "https://images.unsplash.com/photo-1626777552726-4a6b54c97e46?auto=format&fit=crop&w=150&q=80",
+  "Paneer Special": "https://images.unsplash.com/photo-1631452180519-c014fe946bc7?auto=format&fit=crop&w=150&q=80",
+  "Special Mix veg": "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=150&q=80",
+  "Fast Food": "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=150&q=80",
+  "Super Cool": "https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?auto=format&fit=crop&w=150&q=80",
+  "Indian Bread": "https://images.unsplash.com/photo-1589301760014-d929f3979dbc?auto=format&fit=crop&w=150&q=80",
+  "Special Rice": "https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?auto=format&fit=crop&w=150&q=80"
 };
 
 const DELIVERY_AREAS = [
@@ -115,7 +114,7 @@ export default function BbCafeHome() {
 
   const [whatsappNumber, setWhatsappNumber] = useState("919714293759");
   
-  // डिफ़ॉल्ट UPI ID मर्चेंट एड्रेस के साथ सेट है
+  // कैफ़े की मुख्य UPI ID सेट की गई
   const [upiId, setUpiId] = useState("Q231198993@ybl");
   
   const [storeCoordinates, setStoreCoordinates] = useState({ lat: 24.2863, lng: 80.1245 });
@@ -310,11 +309,7 @@ export default function BbCafeHome() {
     const subtotal = getCartSubtotal();
     const addPrice = getCartAddonsPrice();
     const delivery = getDeliveryCharge();
-    
-    // कूपन डिस्काउंट राशि की गणना
-    const rawDiscount = appliedCoupon ? Number(appliedCoupon.discountValue) : 0;
-    const couponDiscount = isNaN(rawDiscount) ? 0 : rawDiscount;
-    
+    const couponDiscount = appliedCoupon ? Number(appliedCoupon.discountValue) : 0;
     return Math.max(0, subtotal + addPrice - couponDiscount) + delivery;
   };
 
@@ -346,9 +341,9 @@ export default function BbCafeHome() {
   const getCategoryImage = (catName: string) => {
     const found = dbCategories.find(c => String(c.name).toLowerCase().trim() === String(catName).toLowerCase().trim());
     if (found) {
-      return found.image || found.imageUrl || found.coverUrl || found.cover || found.url || CATEGORY_IMAGES[catName] || CATEGORY_IMAGES[found.name] || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=120&q=70";
+      return found.image || found.imageUrl || found.coverUrl || found.cover || found.url || CATEGORY_IMAGES[catName] || CATEGORY_IMAGES[found.name] || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=150&q=80";
     }
-    return CATEGORY_IMAGES[catName] || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=120&q=70";
+    return CATEGORY_IMAGES[catName] || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=150&q=80";
   };
 
   const getReferralCode = () => {
@@ -361,7 +356,7 @@ export default function BbCafeHome() {
   // --- CALCULATION MEMOS ---
 
   const ecoCutlerySaves = useMemo(() => {
-    return pastOrders.filter((o: any) => o.noCutlery === true).length;
+    return pastOrders.filter(o => o.noCutlery === true).length;
   }, [pastOrders]);
 
   const calculatedDiyPizzaPrice = useMemo(() => {
@@ -438,7 +433,7 @@ export default function BbCafeHome() {
         ? favorites.includes(item.id) 
         : (selectedCatClean === "all" || itemCatClean === selectedCatClean);
         
-      const matchesSearch = searchWords.every((word: string) => itemName.includes(word));
+      const matchesSearch = searchWords.every(word => itemName.includes(word));
       return matchesCategory && matchesSearch;
     });
   }, [deduplicatedMenu, selectedCategory, favorites, debouncedSearchQuery]);
@@ -701,22 +696,14 @@ export default function BbCafeHome() {
       if (couponSnap.exists()) {
         const data = couponSnap.data();
         const subtotal = getCartSubtotal();
-        
-        // न्यूनतम आर्डर राशि की ऑटो-जांच (minOrder, minOrderAmount, min)
-        const minOrderLimit = data.minOrder ?? data.minOrderAmount ?? data.min ?? 0;
-        
-        if (subtotal < Number(minOrderLimit)) {
+        if (subtotal < (data.minOrder || 0)) {
           toast.dismiss(toastId);
-          toast.error(isHindi ? `न्यूनतम ऑर्डर राशि ₹${minOrderLimit} होनी चाहिए!` : `Minimum order must be ₹${minOrderLimit}!`);
+          toast.error(isHindi ? `न्यूनतम ऑर्डर राशि ₹${data.minOrder} होनी चाहिए!` : `Minimum order must be ₹${data.minOrder}!`);
           return;
         }
-
-        // डिस्काउंट वैल्यू के विभिन्न संभावित फ़ील्ड नामों की सुरक्षित जांच
-        const discountAmount = data.discount ?? data.discountValue ?? data.discountAmount ?? data.amount ?? data.value ?? 0;
-
         setAppliedCoupon({
           code: codeUpper,
-          discountValue: Number(discountAmount)
+          discountValue: data.discount || 0
         });
         toast.dismiss(toastId);
         toast.success(isHindi ? "कूपन सफलतापूर्वक लागू किया गया!" : "Coupon applied successfully!");
@@ -1272,7 +1259,7 @@ export default function BbCafeHome() {
   useEffect(() => {
     const timer = setTimeout(() => {
       const cleanQuery = searchQuery.toLowerCase().trim();
-      const translatedWords = cleanQuery.split(/\s+/).map((word: string) => HINGLISH_DICT[word] || word);
+      const translatedWords = cleanQuery.split(/\s+/).map(word => HINGLISH_DICT[word] || word);
       setDebouncedSearchQuery(translatedWords.join(" "));
     }, 300);
     return () => clearTimeout(timer);
@@ -1682,6 +1669,7 @@ export default function BbCafeHome() {
           </div>
         )}
         
+        {/* Promo Banner */}
         {isBannerEnabled && banners.length > 0 && !bannerError && (
           <div className="w-full h-36 rounded-2xl overflow-hidden relative border border-white/5 bg-white/[0.02]">
             <AnimatePresence mode="wait">
@@ -1790,14 +1778,14 @@ export default function BbCafeHome() {
                     <motion.div 
                       layout 
                       className={`group dark:bg-white/[0.02] bg-white rounded-2xl border dark:border-white/5 border-neutral-200 overflow-hidden flex flex-col relative shadow-md shadow-neutral-100 dark:shadow-none transition-all duration-300 hover:shadow-lg ${!isItemAvailable ? 'opacity-70' : ''}`}
-                      initial={{ opacity: 0, y: 15 }}
+                      initial={{ opacity: 0, y: 30 }}
                       whileInView={{ opacity: 1, y: 0 }}
-                      viewport={{ once: true, margin: "-30px" }}
-                      transition={{ duration: 0.35, ease: "easeOut" }}
+                      viewport={{ once: true, margin: "-50px" }}
+                      transition={{ duration: 0.45, ease: "easeOut" }}
                     >
                       <div className="relative h-44 w-full overflow-hidden font-sans">
                         <img 
-                          src={item.image || item.imageUrl || item.url || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=400&q=70"} 
+                          src={item.image || item.imageUrl || item.url || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=500&q=80"} 
                           className="w-full h-full object-cover origin-center transition-transform duration-700 ease-out group-hover:scale-110" 
                           alt={item.name} 
                           loading="lazy"
@@ -2129,7 +2117,7 @@ export default function BbCafeHome() {
                 </div>
                 <div className="flex gap-2 pt-1 border-t border-white/5 mt-1.5 font-sans">
                   <a 
-                    href={`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(`नमस्ते  बम बम कैफ़े!  कृपया मेरे आर्डर नंबर #${formatBillNumber(liveOrder.billNumber)} का लाइव स्टेटस बताएं।`)}`}
+                    href={`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(`नमस्ते  बम बम कैफ़े! कृपया मेरे आर्डर नंबर #${formatBillNumber(liveOrder.billNumber)} का लाइव स्टेटस बताएं।`)}`}
                     target="_blank"
                     rel="noreferrer"
                     className="flex-1 bg-white/5 hover:bg-white/10 text-center text-[10px] text-yellow-400 py-1.5 rounded-xl border border-white/5 transition-all"
@@ -2312,7 +2300,7 @@ export default function BbCafeHome() {
                 <div className="space-y-3 mb-4 border-t border-neutral-200 dark:border-white/5 pt-3">
                   <p className="text-[10px] font-bold text-neutral-600 dark:text-gray-400 uppercase">{isHindi ? "2. एक्स्ट्रा मसाला/टॉपिंग चुनें:" : "2. Select Add-ons:"}</p>
                   <div className="grid grid-cols-2 gap-2 font-sans">
-                    {Object.entries(PIZZA_ADDONS[normalPizzaSize.toLowerCase()] || {}).map(([addon, cost]: any) => {
+                    {Object.entries(PIZZA_ADDONS[normalPizzaSize.toLowerCase()] || {}).map(([addon, cost]) => {
                       const isSelected = !!normalPizzaAddons[addon];
                       return (
                         <button
@@ -2333,7 +2321,7 @@ export default function BbCafeHome() {
               <div className="space-y-2 mb-6 border-t border-neutral-200 dark:border-white/5 pt-3">
                 <p className="text-[10px] font-bold text-neutral-600 dark:text-gray-400 uppercase">{isHindi ? "शेफ के लिए विशेष निर्देश:" : "Special Note for Chef / Instructions:"}</p>
                 <div className="flex flex-wrap gap-1.5 pb-2">
-                  {QUICK_INSTRUCTION_TAGS.map((tag: any) => (
+                  {QUICK_INSTRUCTION_TAGS.map((tag) => (
                     <button
                       type="button"
                       key={tag}
@@ -2352,133 +2340,13 @@ export default function BbCafeHome() {
                 />
               </div>
 
-              <button type="submit" className="w-full bg-orange-500 text-black p-4 rounded-xl font-black text-xs uppercase">
+              <button type="button" onClick={handleNormalPizzaAdd} className="w-full bg-orange-500 text-black p-4 rounded-xl font-black text-xs uppercase">
                 {isHindi ? "कर्ट में जोड़ने की पुष्टि करें" : "Confirm Add To Cart"}
               </button>
               <button type="button" onClick={() => { setSelectedProduct(null); setNormalPizzaSize(""); setNormalPizzaPrice(0); setChefNote(""); }} className="w-full mt-3 text-neutral-500 dark:text-gray-400 font-black text-[10px] text-center uppercase">
                 {isHindi ? "बंद करें" : "Close"}
               </button>
             </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* COMPACT INSTALL BANNER GUIDE MODAL */}
-      <AnimatePresence>
-        {isInstallModalOpen && (
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[270] flex items-center justify-center p-6 font-sans">
-            <div className="dark:bg-[#111] bg-white w-full max-sm p-6 rounded-3xl border dark:border-white/10 border-neutral-200 text-center space-y-4 shadow-2xl transition-colors duration-200">
-              <Sparkles className="mx-auto text-yellow-400 animate-bounce" size={32} />
-              
-              <div className="space-y-1">
-                <h3 className="text-base font-black dark:text-white text-neutral-900">📲 आसान इंस्टॉलेशन गाइड</h3>
-                <p className="text-[10px] text-neutral-600 dark:text-gray-400 font-bold leading-normal">
-                  यदि व्यक्तिगत इंस्टॉल काम नहीं कर रहा है, तो आप नीचे दिए गए आसान चरणों से इसे होम स्क्रीन पर जोड़ सकते हैं:
-                </p>
-              </div>
-
-              <div className="text-left text-xs space-y-3 text-neutral-800 dark:text-gray-300 font-medium border-y dark:border-white/5 border-neutral-200 py-4 font-sans font-bold">
-                <p className="flex items-start gap-2">
-                  <span className="bg-orange-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px] font-black flex-shrink-0">1</span>
-                  <span>गूगल क्रोम (Chrome) में ऊपर दाईं ओर दिख रहे **तीन डॉट्स (⋮)** आइकॉन पर क्लिक करें।</span>
-                </p>
-                <p className="flex items-start gap-2">
-                  <span className="bg-orange-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px] font-black flex-shrink-0">2</span>
-                  <span>मेन्यू लिस्ट में नीचे जाकर **'Install app'** या **'Add to Home screen'** का विकल्प चुनें।</span>
-                </p>
-                <p className="flex items-start gap-2">
-                  <span className="bg-orange-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px] font-black flex-shrink-0">3</span>
-                  <span>अब **'Install'** बटन दबाएं।  बम बम कैफ़े ऐप आपके फोन की होम स्क्रीन पर असली ऐप की तरह जुड़ जाएगा!</span>
-                </p>
-              </div>
-
-              <button 
-                onClick={() => { triggerHaptic(); setIsInstallModalOpen(false); }} 
-                className="w-full bg-orange-500 text-white p-3.5 rounded-xl font-black text-xs uppercase tracking-wider active:scale-95 transition-all shadow"
-              >
-                समझ गया, बंद करें
-              </button>
-            </div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* SECURED GIFT POINTS MODAL */}
-      <AnimatePresence>
-        {isGiftModalOpen && (
-          <div className="fixed inset-0 bg-black/95 z-[260] flex items-center justify-center p-6 font-sans">
-            <motion.form onSubmit={handleGiftPoints} className="dark:bg-[#111] bg-white w-full max-w-md p-6 rounded-3xl border dark:border-white/10 border-neutral-200 text-center space-y-4 shadow-xl transition-colors duration-200">
-              <Gift className="mx-auto text-yellow-400" size={32} />
-              <div>
-                <h3 className="text-lg font-black text-yellow-400 uppercase italic font-mono">Gift Loyalty Points</h3>
-                <p className="text-[9px] text-neutral-600 font-semibold mt-0.5">अपने पॉइंट्स किसी दोस्त को गिफ्ट करें</p>
-              </div>
-              <div className="space-y-3 text-left">
-                <div className="space-y-1">
-                  <label className="text-[9px] font-black uppercase text-neutral-700 dark:text-neutral-400">Friend's Phone Number</label>
-                  <input type="tel" maxLength={10} placeholder="e.g. 9876543210" value={giftPhone} onChange={(e) => setGiftPhone(e.target.value)} required className="w-full dark:bg-white/10 bg-neutral-50 border dark:border-white/10 border-neutral-300 p-3 rounded-xl text-xs font-bold text-neutral-900 dark:text-white outline-none text-center font-mono" />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[9px] font-black uppercase text-neutral-700 dark:text-neutral-400">Points to Gift (Your Pts: {customerPoints})</label>
-                  <input type="number" placeholder="e.g. 10" value={giftPointsAmount} onChange={(e) => setGiftPointsAmount(e.target.value === "" ? "" : Number(e.target.value))} required className="w-full dark:bg-white/10 bg-neutral-50 border dark:border-white/10 border-neutral-300 p-3 rounded-xl text-xs font-bold text-neutral-900 dark:text-white outline-none text-center font-mono" />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[9px] font-black uppercase text-neutral-700 dark:text-neutral-400 flex items-center gap-1"><Lock size={10}/> <span>Your 4-Digit Security PIN (सुरक्षा पिन)</span></label>
-                  <input type="password" maxLength={4} placeholder="🔒 enter your pin" value={giftSenderPin} onChange={(e) => setGiftSenderPin(e.target.value)} required className="w-full dark:bg-white/10 bg-neutral-50 border dark:border-white/10 border-neutral-300 p-3 rounded-xl text-xs font-bold text-neutral-900 dark:text-white outline-none text-center tracking-widest font-mono" />
-                </div>
-              </div>
-              <div className="flex gap-2">
-                <button type="submit" disabled={isGiftingLoading} className="flex-1 bg-yellow-400 text-black font-black p-3 rounded-xl text-xs uppercase flex items-center justify-center gap-1">
-                  {isGiftingLoading ? <Loader2 className="animate-spin" size={14} /> : <span>Gift Points 🎁</span>}
-                </button>
-                <button type="button" onClick={() => { triggerHaptic(); setIsGiftModalOpen(false); setGiftPhone(""); setGiftPointsAmount(""); setGiftSenderPin(""); }} className="bg-neutral-100 text-neutral-800 dark:bg-white/5 dark:text-gray-400 font-bold p-3 rounded-xl text-xs">CANCEL</button>
-              </div>
-            </motion.form>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* VERIFIED SOCIAL POINTS CLAIM MODAL */}
-      <AnimatePresence>
-        {isClaimModalOpen && claimingPlatform && (
-          <div className="fixed inset-0 bg-black/95 z-[260] flex items-center justify-center p-6 font-sans">
-            <motion.form 
-              onSubmit={handleClaimSubmit}
-              className="dark:bg-[#111] bg-white w-full max-sm p-6 rounded-3xl border dark:border-white/10 border-neutral-200 text-center space-y-4 shadow-xl"
-            >
-              <img src={claimingPlatform.icon} className="w-10 h-10 object-contain mx-auto" alt="" loading="lazy" />
-              <div className="space-y-1">
-                <h3 className="text-base font-black text-orange-600 dark:text-orange-500 uppercase">वेरिफिकेशन दावा सबमिट करें</h3>
-                <p className="text-[10px] text-neutral-600 leading-normal font-semibold">
-                  {claimingPlatform.label} पर फॉलो/सब्सक्राइब करने के बाद, नीचे अपना यूज़रनेम दर्ज करें। हमारे एडमिन इसकी जांच करके आपका {claimingPlatform.points} पॉइंट क्रेडिट करेंगे!
-                </p>
-              </div>
-
-              <div className="space-y-1 text-left">
-                <label className="text-[9px] font-black uppercase text-neutral-700 dark:text-neutral-400">Your Profile Handle / Username</label>
-                <input 
-                  type="text" 
-                  placeholder="e.g. @yourname" 
-                  value={claimUsername} 
-                  onChange={(e) => setClaimUsername(e.target.value)} 
-                  required 
-                  className="w-full dark:bg-white/10 bg-neutral-50 border dark:border-white/10 border-neutral-300 p-3 rounded-xl text-xs font-bold text-neutral-900 dark:text-white outline-none text-center font-mono" 
-                />
-              </div>
-
-              <div className="flex gap-2">
-                <button type="submit" disabled={isClaimingLoading} className="flex-1 bg-yellow-400 text-black font-black p-3 rounded-xl text-xs uppercase flex items-center justify-center gap-1">
-                  {isClaimingLoading ? <Loader2 className="animate-spin" size={14} /> : <span>Claim Reward Request ➔</span>}
-                </button>
-                <button 
-                  type="button" 
-                  onClick={() => { triggerHaptic(); setIsClaimModalOpen(false); setClaimUsername(""); }} 
-                  className="bg-neutral-100 text-neutral-800 dark:bg-white/5 dark:text-gray-400 p-3 rounded-xl font-black text-xs uppercase"
-                >
-                  Cancel
-                </button>
-              </div>
-            </motion.form>
           </div>
         )}
       </AnimatePresence>
@@ -2717,6 +2585,345 @@ export default function BbCafeHome() {
                 </div>
               )}
             </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* MODULAR CART DRAWER */}
+      <AnimatePresence>
+        {isCartOpen && (
+          <CartDrawer 
+            isHindi={isHindi}
+            isCartOpen={isCartOpen}
+            setIsCartOpen={setIsCartOpen}
+            cart={cart}
+            addItem={addItem}
+            removeItem={removeItem}
+            upsellSuggestionItems={upsellSuggestionItems}
+            fulfillmentType={fulfillmentType}
+            setFulfillmentType={setFulfillmentType}
+            ketchupAddon={ketchupAddon}
+            setKetchupAddon={setKetchupAddon}
+            oreganoAddon={oreganoAddon}
+            setOreganoAddon={setOreganoAddon}
+            chiliFlakesAddon={chiliFlakesAddon}
+            setChiliFlakesAddon={setChiliFlakesAddon}
+            selectedArea={selectedArea}
+            setSelectedArea={setSelectedArea}
+            DELIVERY_AREAS={DELIVERY_AREAS}
+            lastDeliveryAddress={lastDeliveryAddress}
+            address={address}
+            setAddress={setAddress}
+            handleDetectLocation={handleDetectLocation}
+            tableNumber={tableNumber}
+            setTableNumber={setTableNumber}
+            noCutlery={noCutlery}
+            setNoCutlery={setNoCutlery}
+            enteredCoupon={enteredCoupon}
+            setEnteredCoupon={setEnteredCoupon}
+            appliedCoupon={appliedCoupon}
+            handleApplyCoupon={handleApplyCoupon}
+            paymentMethod={paymentMethod}
+            setPaymentMethod={setPaymentMethod}
+            setIsUpiPopupOpen={setIsUpiPopupOpen}
+            handleCheckoutClick={handleCheckoutClick}
+            isSubmittingOrder={isSubmittingOrder}
+            getCartSubtotal={getCartSubtotal}
+            getCartAddonsPrice={getCartAddonsPrice}
+            getDeliveryCharge={getDeliveryCharge}
+            getFreeDeliveryProgressPercent={getFreeDeliveryProgressPercent}
+            getTotalBillPrice={getTotalBillPrice}
+            getDisplayPrice={getDisplayPrice}
+            triggerHaptic={triggerHaptic}
+            showAddonsSection={showAddonsSection}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* MODULAR UPI POPUP MODAL */}
+      <AnimatePresence>
+        {isUpiPopupOpen && (
+          <UpiPaymentModal 
+            isHindi={isHindi}
+            isUpiPopupOpen={isUpiPopupOpen}
+            setIsUpiPopupOpen={setIsUpiPopupOpen}
+            getTotalBillPrice={getTotalBillPrice}
+            handleLaunchUpiPay={handleLaunchUpiPay}
+            handleScreenshotChange={handleScreenshotChange}
+            isCompressing={isCompressing}
+            paymentScreenshot={paymentScreenshot}
+            setPaymentScreenshot={setPaymentScreenshot}
+            sendWhatsAppOrder={sendWhatsAppOrder}
+            isSubmittingOrder={isSubmittingOrder}
+            triggerHaptic={triggerHaptic}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* WRITING REVIEW FORM MODAL WITH INTEGRATED EXIT OPTIONS */}
+      <AnimatePresence>
+        {isReviewFormOpen && (
+          <div className="fixed inset-0 bg-black/95 z-[200] flex items-center justify-center p-6 font-sans">
+            <form onSubmit={handleReviewSubmit} className="dark:bg-[#111] bg-white w-full max-w-md p-6 rounded-3xl border dark:border-white/10 border-neutral-200 text-center space-y-4 shadow-xl transition-colors duration-200">
+              <div className="flex justify-between items-center pb-2 border-b dark:border-white/10 border-neutral-200">
+                <h3 className="text-xl font-black text-orange-500 uppercase italic">{isHindi ? "आपकी समीक्षा" : "Your Feedback"}</h3>
+                <button 
+                  type="button" 
+                  onClick={() => { triggerHaptic(); setIsReviewFormOpen(false); }} 
+                  className="p-2 bg-red-100 hover:bg-red-500 hover:text-white text-red-600 rounded-full transition-all duration-200 shadow"
+                  title="Close Feedback"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div className="space-y-3 text-left">
+                <div>
+                  <label className="text-[9px] font-black uppercase text-neutral-700 dark:text-neutral-400">{isHindi ? "क्या नाम" : "Your Name"}</label>
+                  <input autoComplete="name" type="text" placeholder={isHindi ? "अपना नाम दर्ज करें..." : "Enter your name..."} value={reviewName} onChange={(e) => setReviewName(e.target.value)} required className="w-full dark:bg-white/5 bg-neutral-50 border dark:border-white/10 border-neutral-300 p-3 rounded-lg text-xs text-neutral-900 dark:text-white focus:border-orange-500 outline-none" />
+                </div>
+                <div>
+                  <label className="text-[9px] font-black uppercase text-neutral-700 dark:text-neutral-400">{isHindi ? "रेटिंग" : "Rating"}</label>
+                  <div className="flex gap-1 py-1">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <Star 
+                        key={star} 
+                        size={20} 
+                        style={{ color: '#fbbf24', fill: reviewRating >= star ? '#fbbf24' : 'none' }} 
+                        onClick={() => setReviewRating(star)} 
+                        className="cursor-pointer" 
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black uppercase text-neutral-700 dark:text-neutral-400">{isHindi ? "पसंदीदा समीक्षा टच करें:" : "Quick Suggestions:"}</label>
+                  <div className="flex flex-wrap gap-1.5 py-1">
+                    {SUGGESTED_REVIEWS.map((suggestion: string) => (
+                      <button
+                        type="button"
+                        key={suggestion}
+                        onClick={() => setReviewComment(suggestion)}
+                        className="dark:bg-white/5 bg-neutral-50 border dark:border-white/10 border-neutral-300 hover:border-orange-500/50 px-2 py-1 rounded-full text-[9px] text-neutral-800 dark:text-gray-300 font-bold transition-all text-left"
+                      >
+                        {suggestion}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-[9px] font-black uppercase text-neutral-700 dark:text-neutral-400">{isHindi ? "समीक्षा टिप्पणी" : "Comments"}</label>
+                  <textarea placeholder={isHindi ? "खाना कैसा लगा?..." : "How was the food?..."} value={reviewComment} onChange={(e) => setReviewComment(e.target.value)} required rows={3} className="w-full dark:bg-white/5 bg-neutral-50 border dark:border-white/10 border-neutral-300 p-3 rounded-lg text-xs text-neutral-900 dark:text-white focus:border-orange-500 outline-none resize-none" />
+                </div>
+              </div>
+              <div className="flex gap-2 pt-1">
+                <button type="submit" className="flex-1 bg-orange-500 text-black font-black p-3 rounded-lg text-xs uppercase">{isHindi ? "जमा करें" : "SUBMIT"}</button>
+                <button type="button" onClick={() => { triggerHaptic(); setIsReviewFormOpen(false); }} className="dark:bg-white/5 bg-neutral-100 text-neutral-800 dark:text-gray-400 font-bold p-3 rounded-lg text-xs uppercase">{isHindi ? "बंद करें" : "CANCEL"}</button>
+              </div>
+            </form>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* STANDARD CUSTOMIZATION MODAL FOR REGULAR PIZZAS */}
+      <AnimatePresence>
+        {selectedProduct && (
+          <div className="fixed inset-0 bg-black/95 z-[100] flex items-end font-sans">
+            <motion.div initial={{ y: 300 }} animate={{ y: 0 }} exit={{ y: 300 }} className="dark:bg-[#111] bg-white w-full p-6 rounded-t-3xl border-t dark:border-white/10 border-neutral-200 max-w-lg mx-auto overflow-y-auto max-h-[95vh] shadow-2xl transition-colors duration-200">
+              <div className="w-12 h-1 bg-neutral-200 dark:bg-white/15 rounded-full mx-auto mb-4" />
+              <h3 className="text-xl font-black text-center text-neutral-900 dark:text-white font-bold">{selectedProduct?.name}</h3>
+              <p className="text-orange-500 font-black mb-4 uppercase text-[8px] text-center">{isHindi ? "ऑर्डर कस्टमाइज़ करें" : "Customize Your Order"}</p>
+              
+              <div className="space-y-3 mb-4 font-sans">
+                <p className="text-[10px] font-bold text-neutral-600 dark:text-gray-400 uppercase">{isHindi ? "1. साइज चुनें:" : "1. Select Portion Size:"}</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {Object.entries(selectedProduct?.variants || {}).map(([size, price]: any) => (
+                    <button 
+                      type="button" 
+                      key={size} 
+                      onClick={() => { setNormalPizzaSize(size); setNormalPizzaPrice(Number(price)); }} 
+                      className={`p-3 rounded-xl flex flex-col items-center border transition-all ${normalPizzaSize.toLowerCase() === size.toLowerCase() ? 'bg-orange-500/10 border-orange-500 text-orange-600 font-black shadow-sm' : 'dark:bg-white/[0.03] bg-neutral-50 dark:border-white/5 border-neutral-300 dark:text-gray-400 text-neutral-800'}`}
+                    >
+                      <span className="capitalize text-xs font-black">{size}</span>
+                      <span className="font-extrabold text-[10px] mt-1 dark:text-white text-neutral-900 font-mono">₹{price}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {normalPizzaSize && (selectedProduct?.category === "Special Pizza" || selectedProduct?.name?.toLowerCase().includes("pizza")) && (
+                <div className="space-y-3 mb-4 border-t border-neutral-200 dark:border-white/5 pt-3">
+                  <p className="text-[10px] font-bold text-neutral-600 dark:text-gray-400 uppercase">{isHindi ? "2. एक्स्ट्रा मसाला/टॉपिंग चुनें:" : "2. Select Add-ons:"}</p>
+                  <div className="grid grid-cols-2 gap-2 font-sans">
+                    {Object.entries(PIZZA_ADDONS[normalPizzaSize.toLowerCase()] || {}).map(([addon, cost]: any) => {
+                      const isSelected = !!normalPizzaAddons[addon];
+                      return (
+                        <button
+                          type="button"
+                          key={addon}
+                          onClick={() => setNormalPizzaAddons(prev => ({ ...prev, [addon]: !prev[addon] }))}
+                          className={`p-2.5 rounded-xl border flex justify-between items-center text-[9px] font-bold ${isSelected ? 'border-orange-500 bg-orange-500/5 text-orange-600' : 'dark:border-white/5 border-neutral-300 dark:bg-white/[0.02] bg-neutral-50 dark:text-gray-300'}`}
+                        >
+                          <span>{addon}</span>
+                          <span className="text-orange-500 dark:text-orange-400 font-black font-mono">+₹{cost}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              <div className="space-y-2 mb-6 border-t border-neutral-200 dark:border-white/5 pt-3">
+                <p className="text-[10px] font-bold text-neutral-600 dark:text-gray-400 uppercase">{isHindi ? "शेफ के लिए विशेष निर्देश:" : "Special Note for Chef / Instructions:"}</p>
+                <div className="flex flex-wrap gap-1.5 pb-2">
+                  {QUICK_INSTRUCTION_TAGS.map((tag: any) => (
+                    <button
+                      type="button"
+                      key={tag}
+                      onClick={() => quickAppendInstruction(tag, "normal")}
+                      className="text-[9px] font-bold py-1 px-2 rounded-full border dark:border-white/5 border-neutral-300 bg-neutral-100 dark:bg-neutral-800 dark:text-gray-300 text-neutral-800 hover:border-orange-500 transition-colors"
+                    >
+                      {tag}
+                    </button>
+                  ))}
+                </div>
+                <textarea 
+                  placeholder="e.g. Make it extra spicy, No onions, soft crust etc..." 
+                  value={chefNote} 
+                  onChange={(e) => setChefNote(e.target.value)} 
+                  className="w-full text-xs p-3 rounded-xl dark:bg-white/[0.03] bg-neutral-50 border dark:border-white/5 border-neutral-300 text-neutral-900 outline-none focus:border-orange-500 h-16 resize-none"
+                />
+              </div>
+
+              <button type="button" onClick={handleNormalPizzaAdd} className="w-full bg-orange-500 text-black p-4 rounded-xl font-black text-xs uppercase">
+                {isHindi ? "कर्ट में जोड़ने की पुष्टि करें" : "Confirm Add To Cart"}
+              </button>
+              <button type="button" onClick={() => { setSelectedProduct(null); setNormalPizzaSize(""); setNormalPizzaPrice(0); setChefNote(""); }} className="w-full mt-3 text-neutral-500 dark:text-gray-400 font-black text-[10px] text-center uppercase">
+                {isHindi ? "बंद करें" : "Close"}
+              </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* COMPACT INSTALL BANNER GUIDE MODAL */}
+      <AnimatePresence>
+        {isInstallModalOpen && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[270] flex items-center justify-center p-6 font-sans">
+            <div className="dark:bg-[#111] bg-white w-full max-sm p-6 rounded-3xl border dark:border-white/10 border-neutral-200 text-center space-y-4 shadow-2xl transition-colors duration-200">
+              <Sparkles className="mx-auto text-yellow-400 animate-bounce" size={32} />
+              
+              <div className="space-y-1">
+                <h3 className="text-base font-black dark:text-white text-neutral-900">📲 आसान इंस्टॉलेशन गाइड</h3>
+                <p className="text-[10px] text-neutral-600 dark:text-gray-400 font-bold leading-normal">
+                  यदि व्यक्तिगत इंस्टॉल काम नहीं कर रहा है, तो आप नीचे दिए गए आसान चरणों से इसे होम स्क्रीन पर जोड़ सकते हैं:
+                </p>
+              </div>
+
+              <div className="text-left text-xs space-y-3 text-neutral-800 dark:text-gray-300 font-medium border-y dark:border-white/5 border-neutral-200 py-4 font-sans font-bold">
+                <p className="flex items-start gap-2">
+                  <span className="bg-orange-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px] font-black flex-shrink-0">1</span>
+                  <span>गूगल क्रोम (Chrome) में ऊपर दाईं ओर दिख रहे **तीन डॉट्स (⋮)** आइकॉन पर क्लिक करें।</span>
+                </p>
+                <p className="flex items-start gap-2">
+                  <span className="bg-orange-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px] font-black flex-shrink-0">2</span>
+                  <span>मेन्यू लिस्ट में नीचे जाकर **'Install app'** या **'Add to Home screen'** का विकल्प चुनें।</span>
+                </p>
+                <p className="flex items-start gap-2">
+                  <span className="bg-orange-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px] font-black flex-shrink-0">3</span>
+                  <span>अब **'Install'** बटन दबाएं।  बम बम कैफ़े ऐप आपके फोन की होम स्क्रीन पर असली ऐप की तरह जुड़ जाएगा!</span>
+                </p>
+              </div>
+
+              <button 
+                onClick={() => { triggerHaptic(); setIsInstallModalOpen(false); }} 
+                className="w-full bg-orange-500 text-white p-3.5 rounded-xl font-black text-xs uppercase tracking-wider active:scale-95 transition-all shadow"
+              >
+                समझ गया, बंद करें
+              </button>
+            </div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* SECURED GIFT POINTS MODAL */}
+      <AnimatePresence>
+        {isGiftModalOpen && (
+          <div className="fixed inset-0 bg-black/95 z-[260] flex items-center justify-center p-6 font-sans">
+            <motion.form onSubmit={handleGiftPoints} className="dark:bg-[#111] bg-white w-full max-w-md p-6 rounded-3xl border dark:border-white/10 border-neutral-200 text-center space-y-4 shadow-xl transition-colors duration-200">
+              <Gift className="mx-auto text-yellow-400" size={32} />
+              <div>
+                <h3 className="text-lg font-black text-yellow-400 uppercase italic font-mono">Gift Loyalty Points</h3>
+                <p className="text-[9px] text-neutral-600 font-semibold mt-0.5">अपने पॉइंट्स किसी दोस्त को गिफ्ट करें</p>
+              </div>
+              <div className="space-y-3 text-left">
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black uppercase text-neutral-700 dark:text-neutral-400">Friend's Phone Number</label>
+                  <input type="tel" maxLength={10} placeholder="e.g. 9876543210" value={giftPhone} onChange={(e) => setGiftPhone(e.target.value)} required className="w-full dark:bg-white/10 bg-neutral-50 border dark:border-white/10 border-neutral-300 p-3 rounded-xl text-xs font-bold text-neutral-900 dark:text-white outline-none text-center font-mono" />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black uppercase text-neutral-700 dark:text-neutral-400">Points to Gift (Your Pts: {customerPoints})</label>
+                  <input type="number" placeholder="e.g. 10" value={giftPointsAmount} onChange={(e) => setGiftPointsAmount(e.target.value === "" ? "" : Number(e.target.value))} required className="w-full dark:bg-white/10 bg-neutral-50 border dark:border-white/10 border-neutral-300 p-3 rounded-xl text-xs font-bold text-neutral-900 dark:text-white outline-none text-center font-mono" />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black uppercase text-neutral-700 dark:text-neutral-400 flex items-center gap-1"><Lock size={10}/> <span>Your 4-Digit Security PIN (सुरक्षा पिन)</span></label>
+                  <input type="password" maxLength={4} placeholder="🔒 enter your pin" value={giftSenderPin} onChange={(e) => setGiftSenderPin(e.target.value)} required className="w-full dark:bg-white/10 bg-neutral-50 border dark:border-white/10 border-neutral-300 p-3 rounded-xl text-xs font-bold text-neutral-900 dark:text-white outline-none text-center tracking-widest font-mono" />
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <button type="submit" disabled={isGiftingLoading} className="flex-1 bg-yellow-400 text-black font-black p-3 rounded-xl text-xs uppercase flex items-center justify-center gap-1">
+                  {isGiftingLoading ? <Loader2 className="animate-spin" size={14} /> : <span>Gift Points 🎁</span>}
+                </button>
+                <button type="button" onClick={() => { triggerHaptic(); setIsGiftModalOpen(false); setGiftPhone(""); setGiftPointsAmount(""); setGiftSenderPin(""); }} className="bg-neutral-100 text-neutral-800 dark:bg-white/5 dark:text-gray-400 font-bold p-3 rounded-xl text-xs">CANCEL</button>
+              </div>
+            </motion.form>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* VERIFIED SOCIAL POINTS CLAIM MODAL */}
+      <AnimatePresence>
+        {isClaimModalOpen && claimingPlatform && (
+          <div className="fixed inset-0 bg-black/95 z-[260] flex items-center justify-center p-6 font-sans">
+            <motion.form 
+              onSubmit={handleClaimSubmit}
+              className="dark:bg-[#111] bg-white w-full max-sm p-6 rounded-3xl border dark:border-white/10 border-neutral-200 text-center space-y-4 shadow-xl"
+            >
+              <img src={claimingPlatform.icon} className="w-10 h-10 object-contain mx-auto" alt="" loading="lazy" />
+              <div className="space-y-1">
+                <h3 className="text-base font-black text-orange-600 dark:text-orange-500 uppercase">वेरिफिकेशन दावा सबमिट करें</h3>
+                <p className="text-[10px] text-neutral-600 leading-normal font-semibold">
+                  {claimingPlatform.label} पर फॉलो/सब्सक्राइब करने के बाद, नीचे अपना यूज़रनेम दर्ज करें। हमारे एडमिन इसकी जांच करके आपका {claimingPlatform.points} पॉइंट क्रेडिट करेंगे!
+                </p>
+              </div>
+
+              <div className="space-y-1 text-left">
+                <label className="text-[9px] font-black uppercase text-neutral-700 dark:text-neutral-400">Your Profile Handle / Username</label>
+                <input 
+                  type="text" 
+                  placeholder="e.g. @yourname" 
+                  value={claimUsername} 
+                  onChange={(e) => setClaimUsername(e.target.value)} 
+                  required 
+                  className="w-full dark:bg-white/10 bg-neutral-50 border dark:border-white/10 border-neutral-300 p-3 rounded-xl text-xs font-bold text-neutral-900 dark:text-white outline-none text-center font-mono" 
+                />
+              </div>
+
+              <div className="flex gap-2">
+                <button type="submit" disabled={isClaimingLoading} className="flex-1 bg-yellow-400 text-black font-black p-3 rounded-xl text-xs uppercase flex items-center justify-center gap-1">
+                  {isClaimingLoading ? <Loader2 className="animate-spin" size={14} /> : <span>Claim Reward Request ➔</span>}
+                </button>
+                <button 
+                  type="button" 
+                  onClick={() => { triggerHaptic(); setIsClaimModalOpen(false); setClaimUsername(""); }} 
+                  className="bg-neutral-100 text-neutral-800 dark:bg-white/5 dark:text-gray-400 p-3 rounded-xl font-black text-xs uppercase"
+                >
+                  Cancel
+                </button>
+              </div>
+            </motion.form>
           </div>
         )}
       </AnimatePresence>
