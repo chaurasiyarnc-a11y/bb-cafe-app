@@ -640,7 +640,7 @@ export default function StoreStockPage() {
           <span className="text-2xl">☕</span>
           <div>
             <h1 className="text-xs font-black text-orange-600 tracking-wider">BUM BUM CAFE</h1>
-            <p className="text-[9px] text-neutral-400 font-bold uppercase">Welcome, {currentUser.name}</p>
+            <p className="text-[9px] text-neutral-400 font-bold uppercase">Welcome, {currentUser?.name}</p>
           </div>
         </div>
         <div className="flex items-center gap-1.5">
