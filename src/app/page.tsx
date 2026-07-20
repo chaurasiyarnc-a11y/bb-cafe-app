@@ -1,9 +1,8 @@
-
-
 'use client';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { db } from '../lib/firebase'; 
 import { collection, onSnapshot, query, addDoc, doc, setDoc, increment, runTransaction, getDoc, getDocs, where, limit, orderBy } from 'firebase/firestore';
+import { getStorage, ref, uploadString, getDownloadURL } from 'firebase/storage'; 
 import { ShoppingBag, Plus, Search, X, MapPin, Phone, User, Sparkles, Star, Gift, Loader2, Heart, Clock, ChevronRight, WifiOff, History, LogOut, Lock, Award, Play, Globe } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
@@ -13,6 +12,7 @@ import { useCartStore } from '../store/useCartStore';
 import CategorySlider from '../components/admin/home/CategorySlider';
 import DiyPizzaBuilder from '../components/admin/home/DiyPizzaBuilder';
 import CartDrawer from '../components/admin/home/CartDrawer';
+import UpiPaymentModal from '../components/admin/home/UpiPaymentModal';
 
 const FALLBACK_CATEGORIES = ["All", "Special Pizza", "Special Thali", "Paneer Special", "Special Mix veg", "Fast Food", "Super Cool", "Indian Bread", "Special Rice"];
 
@@ -114,6 +114,9 @@ export default function BbCafeHome() {
 
   const [whatsappNumber, setWhatsappNumber] = useState("919714293759");
   
+  // कैफ़े की मुख्य UPI ID
+  const [upiId, setUpiId] = useState("Q231198993@ybl");
+  
   const [storeCoordinates, setStoreCoordinates] = useState({ lat: 24.2863, lng: 80.1245 });
 
   const [storeTimingHindi, setStoreTimingHindi] = useState("सुबह 10:00 से रात 11:00 बजे");
@@ -132,10 +135,10 @@ export default function BbCafeHome() {
   const [address, setAddress] = useState("");
   const [selectedProduct, setSelectedProduct] = useState<any>(null); 
 
-  // Fulfillment and payment - पेमेंट मोड को केवल COD लॉक रखा गया है
+  // Fulfillment and payment
   const [fulfillmentType, setFulfillmentType] = useState<"delivery" | "pickup" | "table">("delivery");
   const [tableNumber, setTableNumber] = useState("Table 1"); 
-  const [paymentMethod] = useState<"cod">("cod");
+  const [paymentMethod, setPaymentMethod] = useState<"cod" | "upi">("cod");
 
   const [isHindi, setIsHindi] = useState(false);
   const [customerPoints, setCustomerPoints] = useState<number>(0);
@@ -193,9 +196,9 @@ export default function BbCafeHome() {
   const [socialAlertIndex, setSocialAlertIndex] = useState(0);
   const [showSocialAlert, setShowSocialAlert] = useState(false);
 
-  // Social Media Point Claims States - री-ऐड किया गया है
+  // Social Media Point Claims States
   const [isClaimModalOpen, setIsClaimModalOpen] = useState(false);
-  const [claimingPlatform, setClaimingPlatform] = useState<any>(null); // लाइन वापस जोड़ी गई
+  const [claimingPlatform, setClaimingPlatform] = useState<any>(null);
   const [claimUsername, setClaimUsername] = useState("");
   const [isClaimingLoading, setIsClaimingLoading] = useState(false);
 
@@ -215,6 +218,11 @@ export default function BbCafeHome() {
   const [showInstallBanner, setShowInstallBanner] = useState(false);
   const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
   const [isSubmittingOrder, setIsSubmittingOrder] = useState(false);
+
+  // UPI Payment states
+  const [paymentScreenshot, setPaymentScreenshot] = useState<string | null>(null);
+  const [isCompressing, setIsCompressing] = useState(false);
+  const [isUpiPopupOpen, setIsUpiPopupOpen] = useState(false);
 
   // UI States
   const [showGreeting] = useState(true);
@@ -518,6 +526,35 @@ export default function BbCafeHome() {
     });
   }, [cart]);
 
+  // --- Optimized UPI Redirection Link Scheme to Prevent Mobile Safari/Chrome popup blocks ---
+  const handleLaunchUpiPay = (platform: string) => {
+    triggerHaptic();
+    const amount = getTotalBillPrice();
+    const merchantName = "Bum Bum Cafe";
+    const transactionNote = `BumBumCafe Order`;
+    
+    // --- UPI ID COPY FALLBACK FOR MERCHANT GUIDELINE BLOCKS ---
+    try {
+      navigator.clipboard.writeText(upiId);
+      toast.success(isHindi 
+        ? `यूपीआई आईडी (${upiId}) कॉपी हो गई है! पेमेंट ऐप में इसे पेस्ट कर सकते हैं।` 
+        : `UPI ID (${upiId}) copied! You can paste it in your payment app if redirection fails.`
+      );
+    } catch (err) {}
+    
+    const standardUpi = `upi://pay?pa=${upiId}&pn=${encodeURIComponent(merchantName)}&am=${amount}&cu=INR&tn=${encodeURIComponent(transactionNote)}`;
+    
+    if (platform === 'phonepe') {
+      window.location.href = `phonepe://pay?pa=${upiId}&pn=${encodeURIComponent(merchantName)}&am=${amount}&cu=INR&tn=${encodeURIComponent(transactionNote)}`;
+    } else if (platform === 'paytm') {
+      window.location.href = `paytmmp://pay?pa=${upiId}&pn=${encodeURIComponent(merchantName)}&am=${amount}&cu=INR&tn=${encodeURIComponent(transactionNote)}`;
+    } else if (platform === 'gpay') {
+      window.location.href = `tez://upi/pay?pa=${upiId}&pn=${encodeURIComponent(merchantName)}&am=${amount}&cu=INR&tn=${encodeURIComponent(transactionNote)}`;
+    } else {
+      window.location.href = standardUpi;
+    }
+  };
+
   // --- EVENT HANDLERS ---
 
   const scrollToMenu = () => {
@@ -621,7 +658,59 @@ export default function BbCafeHome() {
     }
   };
 
-  // --- कूपन सत्यापन तर्क (₹99 न्यूनतम और पिज्जा/सैंडविच की अनिवार्यता) ---
+  const handleClaimSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    triggerHaptic();
+    if (!customerDetails?.phone) {
+      toast.error(isHindi ? "कृपया पहले अपनी प्रोफाइल कस्टमाइज़ करें!" : "Please set up your profile first!");
+      return;
+    }
+    if (!claimUsername) {
+      toast.error(isHindi ? "यूज़रनेम दर्ज करें!" : "Please enter username!");
+      return;
+    }
+    setIsClaimingLoading(true);
+    try {
+      await addDoc(collection(db, "point_claims"), {
+        customerName: customerDetails.name,
+        customerPhone: customerDetails.phone,
+        platform: claimingPlatform.id,
+        username: claimUsername,
+        pointsToEarn: claimingPlatform.points,
+        status: 'pending',
+        timestamp: new Date()
+      });
+      toast.success(isHindi ? "दावा सबमिट किया गया! वेरिफिकेशन के बाद पॉइंट्स मिलेंगे।" : "Claim request submitted! Points will be added after verification.");
+      setClaimUsername("");
+      setIsClaimModalOpen(false);
+    } catch (err) {
+      toast.error("Claim failed. Try again.");
+    } finally {
+      setIsClaimingLoading(false);
+    }
+  };
+
+  const handleDismissInstallBanner = () => {
+    triggerHaptic();
+    setShowInstallBanner(false);
+    localStorage.setItem('bb_app_installed_or_dismissed', 'true');
+  };
+
+  const handleInstallClick = async () => {
+    triggerHaptic();
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === 'accepted') {
+        localStorage.setItem('bb_app_installed_or_dismissed', 'true');
+        setShowInstallBanner(false);
+      }
+      setDeferredPrompt(null);
+    } else {
+      setIsInstallModalOpen(true);
+    }
+  };
+
   const handleApplyCoupon = async () => {
     triggerHaptic();
     if (!enteredCoupon.trim()) {
@@ -636,34 +725,12 @@ export default function BbCafeHome() {
       if (couponSnap.exists()) {
         const data = couponSnap.data();
         const subtotal = getCartSubtotal();
+        if (subtotal < (data.minOrder || 0)) {
+          toast.dismiss(toastId);
+          toast.error(isHindi ? `न्यूनतम ऑर्डर राशि ₹${data.minOrder} होनी चाहिए!` : `Minimum order must be ₹${data.minOrder}!`);
+          return;
+        }
         
-        // नियम 1: न्यूनतम ₹99 बिल
-        const minLimit = Math.max(99, data.minOrder || 0);
-        if (subtotal < minLimit) {
-          toast.dismiss(toastId);
-          toast.error(isHindi 
-            ? `कूपन केवल ₹${minLimit} या उससे अधिक के बिल पर लागू हो सकता है!` 
-            : `Coupon is only applicable on bills of ₹${minLimit} or above!`
-          );
-          return;
-        }
-
-        // नियम 2: कार्ट में पिज्जा या सैंडविच होना आवश्यक है
-        const hasPizzaOrSandwich = cart.some((item: any) => {
-          const nameLower = (item.name || '').toLowerCase();
-          const catLower = (item.category || '').toLowerCase();
-          return nameLower.includes('pizza') || nameLower.includes('sandwich') || catLower.includes('pizza') || catLower.includes('sandwich');
-        });
-
-        if (!hasPizzaOrSandwich) {
-          toast.dismiss(toastId);
-          toast.error(isHindi 
-            ? "यह कूपन केवल पिज्जा या सैंडविच ऑर्डर करने पर ही लागू होगा!" 
-            : "This coupon is only applicable when ordering Pizza or Sandwich!"
-          );
-          return;
-        }
-
         setAppliedCoupon({
           code: codeUpper,
           discountValue: data.discount !== undefined ? data.discount : (data.discountValue !== undefined ? data.discountValue : 0),
@@ -688,8 +755,102 @@ export default function BbCafeHome() {
       toast.error(isHindi ? "कृपया पहले अपनी प्रोफाइल कस्टमाइज़ करें!" : "Please set up your profile first!");
       return;
     }
-    // यूपीआई गेटवे को पूरी तरह बाईपास कर दिया गया है
-    sendWhatsAppOrder();
+    if (paymentMethod === "upi") {
+      setIsUpiPopupOpen(true);
+    } else {
+      sendWhatsAppOrder();
+    }
+  };
+
+  const handleGiftPoints = async (e: React.FormEvent) => {
+    e.preventDefault();
+    triggerHaptic();
+    
+    if (!customerDetails?.phone) {
+      toast.error(isHindi ? "कृपया पहले अपनी प्रोफाइल कस्टमाइज़ करें!" : "Please set up your profile first!");
+      return;
+    }
+    
+    const senderPhoneClean = customerDetails.phone.replace("+91", "").trim();
+    const receiverPhoneClean = giftPhone.trim();
+    const pointsToGift = Number(giftPointsAmount);
+
+    if (!receiverPhoneClean || receiverPhoneClean.length !== 10) {
+      toast.error(isHindi ? "गिफ्ट प्राप्तकर्ता का नंबर 10 अंकों का होना चाहिए!" : "Friend's number must be 10 digits!");
+      return;
+    }
+    if (senderPhoneClean === receiverPhoneClean) {
+      toast.error(isHindi ? "आप स्वयं को पॉइंट्स गिफ्ट नहीं कर सकते!" : "You cannot gift points to yourself!");
+      return;
+    }
+    if (isNaN(pointsToGift) || pointsToGift <= 0) {
+      toast.error(isHindi ? "कृपया सही पॉइंट्स संख्या दर्ज करें!" : "Please enter a valid amount of points!");
+      return;
+    }
+    if (customerPoints < pointsToGift) {
+      toast.error(isHindi ? "आपके पास पर्याप्त पॉइंट्स उपलब्ध नहीं हैं!" : "You do not have enough points!");
+      return;
+    }
+    if (giftSenderPin !== customerDetails.pin) {
+      toast.error(isHindi ? "सुरक्षा पिन गलत है!" : "Invalid security PIN!");
+      return;
+    }
+
+    setIsGiftingLoading(true);
+    const toastId = toast.loading(isHindi ? "पॉइंट्स ट्रांसफर किए जा रहे हैं..." : "Transferring points...");
+
+    try {
+      const receiverDocRef = doc(db, "customer_points", receiverPhoneClean);
+      const receiverSnap = await getDoc(receiverDocRef);
+
+      if (!receiverSnap.exists()) {
+        toast.dismiss(toastId);
+        toast.error(isHindi ? "गिफ्ट पाने वाले का नंबर पंजीकृत नहीं है!" : "The receiver's number is not registered!");
+        setIsGiftingLoading(false);
+        return;
+      }
+
+      const senderDocRef = doc(db, "customer_points", senderPhoneClean);
+
+      await runTransaction(db, async (transaction) => {
+        const senderSnap = await transaction.get(senderDocRef);
+        if (!senderSnap.exists()) throw new Error("Sender records not found.");
+        
+        const currentSenderPoints = senderSnap.data().points || 0;
+        if (currentSenderPoints < pointsToGift) throw new Error("Insufficient points balance.");
+
+        transaction.update(senderDocRef, { points: increment(-pointsToGift) });
+        transaction.update(receiverDocRef, { points: increment(pointsToGift) });
+      });
+
+      await addDoc(collection(db, "customer_points", senderPhoneClean, "history"), {
+        type: 'redeem',
+        points: pointsToGift,
+        description: `Gifted points to ${receiverPhoneClean} 🎁`,
+        timestamp: new Date()
+      });
+
+      await addDoc(collection(db, "customer_points", receiverPhoneClean, "history"), {
+        type: 'earn',
+        points: pointsToGift,
+        description: `Received points from ${senderPhoneClean} 🎁`,
+        timestamp: new Date()
+      });
+
+      setCustomerPoints(prev => prev - pointsToGift);
+      toast.dismiss(toastId);
+      toast.success(isHindi ? "पॉइंट्स गिफ्ट कर दिए गए!" : "Points gifted successfully!");
+      
+      setIsGiftModalOpen(false);
+      setGiftPhone("");
+      setGiftPointsAmount("");
+      setGiftSenderPin("");
+    } catch (err: any) {
+      toast.dismiss(toastId);
+      toast.error(isHindi ? `स्थानांतरण विफल: ${err.message}` : `Transfer failed: ${err.message}`);
+    } finally {
+      setIsGiftingLoading(false);
+    }
   };
 
   const sendWhatsAppOrder = async () => {
@@ -698,6 +859,7 @@ export default function BbCafeHome() {
     if (isSubmittingOrder) return;
     setIsSubmittingOrder(true);
 
+    // --- ENTIRE LOGIC IN TRY-CATCH-FINALLY TO INSURE SUBMITTING ALWAYS RESETS ---
     try {
       if (!customerDetails) { 
         setIsProfileOpen(true); 
@@ -711,6 +873,10 @@ export default function BbCafeHome() {
 
       if (fulfillmentType === "table" && !tableNumber) {
         return toast.error(isHindi ? "कृपया टेबल चुनें!" : "Please select a table!");
+      }
+
+      if (paymentMethod === "upi" && !paymentScreenshot) {
+        return toast.error(isHindi ? "कृपया आगे बढ़ने से पहले यूपीआई भुगतान का स्क्रीनशॉट अपलोड करें!" : "Please upload UPI payment screenshot!");
       }
 
       const tokenNumber = Math.floor(1000 + Math.random() * 9000);
@@ -744,14 +910,38 @@ export default function BbCafeHome() {
       const pointsEarned = Math.floor(finalTotal / 100);
       const totalPointsCost = cart.reduce((acc: number, i: any) => acc + (i.pointsCost || 0), 0);
 
+      // --- SCREENSHOT UPLOAD TO FIREBASE STORAGE (WITH 3.5s STRICT TIMEOUT) ---
+      let screenshotUrl = "";
+      if (paymentMethod === "upi" && paymentScreenshot) {
+        const toastId = toast.loading(isHindi ? "स्क्रीनशॉट अपलोड हो रहा है..." : "Uploading screenshot...");
+        try {
+          const storage = getStorage();
+          const storageRef = ref(storage, `payment_screenshots/bill_${formattedBillStr}_${Date.now()}.jpg`);
+          
+          const uploadPromise = uploadString(storageRef, paymentScreenshot, 'data_url').then(async (uploadResult) => {
+            return await getDownloadURL(uploadResult.ref);
+          });
+          
+          const timeoutPromise = new Promise<string>((_, reject) => 
+            setTimeout(() => reject(new Error("Timeout")), 3500)
+          );
+
+          screenshotUrl = await Promise.race([uploadPromise, timeoutPromise]);
+          toast.dismiss(toastId);
+        } catch (err) {
+          console.warn("Storage upload bypassed (Proceeding with local base64):", err);
+          toast.dismiss(toastId);
+        }
+      }
+
       const orderObj = {
         billNumber, tokenNumber, deliveryPin, customerName: customerDetails.name, customerPhone: customerDetails.phone,
         address: fulfillmentType === "delivery" ? address : `Mode: ${fulfillmentType.toUpperCase()} ${fulfillmentType === 'table' ? `Table: ${tableNumber}` : ''}`, 
         items: cart, subtotal, discount: couponDiscount, total: finalTotal, timestamp: new Date(), status: 'pending',
         deliveryArea: fulfillmentType === "delivery" ? selectedArea.name : fulfillmentType.toUpperCase(), noCutlery, ketchupAddon, oreganoAddon, chiliFlakesAddon,
         fulfillmentType, tableNumber: fulfillmentType === "table" ? tableNumber : "", paymentMethod,
-        paymentScreenshot: "",
-        screenshotUrl: ""
+        paymentScreenshot: paymentScreenshot || "",
+        screenshotUrl: screenshotUrl || ""
       };
 
       await addDoc(collection(db, "orders"), orderObj);
@@ -800,10 +990,11 @@ export default function BbCafeHome() {
       const refCode = getReferralCode();
       
       const modeLabel = fulfillmentType === "delivery" ? `Delivery (${selectedArea.name})` : fulfillmentType === "pickup" ? "Self-Pickup 🛍️" : `Dine-In (Table: ${tableNumber}) 🍽️`;
-      // पेमेंट मोड को केवल नकद (COD / Cash) दिखाया जाएगा
-      const payModeLabel = fulfillmentType === "delivery" ? "Cash on Delivery (COD) 💵" : "Cash at Counter 💵";
+      const payModeLabel = paymentMethod === "cod" 
+        ? (fulfillmentType === "delivery" ? "Cash on Delivery (COD) 💵" : "Cash at Counter 💵")
+        : "UPI Online Payment 📱";
 
-      // --- व्हाट्सएप संदेश का निर्माण ---
+      // --- CONSTRUCT DYNAMIC MESSAGES ---
       let msg = `🔥 *BAM BAM CAFE - NEW ORDER*\n\n`;
       msg += `*Bill No:* #${formattedBillStr}\n`;
       msg += `*Token No:* #${tokenNumber}\n`;
@@ -835,6 +1026,14 @@ export default function BbCafeHome() {
         msg += `*Points Redeemed:* -${totalPointsCost} Pts\n`;
       }
 
+      if (paymentMethod === "upi") {
+        if (screenshotUrl) {
+          msg += `\n📸 *Payment Screenshot Link (JPG):*\n${screenshotUrl}\n`;
+        } else {
+          msg += `\n📸 *भुगतान स्क्रीनशॉट:* बिल #${formattedBillStr} के साथ डेटाबेस में सफलतापूर्वक सेव कर दिया गया है!\n`;
+        }
+      }
+
       msg += `\n_Confirm order by replying 'YES'_`;
       
       playSoundEffect('success');
@@ -856,20 +1055,77 @@ export default function BbCafeHome() {
         setAppliedCoupon(null); 
         setEnteredCoupon(""); 
         setIsCartOpen(false);
+        setPaymentScreenshot(null);
+        setIsUpiPopupOpen(false);
       }, 1500);
 
     } catch (error) {
       console.error("Critical submission error caught:", error);
       toast.error(isHindi ? "ऑर्डर जमा करने में समस्या आई! दोबारा कोशिश करें।" : "Error submitting order. Please try again.");
     } finally {
-      setIsSubmittingOrder(false); 
+      setIsSubmittingOrder(false); // ALWAYS RESET SUBMITTING STATE
     }
+  };
+
+  // --- HTML5 CANVAS BASED REAL-TIME COMPRESSION (SOLVES 1MB FIRESTORE CRASH) ---
+  const handleScreenshotChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    triggerHaptic();
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsCompressing(true);
+    const reader = new FileReader();
+    
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+
+        const MAX_DIM = 800;
+        if (width > MAX_DIM || height > MAX_DIM) {
+          if (width > height) {
+            height = Math.round((height * MAX_DIM) / width);
+            width = MAX_DIM;
+          } else {
+            width = Math.round((width * MAX_DIM) / height);
+            height = MAX_DIM;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          const compressedBase64 = canvas.toDataURL('image/jpeg', 0.6);
+          setPaymentScreenshot(compressedBase64);
+          toast.success(isHindi ? "स्क्रीनशॉट लोड और कंप्रेस हो गया!" : "Screenshot compressed & loaded!");
+        } else {
+          setPaymentScreenshot(event.target?.result as string);
+        }
+        setIsCompressing(false);
+      };
+      img.onerror = () => {
+        setIsCompressing(false);
+        toast.error("Error compression screen");
+      };
+      img.src = event.target?.result as string;
+    };
+
+    reader.onerror = () => {
+      setIsCompressing(false);
+      toast.error(isHindi ? "फाइल लोड करने में समस्या आई।" : "Error loading file.");
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleDetectLocation = () => {
     triggerHaptic();
     if (typeof window === "undefined" || !navigator.geolocation) {
-      toast.error(isHindi ? "जियोलोकेशन आपके डिवाइस परशारीरिक रूप से समर्थित नहीं है।" : "Geolocation is not supported by your device.");
+      toast.error(isHindi ? "जियोलोकेशन आपके डिवाइस पर समर्थित नहीं है।" : "Geolocation is not supported by your device.");
       return;
     }
 
@@ -1018,8 +1274,8 @@ export default function BbCafeHome() {
     });
 
     const noteParts = [];
-    if (selectedAddons.length > 0) noteParts.push("Add-ons: " + selectedAddons.join(', '));
-    if (chefNote) noteParts.push("Note: " + chefNote);
+    if (selectedAddons.length > 0) noteParts.push(`Add-ons: ${selectedAddons.join(', ')}`);
+    if (chefNote) noteParts.push(`Note: ${chefNote}`);
 
     addItem({
       id: `${selectedProduct.id}-${normalPizzaSize.toLowerCase()}`,
@@ -1232,6 +1488,7 @@ export default function BbCafeHome() {
           setIsBannerEnabled(storeData.isBannerEnabled ?? storeData.showPromoBanner ?? true);
           setIsInlineBannerEnabled(storeData.isInlineBannerEnabled ?? storeData.showInlinePromo ?? true);
           if (storeData.whatsappNumber) setWhatsappNumber(storeData.whatsappNumber);
+          if (storeData.upiId) setUpiId(storeData.upiId);
           if (storeData.latitude && storeData.longitude) {
             setStoreCoordinates({ lat: Number(storeData.latitude), lng: Number(storeData.longitude) });
           }
@@ -2484,8 +2741,8 @@ export default function BbCafeHome() {
             appliedCoupon={appliedCoupon}
             handleApplyCoupon={handleApplyCoupon}
             paymentMethod={paymentMethod}
-            setPaymentMethod={() => {}} // पेमेंट मेथड को केवल COD पर डिसेबल रखा गया है
-            setIsUpiPopupOpen={() => {}} // गेटवे पॉपअप डिसेबल किया गया है
+            setPaymentMethod={setPaymentMethod}
+            setIsUpiPopupOpen={setIsUpiPopupOpen}
             handleCheckoutClick={handleCheckoutClick}
             isSubmittingOrder={isSubmittingOrder}
             getCartSubtotal={getCartSubtotal}
@@ -2496,6 +2753,27 @@ export default function BbCafeHome() {
             getDisplayPrice={getDisplayPrice}
             triggerHaptic={triggerHaptic}
             showAddonsSection={showAddonsSection}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* MODULAR UPI POPUP MODAL */}
+      <AnimatePresence>
+        {isUpiPopupOpen && (
+          <UpiPaymentModal 
+            isHindi={isHindi}
+            isUpiPopupOpen={isUpiPopupOpen}
+            setIsUpiPopupOpen={setIsUpiPopupOpen}
+            getTotalBillPrice={getTotalBillPrice}
+            handleLaunchUpiPay={handleLaunchUpiPay}
+            handleScreenshotChange={handleScreenshotChange}
+            isCompressing={isCompressing}
+            paymentScreenshot={paymentScreenshot}
+            setPaymentScreenshot={setPaymentScreenshot}
+            sendWhatsAppOrder={sendWhatsAppOrder}
+            isSubmittingOrder={isSubmittingOrder}
+            triggerHaptic={triggerHaptic}
+            upiId={upiId} // Passed down correctly to safely avoid compile error
           />
         )}
       </AnimatePresence>
