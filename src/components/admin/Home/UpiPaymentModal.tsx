@@ -54,40 +54,21 @@ export default function UpiPaymentModal({
           </p>
         </div>
 
-        {/* यूपीआई ऐप्स ग्रिड */}
+        {/* यूपीआई ऐप्स ग्रिड (अब केवल PhonePe और Paytm) */}
         <div className="grid grid-cols-2 gap-2.5 pt-2">
-          <button 
-            type="button"
-            onClick={() => handleLaunchUpiPay('phonepe')}
-            className="p-3 bg-neutral-50 dark:bg-white/[0.02] border dark:border-white/5 border-neutral-200 hover:border-purple-500 rounded-xl flex items-center justify-center gap-2 transition-all active:scale-95 text-neutral-800 dark:text-white font-bold"
-          >
-            <img src="/phonepe.png" className="w-5 h-5 object-contain flex-shrink-0" alt="PhonePe" onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }} />
-            <span className="text-[10px] font-black font-sans">PhonePe</span>
-          </button>
-          <button 
-            type="button"
-            onClick={() => handleLaunchUpiPay('paytm')}
-            className="p-3 bg-neutral-50 dark:bg-white/[0.02] border dark:border-white/5 border-neutral-200 hover:border-blue-500 rounded-xl flex items-center justify-center gap-2 transition-all active:scale-95 text-neutral-800 dark:text-white font-bold"
-          >
-            <img src="/paytm.png" className="w-5 h-5 object-contain flex-shrink-0" alt="Paytm" onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }} />
-            <span className="text-[10px] font-black font-sans">Paytm</span>
-          </button>
-          <button 
-            type="button"
-            onClick={() => handleLaunchUpiPay('gpay')}
-            className="p-3 bg-neutral-50 dark:bg-white/[0.02] border dark:border-white/5 border-neutral-200 hover:border-green-500 rounded-xl flex items-center justify-center gap-2 transition-all active:scale-95 text-neutral-800 dark:text-white font-bold"
-          >
-            <div className="w-5 h-5 bg-gradient-to-tr from-blue-500 via-red-500 to-yellow-500 rounded-full flex items-center justify-center text-[8px] text-white font-black flex-shrink-0">G</div>
-            <span className="text-[10px] font-black font-sans">GPay</span>
-          </button>
-          <button 
-            type="button"
-            onClick={() => handleLaunchUpiPay('whatsapp')}
-            className="p-3 bg-neutral-50 dark:bg-white/[0.02] border dark:border-white/5 border-neutral-200 hover:border-green-600 rounded-xl flex items-center justify-center gap-2 transition-all active:scale-95 text-neutral-800 dark:text-white font-bold"
-          >
-            <img src="/whatsapp.png" className="w-5 h-5 object-contain flex-shrink-0" alt="WhatsApp Pay" onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }} />
-            <span className="text-[10px] font-black font-sans">WA Pay</span>
-          </button>
+          {['phonepe', 'paytm'].map((app) => (
+            <button 
+              key={app}
+              type="button"
+              onClick={() => handleLaunchUpiPay(app)}
+              className="p-3 bg-neutral-50 dark:bg-white/[0.02] border dark:border-white/5 border-neutral-200 hover:border-orange-500 rounded-xl flex items-center justify-center gap-2 transition-all active:scale-95 text-neutral-800 dark:text-white font-bold"
+            >
+              <img src={`/${app}.png`} className="w-5 h-5 object-contain flex-shrink-0" alt="" onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }} />
+              <span className="text-[10px] font-black font-sans">
+                {app === 'phonepe' ? 'PhonePe' : 'Paytm'}
+              </span>
+            </button>
+          ))}
         </div>
 
         {/* स्क्रीनशॉट अपलोडर */}
