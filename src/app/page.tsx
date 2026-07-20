@@ -313,6 +313,13 @@ export default function BbCafeHome() {
     return Math.max(0, subtotal + addPrice - couponDiscount) + delivery;
   };
 
+  const getFreeDeliveryProgressPercent = () => {
+    const subtotal = getCartSubtotal();
+    const limit = selectedArea.minFree;
+    if (subtotal >= limit) return 100;
+    return (subtotal / limit) * 100;
+  };
+
   const getCustomerTier = (points: number) => {
     if (points >= 50) return { name: "Platinum Member 👑", color: "text-cyan-700 border-cyan-500/40 bg-cyan-100/50 dark:text-cyan-400" };
     if (points >= 20) return { name: "Gold Member 🌟", color: "text-yellow-800 border-yellow-500/40 bg-yellow-100/50 dark:text-yellow-400" };
@@ -1373,59 +1380,52 @@ export default function BbCafeHome() {
       <SocialClaimModal isOpen={isClaimModalOpen} onClose={() => setIsClaimModalOpen(false)} isHindi={isHindi} claimingPlatform={claimingPlatform} claimUsername={claimUsername} setClaimUsername={setClaimUsername} isClaimingLoading={isClaimingLoading} handleClaimSubmit={handleClaimSubmit} triggerHaptic={triggerHaptic} />
 
       {/* Profile Drawer Component */}
-      <ProfileDrawer isOpen={isProfileOpen} onClose={() => setIsProfileOpen(false)} isHindi={isHindi} customerDetails={customerDetails} setCustomerDetails={setCustomerDetails} tempName={tempName} setTempName={setTempName} tempPhone={tempPhone} setTempPhone={setTempPhone} tempPin={tempPin} setTempPin={setTempPin} tempRefCode={tempRefCode} setTempRefCode={setTempRefCode} handleSaveDetails={handleSaveDetails} ecoCutlerySaves={ecoCutlerySaves} customerPoints={customerPoints} getCustomerTier={getCustomerTier} loyaltyRules={loyaltyRules} pointsHistory={pointsHistory} shareCount={shareCount} handleShareApp={handleShareApp} setIsGiftModalOpen={setIsGiftModalOpen} setClaimingPlatform={setClaimingPlatform} setIsClaimModalOpen={setIsClaimModalOpen} cart={cart} handleCustomerRedeem={handleCustomerRedeem} pastOrders={pastOrders} formatBillNumber={formatBillNumber} whatsappNumber={whatsappNumber} triggerHaptic={triggerHaptic} setTempNameState={setTempName} setTempPhoneState={setTempPhone} setTempPinState={setTempPin} />
+      <ProfileDrawer isOpen={isProfileOpen} onClose={() => setIsProfileOpen(false)} isHindi={isHindi} customerDetails={customerDetails} setCustomerDetails={setCustomerDetails} tempName={tempName} setTempName={setTempName} tempPhone={tempPhone} setTempPhone={setTempPhone} tempPin={tempPin} setTempPin={setTempPin} tempRefCode={tempRefCode} setTempRefCode={setTempRefCode} handleSaveDetails={handleSaveDetails} ecoCutlerySaves={ecoCutlerySaves} customerPoints={customerPoints} getCustomerTier={getCustomerTier} loyaltyRules={loyaltyRules} pointsHistory={pointsHistory} shareCount={shareCount} handleShareApp={handleShareApp} setIsGiftModalOpen={setIsGiftModalOpen} setClaimingPlatform={setClaimingPlatform} setIsClaimModalOpen={setIsClaimOpen} cart={cart} handleCustomerRedeem={handleCustomerRedeem} pastOrders={pastOrders} formatBillNumber={formatBillNumber} whatsappNumber={whatsappNumber} triggerHaptic={triggerHaptic} setTempNameState={setTempName} setTempPhoneState={setTempPhone} setTempPinState={setTempPin} />
 
       {/* SAFE COMPATIBLE INVOCATIONS FOR PREVENTING RUNTIME BLOCKING */}
       <SafeCartDrawer 
-        // Drawer toggle options to satisfy both formats safely
-        isOpen={isCartOpen}
         isCartOpen={isCartOpen}
-        open={isCartOpen}
-        show={isCartOpen}
-        onClose={closeCart}
-        close={closeCart}
-        setIsCartOpen={setIsCartOpen}
-        setIsOpen={setIsCartOpen}
-
-        // Standard Props list
+        setIsCartOpen={closeCart}
         cart={cart}
         addItem={addItem}
         removeItem={removeItem}
-        clearCart={clearCart}
-        subtotal={getCartSubtotal()}
-        total={getTotalBillPrice()}
+        upsellSuggestionItems={upsellSuggestionItems}
         fulfillmentType={fulfillmentType}
         setFulfillmentType={setFulfillmentType}
-        tableNumber={tableNumber}
-        setTableNumber={setTableNumber}
-        paymentMethod={paymentMethod}
-        setPaymentMethod={setPaymentMethod}
-        selectedArea={selectedArea}
-        setSelectedArea={setSelectedArea}
-        deliveryAreas={DELIVERY_AREAS}
-        address={address}
-        setAddress={setAddress}
-        isHindi={isHindi}
-        onCheckout={handleCheckoutClick}
-        customerDetails={customerDetails}
-        appliedCoupon={appliedCoupon}
-        setAppliedCoupon={setAppliedCoupon}
-        enteredCoupon={enteredCoupon}
-        setEnteredCoupon={setEnteredCoupon}
-        handleApplyCoupon={handleApplyCoupon}
         ketchupAddon={ketchupAddon}
         setKetchupAddon={setKetchupAddon}
         oreganoAddon={oreganoAddon}
         setOreganoAddon={setOreganoAddon}
         chiliFlakesAddon={chiliFlakesAddon}
         setChiliFlakesAddon={setChiliFlakesAddon}
+        selectedArea={selectedArea}
+        setSelectedArea={setSelectedArea}
+        DELIVERY_AREAS={DELIVERY_AREAS}
+        lastDeliveryAddress={lastDeliveryAddress}
+        address={address}
+        setAddress={setAddress}
+        handleDetectLocation={handleDetectLocation}
+        tableNumber={tableNumber}
+        setTableNumber={setTableNumber}
         noCutlery={noCutlery}
         setNoCutlery={setNoCutlery}
-        showAddonsSection={showAddonsSection}
+        enteredCoupon={enteredCoupon}
+        setEnteredCoupon={setEnteredCoupon}
+        appliedCoupon={appliedCoupon}
+        handleApplyCoupon={handleApplyCoupon}
+        paymentMethod={paymentMethod}
+        setPaymentMethod={setPaymentMethod}
+        setIsUpiPopupOpen={setIsUpiPopupOpen}
+        handleCheckoutClick={handleCheckoutClick}
         isSubmittingOrder={isSubmittingOrder}
-        handleDetectLocation={handleDetectLocation}
-        distanceKm={distanceKm}
-        lastDeliveryAddress={lastDeliveryAddress}
+        getCartSubtotal={getCartSubtotal}
+        getCartAddonsPrice={getCartAddonsPrice}
+        getDeliveryCharge={getDeliveryCharge}
+        getFreeDeliveryProgressPercent={getFreeDeliveryProgressPercent}
+        getTotalBillPrice={getTotalBillPrice}
+        getDisplayPrice={getDisplayPrice}
+        triggerHaptic={triggerHaptic}
+        showAddonsSection={showAddonsSection}
       />
 
       <SafeUpiPaymentModal 
