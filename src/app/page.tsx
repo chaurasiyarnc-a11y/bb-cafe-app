@@ -1,4 +1,7 @@
 
+
+src/app/page.tsx
+
 'use client';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { db } from '../lib/firebase'; 
@@ -13,18 +16,20 @@ import CategorySlider from '../components/admin/home/CategorySlider';
 import DiyPizzaBuilder from '../components/admin/home/DiyPizzaBuilder';
 import CartDrawer from '../components/admin/home/CartDrawer';
 import UpiPaymentModal from '../components/admin/home/UpiPaymentModal';
+
 const FALLBACK_CATEGORIES = ["All", "Special Pizza", "Special Thali", "Paneer Special", "Special Mix veg", "Fast Food", "Super Cool", "Indian Bread", "Special Rice"];
 
+// कैटेगरी इमेजेस का परफॉर्मेंस ऑप्टिमाइज़ेशन (Quality & Width optimized)
 const CATEGORY_IMAGES: { [key: string]: string } = {
-  "All": "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=150&q=80",
-  "Special Pizza": "https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=150&q=80",
-  "Special Thali": "https://images.unsplash.com/photo-1626777552726-4a6b54c97e46?auto=format&fit=crop&w=150&q=80",
-  "Paneer Special": "https://images.unsplash.com/photo-1631452180519-c014fe946bc7?auto=format&fit=crop&w=150&q=80",
-  "Special Mix veg": "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=150&q=80",
-  "Fast Food": "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=150&q=80",
-  "Super Cool": "https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?auto=format&fit=crop&w=150&q=80",
-  "Indian Bread": "https://images.unsplash.com/photo-1589301760014-d929f3979dbc?auto=format&fit=crop&w=150&q=80",
-  "Special Rice": "https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?auto=format&fit=crop&w=150&q=80"
+  "All": "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=120&q=70",
+  "Special Pizza": "https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=120&q=70",
+  "Special Thali": "https://images.unsplash.com/photo-1626777552726-4a6b54c97e46?auto=format&fit=crop&w=120&q=70",
+  "Paneer Special": "https://images.unsplash.com/photo-1631452180519-c014fe946bc7?auto=format&fit=crop&w=120&q=70",
+  "Special Mix veg": "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=120&q=70",
+  "Fast Food": "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=120&q=70",
+  "Super Cool": "https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?auto=format&fit=crop&w=120&q=70",
+  "Indian Bread": "https://images.unsplash.com/photo-1589301760014-d929f3979dbc?auto=format&fit=crop&w=120&q=70",
+  "Special Rice": "https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?auto=format&fit=crop&w=120&q=70"
 };
 
 const DELIVERY_AREAS = [
@@ -113,7 +118,7 @@ export default function BbCafeHome() {
 
   const [whatsappNumber, setWhatsappNumber] = useState("919714293759");
   
-  // कैफ़े की मुख्य UPI ID सेट की गई
+  // यूपीआई आईडी आपकी मर्चेंट आईडी से अपडेटेड है
   const [upiId, setUpiId] = useState("Q231198993@ybl");
   
   const [storeCoordinates, setStoreCoordinates] = useState({ lat: 24.2863, lng: 80.1245 });
@@ -340,9 +345,9 @@ export default function BbCafeHome() {
   const getCategoryImage = (catName: string) => {
     const found = dbCategories.find(c => String(c.name).toLowerCase().trim() === String(catName).toLowerCase().trim());
     if (found) {
-      return found.image || found.imageUrl || found.coverUrl || found.cover || found.url || CATEGORY_IMAGES[catName] || CATEGORY_IMAGES[found.name] || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=150&q=80";
+      return found.image || found.imageUrl || found.coverUrl || found.cover || found.url || CATEGORY_IMAGES[catName] || CATEGORY_IMAGES[found.name] || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=120&q=70";
     }
-    return CATEGORY_IMAGES[catName] || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=150&q=80";
+    return CATEGORY_IMAGES[catName] || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=120&q=70";
   };
 
   const getReferralCode = () => {
@@ -1668,7 +1673,6 @@ export default function BbCafeHome() {
           </div>
         )}
         
-        {/* Promo Banner */}
         {isBannerEnabled && banners.length > 0 && !bannerError && (
           <div className="w-full h-36 rounded-2xl overflow-hidden relative border border-white/5 bg-white/[0.02]">
             <AnimatePresence mode="wait">
@@ -1777,14 +1781,14 @@ export default function BbCafeHome() {
                     <motion.div 
                       layout 
                       className={`group dark:bg-white/[0.02] bg-white rounded-2xl border dark:border-white/5 border-neutral-200 overflow-hidden flex flex-col relative shadow-md shadow-neutral-100 dark:shadow-none transition-all duration-300 hover:shadow-lg ${!isItemAvailable ? 'opacity-70' : ''}`}
-                      initial={{ opacity: 0, y: 30 }}
+                      initial={{ opacity: 0, y: 15 }}
                       whileInView={{ opacity: 1, y: 0 }}
-                      viewport={{ once: true, margin: "-50px" }}
-                      transition={{ duration: 0.45, ease: "easeOut" }}
+                      viewport={{ once: true, margin: "-30px" }}
+                      transition={{ duration: 0.35, ease: "easeOut" }}
                     >
                       <div className="relative h-44 w-full overflow-hidden font-sans">
                         <img 
-                          src={item.image || item.imageUrl || item.url || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=500&q=80"} 
+                          src={item.image || item.imageUrl || item.url || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=400&q=70"} 
                           className="w-full h-full object-cover origin-center transition-transform duration-700 ease-out group-hover:scale-110" 
                           alt={item.name} 
                           loading="lazy"
@@ -2299,7 +2303,7 @@ export default function BbCafeHome() {
                 <div className="space-y-3 mb-4 border-t border-neutral-200 dark:border-white/5 pt-3">
                   <p className="text-[10px] font-bold text-neutral-600 dark:text-gray-400 uppercase">{isHindi ? "2. एक्स्ट्रा मसाला/टॉपिंग चुनें:" : "2. Select Add-ons:"}</p>
                   <div className="grid grid-cols-2 gap-2 font-sans">
-                    {Object.entries(PIZZA_ADDONS[normalPizzaSize.toLowerCase()] || {}).map(([addon, cost]) => {
+                    {Object.entries(PIZZA_ADDONS[normalPizzaSize.toLowerCase()] || {}).map(([addon, cost]: any) => {
                       const isSelected = !!normalPizzaAddons[addon];
                       return (
                         <button
@@ -2320,7 +2324,7 @@ export default function BbCafeHome() {
               <div className="space-y-2 mb-6 border-t border-neutral-200 dark:border-white/5 pt-3">
                 <p className="text-[10px] font-bold text-neutral-600 dark:text-gray-400 uppercase">{isHindi ? "शेफ के लिए विशेष निर्देश:" : "Special Note for Chef / Instructions:"}</p>
                 <div className="flex flex-wrap gap-1.5 pb-2">
-                  {QUICK_INSTRUCTION_TAGS.map((tag) => (
+                  {QUICK_INSTRUCTION_TAGS.map((tag: any) => (
                     <button
                       type="button"
                       key={tag}
@@ -2564,7 +2568,7 @@ export default function BbCafeHome() {
                               </div>
 
                               <a 
-                                href={`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(`नमस्ते बम बम कैफ़े! कृपया मेरे आर्डर नंबर #${formatBillNumber(ord.billNumber)} (टोकन नंबर: #${ord.tokenNumber}) का लाइव स्टेटस बताएं।`)}`}
+                                href={`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(`नमस्ते  बम बम कैफ़े!  कृपया मेरे आर्डर नंबर #${formatBillNumber(ord.billNumber)} (टोकन नंबर: #${ord.tokenNumber}) का लाइव स्टेटस बताएं।`)}`}
                                 target="_blank"
                                 rel="noreferrer"
                                 className="w-full bg-orange-500/10 text-orange-600 hover:bg-orange-500 hover:text-white dark:bg-white/5 hover:dark:bg-white/10 text-center text-[10px] font-black py-2.5 rounded-xl block border dark:border-neutral-800 border-orange-500/20 transition-all"
