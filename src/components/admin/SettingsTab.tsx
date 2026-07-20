@@ -700,7 +700,9 @@ export default function SettingsTab({
               })}
             </div>
           </div>
-
+           <div className="mt-6">
+             <SocialCountsEditor />
+            </div>
           {/* Dine-In Table QR Generator */}
           <div className="bg-[#111] border border-white/5 p-6 rounded-[2.5rem] space-y-4 text-xs font-bold text-left">
             <div>
