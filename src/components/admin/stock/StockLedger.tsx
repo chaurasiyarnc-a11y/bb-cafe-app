@@ -31,7 +31,7 @@ export default function StockLedger({
 
       <div className="space-y-2.5 max-h-[55vh] overflow-y-auto pr-1">
         {unifiedLedger
-          .filter((log) => {
+          .filter((log: any) => {
             if (ledgerFilter === 'IN') return log.type === 'IN';
             if (ledgerFilter === 'OUT') return log.type === 'OUT';
             return true;
