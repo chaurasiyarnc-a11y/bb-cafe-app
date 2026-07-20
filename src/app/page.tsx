@@ -1,5 +1,6 @@
-'use client';
 
+
+'use client';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { db } from '../lib/firebase'; 
 import { collection, onSnapshot, query, addDoc, doc, setDoc, increment, runTransaction, getDoc, getDocs, where, limit, orderBy } from 'firebase/firestore';
@@ -456,6 +457,20 @@ export default function BbCafeHome() {
     if (store?.toggle) store.toggle(false);
   };
 
+  const handleCheckoutClick = () => {
+    triggerHaptic();
+    if (!customerDetails) {
+      setIsProfileOpen(true);
+      toast.error(isHindi ? "कृपया पहले अपनी प्रोफाइल कस्टमाइज़ करें!" : "Please set up your profile first!");
+      return;
+    }
+    if (paymentMethod === "upi") {
+      setIsUpiPopupOpen(true);
+    } else {
+      sendWhatsAppOrder();
+    }
+  };
+
   const handleToggleFavorite = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     triggerHaptic();
@@ -744,6 +759,167 @@ export default function BbCafeHome() {
     }
     setActiveStory(null);
     toast.success("आइटम कार्ट में जोड़ा गया!");
+  };
+
+  const sendWhatsAppOrder = async () => {
+    triggerHaptic();
+    
+    if (isSubmittingOrder) return;
+    setIsSubmittingOrder(true);
+
+    if (!customerDetails) { 
+      setIsProfileOpen(true); 
+      toast.error("ऑर्डर करने के लिए पहले अपनी प्रोफाइल बनाएं! 👤");
+      setIsSubmittingOrder(false);
+      return; 
+    }
+
+    if (fulfillmentType === "delivery" && (!address || address.trim().length < 10)) {
+      setIsSubmittingOrder(false);
+      return toast.error("Please enter full address!");
+    }
+
+    if (fulfillmentType === "table" && !tableNumber) {
+      setIsSubmittingOrder(false);
+      return toast.error(isHindi ? "कृपया टेबल चुनें!" : "Please select a table!");
+    }
+
+    if (paymentMethod === "upi" && !paymentScreenshot) {
+      setIsSubmittingOrder(false);
+      return toast.error(isHindi ? "कृपया आगे बढ़ने से पहले यूपीआई भुगतान का स्क्रीनशॉट अपलोड करें!" : "Please upload UPI payment screenshot!");
+    }
+
+    const tokenNumber = Math.floor(1000 + Math.random() * 9000);
+    const deliveryPin = Math.floor(1000 + Math.random() * 9000);
+
+    let billNumber = 1;
+    const counterDocRef = doc(db, "settings", "store_bill_counter");
+
+    try {
+      await runTransaction(db, async (transaction) => {
+        const counterDoc = await transaction.get(counterDocRef);
+        if (!counterDoc.exists()) {
+          transaction.set(counterDocRef, { nextBillNumber: 2 });
+          billNumber = 1;
+        } else {
+          billNumber = counterDoc.data().nextBillNumber || 1;
+          transaction.update(counterDocRef, { nextBillNumber: billNumber + 1 });
+        }
+      });
+    } catch (e) { 
+      billNumber = Math.floor((Date.now() / 1000) % 100000); 
+    }
+
+    const formattedBillStr = formatBillNumber(billNumber);
+    const subtotal = getCartSubtotal();
+    const addOnsCost = getCartAddonsPrice();
+    const deliveryCharge = getDeliveryCharge();
+    const couponDiscount = appliedCoupon ? Number(appliedCoupon.discountValue) : 0;
+    const finalTotal = getTotalBillPrice();
+    
+    const pointsEarned = Math.floor(finalTotal / 100);
+    const totalPointsCost = cart.reduce((acc: number, i: any) => acc + (i.pointsCost || 0), 0);
+
+    const orderObj = {
+      billNumber, tokenNumber, deliveryPin, customerName: customerDetails.name, customerPhone: customerDetails.phone,
+      address: fulfillmentType === "delivery" ? address : `Mode: ${fulfillmentType.toUpperCase()} ${fulfillmentType === 'table' ? `Table: ${tableNumber}` : ''}`, 
+      items: cart, subtotal, discount: couponDiscount, total: finalTotal, timestamp: new Date(), status: 'pending',
+      deliveryArea: fulfillmentType === "delivery" ? selectedArea.name : fulfillmentType.toUpperCase(), noCutlery, ketchupAddon, oreganoAddon, chiliFlakesAddon,
+      fulfillmentType, tableNumber: fulfillmentType === "table" ? tableNumber : "", paymentMethod,
+      paymentScreenshot: paymentScreenshot || ""
+    };
+
+    try {
+      await addDoc(collection(db, "orders"), orderObj);
+      const phoneClean = customerDetails.phone.replace("+91", "");
+      if (pointsEarned > 0 || totalPointsCost > 0) {
+        await setDoc(doc(db, "customer_points", phoneClean), {
+          name: customerDetails.name, phone: phoneClean, points: increment(pointsEarned - totalPointsCost), lastActive: new Date()
+        }, { merge: true });
+
+        if (pointsEarned > 0) {
+          await addDoc(collection(db, "customer_points", phoneClean, "history"), {
+            type: 'earn',
+            points: pointsEarned,
+            description: `Ordered Bill #${formattedBillStr} 🍕`,
+            timestamp: new Date()
+          });
+        }
+        if (totalPointsCost > 0) {
+          await addDoc(collection(db, "customer_points", phoneClean, "history"), {
+            type: 'redeem',
+            points: totalPointsCost,
+            description: `Redeemed rewards on Bill #${formattedBillStr} 🎁`,
+            timestamp: new Date()
+          });
+        }
+      }
+    } catch (e) {
+      toast.error("Database sync failed. Kripya dobara try karein.");
+      setIsSubmittingOrder(false); 
+      return;
+    }
+
+    const updatedPastOrders = [orderObj, ...pastOrders];
+    setPastOrders(updatedPastOrders);
+    localStorage.setItem('bb_past_orders', JSON.stringify(updatedPastOrders));
+    setLastPlacedOrder(orderObj);
+
+    let itemsText = "";
+    cart.forEach((i: any) => {
+      itemsText += `• ${i.name || "Item"} x${i.quantity || 1} - ₹${(i.price || 0) * (i.quantity || 1)}\n`;
+      if (i.note) {
+        itemsText += `  └─ *Note:* ${i.note}\n`;
+      }
+    });
+    
+    if (ketchupAddon) itemsText += `• Extra Tomato Ketchup x1 - ₹10\n`;
+    if (oreganoAddon) itemsText += `• Extra Oregano x1 - ₹10\n`;
+    if (chiliFlakesAddon) itemsText += `• Extra Chili Flakes x1 - ₹10\n`;
+    if (noCutlery) itemsText += `🌱 (Eco-Friendly: No plastic cutlery requested)\n`;
+
+    const refCode = getReferralCode();
+    
+    const modeLabel = fulfillmentType === "delivery" ? `Delivery (${selectedArea.name})` : fulfillmentType === "pickup" ? "Self-Pickup 🛍️" : `Dine-In (Table: ${tableNumber}) 🍽️`;
+    const payModeLabel = paymentMethod === "cod" 
+      ? (fulfillmentType === "delivery" ? "Cash on Delivery (COD) 💵" : "Cash at Counter 💵")
+      : "UPI Online Payment 📱";
+
+    let msg = `🔥 *BAM BAM CAFE - NEW ORDER*\n\n*Bill No:* #${formattedBillStr}\n*Token No:* #${tokenNumber}\n*Customer:* ${customerDetails.name}\n*Phone:* ${customerDetails.phone}\n*Fulfillment Mode:* ${modeLabel}\n${fulfillmentType === 'delivery' ? `*Address:* ${address}\n` : ''}*Payment Method:* ${payModeLabel}\n\n*ITEMS:*\n${itemsText}\n*Subtotal:* ₹${subtotal + addOnsCost}\n*Coupon Discount:* -₹${couponDiscount}\n${fulfillmentType === 'delivery' ? `*Delivery:* ₹${deliveryCharge}\n` : ''}*TOTAL BILL: ₹${finalTotal}*\n\n🔑 *Delivery PIN:* ${deliveryPin} (Rider ko ye confirm karke hi order le)\n*Invite Code:* ${refCode}\n*Points Earned:* +${pointsEarned} Pts\n${totalPointsCost > 0 ? `*Points Redeemed:* -${totalPointsCost} Pts\n` : ''}`;
+    
+    if (paymentMethod === "upi") {
+      msg += `\n\n📸 *भुगतान स्क्रीनशॉट:* बिल #${formattedBillStr} के साथ डेटाबेस में सफलतापूर्वक सेव कर दिया गया है!`;
+    }
+
+    msg += `\n\n_Confirm order by replying 'YES'_`;
+    
+    playSoundEffect('success');
+    setConfettiActive(true);
+    setTimeout(() => setConfettiActive(false), 5000);
+
+    try {
+      await navigator.clipboard.writeText(msg);
+      toast.success(isHindi ? "ऑर्डर विवरण कॉपी कर लिया गया है!" : "Order details copied to clipboard!");
+    } catch (err) {}
+
+    if (paymentMethod === "upi") {
+      alert(isHindi ? "भुगतान स्क्रीनशॉट डेटाबेस में अपलोड हो गया है! व्हाट्सएप खुलने पर चैट में कृपया स्क्रीनशॉट भी अटैच करके भेजें।" : "Screenshot uploaded to DB! Please attach the screenshot from your gallery in the WhatsApp chat.");
+    }
+
+    setTimeout(() => {
+      window.open(`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(msg)}`, '_blank');
+      clearCart(); 
+      setKetchupAddon(false);
+      setOreganoAddon(false);
+      setChiliFlakesAddon(false);
+      setNoCutlery(false);
+      setAppliedCoupon(null); 
+      setEnteredCoupon(""); 
+      setIsCartOpen(false);
+      setIsSubmittingOrder(false); 
+      setPaymentScreenshot(null);
+      setIsUpiPopupOpen(false);
+    }, 1500);
   };
 
   // --- LIFECYCLES ---
