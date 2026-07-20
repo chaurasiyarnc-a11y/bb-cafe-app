@@ -1085,7 +1085,6 @@ export default function BbCafeHome() {
         let width = img.width;
         let height = img.height;
 
-        // Downscale image dimensions if exceeding 800px
         const MAX_DIM = 800;
         if (width > MAX_DIM || height > MAX_DIM) {
           if (width > height) {
@@ -1103,7 +1102,6 @@ export default function BbCafeHome() {
         const ctx = canvas.getContext('2d');
         if (ctx) {
           ctx.drawImage(img, 0, 0, width, height);
-          // Compress heavily as JPEG with 0.6 quality (converts 4MB to ~60KB)
           const compressedBase64 = canvas.toDataURL('image/jpeg', 0.6);
           setPaymentScreenshot(compressedBase64);
           toast.success(isHindi ? "स्क्रीनशॉट लोड और कंप्रेस हो गया!" : "Screenshot compressed & loaded!");
@@ -2777,8 +2775,7 @@ export default function BbCafeHome() {
             sendWhatsAppOrder={sendWhatsAppOrder}
             isSubmittingOrder={isSubmittingOrder}
             triggerHaptic={triggerHaptic}
-            upiId={upiId}
-             // Passed down to safely support copy & QR code
+            upiId={upiId} // Passed down correctly to safely avoid compile error
           />
         )}
       </AnimatePresence>
