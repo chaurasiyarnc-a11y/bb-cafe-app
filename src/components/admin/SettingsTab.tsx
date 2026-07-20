@@ -399,6 +399,9 @@ export default function SettingsTab({
             {banners.map(b => (
               <div key={b.id} className="bg-white/[0.02] border border-white/5 p-3 rounded-2xl relative">
                 <div className="h-24 overflow-hidden rounded-xl bg-neutral-900 flex items-center justify-center">
+                  <div className="mt-6">
+             <SocialCountsEditor />
+            </div>
                   {isVideoUrl(b.url) ? (
                     <video src={b.url} muted className="w-full h-full object-cover" />
                   ) : (
@@ -477,9 +480,7 @@ export default function SettingsTab({
             <button type="submit" className="w-full bg-green-600 text-white p-3.5 rounded-xl font-black text-xs uppercase">Update Timings & Map</button>
           </form>
         </div>
-      <div className="mt-6">
-             <SocialCountsEditor />
-            </div>
+     
       )}
 
       {/* --- SUB-TAB 4: COUPONS --- */}
