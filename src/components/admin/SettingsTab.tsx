@@ -477,6 +477,9 @@ export default function SettingsTab({
             <button type="submit" className="w-full bg-green-600 text-white p-3.5 rounded-xl font-black text-xs uppercase">Update Timings & Map</button>
           </form>
         </div>
+      <div className="mt-6">
+             <SocialCountsEditor />
+            </div>
       )}
 
       {/* --- SUB-TAB 4: COUPONS --- */}
@@ -700,9 +703,7 @@ export default function SettingsTab({
               })}
             </div>
           </div>
-           <div className="mt-6">
-             <SocialCountsEditor />
-            </div>
+           
           {/* Dine-In Table QR Generator */}
           <div className="bg-[#111] border border-white/5 p-6 rounded-[2.5rem] space-y-4 text-xs font-bold text-left">
             <div>
