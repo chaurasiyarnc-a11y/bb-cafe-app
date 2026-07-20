@@ -63,7 +63,7 @@ interface CartDrawerProps {
   getFreeDeliveryProgressPercent: () => number;
   getTotalBillPrice: () => number;
   getDisplayPrice: (item: any) => string;
-  triggerHaptic: (ms?: number) => void;
+  triggerHaptic: (ms?: number) => void; // वैकल्पिक नंबर फिक्स
   showAddonsSection: boolean;
 }
 
@@ -163,7 +163,7 @@ export default function CartDrawer({
           </div>
         )}
 
-        {/* 3. ADD ADD-ONS (सलेक्ट ऑर्डर मोड के ऊपर ले जाया गया) */}
+        {/* 3. ADD ADD-ONS (ऑर्डर मोड के ऊपर ले जाया गया) */}
         {showAddonsSection && (
           <div className="dark:bg-white/[0.02] bg-neutral-50 border dark:border-white/5 border-neutral-200 rounded-2xl p-4 space-y-2.5 transition-colors duration-200 mt-4 font-sans font-bold">
             <p className="text-[9px] font-black uppercase text-neutral-800 dark:text-gray-400">{isHindi ? "ऐड-ऑन्स जोड़ें (Add-ons):" : "Add Add-ons to order:"}</p>
@@ -181,7 +181,7 @@ export default function CartDrawer({
           </div>
         )}
 
-        {/* 4. SELECT ORDER MODE (अब नीचे स्थित है) */}
+        {/* 4. SELECT ORDER MODE (अब ऐड-ऑन्स के नीचे है) */}
         <div className="dark:bg-white/[0.02] bg-neutral-50 p-4 rounded-2xl border dark:border-white/5 border-neutral-200 space-y-2.5 transition-colors duration-200 mt-4 font-sans font-bold">
           <label className="text-[10px] font-black uppercase text-neutral-800 dark:text-gray-400">{isHindi ? "ऑर्डर का माध्यम चुनें:" : "Select Order Mode:"}</label>
           <div className="grid grid-cols-3 gap-2">
@@ -194,7 +194,7 @@ export default function CartDrawer({
             </button>
             <button
               onClick={() => { triggerHaptic(); setFulfillmentType("pickup"); }}
-              className={`py-3 px-1 rounded-xl border flex flex-col items-center justify-center gap-1.5 transition-all text-center ${fulfillmentType === "pickup" ? 'border-orange-500 bg-orange-500/10 text-orange-600 font-black shadow-sm' : 'border-neutral-300 dark:border-white/5 text-neutral-800 dark:text-gray-300 font-semibold'}`}
+              className={`py-3 px-1 rounded-xl border flex flex-col items-center justify-center gap-1.5 transition-all text-center ${fulfillmentType === "pickup" ? 'border-orange-500 bg-orange-500/10 text-orange-600 font-black shadow-sm' : 'border-neutral-300 dark:border-white/5 text-neutral-800 dark:text-gray-300'}`}
             >
               <span className="text-base">🛍️</span>
               <span className="text-[9px] font-black">{isHindi ? "सेल्फ-पिकअप" : "Self-Pickup"}</span>
