@@ -63,7 +63,7 @@ interface CartDrawerProps {
   getFreeDeliveryProgressPercent: () => number;
   getTotalBillPrice: () => number;
   getDisplayPrice: (item: any) => string;
-  triggerHaptic: (ms?: number) => void; // यहाँ ठीक किया गया
+  triggerHaptic: (ms?: number) => void;
   showAddonsSection: boolean;
 }
 
@@ -163,7 +163,25 @@ export default function CartDrawer({
           </div>
         )}
 
-        {/* 3. SELECT ORDER MODE */}
+        {/* 3. ADD ADD-ONS (सलेक्ट ऑर्डर मोड के ऊपर ले जाया गया) */}
+        {showAddonsSection && (
+          <div className="dark:bg-white/[0.02] bg-neutral-50 border dark:border-white/5 border-neutral-200 rounded-2xl p-4 space-y-2.5 transition-colors duration-200 mt-4 font-sans font-bold">
+            <p className="text-[9px] font-black uppercase text-neutral-800 dark:text-gray-400">{isHindi ? "ऐड-ऑन्स जोड़ें (Add-ons):" : "Add Add-ons to order:"}</p>
+            <div className="grid grid-cols-3 gap-2">
+              <button onClick={() => { triggerHaptic(); setKetchupAddon(!ketchupAddon); }} className={`p-2 rounded-xl border text-[9.5px] font-black ${ketchupAddon ? 'border-red-500 bg-red-500/5 text-red-600' : 'border-neutral-300 dark:border-white/5 bg-transparent text-neutral-800 dark:text-gray-300'}`}>
+                {isHindi ? "केचप" : "Ketchup"} (+₹10)
+              </button>
+              <button onClick={() => { triggerHaptic(); setOreganoAddon(!oreganoAddon); }} className={`p-2 rounded-xl border text-[9.5px] font-black ${oreganoAddon ? 'border-yellow-500 bg-yellow-500/5 text-yellow-600' : 'border-neutral-300 dark:border-white/5 bg-transparent text-neutral-800 dark:text-gray-300'}`}>
+                {isHindi ? "ऑरेगैनो" : "Oregano"} (+₹10)
+              </button>
+              <button onClick={() => { triggerHaptic(); setChiliFlakesAddon(!chiliFlakesAddon); }} className={`p-2 rounded-xl border text-[9.5px] font-black ${chiliFlakesAddon ? 'border-orange-500 bg-orange-500/5 text-orange-600' : 'border-neutral-300 dark:border-white/5 bg-transparent text-neutral-800 dark:text-gray-300'}`}>
+                {isHindi ? "चिली फ्लेक्स" : "Chili Flakes"} (+₹10)
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* 4. SELECT ORDER MODE (अब नीचे स्थित है) */}
         <div className="dark:bg-white/[0.02] bg-neutral-50 p-4 rounded-2xl border dark:border-white/5 border-neutral-200 space-y-2.5 transition-colors duration-200 mt-4 font-sans font-bold">
           <label className="text-[10px] font-black uppercase text-neutral-800 dark:text-gray-400">{isHindi ? "ऑर्डर का माध्यम चुनें:" : "Select Order Mode:"}</label>
           <div className="grid grid-cols-3 gap-2">
@@ -190,25 +208,6 @@ export default function CartDrawer({
             </button>
           </div>
         </div>
-
-        {/* 4. ADD ADD-ONS */}
-        {showAddonsSection && (
-          <div className="dark:bg-white/[0.02] bg-neutral-50 border dark:border-white/5 border-neutral-200 rounded-2xl p-4 space-y-2.5 transition-colors duration-200 mt-4 font-sans font-bold">
-            <p className="text-[9px] font-black uppercase text-neutral-800 dark:text-gray-400">{isHindi ? "ऐड-ऑन्स जोड़ें (Add-ons):" : "Add Add-ons to order:"}</p>
-            <div className="grid grid-cols-3 gap-2">
-              <button onClick={() => { triggerHaptic(); setKetchupAddon(!ketchupAddon); }} className={`p-2 rounded-xl border text-[9.5px] font-black ${ketchupAddon ? 'border-red-500 bg-red-500/5 text-red-600' : 'border-neutral-300 dark:border-white/5 bg-transparent text-neutral-800 dark:text-gray-300'}`}>
-                {isHindi ? "केचप" : "Ketchup"} (+₹10)
-              </button>
-              {/* यहाँ ठीक किया गया */}
-              <button onClick={() => { triggerHaptic(); setOreganoAddon(!oreganoAddon); }} className={`p-2 rounded-xl border text-[9.5px] font-black ${oreganoAddon ? 'border-yellow-500 bg-yellow-500/5 text-yellow-600' : 'border-neutral-300 dark:border-white/5 bg-transparent text-neutral-800 dark:text-gray-300'}`}>
-                {isHindi ? "ऑरेगैनो" : "Oregano"} (+₹10)
-              </button>
-              <button onClick={() => { triggerHaptic(); setChiliFlakesAddon(!chiliFlakesAddon); }} className={`p-2 rounded-xl border text-[9.5px] font-black ${chiliFlakesAddon ? 'border-orange-500 bg-orange-500/5 text-orange-600' : 'border-neutral-300 dark:border-white/5 bg-transparent text-neutral-800 dark:text-gray-300'}`}>
-                {isHindi ? "चिली फ्लेक्स" : "Chili Flakes"} (+₹10)
-              </button>
-            </div>
-          </div>
-        )}
 
         {/* 5. CONDITIONAL INPUTS */}
         {fulfillmentType === "delivery" && (
@@ -278,7 +277,7 @@ export default function CartDrawer({
                       className={`p-2.5 rounded-lg border text-[10px] font-black text-center transition-all ${
                         isSelected 
                           ? 'border-orange-500 bg-orange-500/15 text-orange-600 dark:text-orange-400 shadow-sm font-black' 
-                          : 'border-neutral-300 dark:border-white/10 bg-white dark:bg-white/5 text-neutral-800 dark:text-neutral-300 hover:border-neutral-400'
+                          : 'border-neutral-300 dark:border-white/10 bg-white dark:bg-white/5 text-neutral-800 dark:text-neutral-300'
                       }`}
                     >
                       <span className="block">{t}</span>
@@ -302,7 +301,7 @@ export default function CartDrawer({
                       className={`p-2.5 rounded-lg border text-[10px] font-black text-center transition-all ${
                         isSelected 
                           ? 'border-orange-500 bg-orange-500/15 text-orange-600 dark:text-orange-400 shadow-sm font-black' 
-                          : 'border-neutral-300 dark:border-white/10 bg-white dark:bg-white/5 text-neutral-800 dark:text-neutral-300 hover:border-neutral-400'
+                          : 'border-neutral-300 dark:border-white/10 bg-white dark:bg-white/5 text-neutral-800 dark:text-neutral-300'
                       }`}
                     >
                       <span className="block">{t}</span>
