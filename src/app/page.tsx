@@ -9,10 +9,10 @@ import toast, { Toaster } from 'react-hot-toast';
 import { useCartStore } from '../store/useCartStore';
 
 // सब-कंपोनेंट्स इम्पोर्ट्स
-import CategorySlider from '@/components/home/CategorySlider';
-import DiyPizzaBuilder from '@/components/home/DiyPizzaBuilder';
-import CartDrawer from '@/components/home/CartDrawer';
-import UpiPaymentModal from '@/components/home/UpiPaymentModal';
+import CategorySlider from '../components/admin/home/CategorySlider';
+import DiyPizzaBuilder from '../components/admin/home/DiyPizzaBuilder';
+import CartDrawer from '../components/admin/home/CartDrawer';
+import UpiPaymentModal from '../components/admin/home/UpiPaymentModal';
 
 const FALLBACK_CATEGORIES = ["All", "Special Pizza", "Special Thali", "Paneer Special", "Special Mix veg", "Fast Food", "Super Cool", "Indian Bread", "Special Rice"];
 
