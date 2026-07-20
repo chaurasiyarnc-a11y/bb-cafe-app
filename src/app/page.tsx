@@ -761,6 +761,24 @@ export default function BbCafeHome() {
     toast.success("आइटम कार्ट में जोड़ा गया!");
   };
 
+  const handleLaunchUpiPay = (platform: string) => {
+    triggerHaptic();
+    const amount = getTotalBillPrice();
+    const merchantName = "Bum Bum Cafe";
+    const transactionNote = `BumBumCafe Order`;
+    const standardUpi = `upi://pay?pa=${upiId}&pn=${encodeURIComponent(merchantName)}&am=${amount}&cu=INR&tn=${encodeURIComponent(transactionNote)}`;
+    
+    if (platform === 'phonepe') {
+      window.location.href = `phonepe://pay?pa=${upiId}&pn=${encodeURIComponent(merchantName)}&am=${amount}&cu=INR&tn=${encodeURIComponent(transactionNote)}`;
+    } else if (platform === 'paytm') {
+      window.location.href = `paytmmp://pay?pa=${upiId}&pn=${encodeURIComponent(merchantName)}&am=${amount}&cu=INR&tn=${encodeURIComponent(transactionNote)}`;
+    } else if (platform === 'gpay') {
+      window.location.href = `tez://upi/pay?pa=${upiId}&pn=${encodeURIComponent(merchantName)}&am=${amount}&cu=INR&tn=${encodeURIComponent(transactionNote)}`;
+    } else {
+      window.location.href = standardUpi;
+    }
+  };
+
   const sendWhatsAppOrder = async () => {
     triggerHaptic();
     
