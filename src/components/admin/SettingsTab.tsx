@@ -32,10 +32,10 @@ export default function SettingsTab({
   cafeHelperUsers,
   passcodes,
   userRole,
-  storeOpen // [सुधार] storeOpen को यहाँ डीस्ट्रक्चर कर दिया गया है
+  storeOpen
 }: SettingsTabProps) {
   // --- LOCAL STATES ---
-  const [activeSubTab, setActiveSubTab] = useState<'banners' | 'reels' | 'categories' | 'header_video' | 'coupons' | 'reviews' | 'proofs' | 'claims' | 'security'>('banners');
+  const [activeSubTab, setActiveSubTab] = useState<'banners' | 'reels' | 'categories' | 'social_counts' | 'header_video' | 'coupons' | 'reviews' | 'proofs' | 'claims' | 'security'>('banners');
 
   // Promo Banners State
   const [newBannerUrl, setNewBannerUrl] = useState("");
@@ -48,10 +48,13 @@ export default function SettingsTab({
   const [newReelDesc, setNewReelDesc] = useState("");
   const [newReelPrice, setNewReelPrice] = useState("");
 
-  // Categories State (नया फीचर)
+  // Categories States (Add & Individual Edit)
   const [localCategories, setLocalCategories] = useState<any[]>([]);
   const [newCatName, setNewCatName] = useState("");
   const [newCatCoverUrl, setNewCatCoverUrl] = useState("");
+  const [editingCatId, setEditingCatId] = useState<string | null>(null);
+  const [editingCatName, setEditingCatName] = useState("");
+  const [editingCatCoverUrl, setEditingCatCoverUrl] = useState("");
 
   // Header Background, Timings & Maps
   const [headerVideoInput, setHeaderVideoInput] = useState("");
@@ -85,7 +88,7 @@ export default function SettingsTab({
 
   // --- REAL-TIME DATA SYNC EFFECT ---
   useEffect(() => {
-    // 1. [सुधार] डेटाबेस से वास्तविक स्टोर सेटिंग्स (वीडियो, टाइमिंग्स, मैप) लोड करना
+    // 1. डेटाबेस से वास्तविक स्टोर सेटिंग्स लोड करना
     const unsubStore = onSnapshot(doc(db, "settings", "store"), (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data();
@@ -96,7 +99,7 @@ export default function SettingsTab({
       }
     });
 
-    // 2. [नया सुधार] रीयल-टाइम कैटेगरीज लोड करना
+    // 2. रीयल-टाइम कैटेगरीज लोड करना
     const unsubCategories = onSnapshot(collection(db, "categories"), (snap) => {
       setLocalCategories(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
@@ -168,7 +171,7 @@ export default function SettingsTab({
     } catch (err) { toast.error("Error deleting reel"); }
   };
 
-  // 3. CATEGORIES MANAGEMENT (नया फीचर) [1]
+  // 3. CATEGORIES MANAGEMENT (Add, Individual Edit, Delete, Toggle Visibility)
   const handleAddCategory = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCatName.trim()) return toast.error("कृपया कैटेगरी का नाम लिखें!");
@@ -183,6 +186,22 @@ export default function SettingsTab({
       setNewCatCoverUrl("");
       toast.success("नई कैटेगरी सफलतापूर्वक जोड़ी गई! 📁");
     } catch (err) { toast.error("कैटेगरी जोड़ने में त्रुटि आई।"); }
+  };
+
+  const handleUpdateCategory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingCatId) return;
+    if (!editingCatName.trim()) return toast.error("कैटेगरी का नाम खाली नहीं होना चाहिए!");
+    try {
+      await updateDoc(doc(db, "categories", editingCatId), {
+        name: editingCatName.trim(),
+        coverUrl: editingCatCoverUrl.trim()
+      });
+      setEditingCatId(null);
+      setEditingCatName("");
+      setEditingCatCoverUrl("");
+      toast.success("कैटेगरी सफलतापूर्वक अपडेट की गई! 📁✨");
+    } catch (err) { toast.error("कैटेगरी अपडेट करने में त्रुटि आई।"); }
   };
 
   const handleDeleteCategory = async (id: string) => {
@@ -429,7 +448,8 @@ export default function SettingsTab({
         {[
           { id: 'banners', label: '🖼️ Banners' },
           { id: 'reels', label: '🎥 Reels' },
-          { id: 'categories', label: '📁 Categories' }, // [नया सब-टैब जोड़ा गया]
+          { id: 'categories', label: '📁 Categories' }, 
+          { id: 'social_counts', label: '📊 Socials' }, // [नया सब-टैब]
           { id: 'header_video', label: '🎬 Media/Info' },
           { id: 'coupons', label: '🎟️ Coupons' },
           { id: 'reviews', label: '⭐ Reviews' },
@@ -460,9 +480,6 @@ export default function SettingsTab({
             </div>
             <button type="submit" className="w-full bg-green-600 text-white p-3.5 rounded-xl font-black text-xs uppercase">Add Banner</button>
           </form>
-          <div className="mt-6">
-             <SocialCountsEditor />
-          </div>
           <div className="grid grid-cols-2 gap-4">
             {banners.map(b => (
               <div key={b.id} className="bg-white/[0.02] border border-white/5 p-3 rounded-2xl relative">
@@ -528,34 +545,65 @@ export default function SettingsTab({
         </div>
       )}
 
-      {/* --- [नया सब-टैब] SUB-TAB 3: CATEGORIES --- */}
+      {/* --- SUB-TAB 3: CATEGORIES (Add & Inline Edit) --- */}
       {activeSubTab === 'categories' && (
         <div className="space-y-6">
-          <form onSubmit={handleAddCategory} className="bg-[#020202] border border-white/5 p-6 rounded-[2.5rem] space-y-4">
-            <h3 className="text-sm font-black text-orange-500 uppercase flex items-center gap-1.5">
-              <ImageIcon size={14}/> Add New Category
-            </h3>
-            <div className="space-y-3 text-xs">
-              <input 
-                type="text" 
-                placeholder="Category Name (e.g. Burger, Pizza)" 
-                value={newCatName} 
-                onChange={(e) => setNewCatName(e.target.value)} 
-                className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs text-white outline-none" 
-                required 
-              />
-              <input 
-                type="url" 
-                placeholder="Category Cover Image URL" 
-                value={newCatCoverUrl} 
-                onChange={(e) => setNewCatCoverUrl(e.target.value)} 
-                className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs text-white outline-none" 
-              />
-            </div>
-            <button type="submit" className="w-full bg-green-600 text-white p-3.5 rounded-xl font-black text-xs uppercase">
-              Add Category
-            </button>
-          </form>
+          {!editingCatId ? (
+            <form onSubmit={handleAddCategory} className="bg-[#020202] border border-white/5 p-6 rounded-[2.5rem] space-y-4">
+              <h3 className="text-sm font-black text-orange-500 uppercase flex items-center gap-1.5">
+                <ImageIcon size={14}/> Add New Category
+              </h3>
+              <div className="space-y-3 text-xs">
+                <input 
+                  type="text" 
+                  placeholder="Category Name (e.g. Burger, Pizza)" 
+                  value={newCatName} 
+                  onChange={(e) => setNewCatName(e.target.value)} 
+                  className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs text-white outline-none" 
+                  required 
+                />
+                <input 
+                  type="url" 
+                  placeholder="Category Cover Image URL" 
+                  value={newCatCoverUrl} 
+                  onChange={(e) => setNewCatCoverUrl(e.target.value)} 
+                  className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs text-white outline-none" 
+                />
+              </div>
+              <button type="submit" className="w-full bg-green-600 text-white p-3.5 rounded-xl font-black text-xs uppercase">
+                Add Category
+              </button>
+            </form>
+          ) : (
+            <form onSubmit={handleUpdateCategory} className="bg-orange-500/5 border border-orange-500/20 p-6 rounded-[2.5rem] space-y-4">
+              <h3 className="text-sm font-black text-orange-500 uppercase flex items-center gap-1.5">
+                <Edit size={14}/> Edit Category / अपडेट
+              </h3>
+              <div className="space-y-3 text-xs">
+                <input 
+                  type="text" 
+                  value={editingCatName} 
+                  onChange={(e) => setEditingCatName(e.target.value)} 
+                  className="w-full bg-[#111] border border-orange-500/20 rounded-xl p-3 text-xs text-white outline-none" 
+                  required 
+                />
+                <input 
+                  type="url" 
+                  value={editingCatCoverUrl} 
+                  onChange={(e) => setEditingCatCoverUrl(e.target.value)} 
+                  className="w-full bg-[#111] border border-orange-500/20 rounded-xl p-3 text-xs text-white outline-none" 
+                />
+              </div>
+              <div className="flex gap-2">
+                <button type="submit" className="flex-1 bg-green-600 text-white p-3 rounded-xl font-black text-xs uppercase">
+                  Save Changes
+                </button>
+                <button type="button" onClick={() => setEditingCatId(null)} className="bg-white/5 text-gray-400 p-3 rounded-xl font-black text-xs uppercase">
+                  Cancel
+                </button>
+              </div>
+            </form>
+          )}
 
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             {localCategories.map(cat => (
@@ -573,6 +621,13 @@ export default function SettingsTab({
                     <button onClick={() => toggleCategoryVisibility(cat)} className="p-1 bg-white/5 rounded text-gray-400" title="Toggle Visibility">
                       {cat.isVisible !== false ? <Eye size={12}/> : <EyeOff size={12}/>}
                     </button>
+                    <button onClick={() => {
+                      setEditingCatId(cat.id);
+                      setEditingCatName(cat.name);
+                      setEditingCatCoverUrl(cat.coverUrl || "");
+                    }} className="p-1 bg-blue-500/10 text-blue-400 rounded" title="Edit">
+                      <Settings size={12}/>
+                    </button>
                     <button onClick={() => handleDeleteCategory(cat.id)} className="p-1 bg-red-500/10 text-red-500 rounded" title="Delete">
                       <Trash size={12}/>
                     </button>
@@ -587,7 +642,24 @@ export default function SettingsTab({
         </div>
       )}
 
-      {/* --- SUB-TAB 4: MEDIA/INFO --- */}
+      {/* --- SUB-TAB 4: SOCIAL COUNTS (नया समर्पित सब-टैब) --- */}
+      {activeSubTab === 'social_counts' && (
+        <div className="space-y-6">
+          <div className="bg-[#020202] border border-white/5 p-6 rounded-[2.5rem] space-y-4 text-left">
+            <h3 className="text-sm font-black text-orange-500 uppercase flex items-center gap-1.5">
+              📊 Social Media Counts
+            </h3>
+            <p className="text-[10px] text-gray-500 font-bold uppercase leading-relaxed font-mono">
+              यहाँ से आप होम पेज पर दिखने वाले फ़ॉलोअर्स और सब्सक्राइबर्स के आंकड़े बदल सकते हैं।
+            </p>
+            <div className="pt-2">
+              <SocialCountsEditor />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- SUB-TAB 5: MEDIA/INFO --- */}
       {activeSubTab === 'header_video' && (
         <div className="space-y-6">
           <form onSubmit={handleUpdateHeaderVideo} className="bg-[#111] p-6 rounded-[2.5rem] space-y-4 text-xs font-bold text-left">
@@ -606,7 +678,7 @@ export default function SettingsTab({
         </div>
       )}
 
-      {/* --- SUB-TAB 5: COUPONS --- */}
+      {/* --- SUB-TAB 6: COUPONS --- */}
       {activeSubTab === 'coupons' && (
         <div className="space-y-6">
           <form onSubmit={handleAddCoupon} className="bg-white/[0.02] border border-white/5 p-6 rounded-[2.5rem] space-y-4">
@@ -631,7 +703,7 @@ export default function SettingsTab({
         </div>
       )}
 
-      {/* --- SUB-TAB 6: REVIEWS --- */}
+      {/* --- SUB-TAB 7: REVIEWS --- */}
       {activeSubTab === 'reviews' && (
         <div className="space-y-4">
           {reviews.length === 0 && <p className="text-center text-gray-500 py-12 text-xs uppercase font-bold">No reviews found...</p>}
@@ -655,7 +727,7 @@ export default function SettingsTab({
         </div>
       )}
 
-      {/* --- SUB-TAB 7: SOCIAL PROOF ALERTS --- */}
+      {/* --- SUB-TAB 8: SOCIAL PROOF ALERTS --- */}
       {activeSubTab === 'proofs' && (
         <div className="space-y-6">
           <form onSubmit={handleAddSocialProof} className="bg-white/[0.02] border border-white/5 p-6 rounded-[2.5rem] space-y-4">
@@ -684,7 +756,7 @@ export default function SettingsTab({
         </div>
       )}
 
-      {/* --- SUB-TAB 8: CLAIMS --- */}
+      {/* --- SUB-TAB 9: CLAIMS --- */}
       {activeSubTab === 'claims' && (
         <div className="space-y-6">
           {pointsClaims.length === 0 ? (
@@ -725,10 +797,10 @@ export default function SettingsTab({
         </div>
       )}
 
-      {/* --- SUB-TAB 9: SECURITY (PINS, STAFF & TABLES QR) --- */}
+      {/* --- SUB-TAB 10: SECURITY (PINS, STAFF & TABLES QR) --- */}
       {activeSubTab === 'security' && (
         <div className="space-y-6">
-          {/* Master PIN changes form (Admin role only) */}
+          {/* Master PIN changes form */}
           <form onSubmit={handleUpdatePasscodes} className="bg-[#111] border border-white/5 p-6 rounded-[2.5rem] space-y-4 text-xs font-bold text-left">
             <div>
               <h4 className="text-sm font-black text-orange-500 uppercase">Change security PINs</h4>
