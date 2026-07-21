@@ -1,11 +1,12 @@
 'use client';
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { db } from '../../lib/firebase'; // अपनी लोकेशन के अनुसार पाथ सेट करें
-import { collection, addDoc, doc, setDoc, deleteDoc, updateDoc, runTransaction, increment } from 'firebase/firestore';
+import { collection, addDoc, doc, setDoc, deleteDoc, updateDoc, runTransaction, increment, onSnapshot } from 'firebase/firestore';
 import { Trash, Eye, EyeOff, ImageIcon, Play, Settings, X, Percent, CheckCircle2, XCircle, Lock, Edit, Check } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { isVideoUrl, sha256 } from '../../lib/utils'; // अपनी लोकेशन के अनुसार पाथ सेट करें
 import SocialCountsEditor from './SocialCountsEditor'; // या सही पाथ दें
+
 interface SettingsTabProps {
   banners: any[];
   reels: any[];
@@ -30,10 +31,11 @@ export default function SettingsTab({
   staff,
   cafeHelperUsers,
   passcodes,
-  userRole
+  userRole,
+  storeOpen // [सुधार] storeOpen को यहाँ डीस्ट्रक्चर कर दिया गया है
 }: SettingsTabProps) {
   // --- LOCAL STATES ---
-  const [activeSubTab, setActiveSubTab] = useState<'banners' | 'reels' | 'header_video' | 'coupons' | 'reviews' | 'proofs' | 'claims' | 'security'>('banners');
+  const [activeSubTab, setActiveSubTab] = useState<'banners' | 'reels' | 'categories' | 'header_video' | 'coupons' | 'reviews' | 'proofs' | 'claims' | 'security'>('banners');
 
   // Promo Banners State
   const [newBannerUrl, setNewBannerUrl] = useState("");
@@ -45,6 +47,11 @@ export default function SettingsTab({
   const [newReelTitle, setNewReelTitle] = useState("");
   const [newReelDesc, setNewReelDesc] = useState("");
   const [newReelPrice, setNewReelPrice] = useState("");
+
+  // Categories State (नया फीचर)
+  const [localCategories, setLocalCategories] = useState<any[]>([]);
+  const [newCatName, setNewCatName] = useState("");
+  const [newCatCoverUrl, setNewCatCoverUrl] = useState("");
 
   // Header Background, Timings & Maps
   const [headerVideoInput, setHeaderVideoInput] = useState("");
@@ -75,6 +82,30 @@ export default function SettingsTab({
   // Dynamic PIN Change Inputs
   const [newAdminPinInput, setNewAdminPinInput] = useState("");
   const [newManagerPinInput, setNewManagerPinInput] = useState("");
+
+  // --- REAL-TIME DATA SYNC EFFECT ---
+  useEffect(() => {
+    // 1. [सुधार] डेटाबेस से वास्तविक स्टोर सेटिंग्स (वीडियो, टाइमिंग्स, मैप) लोड करना
+    const unsubStore = onSnapshot(doc(db, "settings", "store"), (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        if (data.headerVideoUrl) setHeaderVideoInput(data.headerVideoUrl);
+        if (data.timingHindi) setStoreTimingHindi(data.timingHindi);
+        if (data.timingEnglish) setStoreTimingEnglish(data.timingEnglish);
+        if (data.googleMapUrl) setGoogleMapUrl(data.googleMapUrl);
+      }
+    });
+
+    // 2. [नया सुधार] रीयल-टाइम कैटेगरीज लोड करना
+    const unsubCategories = onSnapshot(collection(db, "categories"), (snap) => {
+      setLocalCategories(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+
+    return () => {
+      unsubStore();
+      unsubCategories();
+    };
+  }, []);
 
   // --- CRUD HANDLERS ---
 
@@ -137,7 +168,41 @@ export default function SettingsTab({
     } catch (err) { toast.error("Error deleting reel"); }
   };
 
-  // 3. HEADER VIDEO, TIMINGS & MAPS
+  // 3. CATEGORIES MANAGEMENT (नया फीचर) [1]
+  const handleAddCategory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCatName.trim()) return toast.error("कृपया कैटेगरी का नाम लिखें!");
+    try {
+      await addDoc(collection(db, "categories"), {
+        name: newCatName.trim(),
+        coverUrl: newCatCoverUrl.trim() || "",
+        isVisible: true,
+        timestamp: new Date()
+      });
+      setNewCatName("");
+      setNewCatCoverUrl("");
+      toast.success("नई कैटेगरी सफलतापूर्वक जोड़ी गई! 📁");
+    } catch (err) { toast.error("कैटेगरी जोड़ने में त्रुटि आई।"); }
+  };
+
+  const handleDeleteCategory = async (id: string) => {
+    if (!confirm("क्या आप सच में इस कैटेगरी को डिलीट करना चाहते हैं?")) return;
+    try {
+      await deleteDoc(doc(db, "categories", id));
+      toast.success("कैटेगरी डिलीट कर दी गई!");
+    } catch (err) { toast.error("डिलीट करने में त्रुटि आई।"); }
+  };
+
+  const toggleCategoryVisibility = async (cat: any) => {
+    try {
+      await updateDoc(doc(db, "categories", cat.id), {
+        isVisible: cat.isVisible !== false ? false : true
+      });
+      toast.success("कैटेगरी स्टेटस अपडेट किया गया!");
+    } catch (err) { toast.error("स्टेटस बदलने में त्रुटि आई।"); }
+  };
+
+  // 4. HEADER VIDEO, TIMINGS & MAPS
   const handleUpdateHeaderVideo = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!headerVideoInput) return toast.error("Please enter a valid video link!");
@@ -162,7 +227,7 @@ export default function SettingsTab({
     } catch (err) { toast.error("Failed to update store data."); }
   };
 
-  // 4. COUPONS
+  // 5. COUPONS
   const handleAddCoupon = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCouponCode || !newCouponValue) return;
@@ -185,7 +250,7 @@ export default function SettingsTab({
     } catch (err) { toast.error("Error deleting coupon"); }
   };
 
-  // 5. REVIEWS
+  // 6. REVIEWS
   const handleApproveReview = async (id: string) => {
     try {
       await updateDoc(doc(db, "reviews", id), { isApproved: true });
@@ -200,7 +265,7 @@ export default function SettingsTab({
     } catch (err) { toast.error("Error deleting review"); }
   };
 
-  // 6. SOCIAL PROOF ALERTS
+  // 7. SOCIAL PROOF ALERTS
   const handleAddSocialProof = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newProofText.trim()) return toast.error("Please enter alert text!");
@@ -221,7 +286,7 @@ export default function SettingsTab({
     } catch (err) { toast.error("Error deleting alert"); }
   };
 
-  // 7. POINTS CLAIMS
+  // 8. POINTS CLAIMS
   const handleVerifyClaimApproval = async (claim: any) => {
     try {
       await runTransaction(db, async (transaction) => {
@@ -256,7 +321,7 @@ export default function SettingsTab({
     } catch (err) { toast.error("Failed to reject claim request."); }
   };
 
-  // 8. STAFF PIN & CONFIGURATION [2]
+  // 9. STAFF PIN & CONFIGURATION
   const handleAddStaffCombined = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newStaffName.trim() || !newStaffPin) return toast.error("Kripya saari details bharein!");
@@ -349,7 +414,7 @@ export default function SettingsTab({
     } catch (err) { toast.error("Failed to update keys."); }
   };
 
-  // कंबाइंड स्टाफ लिस्ट तैयार करना [2]
+  // कंबाइंड स्टाफ लिस्ट तैयार करना
   const unifiedStaffList = useMemo(() => {
     const list: any[] = [];
     staff.forEach(s => list.push({ ...s, isHelper: false }));
@@ -364,6 +429,7 @@ export default function SettingsTab({
         {[
           { id: 'banners', label: '🖼️ Banners' },
           { id: 'reels', label: '🎥 Reels' },
+          { id: 'categories', label: '📁 Categories' }, // [नया सब-टैब जोड़ा गया]
           { id: 'header_video', label: '🎬 Media/Info' },
           { id: 'coupons', label: '🎟️ Coupons' },
           { id: 'reviews', label: '⭐ Reviews' },
@@ -394,14 +460,13 @@ export default function SettingsTab({
             </div>
             <button type="submit" className="w-full bg-green-600 text-white p-3.5 rounded-xl font-black text-xs uppercase">Add Banner</button>
           </form>
-<div className="mt-6">
+          <div className="mt-6">
              <SocialCountsEditor />
-            </div>
+          </div>
           <div className="grid grid-cols-2 gap-4">
             {banners.map(b => (
               <div key={b.id} className="bg-white/[0.02] border border-white/5 p-3 rounded-2xl relative">
                 <div className="h-24 overflow-hidden rounded-xl bg-neutral-900 flex items-center justify-center">
-                  
                   {isVideoUrl(b.url) ? (
                     <video src={b.url} muted className="w-full h-full object-cover" />
                   ) : (
@@ -463,7 +528,66 @@ export default function SettingsTab({
         </div>
       )}
 
-      {/* --- SUB-TAB 3: MEDIA/INFO (HEADER VIDEO, TIMINGS, MAP) --- */}
+      {/* --- [नया सब-टैब] SUB-TAB 3: CATEGORIES --- */}
+      {activeSubTab === 'categories' && (
+        <div className="space-y-6">
+          <form onSubmit={handleAddCategory} className="bg-[#020202] border border-white/5 p-6 rounded-[2.5rem] space-y-4">
+            <h3 className="text-sm font-black text-orange-500 uppercase flex items-center gap-1.5">
+              <ImageIcon size={14}/> Add New Category
+            </h3>
+            <div className="space-y-3 text-xs">
+              <input 
+                type="text" 
+                placeholder="Category Name (e.g. Burger, Pizza)" 
+                value={newCatName} 
+                onChange={(e) => setNewCatName(e.target.value)} 
+                className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs text-white outline-none" 
+                required 
+              />
+              <input 
+                type="url" 
+                placeholder="Category Cover Image URL" 
+                value={newCatCoverUrl} 
+                onChange={(e) => setNewCatCoverUrl(e.target.value)} 
+                className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs text-white outline-none" 
+              />
+            </div>
+            <button type="submit" className="w-full bg-green-600 text-white p-3.5 rounded-xl font-black text-xs uppercase">
+              Add Category
+            </button>
+          </form>
+
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            {localCategories.map(cat => (
+              <div key={cat.id} className="bg-white/[0.02] border border-white/5 p-3 rounded-2xl relative">
+                <div className="h-24 overflow-hidden rounded-xl bg-neutral-900 flex items-center justify-center">
+                  {cat.coverUrl ? (
+                    <img src={cat.coverUrl} className="w-full h-full object-cover opacity-80" alt={cat.name} />
+                  ) : (
+                    <div className="text-[10px] text-gray-500 font-bold uppercase">No Image</div>
+                  )}
+                </div>
+                <div className="mt-2 text-[10px] flex justify-between items-center">
+                  <span className="font-black truncate pr-1">{cat.name}</span>
+                  <div className="flex gap-1">
+                    <button onClick={() => toggleCategoryVisibility(cat)} className="p-1 bg-white/5 rounded text-gray-400" title="Toggle Visibility">
+                      {cat.isVisible !== false ? <Eye size={12}/> : <EyeOff size={12}/>}
+                    </button>
+                    <button onClick={() => handleDeleteCategory(cat.id)} className="p-1 bg-red-500/10 text-red-500 rounded" title="Delete">
+                      <Trash size={12}/>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+            {localCategories.length === 0 && (
+              <p className="col-span-full text-center text-gray-500 py-6 text-xs uppercase font-bold">No categories found...</p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* --- SUB-TAB 4: MEDIA/INFO --- */}
       {activeSubTab === 'header_video' && (
         <div className="space-y-6">
           <form onSubmit={handleUpdateHeaderVideo} className="bg-[#111] p-6 rounded-[2.5rem] space-y-4 text-xs font-bold text-left">
@@ -480,10 +604,9 @@ export default function SettingsTab({
             <button type="submit" className="w-full bg-green-600 text-white p-3.5 rounded-xl font-black text-xs uppercase">Update Timings & Map</button>
           </form>
         </div>
-     
       )}
 
-      {/* --- SUB-TAB 4: COUPONS --- */}
+      {/* --- SUB-TAB 5: COUPONS --- */}
       {activeSubTab === 'coupons' && (
         <div className="space-y-6">
           <form onSubmit={handleAddCoupon} className="bg-white/[0.02] border border-white/5 p-6 rounded-[2.5rem] space-y-4">
@@ -508,7 +631,7 @@ export default function SettingsTab({
         </div>
       )}
 
-      {/* --- SUB-TAB 5: REVIEWS --- */}
+      {/* --- SUB-TAB 6: REVIEWS --- */}
       {activeSubTab === 'reviews' && (
         <div className="space-y-4">
           {reviews.length === 0 && <p className="text-center text-gray-500 py-12 text-xs uppercase font-bold">No reviews found...</p>}
@@ -532,7 +655,7 @@ export default function SettingsTab({
         </div>
       )}
 
-      {/* --- SUB-TAB 6: SOCIAL PROOF ALERTS --- */}
+      {/* --- SUB-TAB 7: SOCIAL PROOF ALERTS --- */}
       {activeSubTab === 'proofs' && (
         <div className="space-y-6">
           <form onSubmit={handleAddSocialProof} className="bg-white/[0.02] border border-white/5 p-6 rounded-[2.5rem] space-y-4">
@@ -561,7 +684,7 @@ export default function SettingsTab({
         </div>
       )}
 
-      {/* --- SUB-TAB 7: CLAIMS --- */}
+      {/* --- SUB-TAB 8: CLAIMS --- */}
       {activeSubTab === 'claims' && (
         <div className="space-y-6">
           {pointsClaims.length === 0 ? (
@@ -602,7 +725,7 @@ export default function SettingsTab({
         </div>
       )}
 
-      {/* --- SUB-TAB 8: SECURITY (PINS, STAFF & TABLES QR) --- */}
+      {/* --- SUB-TAB 9: SECURITY (PINS, STAFF & TABLES QR) --- */}
       {activeSubTab === 'security' && (
         <div className="space-y-6">
           {/* Master PIN changes form (Admin role only) */}
@@ -628,7 +751,7 @@ export default function SettingsTab({
             )}
           </form>
 
-          {/* Combined Staff Registry Form [2] */}
+          {/* Combined Staff Registry Form */}
           <div className="bg-white/[0.02] border border-white/5 p-6 rounded-[2.5rem] space-y-4 text-xs font-bold text-left">
             <h4 className="text-sm font-black text-yellow-400 uppercase">👥 Staff Accounts Registry</h4>
             
@@ -645,7 +768,7 @@ export default function SettingsTab({
                     <option value="delivery">Rider / Delivery Boy 🛵</option>
                     <option value="kitchen">Cook / Kitchen Staff 👨‍🍳</option>
                     <option value="cashier">Cashier / Counter Manager 💼</option>
-                    <option value="godown">Godown Helper / गोदाम यूज़र 📦 [2]</option>
+                    <option value="godown">Godown Helper / गोदाम यूज़र 📦</option>
                   </select>
                 </div>
                 <button type="submit" className="w-full bg-green-600 text-white p-2.5 rounded-lg font-black uppercase text-[10px]">Add Staff</button>
@@ -663,7 +786,7 @@ export default function SettingsTab({
                     <option value="delivery">Rider / Delivery Boy 🛵</option>
                     <option value="kitchen">Cook / Kitchen Staff 👨‍🍳</option>
                     <option value="cashier">Cashier / Counter Manager 💼</option>
-                    <option value="godown">Godown Helper / गोदाम यूज़र 📦 [2]</option>
+                    <option value="godown">Godown Helper / गोदाम यूज़र 📦</option>
                   </select>
                 </div>
                 <div className="flex gap-2">
@@ -684,7 +807,7 @@ export default function SettingsTab({
                       <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-md mt-1 inline-block ${
                         member.role === 'delivery' ? 'bg-blue-500/10 text-blue-400' : member.role === 'kitchen' ? 'bg-yellow-500/10 text-yellow-400' : member.role === 'godown' ? 'bg-orange-500/10 text-orange-400' : 'bg-green-500/10 text-green-400'
                       }`}>
-                        {member.role === 'delivery' ? 'Rider 🛵' : member.role === 'kitchen' ? 'Kitchen 👨‍🍳' : member.role === 'godown' ? 'Godown 📦 [2]' : 'Cashier 💼'}
+                        {member.role === 'delivery' ? 'Rider 🛵' : member.role === 'kitchen' ? 'Kitchen 👨‍🍳' : member.role === 'godown' ? 'Godown 📦' : 'Cashier 💼'}
                       </span>
                     </div>
                     
