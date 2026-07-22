@@ -1,9 +1,7 @@
-
-
-
 'use client';
 
 import React, { useState, useMemo } from 'react';
+import { Printer } from 'lucide-react'; // मिसिंग इम्पोर्ट यहाँ जोड़ दिया गया है
 
 export default function StockDashboard({
   isDarkMode, dashboardDateRange, setDashboardDateRange, startDate, setStartDate, endDate, setEndDate,
@@ -119,7 +117,7 @@ export default function StockDashboard({
                   </tr>
                 </thead>
                 <tbody>
-                  ${inwardRows.length > 0 ? inwardRows : '<tr><td colspan="4" style="text-align:center; padding:15px; font-size:11px; color:#666;">कोई आवक नहीं</td></tr>'}
+                  ${rows.length > 0 ? rows : '<tr><td colspan="4" style="text-align:center; padding:15px; font-size:11px; color:#666;">कोई आवक नहीं</td></tr>'}
                 </tbody>
               </table>
               <div style="margin-top:10px; text-align:right; font-size:12px; font-weight:bold; border-top:1px solid #22C55E; padding-top:5px;">
@@ -179,7 +177,7 @@ export default function StockDashboard({
               <button
                 key={opt.range}
                 onClick={() => setDashboardDateRange(opt.range)}
-                className={`px-2 py-1 rounded-full text-[9px] font-black uppercase tracking-wider shrink-0 transition-all ${
+                className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-wider shrink-0 transition-all ${
                   dashboardDateRange === opt.range 
                     ? 'bg-orange-500 text-white shadow' 
                     : isDarkMode ? 'bg-neutral-900 text-neutral-400' : 'bg-neutral-100 text-neutral-600'
@@ -448,4 +446,3 @@ export default function StockDashboard({
     </div>
   );
 }
-
