@@ -17,7 +17,7 @@ export default function StockDashboard({
     const outwardGroup: Record<string, { qty: number; price: number; unit: string }> = {};
 
     (stockFlowTimeline || []).forEach((item: any) => {
-      const name = item.name || "अज्ञात सामान";
+      const name = item.name || "अज्ञान सामान";
       const qty = Number(item.qty || 0);
       const price = Number(item.price || 0); // दर (Price) यहाँ मैप की गई है
       const unit = item.unit || "Pcs";
@@ -110,14 +110,14 @@ export default function StockDashboard({
               <table style="width:100%; border-collapse:collapse;">
                 <thead>
                   <tr style="background:#22C55E; color:white;">
-                    <th style="padding:8px; text-align:left; font-size:11px;">सामग्री</th>
-                    <th style="padding:8px; text-align:center; font-size:11px;">मात्रा</th>
-                    <th style="padding:8px; text-align:center; font-size:11px;">दर</th>
-                    <th style="padding:8px; text-align:right; font-size:11px;">कुल मूल्य</th>
+                    <th style="padding:8px; text-align:left; font-size:12px;">सामग्री</th>
+                    <th style="padding:8px; text-align:center; font-size:12px;">मात्रा</th>
+                    <th style="padding:8px; text-align:center; font-size:12px;">दर</th>
+                    <th style="padding:8px; text-align:right; font-size:12px;">कुल मूल्य</th>
                   </tr>
                 </thead>
                 <tbody>
-                  ${rows.length > 0 ? rows : '<tr><td colspan="4" style="text-align:center; padding:15px; font-size:11px; color:#666;">कोई आवक नहीं</td></tr>'}
+                  ${inwardRows.length > 0 ? inwardRows : '<tr><td colspan="4" style="text-align:center; padding:15px; font-size:11px; color:#666;">कोई आवक नहीं</td></tr>'}
                 </tbody>
               </table>
               <div style="margin-top:10px; text-align:right; font-size:12px; font-weight:bold; border-top:1px solid #22C55E; padding-top:5px;">
@@ -177,7 +177,7 @@ export default function StockDashboard({
               <button
                 key={opt.range}
                 onClick={() => setDashboardDateRange(opt.range)}
-                className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-wider shrink-0 transition-all ${
+                className={`px-2 py-1 rounded-full text-[9px] font-black uppercase tracking-wider shrink-0 transition-all ${
                   dashboardDateRange === opt.range 
                     ? 'bg-orange-500 text-white shadow' 
                     : isDarkMode ? 'bg-neutral-900 text-neutral-400' : 'bg-neutral-100 text-neutral-600'
