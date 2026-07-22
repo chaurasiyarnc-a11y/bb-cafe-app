@@ -13,14 +13,14 @@ interface MenuTabProps {
 }
 
 export default function MenuTab({ menu, categories }: MenuTabProps) {
-  // --- मुख्य सब-नेविगेशन टैब (items या categories) ---
+  // --- मुख्य सब-टैब स्टेट ---
   const [menuSubTab, setMenuSubTab] = useState<'items' | 'categories'>('items');
 
   // सर्च और यूआई स्टेट्स
   const [menuSearchQuery, setMenuSearchQuery] = useState("");
   const [showAddForm, setShowAddForm] = useState(false);
 
-  // नया डिश जोड़ने की इनपुट स्टेट्स
+  // नया डिश जोड़ने की स्टेट्स
   const [newName, setNewName] = useState("");
   const [newPrice, setNewPrice] = useState("");
   const [newCategory, setNewCategory] = useState("Special Pizza");
@@ -51,7 +51,7 @@ export default function MenuTab({ menu, categories }: MenuTabProps) {
   const [sopProduct, setSopProduct] = useState<any>(null);
   const [sopRecipeText, setSopRecipeText] = useState("");
 
-  // --- कैटेगरी मैनेजमेंट स्टेट्स (नया) ---
+  // --- कैटेगरी स्टेट्स ---
   const [newCatName, setNewCatName] = useState("");
   const [newCatCoverUrl, setNewCatCoverUrl] = useState("");
   const [editingCatId, setEditingCatId] = useState<string | null>(null);
@@ -74,14 +74,34 @@ export default function MenuTab({ menu, categories }: MenuTabProps) {
     return () => unsubStore();
   }, []);
 
-  // --- SMART CATEGORY DETECTOR (मिसिंग कैटेगरीज खोजना) ---
+  // --- कैटेगरी का गहन विश्लेषण (डुप्लीकेट्स और प्रोडक्ट्स की संख्या) ---
+  const categoriesWithAnalysis = useMemo(() => {
+    const seenNames = new Set<string>();
+    return categories.map(cat => {
+      const nameClean = cat.name?.trim().toLowerCase();
+      const productCount = menu.filter(item => item.category?.trim().toLowerCase() === nameClean).length;
+      const isDuplicateName = seenNames.has(nameClean);
+      seenNames.add(nameClean);
+
+      return {
+        ...cat,
+        productCount,
+        isDuplicateName
+      };
+    });
+  }, [categories, menu]);
+
+  // खाली (0 डिशेज वाली) कैटेगरीज की संख्या
+  const emptyCategoriesCount = useMemo(() => {
+    return categoriesWithAnalysis.filter(c => c.productCount === 0).length;
+  }, [categoriesWithAnalysis]);
+
+  // रीयल-टाइम मिसिंग कैटेगरी डिटेक्टर
   const missingCategories = useMemo(() => {
     if (!menu || menu.length === 0) return [];
-    // प्रोडक्ट्स (menu) में उपयोग किए गए सभी यूनिक कैटेगरी नाम
     const uniqueProdCats = Array.from(
       new Set(menu.map(p => p.category?.trim()).filter(Boolean))
     );
-    // वह कैटेगरी जो categories कलेक्शन की लिस्ट में नहीं हैं
     return uniqueProdCats.filter(prodCat => {
       return !categories.some(
         cat => cat.name?.trim().toLowerCase() === prodCat.toLowerCase()
@@ -93,7 +113,7 @@ export default function MenuTab({ menu, categories }: MenuTabProps) {
     ? categories.map(c => c.name)
     : ADD_CATEGORIES;
 
-  // --- फ़िल्टर की हुई डिश सर्च लिस्ट ---
+  // डिश सर्च फ़िल्टर
   const searchedMenu = useMemo(() => {
     if (!menuSearchQuery.trim()) return menu;
     return menu.filter(item => 
@@ -136,7 +156,7 @@ export default function MenuTab({ menu, categories }: MenuTabProps) {
   };
 
   const handleDeleteCategory = async (id: string) => {
-    if (!confirm("क्या आप सच में इस कैटेगरी को डिलीट करना चाहते हैं? इससे उस कैटेगरी के डिशेस डिलीट नहीं होंगे।")) return;
+    if (!confirm("क्या आप सच में इस कैटेगरी को डिलीट करना चाहते हैं?")) return;
     try {
       await deleteDoc(doc(db, "categories", id));
       toast.success("कैटेगरी डिलीट कर दी गई!");
@@ -162,6 +182,26 @@ export default function MenuTab({ menu, categories }: MenuTabProps) {
       toast.success("'All' कैटेगरी टैब स्टेटस अपडेट किया गया!");
     } catch (err) {
       toast.error("'All' कैटेगरी स्टेटस बदलने में त्रुटि आई।");
+    }
+  };
+
+  // खाली कैटेगरीज को ऑटो-डिलीट करना
+  const handleCleanEmptyCategories = async () => {
+    if (!window.confirm(`क्या आप वाकई सभी खाली कैटेगरीज (${emptyCategoriesCount} खाली कैटेगरीज) को डिलीट करना चाहते हैं?`)) return;
+    toast.loading("Cleaning empty categories...", { id: "clean-cats" });
+    try {
+      let deletedCount = 0;
+      for (const cat of categoriesWithAnalysis) {
+        if (cat.productCount === 0) {
+          await deleteDoc(doc(db, "categories", cat.id));
+          deletedCount++;
+        }
+      }
+      toast.dismiss("clean-cats");
+      toast.success(`${deletedCount} खाली कैटेगरीज सफलतापूर्वक हटा दी गईं! 🧹✨`);
+    } catch (e) {
+      toast.dismiss("clean-cats");
+      toast.error("Error cleaning categories");
     }
   };
 
@@ -609,7 +649,7 @@ export default function MenuTab({ menu, categories }: MenuTabProps) {
         </div>
       )}
 
-      {/* ==================== SUB-TAB 2: [नया जोड़] CATEGORIES MANAGEMENT ==================== */}
+      {/* ==================== SUB-TAB 2: CATEGORIES MANAGEMENT (Smart Analysis) ==================== */}
       {menuSubTab === 'categories' && (
         <div className="space-y-6 pt-2">
           {/* 'All' Category Toggle Switch */}
@@ -627,6 +667,17 @@ export default function MenuTab({ menu, categories }: MenuTabProps) {
               {showAllCategory ? "SHOWING" : "HIDDEN"}
             </button>
           </div>
+
+          {/* ऑटो-क्लीन बटन (0 डिशेज वाली कैटेगरीज को डिलीट करने के लिए) */}
+          {emptyCategoriesCount > 0 && (
+            <button 
+              onClick={handleCleanEmptyCategories}
+              type="button" 
+              className="w-full bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/20 py-3 rounded-2xl font-black text-xs uppercase flex items-center justify-center gap-1.5 transition-all"
+            >
+              🧹 Auto-Delete All Unused Categories ({emptyCategoriesCount} Empty)
+            </button>
+          )}
 
           {/* रीयल-टाइम मिसिंग कैटेगरी फाइंडर */}
           {missingCategories.length > 0 && (
@@ -721,15 +772,33 @@ export default function MenuTab({ menu, categories }: MenuTabProps) {
             </form>
           )}
 
-          {/* कैटेगरीज ग्रिड लिस्ट */}
+          {/* कैटेगरीज ग्रिड लिस्ट (With Analysis Badges) */}
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-            {categories.map(cat => (
+            {categoriesWithAnalysis.map(cat => (
               <div key={cat.id} className="bg-white/[0.02] border border-white/5 p-3 rounded-2xl relative text-left">
-                <div className="h-24 overflow-hidden rounded-xl bg-neutral-900 flex items-center justify-center">
+                <div className="h-24 overflow-hidden rounded-xl bg-neutral-900 flex items-center justify-center relative">
                   {cat.coverUrl ? (
                     <img src={cat.coverUrl} className="w-full h-full object-cover opacity-80" alt={cat.name} />
                   ) : (
                     <div className="text-[10px] text-gray-500 font-bold uppercase">No Image</div>
+                  )}
+
+                  {/* रीयल-टाइम आइटम्स काउंट बैज */}
+                  <div className="absolute top-2 left-2 bg-black/75 px-2 py-1 rounded-lg text-[8px] font-black uppercase text-orange-400 tracking-wider">
+                    {cat.productCount} {cat.productCount === 1 ? 'Item' : 'Items'}
+                  </div>
+
+                  {/* empty/unused कैटेगरी के लिए अलर्ट बैज */}
+                  {cat.productCount === 0 && (
+                    <div className="absolute bottom-2 left-2 bg-red-600/90 text-white px-2 py-0.5 rounded text-[7px] font-black uppercase">
+                      ⚠️ Unused
+                    </div>
+                  )}
+                  {/* duplicate कैटेगरी के लिए अलर्ट बैज */}
+                  {cat.isDuplicateName && (
+                    <div className="absolute top-2 right-2 bg-red-900 text-red-200 px-1.5 py-0.5 rounded text-[7px] font-black uppercase">
+                      🚨 Duplicate
+                    </div>
                   )}
                 </div>
                 <div className="mt-2 text-[10px] flex justify-between items-center">
