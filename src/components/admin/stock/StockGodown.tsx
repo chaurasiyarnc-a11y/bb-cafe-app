@@ -7,7 +7,7 @@ export default function StockGodown({
   isDarkMode, searchQuery, setSearchQuery, isMultiSelectMode, setIsMultiSelectMode, selectedItemIds, setSelectedItemIds,
   selectedCategoryFilter, setSelectedCategoryFilter, visibleCategories, filteredInventory, editedQties, setEditedQties,
   adjustQty, saveQty, handleToggleMultiSelect, setShowManageCategoriesModal, setShowAddProductModal, setEditingProduct,
-  setTransferItem, setShowTransferModal, setConsumeItem, setShowConsumeModal
+  setTransferItem, setShowTransferModal, setConsumeItem, setShowConsumeModal, setShowSaveToListModal, setShowBulkCategoryModal
 }: any) {
   
   // लॉन्ग-प्रेस (Long-press) को ट्रैक करने के लिए रेफ़रेंसेज़
@@ -262,6 +262,31 @@ export default function StockGodown({
           );
         })}
       </div>
+
+      {/* --- फ़्लोटिंग एक्शन बार (Floating Action Bar) --- */}
+      {/* यह केवल तब दिखेगा जब कम से कम 1 आइटम सेलेक्टेड होगा */}
+      {isMultiSelectMode && selectedItemIds.length > 0 && (
+        <div className="fixed bottom-16 left-4 right-4 z-[60] max-w-sm mx-auto p-4 rounded-2xl bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 shadow-2xl border border-neutral-800 dark:border-neutral-200 flex items-center justify-between gap-3 animate-bounce-short">
+          <span className="text-[10px] font-black uppercase shrink-0">
+            {selectedItemIds.length} चयनित (Selected)
+          </span>
+          <div className="flex gap-2 flex-1 justify-end">
+            <button
+              onClick={() => setShowBulkCategoryModal(true)}
+              className="px-3 py-2 bg-neutral-800 dark:bg-neutral-100 hover:bg-neutral-750 dark:hover:bg-neutral-200 text-white dark:text-neutral-900 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all"
+            >
+              📂 कैटेगरी बदलें
+            </button>
+            <button
+              onClick={() => setShowSaveToListModal(true)}
+              className="px-3 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-xl text-[10px] font-black uppercase tracking-wider shadow transition-all"
+            >
+              📝 आर्डर लिस्ट
+            </button>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
