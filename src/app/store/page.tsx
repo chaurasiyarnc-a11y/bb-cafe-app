@@ -78,7 +78,7 @@ interface FixedAsset {
   cost?: number;
   condition: "Working" | "Needs Repair" | "Broken";
   remarks?: string;
-  type?: string; // 'general' या 'crockery_cutlery'
+  type?: string; // 'general', 'cutlery', या 'crockery'
 }
 
 interface UserPin {
@@ -188,7 +188,7 @@ export default function StoreStockPage() {
 
   const [formAddProduct, setFormAddProduct] = useState({ name: '', storeQty: '0', kitchenQty: '0', unit: 'Kg', purchasePrice: '', minLimit: '10', category: 'OTHERS', lastPurchaseDate: getLocalDateString(0) });
   
-  // formAddAsset में 'type' जोड़ दिया गया है ताकि सामान्य और क्रॉकरी में अंतर किया जा सके
+  // formAddAsset में डिफ़ॉल्ट रूप से type 'general' रखा गया है
   const [formAddAsset, setFormAddAsset] = useState({ name: '', quantity: '1', purchaseDate: '', cost: '', condition: 'Working' as any, remarks: '', type: 'general' });
 
   const [showStockOutModal, setShowStockOutModal] = useState<boolean>(false);
@@ -555,7 +555,7 @@ export default function StoreStockPage() {
       cost: parseFloat(formAddAsset.cost) || 0, 
       condition: formAddAsset.condition, 
       remarks: formAddAsset.remarks,
-      type: formAddAsset.type || 'general' // 'general' या 'crockery_cutlery'
+      type: formAddAsset.type || 'general' // 'general', 'cutlery' या 'crockery'
     });
     setShowAddAssetModal(false);
     // फॉर्म रीसेट
@@ -669,6 +669,53 @@ export default function StoreStockPage() {
     window.open(waUrl, '_blank');
   };
 
+  // --- ऑटो-डेटा माइग्रेशन फ़ंक्शन (गोदाम से क्रॉकरी व कटलरी फिक्स्ड एसेट्स में शिफ्ट करने के लिए) ---
+  const handleMigrateCrockeryCutlery = async () => {
+    triggerHaptic(50);
+    if (!window.confirm("क्या आप वाकई गोडाउन (Godown) से क्रॉकरी और कटलरी का सारा डेटा स्थायी संपत्ति (Fixed Assets) में शिफ्ट करना चाहते हैं? यह क्रिया उन्हें गोडाउन से हमेशा के लिए हटा देगी।")) return;
+
+    try {
+      // गोदाम के वे आइटम्स ढूंढें जिनकी कैटेगरी CROCKERY या CUTLERY है
+      const itemsToMigrate = inventory.filter(item => {
+        const cat = (item.category || "").toUpperCase();
+        return cat === 'CROCKERY' || cat === 'CUTLERY';
+      });
+
+      if (itemsToMigrate.length === 0) {
+        toastMessage("गोदाम में ट्रांसफर के लिए कोई क्रॉकरी या कटलरी उत्पाद नहीं मिला!", "info");
+        return;
+      }
+
+      const batch = writeBatch(db);
+
+      itemsToMigrate.forEach(item => {
+        const assetId = `asset_${item.id}`;
+        const assetDocRef = doc(db, "fixed_assets", assetId);
+        const godownDocRef = doc(db, "godown_inventory", item.id);
+
+        // 1. Fixed Assets कलेक्शन में लिखें (सही टाइप के साथ)
+        batch.set(assetDocRef, {
+          id: assetId,
+          name: item.name,
+          quantity: item.storeQty || 1,
+          cost: item.purchasePrice || 0,
+          condition: "Working",
+          remarks: "गोडाउन से स्वचालित रूप से स्थानांतरित (Shifted)",
+          type: item.category?.toLowerCase() || "crockery" // 'crockery' या 'cutlery'
+        });
+
+        // 2. Godown से हमेशा के लिए डिलीट करें
+        batch.delete(godownDocRef);
+      });
+
+      await batch.commit();
+      toastMessage(`${itemsToMigrate.length} सामान सफलतापूर्वक फिक्स्ड एसेट्स में शिफ्ट कर दिए गए हैं! 🚚`, "success");
+    } catch (error) {
+      console.error("Migration error:", error);
+      toastMessage("स्थानांतरण फेल हो गया। कृपया दोबारा प्रयास करें।", "error");
+    }
+  };
+
   // यदि अभी सेशन चेक हो रहा है तो लोडर दिखाएं (ताकि लॉक स्क्रीन न चमके)
   if (authLoading) {
     return (
@@ -771,6 +818,7 @@ export default function StoreStockPage() {
             isDarkMode={isDarkMode} searchQuery={searchQuery} setSearchQuery={setSearchQuery}
             filteredAssets={filteredAssets} setShowAddAssetModal={setShowAddAssetModal}
             handleDeleteAsset={handleDeleteAsset}
+            handleMigrate={handleMigrateCrockeryCutlery} // माइग्रेशन फ़ंक्शन यहाँ प्रोप्स के रूप में भेजा गया है
           />
         )}
 
@@ -981,8 +1029,9 @@ export default function StoreStockPage() {
                   onChange={e => setFormAddAsset({ ...formAddAsset, type: e.target.value })} 
                   className="w-full p-2.5 rounded-xl border dark:bg-neutral-800 text-xs font-bold"
                 >
-                  <option value="general">सामान्य एसेट (General Asset)</option>
-                  <option value="crockery_cutlery">क्रॉकरी और कटलरी (Crockery & Cutlery)</option>
+                  <option value="general">🏢 सामान्य एसेट (General)</option>
+                  <option value="cutlery">🍴 कटलरी (Cutlery)</option>
+                  <option value="crockery">🍽️ क्रॉकरी (Crockery)</option>
                 </select>
               </div>
 
