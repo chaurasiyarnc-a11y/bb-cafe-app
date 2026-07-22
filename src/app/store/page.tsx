@@ -675,14 +675,14 @@ export default function StoreStockPage() {
     if (!window.confirm("क्या आप वाकई गोडाउन (Godown) से क्रॉकरी और कटलरी का सारा डेटा स्थायी संपत्ति (Fixed Assets) में शिफ्ट करना चाहते हैं? यह क्रिया उन्हें गोडाउन से हमेशा के लिए हटा देगी।")) return;
 
     try {
-      // गोदाम के वे आइटम्स ढूंढें जिनकी कैटेगरी CROCKERY या CUTLERY है
+      // गोदाम के वे आइटम्स ढूंढें जिनकी कैटेगरी CROCKERY या CUTLERY है (स्पेलिंग में थोड़ी भिन्नता को भी संभालने के लिए 'CROCKER' और 'CUTLER' की जांच की जा रही है)
       const itemsToMigrate = inventory.filter(item => {
-        const cat = (item.category || "").toUpperCase();
-        return cat === 'CROCKERY' || cat === 'CUTLERY';
+        const cat = (item.category || "").toUpperCase().trim();
+        return cat.includes('CROCKER') || cat.includes('CUTLER');
       });
 
       if (itemsToMigrate.length === 0) {
-        toastMessage("गोदाम में ट्रांसफर के लिए कोई क्रॉकरी या कटलरी उत्पाद नहीं मिला!", "info");
+        toastMessage("गोदाम में ट्रांसफर के लिए कोई क्रॉकरी या कटलरी उत्पाद नहीं मिला! सुनिश्चित करें कि उनका कैटेगरी नाम सही है।", "info");
         return;
       }
 
@@ -693,6 +693,9 @@ export default function StoreStockPage() {
         const assetDocRef = doc(db, "fixed_assets", assetId);
         const godownDocRef = doc(db, "godown_inventory", item.id);
 
+        const cat = (item.category || "").toUpperCase().trim();
+        const finalType = cat.includes('CROCKER') ? 'crockery' : 'cutlery';
+
         // 1. Fixed Assets कलेक्शन में लिखें (सही टाइप के साथ)
         batch.set(assetDocRef, {
           id: assetId,
@@ -700,8 +703,8 @@ export default function StoreStockPage() {
           quantity: item.storeQty || 1,
           cost: item.purchasePrice || 0,
           condition: "Working",
-          remarks: "गोडाउन से स्वचालित रूप से स्थानांतरित (Shifted)",
-          type: item.category?.toLowerCase() || "crockery" // 'crockery' या 'cutlery'
+          remarks: "गोडाउन से स्थानांतरित (Shifted)",
+          type: finalType // 'crockery' या 'cutlery'
         });
 
         // 2. Godown से हमेशा के लिए डिलीट करें
