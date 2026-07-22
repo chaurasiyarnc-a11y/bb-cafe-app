@@ -185,6 +185,7 @@ export default function StoreStockPage() {
   const [showAddProductModal, setShowAddProductModal] = useState<boolean>(false);
   const [showAddAssetModal, setShowAddAssetModal] = useState<boolean>(false);
   const [editingProduct, setEditingProduct] = useState<InventoryItem | null>(null);
+  const [editingAsset, setEditingAsset] = useState<FixedAsset | null>(null); // Fixed Assets एडिटिंग के लिए स्टेट
 
   const [formAddProduct, setFormAddProduct] = useState({ name: '', storeQty: '0', kitchenQty: '0', unit: 'Kg', purchasePrice: '', minLimit: '10', category: 'OTHERS', lastPurchaseDate: getLocalDateString(0) });
   
@@ -563,6 +564,29 @@ export default function StoreStockPage() {
     toastMessage("नया एसेट सफलतापूर्वक जोड़ा गया!", "success");
   };
 
+  // Fixed Asset एडिट सबमिट करने का फ़ंक्शन
+  const handleEditAssetSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingAsset) return;
+    await setDoc(doc(db, "fixed_assets", editingAsset.id), editingAsset, { merge: true });
+    setEditingAsset(null);
+    toastMessage("एसेट का विवरण सफलतापूर्वक अपडेट किया गया!", "success");
+  };
+
+  // एसेट की मात्रा +/- एडजस्ट (मासिक गिनती) करने का फ़ंक्शन
+  const handleAdjustAssetQty = async (assetId: string, diff: number) => {
+    triggerHaptic(20);
+    try {
+      const asset = fixedAssets.find(a => a.id === assetId);
+      if (!asset) return;
+      const nextQty = Math.max(0, (asset.quantity || 0) + diff);
+      await setDoc(doc(db, "fixed_assets", assetId), { quantity: nextQty }, { merge: true });
+      toastMessage("मात्रा सफलतापूर्वक अपडेट की गई!", "success");
+    } catch {
+      toastMessage("मात्रा अपडेट करने में समस्या आई।", "error");
+    }
+  };
+
   const handleWasteSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const qtyNum = parseFloat(formStockOut.quantity);
@@ -675,7 +699,7 @@ export default function StoreStockPage() {
     if (!window.confirm("क्या आप वाकई गोडाउन (Godown) से क्रॉकरी और कटलरी का सारा डेटा स्थायी संपत्ति (Fixed Assets) में शिफ्ट करना चाहते हैं? यह क्रिया उन्हें गोडाउन से हमेशा के लिए हटा देगी।")) return;
 
     try {
-      // गोदाम के वे आइटम्स ढूंढें जिनकी कैटेगरी CROCKERY या CUTLERY है (स्पेलिंग में थोड़ी भिन्नता को भी संभालने के लिए 'CROCKER' और 'CUTLER' की जांच की जा रही है)
+      // गोदाम के वे आइटम्स ढूंढें जिनकी कैटेगरी CROCKERY या CUTLERY है
       const itemsToMigrate = inventory.filter(item => {
         const cat = (item.category || "").toUpperCase().trim();
         return cat.includes('CROCKER') || cat.includes('CUTLER');
@@ -821,7 +845,9 @@ export default function StoreStockPage() {
             isDarkMode={isDarkMode} searchQuery={searchQuery} setSearchQuery={setSearchQuery}
             filteredAssets={filteredAssets} setShowAddAssetModal={setShowAddAssetModal}
             handleDeleteAsset={handleDeleteAsset}
-            handleMigrate={handleMigrateCrockeryCutlery} // माइग्रेशन फ़ंक्शन यहाँ प्रोप्स के रूप में भेजा गया है
+            handleMigrate={handleMigrateCrockeryCutlery} // माइग्रेशन फ़ंक्शन प्रोप्स के रूप में भेजा गया
+            setEditingAsset={setEditingAsset} // एडिटिंग स्टेट प्रोप्स के रूप में भेजा गया
+            handleAdjustQty={handleAdjustAssetQty} // मात्रा कम-ज्यादा करने का फ़ंक्शन प्रोप्स के रूप में भेजा गया
           />
         )}
 
@@ -1044,6 +1070,90 @@ export default function StoreStockPage() {
                 <input type="number" placeholder="लागत (Cost)" value={formAddAsset.cost} onChange={e => setFormAddAsset({ ...formAddAsset, cost: e.target.value })} className="w-full p-2.5 rounded-xl border dark:bg-neutral-800" />
               </div>
               <button type="submit" className="w-full py-3 bg-green-600 text-white rounded-xl text-xs font-bold uppercase">एसेट सहेजें (Save Asset)</button>
+            </motion.form>
+          </div>
+        )}
+
+        {/* Modal: Edit Fixed Asset */}
+        {editingAsset && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <motion.form onSubmit={handleEditAssetSubmit} className="w-full max-w-sm rounded-3xl p-6 space-y-4 bg-white dark:bg-neutral-900 border">
+              <h3 className="text-xs font-black uppercase text-orange-500">एसेट विवरण संपादित करें</h3>
+              
+              <div className="space-y-1">
+                <label className="text-[9px] text-neutral-400 font-bold uppercase">श्रेणी (Type)</label>
+                <select 
+                  value={editingAsset.type || 'general'} 
+                  onChange={e => setEditingAsset({ ...editingAsset, type: e.target.value })} 
+                  className="w-full p-2.5 rounded-xl border dark:bg-neutral-800 text-xs font-bold"
+                >
+                  <option value="general">🏢 सामान्य एसेट (General)</option>
+                  <option value="cutlery">🍴 कटलरी (Cutlery)</option>
+                  <option value="crockery">🍽️ क्रॉकरी (Crockery)</option>
+                </select>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[9px] text-neutral-400 font-bold uppercase">नाम (Name)</label>
+                <input 
+                  type="text" 
+                  value={editingAsset.name} 
+                  onChange={e => setEditingAsset({ ...editingAsset, name: e.target.value.toUpperCase() })} 
+                  className="w-full p-2.5 rounded-xl border dark:bg-neutral-800 text-xs" 
+                  required 
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="space-y-1">
+                  <label className="text-[9px] text-neutral-400 font-bold uppercase">मात्रा (Quantity)</label>
+                  <input 
+                    type="number" 
+                    value={editingAsset.quantity} 
+                    onChange={e => setEditingAsset({ ...editingAsset, quantity: parseFloat(e.target.value) || 0 })} 
+                    className="p-2 border rounded-xl dark:bg-neutral-800" 
+                    required 
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[9px] text-neutral-400 font-bold uppercase">लागत (Cost)</label>
+                  <input 
+                    type="number" 
+                    value={editingAsset.cost || 0} 
+                    onChange={e => setEditingAsset({ ...editingAsset, cost: parseFloat(e.target.value) || 0 })} 
+                    className="p-2 border rounded-xl dark:bg-neutral-800" 
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[9px] text-neutral-400 font-bold uppercase">स्थिति (Condition)</label>
+                <select 
+                  value={editingAsset.condition} 
+                  onChange={e => setEditingAsset({ ...editingAsset, condition: e.target.value as any })} 
+                  className="w-full p-2.5 rounded-xl border dark:bg-[#181818] font-bold text-xs"
+                >
+                  <option value="Working">Working (सक्रिय)</option>
+                  <option value="Needs Repair">Needs Repair (मरम्मत योग्य)</option>
+                  <option value="Broken">Broken (टूटा हुआ)</option>
+                </select>
+              </div>
+
+              <div className="flex gap-2">
+                <button 
+                  type="button" 
+                  onClick={() => {
+                    confirmDeleteWithPin(`क्या आप इस एसेट "${editingAsset.name}" को हटाना चाहते हैं?`, async () => {
+                      await deleteDoc(doc(db, "fixed_assets", editingAsset.id));
+                      setEditingAsset(null);
+                    });
+                  }} 
+                  className="px-4 py-3 bg-red-100 text-red-600 rounded-xl font-bold text-xs uppercase"
+                >
+                  हटाएं
+                </button>
+                <button type="submit" className="flex-1 py-3 bg-orange-500 text-white rounded-xl font-bold text-xs uppercase">अपडेट करें ➔</button>
+              </div>
             </motion.form>
           </div>
         )}
