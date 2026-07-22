@@ -1,10 +1,10 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import { Search, Plus, Trash2, RefreshCw } from 'lucide-react';
+import { Search, Plus, Trash2, RefreshCw, Edit } from 'lucide-react';
 
 export default function StockAssets({
-  isDarkMode, searchQuery, setSearchQuery, filteredAssets, setShowAddAssetModal, handleDeleteAsset, handleMigrate
+  isDarkMode, searchQuery, setSearchQuery, filteredAssets, setShowAddAssetModal, handleDeleteAsset, handleMigrate, setEditingAsset, handleAdjustQty
 }: any) {
   // लोकल स्टेट: एसेट्स को 3 श्रेणियों में फ़िल्टर करने के लिए ('general', 'cutlery', या 'crockery')
   const [activeSubTab, setActiveSubTab] = useState<'general' | 'cutlery' | 'crockery'>('general');
@@ -127,24 +127,60 @@ export default function StockAssets({
           displayedAssets.map((asset: any) => {
             const condDetails = getConditionDetails(asset.condition);
             return (
-              <div key={asset.id} className={`p-4 rounded-2xl border ${isDarkMode ? 'bg-[#181818] border-neutral-800' : 'bg-white border-neutral-100'}`}>
+              <div key={asset.id} className={`p-4 rounded-2xl border flex flex-col gap-3 justify-between ${isDarkMode ? 'bg-[#181818] border-neutral-800' : 'bg-white border-neutral-100'}`}>
                 <div className="flex justify-between items-start">
                   <div>
                     <p className="font-bold text-sm text-neutral-800 dark:text-neutral-100">{asset.name}</p>
-                    <p className="text-[9px] text-neutral-400 font-bold uppercase mt-0.5">मात्रा: {asset.quantity} यूनिट्स</p>
+                    <p className="text-[10px] text-neutral-400 font-bold uppercase mt-0.5">लागत: ₹{(asset.cost || 0).toLocaleString()}</p>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-wider ${condDetails.style}`}>
-                      {condDetails.label}
+                  
+                  <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-wider ${condDetails.style}`}>
+                    {condDetails.label}
+                  </span>
+                </div>
+
+                {/* कम-ज्यादा (मासिक री-काउंटिंग) और एडिट के लिए नीचे का पैनल */}
+                <div className="flex items-center justify-between border-t border-dashed dark:border-neutral-800/80 pt-2.5 mt-1">
+                  
+                  {/* मात्रा कम / ज्यादा करने का कंट्रोलर */}
+                  <div className="flex items-center gap-1.5 bg-neutral-100 dark:bg-neutral-900 p-1 rounded-xl">
+                    <button 
+                      onClick={() => handleAdjustQty(asset.id, -1)} 
+                      className="w-7 h-7 flex items-center justify-center bg-white dark:bg-neutral-800 rounded-lg text-xs font-black shadow-sm active:scale-90 transition-all text-red-500"
+                      title="कम करें (-1)"
+                    >
+                      -
+                    </button>
+                    <span className="w-10 text-center text-xs font-black dark:text-neutral-200">
+                      {asset.quantity} {asset.type === 'general' ? 'Units' : 'Pcs'}
                     </span>
                     <button 
-                      onClick={() => handleDeleteAsset(asset.id, asset.name)} 
-                      className="p-1 hover:bg-red-100 dark:hover:bg-red-950/40 text-neutral-400 hover:text-red-500 rounded-lg transition-colors"
-                      title="हटाएं"
+                      onClick={() => handleAdjustQty(asset.id, 1)} 
+                      className="w-7 h-7 flex items-center justify-center bg-white dark:bg-neutral-800 rounded-lg text-xs font-black shadow-sm active:scale-90 transition-all text-green-500"
+                      title="बढ़ाएं (+1)"
                     >
-                      <Trash2 size={13} />
+                      +
                     </button>
                   </div>
+
+                  <div className="flex items-center gap-1.5">
+                    {/* संपादित करें (Edit Details) बटन */}
+                    <button 
+                      onClick={() => setEditingAsset(asset)}
+                      className="px-3 py-2 bg-orange-100 dark:bg-orange-950/20 text-orange-500 hover:text-orange-600 rounded-xl text-[10px] font-black uppercase flex items-center gap-1 transition-colors"
+                      title="विवरण संपादित करें"
+                    >
+                      <Edit size={11} /> एडिट
+                    </button>
+                    <button 
+                      onClick={() => handleDeleteAsset(asset.id, asset.name)} 
+                      className="p-2 bg-red-50 dark:bg-red-950/10 text-neutral-400 hover:text-red-500 rounded-xl transition-colors"
+                      title="हटाएं"
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                  </div>
+
                 </div>
               </div>
             );
