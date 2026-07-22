@@ -285,7 +285,41 @@ export default function StoreStockPage() {
     }
   };
 
-  // calculations
+  // calculations (कैलकुलेशंस में एसेट्स का वर्गीकरण मूल्य भी शामिल किया गया है)
+  const stats = useMemo(() => {
+    const totalVal = inventory.reduce((sum, item) => sum + (item.storeQty * item.purchasePrice), 0);
+    const lowCount = inventory.filter(item => item.storeQty < item.minLimit).length;
+    
+    // एसेट्स की कुल मात्रा और मूल्य
+    const totalFixedQty = fixedAssets.reduce((sum, asset) => sum + (asset.quantity || 0), 0);
+    const totalFixedVal = fixedAssets.reduce((sum, asset) => sum + ((asset.quantity || 1) * (asset.cost || 0)), 0);
+
+    // 1. सामान्य एसेट्स का कुल मूल्य (general)
+    const generalAssetsVal = fixedAssets
+      .filter(asset => !asset.type || asset.type === 'general')
+      .reduce((sum, asset) => sum + ((asset.quantity || 1) * (asset.cost || 0)), 0);
+
+    // 2. कटलरी का कुल मूल्य (cutlery)
+    const cutleryVal = fixedAssets
+      .filter(asset => asset.type === 'cutlery')
+      .reduce((sum, asset) => sum + ((asset.quantity || 1) * (asset.cost || 0)), 0);
+
+    // 3. क्रॉकरी का कुल मूल्य (crockery)
+    const crockeryVal = fixedAssets
+      .filter(asset => asset.type === 'crockery')
+      .reduce((sum, asset) => sum + ((asset.quantity || 1) * (asset.cost || 0)), 0);
+
+    return { 
+      totalVal, 
+      lowCount, 
+      totalFixedQty, 
+      totalFixedVal,
+      generalAssetsVal,
+      cutleryVal,
+      crockeryVal
+    };
+  }, [inventory, fixedAssets]);
+
   const getFilteredLedgerStats = useMemo(() => {
     const todayStr = getLocalDateString(0);
     const yesterdayStr = getLocalDateString(1);
@@ -312,14 +346,6 @@ export default function StoreStockPage() {
 
     return { totalInwardQty, totalKitchenQty, totalWasteLoss, matchedInward, matchedKitchen, matchedWasteLogs };
   }, [dashboardDateRange, startDate, endDate, stockInHistory, stockOutHistory]);
-
-  const stats = useMemo(() => {
-    const totalVal = inventory.reduce((sum, item) => sum + (item.storeQty * item.purchasePrice), 0);
-    const lowCount = inventory.filter(item => item.storeQty < item.minLimit).length;
-    const totalFixedQty = fixedAssets.reduce((sum, asset) => sum + (asset.quantity || 0), 0);
-    const totalFixedVal = fixedAssets.reduce((sum, asset) => sum + ((asset.quantity || 1) * (asset.cost || 0)), 0);
-    return { totalVal, lowCount, totalFixedQty, totalFixedVal };
-  }, [inventory, fixedAssets]);
 
   const categoryStockValues = useMemo(() => {
     const values: Record<string, number> = {};
@@ -936,7 +962,7 @@ export default function StoreStockPage() {
         {showConsumeModal && consumeItem && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <motion.form onSubmit={handleConsumeKitchenSubmit} className={`w-full max-w-sm rounded-[2rem] p-6 space-y-4 border ${isDarkMode ? 'bg-neutral-900 text-white' : 'bg-white text-neutral-900'}`}>
-              <h3 className="text-xs font-black uppercase text-neutral-400">किचन स्टॉक का उपयोग - {consumeItem.name}</h3>
+              <h3 className="text-xs font-black uppercase text-orange-500">किचन स्टॉक का उपयोग - {consumeItem.name}</h3>
               <input type="number" placeholder="मात्रा (Qty)" value={consumeQtyInput} onChange={e => setConsumeQtyInput(e.target.value)} className="w-full p-2.5 rounded-xl border dark:bg-neutral-800 text-center" required />
               <input type="text" placeholder="टिप्पणी (Remarks)" value={consumeRemarksInput} onChange={e => setConsumeRemarksInput(e.target.value)} className="w-full p-2.5 rounded-xl border dark:bg-neutral-800" />
               <button type="submit" className="w-full py-3 bg-neutral-800 text-white dark:bg-white dark:text-neutral-900 rounded-xl text-xs font-black">उपयोग सहेजें (Save)</button>
