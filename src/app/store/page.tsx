@@ -876,6 +876,8 @@ export default function StoreStockPage() {
             setShowAddProductModal={setShowAddProductModal} setEditingProduct={setEditingProduct}
             setTransferItem={setTransferItem} setShowTransferModal={setShowTransferModal}
             setConsumeItem={setConsumeItem} setShowConsumeModal={setShowConsumeModal}
+            setShowSaveToListModal={setShowSaveToListModal} // सप्लायर आर्डर लिस्ट खोलने का प्रोप
+            setShowBulkCategoryModal={setShowBulkCategoryModal} // बल्क कैटेगरी बदलने का प्रोप
           />
         )}
 
