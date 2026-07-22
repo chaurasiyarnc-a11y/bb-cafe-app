@@ -79,6 +79,7 @@ interface FixedAsset {
   condition: "Working" | "Needs Repair" | "Broken";
   remarks?: string;
   type?: string; // 'general', 'cutlery', या 'crockery'
+  unit?: string; // 'Pcs', 'Kg', 'Ltr', 'Packets' आदि
 }
 
 interface UserPin {
@@ -189,8 +190,8 @@ export default function StoreStockPage() {
 
   const [formAddProduct, setFormAddProduct] = useState({ name: '', storeQty: '0', kitchenQty: '0', unit: 'Kg', purchasePrice: '', minLimit: '10', category: 'OTHERS', lastPurchaseDate: getLocalDateString(0) });
   
-  // formAddAsset में डिफ़ॉल्ट रूप से type 'general' रखा गया है
-  const [formAddAsset, setFormAddAsset] = useState({ name: '', quantity: '1', purchaseDate: '', cost: '', condition: 'Working' as any, remarks: '', type: 'general' });
+  // formAddAsset में डिफ़ॉल्ट रूप से type 'general' और unit 'Pcs' रखा गया है
+  const [formAddAsset, setFormAddAsset] = useState({ name: '', quantity: '1', purchaseDate: '', cost: '', condition: 'Working' as any, remarks: '', type: 'general', unit: 'Pcs' });
 
   const [showStockOutModal, setShowStockOutModal] = useState<boolean>(false);
   const [formStockOut, setFormStockOut] = useState({ item: '', quantity: '', purpose: 'Waste' as any, remarks: '' });
@@ -543,7 +544,7 @@ export default function StoreStockPage() {
     toastMessage("नया उत्पाद जोड़ा गया!", "success");
   };
 
-  // Fixed Asset सेव करते समय उसका प्रकार (Type) भी डेटाबेस में सहेजा जाएगा
+  // Fixed Asset सेव करते समय उसका प्रकार (Type) और कस्टमाइज्ड यूनिट (Unit) भी डेटाबेस में सहेजा जाएगा
   const handleAddAssetSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleanName = formAddAsset.name.toUpperCase().trim();
@@ -556,11 +557,12 @@ export default function StoreStockPage() {
       cost: parseFloat(formAddAsset.cost) || 0, 
       condition: formAddAsset.condition, 
       remarks: formAddAsset.remarks,
-      type: formAddAsset.type || 'general' // 'general', 'cutlery' या 'crockery'
+      type: formAddAsset.type || 'general',
+      unit: formAddAsset.unit || 'Pcs' // 'Pcs', 'Kg', 'Ltr', 'Packets' आदि
     });
     setShowAddAssetModal(false);
     // फॉर्म रीसेट
-    setFormAddAsset({ name: '', quantity: '1', purchaseDate: '', cost: '', condition: 'Working', remarks: '', type: 'general' });
+    setFormAddAsset({ name: '', quantity: '1', purchaseDate: '', cost: '', condition: 'Working', remarks: '', type: 'general', unit: 'Pcs' });
     toastMessage("नया एसेट सफलतापूर्वक जोड़ा गया!", "success");
   };
 
@@ -720,7 +722,7 @@ export default function StoreStockPage() {
         const cat = (item.category || "").toUpperCase().trim();
         const finalType = cat.includes('CROCKER') ? 'crockery' : 'cutlery';
 
-        // 1. Fixed Assets कलेक्शन में लिखें (सही टाइप के साथ)
+        // 1. Fixed Assets कलेक्शन में लिखें (सही टाइप और असली यूनिट के साथ)
         batch.set(assetDocRef, {
           id: assetId,
           name: item.name,
@@ -728,7 +730,8 @@ export default function StoreStockPage() {
           cost: item.purchasePrice || 0,
           condition: "Working",
           remarks: "गोडाउन से स्थानांतरित (Shifted)",
-          type: finalType // 'crockery' या 'cutlery'
+          type: finalType, // 'crockery' या 'cutlery'
+          unit: item.unit || 'Pcs' // गोडाउन का असली यूनिट ट्रांसफर करें
         });
 
         // 2. Godown से हमेशा के लिए डिलीट करें
@@ -1065,9 +1068,30 @@ export default function StoreStockPage() {
               </div>
 
               <input type="text" placeholder="एसेट का नाम" value={formAddAsset.name} onChange={e => setFormAddAsset({ ...formAddAsset, name: e.target.value })} className="w-full p-2.5 rounded-xl border dark:bg-neutral-800 text-xs" required />
+              
               <div className="grid grid-cols-2 gap-2 text-xs">
-                <input type="number" placeholder="मात्रा (Qty)" value={formAddAsset.quantity} onChange={e => setFormAddAsset({ ...formAddAsset, quantity: e.target.value })} className="w-full p-2.5 rounded-xl border dark:bg-neutral-800" required />
-                <input type="number" placeholder="लागत (Cost)" value={formAddAsset.cost} onChange={e => setFormAddAsset({ ...formAddAsset, cost: e.target.value })} className="w-full p-2.5 rounded-xl border dark:bg-neutral-800" />
+                <div className="space-y-1">
+                  <label className="text-[9px] text-neutral-400 font-bold uppercase">मात्रा (Qty)</label>
+                  <input type="number" placeholder="Qty" value={formAddAsset.quantity} onChange={e => setFormAddAsset({ ...formAddAsset, quantity: e.target.value })} className="w-full p-2.5 rounded-xl border dark:bg-neutral-800" required />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[9px] text-neutral-400 font-bold uppercase">यूनिट (Unit)</label>
+                  <select 
+                    value={formAddAsset.unit} 
+                    onChange={e => setFormAddAsset({ ...formAddAsset, unit: e.target.value })} 
+                    className="w-full p-2.5 rounded-xl border dark:bg-neutral-800 font-bold"
+                  >
+                    <option value="Pcs">Pcs</option>
+                    <option value="Kg">Kg</option>
+                    <option value="Ltr">Ltr</option>
+                    <option value="Packets">Packets</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[9px] text-neutral-400 font-bold uppercase">लागत (Cost)</label>
+                <input type="number" placeholder="Cost" value={formAddAsset.cost} onChange={e => setFormAddAsset({ ...formAddAsset, cost: e.target.value })} className="w-full p-2.5 rounded-xl border dark:bg-neutral-800 text-xs" />
               </div>
               <button type="submit" className="w-full py-3 bg-green-600 text-white rounded-xl text-xs font-bold uppercase">एसेट सहेजें (Save Asset)</button>
             </motion.form>
@@ -1104,16 +1128,29 @@ export default function StoreStockPage() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-2 text-xs">
+              <div className="grid grid-cols-3 gap-2 text-xs">
                 <div className="space-y-1">
-                  <label className="text-[9px] text-neutral-400 font-bold uppercase">मात्रा (Quantity)</label>
+                  <label className="text-[9px] text-neutral-400 font-bold uppercase">मात्रा (Qty)</label>
                   <input 
                     type="number" 
                     value={editingAsset.quantity} 
                     onChange={e => setEditingAsset({ ...editingAsset, quantity: parseFloat(e.target.value) || 0 })} 
-                    className="p-2 border rounded-xl dark:bg-neutral-800" 
+                    className="w-full p-2 border rounded-xl dark:bg-neutral-800" 
                     required 
                   />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[9px] text-neutral-400 font-bold uppercase">यूनिट (Unit)</label>
+                  <select 
+                    value={editingAsset.unit || 'Pcs'} 
+                    onChange={e => setEditingAsset({ ...editingAsset, unit: e.target.value })} 
+                    className="w-full p-2 border rounded-xl dark:bg-neutral-800 font-bold"
+                  >
+                    <option value="Pcs">Pcs</option>
+                    <option value="Kg">Kg</option>
+                    <option value="Ltr">Ltr</option>
+                    <option value="Packets">Packets</option>
+                  </select>
                 </div>
                 <div className="space-y-1">
                   <label className="text-[9px] text-neutral-400 font-bold uppercase">लागत (Cost)</label>
@@ -1121,7 +1158,7 @@ export default function StoreStockPage() {
                     type="number" 
                     value={editingAsset.cost || 0} 
                     onChange={e => setEditingAsset({ ...editingAsset, cost: parseFloat(e.target.value) || 0 })} 
-                    className="p-2 border rounded-xl dark:bg-neutral-800" 
+                    className="w-full p-2 border rounded-xl dark:bg-neutral-800" 
                   />
                 </div>
               </div>
