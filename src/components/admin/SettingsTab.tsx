@@ -2,10 +2,27 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { db } from '../../lib/firebase'; // अपनी लोकेशन के अनुसार पाथ सेट करें
 import { collection, addDoc, doc, setDoc, deleteDoc, updateDoc, runTransaction, increment, onSnapshot } from 'firebase/firestore';
-import { Trash, Eye, EyeOff, ImageIcon, Play, Settings, X, Percent, CheckCircle2, XCircle, Lock, Edit, Check } from 'lucide-react';
+import { 
+  Trash, 
+  Eye, 
+  EyeOff, 
+  ImageIcon, 
+  Play, 
+  Settings, 
+  X, 
+  Percent, 
+  CheckCircle2, 
+  XCircle, 
+  Lock, 
+  Edit, 
+  Check,
+  Youtube,       // सोशल आइकन्स
+  Instagram, 
+  Facebook, 
+  MessageCircle 
+} from 'lucide-react';
 import toast from 'react-hot-toast';
 import { isVideoUrl, sha256 } from '../../lib/utils'; // अपनी लोकेशन के अनुसार पाथ सेट करें
-import SocialCountsEditor from './SocialCountsEditor'; // या सही पाथ दें
 
 interface SettingsTabProps {
   banners: any[];
@@ -35,7 +52,7 @@ export default function SettingsTab({
   storeOpen
 }: SettingsTabProps) {
   // --- LOCAL STATES ---
-  const [activeSubTab, setActiveSubTab] = useState<'banners' | 'reels' | 'categories' | 'social_counts' | 'header_video' | 'coupons' | 'reviews' | 'proofs' | 'claims' | 'security'>('banners');
+  const [activeSubTab, setActiveSubTab] = useState<'banners' | 'reels' | 'categories' | 'footer' | 'header_video' | 'coupons' | 'reviews' | 'proofs' | 'claims' | 'security'>('banners');
 
   // Promo Banners State
   const [newBannerUrl, setNewBannerUrl] = useState("");
@@ -61,6 +78,12 @@ export default function SettingsTab({
   const [storeTimingHindi, setStoreTimingHindi] = useState("सुबह 10:00 से रात 11:00 बजे");
   const [storeTimingEnglish, setStoreTimingEnglish] = useState("10:00 AM to 11:00 PM");
   const [googleMapUrl, setGoogleMapUrl] = useState("https://maps.app.goo.gl/8pj1Xby3bbMn5qxu5");
+
+  // Social Counts States (सुधरा हुआ यूआई और स्टेट्स)
+  const [instagramCount, setInstagramCount] = useState("");
+  const [youtubeCount, setYoutubeCount] = useState("");
+  const [facebookCount, setFacebookCount] = useState("");
+  const [whatsappCount, setWhatsAppCount] = useState("");
 
   // Coupons
   const [newCouponCode, setNewCouponCode] = useState("");
@@ -96,6 +119,12 @@ export default function SettingsTab({
         if (data.timingHindi) setStoreTimingHindi(data.timingHindi);
         if (data.timingEnglish) setStoreTimingEnglish(data.timingEnglish);
         if (data.googleMapUrl) setGoogleMapUrl(data.googleMapUrl);
+        
+        // सोशल मीडिया आंकड़े लोड करना
+        if (data.instagramCount) setInstagramCount(data.instagramCount);
+        if (data.youtubeCount) setYoutubeCount(data.youtubeCount);
+        if (data.facebookCount) setFacebookCount(data.facebookCount);
+        if (data.whatsappCount) setWhatsAppCount(data.whatsappCount);
       }
     });
 
@@ -221,7 +250,7 @@ export default function SettingsTab({
     } catch (err) { toast.error("स्टेटस बदलने में त्रुटि आई।"); }
   };
 
-  // 4. HEADER VIDEO, TIMINGS & MAPS
+  // 4. HEADER VIDEO
   const handleUpdateHeaderVideo = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!headerVideoInput) return toast.error("Please enter a valid video link!");
@@ -231,6 +260,7 @@ export default function SettingsTab({
     } catch (err) { toast.error("Failed to update video."); }
   };
 
+  // 5. TIMINGS, MAPS & SOCIAL COUNTS UPDATER
   const handleUpdateStoreTimingsAndLocation = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!storeTimingHindi || !storeTimingEnglish || !googleMapUrl) {
@@ -246,7 +276,20 @@ export default function SettingsTab({
     } catch (err) { toast.error("Failed to update store data."); }
   };
 
-  // 5. COUPONS
+  const handleUpdateSocialCounts = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await setDoc(doc(db, "settings", "store"), {
+        instagramCount,
+        youtubeCount,
+        facebookCount,
+        whatsappCount
+      }, { merge: true });
+      toast.success("Social Media counts updated! 📊🎉");
+    } catch (err) { toast.error("Failed to update social counts."); }
+  };
+
+  // 6. COUPONS
   const handleAddCoupon = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCouponCode || !newCouponValue) return;
@@ -269,7 +312,7 @@ export default function SettingsTab({
     } catch (err) { toast.error("Error deleting coupon"); }
   };
 
-  // 6. REVIEWS
+  // 7. REVIEWS
   const handleApproveReview = async (id: string) => {
     try {
       await updateDoc(doc(db, "reviews", id), { isApproved: true });
@@ -284,7 +327,7 @@ export default function SettingsTab({
     } catch (err) { toast.error("Error deleting review"); }
   };
 
-  // 7. SOCIAL PROOF ALERTS
+  // 8. SOCIAL PROOF ALERTS
   const handleAddSocialProof = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newProofText.trim()) return toast.error("Please enter alert text!");
@@ -305,7 +348,7 @@ export default function SettingsTab({
     } catch (err) { toast.error("Error deleting alert"); }
   };
 
-  // 8. POINTS CLAIMS
+  // 9. POINTS CLAIMS
   const handleVerifyClaimApproval = async (claim: any) => {
     try {
       await runTransaction(db, async (transaction) => {
@@ -340,7 +383,7 @@ export default function SettingsTab({
     } catch (err) { toast.error("Failed to reject claim request."); }
   };
 
-  // 9. STAFF PIN & CONFIGURATION
+  // 10. STAFF PIN & CONFIGURATION
   const handleAddStaffCombined = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newStaffName.trim() || !newStaffPin) return toast.error("Kripya saari details bharein!");
@@ -449,7 +492,7 @@ export default function SettingsTab({
           { id: 'banners', label: '🖼️ Banners' },
           { id: 'reels', label: '🎥 Reels' },
           { id: 'categories', label: '📁 Categories' }, 
-          { id: 'social_counts', label: '📊 Socials' }, // [नया सब-टैब]
+          { id: 'footer', label: '🦶 Footer' }, 
           { id: 'header_video', label: '🎬 Media/Info' },
           { id: 'coupons', label: '🎟️ Coupons' },
           { id: 'reviews', label: '⭐ Reviews' },
@@ -642,38 +685,127 @@ export default function SettingsTab({
         </div>
       )}
 
-      {/* --- SUB-TAB 4: SOCIAL COUNTS (नया समर्पित सब-टैब) --- */}
-      {activeSubTab === 'social_counts' && (
+      {/* --- SUB-TAB 4: FOOTER (Social Counts + Store timings + Maps Link) --- */}
+      {activeSubTab === 'footer' && (
         <div className="space-y-6">
-          <div className="bg-[#020202] border border-white/5 p-6 rounded-[2.5rem] space-y-4 text-left">
+          {/* [सुधार] Social Media Counts (Native Brutalist Beautiful Editor) */}
+          <form onSubmit={handleUpdateSocialCounts} className="bg-[#111] p-6 rounded-[2.5rem] space-y-4 text-xs font-bold text-left border border-white/5">
             <h3 className="text-sm font-black text-orange-500 uppercase flex items-center gap-1.5">
               📊 Social Media Counts
             </h3>
             <p className="text-[10px] text-gray-500 font-bold uppercase leading-relaxed font-mono">
-              यहाँ से आप होम पेज पर दिखने वाले फ़ॉलोअर्स और सब्सक्राइबर्स के आंकड़े बदल सकते हैं।
+              यहाँ से आप होम पेज के फुटर में दिखने वाले लाइव फ़ॉलोअर्स और सब्सक्राइबर्स के आंकड़े बदल सकते हैं।
             </p>
-            <div className="pt-2">
-              <SocialCountsEditor />
+            
+            <div className="grid grid-cols-2 gap-4">
+              {/* Instagram Card */}
+              <div className="bg-black/40 border border-white/5 p-4 rounded-2xl flex flex-col gap-2">
+                <div className="flex items-center gap-2 text-pink-500">
+                  <Instagram size={16} />
+                  <span className="text-[10px] uppercase font-black">Instagram</span>
+                </div>
+                <input 
+                  type="text" 
+                  value={instagramCount} 
+                  onChange={(e) => setInstagramCount(e.target.value)} 
+                  placeholder="e.g. 12K+" 
+                  className="w-full bg-white/5 border border-white/10 rounded-xl p-2.5 text-white outline-none text-xs font-mono font-bold" 
+                  required 
+                />
+              </div>
+
+              {/* YouTube Card */}
+              <div className="bg-black/40 border border-white/5 p-4 rounded-2xl flex flex-col gap-2">
+                <div className="flex items-center gap-2 text-red-500">
+                  <Youtube size={16} />
+                  <span className="text-[10px] uppercase font-black">YouTube</span>
+                </div>
+                <input 
+                  type="text" 
+                  value={youtubeCount} 
+                  onChange={(e) => setYoutubeCount(e.target.value)} 
+                  placeholder="e.g. 10K+" 
+                  className="w-full bg-white/5 border border-white/10 rounded-xl p-2.5 text-white outline-none text-xs font-mono font-bold" 
+                  required 
+                />
+              </div>
+
+              {/* Facebook Card */}
+              <div className="bg-black/40 border border-white/5 p-4 rounded-2xl flex flex-col gap-2">
+                <div className="flex items-center gap-2 text-blue-500">
+                  <Facebook size={16} />
+                  <span className="text-[10px] uppercase font-black">Facebook</span>
+                </div>
+                <input 
+                  type="text" 
+                  value={facebookCount} 
+                  onChange={(e) => setFacebookCount(e.target.value)} 
+                  placeholder="e.g. 5K+" 
+                  className="w-full bg-white/5 border border-white/10 rounded-xl p-2.5 text-white outline-none text-xs font-mono font-bold" 
+                  required 
+                />
+              </div>
+
+              {/* WhatsApp Card */}
+              <div className="bg-black/40 border border-white/5 p-4 rounded-2xl flex flex-col gap-2">
+                <div className="flex items-center gap-2 text-green-500">
+                  <MessageCircle size={16} />
+                  <span className="text-[10px] uppercase font-black">WhatsApp</span>
+                </div>
+                <input 
+                  type="text" 
+                  value={whatsappCount} 
+                  onChange={(e) => setWhatsAppCount(e.target.value)} 
+                  placeholder="e.g. 2K+" 
+                  className="w-full bg-white/5 border border-white/10 rounded-xl p-2.5 text-white outline-none text-xs font-mono font-bold" 
+                  required 
+                />
+              </div>
             </div>
-          </div>
+
+            <button type="submit" className="w-full bg-green-600 hover:bg-green-700 text-white p-3.5 rounded-xl font-black text-xs uppercase transition-all duration-200">
+              Save Social Counts
+            </button>
+          </form>
+
+          {/* Timings & Map Location Section */}
+          <form onSubmit={handleUpdateStoreTimingsAndLocation} className="bg-[#111] p-6 rounded-[2.5rem] space-y-4 text-xs font-bold text-left border border-white/5">
+            <h3 className="text-sm font-black text-orange-500 uppercase flex items-center gap-1.5">⏰ Timing & Location</h3>
+            <p className="text-[10px] text-gray-500 font-bold uppercase leading-relaxed font-mono">
+              यहाँ से आप दुकान के खुलने/बंद होने का समय और गूगल मैप्स की लोकेशन बदल सकते हैं।
+            </p>
+            <div className="space-y-3">
+              <div>
+                <label className="text-[10px] font-black uppercase text-gray-400 block mb-1">Store Timing (Hindi)</label>
+                <input type="text" value={storeTimingHindi} onChange={e => setStoreTimingHindi(e.target.value)} placeholder="Timing (Hindi)" className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-white outline-none" required />
+              </div>
+              <div>
+                <label className="text-[10px] font-black uppercase text-gray-400 block mb-1">Store Timing (English)</label>
+                <input type="text" value={storeTimingEnglish} onChange={e => setStoreTimingEnglish(e.target.value)} placeholder="Timing (English)" className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-white outline-none" required />
+              </div>
+              <div>
+                <label className="text-[10px] font-black uppercase text-gray-400 block mb-1">Google Maps Link</label>
+                <input type="url" value={googleMapUrl} onChange={e => setGoogleMapUrl(e.target.value)} placeholder="Google Map Link" className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-white outline-none" required />
+              </div>
+            </div>
+            <button type="submit" className="w-full bg-green-600 text-white p-3.5 rounded-xl font-black text-xs uppercase">Update Timings & Map</button>
+          </form>
         </div>
       )}
 
-      {/* --- SUB-TAB 5: MEDIA/INFO --- */}
+      {/* --- SUB-TAB 5: MEDIA/INFO (केवल हेडर बैकग्राउंड वीडियो) --- */}
       {activeSubTab === 'header_video' && (
         <div className="space-y-6">
-          <form onSubmit={handleUpdateHeaderVideo} className="bg-[#111] p-6 rounded-[2.5rem] space-y-4 text-xs font-bold text-left">
-            <label className="text-[10px] font-black uppercase text-gray-400">Header Background Video URL</label>
-            <input type="url" value={headerVideoInput} onChange={e => setHeaderVideoInput(e.target.value)} placeholder="Paste video URL" className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-white outline-none" required />
+          <form onSubmit={handleUpdateHeaderVideo} className="bg-[#111] p-6 rounded-[2.5rem] space-y-4 text-xs font-bold text-left border border-white/5">
+            <h3 className="text-sm font-black text-orange-500 uppercase flex items-center gap-1.5">🎬 Header Media</h3>
+            <p className="text-[10px] text-gray-500 font-bold uppercase leading-relaxed font-mono">
+              यहाँ से आप होम पेज पर ऊपर दिखने वाले मुख्य बैकग्राउंड वीडियो का यूआरएल बदल सकते हैं।
+            </p>
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase text-gray-400 block mb-1">Header Background Video URL</label>
+              <input type="url" value={headerVideoInput} onChange={e => setHeaderVideoInput(e.target.value)} placeholder="Paste video URL" className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-white outline-none" required />
+            </div>
             <button type="submit" className="w-full bg-green-600 text-white p-3.5 rounded-xl font-black text-xs uppercase">Update Video</button>
-          </form>
-
-          <form onSubmit={handleUpdateStoreTimingsAndLocation} className="bg-[#111] p-6 rounded-[2.5rem] space-y-4 text-xs font-bold text-left">
-            <label className="text-[10px] font-black uppercase text-gray-400">Store Timings & Google Maps Link</label>
-            <input type="text" value={storeTimingHindi} onChange={e => setStoreTimingHindi(e.target.value)} placeholder="Timing (Hindi)" className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-white outline-none" required />
-            <input type="text" value={storeTimingEnglish} onChange={e => setStoreTimingEnglish(e.target.value)} placeholder="Timing (English)" className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-white outline-none" required />
-            <input type="url" value={googleMapUrl} onChange={e => setGoogleMapUrl(e.target.value)} placeholder="Google Map Link" className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-white outline-none" required />
-            <button type="submit" className="w-full bg-green-600 text-white p-3.5 rounded-xl font-black text-xs uppercase">Update Timings & Map</button>
           </form>
         </div>
       )}
@@ -856,7 +988,7 @@ export default function SettingsTab({
                   <label className="text-[9px] text-gray-500 uppercase">Staff Role</label>
                   <select value={editingStaffRole} onChange={(e) => setEditingStaffRole(e.target.value)} className="w-full bg-neutral-900 border border-white/10 rounded-lg p-2.5 text-white outline-none cursor-pointer">
                     <option value="delivery">Rider / Delivery Boy 🛵</option>
-                    <option value="kitchen">Cook / Kitchen Staff 👨‍🍳</option>
+                    <option value="kitchen">Cook / Kitchen Staff 👨 downtime 👨‍🍳</option>
                     <option value="cashier">Cashier / Counter Manager 💼</option>
                     <option value="godown">Godown Helper / गोदाम यूज़र 📦</option>
                   </select>
