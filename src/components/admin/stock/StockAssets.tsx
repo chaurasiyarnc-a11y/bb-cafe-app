@@ -1,18 +1,18 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import { Search, Plus, Trash2 } from 'lucide-react';
+import { Search, Plus, Trash2, RefreshCw } from 'lucide-react';
 
 export default function StockAssets({
-  isDarkMode, searchQuery, setSearchQuery, filteredAssets, setShowAddAssetModal, handleDeleteAsset
+  isDarkMode, searchQuery, setSearchQuery, filteredAssets, setShowAddAssetModal, handleDeleteAsset, handleMigrate
 }: any) {
-  // लोकल स्टेट: एसेट कैटेगरी फ़िल्टर करने के लिए ('general' या 'crockery_cutlery')
-  const [activeSubTab, setActiveSubTab] = useState<'general' | 'crockery_cutlery'>('general');
+  // लोकल स्टेट: एसेट्स को 3 श्रेणियों में फ़िल्टर करने के लिए ('general', 'cutlery', या 'crockery')
+  const [activeSubTab, setActiveSubTab] = useState<'general' | 'cutlery' | 'crockery'>('general');
 
   // एक्टिव सब-टैब के आधार पर एसेट्स फ़िल्टर करने का लॉजिक
   const displayedAssets = useMemo(() => {
     return filteredAssets.filter((asset: any) => {
-      const assetType = asset.type || 'general'; // यदि type सेट नहीं है, तो उसे 'general' मानेंगे
+      const assetType = asset.type || 'general'; // डिफ़ॉल्ट रूप से 'general' (सामान्य एसेट)
       return assetType === activeSubTab;
     });
   }, [filteredAssets, activeSubTab]);
@@ -39,22 +39,33 @@ export default function StockAssets({
 
   return (
     <div className="space-y-4">
-      {/* चिपचिपा (Sticky) हेडर और सर्च सेक्शन */}
+      {/* हेडर और एक्शन बटन */}
       <div className={`sticky top-[64px] z-30 py-2.5 space-y-2.5 backdrop-blur-md ${isDarkMode ? 'bg-[#0E0E0E]/90' : 'bg-[#FAFAFA]/90'} border-b border-dashed ${isDarkMode ? 'border-neutral-800' : 'border-neutral-200'}`}>
-        <div className="flex justify-between items-center">
+        <div className="flex justify-between items-start gap-2 flex-wrap">
           <div>
             <h2 className="text-sm font-black text-orange-600 uppercase">स्थायी संपत्ति (Fixed Assets)</h2>
-            <p className="text-[10px] text-neutral-400">उपकरण, फ्रिज, क्रॉकरी, ओवन आदि</p>
+            <p className="text-[10px] text-neutral-400">उपकरण, फ्रिज, ओवन, कटलरी और क्रॉकरी</p>
           </div>
-          <button 
-            onClick={() => setShowAddAssetModal(true)} 
-            className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-xl text-xs font-black uppercase flex items-center gap-1 shadow transition-colors"
-          >
-            <Plus size={14} /> एसेट जोड़ें
-          </button>
+          
+          <div className="flex gap-1.5">
+            {/* गोदाम से डेटा ऑटो-शिफ्ट करने का बटन */}
+            <button 
+              onClick={handleMigrate}
+              className="px-2.5 py-1.5 bg-orange-600 hover:bg-orange-700 text-white rounded-xl text-[10px] font-black uppercase flex items-center gap-1 shadow transition-all active:scale-95"
+              title="गोदाम से सारा क्रॉकरी व कटलरी डेटा यहाँ शिफ्ट करें"
+            >
+              <RefreshCw size={12} /> डेटा शिफ्ट करें
+            </button>
+            <button 
+              onClick={() => setShowAddAssetModal(true)} 
+              className="px-2.5 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-xl text-[10px] font-black uppercase flex items-center gap-1 shadow transition-all active:scale-95"
+            >
+              <Plus size={12} /> एसेट जोड़ें
+            </button>
+          </div>
         </div>
 
-        {/* सब-टैब बटन (सामान्य एसेट्स बनाम क्रॉकरी और कटलरी) */}
+        {/* 3 सब-टैब बटन्स (एसेट्स, कटलरी, क्रॉकरी) */}
         <div className="flex gap-1 bg-neutral-100 dark:bg-neutral-900/60 p-1 rounded-xl">
           <button
             onClick={() => setActiveSubTab('general')}
@@ -64,17 +75,27 @@ export default function StockAssets({
                 : 'text-neutral-400'
             }`}
           >
-            🏢 सामान्य एसेट्स
+            🏢 एसेट्स
           </button>
           <button
-            onClick={() => setActiveSubTab('crockery_cutlery')}
+            onClick={() => setActiveSubTab('cutlery')}
             className={`flex-1 py-2 text-center rounded-lg text-xs font-black transition-all ${
-              activeSubTab === 'crockery_cutlery'
+              activeSubTab === 'cutlery'
                 ? (isDarkMode ? 'bg-neutral-800 text-white shadow' : 'bg-white text-neutral-950 shadow')
                 : 'text-neutral-400'
             }`}
           >
-            🍽️ क्रॉकरी और कटलरी
+            🍴 कटलरी
+          </button>
+          <button
+            onClick={() => setActiveSubTab('crockery')}
+            className={`flex-1 py-2 text-center rounded-lg text-xs font-black transition-all ${
+              activeSubTab === 'crockery'
+                ? (isDarkMode ? 'bg-neutral-800 text-white shadow' : 'bg-white text-neutral-950 shadow')
+                : 'text-neutral-400'
+            }`}
+          >
+            🍽️ क्रॉकरी
           </button>
         </div>
 
@@ -83,7 +104,7 @@ export default function StockAssets({
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" size={14} />
           <input 
             type="text" 
-            placeholder="यहाँ खोजें..." 
+            placeholder="एसेट्स खोजें..." 
             value={searchQuery} 
             onChange={e => setSearchQuery(e.target.value)}
             className={`w-full pl-9 pr-4 py-2 text-xs rounded-xl border ${
@@ -98,9 +119,9 @@ export default function StockAssets({
       {/* एसेट्स की सूची */}
       <div className="space-y-2.5 max-h-[50vh] overflow-y-auto pr-1">
         {displayedAssets.length === 0 ? (
-          <div className="text-center py-10 space-y-1">
+          <div className="text-center py-12 space-y-1">
             <span className="text-2xl">📦</span>
-            <p className="text-xs text-neutral-400 font-bold">इस कैटेगरी में कोई एसेट नहीं मिला।</p>
+            <p className="text-xs text-neutral-400 font-bold">इस कैटेगरी में कोई सामान नहीं मिला।</p>
           </div>
         ) : (
           displayedAssets.map((asset: any) => {
