@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Home, Store, Wrench, Layers, AlertTriangle, Lock, X, Eye, EyeOff, Trash2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { db } from '../../../lib/firebase'; 
+import { db } from '../../lib/firebase'; 
 import { 
   collection, onSnapshot, query, orderBy, doc, setDoc, increment, addDoc, deleteDoc, writeBatch 
 } from 'firebase/firestore';
