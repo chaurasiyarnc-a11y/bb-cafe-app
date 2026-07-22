@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Search, Plus, Edit, MinusCircle, PlusCircle, Printer } from 'lucide-react';
 
 export default function StockGodown({
@@ -9,76 +9,11 @@ export default function StockGodown({
   adjustQty, saveQty, handleToggleMultiSelect, setShowManageCategoriesModal, setShowAddProductModal, setEditingProduct,
   setTransferItem, setShowTransferModal, setConsumeItem, setShowConsumeModal, setShowSaveToListModal, setShowBulkCategoryModal
 }: any) {
-  
-  // लॉन्ग-प्रेस (Long-press) को ट्रैक करने के लिए रेफ़रेंसेज़
-  const longPressTimeout = useRef<any>(null);
-  const isLongPressActive = useRef<boolean>(false);
-  const startX = useRef<number>(0);
-  const startY = useRef<number>(0);
 
   // फोन वाइब्रेशन (हैप्टिक फीडबैक) के लिए फ़ंक्शन
   const triggerHaptic = (ms = 35) => {
     if (typeof window !== 'undefined' && window.navigator && window.navigator.vibrate) {
       window.navigator.vibrate(ms);
-    }
-  };
-
-  // --- लॉन्ग-प्रेस शुरू होने पर टाइमर चालू करना (Touch/Mouse Start) ---
-  const handlePressStart = (itemId: string, e: any) => {
-    // सुरक्षा जांच: यदि यूजर ने कार्ड के अंदर किसी बटन, इनपुट, सेलेक्ट बॉक्स या आइकन पर क्लिक किया है, तो लॉन्ग-प्रेस शुरू न करें
-    const target = e.target as HTMLElement;
-    if (target.closest('button') || target.closest('input') || target.closest('select') || target.closest('svg')) {
-      return;
-    }
-
-    // मोबाइल टच या कंप्यूटर माउस के कोऑर्डिनेट्स प्राप्त करें
-    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-
-    startX.current = clientX;
-    startY.current = clientY;
-
-    isLongPressActive.current = false;
-    longPressTimeout.current = setTimeout(() => {
-      isLongPressActive.current = true;
-      setIsMultiSelectMode(true);
-      handleToggleMultiSelect(itemId);
-      triggerHaptic(50); // सफल लॉन्ग-प्रेस होने पर हैप्टिक फ़ीडबैक
-    }, 600); // 600ms का लॉन्ग-प्रेस समय
-  };
-
-  // --- स्क्रॉल होने या उंगली फिसलने पर लॉन्ग-प्रेस निरस्त करना (Touch/Mouse Move) ---
-  const handlePressMove = (e: any) => {
-    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-
-    const diffX = Math.abs(clientX - startX.current);
-    const diffY = Math.abs(clientY - startY.current);
-
-    // यदि यूजर स्क्रॉल कर रहा है (10 पिक्सेल से अधिक हिलने पर), तो लॉन्ग-प्रेस निरस्त करें
-    if (diffX > 10 || diffY > 10) {
-      if (longPressTimeout.current) {
-        clearTimeout(longPressTimeout.current);
-      }
-    }
-  };
-
-  // --- उंगली उठाने या क्लिक छोड़ने पर (Touch/Mouse End) ---
-  const handlePressEnd = (itemId: string, e: any) => {
-    if (longPressTimeout.current) {
-      clearTimeout(longPressTimeout.current);
-    }
-
-    const target = e.target as HTMLElement;
-    if (target.closest('button') || target.closest('input') || target.closest('select') || target.closest('svg')) {
-      return;
-    }
-
-    // यदि यह केवल एक त्वरित टच (Normal Click) था और मल्टी-सेलेक्ट पहले से ऑन है
-    if (!isLongPressActive.current) {
-      if (isMultiSelectMode) {
-        handleToggleMultiSelect(itemId);
-      }
     }
   };
 
@@ -164,6 +99,13 @@ export default function StockGodown({
           -ms-overflow-style: none;
           scrollbar-width: none;
         }
+        @keyframes scaleUp {
+          from { transform: scale(0); }
+          to { transform: scale(1); }
+        }
+        .animate-scale-up {
+          animation: scaleUp 0.15s ease-out forwards;
+        }
       `}} />
 
       {/* Search and Filters */}
@@ -236,27 +178,36 @@ export default function StockGodown({
           return (
             <div 
               key={item.id}
-              onTouchStart={(e) => handlePressStart(item.id, e)}
-              onTouchEnd={(e) => handlePressEnd(item.id, e)}
-              onTouchMove={handlePressMove}
-              onMouseDown={(e) => handlePressStart(item.id, e)}
-              onMouseUp={(e) => handlePressEnd(item.id, e)}
-              onMouseLeave={handlePressMove}
-              className={`p-3.5 rounded-2xl border transition-all relative ${isMultiSelectMode ? 'cursor-pointer' : ''} ${
+              onClick={() => { if (isMultiSelectMode) handleToggleMultiSelect(item.id); }}
+              className={`p-3.5 rounded-2xl border transition-all relative ${isMultiSelectMode ? 'cursor-pointer select-none' : ''} ${
                 isDarkMode ? 'bg-[#181818] border-neutral-800' : 'bg-white border-neutral-100'
               } ${isSelected ? 'ring-2 ring-orange-500 bg-orange-500/[0.01]' : ''} ${isLowStock ? 'border-red-500 bg-red-500/[0.02]' : ''}`}
-              style={{ userSelect: 'none', WebkitUserSelect: 'none', touchAction: 'pan-y' }} // लॉन्ग प्रेस और वर्टिकल स्क्रॉलिंग को मोबाइल पर परफेक्ट बनाने के लिए
             >
-              {isMultiSelectMode && (
-                <div className="absolute top-3.5 right-3.5 w-4 h-4 rounded-full border border-neutral-300 flex items-center justify-center z-10">
-                  {isSelected && <div className="w-2.5 h-2.5 rounded-full bg-orange-500" />}
-                </div>
-              )}
+              <div className="flex items-center">
+                
+                {/* --- सिलेक्शन चेक-सर्कल (Tapping this instantly starts multi-select mode manually!) --- */}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    triggerHaptic(20);
+                    if (!isMultiSelectMode) {
+                      setIsMultiSelectMode(true);
+                    }
+                    handleToggleMultiSelect(item.id);
+                  }}
+                  className={`mr-3 w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-all active:scale-90 ${
+                    isSelected 
+                      ? 'border-orange-500 bg-orange-500/10' 
+                      : 'border-neutral-300 dark:border-neutral-700 bg-transparent'
+                  }`}
+                >
+                  {isSelected && <div className="w-2.5 h-2.5 rounded-full bg-orange-500 animate-scale-up" />}
+                </button>
 
-              <div className="flex justify-between items-start">
-                <div>
+                <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5 flex-wrap">
-                    <p className="font-bold text-sm text-orange-600">{item.name}</p>
+                    <p className="font-bold text-sm text-orange-600 truncate">{item.name}</p>
                     {item.category && <span className="px-1.5 py-0.5 text-[8px] bg-neutral-100 dark:bg-neutral-800 text-neutral-400 font-bold rounded-md uppercase">{item.category}</span>}
                     {isLowStock && <span className="px-1.5 py-0.5 text-[8px] bg-red-100 dark:bg-red-950/40 text-red-600 font-bold rounded-md uppercase flex items-center gap-0.5">⚠️ LOW STOCK</span>}
                     {!isMultiSelectMode && (
