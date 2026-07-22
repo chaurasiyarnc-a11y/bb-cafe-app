@@ -54,11 +54,11 @@ export default function StockDashboard({
       <div className="grid grid-cols-3 gap-2">
         <div className={`p-3 rounded-2xl border text-center ${isDarkMode ? 'bg-[#181818] border-neutral-800' : 'bg-white border-neutral-100'}`}>
           <p className="text-[8px] font-black text-neutral-400 uppercase">सामान आया (IN)</p>
-          <p className="text-xs font-black text-green-500 mt-1">{getFilteredLedgerStats?.totalInwardQty} Units</p>
+          <p className="text-xs font-black text-green-500 mt-1">{getFilteredLedgerStats?.totalInwardQty} यूनिट्स</p>
         </div>
         <div className={`p-3 rounded-2xl border text-center ${isDarkMode ? 'bg-[#181818] border-neutral-800' : 'bg-white border-neutral-100'}`}>
           <p className="text-[8px] font-black text-neutral-400 uppercase">किचन गया (OUT)</p>
-          <p className="text-xs font-black text-orange-500 mt-1">{getFilteredLedgerStats?.totalKitchenQty} Units</p>
+          <p className="text-xs font-black text-orange-500 mt-1">{getFilteredLedgerStats?.totalKitchenQty} यूनिट्स</p>
         </div>
         <div className={`p-3 rounded-2xl border text-center ${isDarkMode ? 'bg-[#181818] border-neutral-800' : 'bg-white border-neutral-100'}`}>
           <p className="text-[8px] font-black text-neutral-400 uppercase">नुकसान (Loss)</p>
@@ -68,18 +68,18 @@ export default function StockDashboard({
 
       <div className="grid grid-cols-2 gap-2">
         <div className={`p-3 rounded-2xl border text-center ${isDarkMode ? 'bg-[#181818] border-neutral-800' : 'bg-white border-neutral-100'}`}>
-          <p className="text-[8px] font-black text-neutral-400 uppercase">Total Godown stock value</p>
+          <p className="text-[8px] font-black text-neutral-400 uppercase">गोदाम का कुल स्टॉक मूल्य</p>
           <p className="text-xs font-black text-neutral-700 dark:text-neutral-200 mt-1">₹{stats?.totalVal?.toLocaleString()}</p>
         </div>
         <div className={`p-3 rounded-2xl border text-center ${isDarkMode ? 'bg-[#181818] border-neutral-800' : 'bg-white border-neutral-100'}`}>
-          <p className="text-[8px] font-black text-neutral-400 uppercase">Fixed Assets Value</p>
+          <p className="text-[8px] font-black text-neutral-400 uppercase">स्थायी संपत्ति मूल्य (Fixed Assets)</p>
           <p className="text-xs font-black text-blue-500 mt-1">₹{stats?.totalFixedVal?.toLocaleString()}</p>
         </div>
       </div>
 
       {/* Category Stock Values */}
       <div className="space-y-2.5">
-        <h3 className="text-xs font-black uppercase text-neutral-400 tracking-wider px-1">Category-wise Stock Value</h3>
+        <h3 className="text-xs font-black uppercase text-neutral-400 tracking-wider px-1">कैटेगरी के अनुसार स्टॉक मूल्य</h3>
         <div className="grid grid-cols-2 gap-2">
           {categories.map((cat: any) => {
             const value = categoryStockValues[cat.name] || 0;
@@ -98,8 +98,8 @@ export default function StockDashboard({
       {/* Timeline */}
       <div className="space-y-2.5">
         <div className="flex justify-between items-center px-1">
-          <h3 className="text-xs font-black uppercase text-neutral-400 tracking-wider">Inward & Outward Flow Timeline</h3>
-          <span className="text-[8px] px-2 py-0.5 rounded-full bg-neutral-100 dark:bg-neutral-800 font-bold uppercase">{stockFlowTimeline.length} Entries</span>
+          <h3 className="text-xs font-black uppercase text-neutral-400 tracking-wider">आवक और जावक प्रवाह टाइमलाइन</h3>
+          <span className="text-[8px] px-2 py-0.5 rounded-full bg-neutral-100 dark:bg-neutral-800 font-bold uppercase">{stockFlowTimeline.length} एंट्रीज</span>
         </div>
         <div className="space-y-1.5 max-h-[30vh] overflow-y-auto pr-1">
           {stockFlowTimeline.map((item: any) => (
