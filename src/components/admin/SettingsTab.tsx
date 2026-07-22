@@ -20,7 +20,7 @@ import {
   Instagram, 
   Facebook, 
   MessageCircle,
-  Ghost // Snapchat के भूतिया आइकन के लिए
+  Ghost 
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { isVideoUrl, sha256 } from '../../lib/utils'; // अपनी लोकेशन के अनुसार पाथ सेट करें
@@ -53,7 +53,7 @@ export default function SettingsTab({
   storeOpen
 }: SettingsTabProps) {
   // --- LOCAL STATES ---
-  const [activeSubTab, setActiveSubTab] = useState<'banners' | 'reels' | 'categories' | 'footer' | 'header_video' | 'coupons' | 'reviews' | 'proofs' | 'claims' | 'security'>('banners');
+  const [activeSubTab, setActiveSubTab] = useState<'banners' | 'reels' | 'footer' | 'header_video' | 'coupons' | 'reviews' | 'proofs' | 'claims' | 'security'>('banners');
 
   // Promo Banners State
   const [newBannerUrl, setNewBannerUrl] = useState("");
@@ -66,26 +66,18 @@ export default function SettingsTab({
   const [newReelDesc, setNewReelDesc] = useState("");
   const [newReelPrice, setNewReelPrice] = useState("");
 
-  // Categories States (Add & Individual Edit)
-  const [localCategories, setLocalCategories] = useState<any[]>([]);
-  const [newCatName, setNewCatName] = useState("");
-  const [newCatCoverUrl, setNewCatCoverUrl] = useState("");
-  const [editingCatId, setEditingCatId] = useState<string | null>(null);
-  const [editingCatName, setEditingCatName] = useState("");
-  const [editingCatCoverUrl, setEditingCatCoverUrl] = useState("");
-
   // Header Background, Timings & Maps
   const [headerVideoInput, setHeaderVideoInput] = useState("");
   const [storeTimingHindi, setStoreTimingHindi] = useState("सुबह 10:00 से रात 11:00 बजे");
   const [storeTimingEnglish, setStoreTimingEnglish] = useState("10:00 AM to 11:00 PM");
   const [googleMapUrl, setGoogleMapUrl] = useState("https://maps.app.goo.gl/8pj1Xby3bbMn5qxu5");
 
-  // Social Counts States (सभी 5 आंकड़े)
+  // Social Counts States
   const [instagramCount, setInstagramCount] = useState("");
   const [youtubeCount, setYoutubeCount] = useState("");
   const [facebookCount, setFacebookCount] = useState("");
   const [whatsappCount, setWhatsAppCount] = useState("");
-  const [snapchatCount, setSnapchatCount] = useState(""); // [नया] Snapchat स्टेट
+  const [snapchatCount, setSnapchatCount] = useState("");
 
   // Coupons
   const [newCouponCode, setNewCouponCode] = useState("");
@@ -113,7 +105,7 @@ export default function SettingsTab({
 
   // --- REAL-TIME DATA SYNC EFFECT ---
   useEffect(() => {
-    // 1. डेटाबेस से वास्तविक स्टोर सेटिंग्स लोड करना
+    // डेटाबेस से वास्तविक स्टोर सेटिंग्स लोड करना
     const unsubStore = onSnapshot(doc(db, "settings", "store"), (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data();
@@ -127,18 +119,12 @@ export default function SettingsTab({
         if (data.youtubeCount) setYoutubeCount(data.youtubeCount);
         if (data.facebookCount) setFacebookCount(data.facebookCount);
         if (data.whatsappCount) setWhatsAppCount(data.whatsappCount);
-        if (data.snapchatCount) setSnapchatCount(data.snapchatCount); // [नया स्नैपचैट लोड]
+        if (data.snapchatCount) setSnapchatCount(data.snapchatCount);
       }
-    });
-
-    // 2. रीयल-टाइम कैटेगरीज लोड करना
-    const unsubCategories = onSnapshot(collection(db, "categories"), (snap) => {
-      setLocalCategories(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
 
     return () => {
       unsubStore();
-      unsubCategories();
     };
   }, []);
 
@@ -203,57 +189,7 @@ export default function SettingsTab({
     } catch (err) { toast.error("Error deleting reel"); }
   };
 
-  // 3. CATEGORIES MANAGEMENT (Add, Individual Edit, Delete, Toggle Visibility)
-  const handleAddCategory = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newCatName.trim()) return toast.error("कृपया कैटेगरी का नाम लिखें!");
-    try {
-      await addDoc(collection(db, "categories"), {
-        name: newCatName.trim(),
-        coverUrl: newCatCoverUrl.trim() || "",
-        isVisible: true,
-        timestamp: new Date()
-      });
-      setNewCatName("");
-      setNewCatCoverUrl("");
-      toast.success("नई कैटेगरी सफलतापूर्वक जोड़ी गई! 📁");
-    } catch (err) { toast.error("कैटेगरी जोड़ने में त्रुटि आई।"); }
-  };
-
-  const handleUpdateCategory = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingCatId) return;
-    if (!editingCatName.trim()) return toast.error("कैटेगरी का नाम खाली नहीं होना चाहिए!");
-    try {
-      await updateDoc(doc(db, "categories", editingCatId), {
-        name: editingCatName.trim(),
-        coverUrl: editingCatCoverUrl.trim()
-      });
-      setEditingCatId(null);
-      setEditingCatName("");
-      setEditingCatCoverUrl("");
-      toast.success("कैटेगरी सफलतापूर्वक अपडेट की गई! 📁✨");
-    } catch (err) { toast.error("कैटेगरी अपडेट करने में त्रुटि आई।"); }
-  };
-
-  const handleDeleteCategory = async (id: string) => {
-    if (!confirm("क्या आप सच में इस कैटेगरी को डिलीट करना चाहते हैं?")) return;
-    try {
-      await deleteDoc(doc(db, "categories", id));
-      toast.success("कैटेगरी डिलीट कर दी गई!");
-    } catch (err) { toast.error("डिलीट करने में त्रुटि आई।"); }
-  };
-
-  const toggleCategoryVisibility = async (cat: any) => {
-    try {
-      await updateDoc(doc(db, "categories", cat.id), {
-        isVisible: cat.isVisible !== false ? false : true
-      });
-      toast.success("कैटेगरी स्टेटस अपडेट किया गया!");
-    } catch (err) { toast.error("स्टेटस बदलने में त्रुटि आई।"); }
-  };
-
-  // 4. HEADER VIDEO
+  // 3. HEADER VIDEO
   const handleUpdateHeaderVideo = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!headerVideoInput) return toast.error("Please enter a valid video link!");
@@ -263,7 +199,7 @@ export default function SettingsTab({
     } catch (err) { toast.error("Failed to update video."); }
   };
 
-  // 5. TIMINGS, MAPS & SOCIAL COUNTS UPDATERS
+  // 4. TIMINGS, MAPS & SOCIAL COUNTS UPDATERS
   const handleUpdateStoreTimingsAndLocation = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!storeTimingHindi || !storeTimingEnglish || !googleMapUrl) {
@@ -287,13 +223,13 @@ export default function SettingsTab({
         youtubeCount,
         facebookCount,
         whatsappCount,
-        snapchatCount // [नया स्नैपचैट सेव]
+        snapchatCount
       }, { merge: true });
       toast.success("Social Media counts updated! 📊🎉");
     } catch (err) { toast.error("Failed to update social counts."); }
   };
 
-  // 6. COUPONS
+  // 5. COUPONS
   const handleAddCoupon = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCouponCode || !newCouponValue) return;
@@ -316,7 +252,7 @@ export default function SettingsTab({
     } catch (err) { toast.error("Error deleting coupon"); }
   };
 
-  // 7. REVIEWS
+  // 6. REVIEWS
   const handleApproveReview = async (id: string) => {
     try {
       await updateDoc(doc(db, "reviews", id), { isApproved: true });
@@ -331,7 +267,7 @@ export default function SettingsTab({
     } catch (err) { toast.error("Error deleting review"); }
   };
 
-  // 8. SOCIAL PROOF ALERTS
+  // 7. SOCIAL PROOF ALERTS
   const handleAddSocialProof = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newProofText.trim()) return toast.error("Please enter alert text!");
@@ -352,7 +288,7 @@ export default function SettingsTab({
     } catch (err) { toast.error("Error deleting alert"); }
   };
 
-  // 9. POINTS CLAIMS
+  // 8. POINTS CLAIMS
   const handleVerifyClaimApproval = async (claim: any) => {
     try {
       await runTransaction(db, async (transaction) => {
@@ -387,7 +323,7 @@ export default function SettingsTab({
     } catch (err) { toast.error("Failed to reject claim request."); }
   };
 
-  // 10. STAFF PIN & CONFIGURATION
+  // 9. STAFF PIN & CONFIGURATION
   const handleAddStaffCombined = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newStaffName.trim() || !newStaffPin) return toast.error("Kripya saari details bharein!");
@@ -495,7 +431,6 @@ export default function SettingsTab({
         {[
           { id: 'banners', label: '🖼️ Banners' },
           { id: 'reels', label: '🎥 Reels' },
-          { id: 'categories', label: '📁 Categories' }, 
           { id: 'footer', label: '🦶 Footer' }, 
           { id: 'header_video', label: '🎬 Media/Info' },
           { id: 'coupons', label: '🎟️ Coupons' },
@@ -592,107 +527,10 @@ export default function SettingsTab({
         </div>
       )}
 
-      {/* --- SUB-TAB 3: CATEGORIES (Add & Inline Edit) --- */}
-      {activeSubTab === 'categories' && (
-        <div className="space-y-6">
-          {!editingCatId ? (
-            <form onSubmit={handleAddCategory} className="bg-[#020202] border border-white/5 p-6 rounded-[2.5rem] space-y-4">
-              <h3 className="text-sm font-black text-orange-500 uppercase flex items-center gap-1.5">
-                <ImageIcon size={14}/> Add New Category
-              </h3>
-              <div className="space-y-3 text-xs">
-                <input 
-                  type="text" 
-                  placeholder="Category Name (e.g. Burger, Pizza)" 
-                  value={newCatName} 
-                  onChange={(e) => setNewCatName(e.target.value)} 
-                  className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs text-white outline-none" 
-                  required 
-                />
-                <input 
-                  type="url" 
-                  placeholder="Category Cover Image URL" 
-                  value={newCatCoverUrl} 
-                  onChange={(e) => setNewCatCoverUrl(e.target.value)} 
-                  className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs text-white outline-none" 
-                />
-              </div>
-              <button type="submit" className="w-full bg-green-600 text-white p-3.5 rounded-xl font-black text-xs uppercase">
-                Add Category
-              </button>
-            </form>
-          ) : (
-            <form onSubmit={handleUpdateCategory} className="bg-orange-500/5 border border-orange-500/20 p-6 rounded-[2.5rem] space-y-4">
-              <h3 className="text-sm font-black text-orange-500 uppercase flex items-center gap-1.5">
-                <Edit size={14}/> Edit Category / अपडेट
-              </h3>
-              <div className="space-y-3 text-xs">
-                <input 
-                  type="text" 
-                  value={editingCatName} 
-                  onChange={(e) => setEditingCatName(e.target.value)} 
-                  className="w-full bg-[#111] border border-orange-500/20 rounded-xl p-3 text-xs text-white outline-none" 
-                  required 
-                />
-                <input 
-                  type="url" 
-                  value={editingCatCoverUrl} 
-                  onChange={(e) => setEditingCatCoverUrl(e.target.value)} 
-                  className="w-full bg-[#111] border border-orange-500/20 rounded-xl p-3 text-xs text-white outline-none" 
-                />
-              </div>
-              <div className="flex gap-2">
-                <button type="submit" className="flex-1 bg-green-600 text-white p-3 rounded-xl font-black text-xs uppercase">
-                  Save Changes
-                </button>
-                <button type="button" onClick={() => setEditingCatId(null)} className="bg-white/5 text-gray-400 p-3 rounded-xl font-black text-xs uppercase">
-                  Cancel
-                </button>
-              </div>
-            </form>
-          )}
-
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-            {localCategories.map(cat => (
-              <div key={cat.id} className="bg-white/[0.02] border border-white/5 p-3 rounded-2xl relative">
-                <div className="h-24 overflow-hidden rounded-xl bg-neutral-900 flex items-center justify-center">
-                  {cat.coverUrl ? (
-                    <img src={cat.coverUrl} className="w-full h-full object-cover opacity-80" alt={cat.name} />
-                  ) : (
-                    <div className="text-[10px] text-gray-500 font-bold uppercase">No Image</div>
-                  )}
-                </div>
-                <div className="mt-2 text-[10px] flex justify-between items-center">
-                  <span className="font-black truncate pr-1">{cat.name}</span>
-                  <div className="flex gap-1">
-                    <button onClick={() => toggleCategoryVisibility(cat)} className="p-1 bg-white/5 rounded text-gray-400" title="Toggle Visibility">
-                      {cat.isVisible !== false ? <Eye size={12}/> : <EyeOff size={12}/>}
-                    </button>
-                    <button onClick={() => {
-                      setEditingCatId(cat.id);
-                      setEditingCatName(cat.name);
-                      setEditingCatCoverUrl(cat.coverUrl || "");
-                    }} className="p-1 bg-blue-500/10 text-blue-400 rounded" title="Edit">
-                      <Settings size={12}/>
-                    </button>
-                    <button onClick={() => handleDeleteCategory(cat.id)} className="p-1 bg-red-500/10 text-red-500 rounded" title="Delete">
-                      <Trash size={12}/>
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))}
-            {localCategories.length === 0 && (
-              <p className="col-span-full text-center text-gray-500 py-6 text-xs uppercase font-bold">No categories found...</p>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* --- SUB-TAB 4: FOOTER (5 Social Counts + Store timings + Maps Link) --- */}
+      {/* --- SUB-TAB 3: FOOTER (5 Social Counts + Store timings + Maps Link) --- */}
       {activeSubTab === 'footer' && (
         <div className="space-y-6">
-          {/* [सुधार] Social Media Counts - कुल 5 आंकड़े (Snapchat सहित) */}
+          {/* Social Media Counts - कुल 5 आंकड़े (Snapchat सहित) */}
           <form onSubmit={handleUpdateSocialCounts} className="bg-[#111] p-6 rounded-[2.5rem] space-y-4 text-xs font-bold text-left border border-white/5">
             <h3 className="text-sm font-black text-orange-500 uppercase flex items-center gap-1.5">
               📊 Social Media Counts
@@ -766,7 +604,7 @@ export default function SettingsTab({
                 />
               </div>
 
-              {/* [नया] Snapchat Card - मोबाइल पर सिमिट्री के लिए col-span-2 सेट है */}
+              {/* Snapchat Card */}
               <div className="bg-black/40 border border-white/5 p-4 rounded-2xl flex flex-col gap-2 col-span-2 md:col-span-1">
                 <div className="flex items-center gap-2 text-yellow-400">
                   <Ghost size={16} />
@@ -813,7 +651,7 @@ export default function SettingsTab({
         </div>
       )}
 
-      {/* --- SUB-TAB 5: MEDIA/INFO (केवल हेडर बैकग्राउंड वीडियो) --- */}
+      {/* --- SUB-TAB 4: MEDIA/INFO (केवल हेडर बैकग्राउंड वीडियो) --- */}
       {activeSubTab === 'header_video' && (
         <div className="space-y-6">
           <form onSubmit={handleUpdateHeaderVideo} className="bg-[#111] p-6 rounded-[2.5rem] space-y-4 text-xs font-bold text-left border border-white/5">
@@ -830,7 +668,7 @@ export default function SettingsTab({
         </div>
       )}
 
-      {/* --- SUB-TAB 6: COUPONS --- */}
+      {/* --- SUB-TAB 5: COUPONS --- */}
       {activeSubTab === 'coupons' && (
         <div className="space-y-6">
           <form onSubmit={handleAddCoupon} className="bg-white/[0.02] border border-white/5 p-6 rounded-[2.5rem] space-y-4">
@@ -855,7 +693,7 @@ export default function SettingsTab({
         </div>
       )}
 
-      {/* --- SUB-TAB 7: REVIEWS --- */}
+      {/* --- SUB-TAB 6: REVIEWS --- */}
       {activeSubTab === 'reviews' && (
         <div className="space-y-4">
           {reviews.length === 0 && <p className="text-center text-gray-500 py-12 text-xs uppercase font-bold">No reviews found...</p>}
@@ -879,7 +717,7 @@ export default function SettingsTab({
         </div>
       )}
 
-      {/* --- SUB-TAB 8: SOCIAL PROOF ALERTS --- */}
+      {/* --- SUB-TAB 7: SOCIAL PROOF ALERTS --- */}
       {activeSubTab === 'proofs' && (
         <div className="space-y-6">
           <form onSubmit={handleAddSocialProof} className="bg-white/[0.02] border border-white/5 p-6 rounded-[2.5rem] space-y-4">
@@ -908,7 +746,7 @@ export default function SettingsTab({
         </div>
       )}
 
-      {/* --- SUB-TAB 9: CLAIMS --- */}
+      {/* --- SUB-TAB 8: CLAIMS --- */}
       {activeSubTab === 'claims' && (
         <div className="space-y-6">
           {pointsClaims.length === 0 ? (
@@ -949,7 +787,7 @@ export default function SettingsTab({
         </div>
       )}
 
-      {/* --- SUB-TAB 10: SECURITY (PINS, STAFF & TABLES QR) --- */}
+      {/* --- SUB-TAB 9: SECURITY (PINS, STAFF & TABLES QR) --- */}
       {activeSubTab === 'security' && (
         <div className="space-y-6">
           {/* Master PIN changes form */}
@@ -1056,7 +894,7 @@ export default function SettingsTab({
           <div className="bg-[#111] border border-white/5 p-6 rounded-[2.5rem] space-y-4 text-xs font-bold text-left">
             <div>
               <h4 className="text-sm font-black text-orange-500 uppercase">🍽️ Dine-In Table QR Generator</h4>
-              <p className="text-[9px] text-gray-500 font-bold uppercase mt-1 leading-relaxed">ऑतोमैटिक टेबल आर्डर रूटिंग के लिए स्कैन क्यूआर कोड जनरेट करें:</p>
+              <p className="text-[9px] text-gray-500 font-bold uppercase mt-1 leading-relaxed">ऑटोमैटिक टेबल आर्डर रूटिंग के लिए स्कैन क्यूआर कोड जनरेट करें:</p>
             </div>
             <div className="flex gap-3 items-end">
               <div className="flex-1 space-y-1">
