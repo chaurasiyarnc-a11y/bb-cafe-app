@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 
 export default function StockDashboard({
   isDarkMode, dashboardDateRange, setDashboardDateRange, startDate, setStartDate, endDate, setEndDate,
@@ -8,6 +8,46 @@ export default function StockDashboard({
 }: any) {
   // लोकल स्टेट: डैशबोर्ड के सब-टैब को कंट्रोल करने के लिए
   const [dashboardTab, setDashboardTab] = useState<'overview' | 'godown' | 'assets'>('overview');
+
+  // --- विस्तृत आवक-जावक रिपोर्ट (Consolidated Itemized Report) निकालने का लॉजिक ---
+  // यह चुनी हुई तारीख के आधार पर सभी एंट्रीज को आपस में जोड़कर (group करके) दिखाता है
+  const consolidatedReport = useMemo(() => {
+    const inwardGroup: Record<string, { qty: number; unit: string }> = {};
+    const outwardGroup: Record<string, { qty: number; unit: string }> = {};
+
+    (stockFlowTimeline || []).forEach((item: any) => {
+      const name = item.name || "अज्ञात सामान";
+      const qty = Number(item.qty || 0);
+      const unit = item.unit || "Pcs";
+
+      if (item.type === 'IN') {
+        if (!inwardGroup[name]) {
+          inwardGroup[name] = { qty: 0, unit: unit };
+        }
+        inwardGroup[name].qty += qty;
+      } else {
+        if (!outwardGroup[name]) {
+          outwardGroup[name] = { qty: 0, unit: unit };
+        }
+        outwardGroup[name].qty += qty;
+      }
+    });
+
+    return {
+      inward: Object.entries(inwardGroup).map(([name, data]) => ({ name, ...data })),
+      outward: Object.entries(outwardGroup).map(([name, data]) => ({ name, ...data }))
+    };
+  }, [stockFlowTimeline]);
+
+  // चयनित अवधि का नाम प्राप्त करने का फ़ंक्शन
+  const getPeriodLabel = () => {
+    if (dashboardDateRange === 'today') return "आज (Today)";
+    if (dashboardDateRange === 'yesterday') return "कल (Yesterday)";
+    if (dashboardDateRange === 'week') return "इस हफ़्ते (This Week)";
+    if (dashboardDateRange === 'month') return "इस महीने (This Month)";
+    if (dashboardDateRange === 'year') return "इस साल (This Year)";
+    return `कस्टम अवधि (${startDate} से ${endDate})`;
+  };
 
   return (
     <div className="space-y-4">
@@ -116,6 +156,56 @@ export default function StockDashboard({
               <p className="text-[10px] font-black text-neutral-400 uppercase">🏢 कुल स्थायी संपत्ति</p>
               <p className="text-sm font-black text-blue-500 mt-1">₹{stats?.totalFixedVal?.toLocaleString()}</p>
             </div>
+          </div>
+
+          {/* --- 📝 विस्तृत आवक-जावक रिपोर्ट सेक्शन (NEW) --- */}
+          <div className={`p-4 rounded-2xl border space-y-3.5 ${isDarkMode ? 'bg-[#121212] border-neutral-800' : 'bg-white border-neutral-150'}`}>
+            <div className="flex justify-between items-center border-b dark:border-neutral-800 pb-2">
+              <h3 className="text-xs font-black uppercase text-orange-500">📝 विस्तृत रिपोर्ट (Detailed Report)</h3>
+              <span className="text-[8px] px-2 py-0.5 rounded-full bg-neutral-100 dark:bg-neutral-800 font-bold uppercase">{getPeriodLabel()}</span>
+            </div>
+
+            {consolidatedReport.inward.length === 0 && consolidatedReport.outward.length === 0 ? (
+              <p className="text-[10px] text-center text-neutral-400 py-4 font-bold uppercase">इस अवधि में कोई आवक-जावक रिकॉर्ड दर्ज नहीं है।</p>
+            ) : (
+              <div className="grid grid-cols-2 gap-3 text-xs">
+                
+                {/* कुल आवक सूची (IN) */}
+                <div className="space-y-2">
+                  <p className="text-[9px] font-black text-green-500 uppercase border-b border-dashed border-green-500/30 pb-1">📥 कुल आवक (IN):</p>
+                  {consolidatedReport.inward.length === 0 ? (
+                    <p className="text-[9px] text-neutral-400 italic">कोई आवक नहीं</p>
+                  ) : (
+                    <div className="space-y-1.5 max-h-[25vh] overflow-y-auto pr-1">
+                      {consolidatedReport.inward.map((item, idx) => (
+                        <div key={idx} className="flex justify-between text-[10px] font-bold">
+                          <span className="text-neutral-500 dark:text-neutral-400 truncate max-w-[70px]">{item.name}</span>
+                          <span className="text-green-500 font-black shrink-0">+{item.qty} {item.unit}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* कुल जावक सूची (OUT) */}
+                <div className="space-y-2">
+                  <p className="text-[9px] font-black text-orange-500 uppercase border-b border-dashed border-orange-500/30 pb-1">🍳 कुल जावक (OUT):</p>
+                  {consolidatedReport.outward.length === 0 ? (
+                    <p className="text-[9px] text-neutral-400 italic">कोई जावक नहीं</p>
+                  ) : (
+                    <div className="space-y-1.5 max-h-[25vh] overflow-y-auto pr-1">
+                      {consolidatedReport.outward.map((item, idx) => (
+                        <div key={idx} className="flex justify-between text-[10px] font-bold">
+                          <span className="text-neutral-500 dark:text-neutral-400 truncate max-w-[70px]">{item.name}</span>
+                          <span className="text-orange-500 font-black shrink-0">-{item.qty} {item.unit}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+              </div>
+            )}
           </div>
         </div>
       )}
