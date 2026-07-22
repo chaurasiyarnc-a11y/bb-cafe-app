@@ -16,10 +16,11 @@ import {
   Lock, 
   Edit, 
   Check,
-  Youtube,       // सोशल आइकन्स
+  Youtube,       
   Instagram, 
   Facebook, 
-  MessageCircle 
+  MessageCircle,
+  Ghost // Snapchat के भूतिया आइकन के लिए
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { isVideoUrl, sha256 } from '../../lib/utils'; // अपनी लोकेशन के अनुसार पाथ सेट करें
@@ -79,11 +80,12 @@ export default function SettingsTab({
   const [storeTimingEnglish, setStoreTimingEnglish] = useState("10:00 AM to 11:00 PM");
   const [googleMapUrl, setGoogleMapUrl] = useState("https://maps.app.goo.gl/8pj1Xby3bbMn5qxu5");
 
-  // Social Counts States (सुधरा हुआ यूआई और स्टेट्स)
+  // Social Counts States (सभी 5 आंकड़े)
   const [instagramCount, setInstagramCount] = useState("");
   const [youtubeCount, setYoutubeCount] = useState("");
   const [facebookCount, setFacebookCount] = useState("");
   const [whatsappCount, setWhatsAppCount] = useState("");
+  const [snapchatCount, setSnapchatCount] = useState(""); // [नया] Snapchat स्टेट
 
   // Coupons
   const [newCouponCode, setNewCouponCode] = useState("");
@@ -125,6 +127,7 @@ export default function SettingsTab({
         if (data.youtubeCount) setYoutubeCount(data.youtubeCount);
         if (data.facebookCount) setFacebookCount(data.facebookCount);
         if (data.whatsappCount) setWhatsAppCount(data.whatsappCount);
+        if (data.snapchatCount) setSnapchatCount(data.snapchatCount); // [नया स्नैपचैट लोड]
       }
     });
 
@@ -260,7 +263,7 @@ export default function SettingsTab({
     } catch (err) { toast.error("Failed to update video."); }
   };
 
-  // 5. TIMINGS, MAPS & SOCIAL COUNTS UPDATER
+  // 5. TIMINGS, MAPS & SOCIAL COUNTS UPDATERS
   const handleUpdateStoreTimingsAndLocation = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!storeTimingHindi || !storeTimingEnglish || !googleMapUrl) {
@@ -283,7 +286,8 @@ export default function SettingsTab({
         instagramCount,
         youtubeCount,
         facebookCount,
-        whatsappCount
+        whatsappCount,
+        snapchatCount // [नया स्नैपचैट सेव]
       }, { merge: true });
       toast.success("Social Media counts updated! 📊🎉");
     } catch (err) { toast.error("Failed to update social counts."); }
@@ -685,10 +689,10 @@ export default function SettingsTab({
         </div>
       )}
 
-      {/* --- SUB-TAB 4: FOOTER (Social Counts + Store timings + Maps Link) --- */}
+      {/* --- SUB-TAB 4: FOOTER (5 Social Counts + Store timings + Maps Link) --- */}
       {activeSubTab === 'footer' && (
         <div className="space-y-6">
-          {/* [सुधार] Social Media Counts (Native Brutalist Beautiful Editor) */}
+          {/* [सुधार] Social Media Counts - कुल 5 आंकड़े (Snapchat सहित) */}
           <form onSubmit={handleUpdateSocialCounts} className="bg-[#111] p-6 rounded-[2.5rem] space-y-4 text-xs font-bold text-left border border-white/5">
             <h3 className="text-sm font-black text-orange-500 uppercase flex items-center gap-1.5">
               📊 Social Media Counts
@@ -697,7 +701,7 @@ export default function SettingsTab({
               यहाँ से आप होम पेज के फुटर में दिखने वाले लाइव फ़ॉलोअर्स और सब्सक्राइबर्स के आंकड़े बदल सकते हैं।
             </p>
             
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
               {/* Instagram Card */}
               <div className="bg-black/40 border border-white/5 p-4 rounded-2xl flex flex-col gap-2">
                 <div className="flex items-center gap-2 text-pink-500">
@@ -757,6 +761,22 @@ export default function SettingsTab({
                   value={whatsappCount} 
                   onChange={(e) => setWhatsAppCount(e.target.value)} 
                   placeholder="e.g. 2K+" 
+                  className="w-full bg-white/5 border border-white/10 rounded-xl p-2.5 text-white outline-none text-xs font-mono font-bold" 
+                  required 
+                />
+              </div>
+
+              {/* [नया] Snapchat Card - मोबाइल पर सिमिट्री के लिए col-span-2 सेट है */}
+              <div className="bg-black/40 border border-white/5 p-4 rounded-2xl flex flex-col gap-2 col-span-2 md:col-span-1">
+                <div className="flex items-center gap-2 text-yellow-400">
+                  <Ghost size={16} />
+                  <span className="text-[10px] uppercase font-black">Snapchat</span>
+                </div>
+                <input 
+                  type="text" 
+                  value={snapchatCount} 
+                  onChange={(e) => setSnapchatCount(e.target.value)} 
+                  placeholder="e.g. 15K+" 
                   className="w-full bg-white/5 border border-white/10 rounded-xl p-2.5 text-white outline-none text-xs font-mono font-bold" 
                   required 
                 />
@@ -988,7 +1008,7 @@ export default function SettingsTab({
                   <label className="text-[9px] text-gray-500 uppercase">Staff Role</label>
                   <select value={editingStaffRole} onChange={(e) => setEditingStaffRole(e.target.value)} className="w-full bg-neutral-900 border border-white/10 rounded-lg p-2.5 text-white outline-none cursor-pointer">
                     <option value="delivery">Rider / Delivery Boy 🛵</option>
-                    <option value="kitchen">Cook / Kitchen Staff 👨 downtime 👨‍🍳</option>
+                    <option value="kitchen">Cook / Kitchen Staff 👨‍🍳</option>
                     <option value="cashier">Cashier / Counter Manager 💼</option>
                     <option value="godown">Godown Helper / गोदाम यूज़र 📦</option>
                   </select>
@@ -1036,7 +1056,7 @@ export default function SettingsTab({
           <div className="bg-[#111] border border-white/5 p-6 rounded-[2.5rem] space-y-4 text-xs font-bold text-left">
             <div>
               <h4 className="text-sm font-black text-orange-500 uppercase">🍽️ Dine-In Table QR Generator</h4>
-              <p className="text-[9px] text-gray-500 font-bold uppercase mt-1 leading-relaxed">ऑटोमैटिक टेबल आर्डर रूटिंग के लिए स्कैन क्यूआर कोड जनरेट करें:</p>
+              <p className="text-[9px] text-gray-500 font-bold uppercase mt-1 leading-relaxed">ऑतोमैटिक टेबल आर्डर रूटिंग के लिए स्कैन क्यूआर कोड जनरेट करें:</p>
             </div>
             <div className="flex gap-3 items-end">
               <div className="flex-1 space-y-1">
