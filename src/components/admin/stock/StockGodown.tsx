@@ -13,6 +13,8 @@ export default function StockGodown({
   // लॉन्ग-प्रेस (Long-press) को ट्रैक करने के लिए रेफ़रेंसेज़
   const longPressTimeout = useRef<any>(null);
   const isLongPressActive = useRef<boolean>(false);
+  const startX = useRef<number>(0);
+  const startY = useRef<number>(0);
 
   // फोन वाइब्रेशन (हैप्टिक फीडबैक) के लिए फ़ंक्शन
   const triggerHaptic = (ms = 35) => {
@@ -21,30 +23,52 @@ export default function StockGodown({
     }
   };
 
-  // --- लॉन्ग-प्रेस शुरू होने पर टाइमर चालू करना (Pointer Down) ---
-  const handlePointerDown = (itemId: string, e: React.PointerEvent) => {
-    // सुरक्षा जांच: यदि यूजर ने कार्ड के अंदर किसी बटन, इनपुट या सेलेक्ट बॉक्स पर क्लिक किया है, तो लॉन्ग-प्रेस शुरू न करें
+  // --- लॉन्ग-प्रेस शुरू होने पर टाइमर चालू करना (Touch/Mouse Start) ---
+  const handlePressStart = (itemId: string, e: any) => {
+    // सुरक्षा जांच: यदि यूजर ने कार्ड के अंदर किसी बटन, इनपुट, सेलेक्ट बॉक्स या आइकन पर क्लिक किया है, तो लॉन्ग-प्रेस शुरू न करें
     const target = e.target as HTMLElement;
     if (target.closest('button') || target.closest('input') || target.closest('select') || target.closest('svg')) {
       return;
     }
+
+    // मोबाइल टच या कंप्यूटर माउस के कोऑर्डिनेट्स प्राप्त करें
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+    startX.current = clientX;
+    startY.current = clientY;
 
     isLongPressActive.current = false;
     longPressTimeout.current = setTimeout(() => {
       isLongPressActive.current = true;
       setIsMultiSelectMode(true);
       handleToggleMultiSelect(itemId);
-      triggerHaptic(50); // लॉन्ग-प्रेस सफल होने पर वाइब्रेशन फ़ीडबैक
-    }, 600); // 600ms तक दबाए रखने पर
+      triggerHaptic(50); // सफल लॉन्ग-प्रेस होने पर हैप्टिक फ़ीडबैक
+    }, 600); // 600ms का लॉन्ग-प्रेस समय
   };
 
-  // --- उंगली उठाने पर (Pointer Up) ---
-  const handlePointerUp = (itemId: string, e: React.PointerEvent) => {
+  // --- स्क्रॉल होने या उंगली फिसलने पर लॉन्ग-प्रेस निरस्त करना (Touch/Mouse Move) ---
+  const handlePressMove = (e: any) => {
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+    const diffX = Math.abs(clientX - startX.current);
+    const diffY = Math.abs(clientY - startY.current);
+
+    // यदि यूजर स्क्रॉल कर रहा है (10 पिक्सेल से अधिक हिलने पर), तो लॉन्ग-प्रेस निरस्त करें
+    if (diffX > 10 || diffY > 10) {
+      if (longPressTimeout.current) {
+        clearTimeout(longPressTimeout.current);
+      }
+    }
+  };
+
+  // --- उंगली उठाने या क्लिक छोड़ने पर (Touch/Mouse End) ---
+  const handlePressEnd = (itemId: string, e: any) => {
     if (longPressTimeout.current) {
       clearTimeout(longPressTimeout.current);
     }
-    
-    // सुरक्षा जांच: बटन्स पर नॉर्मल क्लिक करने पर कार्ड की सेलेक्टिविटी ट्रिगर न हो
+
     const target = e.target as HTMLElement;
     if (target.closest('button') || target.closest('input') || target.closest('select') || target.closest('svg')) {
       return;
@@ -55,13 +79,6 @@ export default function StockGodown({
       if (isMultiSelectMode) {
         handleToggleMultiSelect(itemId);
       }
-    }
-  };
-
-  // --- स्क्रॉल होने या उंगली फिसलने पर (Pointer Cancel/Move) ---
-  const handlePointerCancel = () => {
-    if (longPressTimeout.current) {
-      clearTimeout(longPressTimeout.current);
     }
   };
 
@@ -219,14 +236,16 @@ export default function StockGodown({
           return (
             <div 
               key={item.id}
-              onPointerDown={(e) => handlePointerDown(item.id, e)}
-              onPointerUp={(e) => handlePointerUp(item.id, e)}
-              onPointerCancel={handlePointerCancel}
-              onPointerMove={handlePointerCancel}
+              onTouchStart={(e) => handlePressStart(item.id, e)}
+              onTouchEnd={(e) => handlePressEnd(item.id, e)}
+              onTouchMove={handlePressMove}
+              onMouseDown={(e) => handlePressStart(item.id, e)}
+              onMouseUp={(e) => handlePressEnd(item.id, e)}
+              onMouseLeave={handlePressMove}
               className={`p-3.5 rounded-2xl border transition-all relative ${isMultiSelectMode ? 'cursor-pointer' : ''} ${
                 isDarkMode ? 'bg-[#181818] border-neutral-800' : 'bg-white border-neutral-100'
               } ${isSelected ? 'ring-2 ring-orange-500 bg-orange-500/[0.01]' : ''} ${isLowStock ? 'border-red-500 bg-red-500/[0.02]' : ''}`}
-              style={{ userSelect: 'none', WebkitUserSelect: 'none' }} // लॉन्ग प्रेस के समय मोबाइल पर टेक्स्ट सेलेक्ट होने से रोकने के लिए
+              style={{ userSelect: 'none', WebkitUserSelect: 'none', touchAction: 'pan-y' }} // लॉन्ग प्रेस और वर्टिकल स्क्रॉलिंग को मोबाइल पर परफेक्ट बनाने के लिए
             >
               {isMultiSelectMode && (
                 <div className="absolute top-3.5 right-3.5 w-4 h-4 rounded-full border border-neutral-300 flex items-center justify-center z-10">
@@ -277,7 +296,11 @@ export default function StockGodown({
       {/* --- फ़्लोटिंग एक्शन बार (Floating Action Bar) --- */}
       {/* यह केवल तब दिखेगा जब कम से कम 1 आइटम सेलेक्टेड होगा */}
       {isMultiSelectMode && selectedItemIds.length > 0 && (
-        <div className="fixed bottom-16 left-4 right-4 z-[60] max-w-sm mx-auto p-4 rounded-2xl bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 shadow-2xl border border-neutral-800 dark:border-neutral-200 flex items-center justify-between gap-3 animate-bounce-short">
+        <div 
+          onTouchStart={(e) => e.stopPropagation()} // टच बबलिंग रोकना ताकि क्लिक हमेशा सफल हो
+          onMouseDown={(e) => e.stopPropagation()} // क्लिक बबलिंग रोकना
+          className="fixed bottom-16 left-4 right-4 z-[60] max-w-sm mx-auto p-4 rounded-2xl bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 shadow-2xl border border-neutral-800 dark:border-neutral-200 flex items-center justify-between gap-3 animate-bounce-short"
+        >
           <span className="text-[10px] font-black uppercase shrink-0">
             {selectedItemIds.length} चयनित (Selected)
           </span>
