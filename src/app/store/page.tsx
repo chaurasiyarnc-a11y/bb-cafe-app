@@ -121,14 +121,20 @@ export default function StoreStockPage() {
   const [currentUser, setCurrentUser] = useState<UserPin | null>(null);
   const [pinInput, setPinInput] = useState<string>("");
   const [authError, setAuthError] = useState<string>("");
+  const [authLoading, setAuthLoading] = useState<boolean>(true); // लोडिंग स्टेट
 
   // session restore on reload & Service Worker registration
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const savedUser = localStorage.getItem('bum_bum_cafe_user');
       if (savedUser) {
-        try { setCurrentUser(JSON.parse(savedUser)); } catch { localStorage.removeItem('bum_bum_cafe_user'); }
+        try { 
+          setCurrentUser(JSON.parse(savedUser)); 
+        } catch { 
+          localStorage.removeItem('bum_bum_cafe_user'); 
+        }
       }
+      setAuthLoading(false); // जाँच समाप्त हुई
     }
 
     // Register Service Worker for PWA
@@ -651,6 +657,16 @@ export default function StoreStockPage() {
     window.open(waUrl, '_blank');
   };
 
+  // यदि अभी सेशन चेक हो रहा है तो लोडर दिखाएं (ताकि लॉक स्क्रीन न चमके)
+  if (authLoading) {
+    return (
+      <div className={`min-h-screen flex flex-col items-center justify-center ${isDarkMode ? 'bg-[#0E0E0E] text-white' : 'bg-[#FAFAFA] text-neutral-900'}`}>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div>
+        <p className="text-xs font-bold mt-3 text-neutral-400">प्रमाणीकरण की जाँच हो रही है...</p>
+      </div>
+    );
+  }
+
   // यदि कोई यूजर लॉगिन नहीं है तो सुरक्षित PIN गेट दिखाएं
   if (!currentUser) {
     return (
@@ -703,7 +719,7 @@ export default function StoreStockPage() {
           <span className="text-2xl">☕</span>
           <div>
             <h1 className="text-xs font-black text-orange-600 tracking-wider">BUM BUM CAFE</h1>
-            <p className="text-[9px] text-neutral-400 font-bold uppercase">Welcome, {currentUser?.name}</p>
+            <p className="text-[9px] text-neutral-400 font-bold uppercase">नमस्ते, {currentUser?.name} 👋</p>
           </div>
         </div>
         <div className="flex items-center gap-1.5">
@@ -791,12 +807,12 @@ export default function StoreStockPage() {
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className={`w-full max-w-sm rounded-[2rem] p-6 space-y-4 border ${isDarkMode ? 'bg-[#0F0F0F] border-neutral-800 text-white' : 'bg-white border-neutral-100'}`}>
               <div className="flex justify-between items-center border-b pb-2.5">
-                <h3 className="text-xs font-black uppercase text-orange-500">Manage Categories</h3>
+                <h3 className="text-xs font-black uppercase text-orange-500">कैटेगरी का प्रबंधन (Manage Categories)</h3>
                 <button type="button" onClick={() => setShowManageCategoriesModal(false)} className="p-1.5 bg-neutral-100 dark:bg-neutral-800 rounded-xl"><X size={14} /></button>
               </div>
               <div className="flex gap-1.5 items-center">
                 <input type="text" placeholder="FROZEN" value={addCategoryModalInput} onChange={e => setAddCategoryModalInput(e.target.value)} className="flex-1 p-2 rounded-xl text-xs font-bold border uppercase dark:bg-neutral-900" />
-                <button onClick={handleAddNewCategoryInModal} className="px-3 py-2 bg-green-600 text-white text-xs font-black uppercase rounded-xl">Add</button>
+                <button onClick={handleAddNewCategoryInModal} className="px-3 py-2 bg-green-600 text-white text-xs font-black uppercase rounded-xl">जोड़ें (Add)</button>
               </div>
               <div className="space-y-1.5 max-h-[35vh] overflow-y-auto">
                 {categories.map(cat => (
@@ -817,9 +833,9 @@ export default function StoreStockPage() {
         {showTransferModal && transferItem && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <motion.form onSubmit={handleTransferToKitchenSubmit} className={`w-full max-w-sm rounded-[2rem] p-6 space-y-4 border ${isDarkMode ? 'bg-neutral-900 text-white' : 'bg-white text-neutral-900'}`}>
-              <h3 className="text-xs font-black uppercase text-orange-500">Send to Kitchen - {transferItem.name}</h3>
-              <input type="number" placeholder="Qty" value={transferQtyInput} onChange={e => setTransferQtyInput(e.target.value)} className="w-full p-2.5 rounded-xl border dark:bg-neutral-800 text-center" required />
-              <button type="submit" className="w-full py-3 bg-orange-500 text-white rounded-xl text-xs font-black">Confirm</button>
+              <h3 className="text-xs font-black uppercase text-orange-500">किचन में भेजें - {transferItem.name}</h3>
+              <input type="number" placeholder="मात्रा (Qty)" value={transferQtyInput} onChange={e => setTransferQtyInput(e.target.value)} className="w-full p-2.5 rounded-xl border dark:bg-neutral-800 text-center" required />
+              <button type="submit" className="w-full py-3 bg-orange-500 text-white rounded-xl text-xs font-black">पुष्टि करें (Confirm)</button>
             </motion.form>
           </div>
         )}
@@ -828,10 +844,10 @@ export default function StoreStockPage() {
         {showConsumeModal && consumeItem && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <motion.form onSubmit={handleConsumeKitchenSubmit} className={`w-full max-w-sm rounded-[2rem] p-6 space-y-4 border ${isDarkMode ? 'bg-neutral-900 text-white' : 'bg-white text-neutral-900'}`}>
-              <h3 className="text-xs font-black uppercase text-neutral-400">Consume Kitchen Stock - {consumeItem.name}</h3>
-              <input type="number" placeholder="Qty" value={consumeQtyInput} onChange={e => setConsumeQtyInput(e.target.value)} className="w-full p-2.5 rounded-xl border dark:bg-neutral-800 text-center" required />
-              <input type="text" placeholder="Remarks" value={consumeRemarksInput} onChange={e => setConsumeRemarksInput(e.target.value)} className="w-full p-2.5 rounded-xl border dark:bg-neutral-800" />
-              <button type="submit" className="w-full py-3 bg-neutral-800 text-white dark:bg-white dark:text-neutral-900 rounded-xl text-xs font-black">Save Usage</button>
+              <h3 className="text-xs font-black uppercase text-neutral-400">किचन स्टॉक का उपयोग - {consumeItem.name}</h3>
+              <input type="number" placeholder="मात्रा (Qty)" value={consumeQtyInput} onChange={e => setConsumeQtyInput(e.target.value)} className="w-full p-2.5 rounded-xl border dark:bg-neutral-800 text-center" required />
+              <input type="text" placeholder="टिप्पणी (Remarks)" value={consumeRemarksInput} onChange={e => setConsumeRemarksInput(e.target.value)} className="w-full p-2.5 rounded-xl border dark:bg-neutral-800" />
+              <button type="submit" className="w-full py-3 bg-neutral-800 text-white dark:bg-white dark:text-neutral-900 rounded-xl text-xs font-black">उपयोग सहेजें (Save)</button>
             </motion.form>
           </div>
         )}
@@ -840,18 +856,18 @@ export default function StoreStockPage() {
         {showStockOutModal && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <motion.form onSubmit={handleWasteSubmit} className="w-full max-w-sm rounded-3xl p-6 space-y-4 bg-white dark:bg-neutral-900 border">
-              <h3 className="text-xs font-black text-red-500 uppercase">Log Waste / Damage</h3>
+              <h3 className="text-xs font-black text-red-500 uppercase">कचरा / नुकसान दर्ज करें</h3>
               <select value={formStockOut.item} onChange={e => setFormStockOut({ ...formStockOut, item: e.target.value })} className="w-full p-2.5 rounded-xl border dark:bg-neutral-800 font-bold text-xs" required>
-                <option value="">Choose item...</option>
-                {inventory.map(i => <option key={i.id} value={i.id}>{i.name} ({i.storeQty} available)</option>)}
+                <option value="">सामान चुनें...</option>
+                {inventory.map(i => <option key={i.id} value={i.id}>{i.name} ({i.storeQty} उपलब्ध)</option>)}
               </select>
-              <input type="number" placeholder="Qty" value={formStockOut.quantity} onChange={e => setFormStockOut({ ...formStockOut, quantity: e.target.value })} className="w-full p-2.5 rounded-xl border dark:bg-neutral-800 text-xs" required />
+              <input type="number" placeholder="मात्रा (Qty)" value={formStockOut.quantity} onChange={e => setFormStockOut({ ...formStockOut, quantity: e.target.value })} className="w-full p-2.5 rounded-xl border dark:bg-neutral-800 text-xs" required />
               <select value={formStockOut.purpose} onChange={e => setFormStockOut({ ...formStockOut, purpose: e.target.value as any })} className="w-full p-2.5 rounded-xl border dark:bg-neutral-800 text-xs">
-                <option value="Waste">Waste</option>
-                <option value="Damage">Damage</option>
+                <option value="Waste">Waste (कचरा)</option>
+                <option value="Damage">Damage (नुकसान)</option>
               </select>
-              <input type="text" placeholder="Remarks" value={formStockOut.remarks} onChange={e => setFormStockOut({ ...formStockOut, remarks: e.target.value })} className="w-full p-2.5 rounded-xl border dark:bg-neutral-800 text-xs" />
-              <button type="submit" className="w-full py-3 bg-red-600 text-white rounded-xl font-bold text-xs uppercase">Save Record</button>
+              <input type="text" placeholder="टिप्पणी (Remarks)" value={formStockOut.remarks} onChange={e => setFormStockOut({ ...formStockOut, remarks: e.target.value })} className="w-full p-2.5 rounded-xl border dark:bg-neutral-800 text-xs" />
+              <button type="submit" className="w-full py-3 bg-red-600 text-white rounded-xl font-bold text-xs uppercase">रिकॉर्ड सहेजें (Save)</button>
             </motion.form>
           </div>
         )}
@@ -860,18 +876,18 @@ export default function StoreStockPage() {
         {showAddProductModal && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <motion.form onSubmit={handleAddProductSubmit} className="w-full max-w-sm rounded-3xl p-6 space-y-4 bg-white dark:bg-neutral-900 border">
-              <h3 className="text-xs font-black text-green-500 uppercase">Add New Product</h3>
+              <h3 className="text-xs font-black text-green-500 uppercase">नया उत्पाद जोड़ें</h3>
               <input type="text" placeholder="नाम (जैसे: AMUL BUTTER)" value={formAddProduct.name} onChange={e => setFormAddProduct({ ...formAddProduct, name: e.target.value })} className="w-full p-2.5 rounded-xl border dark:bg-neutral-800 text-xs" required />
               
               <div className="grid grid-cols-2 gap-2 text-xs">
                 <div className="space-y-1">
-                  <label className="text-[9px] text-neutral-400 font-bold uppercase">Category</label>
+                  <label className="text-[9px] text-neutral-400 font-bold uppercase">कैटेगरी (Category)</label>
                   <select value={formAddProduct.category} onChange={e => setFormAddProduct({ ...formAddProduct, category: e.target.value })} className="w-full p-2.5 rounded-xl border dark:bg-[#181818] font-bold">
                     {categories.map(cat => <option key={cat.id} value={cat.name}>{cat.name}</option>)}
                   </select>
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[9px] text-neutral-400 font-bold uppercase">Unit</label>
+                  <label className="text-[9px] text-neutral-400 font-bold uppercase">यूनिट (Unit)</label>
                   <select value={formAddProduct.unit} onChange={e => setFormAddProduct({ ...formAddProduct, unit: e.target.value })} className="w-full p-2.5 rounded-xl border dark:bg-[#181818]">
                     <option value="Kg">Kg</option>
                     <option value="Ltr">Ltr</option>
@@ -882,16 +898,16 @@ export default function StoreStockPage() {
               </div>
 
               <div className="grid grid-cols-2 gap-2 text-xs">
-                <input type="number" placeholder="Price (INR)" value={formAddProduct.purchasePrice} onChange={e => setFormAddProduct({ ...formAddProduct, purchasePrice: e.target.value })} className="p-2 border rounded-xl dark:bg-neutral-800" required />
-                <input type="number" placeholder="Godown Qty" value={formAddProduct.storeQty} onChange={e => setFormAddProduct({ ...formAddProduct, storeQty: e.target.value })} className="p-2 border rounded-xl dark:bg-neutral-800" />
+                <input type="number" placeholder="कीमत (INR)" value={formAddProduct.purchasePrice} onChange={e => setFormAddProduct({ ...formAddProduct, purchasePrice: e.target.value })} className="p-2 border rounded-xl dark:bg-neutral-800" required />
+                <input type="number" placeholder="गोदाम मात्रा (Godown Qty)" value={formAddProduct.storeQty} onChange={e => setFormAddProduct({ ...formAddProduct, storeQty: e.target.value })} className="p-2 border rounded-xl dark:bg-neutral-800" />
               </div>
 
               <div className="grid grid-cols-2 gap-2 text-xs">
-                <input type="number" placeholder="Min Limit" value={formAddProduct.minLimit} onChange={e => setFormAddProduct({ ...formAddProduct, minLimit: e.target.value })} className="p-2 border rounded-xl dark:bg-neutral-800" />
+                <input type="number" placeholder="न्यूनतम सीमा (Min Limit)" value={formAddProduct.minLimit} onChange={e => setFormAddProduct({ ...formAddProduct, minLimit: e.target.value })} className="p-2 border rounded-xl dark:bg-neutral-800" />
                 <input type="date" value={formAddProduct.lastPurchaseDate} onChange={e => setFormAddProduct({ ...formAddProduct, lastPurchaseDate: e.target.value })} className="p-2 border rounded-xl dark:bg-[#181818]" />
               </div>
 
-              <button type="submit" className="w-full py-3 bg-green-600 text-white rounded-xl text-xs font-bold uppercase">Save Product</button>
+              <button type="submit" className="w-full py-3 bg-green-600 text-white rounded-xl text-xs font-bold uppercase">उत्पाद सहेजें (Save Product)</button>
             </motion.form>
           </div>
         )}
@@ -900,18 +916,18 @@ export default function StoreStockPage() {
         {editingProduct && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <motion.form onSubmit={handleEditProductSubmit} className="w-full max-w-sm rounded-3xl p-6 space-y-4 bg-white dark:bg-neutral-900 border">
-              <h3 className="text-xs font-black uppercase text-orange-500">Edit Details</h3>
+              <h3 className="text-xs font-black uppercase text-orange-500">विवरण संपादित करें</h3>
               <input type="text" value={editingProduct.name} onChange={e => setEditingProduct({ ...editingProduct, name: e.target.value.toUpperCase() })} className="w-full p-2.5 rounded-xl border dark:bg-neutral-800 text-xs" required />
               
               <div className="grid grid-cols-2 gap-2 text-xs">
                 <div className="space-y-1">
-                  <label className="text-[9px] text-neutral-400 font-bold uppercase">Category</label>
+                  <label className="text-[9px] text-neutral-400 font-bold uppercase">कैटेगरी (Category)</label>
                   <select value={editingProduct.category || "OTHERS"} onChange={e => setEditingProduct({ ...editingProduct, category: e.target.value })} className="w-full p-2.5 rounded-xl border dark:bg-[#181818] font-bold">
                     {categories.map(cat => <option key={cat.id} value={cat.name}>{cat.name}</option>)}
                   </select>
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[9px] text-neutral-400 font-bold uppercase">Unit</label>
+                  <label className="text-[9px] text-neutral-400 font-bold uppercase">यूनिट (Unit)</label>
                   <select value={editingProduct.unit} onChange={e => setEditingProduct({ ...editingProduct, unit: e.target.value })} className="w-full p-2.5 rounded-xl border dark:bg-[#181818]">
                     <option value="Kg">Kg</option>
                     <option value="Ltr">Ltr</option>
@@ -922,18 +938,18 @@ export default function StoreStockPage() {
               </div>
 
               <div className="grid grid-cols-2 gap-2 text-xs">
-                <input type="number" placeholder="Price (INR)" value={editingProduct.purchasePrice} onChange={e => setEditingProduct({ ...editingProduct, purchasePrice: parseFloat(e.target.value) || 0 })} className="p-2 border rounded-xl dark:bg-neutral-800" required />
-                <input type="number" placeholder="Min Limit" value={editingProduct.minLimit} onChange={e => setEditingProduct({ ...editingProduct, minLimit: parseFloat(e.target.value) || 0 })} className="p-2 border rounded-xl dark:bg-neutral-800" required />
+                <input type="number" placeholder="कीमत (INR)" value={editingProduct.purchasePrice} onChange={e => setEditingProduct({ ...editingProduct, purchasePrice: parseFloat(e.target.value) || 0 })} className="p-2 border rounded-xl dark:bg-neutral-800" required />
+                <input type="number" placeholder="न्यूनतम सीमा (Min Limit)" value={editingProduct.minLimit} onChange={e => setEditingProduct({ ...editingProduct, minLimit: parseFloat(e.target.value) || 0 })} className="p-2 border rounded-xl dark:bg-neutral-800" required />
               </div>
 
               <div className="grid grid-cols-2 gap-2 text-xs">
-                <input type="number" placeholder="Godown Qty" value={editingProduct.storeQty} onChange={e => setEditingProduct({ ...editingProduct, storeQty: parseFloat(e.target.value) || 0 })} className="p-2 border rounded-xl dark:bg-neutral-800" required />
-                <input type="number" placeholder="Kitchen Qty" value={editingProduct.kitchenQty || 0} onChange={e => setEditingProduct({ ...editingProduct, kitchenQty: parseFloat(e.target.value) || 0 })} className="p-2 border rounded-xl dark:bg-neutral-800" required />
+                <input type="number" placeholder="गोदाम मात्रा" value={editingProduct.storeQty} onChange={e => setEditingProduct({ ...editingProduct, storeQty: parseFloat(e.target.value) || 0 })} className="p-2 border rounded-xl dark:bg-neutral-800" required />
+                <input type="number" placeholder="किचन मात्रा" value={editingProduct.kitchenQty || 0} onChange={e => setEditingProduct({ ...editingProduct, kitchenQty: parseFloat(e.target.value) || 0 })} className="p-2 border rounded-xl dark:bg-neutral-800" required />
               </div>
 
               <div className="flex gap-2">
-                <button type="button" onClick={() => handleDeleteProduct(editingProduct.id, editingProduct.name)} className="px-4 py-3 bg-red-100 text-red-600 rounded-xl font-bold text-xs uppercase">Delete</button>
-                <button type="submit" className="flex-1 py-3 bg-orange-500 text-white rounded-xl font-bold text-xs uppercase">Update ➔</button>
+                <button type="button" onClick={() => handleDeleteProduct(editingProduct.id, editingProduct.name)} className="px-4 py-3 bg-red-100 text-red-600 rounded-xl font-bold text-xs uppercase">हटाएं (Delete)</button>
+                <button type="submit" className="flex-1 py-3 bg-orange-500 text-white rounded-xl font-bold text-xs uppercase">अपडेट करें ➔</button>
               </div>
             </motion.form>
           </div>
@@ -943,13 +959,13 @@ export default function StoreStockPage() {
         {showAddAssetModal && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <motion.form onSubmit={handleAddAssetSubmit} className="w-full max-w-sm rounded-3xl p-6 space-y-4 bg-white dark:bg-neutral-900 border">
-              <h3 className="text-xs font-black text-green-500 uppercase">Add Fixed Asset</h3>
-              <input type="text" placeholder="Asset Name" value={formAddAsset.name} onChange={e => setFormAddAsset({ ...formAddAsset, name: e.target.value })} className="w-full p-2.5 rounded-xl border dark:bg-neutral-800 text-xs" required />
+              <h3 className="text-xs font-black text-green-500 uppercase">अचल संपत्ति (Fixed Asset) जोड़ें</h3>
+              <input type="text" placeholder="एसेट का नाम" value={formAddAsset.name} onChange={e => setFormAddAsset({ ...formAddAsset, name: e.target.value })} className="w-full p-2.5 rounded-xl border dark:bg-neutral-800 text-xs" required />
               <div className="grid grid-cols-2 gap-2 text-xs">
-                <input type="number" placeholder="Qty" value={formAddAsset.quantity} onChange={e => setFormAddAsset({ ...formAddAsset, quantity: e.target.value })} className="w-full p-2.5 rounded-xl border dark:bg-neutral-800" required />
-                <input type="number" placeholder="Cost" value={formAddAsset.cost} onChange={e => setFormAddAsset({ ...formAddAsset, cost: e.target.value })} className="w-full p-2.5 rounded-xl border dark:bg-neutral-800" />
+                <input type="number" placeholder="मात्रा (Qty)" value={formAddAsset.quantity} onChange={e => setFormAddAsset({ ...formAddAsset, quantity: e.target.value })} className="w-full p-2.5 rounded-xl border dark:bg-neutral-800" required />
+                <input type="number" placeholder="लागत (Cost)" value={formAddAsset.cost} onChange={e => setFormAddAsset({ ...formAddAsset, cost: e.target.value })} className="w-full p-2.5 rounded-xl border dark:bg-neutral-800" />
               </div>
-              <button type="submit" className="w-full py-3 bg-green-600 text-white rounded-xl text-xs font-bold uppercase">Save Asset</button>
+              <button type="submit" className="w-full py-3 bg-green-600 text-white rounded-xl text-xs font-bold uppercase">एसेट सहेजें (Save Asset)</button>
             </motion.form>
           </div>
         )}
@@ -958,14 +974,14 @@ export default function StoreStockPage() {
         {showBulkCategoryModal && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[110] flex items-center justify-center p-4">
             <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className={`w-full max-w-sm rounded-[2rem] p-6 space-y-4 border ${isDarkMode ? 'bg-[#0F0F0F] border-neutral-800 text-white' : 'bg-white border-neutral-100'}`}>
-              <h3 className="text-xs font-black uppercase text-orange-500">Change Category</h3>
+              <h3 className="text-xs font-black uppercase text-orange-500">कैटेगरी बदलें (Change Category)</h3>
               <select value={bulkTargetCategory} onChange={e => setBulkTargetCategory(e.target.value)} className="w-full p-2.5 rounded-xl border dark:bg-neutral-950 font-bold text-xs">
                 <option value="">-- चुनें --</option>
                 {categories.map(cat => <option key={cat.id} value={cat.name}>{cat.name}</option>)}
-                <option value="CREATE_NEW">-- + CREATE NEW CATEGORY --</option>
+                <option value="CREATE_NEW">-- + नई कैटेगरी बनाएं --</option>
               </select>
               {bulkTargetCategory === "CREATE_NEW" && <input type="text" placeholder="FROZEN FOOD" value={newCategoryInput} onChange={e => setNewCategoryInput(e.target.value)} className="w-full p-2.5 rounded-xl border uppercase dark:bg-neutral-950 text-xs" required />}
-              <button onClick={handleConfirmBulkCategory} className="w-full py-3 bg-[#FF6B00] text-white rounded-xl text-xs font-black">Set Category ➔</button>
+              <button onClick={handleConfirmBulkCategory} className="w-full py-3 bg-[#FF6B00] text-white rounded-xl text-xs font-black">कैटेगरी सेट करें ➔</button>
             </motion.div>
           </div>
         )}
@@ -974,13 +990,13 @@ export default function StoreStockPage() {
         {showSaveToListModal && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[110] flex items-center justify-center p-4">
             <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className={`w-full max-w-sm rounded-[2rem] p-6 space-y-4 border ${isDarkMode ? 'bg-[#0F0F0F] border-neutral-800 text-white' : 'bg-white border-neutral-100'}`}>
-              <h3 className="text-xs font-black uppercase text-orange-500">Save to Supplier Order</h3>
+              <h3 className="text-xs font-black uppercase text-orange-500">सप्लायर ऑर्डर में सहेजें</h3>
               <select value={targetListId} onChange={e => setTargetListId(e.target.value)} className="w-full p-2.5 rounded-xl border dark:bg-neutral-900 font-bold text-xs">
                 {orderLists.map(list => <option key={list.id} value={list.id}>{list.name}</option>)}
-                <option value="CREATE_NEW">-- + CREATE NEW ORDER LIST --</option>
+                <option value="CREATE_NEW">-- + नई ऑर्डर लिस्ट बनाएं --</option>
               </select>
               {targetListId === "CREATE_NEW" && <input type="text" placeholder="WEEKLY ORDER" value={newListNameInput} onChange={e => setNewListNameInput(e.target.value)} className="w-full p-2.5 rounded-xl border uppercase dark:bg-neutral-950 text-xs" required />}
-              <button onClick={handleConfirmSaveToList} className="w-full py-3 bg-[#FF6B00] text-white rounded-xl text-xs font-black">Confirm ➔</button>
+              <button onClick={handleConfirmSaveToList} className="w-full py-3 bg-[#FF6B00] text-white rounded-xl text-xs font-black">पुष्टि करें ➔</button>
             </motion.div>
           </div>
         )}
@@ -1008,19 +1024,19 @@ export default function StoreStockPage() {
       <nav className={`fixed bottom-0 left-0 right-0 z-50 border-t backdrop-blur-md ${isDarkMode ? 'bg-black/90 border-neutral-800 text-white' : 'bg-white/90 border-neutral-100 text-neutral-900'}`}>
         <div className="max-w-md mx-auto grid grid-cols-5 gap-0.5 py-1.5 text-center text-[8px] font-black uppercase">
           <button onClick={() => { setActiveTab('home'); setIsMultiSelectMode(false); }} className={`flex flex-col items-center justify-center py-1 ${activeTab === 'home' ? 'text-[#FF6B00]' : 'text-neutral-400'}`}>
-            <Home size={15} /> <span className="mt-0.5">Home</span>
+            <Home size={15} /> <span className="mt-0.5">होम</span>
           </button>
           <button onClick={() => { setActiveTab('store'); }} className={`flex flex-col items-center justify-center py-1 ${activeTab === 'store' ? 'text-[#FF6B00]' : 'text-neutral-400'}`}>
-            <Store size={15} /> <span className="mt-0.5">Godown</span>
+            <Store size={15} /> <span className="mt-0.5">गोदाम</span>
           </button>
           <button onClick={() => { setActiveTab('fixed_assets'); setIsMultiSelectMode(false); }} className={`flex flex-col items-center justify-center py-1 ${activeTab === 'fixed_assets' ? 'text-[#FF6B00]' : 'text-neutral-400'}`}>
-            <Wrench size={15} /> <span className="mt-0.5">Fixed Assets</span>
+            <Wrench size={15} /> <span className="mt-0.5">स्थायी संपत्ति</span>
           </button>
           <button onClick={() => { setActiveTab('saved_list'); setIsMultiSelectMode(false); }} className={`flex flex-col items-center justify-center py-1 ${activeTab === 'saved_list' ? 'text-[#FF6B00]' : 'text-neutral-400'}`}>
-            <Layers size={15} /> <span className="mt-0.5">Order</span>
+            <Layers size={15} /> <span className="mt-0.5">ऑर्डर</span>
           </button>
           <button onClick={() => { setActiveTab('waste'); setIsMultiSelectMode(false); }} className={`flex flex-col items-center justify-center py-1 ${activeTab === 'waste' ? 'text-[#FF6B00]' : 'text-neutral-400'}`}>
-            <AlertTriangle size={15} /> <span className="mt-0.5">Ledger</span>
+            <AlertTriangle size={15} /> <span className="mt-0.5">लेज़र</span>
           </button>
         </div>
       </nav>
