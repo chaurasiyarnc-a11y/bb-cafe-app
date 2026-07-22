@@ -907,8 +907,10 @@ export default function StoreStockPage() {
         {deleteConfirmation && (
           <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[200] flex items-center justify-center p-4">
             <motion.form onSubmit={handleDeleteVerificationSubmit} className={`w-full max-w-sm rounded-[2.5rem] p-6 space-y-5 border text-center ${isDarkMode ? 'bg-neutral-900 border-neutral-800 text-white' : 'bg-white border-neutral-100'}`}>
-              <span className="text-4xl block">🛡️</span>
-              <h3 className="text-sm font-black text-red-500 uppercase">सुरक्षा प्रमाणीकरण</h3>
+              <div className="flex justify-between items-center border-b dark:border-neutral-800 pb-2 mb-2 w-full">
+                <span className="text-xs font-black text-red-500 uppercase">सुरक्षा प्रमाणीकरण</span>
+                <button type="button" onClick={() => setDeleteConfirmation(null)} className="p-1.5 bg-neutral-100 dark:bg-neutral-850 rounded-xl text-neutral-500"><X size={14} /></button>
+              </div>
               <p className="text-xs text-neutral-400">{deleteConfirmation.message}</p>
               <input type="password" maxLength={6} placeholder="••••" value={deletePinInput} onChange={e => setDeletePinInput(e.target.value)} className="w-full text-center text-xl tracking-[1em] p-2.5 rounded-xl border font-black dark:bg-neutral-800" required />
               {deletePinError && <p className="text-[10px] text-red-500 font-bold">{deletePinError}</p>}
@@ -951,7 +953,10 @@ export default function StoreStockPage() {
         {showTransferModal && transferItem && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <motion.form onSubmit={handleTransferToKitchenSubmit} className={`w-full max-w-sm rounded-[2rem] p-6 space-y-4 border ${isDarkMode ? 'bg-neutral-900 text-white' : 'bg-white text-neutral-900'}`}>
-              <h3 className="text-xs font-black uppercase text-orange-500">किचन में भेजें - {transferItem.name}</h3>
+              <div className="flex justify-between items-center border-b dark:border-neutral-800 pb-2.5 mb-2">
+                <h3 className="text-xs font-black uppercase text-orange-500">किचन में भेजें - {transferItem.name}</h3>
+                <button type="button" onClick={() => setShowTransferModal(false)} className="p-1.5 bg-neutral-100 dark:bg-neutral-800 rounded-xl text-neutral-500"><X size={14} /></button>
+              </div>
               <input type="number" placeholder="मात्रा (Qty)" value={transferQtyInput} onChange={e => setTransferQtyInput(e.target.value)} className="w-full p-2.5 rounded-xl border dark:bg-neutral-800 text-center" required />
               <button type="submit" className="w-full py-3 bg-orange-500 text-white rounded-xl text-xs font-black">पुष्टि करें (Confirm)</button>
             </motion.form>
@@ -962,7 +967,10 @@ export default function StoreStockPage() {
         {showConsumeModal && consumeItem && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <motion.form onSubmit={handleConsumeKitchenSubmit} className={`w-full max-w-sm rounded-[2rem] p-6 space-y-4 border ${isDarkMode ? 'bg-neutral-900 text-white' : 'bg-white text-neutral-900'}`}>
-              <h3 className="text-xs font-black uppercase text-orange-500">किचन स्टॉक का उपयोग - {consumeItem.name}</h3>
+              <div className="flex justify-between items-center border-b dark:border-neutral-800 pb-2.5 mb-2">
+                <h3 className="text-xs font-black uppercase text-neutral-400">किचन स्टॉक का उपयोग - {consumeItem.name}</h3>
+                <button type="button" onClick={() => setShowConsumeModal(false)} className="p-1.5 bg-neutral-100 dark:bg-neutral-800 rounded-xl text-neutral-500"><X size={14} /></button>
+              </div>
               <input type="number" placeholder="मात्रा (Qty)" value={consumeQtyInput} onChange={e => setConsumeQtyInput(e.target.value)} className="w-full p-2.5 rounded-xl border dark:bg-neutral-800 text-center" required />
               <input type="text" placeholder="टिप्पणी (Remarks)" value={consumeRemarksInput} onChange={e => setConsumeRemarksInput(e.target.value)} className="w-full p-2.5 rounded-xl border dark:bg-neutral-800" />
               <button type="submit" className="w-full py-3 bg-neutral-800 text-white dark:bg-white dark:text-neutral-900 rounded-xl text-xs font-black">उपयोग सहेजें (Save)</button>
@@ -974,7 +982,10 @@ export default function StoreStockPage() {
         {showStockOutModal && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <motion.form onSubmit={handleWasteSubmit} className="w-full max-w-sm rounded-3xl p-6 space-y-4 bg-white dark:bg-neutral-900 border">
-              <h3 className="text-xs font-black text-red-500 uppercase">कचरा / नुकसान दर्ज करें</h3>
+              <div className="flex justify-between items-center border-b dark:border-neutral-800 pb-2.5 mb-2">
+                <h3 className="text-xs font-black text-red-500 uppercase">कचरा / नुकसान दर्ज करें</h3>
+                <button type="button" onClick={() => setShowStockOutModal(false)} className="p-1.5 bg-neutral-100 dark:bg-neutral-800 rounded-xl text-neutral-500"><X size={14} /></button>
+              </div>
               <select value={formStockOut.item} onChange={e => setFormStockOut({ ...formStockOut, item: e.target.value })} className="w-full p-2.5 rounded-xl border dark:bg-neutral-800 font-bold text-xs" required>
                 <option value="">सामान चुनें...</option>
                 {inventory.map(i => <option key={i.id} value={i.id}>{i.name} ({i.storeQty} उपलब्ध)</option>)}
@@ -994,7 +1005,10 @@ export default function StoreStockPage() {
         {showAddProductModal && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <motion.form onSubmit={handleAddProductSubmit} className="w-full max-w-sm rounded-3xl p-6 space-y-4 bg-white dark:bg-neutral-900 border">
-              <h3 className="text-xs font-black text-green-500 uppercase">नया उत्पाद जोड़ें</h3>
+              <div className="flex justify-between items-center border-b dark:border-neutral-800 pb-2.5 mb-2">
+                <h3 className="text-xs font-black text-green-500 uppercase">नया उत्पाद जोड़ें</h3>
+                <button type="button" onClick={() => setShowAddProductModal(false)} className="p-1.5 bg-neutral-100 dark:bg-neutral-800 rounded-xl text-neutral-500"><X size={14} /></button>
+              </div>
               <input type="text" placeholder="नाम (जैसे: AMUL BUTTER)" value={formAddProduct.name} onChange={e => setFormAddProduct({ ...formAddProduct, name: e.target.value })} className="w-full p-2.5 rounded-xl border dark:bg-neutral-800 text-xs" required />
               
               <div className="grid grid-cols-2 gap-2 text-xs">
@@ -1034,7 +1048,10 @@ export default function StoreStockPage() {
         {editingProduct && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <motion.form onSubmit={handleEditProductSubmit} className="w-full max-w-sm rounded-3xl p-6 space-y-4 bg-white dark:bg-neutral-900 border">
-              <h3 className="text-xs font-black uppercase text-orange-500">विवरण संपादित करें</h3>
+              <div className="flex justify-between items-center border-b dark:border-neutral-800 pb-2.5 mb-2">
+                <h3 className="text-xs font-black uppercase text-orange-500">विवरण संपादित करें</h3>
+                <button type="button" onClick={() => setEditingProduct(null)} className="p-1.5 bg-neutral-100 dark:bg-neutral-800 rounded-xl text-neutral-500"><X size={14} /></button>
+              </div>
               <input type="text" value={editingProduct.name} onChange={e => setEditingProduct({ ...editingProduct, name: e.target.value.toUpperCase() })} className="w-full p-2.5 rounded-xl border dark:bg-neutral-800 text-xs" required />
               
               <div className="grid grid-cols-2 gap-2 text-xs">
@@ -1077,7 +1094,10 @@ export default function StoreStockPage() {
         {showAddAssetModal && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <motion.form onSubmit={handleAddAssetSubmit} className="w-full max-w-sm rounded-3xl p-6 space-y-4 bg-white dark:bg-neutral-900 border">
-              <h3 className="text-xs font-black text-green-500 uppercase">अचल संपत्ति (Fixed Asset) जोड़ें</h3>
+              <div className="flex justify-between items-center border-b dark:border-neutral-800 pb-2.5 mb-2">
+                <h3 className="text-xs font-black text-green-500 uppercase">अचल संपत्ति (Fixed Asset) जोड़ें</h3>
+                <button type="button" onClick={() => setShowAddAssetModal(false)} className="p-1.5 bg-neutral-100 dark:bg-neutral-800 rounded-xl text-neutral-500"><X size={14} /></button>
+              </div>
               
               {/* एसेट टाइप सिलेक्टर */}
               <div className="space-y-1">
@@ -1128,7 +1148,10 @@ export default function StoreStockPage() {
         {editingAsset && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <motion.form onSubmit={handleEditAssetSubmit} className="w-full max-w-sm rounded-3xl p-6 space-y-4 bg-white dark:bg-neutral-900 border">
-              <h3 className="text-xs font-black uppercase text-orange-500">एसेट विवरण संपादित करें</h3>
+              <div className="flex justify-between items-center border-b dark:border-neutral-800 pb-2.5 mb-2">
+                <h3 className="text-xs font-black uppercase text-orange-500">एसेट विवरण संपादित करें</h3>
+                <button type="button" onClick={() => setEditingAsset(null)} className="p-1.5 bg-neutral-100 dark:bg-neutral-800 rounded-xl text-neutral-500"><X size={14} /></button>
+              </div>
               
               <div className="space-y-1">
                 <label className="text-[9px] text-neutral-400 font-bold uppercase">श्रेणी (Type)</label>
@@ -1225,7 +1248,10 @@ export default function StoreStockPage() {
         {showBulkCategoryModal && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[110] flex items-center justify-center p-4">
             <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className={`w-full max-w-sm rounded-[2rem] p-6 space-y-4 border ${isDarkMode ? 'bg-[#0F0F0F] border-neutral-800 text-white' : 'bg-white border-neutral-100'}`}>
-              <h3 className="text-xs font-black uppercase text-orange-500">कैटेगरी बदलें (Change Category)</h3>
+              <div className="flex justify-between items-center border-b dark:border-neutral-800 pb-2.5 mb-2">
+                <h3 className="text-xs font-black uppercase text-orange-500">कैटेगरी बदलें (Change Category)</h3>
+                <button type="button" onClick={() => setShowBulkCategoryModal(false)} className="p-1.5 bg-neutral-100 dark:bg-neutral-800 rounded-xl text-neutral-500"><X size={14} /></button>
+              </div>
               <select value={bulkTargetCategory} onChange={e => setBulkTargetCategory(e.target.value)} className="w-full p-2.5 rounded-xl border dark:bg-neutral-950 font-bold text-xs">
                 <option value="">-- चुनें --</option>
                 {categories.map(cat => <option key={cat.id} value={cat.name}>{cat.name}</option>)}
@@ -1241,7 +1267,10 @@ export default function StoreStockPage() {
         {showSaveToListModal && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[110] flex items-center justify-center p-4">
             <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className={`w-full max-w-sm rounded-[2rem] p-6 space-y-4 border ${isDarkMode ? 'bg-[#0F0F0F] border-neutral-800 text-white' : 'bg-white border-neutral-100'}`}>
-              <h3 className="text-xs font-black uppercase text-orange-500">सप्लायर ऑर्डर में सहेजें</h3>
+              <div className="flex justify-between items-center border-b dark:border-neutral-800 pb-2.5 mb-2">
+                <h3 className="text-xs font-black uppercase text-orange-500">सप्लायर ऑर्डर में सहेजें</h3>
+                <button type="button" onClick={() => setShowSaveToListModal(false)} className="p-1.5 bg-neutral-100 dark:bg-neutral-800 rounded-xl text-neutral-500"><X size={14} /></button>
+              </div>
               <select value={targetListId} onChange={e => setTargetListId(e.target.value)} className="w-full p-2.5 rounded-xl border dark:bg-neutral-900 font-bold text-xs">
                 {orderLists.map(list => <option key={list.id} value={list.id}>{list.name}</option>)}
                 <option value="CREATE_NEW">-- + नई ऑर्डर लिस्ट बनाएं --</option>
