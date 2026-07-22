@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Home, Store, Wrench, Layers, AlertTriangle, Lock, X, Eye, EyeOff, Trash2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { db } from '@/lib/firebase'; 
+import { db } from '../../../lib/firebase'; 
 import { 
   collection, onSnapshot, query, orderBy, doc, setDoc, increment, addDoc, deleteDoc, writeBatch 
 } from 'firebase/firestore';
@@ -122,13 +122,20 @@ export default function StoreStockPage() {
   const [pinInput, setPinInput] = useState<string>("");
   const [authError, setAuthError] = useState<string>("");
 
-  // session restore on reload
+  // session restore on reload & Service Worker registration
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const savedUser = localStorage.getItem('bum_bum_cafe_user');
       if (savedUser) {
         try { setCurrentUser(JSON.parse(savedUser)); } catch { localStorage.removeItem('bum_bum_cafe_user'); }
       }
+    }
+
+    // Register Service Worker for PWA
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js')
+        .then((reg) => console.log('Store Service Worker Registered Successfully!', reg.scope))
+        .catch((err) => console.error('Store Service Worker failed:', err));
     }
   }, []);
 
@@ -178,7 +185,7 @@ export default function StoreStockPage() {
   const [showStockOutModal, setShowStockOutModal] = useState<boolean>(false);
   const [formStockOut, setFormStockOut] = useState({ item: '', quantity: '', purpose: 'Waste' as any, remarks: '' });
 
-  const toastMessage = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
+  const toastMessage = (message: string, type: 'success' | 'error' | 'info' = 'success') = {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3000);
   };
@@ -289,7 +296,7 @@ export default function StoreStockPage() {
     const matchedKitchen = stockOutHistory.filter(log => log.purpose === "Kitchen Use" && filterFn(log.date));
     const totalKitchenQty = matchedKitchen.reduce((sum, log) => sum + log.qty, 0);
 
-    const matchedWasteLogs = stockOutHistory.filter(log => (log.purpose === "Waste" || log.purpose === "Damage") && filterFn(log.date));
+    const matchedWasteLogs = stockOutHistory.filter(log => (log.purpose === "Waste" || log.purpose === "Damage" || log.purpose === "Staff Use") && filterFn(log.date));
     const totalWasteLoss = matchedWasteLogs.reduce((sum, log) => sum + (log.financialLoss || 0), 0);
 
     return { totalInwardQty, totalKitchenQty, totalWasteLoss, matchedInward, matchedKitchen, matchedWasteLogs };
@@ -688,7 +695,8 @@ export default function StoreStockPage() {
 
   return (
     <div className={`min-h-screen ${isDarkMode ? 'bg-[#0E0E0E]' : 'bg-[#FAFAFA]'} pb-24 font-sans relative ${isDarkMode ? 'text-white' : 'text-neutral-900'}`}>
-      
+      <link rel="manifest" href="/store_manifest.json" />
+
       {/* HEADER */}
       <header className={`sticky top-0 z-40 h-16 border-b px-4 backdrop-blur-md ${isDarkMode ? 'bg-black/80 border-neutral-800' : 'bg-white/80 border-neutral-100'} flex items-center justify-between`}>
         <div className="flex items-center gap-2">
