@@ -66,15 +66,29 @@ export default function StockDashboard({
         </div>
       </div>
 
+      {/* स्टॉक और अचल संपत्ति का वर्गीकृत मूल्य (2x2 ग्रिड) */}
       <div className="grid grid-cols-2 gap-2">
-        <div className={`p-3 rounded-2xl border text-center ${isDarkMode ? 'bg-[#181818] border-neutral-800' : 'bg-white border-neutral-100'}`}>
-          <p className="text-[8px] font-black text-neutral-400 uppercase">गोदाम का कुल स्टॉक मूल्य</p>
+        <div className={`p-3 rounded-2xl border text-center flex flex-col justify-center ${isDarkMode ? 'bg-[#181818] border-neutral-800' : 'bg-white border-neutral-100'}`}>
+          <p className="text-[8px] font-black text-neutral-400 uppercase">📦 गोदाम का कुल स्टॉक</p>
           <p className="text-xs font-black text-neutral-700 dark:text-neutral-200 mt-1">₹{stats?.totalVal?.toLocaleString()}</p>
         </div>
-        <div className={`p-3 rounded-2xl border text-center ${isDarkMode ? 'bg-[#181818] border-neutral-800' : 'bg-white border-neutral-100'}`}>
-          <p className="text-[8px] font-black text-neutral-400 uppercase">स्थायी संपत्ति मूल्य (Fixed Assets)</p>
-          <p className="text-xs font-black text-blue-500 mt-1">₹{stats?.totalFixedVal?.toLocaleString()}</p>
+        <div className={`p-3 rounded-2xl border text-center flex flex-col justify-center ${isDarkMode ? 'bg-[#181818] border-neutral-800' : 'bg-white border-neutral-100'}`}>
+          <p className="text-[8px] font-black text-neutral-400 uppercase">🏢 सामान्य एसेट्स मूल्य</p>
+          <p className="text-xs font-black text-blue-500 mt-1">₹{(stats?.generalAssetsVal || 0).toLocaleString()}</p>
         </div>
+        <div className={`p-3 rounded-2xl border text-center flex flex-col justify-center ${isDarkMode ? 'bg-[#181818] border-neutral-800' : 'bg-white border-neutral-100'}`}>
+          <p className="text-[8px] font-black text-neutral-400 uppercase">🍴 कटलरी कुल मूल्य</p>
+          <p className="text-xs font-black text-amber-500 mt-1">₹{(stats?.cutleryVal || 0).toLocaleString()}</p>
+        </div>
+        <div className={`p-3 rounded-2xl border text-center flex flex-col justify-center ${isDarkMode ? 'bg-[#181818] border-neutral-800' : 'bg-white border-neutral-100'}`}>
+          <p className="text-[8px] font-black text-neutral-400 uppercase">🍽️ क्रॉकरी कुल मूल्य</p>
+          <p className="text-xs font-black text-pink-500 mt-1">₹{(stats?.crockeryVal || 0).toLocaleString()}</p>
+        </div>
+      </div>
+
+      {/* सभी संपत्तियों (Fixed Assets) का ग्रैंड टोटल */}
+      <div className={`p-2.5 rounded-xl border text-center text-[10px] font-black uppercase tracking-wider ${isDarkMode ? 'bg-neutral-900/60 border-neutral-800/80 text-neutral-400' : 'bg-neutral-50 border-neutral-150 text-neutral-500'}`}>
+        कुल अचल संपत्ति (Total Assets Value): <span className="text-orange-500 font-bold ml-1">₹{stats?.totalFixedVal?.toLocaleString()}</span>
       </div>
 
       {/* Category Stock Values */}
