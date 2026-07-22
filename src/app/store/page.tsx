@@ -10,11 +10,11 @@ import {
 } from 'firebase/firestore';
 
 // कस्टमाइज़्ड सब-कंपोनेंट्स के इम्पोर्ट्स (समर्पित फ़ोल्डर से)
-import StockDashboard from '@/components/admin/stock/StockDashboard';
-import StockGodown from '@/components/admin/stock/StockGodown';
-import StockAssets from '@/components/admin/stock/StockAssets';
-import StockSupplierOrder from '@/components/admin/stock/StockSupplierOrder';
-import StockLedger from '@/components/admin/stock/StockLedger';
+import StockDashboard from '../../components/admin/stock/StockDashboard';
+import StockGodown from '../../components/admin/stock/StockGodown';
+import StockAssets from '../../components/admin/stock/StockAssets';
+import StockSupplierOrder from '../../components/admin/stock/StockSupplierOrder';
+import StockLedger from '../../components/admin/stock/StockLedger';
 
 interface InventoryItem {
   id: string;
