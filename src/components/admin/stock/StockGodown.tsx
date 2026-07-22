@@ -21,23 +21,36 @@ export default function StockGodown({
     }
   };
 
-  // लॉन्ग-प्रेस शुरू होने पर टाइमर चालू करना (600ms तक दबाए रखने पर)
-  const handlePressStart = (itemId: string) => {
+  // --- लॉन्ग-प्रेस शुरू होने पर टाइमर चालू करना (Pointer Down) ---
+  const handlePointerDown = (itemId: string, e: React.PointerEvent) => {
+    // सुरक्षा जांच: यदि यूजर ने कार्ड के अंदर किसी बटन, इनपुट या सेलेक्ट बॉक्स पर क्लिक किया है, तो लॉन्ग-प्रेस शुरू न करें
+    const target = e.target as HTMLElement;
+    if (target.closest('button') || target.closest('input') || target.closest('select') || target.closest('svg')) {
+      return;
+    }
+
     isLongPressActive.current = false;
     longPressTimeout.current = setTimeout(() => {
       isLongPressActive.current = true;
       setIsMultiSelectMode(true);
       handleToggleMultiSelect(itemId);
       triggerHaptic(50); // लॉन्ग-प्रेस सफल होने पर वाइब्रेशन फ़ीडबैक
-    }, 600);
+    }, 600); // 600ms तक दबाए रखने पर
   };
 
-  // उंगली उठाने पर टाइमर बंद करना
-  const handlePressEnd = (itemId: string) => {
+  // --- उंगली उठाने पर (Pointer Up) ---
+  const handlePointerUp = (itemId: string, e: React.PointerEvent) => {
     if (longPressTimeout.current) {
       clearTimeout(longPressTimeout.current);
     }
-    // यदि यह केवल एक त्वरित टच (Normal Click) था
+    
+    // सुरक्षा जांच: बटन्स पर नॉर्मल क्लिक करने पर कार्ड की सेलेक्टिविटी ट्रिगर न हो
+    const target = e.target as HTMLElement;
+    if (target.closest('button') || target.closest('input') || target.closest('select') || target.closest('svg')) {
+      return;
+    }
+
+    // यदि यह केवल एक त्वरित टच (Normal Click) था और मल्टी-सेलेक्ट पहले से ऑन है
     if (!isLongPressActive.current) {
       if (isMultiSelectMode) {
         handleToggleMultiSelect(itemId);
@@ -45,8 +58,8 @@ export default function StockGodown({
     }
   };
 
-  // स्क्रॉल या उंगली फिसलने पर लॉन्ग-प्रेस निरस्त करना
-  const handlePressMove = () => {
+  // --- स्क्रॉल होने या उंगली फिसलने पर (Pointer Cancel/Move) ---
+  const handlePointerCancel = () => {
     if (longPressTimeout.current) {
       clearTimeout(longPressTimeout.current);
     }
@@ -206,12 +219,10 @@ export default function StockGodown({
           return (
             <div 
               key={item.id}
-              onTouchStart={() => handlePressStart(item.id)}
-              onTouchEnd={() => handlePressEnd(item.id)}
-              onTouchMove={handlePressMove}
-              onMouseDown={() => handlePressStart(item.id)}
-              onMouseUp={() => handlePressEnd(item.id)}
-              onMouseLeave={handlePressMove}
+              onPointerDown={(e) => handlePointerDown(item.id, e)}
+              onPointerUp={(e) => handlePointerUp(item.id, e)}
+              onPointerCancel={handlePointerCancel}
+              onPointerMove={handlePointerCancel}
               className={`p-3.5 rounded-2xl border transition-all relative ${isMultiSelectMode ? 'cursor-pointer' : ''} ${
                 isDarkMode ? 'bg-[#181818] border-neutral-800' : 'bg-white border-neutral-100'
               } ${isSelected ? 'ring-2 ring-orange-500 bg-orange-500/[0.01]' : ''} ${isLowStock ? 'border-red-500 bg-red-500/[0.02]' : ''}`}
