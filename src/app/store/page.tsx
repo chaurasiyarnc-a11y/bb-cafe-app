@@ -78,6 +78,7 @@ interface FixedAsset {
   cost?: number;
   condition: "Working" | "Needs Repair" | "Broken";
   remarks?: string;
+  type?: string; // 'general' या 'crockery_cutlery'
 }
 
 interface UserPin {
@@ -186,7 +187,9 @@ export default function StoreStockPage() {
   const [editingProduct, setEditingProduct] = useState<InventoryItem | null>(null);
 
   const [formAddProduct, setFormAddProduct] = useState({ name: '', storeQty: '0', kitchenQty: '0', unit: 'Kg', purchasePrice: '', minLimit: '10', category: 'OTHERS', lastPurchaseDate: getLocalDateString(0) });
-  const [formAddAsset, setFormAddAsset] = useState({ name: '', quantity: '1', purchaseDate: '', cost: '', condition: 'Working' as any, remarks: '' });
+  
+  // formAddAsset में 'type' जोड़ दिया गया है ताकि सामान्य और क्रॉकरी में अंतर किया जा सके
+  const [formAddAsset, setFormAddAsset] = useState({ name: '', quantity: '1', purchaseDate: '', cost: '', condition: 'Working' as any, remarks: '', type: 'general' });
 
   const [showStockOutModal, setShowStockOutModal] = useState<boolean>(false);
   const [formStockOut, setFormStockOut] = useState({ item: '', quantity: '', purpose: 'Waste' as any, remarks: '' });
@@ -539,16 +542,25 @@ export default function StoreStockPage() {
     toastMessage("नया उत्पाद जोड़ा गया!", "success");
   };
 
+  // Fixed Asset सेव करते समय उसका प्रकार (Type) भी डेटाबेस में सहेजा जाएगा
   const handleAddAssetSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleanName = formAddAsset.name.toUpperCase().trim();
     if (!cleanName) return;
     const customId = `asset_${Date.now()}`;
     await setDoc(doc(db, "fixed_assets", customId), {
-      id: customId, name: cleanName, quantity: parseFloat(formAddAsset.quantity) || 1, cost: parseFloat(formAddAsset.cost) || 0, condition: formAddAsset.condition, remarks: formAddAsset.remarks
+      id: customId, 
+      name: cleanName, 
+      quantity: parseFloat(formAddAsset.quantity) || 1, 
+      cost: parseFloat(formAddAsset.cost) || 0, 
+      condition: formAddAsset.condition, 
+      remarks: formAddAsset.remarks,
+      type: formAddAsset.type || 'general' // 'general' या 'crockery_cutlery'
     });
     setShowAddAssetModal(false);
-    toastMessage("नया एसेट जोड़ा गया!", "success");
+    // फॉर्म रीसेट
+    setFormAddAsset({ name: '', quantity: '1', purchaseDate: '', cost: '', condition: 'Working', remarks: '', type: 'general' });
+    toastMessage("नया एसेट सफलतापूर्वक जोड़ा गया!", "success");
   };
 
   const handleWasteSubmit = async (e: React.FormEvent) => {
@@ -955,11 +967,25 @@ export default function StoreStockPage() {
           </div>
         )}
 
-        {/* Modal: Add Asset */}
+        {/* Modal: Add Fixed Asset */}
         {showAddAssetModal && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <motion.form onSubmit={handleAddAssetSubmit} className="w-full max-w-sm rounded-3xl p-6 space-y-4 bg-white dark:bg-neutral-900 border">
               <h3 className="text-xs font-black text-green-500 uppercase">अचल संपत्ति (Fixed Asset) जोड़ें</h3>
+              
+              {/* एसेट टाइप सिलेक्टर */}
+              <div className="space-y-1">
+                <label className="text-[9px] text-neutral-400 font-bold uppercase">एसेट का प्रकार (Type)</label>
+                <select 
+                  value={formAddAsset.type} 
+                  onChange={e => setFormAddAsset({ ...formAddAsset, type: e.target.value })} 
+                  className="w-full p-2.5 rounded-xl border dark:bg-neutral-800 text-xs font-bold"
+                >
+                  <option value="general">सामान्य एसेट (General Asset)</option>
+                  <option value="crockery_cutlery">क्रॉकरी और कटलरी (Crockery & Cutlery)</option>
+                </select>
+              </div>
+
               <input type="text" placeholder="एसेट का नाम" value={formAddAsset.name} onChange={e => setFormAddAsset({ ...formAddAsset, name: e.target.value })} className="w-full p-2.5 rounded-xl border dark:bg-neutral-800 text-xs" required />
               <div className="grid grid-cols-2 gap-2 text-xs">
                 <input type="number" placeholder="मात्रा (Qty)" value={formAddAsset.quantity} onChange={e => setFormAddAsset({ ...formAddAsset, quantity: e.target.value })} className="w-full p-2.5 rounded-xl border dark:bg-neutral-800" required />
