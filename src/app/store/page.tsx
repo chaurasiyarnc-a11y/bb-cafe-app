@@ -1,3 +1,5 @@
+
+
 'use client';
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
@@ -365,15 +367,34 @@ export default function StoreStockPage() {
     return values;
   }, [inventory]);
 
+  // गणितीय रिपोर्ट सुधार: टाइमलाइन के डेटा में प्रति-इकाई दर (Price) को भी मैप किया गया है
   const stockFlowTimeline = useMemo(() => {
     const list: any[] = [];
     getFilteredLedgerStats.matchedInward.forEach(log => {
       const item = inventory.find(i => i.id === log.itemId);
-      list.push({ id: log.id, name: log.itemName, qty: log.qty, unit: item?.unit || 'Units', type: 'IN', date: log.date, remarks: log.remarks });
+      list.push({ 
+        id: log.id, 
+        name: log.itemName, 
+        qty: log.qty, 
+        unit: item?.unit || 'Units', 
+        price: item?.purchasePrice || 0, // दर (Price) यहाँ मैप की गई है
+        type: 'IN', 
+        date: log.date, 
+        remarks: log.remarks 
+      });
     });
     getFilteredLedgerStats.matchedKitchen.forEach(log => {
       const item = inventory.find(i => i.id === log.itemId);
-      list.push({ id: log.id, name: log.itemName, qty: log.qty, unit: item?.unit || 'Units', type: 'OUT', date: log.date, remarks: log.remarks });
+      list.push({ 
+        id: log.id, 
+        name: log.itemName, 
+        qty: log.qty, 
+        unit: item?.unit || 'Units', 
+        price: item?.purchasePrice || 0, // दर (Price) यहाँ मैप की गई है
+        type: 'OUT', 
+        date: log.date, 
+        remarks: log.remarks 
+      });
     });
     return list.sort((a, b) => b.date.localeCompare(a.date));
   }, [getFilteredLedgerStats, inventory]);
