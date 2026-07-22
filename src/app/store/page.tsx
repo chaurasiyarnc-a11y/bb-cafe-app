@@ -185,7 +185,7 @@ export default function StoreStockPage() {
   const [showStockOutModal, setShowStockOutModal] = useState<boolean>(false);
   const [formStockOut, setFormStockOut] = useState({ item: '', quantity: '', purpose: 'Waste' as any, remarks: '' });
 
-  const toastMessage = (message: string, type: 'success' | 'error' | 'info' = 'success') = {
+  const toastMessage = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3000);
   };
