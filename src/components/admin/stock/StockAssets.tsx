@@ -142,7 +142,7 @@ export default function StockAssets({
                 {/* कम-ज्यादा (मासिक री-काउंटिंग) और एडिट के लिए नीचे का पैनल */}
                 <div className="flex items-center justify-between border-t border-dashed dark:border-neutral-800/80 pt-2.5 mt-1">
                   
-                  {/* मात्रा कम / ज्यादा करने का कंट्रोलर */}
+                  {/* मात्रा कम / ज्यादा करने का कंट्रोलर (डायनामिक यूनिट प्रदर्शन के साथ) */}
                   <div className="flex items-center gap-1.5 bg-neutral-100 dark:bg-neutral-900 p-1 rounded-xl">
                     <button 
                       onClick={() => handleAdjustQty(asset.id, -1)} 
@@ -151,8 +151,8 @@ export default function StockAssets({
                     >
                       -
                     </button>
-                    <span className="w-10 text-center text-xs font-black dark:text-neutral-200">
-                      {asset.quantity} {asset.type === 'general' ? 'Units' : 'Pcs'}
+                    <span className="w-16 text-center text-xs font-black dark:text-neutral-200">
+                      {asset.quantity} {asset.unit || 'Pcs'}
                     </span>
                     <button 
                       onClick={() => handleAdjustQty(asset.id, 1)} 
