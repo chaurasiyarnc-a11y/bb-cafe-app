@@ -1,7 +1,7 @@
 'use client';
 
-import React from 'react';
-import { Search, Plus, Edit, MinusCircle, PlusCircle } from 'lucide-react';
+import React, { useState, useMemo, useRef } from 'react';
+import { Search, Plus, Edit, MinusCircle, PlusCircle, Printer } from 'lucide-react';
 
 export default function StockGodown({
   isDarkMode, searchQuery, setSearchQuery, isMultiSelectMode, setIsMultiSelectMode, selectedItemIds, setSelectedItemIds,
@@ -9,8 +9,133 @@ export default function StockGodown({
   adjustQty, saveQty, handleToggleMultiSelect, setShowManageCategoriesModal, setShowAddProductModal, setEditingProduct,
   setTransferItem, setShowTransferModal, setConsumeItem, setShowConsumeModal
 }: any) {
+  
+  // लॉन्ग-प्रेस (Long-press) को ट्रैक करने के लिए रेफ़रेंसेज़
+  const longPressTimeout = useRef<any>(null);
+  const isLongPressActive = useRef<boolean>(false);
+
+  // फोन वाइब्रेशन (हैप्टिक फीडबैक) के लिए फ़ंक्शन
+  const triggerHaptic = (ms = 35) => {
+    if (typeof window !== 'undefined' && window.navigator && window.navigator.vibrate) {
+      window.navigator.vibrate(ms);
+    }
+  };
+
+  // लॉन्ग-प्रेस शुरू होने पर टाइमर चालू करना (600ms तक दबाए रखने पर)
+  const handlePressStart = (itemId: string) => {
+    isLongPressActive.current = false;
+    longPressTimeout.current = setTimeout(() => {
+      isLongPressActive.current = true;
+      setIsMultiSelectMode(true);
+      handleToggleMultiSelect(itemId);
+      triggerHaptic(50); // लॉन्ग-प्रेस सफल होने पर वाइब्रेशन फ़ीडबैक
+    }, 600);
+  };
+
+  // उंगली उठाने पर टाइमर बंद करना
+  const handlePressEnd = (itemId: string) => {
+    if (longPressTimeout.current) {
+      clearTimeout(longPressTimeout.current);
+    }
+    // यदि यह केवल एक त्वरित टच (Normal Click) था
+    if (!isLongPressActive.current) {
+      if (isMultiSelectMode) {
+        handleToggleMultiSelect(itemId);
+      }
+    }
+  };
+
+  // स्क्रॉल या उंगली फिसलने पर लॉन्ग-प्रेस निरस्त करना
+  const handlePressMove = () => {
+    if (longPressTimeout.current) {
+      clearTimeout(longPressTimeout.current);
+    }
+  };
+
+  // --- प्रिंटिंग हैंडलर फ़ंक्शन (मात्रा, कीमत, कुल मूल्य और ग्रैंड टोटल के साथ) ---
+  const handlePrintGodown = () => {
+    const printWindow = window.open('', '_blank', 'width=600,height=800');
+    if (!printWindow) {
+      alert("पॉपअप अवरुद्ध हो गया है! कृपया पॉपअप की अनुमति दें।");
+      return;
+    }
+
+    const filterName = selectedCategoryFilter === "All" ? "गोदाम स्टॉक सूची (All Items)" : `कैटेगरी: ${selectedCategoryFilter}`;
+
+    // कुल ग्रैंड टोटल कैलकुलेशन
+    const grandTotal = filteredInventory.reduce((sum: number, item: any) => {
+      const qty = Number(item.storeQty || 0);
+      const price = Number(item.purchasePrice || 0);
+      return sum + (qty * price);
+    }, 0);
+
+    const rows = filteredInventory.map((item: any) => {
+      const qty = Number(item.storeQty || 0);
+      const price = Number(item.purchasePrice || 0);
+      const total = qty * price;
+      return `
+        <tr>
+          <td style="padding:10px; border-bottom:1px solid #ddd; font-weight:bold; font-size:12px;">${item.name}</td>
+          <td style="padding:10px; border-bottom:1px solid #ddd; text-align:center; font-size:12px;">${qty} ${item.unit || 'Kg'}</td>
+          <td style="padding:10px; border-bottom:1px solid #ddd; text-align:center; font-size:12px;">₹${price.toLocaleString()}</td>
+          <td style="padding:10px; border-bottom:1px solid #ddd; text-align:right; font-weight:bold; color:#FF6B00; font-size:12px;">₹${total.toLocaleString()}</td>
+        </tr>
+      `;
+    }).join('');
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Godown_Stock_Sheet</title>
+          <style>
+            @media print {
+              body { margin: 0; padding: 15px; }
+            }
+          </style>
+        </head>
+        <body style="font-family:sans-serif; padding:20px; color:#333;">
+          <h2 style="color:#FF6B00; text-align:center; text-transform: uppercase; margin-bottom: 5px;">BUM BUM CAFE</h2>
+          <h3 style="text-align:center; text-transform: uppercase; margin-top: 0; color:#555; border-bottom:2px solid #FF6B00; padding-bottom: 8px;">${filterName}</h3>
+          <p style="text-align:center; color:#666; font-size:11px; margin-top:-5px;">Generated on: ${new Date().toLocaleString('en-IN')}</p>
+          
+          <table style="width:100%; border-collapse:collapse; margin-top:15px;">
+            <thead>
+              <tr style="background:#FF6B00; color:white;">
+                <th style="padding:10px; text-align:left; font-size:12px;">Item Name (सामग्री)</th>
+                <th style="padding:10px; text-align:center; font-size:12px;">Godown Qty (मात्रा)</th>
+                <th style="padding:10px; text-align:center; font-size:12px;">Price (खरीद दर)</th>
+                <th style="padding:10px; text-align:right; font-size:12px;">Total (कुल मूल्य)</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rows.length > 0 ? rows : '<tr><td colspan="4" style="text-align:center; padding:20px; font-size:12px;">कोई सामान उपलब्ध नहीं है</td></tr>'}
+            </tbody>
+          </table>
+          
+          <div style="margin-top:20px; text-align:right; font-size:14px; font-weight:bold; border-top:2px solid #FF6B00; padding-top:10px;">
+            ग्रैंड टोटल (Grand Total): <span style="color:#FF6B00; font-size:16px;">₹${grandTotal.toLocaleString()}</span>
+          </div>
+          <script>window.onload = function() { window.print(); }</script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
+
   return (
     <div className="space-y-4">
+      
+      {/* क्रोम और सफारी में हॉरिजॉन्टल स्लाइडर का स्क्रॉलबार पूरी तरह छुपाने के लिए स्टाइल */}
+      <style dangerouslySetInnerHTML={{__html: `
+        .no-scrollbar::-webkit-scrollbar {
+          display: none;
+        }
+        .no-scrollbar {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
+      `}} />
+
       {/* Search and Filters */}
       <div className={`sticky top-[64px] z-30 py-2.5 space-y-2.5 backdrop-blur-md ${isDarkMode ? 'bg-[#0E0E0E]/90' : 'bg-[#FAFAFA]/90'} border-b border-dashed ${isDarkMode ? 'border-neutral-800' : 'border-neutral-200'}`}>
         <div className="flex items-center gap-2">
@@ -21,26 +146,32 @@ export default function StockGodown({
               className={`w-full pl-9 pr-4 py-2 text-xs rounded-xl border ${isDarkMode ? 'bg-neutral-900 border-neutral-800 text-white' : 'bg-white border-neutral-200 text-neutral-950'}`}
             />
           </div>
-          <button 
-            onClick={() => { setIsMultiSelectMode(!isMultiSelectMode); setSelectedItemIds([]); }}
-            className={`px-3 py-2 text-xs font-bold rounded-xl border transition-all ${
-              isMultiSelectMode ? 'bg-orange-500 text-white border-orange-500' : isDarkMode ? 'bg-neutral-800 border-neutral-700 text-neutral-300' : 'bg-white border-neutral-200 text-neutral-700'
-            }`}
-          >
-            {isMultiSelectMode ? "Stop Select" : "Multi Select"}
-          </button>
+          {/* केवल तब "Cancel/चयन रद्द करें" बटन दिखेगा जब मल्टी-सेलेक्ट मोड ऑन होगा */}
+          {isMultiSelectMode && (
+            <button 
+              onClick={() => { setIsMultiSelectMode(false); setSelectedItemIds([]); }}
+              className="px-3 py-2 text-xs font-bold rounded-xl bg-red-500 hover:bg-red-600 text-white transition-all shadow"
+            >
+              रद्द करें
+            </button>
+          )}
         </div>
 
         <div className="space-y-1.5">
           <div className="flex justify-between items-center px-0.5">
             <span className="text-[8px] font-black uppercase text-neutral-400 tracking-wider">क्लिक कर फ़िल्टर करें:</span>
-            <button onClick={() => setShowManageCategoriesModal(true)} className="text-[8px] text-orange-500 hover:underline uppercase font-black">🛠️ Manage Categories</button>
+            <div className="flex gap-2.5">
+              {/* नया प्रिंट बटन */}
+              <button onClick={handlePrintGodown} className="text-[8px] text-blue-500 hover:underline uppercase font-black flex items-center gap-0.5">🖨️ प्रिंट लिस्ट</button>
+              <button onClick={() => setShowManageCategoriesModal(true)} className="text-[8px] text-orange-500 hover:underline uppercase font-black">🛠️ Manage Categories</button>
+            </div>
           </div>
           
-          <div className="flex flex-wrap gap-1.5 w-full">
+          {/* स्मूथ हॉरिजॉन्टल स्लाइडर (हाइड स्क्रॉलबार के साथ) */}
+          <div className="flex gap-1.5 overflow-x-auto py-1 w-full no-scrollbar">
             <button
               onClick={() => setSelectedCategoryFilter("All")}
-              className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-wider border transition-all ${
+              className={`px-3 py-1.5 rounded-full text-[9px] font-black uppercase tracking-wider border shrink-0 transition-all ${
                 selectedCategoryFilter === "All" ? "bg-orange-500 border-orange-500 text-white" : isDarkMode ? "bg-neutral-900 border-neutral-800 text-neutral-400" : "bg-neutral-100 border-neutral-200 text-neutral-600"
               }`}
             >
@@ -49,7 +180,7 @@ export default function StockGodown({
             {visibleCategories.map((cat: any) => (
               <button
                 key={cat.id} onClick={() => setSelectedCategoryFilter(cat.name)}
-                className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-wider border transition-all ${
+                className={`px-3 py-1.5 rounded-full text-[9px] font-black uppercase tracking-wider border shrink-0 transition-all ${
                   selectedCategoryFilter === cat.name ? "bg-orange-500 border-orange-500 text-white" : isDarkMode ? "bg-neutral-900 border-neutral-800 text-neutral-400" : "bg-neutral-100 border-neutral-200 text-neutral-600"
                 }`}
               >
@@ -64,7 +195,7 @@ export default function StockGodown({
         <Plus size={14} /> Add New Product (सामान जोड़ें)
       </button>
 
-      {/* Item List */}
+      {/* Item List (आइटम कार्ड्स) */}
       <div className="space-y-2.5">
         {filteredInventory.map((item: any) => {
           const isSelected = selectedItemIds.includes(item.id);
@@ -74,10 +205,17 @@ export default function StockGodown({
 
           return (
             <div 
-              key={item.id} onClick={() => { if (isMultiSelectMode) handleToggleMultiSelect(item.id); }}
+              key={item.id}
+              onTouchStart={() => handlePressStart(item.id)}
+              onTouchEnd={() => handlePressEnd(item.id)}
+              onTouchMove={handlePressMove}
+              onMouseDown={() => handlePressStart(item.id)}
+              onMouseUp={() => handlePressEnd(item.id)}
+              onMouseLeave={handlePressMove}
               className={`p-3.5 rounded-2xl border transition-all relative ${isMultiSelectMode ? 'cursor-pointer' : ''} ${
                 isDarkMode ? 'bg-[#181818] border-neutral-800' : 'bg-white border-neutral-100'
               } ${isSelected ? 'ring-2 ring-orange-500 bg-orange-500/[0.01]' : ''} ${isLowStock ? 'border-red-500 bg-red-500/[0.02]' : ''}`}
+              style={{ userSelect: 'none', WebkitUserSelect: 'none' }} // लॉन्ग प्रेस के समय मोबाइल पर टेक्स्ट सेलेक्ट होने से रोकने के लिए
             >
               {isMultiSelectMode && (
                 <div className="absolute top-3.5 right-3.5 w-4 h-4 rounded-full border border-neutral-300 flex items-center justify-center z-10">
