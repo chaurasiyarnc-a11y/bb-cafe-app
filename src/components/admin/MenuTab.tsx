@@ -1,8 +1,8 @@
 'use client';
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { db } from '../../lib/firebase'; // अपनी लोकेशन के अनुसार पाथ सेट करें
-import { collection, addDoc, doc, updateDoc, deleteDoc, getDocs } from 'firebase/firestore';
-import { Plus, Trash, Edit, Eye, EyeOff, X, BookOpen, Search, Loader2 } from 'lucide-react';
+import { collection, addDoc, doc, updateDoc, deleteDoc, onSnapshot, setDoc } from 'firebase/firestore';
+import { Plus, Trash, Edit, Eye, EyeOff, X, BookOpen, Search, Loader2, ImageIcon, Settings } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const ADD_CATEGORIES = ["Special Pizza", "Special Thali", "Paneer Special", "Special Mix veg", "Fast Food", "Super Cool", "Indian Bread", "Special Rice"];
@@ -13,6 +13,9 @@ interface MenuTabProps {
 }
 
 export default function MenuTab({ menu, categories }: MenuTabProps) {
+  // --- मुख्य सब-नेविगेशन टैब (items या categories) ---
+  const [menuSubTab, setMenuSubTab] = useState<'items' | 'categories'>('items');
+
   // सर्च और यूआई स्टेट्स
   const [menuSearchQuery, setMenuSearchQuery] = useState("");
   const [showAddForm, setShowAddForm] = useState(false);
@@ -48,6 +51,44 @@ export default function MenuTab({ menu, categories }: MenuTabProps) {
   const [sopProduct, setSopProduct] = useState<any>(null);
   const [sopRecipeText, setSopRecipeText] = useState("");
 
+  // --- कैटेगरी मैनेजमेंट स्टेट्स (नया) ---
+  const [newCatName, setNewCatName] = useState("");
+  const [newCatCoverUrl, setNewCatCoverUrl] = useState("");
+  const [editingCatId, setEditingCatId] = useState<string | null>(null);
+  const [editingCatName, setEditingCatName] = useState("");
+  const [editingCatCoverUrl, setEditingCatCoverUrl] = useState("");
+  const [showAllCategory, setShowAllCategory] = useState(true);
+
+  // 'All' कैटेगरी विजिबिलिटी को सिंक करना
+  useEffect(() => {
+    const unsubStore = onSnapshot(doc(db, "settings", "store"), (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        if (data.showAllCategory !== undefined) {
+          setShowAllCategory(data.showAllCategory);
+        } else {
+          setShowAllCategory(true);
+        }
+      }
+    });
+    return () => unsubStore();
+  }, []);
+
+  // --- SMART CATEGORY DETECTOR (मिसिंग कैटेगरीज खोजना) ---
+  const missingCategories = useMemo(() => {
+    if (!menu || menu.length === 0) return [];
+    // प्रोडक्ट्स (menu) में उपयोग किए गए सभी यूनिक कैटेगरी नाम
+    const uniqueProdCats = Array.from(
+      new Set(menu.map(p => p.category?.trim()).filter(Boolean))
+    );
+    // वह कैटेगरी जो categories कलेक्शन की लिस्ट में नहीं हैं
+    return uniqueProdCats.filter(prodCat => {
+      return !categories.some(
+        cat => cat.name?.trim().toLowerCase() === prodCat.toLowerCase()
+      );
+    });
+  }, [menu, categories]);
+
   const categoryOptions = categories.length > 0 
     ? categories.map(c => c.name)
     : ADD_CATEGORIES;
@@ -61,8 +102,70 @@ export default function MenuTab({ menu, categories }: MenuTabProps) {
     );
   }, [menu, menuSearchQuery]);
 
-  // --- CRUD एक्शन्स (डेटाबेस राइट्स) ---
+  // --- CATEGORY ACTIONS ---
+  const handleAddCategory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCatName.trim()) return toast.error("कृपया कैटेगरी का नाम लिखें!");
+    try {
+      await addDoc(collection(db, "categories"), {
+        name: newCatName.trim(),
+        coverUrl: newCatCoverUrl.trim() || "",
+        isVisible: true,
+        timestamp: new Date()
+      });
+      setNewCatName("");
+      setNewCatCoverUrl("");
+      toast.success("नई कैटेगरी सफलतापूर्वक जोड़ी गई! 📁");
+    } catch (err) { toast.error("कैटेगरी जोड़ने में त्रुटि आई।"); }
+  };
 
+  const handleUpdateCategory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingCatId) return;
+    if (!editingCatName.trim()) return toast.error("कैटेगरी का नाम खाली नहीं होना चाहिए!");
+    try {
+      await updateDoc(doc(db, "categories", editingCatId), {
+        name: editingCatName.trim(),
+        coverUrl: editingCatCoverUrl.trim()
+      });
+      setEditingCatId(null);
+      setEditingCatName("");
+      setEditingCatCoverUrl("");
+      toast.success("कैटेगरी सफलतापूर्वक अपडेट की गई! 📁✨");
+    } catch (err) { toast.error("कैटेगरी अपडेट करने में त्रुटि आई।"); }
+  };
+
+  const handleDeleteCategory = async (id: string) => {
+    if (!confirm("क्या आप सच में इस कैटेगरी को डिलीट करना चाहते हैं? इससे उस कैटेगरी के डिशेस डिलीट नहीं होंगे।")) return;
+    try {
+      await deleteDoc(doc(db, "categories", id));
+      toast.success("कैटेगरी डिलीट कर दी गई!");
+    } catch (err) { toast.error("डिलीट करने में त्रुटि आई।"); }
+  };
+
+  const toggleCategoryVisibility = async (cat: any) => {
+    try {
+      await updateDoc(doc(db, "categories", cat.id), {
+        isVisible: cat.isVisible !== false ? false : true
+      });
+      toast.success("कैटेगरी स्टेटस अपडेट किया गया!");
+    } catch (err) { toast.error("स्टेटस बदलने में त्रुटि आई।"); }
+  };
+
+  const toggleShowAllCategory = async () => {
+    try {
+      const nextVal = !showAllCategory;
+      await setDoc(doc(db, "settings", "store"), {
+        showAllCategory: nextVal
+      }, { merge: true });
+      setShowAllCategory(nextVal);
+      toast.success("'All' कैटेगरी टैब स्टेटस अपडेट किया गया!");
+    } catch (err) {
+      toast.error("'All' कैटेगरी स्टेटस बदलने में त्रुटि आई।");
+    }
+  };
+
+  // --- DISH ACTIONS ---
   const handleAddProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newName || !newCategory || !newImage) {
@@ -235,9 +338,6 @@ export default function MenuTab({ menu, categories }: MenuTabProps) {
     ];
 
     try {
-      let importedCount = 0;
-      let skippedCount = 0;
-
       for (const item of data) {
         const matched = menu.find(m => String(m.name).toLowerCase().trim() === item.name.toLowerCase().trim());
         if (matched) {
@@ -247,13 +347,11 @@ export default function MenuTab({ menu, categories }: MenuTabProps) {
             image: item.image,
             variants: item.variants || null
           });
-          skippedCount++;
         } else {
           await addDoc(collection(db, "products"), {
             ...item,
             isVisible: true
           });
-          importedCount++;
         }
       }
       toast.dismiss("import");
@@ -352,135 +450,314 @@ export default function MenuTab({ menu, categories }: MenuTabProps) {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-2">
-        <button onClick={handleBulkImport} type="button" className="w-full bg-yellow-400 text-black py-4 rounded-2xl font-black text-sm flex items-center justify-center gap-2 active:scale-95 transition-all shadow-xl">
-          📥 IMPORT ALL 80+ PDF MENU ITEMS
+      {/* --- मुख्य सब-टैब बटन्स --- */}
+      <div className="flex gap-2 border-b border-white/5 pb-2">
+        <button
+          onClick={() => setMenuSubTab('items')}
+          className={`flex-1 py-3 rounded-2xl font-black text-xs uppercase tracking-wider transition-all duration-150 ${
+            menuSubTab === 'items' 
+              ? 'bg-orange-500 text-white shadow-lg' 
+              : 'bg-white/5 text-gray-400 hover:text-white'
+          }`}
+        >
+          🍔 Menu Items ({menu.length})
         </button>
-        
-        <div className="grid grid-cols-2 gap-2">
-          <button onClick={handleMergeDuplicates} className="bg-indigo-700 hover:bg-indigo-800 text-white py-4 rounded-2xl font-black text-xs uppercase flex items-center justify-center gap-1.5 shadow active:scale-95 transition-all">
-            🔍 Merge Existing Duplicates
-          </button>
-          <button onClick={() => { setShowAddForm(!showAddForm); setEditingProduct(null); }} className="bg-orange-500/10 text-orange-500 border border-orange-500/20 py-4 rounded-2xl font-black text-xs flex items-center justify-center gap-1.5 hover:bg-orange-500/20 active:scale-95 transition-all uppercase">
-            <Plus size={16}/> {showAddForm ? "CLOSE FORM" : "ADD NEW ITEM"}
-          </button>
-        </div>
+        <button
+          onClick={() => setMenuSubTab('categories')}
+          className={`flex-1 py-3 rounded-2xl font-black text-xs uppercase tracking-wider transition-all duration-150 ${
+            menuSubTab === 'categories' 
+              ? 'bg-orange-500 text-white shadow-lg' 
+              : 'bg-white/5 text-gray-400 hover:text-white'
+          }`}
+        >
+          📁 Categories ({categories.length})
+        </button>
       </div>
 
-      {/* डिश सर्च बार */}
-      <div className="sticky top-[73px] z-30 bg-[#050505]/95 backdrop-blur-md py-4 border-b border-white/5 rounded-b-3xl shadow-lg">
-        <div className="relative group max-w-lg mx-auto">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-          <input 
-            type="text" 
-            placeholder="Search item name or category..." 
-            value={menuSearchQuery} 
-            onChange={(e) => setMenuSearchQuery(e.target.value)}
-            className="w-full bg-white text-black py-3 px-11 rounded-xl outline-none text-xs font-semibold"
-          />
+      {/* ==================== SUB-TAB 1: MENU ITEMS LIST ==================== */}
+      {menuSubTab === 'items' && (
+        <div className="space-y-4">
+          <div className="flex flex-col gap-2">
+            <button onClick={handleBulkImport} type="button" className="w-full bg-yellow-400 text-black py-4 rounded-2xl font-black text-sm flex items-center justify-center gap-2 active:scale-95 transition-all shadow-xl">
+              📥 IMPORT ALL 80+ PDF MENU ITEMS
+            </button>
+            
+            <div className="grid grid-cols-2 gap-2">
+              <button onClick={handleMergeDuplicates} className="bg-indigo-700 hover:bg-indigo-800 text-white py-4 rounded-2xl font-black text-xs uppercase flex items-center justify-center gap-1.5 shadow active:scale-95 transition-all">
+                🔍 Merge Existing Duplicates
+              </button>
+              <button onClick={() => { setShowAddForm(!showAddForm); setEditingProduct(null); }} className="bg-orange-500/10 text-orange-500 border border-orange-500/20 py-4 rounded-2xl font-black text-xs flex items-center justify-center gap-1.5 hover:bg-orange-500/20 active:scale-95 transition-all uppercase">
+                <Plus size={16}/> {showAddForm ? "CLOSE FORM" : "ADD NEW ITEM"}
+              </button>
+            </div>
+          </div>
+
+          {/* डिश सर्च बार */}
+          <div className="sticky top-[73px] z-30 bg-[#050505]/95 backdrop-blur-md py-4 border-b border-white/5 rounded-b-3xl shadow-lg">
+            <div className="relative group max-w-lg mx-auto">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+              <input 
+                type="text" 
+                placeholder="Search item name or category..." 
+                value={menuSearchQuery} 
+                onChange={(e) => setMenuSearchQuery(e.target.value)}
+                className="w-full bg-white text-black py-3 px-11 rounded-xl outline-none text-xs font-semibold"
+              />
+            </div>
+          </div>
+
+          {/* --- ADD NEW PRODUCT FORM --- */}
+          {showAddForm && (
+            <form onSubmit={handleAddProduct} className="bg-white/[0.02] border border-white/5 p-6 rounded-[2.5rem] space-y-4">
+              <h3 className="text-lg font-black text-orange-500 italic uppercase">Add Product Form</h3>
+              
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-gray-400 uppercase">Item Name</label>
+                <input type="text" placeholder="e.g., Cheese Corn Pizza" value={newName} onChange={(e) => setNewName(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-white" required />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-gray-400 uppercase">Category</label>
+                <select value={newCategory} onChange={(e) => setNewCategory(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-white cursor-pointer" required>
+                  {categoryOptions.filter(c => c !== "All" && c !== "DIY Pizza").map(cat => (
+                    <option key={cat} value={cat} className="bg-[#111]">{cat}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-gray-400 uppercase">Image URL</label>
+                <input type="url" placeholder="Paste image url link..." value={newImage} onChange={(e) => setNewImage(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-white" required />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-gray-400 uppercase">Portion Option Type</label>
+                <select value={variantType} onChange={(e: any) => setVariantType(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-white cursor-pointer">
+                  <option value="none" className="bg-[#111]">None (Single Price)</option>
+                  <option value="half_full" className="bg-[#111]">Half / Full</option>
+                  <option value="plain_butter" className="bg-[#111]">Plain / Butter</option>
+                  <option value="pizza_sizes" className="bg-[#111]">Pizza Sizes</option>
+                </select>
+              </div>
+
+              {variantType === 'none' && (
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-gray-404 uppercase">Price (₹)</label>
+                  <input type="number" placeholder="Item Price" value={newPrice} onChange={(e) => setNewPrice(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-white" />
+                </div>
+              )}
+
+              {(variantType === 'half_full' || variantType === 'plain_butter') && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-gray-400 uppercase">Half / Plain Price (₹)</label>
+                    <input type="number" placeholder="Price" value={halfPrice} onChange={(e) => setHalfPrice(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-white" />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-gray-400 uppercase">Full / Butter Price (₹)</label>
+                    <input type="number" placeholder="Price" value={fullPrice} onChange={(e) => setFullPrice(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-white" />
+                  </div>
+                </div>
+              )}
+
+              {variantType === 'pizza_sizes' && (
+                <div className="space-y-3 bg-[#111]/40 p-4 rounded-2xl border border-white/5">
+                  <p className="text-[10px] text-orange-400 font-extrabold uppercase font-sans">Prices (Leave blank if unavailable):</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Small (₹)</label><input type="number" value={priceSmall} onChange={(e) => setPriceSmall(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-white text-xs font-bold" /></div>
+                    <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Medium (₹)</label><input type="number" value={priceMedium} onChange={(e) => setPriceMedium(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-white text-xs font-bold" /></div>
+                    <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Large (₹)</label><input type="number" value={priceLarge} onChange={(e) => setPriceLarge(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-white text-xs font-bold" /></div>
+                    <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Extra Large (₹)</label><input type="number" value={priceXL} onChange={(e) => setPriceXL(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-white text-xs font-bold" /></div>
+                  </div>
+                </div>
+              )}
+
+              <button type="submit" className="w-full bg-green-600 text-white p-4 rounded-xl font-black text-sm uppercase">Save Product</button>
+            </form>
+          )}
+
+          {/* डिशेज की रेंडरिंग लिस्ट */}
+          <div className="space-y-3 pt-2">
+            {searchedMenu.length === 0 ? (
+              <p className="text-center text-xs font-black uppercase text-gray-400 py-10">No matching dishes found...</p>
+            ) : (
+              searchedMenu.map((item) => (
+                <div key={item.id} className="bg-white/[0.02] p-4 rounded-3xl border border-white/5 flex items-center gap-4 hover:bg-white/[0.04] transition-all">
+                  <img src={item.image} className="w-16 h-16 rounded-2xl object-cover opacity-80" alt={item.name} />
+                  <div className="flex-1">
+                    <h4 className="font-bold text-sm">{item.name}</h4>
+                    <p className="text-orange-500 font-black text-xs italic capitalize">{item.category}</p>
+                    <p className="text-orange-500 font-black text-sm mt-1">{getAdminDisplayPrice(item)}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button 
+                      onClick={() => { setSopProduct(item); setSopRecipeText(item.recipe || ""); }} 
+                      className="p-3 bg-purple-500/10 text-purple-500 rounded-xl flex items-center gap-1.5"
+                    >
+                      <BookOpen size={16}/> <span className="text-[10px] font-black">SOP</span>
+                    </button>
+                    <button onClick={() => startEditing(item)} className="p-3 bg-blue-500/10 text-blue-500 rounded-xl"><Edit size={18}/></button>
+                    <button onClick={() => toggleItemVisibility(item.id, item.isVisible !== false)} className={`p-3 rounded-xl transition-all ${item.isVisible !== false ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
+                      {item.isVisible !== false ? <Eye size={18}/> : <EyeOff size={18}/>}
+                    </button>
+                    <button onClick={() => handleDeleteProduct(item.id)} className="p-3 bg-red-500/10 text-red-500 rounded-xl"><Trash size={18}/></button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
         </div>
-      </div>
-
-      {/* --- ADD NEW PRODUCT FORM --- */}
-      {showAddForm && (
-        <form onSubmit={handleAddProduct} className="bg-white/[0.02] border border-white/5 p-6 rounded-[2.5rem] space-y-4">
-          <h3 className="text-lg font-black text-orange-500 italic uppercase">Add Product Form</h3>
-          
-          <div className="space-y-1">
-            <label className="text-xs font-bold text-gray-400 uppercase">Item Name</label>
-            <input type="text" placeholder="e.g., Cheese Corn Pizza" value={newName} onChange={(e) => setNewName(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-white" required />
-          </div>
-
-          <div className="space-y-1">
-            <label className="text-xs font-bold text-gray-400 uppercase">Category</label>
-            <select value={newCategory} onChange={(e) => setNewCategory(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-white cursor-pointer" required>
-              {categoryOptions.filter(c => c !== "All" && c !== "DIY Pizza").map(cat => (
-                <option key={cat} value={cat} className="bg-[#111]">{cat}</option>
-              ))}
-            </select>
-          </div>
-
-          <div className="space-y-1">
-            <label className="text-xs font-bold text-gray-400 uppercase">Image URL</label>
-            <input type="url" placeholder="Paste image url link..." value={newImage} onChange={(e) => setNewImage(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-white" required />
-          </div>
-
-          <div className="space-y-1">
-            <label className="text-xs font-bold text-gray-400 uppercase">Portion Option Type</label>
-            <select value={variantType} onChange={(e: any) => setVariantType(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-white cursor-pointer">
-              <option value="none" className="bg-[#111]">None (Single Price)</option>
-              <option value="half_full" className="bg-[#111]">Half / Full</option>
-              <option value="plain_butter" className="bg-[#111]">Plain / Butter</option>
-              <option value="pizza_sizes" className="bg-[#111]">Pizza Sizes</option>
-            </select>
-          </div>
-
-          {variantType === 'none' && (
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-gray-400 uppercase">Price (₹)</label>
-              <input type="number" placeholder="Item Price" value={newPrice} onChange={(e) => setNewPrice(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-white" />
-            </div>
-          )}
-
-          {(variantType === 'half_full' || variantType === 'plain_butter') && (
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-gray-400 uppercase">Half / Plain Price (₹)</label>
-                <input type="number" placeholder="Price" value={halfPrice} onChange={(e) => setHalfPrice(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-white" />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-gray-400 uppercase">Full / Butter Price (₹)</label>
-                <input type="number" placeholder="Price" value={fullPrice} onChange={(e) => setFullPrice(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-sm font-bold text-white" />
-              </div>
-            </div>
-          )}
-
-          {variantType === 'pizza_sizes' && (
-            <div className="space-y-3 bg-[#111]/40 p-4 rounded-2xl border border-white/5">
-              <p className="text-[10px] text-orange-400 font-extrabold uppercase font-sans">Prices (Leave blank if unavailable):</p>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Small (₹)</label><input type="number" value={priceSmall} onChange={(e) => setPriceSmall(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-white text-xs font-bold" /></div>
-                <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Medium (₹)</label><input type="number" value={priceMedium} onChange={(e) => setPriceMedium(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-white text-xs font-bold" /></div>
-                <div className="space-y-1"><label className="text-xs font-bold text-gray-404 uppercase">Large (₹)</label><input type="number" value={priceLarge} onChange={(e) => setPriceLarge(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-white text-xs font-bold" /></div>
-                <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Extra Large (₹)</label><input type="number" value={priceXL} onChange={(e) => setPriceXL(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 outline-none text-white text-xs font-bold" /></div>
-              </div>
-            </div>
-          )}
-
-          <button type="submit" className="w-full bg-green-600 text-white p-4 rounded-xl font-black text-sm uppercase">Save Product</button>
-        </form>
       )}
 
-      {/* डिशेज की रेंडरिंग लिस्ट */}
-      <div className="space-y-3 pt-2">
-        {searchedMenu.length === 0 ? (
-          <p className="text-center text-xs font-black uppercase text-gray-400 py-10">No matching dishes found...</p>
-        ) : (
-          searchedMenu.map((item) => (
-            <div key={item.id} className="bg-white/[0.02] p-4 rounded-3xl border border-white/5 flex items-center gap-4 hover:bg-white/[0.04] transition-all">
-              <img src={item.image} className="w-16 h-16 rounded-2xl object-cover opacity-80" alt={item.name} />
-              <div className="flex-1">
-                <h4 className="font-bold text-sm">{item.name}</h4>
-                <p className="text-orange-500 font-black text-xs italic capitalize">{item.category}</p>
-                <p className="text-orange-500 font-black text-sm mt-1">{getAdminDisplayPrice(item)}</p>
-              </div>
-              <div className="flex items-center gap-2">
-                <button 
-                  onClick={() => { setSopProduct(item); setSopRecipeText(item.recipe || ""); }} 
-                  className="p-3 bg-purple-500/10 text-purple-500 rounded-xl flex items-center gap-1.5"
-                >
-                  <BookOpen size={16}/> <span className="text-[10px] font-black">SOP</span>
-                </button>
-                <button onClick={() => startEditing(item)} className="p-3 bg-blue-500/10 text-blue-500 rounded-xl"><Edit size={18}/></button>
-                <button onClick={() => toggleItemVisibility(item.id, item.isVisible !== false)} className={`p-3 rounded-xl transition-all ${item.isVisible !== false ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
-                  {item.isVisible !== false ? <Eye size={18}/> : <EyeOff size={18}/>}
-                </button>
-                <button onClick={() => handleDeleteProduct(item.id)} className="p-3 bg-red-500/10 text-red-500 rounded-xl"><Trash size={18}/></button>
+      {/* ==================== SUB-TAB 2: [नया जोड़] CATEGORIES MANAGEMENT ==================== */}
+      {menuSubTab === 'categories' && (
+        <div className="space-y-6 pt-2">
+          {/* 'All' Category Toggle Switch */}
+          <div className="bg-white/[0.02] border border-white/5 p-4 rounded-2xl flex justify-between items-center text-xs text-left">
+            <div>
+              <h4 className="font-black text-gray-200">Show "All" Tab on Homepage</h4>
+              <p className="text-[9px] text-gray-500 font-bold uppercase mt-0.5 font-mono">होमपेज पर 'सभी (All)' टैब को दिखाना या छुपाना यहाँ से सेट करें।</p>
+            </div>
+            <button 
+              onClick={toggleShowAllCategory} 
+              className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase transition-all ${
+                showAllCategory ? 'bg-green-500/20 text-green-500 border border-green-500/30' : 'bg-red-500/20 text-red-500 border border-red-500/30'
+              }`}
+            >
+              {showAllCategory ? "SHOWING" : "HIDDEN"}
+            </button>
+          </div>
+
+          {/* रीयल-टाइम मिसिंग कैटेगरी फाइंडर */}
+          {missingCategories.length > 0 && (
+            <div className="bg-yellow-500/5 border border-yellow-500/20 p-5 rounded-[2rem] space-y-3 text-left">
+              <h4 className="text-xs font-black text-yellow-500 uppercase flex items-center gap-1.5">
+                ⚠️ Missing Categories Found in Products ({missingCategories.length})
+              </h4>
+              <p className="text-[9px] text-gray-400 font-bold uppercase leading-relaxed font-mono">
+                ये कैटेगरीज आपके प्रोडक्ट्स में उपयोग की गई हैं, लेकिन "categories" लिस्ट में नहीं हैं। इन्हें यहाँ से सिंक करें:
+              </p>
+              <div className="flex flex-wrap gap-2 pt-1">
+                {missingCategories.map(missingCat => (
+                  <button
+                    key={missingCat}
+                    onClick={async () => {
+                      try {
+                        await addDoc(collection(db, "categories"), {
+                          name: missingCat,
+                          coverUrl: "",
+                          isVisible: true,
+                          timestamp: new Date()
+                        });
+                        toast.success(`Category "${missingCat}" synced successfully!`);
+                      } catch (err) {
+                        toast.error("Error syncing category");
+                      }
+                    }}
+                    className="bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-500 border border-yellow-500/20 px-3 py-1.5 rounded-xl text-[9px] font-black uppercase transition-all"
+                  >
+                    ➕ Sync "{missingCat}"
+                  </button>
+                ))}
               </div>
             </div>
-          ))
-        )}
-      </div>
+          )}
+
+          {/* कैटेगरी फॉर्म (Add / Edit Form Switch) */}
+          {!editingCatId ? (
+            <form onSubmit={handleAddCategory} className="bg-[#020202] border border-white/5 p-6 rounded-[2.5rem] space-y-4 text-left">
+              <h3 className="text-sm font-black text-orange-500 uppercase flex items-center gap-1.5">
+                <ImageIcon size={14}/> Add New Category
+              </h3>
+              <div className="space-y-3 text-xs">
+                <input 
+                  type="text" 
+                  placeholder="Category Name (e.g. Special Pizza, Momos)" 
+                  value={newCatName} 
+                  onChange={(e) => setNewCatName(e.target.value)} 
+                  className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs text-white outline-none" 
+                  required 
+                />
+                <input 
+                  type="url" 
+                  placeholder="Category Cover Image URL Link" 
+                  value={newCatCoverUrl} 
+                  onChange={(e) => setNewCatCoverUrl(e.target.value)} 
+                  className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs text-white outline-none" 
+                />
+              </div>
+              <button type="submit" className="w-full bg-green-600 text-white p-3.5 rounded-xl font-black text-xs uppercase hover:bg-green-700 transition-all">
+                Add Category
+              </button>
+            </form>
+          ) : (
+            <form onSubmit={handleUpdateCategory} className="bg-orange-500/5 border border-orange-500/20 p-6 rounded-[2.5rem] space-y-4 text-left">
+              <h3 className="text-sm font-black text-orange-500 uppercase flex items-center gap-1.5">
+                <Edit size={14}/> Edit Category / अपडेट
+              </h3>
+              <div className="space-y-3 text-xs">
+                <input 
+                  type="text" 
+                  value={editingCatName} 
+                  onChange={(e) => setEditingCatName(e.target.value)} 
+                  className="w-full bg-[#111] border border-orange-500/20 rounded-xl p-3 text-xs text-white outline-none" 
+                  required 
+                />
+                <input 
+                  type="url" 
+                  value={editingCatCoverUrl} 
+                  onChange={(e) => setEditingCatCoverUrl(e.target.value)} 
+                  className="w-full bg-[#111] border border-orange-500/20 rounded-xl p-3 text-xs text-white outline-none" 
+                />
+              </div>
+              <div className="flex gap-2">
+                <button type="submit" className="flex-1 bg-green-600 text-white p-3 rounded-xl font-black text-xs uppercase hover:bg-green-700 transition-all">
+                  Save Changes
+                </button>
+                <button type="button" onClick={() => setEditingCatId(null)} className="bg-white/5 text-gray-400 p-3 rounded-xl font-black text-xs uppercase">
+                  Cancel
+                </button>
+              </div>
+            </form>
+          )}
+
+          {/* कैटेगरीज ग्रिड लिस्ट */}
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            {categories.map(cat => (
+              <div key={cat.id} className="bg-white/[0.02] border border-white/5 p-3 rounded-2xl relative text-left">
+                <div className="h-24 overflow-hidden rounded-xl bg-neutral-900 flex items-center justify-center">
+                  {cat.coverUrl ? (
+                    <img src={cat.coverUrl} className="w-full h-full object-cover opacity-80" alt={cat.name} />
+                  ) : (
+                    <div className="text-[10px] text-gray-500 font-bold uppercase">No Image</div>
+                  )}
+                </div>
+                <div className="mt-2 text-[10px] flex justify-between items-center">
+                  <span className="font-black truncate pr-1">{cat.name}</span>
+                  <div className="flex gap-1">
+                    <button onClick={() => toggleCategoryVisibility(cat)} className="p-1 bg-white/5 rounded text-gray-400" title="Toggle Visibility">
+                      {cat.isVisible !== false ? <Eye size={12}/> : <EyeOff size={12}/>}
+                    </button>
+                    <button onClick={() => {
+                      setEditingCatId(cat.id);
+                      setEditingCatName(cat.name);
+                      setEditingCatCoverUrl(cat.coverUrl || "");
+                    }} className="p-1 bg-blue-500/10 text-blue-400 rounded" title="Edit">
+                      <Settings size={12}/>
+                    </button>
+                    <button onClick={() => handleDeleteCategory(cat.id)} className="p-1 bg-red-500/10 text-red-500 rounded" title="Delete">
+                      <Trash size={12}/>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+            {categories.length === 0 && (
+              <p className="col-span-full text-center text-gray-500 py-6 text-xs uppercase font-bold">No categories found in database.</p>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* --- OVERLAY EDIT DISH MODAL --- */}
       {editingProduct && (
