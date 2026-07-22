@@ -851,6 +851,7 @@ export default function StoreStockPage() {
             startDate={startDate} setStartDate={setStartDate} endDate={endDate} setEndDate={setEndDate}
             getFilteredLedgerStats={getFilteredLedgerStats} stats={stats} categories={categories}
             categoryStockValues={categoryStockValues} stockFlowTimeline={stockFlowTimeline}
+            fixedAssets={fixedAssets} // एसेट्स की सूची प्रोप्स के रूप में भेजी गई
           />
         )}
 
