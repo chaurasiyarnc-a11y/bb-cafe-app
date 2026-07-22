@@ -180,7 +180,7 @@ export default function StoreStockPage() {
   const [consumeQtyInput, setConsumeQtyInput] = useState<string>("");
   const [consumeRemarksInput, setConsumeRemarksInput] = useState<string>("");
 
-  const [isEditingListName, setIsEditingListName] = useState<boolean>(false);
+  const [isEditingListName, setIsEditingListName] =500;
   const [tempListNameInput, setTempListNameInput] = useState<string>("");
 
   const [showAddProductModal, setShowAddProductModal] = useState<boolean>(false);
@@ -285,29 +285,38 @@ export default function StoreStockPage() {
     }
   };
 
+  // --- सुरक्षित एसेट गणना सहायक फ़ंक्शन (0 || 1 वाले जावास्क्रिप्ट एरर से सुरक्षा) ---
+  const getAssetSingleVal = (asset: FixedAsset) => {
+    // यदि मात्रा undefined या null है, तो पुराने रिकॉर्ड्स के लिए 1 मानें
+    // लेकिन यदि मात्रा '0' है, तो उसे '0' ही रखें (0 || 1 वाला लॉजिकल एरर ठीक हुआ)
+    const qty = (asset.quantity === undefined || asset.quantity === null) ? 1 : Number(asset.quantity);
+    const cost = Number(asset.cost || 0);
+    return qty * cost;
+  };
+
   // calculations (कैलकुलेशंस में एसेट्स का वर्गीकरण मूल्य भी शामिल किया गया है)
   const stats = useMemo(() => {
     const totalVal = inventory.reduce((sum, item) => sum + (item.storeQty * item.purchasePrice), 0);
     const lowCount = inventory.filter(item => item.storeQty < item.minLimit).length;
     
-    // एसेट्स की कुल मात्रा और मूल्य
+    // एसेट्स की कुल मात्रा और मूल्य (सुरक्षित गणना के साथ)
     const totalFixedQty = fixedAssets.reduce((sum, asset) => sum + (asset.quantity || 0), 0);
-    const totalFixedVal = fixedAssets.reduce((sum, asset) => sum + ((asset.quantity || 1) * (asset.cost || 0)), 0);
+    const totalFixedVal = fixedAssets.reduce((sum, asset) => sum + getAssetSingleVal(asset), 0);
 
     // 1. सामान्य एसेट्स का कुल मूल्य (general)
     const generalAssetsVal = fixedAssets
       .filter(asset => !asset.type || asset.type === 'general')
-      .reduce((sum, asset) => sum + ((asset.quantity || 1) * (asset.cost || 0)), 0);
+      .reduce((sum, asset) => sum + getAssetSingleVal(asset), 0);
 
     // 2. कटलरी का कुल मूल्य (cutlery)
     const cutleryVal = fixedAssets
       .filter(asset => asset.type === 'cutlery')
-      .reduce((sum, asset) => sum + ((asset.quantity || 1) * (asset.cost || 0)), 0);
+      .reduce((sum, asset) => sum + getAssetSingleVal(asset), 0);
 
     // 3. क्रॉकरी का कुल मूल्य (crockery)
     const crockeryVal = fixedAssets
       .filter(asset => asset.type === 'crockery')
-      .reduce((sum, asset) => sum + ((asset.quantity || 1) * (asset.cost || 0)), 0);
+      .reduce((sum, asset) => sum + getAssetSingleVal(asset), 0);
 
     return { 
       totalVal, 
