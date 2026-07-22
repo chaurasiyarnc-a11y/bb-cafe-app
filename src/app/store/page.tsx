@@ -1,5 +1,3 @@
-
-
 'use client';
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
@@ -10,7 +8,7 @@ import {
   collection, onSnapshot, query, orderBy, doc, setDoc, increment, addDoc, deleteDoc, writeBatch 
 } from 'firebase/firestore';
 
-// कस्टमाइज़्ड सब-कंपोनेंट्स के इम्पोर्ट्स (समर्पित फ़ोल्डर से)
+// ककस्टमाइज़्ड सब-कंपोनेंट्स के इम्पोर्ट्स (समर्पित फ़ोल्डर से)
 import StockDashboard from '../../components/admin/stock/StockDashboard';
 import StockGodown from '../../components/admin/stock/StockGodown';
 import StockAssets from '../../components/admin/stock/StockAssets';
@@ -80,8 +78,8 @@ interface FixedAsset {
   cost?: number;
   condition: "Working" | "Needs Repair" | "Broken";
   remarks?: string;
-  type?: string; // 'general', 'cutlery', या 'crockery'
-  unit?: string; // 'Pcs', 'Kg', 'Ltr', 'Packets' आदि
+  type?: string; 
+  unit?: string; 
 }
 
 interface UserPin {
@@ -125,7 +123,7 @@ export default function StoreStockPage() {
   const [currentUser, setCurrentUser] = useState<UserPin | null>(null);
   const [pinInput, setPinInput] = useState<string>("");
   const [authError, setAuthError] = useState<string>("");
-  const [authLoading, setAuthLoading] = useState<boolean>(true); // लोडिंग स्टेट
+  const [authLoading, setAuthLoading] = useState<boolean>(true); 
 
   // session restore on reload & Service Worker registration
   useEffect(() => {
@@ -138,10 +136,9 @@ export default function StoreStockPage() {
           localStorage.removeItem('bum_bum_cafe_user'); 
         }
       }
-      setAuthLoading(false); // जाँच समाप्त हुई
+      setAuthLoading(false); 
     }
 
-    // Register Service Worker for PWA
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/sw.js')
         .then((reg) => console.log('Store Service Worker Registered Successfully!', reg.scope))
@@ -188,11 +185,9 @@ export default function StoreStockPage() {
   const [showAddProductModal, setShowAddProductModal] = useState<boolean>(false);
   const [showAddAssetModal, setShowAddAssetModal] = useState<boolean>(false);
   const [editingProduct, setEditingProduct] = useState<InventoryItem | null>(null);
-  const [editingAsset, setEditingAsset] = useState<FixedAsset | null>(null); // Fixed Assets एडिटिंग के लिए स्टेट
+  const [editingAsset, setEditingAsset] = useState<FixedAsset | null>(null); 
 
   const [formAddProduct, setFormAddProduct] = useState({ name: '', storeQty: '0', kitchenQty: '0', unit: 'Kg', purchasePrice: '', minLimit: '10', category: 'OTHERS', lastPurchaseDate: getLocalDateString(0) });
-  
-  // formAddAsset में डिफ़ॉल्ट रूप से type 'general' और unit 'Pcs' रखा गया है
   const [formAddAsset, setFormAddAsset] = useState({ name: '', quantity: '1', purchaseDate: '', cost: '', condition: 'Working' as any, remarks: '', type: 'general', unit: 'Pcs' });
 
   const [showStockOutModal, setShowStockOutModal] = useState<boolean>(false);
@@ -210,7 +205,8 @@ export default function StoreStockPage() {
     const unsubInventory = onSnapshot(collection(db, "godown_inventory"), (snap) => {
       setInventory(snap.docs.map(d => ({ id: d.id, kitchenQty: 0, ...d.data() } as InventoryItem)));
     });
-    const unsubCategories = onSnapshot(collection(db, "categories"), (snap) => {
+    // [बदलाव] अब यह केवल गोदाम के लिए समर्पित "godown_categories" से डेटा सिंक करेगा
+    const unsubCategories = onSnapshot(collection(db, "godown_categories"), (snap) => {
       if (!snap.empty) setCategories(snap.docs.map(d => ({ id: d.id, ...d.data() } as CategoryItem)));
     });
     const unsubStockIns = onSnapshot(query(collection(db, "stock_in_history"), orderBy("date", "desc")), (snap) => {
@@ -248,7 +244,6 @@ export default function StoreStockPage() {
     setLocalOrderQties(prev => ({ ...prev, ...updatedLocal }));
   }, [savedOrders, focusedOrderField]);
 
-  // Auth Submit
   const handleLoginSubmit = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     const matched = users.find(u => u.pin === pinInput.trim());
@@ -287,35 +282,26 @@ export default function StoreStockPage() {
     }
   };
 
-  // --- सुरक्षित एसेट गणना सहायक फ़ंक्शन (0 || 1 वाले जावास्क्रिप्ट एरर से सुरक्षा) ---
   const getAssetSingleVal = (asset: FixedAsset) => {
-    // यदि मात्रा undefined या null है, तो पुराने रिकॉर्ड्स के लिए 1 मानें
-    // लेकिन यदि मात्रा '0' है, तो उसे '0' ही रखें (0 || 1 वाला लॉजिकल एरर ठीक हुआ)
     const qty = (asset.quantity === undefined || asset.quantity === null) ? 1 : Number(asset.quantity);
     const cost = Number(asset.cost || 0);
     return qty * cost;
   };
 
-  // calculations (कैलकुलेशंस में एसेट्स का वर्गीकरण मूल्य भी शामिल किया गया है)
   const stats = useMemo(() => {
     const totalVal = inventory.reduce((sum, item) => sum + (item.storeQty * item.purchasePrice), 0);
     const lowCount = inventory.filter(item => item.storeQty < item.minLimit).length;
-    
-    // एसेट्स की कुल मात्रा और मूल्य (सुरक्षित गणना के साथ)
     const totalFixedQty = fixedAssets.reduce((sum, asset) => sum + (asset.quantity || 0), 0);
     const totalFixedVal = fixedAssets.reduce((sum, asset) => sum + getAssetSingleVal(asset), 0);
 
-    // 1. सामान्य एसेट्स का कुल मूल्य (general)
     const generalAssetsVal = fixedAssets
       .filter(asset => !asset.type || asset.type === 'general')
       .reduce((sum, asset) => sum + getAssetSingleVal(asset), 0);
 
-    // 2. कटलरी का कुल मूल्य (cutlery)
     const cutleryVal = fixedAssets
       .filter(asset => asset.type === 'cutlery')
       .reduce((sum, asset) => sum + getAssetSingleVal(asset), 0);
 
-    // 3. क्रॉकरी का कुल मूल्य (crockery)
     const crockeryVal = fixedAssets
       .filter(asset => asset.type === 'crockery')
       .reduce((sum, asset) => sum + getAssetSingleVal(asset), 0);
@@ -367,7 +353,6 @@ export default function StoreStockPage() {
     return values;
   }, [inventory]);
 
-  // गणितीय रिपोर्ट सुधार: टाइमलाइन के डेटा में प्रति-इकाई दर (Price) को भी मैप किया गया है
   const stockFlowTimeline = useMemo(() => {
     const list: any[] = [];
     getFilteredLedgerStats.matchedInward.forEach(log => {
@@ -377,7 +362,7 @@ export default function StoreStockPage() {
         name: log.itemName, 
         qty: log.qty, 
         unit: item?.unit || 'Units', 
-        price: item?.purchasePrice || 0, // दर (Price) यहाँ मैप की गई है
+        price: item?.purchasePrice || 0, 
         type: 'IN', 
         date: log.date, 
         remarks: log.remarks 
@@ -390,7 +375,7 @@ export default function StoreStockPage() {
         name: log.itemName, 
         qty: log.qty, 
         unit: item?.unit || 'Units', 
-        price: item?.purchasePrice || 0, // दर (Price) यहाँ मैप की गई है
+        price: item?.purchasePrice || 0, 
         type: 'OUT', 
         date: log.date, 
         remarks: log.remarks 
@@ -496,7 +481,8 @@ export default function StoreStockPage() {
       if (!newCategoryInput.trim()) return;
       targetCategory = newCategoryInput.trim().toUpperCase();
       const catId = targetCategory.toLowerCase().replace(/\s+/g, '_');
-      await setDoc(doc(db, "categories", catId), { id: catId, name: targetCategory, hidden: false });
+      // [बदलाव] अब यह "godown_categories" में लिखेगा
+      await setDoc(doc(db, "godown_categories", catId), { id: catId, name: targetCategory, hidden: false });
     }
     try {
       const batch = writeBatch(db);
@@ -514,19 +500,22 @@ export default function StoreStockPage() {
     try {
       const formattedName = addCategoryModalInput.trim().toUpperCase();
       const catId = formattedName.toLowerCase().replace(/\s+/g, '_');
-      await setDoc(doc(db, "categories", catId), { id: catId, name: formattedName, hidden: false });
+      // [बदलाव] अब यह "godown_categories" में लिखेगा
+      await setDoc(doc(db, "godown_categories", catId), { id: catId, name: formattedName, hidden: false });
       setAddCategoryModalInput("");
       toastMessage("नई श्रेणी जोड़ी गई!", "success");
     } catch {}
   };
 
   const handleToggleCategoryHide = async (cat: CategoryItem) => {
-    await setDoc(doc(db, "categories", cat.id), { hidden: !cat.hidden }, { merge: true });
+    // [बदलाव] अब यह "godown_categories" में अपडेट करेगा
+    await setDoc(doc(db, "godown_categories", cat.id), { hidden: !cat.hidden }, { merge: true });
   };
 
   const handleRemoveCategory = (cat: CategoryItem) => {
     confirmDeleteWithPin(`क्या आप सच में "${cat.name}" हटाना चाहते हैं?`, async () => {
-      await deleteDoc(doc(db, "categories", cat.id));
+      // [बदलाव] अब यह "godown_categories" से डिलीट करेगा
+      await deleteDoc(doc(db, "godown_categories", cat.id));
     });
   };
 
@@ -600,7 +589,6 @@ export default function StoreStockPage() {
     toastMessage("नया उत्पाद जोड़ा गया!", "success");
   };
 
-  // Fixed Asset सेव करते समय उसका प्रकार (Type) और कस्टमाइज्ड यूनिट (Unit) भी डेटाबेस में सहेजा जाएगा
   const handleAddAssetSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleanName = formAddAsset.name.toUpperCase().trim();
@@ -614,15 +602,13 @@ export default function StoreStockPage() {
       condition: formAddAsset.condition, 
       remarks: formAddAsset.remarks,
       type: formAddAsset.type || 'general',
-      unit: formAddAsset.unit || 'Pcs' // 'Pcs', 'Kg', 'Ltr', 'Packets' आदि
+      unit: formAddAsset.unit || 'Pcs' 
     });
     setShowAddAssetModal(false);
-    // फॉर्म रीसेट
     setFormAddAsset({ name: '', quantity: '1', purchaseDate: '', cost: '', condition: 'Working', remarks: '', type: 'general', unit: 'Pcs' });
     toastMessage("नया एसेट सफलतापूर्वक जोड़ा गया!", "success");
   };
 
-  // Fixed Asset एडिट सबमिट करने का फ़ंक्शन
   const handleEditAssetSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingAsset) return;
@@ -631,7 +617,6 @@ export default function StoreStockPage() {
     toastMessage("एसेट का विवरण सफलतापूर्वक अपडेट किया गया!", "success");
   };
 
-  // एसेट की मात्रा +/- एडजस्ट (मासिक गिनती) करने का फ़ंक्शन
   const handleAdjustAssetQty = async (assetId: string, diff: number) => {
     triggerHaptic(20);
     try {
@@ -751,13 +736,11 @@ export default function StoreStockPage() {
     window.open(waUrl, '_blank');
   };
 
-  // --- ऑटो-डेटा माइग्रेशन फ़ंक्शन (गोदाम से क्रॉकरी व कटलरी फिक्स्ड एसेट्स में शिफ्ट करने के लिए) ---
   const handleMigrateCrockeryCutlery = async () => {
     triggerHaptic(50);
     if (!window.confirm("क्या आप वाकई गोडाउन (Godown) से क्रॉकरी और कटलरी का सारा डेटा स्थायी संपत्ति (Fixed Assets) में शिफ्ट करना चाहते हैं? यह क्रिया उन्हें गोडाउन से हमेशा के लिए हटा देगी।")) return;
 
     try {
-      // गोदाम के वे आइटम्स ढूंढें जिनकी कैटेगरी CROCKERY या CUTLERY है
       const itemsToMigrate = inventory.filter(item => {
         const cat = (item.category || "").toUpperCase().trim();
         return cat.includes('CROCKER') || cat.includes('CUTLER');
@@ -778,7 +761,6 @@ export default function StoreStockPage() {
         const cat = (item.category || "").toUpperCase().trim();
         const finalType = cat.includes('CROCKER') ? 'crockery' : 'cutlery';
 
-        // 1. Fixed Assets कलेक्शन में लिखें (सही टाइप और असली यूनिट के साथ)
         batch.set(assetDocRef, {
           id: assetId,
           name: item.name,
@@ -786,11 +768,10 @@ export default function StoreStockPage() {
           cost: item.purchasePrice || 0,
           condition: "Working",
           remarks: "गोडाउन से स्थानांतरित (Shifted)",
-          type: finalType, // 'crockery' या 'cutlery'
-          unit: item.unit || 'Pcs' // गोडाउन का असली यूनिट ट्रांसफर करें
+          type: finalType, 
+          unit: item.unit || 'Pcs' 
         });
 
-        // 2. Godown से हमेशा के लिए डिलीट करें
         batch.delete(godownDocRef);
       });
 
@@ -802,7 +783,6 @@ export default function StoreStockPage() {
     }
   };
 
-  // यदि अभी सेशन चेक हो रहा है तो लोडर दिखाएं (ताकि लॉक स्क्रीन न चमके)
   if (authLoading) {
     return (
       <div className={`min-h-screen flex flex-col items-center justify-center ${isDarkMode ? 'bg-[#0E0E0E] text-white' : 'bg-[#FAFAFA] text-neutral-900'}`}>
@@ -812,7 +792,6 @@ export default function StoreStockPage() {
     );
   }
 
-  // यदि कोई यूजर लॉगिन नहीं है तो सुरक्षित PIN गेट दिखाएं
   if (!currentUser) {
     return (
       <div className={`min-h-screen flex items-center justify-center p-4 ${isDarkMode ? 'bg-[#0E0E0E] text-white' : 'bg-[#FAFAFA] text-neutral-900'}`}>
@@ -881,7 +860,7 @@ export default function StoreStockPage() {
             startDate={startDate} setStartDate={setStartDate} endDate={endDate} setEndDate={setEndDate}
             getFilteredLedgerStats={getFilteredLedgerStats} stats={stats} categories={categories}
             categoryStockValues={categoryStockValues} stockFlowTimeline={stockFlowTimeline}
-            fixedAssets={fixedAssets} // एसेट्स की सूची प्रोप्स के रूप में भेजी गई
+            fixedAssets={fixedAssets} 
           />
         )}
 
@@ -897,8 +876,8 @@ export default function StoreStockPage() {
             setShowAddProductModal={setShowAddProductModal} setEditingProduct={setEditingProduct}
             setTransferItem={setTransferItem} setShowTransferModal={setShowTransferModal}
             setConsumeItem={setConsumeItem} setShowConsumeModal={setShowConsumeModal}
-            setShowSaveToListModal={setShowSaveToListModal} // सप्लायर आर्डर लिस्ट खोलने का प्रोप
-            setShowBulkCategoryModal={setShowBulkCategoryModal} // बल्क कैटेगरी बदलने का प्रोप
+            setShowSaveToListModal={setShowSaveToListModal} 
+            setShowBulkCategoryModal={setShowBulkCategoryModal} 
           />
         )}
 
@@ -907,9 +886,9 @@ export default function StoreStockPage() {
             isDarkMode={isDarkMode} searchQuery={searchQuery} setSearchQuery={setSearchQuery}
             filteredAssets={filteredAssets} setShowAddAssetModal={setShowAddAssetModal}
             handleDeleteAsset={handleDeleteAsset}
-            handleMigrate={handleMigrateCrockeryCutlery} // माइग्रेशन फ़ंक्शन प्रोप्स के रूप में भेजा गया
-            setEditingAsset={setEditingAsset} // एडिटिंग स्टेट प्रोप्स के रूप में भेजा गया
-            handleAdjustQty={handleAdjustAssetQty} // मात्रा कम-ज्यादा करने का फ़ंक्शन प्रोप्स के रूप में भेजा गया
+            handleMigrate={handleMigrateCrockeryCutlery} 
+            setEditingAsset={setEditingAsset} 
+            handleAdjustQty={handleAdjustAssetQty} 
           />
         )}
 
@@ -1132,7 +1111,6 @@ export default function StoreStockPage() {
                 <button type="button" onClick={() => setShowAddAssetModal(false)} className="p-1.5 bg-neutral-100 dark:bg-neutral-800 rounded-xl text-neutral-500"><X size={14} /></button>
               </div>
               
-              {/* एसेट टाइप सिलेक्टर */}
               <div className="space-y-1">
                 <label className="text-[9px] text-neutral-400 font-bold uppercase">एसेट का प्रकार (Type)</label>
                 <select 
