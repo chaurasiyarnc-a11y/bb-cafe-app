@@ -180,7 +180,7 @@ export default function StoreStockPage() {
   const [consumeQtyInput, setConsumeQtyInput] = useState<string>("");
   const [consumeRemarksInput, setConsumeRemarksInput] = useState<string>("");
 
-  const [isEditingListName, setIsEditingListName] =500;
+  const [isEditingListName, setIsEditingListName] = useState<boolean>(false);
   const [tempListNameInput, setTempListNameInput] = useState<string>("");
 
   const [showAddProductModal, setShowAddProductModal] = useState<boolean>(false);
