@@ -1,3 +1,5 @@
+
+
 'use client';
 import React, { useState, useEffect, useMemo } from 'react';
 import { db } from '@/lib/firebase'; 
@@ -9,7 +11,7 @@ import {
   ShoppingBag, Plus, Minus, Search, X, User, Star, Gift, 
   Loader2, Clock, Trash2, Printer, Check, Play, Settings, 
   Database, RefreshCw, Layers, Phone, MapPin, LayoutGrid, List,
-  Menu, Users
+  Menu, Users, Edit, ArrowLeft, History
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
@@ -19,6 +21,8 @@ interface PosCartItem {
   name: string;
   price: number;
   quantity: number;
+  isReward?: boolean;
+  pointsCost?: number;
   note?: string;
 }
 
@@ -59,6 +63,12 @@ export default function BbCafePos() {
   const [newCustName, setNewCustName] = useState<string>('');
   const [newCustPhone, setNewCustPhone] = useState<string>('');
   const [newCustAddress, setNewCustAddress] = useState<string>('');
+  
+  // Member Profile Edit & History States inside POS Lookup
+  const [editingCustomer, setEditingCustomer] = useState<any | null>(null);
+  const [viewingHistoryCustomer, setViewingHistoryCustomer] = useState<any | null>(null);
+  const [customerHistoryList, setCustomerHistoryList] = useState<any[]>([]);
+  const [editCustPoints, setEditCustPoints] = useState<number>(0);
 
   // Database States
   const [liveOrders, setLiveOrders] = useState<any[]>([]);
@@ -67,6 +77,7 @@ export default function BbCafePos() {
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
+  const [loyaltyRules, setLoyaltyRules] = useState<any[]>([]); // Loyalty rewards rules
   
   // Counter Billing States
   const [cart, setCart] = useState<PosCartItem[]>([]);
@@ -130,7 +141,7 @@ export default function BbCafePos() {
     return () => unsubscribe();
   }, []);
 
-  // Fetch Menu Products
+  // Fetch Menu Products & Loyalty rules
   useEffect(() => {
     const fetchDbData = async () => {
       setLoading(true);
@@ -141,6 +152,10 @@ export default function BbCafePos() {
 
         const cats = Array.from(new Set(items.map((i: any) => i.category).filter(Boolean))) as string[];
         setCategories(['All', ...cats]);
+
+        // Fetch loyalty reward items rules
+        const rulesSnap = await getDocs(collection(db, "loyalty_rules"));
+        setLoyaltyRules(rulesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       } catch (err) {
         toast.error("Error loading products");
       } finally {
@@ -194,7 +209,6 @@ export default function BbCafePos() {
     if (!cleanText) {
       setIsSearchingCustomer(true);
       try {
-        // Load latest 12 active customers on empty search init
         const q = query(collection(db, "customer_points"), orderBy("lastActive", "desc"), limit(12));
         const snap = await getDocs(q);
         setSearchedCustomers(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
@@ -210,10 +224,8 @@ export default function BbCafePos() {
     try {
       let q;
       if (/^\d+$/.test(cleanText)) {
-        // Search strictly by exact phone match
         q = query(collection(db, "customer_points"), where("phone", "==", cleanText));
       } else {
-        // Search by Name prefix match
         const capitalized = cleanText.charAt(0).toUpperCase() + cleanText.slice(1);
         q = query(
           collection(db, "customer_points"), 
@@ -241,6 +253,71 @@ export default function BbCafePos() {
     }
     setIsCustomerModalOpen(false);
     toast.success(`Active Customer: ${cust.name}`);
+  };
+
+  // Fetch Customer Points ledger/history logs
+  const handleLoadCustomerHistory = async (cust: any) => {
+    triggerBeep('tap');
+    setViewingHistoryCustomer(cust);
+    const toastId = toast.loading("Loading points passbook...");
+    try {
+      const hSnap = await getDocs(
+        query(
+          collection(db, "customer_points", cust.phone, "history"),
+          orderBy("timestamp", "desc"),
+          limit(25)
+        )
+      );
+      setCustomerHistoryList(hSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      toast.dismiss(toastId);
+    } catch (e) {
+      toast.dismiss(toastId);
+      toast.error("Failed to load points ledger");
+    }
+  };
+
+  // Edit Customer profile name, address & points balance directly
+  const handleStartEditProfile = (cust: any) => {
+    triggerBeep('tap');
+    setEditingCustomer(cust);
+    setNewCustName(cust.name);
+    setNewCustAddress(cust.address || '');
+    setEditCustPoints(cust.points || 0);
+  };
+
+  const handleUpdateCustomerProfile = async () => {
+    triggerBeep('tap');
+    if (!newCustName.trim()) {
+      toast.error("Name field is mandatory!");
+      return;
+    }
+    const toastId = toast.loading("Saving updates...");
+    try {
+      const userRef = doc(db, "customer_points", editingCustomer.phone);
+      
+      const updatedFields = {
+        name: newCustName.trim(),
+        address: newCustAddress.trim(),
+        points: editCustPoints
+      };
+
+      await updateDoc(userRef, updatedFields);
+      toast.dismiss(toastId);
+      toast.success("Profile saved successfully!");
+
+      // If edited customer is the active one in billing desk, sync state
+      if (customerPhone === editingCustomer.phone) {
+        setCustomerName(updatedFields.name);
+        setAddress(updatedFields.address);
+        setCustomerPoints(updatedFields.points);
+      }
+
+      setEditingCustomer(null);
+      searchDbCustomers(customerSearchQuery); // Refresh list
+    } catch (err) {
+      toast.dismiss(toastId);
+      toast.error("Failed to edit user profile");
+    }
   };
 
   // Save New Customer to Loyalty program DB directly
@@ -287,7 +364,6 @@ export default function BbCafePos() {
         setAddress(newDoc.address);
       }
 
-      // Reset Input fields
       setNewCustName('');
       setNewCustPhone('');
       setNewCustAddress('');
@@ -315,6 +391,34 @@ export default function BbCafePos() {
       }];
     });
     toast.success(`${item.name} added!`, { duration: 800 });
+  };
+
+  // Add Free Point Reward Item to Cart Desk
+  const handleRedeemLoyaltyReward = (rule: any) => {
+    triggerBeep('tap');
+    
+    // Check points already committed in this cart
+    const currentRedeemedCost = cart.reduce((acc, i) => acc + (i.pointsCost || 0), 0);
+    const availablePointsPool = customerPoints - currentRedeemedCost;
+
+    if (availablePointsPool < rule.pointsCost) {
+      toast.error("Not enough loyalty points balance!");
+      return;
+    }
+
+    setCart((prev) => [
+      ...prev,
+      {
+        id: `reward-${rule.id}-${Date.now()}`,
+        name: `🎁 FREE ${rule.rewardName}`,
+        price: 0,
+        quantity: 1,
+        isReward: true,
+        pointsCost: Number(rule.pointsCost) || 0,
+        category: "Special"
+      }
+    ]);
+    toast.success(`${rule.rewardName} added as reward!`);
   };
 
   const handleAddCustomizedItemToCart = () => {
@@ -404,14 +508,13 @@ export default function BbCafePos() {
     return baseSub >= selectedArea.minFree ? 0 : selectedArea.fee;
   };
 
-  const getLoyaltyDiscount = () => Math.min(pointsToRedeem, getCartSubtotal());
+  const getTotalPointsRedeemedInCart = () => cart.reduce((acc, i) => acc + (i.pointsCost || 0), 0);
   
   const getTotalBillPrice = () => {
     const subtotal = getCartSubtotal();
     const addPrice = getCartAddonsPrice();
     const delivery = getDeliveryCharge();
-    const discountCombined = getLoyaltyDiscount() + customDiscount;
-    return Math.max(0, subtotal + addPrice - discountCombined) + delivery;
+    return Math.max(0, subtotal + addPrice - customDiscount) + delivery;
   };
 
   const getFreeDeliveryProgressPercent = () => {
@@ -524,7 +627,8 @@ export default function BbCafePos() {
     const subtotal = getCartSubtotal();
     const addOnsCost = getCartAddonsPrice();
     const deliveryCharge = getDeliveryCharge();
-    const discountCombined = getLoyaltyDiscount() + customDiscount;
+    const totalPointsCost = getTotalPointsRedeemedInCart(); // Committed point costs in this cart
+    const discountCombined = customDiscount; // Point discount is handled via ₹0 reward items directly now
     const finalTotal = getTotalBillPrice();
 
     const tokenNumber = Math.floor(1000 + Math.random() * 9000);
@@ -573,7 +677,7 @@ export default function BbCafePos() {
       if (customerPhone && customerPhone.trim().length === 10) {
         const phoneClean = customerPhone.trim();
         const pointsEarned = Math.floor(finalTotal / 100);
-        const netPointsChange = pointsEarned - pointsToRedeem;
+        const netPointsChange = pointsEarned - totalPointsCost;
 
         await runTransaction(db, async (txn) => {
           const userRef = doc(db, "customer_points", phoneClean);
@@ -602,11 +706,11 @@ export default function BbCafePos() {
             timestamp: new Date()
           });
         }
-        if (pointsToRedeem > 0) {
+        if (totalPointsCost > 0) {
           await addDoc(collection(db, "customer_points", phoneClean, "history"), {
             type: 'redeem',
-            points: pointsToRedeem,
-            description: `Redeemed on Bill #${billNumber} at POS Counter`,
+            points: totalPointsCost,
+            description: `Redeemed rewards on Bill #${billNumber} at POS Counter`,
             timestamp: new Date()
           });
         }
@@ -1200,7 +1304,11 @@ export default function BbCafePos() {
                         <div className="flex items-center gap-2 bg-black/40 px-2 py-1 rounded-xl border border-white/10 flex-shrink-0">
                           <button type="button" onClick={() => handleUpdateCartQuantity(item.id, -1)} className="w-6 h-6 flex items-center justify-center bg-red-500/10 text-red-500 rounded text-sm font-black">-</button>
                           <span className="font-black text-xs px-1 text-white font-mono">{item.quantity}</span>
-                          <button type="button" onClick={() => handleUpdateCartQuantity(item.id, 1)} className="w-6 h-6 flex items-center justify-center bg-green-500/10 text-green-500 rounded text-sm font-black">+</button>
+                          {item.isReward ? (
+                            <button type="button" disabled className="w-6 h-6 flex items-center justify-center bg-white/5 text-gray-500 rounded text-sm font-black cursor-not-allowed opacity-30">+</button>
+                          ) : (
+                            <button type="button" onClick={() => handleUpdateCartQuantity(item.id, 1)} className="w-6 h-6 flex items-center justify-center bg-green-500/10 text-green-500 rounded text-sm font-black">+</button>
+                          )}
                         </div>
                       </div>
                       
@@ -1360,9 +1468,9 @@ export default function BbCafePos() {
                   </div>
                 )}
 
-                {/* 5. LOYALTY PROFILE VERIFICATION PANEL */}
+                {/* 5. ACTIVE CUSTOMER LOYALTY PROFILE DETAILS & DYNAMIC REWARDS REDEMPTION GRID */}
                 <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-4 space-y-2.5 mt-4 font-sans font-bold">
-                  <p className="text-[9px] font-black uppercase text-gray-400">Customer Loyalty Points Desk</p>
+                  <p className="text-[9px] font-black uppercase text-gray-400">Customer Loyalty Profile</p>
                   <div className="flex gap-2">
                     <input 
                       type="tel" 
@@ -1370,30 +1478,61 @@ export default function BbCafePos() {
                       placeholder="Guest 10-digit phone..."
                       value={customerPhone}
                       onChange={(e) => setCustomerPhone(e.target.value)}
-                      className="bg-[#050505] border border-white/5 rounded-xl py-2 px-3 text-xs text-white outline-none focus:border-orange-500 font-bold flex-1"
+                      className="bg-[#050505] border border-white/5 rounded-xl py-2 px-3 text-xs text-white outline-none focus:border-orange-500 font-bold flex-1 font-mono"
                     />
                     <button 
                       type="button"
                       onClick={handleCheckLoyalty}
-                      className="bg-orange-500 hover:bg-orange-600 text-black text-xs font-black px-4 py-2 rounded-xl transition-colors flex items-center gap-1 shrink-0"
+                      className="bg-orange-500 hover:bg-orange-600 text-black text-xs font-black px-4 py-2 rounded-xl transition-colors flex items-center gap-1 shrink-0 font-sans"
                     >
                       <User size={12} /> Verify
                     </button>
                   </div>
-                  {customerPhone && customerPoints > 0 && (
-                    <div className="mt-2 bg-yellow-400/5 border border-yellow-400/20 p-2.5 rounded-xl flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <p className="text-[9px] font-black text-yellow-300 uppercase">Points Balance</p>
-                        <p className="text-[10px] text-gray-300 font-semibold">{customerName || 'Loyal Guest'} ({customerPoints} pts)</p>
+                  
+                  {customerPhone && (
+                    <div className="mt-2 space-y-3">
+                      <div className="bg-yellow-400/5 border border-yellow-400/20 p-2.5 rounded-xl flex items-center justify-between">
+                        <div className="space-y-0.5">
+                          <p className="text-[9px] font-black text-yellow-300 uppercase leading-none">Net Points Balance</p>
+                          <p className="text-[10px] text-gray-300 font-bold mt-1 font-sans">{customerName || 'Loyal Guest'}</p>
+                        </div>
+                        {/* Calculate net points remaining after committing points rewards in cart */}
+                        <div className="text-right">
+                          <span className="text-sm font-black text-yellow-400 font-mono">
+                            {customerPoints - getTotalPointsRedeemedInCart()}
+                          </span>
+                          <span className="text-[8px] text-gray-400 block font-sans">Points Left</span>
+                        </div>
                       </div>
-                      <input 
-                        type="number"
-                        max={Math.min(customerPoints, getCartSubtotal())}
-                        placeholder="Redeem"
-                        value={pointsToRedeem || ''}
-                        onChange={(e) => setPointsToRedeem(Math.max(0, Number(e.target.value)))}
-                        className="w-16 bg-[#050505] border border-yellow-400/20 text-yellow-300 p-1.5 rounded text-center text-xs font-mono outline-none"
-                      />
+
+                      {/* Dynamic rewards selector list from 'loyalty_rules' collection */}
+                      {loyaltyRules.length > 0 && (
+                        <div className="space-y-1.5 pt-1.5 border-t border-white/5">
+                          <p className="text-[8px] font-black uppercase text-gray-400 tracking-wider">Redeem Reward Item (रिडीम करें):</p>
+                          <div className="grid grid-cols-2 gap-1.5 font-mono">
+                            {loyaltyRules.map((rule) => {
+                              const remainingPoints = customerPoints - getTotalPointsRedeemedInCart();
+                              const isEligible = remainingPoints >= rule.pointsCost;
+
+                              return (
+                                <button
+                                  key={rule.id}
+                                  type="button"
+                                  disabled={!isEligible}
+                                  onClick={() => handleRedeemLoyaltyReward(rule)}
+                                  className={`py-2 px-2 rounded-xl text-[9px] font-black uppercase border truncate transition-all ${
+                                    isEligible 
+                                      ? 'bg-yellow-400 border-yellow-500 text-black hover:bg-yellow-500 font-sans' 
+                                      : 'bg-white/5 text-gray-500 border-white/5 cursor-not-allowed font-sans'
+                                  }`}
+                                >
+                                  🎁 Free {rule.rewardName} ({rule.pointsCost} Pts)
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -1436,8 +1575,11 @@ export default function BbCafePos() {
               <div className="bg-gradient-to-b from-orange-600 to-orange-700 p-5 rounded-2xl text-white mt-4 font-mono font-bold">
                 <div className="flex justify-between mb-1.5 text-xs"><span>Subtotal</span> <span>₹{getCartSubtotal()}</span></div>
                 {getCartAddonsPrice() > 0 && <div className="flex justify-between mb-1.5 text-xs"><span>Add-ons</span> <span>+₹{getCartAddonsPrice()}</span></div>}
-                {(pointsToRedeem > 0 || customDiscount > 0) && (
-                  <div className="flex justify-between mb-1.5 text-xs text-green-200 font-bold"><span>Discount/Savings</span> <span>-₹{getLoyaltyDiscount() + customDiscount}</span></div>
+                {getTotalPointsRedeemedInCart() > 0 && (
+                  <div className="flex justify-between mb-1.5 text-xs text-yellow-300 font-bold"><span>Redeemed Points Cost</span> <span>{getTotalPointsRedeemedInCart()} Points</span></div>
+                )}
+                {customDiscount > 0 && (
+                  <div className="flex justify-between mb-1.5 text-xs text-green-200 font-bold"><span>Savings/Discount</span> <span>-₹{customDiscount}</span></div>
                 )}
                 {fulfillmentType === "delivery" && <div className="flex justify-between mb-3 text-xs opacity-90"><span>Delivery Charge</span> <span>₹{getDeliveryCharge()}</span></div>}
                 <div className="h-px bg-white/20 mb-3" />
@@ -1459,7 +1601,7 @@ export default function BbCafePos() {
                   <button
                     type="button"
                     onClick={() => { triggerBeep('tap'); setPaymentMethod("upi"); }}
-                    className={`p-3 rounded-xl border flex flex-col items-center justify-center gap-1 transition-all ${paymentMethod === "upi" ? 'border-orange-500 bg-orange-500/10 text-orange-400 font-black shadow-sm' : 'border-white/5 text-gray-300'}`}
+                    className={`p-3 rounded-xl border flex flex-col items-center justify-center gap-1 transition-all ${paymentMethod === "upi" ? 'border-orange-500 bg-[#fffae6]/10 text-orange-400 font-black shadow-sm' : 'border-white/5 text-gray-300'}`}
                   >
                     <span className="text-sm">📱</span>
                     <span className="text-[9px] font-black">UPI QR</span>
@@ -1467,7 +1609,7 @@ export default function BbCafePos() {
                   <button
                     type="button"
                     onClick={() => { triggerBeep('tap'); setPaymentMethod("card"); }}
-                    className={`p-3 rounded-xl border flex flex-col items-center justify-center gap-1 transition-all ${paymentMethod === "card" ? 'border-orange-500 bg-orange-500/10 text-orange-400 font-black shadow-sm' : 'border-white/5 text-gray-300'}`}
+                    className={`p-3 rounded-xl border flex flex-col items-center justify-center gap-1 transition-all ${paymentMethod === "card" ? 'border-orange-500 bg-[#fffae6]/10 text-orange-400 font-black shadow-sm' : 'border-white/5 text-gray-300'}`}
                   >
                     <span className="text-sm">💳</span>
                     <span className="text-[9px] font-black">Card</span>
@@ -1514,133 +1656,254 @@ export default function BbCafePos() {
       {/* 3. CUSTOMER DIRECTORY / LOYALTY LOOKUP MODAL */}
       <AnimatePresence>
         {isCustomerModalOpen && (
-          <div className="fixed inset-0 bg-black/90 z-[130] flex items-center justify-center p-4 backdrop-blur-md">
+          <div className="fixed inset-0 bg-black/90 z-[130] flex items-center justify-center p-4 backdrop-blur-md font-sans">
             <motion.div
               initial={{ scale: 0.9, opacity: 0 }} 
               animate={{ scale: 1, opacity: 1 }} 
               exit={{ scale: 0.9, opacity: 0 }}
               className="bg-[#111] border border-white/10 w-full max-w-lg p-6 rounded-3xl text-left space-y-4 shadow-2xl relative max-h-[85vh] flex flex-col justify-between"
             >
-              {/* Header */}
-              <div className="flex justify-between items-center border-b border-white/5 pb-2">
-                <div>
-                  <h3 className="text-sm font-black text-white">Customer Directory</h3>
-                  <p className="text-[9px] text-orange-500 font-bold uppercase tracking-wider">Loyalty & Address Database Lookup</p>
-                </div>
-                <button 
-                  type="button" 
-                  onClick={() => { triggerBeep('tap'); setIsCustomerModalOpen(false); }}
-                  className="p-1.5 bg-neutral-900 border border-white/5 rounded-full text-red-400 hover:text-red-500 transition-colors"
-                >
-                  <X size={14} />
-                </button>
-              </div>
+              {/* IF VIEWING TRANSACTION HISTORY PASSBOOK */}
+              {viewingHistoryCustomer ? (
+                <div className="flex flex-col h-full flex-grow space-y-4 overflow-hidden">
+                  <div className="flex justify-between items-center border-b border-white/5 pb-2">
+                    <div className="flex items-center gap-2 text-yellow-300">
+                      <History size={16} />
+                      <div>
+                        <h3 className="text-sm font-black text-white">{viewingHistoryCustomer.name}'s Passbook</h3>
+                        <p className="text-[8px] text-orange-500 font-bold uppercase tracking-wider">Points Earning & Redemption Ledger</p>
+                      </div>
+                    </div>
+                    <button 
+                      type="button" 
+                      onClick={() => { triggerBeep('tap'); setViewingHistoryCustomer(null); setCustomerHistoryList([]); }}
+                      className="p-1.5 bg-neutral-900 border border-white/5 text-gray-400 hover:text-white rounded-full"
+                    >
+                      <ArrowLeft size={14} /> Back
+                    </button>
+                  </div>
 
-              {/* Main Body */}
-              <div className="flex-1 overflow-y-auto space-y-4 pr-1 scrollbar-thin">
-                
-                {/* Search Section */}
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase text-gray-400">Search Existing Member</label>
-                  <div className="relative">
-                    <Search className="absolute left-3 top-2.5 text-gray-500" size={14} />
-                    <input 
-                      type="text" 
-                      placeholder="Search by 10-digit Phone or Name..." 
-                      value={customerSearchQuery}
-                      onChange={(e) => {
-                        setCustomerSearchQuery(e.target.value);
-                        searchDbCustomers(e.target.value);
-                      }}
-                      className="w-full bg-neutral-900 border border-white/5 rounded-xl py-2 px-9 text-xs text-white outline-none focus:border-orange-500 placeholder-gray-500 transition-colors"
-                    />
+                  <div className="flex-1 overflow-y-auto space-y-2 pr-1 scrollbar-thin max-h-[400px]">
+                    {customerHistoryList.length === 0 ? (
+                      <p className="text-center text-xs text-gray-500 py-10 uppercase tracking-widest font-black">No transactions found</p>
+                    ) : (
+                      customerHistoryList.map((h: any) => (
+                        <div key={h.id} className="flex justify-between items-center bg-white/5 p-3 rounded-2xl border border-white/5">
+                          <div>
+                            <span className="text-xs font-black text-gray-200 block">{h.description}</span>
+                            <span className="text-[8px] text-gray-500 block font-mono">
+                              {h.timestamp?.toDate ? h.timestamp.toDate().toLocaleString('en-IN') : new Date(h.timestamp).toLocaleString()}
+                            </span>
+                          </div>
+                          <span className={`px-2 py-0.5 rounded-lg text-[10px] font-black font-mono border ${
+                            h.type === 'earn' ? 'bg-green-500/10 text-green-400 border-green-500/20' : 'bg-red-500/10 text-red-500 border-red-500/20'
+                          }`}>
+                            {h.type === 'earn' ? '+' : '-'}{h.points} Pts
+                          </span>
+                        </div>
+                      ))
+                    )}
                   </div>
                 </div>
-
-                {/* Search Results list */}
-                <div className="space-y-2 max-h-[200px] overflow-y-auto pr-1">
-                  {isSearchingCustomer ? (
-                    <div className="flex justify-center py-4">
-                      <Loader2 className="animate-spin text-orange-500" size={18} />
+              ) : editingCustomer ? (
+                /* IF EDITING CUSTOMER PROFILE DIRECTLY FROM THE DIRECTORY */
+                <div className="flex flex-col space-y-4">
+                  <div className="flex justify-between items-center border-b border-white/5 pb-2">
+                    <div className="flex items-center gap-2 text-yellow-300">
+                      <Edit size={16} />
+                      <div>
+                        <h3 className="text-sm font-black text-white">Edit Customer Profile</h3>
+                        <p className="text-[8px] text-orange-500 font-bold uppercase tracking-wider">Modify loyalty properties</p>
+                      </div>
                     </div>
-                  ) : searchedCustomers.length === 0 ? (
-                    <p className="text-center text-xs text-gray-500 py-3 uppercase tracking-widest font-black">No matches found</p>
-                  ) : (
-                    searchedCustomers.map((cust) => (
-                      <div 
-                        key={cust.id} 
-                        onClick={() => handleSelectCustomer(cust)}
-                        className="bg-neutral-900 border border-white/5 p-3 rounded-2xl flex items-center justify-between hover:border-orange-500 cursor-pointer transition-all"
-                      >
-                        <div className="space-y-0.5">
-                          <span className="font-bold text-xs text-white block">{cust.name}</span>
-                          <span className="text-[9px] text-gray-400 font-mono block">📞 {cust.phone} {cust.address ? `| 📍 ${cust.address.substring(0, 30)}...` : ''}</span>
+                    <button 
+                      type="button" 
+                      onClick={() => { triggerBeep('tap'); setEditingCustomer(null); }}
+                      className="p-1.5 bg-neutral-900 border border-white/5 text-gray-400 hover:text-white rounded-full"
+                    >
+                      <ArrowLeft size={14} /> Back
+                    </button>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <label className="text-[8px] font-black uppercase text-gray-400">Mobile Number (Non-editable)</label>
+                        <input type="text" disabled value={editingCustomer.phone} className="w-full bg-neutral-900/50 border border-white/5 text-gray-500 p-2.5 rounded-xl text-xs font-mono font-bold cursor-not-allowed" />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[8px] font-black uppercase text-gray-400">Customer Name</label>
+                        <input type="text" value={newCustName} onChange={(e) => setNewCustName(e.target.value)} className="w-full bg-black/40 border border-white/10 text-white p-2.5 rounded-xl text-xs outline-none focus:border-orange-500 font-bold" />
+                      </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <label className="text-[8px] font-black uppercase text-gray-400">Saved Delivery Address</label>
+                        <input type="text" value={newCustAddress} onChange={(e) => setNewCustAddress(e.target.value)} className="w-full bg-black/40 border border-white/10 text-white p-2.5 rounded-xl text-xs outline-none focus:border-orange-500 font-semibold" />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[8px] font-black uppercase text-gray-400">Loyalty Points Balance</label>
+                        <input type="number" value={editCustPoints} onChange={(e) => setEditCustPoints(Math.max(0, Number(e.target.value)))} className="w-full bg-black/40 border border-white/10 text-yellow-300 p-2.5 rounded-xl text-xs outline-none focus:border-orange-500 font-mono font-black" />
+                      </div>
+                    </div>
+
+                    <button 
+                      type="button" 
+                      onClick={handleUpdateCustomerProfile}
+                      className="w-full bg-orange-600 hover:bg-orange-700 text-white font-black py-3 rounded-xl text-xs uppercase"
+                    >
+                      Save Profile Changes ➔
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                /* MAIN GUEST SEARCH DIRECTORY PANEL */
+                <>
+                  <div className="flex justify-between items-center border-b border-white/5 pb-2">
+                    <div>
+                      <h3 className="text-sm font-black text-white">Customer Directory</h3>
+                      <p className="text-[8px] text-orange-500 font-bold uppercase tracking-wider">Loyalty & Address Database Lookup</p>
+                    </div>
+                    <button 
+                      type="button" 
+                      onClick={() => { triggerBeep('tap'); setIsCustomerModalOpen(false); }}
+                      className="p-1.5 bg-neutral-900 border border-white/5 text-gray-400 hover:text-white rounded-full"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+
+                  {/* Main Body */}
+                  <div className="flex-1 overflow-y-auto space-y-4 pr-1 scrollbar-thin">
+                    
+                    {/* Search Section */}
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black uppercase text-gray-400">Search Existing Member</label>
+                      <div className="relative">
+                        <Search className="absolute left-3 top-2.5 text-gray-500" size={14} />
+                        <input 
+                          type="text" 
+                          placeholder="Search by 10-digit Phone or Name..." 
+                          value={customerSearchQuery}
+                          onChange={(e) => {
+                            setCustomerSearchQuery(e.target.value);
+                            searchDbCustomers(e.target.value);
+                          }}
+                          className="w-full bg-neutral-900 border border-white/5 rounded-xl py-2 px-9 text-xs text-white outline-none focus:border-orange-500 placeholder-gray-500 transition-colors"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Search Results list with Action controls */}
+                    <div className="space-y-2 max-h-[180px] overflow-y-auto pr-1 scrollbar-thin">
+                      {isSearchingCustomer ? (
+                        <div className="flex justify-center py-4">
+                          <Loader2 className="animate-spin text-orange-500" size={18} />
                         </div>
-                        <div className="flex items-center gap-2">
-                          <span className="bg-yellow-400/10 border border-yellow-400/20 text-yellow-300 text-[9px] font-black px-2 py-0.5 rounded-full font-mono">{cust.points || 0} Pts</span>
-                          <span className="text-[9px] font-black text-orange-500 uppercase shrink-0">Select ➔</span>
+                      ) : searchedCustomers.length === 0 ? (
+                        <p className="text-center text-xs text-gray-500 py-3 uppercase tracking-widest font-black">No matches found</p>
+                      ) : (
+                        searchedCustomers.map((cust) => (
+                          <div 
+                            key={cust.id} 
+                            className="bg-neutral-900 border border-white/5 p-3 rounded-2xl flex flex-col gap-2.5 hover:border-orange-500/50 transition-all"
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="space-y-0.5">
+                                <span className="font-bold text-xs text-white block">{cust.name}</span>
+                                <span className="text-[9px] text-gray-400 font-mono block">📞 {cust.phone} {cust.address ? `| 📍 ${cust.address.substring(0, 20)}...` : ''}</span>
+                              </div>
+                              <span className="bg-yellow-400/10 border border-yellow-400/20 text-yellow-300 text-[9px] font-black px-2 py-0.5 rounded-full font-mono">{cust.points || 0} Pts</span>
+                            </div>
+
+                            {/* Operational Actions */}
+                            <div className="flex gap-2 border-t border-white/5 pt-2">
+                              <button 
+                                type="button" 
+                                onClick={() => handleSelectCustomer(cust)}
+                                className="flex-1 bg-green-600/10 hover:bg-green-600 text-green-400 hover:text-white border border-green-500/20 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all"
+                              >
+                                Select ➔
+                              </button>
+                              <button 
+                                type="button" 
+                                onClick={() => handleStartEditProfile(cust)}
+                                className="bg-neutral-850 hover:bg-neutral-800 text-gray-300 border border-white/5 px-2.5 py-1.5 rounded-xl text-[9px] font-bold uppercase transition-all"
+                              >
+                                ✍️ Edit
+                              </button>
+                              <button 
+                                type="button" 
+                                onClick={() => handleLoadCustomerHistory(cust)}
+                                className="bg-neutral-850 hover:bg-neutral-800 text-yellow-400 border border-white/5 px-2.5 py-1.5 rounded-xl text-[9px] font-bold uppercase transition-all"
+                              >
+                                📜 Passbook
+                              </button>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+
+                    {/* Quick Add Form Section */}
+                    <div className="border-t border-white/5 pt-4 space-y-3">
+                      <p className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Or Register New Guest Profile</p>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <label className="text-[8px] font-black uppercase text-gray-400">Mobile Number (10 digit)</label>
+                          <input 
+                            type="tel" 
+                            maxLength={10}
+                            placeholder="e.g. 9876543210"
+                            value={newCustPhone}
+                            onChange={(e) => setNewCustPhone(e.target.value)}
+                            className="w-full bg-[#050505] border border-white/5 rounded-xl p-2.5 text-xs text-white outline-none focus:border-orange-500 font-mono font-bold"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[8px] font-black uppercase text-gray-400">Customer Name</label>
+                          <input 
+                            type="text" 
+                            placeholder="e.g. Ramesh ji"
+                            value={newCustName}
+                            onChange={(e) => setNewCustName(e.target.value)}
+                            className="w-full bg-[#050505] border border-white/5 rounded-xl p-2.5 text-xs text-white outline-none focus:border-orange-500 font-bold"
+                          />
                         </div>
                       </div>
-                    ))
-                  )}
-                </div>
-
-                {/* Quick Add Form Section */}
-                <div className="border-t border-white/5 pt-4 space-y-3">
-                  <p className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Or Register New Guest Profile</p>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1">
-                      <label className="text-[8px] font-black uppercase text-gray-400">Mobile Number (10 digit)</label>
-                      <input 
-                        type="tel" 
-                        maxLength={10}
-                        placeholder="e.g. 9876543210"
-                        value={newCustPhone}
-                        onChange={(e) => setNewCustPhone(e.target.value)}
-                        className="w-full bg-[#050505] border border-white/5 rounded-xl p-2.5 text-xs text-white outline-none focus:border-orange-500 font-mono font-bold"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[8px] font-black uppercase text-gray-400">Customer Name</label>
-                      <input 
-                        type="text" 
-                        placeholder="e.g. Ramesh ji"
-                        value={newCustName}
-                        onChange={(e) => setNewCustName(e.target.value)}
-                        className="w-full bg-[#050505] border border-white/5 rounded-xl p-2.5 text-xs text-white outline-none focus:border-orange-500 font-bold"
-                      />
+                      <div className="space-y-1">
+                        <label className="text-[8px] font-black uppercase text-gray-400">Delivery Address (Optional)</label>
+                        <input 
+                          type="text" 
+                          placeholder="e.g. House No. 12, Mohandra"
+                          value={newCustAddress}
+                          onChange={(e) => setNewCustAddress(e.target.value)}
+                          className="w-full bg-[#050505] border border-white/5 rounded-xl p-2.5 text-xs text-white outline-none focus:border-orange-500 font-semibold"
+                        />
+                      </div>
                     </div>
                   </div>
-                  <div className="space-y-1">
-                    <label className="text-[8px] font-black uppercase text-gray-400">Delivery Address (Optional)</label>
-                    <input 
-                      type="text" 
-                      placeholder="e.g. House No. 12, Mohandra"
-                      value={newCustAddress}
-                      onChange={(e) => setNewCustAddress(e.target.value)}
-                      className="w-full bg-[#050505] border border-white/5 rounded-xl p-2.5 text-xs text-white outline-none focus:border-orange-500 font-semibold"
-                    />
-                  </div>
-                </div>
-              </div>
 
-              {/* Footer Save Operations */}
-              <div className="border-t border-white/5 pt-3 flex gap-2 animate-none">
-                <button 
-                  type="button" 
-                  onClick={handleSaveNewCustomer}
-                  className="flex-grow bg-green-600 hover:bg-green-700 text-white font-black py-3 rounded-xl text-xs uppercase tracking-wider shadow"
-                >
-                  Save & Select Guest ➔
-                </button>
-                <button 
-                  type="button" 
-                  onClick={() => { triggerBeep('tap'); setIsCustomerModalOpen(false); }}
-                  className="bg-neutral-900 border border-white/5 text-gray-400 hover:text-white px-4 py-3 rounded-xl text-xs font-bold uppercase"
-                >
-                  Cancel
-                </button>
-              </div>
+                  {/* Footer Save Operations */}
+                  <div className="border-t border-white/5 pt-3 flex gap-2">
+                    <button 
+                      type="button" 
+                      onClick={handleSaveNewCustomer}
+                      className="flex-grow bg-green-600 hover:bg-green-700 text-white font-black py-3 rounded-xl text-xs uppercase tracking-wider shadow"
+                    >
+                      Save & Select Guest ➔
+                    </button>
+                    <button 
+                      type="button" 
+                      onClick={() => { triggerBeep('tap'); setIsCustomerModalOpen(false); }}
+                      className="bg-neutral-900 border border-white/5 text-gray-400 hover:text-white px-4 py-3 rounded-xl text-xs font-bold uppercase"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </>
+              )}
             </motion.div>
           </div>
         )}
