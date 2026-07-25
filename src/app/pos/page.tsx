@@ -9,7 +9,7 @@ import {
   ShoppingBag, Plus, Minus, Search, X, User, Star, Gift, 
   Loader2, Clock, Trash2, Printer, Check, Play, Settings, 
   Database, RefreshCw, Layers, Phone, MapPin, LayoutGrid, List,
-  ChevronLeft, ChevronRight 
+  Menu // Added Menu icon for sidebar trigger
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
@@ -23,11 +23,11 @@ interface PosCartItem {
 }
 
 export default function BbCafePos() {
-  // Navigation & View States
+  // Navigation & View States - Default tab is 'billing'
   const [activeTab, setActiveTab] = useState<'orders' | 'billing' | 'inventory'>('billing');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid'); 
   const [isCartOpen, setIsCartOpen] = useState<boolean>(false); 
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false); // Sidebar Open/Close state
+  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false); // Fully collapsible sidebar state (Default: closed/hidden)
 
   // Database States
   const [liveOrders, setLiveOrders] = useState<any[]>([]);
@@ -84,7 +84,7 @@ export default function BbCafePos() {
     return () => unsubscribe();
   }, []);
 
-  // Load menu items on component mount or tab change
+  // Load menu items
   useEffect(() => {
     const fetchDbData = async () => {
       setLoading(true);
@@ -157,7 +157,7 @@ export default function BbCafePos() {
         quantity: 1
       }];
     });
-    toast.success(`${item.name} added to desk!`, { duration: 1000 });
+    toast.success(`${item.name} added!`, { duration: 800 });
   };
 
   const handleUpdateCartQuantity = (id: string, amount: number) => {
@@ -405,120 +405,134 @@ export default function BbCafePos() {
     <div className="min-h-screen bg-[#050505] text-gray-100 flex flex-row font-sans antialiased overflow-hidden">
       <Toaster position="top-center" />
 
-      {/* 1. LEFT COLLAPSIBLE NAVIGATION SIDEBAR */}
-      <aside 
-        className={`bg-neutral-950 border-r border-white/5 flex flex-col justify-between p-4 shrink-0 shadow-lg z-30 transition-all duration-300 ${
-          isSidebarCollapsed ? 'w-20' : 'w-64'
-        }`}
-      >
-        <div className="space-y-6">
-          {/* Logo / Title Block & Collapse/Expand Trigger Button */}
-          <div className="flex items-center justify-between px-1 py-1 border-b border-white/5 pb-4 gap-2">
-            {!isSidebarCollapsed && (
-              <div className="flex items-center gap-2">
-                <Database className="text-orange-500 animate-pulse" size={18} />
-                <h1 className="text-xs font-black tracking-wider uppercase text-yellow-300">
-                  Bum Bum POS <span className="text-[8px] text-gray-400 lowercase font-mono">v1.9</span>
-                </h1>
-              </div>
-            )}
-            {isSidebarCollapsed && (
-              <Database className="text-orange-500 animate-pulse mx-auto" size={18} />
-            )}
-            <button 
-              onClick={() => { triggerBeep('tap'); setIsSidebarCollapsed(!isSidebarCollapsed); }}
-              className="p-1.5 bg-neutral-900 border border-white/5 text-gray-400 hover:text-white rounded-lg mx-auto"
-              title={isSidebarCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
-            >
-              {isSidebarCollapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
-            </button>
-          </div>
+      {/* 1. COMPLETELY COLLAPSIBLE SLIDE-OUT SIDEBAR DRAWER */}
+      <AnimatePresence>
+        {isSidebarOpen && (
+          <>
+            {/* Sidebar Backdrop overlay */}
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsSidebarOpen(false)}
+              className="fixed inset-0 bg-black/70 z-40 backdrop-blur-xs cursor-pointer"
+            />
 
-          {/* Vertical Navigation Items */}
-          <nav className="space-y-1.5">
-            <button 
-              onClick={() => { triggerBeep('tap'); setActiveTab('billing'); }}
-              className={`w-full flex items-center rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-250 ${
-                isSidebarCollapsed ? 'justify-center p-3' : 'justify-start px-4 py-3 gap-3'
-              } ${activeTab === 'billing' ? 'bg-orange-600 text-white shadow-md' : 'text-gray-400 hover:text-white hover:bg-neutral-900'}`}
-              title="Counter Billing"
+            {/* Slide-out Sidebar */}
+            <motion.aside 
+              initial={{ x: '-100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '-100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 220 }}
+              className="fixed left-0 top-0 bottom-0 w-64 bg-neutral-950 border-r border-white/5 flex flex-col justify-between p-4 shadow-2xl z-50"
             >
-              <ShoppingBag size={14} />
-              {!isSidebarCollapsed && <span>Counter Billing</span>}
-            </button>
+              <div className="space-y-6">
+                {/* Header with Close option */}
+                <div className="flex items-center justify-between px-1 py-1 border-b border-white/5 pb-4 gap-2">
+                  <div className="flex items-center gap-2">
+                    <Database className="text-orange-500 animate-pulse" size={18} />
+                    <h1 className="text-xs font-black tracking-wider uppercase text-yellow-300">
+                      Bum Bum POS <span className="text-[8px] text-gray-400 lowercase font-mono">v1.10</span>
+                    </h1>
+                  </div>
+                  <button 
+                    onClick={() => { triggerBeep('tap'); setIsSidebarOpen(false); }}
+                    className="p-1.5 bg-neutral-900 border border-white/5 text-gray-400 hover:text-white rounded-lg"
+                    title="Close Sidebar"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
 
-            <button 
-              onClick={() => { triggerBeep('tap'); setActiveTab('orders'); }}
-              className={`w-full flex items-center rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-250 ${
-                isSidebarCollapsed ? 'justify-center p-3' : 'justify-between px-4 py-3'
-              } ${activeTab === 'orders' ? 'bg-orange-600 text-white shadow-md' : 'text-gray-400 hover:text-white hover:bg-neutral-900'}`}
-              title="Live Orders"
-            >
-              <div className={`flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'}`}>
-                <Clock size={14} />
-                {!isSidebarCollapsed && <span>Live Orders</span>}
+                {/* Vertical Navigation items */}
+                <nav className="space-y-1.5">
+                  <button 
+                    onClick={() => { triggerBeep('tap'); setActiveTab('billing'); setIsSidebarOpen(false); }}
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-200 ${activeTab === 'billing' ? 'bg-orange-600 text-white shadow-md' : 'text-gray-400 hover:text-white hover:bg-neutral-900'}`}
+                  >
+                    <ShoppingBag size={14} />
+                    <span>Counter Billing</span>
+                  </button>
+
+                  <button 
+                    onClick={() => { triggerBeep('tap'); setActiveTab('orders'); setIsSidebarOpen(false); }}
+                    className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-200 ${activeTab === 'orders' ? 'bg-orange-600 text-white shadow-md' : 'text-gray-400 hover:text-white hover:bg-neutral-900'}`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <Clock size={14} />
+                      <span>Live Orders</span>
+                    </div>
+                    {liveOrders.filter(o => o.status !== 'completed' && o.status !== 'rejected').length > 0 && (
+                      <span className="bg-yellow-400 text-black font-black text-[9px] px-2 py-0.5 rounded-full font-mono">
+                        {liveOrders.filter(o => o.status !== 'completed' && o.status !== 'rejected').length}
+                      </span>
+                    )}
+                  </button>
+
+                  <button 
+                    onClick={() => { triggerBeep('tap'); setActiveTab('inventory'); setIsSidebarOpen(false); }}
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-200 ${activeTab === 'inventory' ? 'bg-orange-600 text-white shadow-md' : 'text-gray-400 hover:text-white hover:bg-neutral-900'}`}
+                  >
+                    <Layers size={14} />
+                    <span>Stock Toggle</span>
+                  </button>
+                </nav>
               </div>
-              {!isSidebarCollapsed && liveOrders.filter(o => o.status !== 'completed' && o.status !== 'rejected').length > 0 && (
-                <span className="bg-yellow-400 text-black font-black text-[9px] px-2 py-0.5 rounded-full font-mono">
-                  {liveOrders.filter(o => o.status !== 'completed' && o.status !== 'rejected').length}
-                </span>
+
+              {/* Sidebar bottom View Toggles */}
+              {activeTab === 'billing' && (
+                <div className="border-t border-white/5 pt-4 space-y-2">
+                  <p className="text-[9px] font-black uppercase text-gray-500 px-2 tracking-wider">Layout View</p>
+                  <div className="flex bg-neutral-900 border border-white/5 p-1 rounded-xl">
+                    <button 
+                      type="button"
+                      onClick={() => { triggerBeep('tap'); setViewMode('grid'); }}
+                      className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[9px] font-black uppercase transition-all ${viewMode === 'grid' ? 'bg-orange-500 text-black shadow-sm' : 'text-gray-400 hover:text-white'}`}
+                    >
+                      <LayoutGrid size={12} />
+                      <span>Grid</span>
+                    </button>
+                    <button 
+                      type="button"
+                      onClick={() => { triggerBeep('tap'); setViewMode('list'); }}
+                      className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[9px] font-black uppercase transition-all ${viewMode === 'list' ? 'bg-orange-500 text-black shadow-sm' : 'text-gray-400 hover:text-white'}`}
+                    >
+                      <List size={12} />
+                      <span>List</span>
+                    </button>
+                  </div>
+                </div>
               )}
-            </button>
-
-            <button 
-              onClick={() => { triggerBeep('tap'); setActiveTab('inventory'); }}
-              className={`w-full flex items-center rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-250 ${
-                isSidebarCollapsed ? 'justify-center p-3' : 'justify-start px-4 py-3 gap-3'
-              } ${activeTab === 'inventory' ? 'bg-orange-600 text-white shadow-md' : 'text-gray-400 hover:text-white hover:bg-neutral-900'}`}
-              title="Stock Toggle"
-            >
-              <Layers size={14} />
-              {!isSidebarCollapsed && <span>Stock Toggle</span>}
-            </button>
-          </nav>
-        </div>
-
-        {/* SIDEBAR BOTTOM: CONDITIONAL GRID / LIST VIEW CONTROLS */}
-        {activeTab === 'billing' && (
-          <div className="border-t border-white/5 pt-4 space-y-2">
-            {!isSidebarCollapsed && (
-              <p className="text-[9px] font-black uppercase text-gray-500 px-2 tracking-wider">Layout View</p>
-            )}
-            <div className={`flex bg-neutral-900 border border-white/5 p-1 rounded-xl ${isSidebarCollapsed ? 'flex-col gap-1' : 'flex-row'}`}>
-              <button 
-                type="button"
-                onClick={() => { triggerBeep('tap'); setViewMode('grid'); }}
-                className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[9px] font-black uppercase transition-all ${viewMode === 'grid' ? 'bg-orange-500 text-black shadow-sm' : 'text-gray-400 hover:text-white'}`}
-                title="Grid View"
-              >
-                <LayoutGrid size={12} />
-                {!isSidebarCollapsed && <span>Grid</span>}
-              </button>
-              <button 
-                type="button"
-                onClick={() => { triggerBeep('tap'); setViewMode('list'); }}
-                className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[9px] font-black uppercase transition-all ${viewMode === 'list' ? 'bg-orange-500 text-black shadow-sm' : 'text-gray-400 hover:text-white'}`}
-                title="List View"
-              >
-                <List size={12} />
-                {!isSidebarCollapsed && <span>List</span>}
-              </button>
-            </div>
-          </div>
+            </motion.aside>
+          </>
         )}
-      </aside>
+      </AnimatePresence>
 
-      {/* 2. MAIN WORKSPACE CONTENT */}
+      {/* 2. MAIN WORKSPACE CONTENT AREA (Always takes full screen width when sidebar is closed) */}
       <main className="flex-1 p-5 overflow-hidden flex flex-col relative h-screen">
         
+        {/* GLOBAL HEADER BAR WITH SIDEBAR MENU TOGGLE */}
+        <div className="flex items-center gap-3 mb-4 shrink-0 border-b border-white/5 pb-3">
+          <button 
+            type="button"
+            onClick={() => { triggerBeep('tap'); setIsSidebarOpen(true); }}
+            className="p-2.5 bg-neutral-950 hover:bg-neutral-900 border border-white/5 text-orange-500 hover:text-orange-400 rounded-xl transition-all shadow-md flex-shrink-0"
+            title="Open Menu Sidebar"
+          >
+            <Menu size={16} />
+          </button>
+          
+          <div className="flex flex-col">
+            <h2 className="text-[10px] font-black uppercase tracking-widest text-orange-500 leading-none">
+              {activeTab === 'billing' ? 'Counter Billing Workspace' : activeTab === 'orders' ? 'Live Orders Pipeline' : 'Item Availability Control'}
+            </h2>
+            <span className="text-[9px] text-gray-400 font-bold mt-1">Bum Bum Cafe • Mohandra</span>
+          </div>
+        </div>
+
         {/* VIEW 1: LIVE ORDERS TICKET PIPELINE */}
         {activeTab === 'orders' && (
           <div className="space-y-4 flex-1 overflow-y-auto pr-1">
-            <div className="flex justify-between items-center">
-              <h2 className="text-xs font-black uppercase tracking-widest text-orange-500">Live Kitchen and Delivery Pipeline</h2>
-              <span className="text-[10px] font-bold text-gray-400">Updates instantly as customers order online</span>
-            </div>
-
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pb-20">
               {liveOrders.map((order: any) => {
                 if (order.status === 'completed' || order.status === 'rejected') return null;
@@ -663,8 +677,8 @@ export default function BbCafePos() {
                 <p className="text-center text-gray-500 text-xs py-10 uppercase tracking-widest font-black">No matching items found</p>
               ) : viewMode === 'grid' ? (
                 
-                /* GRID VIEW */
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 overflow-y-auto flex-1 pr-1 pb-16">
+                /* EXTREMELY HIGH-DENSITY 4-COLUMN GRID LAYOUT */
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 overflow-y-auto flex-1 pr-1 pb-16">
                   {filteredMenu.map((item) => {
                     const isAvailable = item.isAvailable !== false;
                     return (
@@ -672,7 +686,7 @@ export default function BbCafePos() {
                         key={item.id}
                         disabled={!isAvailable}
                         onClick={() => handleAddProductToCart(item)}
-                        className={`bg-neutral-900 border p-3 rounded-2xl text-left flex flex-col justify-between h-24 hover:border-orange-500 transition-all duration-200 active:scale-95 ${!isAvailable ? 'opacity-40 cursor-not-allowed' : 'border-white/5'}`}
+                        className={`bg-neutral-900 border p-3 rounded-2xl text-left flex flex-col justify-between h-24 hover:border-orange-500 transition-all duration-200 active:scale-95 ${!isAvailable ? 'opacity-40 cursor-not-allowed border-white/5' : 'border-white/5'}`}
                       >
                         <div>
                           <p className="font-bold text-xs text-gray-100 line-clamp-2 leading-snug">{item.name}</p>
@@ -688,7 +702,7 @@ export default function BbCafePos() {
                 </div>
               ) : (
                 
-                /* LIST VIEW */
+                /* DENSE LIST VIEW */
                 <div className="flex flex-col gap-2 overflow-y-auto flex-1 pr-1 pb-16">
                   {filteredMenu.map((item) => {
                     const isAvailable = item.isAvailable !== false;
@@ -950,7 +964,7 @@ export default function BbCafePos() {
                 return (
                   <div 
                     key={item.id} 
-                    className="bg-neutral-900 border border-white/5 p-4 rounded-2xl flex items-center justify-between"
+                    className="bg-neutral-950 border border-white/5 p-4 rounded-2xl flex items-center justify-between"
                   >
                     <div>
                       <span className="font-bold text-xs text-white block">{item.name}</span>
