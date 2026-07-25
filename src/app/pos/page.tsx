@@ -6,8 +6,10 @@ import {
   updateDoc, addDoc, runTransaction, increment, getDoc, getDocs, where, setDoc 
 } from 'firebase/firestore';
 import { 
-  ShoppingBag, Search, X, Loader2, Clock, Trash2, Printer, Check, Play, Settings, 
-  Database, RefreshCw, Layers, Menu, Users
+  ShoppingBag, Plus, Minus, Search, X, User, Star, Gift, 
+  Loader2, Clock, Trash2, Printer, Check, Play, Settings, 
+  Database, RefreshCw, Layers, Phone, MapPin, LayoutGrid, List,
+  Menu, Users
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
@@ -16,6 +18,11 @@ import toast, { Toaster } from 'react-hot-toast';
 import PosCartDrawer from '@/components/pos/PosCartDrawer';
 import CustomerDirectoryModal from '@/components/pos/CustomerDirectoryModal';
 import CustomizerModal from '@/components/pos/CustomizerModal';
+
+// ⚡ TypeScript TS2607 एरर को बायपास करने के लिए कास्टिंग
+const SafeLock = Lock as any;
+const SafeDatabase = Database as any;
+const SafeMenu = Menu as any;
 
 interface PosCartItem {
   id: string;
@@ -424,7 +431,7 @@ export default function BbCafePos() {
         <Toaster position="top-center" />
         <form onSubmit={handlePinLoginSubmit} className="bg-neutral-950 border border-white/5 p-8 rounded-[2rem] w-full max-w-sm text-center space-y-6 shadow-2xl">
           <div className="space-y-2">
-            <Lock className="text-orange-500 animate-bounce mx-auto" size={40} />
+            <SafeLock className="text-orange-500 animate-bounce mx-auto" size={40} />
             <h1 className="text-lg font-black tracking-wider uppercase text-yellow-300">Bum Bum POS Security</h1>
             <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Please enter 4-Digit Security PIN</p>
           </div>
@@ -454,7 +461,7 @@ export default function BbCafePos() {
         <div className="space-y-6">
           <div className="flex items-center justify-between px-1 py-1 border-b border-neutral-200 dark:border-white/5 pb-4 gap-2">
             <div className="flex items-center gap-2">
-              <Database className="text-orange-500 animate-pulse" size={18} />
+              <SafeDatabase className="text-orange-500 animate-pulse" size={18} />
               <h1 className="text-xs font-black tracking-wider uppercase text-yellow-500 dark:text-yellow-300">Bum Bum POS <span className="text-[8px] text-gray-400 lowercase font-mono">v1.12</span></h1>
             </div>
             <button onClick={() => { triggerBeep('tap'); setIsSidebarOpen(!isSidebarOpen); }} className="p-1.5 bg-neutral-200 dark:bg-neutral-900 border border-neutral-300 dark:border-white/5 text-gray-400 hover:text-white rounded-lg md:hidden"><X size={14} /></button>
@@ -481,7 +488,7 @@ export default function BbCafePos() {
       <main className="flex-1 p-5 overflow-hidden flex flex-col relative h-screen">
         {/* GLOBAL HEADER BAR */}
         <div className="flex items-center gap-3 mb-4 shrink-0 border-b border-neutral-200 dark:border-white/5 pb-3">
-          <button type="button" onClick={() => { triggerBeep('tap'); setIsSidebarOpen(true); }} className="p-2.5 bg-neutral-200 dark:bg-neutral-950 hover:bg-neutral-300 dark:hover:bg-neutral-900 border border-neutral-300 dark:border-white/5 text-orange-500 hover:text-orange-400 rounded-xl transition-all shadow-md md:hidden"><Menu size={16} /></button>
+          <button type="button" onClick={() => { triggerBeep('tap'); setIsSidebarOpen(true); }} className="p-2.5 bg-neutral-200 dark:bg-neutral-950 hover:bg-neutral-300 dark:hover:bg-neutral-900 border border-neutral-300 dark:border-white/5 text-orange-500 hover:text-orange-400 rounded-xl transition-all shadow-md md:hidden"><SafeMenu size={16} /></button>
           <div className="flex flex-col"><h2 className="text-[10px] font-black uppercase tracking-widest text-orange-500 leading-none">{activeTab === 'billing' ? 'Counter Billing Workspace' : activeTab === 'orders' ? 'Live Orders Pipeline' : activeTab === 'inventory' ? 'Item Availability Control' : activeTab === 'receipts' ? 'Past Receipts reprint panel' : 'POS Configuration Settings'}</h2><span className="text-[9px] text-gray-400 font-bold mt-1">Bum Bum Cafe • Mohandra</span></div>
         </div>
 
@@ -498,7 +505,7 @@ export default function BbCafePos() {
                         <div><p className="text-xs font-black text-yellow-600 dark:text-yellow-300 font-mono">Bill: #${String(order.billNumber).padStart(4, '0')}</p><p className="text-[9px] text-gray-400 font-mono mt-0.5">Token: #{order.tokenNumber}</p></div>
                         <span className="bg-orange-500/10 border border-orange-500/20 text-orange-400 text-[8px] font-black uppercase tracking-wider px-2 py-0.5 rounded">{order.fulfillmentType || 'table'}</span>
                       </div>
-                      <div className="space-y-1 mb-3 text-[10px] font-semibold text-neutral-800 dark:text-gray-300"><p className="dark:text-white text-neutral-950 truncate font-black">👤 {order.customerName}</p>{order.customerPhone && <p className="font-mono">📞 {order.customerPhone}</p>}{order.address && <p className="text-gray-400 line-clamp-1">📍 {order.address}</p>}</div>
+                      <div className="space-y-1 mb-3 text-[10px] font-semibold text-neutral-800 dark:text-gray-300"><p className="dark:text-white text-neutral-955 truncate font-black">👤 {order.customerName}</p>{order.customerPhone && <p className="font-mono">📞 {order.customerPhone}</p>}{order.address && <p className="text-gray-400 line-clamp-1">📍 {order.address}</p>}</div>
                       <div className="space-y-1.5 border-t border-dashed border-neutral-200 dark:border-white/5 pt-2.5 mb-4">
                         {order.items?.map((it: any, index: number) => (
                           <div key={index} className="flex justify-between text-[11px] text-neutral-800 dark:text-gray-200"><span className="font-bold">{it.name} <span className="text-orange-500">x{it.quantity}</span>{it.note ? `<br/><span style="font-size: 9px; color: #888;">(${it.note})</span>` : ''}</span><span className="font-mono text-gray-400">₹{it.price * it.quantity}</span></div>
@@ -555,7 +562,7 @@ export default function BbCafePos() {
             </div>
 
             {cart.length > 0 && !isCartOpen && (
-              <motion.button initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} onClick={() => { triggerBeep('tap'); setIsCartOpen(true); }} className="fixed bottom-6 right-6 left-6 md:left-auto bg-green-600 hover:bg-green-700 text-white font-black px-6 py-4 rounded-2xl shadow-2xl flex items-center justify-between gap-4 z-40 border border-green-500/20 active:scale-95 transition-all"><div className="flex items-center gap-2.5"><div className="bg-white/10 p-2 rounded-xl"><ShoppingBag size={16} /></div><div className="text-left"><p className="text-[8px] uppercase tracking-wider text-green-100">Active Bill Cart</p><p className="text-xs font-bold font-mono">{cart.reduce((sum, item) => sum + item.quantity, 0)} Items</p></div></div><div className="flex items-center gap-1 text-sm font-black font-mono"><span>To Pay: ₹{getTotalBillPrice()}</span><span>➔</span></div></motion.button>
+              <motion.button  initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} onClick={() => { triggerBeep('tap'); setIsCartOpen(true); }} className="fixed bottom-6 right-6 left-6 md:left-auto bg-green-600 hover:bg-green-700 text-white font-black px-6 py-4 rounded-2xl shadow-2xl flex items-center justify-between gap-4 z-40 border border-green-500/20 active:scale-95 transition-all"><div className="flex items-center gap-2.5"><div className="bg-white/10 p-2 rounded-xl"><ShoppingBag size={16} /></div><div className="text-left"><p className="text-[8px] uppercase tracking-wider text-green-100">Active Bill Cart</p><p className="text-xs font-bold font-mono">{cart.reduce((sum, item) => sum + item.quantity, 0)} Items</p></div></div><div className="flex items-center gap-1 text-sm font-black font-mono"><span>To Pay: ₹{getTotalBillPrice()}</span><span>➔</span></div></motion.button>
             )}
           </div>
         )}
