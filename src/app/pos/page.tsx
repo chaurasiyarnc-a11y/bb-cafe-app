@@ -60,22 +60,24 @@ interface DeliveryArea {
   range: string;
 }
 
-const DELIVERY_AREAS: DeliveryArea[] = [
-  { name: "Mohandra Town", fee: 20, minFree: 99, range: "0-2 KM" },
-  { name: "Within 5 KM (Bum Bum Cafe से 5km के दायरे में)", fee: 50, minFree: 499, range: "2-5 KM" },
-  { name: "Within 12 KM (12km के दायरे में)", fee: 99, minFree: 999, range: "5-12 KM" }
-];
-
-const PIZZA_ADDONS: { [size: string]: { [addon: string]: number } } = {
-  "small": { "Veg Add-on": 10, "Paneer": 20, "Black Olives": 20, "Jalapeno": 20, "Extra Cheese": 20, "Mushroom": 20 },
-  "medium": { "Veg Add-on": 10, "Paneer": 30, "Black Olives": 30, "Jalapeno": 30, "Extra Cheese": 30, "Mushroom": 30 },
-  "large": { "Veg Add-on": 20, "Paneer": 40, "Black Olives": 40, "Jalapeno": 40, "Extra Cheese": 40, "Mushroom": 40 },
-  "extra large": { "Veg Add-on": 30, "Paneer": 50, "Black Olives": 50, "Jalapeno": 50, "Extra Cheese": 60, "Mushroom": 50 }
-};
-
-const QUICK_INSTRUCTION_TAGS = ["🌶️ Extra Spicy", "🧅 No Onion-Garlic", "🧀 Extra Cheese", "🔥 Well Baked", "🌱 Make it Mild"];
-
 export default function BbCafePos() {
+  const DELIVERY_AREAS: DeliveryArea[] = useMemo(() => [
+    { name: "Mohandra Town", fee: 20, minFree: 99, range: "0-2 KM" },
+    { name: "Within 5 KM (Bum Bum Cafe से 5km के दायरे में)", fee: 50, minFree: 499, range: "2-5 KM" },
+    { name: "Within 12 KM (12km के दायरे में)", fee: 99, minFree: 999, range: "5-12 KM" }
+  ], []);
+
+  const PIZZA_ADDONS: { [size: string]: { [addon: string]: number } } = useMemo(() => ({
+    "small": { "Veg Add-on": 10, "Paneer": 20, "Black Olives": 20, "Jalapeno": 20, "Extra Cheese": 20, "Mushroom": 20 },
+    "medium": { "Veg Add-on": 10, "Paneer": 30, "Black Olives": 30, "Jalapeno": 30, "Extra Cheese": 30, "Mushroom": 30 },
+    "large": { "Veg Add-on": 20, "Paneer": 40, "Black Olives": 40, "Jalapeno": 40, "Extra Cheese": 40, "Mushroom": 40 },
+    "extra large": { "Veg Add-on": 30, "Paneer": 50, "Black Olives": 50, "Jalapeno": 50, "Extra Cheese": 60, "Mushroom": 50 }
+  }), []);
+
+  const QUICK_INSTRUCTION_TAGS = useMemo(() => [
+    "🌶️ Extra Spicy", "🧅 No Onion-Garlic", "🧀 Extra Cheese", "🔥 Well Baked", "🌱 Make it Mild"
+  ], []);
+
   // Authentication & Security Lockscreen States
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
   const [currentUser, setCurrentUser] = useState<any | null>(null);
@@ -172,7 +174,34 @@ export default function BbCafePos() {
     } catch (e) {}
   };
 
-  // Live Orders Listener & Store Open Listener
+  // Auth Session, Database streams & Settings fetchers
+  useEffect(() => {
+    const savedUser = localStorage.getItem("bb_pos_user");
+    if (savedUser) {
+      try {
+        const parsed = JSON.parse(savedUser);
+        setIsLoggedIn(true);
+        setCurrentUser(parsed);
+      } catch (e) {}
+    }
+
+    const localGst = localStorage.getItem("bb_pos_gst_enabled");
+    if (localGst) setGstEnabled(localGst === 'true');
+    const localGstRate = localStorage.getItem("bb_pos_gst_rate");
+    if (localGstRate) setGstRate(Number(localGstRate) || 5);
+    const localPaper = localStorage.getItem("bb_pos_paper_size");
+    if (localPaper) setPrinterPaperSize(localPaper as any);
+    const localTheme = localStorage.getItem("bb_pos_theme");
+    if (localTheme) {
+      setThemeMode(localTheme as any);
+      if (localTheme === 'light') {
+        document.documentElement.classList.remove('dark');
+      } else {
+        document.documentElement.classList.add('dark');
+      }
+    }
+  }, []);
+
   useEffect(() => {
     const q = query(collection(db, "orders"), orderBy("timestamp", "desc"), limit(60));
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -192,7 +221,6 @@ export default function BbCafePos() {
     };
   }, []);
 
-  // Fetch Menu Products
   useEffect(() => {
     if (!isLoggedIn) return;
     const fetchDbData = async () => {
@@ -270,6 +298,34 @@ export default function BbCafePos() {
       toast.success(`Order updated to ${nextStatus}`);
     } catch (err) {
       toast.error("Failed to update status");
+    }
+  };
+
+  const handleCheckLoyalty = async () => {
+    triggerBeep('tap');
+    if (customerPhone.trim().length !== 10) {
+      toast.error("Please enter a valid 10-digit number!");
+      return;
+    }
+    const phoneClean = customerPhone.trim();
+    const toastId = toast.loading("Checking loyalty points...");
+    try {
+      const docSnap = await getDoc(doc(db, "customer_points", phoneClean));
+      toast.dismiss(toastId);
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setCustomerName(data.name || '');
+        setCustomerPoints(data.points || 0);
+        if (data.address) setAddress(data.address);
+        toast.success(`Member Found! Points: ${data.points || 0}`);
+      } else {
+        setCustomerName('');
+        setCustomerPoints(0);
+        toast.success("New Guest profile initialized!");
+      }
+    } catch (e) {
+      toast.dismiss(toastId);
+      toast.error("Error checking loyalty DB");
     }
   };
 
@@ -916,7 +972,7 @@ export default function BbCafePos() {
               {liveOrders.map((order: any) => {
                 if (order.status === 'completed' || order.status === 'rejected') return null;
                 return (
-                  <motion.div layout key={order.id} className="bg-white dark:bg-neutral-950 border border-neutral-200 dark:border-white/5 rounded-2xl p-4 flex flex-col justify-between shadow-lg">
+                  <motion.div layout key={order.id} className="bg-white dark:bg-neutral-955 border border-neutral-200 dark:border-white/5 rounded-2xl p-4 flex flex-col justify-between shadow-lg">
                     <div>
                       <div className="flex justify-between items-start border-b border-neutral-200 dark:border-white/5 pb-2 mb-3">
                         <div><p className="text-xs font-black text-yellow-600 dark:text-yellow-300 font-mono">Bill: #${String(order.billNumber).padStart(4, '0')}</p><p className="text-[9px] text-gray-400 font-mono mt-0.5">Token: #{order.tokenNumber}</p></div>
