@@ -96,7 +96,7 @@ export default function CustomizerModal({
               <button
                 type="button"
                 key={tag}
-                onClick={() => { triggerBeep('tap'); setCustomizerChefNote((prev: any) => prev ? `${prev}, ${tag}` : tag); }}
+                onClick={() => { triggerBeep('tap'); setCustomizerChefNote(customizerChefNote ? `${customizerChefNote}, ${tag}` : tag); }}
                 className="text-[9px] font-bold py-1 px-2 rounded-full border border-white/5 bg-neutral-900 text-gray-300 hover:border-orange-500 transition-colors"
               >
                 {tag}
