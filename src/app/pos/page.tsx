@@ -20,8 +20,31 @@ import PosCartDrawer from '@/components/pos/PosCartDrawer';
 import CustomerDirectoryModal from '@/components/pos/CustomerDirectoryModal';
 import CustomizerModal from '@/components/pos/CustomizerModal';
 
-// ⚡ TypeScript TS2607 एरर से बचने के लिए सुरक्षित आइकन्स की घोषणा
-const [SafeLock, SafeDatabase, SafeMenu, SafeLogOut, SafeToggleRight, SafeToggleLeft, SafeMoon, SafeSun, SafeShoppingBag, SafeClock, SafeLayers, SafePrinter, SafeUsers, SafePlay, SafeCheck, SafeSearch, SafeX, SafeRefreshCw, SafeLayoutGrid, SafeList, SafePlus, SafeMinus, SafeChevronLeft, SafeChevronRight] = [Lock, Database, Menu, LogOut, ToggleRight, ToggleLeft, Moon, Sun, ShoppingBag, Clock, Layers, Printer, Users, Play, Check, Search, X, RefreshCw, LayoutGrid, List, Plus, Minus, ChevronLeft, ChevronRight].map(icon => icon as any);
+// ⚡ TypeScript TS2607 एरर से बचने के लिए सुरक्षित आइकन्स की मानक घोषणा (No destructuring mapping to avoid parser issues)
+const SafeLock = Lock as any;
+const SafeDatabase = Database as any;
+const SafeMenu = Menu as any;
+const SafeLogOut = LogOut as any;
+const SafeToggleRight = ToggleRight as any;
+const SafeToggleLeft = ToggleLeft as any;
+const SafeMoon = Moon as any;
+const SafeSun = Sun as any;
+const SafeShoppingBag = ShoppingBag as any;
+const SafeClock = Clock as any;
+const SafeLayers = Layers as any;
+const SafePrinter = Printer as any;
+const SafeUsers = Users as any;
+const SafePlay = Play as any;
+const SafeCheck = Check as any;
+const SafeSearch = Search as any;
+const SafeX = X as any;
+const SafeRefreshCw = RefreshCw as any;
+const SafeLayoutGrid = LayoutGrid as any;
+const SafeList = List as any;
+const SafePlus = Plus as any;
+const SafeMinus = Minus as any;
+const SafeChevronLeft = ChevronLeft as any;
+const SafeChevronRight = ChevronRight as any;
 
 interface PosCartItem {
   id: string;
@@ -30,7 +53,7 @@ interface PosCartItem {
   quantity: number;
   isReward?: boolean;
   pointsCost?: number;
-  note?: string; // रसोइया निर्देश/नोट्स
+  note?: string; 
 }
 
 interface DeliveryArea {
@@ -110,7 +133,7 @@ export default function BbCafePos() {
   const [address, setAddress] = useState<string>('');
   const [tableNumber, setTableNumber] = useState<string>('Table 1');
   const [isSubmittingOrder, setIsSubmittingOrder] = useState<boolean>(false);
-  const [chefInstructions, setChefInstructions] = useState<string>(''); // Order Level Note
+  const [chefInstructions, setChefInstructions] = useState<string>(''); 
   
   const [noCutlery, setNoCutlery] = useState<boolean>(false);
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'upi' | 'card'>('cash');
@@ -119,7 +142,7 @@ export default function BbCafePos() {
   const [selectedProduct, setSelectedProduct] = useState<any>(null); 
   const [normalPizzaSize, setNormalPizzaSize] = useState<string>("");
   const [normalPizzaPrice, setNormalPizzaPrice] = useState<number>(0);
-  const [customizerChefNote, setCustomizerChefNote] = useState<string>(""); // Note specifically for Customizer
+  const [customizerChefNote, setCustomizerChefNote] = useState<string>(""); 
 
   const triggerBeep = (type: 'tap' | 'success') => {
     try {
@@ -699,7 +722,7 @@ export default function BbCafePos() {
         deliveryArea: fulfillmentType === "delivery" ? selectedArea.name : "",
         tableNumber: fulfillmentType === 'table' ? tableNumber : '',
         paymentMethod: paymentMethod, 
-        chefInstructions, // Fixed: keeps note/instructions saved
+        chefInstructions, 
         noCutlery,
         source: 'POS'
       };
@@ -770,7 +793,7 @@ export default function BbCafePos() {
       setCustomDiscount(0);
       setIsCartOpen(false); 
       setPaymentMethod('cash');
-      setChefInstructions(''); // Fixed: Resets instructions correctly
+      setChefInstructions(''); 
       setNoCutlery(false);
       
     } catch (err) {
@@ -862,13 +885,13 @@ export default function BbCafePos() {
     );
   };
 
-  // 📝 Dynamic UI Navigation items
+  // 📝 Dynamic UI Navigation items (Removed JSX tags to resolve SWC parser error)
   const navItems = [
-    { id: 'billing', label: 'Counter Billing', icon: <SafeShoppingBag size={14} /> },
-    { id: 'orders', label: 'Live Orders', icon: <SafeClock size={14} />, badge: liveOrders.filter(o => o.status !== 'completed' && o.status !== 'rejected').length },
-    { id: 'inventory', label: 'Stock Toggle', icon: <SafeLayers size={14} /> },
-    { id: 'receipts', label: 'Past Receipts', icon: <SafePrinter size={14} /> },
-    { id: 'settings', label: 'POS Settings', icon: <Settings size={14} /> }
+    { id: 'billing', label: 'Counter Billing', icon: SafeShoppingBag },
+    { id: 'orders', label: 'Live Orders', icon: SafeClock, badge: liveOrders.filter(o => o.status !== 'completed' && o.status !== 'rejected').length },
+    { id: 'inventory', label: 'Stock Toggle', icon: SafeLayers },
+    { id: 'receipts', label: 'Past Receipts', icon: SafePrinter },
+    { id: 'settings', label: 'POS Settings', icon: Settings }
   ];
 
   return (
@@ -994,22 +1017,25 @@ export default function BbCafePos() {
 
               {/* Navigation stack */}
               <nav className="space-y-1.5">
-                {navItems.map((item) => (
-                  <button 
-                    key={item.id}
-                    onClick={() => { triggerBeep('tap'); setActiveTab(item.id as any); }}
-                    className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-200 ${activeTab === item.id ? 'bg-orange-600 text-white shadow-md' : 'text-gray-400 hover:text-white hover:bg-neutral-200 dark:hover:bg-neutral-900'}`}
-                    title={item.label}
-                  >
-                    <div className="flex items-center gap-3">
-                      {item.icon}
-                      {!isSidebarCollapsed && <span className="md:hidden lg:inline">{item.label}</span>}
-                    </div>
-                    {item.badge !== undefined && item.badge > 0 && (
-                      <span className="bg-yellow-400 text-black font-black text-[9px] px-2 py-0.5 rounded-full font-mono">{item.badge}</span>
-                    )}
-                  </button>
-                ))}
+                {navItems.map((item) => {
+                  const IconComp = item.icon;
+                  return (
+                    <button 
+                      key={item.id}
+                      onClick={() => { triggerBeep('tap'); setActiveTab(item.id as any); }}
+                      className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-200 ${activeTab === item.id ? 'bg-orange-600 text-white shadow-md' : 'text-gray-400 hover:text-white hover:bg-neutral-200 dark:hover:bg-neutral-900'}`}
+                      title={item.label}
+                    >
+                      <div className="flex items-center gap-3">
+                        <IconComp size={14} />
+                        {!isSidebarCollapsed && <span className="md:hidden lg:inline">{item.label}</span>}
+                      </div>
+                      {item.badge !== undefined && item.badge > 0 && (
+                        <span className="bg-yellow-400 text-black font-black text-[9px] px-2 py-0.5 rounded-full font-mono">{item.badge}</span>
+                      )}
+                    </button>
+                  );
+                })}
               </nav>
             </div>
 
@@ -1129,7 +1155,7 @@ export default function BbCafePos() {
               <div className="bg-white dark:bg-neutral-950 border border-neutral-200 dark:border-white/5 p-5 flex-1 overflow-y-auto pb-20 shadow-xl rounded-3xl">
                 <div className="flex justify-between items-center mb-6">
                   <div><h2 className="text-sm font-black uppercase tracking-widest text-orange-500">Live Item Availability & Stock Control</h2><p className="text-[10px] text-neutral-500 dark:text-gray-400 font-bold mt-1">Disabling an item here immediately makes it unavailable on customers' phones.</p></div>
-                  <button onClick={async () => { triggerBeep('tap'); const prodSnap = await getDocs(collection(db, "products")); setProducts(prodSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }))); toast.success("Catalog updated!"); }} className="p-2 bg-neutral-200 dark:bg-neutral-900 border border-neutral-300 dark:border-white/5 text-gray-400 hover:text-white transition-colors"><SafeRefreshCw size={14} /></button>
+                  <button onClick={async () => { triggerBeep('tap'); const prodSnap = await getDocs(collection(db, "products")); setProducts(prodSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }))); toast.success("Catalog updated!"); }} className="p-2 bg-neutral-200 dark:bg-neutral-950 border border-neutral-300 dark:border-white/5 text-gray-400 hover:text-white transition-colors"><SafeRefreshCw size={14} /></button>
                 </div>
                 <div className="space-y-2 max-w-2xl">
                   {products.map((item) => {
@@ -1255,7 +1281,7 @@ export default function BbCafePos() {
         setAddress={setAddress}
         tableNumber={tableNumber}
         setTableNumber={setTableNumber}
-        chefInstructions={chefInstructions} // Keeping the Order Instructions/Note
+        chefInstructions={chefInstructions} 
         setChefInstructions={setChefInstructions}
         isSubmittingOrder={isSubmittingOrder}
         paymentMethod={paymentMethod}
@@ -1263,7 +1289,7 @@ export default function BbCafePos() {
         noCutlery={noCutlery}
         setNoCutlery={setNoCutlery}
         getCartSubtotal={getCartSubtotal}
-        getCartAddonsPrice={() => 0} // Removed: Now safely returns 0
+        getCartAddonsPrice={() => 0} 
         getDeliveryCharge={getDeliveryCharge}
         getFreeDeliveryProgressPercent={getFreeDeliveryProgressPercent}
         getTotalPointsRedeemedInCart={getTotalPointsRedeemedInCart}
@@ -1274,8 +1300,8 @@ export default function BbCafePos() {
         setIsCustomerModalOpen={setIsCustomerModalOpen}
         searchDbCustomers={searchDbCustomers}
         handleUpdateCartQuantity={handleUpdateCartQuantity}
-        handleUpdateCartItemNote={handleUpdateCartItemNote} // Note edit is completely functional
-        showAddonsSection={false} // Removed
+        handleUpdateCartItemNote={handleUpdateCartItemNote} 
+        showAddonsSection={false} 
         triggerBeep={triggerBeep}
         handleCheckLoyalty={handleCheckLoyalty}
       />
@@ -1317,11 +1343,11 @@ export default function BbCafePos() {
         setNormalPizzaSize={setNormalPizzaSize}
         normalPizzaPrice={normalPizzaPrice}
         setNormalPizzaPrice={setNormalPizzaPrice}
-        normalPizzaAddons={{}} // Removed addons
-        setNormalPizzaAddons={() => {}} // Disabled safely
-        customizerChefNote={customizerChefNote} // Keeping Note/Instructions inside Customizer
+        normalPizzaAddons={{}} 
+        setNormalPizzaAddons={() => {}} 
+        customizerChefNote={customizerChefNote} 
         setCustomizerChefNote={setCustomizerChefNote}
-        PIZZA_ADDONS={{}} // Removed addons config
+        PIZZA_ADDONS={{}} 
         QUICK_INSTRUCTION_TAGS={QUICK_INSTRUCTION_TAGS}
         handleAddCustomizedItemToCart={handleAddCustomizedItemToCart}
         triggerBeep={triggerBeep}
