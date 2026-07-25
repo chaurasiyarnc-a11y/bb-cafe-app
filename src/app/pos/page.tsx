@@ -31,7 +31,7 @@ const SafeMoon = Moon as any;
 const SafeSun = Sun as any;
 const SafeShoppingBag = ShoppingBag as any;
 const SafeClock = Clock as any;
-const SafeLayers = Layers as any;
+const SafeLayers = SafeLayers as any;
 const SafePrinter = Printer as any;
 const SafeUsers = Users as any;
 const SafePlay = Play as any;
@@ -1074,7 +1074,7 @@ export default function BbCafePos() {
       <main className="flex-1 p-3 md:p-5 overflow-y-auto flex flex-col relative h-screen">
         {/* GLOBAL HEADER BAR */}
         <div className="flex items-center gap-3 mb-4 shrink-0 border-b border-neutral-200 dark:border-white/5 pb-3">
-          <button type="button" onClick={() => { triggerBeep('tap'); setIsSidebarOpen(true); }} className="p-2.5 bg-neutral-200 dark:bg-neutral-950 hover:bg-neutral-300 dark:hover:bg-neutral-900 border border-neutral-300 dark:border-white/5 text-orange-500 hover:text-orange-400 rounded-xl transition-all shadow-md md:hidden"><SafeMenu size={16} /></button>
+          <button type="button" onClick={() => { triggerBeep('tap'); setIsSidebarOpen(true); }} className="p-2.5 bg-neutral-200 dark:bg-neutral-955 hover:bg-neutral-300 dark:hover:bg-neutral-900 border border-neutral-300 dark:border-white/5 text-orange-500 hover:text-orange-400 rounded-xl transition-all shadow-md md:hidden"><SafeMenu size={16} /></button>
           <div className="flex flex-col"><h2 className="text-[10px] font-black uppercase tracking-widest text-orange-500 leading-none">{activeTab === 'billing' ? 'Counter Billing Workspace' : activeTab === 'orders' ? 'Live Orders Pipeline' : activeTab === 'inventory' ? 'Item Availability Control' : activeTab === 'receipts' ? 'Past Receipts reprint panel' : 'POS Configuration Settings'}</h2><span className="text-[9px] text-gray-400 font-bold mt-1">Bum Bum Cafe • Mohandra</span></div>
           {activeTab === 'billing' && (
             <button type="button" onClick={() => { triggerBeep('tap'); setIsCustomerModalOpen(true); searchDbCustomers(''); }} className="ml-auto p-2 md:p-2.5 bg-neutral-200 dark:bg-neutral-950 hover:bg-neutral-300 dark:hover:bg-neutral-900 border border-neutral-300 dark:border-white/5 text-yellow-600 dark:text-yellow-400 rounded-xl transition-all shadow-md flex items-center gap-1 text-[10px] font-black uppercase"><SafeUsers size={14} /><span>Search Guest</span></button>
@@ -1094,10 +1094,23 @@ export default function BbCafePos() {
                         <div><p className="text-xs font-black text-yellow-600 dark:text-yellow-300 font-mono">Bill: #${String(order.billNumber).padStart(4, '0')}</p><p className="text-[9px] text-gray-400 font-mono mt-0.5">Token: #{order.tokenNumber}</p></div>
                         <span className="bg-orange-500/10 border border-orange-500/20 text-orange-400 text-[8px] font-black uppercase tracking-wider px-2 py-0.5 rounded">{order.fulfillmentType || 'table'}</span>
                       </div>
-                      <div className="space-y-1 mb-3 text-[10px] font-semibold text-neutral-800 dark:text-gray-300"><p className="dark:text-white text-neutral-900 truncate font-black">👤 {order.customerName}</p>{order.customerPhone && <p className="font-mono">📞 {order.customerPhone}</p>}{order.address && <p className="text-gray-400 line-clamp-1">📍 {order.address}</p>}</div>
+                      <div className="space-y-1 mb-3 text-[10px] font-semibold text-neutral-800 dark:text-gray-300"><p className="dark:text-white text-neutral-955 truncate font-black">👤 {order.customerName}</p>{order.customerPhone && <p className="font-mono">📞 {order.customerPhone}</p>}{order.address && <p className="text-gray-400 line-clamp-1">📍 {order.address}</p>}</div>
                       <div className="space-y-1.5 border-t border-dashed border-neutral-200 dark:border-white/5 pt-2.5 mb-4">
                         {order.items?.map((it: any, index: number) => (
-                          <div key={index} className="flex justify-between text-[11px] text-neutral-800 dark:text-gray-200"><span className="font-bold">{it.name} <span className="text-orange-500">x{it.quantity}</span>{it.note ? `<br/><span style="font-size: 9px; color: #888;">(${it.note})</span>` : ''}</span><span className="font-mono text-gray-400">₹{it.price * it.quantity}</span></div>
+                          <div key={index} className="flex justify-between text-[11px] text-neutral-800 dark:text-gray-200">
+                            <span className="font-bold">
+                              {it.name} <span className="text-orange-500">x{it.quantity}</span>
+                              {it.note && (
+                                <>
+                                  <br />
+                                  <span className="text-[9px] text-neutral-500 dark:text-gray-400 italic">
+                                    ({it.note})
+                                  </span>
+                                </>
+                              )}
+                            </span>
+                            <span className="font-mono text-gray-400">₹{it.price * it.quantity}</span>
+                          </div>
                         ))}
                       </div>
                     </div>
@@ -1136,7 +1149,7 @@ export default function BbCafePos() {
               ) : filteredMenu.length === 0 ? (
                 <p className="text-center text-gray-500 text-xs py-10 uppercase tracking-widest font-black">No matching items found</p>
               ) : (
-                /* RESPONSIVE GRID */
+                /* RESPONSIVE 2-COLUMN ON MOBILE, 4-COLUMN ON DESKTOP GRID */
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 overflow-y-auto flex-1 pr-1 pb-16">
                   {filteredMenu.map((item) => {
                     const isAvailable = item.isAvailable !== false;
@@ -1206,7 +1219,20 @@ export default function BbCafePos() {
                       <div className="bg-neutral-50 dark:bg-white/5 p-3 rounded-2xl text-[10px] font-semibold text-neutral-800 dark:text-gray-300 space-y-1"><p>👤 <b>Name:</b> {selectedReceipt.customerName || 'Walk-in Guest'}</p>{selectedReceipt.customerPhone && <p className="font-mono">📞 <b>Phone:</b> {selectedReceipt.customerPhone}</p>}<p><b>Pay Mode:</b> {selectedReceipt.paymentMethod?.toUpperCase() || 'CASH'}</p>{selectedReceipt.tableNumber && <p>🪑 <b>Table No:</b> {selectedReceipt.tableNumber}</p>}</div>
                       <div className="space-y-2 border-t border-neutral-200 dark:border-white/5 pt-3"><p className="text-[9px] font-black text-gray-400 uppercase">Items Purchased:</p>
                         {selectedReceipt.items?.map((it: any, index: number) => (
-                          <div key={index} className="flex justify-between text-xs text-neutral-800 dark:text-gray-200"><span>{it.name} <span className="text-orange-500">x{it.quantity}</span>{it.note ? `<br/><span style="font-size: 9.5px; color: #888;">(${it.note})</span>` : ''}</span><span className="font-mono text-gray-400">₹{it.price * it.quantity}</span></div>
+                          <div key={index} className="flex justify-between text-xs text-neutral-800 dark:text-gray-200">
+                            <span>
+                              {it.name} <span className="text-orange-500">x{it.quantity}</span>
+                              {it.note && (
+                                <>
+                                  <br />
+                                  <span className="text-[9.5px] text-neutral-500 dark:text-gray-400 italic">
+                                    ({it.note})
+                                  </span>
+                                </>
+                              )}
+                            </span>
+                            <span className="font-mono text-gray-400">₹{it.price * it.quantity}</span>
+                          </div>
                         ))}
                       </div>
                       <div className="border-t border-neutral-200 dark:border-white/5 pt-3 space-y-1.5 text-xs font-semibold text-neutral-600 dark:text-gray-400 font-mono"><div className="flex justify-between"><span>Subtotal:</span><span>₹{selectedReceipt.subtotal}</span></div>{selectedReceipt.discount > 0 && <div className="flex justify-between text-yellow-500"><span>Savings/Discount:</span><span>-₹{selectedReceipt.discount}</span></div>}{selectedReceipt.gstRate > 0 && <div className="flex justify-between"><span>GST (${selectedReceipt.gstRate}%):</span><span>+₹{selectedReceipt.gstAmount || 0}</span></div>}<div className="flex justify-between font-black text-green-600 dark:text-green-400 text-sm border-t border-dashed border-neutral-200 dark:border-white/5 pt-2"><span>Grand Total:</span><span>₹{selectedReceipt.total}</span></div></div>
