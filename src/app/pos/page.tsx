@@ -19,7 +19,7 @@ import PosCartDrawer from '@/components/pos/PosCartDrawer';
 import CustomerDirectoryModal from '@/components/pos/CustomerDirectoryModal';
 import CustomizerModal from '@/components/pos/CustomizerModal';
 
-// ⚡ TypeScript TS2607 एरर से पूरी तरह बचने के लिए सुरक्षित आइकन्स की घोषणा
+// ⚡ TypeScript TS2607 एरर से बचने के लिए सुरक्षित आइकन्स की घोषणा
 const SafeLock = Lock as any;
 const SafeDatabase = Database as any;
 const SafeMenu = Menu as any;
@@ -60,13 +60,25 @@ interface DeliveryArea {
   range: string;
 }
 
-const DELIVERY_AREAS: DeliveryArea[] = [
-  { name: "Mohandra Town", fee: 20, minFree: 99, range: "0-2 KM" },
-  { name: "Within 5 KM (Bum Bum Cafe से 5km के दायरे में)", fee: 50, minFree: 499, range: "2-5 KM" },
-  { name: "Within 12 KM (12km के दायरे में)", fee: 99, minFree: 999, range: "5-12 KM" }
-];
-
 export default function BbCafePos() {
+  // कॉन्सटेंट्स को फ़ंक्शन के अंदर रखा गया है ताकि कॉपी-पेस्ट एरर न आए
+  const DELIVERY_AREAS: DeliveryArea[] = useMemo(() => [
+    { name: "Mohandra Town", fee: 20, minFree: 99, range: "0-2 KM" },
+    { name: "Within 5 KM (Bum Bum Cafe से 5km के दायरे में)", fee: 50, minFree: 499, range: "2-5 KM" },
+    { name: "Within 12 KM (12km के दायरे में)", fee: 99, minFree: 999, range: "5-12 KM" }
+  ], []);
+
+  const PIZZA_ADDONS: { [size: string]: { [addon: string]: number } } = useMemo(() => ({
+    "small": { "Veg Add-on": 10, "Paneer": 20, "Black Olives": 20, "Jalapeno": 20, "Extra Cheese": 20, "Mushroom": 20 },
+    "medium": { "Veg Add-on": 10, "Paneer": 30, "Black Olives": 30, "Jalapeno": 30, "Extra Cheese": 30, "Mushroom": 30 },
+    "large": { "Veg Add-on": 20, "Paneer": 40, "Black Olives": 40, "Jalapeno": 40, "Extra Cheese": 40, "Mushroom": 40 },
+    "extra large": { "Veg Add-on": 30, "Paneer": 50, "Black Olives": 50, "Jalapeno": 50, "Extra Cheese": 60, "Mushroom": 50 }
+  }), []);
+
+  const QUICK_INSTRUCTION_TAGS = useMemo(() => [
+    "🌶️ Extra Spicy", "🧅 No Onion-Garlic", "🧀 Extra Cheese", "🔥 Well Baked", "🌱 Make it Mild"
+  ], []);
+
   // Authentication & Security Lockscreen States
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
   const [currentUser, setCurrentUser] = useState<any | null>(null);
@@ -163,7 +175,34 @@ export default function BbCafePos() {
     } catch (e) {}
   };
 
-  // Live Orders Listener & Store Open Listener
+  // Auth Session, Database streams & Settings fetchers
+  useEffect(() => {
+    const savedUser = localStorage.getItem("bb_pos_user");
+    if (savedUser) {
+      try {
+        const parsed = JSON.parse(savedUser);
+        setIsLoggedIn(true);
+        setCurrentUser(parsed);
+      } catch (e) {}
+    }
+
+    const localGst = localStorage.getItem("bb_pos_gst_enabled");
+    if (localGst) setGstEnabled(localGst === 'true');
+    const localGstRate = localStorage.getItem("bb_pos_gst_rate");
+    if (localGstRate) setGstRate(Number(localGstRate) || 5);
+    const localPaper = localStorage.getItem("bb_pos_paper_size");
+    if (localPaper) setPrinterPaperSize(localPaper as any);
+    const localTheme = localStorage.getItem("bb_pos_theme");
+    if (localTheme) {
+      setThemeMode(localTheme as any);
+      if (localTheme === 'light') {
+        document.documentElement.classList.remove('dark');
+      } else {
+        document.documentElement.classList.add('dark');
+      }
+    }
+  }, []);
+
   useEffect(() => {
     const q = query(collection(db, "orders"), orderBy("timestamp", "desc"), limit(60));
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -183,7 +222,6 @@ export default function BbCafePos() {
     };
   }, []);
 
-  // Fetch Menu Products
   useEffect(() => {
     if (!isLoggedIn) return;
     const fetchDbData = async () => {
@@ -975,6 +1013,7 @@ export default function BbCafePos() {
           </div>
         )}
 
+        {/* VIEW 3: INVENTORY STOCK MANAGEMENT */}
         {activeTab === 'inventory' && (
           <div className="bg-white dark:bg-neutral-950 border border-neutral-200 dark:border-white/5 p-5 flex-1 overflow-y-auto pb-20 shadow-xl rounded-3xl">
             <div className="flex justify-between items-center mb-6">
@@ -998,6 +1037,7 @@ export default function BbCafePos() {
           </div>
         )}
 
+        {/* VIEW 4: PAST RECEIPTS & REPRINT LEDGER SCREEN */}
         {activeTab === 'receipts' && (
           <div className="flex-1 flex flex-col md:flex-row gap-5 overflow-hidden">
             <div className="flex-1 bg-white dark:bg-neutral-950 border border-neutral-200 dark:border-white/5 rounded-3xl p-4 flex flex-col overflow-hidden shadow-xl">
@@ -1015,7 +1055,7 @@ export default function BbCafePos() {
                 })}
               </div>
             </div>
-            <div className="w-full md:w-[380px] bg-white dark:bg-neutral-950 border border-neutral-200 dark:border-white/5 p-4 rounded-3xl flex flex-col justify-between shadow-xl overflow-y-auto h-full text-neutral-800 dark:text-gray-100">
+            <div className="w-full md:w-[380px] bg-white dark:bg-neutral-950 border border-neutral-200 dark:border-white/5 p-4 rounded-3xl flex flex-col justify-between shadow-xl overflow-y-auto h-full text-neutral-800 dark:text-gray-100 font-bold">
               {selectedReceipt ? (
                 <div className="space-y-4 flex flex-col justify-between h-full">
                   <div>
@@ -1040,7 +1080,7 @@ export default function BbCafePos() {
         )}
 
         {activeTab === 'settings' && (
-          <div className="bg-white dark:bg-neutral-950 border border-neutral-200 dark:border-white/5 p-6 rounded-3xl shadow-xl flex-grow max-w-2xl space-y-6 overflow-y-auto">
+          <div className="bg-white dark:bg-neutral-950 border border-neutral-200 dark:border-white/5 p-6 rounded-3xl shadow-xl flex-grow max-w-2xl space-y-6 overflow-y-auto font-bold text-neutral-800 dark:text-gray-100">
             <h3 className="text-sm font-black uppercase text-orange-500 tracking-wider">POS Configuration & Hardware settings</h3>
             <div className="border-b border-neutral-200 dark:border-white/5 pb-4 space-y-3"><p className="text-xs font-bold text-neutral-800 dark:text-white uppercase tracking-wider">A. Dashboard UI Theme mode:</p>
               <div className="flex bg-neutral-100 dark:bg-neutral-900 border border-neutral-200 dark:border-white/5 p-1 rounded-xl w-60">
