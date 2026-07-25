@@ -712,6 +712,14 @@ export default function BbCafePos() {
       {/* 3. MODULAR CHILD OVERLAYS */}
       <PosCartDrawer 
         isHindi={false} isCartOpen={isCartOpen} setIsCartOpen={setIsCartOpen} cart={cart} setCart={setCart} customerPhone={customerPhone} setCustomerPhone={setCustomerPhone} customerName={customerName} setCustomerName={setCustomerName} customerPoints={customerPoints} setCustomerPoints={setCustomerPoints} pointsToRedeem={pointsToRedeem} setPointsToRedeem={setPointsToRedeem} customDiscount={customDiscount} setCustomDiscount={setCustomDiscount} fulfillmentType={fulfillmentType} setFulfillmentType={setFulfillmentType} selectedArea={selectedArea} setSelectedArea={setSelectedArea} DELIVERY_AREAS={DELIVERY_AREAS} address={address} setAddress={setAddress} tableNumber={tableNumber} setTableNumber={setTableNumber} chefInstructions={chefInstructions} setChefInstructions={setChefInstructions} isSubmittingOrder={isSubmittingOrder} paymentMethod={paymentMethod} setPaymentMethod={setPaymentMethod} noCutlery={noCutlery} setNoCutlery={setNoCutlery} getCartSubtotal={getCartSubtotal} getCartAddonsPrice={() => 0} getDeliveryCharge={getDeliveryCharge} getFreeDeliveryProgressPercent={getFreeDeliveryProgressPercent} getTotalPointsRedeemedInCart={getTotalPointsRedeemedInCart} getTotalBillPrice={getTotalBillPrice} loyaltyRules={loyaltyRules} handlePlaceOrder={handlePlaceOrder} handleDetectLocation={handleDetectLocation} setIsCustomerModalOpen={setIsCustomerModalOpen} searchDbCustomers={searchDbCustomers} handleUpdateCartQuantity={handleUpdateCartQuantity} handleUpdateCartItemNote={handleUpdateCartItemNote} showAddonsSection={false} triggerBeep={triggerBeep} handleCheckLoyalty={handleCheckLoyalty}
+        
+        // 🛠️ TypeScript TS2607 type safety parameters passed as static/dummy props
+        ketchupAddon={false}
+        setKetchupAddon={() => {}}
+        oreganoAddon={false}
+        setOreganoAddon={() => {}}
+        chiliFlakesAddon={false}
+        setChiliFlakesAddon={() => {}}
       />
 
       <CustomerDirectoryModal 
