@@ -9,7 +9,8 @@ import {
   ShoppingBag, Plus, Minus, Search, X, User, Star, Gift, 
   Loader2, Clock, Trash2, Printer, Check, Play, Settings, 
   Database, RefreshCw, Layers, Phone, MapPin, LayoutGrid, List,
-  Menu, Users, LogOut, Lock, ToggleLeft, ToggleRight, Sun, Moon
+  Menu, Users, LogOut, Lock, ToggleLeft, ToggleRight, Sun, Moon,
+  ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
@@ -42,6 +43,8 @@ const SafeLayoutGrid = LayoutGrid as any;
 const SafeList = List as any;
 const SafePlus = Plus as any;
 const SafeMinus = Minus as any;
+const SafeChevronLeft = ChevronLeft as any;
+const SafeChevronRight = ChevronRight as any;
 
 interface PosCartItem {
   id: string;
@@ -87,8 +90,8 @@ export default function BbCafePos() {
   const [activeTab, setActiveTab] = useState<'orders' | 'billing' | 'inventory' | 'receipts' | 'settings'>('billing');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid'); 
   const [isCartOpen, setIsCartOpen] = useState<boolean>(false); 
-  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false); 
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false); 
+  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false); // Mobile Drawer Toggle
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false); // Desktop compact toggle
 
   // Dynamic Settings states
   const [gstEnabled, setGstEnabled] = useState<boolean>(false);
@@ -585,7 +588,7 @@ export default function BbCafePos() {
       prev.map(item => item.id === itemId ? { ...item, note: noteValue } : item)
     );
   };
-  // Pricing Helpers
+// Pricing Helpers
   const getCartSubtotal = () => cart.reduce((acc, i) => acc + (i.price * i.quantity), 0);
   
   const getCartAddonsPrice = () => {
@@ -972,7 +975,7 @@ export default function BbCafePos() {
               {liveOrders.map((order: any) => {
                 if (order.status === 'completed' || order.status === 'rejected') return null;
                 return (
-                  <motion.div layout key={order.id} className="bg-white dark:bg-neutral-950 border border-neutral-200 dark:border-white/5 rounded-2xl p-4 flex flex-col justify-between shadow-lg">
+                  <motion.div layout key={order.id} className="bg-white dark:bg-neutral-955 border border-neutral-200 dark:border-white/5 rounded-2xl p-4 flex flex-col justify-between shadow-lg">
                     <div>
                       <div className="flex justify-between items-start border-b border-neutral-200 dark:border-white/5 pb-2 mb-3">
                         <div><p className="text-xs font-black text-yellow-600 dark:text-yellow-300 font-mono">Bill: #${String(order.billNumber).padStart(4, '0')}</p><p className="text-[9px] text-gray-400 font-mono mt-0.5">Token: #{order.tokenNumber}</p></div>
@@ -1105,10 +1108,10 @@ export default function BbCafePos() {
         )}
 
         {activeTab === 'settings' && (
-          <div className="bg-white dark:bg-neutral-950 border border-neutral-200 dark:border-white/5 p-6 rounded-3xl shadow-xl flex-grow max-w-2xl space-y-6 overflow-y-auto font-bold text-neutral-800 dark:text-gray-100">
+          <div className="bg-white dark:bg-neutral-950 border border-neutral-200 dark:border-white/5 p-6 rounded-3xl shadow-xl flex-grow max-w-2xl space-y-6 overflow-y-auto font-bold text-neutral-800 dark:text-gray-100 font-sans">
             <h3 className="text-sm font-black uppercase text-orange-500 tracking-wider">POS Configuration & Hardware settings</h3>
             <div className="border-b border-neutral-200 dark:border-white/5 pb-4 space-y-3"><p className="text-xs font-bold text-neutral-800 dark:text-white uppercase tracking-wider">A. Dashboard UI Theme mode:</p>
-              <div className="flex bg-neutral-100 dark:bg-neutral-900 border border-neutral-200 dark:border-white/5 p-1 rounded-xl w-60">
+              <div className="flex bg-neutral-100 dark:bg-neutral-900 border border-neutral-200 dark:border-white/5 p-1 rounded-xl w-60 font-sans">
                 <button type="button" onClick={() => handleToggleTheme('dark')} className={`flex-grow flex items-center justify-center gap-1.5 py-2 rounded-lg text-[10px] font-black uppercase transition-all ${themeMode === 'dark' ? 'bg-[#050505] text-amber-400 border border-white/5 shadow-sm' : 'text-gray-400 hover:text-white'}`}><SafeMoon size={12} /> Dark Mode</button>
                 <button type="button" onClick={() => handleToggleTheme('light')} className={`flex-grow flex items-center justify-center gap-1.5 py-2 rounded-lg text-[10px] font-black uppercase transition-all ${themeMode === 'light' ? 'bg-white text-orange-600 border border-neutral-200 shadow-sm' : 'text-neutral-500 hover:text-neutral-800'}`}><SafeSun size={12} /> Light Mode</button>
               </div>
