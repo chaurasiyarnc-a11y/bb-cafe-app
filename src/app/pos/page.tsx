@@ -88,8 +88,9 @@ export default function BbCafePos() {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid'); 
   const [isCartOpen, setIsCartOpen] = useState<boolean>(false); 
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false); 
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false); 
 
-  // Dynamic Settings states (Saved in LocalStorage)
+  // Dynamic Settings states
   const [gstEnabled, setGstEnabled] = useState<boolean>(false);
   const [gstRate, setGstRate] = useState<number>(5);
   const [printerPaperSize, setPrinterPaperSize] = useState<'58mm' | '80mm'>('58mm');
@@ -584,7 +585,6 @@ export default function BbCafePos() {
       prev.map(item => item.id === itemId ? { ...item, note: noteValue } : item)
     );
   };
-
   // Pricing Helpers
   const getCartSubtotal = () => cart.reduce((acc, i) => acc + (i.price * i.quantity), 0);
   
@@ -972,7 +972,7 @@ export default function BbCafePos() {
               {liveOrders.map((order: any) => {
                 if (order.status === 'completed' || order.status === 'rejected') return null;
                 return (
-                  <motion.div layout key={order.id} className="bg-white dark:bg-neutral-955 border border-neutral-200 dark:border-white/5 rounded-2xl p-4 flex flex-col justify-between shadow-lg">
+                  <motion.div layout key={order.id} className="bg-white dark:bg-neutral-950 border border-neutral-200 dark:border-white/5 rounded-2xl p-4 flex flex-col justify-between shadow-lg">
                     <div>
                       <div className="flex justify-between items-start border-b border-neutral-200 dark:border-white/5 pb-2 mb-3">
                         <div><p className="text-xs font-black text-yellow-600 dark:text-yellow-300 font-mono">Bill: #${String(order.billNumber).padStart(4, '0')}</p><p className="text-[9px] text-gray-400 font-mono mt-0.5">Token: #{order.tokenNumber}</p></div>
