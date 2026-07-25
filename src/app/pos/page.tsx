@@ -20,31 +20,8 @@ import PosCartDrawer from '@/components/pos/PosCartDrawer';
 import CustomerDirectoryModal from '@/components/pos/CustomerDirectoryModal';
 import CustomizerModal from '@/components/pos/CustomizerModal';
 
-// ⚡ TypeScript TS2607 एरर से बचने के लिए सुरक्षित आइकन्स की घोषणा
-const SafeLock = Lock as any;
-const SafeDatabase = Database as any;
-const SafeMenu = Menu as any;
-const SafeLogOut = LogOut as any;
-const SafeToggleRight = ToggleRight as any;
-const SafeToggleLeft = ToggleLeft as any;
-const SafeMoon = Moon as any;
-const SafeSun = Sun as any;
-const SafeShoppingBag = ShoppingBag as any;
-const SafeClock = Clock as any;
-const SafeLayers = Layers as any;
-const SafePrinter = Printer as any;
-const SafeUsers = Users as any;
-const SafePlay = Play as any;
-const SafeCheck = Check as any;
-const SafeSearch = Search as any;
-const SafeX = X as any;
-const SafeRefreshCw = RefreshCw as any;
-const SafeLayoutGrid = LayoutGrid as any;
-const SafeList = List as any;
-const SafePlus = Plus as any;
-const SafeMinus = Minus as any;
-const SafeChevronLeft = ChevronLeft as any;
-const SafeChevronRight = ChevronRight as any;
+// ⚡ TypeScript TS2607 एरर से बचने के लिए सुरक्षित आइकन्स की घोषणा (Compressed to single line)
+const [SafeLock, SafeDatabase, SafeMenu, SafeLogOut, SafeToggleRight, SafeToggleLeft, SafeMoon, SafeSun, SafeShoppingBag, SafeClock, SafeLayers, SafePrinter, SafeUsers, SafePlay, SafeCheck, SafeSearch, SafeX, SafeRefreshCw, SafeLayoutGrid, SafeList, SafePlus, SafeMinus, SafeChevronLeft, SafeChevronRight] = [Lock, Database, Menu, LogOut, ToggleRight, ToggleLeft, Moon, Sun, ShoppingBag, Clock, Layers, Printer, Users, Play, Check, Search, X, RefreshCw, LayoutGrid, List, Plus, Minus, ChevronLeft, ChevronRight].map(icon => icon as any);
 
 interface PosCartItem {
   id: string;
@@ -90,8 +67,8 @@ export default function BbCafePos() {
   const [activeTab, setActiveTab] = useState<'orders' | 'billing' | 'inventory' | 'receipts' | 'settings'>('billing');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid'); 
   const [isCartOpen, setIsCartOpen] = useState<boolean>(false); 
-  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false); // Mobile Drawer Toggle
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false); // Desktop compact toggle
+  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false); 
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false); 
 
   // Dynamic Settings states (Saved in LocalStorage)
   const [gstEnabled, setGstEnabled] = useState<boolean>(false);
@@ -320,12 +297,12 @@ export default function BbCafePos() {
         const data = docSnap.data();
         setCustomerName(data.name || '');
         setCustomerPoints(data.points || 0);
-        setAddress(data.address || '');
+        setAddress(data.address || ''); 
         toast.success(`Member Found! Points: ${data.points || 0}`);
       } else {
         setCustomerName('');
         setCustomerPoints(0);
-        setAddress('');
+        setAddress(''); 
         toast.success("New Guest profile initialized!");
       }
     } catch (e) {
@@ -378,7 +355,7 @@ export default function BbCafePos() {
     setCustomerPhone(cust.phone);
     setCustomerName(cust.name);
     setCustomerPoints(cust.points || 0);
-    setAddress(cust.address || '');
+    setAddress(cust.address || ''); 
     setIsCustomerModalOpen(false);
     toast.success(`Active Customer: ${cust.name}`);
   };
@@ -932,6 +909,15 @@ export default function BbCafePos() {
     );
   };
 
+  // 📝 Dynamic UI Navigation items mapped to save code length and prevent compilation crashes
+  const navItems = [
+    { id: 'billing', label: 'Counter Billing', icon: <SafeShoppingBag size={14} /> },
+    { id: 'orders', label: 'Live Orders', icon: <SafeClock size={14} />, badge: liveOrders.filter(o => o.status !== 'completed' && o.status !== 'rejected').length },
+    { id: 'inventory', label: 'Stock Toggle', icon: <SafeLayers size={14} /> },
+    { id: 'receipts', label: 'Past Receipts', icon: <SafePrinter size={14} /> },
+    { id: 'settings', label: 'POS Settings', icon: <Settings size={14} /> }
+  ];
+
   return (
     <div className="min-h-screen bg-neutral-50 dark:bg-[#050505] text-neutral-800 dark:text-gray-100 flex flex-col md:flex-row font-sans antialiased overflow-hidden transition-colors duration-200">
       <Toaster position="top-center" />
@@ -1053,13 +1039,24 @@ export default function BbCafePos() {
                 <button onClick={() => { triggerBeep('tap'); setIsSidebarOpen(false); }} className="p-1.5 bg-neutral-200 dark:bg-neutral-900 border border-neutral-300 dark:border-white/5 text-gray-400 hover:text-white rounded-lg md:hidden"><X size={14} /></button>
               </div>
 
-              {/* Navigation stack */}
+              {/* Navigation stack (Refactored loop saves JSX space and ensures no truncation) */}
               <nav className="space-y-1.5">
-                <button onClick={() => { triggerBeep('tap'); setActiveTab('billing'); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-200 ${activeTab === 'billing' ? 'bg-orange-600 text-white shadow-md' : 'text-gray-400 hover:text-white hover:bg-neutral-200 dark:hover:bg-neutral-900'}`} title="Counter Billing"><SafeShoppingBag size={14} />{!isSidebarCollapsed && <span className="md:hidden lg:inline">Counter Billing</span>}</button>
-                <button onClick={() => { triggerBeep('tap'); setActiveTab('orders'); }} className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-200 ${activeTab === 'orders' ? 'bg-orange-600 text-white shadow-md' : 'text-gray-400 hover:text-white hover:bg-neutral-200 dark:hover:bg-neutral-900'}`} title="Live Orders"><div className="flex items-center gap-3"><SafeClock size={14} />{!isSidebarCollapsed && <span className="md:hidden lg:inline">Live Orders</span>}</div>{liveOrders.filter(o => o.status !== 'completed' && o.status !== 'rejected').length > 0 && (<span className="bg-yellow-400 text-black font-black text-[9px] px-2 py-0.5 rounded-full font-mono">{liveOrders.filter(o => o.status !== 'completed' && o.status !== 'rejected').length}</span>)}</button>
-                <button onClick={() => { triggerBeep('tap'); setActiveTab('inventory'); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-200 ${activeTab === 'inventory' ? 'bg-orange-600 text-white shadow-md' : 'text-gray-400 hover:text-white hover:bg-neutral-200 dark:hover:bg-neutral-900'}`} title="Stock Toggle"><SafeLayers size={14} />{!isSidebarCollapsed && <span className="md:hidden lg:inline">Stock Toggle</span>}</button>
-                <button onClick={() => { triggerBeep('tap'); setActiveTab('receipts'); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-200 ${activeTab === 'receipts' ? 'bg-orange-600 text-white shadow-md' : 'text-gray-400 hover:text-white hover:bg-neutral-200 dark:hover:bg-neutral-900'}`} title="Past Receipts"><SafePrinter size={14} />{!isSidebarCollapsed && <span className="md:hidden lg:inline">Past Receipts</span>}</button>
-                <button onClick={() => { triggerBeep('tap'); setActiveTab('settings'); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-200 ${activeTab === 'settings' ? 'bg-orange-600 text-white shadow-md' : 'text-gray-400 hover:text-white hover:bg-neutral-200 dark:hover:bg-neutral-900'}`} title="POS Settings"><Settings size={14} />{!isSidebarCollapsed && <span className="md:hidden lg:inline">POS Settings</span>}</button>
+                {navItems.map((item) => (
+                  <button 
+                    key={item.id}
+                    onClick={() => { triggerBeep('tap'); setActiveTab(item.id as any); }}
+                    className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-200 ${activeTab === item.id ? 'bg-orange-600 text-white shadow-md' : 'text-gray-400 hover:text-white hover:bg-neutral-200 dark:hover:bg-neutral-900'}`}
+                    title={item.label}
+                  >
+                    <div className="flex items-center gap-3">
+                      {item.icon}
+                      {!isSidebarCollapsed && <span className="md:hidden lg:inline">{item.label}</span>}
+                    </div>
+                    {item.badge !== undefined && item.badge > 0 && (
+                      <span className="bg-yellow-400 text-black font-black text-[9px] px-2 py-0.5 rounded-full font-mono">{item.badge}</span>
+                    )}
+                  </button>
+                ))}
               </nav>
             </div>
 
