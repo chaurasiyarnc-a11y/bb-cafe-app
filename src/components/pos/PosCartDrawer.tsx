@@ -2,7 +2,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { X, Trash2, ShoppingBag, MapPin, Users, User, Printer, Loader2, Minus, Plus } from 'lucide-react';
-import toast from 'react-hot-toast'; // ⚡ यह आवश्यक इम्पोर्ट यहाँ जोड़ा गया है
+import toast from 'react-hot-toast';
 
 interface PosCartDrawerProps {
   isHindi: boolean;
@@ -57,6 +57,7 @@ interface PosCartDrawerProps {
   handleUpdateCartItemNote: (id: string, note: string) => void;
   showAddonsSection: boolean;
   triggerBeep: (type: 'tap' | 'success') => void;
+  handleCheckLoyalty: () => void; // ⚡ यह आवश्यक टाइप डिक्लेरेशन यहाँ सुनिश्चित किया गया है
 }
 
 export default function PosCartDrawer({
@@ -68,7 +69,8 @@ export default function PosCartDrawer({
   chiliFlakesAddon, setChiliFlakesAddon, noCutlery, setNoCutlery, getCartSubtotal, getCartAddonsPrice,
   getDeliveryCharge, getFreeDeliveryProgressPercent, getTotalPointsRedeemedInCart, getTotalBillPrice,
   loyaltyRules, handlePlaceOrder, handleDetectLocation, setIsCustomerModalOpen, searchDbCustomers,
-  handleUpdateCartQuantity, handleUpdateCartItemNote, showAddonsSection, triggerBeep
+  handleUpdateCartQuantity, handleUpdateCartItemNote, showAddonsSection, triggerBeep,
+  handleCheckLoyalty // ⚡ यह यहाँ जोड़ा गया है
 }: PosCartDrawerProps) {
   if (!isCartOpen) return null;
 
