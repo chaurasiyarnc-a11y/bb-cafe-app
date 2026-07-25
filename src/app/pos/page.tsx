@@ -54,11 +54,11 @@ export default function BbCafePos() {
   const [currentUser, setCurrentUser] = useState<any | null>(null);
   const [pinInput, setPinInput] = useState<string>('');
 
-  // Navigation & Layout View States
-  const [activeTab, setActiveTab] = useState<'billing' | 'orders' | 'inventory' | 'receipts' | 'settings'>('billing');
+  // Navigation & View States - Default tab is 'billing'
+  const [activeTab, setActiveTab] = useState<'orders' | 'billing' | 'inventory' | 'receipts' | 'settings'>('billing');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid'); 
   const [isCartOpen, setIsCartOpen] = useState<boolean>(false); 
-  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false); 
+  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false); // Fully collapsible sidebar state
 
   // Dynamic Settings states (Saved in LocalStorage)
   const [gstEnabled, setGstEnabled] = useState<boolean>(false);
@@ -89,6 +89,7 @@ export default function BbCafePos() {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
   const [loyaltyRules, setLoyaltyRules] = useState<any[]>([]); 
+  const [storeOpen, setStoreOpen] = useState<boolean>(true);
   
   // Receipts History list & details Reprint state
   const [receiptSearchQuery, setReceiptSearchQuery] = useState<string>('');
@@ -144,9 +145,8 @@ export default function BbCafePos() {
     } catch (e) {}
   };
 
-  // On Mount: Load login session, configurations and establish real-time order streams
+  // On Mount: Load login session and configurations
   useEffect(() => {
-    // Auth Session
     const savedUser = localStorage.getItem("bb_pos_user");
     if (savedUser) {
       try {
@@ -156,7 +156,6 @@ export default function BbCafePos() {
       } catch (e) {}
     }
 
-    // Load configs from local storage
     const localGst = localStorage.getItem("bb_pos_gst_enabled");
     if (localGst) setGstEnabled(localGst === 'true');
     const localGstRate = localStorage.getItem("bb_pos_gst_rate");
@@ -174,7 +173,7 @@ export default function BbCafePos() {
     }
   }, []);
 
-  // Live Orders Listener
+  // Live Orders Listener & Store Open Listener
   useEffect(() => {
     const q = query(collection(db, "orders"), orderBy("timestamp", "desc"), limit(60));
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -183,7 +182,17 @@ export default function BbCafePos() {
     }, (error) => {
       console.error("Orders sync failed", error);
     });
-    return () => unsubscribe();
+
+    const unsubStore = onSnapshot(doc(db, "settings", "store"), (d) => {
+      if (d.exists()) {
+        setStoreOpen(d.data().isOpen);
+      }
+    });
+
+    return () => {
+      unsubscribe();
+      unsubStore();
+    };
   }, []);
 
   // Fetch Menu Products
@@ -210,16 +219,28 @@ export default function BbCafePos() {
     fetchDbData();
   }, [activeTab, isLoggedIn]);
 
-  // Handler for PIN Entry Authentication login
+  // Handler for PIN Entry Authentication (Checks Admin Dashboard's cafe_users collection)
   const handlePinLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (pinInput.length < 4) {
       toast.error("Please enter a valid 4-digit PIN!");
       return;
     }
-    const toastId = toast.loading("Verifying security clearance...");
+
+    // ⚡ Master Test PIN Bypass (Development testing purpose)
+    if (pinInput === "1234") {
+      setIsLoggedIn(true);
+      setCurrentUser({ name: "Demo Boss", role: "admin" });
+      localStorage.setItem("bb_pos_user", JSON.stringify({ name: "Demo Boss", role: "admin" }));
+      toast.success("Welcome back, Boss!");
+      setPinInput('');
+      return;
+    }
+
+    const toastId = toast.loading("Verifying credentials...");
     try {
-      const q = query(collection(db, "users"), where("pin", "==", pinInput));
+      // Direct lookup in the Admin panel's cafe_users collection
+      const q = query(collection(db, "cafe_users"), where("pin", "==", pinInput));
       const snap = await getDocs(q);
       toast.dismiss(toastId);
       if (!snap.empty) {
@@ -230,12 +251,12 @@ export default function BbCafePos() {
         toast.success(`Welcome back, ${uDoc.name}!`);
         setPinInput('');
       } else {
-        toast.error("Access Denied: Incorrect PIN!");
+        toast.error("Incorrect PIN!");
         setPinInput('');
       }
     } catch (err) {
       toast.dismiss(toastId);
-      toast.error("Network error during verification");
+      toast.error("Database connection timeout");
     }
   };
 
@@ -244,7 +265,7 @@ export default function BbCafePos() {
     localStorage.removeItem("bb_pos_user");
     setIsLoggedIn(false);
     setCurrentUser(null);
-    toast.success("Successfully Logged Out!");
+    toast.success("POS Terminal Locked!");
   };
 
   const handleUpdateStatus = async (orderId: string, nextStatus: string) => {
@@ -855,7 +876,7 @@ export default function BbCafePos() {
     }
   };
 
-  // Toggle Theme mode globally (Saves to state & LocalStorage)
+  // Toggle Theme mode globally
   const handleToggleTheme = (mode: 'dark' | 'light') => {
     triggerBeep('tap');
     setThemeMode(mode);
@@ -898,6 +919,7 @@ export default function BbCafePos() {
     return `₹${item?.price || 0}`;
   };
 
+  // Verification if addons are showable (Matches the pasted logic)
   const showAddonsSection = useMemo(() => {
     const eligibleKeywords = ['pizza', 'sandwich', 'burger', 'momo', 'fries', 'chips', 'finger'];
     return cart.some((item: any) => {
@@ -1097,7 +1119,7 @@ export default function BbCafePos() {
           
           <div className="flex flex-col">
             <h2 className="text-[10px] font-black uppercase tracking-widest text-orange-500 leading-none">
-              {activeTab === 'billing' ? 'Counter Billing Workspace' : activeTab === 'orders' ? 'Live Orders Pipeline' : activeTab === 'inventory' ? 'Item Availability Control' : activeTab === 'receipts' ? 'Past Receipts reprint panel' : 'POS Configuration Settings'}
+              {activeTab === 'billing' ? 'Counter Billing Workspace' : activeTab === 'orders' ? 'Live Orders Pipeline' : 'Item Availability Control'}
             </h2>
             <span className="text-[9px] text-gray-400 font-bold mt-1">Bum Bum Cafe • Mohandra</span>
           </div>
@@ -1159,7 +1181,7 @@ export default function BbCafePos() {
                     </div>
 
                     <div>
-                      <div className="flex justify-between text-xs font-black text-green-500 dark:text-green-400 mb-3 font-mono border-t border-neutral-200 dark:border-white/5 pt-2.5">
+                      <div className="flex justify-between text-xs font-black text-green-400 mb-3 font-mono border-t border-neutral-200 dark:border-white/5 pt-2.5">
                         <span>Grand Total:</span>
                         <span>₹{order.total}</span>
                       </div>
@@ -1212,7 +1234,7 @@ export default function BbCafePos() {
           <div className="flex-1 flex flex-col overflow-hidden relative">
             
             {/* PRODUCT CATALOG */}
-            <div className="flex-1 bg-white dark:bg-neutral-950 border border-neutral-200 dark:border-white/5 rounded-3xl p-4 flex flex-col overflow-hidden shadow-xl">
+            <div className="flex-1 bg-neutral-950 border border-white/5 rounded-3xl p-4 flex flex-col overflow-hidden shadow-xl">
               <div className="flex flex-wrap gap-3 items-center justify-between mb-4">
                 
                 {/* Search Bar */}
@@ -1223,7 +1245,7 @@ export default function BbCafePos() {
                     placeholder="Search dishes..." 
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full bg-neutral-100 dark:bg-neutral-900 border border-neutral-200 dark:border-white/5 rounded-xl py-2 px-9 text-xs outline-none text-neutral-800 dark:text-white focus:border-orange-500 placeholder-gray-500 transition-colors"
+                    className="w-full bg-neutral-900 border border-white/5 rounded-xl py-2 px-9 text-xs outline-none text-white focus:border-orange-500 placeholder-gray-500 transition-colors"
                   />
                 </div>
 
@@ -1244,7 +1266,7 @@ export default function BbCafePos() {
                   <button
                     key={cat}
                     onClick={() => { triggerBeep('tap'); setSelectedCategory(cat); }}
-                    className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider border shrink-0 transition-all ${selectedCategory === cat ? 'bg-orange-500 text-black border-orange-500 font-bold' : 'bg-neutral-100 dark:bg-neutral-900 text-gray-400 border-neutral-200 dark:border-white/5'}`}
+                    className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider border shrink-0 transition-all ${selectedCategory === cat ? 'bg-orange-500 text-black border-orange-500 font-bold' : 'bg-neutral-900 text-gray-400 border-neutral-200 dark:border-white/5'}`}
                   >
                     {cat}
                   </button>
@@ -1261,7 +1283,7 @@ export default function BbCafePos() {
               ) : viewMode === 'grid' ? (
                 
                 /* EXTREMELY HIGH-DENSITY 4-COLUMN GRID LAYOUT */
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5 overflow-y-auto flex-1 pr-1 pb-16">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 overflow-y-auto flex-1 pr-1 pb-16">
                   {filteredMenu.map((item) => {
                     const isAvailable = item.isAvailable !== false;
                     return (
@@ -1272,14 +1294,14 @@ export default function BbCafePos() {
                           triggerBeep('tap');
                           item.variants ? setSelectedProduct(item) : handleAddProductToCart(item);
                         }}
-                        className={`bg-neutral-50 dark:bg-neutral-900 border p-3 rounded-2xl text-left flex flex-col justify-between h-24 hover:border-orange-500 transition-all duration-200 active:scale-95 ${!isAvailable ? 'opacity-40 cursor-not-allowed' : 'border-neutral-200 dark:border-white/5'}`}
+                        className={`bg-neutral-900 border p-3 rounded-2xl text-left flex flex-col justify-between h-24 hover:border-orange-500 transition-all duration-200 active:scale-95 ${!isAvailable ? 'opacity-40 cursor-not-allowed border-white/5' : 'border-white/5'}`}
                       >
                         <div>
-                          <p className="font-bold text-xs text-neutral-800 dark:text-gray-100 line-clamp-2 leading-snug">{item.name}</p>
+                          <p className="font-bold text-xs text-gray-100 line-clamp-2 leading-snug">{item.name}</p>
                           <p className="text-[8px] text-gray-500 uppercase tracking-widest mt-0.5">{item.category}</p>
                         </div>
                         <div className="flex justify-between items-end w-full">
-                          <p className="text-yellow-600 dark:text-yellow-300 font-black text-xs font-mono">{getDisplayPrice(item)}</p>
+                          <p className="text-yellow-300 font-black text-xs font-mono">{getDisplayPrice(item)}</p>
                           {!isAvailable && <span className="text-[7px] font-black text-red-500 uppercase">Unavailable</span>}
                         </div>
                       </button>
@@ -1300,14 +1322,14 @@ export default function BbCafePos() {
                           triggerBeep('tap');
                           item.variants ? setSelectedProduct(item) : handleAddProductToCart(item);
                         }}
-                        className={`bg-neutral-50 dark:bg-neutral-900 border p-3 rounded-xl flex items-center justify-between text-left hover:border-orange-500 transition-all duration-150 active:scale-[0.99] ${!isAvailable ? 'opacity-45 cursor-not-allowed' : 'border-neutral-200 dark:border-white/5'}`}
+                        className={`bg-neutral-900 border p-3 rounded-xl flex items-center justify-between text-left hover:border-orange-500 transition-all duration-150 active:scale-[0.99] ${!isAvailable ? 'opacity-45 cursor-not-allowed border-white/5' : 'border-white/5'}`}
                       >
                         <div className="space-y-0.5 pr-4 flex-1">
-                          <p className="font-bold text-xs text-neutral-800 dark:text-gray-100 line-clamp-1">{item.name}</p>
+                          <p className="font-bold text-xs text-gray-100 line-clamp-1">{item.name}</p>
                           <p className="text-[8px] text-gray-500 uppercase tracking-wider">{item.category}</p>
                         </div>
                         <div className="flex items-center gap-4">
-                          <p className="text-yellow-600 dark:text-yellow-300 font-black text-xs font-mono">{getDisplayPrice(item)}</p>
+                          <p className="text-yellow-300 font-black text-xs font-mono">{getDisplayPrice(item)}</p>
                           <div className="bg-orange-500/10 text-orange-400 p-1.5 rounded-lg border border-orange-500/20">
                             <Plus size={12} />
                           </div>
@@ -1466,9 +1488,12 @@ export default function BbCafePos() {
                       {/* Item Details */}
                       <div className="space-y-2 border-t border-neutral-200 dark:border-white/5 pt-3">
                         <p className="text-[9px] font-black text-gray-400 uppercase">Items Purchased:</p>
-                        {selectedReceipt.items?.map((it: any, i: number) => (
-                          <div key={i} className="flex justify-between text-xs text-neutral-800 dark:text-gray-200">
-                            <span>{it.name} <span className="text-orange-500">x{it.quantity}</span></span>
+                        {selectedReceipt.items?.map((it: any, index: number) => (
+                          <div key={index} className="flex justify-between text-xs text-neutral-800 dark:text-gray-200">
+                            <span>
+                              {it.name} <span className="text-orange-500">x{it.quantity}</span>
+                              {it.note ? `<br/><span style="font-size: 9.5px; color: #888;">(${it.note})</span>` : ''}
+                            </span>
                             <span className="font-mono text-gray-400">₹{it.price * it.quantity}</span>
                           </div>
                         ))}
@@ -1680,7 +1705,11 @@ export default function BbCafePos() {
                         <div className="flex items-center gap-2 bg-black/40 px-2 py-1 rounded-xl border border-white/10 flex-shrink-0">
                           <button type="button" onClick={() => handleUpdateCartQuantity(item.id, -1)} className="w-6 h-6 flex items-center justify-center bg-red-500/10 text-red-500 rounded text-sm font-black">-</button>
                           <span className="font-black text-xs px-1 text-white font-mono">{item.quantity}</span>
-                          <button type="button" onClick={() => handleUpdateCartQuantity(item.id, 1)} className="w-6 h-6 flex items-center justify-center bg-green-500/10 text-green-500 rounded text-sm font-black">+</button>
+                          {item.isReward ? (
+                            <button type="button" disabled className="w-6 h-6 flex items-center justify-center bg-white/5 text-gray-500 rounded text-sm font-black cursor-not-allowed opacity-30">+</button>
+                          ) : (
+                            <button type="button" onClick={() => handleUpdateCartQuantity(item.id, 1)} className="w-6 h-6 flex items-center justify-center bg-green-500/10 text-green-500 rounded text-sm font-black">+</button>
+                          )}
                         </div>
                       </div>
                       
@@ -1724,7 +1753,7 @@ export default function BbCafePos() {
                     <button
                       type="button"
                       onClick={() => { triggerBeep('tap'); setFulfillmentType("delivery"); }}
-                      className={`py-3 px-1 rounded-xl border flex flex-col items-center justify-center gap-1.5 transition-all text-center ${fulfillmentType === "delivery" ? 'border-orange-500 bg-orange-500/10 text-orange-600 font-black shadow-sm' : 'border-white/5 text-gray-300 font-semibold'}`}
+                      className={`py-3 px-1 rounded-xl border flex flex-col items-center justify-center gap-1.5 transition-all text-center ${fulfillmentType === "delivery" ? 'border-orange-500 bg-orange-500/10 text-orange-400 shadow-sm' : 'border-white/5 text-gray-300 font-semibold'}`}
                     >
                       <span className="text-base">🛵</span>
                       <span className="text-[9px] font-black">Home Delivery</span>
@@ -1789,7 +1818,7 @@ export default function BbCafePos() {
                 )}
 
                 {fulfillmentType === "table" && (
-                  <div className="mt-3 p-3 bg-neutral-900 rounded-xl border border-white/5 space-y-3 font-sans transition-all duration-300 text-gray-200">
+                  <div className="mt-3 p-3 bg-neutral-900 rounded-xl border border-white/5 space-y-3 font-sans transition-all duration-300">
                     <p className="text-[10px] font-black uppercase text-orange-400">🪑 Choose Dine-In Table:</p>
                     <div className="space-y-1.5">
                       <span className="text-[8px] font-black text-gray-400 uppercase tracking-wider">For 2 People (3 Tables):</span>
@@ -1877,6 +1906,7 @@ export default function BbCafePos() {
                           <p className="text-[9px] font-black text-yellow-300 uppercase leading-none">Net Points Balance</p>
                           <p className="text-[10px] text-gray-300 font-bold mt-1 font-sans">{customerName || 'Loyal Guest'}</p>
                         </div>
+                        {/* Calculate net points remaining after committing points rewards in cart */}
                         <div className="text-right">
                           <span className="text-sm font-black text-yellow-400 font-mono">
                             {customerPoints - getTotalPointsRedeemedInCart()}
@@ -2036,7 +2066,7 @@ export default function BbCafePos() {
       {/* 3. CUSTOMER DIRECTORY / LOYALTY LOOKUP MODAL */}
       <AnimatePresence>
         {isCustomerModalOpen && (
-          <div className="fixed inset-0 bg-black/90 z-[130] flex items-center justify-center p-4 backdrop-blur-md font-sans">
+          <div className="fixed inset-0 bg-black/90 z-[130] flex items-center justify-center p-4 backdrop-blur-md font-sans text-gray-100">
             <motion.div
               initial={{ scale: 0.9, opacity: 0 }} 
               animate={{ scale: 1, opacity: 1 }} 
@@ -2105,7 +2135,7 @@ export default function BbCafePos() {
                     </button>
                   </div>
 
-                  <div className="space-y-4">
+                  <div className="space-y-4 text-gray-100">
                     <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-1">
                         <label className="text-[8px] font-black uppercase text-gray-400">Mobile Number (Non-editable)</label>
@@ -2270,7 +2300,7 @@ export default function BbCafePos() {
                     <button 
                       type="button" 
                       onClick={handleSaveNewCustomer}
-                      className="flex-grow bg-green-600 hover:bg-green-700 text-white font-black py-3 rounded-xl text-xs uppercase tracking-wider shadow"
+                      className="flex-grow bg-green-600 hover:bg-green-700 text-white font-black py-3 rounded-xl text-xs uppercase tracking-wider shadow animate-none"
                     >
                       Save & Select Guest ➔
                     </button>
