@@ -8,7 +8,7 @@ import {
 import { 
   ShoppingBag, Plus, Minus, Search, X, User, Star, Gift, 
   Loader2, Clock, Trash2, Printer, Check, Play, Settings, 
-  Database, RefreshCw, Layers, Phone, MapPin 
+  Database, RefreshCw, Layers, Phone, MapPin, LayoutGrid, List 
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
@@ -22,10 +22,12 @@ interface PosCartItem {
 }
 
 export default function BbCafePos() {
-  // Tabs: 'orders' (Live orders tracker), 'billing' (Counter billing), 'inventory' (Menu controls)
+  // Navigation & View States
   const [activeTab, setActiveTab] = useState<'orders' | 'billing' | 'inventory'>('orders');
-  
-  // Real-time & SWR states
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid'); // Grid vs List view toggle
+  const [isCartOpen, setIsCartOpen] = useState<boolean>(false); // Slide-out Cart Drawer
+
+  // Database States
   const [liveOrders, setLiveOrders] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
@@ -68,7 +70,7 @@ export default function BbCafePos() {
     } catch (e) {}
   };
 
-  // 1. Live Orders Watcher (Real-time syncing from online customers & offline orders)
+  // Real-time Order Stream watcher
   useEffect(() => {
     const q = query(collection(db, "orders"), orderBy("timestamp", "desc"), limit(60));
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -80,7 +82,7 @@ export default function BbCafePos() {
     return () => unsubscribe();
   }, []);
 
-  // 2. Load Products and Categories once
+  // Load Menu Catalog
   useEffect(() => {
     const fetchDbData = async () => {
       setLoading(true);
@@ -89,7 +91,6 @@ export default function BbCafePos() {
         const items = prodSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         setProducts(items);
 
-        // Extract unique categories
         const cats = Array.from(new Set(items.map((i: any) => i.category).filter(Boolean))) as string[];
         setCategories(['All', ...cats]);
       } catch (err) {
@@ -101,18 +102,16 @@ export default function BbCafePos() {
     fetchDbData();
   }, [activeTab]);
 
-  // Order state update (Accept, Dispatch, Complete)
   const handleUpdateStatus = async (orderId: string, nextStatus: string) => {
     triggerBeep('tap');
     try {
       await updateDoc(doc(db, "orders", orderId), { status: nextStatus });
       toast.success(`Order updated to ${nextStatus}`);
     } catch (err) {
-      toast.error("Failed to update order status");
+      toast.error("Failed to update status");
     }
   };
 
-  // Lookup Customer Loyalty Profile
   const handleCheckLoyalty = async () => {
     triggerBeep('tap');
     if (customerPhone.trim().length !== 10) {
@@ -132,7 +131,7 @@ export default function BbCafePos() {
       } else {
         setCustomerName('');
         setCustomerPoints(0);
-        toast.success("New Guest detected. Points profile will be created on checkout!");
+        toast.success("New Guest profile initialized!");
       }
     } catch (e) {
       toast.dismiss(toastId);
@@ -140,7 +139,6 @@ export default function BbCafePos() {
     }
   };
 
-  // Add Item to POS Cart
   const handleAddProductToCart = (item: any) => {
     triggerBeep('tap');
     setCart((prev) => {
@@ -157,6 +155,7 @@ export default function BbCafePos() {
         quantity: 1
       }];
     });
+    toast.success(`${item.name} added to desk!`, { duration: 1000 });
   };
 
   const handleUpdateCartQuantity = (id: string, amount: number) => {
@@ -172,12 +171,12 @@ export default function BbCafePos() {
     );
   };
 
-  // Price Calculation Memos
+  // Pricing calculations
   const getSubtotal = () => cart.reduce((acc, i) => acc + (i.price * i.quantity), 0);
   const getLoyaltyDiscount = () => Math.min(pointsToRedeem, getSubtotal());
   const getTotalBill = () => Math.max(0, getSubtotal() - getLoyaltyDiscount() - customDiscount);
 
-  // Print HTML Thermal Invoice Generator (Compatible with 58mm/80mm POS Thermal printers)
+  // Print Receipt
   const handlePrintReceipt = (order: any) => {
     triggerBeep('tap');
     const printWindow = window.open('', '_blank', 'width=320,height=600');
@@ -207,8 +206,6 @@ export default function BbCafePos() {
               background-color: #fff;
             }
             .center { text-align: center; }
-            .right { text-align: right; }
-            .bold { font-weight: bold; }
             .divider { border-top: 1px dashed #000; margin: 6px 0; }
             table { width: 100%; border-collapse: collapse; }
           </style>
@@ -216,8 +213,7 @@ export default function BbCafePos() {
         <body onload="window.print(); window.close();">
           <div class="center">
             <h3 style="margin: 0 0 2px 0; font-size: 16px;">BUM BUM CAFE</h3>
-            <span style="font-size: 10px;">Mohandra, Panna (M.P.)</span><br/>
-            <span style="font-size: 10px;">Contact: +91 97142 93759</span>
+            <span style="font-size: 10px;">Mohandra, Panna (M.P.)</span>
           </div>
           <div class="divider"></div>
           <div style="font-size: 10px; line-height: 1.3;">
@@ -226,7 +222,6 @@ export default function BbCafePos() {
             <b>Date:</b> ${formattedDate}<br/>
             <b>Type:</b> ${order.fulfillmentType?.toUpperCase()} ${order.tableNumber ? `| Table: ${order.tableNumber}` : ''}<br/>
             <b>Guest:</b> ${order.customerName || 'Walk-in Guest'}<br/>
-            ${order.customerPhone ? `<b>Phone:</b> ${order.customerPhone}<br/>` : ''}
           </div>
           <div class="divider"></div>
           <table>
@@ -249,7 +244,7 @@ export default function BbCafePos() {
             </div>
             ${order.discount ? `
             <div style="display: flex; justify-content: space-between; font-weight: bold;">
-              <span>Discount/Points:</span>
+              <span>Savings:</span>
               <span>-₹${order.discount}</span>
             </div>` : ''}
             <div style="display: flex; justify-content: space-between; font-weight: bold; font-size: 13px; margin-top: 2px;">
@@ -257,9 +252,8 @@ export default function BbCafePos() {
               <span>₹${order.total}</span>
             </div>
           </div>
-          <div class="divider" style="margin-top: 10px;"></div>
-          <div class="center" style="font-size: 9px; margin-top: 6px; line-height: 1.2;">
-            Swad Aur Suraksha Ka Wada!<br/>
+          <div class="divider"></div>
+          <div class="center" style="font-size: 9px; margin-top: 6px;">
             <b>Thank you! Visit Again! 🍕🍔</b>
           </div>
         </body>
@@ -268,7 +262,7 @@ export default function BbCafePos() {
     printWindow.document.close();
   };
 
-  // Place POS Counter offline Order
+  // Checkout counter submit
   const handlePlaceOrder = async (e: React.FormEvent) => {
     e.preventDefault();
     if (cart.length === 0) {
@@ -289,7 +283,6 @@ export default function BbCafePos() {
     const counterDocRef = doc(db, "settings", "store_bill_counter");
 
     try {
-      // 1. Transaction to fetch unique & consecutive bill number
       await runTransaction(db, async (transaction) => {
         const counterDoc = await transaction.get(counterDocRef);
         if (!counterDoc.exists()) {
@@ -312,7 +305,7 @@ export default function BbCafePos() {
         discount: discountCombined,
         total: finalTotal,
         timestamp: new Date(),
-        status: 'completed', // Counter bills are marked completed instantly
+        status: 'completed',
         fulfillmentType: fulfillmentType,
         tableNumber: fulfillmentType === 'dine_in' ? tableNumber : '',
         paymentMethod: 'cash',
@@ -320,10 +313,8 @@ export default function BbCafePos() {
         source: 'POS'
       };
 
-      // 2. Add document to main orders database
       await addDoc(collection(db, "orders"), orderObj);
 
-      // 3. Loyalty ledger update
       if (customerPhone && customerPhone.trim().length === 10) {
         const phoneClean = customerPhone.trim();
         const pointsEarned = Math.floor(finalTotal / 100);
@@ -348,12 +339,11 @@ export default function BbCafePos() {
           }
         });
 
-        // Points ledger logs
         if (pointsEarned > 0) {
           await addDoc(collection(db, "customer_points", phoneClean, "history"), {
             type: 'earn',
             points: pointsEarned,
-            description: `Earned on Bill #${billNumber} at Counter`,
+            description: `Earned on Bill #${billNumber} at POS Counter`,
             timestamp: new Date()
           });
         }
@@ -361,16 +351,15 @@ export default function BbCafePos() {
           await addDoc(collection(db, "customer_points", phoneClean, "history"), {
             type: 'redeem',
             points: pointsToRedeem,
-            description: `Redeemed on Bill #${billNumber} at Counter`,
+            description: `Redeemed on Bill #${billNumber} at POS Counter`,
             timestamp: new Date()
           });
         }
       }
 
       triggerBeep('success');
-      toast.success(`Bill #${billNumber} successfully saved!`);
+      toast.success(`Bill #${billNumber} successfully processed!`);
       
-      // Print the Thermal invoice instantly
       handlePrintReceipt(orderObj);
 
       // Reset billing states
@@ -381,6 +370,7 @@ export default function BbCafePos() {
       setPointsToRedeem(0);
       setCustomDiscount(0);
       setChefInstructions('');
+      setIsCartOpen(false); // Close Drawer on success
       
     } catch (err) {
       console.error(err);
@@ -390,7 +380,6 @@ export default function BbCafePos() {
     }
   };
 
-  // Toggle Item Out-of-stock/In-stock (Updates customer app instantly)
   const handleToggleStock = async (productId: string, currentStatus: boolean) => {
     triggerBeep('tap');
     try {
@@ -400,13 +389,12 @@ export default function BbCafePos() {
       setProducts(prev => 
         prev.map(p => p.id === productId ? { ...p, isAvailable: !currentStatus } : p)
       );
-      toast.success("Stock availability synced with Online App!");
+      toast.success("Stock status updated on Web App!");
     } catch (err) {
-      toast.error("Error updating product availability");
+      toast.error("Error updating stock");
     }
   };
 
-  // Filtered menu grid
   const filteredMenu = useMemo(() => {
     return products.filter(p => {
       const matchCat = selectedCategory === 'All' || p.category === selectedCategory;
@@ -416,19 +404,19 @@ export default function BbCafePos() {
   }, [products, selectedCategory, searchQuery]);
 
   return (
-    <div className="min-h-screen bg-[#050505] text-gray-100 flex flex-col font-sans antialiased selection:bg-orange-500 selection:text-black">
+    <div className="min-h-screen bg-[#050505] text-gray-100 flex flex-col font-sans antialiased">
       <Toaster position="top-center" />
 
-      {/* FIXED TOP HEADER */}
+      {/* HEADER SECTION */}
       <header className="bg-neutral-950 border-b border-white/5 py-3.5 px-6 flex flex-wrap justify-between items-center gap-4 sticky top-0 z-50 shadow-md">
         <div className="flex items-center gap-2">
           <Database className="text-orange-500 animate-pulse" size={18} />
           <h1 className="text-sm font-black tracking-wider uppercase text-yellow-300">
-            Bum Bum Cafe <span className="text-white text-xs lowercase font-normal">point of sale v1.2</span>
+            Bum Bum Cafe <span className="text-white text-xs lowercase font-normal">point of sale v1.5</span>
           </h1>
         </div>
 
-        {/* ADMIN TAB NAVIGATION BUTTONS */}
+        {/* ADMIN VIEW SWITCHER */}
         <div className="flex bg-neutral-900 border border-white/5 p-1 rounded-xl gap-1">
           <button 
             onClick={() => { triggerBeep('tap'); setActiveTab('orders'); }}
@@ -451,10 +439,10 @@ export default function BbCafePos() {
         </div>
       </header>
 
-      {/* POS VIEW CONTAINER */}
-      <main className="flex-1 p-5 overflow-hidden flex flex-col max-w-7xl mx-auto w-full">
+      {/* MAIN CONTENT VIEW */}
+      <main className="flex-1 p-5 overflow-hidden flex flex-col max-w-7xl mx-auto w-full relative">
         
-        {/* VIEW 1: REAL-TIME LIVE ORDERS TRACKER */}
+        {/* TAB 1: LIVE ORDERS TICKET PIPELINE */}
         {activeTab === 'orders' && (
           <div className="space-y-4 flex-1 overflow-y-auto pr-1">
             <div className="flex justify-between items-center">
@@ -464,15 +452,13 @@ export default function BbCafePos() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pb-20">
               {liveOrders.map((order: any) => {
-                const isCompleted = order.status === 'completed';
-                const isRejected = order.status === 'rejected';
-                if (isCompleted || isRejected) return null; // Don't show inactive bills in the active live window
+                if (order.status === 'completed' || order.status === 'rejected') return null;
 
                 return (
                   <motion.div 
                     layout
                     key={order.id}
-                    className="bg-neutral-950 border border-white/5 rounded-2xl p-4 flex flex-col justify-between shadow-lg relative overflow-hidden"
+                    className="bg-neutral-950 border border-white/5 rounded-2xl p-4 flex flex-col justify-between shadow-lg"
                   >
                     <div>
                       <div className="flex justify-between items-start border-b border-white/5 pb-2 mb-3">
@@ -485,7 +471,6 @@ export default function BbCafePos() {
                         </span>
                       </div>
 
-                      {/* Customer Summary */}
                       <div className="space-y-1 mb-3 text-[10px] font-semibold text-gray-300">
                         <p className="text-white truncate font-black">👤 {order.customerName}</p>
                         {order.customerPhone && <p className="font-mono text-gray-400">📞 {order.customerPhone}</p>}
@@ -497,7 +482,6 @@ export default function BbCafePos() {
                         )}
                       </div>
 
-                      {/* Product details inside the card */}
                       <div className="space-y-1.5 border-t border-dashed border-white/5 pt-2.5 mb-4">
                         {order.items?.map((it: any, index: number) => (
                           <div key={index} className="flex justify-between text-[11px] text-gray-200">
@@ -508,7 +492,6 @@ export default function BbCafePos() {
                       </div>
                     </div>
 
-                    {/* Footer operations */}
                     <div>
                       <div className="flex justify-between text-xs font-black text-green-400 mb-3 font-mono border-t border-white/5 pt-2.5">
                         <span>Grand Total:</span>
@@ -546,20 +529,9 @@ export default function BbCafePos() {
                         <button 
                           onClick={() => handlePrintReceipt(order)}
                           className="p-2.5 bg-neutral-900 hover:bg-neutral-800 text-gray-300 border border-white/5 rounded-xl transition-all"
-                          title="Print Receipt"
                         >
                           <Printer size={14} />
                         </button>
-
-                        {order.status === 'pending' && (
-                          <button 
-                            onClick={() => handleUpdateStatus(order.id, 'rejected')}
-                            className="p-2.5 bg-red-950/20 hover:bg-red-950 text-red-500 border border-red-500/10 rounded-xl transition-all"
-                            title="Reject/Cancel Order"
-                          >
-                            <X size={14} />
-                          </button>
-                        )}
                       </div>
                     </div>
                   </motion.div>
@@ -569,14 +541,16 @@ export default function BbCafePos() {
           </div>
         )}
 
-        {/* VIEW 2: COUNTER BILLING PANEL */}
+        {/* TAB 2: BILlING WORKSPACE */}
         {activeTab === 'billing' && (
-          <div className="flex-1 flex flex-col md:flex-row gap-5 overflow-hidden">
+          <div className="flex-1 flex flex-col overflow-hidden relative">
             
-            {/* LEFT AREA: Product catalog list */}
+            {/* PRODUCT CATALOG: takes full width now */}
             <div className="flex-1 bg-neutral-950 border border-white/5 rounded-3xl p-4 flex flex-col overflow-hidden shadow-xl">
-              <div className="flex gap-2 items-center mb-4">
-                <div className="relative flex-1">
+              <div className="flex flex-wrap gap-3 items-center justify-between mb-4">
+                
+                {/* Search Bar */}
+                <div className="relative flex-1 min-w-[200px]">
                   <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-500" size={14} />
                   <input 
                     type="text" 
@@ -586,9 +560,43 @@ export default function BbCafePos() {
                     className="w-full bg-neutral-900 border border-white/5 rounded-xl py-2 px-9 text-xs outline-none text-white focus:border-orange-500 placeholder-gray-500 transition-colors"
                   />
                 </div>
+
+                {/* VIEW MODE TOGGLE & CART BUTTON CONTAINER */}
+                <div className="flex items-center gap-3">
+                  
+                  {/* Grid/List View Toggles */}
+                  <div className="flex bg-neutral-900 border border-white/5 p-1 rounded-xl">
+                    <button 
+                      type="button"
+                      onClick={() => { triggerBeep('tap'); setViewMode('grid'); }}
+                      className={`p-2 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-orange-500 text-black' : 'text-gray-400 hover:text-white'}`}
+                      title="Grid View"
+                    >
+                      <LayoutGrid size={14} />
+                    </button>
+                    <button 
+                      type="button"
+                      onClick={() => { triggerBeep('tap'); setViewMode('list'); }}
+                      className={`p-2 rounded-lg transition-all ${viewMode === 'list' ? 'bg-orange-500 text-black' : 'text-gray-400 hover:text-white'}`}
+                      title="List View"
+                    >
+                      <List size={14} />
+                    </button>
+                  </div>
+
+                  {/* CART TRIGGER BUTTON */}
+                  <button 
+                    type="button"
+                    onClick={() => { triggerBeep('tap'); setIsCartOpen(true); }}
+                    className="bg-orange-500 hover:bg-orange-600 text-black font-black text-xs py-2 px-4 rounded-xl flex items-center gap-2 shadow-lg transition-all active:scale-95"
+                  >
+                    <ShoppingBag size={14} />
+                    <span>Cart ({cart.reduce((sum, item) => sum + item.quantity, 0)})</span>
+                  </button>
+                </div>
               </div>
 
-              {/* Categorization chips */}
+              {/* Category Chips */}
               <div className="flex gap-1.5 overflow-x-auto pb-3.5 scrollbar-none">
                 {categories.map((cat) => (
                   <button
@@ -601,13 +609,17 @@ export default function BbCafePos() {
                 ))}
               </div>
 
-              {/* Product grid list */}
+              {/* PRODUCT DISPLAY (GRID VS LIST VIEW RENDERING) */}
               {loading ? (
                 <div className="flex items-center justify-center flex-1">
                   <Loader2 className="animate-spin text-orange-500" size={24} />
                 </div>
-              ) : (
-                <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 overflow-y-auto flex-1 pr-1 pb-16">
+              ) : filteredMenu.length === 0 ? (
+                <p className="text-center text-gray-500 text-xs py-10 uppercase tracking-widest font-black">No matching items found</p>
+              ) : viewMode === 'grid' ? (
+                
+                /* VIEW 1: GRID MODE (Existing gorgeous grid styling) */
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 overflow-y-auto flex-1 pr-1 pb-16">
                   {filteredMenu.map((item) => {
                     const isAvailable = item.isAvailable !== false;
                     return (
@@ -629,165 +641,251 @@ export default function BbCafePos() {
                     );
                   })}
                 </div>
+              ) : (
+                
+                /* VIEW 2: LIST MODE (Ultra clean, dense row-by-row layout) */
+                <div className="flex flex-col gap-2 overflow-y-auto flex-1 pr-1 pb-16">
+                  {filteredMenu.map((item) => {
+                    const isAvailable = item.isAvailable !== false;
+                    return (
+                      <button
+                        key={item.id}
+                        disabled={!isAvailable}
+                        onClick={() => handleAddProductToCart(item)}
+                        className={`bg-neutral-900 border p-3 rounded-xl flex items-center justify-between text-left hover:border-orange-500 transition-all duration-150 active:scale-[0.99] ${!isAvailable ? 'opacity-45 cursor-not-allowed border-white/5' : 'border-white/5'}`}
+                      >
+                        <div className="space-y-0.5 pr-4 flex-1">
+                          <p className="font-bold text-xs text-gray-100 line-clamp-1">{item.name}</p>
+                          <p className="text-[8px] text-gray-500 uppercase tracking-wider">{item.category}</p>
+                        </div>
+                        <div className="flex items-center gap-4">
+                          <p className="text-yellow-300 font-black text-xs font-mono">₹{item.price}</p>
+                          <div className="bg-orange-500/10 text-orange-400 p-1.5 rounded-lg border border-orange-500/20">
+                            <Plus size={12} />
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
               )}
             </div>
 
-            {/* RIGHT AREA: Cart settlement and checkout form */}
-            <form onSubmit={handlePlaceOrder} className="w-full md:w-[380px] bg-neutral-950 border border-white/5 rounded-3xl p-4 flex flex-col justify-between shadow-xl overflow-y-auto h-full max-h-[85vh] scrollbar-thin">
-              
-              {/* Product Ledger Summary */}
-              <div>
-                <h3 className="text-xs font-black uppercase tracking-widest text-orange-500 mb-3 border-b border-white/5 pb-2">Active Order Desk</h3>
-                
-                <div className="space-y-2 max-h-[160px] overflow-y-auto mb-4 pr-1">
-                  {cart.map((item) => (
-                    <div key={item.id} className="flex justify-between items-center text-xs text-gray-300 font-semibold">
-                      <span className="flex-1 truncate pr-2">{item.name}</span>
-                      <div className="flex items-center gap-2 bg-neutral-900 border border-white/5 px-2 py-0.5 rounded-lg mr-4">
-                        <button type="button" onClick={() => handleUpdateCartQuantity(item.id, -1)} className="text-gray-400 hover:text-white"><Minus size={10} /></button>
-                        <span className="font-bold text-white min-w-[12px] text-center font-mono">{item.quantity}</span>
-                        <button type="button" onClick={() => handleUpdateCartQuantity(item.id, 1)} className="text-gray-400 hover:text-white"><Plus size={10} /></button>
-                      </div>
-                      <span className="font-mono text-gray-100 font-black">₹{item.price * item.quantity}</span>
-                    </div>
-                  ))}
-                  {cart.length === 0 && (
-                    <p className="text-center py-8 text-gray-500 text-[10px] uppercase font-bold tracking-wider">Your bill is empty</p>
-                  )}
-                </div>
-
-                {/* Member Rewards verification Panel */}
-                <div className="border-t border-white/5 pt-3.5 mb-4">
-                  <p className="text-[8px] font-black uppercase text-gray-400 tracking-wider mb-2">Member Rewards Ledger</p>
-                  <div className="flex gap-2">
-                    <input 
-                      type="tel" 
-                      maxLength={10}
-                      placeholder="Customer 10-digit phone..."
-                      value={customerPhone}
-                      onChange={(e) => setCustomerPhone(e.target.value)}
-                      className="bg-neutral-900 border border-white/5 rounded-xl py-2 px-3 text-xs text-white outline-none focus:border-orange-500 font-bold flex-1"
-                    />
-                    <button 
-                      type="button"
-                      onClick={handleCheckLoyalty}
-                      className="bg-orange-500 hover:bg-orange-600 text-black text-xs font-black px-3.5 rounded-xl transition-colors flex items-center gap-1 shrink-0"
-                    >
-                      <User size={12} /> Verify
-                    </button>
+            {/* FLOATING ACTION CART BAR (Shown at bottom when cart drawer is closed) */}
+            {cart.length > 0 && !isCartOpen && (
+              <motion.button
+                initial={{ y: 50, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                onClick={() => { triggerBeep('tap'); setIsCartOpen(true); }}
+                className="fixed bottom-6 right-6 left-6 md:left-auto bg-green-600 hover:bg-green-700 text-white font-black px-6 py-4 rounded-2xl shadow-2xl flex items-center justify-between gap-4 z-40 border border-green-500/20 active:scale-95 transition-all"
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className="bg-white/10 p-2 rounded-xl">
+                    <ShoppingBag size={16} />
                   </div>
-
-                  {customerPhone && customerPoints > 0 && (
-                    <div className="mt-2 bg-yellow-400/5 border border-yellow-400/20 p-2.5 rounded-xl flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <p className="text-[9px] font-black text-yellow-300 uppercase">Loyalty Points Available</p>
-                        <p className="text-[10px] text-gray-300 font-semibold">{customerName || 'Walk-in Guest'} ({customerPoints} pts)</p>
-                      </div>
-                      <input 
-                        type="number"
-                        max={Math.min(customerPoints, getSubtotal())}
-                        placeholder="Points to redeem"
-                        value={pointsToRedeem || ''}
-                        onChange={(e) => setPointsToRedeem(Math.max(0, Number(e.target.value)))}
-                        className="w-16 bg-neutral-900 border border-yellow-400/20 text-yellow-300 p-1 rounded text-center text-xs font-mono outline-none"
-                      />
-                    </div>
-                  )}
-                </div>
-
-                {/* POS Discount & Chef Note Fields */}
-                <div className="grid grid-cols-2 gap-2 mb-4">
-                  <div className="space-y-1">
-                    <label className="text-[8px] font-black uppercase text-gray-400">Custom Discount (₹)</label>
-                    <input 
-                      type="number" 
-                      placeholder="e.g. 50"
-                      value={customDiscount || ''}
-                      onChange={(e) => setCustomDiscount(Math.max(0, Number(e.target.value)))}
-                      className="w-full bg-neutral-900 border border-white/5 rounded-xl p-2 text-xs text-white outline-none focus:border-orange-500 font-mono"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[8px] font-black uppercase text-gray-400">Order Fulfilment</label>
-                    <div className="flex bg-neutral-900 border border-white/5 p-1 rounded-xl">
-                      <button 
-                        type="button"
-                        onClick={() => setFulfillmentType('dine_in')}
-                        className={`flex-1 text-[8px] font-black uppercase py-1.5 rounded ${fulfillmentType === 'dine_in' ? 'bg-orange-500 text-black' : 'text-gray-400'}`}
-                      >
-                        DINE-IN
-                      </button>
-                      <button 
-                        type="button"
-                        onClick={() => setFulfillmentType('takeaway')}
-                        className={`flex-1 text-[8px] font-black uppercase py-1.5 rounded ${fulfillmentType === 'takeaway' ? 'bg-orange-500 text-black' : 'text-gray-400'}`}
-                      >
-                        TAKEAWAY
-                      </button>
-                    </div>
+                  <div className="text-left">
+                    <p className="text-[8px] uppercase tracking-wider text-green-100">Active Bill Cart</p>
+                    <p className="text-xs font-bold font-mono">{cart.reduce((sum, item) => sum + item.quantity, 0)} Items</p>
                   </div>
                 </div>
+                <div className="flex items-center gap-1 text-sm font-black font-mono">
+                  <span>To Pay: ₹{getTotalBill()}</span>
+                  <span>➔</span>
+                </div>
+              </motion.button>
+            )}
 
-                {fulfillmentType === 'dine_in' && (
-                  <div className="space-y-1 mb-4">
-                    <label className="text-[8px] font-black uppercase text-gray-400">Dine-In Table Selector</label>
-                    <select 
-                      value={tableNumber} 
-                      onChange={(e) => setTableNumber(e.target.value)}
-                      className="w-full bg-neutral-900 border border-white/5 rounded-xl p-2.5 text-xs text-white outline-none focus:border-orange-500 font-bold"
-                    >
-                      {Array.from({ length: 10 }).map((_, i) => (
-                        <option key={i} value={`Table ${i+1}`}>Table {i+1}</option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-
-                <div className="space-y-1 mb-4">
-                  <label className="text-[8px] font-black uppercase text-gray-400">Kitchen Note / Chef Instructions</label>
-                  <input 
-                    type="text" 
-                    placeholder="e.g. Extra Spicy, Soft Base..." 
-                    value={chefInstructions}
-                    onChange={(e) => setChefInstructions(e.target.value)}
-                    className="w-full bg-neutral-900 border border-white/5 rounded-xl p-2.5 text-xs text-white outline-none focus:border-orange-500 font-semibold"
+            {/* CART DRAWER: CO-EXISTENT WITH INTERACTIVE BACKDROP */}
+            <AnimatePresence>
+              {isCartOpen && (
+                <>
+                  {/* Backdrop */}
+                  <motion.div 
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    onClick={() => setIsCartOpen(false)}
+                    className="fixed inset-0 bg-black/60 z-40 backdrop-blur-xs cursor-pointer"
                   />
-                </div>
-              </div>
 
-              {/* Order total placement operations */}
-              <div className="border-t border-white/5 pt-3.5 space-y-3.5">
-                <div className="space-y-1">
-                  <div className="flex justify-between text-[10px] text-gray-400 font-bold">
-                    <span>Subtotal:</span>
-                    <span>₹{getSubtotal()}</span>
-                  </div>
-                  {(pointsToRedeem > 0 || customDiscount > 0) && (
-                    <div className="flex justify-between text-[10px] text-yellow-300 font-bold">
-                      <span>Total Savings:</span>
-                      <span>-₹{getLoyaltyDiscount() + customDiscount}</span>
+                  {/* Active Order Desk Slide-over Drawer */}
+                  <motion.div
+                    initial={{ x: '100%' }}
+                    animate={{ x: 0 }}
+                    exit={{ x: '100%' }}
+                    transition={{ type: 'spring', damping: 25, stiffness: 220 }}
+                    className="fixed right-0 top-0 bottom-0 w-full sm:w-[420px] bg-neutral-950 border-l border-white/10 p-5 z-50 flex flex-col justify-between shadow-2xl overflow-y-auto"
+                  >
+                    <div>
+                      {/* Drawer Header */}
+                      <div className="flex justify-between items-center mb-4 border-b border-white/5 pb-3">
+                        <div className="flex items-center gap-2">
+                          <ShoppingBag className="text-orange-500" size={16} />
+                          <h3 className="text-xs font-black uppercase tracking-widest text-orange-500">Active Order Desk</h3>
+                        </div>
+                        <button 
+                          type="button" 
+                          onClick={() => { triggerBeep('tap'); setIsCartOpen(false); }}
+                          className="p-1.5 bg-neutral-900 border border-white/5 text-gray-400 hover:text-white rounded-lg"
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                      
+                      {/* Cart items list in Drawer */}
+                      <div className="space-y-2 max-h-[180px] overflow-y-auto mb-4 pr-1">
+                        {cart.map((item) => (
+                          <div key={item.id} className="flex justify-between items-center text-xs text-gray-300 font-semibold">
+                            <span className="flex-1 truncate pr-2">{item.name}</span>
+                            <div className="flex items-center gap-2 bg-neutral-900 border border-white/5 px-2 py-0.5 rounded-lg mr-4">
+                              <button type="button" onClick={() => handleUpdateCartQuantity(item.id, -1)} className="text-gray-400 hover:text-white"><Minus size={10} /></button>
+                              <span className="font-bold text-white min-w-[12px] text-center font-mono">{item.quantity}</span>
+                              <button type="button" onClick={() => handleUpdateCartQuantity(item.id, 1)} className="text-gray-400 hover:text-white"><Plus size={10} /></button>
+                            </div>
+                            <span className="font-mono text-gray-100 font-black">₹{item.price * item.quantity}</span>
+                          </div>
+                        ))}
+                        {cart.length === 0 && (
+                          <p className="text-center py-8 text-gray-500 text-[10px] uppercase font-bold tracking-wider">Your bill is empty</p>
+                        )}
+                      </div>
+
+                      {/* Loyalty Ledger block */}
+                      <div className="border-t border-white/5 pt-3.5 mb-4">
+                        <p className="text-[8px] font-black uppercase text-gray-400 tracking-wider mb-2">Member Rewards Ledger</p>
+                        <div className="flex gap-2">
+                          <input 
+                            type="tel" 
+                            maxLength={10}
+                            placeholder="Customer 10-digit phone..."
+                            value={customerPhone}
+                            onChange={(e) => setCustomerPhone(e.target.value)}
+                            className="bg-neutral-900 border border-white/5 rounded-xl py-2 px-3 text-xs text-white outline-none focus:border-orange-500 font-bold flex-1"
+                          />
+                          <button 
+                            type="button"
+                            onClick={handleCheckLoyalty}
+                            className="bg-orange-500 hover:bg-orange-600 text-black text-xs font-black px-3.5 rounded-xl transition-colors flex items-center gap-1 shrink-0"
+                          >
+                            <User size={12} /> Verify
+                          </button>
+                        </div>
+
+                        {customerPhone && customerPoints > 0 && (
+                          <div className="mt-2 bg-yellow-400/5 border border-yellow-400/20 p-2.5 rounded-xl flex items-center justify-between">
+                            <div className="space-y-0.5">
+                              <p className="text-[9px] font-black text-yellow-300 uppercase">Loyalty Points Available</p>
+                              <p className="text-[10px] text-gray-300 font-semibold">{customerName || 'Walk-in Guest'} ({customerPoints} pts)</p>
+                            </div>
+                            <input 
+                              type="number"
+                              max={Math.min(customerPoints, getSubtotal())}
+                              placeholder="Points to redeem"
+                              value={pointsToRedeem || ''}
+                              onChange={(e) => setPointsToRedeem(Math.max(0, Number(e.target.value)))}
+                              className="w-16 bg-neutral-900 border border-yellow-400/20 text-yellow-300 p-1 rounded text-center text-xs font-mono outline-none"
+                            />
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Fields inside Drawer */}
+                      <div className="grid grid-cols-2 gap-2 mb-4">
+                        <div className="space-y-1">
+                          <label className="text-[8px] font-black uppercase text-gray-400">Custom Discount (₹)</label>
+                          <input 
+                            type="number" 
+                            placeholder="e.g. 50"
+                            value={customDiscount || ''}
+                            onChange={(e) => setCustomDiscount(Math.max(0, Number(e.target.value)))}
+                            className="w-full bg-neutral-900 border border-white/5 rounded-xl p-2 text-xs text-white outline-none focus:border-orange-500 font-mono"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[8px] font-black uppercase text-gray-400">Order Fulfilment</label>
+                          <div className="flex bg-neutral-900 border border-white/5 p-1 rounded-xl">
+                            <button 
+                              type="button"
+                              onClick={() => setFulfillmentType('dine_in')}
+                              className={`flex-1 text-[8px] font-black uppercase py-1.5 rounded ${fulfillmentType === 'dine_in' ? 'bg-orange-500 text-black' : 'text-gray-400'}`}
+                            >
+                              DINE-IN
+                            </button>
+                            <button 
+                              type="button"
+                              onClick={() => setFulfillmentType('takeaway')}
+                              className={`flex-1 text-[8px] font-black uppercase py-1.5 rounded ${fulfillmentType === 'takeaway' ? 'bg-orange-500 text-black' : 'text-gray-400'}`}
+                            >
+                              TAKEAWAY
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      {fulfillmentType === 'dine_in' && (
+                        <div className="space-y-1 mb-4">
+                          <label className="text-[8px] font-black uppercase text-gray-400">Dine-In Table Selector</label>
+                          <select 
+                            value={tableNumber} 
+                            onChange={(e) => setTableNumber(e.target.value)}
+                            className="w-full bg-neutral-900 border border-white/5 rounded-xl p-2.5 text-xs text-white outline-none focus:border-orange-500 font-bold"
+                          >
+                            {Array.from({ length: 10 }).map((_, i) => (
+                              <option key={i} value={`Table ${i+1}`}>Table {i+1}</option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+
+                      <div className="space-y-1 mb-4">
+                        <label className="text-[8px] font-black uppercase text-gray-400">Kitchen Instructions</label>
+                        <input 
+                          type="text" 
+                          placeholder="e.g. Extra Spicy, Soft Base..." 
+                          value={chefInstructions}
+                          onChange={(e) => setChefInstructions(e.target.value)}
+                          className="w-full bg-neutral-900 border border-white/5 rounded-xl p-2.5 text-xs text-white outline-none focus:border-orange-500 font-semibold"
+                        />
+                      </div>
                     </div>
-                  )}
-                  <div className="flex justify-between text-sm font-black text-green-400 font-mono">
-                    <span>Grand Total:</span>
-                    <span>₹{getTotalBill()}</span>
-                  </div>
-                </div>
 
-                <button 
-                  type="submit"
-                  disabled={isSubmittingOrder || cart.length === 0}
-                  className="w-full bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white font-black py-4 rounded-2xl text-xs uppercase tracking-wider transition-all active:scale-95 shadow-lg flex items-center justify-center gap-2"
-                >
-                  {isSubmittingOrder ? <Loader2 className="animate-spin" size={14} /> : <span>Confirm & Print Bill 🚀</span>}
-                </button>
-              </div>
+                    {/* Settlement calculations and final complete button */}
+                    <div className="border-t border-white/5 pt-3.5 space-y-3.5">
+                      <div className="space-y-1">
+                        <div className="flex justify-between text-[10px] text-gray-400 font-bold">
+                          <span>Subtotal:</span>
+                          <span>₹{getSubtotal()}</span>
+                        </div>
+                        {(pointsToRedeem > 0 || customDiscount > 0) && (
+                          <div className="flex justify-between text-[10px] text-yellow-300 font-bold">
+                            <span>Total Savings:</span>
+                            <span>-₹{getLoyaltyDiscount() + customDiscount}</span>
+                          </div>
+                        )}
+                        <div className="flex justify-between text-sm font-black text-green-400 font-mono">
+                          <span>Grand Total:</span>
+                          <span>₹{getTotalBill()}</span>
+                        </div>
+                      </div>
 
-            </form>
+                      <button 
+                        type="button"
+                        onClick={handlePlaceOrder}
+                        disabled={isSubmittingOrder || cart.length === 0}
+                        className="w-full bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white font-black py-4 rounded-2xl text-xs uppercase tracking-wider transition-all active:scale-95 shadow-lg flex items-center justify-center gap-2"
+                      >
+                        {isSubmittingOrder ? <Loader2 className="animate-spin" size={14} /> : <span>Confirm & Print Bill 🚀</span>}
+                      </button>
+                    </div>
+
+                  </motion.div>
+                </>
+              )}
+            </AnimatePresence>
           </div>
         )}
 
-        {/* VIEW 3: INVENTORY STOCK MANAGEMENT */}
+        {/* TAB 3: INVENTORY STOCK MANAGEMENT */}
         {activeTab === 'inventory' && (
           <div className="bg-neutral-950 border border-white/5 rounded-3xl p-5 flex-1 overflow-y-auto pb-20 shadow-xl">
             <div className="flex justify-between items-center mb-6">
@@ -803,7 +901,6 @@ export default function BbCafePos() {
                   toast.success("Catalog updated!");
                 }}
                 className="p-2 bg-neutral-900 border border-white/5 rounded-xl text-gray-400 hover:text-white transition-colors"
-                title="Refresh Menu"
               >
                 <RefreshCw size={14} />
               </button>
