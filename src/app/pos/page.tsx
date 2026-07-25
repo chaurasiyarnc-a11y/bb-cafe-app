@@ -31,7 +31,7 @@ const SafeMoon = Moon as any;
 const SafeSun = Sun as any;
 const SafeShoppingBag = ShoppingBag as any;
 const SafeClock = Clock as any;
-const SafeLayers = SafeLayers as any;
+const SafeLayers = Layers as any;
 const SafePrinter = Printer as any;
 const SafeUsers = Users as any;
 const SafePlay = Play as any;
@@ -926,351 +926,353 @@ export default function BbCafePos() {
     );
   };
 
-  // 🔐 RENDERING LOCKSCREEN IF NOT LOGGED IN
-  if (!isLoggedIn) {
-    return (
-      <div className="min-h-screen bg-neutral-900 text-white flex flex-col items-center justify-center p-4 transition-colors duration-200">
-        <Toaster position="top-center" />
-        <motion.div 
-          initial={{ opacity: 0, y: -20 }} 
-          animate={{ opacity: 1, y: 0 }}
-          className="w-full max-w-sm bg-neutral-950 border border-white/5 rounded-3xl p-8 shadow-2xl space-y-6 text-center"
-        >
-          {/* Logo Section */}
-          <div className="flex flex-col items-center gap-2">
-            <div className="p-4 bg-orange-500/10 text-orange-500 rounded-full border border-orange-500/20">
-              <SafeLock size={32} />
-            </div>
-            <h1 className="text-xl font-black uppercase tracking-wider text-yellow-500">BUM BUM CAFE</h1>
-            <p className="text-xs text-neutral-400">POS Terminal Locked • Enter Secret PIN</p>
-          </div>
-
-          <form onSubmit={handlePinLoginSubmit} className="space-y-4">
-            <input 
-              type="password" 
-              maxLength={4} 
-              value={pinInput} 
-              readOnly 
-              placeholder="••••"
-              className="w-full bg-neutral-900 border border-white/5 text-center text-3xl tracking-widest font-mono font-bold py-4 rounded-2xl outline-none focus:border-orange-500 text-orange-400 placeholder-neutral-700"
-            />
-
-            {/* Visual Number Pad */}
-            <div className="grid grid-cols-3 gap-3 max-w-xs mx-auto pt-2">
-              {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
-                <button
-                  key={num}
-                  type="button"
-                  onClick={() => {
-                    triggerBeep('tap');
-                    if (pinInput.length < 4) setPinInput(prev => prev + num);
-                  }}
-                  className="aspect-square bg-neutral-900 hover:bg-neutral-800 active:scale-95 border border-white/5 font-black text-xl rounded-2xl transition-all flex items-center justify-center"
-                >
-                  {num}
-                </button>
-              ))}
-              <button
-                type="button"
-                onClick={() => {
-                  triggerBeep('tap');
-                  setPinInput('');
-                }}
-                className="aspect-square bg-neutral-900 hover:bg-neutral-800 active:scale-95 border border-white/5 font-bold text-xs uppercase text-red-400 rounded-2xl transition-all flex items-center justify-center"
-              >
-                Clear
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  triggerBeep('tap');
-                  if (pinInput.length < 4) setPinInput(prev => prev + '0');
-                }}
-                className="aspect-square bg-neutral-900 hover:bg-neutral-800 active:scale-95 border border-white/5 font-black text-xl rounded-2xl transition-all flex items-center justify-center"
-              >
-                0
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  triggerBeep('success');
-                  handlePinLoginSubmit();
-                }}
-                className="aspect-square bg-orange-600 hover:bg-orange-500 text-white active:scale-95 font-bold text-xs uppercase tracking-wider rounded-2xl transition-all flex items-center justify-center"
-              >
-                Login
-              </button>
-            </div>
-          </form>
-          <p className="text-[10px] text-neutral-500 font-mono">Demo Admin PIN: 1234</p>
-        </motion.div>
-      </div>
-    );
-  }
-
-  // 🖥️ FULL WORKING POS SYSTEM UI
+  // 🖥️ SINGLE ROOT LEVEL RETURN (Saves SWC Parser from compile crashes)
   return (
     <div className="min-h-screen bg-neutral-50 dark:bg-[#050505] text-neutral-800 dark:text-gray-100 flex flex-col md:flex-row font-sans antialiased overflow-hidden transition-colors duration-200">
       <Toaster position="top-center" />
 
-      {/* ⚠️ MOBILE ONLY SIDEBAR OVERLAY BACKDROP */}
-      {isSidebarOpen && (
-        <div 
-          onClick={() => setIsSidebarOpen(false)}
-          className="fixed inset-0 bg-black/60 z-40 md:hidden backdrop-blur-sm cursor-pointer"
-        />
-      )}
+      {/* 🔐 SCREEN 1: LOCKED STATE (Conditional Rendering Overlay) */}
+      {!isLoggedIn ? (
+        <div className="fixed inset-0 bg-neutral-900 text-white flex flex-col items-center justify-center p-4 z-50">
+          <motion.div 
+            initial={{ opacity: 0, y: -20 }} 
+            animate={{ opacity: 1, y: 0 }}
+            className="w-full max-w-sm bg-neutral-950 border border-white/5 rounded-3xl p-8 shadow-2xl space-y-6 text-center"
+          >
+            {/* Logo Section */}
+            <div className="flex flex-col items-center gap-2">
+              <div className="p-4 bg-orange-500/10 text-orange-500 rounded-full border border-orange-500/20">
+                <SafeLock size={32} />
+              </div>
+              <h1 className="text-xl font-black uppercase tracking-wider text-yellow-500">BUM BUM CAFE</h1>
+              <p className="text-xs text-neutral-400">POS Terminal Locked • Enter Secret PIN</p>
+            </div>
 
-      {/* 1. FLEXIBLE/RESPONSIVE LEFT NAVIGATION SIDEBAR */}
-      <aside className={`bg-neutral-100 dark:bg-neutral-950 border-r border-neutral-200 dark:border-white/5 flex flex-col justify-between p-4 shrink-0 shadow-lg z-50 transition-all duration-300
-        fixed inset-y-0 left-0 md:relative md:translate-x-0 md:flex
-        ${isSidebarOpen ? 'translate-x-0 w-64' : '-translate-x-full md:translate-x-0'}
-        ${isSidebarCollapsed ? 'md:w-20' : 'md:w-64'}
-      `}>
-        <div className="space-y-6">
-          <div className="flex items-center justify-between px-1 py-1 border-b border-neutral-200 dark:border-white/5 pb-4 gap-2">
-            <div className="flex items-center gap-2">
-              <SafeDatabase className="text-orange-500 animate-pulse" size={18} />
-              {!isSidebarCollapsed && (
-                <h1 className="text-xs font-black tracking-wider uppercase text-yellow-500 dark:text-yellow-300">Bum Bum POS <span className="text-[8px] text-gray-400 lowercase font-mono">v1.12</span></h1>
+            <form 
+              onSubmit={(e) => {
+                e.preventDefault();
+                handlePinLoginSubmit();
+              }} 
+              className="space-y-4"
+            >
+              <input 
+                type="password" 
+                maxLength={4} 
+                value={pinInput} 
+                readOnly 
+                placeholder="••••"
+                className="w-full bg-neutral-900 border border-white/5 text-center text-3xl tracking-widest font-mono font-bold py-4 rounded-2xl outline-none focus:border-orange-500 text-orange-400 placeholder-neutral-700"
+              />
+
+              {/* Visual Number Pad */}
+              <div className="grid grid-cols-3 gap-3 max-w-xs mx-auto pt-2">
+                {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
+                  <button
+                    key={num}
+                    type="button"
+                    onClick={() => {
+                      triggerBeep('tap');
+                      if (pinInput.length < 4) setPinInput(prev => prev + num);
+                    }}
+                    className="aspect-square bg-neutral-900 hover:bg-neutral-800 active:scale-95 border border-white/5 font-black text-xl rounded-2xl transition-all flex items-center justify-center"
+                  >
+                    {num}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => {
+                    triggerBeep('tap');
+                    setPinInput('');
+                  }}
+                  className="aspect-square bg-neutral-900 hover:bg-neutral-800 active:scale-95 border border-white/5 font-bold text-xs uppercase text-red-400 rounded-2xl transition-all flex items-center justify-center"
+                >
+                  Clear
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    triggerBeep('tap');
+                    if (pinInput.length < 4) setPinInput(prev => prev + '0');
+                  }}
+                  className="aspect-square bg-neutral-900 hover:bg-neutral-800 active:scale-95 border border-white/5 font-black text-xl rounded-2xl transition-all flex items-center justify-center"
+                >
+                  0
+                </button>
+                <button
+                  type="submit"
+                  className="aspect-square bg-orange-600 hover:bg-orange-500 text-white active:scale-95 font-bold text-xs uppercase tracking-wider rounded-2xl transition-all flex items-center justify-center"
+                >
+                  Login
+                </button>
+              </div>
+            </form>
+            <p className="text-[10px] text-neutral-500 font-mono">Demo Admin PIN: 1234</p>
+          </motion.div>
+        </div>
+      ) : (
+        /* 🖥️ SCREEN 2: ACTIVE POS TERMINAL WORKSPACE */
+        <>
+          {/* ⚠️ MOBILE ONLY SIDEBAR OVERLAY BACKDROP */}
+          {isSidebarOpen && (
+            <div 
+              onClick={() => setIsSidebarOpen(false)}
+              className="fixed inset-0 bg-black/60 z-40 md:hidden backdrop-blur-sm cursor-pointer"
+            />
+          )}
+
+          {/* 1. FLEXIBLE/RESPONSIVE LEFT NAVIGATION SIDEBAR */}
+          <aside className={`bg-neutral-100 dark:bg-neutral-950 border-r border-neutral-200 dark:border-white/5 flex flex-col justify-between p-4 shrink-0 shadow-lg z-30 transition-all duration-300
+            fixed inset-y-0 left-0 md:relative md:translate-x-0 md:flex
+            ${isSidebarOpen ? 'translate-x-0 w-64' : '-translate-x-full md:translate-x-0'}
+            ${isSidebarCollapsed ? 'md:w-20' : 'md:w-64'}
+          `}>
+            <div className="space-y-6">
+              <div className="flex items-center justify-between px-1 py-1 border-b border-neutral-200 dark:border-white/5 pb-4 gap-2">
+                <div className="flex items-center gap-2">
+                  <SafeDatabase className="text-orange-500 animate-pulse" size={18} />
+                  {!isSidebarCollapsed && (
+                    <h1 className="text-xs font-black tracking-wider uppercase text-yellow-500 dark:text-yellow-300">Bum Bum POS <span className="text-[8px] text-gray-400 lowercase font-mono">v1.12</span></h1>
+                  )}
+                </div>
+                
+                {/* Desktop Collapse Trigger */}
+                <button 
+                  onClick={() => { triggerBeep('tap'); setIsSidebarCollapsed(!isSidebarCollapsed); }}
+                  className="hidden md:flex p-1.5 bg-neutral-200 dark:bg-neutral-900 border border-neutral-300 dark:border-white/5 text-gray-400 hover:text-white rounded-lg mx-auto"
+                  title={isSidebarCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
+                >
+                  {isSidebarCollapsed ? <SafeChevronRight size={14} /> : <SafeChevronLeft size={14} />}
+                </button>
+
+                <button onClick={() => { triggerBeep('tap'); setIsSidebarOpen(false); }} className="p-1.5 bg-neutral-200 dark:bg-neutral-900 border border-neutral-300 dark:border-white/5 text-gray-400 hover:text-white rounded-lg md:hidden"><X size={14} /></button>
+              </div>
+
+              {/* Navigation stack */}
+              <nav className="space-y-1.5">
+                <button onClick={() => { triggerBeep('tap'); setActiveTab('billing'); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-200 ${activeTab === 'billing' ? 'bg-orange-600 text-white shadow-md' : 'text-gray-400 hover:text-white hover:bg-neutral-200 dark:hover:bg-neutral-900'}`} title="Counter Billing"><SafeShoppingBag size={14} />{!isSidebarCollapsed && <span className="md:hidden lg:inline">Counter Billing</span>}</button>
+                <button onClick={() => { triggerBeep('tap'); setActiveTab('orders'); }} className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-200 ${activeTab === 'orders' ? 'bg-orange-600 text-white shadow-md' : 'text-gray-400 hover:text-white hover:bg-neutral-200 dark:hover:bg-neutral-900'}`} title="Live Orders"><div className="flex items-center gap-3"><SafeClock size={14} />{!isSidebarCollapsed && <span className="md:hidden lg:inline">Live Orders</span>}</div>{liveOrders.filter(o => o.status !== 'completed' && o.status !== 'rejected').length > 0 && (<span className="bg-yellow-400 text-black font-black text-[9px] px-2 py-0.5 rounded-full font-mono">{liveOrders.filter(o => o.status !== 'completed' && o.status !== 'rejected').length}</span>)}</button>
+                <button onClick={() => { triggerBeep('tap'); setActiveTab('inventory'); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-200 ${activeTab === 'inventory' ? 'bg-orange-600 text-white shadow-md' : 'text-gray-400 hover:text-white hover:bg-neutral-200 dark:hover:bg-neutral-900'}`} title="Stock Toggle"><SafeLayers size={14} />{!isSidebarCollapsed && <span className="md:hidden lg:inline">Stock Toggle</span>}</button>
+                <button onClick={() => { triggerBeep('tap'); setActiveTab('receipts'); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-200 ${activeTab === 'receipts' ? 'bg-orange-600 text-white shadow-md' : 'text-gray-400 hover:text-white hover:bg-neutral-200 dark:hover:bg-neutral-900'}`} title="Past Receipts"><SafePrinter size={14} />{!isSidebarCollapsed && <span className="md:hidden lg:inline">Past Receipts</span>}</button>
+                <button onClick={() => { triggerBeep('tap'); setActiveTab('settings'); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-200 ${activeTab === 'settings' ? 'bg-orange-600 text-white shadow-md' : 'text-gray-400 hover:text-white hover:bg-neutral-200 dark:hover:bg-neutral-900'}`} title="POS Settings"><Settings size={14} />{!isSidebarCollapsed && <span className="md:hidden lg:inline">POS Settings</span>}</button>
+              </nav>
+            </div>
+
+            {/* LOGOUT BUTTON */}
+            <div className="space-y-4 pt-4 border-t border-neutral-200 dark:border-white/5">
+              <div className="px-2 text-neutral-500 dark:text-gray-400">
+                <p className="text-[8px] font-mono tracking-wider font-bold leading-none">LOGGED IN AS</p>
+                {!isSidebarCollapsed && (
+                  <p className="text-[10px] font-black text-orange-600 dark:text-orange-400 uppercase truncate mt-1">{currentUser?.name || "Cashier"}</p>
+                )}
+              </div>
+              <button type="button" onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-[10px] font-black uppercase text-red-500 hover:bg-red-500/10 transition-colors" title="Lock Terminal"><SafeLogOut size={14} />{!isSidebarCollapsed && <span>Lock Terminal</span></button>
+            </div>
+          </</aside>
+
+          {/* 2. MAIN WORKSPACE CONTENT AREA */}
+          <main className="flex-1 p-3 md:p-5 overflow-y-auto flex flex-col relative h-screen">
+            {/* GLOBAL HEADER BAR */}
+            <div className="flex items-center gap-3 mb-4 shrink-0 border-b border-neutral-200 dark:border-white/5 pb-3">
+              <button type="button" onClick={() => { triggerBeep('tap'); setIsSidebarOpen(true); }} className="p-2.5 bg-neutral-200 dark:bg-neutral-950 hover:bg-neutral-300 dark:hover:bg-neutral-900 border border-neutral-300 dark:border-white/5 text-orange-500 hover:text-orange-400 rounded-xl transition-all shadow-md md:hidden"><SafeMenu size={16} /></button>
+              <div className="flex flex-col"><h2 className="text-[10px] font-black uppercase tracking-widest text-orange-500 leading-none">{activeTab === 'billing' ? 'Counter Billing Workspace' : activeTab === 'orders' ? 'Live Orders Pipeline' : activeTab === 'inventory' ? 'Item Availability Control' : activeTab === 'receipts' ? 'Past Receipts reprint panel' : 'POS Configuration Settings'}</h2><span className="text-[9px] text-gray-400 font-bold mt-1">Bum Bum Cafe • Mohandra</span></div>
+              {activeTab === 'billing' && (
+                <button type="button" onClick={() => { triggerBeep('tap'); setIsCustomerModalOpen(true); searchDbCustomers(''); }} className="ml-auto p-2 md:p-2.5 bg-neutral-200 dark:bg-neutral-950 hover:bg-neutral-300 dark:hover:bg-neutral-900 border border-neutral-300 dark:border-white/5 text-yellow-600 dark:text-yellow-400 rounded-xl transition-all shadow-md flex items-center gap-1 text-[10px] font-black uppercase"><SafeUsers size={14} /><span>Search Guest</span></button>
               )}
             </div>
-            
-            {/* Desktop Collapse Trigger */}
-            <button 
-              onClick={() => { triggerBeep('tap'); setIsSidebarCollapsed(!isSidebarCollapsed); }}
-              className="hidden md:flex p-1.5 bg-neutral-200 dark:bg-neutral-900 border border-neutral-300 dark:border-white/5 text-gray-400 hover:text-white rounded-lg mx-auto"
-              title={isSidebarCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
-            >
-              {isSidebarCollapsed ? <SafeChevronRight size={14} /> : <SafeChevronLeft size={14} />}
-            </button>
 
-            <button onClick={() => { triggerBeep('tap'); setIsSidebarOpen(false); }} className="p-1.5 bg-neutral-200 dark:bg-neutral-900 border border-neutral-300 dark:border-white/5 text-gray-400 hover:text-white rounded-lg md:hidden"><X size={14} /></button>
-          </div>
-
-          {/* Navigation stack */}
-          <nav className="space-y-1.5">
-            <button onClick={() => { triggerBeep('tap'); setActiveTab('billing'); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-200 ${activeTab === 'billing' ? 'bg-orange-600 text-white shadow-md' : 'text-gray-400 hover:text-white hover:bg-neutral-200 dark:hover:bg-neutral-900'}`} title="Counter Billing"><SafeShoppingBag size={14} />{!isSidebarCollapsed && <span className="md:hidden lg:inline">Counter Billing</span>}</button>
-            <button onClick={() => { triggerBeep('tap'); setActiveTab('orders'); }} className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-200 ${activeTab === 'orders' ? 'bg-orange-600 text-white shadow-md' : 'text-gray-400 hover:text-white hover:bg-neutral-200 dark:hover:bg-neutral-900'}`} title="Live Orders"><div className="flex items-center gap-3"><SafeClock size={14} />{!isSidebarCollapsed && <span className="md:hidden lg:inline">Live Orders</span>}</div>{liveOrders.filter(o => o.status !== 'completed' && o.status !== 'rejected').length > 0 && (<span className="bg-yellow-400 text-black font-black text-[9px] px-2 py-0.5 rounded-full font-mono">{liveOrders.filter(o => o.status !== 'completed' && o.status !== 'rejected').length}</span>)}</button>
-            <button onClick={() => { triggerBeep('tap'); setActiveTab('inventory'); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-200 ${activeTab === 'inventory' ? 'bg-orange-600 text-white shadow-md' : 'text-gray-400 hover:text-white hover:bg-neutral-200 dark:hover:bg-neutral-900'}`} title="Stock Toggle"><SafeLayers size={14} />{!isSidebarCollapsed && <span className="md:hidden lg:inline">Stock Toggle</span>}</button>
-            <button onClick={() => { triggerBeep('tap'); setActiveTab('receipts'); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-200 ${activeTab === 'receipts' ? 'bg-orange-600 text-white shadow-md' : 'text-gray-400 hover:text-white hover:bg-neutral-200 dark:hover:bg-neutral-900'}`} title="Past Receipts"><SafePrinter size={14} />{!isSidebarCollapsed && <span className="md:hidden lg:inline">Past Receipts</span>}</button>
-            <button onClick={() => { triggerBeep('tap'); setActiveTab('settings'); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-200 ${activeTab === 'settings' ? 'bg-orange-600 text-white shadow-md' : 'text-gray-400 hover:text-white hover:bg-neutral-200 dark:hover:bg-neutral-900'}`} title="POS Settings"><Settings size={14} />{!isSidebarCollapsed && <span className="md:hidden lg:inline">POS Settings</span>}</button>
-          </nav>
-        </div>
-
-        {/* LOGOUT BUTTON */}
-        <div className="space-y-4 pt-4 border-t border-neutral-200 dark:border-white/5">
-          <div className="px-2 text-neutral-500 dark:text-gray-400">
-            <p className="text-[8px] font-mono tracking-wider font-bold leading-none">LOGGED IN AS</p>
-            {!isSidebarCollapsed && (
-              <p className="text-[10px] font-black text-orange-600 dark:text-orange-400 uppercase truncate mt-1">{currentUser?.name || "Cashier"}</p>
-            )}
-          </div>
-          <button type="button" onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-[10px] font-black uppercase text-red-500 hover:bg-red-500/10 transition-colors" title="Lock Terminal"><SafeLogOut size={14} />{!isSidebarCollapsed && <span>Lock Terminal</span></button>
-        </div>
-      </aside>
-
-      {/* 2. MAIN WORKSPACE CONTENT AREA */}
-      <main className="flex-1 p-3 md:p-5 overflow-y-auto flex flex-col relative h-screen">
-        {/* GLOBAL HEADER BAR */}
-        <div className="flex items-center gap-3 mb-4 shrink-0 border-b border-neutral-200 dark:border-white/5 pb-3">
-          <button type="button" onClick={() => { triggerBeep('tap'); setIsSidebarOpen(true); }} className="p-2.5 bg-neutral-200 dark:bg-neutral-955 hover:bg-neutral-300 dark:hover:bg-neutral-900 border border-neutral-300 dark:border-white/5 text-orange-500 hover:text-orange-400 rounded-xl transition-all shadow-md md:hidden"><SafeMenu size={16} /></button>
-          <div className="flex flex-col"><h2 className="text-[10px] font-black uppercase tracking-widest text-orange-500 leading-none">{activeTab === 'billing' ? 'Counter Billing Workspace' : activeTab === 'orders' ? 'Live Orders Pipeline' : activeTab === 'inventory' ? 'Item Availability Control' : activeTab === 'receipts' ? 'Past Receipts reprint panel' : 'POS Configuration Settings'}</h2><span className="text-[9px] text-gray-400 font-bold mt-1">Bum Bum Cafe • Mohandra</span></div>
-          {activeTab === 'billing' && (
-            <button type="button" onClick={() => { triggerBeep('tap'); setIsCustomerModalOpen(true); searchDbCustomers(''); }} className="ml-auto p-2 md:p-2.5 bg-neutral-200 dark:bg-neutral-950 hover:bg-neutral-300 dark:hover:bg-neutral-900 border border-neutral-300 dark:border-white/5 text-yellow-600 dark:text-yellow-400 rounded-xl transition-all shadow-md flex items-center gap-1 text-[10px] font-black uppercase"><SafeUsers size={14} /><span>Search Guest</span></button>
-          )}
-        </div>
-
-        {/* TAB VIEWS RENDERED */}
-        {activeTab === 'orders' && (
-          <div className="space-y-4 flex-1 overflow-y-auto pr-1">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pb-20">
-              {liveOrders.map((order: any) => {
-                if (order.status === 'completed' || order.status === 'rejected') return null;
-                return (
-                  <motion.div layout key={order.id} className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-white/5 rounded-2xl p-4 flex flex-col justify-between shadow-lg">
-                    <div>
-                      <div className="flex justify-between items-start border-b border-neutral-200 dark:border-white/5 pb-2 mb-3">
-                        <div><p className="text-xs font-black text-yellow-600 dark:text-yellow-300 font-mono">Bill: #${String(order.billNumber).padStart(4, '0')}</p><p className="text-[9px] text-gray-400 font-mono mt-0.5">Token: #{order.tokenNumber}</p></div>
-                        <span className="bg-orange-500/10 border border-orange-500/20 text-orange-400 text-[8px] font-black uppercase tracking-wider px-2 py-0.5 rounded">{order.fulfillmentType || 'table'}</span>
-                      </div>
-                      <div className="space-y-1 mb-3 text-[10px] font-semibold text-neutral-800 dark:text-gray-300"><p className="dark:text-white text-neutral-955 truncate font-black">👤 {order.customerName}</p>{order.customerPhone && <p className="font-mono">📞 {order.customerPhone}</p>}{order.address && <p className="text-gray-400 line-clamp-1">📍 {order.address}</p>}</div>
-                      <div className="space-y-1.5 border-t border-dashed border-neutral-200 dark:border-white/5 pt-2.5 mb-4">
-                        {order.items?.map((it: any, index: number) => (
-                          <div key={index} className="flex justify-between text-[11px] text-neutral-800 dark:text-gray-200">
-                            <span className="font-bold">
-                              {it.name} <span className="text-orange-500">x{it.quantity}</span>
-                              {it.note && (
-                                <>
-                                  <br />
-                                  <span className="text-[9px] text-neutral-500 dark:text-gray-400 italic">
-                                    ({it.note})
-                                  </span>
-                                </>
-                              )}
-                            </span>
-                            <span className="font-mono text-gray-400">₹{it.price * it.quantity}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                    <div>
-                      <div className="flex justify-between text-xs font-black text-green-400 mb-3 font-mono border-t border-neutral-200 dark:border-white/5 pt-2.5"><span>Grand Total:</span><span>₹{order.total}</span></div>
-                      <div className="flex gap-2">
-                        {order.status === 'pending' && (<button onClick={() => handleUpdateStatus(order.id, 'preparing')} className="flex-1 bg-amber-500 hover:bg-amber-600 text-black font-black py-2.5 rounded-xl text-[10px] uppercase tracking-wider flex items-center justify-center gap-1 shadow-md transition-all active:scale-95"><SafePlay size={10} className="fill-black" /> Accept (To KDS)</button>)}
-                        {order.status === 'preparing' && (<button onClick={() => handleUpdateStatus(order.id, order.fulfillmentType === 'delivery' ? 'out_for_delivery' : 'completed')} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-black py-2.5 rounded-xl text-[10px] uppercase tracking-wider flex items-center justify-center gap-1 shadow-md transition-all active:scale-95"><SafeCheck size={10} /> Dispatch</button>)}
-                        {order.status === 'out_for_delivery' && (<button onClick={() => handleUpdateStatus(order.id, 'completed')} className="flex-1 bg-green-600 hover:bg-green-700 text-white font-black py-2.5 rounded-xl text-[10px] uppercase tracking-wider flex items-center justify-center gap-1 shadow-md transition-all active:scale-95"><SafeCheck size={10} /> Mark Completed</button>)}
-                        <button onClick={() => handlePrintReceipt(order)} className="p-2.5 bg-neutral-200 dark:bg-neutral-900 border border-neutral-300 dark:border-white/5 text-gray-500 hover:text-white rounded-xl"><SafePrinter size={14} /></button>
-                      </div>
-                    </div>
-                  </motion.div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'billing' && (
-          <div className="flex-1 flex flex-col overflow-hidden relative">
-            <div className="flex-1 bg-white dark:bg-neutral-950 border border-neutral-200 dark:border-white/5 rounded-3xl p-4 flex flex-col overflow-hidden shadow-xl">
-              <div className="flex flex-wrap gap-3 items-center justify-between mb-4">
-                <div className="relative flex-1 min-w-[200px]"><SafeSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-500" size={14} /><input type="text" placeholder="Search dishes..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full bg-neutral-100 dark:bg-neutral-900 border border-neutral-200 dark:border-white/5 rounded-xl py-2 px-9 text-xs outline-none text-neutral-800 dark:text-white focus:border-orange-500 placeholder-gray-500 transition-colors" /></div>
-                <button type="button" onClick={() => { triggerBeep('tap'); setIsCartOpen(true); }} className="bg-orange-500 hover:bg-orange-600 text-black font-black text-xs py-2 px-4 rounded-xl flex items-center gap-2 shadow-lg transition-all active:scale-95"><SafeShoppingBag size={14} /><span>Cart ({cart.reduce((sum, item) => sum + item.quantity, 0)})</span></button>
-              </div>
-
-              <div className="flex gap-1.5 overflow-x-auto pb-3.5 scrollbar-none">
-                {categories.map((cat) => (
-                  <button key={cat} onClick={() => { triggerBeep('tap'); setSelectedCategory(cat); }} className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider border shrink-0 transition-all ${selectedCategory === cat ? 'bg-orange-500 text-black border-orange-500 font-bold' : 'bg-neutral-100 dark:bg-neutral-900 text-gray-400 border-neutral-200 dark:border-white/5'}`}>{cat}</button>
-                ))}
-              </div>
-
-              {loading ? (
-                <div className="flex items-center justify-center flex-1"><Loader2 className="animate-spin text-orange-500" size={24} /></div>
-              ) : filteredMenu.length === 0 ? (
-                <p className="text-center text-gray-500 text-xs py-10 uppercase tracking-widest font-black">No matching items found</p>
-              ) : (
-                /* RESPONSIVE 2-COLUMN ON MOBILE, 4-COLUMN ON DESKTOP GRID */
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 overflow-y-auto flex-1 pr-1 pb-16">
-                  {filteredMenu.map((item) => {
-                    const isAvailable = item.isAvailable !== false;
+            {/* TAB VIEWS RENDERED */}
+            {activeTab === 'orders' && (
+              <div className="space-y-4 flex-1 overflow-y-auto pr-1">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pb-20">
+                  {liveOrders.map((order: any) => {
+                    if (order.status === 'completed' || order.status === 'rejected') return null;
                     return (
-                      <button key={item.id} disabled={!isAvailable} onClick={() => { triggerBeep('tap'); item.variants ? setSelectedProduct(item) : handleAddProductToCart(item); }} className={`bg-neutral-50 dark:bg-neutral-900 border p-3 rounded-2xl text-left flex flex-col justify-between h-24 hover:border-orange-500 transition-all duration-200 active:scale-95 ${!isAvailable ? 'opacity-40 cursor-not-allowed border-white/5' : 'border-neutral-200 dark:border-white/5'}`}>
-                        <div><p className="font-bold text-xs text-neutral-800 dark:text-gray-100 line-clamp-2 leading-snug">{item.name}</p><p className="text-[8px] text-gray-500 uppercase tracking-widest mt-0.5">{item.category}</p></div>
-                        <div className="flex justify-between items-end w-full"><p className="text-yellow-600 dark:text-yellow-300 font-black text-xs font-mono">{getDisplayPrice(item)}</p>{!isAvailable && <span className="text-[7px] font-black text-red-500 uppercase">Unavailable</span>}</div>
-                      </button>
+                      <motion.div layout key={order.id} className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-white/5 rounded-2xl p-4 flex flex-col justify-between shadow-lg">
+                        <div>
+                          <div className="flex justify-between items-start border-b border-neutral-200 dark:border-white/5 pb-2 mb-3">
+                            <div><p className="text-xs font-black text-yellow-600 dark:text-yellow-300 font-mono">Bill: #${String(order.billNumber).padStart(4, '0')}</p><p className="text-[9px] text-gray-400 font-mono mt-0.5">Token: #{order.tokenNumber}</p></div>
+                            <span className="bg-orange-500/10 border border-orange-500/20 text-orange-400 text-[8px] font-black uppercase tracking-wider px-2 py-0.5 rounded">{order.fulfillmentType || 'table'}</span>
+                          </div>
+                          <div className="space-y-1 mb-3 text-[10px] font-semibold text-neutral-800 dark:text-gray-300"><p className="dark:text-white text-neutral-950 truncate font-black">👤 {order.customerName}</p>{order.customerPhone && <p className="font-mono">📞 {order.customerPhone}</p>}{order.address && <p className="text-gray-400 line-clamp-1">📍 {order.address}</p>}</div>
+                          <div className="space-y-1.5 border-t border-dashed border-neutral-200 dark:border-white/5 pt-2.5 mb-4">
+                            {order.items?.map((it: any, index: number) => (
+                              <div key={index} className="flex justify-between text-[11px] text-neutral-800 dark:text-gray-200">
+                                <span className="font-bold">
+                                  {it.name} <span className="text-orange-500">x{it.quantity}</span>
+                                  {it.note && (
+                                    <>
+                                      <br />
+                                      <span className="text-[9px] text-neutral-500 dark:text-gray-400 italic">
+                                        ({it.note})
+                                      </span>
+                                    </>
+                                  )}
+                                </span>
+                                <span className="font-mono text-gray-400">₹{it.price * it.quantity}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="flex justify-between text-xs font-black text-green-400 mb-3 font-mono border-t border-neutral-200 dark:border-white/5 pt-2.5"><span>Grand Total:</span><span>₹{order.total}</span></div>
+                          <div className="flex gap-2">
+                            {order.status === 'pending' && (<button onClick={() => handleUpdateStatus(order.id, 'preparing')} className="flex-1 bg-amber-500 hover:bg-amber-600 text-black font-black py-2.5 rounded-xl text-[10px] uppercase tracking-wider flex items-center justify-center gap-1 shadow-md transition-all active:scale-95"><SafePlay size={10} className="fill-black" /> Accept (To KDS)</button>)}
+                            {order.status === 'preparing' && (<button onClick={() => handleUpdateStatus(order.id, order.fulfillmentType === 'delivery' ? 'out_for_delivery' : 'completed')} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-black py-2.5 rounded-xl text-[10px] uppercase tracking-wider flex items-center justify-center gap-1 shadow-md transition-all active:scale-95"><SafeCheck size={10} /> Dispatch</button>)}
+                            {order.status === 'out_for_delivery' && (<button onClick={() => handleUpdateStatus(order.id, 'completed')} className="flex-1 bg-green-600 hover:bg-green-700 text-white font-black py-2.5 rounded-xl text-[10px] uppercase tracking-wider flex items-center justify-center gap-1 shadow-md transition-all active:scale-95"><SafeCheck size={10} /> Mark Completed</button>)}
+                            <button onClick={() => handlePrintReceipt(order)} className="p-2.5 bg-neutral-200 dark:bg-neutral-900 border border-neutral-300 dark:border-white/5 text-gray-500 hover:text-white rounded-xl"><SafePrinter size={14} /></button>
+                          </div>
+                        </div>
+                      </motion.div>
                     );
                   })}
                 </div>
-              )}
-            </div>
-
-            {cart.length > 0 && !isCartOpen && (
-              <motion.button  initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} onClick={() => { triggerBeep('tap'); setIsCartOpen(true); }} className="fixed bottom-6 right-6 left-6 md:left-auto bg-green-600 hover:bg-green-700 text-white font-black px-6 py-4 rounded-2xl shadow-2xl flex items-center justify-between gap-4 z-40 border border-green-500/20 active:scale-95 transition-all"><div className="flex items-center gap-2.5"><div className="bg-white/10 p-2 rounded-xl"><SafeShoppingBag size={16} /></div><div className="text-left"><p className="text-[8px] uppercase tracking-wider text-green-100">Active Bill Cart</p><p className="text-xs font-bold font-mono">{cart.reduce((sum, item) => sum + item.quantity, 0)} Items</p></div></div><div className="flex items-center gap-1 text-sm font-black font-mono"><span>To Pay: ₹{getTotalBillPrice()}</span><span>➔</span></div></motion.button>
+              </div>
             )}
-          </div>
-        )}
 
-        {activeTab === 'inventory' && (
-          <div className="bg-white dark:bg-neutral-950 border border-neutral-200 dark:border-white/5 p-5 flex-1 overflow-y-auto pb-20 shadow-xl rounded-3xl">
-            <div className="flex justify-between items-center mb-6">
-              <div><h2 className="text-sm font-black uppercase tracking-widest text-orange-500">Live Item Availability & Stock Control</h2><p className="text-[10px] text-neutral-500 dark:text-gray-400 font-bold mt-1">Disabling an item here immediately makes it unavailable on customers' phones.</p></div>
-              <button onClick={async () => { triggerBeep('tap'); const prodSnap = await getDocs(collection(db, "products")); setProducts(prodSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }))); toast.success("Catalog updated!"); }} className="p-2 bg-neutral-200 dark:bg-neutral-900 border border-neutral-300 dark:border-white/5 text-gray-400 hover:text-white transition-colors"><SafeRefreshCw size={14} /></button>
-            </div>
-            <div className="space-y-2 max-w-2xl">
-              {products.map((item) => {
-                const isAvailable = item.isAvailable !== false;
-                return (
-                  <div key={item.id} className="bg-neutral-100 dark:bg-neutral-900 border border-neutral-200 dark:border-white/5 p-4 rounded-2xl flex items-center justify-between">
-                    <div><span className="font-bold text-xs text-neutral-800 dark:text-white block">{item.name}</span><span className="text-[8px] text-gray-500 uppercase tracking-wider block font-mono">Category: {item.category} | Price: ₹{item.price}</span></div>
-                    <div className="flex items-center gap-4">
-                      <span className={`text-[8px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full border ${isAvailable ? 'bg-green-500/10 text-green-400 border-green-500/20' : 'bg-red-500/10 text-red-400 border-red-500/20'}`}>{isAvailable ? 'In Stock' : 'Out of Stock'}</span>
-                      <button onClick={() => handleToggleStock(item.id, isAvailable)} className={`text-[9px] font-black uppercase tracking-wider px-3.5 py-2 rounded-xl border transition-all active:scale-95 ${isAvailable ? 'bg-red-950/25 border-red-500/20 text-red-400 hover:bg-red-950' : 'bg-green-950/25 border-green-500/20 text-green-400 hover:bg-green-950'}`}>{isAvailable ? 'Disable' : 'Enable'}</button>
-                    </div>
+            {activeTab === 'billing' && (
+              <div className="flex-1 flex flex-col overflow-hidden relative">
+                <div className="flex-1 bg-white dark:bg-neutral-950 border border-neutral-200 dark:border-white/5 rounded-3xl p-4 flex flex-col overflow-hidden shadow-xl">
+                  <div className="flex flex-wrap gap-3 items-center justify-between mb-4">
+                    <div className="relative flex-1 min-w-[200px]"><SafeSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-500" size={14} /><input type="text" placeholder="Search dishes..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full bg-neutral-100 dark:bg-neutral-900 border border-neutral-200 dark:border-white/5 rounded-xl py-2 px-9 text-xs outline-none text-neutral-800 dark:text-white focus:border-orange-500 placeholder-gray-500 transition-colors" /></div>
+                    <button type="button" onClick={() => { triggerBeep('tap'); setIsCartOpen(true); }} className="bg-orange-500 hover:bg-orange-600 text-black font-black text-xs py-2 px-4 rounded-xl flex items-center gap-2 shadow-lg transition-all active:scale-95"><SafeShoppingBag size={14} /><span>Cart ({cart.reduce((sum, item) => sum + item.quantity, 0)})</span></button>
                   </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
 
-        {activeTab === 'receipts' && (
-          <div className="flex-1 flex flex-col md:flex-row gap-5 overflow-hidden">
-            <div className="flex-1 bg-white dark:bg-neutral-950 border border-neutral-200 dark:border-white/5 rounded-3xl p-4 flex flex-col overflow-hidden shadow-xl">
-              <div className="relative mb-4"><SafeSearch className="absolute left-3 top-2.5 text-gray-500" size={14} /><input type="text" placeholder="Search past bills by Bill No, Name or Phone..." value={receiptSearchQuery} onChange={(e) => setReceiptSearchQuery(e.target.value)} className="w-full bg-neutral-100 dark:bg-neutral-900 border border-neutral-200 dark:border-white/5 rounded-xl py-2 px-9 text-xs outline-none text-neutral-800 dark:text-white focus:border-orange-500 placeholder-gray-500 transition-colors" /></div>
-              <div className="space-y-2 overflow-y-auto flex-1 pr-1 pb-16">
-                {filteredPastReceipts.map((order) => {
-                  const isSelected = selectedReceipt?.id === order.id;
-                  const formattedDate = order.timestamp?.toDate ? order.timestamp.toDate().toLocaleString('en-IN') : new Date(order.timestamp).toLocaleString();
-                  return (
-                    <div key={order.id} onClick={() => { triggerBeep('tap'); setSelectedReceipt(order); }} className={`bg-neutral-50 dark:bg-neutral-900 border p-4 rounded-2xl flex justify-between items-center cursor-pointer transition-all hover:border-orange-500 ${isSelected ? 'border-orange-500 bg-orange-500/10' : 'border-neutral-200 dark:border-white/5'}`}>
-                      <div><span className="font-bold text-xs block text-neutral-900 dark:text-white font-mono">Bill No: #${order.billNumber}</span><span className="text-[9px] text-gray-400 block font-mono">Token: #{order.tokenNumber} | ${formattedDate}</span><span className="text-[9px] text-gray-400 block uppercase">Guest: {order.customerName || 'Walk-in'}</span></div>
-                      <div className="text-right"><span className="text-sm font-black text-green-600 dark:text-green-400 font-mono">₹{order.total}</span><span className="text-[8px] text-gray-500 block uppercase font-bold">{order.paymentMethod?.toUpperCase() || 'CASH'}</span></div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-            <div className="w-full md:w-[380px] bg-white dark:bg-neutral-950 border border-neutral-200 dark:border-white/5 p-4 rounded-3xl flex flex-col justify-between shadow-xl overflow-y-auto h-full text-neutral-800 dark:text-gray-100 font-bold">
-              {selectedReceipt ? (
-                <div className="space-y-4 flex flex-col justify-between h-full">
-                  <div>
-                    <div className="border-b border-neutral-200 dark:border-white/5 pb-3"><span className="text-[9px] text-orange-500 font-black uppercase tracking-wider">Receipt Inspector Panel</span><h3 className="text-base font-black font-mono">Bill No: #${selectedReceipt.billNumber}</h3><p className="text-[10px] text-gray-400 font-mono">Token: #{selectedReceipt.tokenNumber}</p></div>
-                    <div className="space-y-3 mt-4">
-                      <div className="bg-neutral-50 dark:bg-white/5 p-3 rounded-2xl text-[10px] font-semibold text-neutral-800 dark:text-gray-300 space-y-1"><p>👤 <b>Name:</b> {selectedReceipt.customerName || 'Walk-in Guest'}</p>{selectedReceipt.customerPhone && <p className="font-mono">📞 <b>Phone:</b> {selectedReceipt.customerPhone}</p>}<p><b>Pay Mode:</b> {selectedReceipt.paymentMethod?.toUpperCase() || 'CASH'}</p>{selectedReceipt.tableNumber && <p>🪑 <b>Table No:</b> {selectedReceipt.tableNumber}</p>}</div>
-                      <div className="space-y-2 border-t border-neutral-200 dark:border-white/5 pt-3"><p className="text-[9px] font-black text-gray-400 uppercase">Items Purchased:</p>
-                        {selectedReceipt.items?.map((it: any, index: number) => (
-                          <div key={index} className="flex justify-between text-xs text-neutral-800 dark:text-gray-200">
-                            <span>
-                              {it.name} <span className="text-orange-500">x{it.quantity}</span>
-                              {it.note && (
-                                <>
-                                  <br />
-                                  <span className="text-[9.5px] text-neutral-500 dark:text-gray-400 italic">
-                                    ({it.note})
-                                  </span>
-                                </>
-                              )}
-                            </span>
-                            <span className="font-mono text-gray-400">₹{it.price * it.quantity}</span>
-                          </div>
-                        ))}
-                      </div>
-                      <div className="border-t border-neutral-200 dark:border-white/5 pt-3 space-y-1.5 text-xs font-semibold text-neutral-600 dark:text-gray-400 font-mono"><div className="flex justify-between"><span>Subtotal:</span><span>₹{selectedReceipt.subtotal}</span></div>{selectedReceipt.discount > 0 && <div className="flex justify-between text-yellow-500"><span>Savings/Discount:</span><span>-₹{selectedReceipt.discount}</span></div>}{selectedReceipt.gstRate > 0 && <div className="flex justify-between"><span>GST (${selectedReceipt.gstRate}%):</span><span>+₹{selectedReceipt.gstAmount || 0}</span></div>}<div className="flex justify-between font-black text-green-600 dark:text-green-400 text-sm border-t border-dashed border-neutral-200 dark:border-white/5 pt-2"><span>Grand Total:</span><span>₹{selectedReceipt.total}</span></div></div>
-                    </div>
+                  <div className="flex gap-1.5 overflow-x-auto pb-3.5 scrollbar-none">
+                    {categories.map((cat) => (
+                      <button key={cat} onClick={() => { triggerBeep('tap'); setSelectedCategory(cat); }} className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider border shrink-0 transition-all ${selectedCategory === cat ? 'bg-orange-500 text-black border-orange-500 font-bold' : 'bg-neutral-100 dark:bg-neutral-900 text-gray-400 border-neutral-200 dark:border-white/5'}`}>{cat}</button>
+                    ))}
                   </div>
-                  <button type="button" onClick={() => handlePrintReceipt(selectedReceipt)} className="w-full bg-green-600 hover:bg-green-700 text-white font-black py-4 rounded-2xl text-xs uppercase tracking-wider flex items-center justify-center gap-2"><SafePrinter size={16} /> Reprint Thermal Invoice</button>
+
+                  {loading ? (
+                    <div className="flex items-center justify-center flex-1"><Loader2 className="animate-spin text-orange-500" size={24} /></div>
+                  ) : filteredMenu.length === 0 ? (
+                    <p className="text-center text-gray-500 text-xs py-10 uppercase tracking-widest font-black">No matching items found</p>
+                  ) : (
+                    /* RESPONSIVE 2-COLUMN ON MOBILE, 4-COLUMN ON DESKTOP GRID */
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 overflow-y-auto flex-1 pr-1 pb-16">
+                      {filteredMenu.map((item) => {
+                        const isAvailable = item.isAvailable !== false;
+                        return (
+                          <button key={item.id} disabled={!isAvailable} onClick={() => { triggerBeep('tap'); item.variants ? setSelectedProduct(item) : handleAddProductToCart(item); }} className={`bg-neutral-50 dark:bg-neutral-900 border p-3 rounded-2xl text-left flex flex-col justify-between h-24 hover:border-orange-500 transition-all duration-200 active:scale-95 ${!isAvailable ? 'opacity-40 cursor-not-allowed border-white/5' : 'border-neutral-200 dark:border-white/5'}`}>
+                            <div><p className="font-bold text-xs text-neutral-800 dark:text-gray-100 line-clamp-2 leading-snug">{item.name}</p><p className="text-[8px] text-gray-500 uppercase tracking-widest mt-0.5">{item.category}</p></div>
+                            <div className="flex justify-between items-end w-full"><p className="text-yellow-600 dark:text-yellow-300 font-black text-xs font-mono">{getDisplayPrice(item)}</p>{!isAvailable && <span className="text-[7px] font-black text-red-500 uppercase">Unavailable</span>}</div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
-              ) : (
-                <div className="flex flex-col items-center justify-center h-full text-gray-500 text-xs text-center uppercase py-20 font-bold"><span>Select any past receipt to view breakdown & reprint bill 🧾</span></div>
-              )}
-            </div>
-          </div>
-        )}
 
-        {activeTab === 'settings' && (
-          <div className="bg-white dark:bg-neutral-950 border border-neutral-200 dark:border-white/5 p-6 rounded-3xl shadow-xl flex-grow max-w-2xl space-y-6 overflow-y-auto font-bold text-neutral-800 dark:text-gray-100 font-sans">
-            <h3 className="text-sm font-black uppercase text-orange-500 tracking-wider">POS Configuration & Hardware settings</h3>
-            <div className="border-b border-neutral-200 dark:border-white/5 pb-4 space-y-3"><p className="text-xs font-bold text-neutral-800 dark:text-white uppercase tracking-wider">A. Dashboard UI Theme mode:</p>
-              <div className="flex bg-neutral-100 dark:bg-neutral-900 border border-neutral-200 dark:border-white/5 p-1 rounded-xl w-60 font-sans">
-                <button type="button" onClick={() => handleToggleTheme('dark')} className={`flex-grow flex items-center justify-center gap-1.5 py-2 rounded-lg text-[10px] font-black uppercase transition-all ${themeMode === 'dark' ? 'bg-[#050505] text-amber-400 border border-white/5 shadow-sm' : 'text-gray-400 hover:text-white'}`}><SafeMoon size={12} /> Dark Mode</button>
-                <button type="button" onClick={() => handleToggleTheme('light')} className={`flex-grow flex items-center justify-center gap-1.5 py-2 rounded-lg text-[10px] font-black uppercase transition-all ${themeMode === 'light' ? 'bg-white text-orange-600 border border-neutral-200 shadow-sm' : 'text-neutral-500 hover:text-neutral-800'}`}><SafeSun size={12} /> Light Mode</button>
+                {cart.length > 0 && !isCartOpen && (
+                  <motion.button  initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} onClick={() => { triggerBeep('tap'); setIsCartOpen(true); }} className="fixed bottom-6 right-6 left-6 md:left-auto bg-green-600 hover:bg-green-700 text-white font-black px-6 py-4 rounded-2xl shadow-2xl flex items-center justify-between gap-4 z-40 border border-green-500/20 active:scale-95 transition-all"><div className="flex items-center gap-2.5"><div className="bg-white/10 p-2 rounded-xl"><SafeShoppingBag size={16} /></div><div className="text-left"><p className="text-[8px] uppercase tracking-wider text-green-100">Active Bill Cart</p><p className="text-xs font-bold font-mono">{cart.reduce((sum, item) => sum + item.quantity, 0)} Items</p></div></div><div className="flex items-center gap-1 text-sm font-black font-mono"><span>To Pay: ₹{getTotalBillPrice()}</span><span>➔</span></div></motion.button>
+                )}
               </div>
-            </div>
-            <div className="border-b border-neutral-200 dark:border-white/5 pb-4 space-y-3"><p className="text-xs font-bold text-neutral-800 dark:text-white uppercase tracking-wider">B. GST Configuration Setup:</p>
-              <div className="flex flex-wrap items-center justify-between gap-2"><span className="text-[11px] font-semibold text-neutral-600 dark:text-gray-300">Enable GST calculations on all bills:</span><button type="button" onClick={() => { triggerBeep('tap'); const next = !gstEnabled; setGstEnabled(next); localStorage.setItem("bb_pos_gst_enabled", String(next)); }} className="text-orange-500">{gstEnabled ? <SafeToggleRight size={32} /> : <SafeToggleLeft size={32} className="text-neutral-500" />}</button></div>
-              {gstEnabled && (
-                <div className="space-y-1 max-w-sm"><label className="text-[9px] font-black uppercase text-gray-500">GST Rate (%) Percentage</label><input type="number" placeholder="e.g. 5" value={gstRate} onChange={(e) => { const r = Math.max(0, Number(e.target.value)); setGstRate(r); localStorage.setItem("bb_pos_gst_rate", String(r)); }} className="w-full bg-neutral-100 dark:bg-neutral-900 border border-neutral-200 dark:border-white/5 p-3 rounded-xl text-xs outline-none focus:border-orange-500 font-mono font-black" /></div>
-              )}
-            </div>
-            <div className="pb-4 space-y-3"><p className="text-xs font-bold text-neutral-800 dark:text-white uppercase tracking-wider">C. Thermal Receipt Paper Settings:</p>
-              <div className="flex bg-neutral-100 dark:bg-neutral-900 border border-neutral-200 dark:border-white/5 p-1 rounded-xl w-60">
-                <button type="button" onClick={() => { triggerBeep('tap'); setPrinterPaperSize('58mm'); localStorage.setItem("bb_pos_paper_size", '58mm'); }} className={`flex-grow py-2 rounded-lg text-[10px] font-black uppercase transition-all ${printerPaperSize === '58mm' ? 'bg-[#050505] text-amber-400 border border-white/5 shadow-sm' : 'text-gray-400'}`}>58mm Roll width</button>
-                <button type="button" onClick={() => { triggerBeep('tap'); setPrinterPaperSize('80mm'); localStorage.setItem("bb_pos_paper_size", '80mm'); }} className={`flex-grow py-2 rounded-lg text-[10px] font-black uppercase transition-all ${printerPaperSize === '80mm' ? 'bg-[#050505] text-amber-400 border border-white/5 shadow-sm' : 'text-gray-400'}`}>80mm Roll width</button>
+            )}
+
+            {activeTab === 'inventory' && (
+              <div className="bg-white dark:bg-neutral-950 border border-neutral-200 dark:border-white/5 p-5 flex-1 overflow-y-auto pb-20 shadow-xl rounded-3xl">
+                <div className="flex justify-between items-center mb-6">
+                  <div><h2 className="text-sm font-black uppercase tracking-widest text-orange-500">Live Item Availability & Stock Control</h2><p className="text-[10px] text-neutral-500 dark:text-gray-400 font-bold mt-1">Disabling an item here immediately makes it unavailable on customers' phones.</p></div>
+                  <button onClick={async () => { triggerBeep('tap'); const prodSnap = await getDocs(collection(db, "products")); setProducts(prodSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }))); toast.success("Catalog updated!"); }} className="p-2 bg-neutral-200 dark:bg-neutral-900 border border-neutral-300 dark:border-white/5 text-gray-400 hover:text-white transition-colors"><SafeRefreshCw size={14} /></button>
+                </div>
+                <div className="space-y-2 max-w-2xl">
+                  {products.map((item) => {
+                    const isAvailable = item.isAvailable !== false;
+                    return (
+                      <div key={item.id} className="bg-neutral-100 dark:bg-neutral-900 border border-neutral-200 dark:border-white/5 p-4 rounded-2xl flex items-center justify-between">
+                        <div><span className="font-bold text-xs text-neutral-800 dark:text-white block">{item.name}</span><span className="text-[8px] text-gray-500 uppercase tracking-wider block font-mono">Category: {item.category} | Price: ₹{item.price}</span></div>
+                        <div className="flex items-center gap-4">
+                          <span className={`text-[8px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full border ${isAvailable ? 'bg-green-500/10 text-green-400 border-green-500/20' : 'bg-red-500/10 text-red-400 border-red-500/20'}`}>{isAvailable ? 'In Stock' : 'Out of Stock'}</span>
+                          <button onClick={() => handleToggleStock(item.id, isAvailable)} className={`text-[9px] font-black uppercase tracking-wider px-3.5 py-2 rounded-xl border transition-all active:scale-95 ${isAvailable ? 'bg-red-950/25 border-red-500/20 text-red-400 hover:bg-red-950' : 'bg-green-950/25 border-green-500/20 text-green-400 hover:bg-green-950'}`}>{isAvailable ? 'Disable' : 'Enable'}</button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          </div>
-        )}
-      </main>
+            )}
+
+            {activeTab === 'receipts' && (
+              <div className="flex-1 flex flex-col md:flex-row gap-5 overflow-hidden">
+                <div className="flex-1 bg-white dark:bg-neutral-950 border border-neutral-200 dark:border-white/5 rounded-3xl p-4 flex flex-col overflow-hidden shadow-xl">
+                  <div className="relative mb-4"><SafeSearch className="absolute left-3 top-2.5 text-gray-500" size={14} /><input type="text" placeholder="Search past bills by Bill No, Name or Phone..." value={receiptSearchQuery} onChange={(e) => setReceiptSearchQuery(e.target.value)} className="w-full bg-neutral-100 dark:bg-neutral-900 border border-neutral-200 dark:border-white/5 rounded-xl py-2 px-9 text-xs outline-none text-neutral-800 dark:text-white focus:border-orange-500 placeholder-gray-500 transition-colors" /></div>
+                  <div className="space-y-2 overflow-y-auto flex-1 pr-1 pb-16">
+                    {filteredPastReceipts.map((order) => {
+                      const isSelected = selectedReceipt?.id === order.id;
+                      const formattedDate = order.timestamp?.toDate ? order.timestamp.toDate().toLocaleString('en-IN') : new Date(order.timestamp).toLocaleString();
+                      return (
+                        <div key={order.id} onClick={() => { triggerBeep('tap'); setSelectedReceipt(order); }} className={`bg-neutral-50 dark:bg-neutral-900 border p-4 rounded-2xl flex justify-between items-center cursor-pointer transition-all hover:border-orange-500 ${isSelected ? 'border-orange-500 bg-orange-500/10' : 'border-neutral-200 dark:border-white/5'}`}>
+                          <div><span className="font-bold text-xs block text-neutral-900 dark:text-white font-mono">Bill No: #${order.billNumber}</span><span className="text-[9px] text-gray-400 block font-mono">Token: #{order.tokenNumber} | ${formattedDate}</span><span className="text-[9px] text-gray-400 block uppercase">Guest: {order.customerName || 'Walk-in'}</span></div>
+                          <div className="text-right"><span className="text-sm font-black text-green-600 dark:text-green-400 font-mono">₹{order.total}</span><span className="text-[8px] text-gray-500 block uppercase font-bold">{order.paymentMethod?.toUpperCase() || 'CASH'}</span></div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+                <div className="w-full md:w-[380px] bg-white dark:bg-neutral-950 border border-neutral-200 dark:border-white/5 p-4 rounded-3xl flex flex-col justify-between shadow-xl overflow-y-auto h-full text-neutral-800 dark:text-gray-100 font-bold">
+                  {selectedReceipt ? (
+                    <div className="space-y-4 flex flex-col justify-between h-full">
+                      <div>
+                        <div className="border-b border-neutral-200 dark:border-white/5 pb-3"><span className="text-[9px] text-orange-500 font-black uppercase tracking-wider">Receipt Inspector Panel</span><h3 className="text-base font-black font-mono">Bill No: #${selectedReceipt.billNumber}</h3><p className="text-[10px] text-gray-400 font-mono">Token: #{selectedReceipt.tokenNumber}</p></div>
+                        <div className="space-y-3 mt-4">
+                          <div className="bg-neutral-50 dark:bg-white/5 p-3 rounded-2xl text-[10px] font-semibold text-neutral-800 dark:text-gray-300 space-y-1"><p>👤 <b>Name:</b> {selectedReceipt.customerName || 'Walk-in Guest'}</p>{selectedReceipt.customerPhone && <p className="font-mono">📞 <b>Phone:</b> {selectedReceipt.customerPhone}</p>}<p><b>Pay Mode:</b> {selectedReceipt.paymentMethod?.toUpperCase() || 'CASH'}</p>{selectedReceipt.tableNumber && <p>🪑 <b>Table No:</b> {selectedReceipt.tableNumber}</p>}</div>
+                          <div className="space-y-2 border-t border-neutral-200 dark:border-white/5 pt-3"><p className="text-[9px] font-black text-gray-400 uppercase">Items Purchased:</p>
+                            {selectedReceipt.items?.map((it: any, index: number) => (
+                              <div key={index} className="flex justify-between text-xs text-neutral-800 dark:text-gray-200">
+                                <span>
+                                  {it.name} <span className="text-orange-500">x{it.quantity}</span>
+                                  {it.note && (
+                                    <>
+                                      <br />
+                                      <span className="text-[9.5px] text-neutral-500 dark:text-gray-400 italic">
+                                        ({it.note})
+                                      </span>
+                                    </>
+                                  )}
+                                </span>
+                                <span className="font-mono text-gray-400">₹{it.price * it.quantity}</span>
+                              </div>
+                            ))}
+                          </div>
+                          <div className="border-t border-neutral-200 dark:border-white/5 pt-3 space-y-1.5 text-xs font-semibold text-neutral-600 dark:text-gray-400 font-mono"><div className="flex justify-between"><span>Subtotal:</span><span>₹{selectedReceipt.subtotal}</span></div>{selectedReceipt.discount > 0 && <div className="flex justify-between text-yellow-500"><span>Savings/Discount:</span><span>-₹{selectedReceipt.discount}</span></div>}{selectedReceipt.gstRate > 0 && <div className="flex justify-between"><span>GST (${selectedReceipt.gstRate}%):</span><span>+₹{selectedReceipt.gstAmount || 0}</span></div>}<div className="flex justify-between font-black text-green-600 dark:text-green-400 text-sm border-t border-dashed border-neutral-200 dark:border-white/5 pt-2"><span>Grand Total:</span><span>₹{selectedReceipt.total}</span></div></div>
+                        </div>
+                      </div>
+                      <button type="button" onClick={() => handlePrintReceipt(selectedReceipt)} className="w-full bg-green-600 hover:bg-green-700 text-white font-black py-4 rounded-2xl text-xs uppercase tracking-wider flex items-center justify-center gap-2"><SafePrinter size={16} /> Reprint Thermal Invoice</button>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center h-full text-gray-500 text-xs text-center uppercase py-20 font-bold"><span>Select any past receipt to view breakdown & reprint bill 🧾</span></div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'settings' && (
+              <div className="bg-white dark:bg-neutral-950 border border-neutral-200 dark:border-white/5 p-6 rounded-3xl shadow-xl flex-grow max-w-2xl space-y-6 overflow-y-auto font-bold text-neutral-800 dark:text-gray-100 font-sans">
+                <h3 className="text-sm font-black uppercase text-orange-500 tracking-wider">POS Configuration & Hardware settings</h3>
+                <div className="border-b border-neutral-200 dark:border-white/5 pb-4 space-y-3"><p className="text-xs font-bold text-neutral-800 dark:text-white uppercase tracking-wider">A. Dashboard UI Theme mode:</p>
+                  <div className="flex bg-neutral-100 dark:bg-neutral-900 border border-neutral-200 dark:border-white/5 p-1 rounded-xl w-60 font-sans">
+                    <button type="button" onClick={() => handleToggleTheme('dark')} className={`flex-grow flex items-center justify-center gap-1.5 py-2 rounded-lg text-[10px] font-black uppercase transition-all ${themeMode === 'dark' ? 'bg-[#050505] text-amber-400 border border-white/5 shadow-sm' : 'text-gray-400 hover:text-white'}`}><SafeMoon size={12} /> Dark Mode</button>
+                    <button type="button" onClick={() => handleToggleTheme('light')} className={`flex-grow flex items-center justify-center gap-1.5 py-2 rounded-lg text-[10px] font-black uppercase transition-all ${themeMode === 'light' ? 'bg-white text-orange-600 border border-neutral-200 shadow-sm' : 'text-neutral-500 hover:text-neutral-800'}`}><SafeSun size={12} /> Light Mode</button>
+                  </div>
+                </div>
+                <div className="border-b border-neutral-200 dark:border-white/5 pb-4 space-y-3"><p className="text-xs font-bold text-neutral-800 dark:text-white uppercase tracking-wider">B. GST Configuration Setup:</p>
+                  <div className="flex flex-wrap items-center justify-between gap-2"><span className="text-[11px] font-semibold text-neutral-600 dark:text-gray-300">Enable GST calculations on all bills:</span><button type="button" onClick={() => { triggerBeep('tap'); const next = !gstEnabled; setGstEnabled(next); localStorage.setItem("bb_pos_gst_enabled", String(next)); }} className="text-orange-500">{gstEnabled ? <SafeToggleRight size={32} /> : <SafeToggleLeft size={32} className="text-neutral-500" />}</button></div>
+                  {gstEnabled && (
+                    <div className="space-y-1 max-w-sm"><label className="text-[9px] font-black uppercase text-gray-500">GST Rate (%) Percentage</label><input type="number" placeholder="e.g. 5" value={gstRate} onChange={(e) => { const r = Math.max(0, Number(e.target.value)); setGstRate(r); localStorage.setItem("bb_pos_gst_rate", String(r)); }} className="w-full bg-neutral-100 dark:bg-neutral-900 border border-neutral-200 dark:border-white/5 p-3 rounded-xl text-xs outline-none focus:border-orange-500 font-mono font-black" /></div>
+                  )}
+                </div>
+                <div className="pb-4 space-y-3"><p className="text-xs font-bold text-neutral-800 dark:text-white uppercase tracking-wider">C. Thermal Receipt Paper Settings:</p>
+                  <div className="flex bg-neutral-100 dark:bg-neutral-900 border border-neutral-200 dark:border-white/5 p-1 rounded-xl w-60">
+                    <button type="button" onClick={() => { triggerBeep('tap'); setPrinterPaperSize('58mm'); localStorage.setItem("bb_pos_paper_size", '58mm'); }} className={`flex-grow py-2 rounded-lg text-[10px] font-black uppercase transition-all ${printerPaperSize === '58mm' ? 'bg-[#050505] text-amber-400 border border-white/5 shadow-sm' : 'text-gray-400'}`}>58mm Roll width</button>
+                    <button type="button" onClick={() => { triggerBeep('tap'); setPrinterPaperSize('80mm'); localStorage.setItem("bb_pos_paper_size", '80mm'); }} className={`flex-grow py-2 rounded-lg text-[10px] font-black uppercase transition-all ${printerPaperSize === '80mm' ? 'bg-[#050505] text-amber-400 border border-white/5 shadow-sm' : 'text-gray-400'}`}>80mm Roll width</button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </main>
+        </>
+      )}
 
       {/* 3. MODULAR CHILD OVERLAYS */}
       <PosCartDrawer 
