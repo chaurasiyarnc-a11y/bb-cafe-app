@@ -9,7 +9,7 @@ import {
   ShoppingBag, Plus, Minus, Search, X, User, Star, Gift, 
   Loader2, Clock, Trash2, Printer, Check, Play, Settings, 
   Database, RefreshCw, Layers, Phone, MapPin, LayoutGrid, List,
-  Menu // Added Menu icon for sidebar trigger
+  Menu 
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
@@ -22,12 +22,22 @@ interface PosCartItem {
   note?: string;
 }
 
+// Size-based pricing for Pizza toppings/Addons
+const PIZZA_ADDONS: { [size: string]: { [addon: string]: number } } = {
+  "small": { "Veg Add-on": 10, "Paneer": 20, "Black Olives": 20, "Jalapeno": 20, "Extra Cheese": 20, "Mushroom": 20 },
+  "medium": { "Veg Add-on": 10, "Paneer": 30, "Black Olives": 30, "Jalapeno": 30, "Extra Cheese": 30, "Mushroom": 30 },
+  "large": { "Veg Add-on": 20, "Paneer": 40, "Black Olives": 40, "Jalapeno": 40, "Extra Cheese": 40, "Mushroom": 40 },
+  "extra large": { "Veg Add-on": 30, "Paneer": 50, "Black Olives": 50, "Jalapeno": 50, "Extra Cheese": 60, "Mushroom": 50 }
+};
+
+const QUICK_INSTRUCTION_TAGS = ["🌶️ Extra Spicy", "🧅 No Onion-Garlic", "🧀 Extra Cheese", "🔥 Well Baked", "🌱 Make it Mild"];
+
 export default function BbCafePos() {
-  // Navigation & View States - Default tab is 'billing'
+  // Navigation & View States
   const [activeTab, setActiveTab] = useState<'orders' | 'billing' | 'inventory'>('billing');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid'); 
   const [isCartOpen, setIsCartOpen] = useState<boolean>(false); 
-  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false); // Fully collapsible sidebar state (Default: closed/hidden)
+  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false); 
 
   // Database States
   const [liveOrders, setLiveOrders] = useState<any[]>([]);
@@ -48,6 +58,13 @@ export default function BbCafePos() {
   const [tableNumber, setTableNumber] = useState<string>('Table 1');
   const [chefInstructions, setChefInstructions] = useState<string>('');
   const [isSubmittingOrder, setIsSubmittingOrder] = useState<boolean>(false);
+
+  // Dynamic Variation Selection Pop-up States
+  const [selectedProduct, setSelectedProduct] = useState<any>(null); // Customization Modal Trigger
+  const [normalPizzaSize, setNormalPizzaSize] = useState<string>("");
+  const [normalPizzaPrice, setNormalPizzaPrice] = useState<number>(0);
+  const [normalPizzaAddons, setNormalPizzaAddons] = useState<{ [addon: string]: boolean }>({});
+  const [customizerChefNote, setCustomizerChefNote] = useState<string>("");
 
   // Sound effects
   const triggerBeep = (type: 'tap' | 'success') => {
@@ -160,6 +177,59 @@ export default function BbCafePos() {
     toast.success(`${item.name} added!`, { duration: 800 });
   };
 
+  // Adding Customized Item with specific variants and add-ons
+  const handleAddCustomizedItemToCart = () => {
+    triggerBeep('tap');
+    if (!normalPizzaSize) {
+      toast.error("Please select a size first!");
+      return;
+    }
+
+    let finalPrice = normalPizzaPrice;
+    const selectedAddons: string[] = [];
+
+    // Calculate add-on cost
+    Object.entries(normalPizzaAddons).forEach(([addon, isSelected]) => {
+      if (isSelected) {
+        const cost = PIZZA_ADDONS[normalPizzaSize.toLowerCase()]?.[addon] || 0;
+        finalPrice += cost;
+        selectedAddons.push(addon);
+      }
+    });
+
+    const noteParts = [];
+    if (selectedAddons.length > 0) noteParts.push(`Addons: ${selectedAddons.join(', ')}`);
+    if (customizerChefNote.trim()) noteParts.push(`Note: ${customizerChefNote.trim()}`);
+
+    const compositeId = `${selectedProduct.id}-${normalPizzaSize.toLowerCase()}`;
+    const compositeName = `${selectedProduct.name} (${normalPizzaSize.toUpperCase()})`;
+
+    setCart((prev) => {
+      const existingIndex = prev.findIndex(c => c.id === compositeId && c.note === noteParts.join(' | '));
+      if (existingIndex > -1) {
+        const next = [...prev];
+        next[existingIndex].quantity += 1;
+        return next;
+      }
+      return [...prev, {
+        id: compositeId,
+        name: compositeName,
+        price: finalPrice,
+        quantity: 1,
+        note: noteParts.join(' | ')
+      }];
+    });
+
+    // Reset popup customizer
+    setSelectedProduct(null);
+    setNormalPizzaSize("");
+    setNormalPizzaPrice(0);
+    setNormalPizzaAddons({});
+    setCustomizerChefNote("");
+
+    toast.success("Customized item added!");
+  };
+
   const handleUpdateCartQuantity = (id: string, amount: number) => {
     triggerBeep('tap');
     setCart((prev) => 
@@ -185,9 +255,12 @@ export default function BbCafePos() {
     const formattedDate = order.timestamp?.toDate ? order.timestamp.toDate().toLocaleString('en-IN') : new Date(order.timestamp).toLocaleString();
     const itemsRows = order.items.map((it: any) => `
       <tr>
-        <td style="font-size: 11px; padding: 4px 0; max-width: 140px; word-break: break-word;">${it.name}</td>
-        <td style="font-size: 11px; text-align: center; padding: 4px 0;">x${it.quantity}</td>
-        <td style="font-size: 11px; text-align: right; padding: 4px 0;">₹${it.price * it.quantity}</td>
+        <td style="font-size: 11px; padding: 4px 0; max-width: 140px; word-break: break-word;">
+          ${it.name}
+          ${it.note ? `<br/><span style="font-size: 9px; color: #555; font-style: italic;">(${it.note})</span>` : ''}
+        </td>
+        <td style="font-size: 11px; text-align: center; padding: 4px 0; vertical-align: top;">x${it.quantity}</td>
+        <td style="font-size: 11px; text-align: right; padding: 4px 0; vertical-align: top;">₹${it.price * it.quantity}</td>
       </tr>
     `).join('');
 
@@ -401,6 +474,19 @@ export default function BbCafePos() {
     });
   }, [products, selectedCategory, searchQuery]);
 
+  // Pricing helper for variants and range presentation
+  const getDisplayPrice = (item: any) => {
+    if (item?.variants && typeof item.variants === 'object') {
+      const prices = Object.values(item.variants).map(Number).filter(n => !isNaN(n));
+      if (prices.length > 0) {
+        const minPrice = Math.min(...prices);
+        const maxPrice = Math.max(...prices);
+        return minPrice === maxPrice ? `₹${minPrice}` : `₹${minPrice} - ₹${maxPrice}`;
+      }
+    }
+    return `₹${item?.price || 0}`;
+  };
+
   return (
     <div className="min-h-screen bg-[#050505] text-gray-100 flex flex-row font-sans antialiased overflow-hidden">
       <Toaster position="top-center" />
@@ -432,7 +518,7 @@ export default function BbCafePos() {
                   <div className="flex items-center gap-2">
                     <Database className="text-orange-500 animate-pulse" size={18} />
                     <h1 className="text-xs font-black tracking-wider uppercase text-yellow-300">
-                      Bum Bum POS <span className="text-[8px] text-gray-400 lowercase font-mono">v1.10</span>
+                      Bum Bum POS <span className="text-[8px] text-gray-400 lowercase font-mono">v1.11</span>
                     </h1>
                   </div>
                   <button 
@@ -568,7 +654,10 @@ export default function BbCafePos() {
                       <div className="space-y-1.5 border-t border-dashed border-white/5 pt-2.5 mb-4">
                         {order.items?.map((it: any, index: number) => (
                           <div key={index} className="flex justify-between text-[11px] text-gray-200">
-                            <span className="font-bold">{it.name} <span className="text-orange-500">x{it.quantity}</span></span>
+                            <span className="font-bold">
+                              {it.name} <span className="text-orange-500">x{it.quantity}</span>
+                              {it.note ? `<br/><span style="font-size: 9px; color: #888;">(${it.note})</span>` : ''}
+                            </span>
                             <span className="font-mono text-gray-400">₹{it.price * it.quantity}</span>
                           </div>
                         ))}
@@ -677,7 +766,7 @@ export default function BbCafePos() {
                 <p className="text-center text-gray-500 text-xs py-10 uppercase tracking-widest font-black">No matching items found</p>
               ) : viewMode === 'grid' ? (
                 
-                /* EXTREMELY HIGH-DENSITY 4-COLUMN GRID LAYOUT */
+                /* EXTREMELY HIGH-DENSITY 4-COLUMN GRID LAYOUT WITH VARIATIONS SUPPORT */
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 overflow-y-auto flex-1 pr-1 pb-16">
                   {filteredMenu.map((item) => {
                     const isAvailable = item.isAvailable !== false;
@@ -685,7 +774,10 @@ export default function BbCafePos() {
                       <button
                         key={item.id}
                         disabled={!isAvailable}
-                        onClick={() => handleAddProductToCart(item)}
+                        onClick={() => {
+                          triggerBeep('tap');
+                          item.variants ? setSelectedProduct(item) : handleAddProductToCart(item);
+                        }}
                         className={`bg-neutral-900 border p-3 rounded-2xl text-left flex flex-col justify-between h-24 hover:border-orange-500 transition-all duration-200 active:scale-95 ${!isAvailable ? 'opacity-40 cursor-not-allowed border-white/5' : 'border-white/5'}`}
                       >
                         <div>
@@ -693,7 +785,7 @@ export default function BbCafePos() {
                           <p className="text-[8px] text-gray-500 uppercase tracking-widest mt-0.5">{item.category}</p>
                         </div>
                         <div className="flex justify-between items-end w-full">
-                          <p className="text-yellow-300 font-black text-xs font-mono">₹{item.price}</p>
+                          <p className="text-yellow-300 font-black text-xs font-mono">{getDisplayPrice(item)}</p>
                           {!isAvailable && <span className="text-[7px] font-black text-red-500 uppercase">Unavailable</span>}
                         </div>
                       </button>
@@ -702,7 +794,7 @@ export default function BbCafePos() {
                 </div>
               ) : (
                 
-                /* DENSE LIST VIEW */
+                /* DENSE LIST VIEW WITH VARIATIONS SUPPORT */
                 <div className="flex flex-col gap-2 overflow-y-auto flex-1 pr-1 pb-16">
                   {filteredMenu.map((item) => {
                     const isAvailable = item.isAvailable !== false;
@@ -710,7 +802,10 @@ export default function BbCafePos() {
                       <button
                         key={item.id}
                         disabled={!isAvailable}
-                        onClick={() => handleAddProductToCart(item)}
+                        onClick={() => {
+                          triggerBeep('tap');
+                          item.variants ? setSelectedProduct(item) : handleAddProductToCart(item);
+                        }}
                         className={`bg-neutral-900 border p-3 rounded-xl flex items-center justify-between text-left hover:border-orange-500 transition-all duration-150 active:scale-[0.99] ${!isAvailable ? 'opacity-45 cursor-not-allowed border-white/5' : 'border-white/5'}`}
                       >
                         <div className="space-y-0.5 pr-4 flex-1">
@@ -718,7 +813,7 @@ export default function BbCafePos() {
                           <p className="text-[8px] text-gray-500 uppercase tracking-wider">{item.category}</p>
                         </div>
                         <div className="flex items-center gap-4">
-                          <p className="text-yellow-300 font-black text-xs font-mono">₹{item.price}</p>
+                          <p className="text-yellow-300 font-black text-xs font-mono">{getDisplayPrice(item)}</p>
                           <div className="bg-orange-500/10 text-orange-400 p-1.5 rounded-lg border border-orange-500/20">
                             <Plus size={12} />
                           </div>
@@ -790,14 +885,19 @@ export default function BbCafePos() {
                       
                       <div className="space-y-2 max-h-[180px] overflow-y-auto mb-4 pr-1">
                         {cart.map((item) => (
-                          <div key={item.id} className="flex justify-between items-center text-xs text-gray-300 font-semibold">
-                            <span className="flex-1 truncate pr-2">{item.name}</span>
-                            <div className="flex items-center gap-2 bg-neutral-900 border border-white/5 px-2 py-0.5 rounded-lg mr-4">
-                              <button type="button" onClick={() => handleUpdateCartQuantity(item.id, -1)} className="text-gray-400 hover:text-white"><Minus size={10} /></button>
-                              <span className="font-bold text-white min-w-[12px] text-center font-mono">{item.quantity}</span>
-                              <button type="button" onClick={() => handleUpdateCartQuantity(item.id, 1)} className="text-gray-400 hover:text-white"><Plus size={10} /></button>
+                          <div key={item.id} className="flex flex-col border-b border-white/5 pb-2 mb-2">
+                            <div className="flex justify-between items-center text-xs text-gray-300 font-semibold">
+                              <span className="flex-1 truncate pr-2">{item.name}</span>
+                              <div className="flex items-center gap-2 bg-neutral-900 border border-white/5 px-2 py-0.5 rounded-lg mr-4">
+                                <button type="button" onClick={() => handleUpdateCartQuantity(item.id, -1)} className="text-gray-400 hover:text-white"><Minus size={10} /></button>
+                                <span className="font-bold text-white min-w-[12px] text-center font-mono">{item.quantity}</span>
+                                <button type="button" onClick={() => handleUpdateCartQuantity(item.id, 1)} className="text-gray-400 hover:text-white"><Plus size={10} /></button>
+                              </div>
+                              <span className="font-mono text-gray-100 font-black">₹{item.price * item.quantity}</span>
                             </div>
-                            <span className="font-mono text-gray-100 font-black">₹{item.price * item.quantity}</span>
+                            {item.note && (
+                              <p className="text-[10px] text-yellow-300 font-bold italic mt-1 bg-yellow-400/5 px-2 py-1 rounded border border-yellow-500/10 max-w-xs">{item.note}</p>
+                            )}
                           </div>
                         ))}
                         {cart.length === 0 && (
@@ -990,6 +1090,118 @@ export default function BbCafePos() {
         )}
 
       </main>
+
+      {/* 3. VARIATIONS AND PORTIONS SELECTION CUSTOMIZATION POPUP MODAL (Same as Online Page) */}
+      <AnimatePresence>
+        {selectedProduct && (
+          <div className="fixed inset-0 bg-black/90 z-[110] flex items-center justify-center p-4 backdrop-blur-md">
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }} 
+              animate={{ scale: 1, opacity: 1 }} 
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-[#111] border border-white/10 w-full max-w-md p-6 rounded-3xl text-left space-y-4 shadow-2xl relative max-h-[90vh] overflow-y-auto scrollbar-thin"
+            >
+              {/* Header */}
+              <div className="flex justify-between items-center border-b border-white/5 pb-2">
+                <div>
+                  <h3 className="text-sm font-black text-white">{selectedProduct.name}</h3>
+                  <p className="text-[9px] text-orange-500 font-bold uppercase tracking-wider">Customize Counter Order</p>
+                </div>
+                <button 
+                  type="button" 
+                  onClick={() => { setSelectedProduct(null); setNormalPizzaSize(""); setNormalPizzaPrice(0); setCustomizerChefNote(""); }}
+                  className="p-1.5 bg-neutral-900 border border-white/5 rounded-full text-red-400 hover:text-red-500 transition-colors"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+
+              {/* Portion size selection (Dynamic Sizes based on product database) */}
+              <div className="space-y-2">
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">1. Select Portion Size:</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {Object.entries(selectedProduct.variants || {}).map(([size, price]: any) => (
+                    <button 
+                      type="button" 
+                      key={size} 
+                      onClick={() => { triggerBeep('tap'); setNormalPizzaSize(size); setNormalPizzaPrice(Number(price)); }} 
+                      className={`p-3 rounded-xl flex flex-col items-center border transition-all duration-200 ${normalPizzaSize.toLowerCase() === size.toLowerCase() ? 'bg-orange-500/10 border-orange-500 text-orange-500 font-black' : 'bg-neutral-900 border-white/5 text-gray-400'}`}
+                    >
+                      <span className="capitalize text-[11px] font-black">{size}</span>
+                      <span className="font-black text-xs mt-1 text-white font-mono">₹{price}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Dynamic Add-on / Toppings Selector (Only active if size is selected & is pizza category) */}
+              {normalPizzaSize && (selectedProduct.category === "Special Pizza" || selectedProduct.name?.toLowerCase().includes("pizza")) && (
+                <div className="space-y-2 border-t border-white/5 pt-3">
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">2. Select Premium Toppings:</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {Object.entries(PIZZA_ADDONS[normalPizzaSize.toLowerCase()] || {}).map(([addon, cost]: any) => {
+                      const isSelected = !!normalPizzaAddons[addon];
+                      return (
+                        <button
+                          type="button"
+                          key={addon}
+                          onClick={() => { triggerBeep('tap'); setNormalPizzaAddons(prev => ({ ...prev, [addon]: !prev[addon] })); }}
+                          className={`p-2.5 rounded-xl border flex justify-between items-center text-[10px] font-bold transition-all ${isSelected ? 'border-orange-500 bg-orange-500/5 text-orange-400' : 'border-white/5 bg-neutral-900 text-gray-400'}`}
+                        >
+                          <span>{addon}</span>
+                          <span className="text-orange-500 font-black font-mono">+₹{cost}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Chef Notes & Instructions inside Modal */}
+              <div className="space-y-2 border-t border-white/5 pt-3">
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">3. Special Cooking instructions:</p>
+                <div className="flex flex-wrap gap-1">
+                  {QUICK_INSTRUCTION_TAGS.map((tag) => (
+                    <button
+                      type="button"
+                      key={tag}
+                      onClick={() => { triggerBeep('tap'); setCustomizerChefNote(prev => prev ? `${prev}, ${tag}` : tag); }}
+                      className="text-[9px] font-bold py-1 px-2 rounded-full border border-white/5 bg-neutral-900 text-gray-300 hover:border-orange-500 transition-colors"
+                    >
+                      {tag}
+                    </button>
+                  ))}
+                </div>
+                <input 
+                  type="text" 
+                  placeholder="e.g. Well baked crust, extra cheese toppings..." 
+                  value={customizerChefNote} 
+                  onChange={(e) => setCustomizerChefNote(e.target.value)} 
+                  className="w-full text-xs p-3 rounded-xl bg-neutral-900 border border-white/5 text-white outline-none focus:border-orange-500 font-semibold"
+                />
+              </div>
+
+              {/* Confirm customization to Cart */}
+              <div className="border-t border-white/5 pt-3 flex gap-2">
+                <button 
+                  type="button" 
+                  onClick={handleAddCustomizedItemToCart}
+                  className="flex-grow bg-green-600 hover:bg-green-700 text-white font-black py-3 rounded-xl text-xs uppercase tracking-wider shadow"
+                >
+                  Confirm Portion & Add ➔
+                </button>
+                <button 
+                  type="button" 
+                  onClick={() => { setSelectedProduct(null); setNormalPizzaSize(""); setNormalPizzaPrice(0); setCustomizerChefNote(""); }}
+                  className="bg-neutral-900 border border-white/5 text-gray-400 hover:text-white px-4 py-3 rounded-xl text-xs font-bold uppercase"
+                >
+                  Cancel
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
