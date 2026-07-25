@@ -11,7 +11,7 @@ import {
   ShoppingBag, Plus, Minus, Search, X, User, Star, Gift, 
   Loader2, Clock, Trash2, Printer, Check, Play, Settings, 
   Database, RefreshCw, Layers, Phone, MapPin, LayoutGrid, List,
-  Menu, Users, Edit, ArrowLeft, History
+  Menu, Users, Edit, ArrowLeft, History, LogOut, Lock, ToggleLeft, ToggleRight, Sun, Moon
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
@@ -49,11 +49,22 @@ const PIZZA_ADDONS: { [size: string]: { [addon: string]: number } } = {
 const QUICK_INSTRUCTION_TAGS = ["🌶️ Extra Spicy", "🧅 No Onion-Garlic", "🧀 Extra Cheese", "🔥 Well Baked", "🌱 Make it Mild"];
 
 export default function BbCafePos() {
-  // Navigation & View States
-  const [activeTab, setActiveTab] = useState<'orders' | 'billing' | 'inventory'>('billing');
+  // Authentication & Security Lockscreen States
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
+  const [currentUser, setCurrentUser] = useState<any | null>(null);
+  const [pinInput, setPinInput] = useState<string>('');
+
+  // Navigation & Layout View States
+  const [activeTab, setActiveTab] = useState<'billing' | 'orders' | 'inventory' | 'receipts' | 'settings'>('billing');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid'); 
   const [isCartOpen, setIsCartOpen] = useState<boolean>(false); 
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false); 
+
+  // Dynamic Settings states (Saved in LocalStorage)
+  const [gstEnabled, setGstEnabled] = useState<boolean>(false);
+  const [gstRate, setGstRate] = useState<number>(5);
+  const [printerPaperSize, setPrinterPaperSize] = useState<'58mm' | '80mm'>('58mm');
+  const [themeMode, setThemeMode] = useState<'dark' | 'light'>('dark');
 
   // Customer Directory Lookup Modal States
   const [isCustomerModalOpen, setIsCustomerModalOpen] = useState<boolean>(false);
@@ -77,8 +88,12 @@ export default function BbCafePos() {
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
-  const [loyaltyRules, setLoyaltyRules] = useState<any[]>([]); // Loyalty rewards rules
+  const [loyaltyRules, setLoyaltyRules] = useState<any[]>([]); 
   
+  // Receipts History list & details Reprint state
+  const [receiptSearchQuery, setReceiptSearchQuery] = useState<string>('');
+  const [selectedReceipt, setSelectedReceipt] = useState<any | null>(null);
+
   // Counter Billing States
   const [cart, setCart] = useState<PosCartItem[]>([]);
   const [customerPhone, setCustomerPhone] = useState<string>('');
@@ -129,6 +144,36 @@ export default function BbCafePos() {
     } catch (e) {}
   };
 
+  // On Mount: Load login session, configurations and establish real-time order streams
+  useEffect(() => {
+    // Auth Session
+    const savedUser = localStorage.getItem("bb_pos_user");
+    if (savedUser) {
+      try {
+        const parsed = JSON.parse(savedUser);
+        setIsLoggedIn(true);
+        setCurrentUser(parsed);
+      } catch (e) {}
+    }
+
+    // Load configs from local storage
+    const localGst = localStorage.getItem("bb_pos_gst_enabled");
+    if (localGst) setGstEnabled(localGst === 'true');
+    const localGstRate = localStorage.getItem("bb_pos_gst_rate");
+    if (localGstRate) setGstRate(Number(localGstRate) || 5);
+    const localPaper = localStorage.getItem("bb_pos_paper_size");
+    if (localPaper) setPrinterPaperSize(localPaper as any);
+    const localTheme = localStorage.getItem("bb_pos_theme");
+    if (localTheme) {
+      setThemeMode(localTheme as any);
+      if (localTheme === 'light') {
+        document.documentElement.classList.remove('dark');
+      } else {
+        document.documentElement.classList.add('dark');
+      }
+    }
+  }, []);
+
   // Live Orders Listener
   useEffect(() => {
     const q = query(collection(db, "orders"), orderBy("timestamp", "desc"), limit(60));
@@ -141,8 +186,9 @@ export default function BbCafePos() {
     return () => unsubscribe();
   }, []);
 
-  // Fetch Menu Products & Loyalty rules
+  // Fetch Menu Products
   useEffect(() => {
+    if (!isLoggedIn) return;
     const fetchDbData = async () => {
       setLoading(true);
       try {
@@ -153,7 +199,6 @@ export default function BbCafePos() {
         const cats = Array.from(new Set(items.map((i: any) => i.category).filter(Boolean))) as string[];
         setCategories(['All', ...cats]);
 
-        // Fetch loyalty reward items rules
         const rulesSnap = await getDocs(collection(db, "loyalty_rules"));
         setLoyaltyRules(rulesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       } catch (err) {
@@ -163,7 +208,44 @@ export default function BbCafePos() {
       }
     };
     fetchDbData();
-  }, [activeTab]);
+  }, [activeTab, isLoggedIn]);
+
+  // Handler for PIN Entry Authentication login
+  const handlePinLoginSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (pinInput.length < 4) {
+      toast.error("Please enter a valid 4-digit PIN!");
+      return;
+    }
+    const toastId = toast.loading("Verifying security clearance...");
+    try {
+      const q = query(collection(db, "users"), where("pin", "==", pinInput));
+      const snap = await getDocs(q);
+      toast.dismiss(toastId);
+      if (!snap.empty) {
+        const uDoc = snap.docs[0].data();
+        setIsLoggedIn(true);
+        setCurrentUser({ id: snap.docs[0].id, ...uDoc });
+        localStorage.setItem("bb_pos_user", JSON.stringify({ id: snap.docs[0].id, ...uDoc }));
+        toast.success(`Welcome back, ${uDoc.name}!`);
+        setPinInput('');
+      } else {
+        toast.error("Access Denied: Incorrect PIN!");
+        setPinInput('');
+      }
+    } catch (err) {
+      toast.dismiss(toastId);
+      toast.error("Network error during verification");
+    }
+  };
+
+  const handleLogout = () => {
+    triggerBeep('tap');
+    localStorage.removeItem("bb_pos_user");
+    setIsLoggedIn(false);
+    setCurrentUser(null);
+    toast.success("Successfully Logged Out!");
+  };
 
   const handleUpdateStatus = async (orderId: string, nextStatus: string) => {
     triggerBeep('tap');
@@ -203,7 +285,7 @@ export default function BbCafePos() {
     }
   };
 
-  // Search Firestore Customer points list (By exact phone number or name prefix match)
+  // Search Firestore Customer points list
   const searchDbCustomers = async (text: string) => {
     const cleanText = text.trim();
     if (!cleanText) {
@@ -305,7 +387,6 @@ export default function BbCafePos() {
       toast.dismiss(toastId);
       toast.success("Profile saved successfully!");
 
-      // If edited customer is the active one in billing desk, sync state
       if (customerPhone === editingCustomer.phone) {
         setCustomerName(updatedFields.name);
         setAddress(updatedFields.address);
@@ -313,7 +394,7 @@ export default function BbCafePos() {
       }
 
       setEditingCustomer(null);
-      searchDbCustomers(customerSearchQuery); // Refresh list
+      searchDbCustomers(customerSearchQuery); 
     } catch (err) {
       toast.dismiss(toastId);
       toast.error("Failed to edit user profile");
@@ -356,7 +437,6 @@ export default function BbCafePos() {
       toast.dismiss(toastId);
       toast.success("New Customer Registered Successfully!");
 
-      // Auto Select Customer details
       setCustomerPhone(cleanPhone);
       setCustomerName(newDoc.name);
       setCustomerPoints(0);
@@ -391,34 +471,6 @@ export default function BbCafePos() {
       }];
     });
     toast.success(`${item.name} added!`, { duration: 800 });
-  };
-
-  // Add Free Point Reward Item to Cart Desk
-  const handleRedeemLoyaltyReward = (rule: any) => {
-    triggerBeep('tap');
-    
-    // Check points already committed in this cart
-    const currentRedeemedCost = cart.reduce((acc, i) => acc + (i.pointsCost || 0), 0);
-    const availablePointsPool = customerPoints - currentRedeemedCost;
-
-    if (availablePointsPool < rule.pointsCost) {
-      toast.error("Not enough loyalty points balance!");
-      return;
-    }
-
-    setCart((prev) => [
-      ...prev,
-      {
-        id: `reward-${rule.id}-${Date.now()}`,
-        name: `🎁 FREE ${rule.rewardName}`,
-        price: 0,
-        quantity: 1,
-        isReward: true,
-        pointsCost: Number(rule.pointsCost) || 0,
-        category: "Special"
-      }
-    ]);
-    toast.success(`${rule.rewardName} added as reward!`);
   };
 
   const handleAddCustomizedItemToCart = () => {
@@ -508,13 +560,47 @@ export default function BbCafePos() {
     return baseSub >= selectedArea.minFree ? 0 : selectedArea.fee;
   };
 
-  const getTotalPointsRedeemedInCart = () => cart.reduce((acc, i) => acc + (i.pointsCost || 0), 0);
+  const handleRedeemLoyaltyReward = (rule: any) => {
+    triggerBeep('tap');
+    const currentRedeemedCost = cart.reduce((acc, i) => acc + (i.pointsCost || 0), 0);
+    const availablePointsPool = customerPoints - currentRedeemedCost;
+
+    if (availablePointsPool < rule.pointsCost) {
+      toast.error("Not enough loyalty points balance!");
+      return;
+    }
+
+    setCart((prev) => [
+      ...prev,
+      {
+        id: `reward-${rule.id}-${Date.now()}`,
+        name: `🎁 FREE ${rule.rewardName}`,
+        price: 0,
+        quantity: 1,
+        isReward: true,
+        pointsCost: Number(rule.pointsCost) || 0,
+        category: "Special"
+      }
+    ]);
+    toast.success(`${rule.rewardName} added as reward!`);
+  };
+
+  const getLoyaltyDiscount = () => Math.min(pointsToRedeem, getCartSubtotal());
   
+  // Real-time GST calculation logic
+  const getGstAmountCalculated = () => {
+    if (!gstEnabled) return 0;
+    const subtotal = getCartSubtotal() + getCartAddonsPrice();
+    return Number(((subtotal * gstRate) / 100).toFixed(2));
+  };
+
   const getTotalBillPrice = () => {
     const subtotal = getCartSubtotal();
     const addPrice = getCartAddonsPrice();
     const delivery = getDeliveryCharge();
-    return Math.max(0, subtotal + addPrice - customDiscount) + delivery;
+    const gstAmount = getGstAmountCalculated();
+    const discountCombined = getLoyaltyDiscount() + customDiscount;
+    return Math.max(0, subtotal + addPrice + gstAmount - discountCombined) + delivery;
   };
 
   const getFreeDeliveryProgressPercent = () => {
@@ -524,10 +610,13 @@ export default function BbCafePos() {
     return (subtotal / limit) * 100;
   };
 
+  const getTotalPointsRedeemedInCart = () => cart.reduce((acc, i) => acc + (i.pointsCost || 0), 0);
+
   // 📄 THERMAL RECEIPT PRINTING FUNCTION
   const handlePrintReceipt = (order: any) => {
     triggerBeep('tap');
-    const printWindow = window.open('', '_blank', 'width=320,height=600');
+    const widthPixels = printerPaperSize === '58mm' ? '240px' : '290px';
+    const printWindow = window.open('', '_blank', 'width=340,height=600');
     if (!printWindow) return;
 
     const formattedDate = order.timestamp?.toDate ? order.timestamp.toDate().toLocaleString('en-IN') : new Date(order.timestamp).toLocaleString();
@@ -550,9 +639,9 @@ export default function BbCafePos() {
             @page { margin: 0; }
             body { 
               font-family: 'Courier New', Courier, monospace; 
-              width: 270px; 
+              width: ${widthPixels}; 
               margin: 0; 
-              padding: 10px; 
+              padding: 8px; 
               color: #000;
               background-color: #fff;
             }
@@ -563,8 +652,8 @@ export default function BbCafePos() {
         </head>
         <body onload="window.print(); window.close();">
           <div class="center">
-            <h3 style="margin: 0 0 2px 0; font-size: 16px;">BUM BUM CAFE</h3>
-            <span style="font-size: 10px;">Mohandra, Panna (M.P.)</span>
+            <h3 style="margin: 0 0 2px 0; font-size: 15px;">BUM BUM CAFE</h3>
+            <span style="font-size: 9px;">Mohandra, Panna (M.P.)</span>
           </div>
           <div class="divider"></div>
           <div style="font-size: 10px; line-height: 1.3;">
@@ -599,7 +688,12 @@ export default function BbCafePos() {
               <span>Savings:</span>
               <span>-₹${order.discount}</span>
             </div>` : ''}
-            <div style="display: flex; justify-content: space-between; font-weight: bold; font-size: 13px; margin-top: 2px;">
+            ${order.gstRate ? `
+            <div style="display: flex; justify-content: space-between;">
+              <span>GST (${order.gstRate}%):</span>
+              <span>+₹${order.gstAmount || 0}</span>
+            </div>` : ''}
+            <div style="display: flex; justify-content: space-between; font-weight: bold; font-size: 12px; margin-top: 2px;">
               <span>GRAND TOTAL:</span>
               <span>₹${order.total}</span>
             </div>
@@ -627,8 +721,9 @@ export default function BbCafePos() {
     const subtotal = getCartSubtotal();
     const addOnsCost = getCartAddonsPrice();
     const deliveryCharge = getDeliveryCharge();
-    const totalPointsCost = getTotalPointsRedeemedInCart(); // Committed point costs in this cart
-    const discountCombined = customDiscount; // Point discount is handled via ₹0 reward items directly now
+    const totalPointsCost = getTotalPointsRedeemedInCart(); 
+    const discountCombined = customDiscount; 
+    const gstAmount = getGstAmountCalculated();
     const finalTotal = getTotalBillPrice();
 
     const tokenNumber = Math.floor(1000 + Math.random() * 9000);
@@ -658,6 +753,8 @@ export default function BbCafePos() {
         items: cart,
         subtotal: subtotal + addOnsCost,
         discount: discountCombined,
+        gstRate: gstEnabled ? gstRate : 0,
+        gstAmount: gstAmount,
         total: finalTotal,
         timestamp: new Date(),
         status: 'completed',
@@ -758,6 +855,19 @@ export default function BbCafePos() {
     }
   };
 
+  // Toggle Theme mode globally (Saves to state & LocalStorage)
+  const handleToggleTheme = (mode: 'dark' | 'light') => {
+    triggerBeep('tap');
+    setThemeMode(mode);
+    localStorage.setItem("bb_pos_theme", mode);
+    if (mode === 'light') {
+      document.documentElement.classList.remove('dark');
+    } else {
+      document.documentElement.classList.add('dark');
+    }
+  };
+
+  // Filtered lists
   const filteredMenu = useMemo(() => {
     return products.filter(p => {
       const matchCat = selectedCategory === 'All' || p.category === selectedCategory;
@@ -765,6 +875,16 @@ export default function BbCafePos() {
       return matchCat && matchSearch;
     });
   }, [products, selectedCategory, searchQuery]);
+
+  const filteredPastReceipts = useMemo(() => {
+    return liveOrders.filter(o => {
+      const bStr = String(o.billNumber);
+      const phoneStr = String(o.customerPhone || '');
+      const nameStr = String(o.customerName || '').toLowerCase();
+      const q = receiptSearchQuery.trim().toLowerCase();
+      return bStr.includes(q) || phoneStr.includes(q) || nameStr.includes(q);
+    });
+  }, [liveOrders, receiptSearchQuery]);
 
   const getDisplayPrice = (item: any) => {
     if (item?.variants && typeof item.variants === 'object') {
@@ -778,7 +898,6 @@ export default function BbCafePos() {
     return `₹${item?.price || 0}`;
   };
 
-  // Verification if addons are showable (Matches the pasted logic)
   const showAddonsSection = useMemo(() => {
     const eligibleKeywords = ['pizza', 'sandwich', 'burger', 'momo', 'fries', 'chips', 'finger'];
     return cart.some((item: any) => {
@@ -810,127 +929,175 @@ export default function BbCafePos() {
     );
   };
 
+  // --- RENDERING SECURE SECURITY LOCK SCREEN PANEL IF LOGGED OUT ---
+  if (!isLoggedIn) {
+    return (
+      <div className="min-h-screen bg-[#050505] text-white flex items-center justify-center p-4 font-sans antialiased">
+        <Toaster position="top-center" />
+        <form onSubmit={handlePinLoginSubmit} className="bg-neutral-950 border border-white/5 p-8 rounded-[2rem] w-full max-w-sm text-center space-y-6 shadow-2xl">
+          <div className="space-y-2">
+            <Lock className="text-orange-500 animate-bounce mx-auto" size={40} />
+            <h1 className="text-lg font-black tracking-wider uppercase text-yellow-300">Bum Bum POS Security</h1>
+            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Please enter 4-Digit Security PIN</p>
+          </div>
+          
+          <input 
+            type="password" 
+            maxLength={4}
+            value={pinInput}
+            readOnly
+            className="w-full bg-black/40 border border-white/10 p-4 rounded-2xl text-center text-2xl font-black font-mono tracking-widest text-orange-500 outline-none"
+          />
+
+          {/* Clean Virtual Number Pad */}
+          <div className="grid grid-cols-3 gap-3">
+            {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
+              <button
+                type="button"
+                key={num}
+                onClick={() => { triggerBeep('tap'); if (pinInput.length < 4) setPinInput(p => p + num); }}
+                className="bg-neutral-900 hover:bg-neutral-800 border border-white/5 py-3 rounded-xl font-bold font-mono text-base transition-all active:scale-95"
+              >
+                {num}
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={() => { triggerBeep('tap'); setPinInput(''); }}
+              className="bg-neutral-900 hover:bg-red-950 hover:text-red-400 border border-white/5 py-3 rounded-xl font-black text-xs transition-all active:scale-95"
+            >
+              CLEAR
+            </button>
+            <button
+              type="button"
+              onClick={() => { triggerBeep('tap'); if (pinInput.length < 4) setPinInput(p => p + '0'); }}
+              className="bg-neutral-900 hover:bg-neutral-800 border border-white/5 py-3 rounded-xl font-bold font-mono text-base transition-all active:scale-95"
+            >
+              0
+            </button>
+            <button
+              type="submit"
+              className="bg-green-600 hover:bg-green-700 text-black font-black py-3 rounded-xl text-xs transition-all active:scale-95 uppercase tracking-wider"
+            >
+              LOGIN
+            </button>
+          </div>
+        </form>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-[#050505] text-gray-100 flex flex-row font-sans antialiased overflow-hidden">
+    <div className="min-h-screen bg-neutral-50 dark:bg-[#050505] text-neutral-800 dark:text-gray-100 flex flex-col md:flex-row font-sans antialiased overflow-hidden transition-colors duration-200">
       <Toaster position="top-center" />
 
-      {/* 1. COMPLETELY COLLAPSIBLE SLIDE-OUT SIDEBAR DRAWER */}
-      <AnimatePresence>
-        {isSidebarOpen && (
-          <>
-            {/* Sidebar Backdrop overlay */}
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setIsSidebarOpen(false)}
-              className="fixed inset-0 bg-black/70 z-40 backdrop-blur-xs cursor-pointer"
-            />
-
-            {/* Slide-out Sidebar */}
-            <motion.aside 
-              initial={{ x: '-100%' }}
-              animate={{ x: 0 }}
-              exit={{ x: '-100%' }}
-              transition={{ type: 'spring', damping: 25, stiffness: 220 }}
-              className="fixed left-0 top-0 bottom-0 w-64 bg-neutral-950 border-r border-white/5 flex flex-col justify-between p-4 shadow-2xl z-50"
+      {/* 1. FLEXIBLE/RESPONSIVE LEFT NAVIGATION SIDEBAR */}
+      <aside 
+        className={`bg-neutral-100 dark:bg-neutral-950 border-r border-neutral-200 dark:border-white/5 flex flex-col justify-between p-4 shrink-0 shadow-lg z-30 transition-all duration-300 ${
+          isSidebarOpen ? 'w-64' : 'w-64 md:w-20 lg:w-64'
+        }`}
+      >
+        <div className="space-y-6">
+          {/* Header block with responsive indicators */}
+          <div className="flex items-center justify-between px-1 py-1 border-b border-neutral-200 dark:border-white/5 pb-4 gap-2">
+            <div className="flex items-center gap-2">
+              <Database className="text-orange-500 animate-pulse" size={18} />
+              <h1 className="text-xs font-black tracking-wider uppercase text-yellow-500 dark:text-yellow-300">
+                Bum Bum POS <span className="text-[8px] text-gray-400 lowercase font-mono">v1.12</span>
+              </h1>
+            </div>
+            <button 
+              onClick={() => { triggerBeep('tap'); setIsSidebarOpen(!isSidebarOpen); }}
+              className="p-1.5 bg-neutral-200 dark:bg-neutral-900 border border-neutral-300 dark:border-white/5 text-gray-400 hover:text-white rounded-lg md:hidden"
             >
-              <div className="space-y-6">
-                <div className="flex items-center justify-between px-1 py-1 border-b border-white/5 pb-4 gap-2">
-                  <div className="flex items-center gap-2">
-                    <Database className="text-orange-500 animate-pulse" size={18} />
-                    <h1 className="text-xs font-black tracking-wider uppercase text-yellow-300">
-                      Bum Bum POS <span className="text-[8px] text-gray-400 lowercase font-mono">v1.12</span>
-                    </h1>
-                  </div>
-                  <button 
-                    onClick={() => { triggerBeep('tap'); setIsSidebarOpen(false); }}
-                    className="p-1.5 bg-neutral-900 border border-white/5 text-gray-400 hover:text-white rounded-lg"
-                  >
-                    <X size={14} />
-                  </button>
-                </div>
+              <X size={14} />
+            </button>
+          </div>
 
-                {/* Vertical Navigation items */}
-                <nav className="space-y-1.5">
-                  <button 
-                    onClick={() => { triggerBeep('tap'); setActiveTab('billing'); setIsSidebarOpen(false); }}
-                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-200 ${activeTab === 'billing' ? 'bg-orange-600 text-white shadow-md' : 'text-gray-400 hover:text-white hover:bg-neutral-900'}`}
-                  >
-                    <ShoppingBag size={14} />
-                    <span>Counter Billing</span>
-                  </button>
+          {/* Navigation stack */}
+          <nav className="space-y-1.5">
+            <button 
+              onClick={() => { triggerBeep('tap'); setActiveTab('billing'); }}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-200 ${activeTab === 'billing' ? 'bg-orange-600 text-white shadow-md' : 'text-gray-400 hover:text-white hover:bg-neutral-200 dark:hover:bg-neutral-900'}`}
+            >
+              <ShoppingBag size={14} />
+              <span className={`md:hidden lg:inline`}>Counter Billing</span>
+            </button>
 
-                  <button 
-                    onClick={() => { triggerBeep('tap'); setActiveTab('orders'); setIsSidebarOpen(false); }}
-                    className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-200 ${activeTab === 'orders' ? 'bg-orange-600 text-white shadow-md' : 'text-gray-400 hover:text-white hover:bg-neutral-900'}`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <Clock size={14} />
-                      <span>Live Orders</span>
-                    </div>
-                    {liveOrders.filter(o => o.status !== 'completed' && o.status !== 'rejected').length > 0 && (
-                      <span className="bg-yellow-400 text-black font-black text-[9px] px-2 py-0.5 rounded-full font-mono">
-                        {liveOrders.filter(o => o.status !== 'completed' && o.status !== 'rejected').length}
-                      </span>
-                    )}
-                  </button>
-
-                  <button 
-                    onClick={() => { triggerBeep('tap'); setActiveTab('inventory'); setIsSidebarOpen(false); }}
-                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-200 ${activeTab === 'inventory' ? 'bg-orange-600 text-white shadow-md' : 'text-gray-400 hover:text-white hover:bg-neutral-900'}`}
-                  >
-                    <Layers size={14} />
-                    <span>Stock Toggle</span>
-                  </button>
-                </nav>
+            <button 
+              onClick={() => { triggerBeep('tap'); setActiveTab('orders'); }}
+              className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-200 ${activeTab === 'orders' ? 'bg-orange-600 text-white shadow-md' : 'text-gray-400 hover:text-white hover:bg-neutral-200 dark:hover:bg-neutral-900'}`}
+            >
+              <div className="flex items-center gap-3">
+                <Clock size={14} />
+                <span className={`md:hidden lg:inline`}>Live Orders</span>
               </div>
-
-              {/* Sidebar bottom View Toggles */}
-              {activeTab === 'billing' && (
-                <div className="border-t border-white/5 pt-4 space-y-2">
-                  <p className="text-[9px] font-black uppercase text-gray-500 px-2 tracking-wider">Layout View</p>
-                  <div className="flex bg-neutral-900 border border-white/5 p-1 rounded-xl">
-                    <button 
-                      type="button"
-                      onClick={() => { triggerBeep('tap'); setViewMode('grid'); }}
-                      className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[9px] font-black uppercase transition-all ${viewMode === 'grid' ? 'bg-orange-500 text-black shadow-sm' : 'text-gray-400 hover:text-white'}`}
-                    >
-                      <LayoutGrid size={12} />
-                      <span>Grid</span>
-                    </button>
-                    <button 
-                      type="button"
-                      onClick={() => { triggerBeep('tap'); setViewMode('list'); }}
-                      className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[9px] font-black uppercase transition-all ${viewMode === 'list' ? 'bg-orange-500 text-black shadow-sm' : 'text-gray-400 hover:text-white'}`}
-                    >
-                      <List size={12} />
-                      <span>List</span>
-                    </button>
-                  </div>
-                </div>
+              {liveOrders.filter(o => o.status !== 'completed' && o.status !== 'rejected').length > 0 && (
+                <span className="bg-yellow-400 text-black font-black text-[9px] px-2 py-0.5 rounded-full font-mono">
+                  {liveOrders.filter(o => o.status !== 'completed' && o.status !== 'rejected').length}
+                </span>
               )}
-            </motion.aside>
-          </>
-        )}
-      </AnimatePresence>
+            </button>
+
+            <button 
+              onClick={() => { triggerBeep('tap'); setActiveTab('inventory'); }}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-200 ${activeTab === 'inventory' ? 'bg-orange-600 text-white shadow-md' : 'text-gray-400 hover:text-white hover:bg-neutral-200 dark:hover:bg-neutral-900'}`}
+            >
+              <Layers size={14} />
+              <span className={`md:hidden lg:inline`}>Stock Toggle</span>
+            </button>
+
+            <button 
+              onClick={() => { triggerBeep('tap'); setActiveTab('receipts'); }}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-200 ${activeTab === 'receipts' ? 'bg-orange-600 text-white shadow-md' : 'text-gray-400 hover:text-white hover:bg-neutral-200 dark:hover:bg-neutral-900'}`}
+            >
+              <Printer size={14} />
+              <span className={`md:hidden lg:inline`}>Past Receipts</span>
+            </button>
+
+            <button 
+              onClick={() => { triggerBeep('tap'); setActiveTab('settings'); }}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-200 ${activeTab === 'settings' ? 'bg-orange-600 text-white shadow-md' : 'text-gray-400 hover:text-white hover:bg-neutral-200 dark:hover:bg-neutral-900'}`}
+            >
+              <Settings size={14} />
+              <span className={`md:hidden lg:inline`}>POS Settings</span>
+            </button>
+          </nav>
+        </div>
+
+        {/* LOGOUT BUTTON IN VERTICAL SIDEBAR BASE */}
+        <div className="space-y-4 pt-4 border-t border-neutral-200 dark:border-white/5">
+          <div className="px-2 text-neutral-500 dark:text-gray-400">
+            <p className="text-[8px] font-mono tracking-wider font-bold">LOGGED IN AS</p>
+            <p className="text-[10px] font-black text-orange-600 dark:text-orange-400 uppercase truncate">{currentUser?.name || "Cashier"}</p>
+          </div>
+          <button 
+            type="button"
+            onClick={handleLogout}
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-[10px] font-black uppercase text-red-500 hover:bg-red-500/10 transition-colors"
+          >
+            <LogOut size={14} />
+            <span className={`md:hidden lg:inline`}>Lock Terminal</span>
+          </button>
+        </div>
+      </aside>
 
       {/* 2. MAIN WORKSPACE CONTENT AREA */}
       <main className="flex-1 p-5 overflow-hidden flex flex-col relative h-screen">
         
         {/* GLOBAL HEADER BAR WITH SIDEBAR MENU TOGGLE */}
-        <div className="flex items-center gap-3 mb-4 shrink-0 border-b border-white/5 pb-3">
+        <div className="flex items-center gap-3 mb-4 shrink-0 border-b border-neutral-200 dark:border-white/5 pb-3">
           <button 
             type="button"
             onClick={() => { triggerBeep('tap'); setIsSidebarOpen(true); }}
-            className="p-2.5 bg-neutral-950 hover:bg-neutral-900 border border-white/5 text-orange-500 hover:text-orange-400 rounded-xl transition-all shadow-md flex-shrink-0"
+            className="p-2.5 bg-neutral-200 dark:bg-neutral-950 hover:bg-neutral-300 dark:hover:bg-neutral-900 border border-neutral-300 dark:border-white/5 text-orange-500 hover:text-orange-400 rounded-xl transition-all shadow-md md:hidden"
           >
             <Menu size={16} />
           </button>
           
           <div className="flex flex-col">
             <h2 className="text-[10px] font-black uppercase tracking-widest text-orange-500 leading-none">
-              {activeTab === 'billing' ? 'Counter Billing Workspace' : activeTab === 'orders' ? 'Live Orders Pipeline' : 'Item Availability Control'}
+              {activeTab === 'billing' ? 'Counter Billing Workspace' : activeTab === 'orders' ? 'Live Orders Pipeline' : activeTab === 'inventory' ? 'Item Availability Control' : activeTab === 'receipts' ? 'Past Receipts reprint panel' : 'POS Configuration Settings'}
             </h2>
             <span className="text-[9px] text-gray-400 font-bold mt-1">Bum Bum Cafe • Mohandra</span>
           </div>
@@ -940,7 +1107,7 @@ export default function BbCafePos() {
             <button
               type="button"
               onClick={() => { triggerBeep('tap'); setIsCustomerModalOpen(true); searchDbCustomers(''); }}
-              className="ml-auto p-2.5 bg-neutral-950 hover:bg-neutral-900 border border-white/5 text-yellow-300 hover:text-yellow-400 rounded-xl transition-all shadow-md flex items-center gap-1.5 text-[10px] font-black uppercase"
+              className="ml-auto p-2.5 bg-neutral-200 dark:bg-neutral-950 hover:bg-neutral-300 dark:hover:bg-neutral-900 border border-neutral-300 dark:border-white/5 text-yellow-600 dark:text-yellow-400 rounded-xl transition-all shadow-md flex items-center gap-1.5 text-[10px] font-black uppercase"
             >
               <Users size={14} />
               <span>Search Guest</span>
@@ -959,12 +1126,12 @@ export default function BbCafePos() {
                   <motion.div 
                     layout
                     key={order.id}
-                    className="bg-neutral-950 border border-white/5 rounded-2xl p-4 flex flex-col justify-between shadow-lg"
+                    className="bg-white dark:bg-neutral-950 border border-neutral-200 dark:border-white/5 rounded-2xl p-4 flex flex-col justify-between shadow-lg"
                   >
                     <div>
-                      <div className="flex justify-between items-start border-b border-white/5 pb-2 mb-3">
+                      <div className="flex justify-between items-start border-b border-neutral-200 dark:border-white/5 pb-2 mb-3">
                         <div>
-                          <p className="text-xs font-black text-yellow-300 font-mono">Bill: #${String(order.billNumber).padStart(4, '0')}</p>
+                          <p className="text-xs font-black text-yellow-600 dark:text-yellow-300 font-mono">Bill: #${String(order.billNumber).padStart(4, '0')}</p>
                           <p className="text-[9px] text-gray-400 font-mono mt-0.5">Token: #{order.tokenNumber}</p>
                         </div>
                         <span className="bg-orange-500/10 border border-orange-500/20 text-orange-400 text-[8px] font-black uppercase tracking-wider px-2 py-0.5 rounded">
@@ -972,15 +1139,15 @@ export default function BbCafePos() {
                         </span>
                       </div>
 
-                      <div className="space-y-1 mb-3 text-[10px] font-semibold text-gray-300">
-                        <p className="text-white truncate font-black">👤 {order.customerName}</p>
+                      <div className="space-y-1 mb-3 text-[10px] font-semibold text-neutral-800 dark:text-gray-300">
+                        <p className="dark:text-white text-neutral-950 truncate font-black">👤 {order.customerName}</p>
                         {order.customerPhone && <p className="font-mono text-gray-400">📞 {order.customerPhone}</p>}
                         {order.address && <p className="text-gray-400 line-clamp-1">📍 {order.address}</p>}
                       </div>
 
-                      <div className="space-y-1.5 border-t border-dashed border-white/5 pt-2.5 mb-4">
+                      <div className="space-y-1.5 border-t border-dashed border-neutral-200 dark:border-white/5 pt-2.5 mb-4">
                         {order.items?.map((it: any, index: number) => (
-                          <div key={index} className="flex justify-between text-[11px] text-gray-200">
+                          <div key={index} className="flex justify-between text-[11px] text-neutral-800 dark:text-gray-200">
                             <span className="font-bold">
                               {it.name} <span className="text-orange-500">x{it.quantity}</span>
                               {it.note ? `<br/><span style="font-size: 9px; color: #888;">(${it.note})</span>` : ''}
@@ -992,7 +1159,7 @@ export default function BbCafePos() {
                     </div>
 
                     <div>
-                      <div className="flex justify-between text-xs font-black text-green-400 mb-3 font-mono border-t border-white/5 pt-2.5">
+                      <div className="flex justify-between text-xs font-black text-green-500 dark:text-green-400 mb-3 font-mono border-t border-neutral-200 dark:border-white/5 pt-2.5">
                         <span>Grand Total:</span>
                         <span>₹{order.total}</span>
                       </div>
@@ -1027,7 +1194,7 @@ export default function BbCafePos() {
 
                         <button 
                           onClick={() => handlePrintReceipt(order)}
-                          className="p-2.5 bg-neutral-900 hover:bg-neutral-800 text-gray-300 border border-white/5 rounded-xl transition-all"
+                          className="p-2.5 bg-neutral-200 dark:bg-neutral-900 border border-neutral-300 dark:border-white/5 text-gray-500 hover:text-white rounded-xl transition-all"
                         >
                           <Printer size={14} />
                         </button>
@@ -1045,7 +1212,7 @@ export default function BbCafePos() {
           <div className="flex-1 flex flex-col overflow-hidden relative">
             
             {/* PRODUCT CATALOG */}
-            <div className="flex-1 bg-neutral-950 border border-white/5 rounded-3xl p-4 flex flex-col overflow-hidden shadow-xl">
+            <div className="flex-1 bg-white dark:bg-neutral-950 border border-neutral-200 dark:border-white/5 rounded-3xl p-4 flex flex-col overflow-hidden shadow-xl">
               <div className="flex flex-wrap gap-3 items-center justify-between mb-4">
                 
                 {/* Search Bar */}
@@ -1056,7 +1223,7 @@ export default function BbCafePos() {
                     placeholder="Search dishes..." 
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full bg-neutral-900 border border-white/5 rounded-xl py-2 px-9 text-xs outline-none text-white focus:border-orange-500 placeholder-gray-500 transition-colors"
+                    className="w-full bg-neutral-100 dark:bg-neutral-900 border border-neutral-200 dark:border-white/5 rounded-xl py-2 px-9 text-xs outline-none text-neutral-800 dark:text-white focus:border-orange-500 placeholder-gray-500 transition-colors"
                   />
                 </div>
 
@@ -1077,7 +1244,7 @@ export default function BbCafePos() {
                   <button
                     key={cat}
                     onClick={() => { triggerBeep('tap'); setSelectedCategory(cat); }}
-                    className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider border shrink-0 transition-all ${selectedCategory === cat ? 'bg-orange-500 text-black border-orange-500 font-bold' : 'bg-neutral-900 text-gray-400 border-white/5'}`}
+                    className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider border shrink-0 transition-all ${selectedCategory === cat ? 'bg-orange-500 text-black border-orange-500 font-bold' : 'bg-neutral-100 dark:bg-neutral-900 text-gray-400 border-neutral-200 dark:border-white/5'}`}
                   >
                     {cat}
                   </button>
@@ -1094,7 +1261,7 @@ export default function BbCafePos() {
               ) : viewMode === 'grid' ? (
                 
                 /* EXTREMELY HIGH-DENSITY 4-COLUMN GRID LAYOUT */
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 overflow-y-auto flex-1 pr-1 pb-16">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5 overflow-y-auto flex-1 pr-1 pb-16">
                   {filteredMenu.map((item) => {
                     const isAvailable = item.isAvailable !== false;
                     return (
@@ -1105,14 +1272,14 @@ export default function BbCafePos() {
                           triggerBeep('tap');
                           item.variants ? setSelectedProduct(item) : handleAddProductToCart(item);
                         }}
-                        className={`bg-neutral-900 border p-3 rounded-2xl text-left flex flex-col justify-between h-24 hover:border-orange-500 transition-all duration-200 active:scale-95 ${!isAvailable ? 'opacity-40 cursor-not-allowed border-white/5' : 'border-white/5'}`}
+                        className={`bg-neutral-50 dark:bg-neutral-900 border p-3 rounded-2xl text-left flex flex-col justify-between h-24 hover:border-orange-500 transition-all duration-200 active:scale-95 ${!isAvailable ? 'opacity-40 cursor-not-allowed' : 'border-neutral-200 dark:border-white/5'}`}
                       >
                         <div>
-                          <p className="font-bold text-xs text-gray-100 line-clamp-2 leading-snug">{item.name}</p>
+                          <p className="font-bold text-xs text-neutral-800 dark:text-gray-100 line-clamp-2 leading-snug">{item.name}</p>
                           <p className="text-[8px] text-gray-500 uppercase tracking-widest mt-0.5">{item.category}</p>
                         </div>
                         <div className="flex justify-between items-end w-full">
-                          <p className="text-yellow-300 font-black text-xs font-mono">{getDisplayPrice(item)}</p>
+                          <p className="text-yellow-600 dark:text-yellow-300 font-black text-xs font-mono">{getDisplayPrice(item)}</p>
                           {!isAvailable && <span className="text-[7px] font-black text-red-500 uppercase">Unavailable</span>}
                         </div>
                       </button>
@@ -1133,14 +1300,14 @@ export default function BbCafePos() {
                           triggerBeep('tap');
                           item.variants ? setSelectedProduct(item) : handleAddProductToCart(item);
                         }}
-                        className={`bg-neutral-900 border p-3 rounded-xl flex items-center justify-between text-left hover:border-orange-500 transition-all duration-150 active:scale-[0.99] ${!isAvailable ? 'opacity-45 cursor-not-allowed border-white/5' : 'border-white/5'}`}
+                        className={`bg-neutral-50 dark:bg-neutral-900 border p-3 rounded-xl flex items-center justify-between text-left hover:border-orange-500 transition-all duration-150 active:scale-[0.99] ${!isAvailable ? 'opacity-45 cursor-not-allowed' : 'border-neutral-200 dark:border-white/5'}`}
                       >
                         <div className="space-y-0.5 pr-4 flex-1">
-                          <p className="font-bold text-xs text-gray-100 line-clamp-1">{item.name}</p>
+                          <p className="font-bold text-xs text-neutral-800 dark:text-gray-100 line-clamp-1">{item.name}</p>
                           <p className="text-[8px] text-gray-500 uppercase tracking-wider">{item.category}</p>
                         </div>
                         <div className="flex items-center gap-4">
-                          <p className="text-yellow-300 font-black text-xs font-mono">{getDisplayPrice(item)}</p>
+                          <p className="text-yellow-600 dark:text-yellow-300 font-black text-xs font-mono">{getDisplayPrice(item)}</p>
                           <div className="bg-orange-500/10 text-orange-400 p-1.5 rounded-lg border border-orange-500/20">
                             <Plus size={12} />
                           </div>
@@ -1181,11 +1348,11 @@ export default function BbCafePos() {
 
         {/* VIEW 3: INVENTORY STOCK MANAGEMENT */}
         {activeTab === 'inventory' && (
-          <div className="bg-[#050505] p-5 flex-1 overflow-y-auto pb-20 shadow-xl">
+          <div className="bg-white dark:bg-neutral-950 border border-neutral-200 dark:border-white/5 p-5 flex-1 overflow-y-auto pb-20 shadow-xl rounded-3xl">
             <div className="flex justify-between items-center mb-6">
               <div>
                 <h2 className="text-sm font-black uppercase tracking-widest text-orange-500">Live Item Availability & Stock Control</h2>
-                <p className="text-[10px] text-gray-400 font-bold mt-1">Disabling an item here immediately makes it unavailable on customers' phones.</p>
+                <p className="text-[10px] text-neutral-500 dark:text-gray-400 font-bold mt-1">Disabling an item here immediately makes it unavailable on customers' phones.</p>
               </div>
               <button 
                 onClick={async () => {
@@ -1194,7 +1361,7 @@ export default function BbCafePos() {
                   setProducts(prodSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
                   toast.success("Catalog updated!");
                 }}
-                className="p-2 bg-neutral-900 border border-white/5 rounded-xl text-gray-400 hover:text-white transition-colors"
+                className="p-2 bg-neutral-200 dark:bg-neutral-900 border border-neutral-300 dark:border-white/5 text-gray-400 hover:text-white transition-colors"
               >
                 <RefreshCw size={14} />
               </button>
@@ -1206,10 +1373,10 @@ export default function BbCafePos() {
                 return (
                   <div 
                     key={item.id} 
-                    className="bg-neutral-950 border border-white/5 p-4 rounded-2xl flex items-center justify-between"
+                    className="bg-neutral-100 dark:bg-neutral-900 border border-neutral-200 dark:border-white/5 p-4 rounded-2xl flex items-center justify-between"
                   >
                     <div>
-                      <span className="font-bold text-xs text-white block">{item.name}</span>
+                      <span className="font-bold text-xs text-neutral-800 dark:text-white block">{item.name}</span>
                       <span className="text-[8px] text-gray-500 uppercase tracking-wider block font-mono">Category: {item.category} | Price: ₹{item.price}</span>
                     </div>
 
@@ -1227,6 +1394,215 @@ export default function BbCafePos() {
                   </div>
                 );
               })}
+            </div>
+          </div>
+        )}
+
+        {/* VIEW 4: PAST RECEIPTS & REPRINT LEDGER SCREEN */}
+        {activeTab === 'receipts' && (
+          <div className="flex-1 flex flex-col md:flex-row gap-5 overflow-hidden">
+            
+            {/* Left side: Search Receipts list */}
+            <div className="flex-1 bg-white dark:bg-neutral-950 border border-neutral-200 dark:border-white/5 rounded-3xl p-4 flex flex-col overflow-hidden shadow-xl">
+              <div className="relative mb-4">
+                <Search className="absolute left-3 top-2.5 text-gray-500" size={14} />
+                <input 
+                  type="text" 
+                  placeholder="Search past bills by Bill No, Name or Phone..." 
+                  value={receiptSearchQuery}
+                  onChange={(e) => setReceiptSearchQuery(e.target.value)}
+                  className="w-full bg-neutral-100 dark:bg-neutral-900 border border-neutral-200 dark:border-white/5 rounded-xl py-2 px-9 text-xs outline-none text-neutral-800 dark:text-white focus:border-orange-500 placeholder-gray-500 transition-colors"
+                />
+              </div>
+
+              <div className="space-y-2 overflow-y-auto flex-1 pr-1 pb-16">
+                {filteredPastReceipts.map((order) => {
+                  const isSelected = selectedReceipt?.id === order.id;
+                  const formattedDate = order.timestamp?.toDate ? order.timestamp.toDate().toLocaleString('en-IN') : new Date(order.timestamp).toLocaleString();
+                  
+                  return (
+                    <div 
+                      key={order.id}
+                      onClick={() => { triggerBeep('tap'); setSelectedReceipt(order); }}
+                      className={`bg-neutral-50 dark:bg-neutral-900 border p-4 rounded-2xl flex justify-between items-center cursor-pointer transition-all hover:border-orange-500 ${
+                        isSelected ? 'border-orange-500 bg-orange-500/10' : 'border-neutral-200 dark:border-white/5'
+                      }`}
+                    >
+                      <div>
+                        <span className="font-bold text-xs block text-neutral-900 dark:text-white font-mono">Bill No: #${order.billNumber}</span>
+                        <span className="text-[9px] text-gray-400 block font-mono">Token: #{order.tokenNumber} | ${formattedDate}</span>
+                        <span className="text-[9px] text-gray-400 block uppercase">Guest: {order.customerName || 'Walk-in'}</span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-sm font-black text-green-600 dark:text-green-400 font-mono">₹{order.total}</span>
+                        <span className="text-[8px] text-gray-500 block uppercase font-bold">{order.paymentMethod?.toUpperCase() || 'CASH'}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Right side: Detailed selected bill parameters & print trigger */}
+            <div className="w-full md:w-[380px] bg-white dark:bg-neutral-950 border border-neutral-200 dark:border-white/5 p-4 rounded-3xl flex flex-col justify-between shadow-xl overflow-y-auto h-full">
+              {selectedReceipt ? (
+                <div className="space-y-4 flex flex-col justify-between h-full">
+                  <div>
+                    <div className="border-b border-neutral-200 dark:border-white/5 pb-3">
+                      <span className="text-[9px] text-orange-500 font-black uppercase tracking-wider">Receipt Inspector Panel</span>
+                      <h3 className="text-base font-black text-neutral-900 dark:text-white font-mono">Bill No: #${selectedReceipt.billNumber}</h3>
+                      <p className="text-[10px] text-gray-400 font-mono">Token: #{selectedReceipt.tokenNumber}</p>
+                    </div>
+
+                    <div className="space-y-3 mt-4">
+                      {/* Customer metrics */}
+                      <div className="bg-neutral-50 dark:bg-white/5 p-3 rounded-2xl text-[10px] font-semibold text-neutral-800 dark:text-gray-300 space-y-1">
+                        <p>👤 <b>Name:</b> {selectedReceipt.customerName || 'Walk-in Guest'}</p>
+                        {selectedReceipt.customerPhone && <p className="font-mono">📞 <b>Phone:</b> {selectedReceipt.customerPhone}</p>}
+                        <p><b>Pay Mode:</b> {selectedReceipt.paymentMethod?.toUpperCase() || 'CASH'}</p>
+                        {selectedReceipt.tableNumber && <p>🪑 <b>Table No:</b> {selectedReceipt.tableNumber}</p>}
+                      </div>
+
+                      {/* Item Details */}
+                      <div className="space-y-2 border-t border-neutral-200 dark:border-white/5 pt-3">
+                        <p className="text-[9px] font-black text-gray-400 uppercase">Items Purchased:</p>
+                        {selectedReceipt.items?.map((it: any, i: number) => (
+                          <div key={i} className="flex justify-between text-xs text-neutral-800 dark:text-gray-200">
+                            <span>{it.name} <span className="text-orange-500">x{it.quantity}</span></span>
+                            <span className="font-mono text-gray-400">₹{it.price * it.quantity}</span>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Financial statistics */}
+                      <div className="border-t border-neutral-200 dark:border-white/5 pt-3 space-y-1.5 text-xs font-semibold text-neutral-600 dark:text-gray-400 font-mono">
+                        <div className="flex justify-between"><span>Subtotal:</span><span>₹{selectedReceipt.subtotal}</span></div>
+                        {selectedReceipt.discount > 0 && <div className="flex justify-between text-yellow-500"><span>Savings/Discount:</span><span>-₹{selectedReceipt.discount}</span></div>}
+                        {selectedReceipt.gstRate > 0 && <div className="flex justify-between"><span>GST (${selectedReceipt.gstRate}%):</span><span>+₹{selectedReceipt.gstAmount || 0}</span></div>}
+                        <div className="flex justify-between font-black text-green-600 dark:text-green-400 text-sm border-t border-dashed border-neutral-200 dark:border-white/5 pt-2">
+                          <span>Grand Total:</span><span>₹{selectedReceipt.total}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <button 
+                    type="button"
+                    onClick={() => handlePrintReceipt(selectedReceipt)}
+                    className="w-full bg-green-600 hover:bg-green-700 text-white font-black py-4 rounded-2xl text-xs uppercase tracking-wider flex items-center justify-center gap-2"
+                  >
+                    <Printer size={16} /> Reprint Thermal Invoice
+                  </button>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center h-full text-gray-500 text-xs text-center uppercase py-20 font-bold">
+                  <span>Select any past receipt to view breakdown & reprint bill 🧾</span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* VIEW 5: CONFIGURATION SETTINGS VIEW */}
+        {activeTab === 'settings' && (
+          <div className="bg-white dark:bg-neutral-950 border border-neutral-200 dark:border-white/5 p-6 rounded-3xl shadow-xl flex-grow max-w-2xl space-y-6 overflow-y-auto">
+            <h3 className="text-sm font-black uppercase text-orange-500 tracking-wider">POS Configuration & Hardware settings</h3>
+
+            {/* A. Dark/Light Theme Switching */}
+            <div className="border-b border-neutral-200 dark:border-white/5 pb-4 space-y-3">
+              <p className="text-xs font-bold text-neutral-800 dark:text-white uppercase tracking-wider">A. Dashboard UI Theme mode:</p>
+              <div className="flex bg-neutral-100 dark:bg-neutral-900 border border-neutral-200 dark:border-white/5 p-1 rounded-xl w-60">
+                <button
+                  type="button"
+                  onClick={() => handleToggleTheme('dark')}
+                  className={`flex-grow flex items-center justify-center gap-1.5 py-2 rounded-lg text-[10px] font-black uppercase transition-all ${
+                    themeMode === 'dark' ? 'bg-[#050505] text-amber-400 border border-white/5 shadow-sm' : 'text-gray-400 hover:text-white'
+                  }`}
+                >
+                  <Moon size={12} /> Dark Mode
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleToggleTheme('light')}
+                  className={`flex-grow flex items-center justify-center gap-1.5 py-2 rounded-lg text-[10px] font-black uppercase transition-all ${
+                    themeMode === 'light' ? 'bg-white text-orange-600 border border-neutral-200 shadow-sm' : 'text-neutral-500 hover:text-neutral-800'
+                  }`}
+                >
+                  <Sun size={12} /> Light Mode
+                </button>
+              </div>
+            </div>
+
+            {/* B. GST Configuration parameters */}
+            <div className="border-b border-neutral-200 dark:border-white/5 pb-4 space-y-3">
+              <p className="text-xs font-bold text-neutral-800 dark:text-white uppercase tracking-wider">B. GST Configuration Setup:</p>
+              
+              <div className="flex items-center justify-between max-w-sm">
+                <span className="text-[11px] font-semibold text-neutral-600 dark:text-gray-300">Enable GST calculations on all bills:</span>
+                <button 
+                  type="button"
+                  onClick={() => {
+                    triggerBeep('tap');
+                    const next = !gstEnabled;
+                    setGstEnabled(next);
+                    localStorage.setItem("bb_pos_gst_enabled", String(next));
+                  }}
+                  className="text-orange-500"
+                >
+                  {gstEnabled ? <ToggleRight size={32} /> : <ToggleLeft size={32} className="text-neutral-500" />}
+                </button>
+              </div>
+
+              {gstEnabled && (
+                <div className="space-y-1 max-w-sm">
+                  <label className="text-[9px] font-black uppercase text-gray-500">GST Rate (%) Percentage</label>
+                  <input 
+                    type="number" 
+                    placeholder="e.g. 5"
+                    value={gstRate}
+                    onChange={(e) => {
+                      const r = Math.max(0, Number(e.target.value));
+                      setGstRate(r);
+                      localStorage.setItem("bb_pos_gst_rate", String(r));
+                    }}
+                    className="w-full bg-neutral-100 dark:bg-neutral-900 border border-neutral-200 dark:border-white/5 p-3 rounded-xl text-xs outline-none focus:border-orange-500 font-mono font-black"
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* C. Printer configuration parameter */}
+            <div className="pb-4 space-y-3">
+              <p className="text-xs font-bold text-neutral-800 dark:text-white uppercase tracking-wider">C. Thermal Receipt Paper Settings:</p>
+              
+              <div className="flex bg-neutral-100 dark:bg-neutral-900 border border-neutral-200 dark:border-white/5 p-1 rounded-xl w-60">
+                <button
+                  type="button"
+                  onClick={() => {
+                    triggerBeep('tap');
+                    setPrinterPaperSize('58mm');
+                    localStorage.setItem("bb_pos_paper_size", '58mm');
+                  }}
+                  className={`flex-grow py-2 rounded-lg text-[10px] font-black uppercase transition-all ${
+                    printerPaperSize === '58mm' ? 'bg-[#050505] text-amber-400 border border-white/5 shadow-sm' : 'text-gray-400'
+                  }`}
+                >
+                  58mm Roll width
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    triggerBeep('tap');
+                    setPrinterPaperSize('80mm');
+                    localStorage.setItem("bb_pos_paper_size", '80mm');
+                  }}
+                  className={`flex-grow py-2 rounded-lg text-[10px] font-black uppercase transition-all ${
+                    printerPaperSize === '80mm' ? 'bg-[#050505] text-amber-400 border border-white/5 shadow-sm' : 'text-gray-400'
+                  }`}
+                >
+                  80mm Roll width
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -1250,7 +1626,7 @@ export default function BbCafePos() {
               animate={{ y: 0 }} 
               exit={{ y: "100%" }} 
               transition={{ type: "spring", damping: 25, stiffness: 220 }}
-              className="fixed right-0 bottom-0 top-0 w-full sm:w-[460px] bg-[#0b0c10] border-l border-white/10 p-5 z-[120] flex flex-col justify-between shadow-2xl overflow-y-auto pb-32 scrollbar-thin"
+              className="fixed right-0 bottom-0 top-0 w-full sm:w-[460px] bg-[#0b0c10] border-l border-white/10 p-5 z-[120] flex flex-col justify-between shadow-2xl overflow-y-auto pb-32 scrollbar-thin text-gray-100"
             >
               <div>
                 {/* Live Bill Sticky Progress Header */}
@@ -1304,11 +1680,7 @@ export default function BbCafePos() {
                         <div className="flex items-center gap-2 bg-black/40 px-2 py-1 rounded-xl border border-white/10 flex-shrink-0">
                           <button type="button" onClick={() => handleUpdateCartQuantity(item.id, -1)} className="w-6 h-6 flex items-center justify-center bg-red-500/10 text-red-500 rounded text-sm font-black">-</button>
                           <span className="font-black text-xs px-1 text-white font-mono">{item.quantity}</span>
-                          {item.isReward ? (
-                            <button type="button" disabled className="w-6 h-6 flex items-center justify-center bg-white/5 text-gray-500 rounded text-sm font-black cursor-not-allowed opacity-30">+</button>
-                          ) : (
-                            <button type="button" onClick={() => handleUpdateCartQuantity(item.id, 1)} className="w-6 h-6 flex items-center justify-center bg-green-500/10 text-green-500 rounded text-sm font-black">+</button>
-                          )}
+                          <button type="button" onClick={() => handleUpdateCartQuantity(item.id, 1)} className="w-6 h-6 flex items-center justify-center bg-green-500/10 text-green-500 rounded text-sm font-black">+</button>
                         </div>
                       </div>
                       
@@ -1417,7 +1789,7 @@ export default function BbCafePos() {
                 )}
 
                 {fulfillmentType === "table" && (
-                  <div className="mt-3 p-3 bg-neutral-900 rounded-xl border border-white/5 space-y-3 font-sans transition-all duration-300">
+                  <div className="mt-3 p-3 bg-neutral-900 rounded-xl border border-white/5 space-y-3 font-sans transition-all duration-300 text-gray-200">
                     <p className="text-[10px] font-black uppercase text-orange-400">🪑 Choose Dine-In Table:</p>
                     <div className="space-y-1.5">
                       <span className="text-[8px] font-black text-gray-400 uppercase tracking-wider">For 2 People (3 Tables):</span>
@@ -1487,6 +1859,15 @@ export default function BbCafePos() {
                     >
                       <User size={12} /> Verify
                     </button>
+                    {/* Search icon shifted inside Cart Drawer exactly adjacent to phone */}
+                    <button
+                      type="button"
+                      onClick={() => { triggerBeep('tap'); setIsCustomerModalOpen(true); searchDbCustomers(''); }}
+                      className="p-2.5 bg-neutral-900 hover:bg-neutral-800 border border-white/5 text-yellow-300 rounded-xl transition-all shadow-md flex items-center justify-center shrink-0"
+                      title="Search Guest from Directory"
+                    >
+                      <Users size={16} />
+                    </button>
                   </div>
                   
                   {customerPhone && (
@@ -1496,7 +1877,6 @@ export default function BbCafePos() {
                           <p className="text-[9px] font-black text-yellow-300 uppercase leading-none">Net Points Balance</p>
                           <p className="text-[10px] text-gray-300 font-bold mt-1 font-sans">{customerName || 'Loyal Guest'}</p>
                         </div>
-                        {/* Calculate net points remaining after committing points rewards in cart */}
                         <div className="text-right">
                           <span className="text-sm font-black text-yellow-400 font-mono">
                             {customerPoints - getTotalPointsRedeemedInCart()}
@@ -1505,7 +1885,7 @@ export default function BbCafePos() {
                         </div>
                       </div>
 
-                      {/* Dynamic rewards selector list from 'loyalty_rules' collection */}
+                      {/* Dynamic rewards selector list */}
                       {loyaltyRules.length > 0 && (
                         <div className="space-y-1.5 pt-1.5 border-t border-white/5">
                           <p className="text-[8px] font-black uppercase text-gray-400 tracking-wider">Redeem Reward Item (रिडीम करें):</p>
