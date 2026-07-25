@@ -61,7 +61,7 @@ interface DeliveryArea {
 }
 
 export default function BbCafePos() {
-  // कॉन्सटेंट्स को फ़ंक्शन के अंदर रखा गया है ताकि कॉपी-पेस्ट एरर न आए
+  // कॉन्सटेंट्स
   const DELIVERY_AREAS: DeliveryArea[] = useMemo(() => [
     { name: "Mohandra Town", fee: 20, minFree: 99, range: "0-2 KM" },
     { name: "Within 5 KM (Bum Bum Cafe से 5km के दायरे में)", fee: 50, minFree: 499, range: "2-5 KM" },
@@ -603,76 +603,6 @@ export default function BbCafePos() {
 
   const getTotalPointsRedeemedInCart = () => cart.reduce((acc, i) => acc + (i.pointsCost || 0), 0);
 
-  // 📄 THERMAL RECEIPT PRINTING FUNCTION
-  const handlePrintReceipt = (order: any) => {
-    triggerBeep('tap');
-    const widthPixels = printerPaperSize === '58mm' ? '240px' : '290px';
-    const printWindow = window.open('', '_blank', 'width=340,height=600');
-    if (!printWindow) return;
-
-    const formattedDate = order.timestamp?.toDate ? order.timestamp.toDate().toLocaleString('en-IN') : new Date(order.timestamp).toLocaleString();
-    const itemsRows = order.items.map((it: any) => `
-      <tr>
-        <td style="font-size: 11px; padding: 4px 0; max-width: 140px; word-break: break-word;">
-          ${it.name} ${it.note ? `<br/><span style="font-size: 9px; color: #555; font-style: italic;">(${it.note})</span>` : ''}
-        </td>
-        <td style="font-size: 11px; text-align: center; padding: 4px 0; vertical-align: top;">x${it.quantity}</td>
-        <td style="font-size: 11px; text-align: right; padding: 4px 0; vertical-align: top;">₹${it.price * it.quantity}</td>
-      </tr>
-    `).join('');
-
-    printWindow.document.write(`
-      <html>
-        <head>
-          <title>Bill #${order.billNumber}</title>
-          <style>
-            @page { margin: 0; }
-            body { font-family: 'Courier New', Courier, monospace; width: ${widthPixels}; margin: 0; padding: 8px; color: #000; background-color: #fff; }
-            .center { text-align: center; }
-            .divider { border-top: 1px dashed #000; margin: 6px 0; }
-            table { width: 100%; border-collapse: collapse; }
-          </style>
-        </head>
-        <body onload="window.print(); window.close();">
-          <div class="center">
-            <h3 style="margin: 0 0 2px 0; font-size: 15px;">BUM BUM CAFE</h3>
-            <span style="font-size: 9px;">Mohandra, Panna (M.P.)</span>
-          </div>
-          <div class="divider"></div>
-          <div style="font-size: 10px; line-height: 1.3;">
-            <b>Bill No:</b> #${String(order.billNumber).padStart(4, '0')}<br/>
-            <b>Token No:</b> #${order.tokenNumber}<br/>
-            <b>Date:</b> ${formattedDate}<br/>
-            <b>Type:</b> ${order.fulfillmentType?.toUpperCase()} ${order.tableNumber ? `| Table: ${order.tableNumber}` : ''}<br/>
-            <b>Pay Mode:</b> ${order.paymentMethod?.toUpperCase()}<br/>
-            <b>Guest:</b> ${order.customerName || 'Walk-in Guest'}<br/>
-          </div>
-          <div class="divider"></div>
-          <table>
-            <thead>
-              <tr style="border-bottom: 1px dashed #000;">
-                <th style="font-size: 10px; text-align: left; padding-bottom: 4px;">Item</th>
-                <th style="font-size: 10px; text-align: center; padding-bottom: 4px;">Qty</th>
-                <th style="font-size: 10px; text-align: right; padding-bottom: 4px;">Total</th>
-              </tr>
-            </thead>
-            <tbody>${itemsRows}</tbody>
-          </table>
-          <div class="divider"></div>
-          <div style="font-size: 11px; line-height: 1.4;">
-            <div style="display: flex; justify-content: space-between;"><span>Subtotal:</span><span>₹${order.subtotal}</span></div>
-            ${order.discount ? `<div style="display: flex; justify-content: space-between; font-weight: bold;"><span>Savings:</span><span>-₹${order.discount}</span></div>` : ''}
-            ${order.gstRate ? `<div style="display: flex; justify-content: space-between;"><span>GST (${order.gstRate}%):</span><span>+₹${order.gstAmount || 0}</span></div>` : ''}
-            <div style="display: flex; justify-content: space-between; font-weight: bold; font-size: 12px; margin-top: 2px;"><span>GRAND TOTAL:</span><span>₹${order.total}</span></div>
-          </div>
-          <div class="divider"></div>
-          <div class="center" style="font-size: 9px; margin-top: 6px;"><b>Thank you! Visit Again! 🍕🍔</b></div>
-        </body>
-      </html>
-    `);
-    printWindow.document.close();
-  };
-
   // Checkout submission to Firestore & print trigger
   const handlePlaceOrder = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1013,7 +943,6 @@ export default function BbCafePos() {
           </div>
         )}
 
-        {/* VIEW 3: INVENTORY STOCK MANAGEMENT */}
         {activeTab === 'inventory' && (
           <div className="bg-white dark:bg-neutral-950 border border-neutral-200 dark:border-white/5 p-5 flex-1 overflow-y-auto pb-20 shadow-xl rounded-3xl">
             <div className="flex justify-between items-center mb-6">
@@ -1037,7 +966,6 @@ export default function BbCafePos() {
           </div>
         )}
 
-        {/* VIEW 4: PAST RECEIPTS & REPRINT LEDGER SCREEN */}
         {activeTab === 'receipts' && (
           <div className="flex-1 flex flex-col md:flex-row gap-5 overflow-hidden">
             <div className="flex-1 bg-white dark:bg-neutral-950 border border-neutral-200 dark:border-white/5 rounded-3xl p-4 flex flex-col overflow-hidden shadow-xl">
@@ -1158,6 +1086,7 @@ export default function BbCafePos() {
         handleUpdateCartItemNote={handleUpdateCartItemNote}
         showAddonsSection={showAddonsSection}
         triggerBeep={triggerBeep}
+        handleCheckLoyalty={handleCheckLoyalty} // ⚡ Passed successfully
       />
 
       <CustomerDirectoryModal 
