@@ -8,7 +8,8 @@ import {
 import { 
   ShoppingBag, Plus, Minus, Search, X, User, Star, Gift, 
   Loader2, Clock, Trash2, Printer, Check, Play, Settings, 
-  Database, RefreshCw, Layers, Phone, MapPin, LayoutGrid, List
+  Database, RefreshCw, Layers, Phone, MapPin, LayoutGrid, List,
+  Menu
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
@@ -213,7 +214,7 @@ export default function BbCafePos() {
       }
     });
 
-    const noteParts = [];
+    const noteParts: string[] = [];
     if (selectedAddons.length > 0) noteParts.push(`Addons: ${selectedAddons.join(', ')}`);
     if (customizerChefNote.trim()) noteParts.push(`Note: ${customizerChefNote.trim()}`);
 
@@ -264,7 +265,7 @@ export default function BbCafePos() {
     );
   };
 
-  // Pricing Helpers (Matches past structures perfectly)
+  // Pricing Helpers
   const getCartSubtotal = () => cart.reduce((acc, i) => acc + (i.price * i.quantity), 0);
   
   const getCartAddonsPrice = () => {
@@ -848,7 +849,7 @@ export default function BbCafePos() {
               </motion.button>
             )}
 
-            {/* UPGRADED POS CART DRAWER (MATCHES USER PASTED STYLE EXACTLY) */}
+            {/* ACTIVE ORDER DESK DRAWER */}
             <AnimatePresence>
               {isCartOpen && (
                 <>
