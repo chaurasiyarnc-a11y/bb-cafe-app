@@ -225,7 +225,6 @@ export default function BbCafePos() {
     };
   }, []);
 
-  // Optimized: Removed activeTab from dependency array to minimize Firestore reads on view switches
   useEffect(() => {
     if (!isLoggedIn) return;
     const fetchDbData = async () => {
@@ -321,12 +320,12 @@ export default function BbCafePos() {
         const data = docSnap.data();
         setCustomerName(data.name || '');
         setCustomerPoints(data.points || 0);
-        setAddress(data.address || ''); // Fixed: resets properly if address is empty
+        setAddress(data.address || '');
         toast.success(`Member Found! Points: ${data.points || 0}`);
       } else {
         setCustomerName('');
         setCustomerPoints(0);
-        setAddress(''); // Fixed: resets for new guest profiles
+        setAddress('');
         toast.success("New Guest profile initialized!");
       }
     } catch (e) {
@@ -379,7 +378,7 @@ export default function BbCafePos() {
     setCustomerPhone(cust.phone);
     setCustomerName(cust.name);
     setCustomerPoints(cust.points || 0);
-    setAddress(cust.address || ''); // Fixed: clears or overrides previous selection address safely
+    setAddress(cust.address || '');
     setIsCustomerModalOpen(false);
     toast.success(`Active Customer: ${cust.name}`);
   };
@@ -487,7 +486,7 @@ export default function BbCafePos() {
       setCustomerPhone(cleanPhone);
       setCustomerName(newDoc.name);
       setCustomerPoints(0);
-      setAddress(newDoc.address || ''); // Fixed
+      setAddress(newDoc.address || '');
 
       setNewCustName('');
       setNewCustPhone('');
@@ -716,8 +715,8 @@ export default function BbCafePos() {
     const addOnsCost = getCartAddonsPrice();
     const deliveryCharge = getDeliveryCharge();
     const totalPointsCost = getTotalPointsRedeemedInCart(); 
-    const loyaltyDiscount = getLoyaltyDiscount(); // Fixed: calculated from state helper
-    const discountCombined = customDiscount + loyaltyDiscount; // Fixed: combines both discounts properly
+    const loyaltyDiscount = getLoyaltyDiscount(); 
+    const discountCombined = customDiscount + loyaltyDiscount; 
     const gstAmount = getGstAmountCalculated();
     const finalTotal = getTotalBillPrice();
 
@@ -727,7 +726,6 @@ export default function BbCafePos() {
     const counterDocRef = doc(db, "settings", "store_bill_counter");
 
     try {
-      // Fixed: The transaction block now returns the correct bill number instead of relying on outer-scope side effects [1].
       const billNumber = await runTransaction(db, async (transaction) => {
         const counterDoc = await transaction.get(counterDocRef);
         if (!counterDoc.exists()) {
@@ -770,7 +768,6 @@ export default function BbCafePos() {
       if (customerPhone && customerPhone.trim().length === 10) {
         const phoneClean = customerPhone.trim();
         const pointsEarned = Math.floor(finalTotal / 100);
-        // Fixed: netPointsChange now correctly subtracts pointsToRedeem so balance updates appropriately
         const netPointsChange = pointsEarned - totalPointsCost - pointsToRedeem;
 
         await runTransaction(db, async (txn) => {
@@ -808,7 +805,6 @@ export default function BbCafePos() {
             timestamp: new Date()
           });
         }
-        // Fixed: Adds ledger log for direct cash redemption
         if (pointsToRedeem > 0) {
           await addDoc(collection(db, "customer_points", phoneClean, "history"), {
             type: 'redeem',
@@ -936,7 +932,6 @@ export default function BbCafePos() {
     );
   };
 
-  // 🖥️ SINGLE ROOT LEVEL RETURN
   return (
     <div className="min-h-screen bg-neutral-50 dark:bg-[#050505] text-neutral-800 dark:text-gray-100 flex flex-col md:flex-row font-sans antialiased overflow-hidden transition-colors duration-200">
       <Toaster position="top-center" />
@@ -1213,7 +1208,7 @@ export default function BbCafePos() {
                       const formattedDate = order.timestamp?.toDate ? order.timestamp.toDate().toLocaleString('en-IN') : new Date(order.timestamp).toLocaleString();
                       return (
                         <div key={order.id} onClick={() => { triggerBeep('tap'); setSelectedReceipt(order); }} className={`bg-neutral-50 dark:bg-neutral-900 border p-4 rounded-2xl flex justify-between items-center cursor-pointer transition-all hover:border-orange-500 ${isSelected ? 'border-orange-500 bg-orange-500/10' : 'border-neutral-200 dark:border-white/5'}`}>
-                          <div><span className="font-bold text-xs block text-neutral-900 dark:text-white font-mono">Bill No: #${order.billNumber}</span><span className="text-[9px] text-gray-400 block font-mono">Token: #{order.tokenNumber} | ${formattedDate}</span><span className="text-[9px] text-gray-400 block uppercase">Guest: {order.customerName || 'Walk-in'}</span></div>
+                          <div><span className="font-bold text-xs block text-neutral-900 dark:text-white font-mono">Bill No: #${order.billNumber}</span><span className="text-[9px] text-gray-400 block font-mono">Token: #{order.tokenNumber} | {formattedDate}</span><span className="text-[9px] text-gray-400 block uppercase">Guest: {order.customerName || 'Walk-in'}</span></div>
                           <div className="text-right"><span className="text-sm font-black text-green-600 dark:text-green-400 font-mono">₹{order.total}</span><span className="text-[8px] text-gray-500 block uppercase font-bold">{order.paymentMethod?.toUpperCase() || 'CASH'}</span></div>
                         </div>
                       );
