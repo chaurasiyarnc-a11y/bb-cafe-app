@@ -1068,7 +1068,7 @@ export default function BbCafePos() {
               </div>
               <button type="button" onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-[10px] font-black uppercase text-red-500 hover:bg-red-500/10 transition-colors" title="Lock Terminal"><SafeLogOut size={14} />{!isSidebarCollapsed && <span>Lock Terminal</span></button>
             </div>
-          </</aside>
+          </aside>
 
           {/* 2. MAIN WORKSPACE CONTENT AREA */}
           <main className="flex-1 p-3 md:p-5 overflow-y-auto flex flex-col relative h-screen">
