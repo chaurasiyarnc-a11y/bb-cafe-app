@@ -2,6 +2,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { X, Trash2, ShoppingBag, MapPin, Users, User, Printer, Loader2, Minus, Plus } from 'lucide-react';
+import toast from 'react-hot-toast'; // ⚡ यह आवश्यक इम्पोर्ट यहाँ जोड़ा गया है
 
 interface PosCartDrawerProps {
   isHindi: boolean;
@@ -165,11 +166,7 @@ export default function PosCartDrawer({
                   <div className="flex items-center gap-2 bg-black/40 px-2 py-1 rounded-xl border border-white/10 flex-shrink-0">
                     <button type="button" onClick={() => handleUpdateCartQuantity(item.id, -1)} className="w-6 h-6 flex items-center justify-center bg-red-500/10 text-red-500 rounded text-sm font-black">-</button>
                     <span className="font-black text-xs px-1 text-white font-mono">{item.quantity}</span>
-                    {item.isReward ? (
-                      <button type="button" disabled className="w-6 h-6 flex items-center justify-center bg-white/5 text-gray-500 rounded text-sm font-black cursor-not-allowed opacity-30">+</button>
-                    ) : (
-                      <button type="button" onClick={() => handleUpdateCartQuantity(item.id, 1)} className="w-6 h-6 flex items-center justify-center bg-green-500/10 text-green-500 rounded text-sm font-black">+</button>
-                    )}
+                    <button type="button" onClick={() => handleUpdateCartQuantity(item.id, 1)} className="w-6 h-6 flex items-center justify-center bg-green-500/10 text-green-500 rounded text-sm font-black">+</button>
                   </div>
                 </div>
                 <input 
