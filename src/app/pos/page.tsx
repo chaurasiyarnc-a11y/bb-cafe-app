@@ -3,13 +3,13 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { db } from '@/lib/firebase'; 
 import { 
   collection, onSnapshot, query, orderBy, limit, doc, 
-  updateDoc, addDoc, runTransaction, increment, getDoc, getDocs, where 
+  updateDoc, addDoc, runTransaction, increment, getDoc, getDocs, where, setDoc 
 } from 'firebase/firestore';
 import { 
   ShoppingBag, Plus, Minus, Search, X, User, Star, Gift, 
   Loader2, Clock, Trash2, Printer, Check, Play, Settings, 
   Database, RefreshCw, Layers, Phone, MapPin, LayoutGrid, List,
-  Menu
+  Menu, Users
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
@@ -50,6 +50,15 @@ export default function BbCafePos() {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid'); 
   const [isCartOpen, setIsCartOpen] = useState<boolean>(false); 
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false); 
+
+  // Customer Directory Lookup Modal States
+  const [isCustomerModalOpen, setIsCustomerModalOpen] = useState<boolean>(false);
+  const [customerSearchQuery, setCustomerSearchQuery] = useState<string>('');
+  const [searchedCustomers, setSearchedCustomers] = useState<any[]>([]);
+  const [isSearchingCustomer, setIsSearchingCustomer] = useState<boolean>(false);
+  const [newCustName, setNewCustName] = useState<string>('');
+  const [newCustPhone, setNewCustPhone] = useState<string>('');
+  const [newCustAddress, setNewCustAddress] = useState<string>('');
 
   // Database States
   const [liveOrders, setLiveOrders] = useState<any[]>([]);
@@ -166,6 +175,7 @@ export default function BbCafePos() {
         const data = docSnap.data();
         setCustomerName(data.name || '');
         setCustomerPoints(data.points || 0);
+        if (data.address) setAddress(data.address);
         toast.success(`Member Found! Points: ${data.points || 0}`);
       } else {
         setCustomerName('');
@@ -175,6 +185,116 @@ export default function BbCafePos() {
     } catch (e) {
       toast.dismiss(toastId);
       toast.error("Error checking loyalty DB");
+    }
+  };
+
+  // Search Firestore Customer points list (By exact phone number or name prefix match)
+  const searchDbCustomers = async (text: string) => {
+    const cleanText = text.trim();
+    if (!cleanText) {
+      setIsSearchingCustomer(true);
+      try {
+        // Load latest 12 active customers on empty search init
+        const q = query(collection(db, "customer_points"), orderBy("lastActive", "desc"), limit(12));
+        const snap = await getDocs(q);
+        setSearchedCustomers(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      } catch (e) {
+        console.error("Latest customer fetch failed", e);
+      } finally {
+        setIsSearchingCustomer(false);
+      }
+      return;
+    }
+
+    setIsSearchingCustomer(true);
+    try {
+      let q;
+      if (/^\d+$/.test(cleanText)) {
+        // Search strictly by exact phone match
+        q = query(collection(db, "customer_points"), where("phone", "==", cleanText));
+      } else {
+        // Search by Name prefix match
+        const capitalized = cleanText.charAt(0).toUpperCase() + cleanText.slice(1);
+        q = query(
+          collection(db, "customer_points"), 
+          where("name", ">=", capitalized), 
+          where("name", "<=", capitalized + '\uf8ff'),
+          limit(15)
+        );
+      }
+      const snap = await getDocs(q);
+      setSearchedCustomers(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    } catch (e) {
+      console.error("Search operations failed", e);
+    } finally {
+      setIsSearchingCustomer(false);
+    }
+  };
+
+  const handleSelectCustomer = (cust: any) => {
+    triggerBeep('tap');
+    setCustomerPhone(cust.phone);
+    setCustomerName(cust.name);
+    setCustomerPoints(cust.points || 0);
+    if (cust.address) {
+      setAddress(cust.address);
+    }
+    setIsCustomerModalOpen(false);
+    toast.success(`Active Customer: ${cust.name}`);
+  };
+
+  // Save New Customer to Loyalty program DB directly
+  const handleSaveNewCustomer = async (e: React.FormEvent) => {
+    e.preventDefault();
+    triggerBeep('tap');
+    const cleanPhone = newCustPhone.trim();
+    if (cleanPhone.length !== 10 || !/^\d+$/.test(cleanPhone)) {
+      toast.error("Mobile number must be exactly 10 digits!");
+      return;
+    }
+    if (!newCustName.trim()) {
+      toast.error("Name field cannot be left blank!");
+      return;
+    }
+
+    const toastId = toast.loading("Registering guest...");
+    try {
+      const userRef = doc(db, "customer_points", cleanPhone);
+      const userSnap = await getDoc(userRef);
+      if (userSnap.exists()) {
+        toast.dismiss(toastId);
+        toast.error("This phone number is already registered!");
+        return;
+      }
+
+      const newDoc = {
+        name: newCustName.trim(),
+        phone: cleanPhone,
+        points: 0,
+        address: newCustAddress.trim() || "",
+        lastActive: new Date()
+      };
+
+      await setDoc(userRef, newDoc);
+      toast.dismiss(toastId);
+      toast.success("New Customer Registered Successfully!");
+
+      // Auto Select Customer details
+      setCustomerPhone(cleanPhone);
+      setCustomerName(newDoc.name);
+      setCustomerPoints(0);
+      if (newDoc.address) {
+        setAddress(newDoc.address);
+      }
+
+      // Reset Input fields
+      setNewCustName('');
+      setNewCustPhone('');
+      setNewCustAddress('');
+      setIsCustomerModalOpen(false);
+    } catch (err) {
+      toast.dismiss(toastId);
+      toast.error("Database write operation failed");
     }
   };
 
@@ -710,6 +830,18 @@ export default function BbCafePos() {
             </h2>
             <span className="text-[9px] text-gray-400 font-bold mt-1">Bum Bum Cafe • Mohandra</span>
           </div>
+
+          {/* DYNAMIC CUSTOMER SEARCH DIRECTORY TRIGGER IN HEADER */}
+          {activeTab === 'billing' && (
+            <button
+              type="button"
+              onClick={() => { triggerBeep('tap'); setIsCustomerModalOpen(true); searchDbCustomers(''); }}
+              className="ml-auto p-2.5 bg-neutral-950 hover:bg-neutral-900 border border-white/5 text-yellow-300 hover:text-yellow-400 rounded-xl transition-all shadow-md flex items-center gap-1.5 text-[10px] font-black uppercase"
+            >
+              <Users size={14} />
+              <span>Search Guest</span>
+            </button>
+          )}
         </div>
 
         {/* VIEW 1: LIVE ORDERS TICKET PIPELINE */}
@@ -945,7 +1077,7 @@ export default function BbCafePos() {
 
         {/* VIEW 3: INVENTORY STOCK MANAGEMENT */}
         {activeTab === 'inventory' && (
-          <div className="bg-neutral-950 border border-white/5 rounded-3xl p-5 flex-1 overflow-y-auto pb-20 shadow-xl">
+          <div className="bg-[#050505] p-5 flex-1 overflow-y-auto pb-20 shadow-xl">
             <div className="flex justify-between items-center mb-6">
               <div>
                 <h2 className="text-sm font-black uppercase tracking-widest text-orange-500">Live Item Availability & Stock Control</h2>
@@ -1379,7 +1511,142 @@ export default function BbCafePos() {
         )}
       </AnimatePresence>
 
-      {/* 3. VARIATIONS AND PORTIONS SELECTION CUSTOMIZATION POPUP MODAL */}
+      {/* 3. CUSTOMER DIRECTORY / LOYALTY LOOKUP MODAL */}
+      <AnimatePresence>
+        {isCustomerModalOpen && (
+          <div className="fixed inset-0 bg-black/90 z-[130] flex items-center justify-center p-4 backdrop-blur-md">
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }} 
+              animate={{ scale: 1, opacity: 1 }} 
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-[#111] border border-white/10 w-full max-w-lg p-6 rounded-3xl text-left space-y-4 shadow-2xl relative max-h-[85vh] flex flex-col justify-between"
+            >
+              {/* Header */}
+              <div className="flex justify-between items-center border-b border-white/5 pb-2">
+                <div>
+                  <h3 className="text-sm font-black text-white">Customer Directory</h3>
+                  <p className="text-[9px] text-orange-500 font-bold uppercase tracking-wider">Loyalty & Address Database Lookup</p>
+                </div>
+                <button 
+                  type="button" 
+                  onClick={() => { triggerBeep('tap'); setIsCustomerModalOpen(false); }}
+                  className="p-1.5 bg-neutral-900 border border-white/5 rounded-full text-red-400 hover:text-red-500 transition-colors"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+
+              {/* Main Body */}
+              <div className="flex-1 overflow-y-auto space-y-4 pr-1 scrollbar-thin">
+                
+                {/* Search Section */}
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase text-gray-400">Search Existing Member</label>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-2.5 text-gray-500" size={14} />
+                    <input 
+                      type="text" 
+                      placeholder="Search by 10-digit Phone or Name..." 
+                      value={customerSearchQuery}
+                      onChange={(e) => {
+                        setCustomerSearchQuery(e.target.value);
+                        searchDbCustomers(e.target.value);
+                      }}
+                      className="w-full bg-neutral-900 border border-white/5 rounded-xl py-2 px-9 text-xs text-white outline-none focus:border-orange-500 placeholder-gray-500 transition-colors"
+                    />
+                  </div>
+                </div>
+
+                {/* Search Results list */}
+                <div className="space-y-2 max-h-[200px] overflow-y-auto pr-1">
+                  {isSearchingCustomer ? (
+                    <div className="flex justify-center py-4">
+                      <Loader2 className="animate-spin text-orange-500" size={18} />
+                    </div>
+                  ) : searchedCustomers.length === 0 ? (
+                    <p className="text-center text-xs text-gray-500 py-3 uppercase tracking-widest font-black">No matches found</p>
+                  ) : (
+                    searchedCustomers.map((cust) => (
+                      <div 
+                        key={cust.id} 
+                        onClick={() => handleSelectCustomer(cust)}
+                        className="bg-neutral-900 border border-white/5 p-3 rounded-2xl flex items-center justify-between hover:border-orange-500 cursor-pointer transition-all"
+                      >
+                        <div className="space-y-0.5">
+                          <span className="font-bold text-xs text-white block">{cust.name}</span>
+                          <span className="text-[9px] text-gray-400 font-mono block">📞 {cust.phone} {cust.address ? `| 📍 ${cust.address.substring(0, 30)}...` : ''}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="bg-yellow-400/10 border border-yellow-400/20 text-yellow-300 text-[9px] font-black px-2 py-0.5 rounded-full font-mono">{cust.points || 0} Pts</span>
+                          <span className="text-[9px] font-black text-orange-500 uppercase shrink-0">Select ➔</span>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                {/* Quick Add Form Section */}
+                <div className="border-t border-white/5 pt-4 space-y-3">
+                  <p className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Or Register New Guest Profile</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-[8px] font-black uppercase text-gray-400">Mobile Number (10 digit)</label>
+                      <input 
+                        type="tel" 
+                        maxLength={10}
+                        placeholder="e.g. 9876543210"
+                        value={newCustPhone}
+                        onChange={(e) => setNewCustPhone(e.target.value)}
+                        className="w-full bg-[#050505] border border-white/5 rounded-xl p-2.5 text-xs text-white outline-none focus:border-orange-500 font-mono font-bold"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[8px] font-black uppercase text-gray-400">Customer Name</label>
+                      <input 
+                        type="text" 
+                        placeholder="e.g. Ramesh ji"
+                        value={newCustName}
+                        onChange={(e) => setNewCustName(e.target.value)}
+                        className="w-full bg-[#050505] border border-white/5 rounded-xl p-2.5 text-xs text-white outline-none focus:border-orange-500 font-bold"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[8px] font-black uppercase text-gray-400">Delivery Address (Optional)</label>
+                    <input 
+                      type="text" 
+                      placeholder="e.g. House No. 12, Mohandra"
+                      value={newCustAddress}
+                      onChange={(e) => setNewCustAddress(e.target.value)}
+                      className="w-full bg-[#050505] border border-white/5 rounded-xl p-2.5 text-xs text-white outline-none focus:border-orange-500 font-semibold"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Footer Save Operations */}
+              <div className="border-t border-white/5 pt-3 flex gap-2 animate-none">
+                <button 
+                  type="button" 
+                  onClick={handleSaveNewCustomer}
+                  className="flex-grow bg-green-600 hover:bg-green-700 text-white font-black py-3 rounded-xl text-xs uppercase tracking-wider shadow"
+                >
+                  Save & Select Guest ➔
+                </button>
+                <button 
+                  type="button" 
+                  onClick={() => { triggerBeep('tap'); setIsCustomerModalOpen(false); }}
+                  className="bg-neutral-900 border border-white/5 text-gray-400 hover:text-white px-4 py-3 rounded-xl text-xs font-bold uppercase"
+                >
+                  Cancel
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* 4. VARIATIONS AND PORTIONS SELECTION CUSTOMIZATION POPUP MODAL */}
       <AnimatePresence>
         {selectedProduct && (
           <div className="fixed inset-0 bg-black/90 z-[110] flex items-center justify-center p-4 backdrop-blur-md">
