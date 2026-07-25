@@ -225,6 +225,7 @@ export default function BbCafePos() {
     };
   }, []);
 
+  // Optimized: Removed activeTab from dependency array to minimize Firestore reads on view switches
   useEffect(() => {
     if (!isLoggedIn) return;
     const fetchDbData = async () => {
@@ -246,7 +247,7 @@ export default function BbCafePos() {
       }
     };
     fetchDbData();
-  }, [activeTab, isLoggedIn]);
+  }, [isLoggedIn]);
 
   // Auth Submit PIN
   const handlePinLoginSubmit = async (e?: React.FormEvent) => {
@@ -320,11 +321,12 @@ export default function BbCafePos() {
         const data = docSnap.data();
         setCustomerName(data.name || '');
         setCustomerPoints(data.points || 0);
-        if (data.address) setAddress(data.address);
+        setAddress(data.address || ''); // Fixed: resets properly if address is empty
         toast.success(`Member Found! Points: ${data.points || 0}`);
       } else {
         setCustomerName('');
         setCustomerPoints(0);
+        setAddress(''); // Fixed: resets for new guest profiles
         toast.success("New Guest profile initialized!");
       }
     } catch (e) {
@@ -377,9 +379,7 @@ export default function BbCafePos() {
     setCustomerPhone(cust.phone);
     setCustomerName(cust.name);
     setCustomerPoints(cust.points || 0);
-    if (cust.address) {
-      setAddress(cust.address);
-    }
+    setAddress(cust.address || ''); // Fixed: clears or overrides previous selection address safely
     setIsCustomerModalOpen(false);
     toast.success(`Active Customer: ${cust.name}`);
   };
@@ -487,9 +487,7 @@ export default function BbCafePos() {
       setCustomerPhone(cleanPhone);
       setCustomerName(newDoc.name);
       setCustomerPoints(0);
-      if (newDoc.address) {
-        setAddress(newDoc.address);
-      }
+      setAddress(newDoc.address || ''); // Fixed
 
       setNewCustName('');
       setNewCustPhone('');
@@ -718,25 +716,27 @@ export default function BbCafePos() {
     const addOnsCost = getCartAddonsPrice();
     const deliveryCharge = getDeliveryCharge();
     const totalPointsCost = getTotalPointsRedeemedInCart(); 
-    const discountCombined = customDiscount; 
+    const loyaltyDiscount = getLoyaltyDiscount(); // Fixed: calculated from state helper
+    const discountCombined = customDiscount + loyaltyDiscount; // Fixed: combines both discounts properly
     const gstAmount = getGstAmountCalculated();
     const finalTotal = getTotalBillPrice();
 
     const tokenNumber = Math.floor(1000 + Math.random() * 9000);
     const deliveryPin = Math.floor(1000 + Math.random() * 9000);
 
-    let billNumber = 1;
     const counterDocRef = doc(db, "settings", "store_bill_counter");
 
     try {
-      await runTransaction(db, async (transaction) => {
+      // Fixed: The transaction block now returns the correct bill number instead of relying on outer-scope side effects [1].
+      const billNumber = await runTransaction(db, async (transaction) => {
         const counterDoc = await transaction.get(counterDocRef);
         if (!counterDoc.exists()) {
           transaction.set(counterDocRef, { nextBillNumber: 2 });
-          billNumber = 1;
+          return 1;
         } else {
-          billNumber = counterDoc.data().nextBillNumber || 1;
-          transaction.update(counterDocRef, { nextBillNumber: billNumber + 1 });
+          const nextBill = counterDoc.data().nextBillNumber || 1;
+          transaction.update(counterDocRef, { nextBillNumber: nextBill + 1 });
+          return nextBill;
         }
       });
 
@@ -770,7 +770,8 @@ export default function BbCafePos() {
       if (customerPhone && customerPhone.trim().length === 10) {
         const phoneClean = customerPhone.trim();
         const pointsEarned = Math.floor(finalTotal / 100);
-        const netPointsChange = pointsEarned - totalPointsCost;
+        // Fixed: netPointsChange now correctly subtracts pointsToRedeem so balance updates appropriately
+        const netPointsChange = pointsEarned - totalPointsCost - pointsToRedeem;
 
         await runTransaction(db, async (txn) => {
           const userRef = doc(db, "customer_points", phoneClean);
@@ -780,7 +781,7 @@ export default function BbCafePos() {
             txn.set(userRef, {
               name: customerName.trim() || "Walk-in Guest",
               phone: phoneClean,
-              points: pointsEarned,
+              points: Math.max(0, netPointsChange),
               lastActive: new Date()
             });
           } else {
@@ -804,6 +805,15 @@ export default function BbCafePos() {
             type: 'redeem',
             points: totalPointsCost,
             description: `Redeemed rewards on Bill #${billNumber} at POS Counter`,
+            timestamp: new Date()
+          });
+        }
+        // Fixed: Adds ledger log for direct cash redemption
+        if (pointsToRedeem > 0) {
+          await addDoc(collection(db, "customer_points", phoneClean, "history"), {
+            type: 'redeem',
+            points: pointsToRedeem,
+            description: `Redeemed ${pointsToRedeem} points for ₹${pointsToRedeem} cash discount on Bill #${billNumber}`,
             timestamp: new Date()
           });
         }
@@ -926,7 +936,7 @@ export default function BbCafePos() {
     );
   };
 
-  // 🖥️ SINGLE ROOT LEVEL RETURN (Saves SWC Parser from compile crashes)
+  // 🖥️ SINGLE ROOT LEVEL RETURN
   return (
     <div className="min-h-screen bg-neutral-50 dark:bg-[#050505] text-neutral-800 dark:text-gray-100 flex flex-col md:flex-row font-sans antialiased overflow-hidden transition-colors duration-200">
       <Toaster position="top-center" />
@@ -972,7 +982,7 @@ export default function BbCafePos() {
                     type="button"
                     onClick={() => {
                       triggerBeep('tap');
-                      if (pinInput.length < 4) setPinInput(prev => prev + num);
+                      if (pinInput.length < 4) setPinInput(prev => prev + String(num));
                     }}
                     className="aspect-square bg-neutral-900 hover:bg-neutral-800 active:scale-95 border border-white/5 font-black text-xl rounded-2xl transition-all flex items-center justify-center"
                   >
