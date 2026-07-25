@@ -60,25 +60,22 @@ interface DeliveryArea {
   range: string;
 }
 
+const DELIVERY_AREAS: DeliveryArea[] = [
+  { name: "Mohandra Town", fee: 20, minFree: 99, range: "0-2 KM" },
+  { name: "Within 5 KM (Bum Bum Cafe से 5km के दायरे में)", fee: 50, minFree: 499, range: "2-5 KM" },
+  { name: "Within 12 KM (12km के दायरे में)", fee: 99, minFree: 999, range: "5-12 KM" }
+];
+
+const PIZZA_ADDONS: { [size: string]: { [addon: string]: number } } = {
+  "small": { "Veg Add-on": 10, "Paneer": 20, "Black Olives": 20, "Jalapeno": 20, "Extra Cheese": 20, "Mushroom": 20 },
+  "medium": { "Veg Add-on": 10, "Paneer": 30, "Black Olives": 30, "Jalapeno": 30, "Extra Cheese": 30, "Mushroom": 30 },
+  "large": { "Veg Add-on": 20, "Paneer": 40, "Black Olives": 40, "Jalapeno": 40, "Extra Cheese": 40, "Mushroom": 40 },
+  "extra large": { "Veg Add-on": 30, "Paneer": 50, "Black Olives": 50, "Jalapeno": 50, "Extra Cheese": 60, "Mushroom": 50 }
+};
+
+const QUICK_INSTRUCTION_TAGS = ["🌶️ Extra Spicy", "🧅 No Onion-Garlic", "🧀 Extra Cheese", "🔥 Well Baked", "🌱 Make it Mild"];
+
 export default function BbCafePos() {
-  // कॉन्सटेंट्स
-  const DELIVERY_AREAS: DeliveryArea[] = useMemo(() => [
-    { name: "Mohandra Town", fee: 20, minFree: 99, range: "0-2 KM" },
-    { name: "Within 5 KM (Bum Bum Cafe से 5km के दायरे में)", fee: 50, minFree: 499, range: "2-5 KM" },
-    { name: "Within 12 KM (12km के दायरे में)", fee: 99, minFree: 999, range: "5-12 KM" }
-  ], []);
-
-  const PIZZA_ADDONS: { [size: string]: { [addon: string]: number } } = useMemo(() => ({
-    "small": { "Veg Add-on": 10, "Paneer": 20, "Black Olives": 20, "Jalapeno": 20, "Extra Cheese": 20, "Mushroom": 20 },
-    "medium": { "Veg Add-on": 10, "Paneer": 30, "Black Olives": 30, "Jalapeno": 30, "Extra Cheese": 30, "Mushroom": 30 },
-    "large": { "Veg Add-on": 20, "Paneer": 40, "Black Olives": 40, "Jalapeno": 40, "Extra Cheese": 40, "Mushroom": 40 },
-    "extra large": { "Veg Add-on": 30, "Paneer": 50, "Black Olives": 50, "Jalapeno": 50, "Extra Cheese": 60, "Mushroom": 50 }
-  }), []);
-
-  const QUICK_INSTRUCTION_TAGS = useMemo(() => [
-    "🌶️ Extra Spicy", "🧅 No Onion-Garlic", "🧀 Extra Cheese", "🔥 Well Baked", "🌱 Make it Mild"
-  ], []);
-
   // Authentication & Security Lockscreen States
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
   const [currentUser, setCurrentUser] = useState<any | null>(null);
@@ -175,34 +172,7 @@ export default function BbCafePos() {
     } catch (e) {}
   };
 
-  // Auth Session, Database streams & Settings fetchers
-  useEffect(() => {
-    const savedUser = localStorage.getItem("bb_pos_user");
-    if (savedUser) {
-      try {
-        const parsed = JSON.parse(savedUser);
-        setIsLoggedIn(true);
-        setCurrentUser(parsed);
-      } catch (e) {}
-    }
-
-    const localGst = localStorage.getItem("bb_pos_gst_enabled");
-    if (localGst) setGstEnabled(localGst === 'true');
-    const localGstRate = localStorage.getItem("bb_pos_gst_rate");
-    if (localGstRate) setGstRate(Number(localGstRate) || 5);
-    const localPaper = localStorage.getItem("bb_pos_paper_size");
-    if (localPaper) setPrinterPaperSize(localPaper as any);
-    const localTheme = localStorage.getItem("bb_pos_theme");
-    if (localTheme) {
-      setThemeMode(localTheme as any);
-      if (localTheme === 'light') {
-        document.documentElement.classList.remove('dark');
-      } else {
-        document.documentElement.classList.add('dark');
-      }
-    }
-  }, []);
-
+  // Live Orders Listener & Store Open Listener
   useEffect(() => {
     const q = query(collection(db, "orders"), orderBy("timestamp", "desc"), limit(60));
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -222,6 +192,7 @@ export default function BbCafePos() {
     };
   }, []);
 
+  // Fetch Menu Products
   useEffect(() => {
     if (!isLoggedIn) return;
     const fetchDbData = async () => {
@@ -602,6 +573,76 @@ export default function BbCafePos() {
   };
 
   const getTotalPointsRedeemedInCart = () => cart.reduce((acc, i) => acc + (i.pointsCost || 0), 0);
+
+  // 📄 THERMAL RECEIPT PRINTING FUNCTION
+  const handlePrintReceipt = (order: any) => {
+    triggerBeep('tap');
+    const widthPixels = printerPaperSize === '58mm' ? '240px' : '290px';
+    const printWindow = window.open('', '_blank', 'width=340,height=600');
+    if (!printWindow) return;
+
+    const formattedDate = order.timestamp?.toDate ? order.timestamp.toDate().toLocaleString('en-IN') : new Date(order.timestamp).toLocaleString();
+    const itemsRows = order.items.map((it: any) => `
+      <tr>
+        <td style="font-size: 11px; padding: 4px 0; max-width: 140px; word-break: break-word;">
+          ${it.name} ${it.note ? `<br/><span style="font-size: 9px; color: #555; font-style: italic;">(${it.note})</span>` : ''}
+        </td>
+        <td style="font-size: 11px; text-align: center; padding: 4px 0; vertical-align: top;">x${it.quantity}</td>
+        <td style="font-size: 11px; text-align: right; padding: 4px 0; vertical-align: top;">₹${it.price * it.quantity}</td>
+      </tr>
+    `).join('');
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Bill #${order.billNumber}</title>
+          <style>
+            @page { margin: 0; }
+            body { font-family: 'Courier New', Courier, monospace; width: ${widthPixels}; margin: 0; padding: 8px; color: #000; background-color: #fff; }
+            .center { text-align: center; }
+            .divider { border-top: 1px dashed #000; margin: 6px 0; }
+            table { width: 100%; border-collapse: collapse; }
+          </style>
+        </head>
+        <body onload="window.print(); window.close();">
+          <div class="center">
+            <h3 style="margin: 0 0 2px 0; font-size: 15px;">BUM BUM CAFE</h3>
+            <span style="font-size: 9px;">Mohandra, Panna (M.P.)</span>
+          </div>
+          <div class="divider"></div>
+          <div style="font-size: 10px; line-height: 1.3;">
+            <b>Bill No:</b> #${String(order.billNumber).padStart(4, '0')}<br/>
+            <b>Token No:</b> #${order.tokenNumber}<br/>
+            <b>Date:</b> ${formattedDate}<br/>
+            <b>Type:</b> ${order.fulfillmentType?.toUpperCase()} ${order.tableNumber ? `| Table: ${order.tableNumber}` : ''}<br/>
+            <b>Pay Mode:</b> ${order.paymentMethod?.toUpperCase()}<br/>
+            <b>Guest:</b> ${order.customerName || 'Walk-in Guest'}<br/>
+          </div>
+          <div class="divider"></div>
+          <table>
+            <thead>
+              <tr style="border-bottom: 1px dashed #000;">
+                <th style="font-size: 10px; text-align: left; padding-bottom: 4px;">Item</th>
+                <th style="font-size: 10px; text-align: center; padding-bottom: 4px;">Qty</th>
+                <th style="font-size: 10px; text-align: right; padding-bottom: 4px;">Total</th>
+              </tr>
+            </thead>
+            <tbody>${itemsRows}</tbody>
+          </table>
+          <div class="divider"></div>
+          <div style="font-size: 11px; line-height: 1.4;">
+            <div style="display: flex; justify-content: space-between;"><span>Subtotal:</span><span>₹${order.subtotal}</span></div>
+            ${order.discount ? `<div style="display: flex; justify-content: space-between; font-weight: bold;"><span>Savings:</span><span>-₹${order.discount}</span></div>` : ''}
+            ${order.gstRate ? `<div style="display: flex; justify-content: space-between;"><span>GST (${order.gstRate}%):</span><span>+₹${order.gstAmount || 0}</span></div>` : ''}
+            <div style="display: flex; justify-content: space-between; font-weight: bold; font-size: 12px; margin-top: 2px;"><span>GRAND TOTAL:</span><span>₹${order.total}</span></div>
+          </div>
+          <div class="divider"></div>
+          <div class="center" style="font-size: 9px; margin-top: 6px;"><b>Thank you! Visit Again! 🍕🍔</b></div>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
 
   // Checkout submission to Firestore & print trigger
   const handlePlaceOrder = async (e: React.FormEvent) => {
