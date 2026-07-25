@@ -93,7 +93,7 @@ export default function BbCafePos() {
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false); // Mobile Drawer Toggle
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false); // Desktop compact toggle
 
-  // Dynamic Settings states
+  // Dynamic Settings states (Saved in LocalStorage)
   const [gstEnabled, setGstEnabled] = useState<boolean>(false);
   const [gstRate, setGstRate] = useState<number>(5);
   const [printerPaperSize, setPrinterPaperSize] = useState<'58mm' | '80mm'>('58mm');
@@ -588,6 +588,7 @@ export default function BbCafePos() {
       prev.map(item => item.id === itemId ? { ...item, note: noteValue } : item)
     );
   };
+
 // Pricing Helpers
   const getCartSubtotal = () => cart.reduce((acc, i) => acc + (i.price * i.quantity), 0);
   
@@ -929,42 +930,71 @@ export default function BbCafePos() {
     <div className="min-h-screen bg-neutral-50 dark:bg-[#050505] text-neutral-800 dark:text-gray-100 flex flex-col md:flex-row font-sans antialiased overflow-hidden transition-colors duration-200">
       <Toaster position="top-center" />
 
+      {/* ⚠️ MOBILE ONLY SIDEBAR OVERLAY BACKDROP */}
+      {isSidebarOpen && (
+        <div 
+          onClick={() => setIsSidebarOpen(false)}
+          className="fixed inset-0 bg-black/60 z-40 md:hidden backdrop-blur-xs cursor-pointer"
+        />
+      )}
+
       {/* 1. FLEXIBLE/RESPONSIVE LEFT NAVIGATION SIDEBAR */}
-      <aside className={`bg-neutral-100 dark:bg-neutral-950 border-r border-neutral-200 dark:border-white/5 flex flex-col justify-between p-4 shrink-0 shadow-lg z-30 transition-all duration-300 ${isSidebarOpen ? 'w-64' : 'w-64 md:w-20 lg:w-64'}`}>
+      <aside className={`bg-neutral-100 dark:bg-neutral-950 border-r border-neutral-200 dark:border-white/5 flex flex-col justify-between p-4 shrink-0 shadow-lg z-50 transition-all duration-300
+        fixed inset-y-0 left-0 md:relative md:translate-x-0 md:flex
+        ${isSidebarOpen ? 'translate-x-0 w-64' : '-translate-x-full md:translate-x-0'}
+        ${isSidebarCollapsed ? 'md:w-20' : 'md:w-64'}
+      `}>
         <div className="space-y-6">
           <div className="flex items-center justify-between px-1 py-1 border-b border-neutral-200 dark:border-white/5 pb-4 gap-2">
             <div className="flex items-center gap-2">
               <SafeDatabase className="text-orange-500 animate-pulse" size={18} />
-              <h1 className="text-xs font-black tracking-wider uppercase text-yellow-500 dark:text-yellow-300">Bum Bum POS <span className="text-[8px] text-gray-400 lowercase font-mono">v1.12</span></h1>
+              {!isSidebarCollapsed && (
+                <h1 className="text-xs font-black tracking-wider uppercase text-yellow-500 dark:text-yellow-300">Bum Bum POS <span className="text-[8px] text-gray-400 lowercase font-mono">v1.12</span></h1>
+              )}
             </div>
-            <button onClick={() => { triggerBeep('tap'); setIsSidebarOpen(!isSidebarOpen); }} className="p-1.5 bg-neutral-200 dark:bg-neutral-900 border border-neutral-300 dark:border-white/5 text-gray-400 hover:text-white rounded-lg md:hidden"><X size={14} /></button>
+            
+            {/* Desktop Collapse Trigger */}
+            <button 
+              onClick={() => { triggerBeep('tap'); setIsSidebarCollapsed(!isSidebarCollapsed); }}
+              className="hidden md:flex p-1.5 bg-neutral-200 dark:bg-neutral-900 border border-neutral-300 dark:border-white/5 text-gray-400 hover:text-white rounded-lg mx-auto"
+              title={isSidebarCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
+            >
+              {isSidebarCollapsed ? <SafeChevronRight size={14} /> : <SafeChevronLeft size={14} />}
+            </button>
+
+            <button onClick={() => { triggerBeep('tap'); setIsSidebarOpen(false); }} className="p-1.5 bg-neutral-200 dark:bg-neutral-900 border border-neutral-300 dark:border-white/5 text-gray-400 hover:text-white rounded-lg md:hidden"><X size={14} /></button>
           </div>
 
           {/* Navigation stack */}
           <nav className="space-y-1.5">
-            <button onClick={() => { triggerBeep('tap'); setActiveTab('billing'); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-200 ${activeTab === 'billing' ? 'bg-orange-600 text-white shadow-md' : 'text-gray-400 hover:text-white hover:bg-neutral-200 dark:hover:bg-neutral-900'}`}><SafeShoppingBag size={14} /><span className="md:hidden lg:inline">Counter Billing</span></button>
-            <button onClick={() => { triggerBeep('tap'); setActiveTab('orders'); }} className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-200 ${activeTab === 'orders' ? 'bg-orange-600 text-white shadow-md' : 'text-gray-400 hover:text-white hover:bg-neutral-200 dark:hover:bg-neutral-900'}`}><div className="flex items-center gap-3"><SafeClock size={14} /><span className="md:hidden lg:inline">Live Orders</span></div>{liveOrders.filter(o => o.status !== 'completed' && o.status !== 'rejected').length > 0 && (<span className="bg-yellow-400 text-black font-black text-[9px] px-2 py-0.5 rounded-full font-mono">{liveOrders.filter(o => o.status !== 'completed' && o.status !== 'rejected').length}</span>)}</button>
-            <button onClick={() => { triggerBeep('tap'); setActiveTab('inventory'); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-200 ${activeTab === 'inventory' ? 'bg-orange-600 text-white shadow-md' : 'text-gray-400 hover:text-white hover:bg-neutral-200 dark:hover:bg-neutral-900'}`}><SafeLayers size={14} /><span className="md:hidden lg:inline">Stock Toggle</span></button>
-            <button onClick={() => { triggerBeep('tap'); setActiveTab('receipts'); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-200 ${activeTab === 'receipts' ? 'bg-orange-600 text-white shadow-md' : 'text-gray-400 hover:text-white hover:bg-neutral-200 dark:hover:bg-neutral-900'}`}><SafePrinter size={14} /><span className="md:hidden lg:inline">Past Receipts</span></button>
-            <button onClick={() => { triggerBeep('tap'); setActiveTab('settings'); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-200 ${activeTab === 'settings' ? 'bg-orange-600 text-white shadow-md' : 'text-gray-400 hover:text-white hover:bg-neutral-200 dark:hover:bg-neutral-900'}`}><Settings size={14} /><span className="md:hidden lg:inline">POS Settings</span></button>
+            <button onClick={() => { triggerBeep('tap'); setActiveTab('billing'); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-200 ${activeTab === 'billing' ? 'bg-orange-600 text-white shadow-md' : 'text-gray-400 hover:text-white hover:bg-neutral-200 dark:hover:bg-neutral-900'}`} title="Counter Billing"><SafeShoppingBag size={14} />{!isSidebarCollapsed && <span className="md:hidden lg:inline">Counter Billing</span>}</button>
+            <button onClick={() => { triggerBeep('tap'); setActiveTab('orders'); }} className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-200 ${activeTab === 'orders' ? 'bg-orange-600 text-white shadow-md' : 'text-gray-400 hover:text-white hover:bg-neutral-200 dark:hover:bg-neutral-900'}`} title="Live Orders"><div className="flex items-center gap-3"><SafeClock size={14} />{!isSidebarCollapsed && <span className="md:hidden lg:inline">Live Orders</span>}</div>{liveOrders.filter(o => o.status !== 'completed' && o.status !== 'rejected').length > 0 && (<span className="bg-yellow-400 text-black font-black text-[9px] px-2 py-0.5 rounded-full font-mono">{liveOrders.filter(o => o.status !== 'completed' && o.status !== 'rejected').length}</span>)}</button>
+            <button onClick={() => { triggerBeep('tap'); setActiveTab('inventory'); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-200 ${activeTab === 'inventory' ? 'bg-orange-600 text-white shadow-md' : 'text-gray-400 hover:text-white hover:bg-neutral-200 dark:hover:bg-neutral-900'}`} title="Stock Toggle"><SafeLayers size={14} />{!isSidebarCollapsed && <span className="md:hidden lg:inline">Stock Toggle</span>}</button>
+            <button onClick={() => { triggerBeep('tap'); setActiveTab('receipts'); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-200 ${activeTab === 'receipts' ? 'bg-orange-600 text-white shadow-md' : 'text-gray-400 hover:text-white hover:bg-neutral-200 dark:hover:bg-neutral-900'}`} title="Past Receipts"><SafePrinter size={14} />{!isSidebarCollapsed && <span className="md:hidden lg:inline">Past Receipts</span>}</button>
+            <button onClick={() => { triggerBeep('tap'); setActiveTab('settings'); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-200 ${activeTab === 'settings' ? 'bg-orange-600 text-white shadow-md' : 'text-gray-400 hover:text-white hover:bg-neutral-200 dark:hover:bg-neutral-900'}`} title="POS Settings"><Settings size={14} />{!isSidebarCollapsed && <span className="md:hidden lg:inline">POS Settings</span>}</button>
           </nav>
         </div>
 
         {/* LOGOUT BUTTON */}
         <div className="space-y-4 pt-4 border-t border-neutral-200 dark:border-white/5">
-          <div className="px-2 text-neutral-500 dark:text-gray-400"><p className="text-[8px] font-mono tracking-wider font-bold leading-none">LOGGED IN AS</p><p className="text-[10px] font-black text-orange-600 dark:text-orange-400 uppercase truncate mt-1">{currentUser?.name || "Cashier"}</p></div>
-          <button type="button" onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-[10px] font-black uppercase text-red-500 hover:bg-red-500/10 transition-colors"><SafeLogOut size={14} /><span>Lock Terminal</span></button>
+          <div className="px-2 text-neutral-500 dark:text-gray-400">
+            <p className="text-[8px] font-mono tracking-wider font-bold leading-none">LOGGED IN AS</p>
+            {!isSidebarCollapsed && (
+              <p className="text-[10px] font-black text-orange-600 dark:text-orange-400 uppercase truncate mt-1">{currentUser?.name || "Cashier"}</p>
+            )}
+          </div>
+          <button type="button" onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-[10px] font-black uppercase text-red-500 hover:bg-red-500/10 transition-colors" title="Lock Terminal"><SafeLogOut size={14} />{!isSidebarCollapsed && <span>Lock Terminal</span></button>
         </div>
       </aside>
 
       {/* 2. MAIN WORKSPACE CONTENT AREA */}
-      <main className="flex-1 p-5 overflow-hidden flex flex-col relative h-screen">
+      <main className="flex-1 p-3 md:p-5 overflow-y-auto flex flex-col relative h-screen">
         {/* GLOBAL HEADER BAR */}
         <div className="flex items-center gap-3 mb-4 shrink-0 border-b border-neutral-200 dark:border-white/5 pb-3">
           <button type="button" onClick={() => { triggerBeep('tap'); setIsSidebarOpen(true); }} className="p-2.5 bg-neutral-200 dark:bg-neutral-950 hover:bg-neutral-300 dark:hover:bg-neutral-900 border border-neutral-300 dark:border-white/5 text-orange-500 hover:text-orange-400 rounded-xl transition-all shadow-md md:hidden"><SafeMenu size={16} /></button>
           <div className="flex flex-col"><h2 className="text-[10px] font-black uppercase tracking-widest text-orange-500 leading-none">{activeTab === 'billing' ? 'Counter Billing Workspace' : activeTab === 'orders' ? 'Live Orders Pipeline' : activeTab === 'inventory' ? 'Item Availability Control' : activeTab === 'receipts' ? 'Past Receipts reprint panel' : 'POS Configuration Settings'}</h2><span className="text-[9px] text-gray-400 font-bold mt-1">Bum Bum Cafe • Mohandra</span></div>
           {activeTab === 'billing' && (
-            <button type="button" onClick={() => { triggerBeep('tap'); setIsCustomerModalOpen(true); searchDbCustomers(''); }} className="ml-auto p-2.5 bg-neutral-200 dark:bg-neutral-950 hover:bg-neutral-300 dark:hover:bg-neutral-900 border border-neutral-300 dark:border-white/5 text-yellow-600 dark:text-yellow-400 rounded-xl transition-all shadow-md flex items-center gap-1.5 text-[10px] font-black uppercase"><SafeUsers size={14} /><span>Search Guest</span></button>
+            <button type="button" onClick={() => { triggerBeep('tap'); setIsCustomerModalOpen(true); searchDbCustomers(''); }} className="ml-auto p-2 md:p-2.5 bg-neutral-200 dark:bg-neutral-950 hover:bg-neutral-300 dark:hover:bg-neutral-900 border border-neutral-300 dark:border-white/5 text-yellow-600 dark:text-yellow-400 rounded-xl transition-all shadow-md flex items-center gap-1 text-[10px] font-black uppercase"><SafeUsers size={14} /><span>Search Guest</span></button>
           )}
         </div>
 
@@ -1023,6 +1053,7 @@ export default function BbCafePos() {
               ) : filteredMenu.length === 0 ? (
                 <p className="text-center text-gray-500 text-xs py-10 uppercase tracking-widest font-black">No matching items found</p>
               ) : (
+                /* RESPONSIVE 2-COLUMN ON MOBILE, 4-COLUMN ON DESKTOP GRID */
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 overflow-y-auto flex-1 pr-1 pb-16">
                   {filteredMenu.map((item) => {
                     const isAvailable = item.isAvailable !== false;
@@ -1117,7 +1148,7 @@ export default function BbCafePos() {
               </div>
             </div>
             <div className="border-b border-neutral-200 dark:border-white/5 pb-4 space-y-3"><p className="text-xs font-bold text-neutral-800 dark:text-white uppercase tracking-wider">B. GST Configuration Setup:</p>
-              <div className="flex items-center justify-between max-w-sm"><span className="text-[11px] font-semibold text-neutral-600 dark:text-gray-300">Enable GST calculations on all bills:</span><button type="button" onClick={() => { triggerBeep('tap'); const next = !gstEnabled; setGstEnabled(next); localStorage.setItem("bb_pos_gst_enabled", String(next)); }} className="text-orange-500">{gstEnabled ? <SafeToggleRight size={32} /> : <SafeToggleLeft size={32} className="text-neutral-500" />}</button></div>
+              <div className="flex items-center justify-between max-sm"><span className="text-[11px] font-semibold text-neutral-600 dark:text-gray-300">Enable GST calculations on all bills:</span><button type="button" onClick={() => { triggerBeep('tap'); const next = !gstEnabled; setGstEnabled(next); localStorage.setItem("bb_pos_gst_enabled", String(next)); }} className="text-orange-500">{gstEnabled ? <SafeToggleRight size={32} /> : <SafeToggleLeft size={32} className="text-neutral-500" />}</button></div>
               {gstEnabled && (
                 <div className="space-y-1 max-w-sm"><label className="text-[9px] font-black uppercase text-gray-500">GST Rate (%) Percentage</label><input type="number" placeholder="e.g. 5" value={gstRate} onChange={(e) => { const r = Math.max(0, Number(e.target.value)); setGstRate(r); localStorage.setItem("bb_pos_gst_rate", String(r)); }} className="w-full bg-neutral-100 dark:bg-neutral-900 border border-neutral-200 dark:border-white/5 p-3 rounded-xl text-xs outline-none focus:border-orange-500 font-mono font-black" /></div>
               )}
