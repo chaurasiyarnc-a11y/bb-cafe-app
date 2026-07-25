@@ -8,8 +8,7 @@ import {
 import { 
   ShoppingBag, Plus, Minus, Search, X, User, Star, Gift, 
   Loader2, Clock, Trash2, Printer, Check, Play, Settings, 
-  Database, RefreshCw, Layers, Phone, MapPin, LayoutGrid, List,
-  Menu 
+  Database, RefreshCw, Layers, Phone, MapPin, LayoutGrid, List
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
@@ -22,7 +21,19 @@ interface PosCartItem {
   note?: string;
 }
 
-// Size-based pricing for Pizza toppings/Addons
+interface DeliveryArea {
+  name: string;
+  fee: number;
+  minFree: number;
+  range: string;
+}
+
+const DELIVERY_AREAS: DeliveryArea[] = [
+  { name: "Mohandra Town", fee: 20, minFree: 99, range: "0-2 KM" },
+  { name: "Within 5 KM (Bum Bum Cafe से 5km के दायरे में)", fee: 50, minFree: 499, range: "2-5 KM" },
+  { name: "Within 12 KM (12km के दायरे में)", fee: 99, minFree: 999, range: "5-12 KM" }
+];
+
 const PIZZA_ADDONS: { [size: string]: { [addon: string]: number } } = {
   "small": { "Veg Add-on": 10, "Paneer": 20, "Black Olives": 20, "Jalapeno": 20, "Extra Cheese": 20, "Mushroom": 20 },
   "medium": { "Veg Add-on": 10, "Paneer": 30, "Black Olives": 30, "Jalapeno": 30, "Extra Cheese": 30, "Mushroom": 30 },
@@ -54,19 +65,26 @@ export default function BbCafePos() {
   const [customerPoints, setCustomerPoints] = useState<number>(0);
   const [pointsToRedeem, setPointsToRedeem] = useState<number>(0);
   const [customDiscount, setCustomDiscount] = useState<number>(0);
-  const [fulfillmentType, setFulfillmentType] = useState<'dine_in' | 'takeaway'>('dine_in');
+  const [fulfillmentType, setFulfillmentType] = useState<'delivery' | 'pickup' | 'table'>('table');
+  const [selectedArea, setSelectedArea] = useState<DeliveryArea>(DELIVERY_AREAS[0]);
+  const [address, setAddress] = useState<string>('');
   const [tableNumber, setTableNumber] = useState<string>('Table 1');
-  const [chefInstructions, setChefInstructions] = useState<string>('');
   const [isSubmittingOrder, setIsSubmittingOrder] = useState<boolean>(false);
+  
+  // POS Specific Add-ons
+  const [ketchupAddon, setKetchupAddon] = useState<boolean>(false);
+  const [oreganoAddon, setOreganoAddon] = useState<boolean>(false);
+  const [chiliFlakesAddon, setChiliFlakesAddon] = useState<boolean>(false);
+  const [noCutlery, setNoCutlery] = useState<boolean>(false);
+  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'upi' | 'card'>('cash');
 
-  // Dynamic Variation Selection Pop-up States
-  const [selectedProduct, setSelectedProduct] = useState<any>(null); // Customization Modal Trigger
+  // Dynamic Variation Selection States
+  const [selectedProduct, setSelectedProduct] = useState<any>(null); 
   const [normalPizzaSize, setNormalPizzaSize] = useState<string>("");
   const [normalPizzaPrice, setNormalPizzaPrice] = useState<number>(0);
   const [normalPizzaAddons, setNormalPizzaAddons] = useState<{ [addon: string]: boolean }>({});
   const [customizerChefNote, setCustomizerChefNote] = useState<string>("");
 
-  // Sound effects
   const triggerBeep = (type: 'tap' | 'success') => {
     try {
       const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -89,7 +107,7 @@ export default function BbCafePos() {
     } catch (e) {}
   };
 
-  // Real-time listener for orders pipeline
+  // Live Orders Listener
   useEffect(() => {
     const q = query(collection(db, "orders"), orderBy("timestamp", "desc"), limit(60));
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -101,7 +119,7 @@ export default function BbCafePos() {
     return () => unsubscribe();
   }, []);
 
-  // Load menu items
+  // Fetch Menu Products
   useEffect(() => {
     const fetchDbData = async () => {
       setLoading(true);
@@ -177,7 +195,6 @@ export default function BbCafePos() {
     toast.success(`${item.name} added!`, { duration: 800 });
   };
 
-  // Adding Customized Item with specific variants and add-ons
   const handleAddCustomizedItemToCart = () => {
     triggerBeep('tap');
     if (!normalPizzaSize) {
@@ -188,7 +205,6 @@ export default function BbCafePos() {
     let finalPrice = normalPizzaPrice;
     const selectedAddons: string[] = [];
 
-    // Calculate add-on cost
     Object.entries(normalPizzaAddons).forEach(([addon, isSelected]) => {
       if (isSelected) {
         const cost = PIZZA_ADDONS[normalPizzaSize.toLowerCase()]?.[addon] || 0;
@@ -220,7 +236,6 @@ export default function BbCafePos() {
       }];
     });
 
-    // Reset popup customizer
     setSelectedProduct(null);
     setNormalPizzaSize("");
     setNormalPizzaPrice(0);
@@ -243,98 +258,48 @@ export default function BbCafePos() {
     );
   };
 
-  const getSubtotal = () => cart.reduce((acc, i) => acc + (i.price * i.quantity), 0);
-  const getLoyaltyDiscount = () => Math.min(pointsToRedeem, getSubtotal());
-  const getTotalBill = () => Math.max(0, getSubtotal() - getLoyaltyDiscount() - customDiscount);
-
-  const handlePrintReceipt = (order: any) => {
-    triggerBeep('tap');
-    const printWindow = window.open('', '_blank', 'width=320,height=600');
-    if (!printWindow) return;
-
-    const formattedDate = order.timestamp?.toDate ? order.timestamp.toDate().toLocaleString('en-IN') : new Date(order.timestamp).toLocaleString();
-    const itemsRows = order.items.map((it: any) => `
-      <tr>
-        <td style="font-size: 11px; padding: 4px 0; max-width: 140px; word-break: break-word;">
-          ${it.name}
-          ${it.note ? `<br/><span style="font-size: 9px; color: #555; font-style: italic;">(${it.note})</span>` : ''}
-        </td>
-        <td style="font-size: 11px; text-align: center; padding: 4px 0; vertical-align: top;">x${it.quantity}</td>
-        <td style="font-size: 11px; text-align: right; padding: 4px 0; vertical-align: top;">₹${it.price * it.quantity}</td>
-      </tr>
-    `).join('');
-
-    printWindow.document.write(`
-      <html>
-        <head>
-          <title>Bill #${order.billNumber}</title>
-          <style>
-            @page { margin: 0; }
-            body { 
-              font-family: 'Courier New', Courier, monospace; 
-              width: 270px; 
-              margin: 0; 
-              padding: 10px; 
-              color: #000;
-              background-color: #fff;
-            }
-            .center { text-align: center; }
-            .divider { border-top: 1px dashed #000; margin: 6px 0; }
-            table { width: 100%; border-collapse: collapse; }
-          </style>
-        </head>
-        <body onload="window.print(); window.close();">
-          <div class="center">
-            <h3 style="margin: 0 0 2px 0; font-size: 16px;">BUM BUM CAFE</h3>
-            <span style="font-size: 10px;">Mohandra, Panna (M.P.)</span>
-          </div>
-          <div class="divider"></div>
-          <div style="font-size: 10px; line-height: 1.3;">
-            <b>Bill No:</b> #${String(order.billNumber).padStart(4, '0')}<br/>
-            <b>Token No:</b> #${order.tokenNumber}<br/>
-            <b>Date:</b> ${formattedDate}<br/>
-            <b>Type:</b> ${order.fulfillmentType?.toUpperCase()} ${order.tableNumber ? `| Table: ${order.tableNumber}` : ''}<br/>
-            <b>Guest:</b> ${order.customerName || 'Walk-in Guest'}<br/>
-          </div>
-          <div class="divider"></div>
-          <table>
-            <thead>
-              <tr style="border-bottom: 1px dashed #000;">
-                <th style="font-size: 10px; text-align: left; padding-bottom: 4px;">Item</th>
-                <th style="font-size: 10px; text-align: center; padding-bottom: 4px;">Qty</th>
-                <th style="font-size: 10px; text-align: right; padding-bottom: 4px;">Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${itemsRows}
-            </tbody>
-          </table>
-          <div class="divider"></div>
-          <div style="font-size: 11px; line-height: 1.4;">
-            <div style="display: flex; justify-content: space-between;">
-              <span>Subtotal:</span>
-              <span>₹${order.subtotal}</span>
-            </div>
-            ${order.discount ? `
-            <div style="display: flex; justify-content: space-between; font-weight: bold;">
-              <span>Savings:</span>
-              <span>-₹${order.discount}</span>
-            </div>` : ''}
-            <div style="display: flex; justify-content: space-between; font-weight: bold; font-size: 13px; margin-top: 2px;">
-              <span>GRAND TOTAL:</span>
-              <span>₹${order.total}</span>
-            </div>
-          </div>
-          <div class="divider"></div>
-          <div class="center" style="font-size: 9px; margin-top: 6px;">
-            <b>Thank you! Visit Again! 🍕🍔</b>
-          </div>
-        </body>
-      </html>
-    `);
-    printWindow.document.close();
+  const handleUpdateCartItemNote = (itemId: string, noteValue: string) => {
+    setCart(prev => 
+      prev.map(item => item.id === itemId ? { ...item, note: noteValue } : item)
+    );
   };
 
+  // Pricing Helpers (Matches past structures perfectly)
+  const getCartSubtotal = () => cart.reduce((acc, i) => acc + (i.price * i.quantity), 0);
+  
+  const getCartAddonsPrice = () => {
+    let total = 0;
+    if (ketchupAddon) total += 10;
+    if (oreganoAddon) total += 10;
+    if (chiliFlakesAddon) total += 10;
+    return total;
+  };
+
+  const getDeliveryCharge = () => {
+    if (fulfillmentType === "pickup" || fulfillmentType === "table") return 0;
+    const baseSub = getCartSubtotal();
+    if (baseSub === 0) return 0;
+    return baseSub >= selectedArea.minFree ? 0 : selectedArea.fee;
+  };
+
+  const getLoyaltyDiscount = () => Math.min(pointsToRedeem, getCartSubtotal());
+  
+  const getTotalBillPrice = () => {
+    const subtotal = getCartSubtotal();
+    const addPrice = getCartAddonsPrice();
+    const delivery = getDeliveryCharge();
+    const discountCombined = getLoyaltyDiscount() + customDiscount;
+    return Math.max(0, subtotal + addPrice - discountCombined) + delivery;
+  };
+
+  const getFreeDeliveryProgressPercent = () => {
+    const subtotal = getCartSubtotal();
+    const limit = selectedArea.minFree;
+    if (subtotal >= limit) return 100;
+    return (subtotal / limit) * 100;
+  };
+
+  // Checkout submission to Firestore & print trigger
   const handlePlaceOrder = async (e: React.FormEvent) => {
     e.preventDefault();
     if (cart.length === 0) {
@@ -344,9 +309,11 @@ export default function BbCafePos() {
     if (isSubmittingOrder) return;
     setIsSubmittingOrder(true);
 
-    const subtotal = getSubtotal();
+    const subtotal = getCartSubtotal();
+    const addOnsCost = getCartAddonsPrice();
+    const deliveryCharge = getDeliveryCharge();
     const discountCombined = getLoyaltyDiscount() + customDiscount;
-    const finalTotal = getTotalBill();
+    const finalTotal = getTotalBillPrice();
 
     const tokenNumber = Math.floor(1000 + Math.random() * 9000);
     const deliveryPin = Math.floor(1000 + Math.random() * 9000);
@@ -373,15 +340,19 @@ export default function BbCafePos() {
         customerName: customerName.trim() || "Walk-in Guest",
         customerPhone: customerPhone ? `+91${customerPhone}` : "",
         items: cart,
-        subtotal,
+        subtotal: subtotal + addOnsCost,
         discount: discountCombined,
         total: finalTotal,
         timestamp: new Date(),
         status: 'completed',
         fulfillmentType: fulfillmentType,
-        tableNumber: fulfillmentType === 'dine_in' ? tableNumber : '',
-        paymentMethod: 'cash',
-        chefInstructions,
+        deliveryArea: fulfillmentType === "delivery" ? selectedArea.name : "",
+        tableNumber: fulfillmentType === 'table' ? tableNumber : '',
+        paymentMethod: paymentMethod, 
+        ketchupAddon,
+        oreganoAddon,
+        chiliFlakesAddon,
+        noCutlery,
         source: 'POS'
       };
 
@@ -430,18 +401,23 @@ export default function BbCafePos() {
       }
 
       triggerBeep('success');
-      toast.success(`Bill #${billNumber} successfully processed!`);
+      toast.success(`Bill #${billNumber} processed!`);
       
       handlePrintReceipt(orderObj);
 
+      // Reset billing states
       setCart([]);
       setCustomerPhone('');
       setCustomerName('');
       setCustomerPoints(0);
       setPointsToRedeem(0);
       setCustomDiscount(0);
-      setChefInstructions('');
       setIsCartOpen(false); 
+      setPaymentMethod('cash');
+      setKetchupAddon(false);
+      setOreganoAddon(false);
+      setChiliFlakesAddon(false);
+      setNoCutlery(false);
       
     } catch (err) {
       console.error(err);
@@ -474,7 +450,6 @@ export default function BbCafePos() {
     });
   }, [products, selectedCategory, searchQuery]);
 
-  // Pricing helper for variants and range presentation
   const getDisplayPrice = (item: any) => {
     if (item?.variants && typeof item.variants === 'object') {
       const prices = Object.values(item.variants).map(Number).filter(n => !isNaN(n));
@@ -485,6 +460,38 @@ export default function BbCafePos() {
       }
     }
     return `₹${item?.price || 0}`;
+  };
+
+  // Verification if addons are showable (Matches the pasted logic)
+  const showAddonsSection = useMemo(() => {
+    const eligibleKeywords = ['pizza', 'sandwich', 'burger', 'momo', 'fries', 'chips', 'finger'];
+    return cart.some((item: any) => {
+      const nameLower = (item.name || '').toLowerCase();
+      return eligibleKeywords.some(keyword => nameLower.includes(keyword));
+    });
+  }, [cart]);
+
+  const handleDetectLocation = () => {
+    triggerBeep('tap');
+    if (typeof window === "undefined" || !navigator.geolocation) {
+      toast.error("Geolocation is not supported by your device.");
+      return;
+    }
+
+    const toastId = toast.loading("Detecting live location...");
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        setAddress(`GPS Location: https://www.google.com/maps?q=${latitude.toFixed(6)},${longitude.toFixed(6)}`);
+        toast.dismiss(toastId);
+        toast.success("Location successfully detected!");
+      },
+      () => {
+        toast.dismiss(toastId);
+        toast.error("Unable to retrieve location.");
+      },
+      { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+    );
   };
 
   return (
@@ -513,18 +520,16 @@ export default function BbCafePos() {
               className="fixed left-0 top-0 bottom-0 w-64 bg-neutral-950 border-r border-white/5 flex flex-col justify-between p-4 shadow-2xl z-50"
             >
               <div className="space-y-6">
-                {/* Header with Close option */}
                 <div className="flex items-center justify-between px-1 py-1 border-b border-white/5 pb-4 gap-2">
                   <div className="flex items-center gap-2">
                     <Database className="text-orange-500 animate-pulse" size={18} />
                     <h1 className="text-xs font-black tracking-wider uppercase text-yellow-300">
-                      Bum Bum POS <span className="text-[8px] text-gray-400 lowercase font-mono">v1.11</span>
+                      Bum Bum POS <span className="text-[8px] text-gray-400 lowercase font-mono">v1.12</span>
                     </h1>
                   </div>
                   <button 
                     onClick={() => { triggerBeep('tap'); setIsSidebarOpen(false); }}
                     className="p-1.5 bg-neutral-900 border border-white/5 text-gray-400 hover:text-white rounded-lg"
-                    title="Close Sidebar"
                   >
                     <X size={14} />
                   </button>
@@ -594,7 +599,7 @@ export default function BbCafePos() {
         )}
       </AnimatePresence>
 
-      {/* 2. MAIN WORKSPACE CONTENT AREA (Always takes full screen width when sidebar is closed) */}
+      {/* 2. MAIN WORKSPACE CONTENT AREA */}
       <main className="flex-1 p-5 overflow-hidden flex flex-col relative h-screen">
         
         {/* GLOBAL HEADER BAR WITH SIDEBAR MENU TOGGLE */}
@@ -603,7 +608,6 @@ export default function BbCafePos() {
             type="button"
             onClick={() => { triggerBeep('tap'); setIsSidebarOpen(true); }}
             className="p-2.5 bg-neutral-950 hover:bg-neutral-900 border border-white/5 text-orange-500 hover:text-orange-400 rounded-xl transition-all shadow-md flex-shrink-0"
-            title="Open Menu Sidebar"
           >
             <Menu size={16} />
           </button>
@@ -636,7 +640,7 @@ export default function BbCafePos() {
                           <p className="text-[9px] text-gray-400 font-mono mt-0.5">Token: #{order.tokenNumber}</p>
                         </div>
                         <span className="bg-orange-500/10 border border-orange-500/20 text-orange-400 text-[8px] font-black uppercase tracking-wider px-2 py-0.5 rounded">
-                          {order.fulfillmentType || 'DINE_IN'}
+                          {order.fulfillmentType || 'table'}
                         </span>
                       </div>
 
@@ -644,11 +648,6 @@ export default function BbCafePos() {
                         <p className="text-white truncate font-black">👤 {order.customerName}</p>
                         {order.customerPhone && <p className="font-mono text-gray-400">📞 {order.customerPhone}</p>}
                         {order.address && <p className="text-gray-400 line-clamp-1">📍 {order.address}</p>}
-                        {order.chefInstructions && (
-                          <p className="text-yellow-400/90 italic bg-yellow-500/5 p-1.5 rounded border border-yellow-500/10 mt-1">
-                            ⚠️ Instructions: {order.chefInstructions}
-                          </p>
-                        )}
                       </div>
 
                       <div className="space-y-1.5 border-t border-dashed border-white/5 pt-2.5 mb-4">
@@ -766,7 +765,7 @@ export default function BbCafePos() {
                 <p className="text-center text-gray-500 text-xs py-10 uppercase tracking-widest font-black">No matching items found</p>
               ) : viewMode === 'grid' ? (
                 
-                /* EXTREMELY HIGH-DENSITY 4-COLUMN GRID LAYOUT WITH VARIATIONS SUPPORT */
+                /* EXTREMELY HIGH-DENSITY 4-COLUMN GRID LAYOUT */
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 overflow-y-auto flex-1 pr-1 pb-16">
                   {filteredMenu.map((item) => {
                     const isAvailable = item.isAvailable !== false;
@@ -794,7 +793,7 @@ export default function BbCafePos() {
                 </div>
               ) : (
                 
-                /* DENSE LIST VIEW WITH VARIATIONS SUPPORT */
+                /* DENSE LIST VIEW */
                 <div className="flex flex-col gap-2 overflow-y-auto flex-1 pr-1 pb-16">
                   {filteredMenu.map((item) => {
                     const isAvailable = item.isAvailable !== false;
@@ -843,13 +842,13 @@ export default function BbCafePos() {
                   </div>
                 </div>
                 <div className="flex items-center gap-1 text-sm font-black font-mono">
-                  <span>To Pay: ₹{getTotalBill()}</span>
+                  <span>To Pay: ₹{getTotalBillPrice()}</span>
                   <span>➔</span>
                 </div>
               </motion.button>
             )}
 
-            {/* ACTIVE ORDER DESK DRAWER */}
+            {/* UPGRADED POS CART DRAWER (MATCHES USER PASTED STYLE EXACTLY) */}
             <AnimatePresence>
               {isCartOpen && (
                 <>
@@ -858,46 +857,80 @@ export default function BbCafePos() {
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
                     onClick={() => setIsCartOpen(false)}
-                    className="fixed inset-0 bg-black/60 z-40 backdrop-blur-xs cursor-pointer"
+                    className="fixed inset-0 bg-black/75 backdrop-blur-sm z-[110] flex items-end font-sans"
                   />
 
                   <motion.div
-                    initial={{ x: '100%' }}
-                    animate={{ x: 0 }}
-                    exit={{ x: '100%' }}
-                    transition={{ type: 'spring', damping: 25, stiffness: 220 }}
-                    className="fixed right-0 top-0 bottom-0 w-full sm:w-[420px] bg-neutral-950 border-l border-white/10 p-5 z-50 flex flex-col justify-between shadow-2xl overflow-y-auto"
+                    initial={{ y: "100%" }} 
+                    animate={{ y: 0 }} 
+                    exit={{ y: "100%" }} 
+                    transition={{ type: "spring", damping: 25, stiffness: 220 }}
+                    className="fixed right-0 bottom-0 top-0 w-full sm:w-[460px] bg-[#0b0c10] border-l border-white/10 p-5 z-50 flex flex-col justify-between shadow-2xl overflow-y-auto pb-32 scrollbar-thin"
                   >
                     <div>
-                      <div className="flex justify-between items-center mb-4 border-b border-white/5 pb-3">
-                        <div className="flex items-center gap-2">
-                          <ShoppingBag className="text-orange-500" size={16} />
-                          <h3 className="text-xs font-black uppercase tracking-widest text-orange-500">Active Order Desk</h3>
+                      {/* Live Bill Sticky Progress Header */}
+                      <div className="sticky top-0 z-30 bg-[#0b0c10] pb-3 border-b border-white/5 space-y-2 mb-4">
+                        {fulfillmentType === "delivery" && (
+                          <div className="bg-orange-500/10 border border-orange-500/20 rounded-xl p-2.5 space-y-1.5 text-[10px] font-sans font-bold">
+                            <div className="flex justify-between items-center font-black uppercase text-orange-400">
+                              <span>🚚 Free Delivery Target:</span>
+                              <span>{getCartSubtotal() >= selectedArea.minFree ? "Achieved! 🎉" : `Need ₹${selectedArea.minFree - getCartSubtotal()} more`}</span>
+                            </div>
+                            <div className="w-full bg-white/10 h-1.5 rounded-full overflow-hidden">
+                              <div className="bg-orange-500 h-full transition-all duration-300" style={{ width: `${getFreeDeliveryProgressPercent()}%` }} />
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="bg-neutral-950 p-3 rounded-2xl border border-white/5 flex justify-between items-center font-mono font-bold">
+                          <span className="text-[10px] font-black uppercase text-gray-400 font-sans">LIVE BILL TOTAL:</span>
+                          <span className="text-sm font-black text-yellow-400 font-mono">₹{getTotalBillPrice()}</span>
                         </div>
-                        <button 
-                          type="button" 
-                          onClick={() => { triggerBeep('tap'); setIsCartOpen(false); }}
-                          className="p-1.5 bg-neutral-900 border border-white/5 text-gray-400 hover:text-white rounded-lg"
-                        >
-                          <X size={14} />
-                        </button>
+                      </div>
+
+                      {/* Header with Title and Clear Cart Option */}
+                      <div className="flex justify-between items-center mb-6">
+                        <h2 className="text-2xl font-black text-white font-mono font-bold">Your POS Cart</h2>
+                        <div className="flex items-center gap-2">
+                          {cart.length > 0 && (
+                            <button 
+                              type="button" 
+                              onClick={() => { triggerBeep('tap'); setCart([]); }}
+                              className="p-1.5 text-red-500 hover:bg-red-500/10 rounded-lg text-[9px] font-bold uppercase tracking-wider flex items-center gap-1 transition-all"
+                            >
+                              <Trash2 size={12} /> Clear Cart
+                            </button>
+                          )}
+                          <button onClick={() => { triggerBeep('tap'); setIsCartOpen(false); }} className="p-2.5 bg-white/5 text-white rounded-full hover:bg-white/10 transition-all">
+                            <X size={20} />
+                          </button>
+                        </div>
                       </div>
                       
-                      <div className="space-y-2 max-h-[180px] overflow-y-auto mb-4 pr-1">
+                      {/* 1. CART ITEMS LIST */}
+                      <div className="space-y-3.5 mb-4">
                         {cart.map((item) => (
-                          <div key={item.id} className="flex flex-col border-b border-white/5 pb-2 mb-2">
-                            <div className="flex justify-between items-center text-xs text-gray-300 font-semibold">
-                              <span className="flex-1 truncate pr-2">{item.name}</span>
-                              <div className="flex items-center gap-2 bg-neutral-900 border border-white/5 px-2 py-0.5 rounded-lg mr-4">
-                                <button type="button" onClick={() => handleUpdateCartQuantity(item.id, -1)} className="text-gray-400 hover:text-white"><Minus size={10} /></button>
-                                <span className="font-bold text-white min-w-[12px] text-center font-mono">{item.quantity}</span>
-                                <button type="button" onClick={() => handleUpdateCartQuantity(item.id, 1)} className="text-gray-400 hover:text-white"><Plus size={10} /></button>
+                          <div key={item.id} className="flex flex-col bg-white/[0.02] p-4 rounded-2xl border border-white/5 shadow-sm transition-colors duration-200 gap-1.5 font-sans font-bold">
+                            <div className="flex justify-between items-center">
+                              <div className="min-w-0 pr-3 flex-1">
+                                <h4 className="font-bold text-xs text-gray-100 truncate">{item.name}</h4>
+                                <p className="text-orange-500 font-black mt-1 text-[11px] font-mono">₹{item.price}</p>
                               </div>
-                              <span className="font-mono text-gray-100 font-black">₹{item.price * item.quantity}</span>
+                              <div className="flex items-center gap-2 bg-black/40 px-2 py-1 rounded-xl border border-white/10 flex-shrink-0">
+                                <button type="button" onClick={() => handleUpdateCartQuantity(item.id, -1)} className="w-6 h-6 flex items-center justify-center bg-red-500/10 text-red-500 rounded text-sm font-black">-</button>
+                                <span className="font-black text-xs px-1 text-white font-mono">{item.quantity}</span>
+                                <button type="button" onClick={() => handleUpdateCartQuantity(item.id, 1)} className="w-6 h-6 flex items-center justify-center bg-green-500/10 text-green-500 rounded text-sm font-black">+</button>
+                              </div>
                             </div>
-                            {item.note && (
-                              <p className="text-[10px] text-yellow-300 font-bold italic mt-1 bg-yellow-400/5 px-2 py-1 rounded border border-yellow-500/10 max-w-xs">{item.note}</p>
-                            )}
+                            
+                            {/* Inline instructions note */}
+                            <input 
+                              type="text"
+                              placeholder="Instructions for KOT..."
+                              value={item.note || ''}
+                              onChange={(e) => handleUpdateCartItemNote(item.id, e.target.value)}
+                              className="w-full bg-black/40 border border-white/10 text-[10px] p-2 rounded-xl outline-none focus:border-orange-500/40 text-yellow-300 font-bold"
+                            />
                           </div>
                         ))}
                         {cart.length === 0 && (
@@ -905,128 +938,290 @@ export default function BbCafePos() {
                         )}
                       </div>
 
-                      <div className="border-t border-white/5 pt-3.5 mb-4">
-                        <p className="text-[8px] font-black uppercase text-gray-400 tracking-wider mb-2">Member Rewards Ledger</p>
+                      {/* 2. INLINE ADD-ONS FOR CORRESPONDING ITEMS */}
+                      {showAddonsSection && (
+                        <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-4 space-y-2.5 transition-colors duration-200 mt-4 font-sans font-bold">
+                          <p className="text-[9px] font-black uppercase text-gray-400">Add Add-ons to order:</p>
+                          <div className="grid grid-cols-3 gap-2">
+                            <button type="button" onClick={() => { triggerBeep('tap'); setKetchupAddon(!ketchupAddon); }} className={`p-2 rounded-xl border text-[9.5px] font-black ${ketchupAddon ? 'border-red-500 bg-red-500/5 text-red-600' : 'border-white/5 bg-transparent text-gray-300'}`}>
+                              Ketchup (+₹10)
+                            </button>
+                            <button type="button" onClick={() => { triggerBeep('tap'); setOreganoAddon(!oreganoAddon); }} className={`p-2 rounded-xl border text-[9.5px] font-black ${oreganoAddon ? 'border-yellow-500 bg-yellow-500/5 text-yellow-600' : 'border-white/5 bg-transparent text-gray-300'}`}>
+                              Oregano (+₹10)
+                            </button>
+                            <button type="button" onClick={() => { triggerBeep('tap'); setChiliFlakesAddon(!chiliFlakesAddon); }} className={`p-2 rounded-xl border text-[9.5px] font-black ${chiliFlakesAddon ? 'border-orange-500 bg-orange-500/5 text-orange-600' : 'border-white/5 bg-transparent text-gray-300'}`}>
+                              Chili Flakes (+₹10)
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* 3. POS ORDER TYPE SELECTION */}
+                      <div className="bg-white/[0.02] p-4 rounded-2xl border border-white/5 space-y-2.5 transition-colors duration-200 mt-4 font-sans font-bold">
+                        <label className="text-[10px] font-black uppercase text-gray-400">Select Order Mode:</label>
+                        <div className="grid grid-cols-3 gap-2">
+                          <button
+                            type="button"
+                            onClick={() => { triggerBeep('tap'); setFulfillmentType("delivery"); }}
+                            className={`py-3 px-1 rounded-xl border flex flex-col items-center justify-center gap-1.5 transition-all text-center ${fulfillmentType === "delivery" ? 'border-orange-500 bg-orange-500/10 text-orange-600 font-black shadow-sm' : 'border-white/5 text-gray-300 font-semibold'}`}
+                          >
+                            <span className="text-base">🛵</span>
+                            <span className="text-[9px] font-black">Home Delivery</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => { triggerBeep('tap'); setFulfillmentType("pickup"); }}
+                            className={`py-3 px-1 rounded-xl border flex flex-col items-center justify-center gap-1.5 transition-all text-center ${fulfillmentType === "pickup" ? 'border-orange-500 bg-orange-500/10 text-orange-600 font-black shadow-sm' : 'border-white/5 text-gray-300'}`}
+                          >
+                            <span className="text-base">🛍️</span>
+                            <span className="text-[9px] font-black">Self-Pickup</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => { triggerBeep('tap'); setFulfillmentType("table"); }}
+                            className={`py-3 px-1 rounded-xl border flex flex-col items-center justify-center gap-1.5 transition-all text-center ${fulfillmentType === "table" ? 'border-orange-500 bg-orange-500/10 text-orange-600 font-black shadow-sm' : 'border-white/5 text-gray-300'}`}
+                          >
+                            <span className="text-base">🍽️</span>
+                            <span className="text-[9px] font-black">Dine-In (Table)</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* 4. CONDITIONAL MODE INPUTS */}
+                      {fulfillmentType === "delivery" && (
+                        <div className="space-y-4 mt-4 font-sans font-bold">
+                          <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-4 space-y-2.5 transition-colors duration-200">
+                            <label className="text-[9px] font-black uppercase text-gray-400">Select Delivery Zone (KM):</label>
+                            <div className="grid grid-cols-2 gap-2">
+                              {DELIVERY_AREAS.map((area) => {
+                                const isSelected = selectedArea.name === area.name;
+                                return (
+                                  <button
+                                    type="button"
+                                    key={area.name}
+                                    onClick={() => { triggerBeep('tap'); setSelectedArea(area); }}
+                                    className={`p-3 rounded-xl border text-left flex flex-col justify-between transition-all duration-200 active:scale-95 ${
+                                      isSelected 
+                                        ? 'border-orange-500 bg-orange-500/10 text-orange-400 shadow-md font-black' 
+                                        : 'border-white/5 bg-white/[0.01] text-neutral-300 hover:border-white/10'
+                                    }`}
+                                  >
+                                    <span className="text-[9px] font-black leading-tight uppercase truncate">{area.name.replace("Mohandra ", "")}</span>
+                                    <div className="flex justify-between items-center w-full mt-2 font-mono">
+                                      <span className="text-[8px] font-black text-neutral-300 font-bold">Fee: ₹{area.fee}</span>
+                                      <span className="text-[8px] font-black bg-white/5 px-1.5 py-0.5 rounded text-yellow-400">Min: ₹{area.minFree}</span>
+                                    </div>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+
+                          <div className="bg-white/[0.02] p-4 rounded-2xl border border-white/5 space-y-2 transition-colors duration-200">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-1.5 text-orange-500"><MapPin size={14}/><h3 className="font-black uppercase text-[10px]">Delivery Address</h3></div>
+                              <button type="button" onClick={handleDetectLocation} className="text-[8px] bg-green-600 hover:bg-green-700 text-white font-black px-2 py-1 rounded flex items-center gap-1 shadow-sm uppercase">📍 Live GPS Location</button>
+                            </div>
+                            <textarea placeholder="Ghar ka address, Landmark ke saath..." value={address} onChange={(e) => setAddress(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs font-semibold text-white outline-none resize-none h-16" />
+                          </div>
+                        </div>
+                      )}
+
+                      {fulfillmentType === "table" && (
+                        <div className="mt-3 p-3 bg-neutral-900 rounded-xl border border-white/5 space-y-3 font-sans transition-all duration-300">
+                          <p className="text-[10px] font-black uppercase text-orange-400">🪑 Choose Dine-In Table:</p>
+                          <div className="space-y-1.5">
+                            <span className="text-[8px] font-black text-gray-400 uppercase tracking-wider">For 2 People (3 Tables):</span>
+                            <div className="grid grid-cols-3 gap-2">
+                              {["Table 1", "Table 2", "Table 3"].map((t) => {
+                                const isSelected = tableNumber === t;
+                                return (
+                                  <button
+                                    key={t}
+                                    type="button"
+                                    onClick={() => { triggerBeep('tap'); setTableNumber(t); }}
+                                    className={`p-2.5 rounded-lg border text-[10px] font-black text-center transition-all ${
+                                      isSelected 
+                                        ? 'border-orange-500 bg-orange-500/15 text-orange-400 shadow-sm font-black' 
+                                        : 'border-white/10 bg-white/5 text-neutral-300'
+                                    }`}
+                                  >
+                                    <span className="block">{t}</span>
+                                    <span className="text-[7.5px] text-gray-400 font-normal">👥 2 seats</span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                          <div className="space-y-1.5 pt-1">
+                            <span className="text-[8px] font-black text-gray-400 uppercase tracking-wider">For 4 People (3 Tables):</span>
+                            <div className="grid grid-cols-3 gap-2">
+                              {["Table 4", "Table 5", "Table 6"].map((t) => {
+                                const isSelected = tableNumber === t;
+                                return (
+                                  <button
+                                    key={t}
+                                    type="button"
+                                    onClick={() => { triggerBeep('tap'); setTableNumber(t); }}
+                                    className={`p-2.5 rounded-lg border text-[10px] font-black text-center transition-all ${
+                                      isSelected 
+                                        ? 'border-orange-500 bg-orange-500/15 text-orange-400 shadow-sm font-black' 
+                                        : 'border-white/10 bg-white/5 text-neutral-300'
+                                    }`}
+                                  >
+                                    <span className="block">{t}</span>
+                                    <span className="text-[7.5px] text-gray-400 font-normal">👥👥 4 seats</span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* 5. LOYALTY PROFILE VERIFICATION PANEL */}
+                      <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-4 space-y-2.5 mt-4 font-sans font-bold">
+                        <p className="text-[9px] font-black uppercase text-gray-400">Customer Loyalty Points Desk</p>
                         <div className="flex gap-2">
                           <input 
                             type="tel" 
                             maxLength={10}
-                            placeholder="Customer 10-digit phone..."
+                            placeholder="Guest 10-digit phone..."
                             value={customerPhone}
                             onChange={(e) => setCustomerPhone(e.target.value)}
-                            className="bg-neutral-900 border border-white/5 rounded-xl py-2 px-3 text-xs text-white outline-none focus:border-orange-500 font-bold flex-1"
+                            className="bg-[#050505] border border-white/5 rounded-xl py-2 px-3 text-xs text-white outline-none focus:border-orange-500 font-bold flex-1"
                           />
                           <button 
                             type="button"
                             onClick={handleCheckLoyalty}
-                            className="bg-orange-500 hover:bg-orange-600 text-black text-xs font-black px-3.5 rounded-xl transition-colors flex items-center gap-1 shrink-0"
+                            className="bg-orange-500 hover:bg-orange-600 text-black text-xs font-black px-4 py-2 rounded-xl transition-colors flex items-center gap-1 shrink-0"
                           >
                             <User size={12} /> Verify
                           </button>
                         </div>
-
                         {customerPhone && customerPoints > 0 && (
                           <div className="mt-2 bg-yellow-400/5 border border-yellow-400/20 p-2.5 rounded-xl flex items-center justify-between">
                             <div className="space-y-0.5">
-                              <p className="text-[9px] font-black text-yellow-300 uppercase">Loyalty Points Available</p>
-                              <p className="text-[10px] text-gray-300 font-semibold">{customerName || 'Walk-in Guest'} ({customerPoints} pts)</p>
+                              <p className="text-[9px] font-black text-yellow-300 uppercase">Points Balance</p>
+                              <p className="text-[10px] text-gray-300 font-semibold">{customerName || 'Loyal Guest'} ({customerPoints} pts)</p>
                             </div>
                             <input 
                               type="number"
-                              max={Math.min(customerPoints, getSubtotal())}
-                              placeholder="Points to redeem"
+                              max={Math.min(customerPoints, getCartSubtotal())}
+                              placeholder="Redeem"
                               value={pointsToRedeem || ''}
                               onChange={(e) => setPointsToRedeem(Math.max(0, Number(e.target.value)))}
-                              className="w-16 bg-neutral-900 border border-yellow-400/20 text-yellow-300 p-1 rounded text-center text-xs font-mono outline-none"
+                              className="w-16 bg-[#050505] border border-yellow-400/20 text-yellow-300 p-1.5 rounded text-center text-xs font-mono outline-none"
                             />
                           </div>
                         )}
                       </div>
 
-                      <div className="grid grid-cols-2 gap-2 mb-4">
-                        <div className="space-y-1">
-                          <label className="text-[8px] font-black uppercase text-gray-400">Custom Discount (₹)</label>
-                          <input 
-                            type="number" 
-                            placeholder="e.g. 50"
-                            value={customDiscount || ''}
-                            onChange={(e) => setCustomDiscount(Math.max(0, Number(e.target.value)))}
-                            className="w-full bg-neutral-900 border border-white/5 rounded-xl p-2 text-xs text-white outline-none focus:border-orange-500 font-mono"
-                          />
-                        </div>
-                        <div className="space-y-1">
-                          <label className="text-[8px] font-black uppercase text-gray-400">Order Fulfilment</label>
-                          <div className="flex bg-neutral-900 border border-white/5 p-1 rounded-xl">
-                            <button 
+                      {/* 6. DISCOUNTS ADJUSTMENT */}
+                      <div className="bg-white/[0.02] p-4 rounded-2xl border border-white/5 space-y-2.5 mt-4 font-sans font-bold">
+                        <label className="text-[10px] font-black uppercase text-gray-400">POS Custom Discount (₹)</label>
+                        <input 
+                          type="number" 
+                          placeholder="e.g. 50"
+                          value={customDiscount || ''}
+                          onChange={(e) => setCustomDiscount(Math.max(0, Number(e.target.value)))}
+                          className="w-full bg-[#050505] border border-white/5 rounded-xl p-2.5 text-xs text-white outline-none focus:border-orange-500 font-mono font-bold"
+                        />
+                        <div className="flex gap-1.5 flex-wrap">
+                          {[10, 20, 50, 100].map((val) => (
+                            <button
                               type="button"
-                              onClick={() => setFulfillmentType('dine_in')}
-                              className={`flex-1 text-[8px] font-black uppercase py-1.5 rounded ${fulfillmentType === 'dine_in' ? 'bg-orange-500 text-black' : 'text-gray-400'}`}
+                              key={val}
+                              onClick={() => { triggerBeep('tap'); setCustomDiscount(val); }}
+                              className="bg-neutral-900 text-[9px] text-orange-400 font-bold py-1 px-2.5 rounded-lg border border-white/5 hover:border-orange-500/30 transition-all font-mono"
                             >
-                              DINE-IN
+                              -₹{val}
                             </button>
-                            <button 
-                              type="button"
-                              onClick={() => setFulfillmentType('takeaway')}
-                              className={`flex-1 text-[8px] font-black uppercase py-1.5 rounded ${fulfillmentType === 'takeaway' ? 'bg-orange-500 text-black' : 'text-gray-400'}`}
-                            >
-                              TAKEAWAY
-                            </button>
-                          </div>
+                          ))}
                         </div>
                       </div>
 
-                      {fulfillmentType === 'dine_in' && (
-                        <div className="space-y-1 mb-4">
-                          <label className="text-[8px] font-black uppercase text-gray-400">Dine-In Table Selector</label>
-                          <select 
-                            value={tableNumber} 
-                            onChange={(e) => setTableNumber(e.target.value)}
-                            className="w-full bg-neutral-900 border border-white/5 rounded-xl p-2.5 text-xs text-white outline-none focus:border-orange-500 font-bold"
-                          >
-                            {Array.from({ length: 10 }).map((_, i) => (
-                              <option key={i} value={`Table ${i+1}`}>Table {i+1}</option>
-                            ))}
-                          </select>
+                      {/* 7. ECO FRIENDLY PACKING CONTROL */}
+                      <div className="bg-green-950/10 border border-green-500/10 rounded-2xl p-4 flex justify-between items-center transition-colors duration-200 mt-4 font-sans font-bold">
+                        <div className="space-y-0.5">
+                          <p className="text-[10px] font-black text-green-500 uppercase tracking-tight">Eco-Friendly Pack</p>
+                          <p className="text-[8px] text-gray-400">Skip single-use plastic spoon/tissue paper</p>
                         </div>
-                      )}
+                        <input type="checkbox" checked={noCutlery} onChange={() => { triggerBeep('tap'); setNoCutlery(!noCutlery); }} className="w-4 h-4 accent-green-600" />
+                      </div>
+                    </div>
 
-                      <div className="space-y-1 mb-4">
-                        <label className="text-[8px] font-black uppercase text-gray-400">Kitchen Instructions</label>
+                    {/* 8. POS BILL SUMMARY CARD */}
+                    <div className="bg-gradient-to-b from-orange-600 to-orange-700 p-5 rounded-2xl text-white mt-4 font-mono font-bold">
+                      <div className="flex justify-between mb-1.5 text-xs"><span>Subtotal</span> <span>₹{getCartSubtotal()}</span></div>
+                      {getCartAddonsPrice() > 0 && <div className="flex justify-between mb-1.5 text-xs"><span>Add-ons</span> <span>+₹{getCartAddonsPrice()}</span></div>}
+                      {(pointsToRedeem > 0 || customDiscount > 0) && (
+                        <div className="flex justify-between mb-1.5 text-xs text-green-200 font-bold"><span>Discount/Savings</span> <span>-₹{getLoyaltyDiscount() + customDiscount}</span></div>
+                      )}
+                      {fulfillmentType === "delivery" && <div className="flex justify-between mb-3 text-xs opacity-90"><span>Delivery Charge</span> <span>₹{getDeliveryCharge()}</span></div>}
+                      <div className="h-px bg-white/20 mb-3" />
+                      <div className="flex justify-between font-black text-xl font-mono"><span>Grand Total</span> <span>₹{getTotalBillPrice()}</span></div>
+                    </div>
+
+                    {/* 9. POS PAYMENT TYPE SELECTION & PRINT SUBMIT */}
+                    <div className="bg-white/[0.02] p-4 rounded-2xl border border-white/5 space-y-2.5 transition-colors duration-200 mt-4 font-sans font-bold">
+                      <label className="text-[9px] font-black uppercase text-gray-400">Select Counter Payment Method:</label>
+                      <div className="grid grid-cols-3 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => { triggerBeep('tap'); setPaymentMethod("cash"); }}
+                          className={`p-3 rounded-xl border flex flex-col items-center justify-center gap-1 transition-all ${paymentMethod === "cash" ? 'border-orange-500 bg-orange-500/10 text-orange-400 font-black shadow-sm' : 'border-white/5 text-gray-300'}`}
+                        >
+                          <span className="text-sm">💵</span>
+                          <span className="text-[9px] font-black">Cash </span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => { triggerBeep('tap'); setPaymentMethod("upi"); }}
+                          className={`p-3 rounded-xl border flex flex-col items-center justify-center gap-1 transition-all ${paymentMethod === "upi" ? 'border-orange-500 bg-orange-500/10 text-orange-400 font-black shadow-sm' : 'border-white/5 text-gray-300'}`}
+                        >
+                          <span className="text-sm">📱</span>
+                          <span className="text-[9px] font-black">UPI QR</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => { triggerBeep('tap'); setPaymentMethod("card"); }}
+                          className={`p-3 rounded-xl border flex flex-col items-center justify-center gap-1 transition-all ${paymentMethod === "card" ? 'border-orange-500 bg-orange-500/10 text-orange-400 font-black shadow-sm' : 'border-white/5 text-gray-300'}`}
+                        >
+                          <span className="text-sm">💳</span>
+                          <span className="text-[9px] font-black">Card</span>
+                        </button>
+                      </div>
+
+                      {/* Dynamic KOT Chef Instructions */}
+                      <div className="space-y-1.5 mt-2">
+                        <label className="text-[8px] font-black uppercase text-gray-400">Special Instructions for KOT</label>
                         <input 
                           type="text" 
                           placeholder="e.g. Extra Spicy, Soft Base..." 
                           value={chefInstructions}
                           onChange={(e) => setChefInstructions(e.target.value)}
-                          className="w-full bg-neutral-900 border border-white/5 rounded-xl p-2.5 text-xs text-white outline-none focus:border-orange-500 font-semibold"
+                          className="w-full bg-[#050505] border border-white/5 rounded-xl p-2.5 text-xs text-white outline-none focus:border-orange-500 font-semibold"
                         />
-                      </div>
-                    </div>
-
-                    <div className="border-t border-white/5 pt-3.5 space-y-3.5">
-                      <div className="space-y-1">
-                        <div className="flex justify-between text-[10px] text-gray-400 font-bold">
-                          <span>Subtotal:</span>
-                          <span>₹{getSubtotal()}</span>
-                        </div>
-                        {(pointsToRedeem > 0 || customDiscount > 0) && (
-                          <div className="flex justify-between text-[10px] text-yellow-300 font-bold">
-                            <span>Total Savings:</span>
-                            <span>-₹{getLoyaltyDiscount() + customDiscount}</span>
-                          </div>
-                        )}
-                        <div className="flex justify-between text-sm font-black text-green-400 font-mono">
-                          <span>Grand Total:</span>
-                          <span>₹{getTotalBill()}</span>
-                        </div>
                       </div>
 
                       <button 
-                        type="button"
-                        onClick={handlePlaceOrder}
-                        disabled={isSubmittingOrder || cart.length === 0}
-                        className="w-full bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white font-black py-4 rounded-2xl text-xs uppercase tracking-wider transition-all active:scale-95 shadow-lg flex items-center justify-center gap-2"
+                        onClick={handlePlaceOrder} 
+                        type="button" 
+                        disabled={isSubmittingOrder} 
+                        className="w-full bg-green-600 hover:bg-green-700 p-4 rounded-2xl font-black text-sm text-white flex items-center justify-center gap-2 shadow-lg transition-all active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed mt-4"
                       >
-                        {isSubmittingOrder ? <Loader2 className="animate-spin" size={14} /> : <span>Confirm & Print Bill 🚀</span>}
+                        {isSubmittingOrder ? (
+                          <span className="flex items-center gap-2">
+                            <Loader2 className="animate-spin" size={16} />
+                            Processing transaction... ⏳
+                          </span>
+                        ) : (
+                          <span className="flex items-center gap-2 justify-center">
+                            <Printer size={16} />
+                            <span>CONFIRM & PRINT BILL 🚀</span>
+                          </span>
+                        )}
                       </button>
                     </div>
 
@@ -1091,7 +1286,7 @@ export default function BbCafePos() {
 
       </main>
 
-      {/* 3. VARIATIONS AND PORTIONS SELECTION CUSTOMIZATION POPUP MODAL (Same as Online Page) */}
+      {/* 3. VARIATIONS AND PORTIONS SELECTION CUSTOMIZATION POPUP MODAL */}
       <AnimatePresence>
         {selectedProduct && (
           <div className="fixed inset-0 bg-black/90 z-[110] flex items-center justify-center p-4 backdrop-blur-md">
@@ -1101,7 +1296,6 @@ export default function BbCafePos() {
               exit={{ scale: 0.9, opacity: 0 }}
               className="bg-[#111] border border-white/10 w-full max-w-md p-6 rounded-3xl text-left space-y-4 shadow-2xl relative max-h-[90vh] overflow-y-auto scrollbar-thin"
             >
-              {/* Header */}
               <div className="flex justify-between items-center border-b border-white/5 pb-2">
                 <div>
                   <h3 className="text-sm font-black text-white">{selectedProduct.name}</h3>
@@ -1116,7 +1310,6 @@ export default function BbCafePos() {
                 </button>
               </div>
 
-              {/* Portion size selection (Dynamic Sizes based on product database) */}
               <div className="space-y-2">
                 <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">1. Select Portion Size:</p>
                 <div className="grid grid-cols-2 gap-2">
@@ -1134,7 +1327,6 @@ export default function BbCafePos() {
                 </div>
               </div>
 
-              {/* Dynamic Add-on / Toppings Selector (Only active if size is selected & is pizza category) */}
               {normalPizzaSize && (selectedProduct.category === "Special Pizza" || selectedProduct.name?.toLowerCase().includes("pizza")) && (
                 <div className="space-y-2 border-t border-white/5 pt-3">
                   <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">2. Select Premium Toppings:</p>
@@ -1157,7 +1349,6 @@ export default function BbCafePos() {
                 </div>
               )}
 
-              {/* Chef Notes & Instructions inside Modal */}
               <div className="space-y-2 border-t border-white/5 pt-3">
                 <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">3. Special Cooking instructions:</p>
                 <div className="flex flex-wrap gap-1">
@@ -1181,7 +1372,6 @@ export default function BbCafePos() {
                 />
               </div>
 
-              {/* Confirm customization to Cart */}
               <div className="border-t border-white/5 pt-3 flex gap-2">
                 <button 
                   type="button" 
