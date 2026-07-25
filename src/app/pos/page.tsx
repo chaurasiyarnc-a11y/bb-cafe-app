@@ -20,7 +20,7 @@ import PosCartDrawer from '@/components/pos/PosCartDrawer';
 import CustomerDirectoryModal from '@/components/pos/CustomerDirectoryModal';
 import CustomizerModal from '@/components/pos/CustomizerModal';
 
-// ⚡ TypeScript TS2607 एरर से बचने के लिए सुरक्षित आइकन्स की घोषणा (Compressed to single line)
+// ⚡ TypeScript TS2607 एरर से बचने के लिए सुरक्षित आइकन्स की घोषणा
 const [SafeLock, SafeDatabase, SafeMenu, SafeLogOut, SafeToggleRight, SafeToggleLeft, SafeMoon, SafeSun, SafeShoppingBag, SafeClock, SafeLayers, SafePrinter, SafeUsers, SafePlay, SafeCheck, SafeSearch, SafeX, SafeRefreshCw, SafeLayoutGrid, SafeList, SafePlus, SafeMinus, SafeChevronLeft, SafeChevronRight] = [Lock, Database, Menu, LogOut, ToggleRight, ToggleLeft, Moon, Sun, ShoppingBag, Clock, Layers, Printer, Users, Play, Check, Search, X, RefreshCw, LayoutGrid, List, Plus, Minus, ChevronLeft, ChevronRight].map(icon => icon as any);
 
 interface PosCartItem {
@@ -30,7 +30,7 @@ interface PosCartItem {
   quantity: number;
   isReward?: boolean;
   pointsCost?: number;
-  note?: string;
+  note?: string; // रसोइया निर्देश/नोट्स
 }
 
 interface DeliveryArea {
@@ -46,13 +46,6 @@ export default function BbCafePos() {
     { name: "Within 5 KM (Bum Bum Cafe से 5km के दायरे में)", fee: 50, minFree: 499, range: "2-5 KM" },
     { name: "Within 12 KM (12km के दायरे में)", fee: 99, minFree: 999, range: "5-12 KM" }
   ], []);
-
-  const PIZZA_ADDONS: { [size: string]: { [addon: string]: number } } = useMemo(() => ({
-    "small": { "Veg Add-on": 10, "Paneer": 20, "Black Olives": 20, "Jalapeno": 20, "Extra Cheese": 20, "Mushroom": 20 },
-    "medium": { "Veg Add-on": 10, "Paneer": 30, "Black Olives": 30, "Jalapeno": 30, "Extra Cheese": 30, "Mushroom": 30 },
-    "large": { "Veg Add-on": 20, "Paneer": 40, "Black Olives": 40, "Jalapeno": 40, "Extra Cheese": 40, "Mushroom": 40 },
-    "extra large": { "Veg Add-on": 30, "Paneer": 50, "Black Olives": 50, "Jalapeno": 50, "Extra Cheese": 60, "Mushroom": 50 }
-  }), []);
 
   const QUICK_INSTRUCTION_TAGS = useMemo(() => [
     "🌶️ Extra Spicy", "🧅 No Onion-Garlic", "🧀 Extra Cheese", "🔥 Well Baked", "🌱 Make it Mild"
@@ -117,12 +110,8 @@ export default function BbCafePos() {
   const [address, setAddress] = useState<string>('');
   const [tableNumber, setTableNumber] = useState<string>('Table 1');
   const [isSubmittingOrder, setIsSubmittingOrder] = useState<boolean>(false);
-  const [chefInstructions, setChefInstructions] = useState<string>('');
+  const [chefInstructions, setChefInstructions] = useState<string>(''); // Order Level Note
   
-  // POS Specific Add-ons
-  const [ketchupAddon, setKetchupAddon] = useState<boolean>(false);
-  const [oreganoAddon, setOreganoAddon] = useState<boolean>(false);
-  const [chiliFlakesAddon, setChiliFlakesAddon] = useState<boolean>(false);
   const [noCutlery, setNoCutlery] = useState<boolean>(false);
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'upi' | 'card'>('cash');
 
@@ -130,8 +119,7 @@ export default function BbCafePos() {
   const [selectedProduct, setSelectedProduct] = useState<any>(null); 
   const [normalPizzaSize, setNormalPizzaSize] = useState<string>("");
   const [normalPizzaPrice, setNormalPizzaPrice] = useState<number>(0);
-  const [normalPizzaAddons, setNormalPizzaAddons] = useState<{ [addon: string]: boolean }>({});
-  const [customizerChefNote, setCustomizerChefNote] = useState<string>("");
+  const [customizerChefNote, setCustomizerChefNote] = useState<string>(""); // Note specifically for Customizer
 
   const triggerBeep = (type: 'tap' | 'success') => {
     try {
@@ -502,18 +490,7 @@ export default function BbCafePos() {
     }
 
     let finalPrice = normalPizzaPrice;
-    const selectedAddons: string[] = [];
-
-    Object.entries(normalPizzaAddons).forEach(([addon, isSelected]) => {
-      if (isSelected) {
-        const cost = PIZZA_ADDONS[normalPizzaSize.toLowerCase()]?.[addon] || 0;
-        finalPrice += cost;
-        selectedAddons.push(addon);
-      }
-    });
-
     const noteParts: string[] = [];
-    if (selectedAddons.length > 0) noteParts.push(`Addons: ${selectedAddons.join(', ')}`);
     if (customizerChefNote.trim()) noteParts.push(`Note: ${customizerChefNote.trim()}`);
 
     const compositeId = `${selectedProduct.id}-${normalPizzaSize.toLowerCase()}`;
@@ -538,7 +515,6 @@ export default function BbCafePos() {
     setSelectedProduct(null);
     setNormalPizzaSize("");
     setNormalPizzaPrice(0);
-    setNormalPizzaAddons({});
     setCustomizerChefNote("");
 
     toast.success("Customized item added!");
@@ -565,14 +541,6 @@ export default function BbCafePos() {
 
   // Pricing Helpers
   const getCartSubtotal = () => cart.reduce((acc, i) => acc + (i.price * i.quantity), 0);
-  
-  const getCartAddonsPrice = () => {
-    let total = 0;
-    if (ketchupAddon) total += 10;
-    if (oreganoAddon) total += 10;
-    if (chiliFlakesAddon) total += 10;
-    return total;
-  };
 
   const getDeliveryCharge = () => {
     if (fulfillmentType === "pickup" || fulfillmentType === "table") return 0;
@@ -586,17 +554,16 @@ export default function BbCafePos() {
   // Real-time GST calculation logic
   const getGstAmountCalculated = () => {
     if (!gstEnabled) return 0;
-    const subtotal = getCartSubtotal() + getCartAddonsPrice();
+    const subtotal = getCartSubtotal();
     return Number(((subtotal * gstRate) / 100).toFixed(2));
   };
 
   const getTotalBillPrice = () => {
     const subtotal = getCartSubtotal();
-    const addPrice = getCartAddonsPrice();
     const delivery = getDeliveryCharge();
     const gstAmount = getGstAmountCalculated();
     const discountCombined = getLoyaltyDiscount() + customDiscount;
-    return Math.max(0, subtotal + addPrice + gstAmount - discountCombined) + delivery;
+    return Math.max(0, subtotal + gstAmount - discountCombined) + delivery;
   };
 
   const getFreeDeliveryProgressPercent = () => {
@@ -689,7 +656,6 @@ export default function BbCafePos() {
     setIsSubmittingOrder(true);
 
     const subtotal = getCartSubtotal();
-    const addOnsCost = getCartAddonsPrice();
     const deliveryCharge = getDeliveryCharge();
     const totalPointsCost = getTotalPointsRedeemedInCart(); 
     const loyaltyDiscount = getLoyaltyDiscount(); 
@@ -722,7 +688,7 @@ export default function BbCafePos() {
         customerName: customerName.trim() || "Walk-in Guest",
         customerPhone: customerPhone ? `+91${customerPhone}` : "",
         items: cart,
-        subtotal: subtotal + addOnsCost,
+        subtotal: subtotal,
         discount: discountCombined,
         gstRate: gstEnabled ? gstRate : 0,
         gstAmount: gstAmount,
@@ -733,9 +699,7 @@ export default function BbCafePos() {
         deliveryArea: fulfillmentType === "delivery" ? selectedArea.name : "",
         tableNumber: fulfillmentType === 'table' ? tableNumber : '',
         paymentMethod: paymentMethod, 
-        ketchupAddon,
-        oreganoAddon,
-        chiliFlakesAddon,
+        chefInstructions, // Fixed: keeps note/instructions saved
         noCutlery,
         source: 'POS'
       };
@@ -806,9 +770,7 @@ export default function BbCafePos() {
       setCustomDiscount(0);
       setIsCartOpen(false); 
       setPaymentMethod('cash');
-      setKetchupAddon(false);
-      setOreganoAddon(false);
-      setChiliFlakesAddon(false);
+      setChefInstructions(''); // Fixed: Resets instructions correctly
       setNoCutlery(false);
       
     } catch (err) {
@@ -877,15 +839,6 @@ export default function BbCafePos() {
     return `₹${item?.price || 0}`;
   };
 
-  // Verification if addons are showable (Matches the pasted logic)
-  const showAddonsSection = useMemo(() => {
-    const eligibleKeywords = ['pizza', 'sandwich', 'burger', 'momo', 'fries', 'chips', 'finger'];
-    return cart.some((item: any) => {
-      const nameLower = (item.name || '').toLowerCase();
-      return eligibleKeywords.some(keyword => nameLower.includes(keyword));
-    });
-  }, [cart]);
-
   const handleDetectLocation = () => {
     triggerBeep('tap');
     if (typeof window === "undefined" || !navigator.geolocation) {
@@ -909,7 +862,7 @@ export default function BbCafePos() {
     );
   };
 
-  // 📝 Dynamic UI Navigation items mapped to save code length and prevent compilation crashes
+  // 📝 Dynamic UI Navigation items
   const navItems = [
     { id: 'billing', label: 'Counter Billing', icon: <SafeShoppingBag size={14} /> },
     { id: 'orders', label: 'Live Orders', icon: <SafeClock size={14} />, badge: liveOrders.filter(o => o.status !== 'completed' && o.status !== 'rejected').length },
@@ -1039,7 +992,7 @@ export default function BbCafePos() {
                 <button onClick={() => { triggerBeep('tap'); setIsSidebarOpen(false); }} className="p-1.5 bg-neutral-200 dark:bg-neutral-900 border border-neutral-300 dark:border-white/5 text-gray-400 hover:text-white rounded-lg md:hidden"><X size={14} /></button>
               </div>
 
-              {/* Navigation stack (Refactored loop saves JSX space and ensures no truncation) */}
+              {/* Navigation stack */}
               <nav className="space-y-1.5">
                 {navItems.map((item) => (
                   <button 
@@ -1302,21 +1255,15 @@ export default function BbCafePos() {
         setAddress={setAddress}
         tableNumber={tableNumber}
         setTableNumber={setTableNumber}
-        chefInstructions={chefInstructions}
+        chefInstructions={chefInstructions} // Keeping the Order Instructions/Note
         setChefInstructions={setChefInstructions}
         isSubmittingOrder={isSubmittingOrder}
         paymentMethod={paymentMethod}
         setPaymentMethod={setPaymentMethod}
-        ketchupAddon={ketchupAddon}
-        setKetchupAddon={setKetchupAddon}
-        oreganoAddon={oreganoAddon}
-        setOreganoAddon={setOreganoAddon}
-        chiliFlakesAddon={chiliFlakesAddon}
-        setChiliFlakesAddon={setChiliFlakesAddon}
         noCutlery={noCutlery}
         setNoCutlery={setNoCutlery}
         getCartSubtotal={getCartSubtotal}
-        getCartAddonsPrice={getCartAddonsPrice}
+        getCartAddonsPrice={() => 0} // Removed: Now safely returns 0
         getDeliveryCharge={getDeliveryCharge}
         getFreeDeliveryProgressPercent={getFreeDeliveryProgressPercent}
         getTotalPointsRedeemedInCart={getTotalPointsRedeemedInCart}
@@ -1327,8 +1274,8 @@ export default function BbCafePos() {
         setIsCustomerModalOpen={setIsCustomerModalOpen}
         searchDbCustomers={searchDbCustomers}
         handleUpdateCartQuantity={handleUpdateCartQuantity}
-        handleUpdateCartItemNote={handleUpdateCartItemNote}
-        showAddonsSection={showAddonsSection}
+        handleUpdateCartItemNote={handleUpdateCartItemNote} // Note edit is completely functional
+        showAddonsSection={false} // Removed
         triggerBeep={triggerBeep}
         handleCheckLoyalty={handleCheckLoyalty}
       />
@@ -1370,11 +1317,11 @@ export default function BbCafePos() {
         setNormalPizzaSize={setNormalPizzaSize}
         normalPizzaPrice={normalPizzaPrice}
         setNormalPizzaPrice={setNormalPizzaPrice}
-        normalPizzaAddons={normalPizzaAddons}
-        setNormalPizzaAddons={setNormalPizzaAddons}
-        customizerChefNote={customizerChefNote}
+        normalPizzaAddons={{}} // Removed addons
+        setNormalPizzaAddons={() => {}} // Disabled safely
+        customizerChefNote={customizerChefNote} // Keeping Note/Instructions inside Customizer
         setCustomizerChefNote={setCustomizerChefNote}
-        PIZZA_ADDONS={PIZZA_ADDONS}
+        PIZZA_ADDONS={{}} // Removed addons config
         QUICK_INSTRUCTION_TAGS={QUICK_INSTRUCTION_TAGS}
         handleAddCustomizedItemToCart={handleAddCustomizedItemToCart}
         triggerBeep={triggerBeep}
