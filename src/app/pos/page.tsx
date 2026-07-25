@@ -249,8 +249,8 @@ export default function BbCafePos() {
   }, [activeTab, isLoggedIn]);
 
   // Auth Submit PIN
-  const handlePinLoginSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handlePinLoginSubmit = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     if (pinInput.length < 4) {
       toast.error("Please enter a valid 4-digit PIN!");
       return;
@@ -589,7 +589,7 @@ export default function BbCafePos() {
     );
   };
 
-// Pricing Helpers
+  // Pricing Helpers
   const getCartSubtotal = () => cart.reduce((acc, i) => acc + (i.price * i.quantity), 0);
   
   const getCartAddonsPrice = () => {
@@ -926,6 +926,89 @@ export default function BbCafePos() {
     );
   };
 
+  // 🔐 RENDERING LOCKSCREEN IF NOT LOGGED IN
+  if (!isLoggedIn) {
+    return (
+      <div className="min-h-screen bg-neutral-900 text-white flex flex-col items-center justify-center p-4 transition-colors duration-200">
+        <Toaster position="top-center" />
+        <motion.div 
+          initial={{ opacity: 0, y: -20 }} 
+          animate={{ opacity: 1, y: 0 }}
+          className="w-full max-w-sm bg-neutral-950 border border-white/5 rounded-3xl p-8 shadow-2xl space-y-6 text-center"
+        >
+          {/* Logo Section */}
+          <div className="flex flex-col items-center gap-2">
+            <div className="p-4 bg-orange-500/10 text-orange-500 rounded-full border border-orange-500/20">
+              <SafeLock size={32} />
+            </div>
+            <h1 className="text-xl font-black uppercase tracking-wider text-yellow-500">BUM BUM CAFE</h1>
+            <p className="text-xs text-neutral-400">POS Terminal Locked • Enter Secret PIN</p>
+          </div>
+
+          <form onSubmit={handlePinLoginSubmit} className="space-y-4">
+            <input 
+              type="password" 
+              maxLength={4} 
+              value={pinInput} 
+              readOnly 
+              placeholder="••••"
+              className="w-full bg-neutral-900 border border-white/5 text-center text-3xl tracking-widest font-mono font-bold py-4 rounded-2xl outline-none focus:border-orange-500 text-orange-400 placeholder-neutral-700"
+            />
+
+            {/* Visual Number Pad */}
+            <div className="grid grid-cols-3 gap-3 max-w-xs mx-auto pt-2">
+              {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
+                <button
+                  key={num}
+                  type="button"
+                  onClick={() => {
+                    triggerBeep('tap');
+                    if (pinInput.length < 4) setPinInput(prev => prev + num);
+                  }}
+                  className="aspect-square bg-neutral-900 hover:bg-neutral-800 active:scale-95 border border-white/5 font-black text-xl rounded-2xl transition-all flex items-center justify-center"
+                >
+                  {num}
+                </button>
+              ))}
+              <button
+                type="button"
+                onClick={() => {
+                  triggerBeep('tap');
+                  setPinInput('');
+                }}
+                className="aspect-square bg-neutral-900 hover:bg-neutral-800 active:scale-95 border border-white/5 font-bold text-xs uppercase text-red-400 rounded-2xl transition-all flex items-center justify-center"
+              >
+                Clear
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  triggerBeep('tap');
+                  if (pinInput.length < 4) setPinInput(prev => prev + '0');
+                }}
+                className="aspect-square bg-neutral-900 hover:bg-neutral-800 active:scale-95 border border-white/5 font-black text-xl rounded-2xl transition-all flex items-center justify-center"
+              >
+                0
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  triggerBeep('success');
+                  handlePinLoginSubmit();
+                }}
+                className="aspect-square bg-orange-600 hover:bg-orange-500 text-white active:scale-95 font-bold text-xs uppercase tracking-wider rounded-2xl transition-all flex items-center justify-center"
+              >
+                Login
+              </button>
+            </div>
+          </form>
+          <p className="text-[10px] text-neutral-500 font-mono">Demo Admin PIN: 1234</p>
+        </motion.div>
+      </div>
+    );
+  }
+
+  // 🖥️ FULL WORKING POS SYSTEM UI
   return (
     <div className="min-h-screen bg-neutral-50 dark:bg-[#050505] text-neutral-800 dark:text-gray-100 flex flex-col md:flex-row font-sans antialiased overflow-hidden transition-colors duration-200">
       <Toaster position="top-center" />
@@ -934,7 +1017,7 @@ export default function BbCafePos() {
       {isSidebarOpen && (
         <div 
           onClick={() => setIsSidebarOpen(false)}
-          className="fixed inset-0 bg-black/60 z-40 md:hidden backdrop-blur-xs cursor-pointer"
+          className="fixed inset-0 bg-black/60 z-40 md:hidden backdrop-blur-sm cursor-pointer"
         />
       )}
 
@@ -1005,13 +1088,13 @@ export default function BbCafePos() {
               {liveOrders.map((order: any) => {
                 if (order.status === 'completed' || order.status === 'rejected') return null;
                 return (
-                  <motion.div layout key={order.id} className="bg-white dark:bg-neutral-955 border border-neutral-200 dark:border-white/5 rounded-2xl p-4 flex flex-col justify-between shadow-lg">
+                  <motion.div layout key={order.id} className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-white/5 rounded-2xl p-4 flex flex-col justify-between shadow-lg">
                     <div>
                       <div className="flex justify-between items-start border-b border-neutral-200 dark:border-white/5 pb-2 mb-3">
                         <div><p className="text-xs font-black text-yellow-600 dark:text-yellow-300 font-mono">Bill: #${String(order.billNumber).padStart(4, '0')}</p><p className="text-[9px] text-gray-400 font-mono mt-0.5">Token: #{order.tokenNumber}</p></div>
                         <span className="bg-orange-500/10 border border-orange-500/20 text-orange-400 text-[8px] font-black uppercase tracking-wider px-2 py-0.5 rounded">{order.fulfillmentType || 'table'}</span>
                       </div>
-                      <div className="space-y-1 mb-3 text-[10px] font-semibold text-neutral-800 dark:text-gray-300"><p className="dark:text-white text-neutral-955 truncate font-black">👤 {order.customerName}</p>{order.customerPhone && <p className="font-mono">📞 {order.customerPhone}</p>}{order.address && <p className="text-gray-400 line-clamp-1">📍 {order.address}</p>}</div>
+                      <div className="space-y-1 mb-3 text-[10px] font-semibold text-neutral-800 dark:text-gray-300"><p className="dark:text-white text-neutral-900 truncate font-black">👤 {order.customerName}</p>{order.customerPhone && <p className="font-mono">📞 {order.customerPhone}</p>}{order.address && <p className="text-gray-400 line-clamp-1">📍 {order.address}</p>}</div>
                       <div className="space-y-1.5 border-t border-dashed border-neutral-200 dark:border-white/5 pt-2.5 mb-4">
                         {order.items?.map((it: any, index: number) => (
                           <div key={index} className="flex justify-between text-[11px] text-neutral-800 dark:text-gray-200"><span className="font-bold">{it.name} <span className="text-orange-500">x{it.quantity}</span>{it.note ? `<br/><span style="font-size: 9px; color: #888;">(${it.note})</span>` : ''}</span><span className="font-mono text-gray-400">₹{it.price * it.quantity}</span></div>
@@ -1053,7 +1136,7 @@ export default function BbCafePos() {
               ) : filteredMenu.length === 0 ? (
                 <p className="text-center text-gray-500 text-xs py-10 uppercase tracking-widest font-black">No matching items found</p>
               ) : (
-                /* RESPONSIVE 2-COLUMN ON MOBILE, 4-COLUMN ON DESKTOP GRID */
+                /* RESPONSIVE GRID */
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 overflow-y-auto flex-1 pr-1 pb-16">
                   {filteredMenu.map((item) => {
                     const isAvailable = item.isAvailable !== false;
@@ -1148,7 +1231,7 @@ export default function BbCafePos() {
               </div>
             </div>
             <div className="border-b border-neutral-200 dark:border-white/5 pb-4 space-y-3"><p className="text-xs font-bold text-neutral-800 dark:text-white uppercase tracking-wider">B. GST Configuration Setup:</p>
-              <div className="flex items-center justify-between max-sm"><span className="text-[11px] font-semibold text-neutral-600 dark:text-gray-300">Enable GST calculations on all bills:</span><button type="button" onClick={() => { triggerBeep('tap'); const next = !gstEnabled; setGstEnabled(next); localStorage.setItem("bb_pos_gst_enabled", String(next)); }} className="text-orange-500">{gstEnabled ? <SafeToggleRight size={32} /> : <SafeToggleLeft size={32} className="text-neutral-500" />}</button></div>
+              <div className="flex flex-wrap items-center justify-between gap-2"><span className="text-[11px] font-semibold text-neutral-600 dark:text-gray-300">Enable GST calculations on all bills:</span><button type="button" onClick={() => { triggerBeep('tap'); const next = !gstEnabled; setGstEnabled(next); localStorage.setItem("bb_pos_gst_enabled", String(next)); }} className="text-orange-500">{gstEnabled ? <SafeToggleRight size={32} /> : <SafeToggleLeft size={32} className="text-neutral-500" />}</button></div>
               {gstEnabled && (
                 <div className="space-y-1 max-w-sm"><label className="text-[9px] font-black uppercase text-gray-500">GST Rate (%) Percentage</label><input type="number" placeholder="e.g. 5" value={gstRate} onChange={(e) => { const r = Math.max(0, Number(e.target.value)); setGstRate(r); localStorage.setItem("bb_pos_gst_rate", String(r)); }} className="w-full bg-neutral-100 dark:bg-neutral-900 border border-neutral-200 dark:border-white/5 p-3 rounded-xl text-xs outline-none focus:border-orange-500 font-mono font-black" /></div>
               )}
@@ -1217,7 +1300,7 @@ export default function BbCafePos() {
         handleUpdateCartItemNote={handleUpdateCartItemNote}
         showAddonsSection={showAddonsSection}
         triggerBeep={triggerBeep}
-        handleCheckLoyalty={handleCheckLoyalty} // ⚡ Passed successfully
+        handleCheckLoyalty={handleCheckLoyalty}
       />
 
       <CustomerDirectoryModal 
