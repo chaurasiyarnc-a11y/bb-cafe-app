@@ -163,34 +163,7 @@ export default function BbCafePos() {
     } catch (e) {}
   };
 
-  // Auth Session, Database streams & Settings fetchers
-  useEffect(() => {
-    const savedUser = localStorage.getItem("bb_pos_user");
-    if (savedUser) {
-      try {
-        const parsed = JSON.parse(savedUser);
-        setIsLoggedIn(true);
-        setCurrentUser(parsed);
-      } catch (e) {}
-    }
-
-    const localGst = localStorage.getItem("bb_pos_gst_enabled");
-    if (localGst) setGstEnabled(localGst === 'true');
-    const localGstRate = localStorage.getItem("bb_pos_gst_rate");
-    if (localGstRate) setGstRate(Number(localGstRate) || 5);
-    const localPaper = localStorage.getItem("bb_pos_paper_size");
-    if (localPaper) setPrinterPaperSize(localPaper as any);
-    const localTheme = localStorage.getItem("bb_pos_theme");
-    if (localTheme) {
-      setThemeMode(localTheme as any);
-      if (localTheme === 'light') {
-        document.documentElement.classList.remove('dark');
-      } else {
-        document.documentElement.classList.add('dark');
-      }
-    }
-  }, []);
-
+  // Live Orders Listener & Store Open Listener
   useEffect(() => {
     const q = query(collection(db, "orders"), orderBy("timestamp", "desc"), limit(60));
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -210,6 +183,7 @@ export default function BbCafePos() {
     };
   }, []);
 
+  // Fetch Menu Products
   useEffect(() => {
     if (!isLoggedIn) return;
     const fetchDbData = async () => {
@@ -280,6 +254,16 @@ export default function BbCafePos() {
     toast.success("POS Terminal Locked!");
   };
 
+  const handleUpdateStatus = async (orderId: string, nextStatus: string) => {
+    triggerBeep('tap');
+    try {
+      await updateDoc(doc(db, "orders", orderId), { status: nextStatus });
+      toast.success(`Order updated to ${nextStatus}`);
+    } catch (err) {
+      toast.error("Failed to update status");
+    }
+  };
+
   const searchDbCustomers = async (text: string) => {
     const cleanText = text.trim();
     if (!cleanText) {
@@ -319,14 +303,226 @@ export default function BbCafePos() {
     }
   };
 
+  const handleSelectCustomer = (cust: any) => {
+    triggerBeep('tap');
+    setCustomerPhone(cust.phone);
+    setCustomerName(cust.name);
+    setCustomerPoints(cust.points || 0);
+    if (cust.address) {
+      setAddress(cust.address);
+    }
+    setIsCustomerModalOpen(false);
+    toast.success(`Active Customer: ${cust.name}`);
+  };
+
+  // Fetch Customer Points ledger/history logs
+  const handleLoadCustomerHistory = async (cust: any) => {
+    triggerBeep('tap');
+    setViewingHistoryCustomer(cust);
+    const toastId = toast.loading("Loading points passbook...");
+    try {
+      const hSnap = await getDocs(
+        query(
+          collection(db, "customer_points", cust.phone, "history"),
+          orderBy("timestamp", "desc"),
+          limit(25)
+        )
+      );
+      setCustomerHistoryList(hSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      toast.dismiss(toastId);
+    } catch (e) {
+      toast.dismiss(toastId);
+      toast.error("Failed to load points ledger");
+    }
+  };
+
+  // Edit Customer profile name, address & points balance directly
+  const handleStartEditProfile = (cust: any) => {
+    triggerBeep('tap');
+    setEditingCustomer(cust);
+    setNewCustName(cust.name);
+    setNewCustAddress(cust.address || '');
+    setEditCustPoints(cust.points || 0);
+  };
+
+  const handleUpdateCustomerProfile = async () => {
+    triggerBeep('tap');
+    if (!newCustName.trim()) {
+      toast.error("Name field is mandatory!");
+      return;
+    }
+    const toastId = toast.loading("Saving updates...");
+    try {
+      const userRef = doc(db, "customer_points", editingCustomer.phone);
+      
+      const updatedFields = {
+        name: newCustName.trim(),
+        address: newCustAddress.trim(),
+        points: editCustPoints
+      };
+
+      await updateDoc(userRef, updatedFields);
+      toast.dismiss(toastId);
+      toast.success("Profile saved successfully!");
+
+      if (customerPhone === editingCustomer.phone) {
+        setCustomerName(updatedFields.name);
+        setAddress(updatedFields.address);
+        setCustomerPoints(updatedFields.points);
+      }
+
+      setEditingCustomer(null);
+      searchDbCustomers(customerSearchQuery); 
+    } catch (err) {
+      toast.dismiss(toastId);
+      toast.error("Failed to edit user profile");
+    }
+  };
+
+  // Save New Customer to Loyalty program DB directly
+  const handleSaveNewCustomer = async (e: React.FormEvent) => {
+    e.preventDefault();
+    triggerBeep('tap');
+    const cleanPhone = newCustPhone.trim();
+    if (cleanPhone.length !== 10 || !/^\d+$/.test(cleanPhone)) {
+      toast.error("Mobile number must be exactly 10 digits!");
+      return;
+    }
+    if (!newCustName.trim()) {
+      toast.error("Name field cannot be left blank!");
+      return;
+    }
+
+    const toastId = toast.loading("Registering guest...");
+    try {
+      const userRef = doc(db, "customer_points", cleanPhone);
+      const userSnap = await getDoc(userRef);
+      if (userSnap.exists()) {
+        toast.dismiss(toastId);
+        toast.error("This phone number is already registered!");
+        return;
+      }
+
+      const newDoc = {
+        name: newCustName.trim(),
+        phone: cleanPhone,
+        points: 0,
+        address: newCustAddress.trim() || "",
+        lastActive: new Date()
+      };
+
+      await setDoc(userRef, newDoc);
+      toast.dismiss(toastId);
+      toast.success("New Customer Registered Successfully!");
+
+      setCustomerPhone(cleanPhone);
+      setCustomerName(newDoc.name);
+      setCustomerPoints(0);
+      if (newDoc.address) {
+        setAddress(newDoc.address);
+      }
+
+      setNewCustName('');
+      setNewCustPhone('');
+      setNewCustAddress('');
+      setIsCustomerModalOpen(false);
+    } catch (err) {
+      toast.dismiss(toastId);
+      toast.error("Database write operation failed");
+    }
+  };
+
+  const handleAddProductToCart = (item: any) => {
+    triggerBeep('tap');
+    setCart((prev) => {
+      const existingIndex = prev.findIndex(c => c.id === item.id);
+      if (existingIndex > -1) {
+        const next = [...prev];
+        next[existingIndex].quantity += 1;
+        return next;
+      }
+      return [...prev, {
+        id: item.id,
+        name: item.name,
+        price: Number(item.price) || 0,
+        quantity: 1
+      }];
+    });
+    toast.success(`${item.name} added!`, { duration: 800 });
+  };
+
+  const handleAddCustomizedItemToCart = () => {
+    triggerBeep('tap');
+    if (!normalPizzaSize) {
+      toast.error("Please select a size first!");
+      return;
+    }
+
+    let finalPrice = normalPizzaPrice;
+    const selectedAddons: string[] = [];
+
+    Object.entries(normalPizzaAddons).forEach(([addon, isSelected]) => {
+      if (isSelected) {
+        const cost = PIZZA_ADDONS[normalPizzaSize.toLowerCase()]?.[addon] || 0;
+        finalPrice += cost;
+        selectedAddons.push(addon);
+      }
+    });
+
+    const noteParts: string[] = [];
+    if (selectedAddons.length > 0) noteParts.push(`Addons: ${selectedAddons.join(', ')}`);
+    if (customizerChefNote.trim()) noteParts.push(`Note: ${customizerChefNote.trim()}`);
+
+    const compositeId = `${selectedProduct.id}-${normalPizzaSize.toLowerCase()}`;
+    const compositeName = `${selectedProduct.name} (${normalPizzaSize.toUpperCase()})`;
+
+    setCart((prev) => {
+      const existingIndex = prev.findIndex(c => c.id === compositeId && c.note === noteParts.join(' | '));
+      if (existingIndex > -1) {
+        const next = [...prev];
+        next[existingIndex].quantity += 1;
+        return next;
+      }
+      return [...prev, {
+        id: compositeId,
+        name: compositeName,
+        price: finalPrice,
+        quantity: 1,
+        note: noteParts.join(' | ')
+      }];
+    });
+
+    setSelectedProduct(null);
+    setNormalPizzaSize("");
+    setNormalPizzaPrice(0);
+    setNormalPizzaAddons({});
+    setCustomizerChefNote("");
+
+    toast.success("Customized item added!");
+  };
+
+  const handleUpdateCartQuantity = (id: string, amount: number) => {
+    triggerBeep('tap');
+    setCart((prev) => 
+      prev.map(item => {
+        if (item.id === id) {
+          const updatedQty = item.quantity + amount;
+          return updatedQty > 0 ? { ...item, quantity: updatedQty } : null;
+        }
+        return item;
+      }).filter(Boolean) as PosCartItem[]
+    );
+  };
+
   const handleUpdateCartItemNote = (itemId: string, noteValue: string) => {
     setCart(prev => 
       prev.map(item => item.id === itemId ? { ...item, note: noteValue } : item)
     );
   };
 
-  // Pricing calculations
+  // Pricing Helpers
   const getCartSubtotal = () => cart.reduce((acc, i) => acc + (i.price * i.quantity), 0);
+  
   const getCartAddonsPrice = () => {
     let total = 0;
     if (ketchupAddon) total += 10;
@@ -334,18 +530,23 @@ export default function BbCafePos() {
     if (chiliFlakesAddon) total += 10;
     return total;
   };
+
   const getDeliveryCharge = () => {
     if (fulfillmentType === "pickup" || fulfillmentType === "table") return 0;
     const baseSub = getCartSubtotal();
     if (baseSub === 0) return 0;
     return baseSub >= selectedArea.minFree ? 0 : selectedArea.fee;
   };
+
   const getLoyaltyDiscount = () => Math.min(pointsToRedeem, getCartSubtotal());
+  
+  // Real-time GST calculation logic
   const getGstAmountCalculated = () => {
     if (!gstEnabled) return 0;
     const subtotal = getCartSubtotal() + getCartAddonsPrice();
     return Number(((subtotal * gstRate) / 100).toFixed(2));
   };
+
   const getTotalBillPrice = () => {
     const subtotal = getCartSubtotal();
     const addPrice = getCartAddonsPrice();
@@ -354,15 +555,17 @@ export default function BbCafePos() {
     const discountCombined = getLoyaltyDiscount() + customDiscount;
     return Math.max(0, subtotal + addPrice + gstAmount - discountCombined) + delivery;
   };
+
   const getFreeDeliveryProgressPercent = () => {
     const subtotal = getCartSubtotal();
     const limit = selectedArea.minFree;
     if (subtotal >= limit) return 100;
     return (subtotal / limit) * 100;
   };
+
   const getTotalPointsRedeemedInCart = () => cart.reduce((acc, i) => acc + (i.pointsCost || 0), 0);
 
-  // 📄 PRINT RECEIPT
+  // 📄 THERMAL RECEIPT PRINTING FUNCTION
   const handlePrintReceipt = (order: any) => {
     triggerBeep('tap');
     const widthPixels = printerPaperSize === '58mm' ? '240px' : '290px';
@@ -432,6 +635,184 @@ export default function BbCafePos() {
     printWindow.document.close();
   };
 
+  // Checkout submission to Firestore & print trigger
+  const handlePlaceOrder = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (cart.length === 0) {
+      toast.error("Your billing cart is empty!");
+      return;
+    }
+    if (isSubmittingOrder) return;
+    setIsSubmittingOrder(true);
+
+    const subtotal = getCartSubtotal();
+    const addOnsCost = getCartAddonsPrice();
+    const deliveryCharge = getDeliveryCharge();
+    const totalPointsCost = getTotalPointsRedeemedInCart(); 
+    const discountCombined = customDiscount; 
+    const gstAmount = getGstAmountCalculated();
+    const finalTotal = getTotalBillPrice();
+
+    const tokenNumber = Math.floor(1000 + Math.random() * 9000);
+    const deliveryPin = Math.floor(1000 + Math.random() * 9000);
+
+    let billNumber = 1;
+    const counterDocRef = doc(db, "settings", "store_bill_counter");
+
+    try {
+      await runTransaction(db, async (transaction) => {
+        const counterDoc = await transaction.get(counterDocRef);
+        if (!counterDoc.exists()) {
+          transaction.set(counterDocRef, { nextBillNumber: 2 });
+          billNumber = 1;
+        } else {
+          billNumber = counterDoc.data().nextBillNumber || 1;
+          transaction.update(counterDocRef, { nextBillNumber: billNumber + 1 });
+        }
+      });
+
+      const orderObj = {
+        billNumber,
+        tokenNumber,
+        deliveryPin,
+        customerName: customerName.trim() || "Walk-in Guest",
+        customerPhone: customerPhone ? `+91${customerPhone}` : "",
+        items: cart,
+        subtotal: subtotal + addOnsCost,
+        discount: discountCombined,
+        gstRate: gstEnabled ? gstRate : 0,
+        gstAmount: gstAmount,
+        total: finalTotal,
+        timestamp: new Date(),
+        status: 'completed',
+        fulfillmentType: fulfillmentType,
+        deliveryArea: fulfillmentType === "delivery" ? selectedArea.name : "",
+        tableNumber: fulfillmentType === 'table' ? tableNumber : '',
+        paymentMethod: paymentMethod, 
+        ketchupAddon,
+        oreganoAddon,
+        chiliFlakesAddon,
+        noCutlery,
+        source: 'POS'
+      };
+
+      await addDoc(collection(db, "orders"), orderObj);
+
+      if (customerPhone && customerPhone.trim().length === 10) {
+        const phoneClean = customerPhone.trim();
+        const pointsEarned = Math.floor(finalTotal / 100);
+        const netPointsChange = pointsEarned - totalPointsCost;
+
+        await runTransaction(db, async (txn) => {
+          const userRef = doc(db, "customer_points", phoneClean);
+          const userSnap = await txn.get(userRef);
+
+          if (!userSnap.exists()) {
+            txn.set(userRef, {
+              name: customerName.trim() || "Walk-in Guest",
+              phone: phoneClean,
+              points: pointsEarned,
+              lastActive: new Date()
+            });
+          } else {
+            txn.update(userRef, {
+              points: increment(netPointsChange),
+              lastActive: new Date()
+            });
+          }
+        });
+
+        if (pointsEarned > 0) {
+          await addDoc(collection(db, "customer_points", phoneClean, "history"), {
+            type: 'earn',
+            points: pointsEarned,
+            description: `Earned on Bill #${billNumber} at POS Counter`,
+            timestamp: new Date()
+          });
+        }
+        if (totalPointsCost > 0) {
+          await addDoc(collection(db, "customer_points", phoneClean, "history"), {
+            type: 'redeem',
+            points: totalPointsCost,
+            description: `Redeemed rewards on Bill #${billNumber} at POS Counter`,
+            timestamp: new Date()
+          });
+        }
+      }
+
+      triggerBeep('success');
+      toast.success(`Bill #${billNumber} processed!`);
+      
+      handlePrintReceipt(orderObj);
+
+      // Reset billing states
+      setCart([]);
+      setCustomerPhone('');
+      setCustomerName('');
+      setCustomerPoints(0);
+      setPointsToRedeem(0);
+      setCustomDiscount(0);
+      setIsCartOpen(false); 
+      setPaymentMethod('cash');
+      setKetchupAddon(false);
+      setOreganoAddon(false);
+      setChiliFlakesAddon(false);
+      setNoCutlery(false);
+      
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to process counter transaction");
+    } finally {
+      setIsSubmittingOrder(false);
+    }
+  };
+
+  const handleToggleStock = async (productId: string, currentStatus: boolean) => {
+    triggerBeep('tap');
+    try {
+      await updateDoc(doc(db, "products", productId), {
+        isAvailable: !currentStatus
+      });
+      setProducts(prev => 
+        prev.map(p => p.id === productId ? { ...p, isAvailable: !currentStatus } : p)
+      );
+      toast.success("Stock status updated on Web App!");
+    } catch (err) {
+      toast.error("Error updating stock");
+    }
+  };
+
+  // Toggle Theme mode globally
+  const handleToggleTheme = (mode: 'dark' | 'light') => {
+    triggerBeep('tap');
+    setThemeMode(mode);
+    localStorage.setItem("bb_pos_theme", mode);
+    if (mode === 'light') {
+      document.documentElement.classList.remove('dark');
+    } else {
+      document.documentElement.classList.add('dark');
+    }
+  };
+
+  // Filtered lists
+  const filteredMenu = useMemo(() => {
+    return products.filter(p => {
+      const matchCat = selectedCategory === 'All' || p.category === selectedCategory;
+      const matchSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase());
+      return matchCat && matchSearch;
+    });
+  }, [products, selectedCategory, searchQuery]);
+
+  const filteredPastReceipts = useMemo(() => {
+    return liveOrders.filter(o => {
+      const bStr = String(o.billNumber);
+      const phoneStr = String(o.customerPhone || '');
+      const nameStr = String(o.customerName || '').toLowerCase();
+      const q = receiptSearchQuery.trim().toLowerCase();
+      return bStr.includes(q) || phoneStr.includes(q) || nameStr.includes(q);
+    });
+  }, [liveOrders, receiptSearchQuery]);
+
   const getDisplayPrice = (item: any) => {
     if (item?.variants && typeof item.variants === 'object') {
       const prices = Object.values(item.variants).map(Number).filter(n => !isNaN(n));
@@ -444,32 +825,37 @@ export default function BbCafePos() {
     return `₹${item?.price || 0}`;
   };
 
-  if (!isLoggedIn) {
-    return (
-      <div className="min-h-screen bg-[#050505] text-white flex items-center justify-center p-4 font-sans antialiased">
-        <Toaster position="top-center" />
-        <form onSubmit={handlePinLoginSubmit} className="bg-neutral-950 border border-white/5 p-8 rounded-[2rem] w-full max-w-sm text-center space-y-6 shadow-2xl">
-          <div className="space-y-2">
-            <SafeLock className="text-orange-500 animate-bounce mx-auto" size={40} />
-            <h1 className="text-lg font-black tracking-wider uppercase text-yellow-300">Bum Bum POS Security</h1>
-            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Please enter 4-Digit Security PIN</p>
-          </div>
-          
-          <input type="password" maxLength={4} value={pinInput} readOnly className="w-full bg-black/40 border border-white/10 p-4 rounded-2xl text-center text-2xl font-black font-mono tracking-widest text-orange-500 outline-none" />
+  // Verification if addons are showable (Matches the pasted logic)
+  const showAddonsSection = useMemo(() => {
+    const eligibleKeywords = ['pizza', 'sandwich', 'burger', 'momo', 'fries', 'chips', 'finger'];
+    return cart.some((item: any) => {
+      const nameLower = (item.name || '').toLowerCase();
+      return eligibleKeywords.some(keyword => nameLower.includes(keyword));
+    });
+  }, [cart]);
 
-          {/* Clean Virtual Number Pad */}
-          <div className="grid grid-cols-3 gap-3">
-            {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
-              <button type="button" key={num} onClick={() => { triggerBeep('tap'); if (pinInput.length < 4) setPinInput(p => p + num); }} className="bg-neutral-900 hover:bg-neutral-800 border border-white/5 py-3 rounded-xl font-bold font-mono text-base transition-all active:scale-95">{num}</button>
-            ))}
-            <button type="button" onClick={() => { triggerBeep('tap'); setPinInput(''); }} className="bg-neutral-900 hover:bg-red-950 hover:text-red-400 border border-white/5 py-3 rounded-xl font-black text-xs transition-all active:scale-95">CLEAR</button>
-            <button type="button" onClick={() => { triggerBeep('tap'); if (pinInput.length < 4) setPinInput(p => p + '0'); }} className="bg-neutral-900 hover:bg-neutral-800 border border-white/5 py-3 rounded-xl font-bold font-mono text-base transition-all active:scale-95">0</button>
-            <button type="submit" className="bg-green-600 hover:bg-green-700 text-black font-black py-3 rounded-xl text-xs transition-all active:scale-95 uppercase tracking-wider">LOGIN</button>
-          </div>
-        </form>
-      </div>
+  const handleDetectLocation = () => {
+    triggerBeep('tap');
+    if (typeof window === "undefined" || !navigator.geolocation) {
+      toast.error("Geolocation is not supported by your device.");
+      return;
+    }
+
+    const toastId = toast.loading("Detecting live location...");
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        setAddress(`GPS Location: https://www.google.com/maps?q=${latitude.toFixed(6)},${longitude.toFixed(6)}`);
+        toast.dismiss(toastId);
+        toast.success("Location successfully detected!");
+      },
+      () => {
+        toast.dismiss(toastId);
+        toast.error("Unable to retrieve location.");
+      },
+      { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
     );
-  }
+  };
 
   return (
     <div className="min-h-screen bg-neutral-50 dark:bg-[#050505] text-neutral-800 dark:text-gray-100 flex flex-col md:flex-row font-sans antialiased overflow-hidden transition-colors duration-200">
@@ -509,6 +895,9 @@ export default function BbCafePos() {
         <div className="flex items-center gap-3 mb-4 shrink-0 border-b border-neutral-200 dark:border-white/5 pb-3">
           <button type="button" onClick={() => { triggerBeep('tap'); setIsSidebarOpen(true); }} className="p-2.5 bg-neutral-200 dark:bg-neutral-950 hover:bg-neutral-300 dark:hover:bg-neutral-900 border border-neutral-300 dark:border-white/5 text-orange-500 hover:text-orange-400 rounded-xl transition-all shadow-md md:hidden"><SafeMenu size={16} /></button>
           <div className="flex flex-col"><h2 className="text-[10px] font-black uppercase tracking-widest text-orange-500 leading-none">{activeTab === 'billing' ? 'Counter Billing Workspace' : activeTab === 'orders' ? 'Live Orders Pipeline' : activeTab === 'inventory' ? 'Item Availability Control' : activeTab === 'receipts' ? 'Past Receipts reprint panel' : 'POS Configuration Settings'}</h2><span className="text-[9px] text-gray-400 font-bold mt-1">Bum Bum Cafe • Mohandra</span></div>
+          {activeTab === 'billing' && (
+            <button type="button" onClick={() => { triggerBeep('tap'); setIsCustomerModalOpen(true); searchDbCustomers(''); }} className="ml-auto p-2.5 bg-neutral-200 dark:bg-neutral-950 hover:bg-neutral-300 dark:hover:bg-neutral-900 border border-neutral-300 dark:border-white/5 text-yellow-600 dark:text-yellow-400 rounded-xl transition-all shadow-md flex items-center gap-1.5 text-[10px] font-black uppercase"><SafeUsers size={14} /><span>Search Guest</span></button>
+          )}
         </div>
 
         {/* TAB VIEWS RENDERED */}
