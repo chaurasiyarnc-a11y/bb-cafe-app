@@ -22,10 +22,10 @@ interface PosCartItem {
 }
 
 export default function BbCafePos() {
-  // Navigation & View States
-  const [activeTab, setActiveTab] = useState<'orders' | 'billing' | 'inventory'>('orders');
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid'); // Grid vs List view toggle
-  const [isCartOpen, setIsCartOpen] = useState<boolean>(false); // Slide-out Cart Drawer
+  // Navigation & View States - Default changed to 'billing' for immediate loading on refresh
+  const [activeTab, setActiveTab] = useState<'orders' | 'billing' | 'inventory'>('billing');
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid'); 
+  const [isCartOpen, setIsCartOpen] = useState<boolean>(false); 
 
   // Database States
   const [liveOrders, setLiveOrders] = useState<any[]>([]);
@@ -47,7 +47,7 @@ export default function BbCafePos() {
   const [chefInstructions, setChefInstructions] = useState<string>('');
   const [isSubmittingOrder, setIsSubmittingOrder] = useState<boolean>(false);
 
-  // Sound effects for POS efficiency
+  // Sound effects
   const triggerBeep = (type: 'tap' | 'success') => {
     try {
       const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -70,7 +70,7 @@ export default function BbCafePos() {
     } catch (e) {}
   };
 
-  // Real-time Order Stream watcher
+  // Real-time listener for orders pipeline
   useEffect(() => {
     const q = query(collection(db, "orders"), orderBy("timestamp", "desc"), limit(60));
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -82,7 +82,7 @@ export default function BbCafePos() {
     return () => unsubscribe();
   }, []);
 
-  // Load Menu Catalog
+  // Load menu items on component mount or tab change
   useEffect(() => {
     const fetchDbData = async () => {
       setLoading(true);
@@ -171,12 +171,10 @@ export default function BbCafePos() {
     );
   };
 
-  // Pricing calculations
   const getSubtotal = () => cart.reduce((acc, i) => acc + (i.price * i.quantity), 0);
   const getLoyaltyDiscount = () => Math.min(pointsToRedeem, getSubtotal());
   const getTotalBill = () => Math.max(0, getSubtotal() - getLoyaltyDiscount() - customDiscount);
 
-  // Print Receipt
   const handlePrintReceipt = (order: any) => {
     triggerBeep('tap');
     const printWindow = window.open('', '_blank', 'width=320,height=600');
@@ -262,7 +260,6 @@ export default function BbCafePos() {
     printWindow.document.close();
   };
 
-  // Checkout counter submit
   const handlePlaceOrder = async (e: React.FormEvent) => {
     e.preventDefault();
     if (cart.length === 0) {
@@ -362,7 +359,6 @@ export default function BbCafePos() {
       
       handlePrintReceipt(orderObj);
 
-      // Reset billing states
       setCart([]);
       setCustomerPhone('');
       setCustomerName('');
@@ -370,7 +366,7 @@ export default function BbCafePos() {
       setPointsToRedeem(0);
       setCustomDiscount(0);
       setChefInstructions('');
-      setIsCartOpen(false); // Close Drawer on success
+      setIsCartOpen(false); 
       
     } catch (err) {
       console.error(err);
@@ -404,45 +400,85 @@ export default function BbCafePos() {
   }, [products, selectedCategory, searchQuery]);
 
   return (
-    <div className="min-h-screen bg-[#050505] text-gray-100 flex flex-col font-sans antialiased">
+    <div className="min-h-screen bg-[#050505] text-gray-100 flex flex-row font-sans antialiased overflow-hidden">
       <Toaster position="top-center" />
 
-      {/* HEADER SECTION */}
-      <header className="bg-neutral-950 border-b border-white/5 py-3.5 px-6 flex flex-wrap justify-between items-center gap-4 sticky top-0 z-50 shadow-md">
-        <div className="flex items-center gap-2">
-          <Database className="text-orange-500 animate-pulse" size={18} />
-          <h1 className="text-sm font-black tracking-wider uppercase text-yellow-300">
-            Bum Bum Cafe <span className="text-white text-xs lowercase font-normal">point of sale v1.5</span>
-          </h1>
+      {/* 1. LEFT NAVIGATION SIDEBAR */}
+      <aside className="w-64 bg-neutral-950 border-r border-white/5 flex flex-col justify-between p-4 shrink-0 shadow-lg z-30">
+        <div className="space-y-6">
+          {/* Logo / Title Block */}
+          <div className="flex items-center gap-2 px-2 py-1 border-b border-white/5 pb-4">
+            <Database className="text-orange-500 animate-pulse" size={18} />
+            <h1 className="text-xs font-black tracking-wider uppercase text-yellow-300">
+              Bum Bum POS <span className="text-[8px] text-gray-400 lowercase font-mono">v1.8</span>
+            </h1>
+          </div>
+
+          {/* Navigation Controls */}
+          <nav className="space-y-1.5">
+            <button 
+              onClick={() => { triggerBeep('tap'); setActiveTab('billing'); }}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-250 ${activeTab === 'billing' ? 'bg-orange-600 text-white shadow-md' : 'text-gray-400 hover:text-white hover:bg-neutral-900'}`}
+            >
+              <ShoppingBag size={14} />
+              <span>Counter Billing</span>
+            </button>
+
+            <button 
+              onClick={() => { triggerBeep('tap'); setActiveTab('orders'); }}
+              className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-250 ${activeTab === 'orders' ? 'bg-orange-600 text-white shadow-md' : 'text-gray-400 hover:text-white hover:bg-neutral-900'}`}
+            >
+              <div className="flex items-center gap-3">
+                <Clock size={14} />
+                <span>Live Orders</span>
+              </div>
+              {liveOrders.filter(o => o.status !== 'completed' && o.status !== 'rejected').length > 0 && (
+                <span className="bg-yellow-400 text-black font-black text-[9px] px-2 py-0.5 rounded-full font-mono">
+                  {liveOrders.filter(o => o.status !== 'completed' && o.status !== 'rejected').length}
+                </span>
+              )}
+            </button>
+
+            <button 
+              onClick={() => { triggerBeep('tap'); setActiveTab('inventory'); }}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-250 ${activeTab === 'inventory' ? 'bg-orange-600 text-white shadow-md' : 'text-gray-400 hover:text-white hover:bg-neutral-900'}`}
+            >
+              <Layers size={14} />
+              <span>Stock Toggle</span>
+            </button>
+          </nav>
         </div>
 
-        {/* ADMIN VIEW SWITCHER */}
-        <div className="flex bg-neutral-900 border border-white/5 p-1 rounded-xl gap-1">
-          <button 
-            onClick={() => { triggerBeep('tap'); setActiveTab('orders'); }}
-            className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all duration-200 ${activeTab === 'orders' ? 'bg-orange-600 text-white shadow-md' : 'text-gray-400 hover:text-white'}`}
-          >
-            📋 Live Orders ({liveOrders.filter(o => o.status !== 'completed' && o.status !== 'rejected').length})
-          </button>
-          <button 
-            onClick={() => { triggerBeep('tap'); setActiveTab('billing'); }}
-            className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all duration-200 ${activeTab === 'billing' ? 'bg-orange-600 text-white shadow-md' : 'text-gray-400 hover:text-white'}`}
-          >
-            💰 Counter Billing
-          </button>
-          <button 
-            onClick={() => { triggerBeep('tap'); setActiveTab('inventory'); }}
-            className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all duration-200 ${activeTab === 'inventory' ? 'bg-orange-600 text-white shadow-md' : 'text-gray-400 hover:text-white'}`}
-          >
-            🍕 Stock Toggle
-          </button>
-        </div>
-      </header>
+        {/* SIDEBAR BOTTOM: GRID / LIST VIEW CONTROLS */}
+        {activeTab === 'billing' && (
+          <div className="border-t border-white/5 pt-4 space-y-2">
+            <p className="text-[9px] font-black uppercase text-gray-500 px-2 tracking-wider">Layout View</p>
+            <div className="flex bg-neutral-900 border border-white/5 p-1 rounded-xl">
+              <button 
+                type="button"
+                onClick={() => { triggerBeep('tap'); setViewMode('grid'); }}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[9px] font-black uppercase transition-all ${viewMode === 'grid' ? 'bg-orange-500 text-black shadow-sm' : 'text-gray-400 hover:text-white'}`}
+              >
+                <LayoutGrid size={12} />
+                <span>Grid</span>
+              </button>
+              <button 
+                type="button"
+                onClick={() => { triggerBeep('tap'); setViewMode('list'); }}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[9px] font-black uppercase transition-all ${viewMode === 'list' ? 'bg-orange-500 text-black shadow-sm' : 'text-gray-400 hover:text-white'}`}
+              >
+                <List size={12} />
+                <span>List</span>
+              </button>
+            </div>
+          </div>
+        )}
+      </aside>
 
-      {/* MAIN CONTENT VIEW */}
-      <main className="flex-1 p-5 overflow-hidden flex flex-col max-w-7xl mx-auto w-full relative">
+      {/* 2. MAIN WORKSPACE CONTENT */}
+      <main className="flex-1 p-5 overflow-hidden flex flex-col relative h-screen">
         
-        {/* TAB 1: LIVE ORDERS TICKET PIPELINE */}
+        {/* VIEW 1: LIVE ORDERS TICKET PIPELINE */}
         {activeTab === 'orders' && (
           <div className="space-y-4 flex-1 overflow-y-auto pr-1">
             <div className="flex justify-between items-center">
@@ -541,11 +577,11 @@ export default function BbCafePos() {
           </div>
         )}
 
-        {/* TAB 2: BILlING WORKSPACE */}
+        {/* VIEW 2: BILLING WORKSPACE */}
         {activeTab === 'billing' && (
           <div className="flex-1 flex flex-col overflow-hidden relative">
             
-            {/* PRODUCT CATALOG: takes full width now */}
+            {/* PRODUCT CATALOG */}
             <div className="flex-1 bg-neutral-950 border border-white/5 rounded-3xl p-4 flex flex-col overflow-hidden shadow-xl">
               <div className="flex flex-wrap gap-3 items-center justify-between mb-4">
                 
@@ -561,39 +597,15 @@ export default function BbCafePos() {
                   />
                 </div>
 
-                {/* VIEW MODE TOGGLE & CART BUTTON CONTAINER */}
-                <div className="flex items-center gap-3">
-                  
-                  {/* Grid/List View Toggles */}
-                  <div className="flex bg-neutral-900 border border-white/5 p-1 rounded-xl">
-                    <button 
-                      type="button"
-                      onClick={() => { triggerBeep('tap'); setViewMode('grid'); }}
-                      className={`p-2 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-orange-500 text-black' : 'text-gray-400 hover:text-white'}`}
-                      title="Grid View"
-                    >
-                      <LayoutGrid size={14} />
-                    </button>
-                    <button 
-                      type="button"
-                      onClick={() => { triggerBeep('tap'); setViewMode('list'); }}
-                      className={`p-2 rounded-lg transition-all ${viewMode === 'list' ? 'bg-orange-500 text-black' : 'text-gray-400 hover:text-white'}`}
-                      title="List View"
-                    >
-                      <List size={14} />
-                    </button>
-                  </div>
-
-                  {/* CART TRIGGER BUTTON */}
-                  <button 
-                    type="button"
-                    onClick={() => { triggerBeep('tap'); setIsCartOpen(true); }}
-                    className="bg-orange-500 hover:bg-orange-600 text-black font-black text-xs py-2 px-4 rounded-xl flex items-center gap-2 shadow-lg transition-all active:scale-95"
-                  >
-                    <ShoppingBag size={14} />
-                    <span>Cart ({cart.reduce((sum, item) => sum + item.quantity, 0)})</span>
-                  </button>
-                </div>
+                {/* ACTIVE DRAWER TRIGGER */}
+                <button 
+                  type="button"
+                  onClick={() => { triggerBeep('tap'); setIsCartOpen(true); }}
+                  className="bg-orange-500 hover:bg-orange-600 text-black font-black text-xs py-2 px-4 rounded-xl flex items-center gap-2 shadow-lg transition-all active:scale-95"
+                >
+                  <ShoppingBag size={14} />
+                  <span>Cart ({cart.reduce((sum, item) => sum + item.quantity, 0)})</span>
+                </button>
               </div>
 
               {/* Category Chips */}
@@ -609,7 +621,7 @@ export default function BbCafePos() {
                 ))}
               </div>
 
-              {/* PRODUCT DISPLAY (GRID VS LIST VIEW RENDERING) */}
+              {/* PRODUCTS DISPLAY GRID VS LIST */}
               {loading ? (
                 <div className="flex items-center justify-center flex-1">
                   <Loader2 className="animate-spin text-orange-500" size={24} />
@@ -618,7 +630,7 @@ export default function BbCafePos() {
                 <p className="text-center text-gray-500 text-xs py-10 uppercase tracking-widest font-black">No matching items found</p>
               ) : viewMode === 'grid' ? (
                 
-                /* VIEW 1: GRID MODE (Existing gorgeous grid styling) */
+                /* GRID VIEW */
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 overflow-y-auto flex-1 pr-1 pb-16">
                   {filteredMenu.map((item) => {
                     const isAvailable = item.isAvailable !== false;
@@ -643,7 +655,7 @@ export default function BbCafePos() {
                 </div>
               ) : (
                 
-                /* VIEW 2: LIST MODE (Ultra clean, dense row-by-row layout) */
+                /* LIST VIEW */
                 <div className="flex flex-col gap-2 overflow-y-auto flex-1 pr-1 pb-16">
                   {filteredMenu.map((item) => {
                     const isAvailable = item.isAvailable !== false;
@@ -671,7 +683,7 @@ export default function BbCafePos() {
               )}
             </div>
 
-            {/* FLOATING ACTION CART BAR (Shown at bottom when cart drawer is closed) */}
+            {/* FLOATING ACTION CART BAR */}
             {cart.length > 0 && !isCartOpen && (
               <motion.button
                 initial={{ y: 50, opacity: 0 }}
@@ -695,11 +707,10 @@ export default function BbCafePos() {
               </motion.button>
             )}
 
-            {/* CART DRAWER: CO-EXISTENT WITH INTERACTIVE BACKDROP */}
+            {/* ACTIVE ORDER DESK DRAWER */}
             <AnimatePresence>
               {isCartOpen && (
                 <>
-                  {/* Backdrop */}
                   <motion.div 
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
@@ -708,7 +719,6 @@ export default function BbCafePos() {
                     className="fixed inset-0 bg-black/60 z-40 backdrop-blur-xs cursor-pointer"
                   />
 
-                  {/* Active Order Desk Slide-over Drawer */}
                   <motion.div
                     initial={{ x: '100%' }}
                     animate={{ x: 0 }}
@@ -717,7 +727,6 @@ export default function BbCafePos() {
                     className="fixed right-0 top-0 bottom-0 w-full sm:w-[420px] bg-neutral-950 border-l border-white/10 p-5 z-50 flex flex-col justify-between shadow-2xl overflow-y-auto"
                   >
                     <div>
-                      {/* Drawer Header */}
                       <div className="flex justify-between items-center mb-4 border-b border-white/5 pb-3">
                         <div className="flex items-center gap-2">
                           <ShoppingBag className="text-orange-500" size={16} />
@@ -732,7 +741,6 @@ export default function BbCafePos() {
                         </button>
                       </div>
                       
-                      {/* Cart items list in Drawer */}
                       <div className="space-y-2 max-h-[180px] overflow-y-auto mb-4 pr-1">
                         {cart.map((item) => (
                           <div key={item.id} className="flex justify-between items-center text-xs text-gray-300 font-semibold">
@@ -750,7 +758,6 @@ export default function BbCafePos() {
                         )}
                       </div>
 
-                      {/* Loyalty Ledger block */}
                       <div className="border-t border-white/5 pt-3.5 mb-4">
                         <p className="text-[8px] font-black uppercase text-gray-400 tracking-wider mb-2">Member Rewards Ledger</p>
                         <div className="flex gap-2">
@@ -789,7 +796,6 @@ export default function BbCafePos() {
                         )}
                       </div>
 
-                      {/* Fields inside Drawer */}
                       <div className="grid grid-cols-2 gap-2 mb-4">
                         <div className="space-y-1">
                           <label className="text-[8px] font-black uppercase text-gray-400">Custom Discount (₹)</label>
@@ -849,7 +855,6 @@ export default function BbCafePos() {
                       </div>
                     </div>
 
-                    {/* Settlement calculations and final complete button */}
                     <div className="border-t border-white/5 pt-3.5 space-y-3.5">
                       <div className="space-y-1">
                         <div className="flex justify-between text-[10px] text-gray-400 font-bold">
@@ -885,7 +890,7 @@ export default function BbCafePos() {
           </div>
         )}
 
-        {/* TAB 3: INVENTORY STOCK MANAGEMENT */}
+        {/* VIEW 3: INVENTORY STOCK MANAGEMENT */}
         {activeTab === 'inventory' && (
           <div className="bg-neutral-950 border border-white/5 rounded-3xl p-5 flex-1 overflow-y-auto pb-20 shadow-xl">
             <div className="flex justify-between items-center mb-6">
