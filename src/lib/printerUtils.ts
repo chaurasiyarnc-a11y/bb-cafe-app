@@ -6,6 +6,23 @@ export interface PrintConfig {
   usbDevice?: any;
 }
 
+// फायरबेस टाइमस्टैम्प को सुरक्षित रूप से डेट स्ट्रिंग में बदलने का फंक्शन
+function formatDate(timestamp: any): string {
+  try {
+    if (!timestamp) return new Date().toLocaleString('en-IN');
+    if (typeof timestamp.toDate === 'function') {
+      return timestamp.toDate().toLocaleString('en-IN');
+    }
+    if (timestamp.seconds) {
+      return new Date(timestamp.seconds * 1000).toLocaleString('en-IN');
+    }
+    const date = new Date(timestamp);
+    return isNaN(date.getTime()) ? new Date().toLocaleString('en-IN') : date.toLocaleString('en-IN');
+  } catch (e) {
+    return new Date().toLocaleString('en-IN');
+  }
+}
+
 // दो तरफ के टेक्स्ट को थर्मल प्रिंटर की विड्थ के अनुसार अलाइन करने का हेल्पर (Bluetooth/Serial के लिए)
 function padSpaces(left: string, right: string, maxLen: number): string {
   const leftLen = left.length;
@@ -37,7 +54,7 @@ export async function handlePrintKot(order: any, config: PrintConfig) {
     text += "Item Name               Qty\n";
     text += "--------------------------------\n";
 
-    order.items?.forEach((it: any) => {
+    (order.items || []).forEach((it: any) => {
       const name = it.name.substring(0, 24);
       const qty = `x${it.quantity}`;
       text += padSpaces(name, qty, widthChars) + "\n";
@@ -52,11 +69,8 @@ export async function handlePrintKot(order: any, config: PrintConfig) {
     }
     text += "\n\n\n\n"; // कटर स्पेस
 
-    // ESC/POS बाइट्स भेजें
     const encoder = new TextEncoder();
     const dataBytes = encoder.encode(text);
-    
-    // कटर कमांड (GS V 66 0)
     const cutBytes = new Uint8Array([0x1d, 0x56, 0x42, 0x00]);
     const finalBytes = new Uint8Array(dataBytes.length + cutBytes.length);
     finalBytes.set(dataBytes);
@@ -156,7 +170,7 @@ export async function handlePrintKot(order: any, config: PrintConfig) {
               </tr>
             </thead>
             <tbody>
-              ${order.items?.map((it: any) => `
+              ${(order.items || []).map((it: any) => `
                 <tr>
                   <td>
                     <b>${it.name}</b>
@@ -190,7 +204,7 @@ export async function handlePrintReceipt(order: any, config: PrintConfig) {
   const widthChars = is58 ? 32 : 48;
 
   // यूपीआई भुगतान यूआरएल (UPI URL)
-  const upiId = "bumbumcafe@upi"; // आप इसे अपने असली UPI हैंडल से बदल सकते हैं
+  const upiId = "bumbumcafe@upi";
   const upiUrl = `upi://pay?pa=${upiId}&pn=BumBumCafe&am=${order.total}&cu=INR`;
   const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=75x75&data=${encodeURIComponent(upiUrl)}`;
 
@@ -209,14 +223,14 @@ export async function handlePrintReceipt(order: any, config: PrintConfig) {
     text += `Token: #${order.tokenNumber}\n`;
     text += `Type: ${order.fulfillmentType.toUpperCase()}\n`;
     if (order.tableNumber) text += `Table: ${order.tableNumber}\n`;
-    text += `Date: ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}\n`;
+    text += `Date: ${formatDate(order.timestamp)}\n`;
     text += "--------------------------------\n";
     text += "Item Name         Qty     Total\n";
     text += "--------------------------------\n";
 
-    order.items?.forEach((it: any) => {
+    (order.items || []).forEach((it: any) => {
       const leftCol = `${it.name.substring(0, 16)} x${it.quantity}`;
-      const rightCol = `₹${it.price * it.quantity}`; // 'Rs' को '₹' से रिप्लेस किया गया
+      const rightCol = `₹${it.price * it.quantity}`;
       text += padSpaces(leftCol, rightCol, widthChars) + "\n";
       if (it.note) text += ` * Note: ${it.note}\n`;
     });
@@ -232,8 +246,6 @@ export async function handlePrintReceipt(order: any, config: PrintConfig) {
     text += "--------------------------------\n";
     text += padSpaces("GRAND TOTAL:", `₹${order.total}`, widthChars) + "\n";
     text += "--------------------------------\n";
-    
-    // डैश्ड पे बॉक्स (QR Code के लिए टेक्स्ट सूचना)
     text += "       SCAN TO PAY (UPI)\n";
     text += `      UPI: ${upiId}\n`;
     text += `      Amount: ₹${order.total}\n`;
@@ -260,11 +272,11 @@ export async function handlePrintReceipt(order: any, config: PrintConfig) {
       }
       return;
     } catch (err) {
-      console.error("Direct receipt hardware print failed, falling back to browser window...", err);
+      console.error("Direct hardware print failed, falling back to browser window...", err);
     }
   }
 
-  // 2. Fallback: Browser Print Window (सभी सिस्टम ड्राइवर्स के लिए कम्पैक्ट विजुअल लेआउट)
+  // 2. Fallback: Browser Print Window (कम्पैक्ट विजुअल लेआउट)
   const printWindow = window.open('', '_blank', 'width=350,height=600');
   if (!printWindow) return;
 
@@ -284,7 +296,7 @@ export async function handlePrintReceipt(order: any, config: PrintConfig) {
         width: ${is58 ? '52mm' : '76mm'};
         padding: 2mm 1mm;
         margin: 0;
-        font-size: 9.5px; /* बेहतर कम्पैक्ट फ़ॉन्ट साइज़ */
+        font-size: 9.5px;
         line-height: 1.15;
         box-sizing: border-box;
       }
@@ -340,7 +352,6 @@ export async function handlePrintReceipt(order: any, config: PrintConfig) {
         padding: 3px 0;
         margin-top: 3px;
       }
-      /* कम्पैक्ट स्कैन टू पे क्यूआर बॉक्स */
       .qr-box {
         text-align: center;
         margin: 5px auto;
@@ -359,7 +370,7 @@ export async function handlePrintReceipt(order: any, config: PrintConfig) {
         display: block;
       }
       .qr-img {
-        width: 75px; /* छोटा कम्पैक्ट साइज़ */
+        width: 75px;
         height: 75px;
         display: block;
         margin: 0 auto;
@@ -388,7 +399,7 @@ export async function handlePrintReceipt(order: any, config: PrintConfig) {
             <b>Token No:</b> #${order.tokenNumber}<br/>
             <b>Fulfillment:</b> ${order.fulfillmentType.toUpperCase()}<br/>
             ${order.tableNumber ? `<b>Table No:</b> ${order.tableNumber}<br/>` : ''}
-            <b>Date:</b> ${new Date(order.timestamp).toLocaleDateString()} ${new Date(order.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            <b>Date:</b> ${formatDate(order.timestamp)}
           </div>
           <div class="bill-divider"></div>
           
@@ -401,7 +412,7 @@ export async function handlePrintReceipt(order: any, config: PrintConfig) {
               </tr>
             </thead>
             <tbody>
-              ${order.items?.map((it: any) => `
+              ${(order.items || []).map((it: any) => `
                 <tr>
                   <td>
                     ${it.name}
@@ -421,7 +432,7 @@ export async function handlePrintReceipt(order: any, config: PrintConfig) {
             <span>₹${order.subtotal}</span>
           </div>
           ${order.discount > 0 ? `
-            <div class="total-row" style="color: #000;">
+            <div class="total-row">
               <span>Discount:</span>
               <span>-₹${order.discount}</span>
             </div>
@@ -438,7 +449,7 @@ export async function handlePrintReceipt(order: any, config: PrintConfig) {
             <span>₹${order.total}</span>
           </div>
 
-          <!-- क्यूआर कोड: "SCAN TO PAY" के तुरंत नीचे और छोटे अलाइनमेंट में -->
+          <!-- क्यूआर कोड: "SCAN TO PAY" के ठीक नीचे और छोटे अलाइनमेंट में -->
           <div class="qr-box">
             <span class="qr-title">SCAN TO PAY (UPI)</span>
             <img class="qr-img" src="${qrCodeUrl}" alt="UPI QR Code" />
