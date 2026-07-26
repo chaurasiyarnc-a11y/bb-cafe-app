@@ -33,7 +33,7 @@ const SafeClock = Clock as any;
 const SafeLayers = Layers as any;
 const SafePrinter = Printer as any;
 const SafeUsers = Users as any;
-const SafePlay = Play as any; 
+const SafePlay = Play as any;
 const SafeCheck = Check as any;
 const SafeSearch = Search as any;
 const SafeX = X as any;
@@ -461,7 +461,7 @@ export default function BbCafePos() {
     return text;
   };
 
-  // 📝 Real-time receipt printer logic (Supports Web Bluetooth SPP/PT-210, USB Web Serial/WebUSB and CSS @page sizing) [1]
+  // 📝 Print receipt logic matched 100% with the provided beautiful image layout (UPI QR Code + Font size + Columns) [1]
   const handlePrintReceipt = async (order: any) => {
     triggerBeep('tap');
 
@@ -519,18 +519,55 @@ export default function BbCafePos() {
       return;
     }
 
-    // 3. Fallback browser print (Optimized with custom CSS size so the browser print dialog defaults to receipt roll instead of A4 PDF) [1]
+    // 3. System Browser print formatted exactly like the user's provided receipt image [1]
     const pageDimensionsWidth = printerPaperSize === '58mm' ? '58mm' : '80mm';
-    const containerRenderWidth = printerPaperSize === '58mm' ? '48mm' : '72mm'; // accounting for edge margins
-    
+    const containerRenderWidth = printerPaperSize === '58mm' ? '48mm' : '72mm'; // accounting for margins
+
+    // Calculate Date formatted exactly like: '26/07/26 6:19 PM'
+    const now = order.timestamp?.toDate ? order.timestamp.toDate() : new Date(order.timestamp);
+    const day = String(now.getDate()).padStart(2, '0');
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const year = String(now.getFullYear()).slice(-2);
+    let hours = now.getHours();
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    hours = hours % 12;
+    hours = hours ? hours : 12; // the hour '0' should be '12'
+    const formattedReceiptDate = `${day}/${month}/${year} ${hours}:${minutes} ${ampm}`;
+
+    // UPI QR Code generation via free qrserver API
+    const upiId = "9714293759@paytm"; // Mo. 9714293759 from image
+    const upiLink = `upi://pay?pa=${upiId}&pn=Bum%20Bum%20Cafe&am=${order.total}&cu=INR`;
+    const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=110x110&margin=0&data=${encodeURIComponent(upiLink)}`;
+
     const printWindow = window.open('', '_blank', 'width=340,height=600');
     if (!printWindow) {
       toast.error("Popup blocked! Please allow popups for this POS.");
       return;
     }
-    const formattedDate = order.timestamp?.toDate ? order.timestamp.toDate().toLocaleString('en-IN') : new Date(order.timestamp).toLocaleString();
-    const itemsRows = order.items.map((it: any) => `<tr><td style="font-size:11px; padding: 4px 0;">${it.name}${it.note ? `<br/><i style="font-size:9px;color:#555;">(${it.note})</i>` : ''}</td><td style="text-align:center; font-size:11px;">x${it.quantity}</td><td style="text-align:right; font-size:11px;">₹${it.price * it.quantity}</td></tr>`).join('');
     
+    // Generate clean billing items layout matching image design [1]
+    const itemsRows = order.items.map((it: any) => {
+      // Split notes clearly like `+ Half (₹60)`
+      let noteFormatted = "";
+      if (it.note) {
+        // format nicely if it is a variant or extra instruction
+        noteFormatted = it.note.startsWith("+") ? it.note : `+ ${it.note}`;
+      }
+      return `
+        <tr>
+          <td style="font-size: 11.5px; font-weight: bold; padding: 5px 0 1px 0; color: #111;">${it.name}</td>
+          <td style="font-size: 11.5px; font-weight: bold; text-align: right; padding: 5px 0 1px 0; color: #111;">₹${it.price * it.quantity}</td>
+        </tr>
+        <tr>
+          <td colspan="2" style="font-size: 10px; color: #444; padding-bottom: 5px; font-weight: 500;">
+            ${it.quantity} x ₹${it.price}
+            ${noteFormatted ? `<br/><span style="padding-left: 2px; font-weight: bold; color: #222;">${noteFormatted}</span>` : ''}
+          </td>
+        </tr>
+      `;
+    }).join('');
+
     printWindow.document.write(`
       <html>
         <head>
@@ -542,53 +579,97 @@ export default function BbCafePos() {
               margin: 0mm; 
             }
             body { 
-              font-family: 'Courier New', Courier, monospace; 
+              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
               width: ${containerRenderWidth}; 
               margin: 0 auto; 
-              padding: 4px; 
+              padding: 6px; 
               color: #000; 
               background-color: #fff; 
               font-size: 11px;
+              line-height: 1.35;
             }
             .center { text-align: center; }
-            .divider { border-top: 1px dashed #000; margin: 6px 0; }
+            .divider { 
+              border-top: 1.5px dotted #000; 
+              margin: 6px 0; 
+              height: 0;
+              width: 100%;
+            }
             table { width: 100%; border-collapse: collapse; }
           </style>
         </head>
         <body>
+          <!-- UPI QR Code centered at top -->
+          <div class="center" style="margin-bottom: 8px; margin-top: 4px;">
+            <img src="${qrCodeUrl}" style="width: 105px; height: 105px;" />
+            <div style="font-size: 7.5px; font-weight: 800; margin-top: 2px; letter-spacing: 0.5px;">BHIM UPI</div>
+          </div>
+
           <div class="center">
-            <h3 style="margin: 0 0 2px 0; font-size: 15px;">BUM BUM CAFE</h3>
-            <span style="font-size: 9px;">Mohandra, Panna (M.P.)</span>
+            <h2 style="margin: 0; font-size: 15px; font-weight: 850; letter-spacing: 0.2px;">Bum Bum Cafe</h2>
+            <div style="font-size: 9px; line-height: 1.3; margin-top: 3px; font-weight: 600; color: #111;">
+              बस स्टैंड मोहंद्रा, पीपल पेड़ के नीचे, मोहंद्रा,<br/>
+              जिला पन्ना, मध्य प्रदेश, 488442
+            </div>
+            <div style="font-size: 9.5px; font-weight: 800; margin-top: 3px; color: #000;">Mo. 9714293759</div>
           </div>
-          <div class="divider"></div>
-          <div style="font-size: 10px; line-height: 1.3;">
-            <b>Bill No:</b> #${String(order.billNumber).padStart(4, '0')}<br/>
-            <b>Token No:</b> #${order.tokenNumber}<br/>
-            <b>Date:</b> ${formattedDate}<br/>
-            <b>Type:</b> ${order.fulfillmentType?.toUpperCase()}<br/>
-            <b>Pay Mode:</b> ${order.paymentMethod?.toUpperCase()}<br/>
-            <b>Guest:</b> ${order.customerName || 'Walk-in Guest'}<br/>
+
+          <div style="font-size: 9.5px; line-height: 1.4; margin-top: 10px; font-weight: bold; color: #222;">
+            <div>Employee: Owner</div>
+            <div>POS: POS 02</div>
+            <div style="margin-top: 6px;">Customer: ${order.customerName || 'Walk-in Guest'}</div>
+            ${order.customerPhone ? `<div style="font-family: monospace; font-size: 9.5px; font-weight: bold;">${order.customerPhone.replace('+91', '')}</div>` : ''}
           </div>
+
           <div class="divider"></div>
-          <table>
-            <thead>
-              <tr style="border-bottom: 1px dashed #000;">
-                <th style="font-size: 10px; text-align: left; padding-bottom: 4px;">Item</th>
-                <th style="font-size: 10px; text-align: center; padding-bottom: 4px;">Qty</th>
-                <th style="font-size: 10px; text-align: right; padding-bottom: 4px;">Total</th>
-              </tr>
-            </thead>
-            <tbody>${itemsRows}</tbody>
+          
+          <table style="width: 100%; border-collapse: collapse;">
+            <tbody>
+              ${itemsRows}
+            </tbody>
           </table>
+
           <div class="divider"></div>
-          <div style="font-size: 11px; line-height: 1.4;">
-            <div style="display: flex; justify-content: space-between;"><span>Subtotal:</span><span>₹${order.subtotal}</span></div>
-            ${order.discount ? `<div style="display: flex; justify-content: space-between; font-weight: bold;"><span>Savings:</span><span>-₹${order.discount}</span></div>` : ''}
-            ${order.gstRate ? `<div style="display: flex; justify-content: space-between;"><span>GST (${order.gstRate}%):</span><span>+₹${order.gstAmount || 0}</span></div>` : ''}
-            <div style="display: flex; justify-content: space-between; font-weight: bold; font-size: 12px; margin-top: 2px;"><span>GRAND TOTAL:</span><span>₹${order.total}</span></div>
+
+          <!-- Loyalty points section matching image -->
+          <div style="font-size: 10px; font-weight: 600; line-height: 1.5; color: #222;">
+            <div style="display: flex; justify-content: space-between;">
+              <span>Points earned</span>
+              <span>1</span>
+            </div>
+            <div style="display: flex; justify-content: space-between;">
+              <span>Points balance</span>
+              <span>1</span>
+            </div>
           </div>
+
           <div class="divider"></div>
-          <div class="center" style="font-size: 9px; margin-top: 6px;"><b>Thank you! Visit Again! 🍕🍔</b></div>
+
+          <!-- Grand Total centered values -->
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 1px 0;">
+            <span style="font-size: 14px; font-weight: 900;">Total</span>
+            <span style="font-size: 14px; font-weight: 900;">₹${order.total}</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 1px 0; font-size: 11px; font-weight: 600; margin-top: 2px;">
+            <span>Cash</span>
+            <span style="font-weight: 850;">₹${order.total}</span>
+          </div>
+
+          <div class="divider"></div>
+
+          <!-- Footer with social handles -->
+          <div class="center" style="font-size: 9px; line-height: 1.4; margin-top: 6px; font-weight: 600; color: #111;">
+            <div style="font-weight: 850; font-size: 9.5px; margin-bottom: 2px;">Follow us</div>
+            <div>www.youtube.com/@bbcafe.i</div>
+            <div>All Social Media @bbcafe.in</div>
+            <div style="margin-top: 6px; font-weight: 850; font-size: 10px; color: #000;">❤ Thank you, visit again. ❤</div>
+          </div>
+
+          <!-- Receipt Timestamp and Bill Code aligned like image -->
+          <div style="display: flex; justify-content: space-between; font-size: 9.5px; font-family: monospace; color: #000; margin-top: 14px; font-weight: 850; border-top: 1px dashed #eee; padding-top: 4px;">
+            <span>${formattedReceiptDate}</span>
+            <span>#3-${order.billNumber}</span>
+          </div>
         </body>
       </html>
     `);
@@ -616,6 +697,7 @@ export default function BbCafePos() {
         return;
       }
       try {
+        // Request any Bluetooth Low Energy thermal printer
         const device = await (navigator as any).bluetooth.requestDevice({ 
           acceptAllDevices: true,
           optionalServices: [
@@ -626,7 +708,7 @@ export default function BbCafePos() {
 
         const server = await device.gatt!.connect();
         
-        // 🛠️ Dual-UUID Bluetooth service scanner fallback setup to support 99% of receipt printers
+        // Dual-UUID Bluetooth service scanner fallback setup to support 99% of receipt printers
         let service;
         let characteristic;
 
@@ -713,7 +795,7 @@ export default function BbCafePos() {
     handlePrintReceipt(mockOrder);
   };
 
-  // 📝 Geolocation detection handler restored and fully compiled inside scope
+  // Geolocation detection handler
   const handleDetectLocation = () => {
     triggerBeep('tap');
     if (typeof window === "undefined" || !navigator.geolocation) {
@@ -857,7 +939,7 @@ export default function BbCafePos() {
                       onClick={() => { 
                         triggerBeep('tap'); 
                         setActiveTab(item.id as any); 
-                        setIsSidebarOpen(false); // 🛠️ Tab select करते ही ड्रावर बंद हो जाएगा
+                        setIsSidebarOpen(false); // Tab select करते ही ड्रावर बंद हो जाएगा
                       }} 
                       className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-200 ${activeTab === item.id ? 'bg-orange-600 text-white' : 'text-gray-400 hover:bg-neutral-200 dark:hover:bg-neutral-900'}`}
                     >
@@ -872,7 +954,7 @@ export default function BbCafePos() {
               </nav>
             </div>
             <div className="space-y-4 pt-4 border-t border-neutral-200 dark:border-white/5">
-              <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-[10px] font-black uppercase text-red-500 hover:bg-red-500/10"><SafeLogOut size={14} />{!isSidebarCollapsed && <span>Lock POS</span>}</button>
+              <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-[10px] font-black uppercase text-red-500 hover:bg-red-500/10"><SafeLogOut size={14} />{!isSidebarCollapsed && <span>Lock POS</span></button>
             </div>
           </aside>
 
