@@ -19,8 +19,13 @@ import PosCartDrawer from '@/components/pos/PosCartDrawer';
 import CustomerDirectoryModal from '@/components/pos/CustomerDirectoryModal';
 import CustomizerModal from '@/components/pos/CustomizerModal';
 
-// यूटिलिटी फ़ाइल से प्रिंटर फंक्शन्स
-import { handlePrintKot, handlePrintReceipt, PrintConfig } from '@/lib/printerUtils';
+// यूटिलिटी फ़ाइल से प्रिंटर और रसीद प्रिव्यू फ़ंक्शंस को इम्पोर्ट करना
+import { 
+  handlePrintKot, 
+  handlePrintReceipt, 
+  generateReceiptHtml, 
+  PrintConfig 
+} from '@/lib/printerUtils';
 
 // Safe Lucide Icons
 const SafeLock = Lock as any;
@@ -35,7 +40,7 @@ const SafeShoppingBag = ShoppingBag as any;
 const SafeClock = Clock as any; 
 const SafeLayers = Layers as any;
 const SafePrinter = Printer as any;
-const SafeUsers = Users as any; // सुधारा हुआ सुरक्षित असाइनमेंट
+const SafeUsers = Users as any; 
 const SafePlay = Play as any; 
 const SafeCheck = Check as any;
 const SafeSearch = Search as any;
@@ -97,6 +102,7 @@ export default function BbCafePos() {
   const [isConnecting, setIsConnecting] = useState(false);
   const [printerConnected, setPrinterConnected] = useState(false);
   const [bleCharacteristic, setBleCharacteristic] = useState<any>(null);
+  const [fontSize, setFontSize] = useState<number>(9); // डायनामिक फ़ॉन्ट साइज स्टेट
 
   // USB Web Serial and WebUSB references
   const [serialPort, setSerialPort] = useState<any>(null); 
@@ -144,7 +150,6 @@ export default function BbCafePos() {
   const [isSubmittingOrder, setIsSubmittingOrder] = useState(false);
   const [chefInstructions, setChefInstructions] = useState('');
   
-  // क्रेडिट कार्ड विकल्प हटाकर स्टेट में केवल cash और upi रखा गया है
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'upi'>('cash');
 
   const [selectedProduct, setSelectedProduct] = useState<any>(null); 
@@ -152,10 +157,9 @@ export default function BbCafePos() {
   const [normalPizzaPrice, setNormalPizzaPrice] = useState(0);
   const [customizerChefNote, setCustomizerChefNote] = useState(""); 
 
-  // ड्रावर कंपोनेंट के लिए सेफ पेमेंट हैंडलर (कार्ड विकल्प को ब्लॉक करने के लिए)
   const handleSetPaymentMethod = (val: 'cash' | 'upi' | 'card') => {
     if (val === 'card') {
-      setPaymentMethod('cash'); // कार्ड चयन होने पर सुरक्षा के लिए वापस कैश पर सेट कर देगा
+      setPaymentMethod('cash');
     } else {
       setPaymentMethod(val);
     }
@@ -213,6 +217,10 @@ export default function BbCafePos() {
     const localPrintCopies = localStorage.getItem("bb_pos_print_copies");
     if (localPrintCopies) setPrintCopies(Number(localPrintCopies) || 1);
 
+    // लोकल स्टोरेज से फ़ॉन्ट साइज लोड करना
+    const localFontSize = localStorage.getItem("bb_pos_font_size");
+    if (localFontSize) setFontSize(Number(localFontSize) || 9);
+
     const localTheme = localStorage.getItem("bb_pos_theme") || 'dark';
     setThemeMode(localTheme as any);
     if (localTheme === 'light') document.documentElement.classList.remove('dark');
@@ -265,7 +273,6 @@ export default function BbCafePos() {
     })();
   }, [isLoggedIn]);
 
-  // रसीदें सीधे डेटाबेस से लोड करना
   useEffect(() => {
     if (activeTab !== 'receipts') return;
 
@@ -335,7 +342,6 @@ export default function BbCafePos() {
     }
   };
 
-  // रिफंड प्रक्रिया (Refund Order)
   const handleRefundOrder = async (orderId: string) => {
     triggerBeep('tap');
     const confirmRefund = window.confirm("Are you sure you want to refund/cancel this bill?");
@@ -345,7 +351,6 @@ export default function BbCafePos() {
     try {
       await updateDoc(doc(db, "orders", orderId), { status: 'refunded' });
       
-      // लोकल स्टेट्स को तुरंत अपडेट करें
       setSelectedReceipt((prev: any) => prev ? { ...prev, status: 'refunded' } : null);
       setPastReceipts(prev => prev.map(o => o.id === orderId ? { ...o, status: 'refunded' } : o));
       
@@ -523,13 +528,22 @@ export default function BbCafePos() {
   const getFreeDeliveryProgressPercent = () => Math.min(100, (getCartSubtotal() / selectedArea.minFree) * 100);
   const getTotalPointsRedeemedInCart = () => cart.reduce((acc, i) => acc + (i.pointsCost || 0), 0);
 
-  // प्रिंटिंग कॉन्फ़िगरेशन
+  // फ़ॉन्ट साइज कंट्रोल फंक्शन
+  const handleFontSizeChange = (newSize: number) => {
+    if (newSize >= 6 && newSize <= 24) {
+      setFontSize(newSize);
+      localStorage.setItem("bb_pos_font_size", String(newSize));
+    }
+  };
+
+  // प्रिंटिंग कॉन्फ़िगरेशन (फ़ॉन्ट साइज के साथ अपडेटेड)
   const getPrintConfig = (): PrintConfig => ({
     printerPaperSize,
     printerType,
     bleCharacteristic,
     serialPort,
-    usbDevice
+    usbDevice,
+    fontSize // dynamic font size added
   });
 
   const handleConnectPrinter = async () => {
@@ -722,14 +736,11 @@ export default function BbCafePos() {
       
       const pConfig = getPrintConfig();
 
-      // 1. K.O.T printed first
       toast.success("Printing KOT first...");
       await handlePrintKot(orderObj, pConfig);
 
-      // Simple 1.5 seconds layout cooldown to let the printer paper slice complete cleanly
       await new Promise((resolve) => setTimeout(resolve, 1500));
 
-      // 2. Customer Receipt printed second
       toast.success("Printing Customer Receipt...");
       await handlePrintReceipt(orderObj, pConfig);
 
@@ -768,7 +779,6 @@ export default function BbCafePos() {
     );
   }, [pastReceipts, receiptSearchQuery]);
 
-  // लाइव ऑर्डर्स फ़िल्टरिंग (completed/rejected ऑर्डर्स यहाँ से तुरंत हटेंगे)
   const activeLiveOrders = useMemo(() => {
     return liveOrders.filter((o) => o.status !== 'completed' && o.status !== 'rejected');
   }, [liveOrders]);
@@ -785,7 +795,36 @@ export default function BbCafePos() {
     { id: 'settings', label: 'POS Settings', icon: SafeSettings }
   ];
 
-  // UI थीम कलर्स सुधार
+  // लाइव प्रिंट प्रिव्यू के लिए एक्टिव डेटा या सैंपल डेटा लोड करना
+  const sampleOrderForPreview = useMemo(() => {
+    return {
+      billNumber: 45,
+      tokenNumber: 12,
+      timestamp: new Date(),
+      customerName: customerName || "Walk-in Guest",
+      customerPhone: customerPhone ? `+91${customerPhone}` : "",
+      address: address || "Mohandra Bus Stand, Panna, MP",
+      fulfillmentType,
+      tableNumber: tableNumber || "T-1",
+      paymentMethod,
+      items: cart.length > 0 ? cart : [
+        { name: "PANEER TIKKA", quantity: 2, price: 180, note: "EXTRA SPICY" },
+        { name: "VEG BURGER", quantity: 1, price: 90 },
+        { name: "MASALA CHAI", quantity: 3, price: 20 }
+      ],
+      subtotal: cart.length > 0 ? getCartSubtotal() : 510,
+      discount: cart.length > 0 ? (customDiscount + getLoyaltyDiscount()) : 10,
+      customerPointsRedeemed: pointsToRedeem,
+      customerPointsEarned: cart.length > 0 ? Math.floor(getTotalBillPrice() / 100) : 5,
+      customerPointsAfter: customerPhone ? Math.max(0, customerPoints + (Math.floor(getTotalBillPrice() / 100) - getTotalPointsRedeemedInCart() - pointsToRedeem)) : 25,
+      total: cart.length > 0 ? getTotalBillPrice() : 500
+    };
+  }, [cart, customerName, customerPhone, address, fulfillmentType, tableNumber, paymentMethod, customDiscount, pointsToRedeem, customerPoints]);
+
+  const receiptHtmlContent = useMemo(() => {
+    return generateReceiptHtml(sampleOrderForPreview, getPrintConfig());
+  }, [sampleOrderForPreview, printerPaperSize, printerType, fontSize]);
+
   const mainClass = "min-h-screen flex flex-col md:flex-row font-sans antialiased overflow-hidden transition-colors duration-200 " + 
     (themeMode === "dark" ? "dark bg-[#0a0a0a] text-neutral-100" : "bg-neutral-50 text-neutral-800");
 
@@ -888,7 +927,6 @@ export default function BbCafePos() {
               )}
             </div>
 
-            {/* LIVE ORDERS: आर्डर्स पूरे होने पर पूर्णतः खाली workspace दिखेगा */}
             {activeTab === 'orders' && (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pb-20 overflow-y-auto flex-1 font-sans">
                 {activeLiveOrders.length === 0 ? (
@@ -1071,7 +1109,6 @@ export default function BbCafePos() {
               </div>
             )}
 
-            {/* PAST RECEIPTS: अब पूरा बिल क्लिक करने पर रसीद विवरण पॉपअप में खुलेगा */}
             {activeTab === 'receipts' && (
               <div className="flex-1 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-3xl p-4 flex flex-col overflow-hidden shadow-xl max-w-5xl w-full mx-auto font-sans">
                 <div className="relative mb-4">
@@ -1124,119 +1161,188 @@ export default function BbCafePos() {
               </div>
             )}
 
+            {/* SETTINGS WORKSPACE: लाइव प्रिंट प्रिव्यू और फ़ॉन्ट साइज कंट्रोल के साथ अपडेटेड */}
             {activeTab === 'settings' && (
-              <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 p-6 rounded-3xl shadow-xl flex-grow max-w-xl space-y-6 overflow-y-auto font-sans">
-                <h3 className="text-sm font-black uppercase text-orange-500">POS Settings</h3>
-                <div className="border-b border-neutral-200 dark:border-neutral-800 pb-4 space-y-3">
-                  <p className="text-xs font-bold uppercase text-neutral-800 dark:text-neutral-200">A. UI Theme:</p>
-                  <div className="flex bg-neutral-100 dark:bg-neutral-800 p-1 rounded-xl w-60 border border-transparent dark:border-neutral-700">
-                    <button 
-                      onClick={() => handleToggleTheme('dark')} 
-                      className={"flex-grow py-2 rounded-lg text-[10px] font-black uppercase transition-all " + (themeMode === 'dark' ? "bg-neutral-950 text-amber-400 shadow-md" : "text-neutral-400")}
-                    >
-                      Dark
-                    </button>
-                    <button 
-                      onClick={() => handleToggleTheme('light')} 
-                      className={"flex-grow py-2 rounded-lg text-[10px] font-black uppercase transition-all " + (themeMode === 'light' ? "bg-white text-orange-600 shadow-md" : "text-neutral-400")}
-                    >
-                      Light
-                    </button>
-                  </div>
-                </div>
-                <div className="border-b border-neutral-200 dark:border-neutral-800 pb-4 space-y-3">
-                  <p className="text-xs font-bold uppercase text-neutral-800 dark:text-neutral-200">B. GST Config:</p>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-neutral-700 dark:text-neutral-300">Enable GST:</span>
-                    <button onClick={() => { const next = !gstEnabled; setGstEnabled(next); localStorage.setItem("bb_pos_gst_enabled", String(next)); }} className="text-orange-500">
-                      {gstEnabled ? <SafeToggleRight size={32} /> : <SafeToggleLeft size={32} />}
-                    </button>
-                  </div>
-                  {gstEnabled && (
-                    <input type="number" value={gstRate} onChange={e => { const r = Math.max(0, Number(e.target.value)); setGstRate(r); localStorage.setItem("bb_pos_gst_rate", String(r)); }} className="w-full bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 p-3 rounded-xl text-xs outline-none text-neutral-900 dark:text-neutral-100" />
-                  )}
-                </div>
-                <div className="border-b border-neutral-200 dark:border-neutral-800 pb-4 space-y-3">
-                  <p className="text-xs font-bold uppercase text-neutral-800 dark:text-neutral-200">C. Paper Size:</p>
-                  <div className="flex bg-neutral-100 dark:bg-neutral-800 p-1 rounded-xl w-60 border border-transparent dark:border-neutral-700">
-                    <button 
-                      onClick={() => { setPrinterPaperSize('58mm'); localStorage.setItem("bb_pos_paper_size", '58mm'); }} 
-                      className={"flex-grow py-2 rounded-lg text-[10px] font-black uppercase transition-all " + (printerPaperSize === '58mm' ? "bg-neutral-950 text-amber-400 shadow-md" : "text-neutral-400")}
-                    >
-                      58mm
-                    </button>
-                    <button 
-                      onClick={() => { setPrinterPaperSize('80mm'); localStorage.setItem("bb_pos_paper_size", '80mm'); }} 
-                      className={"flex-grow py-2 rounded-lg text-[10px] font-black uppercase transition-all " + (printerPaperSize === '80mm' ? "bg-white text-orange-600 shadow-md" : "text-neutral-400")}
-                    >
-                      80mm
-                    </button>
-                  </div>
-                </div>
-
-                <div className="space-y-3 pt-4 border-t border-neutral-200 dark:border-neutral-800">
-                  <div className="flex items-center justify-between">
-                    <p className="text-xs font-bold uppercase text-neutral-800 dark:text-neutral-200">D. Hardware Printer Connection Setup:</p>
-                    <span className={"text-[8px] font-black uppercase tracking-widest px-2.5 py-0.5 rounded-full border " + (printerConnected ? "bg-green-500/10 text-green-400 border-green-500/20" : "bg-red-500/10 text-red-400 border-red-500/20")}>
-                      {printerConnected ? '● Connected' : 'Disconnected'}
-                    </span>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    {[
-                      { id: 'thermal_usb', label: 'Thermal USB' },
-                      { id: 'thermal_bluetooth', label: 'Thermal Bluetooth' },
-                      { id: 'network_ip', label: 'Network IP Printer' },
-                      { id: 'laser', label: 'Laser A4 Printer' }
-                    ].map((p) => {
-                      const isSelected = printerType === p.id;
-                      const btnClass = "p-2 rounded-xl border text-[9px] font-black uppercase tracking-wider transition-all " + 
-                        (isSelected 
-                          ? "bg-neutral-950 text-amber-400 border-amber-500" 
-                          : "bg-neutral-100 dark:bg-neutral-800 border-neutral-200 dark:border-neutral-700 hover:text-orange-500 dark:hover:text-orange-400");
-                      return (
-                        <button 
-                          key={p.id} 
-                          onClick={() => { 
-                            triggerBeep('tap'); 
-                            setPrinterType(p.id as any); 
-                            setPrinterConnected(false); 
-                            setBleCharacteristic(null); 
-                            localStorage.setItem("bb_pos_printer_type", p.id); 
-                          }} 
-                          className={btnClass}
-                        >
-                          {p.label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                  {printerType === 'network_ip' && (
-                    <div className="space-y-1 mt-2">
-                      <label className="text-[9px] font-black uppercase text-gray-500 dark:text-gray-400">Printer IP Address</label>
-                      <input type="text" value={printerIp} onChange={e => { setPrinterIp(e.target.value); localStorage.setItem("bb_pos_printer_ip", e.target.value); }} className="w-full bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 p-3 rounded-xl text-xs outline-none font-mono text-neutral-800 dark:text-neutral-100" />
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start pb-20 overflow-y-auto flex-1 font-sans">
+                
+                {/* बायाँ कॉलम: सेटिंग्स कंट्रोल्स */}
+                <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 p-6 rounded-3xl shadow-xl space-y-6">
+                  <h3 className="text-sm font-black uppercase text-orange-500">POS Settings</h3>
+                  
+                  {/* UI थीम */}
+                  <div className="border-b border-neutral-200 dark:border-neutral-800 pb-4 space-y-3">
+                    <p className="text-xs font-bold uppercase text-neutral-800 dark:text-neutral-200">A. UI Theme:</p>
+                    <div className="flex bg-neutral-100 dark:bg-neutral-800 p-1 rounded-xl w-60 border border-transparent dark:border-neutral-700">
+                      <button 
+                        onClick={() => handleToggleTheme('dark')} 
+                        className={"flex-grow py-2 rounded-lg text-[10px] font-black uppercase transition-all " + (themeMode === 'dark' ? "bg-neutral-950 text-amber-400 shadow-md" : "text-neutral-400")}
+                      >
+                        Dark
+                      </button>
+                      <button 
+                        onClick={() => handleToggleTheme('light')} 
+                        className={"flex-grow py-2 rounded-lg text-[10px] font-black uppercase transition-all " + (themeMode === 'light' ? "bg-white text-orange-600 shadow-md" : "text-neutral-400")}
+                      >
+                        Light
+                      </button>
                     </div>
-                  )}
-                  <div className="space-y-1">
-                    <label className="text-[9px] font-black uppercase text-gray-500 dark:text-gray-400">Number of Bill Copies</label>
-                    <input type="number" min={1} max={5} value={printCopies} onChange={e => { const v = Math.max(1, Number(e.target.value)); setPrintCopies(v); localStorage.setItem("bb_pos_print_copies", String(v)); }} className="w-full bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 p-3 rounded-xl text-xs outline-none font-mono text-neutral-800 dark:text-neutral-100" />
                   </div>
 
-                  <div className="flex gap-2 pt-2">
-                    <button 
-                      onClick={handleConnectPrinter} 
-                      disabled={isConnecting}
-                      className="flex-1 bg-amber-500 hover:bg-amber-600 disabled:bg-neutral-750 text-black disabled:text-neutral-500 font-black py-2.5 rounded-xl text-[10px] uppercase shadow-md active:scale-95 transition-all flex items-center justify-center gap-1"
-                    >
-                      {isConnecting ? <Loader2 className="animate-spin text-neutral-500" size={10} /> : 'Connect Device'}
-                    </button>
-                    <button 
-                      onClick={handleTestPrint} 
-                      className="flex-grow bg-green-600 hover:bg-green-700 text-white font-black py-2.5 rounded-xl text-[10px] uppercase shadow-md active:scale-95 transition-all"
-                    >
-                      Test Print 🧾
-                    </button>
+                  {/* GST सेटिंग्स */}
+                  <div className="border-b border-neutral-200 dark:border-neutral-800 pb-4 space-y-3">
+                    <p className="text-xs font-bold uppercase text-neutral-800 dark:text-neutral-200">B. GST Config:</p>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-neutral-700 dark:text-neutral-300">Enable GST:</span>
+                      <button onClick={() => { const next = !gstEnabled; setGstEnabled(next); localStorage.setItem("bb_pos_gst_enabled", String(next)); }} className="text-orange-500">
+                        {gstEnabled ? <SafeToggleRight size={32} /> : <SafeToggleLeft size={32} />}
+                      </button>
+                    </div>
+                    {gstEnabled && (
+                      <input type="number" value={gstRate} onChange={e => { const r = Math.max(0, Number(e.target.value)); setGstRate(r); localStorage.setItem("bb_pos_gst_rate", String(r)); }} className="w-full bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 p-3 rounded-xl text-xs outline-none text-neutral-900 dark:text-neutral-100" />
+                    )}
+                  </div>
+
+                  {/* पेपर साइज */}
+                  <div className="border-b border-neutral-200 dark:border-neutral-800 pb-4 space-y-3">
+                    <p className="text-xs font-bold uppercase text-neutral-800 dark:text-neutral-200">C. Paper Size:</p>
+                    <div className="flex bg-neutral-100 dark:bg-neutral-800 p-1 rounded-xl w-60 border border-transparent dark:border-neutral-700">
+                      <button 
+                        onClick={() => { setPrinterPaperSize('58mm'); localStorage.setItem("bb_pos_paper_size", '58mm'); }} 
+                        className={"flex-grow py-2 rounded-lg text-[10px] font-black uppercase transition-all " + (printerPaperSize === '58mm' ? "bg-neutral-950 text-amber-400 shadow-md" : "text-neutral-400")}
+                      >
+                        58mm
+                      </button>
+                      <button 
+                        onClick={() => { setPrinterPaperSize('80mm'); localStorage.setItem("bb_pos_paper_size", '80mm'); }} 
+                        className={"flex-grow py-2 rounded-lg text-[10px] font-black uppercase transition-all " + (printerPaperSize === '80mm' ? "bg-white text-orange-600 shadow-md" : "text-neutral-400")}
+                      >
+                        80mm
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* नया फ़ॉन्ट साइज कंट्रोल */}
+                  <div className="border-b border-neutral-200 dark:border-neutral-800 pb-4 space-y-3">
+                    <p className="text-xs font-bold uppercase text-neutral-800 dark:text-neutral-200">D. Base Font Size (px):</p>
+                    <div className="flex items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={() => handleFontSizeChange(fontSize - 0.5)}
+                        className="bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 border border-neutral-200 dark:border-neutral-750 w-10 h-10 rounded-lg font-bold text-base text-gray-700 dark:text-white flex items-center justify-center transition"
+                      >
+                        -
+                      </button>
+                      <input
+                        type="number"
+                        step="0.5"
+                        min="6"
+                        max="24"
+                        value={fontSize}
+                        onChange={(e) => handleFontSizeChange(parseFloat(e.target.value) || 9)}
+                        className="w-20 text-center font-bold text-xs bg-neutral-100 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-100 p-2 border border-neutral-200 dark:border-neutral-700 rounded-lg h-10 focus:outline-orange-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleFontSizeChange(fontSize + 0.5)}
+                        className="bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 border border-neutral-200 dark:border-neutral-750 w-10 h-10 rounded-lg font-bold text-base text-gray-700 dark:text-white flex items-center justify-center transition"
+                      >
+                        +
+                      </button>
+                      <span className="text-[10px] text-gray-400 font-semibold ml-1">Normal: 8.5px - 10px</span>
+                    </div>
+                  </div>
+
+                  {/* हार्डवेयर प्रिंटर कनेक्शन */}
+                  <div className="space-y-3 pt-4 border-t border-neutral-200 dark:border-neutral-800">
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs font-bold uppercase text-neutral-800 dark:text-neutral-200">E. Hardware Printer Connection:</p>
+                      <span className={"text-[8px] font-black uppercase tracking-widest px-2.5 py-0.5 rounded-full border " + (printerConnected ? "bg-green-500/10 text-green-400 border-green-500/20" : "bg-red-500/10 text-red-400 border-red-500/20")}>
+                        {printerConnected ? '● Connected' : 'Disconnected'}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      {[
+                        { id: 'thermal_usb', label: 'Thermal USB' },
+                        { id: 'thermal_bluetooth', label: 'Thermal Bluetooth' },
+                        { id: 'network_ip', label: 'Network IP Printer' },
+                        { id: 'laser', label: 'Laser A4 Printer' }
+                      ].map((p) => {
+                        const isSelected = printerType === p.id;
+                        const btnClass = "p-2 rounded-xl border text-[9px] font-black uppercase tracking-wider transition-all " + 
+                          (isSelected 
+                            ? "bg-neutral-950 text-amber-400 border-amber-500" 
+                            : "bg-neutral-100 dark:bg-neutral-800 border-neutral-200 dark:border-neutral-700 hover:text-orange-500 dark:hover:text-orange-400");
+                        return (
+                          <button 
+                            key={p.id} 
+                            onClick={() => { 
+                              triggerBeep('tap'); 
+                              setPrinterType(p.id as any); 
+                              setPrinterConnected(false); 
+                              setBleCharacteristic(null); 
+                              localStorage.setItem("bb_pos_printer_type", p.id); 
+                            }} 
+                            className={btnClass}
+                          >
+                            {p.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {printerType === 'network_ip' && (
+                      <div className="space-y-1 mt-2">
+                        <label className="text-[9px] font-black uppercase text-gray-500 dark:text-gray-400">Printer IP Address</label>
+                        <input type="text" value={printerIp} onChange={e => { setPrinterIp(e.target.value); localStorage.setItem("bb_pos_printer_ip", e.target.value); }} className="w-full bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 p-3 rounded-xl text-xs outline-none font-mono text-neutral-800 dark:text-neutral-100" />
+                      </div>
+                    )}
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-black uppercase text-gray-500 dark:text-gray-400">Number of Bill Copies</label>
+                      <input type="number" min={1} max={5} value={printCopies} onChange={e => { const v = Math.max(1, Number(e.target.value)); setPrintCopies(v); localStorage.setItem("bb_pos_print_copies", String(v)); }} className="w-full bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 p-3 rounded-xl text-xs outline-none font-mono text-neutral-800 dark:text-neutral-100" />
+                    </div>
+
+                    <div className="flex gap-2 pt-2">
+                      <button 
+                        onClick={handleConnectPrinter} 
+                        disabled={isConnecting}
+                        className="flex-1 bg-amber-500 hover:bg-amber-600 disabled:bg-neutral-750 text-black disabled:text-neutral-500 font-black py-2.5 rounded-xl text-[10px] uppercase shadow-md active:scale-95 transition-all flex items-center justify-center gap-1"
+                      >
+                        {isConnecting ? <Loader2 className="animate-spin text-neutral-500" size={10} /> : 'Connect Device'}
+                      </button>
+                      <button 
+                        onClick={handleTestPrint} 
+                        className="flex-grow bg-green-600 hover:bg-green-700 text-white font-black py-2.5 rounded-xl text-[10px] uppercase shadow-md active:scale-95 transition-all"
+                      >
+                        Test Print 🧾
+                      </button>
+                    </div>
                   </div>
                 </div>
+
+                {/* दायाँ कॉलम: लाइव थर्मल प्रिव्यू */}
+                <div className="flex flex-col items-center">
+                  <span className="text-xs font-bold text-neutral-500 mb-2">Live Thermal Roll Preview</span>
+                  
+                  {/* थर्मल रसीद सिमुलेटर (Iframe Isolator) */}
+                  <div className="bg-neutral-200 dark:bg-neutral-800 p-4 rounded-3xl border border-neutral-300 dark:border-neutral-850 max-w-full flex justify-center shadow-inner">
+                    <iframe
+                      srcDoc={receiptHtmlContent}
+                      style={{
+                        width: printerPaperSize === '58mm' ? '250px' : '340px',
+                        height: '460px',
+                        border: 'none',
+                        backgroundColor: '#fff',
+                        boxShadow: '0 4px 10px rgba(0,0,0,0.15)',
+                        borderRadius: '8px',
+                        transition: 'width 0.2s ease'
+                      }}
+                      title="Live Print Preview"
+                    />
+                  </div>
+                  <p className="text-[10px] text-neutral-400 mt-2 text-center max-w-xs">
+                    * जब आप कार्ट में असली आइटम्स जोड़ेंगे, तो यह लाइव बिल दिखाने लगेगा।
+                  </p>
+                </div>
+
               </div>
             )}
           </main>
@@ -1383,8 +1489,8 @@ export default function BbCafePos() {
         setChefInstructions={setChefInstructions} 
         isSubmittingOrder={isSubmittingOrder} 
         paymentMethod={paymentMethod} 
-        setPaymentMethod={handleSetPaymentMethod} // सुधरा हुआ सेफ हैंडलर पास किया गया
-        noCutlery={false} // ईको-फ्रेंडली पैक विकल्प को कार्ट से हटाया गया
+        setPaymentMethod={handleSetPaymentMethod} 
+        noCutlery={false} 
         setNoCutlery={() => {}} 
         getCartSubtotal={getCartSubtotal} 
         getCartAddonsPrice={() => 0} 
