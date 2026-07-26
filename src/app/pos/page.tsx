@@ -434,23 +434,23 @@ export default function BbCafePos() {
   const getFreeDeliveryProgressPercent = () => Math.min(100, (getCartSubtotal() / selectedArea.minFree) * 100);
   const getTotalPointsRedeemedInCart = () => cart.reduce((acc, i) => acc + (i.pointsCost || 0), 0);
 
-  // Buffer Chunk writing function to prevent Web Bluetooth and USB truncation / buffer overflows
+  // Safe chunk writing helper for both Web Bluetooth and USB serial port thermal printers
   const sendToPrinterInChunks = async (text: string) => {
     const encoder = new TextEncoder();
     const bytes = encoder.encode(text);
-    const chunkSize = 120; // Highly safe chunk size for standard thermal printers
+    const chunkSize = 120; // 120 bytes is highly safe to prevent printer buffers from dropping data
 
     if (printerType === 'thermal_bluetooth' && bleCharacteristic) {
       try {
         for (let i = 0; i < bytes.length; i += chunkSize) {
           const chunk = bytes.slice(i, i + chunkSize);
           await bleCharacteristic.writeValue(chunk);
-          await new Promise((resolve) => setTimeout(resolve, 60)); // Buffer recovery delay
+          await new Promise((resolve) => setTimeout(resolve, 60)); // Small pause
         }
         return true;
       } catch (err) {
         console.error(err);
-        throw new Error("Bluetooth print fail");
+        throw new Error("Bluetooth print failed");
       }
     }
 
@@ -477,13 +477,13 @@ export default function BbCafePos() {
         }
       } catch (err) {
         console.error(err);
-        throw new Error("USB print fail");
+        throw new Error("USB print failed");
       }
     }
     return false;
   };
 
-  // 1. K.O.T ESC/POS Generator (Kitchen format)
+  // 1. K.O.T ESC/POS Text Generator
   const generateKotEscPosText = (order: any) => {
     const formattedDate = order.timestamp?.toDate ? order.timestamp.toDate().toLocaleString('en-IN') : new Date(order.timestamp).toLocaleString();
     const dividerLine = "--------------------------------\n";
@@ -519,7 +519,7 @@ export default function BbCafePos() {
     return text;
   };
 
-  // 2. Customer Receipt ESC/POS Generator (With loyalty details in the header)
+  // 2. Customer Receipt ESC/POS Text Generator
   const generateEscPosText = (order: any) => {
     const formattedDate = order.timestamp?.toDate ? order.timestamp.toDate().toLocaleString('en-IN') : new Date(order.timestamp).toLocaleString();
     const dividerLine = "--------------------------------\n";
@@ -534,7 +534,6 @@ export default function BbCafePos() {
     text += `Type: ${order.fulfillmentType?.toUpperCase()}\n`;
     text += `Pay Mode: ${order.paymentMethod?.toUpperCase()}\n`;
     
-    // Header loyalty profile
     if (order.customerPhone) {
       text += dividerLine;
       text += `GUEST: ${order.customerName.toUpperCase()}\n`;
@@ -562,9 +561,8 @@ export default function BbCafePos() {
     return text;
   };
 
-  // Print K.O.T Action
+  // 3. Print K.O.T System (Bigger & Highlighted styling)
   const handlePrintKot = async (order: any) => {
-    // A. Direct Hardware Printer chunked sending
     if ((printerType === 'thermal_bluetooth' && bleCharacteristic) || (printerType === 'thermal_usb' && (serialPort || usbDevice))) {
       try {
         const kotText = generateKotEscPosText(order);
@@ -575,16 +573,19 @@ export default function BbCafePos() {
       return;
     }
 
-    // B. System Print Dialog Fallback
     const printWindow = window.open('', '_blank', 'width=340,height=600');
     if (!printWindow) return;
     
     const itemsHtml = order.items.map((it: any) => `
-      <tr>
-        <td style="font-size: 13px; font-weight: bold; padding: 4px 0;">${it.name.toUpperCase()}</td>
-        <td style="font-size: 13px; font-weight: bold; text-align: right; padding: 4px 0;">x ${it.quantity}</td>
+      <tr style="border-bottom: 1px dashed #ccc;">
+        <td style="font-size: 13px; font-weight: 900; padding: 6px 0; color: #000; text-transform: uppercase;">
+          ${it.name}
+          ${it.note ? `<div style="font-size: 11px; color: #d97706; font-weight: 800; padding-left: 6px; margin-top: 2px;">★ NOTE: ${it.note}</div>` : ''}
+        </td>
+        <td style="font-size: 14px; font-weight: 900; text-align: right; padding: 6px 0; color: #000; font-family: monospace;">
+          x ${it.quantity}
+        </td>
       </tr>
-      ${it.note ? `<tr><td colspan="2" style="font-size: 11px; color: #333; padding-bottom: 4px;">* Note: ${it.note}</td></tr>` : ''}
     `).join('');
 
     printWindow.document.write(`
@@ -592,25 +593,51 @@ export default function BbCafePos() {
         <head>
           <style>
             @page { size: ${printerPaperSize === '58mm' ? '58mm' : '80mm'} auto; margin: 0; }
-            body { font-family: monospace; padding: 6px; font-size: 12px; }
+            body { font-family: monospace; padding: 6px; font-size: 12px; color: #000; background-color: #fff; }
             .center { text-align: center; }
             .divider { border-top: 1.5px dotted #000; margin: 6px 0; }
           </style>
         </head>
         <body>
-          <div class="center" style="font-size: 16px; font-weight: bold; border: 2px solid #000; padding: 4px;">K.O.T (KITCHEN)</div>
-          <div class="center" style="font-size: 11px; margin-top: 4px;">BUM BUM CAFE</div>
+          <div class="center" style="font-size: 17px; font-weight: 900; border: 2.5px solid #000; padding: 5px; letter-spacing: 1px; background-color: #000; color: #fff;">
+            K.O.T (KITCHEN)
+          </div>
+          <div class="center" style="font-size: 10px; font-weight: bold; margin-top: 3px; letter-spacing: 0.5px;">BUM BUM CAFE</div>
+          
           <div class="divider"></div>
-          <div><b>Token: #${order.tokenNumber}</b></div>
-          <div>Bill No: #${order.billNumber}</div>
-          <div>Type: ${order.fulfillmentType?.toUpperCase()} ${order.tableNumber ? `(${order.tableNumber})` : ''}</div>
+          
+          <div style="font-size: 11.5px; font-weight: bold; line-height: 1.4;">
+            <div>Token No: <span style="font-size: 13px; font-weight: 900;">#${order.tokenNumber}</span></div>
+            <div>Bill No: #${order.billNumber}</div>
+            <div>Mode: <span style="font-size: 12px; font-weight: 950; text-transform: uppercase;">${order.fulfillmentType?.toUpperCase()} ${order.tableNumber ? `(${order.tableNumber})` : ''}</span></div>
+          </div>
+          
           <div class="divider"></div>
+          
           <table style="width:100%; border-collapse:collapse;">
-            ${itemsHtml}
+            <thead>
+              <tr style="border-bottom: 1px solid #000;">
+                <th style="text-align: left; font-size: 11px; font-weight: 900; padding-bottom: 4px;">ITEM DESCRIPTION</th>
+                <th style="text-align: right; font-size: 11px; font-weight: 900; padding-bottom: 4px;">QTY</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${itemsRows}
+            </tbody>
           </table>
-          ${order.chefInstructions ? `<div class="divider"></div><div><b>Instructions:</b> ${order.chefInstructions}</div>` : ''}
+          
+          ${order.chefInstructions ? `
+            <div style="margin-top: 10px; padding: 6px; border: 1.5px solid #000; background-color: #fafafa; border-radius: 4px;">
+              <div style="font-size: 10px; font-weight: 900; color: #000; text-decoration: underline; margin-bottom: 2px;">👨‍🍳 CHEF INSTRUCTION:</div>
+              <div style="font-size: 12px; font-weight: 900; line-height: 1.3;">${order.chefInstructions}</div>
+            </div>
+          ` : ''}
+          
           <div class="divider"></div>
-          <div class="center" style="font-size: 10px;">${new Date().toLocaleString('en-IN')}</div>
+          
+          <div class="center" style="font-size: 9.5px; font-weight: bold;">
+            Printed on: ${new Date().toLocaleString('en-IN')}
+          </div>
         </body>
       </html>
     `);
@@ -622,11 +649,10 @@ export default function BbCafePos() {
     }, 350);
   };
 
-  // Print Customer Receipt Action
+  // 4. Print Customer Receipt System (Loyalty in Header + QR Pay Footer)
   const handlePrintReceipt = async (order: any) => {
     triggerBeep('tap');
 
-    // A. Direct Hardware Printer chunked sending
     if ((printerType === 'thermal_bluetooth' && bleCharacteristic) || (printerType === 'thermal_usb' && (serialPort || usbDevice))) {
       const toastId = toast.loading("Sending directly to thermal printer...");
       try {
@@ -646,7 +672,6 @@ export default function BbCafePos() {
       return;
     }
 
-    // B. Fallback: System Print Dialog with dynamic UPI QR Code and Loyalty inside Header
     const pageDimensionsWidth = printerPaperSize === '58mm' ? '58mm' : '80mm';
     const containerRenderWidth = printerPaperSize === '58mm' ? '48mm' : '72mm';
 
@@ -677,19 +702,23 @@ export default function BbCafePos() {
       }
       return `
         <tr>
-          <td style="font-size: 11.5px; font-weight: bold; padding: 5px 0 1px 0; color: #111;">${it.name}</td>
-          <td style="font-size: 11.5px; font-weight: bold; text-align: right; padding: 5px 0 1px 0; color: #111;">₹${it.price * it.quantity}</td>
+          <td style="font-size: 11px; font-weight: bold; padding: 4px 0 1px 0; color: #111; vertical-align: top;">
+            ${it.name}
+            ${noteFormatted ? `<br/><span style="font-size: 9px; font-weight: bold; color: #555; padding-left: 4px; font-style: italic;">${noteFormatted}</span>` : ''}
+          </td>
+          <td style="font-size: 11px; font-weight: bold; text-align: right; padding: 4px 0 1px 0; color: #111; font-family: monospace; vertical-align: top;">
+            ₹${it.price * it.quantity}
+          </td>
         </tr>
         <tr>
-          <td colspan="2" style="font-size: 10px; color: #444; padding-bottom: 5px; font-weight: 500;">
+          <td colspan="2" style="font-size: 9.5px; color: #666; padding-bottom: 4px; font-weight: 500; font-family: monospace; border-bottom: 1px dashed #eee;">
             ${it.quantity} x ₹${it.price}
-            ${noteFormatted ? '<br/><span style="padding-left: 2px; font-weight: bold; color: #222;">' + noteFormatted + '</span>' : ''}
           </td>
         </tr>
       `;
     }).join('');
 
-    const phoneMarkup = order.customerPhone ? `<div style="font-family: monospace; font-size: 9.5px; font-weight: bold;">${order.customerPhone.replace('+91', '')}</div>` : '';
+    const phoneMarkup = order.customerPhone ? `<div style="font-family: monospace; font-size: 10px; font-weight: bold; margin-top: 2px;">📞 ${order.customerPhone.replace('+91', '')}</div>` : '';
 
     printWindow.document.write(`
       <html>
@@ -701,14 +730,14 @@ export default function BbCafePos() {
               margin: 0mm; 
             }
             body { 
-              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
               width: ${containerRenderWidth}; 
               margin: 0 auto; 
-              padding: 6px; 
+              padding: 4px; 
               color: #000; 
               background-color: #fff; 
               font-size: 11px;
-              line-height: 1.35;
+              line-height: 1.3;
             }
             .center { text-align: center; }
             .divider { 
@@ -717,42 +746,67 @@ export default function BbCafePos() {
               height: 0;
               width: 100%;
             }
+            .double-divider { 
+              border-top: 1.5px dotted #000; 
+              border-bottom: 1.5px dotted #000; 
+              margin: 6px 0; 
+              height: 3px;
+              width: 100%;
+            }
             table { width: 100%; border-collapse: collapse; }
+            .meta-grid {
+              display: grid;
+              grid-template-cols: 1fr 1fr;
+              font-size: 9.5px;
+              row-gap: 2px;
+              font-family: monospace;
+              font-weight: bold;
+              color: #222;
+            }
           </style>
         </head>
         <body>
-          <div class="center" style="margin-top: 4px; margin-bottom: 8px;">
-            <div style="display: inline-block; background-color: #000; color: #fff; padding: 5px 10px; font-size: 13px; font-weight: 900; border-radius: 4px; letter-spacing: 1px; margin-bottom: 4px;">
+          <div class="center" style="margin-top: 2px; margin-bottom: 6px;">
+            <div style="display: inline-block; background-color: #000; color: #fff; padding: 4px 8px; font-size: 12.5px; font-weight: 900; border-radius: 3px; letter-spacing: 0.5px; margin-bottom: 3px;">
               🍕 BUM BUM CAFE 🍕
             </div>
-            <div style="font-size: 9px; line-height: 1.3; font-weight: 600; color: #111;">
+            <div style="font-size: 8.5px; line-height: 1.25; font-weight: bold; color: #333;">
               बस स्टैंड मोहंद्रा, पीपल पेड़ के नीचे, मोहंद्रा,<br/>
               जिला पन्ना, मध्य प्रदेश, 488442
             </div>
-            <div style="font-size: 9.5px; font-weight: 800; margin-top: 3px; color: #000;">Mo. 9714293759</div>
+            <div style="font-size: 9.5px; font-weight: 800; margin-top: 2px; color: #000; font-family: monospace;">Mo. 9714293759</div>
           </div>
 
-          <div style="font-size: 9.5px; line-height: 1.4; margin-top: 8px; font-weight: bold; color: #222;">
-            <div>Employee: Owner</div>
-            <div>POS: Terminal 02</div>
-            <div style="margin-top: 6px;">Customer: ${order.customerName || 'Walk-in Guest'}</div>
+          <div class="divider"></div>
+
+          <div class="meta-grid">
+            <div>Bill No: #${String(order.billNumber).padStart(4, '0')}</div>
+            <div style="text-align: right;">Token: #<strong>${order.tokenNumber}</strong></div>
+            <div>Mode: ${order.fulfillmentType?.toUpperCase()}</div>
+            <div style="text-align: right;">Pay: ${order.paymentMethod?.toUpperCase()}</div>
+          </div>
+
+          <div class="divider"></div>
+
+          <div style="font-size: 10px; line-height: 1.35; font-weight: bold; color: #111;">
+            <div style="font-size: 9px; color: #555; text-transform: uppercase;">Customer Details:</div>
+            <div style="font-size: 10.5px; font-weight: 800; color: #000; margin-top: 1px;">👤 ${order.customerName || 'Walk-in Guest'}</div>
             ${phoneMarkup}
 
-            <!-- Loyalty Status printed directly in Receipt Header -->
             ${order.customerPhone ? `
-            <div style="background-color: #f5f5f5; border: 1px dashed #000; padding: 5px; margin-top: 5px; font-size: 9px; border-radius: 4px;">
-              <div style="font-weight: 900; color: #b45309; text-align: center; margin-bottom: 3px;">LOYALTY POINTS STATUS</div>
-              <div style="display: flex; justify-content: space-between;"><span>Prev Balance:</span> <span>${order.customerPointsBefore || 0}</span></div>
-              <div style="display: flex; justify-content: space-between;"><span>Points Earned:</span> <span style="color: green;">+${order.customerPointsEarned || 0}</span></div>
-              <div style="display: flex; justify-content: space-between;"><span>Points Redeemed:</span> <span style="color: red;">-${order.customerPointsRedeemed || 0}</span></div>
-              <div style="display: flex; justify-content: space-between; font-weight: 900; border-top: 1px dotted #ccc; padding-top: 2px; margin-top: 2px;"><span>Total Points:</span> <span>${order.customerPointsAfter || 0}</span></div>
+            <div style="background-color: #fafafa; border: 1px dashed #aaa; padding: 5px; margin-top: 6px; font-size: 8.5px; border-radius: 4px; font-family: monospace;">
+              <div style="font-weight: 900; color: #b45309; text-align: center; margin-bottom: 3px; font-family: sans-serif; letter-spacing: 0.3px;">★ LOYALTY PROFILE ★</div>
+              <div style="display: flex; justify-content: space-between;"><span>Prev Balance:</span> <span>${order.customerPointsBefore || 0} pts</span></div>
+              <div style="display: flex; justify-content: space-between;"><span>Earned:</span> <span style="color: green;">+${order.customerPointsEarned || 0} pts</span></div>
+              <div style="display: flex; justify-content: space-between;"><span>Redeemed:</span> <span style="color: red;">-${order.customerPointsRedeemed || 0} pts</span></div>
+              <div style="display: flex; justify-content: space-between; font-weight: 900; border-top: 1px dotted #ccc; padding-top: 2px; margin-top: 2px; color: #000; font-size: 9px;"><span>New Balance:</span> <span>${order.customerPointsAfter || 0} pts</span></div>
             </div>
             ` : ''}
           </div>
 
-          <div class="divider"></div>
+          <div class="divider" style="margin-top: 8px;"></div>
           
-          <table style="width: 100%; border-collapse: collapse;">
+          <table style="margin-top: 2px;">
             <tbody>
               ${itemsRows}
             </tbody>
@@ -760,33 +814,50 @@ export default function BbCafePos() {
 
           <div class="divider"></div>
 
-          <div style="display: flex; justify-content: space-between; align-items: center; padding: 1px 0;">
-            <span style="font-size: 14px; font-weight: 900;">Total</span>
-            <span style="font-size: 14px; font-weight: 900;">₹${order.total}</span>
+          <div style="font-size: 10.5px; font-family: monospace; font-weight: bold; line-height: 1.45; color: #111;">
+            <div style="display: flex; justify-content: space-between;">
+              <span>Subtotal:</span>
+              <span>₹${order.subtotal}</span>
+            </div>
+            ${order.discount ? `
+            <div style="display: flex; justify-content: space-between; color: green;">
+              <span>Savings:</span>
+              <span>-₹${order.discount}</span>
+            </div>` : ''}
+            ${order.gstAmount ? `
+            <div style="display: flex; justify-content: space-between; color: #444;">
+              <span>GST (${order.gstRate}%):</span>
+              <span>+₹${order.gstAmount}</span>
+            </div>` : ''}
           </div>
-          <div style="display: flex; justify-content: space-between; align-items: center; padding: 1px 0; font-size: 11px; font-weight: 600; margin-top: 2px;">
-            <span>${order.paymentMethod?.toUpperCase()}</span>
-            <span style="font-weight: 850;">₹${order.total}</span>
+
+          <div class="double-divider"></div>
+
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 2px 0;">
+            <span style="font-size: 13.5px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.5px;">Grand Total</span>
+            <span style="font-size: 14.5px; font-weight: 900; font-family: monospace;">₹${order.total}</span>
           </div>
 
           <div class="divider"></div>
 
-          <div class="center" style="margin-top: 10px; margin-bottom: 8px;">
-            <div style="font-size: 9px; font-weight: 900; text-transform: uppercase; margin-bottom: 5px; color: #000; letter-spacing: 0.2px;">
+          <div class="center" style="margin-top: 8px; margin-bottom: 6px;">
+            <div style="font-size: 9px; font-weight: 900; text-transform: uppercase; margin-bottom: 4px; color: #000; letter-spacing: 0.2px;">
               Scan To Pay: ₹${order.total}
             </div>
-            <img src="${qrCodeUrl}" style="width: 110px; height: 110px; display: inline-block; border: 1px solid #eaeaea; padding: 2px; border-radius: 4px;" />
-            <div style="font-size: 7.5px; font-weight: 800; margin-top: 3px; letter-spacing: 0.5px; color: #333;">BHIM UPI PAYTM</div>
+            <img src="${qrCodeUrl}" style="width: 105px; height: 105px; display: inline-block; border: 1.5px solid #000; padding: 2px; border-radius: 4px;" />
+            <div style="font-size: 8px; font-weight: 900; margin-top: 4px; letter-spacing: 0.5px; color: #000;">BHIM UPI PAYTM</div>
           </div>
 
-          <div class="center" style="font-size: 9px; line-height: 1.4; margin-top: 6px; font-weight: 600; color: #111;">
-            <div style="font-weight: 850; font-size: 9.5px; margin-bottom: 2px;">Follow us</div>
+          <div class="divider"></div>
+
+          <div class="center" style="font-size: 8.5px; line-height: 1.4; margin-top: 4px; font-weight: bold; color: #222;">
+            <div style="font-weight: 900; font-size: 9px; margin-bottom: 1px;">Follow us</div>
             <div>www.youtube.com/@bbcafe.i</div>
-            <div>All Social Media @bbcafe.in</div>
-            <div style="margin-top: 6px; font-weight: 850; font-size: 10px; color: #000;">❤ Thank you, visit again. ❤</div>
+            <div>Social Media: @bbcafe.in</div>
+            <div style="margin-top: 4px; font-weight: 900; font-size: 10px; color: #000; font-style: italic;">❤ Thank you, visit again! ❤</div>
           </div>
 
-          <div style="display: flex; justify-content: space-between; font-size: 9.5px; font-family: monospace; color: #000; margin-top: 14px; font-weight: 850; border-top: 1px dashed #eee; padding-top: 4px;">
+          <div style="display: flex; justify-content: space-between; font-size: 9px; font-family: monospace; color: #444; margin-top: 10px; font-weight: bold; border-top: 1px dashed #ccc; padding-top: 4px;">
             <span>${formattedReceiptDate}</span>
             <span>#3-${order.billNumber}</span>
           </div>
@@ -802,7 +873,7 @@ export default function BbCafePos() {
     }, 350); 
   };
 
-  // Direct Hardware Printer connector
+  // Direct Hardware Connection Printer setup trigger
   const handleConnectPrinter = async () => {
     triggerBeep('tap');
     setIsConnecting(true);
@@ -926,7 +997,7 @@ export default function BbCafePos() {
     );
   };
 
-  // Place Order flow: Saves details, prints KOT first, then prints detailed Customer Bill
+  // Place Order transaction flow (Includes K.O.T -> Customer Receipt printing sequence)
   const handlePlaceOrder = async (e: React.FormEvent) => {
     e.preventDefault();
     if (cart.length === 0 || isSubmittingOrder) return;
@@ -936,7 +1007,6 @@ export default function BbCafePos() {
     const finalTotal = getTotalBillPrice();
     const token = Math.floor(1000 + Math.random() * 9000);
 
-    // Save detailed customer points configuration
     const earned = Math.floor(finalTotal / 100);
     const netPoints = customerPhone ? (earned - getTotalPointsRedeemedInCart() - pointsToRedeem) : 0;
     const pointsAfterBill = customerPhone ? Math.max(0, customerPoints + netPoints) : 0;
@@ -992,18 +1062,17 @@ export default function BbCafePos() {
       triggerBeep('success'); 
       toast.success(`Bill #${billNumber} saved successfully!`);
       
-      // 1. First, print Kitchen Order Ticket (K.O.T)
+      // 1. K.O.T printed first
       toast.success("Printing KOT first...");
       await handlePrintKot(orderObj);
 
-      // Wait 1.5 seconds for thermal printer buffer spacing
+      // Simple 1.5 seconds layout cooldown to let the printer paper slice complete cleanly
       await new Promise((resolve) => setTimeout(resolve, 1500));
 
-      // 2. Second, print detailed Customer Bill
+      // 2. Customer Receipt printed second
       toast.success("Printing Customer Receipt...");
       await handlePrintReceipt(orderObj);
 
-      // Clear layout
       setCart([]); setCustomerPhone(''); setCustomerName(''); setCustomerPoints(0); setPointsToRedeem(0); setCustomDiscount(0); setIsCartOpen(false); setChefInstructions('');
     } catch (err) {
       toast.error("Counter transaction failed");
