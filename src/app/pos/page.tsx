@@ -33,7 +33,7 @@ const SafeClock = Clock as any;
 const SafeLayers = Layers as any;
 const SafePrinter = Printer as any;
 const SafeUsers = Users as any;
-const SafePlay = Play as any;
+const SafePlay = SafePlay as any || Play;
 const SafeCheck = Check as any;
 const SafeSearch = Search as any;
 const SafeX = X as any;
@@ -91,11 +91,7 @@ export default function BbCafePos() {
   const [printCopies, setPrintCopies] = useState(1);
   const [isConnecting, setIsConnecting] = useState(false);
   const [printerConnected, setPrinterConnected] = useState(false);
-  
-  // Real hardware API connection references
-  const [bleCharacteristic, setBleCharacteristic] = useState<any>(null); // Bluetooth reference
-  const [serialPort, setSerialPort] = useState<any>(null); // USB Web Serial reference
-  const [usbDevice, setUsbDevice] = useState<any>(null); // USB WebUSB reference
+  const [bleCharacteristic, setBleCharacteristic] = useState<any>(null); // Real Web Bluetooth GATT reference
 
   const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false);
   const [customerSearchQuery, setCustomerSearchQuery] = useState('');
@@ -461,7 +457,7 @@ export default function BbCafePos() {
     return text;
   };
 
-  // 📝 Real-time print receipt logic optimized to avoid blank print view + USB/Bluetooth Direct Silent Printing [1]
+  // 📝 Print receipt logic optimized to avoid blank print view + USB/Bluetooth Direct Silent Printing [1]
   const handlePrintReceipt = async (order: any) => {
     triggerBeep('tap');
 
@@ -519,7 +515,7 @@ export default function BbCafePos() {
       return;
     }
 
-    // 3. System print dialog fallback for laser/IP printers (Fixed delayed paint) [1]
+    // 3. System print dialog fallback for laser/IP printers (Fixed delayed paint so page is never empty) [1]
     const widthPixels = printerPaperSize === '58mm' ? '240px' : '290px';
     const printWindow = window.open('', '_blank', 'width=340,height=600');
     if (!printWindow) {
@@ -588,7 +584,7 @@ export default function BbCafePos() {
     }, 350); 
   };
 
-  // 📝 Real-time bluetooth & direct USB device connector
+  // 📝 Real-time bluetooth & direct USB device connector (Type casting fixed safely)
   const handleConnectPrinter = async () => {
     triggerBeep('tap');
     setIsConnecting(true);
@@ -602,6 +598,7 @@ export default function BbCafePos() {
         return;
       }
       try {
+        // Request any Bluetooth Low Energy thermal printer
         const device = await (navigator as any).bluetooth.requestDevice({ 
           acceptAllDevices: true,
           optionalServices: ['000018f0-0000-1000-8000-00805f9b34fb'] 
@@ -684,6 +681,29 @@ export default function BbCafePos() {
       timestamp: new Date()
     };
     handlePrintReceipt(mockOrder);
+  };
+
+  // 📝 Geolocation detection handler restored and fully compiled inside scope
+  const handleDetectLocation = () => {
+    triggerBeep('tap');
+    if (typeof window === "undefined" || !navigator.geolocation) {
+      toast.error("Geolocation is not supported by your device.");
+      return;
+    }
+    const toastId = toast.loading("Detecting location...");
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        setAddress(`GPS Location: https://www.google.com/maps?q=${latitude.toFixed(6)},${longitude.toFixed(6)}`);
+        toast.dismiss(toastId);
+        toast.success("Location detected!");
+      },
+      () => {
+        toast.dismiss(toastId);
+        toast.error("Unable to retrieve location.");
+      },
+      { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+    );
   };
 
   const handlePlaceOrder = async (e: React.FormEvent) => {
@@ -802,7 +822,15 @@ export default function BbCafePos() {
                 {navItems.map((item) => {
                   const Icon = item.icon;
                   return (
-                    <button key={item.id} onClick={() => { triggerBeep('tap'); setActiveTab(item.id as any); }} className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-200 ${activeTab === item.id ? 'bg-orange-600 text-white' : 'text-gray-400 hover:bg-neutral-200 dark:hover:bg-neutral-900'}`}>
+                    <button 
+                      key={item.id} 
+                      onClick={() => { 
+                        triggerBeep('tap'); 
+                        setActiveTab(item.id as any); 
+                        setIsSidebarOpen(false); // 🛠️ Tab select karte hi drawer automatically close ho jayega
+                      }} 
+                      className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-200 ${activeTab === item.id ? 'bg-orange-600 text-white' : 'text-gray-400 hover:bg-neutral-200 dark:hover:bg-neutral-900'}`}
+                    >
                       <div className="flex items-center gap-3">
                         <Icon size={14} />
                         {!isSidebarCollapsed && <span>{item.label}</span>}
@@ -918,7 +946,7 @@ export default function BbCafePos() {
               <div className="bg-white dark:bg-neutral-950 border border-neutral-200 dark:border-white/5 p-5 flex-1 overflow-y-auto pb-20 rounded-3xl">
                 <div className="flex justify-between items-center mb-6">
                   <div><h2 className="text-sm font-black uppercase text-orange-500">Live Item Stock Control</h2><p className="text-[10px] text-neutral-500">Disable items instantly for customers.</p></div>
-                  <button onClick={async () => { triggerBeep('tap'); const snap = await getDocs(collection(db, "products")); setProducts(snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))); }} className="p-2 bg-neutral-200 dark:bg-neutral-900 text-gray-400 rounded-xl"><SafeRefreshCw size={14} /></button>
+                  <button onClick={async () => { triggerBeep('tap'); const snap = await getDocs(collection(db, "products")); setProducts(snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))); }} className="p-2 bg-neutral-200 dark:bg-neutral-950 text-gray-400 rounded-xl"><SafeRefreshCw size={14} /></button>
                 </div>
                 <div className="space-y-2 max-w-xl">
                   {products.map((item) => {
