@@ -91,7 +91,11 @@ export default function BbCafePos() {
   const [printCopies, setPrintCopies] = useState(1);
   const [isConnecting, setIsConnecting] = useState(false);
   const [printerConnected, setPrinterConnected] = useState(false);
-  const [bleCharacteristic, setBleCharacteristic] = useState<any>(null); // Real Web Bluetooth GATT reference
+  
+  // Real hardware API connection references
+  const [bleCharacteristic, setBleCharacteristic] = useState<any>(null); // Bluetooth reference
+  const [serialPort, setSerialPort] = useState<any>(null); // USB Web Serial reference
+  const [usbDevice, setUsbDevice] = useState<any>(null); // USB WebUSB reference
 
   const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false);
   const [customerSearchQuery, setCustomerSearchQuery] = useState('');
@@ -235,7 +239,7 @@ export default function BbCafePos() {
         const uDoc = snap.docs[0].data();
         setIsLoggedIn(true);
         setCurrentUser({ id: snap.docs[0].id, ...uDoc });
-        localStorage.setItem("bb_pos_user", JSON.stringify({ id: snap.docs[0].id, ...uDoc })); // Fixed: Parenthesis properly closed
+        localStorage.setItem("bb_pos_user", JSON.stringify({ id: snap.docs[0].id, ...uDoc })); 
         toast.success(`Welcome, ${uDoc.name}!`);
       } else {
         toast.error("Incorrect PIN!");
@@ -424,60 +428,98 @@ export default function BbCafePos() {
   const getFreeDeliveryProgressPercent = () => Math.min(100, (getCartSubtotal() / selectedArea.minFree) * 100);
   const getTotalPointsRedeemedInCart = () => cart.reduce((acc, i) => acc + (i.pointsCost || 0), 0);
 
-  // 📝 Print receipt logic optimized to avoid blank print view + Bluetooth direct ESC/POS writing [1]
+  // Helper to generate clean ESC/POS text command body
+  const generateEscPosText = (order: any) => {
+    const formattedDate = order.timestamp?.toDate ? order.timestamp.toDate().toLocaleString('en-IN') : new Date(order.timestamp).toLocaleString();
+    const dividerLine = "--------------------------------\n";
+    
+    let text = "";
+    text += "          BUM BUM CAFE          \n";
+    text += "     Mohandra, Panna (M.P.)     \n";
+    text += dividerLine;
+    text += `Bill No: #${String(order.billNumber).padStart(4, '0')}\n`;
+    text += `Token No: #${order.tokenNumber}\n`;
+    text += `Date: ${formattedDate}\n`;
+    text += `Type: ${order.fulfillmentType?.toUpperCase()}\n`;
+    text += `Pay Mode: ${order.paymentMethod?.toUpperCase()}\n`;
+    text += dividerLine;
+
+    order.items.forEach((it: any) => {
+      const itemText = `${it.name} x${it.quantity}`;
+      const itemPrice = `Rs.${it.price * it.quantity}`;
+      text += `${itemText.slice(0, 20).padEnd(20)}${itemPrice.padStart(12)}\n`;
+      if (it.note) text += `  (${it.note})\n`;
+    });
+
+    text += dividerLine;
+    text += `Subtotal: Rs.${order.subtotal}\n`;
+    if (order.discount) text += `Savings: -Rs.${order.discount}\n`;
+    text += `Total Bill: Rs.${order.total}\n`;
+    text += dividerLine;
+    text += "    Thank you! Visit Again!🍕   \n";
+    text += "\n\n\n\n"; // Paper feed space
+    return text;
+  };
+
+  // 📝 Real-time print receipt logic optimized to avoid blank print view + USB/Bluetooth Direct Silent Printing [1]
   const handlePrintReceipt = async (order: any) => {
     triggerBeep('tap');
 
-    // 1. Bluetooth Printer ESC/POS Real-time Print Implementation
+    // 1. Direct Bluetooth Printer ESC/POS Real-time Print Implementation (No Dialog)
     if (printerType === 'thermal_bluetooth' && bleCharacteristic) {
-      const toastId = toast.loading("Sending bill directly to Bluetooth printer...");
+      const toastId = toast.loading("Sending directly to Bluetooth printer...");
       try {
-        const formattedDate = order.timestamp?.toDate ? order.timestamp.toDate().toLocaleString('en-IN') : new Date(order.timestamp).toLocaleString();
-        const dividerLine = "--------------------------------\n";
-        
-        let receiptText = "";
-        receiptText += "          BUM BUM CAFE          \n";
-        receiptText += "     Mohandra, Panna (M.P.)     \n";
-        receiptText += dividerLine;
-        receiptText += `Bill No: #${String(order.billNumber).padStart(4, '0')}\n`;
-        receiptText += `Token No: #${order.tokenNumber}\n`;
-        receiptText += `Date: ${formattedDate}\n`;
-        receiptText += `Type: ${order.fulfillmentType?.toUpperCase()}\n`;
-        receiptText += `Pay Mode: ${order.paymentMethod?.toUpperCase()}\n`;
-        receiptText += dividerLine;
-
-        order.items.forEach((it: any) => {
-          const itemText = `${it.name} x${it.quantity}`;
-          const itemPrice = `Rs.${it.price * it.quantity}`;
-          receiptText += `${itemText.slice(0, 20).padEnd(20)}${itemPrice.padStart(12)}\n`;
-          if (it.note) receiptText += `  (${it.note})\n`;
-        });
-
-        receiptText += dividerLine;
-        receiptText += `Subtotal: Rs.${order.subtotal}\n`;
-        if (order.discount) receiptText += `Savings: -Rs.${order.discount}\n`;
-        receiptText += `Total Bill: Rs.${order.total}\n`;
-        receiptText += dividerLine;
-        receiptText += "    Thank you! Visit Again!🍕   \n";
-        receiptText += "\n\n\n\n"; // Paper feed space
-
+        const receiptText = generateEscPosText(order);
         const encoder = new TextEncoder();
         const bytes = encoder.encode(receiptText);
-        
-        await bleCharacteristic.writeValue(bytes); // Write direct ESC/POS raw bytes
+        await bleCharacteristic.writeValue(bytes);
         toast.dismiss(toastId);
-        toast.success("Receipt printed successfully!");
+        toast.success("Printed directly via Bluetooth!");
       } catch (err) {
         console.error(err);
         toast.dismiss(toastId);
-        toast.error("Bluetooth write failed. Reconnect printing device.");
+        toast.error("Bluetooth print failed. Please reconnect.");
         setPrinterConnected(false);
         setBleCharacteristic(null);
       }
       return;
     }
 
-    // 2. Standard laser/USB/system browser print (Fixed delayed paint so page is never empty) [1]
+    // 2. Direct USB Printer ESC/POS Real-time Print Implementation (Web Serial & WebUSB - No Dialog) [1]
+    if (printerType === 'thermal_usb' && (serialPort || usbDevice)) {
+      const toastId = toast.loading("Sending directly to USB printer...");
+      try {
+        const receiptText = generateEscPosText(order);
+        const encoder = new TextEncoder();
+        const bytes = encoder.encode(receiptText);
+
+        if (serialPort) {
+          const writer = serialPort.writable.getWriter();
+          await writer.write(bytes);
+          writer.releaseLock();
+          toast.dismiss(toastId);
+          toast.success("Printed directly via USB Serial!");
+          return;
+        }
+
+        if (usbDevice) {
+          await usbDevice.transferOut(1, bytes); // Raw bulk transfer to print endpoint
+          toast.dismiss(toastId);
+          toast.success("Printed directly via WebUSB!");
+          return;
+        }
+      } catch (err) {
+        console.error(err);
+        toast.dismiss(toastId);
+        toast.error("USB direct print failed. Please reconnect printer.");
+        setPrinterConnected(false);
+        setSerialPort(null);
+        setUsbDevice(null);
+      }
+      return;
+    }
+
+    // 3. System print dialog fallback for laser/IP printers (Fixed delayed paint) [1]
     const widthPixels = printerPaperSize === '58mm' ? '240px' : '290px';
     const printWindow = window.open('', '_blank', 'width=340,height=600');
     if (!printWindow) {
@@ -546,29 +588,28 @@ export default function BbCafePos() {
     }, 350); 
   };
 
-  // 📝 Real-time bluetooth device connector (Fixed Type-Casting for browser compilation)
+  // 📝 Real-time bluetooth & direct USB device connector
   const handleConnectPrinter = async () => {
     triggerBeep('tap');
     setIsConnecting(true);
     const toastId = toast.loading(`Connecting to ${printerType.toUpperCase().replace('_', ' ')}...`);
 
     if (printerType === 'thermal_bluetooth') {
-      if (!(navigator as any).bluetooth) { // Fixed: Type casted navigator to 'any'
+      if (!(navigator as any).bluetooth) { 
         toast.dismiss(toastId);
         setIsConnecting(false);
         toast.error("Web Bluetooth is not supported on this browser/device. Please use Google Chrome on HTTPS.");
         return;
       }
       try {
-        // Request any Bluetooth Low Energy thermal printer
-        const device = await (navigator as any).bluetooth.requestDevice({ // Fixed: Type casted navigator to 'any'
+        const device = await (navigator as any).bluetooth.requestDevice({ 
           acceptAllDevices: true,
-          optionalServices: ['000018f0-0000-1000-8000-00805f9b34fb'] // Standard battery and SPP service UUID
+          optionalServices: ['000018f0-0000-1000-8000-00805f9b34fb'] 
         });
 
         const server = await device.gatt!.connect();
         const service = await server.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb');
-        const characteristic = await service.getCharacteristic('00002af1-0000-1000-8000-00805f9b34fb'); // Write characteristics
+        const characteristic = await service.getCharacteristic('00002af1-0000-1000-8000-00805f9b34fb'); 
 
         setBleCharacteristic(characteristic);
         setPrinterConnected(true);
@@ -581,8 +622,42 @@ export default function BbCafePos() {
       } finally {
         setIsConnecting(false);
       }
+    } else if (printerType === 'thermal_usb') {
+      if (!(navigator as any).serial && !(navigator as any).usb) {
+        toast.dismiss(toastId);
+        setIsConnecting(false);
+        toast.error("Direct USB printing is not supported on this browser. Please use Google Chrome.");
+        return;
+      }
+      try {
+        // Option A: Attempt Web Serial (Virtual COM Port) [1]
+        if ((navigator as any).serial) {
+          const port = await (navigator as any).serial.requestPort();
+          await port.open({ baudRate: 9600 });
+          setSerialPort(port);
+          setPrinterConnected(true);
+          toast.dismiss(toastId);
+          toast.success("Direct USB Printer Connected via Web Serial!");
+        } else {
+          // Option B: Fallback to WebUSB bulk transfer endpoint pairing [1]
+          const device = await (navigator as any).usb.requestDevice({ filters: [] });
+          await device.open();
+          await device.selectConfiguration(1);
+          await device.claimInterface(0);
+          setUsbDevice(device);
+          setPrinterConnected(true);
+          toast.dismiss(toastId);
+          toast.success("Direct USB Printer Connected via WebUSB!");
+        }
+      } catch (err: any) {
+        console.error(err);
+        toast.dismiss(toastId);
+        toast.error("Direct USB connection failed. Ensure printer is connected and not occupied.");
+      } finally {
+        setIsConnecting(false);
+      }
     } else {
-      // USB/Laser Mock connection
+      // Laser/IP Printer simulated setup
       setTimeout(() => {
         toast.dismiss(toastId);
         setIsConnecting(false);
@@ -670,28 +745,6 @@ export default function BbCafePos() {
     triggerBeep('tap'); setThemeMode(mode); localStorage.setItem("bb_pos_theme", mode);
     if (mode === 'light') document.documentElement.classList.remove('dark');
     else document.documentElement.classList.add('dark');
-  };
-
-  const handleDetectLocation = () => {
-    triggerBeep('tap');
-    if (typeof window === "undefined" || !navigator.geolocation) {
-      toast.error("Geolocation is not supported by your device.");
-      return;
-    }
-    const toastId = toast.loading("Detecting location...");
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const { latitude, longitude } = position.coords;
-        setAddress(`GPS Location: https://www.google.com/maps?q=${latitude.toFixed(6)},${longitude.toFixed(6)}`);
-        toast.dismiss(toastId);
-        toast.success("Location detected!");
-      },
-      () => {
-        toast.dismiss(toastId);
-        toast.error("Unable to retrieve location.");
-      },
-      { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
-    );
   };
 
   const filteredMenu = useMemo(() => products.filter(p => (selectedCategory === 'All' || p.category === selectedCategory) && p.name.toLowerCase().includes(searchQuery.toLowerCase())), [products, selectedCategory, searchQuery]);
