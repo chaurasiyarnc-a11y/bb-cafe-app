@@ -8,31 +8,30 @@ export interface PrintConfig {
   usbDevice: any;
 }
 
-// डायरेक्ट हार्डवेयर प्रिंटर के लिए UPI QR कोड बाइट्स (ESC/POS) जेनरेटर
+// डायरेक्ट थर्मल प्रिंटर के लिए बाइट-कोड आधारित QR कोड जनरेटर
 export const generateEscPosQrBytes = (upiUrl: string): Uint8Array => {
   const encoder = new TextEncoder();
   const urlBytes = encoder.encode(upiUrl);
   const pL = (urlBytes.length + 3) & 0xFF;
   const pH = ((urlBytes.length + 3) >> 8) & 0xFF;
 
-  // ESC/POS QR Code कमांड्स
   const commands = [
-    // 1. Set model (Model 2)
+    // Model 2 सेट करें
     0x1D, 0x28, 0x6B, 0x04, 0x00, 0x31, 0x41, 0x32, 0x00,
-    // 2. Set module size (size 6 dots)
+    // QR कोड का आकार (साइज 6 डॉट्स)
     0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x43, 0x06,
-    // 3. Set error correction level (Level L)
+    // एरर करेक्शन लेवल (Level L)
     0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x45, 0x30,
-    // 4. Store data in symbol storage area
+    // सिंबल स्टोरेज एरिया में डेटा स्टोर करें
     0x1D, 0x28, 0x6B, pL, pH, 0x31, 0x50, 0x30, ...Array.from(urlBytes),
-    // 5. Print QR Code symbol
+    // QR कोड प्रिंट करें
     0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x51, 0x48,
     0x0A, 0x0A
   ];
   return new Uint8Array(commands);
 };
 
-// बफर ओवरफ़्लो रोकने के लिए छोटे चंक्स में प्रिंट बाइट्स भेजने का फ़ंक्शन
+// डेटा बफर को छोटे पैकेट्स में भेजने का सुरक्षित सिस्टम
 export const sendToPrinterInChunks = async (
   config: PrintConfig,
   text: string,
@@ -50,7 +49,7 @@ export const sendToPrinterInChunks = async (
     finalBytes = combined;
   }
 
-  const chunkSize = 120; // 120 बाइट्स का सुरक्षित आकार
+  const chunkSize = 120;
 
   if (config.printerType === 'thermal_bluetooth' && config.bleCharacteristic) {
     try {
@@ -95,7 +94,7 @@ export const sendToPrinterInChunks = async (
   return false;
 };
 
-// K.O.T डायरेक्ट प्रिंटर टेक्स्ट जेनरेटर (No Chinese, items left-aligned, qty right-aligned)
+// K.O.T डायरेक्ट प्रिंटर टेक्स्ट डिज़ाइन (No Chinese, clean alignment)
 export const generateKotEscPosText = (order: any): string => {
   const formattedDate = order.timestamp?.toDate ? order.timestamp.toDate().toLocaleString('en-IN') : new Date(order.timestamp).toLocaleString();
   const dividerLine = "--------------------------------\n";
@@ -135,7 +134,7 @@ export const generateKotEscPosText = (order: any): string => {
   return text;
 };
 
-// रसीद डायरेक्ट प्रिंटर टेक्स्ट जेनरेटर (No Chinese, Customer details inside header, Aligned details)
+// ग्राहक बिल डायरेक्ट प्रिंटर टेक्स्ट डिज़ाइन (Customer Info & Vertical Points)
 export const generateEscPosText = (order: any): string => {
   const formattedDate = order.timestamp?.toDate ? order.timestamp.toDate().toLocaleString('en-IN') : new Date(order.timestamp).toLocaleString();
   const dividerLine = "--------------------------------\n";
@@ -152,13 +151,13 @@ export const generateEscPosText = (order: any): string => {
   text += `Name: ${order.customerName || 'Walk-in Guest'}\n`;
   if (order.customerPhone) {
     text += `Phone: ${order.customerPhone}\n`;
-    text += `Prev Points: ${order.customerPointsBefore || 0}\n`;
-    text += `Earned: +${order.customerPointsEarned || 0}  Redeemed: -${order.customerPointsRedeemed || 0}\n`;
-    text += `New Balance: ${order.customerPointsAfter || 0}\n`;
+  }
+  if (order.address) {
+    text += `Address: ${order.address}\n`;
   }
   text += dividerLine;
 
-  // Metadata
+  // Invoice metadata
   text += `Bill No: #${String(order.billNumber).padStart(4, '0')}\n`;
   text += `Token No: #${order.tokenNumber}\n`;
   text += `Date: ${formattedDate}\n`;
@@ -172,7 +171,6 @@ export const generateEscPosText = (order: any): string => {
     const qtyPrice = `  ${it.quantity} x Rs.${it.price}`;
     const itemTotal = `Rs.${it.price * it.quantity}`;
     text += `${qtyPrice.padEnd(20)}${itemTotal.padStart(12)}\n`;
-    if (it.note) text += `  Note: (${it.note.toUpperCase()})\n`;
   });
 
   // Vertical totals stack
@@ -189,19 +187,26 @@ export const generateEscPosText = (order: any): string => {
   
   text += dividerLine;
   text += `GRAND TOTAL:        Rs.${order.total}\n`;
-  text += dividerLine;
   
+  // Points information - Stacked Vertically
+  if (order.customerPhone) {
+    text += dividerLine;
+    text += `Current Point:      ${order.customerPointsEarned || 0}\n`;
+    text += `Balance Point:      ${order.customerPointsAfter || 0}\n`;
+  }
+
+  text += dividerLine;
   text += "          SCAN TO PAY           \n";
   text += "\n\n"; 
   text += "    THANK YOU! VISIT AGAIN      \n";
-  text += "      BBCAFE.IN / YOUTUBE       \n";
+  text += "  www.bb-cafe-app.vercel.app    \n";
   text += dividerLine;
   text += `Date: ${formattedDate}  #3-${order.billNumber}\n`;
   text += "\n\n\n\n";
   return text;
 };
 
-// K.O.T प्रिंट फ़ंक्शन (सिस्टम प्रिंट डायलॉग और डायरेक्ट हार्डवेयर दोनों के लिए)
+// K.O.T प्रिंट फ़ंक्शन
 export const handlePrintKot = async (order: any, config: PrintConfig) => {
   if (
     (config.printerType === 'thermal_bluetooth' && config.bleCharacteristic) || 
@@ -292,7 +297,7 @@ export const handlePrintKot = async (order: any, config: PrintConfig) => {
   }, 350);
 };
 
-// ग्राहक रसीद प्रिंट फ़ंक्शन (सिस्टम प्रिंट डायलॉग और डायरेक्ट हार्डवेयर दोनों के लिए)
+// ग्राहक रसीद प्रिंट फ़ंक्शन
 export const handlePrintReceipt = async (order: any, config: PrintConfig) => {
   const upiId = "9714293759@paytm"; 
   const upiLink = `upi://pay?pa=${upiId}&pn=Bum%20Bum%20Cafe&am=${order.total}&cu=INR`;
@@ -304,7 +309,6 @@ export const handlePrintReceipt = async (order: any, config: PrintConfig) => {
     const toastId = toast.loading("Sending directly to thermal printer...");
     try {
       const receiptText = generateEscPosText(order);
-      // टेक्स्ट के साथ डायनेमिक UPI QR कोड बाइट्स भी एक साथ भेज रहे हैं
       await sendToPrinterInChunks(config, receiptText, upiLink);
       toast.dismiss(toastId);
       toast.success("Customer receipt printed!");
@@ -338,15 +342,10 @@ export const handlePrintReceipt = async (order: any, config: PrintConfig) => {
   }
   
   const itemsRows = order.items.map((it: any) => {
-    let noteFormatted = "";
-    if (it.note) {
-      noteFormatted = it.note.startsWith("+") ? it.note : "+ " + it.note;
-    }
     return `
       <tr>
         <td style="font-size: 11px; font-weight: bold; padding: 4px 0 1px 0; color: #111; vertical-align: top;">
           ${it.name.toUpperCase()}
-          ${noteFormatted ? `<br/><span style="font-size: 9px; font-weight: bold; color: #555; padding-left: 4px; font-style: italic;">Note: ${noteFormatted}</span>` : ''}
         </td>
       </tr>
       <tr>
@@ -359,14 +358,13 @@ export const handlePrintReceipt = async (order: any, config: PrintConfig) => {
   }).join('');
 
   const phoneMarkup = order.customerPhone ? `<div style="font-family: monospace; font-size: 10px; font-weight: bold; margin-top: 2px;">Phone: ${order.customerPhone.replace('+91', '')}</div>` : '';
+  const addressMarkup = order.address ? `<div style="font-size: 10px; font-weight: bold; margin-top: 2px; max-width: 100%; word-wrap: break-word;">Address: ${order.address}</div>` : '';
 
   const loyaltyHeaderMarkup = order.customerPhone ? `
     <div style="background-color: #fafafa; border: 1px dashed #aaa; padding: 5px; margin-top: 6px; font-size: 8.5px; border-radius: 4px; font-family: monospace;">
-      <div style="font-weight: 900; color: #b45309; text-align: center; margin-bottom: 3px; font-family: sans-serif; letter-spacing: 0.3px;">LOYALTY POINTS PROFILE</div>
-      <div style="display: flex; justify-content: space-between;"><span>Prev Balance:</span> <span>${order.customerPointsBefore || 0} pts</span></div>
-      <div style="display: flex; justify-content: space-between;"><span>Points Earned:</span> <span style="color: green;">+${order.customerPointsEarned || 0} pts</span></div>
-      <div style="display: flex; justify-content: space-between;"><span>Points Redeemed:</span> <span style="color: red;">-${order.customerPointsRedeemed || 0} pts</span></div>
-      <div style="display: flex; justify-content: space-between; font-weight: 900; border-top: 1px dotted #ccc; padding-top: 2px; margin-top: 2px; color: #000; font-size: 9px;"><span>New Balance:</span> <span>${order.customerPointsAfter || 0} pts</span></div>
+      <div style="font-weight: 900; color: #b45309; text-align: center; margin-bottom: 4px; font-family: sans-serif; letter-spacing: 0.3px;">LOYALTY POINTS PROFILE</div>
+      <div style="display: flex; justify-content: space-between; margin-bottom: 2px;"><span>Current Point:</span> <span style="color: green; font-weight: 900;">+${order.customerPointsEarned || 0} pts</span></div>
+      <div style="display: flex; justify-content: space-between;"><span>Balance Point:</span> <span style="font-weight: 900;">${order.customerPointsAfter || 0} pts</span></div>
     </div>
   ` : '';
 
@@ -436,6 +434,7 @@ export const handlePrintReceipt = async (order: any, config: PrintConfig) => {
           <div style="font-size: 9px; color: #555; text-transform: uppercase;">CUSTOMER DETAILS:</div>
           <div style="font-size: 10.5px; font-weight: 800; color: #000; margin-top: 1px;">Name: ${order.customerName || 'Walk-in Guest'}</div>
           ${phoneMarkup}
+          ${addressMarkup}
           ${loyaltyHeaderMarkup}
         </div>
 
@@ -503,6 +502,7 @@ export const handlePrintReceipt = async (order: any, config: PrintConfig) => {
           <div>www.youtube.com/@bbcafe.i</div>
           <div>Social Media: @bbcafe.in</div>
           <div style="margin-top: 4px; font-weight: 900; font-size: 10px; color: #000; font-style: italic;">THANK YOU, VISIT AGAIN!</div>
+          <div style="font-size: 9.5px; font-weight: bold; margin-top: 3px; color: #000;">www.bb-cafe-app.vercel.app</div>
         </div>
 
         <div style="display: flex; justify-content: space-between; font-size: 9px; font-family: monospace; color: #444; margin-top: 10px; font-weight: bold; border-top: 1px dashed #ccc; padding-top: 4px;">
