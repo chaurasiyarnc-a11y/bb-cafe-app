@@ -434,7 +434,92 @@ export default function BbCafePos() {
   const getFreeDeliveryProgressPercent = () => Math.min(100, (getCartSubtotal() / selectedArea.minFree) * 100);
   const getTotalPointsRedeemedInCart = () => cart.reduce((acc, i) => acc + (i.pointsCost || 0), 0);
 
-  // Helper for ESC/POS Text Generation (USB Direct/Bluetooth fallback)
+  // Buffer Chunk writing function to prevent Web Bluetooth and USB truncation / buffer overflows
+  const sendToPrinterInChunks = async (text: string) => {
+    const encoder = new TextEncoder();
+    const bytes = encoder.encode(text);
+    const chunkSize = 120; // Highly safe chunk size for standard thermal printers
+
+    if (printerType === 'thermal_bluetooth' && bleCharacteristic) {
+      try {
+        for (let i = 0; i < bytes.length; i += chunkSize) {
+          const chunk = bytes.slice(i, i + chunkSize);
+          await bleCharacteristic.writeValue(chunk);
+          await new Promise((resolve) => setTimeout(resolve, 60)); // Buffer recovery delay
+        }
+        return true;
+      } catch (err) {
+        console.error(err);
+        throw new Error("Bluetooth print fail");
+      }
+    }
+
+    if (printerType === 'thermal_usb') {
+      try {
+        if (serialPort) {
+          const writer = serialPort.writable.getWriter();
+          for (let i = 0; i < bytes.length; i += chunkSize) {
+            const chunk = bytes.slice(i, i + chunkSize);
+            await writer.write(chunk);
+            await new Promise((resolve) => setTimeout(resolve, 40));
+          }
+          writer.releaseLock();
+          return true;
+        }
+
+        if (usbDevice) {
+          for (let i = 0; i < bytes.length; i += chunkSize) {
+            const chunk = bytes.slice(i, i + chunkSize);
+            await usbDevice.transferOut(1, chunk);
+            await new Promise((resolve) => setTimeout(resolve, 40));
+          }
+          return true;
+        }
+      } catch (err) {
+        console.error(err);
+        throw new Error("USB print fail");
+      }
+    }
+    return false;
+  };
+
+  // 1. K.O.T ESC/POS Generator (Kitchen format)
+  const generateKotEscPosText = (order: any) => {
+    const formattedDate = order.timestamp?.toDate ? order.timestamp.toDate().toLocaleString('en-IN') : new Date(order.timestamp).toLocaleString();
+    const dividerLine = "--------------------------------\n";
+    
+    let text = "";
+    text += "        ** K.O.T **             \n";
+    text += "      BUM BUM CAFE - KITCHEN    \n";
+    text += dividerLine;
+    text += `Token No: #${order.tokenNumber}\n`;
+    text += `Bill No: #${String(order.billNumber).padStart(4, '0')}\n`;
+    text += `Date: ${formattedDate}\n`;
+    text += `Type: ${order.fulfillmentType?.toUpperCase()}\n`;
+    if (order.fulfillmentType === 'table') {
+      text += `Table: ${order.tableNumber}\n`;
+    }
+    text += dividerLine;
+    text += "ITEMS:\n";
+    
+    order.items.forEach((it: any) => {
+      text += `${it.name.toUpperCase()} x ${it.quantity}\n`;
+      if (it.note) {
+        text += `  * Note: ${it.note}\n`;
+      }
+    });
+    
+    if (order.chefInstructions) {
+      text += dividerLine;
+      text += `INSTRUCTIONS: ${order.chefInstructions}\n`;
+    }
+    
+    text += dividerLine;
+    text += "\n\n\n\n";
+    return text;
+  };
+
+  // 2. Customer Receipt ESC/POS Generator (With loyalty details in the header)
   const generateEscPosText = (order: any) => {
     const formattedDate = order.timestamp?.toDate ? order.timestamp.toDate().toLocaleString('en-IN') : new Date(order.timestamp).toLocaleString();
     const dividerLine = "--------------------------------\n";
@@ -448,6 +533,16 @@ export default function BbCafePos() {
     text += `Date: ${formattedDate}\n`;
     text += `Type: ${order.fulfillmentType?.toUpperCase()}\n`;
     text += `Pay Mode: ${order.paymentMethod?.toUpperCase()}\n`;
+    
+    // Header loyalty profile
+    if (order.customerPhone) {
+      text += dividerLine;
+      text += `GUEST: ${order.customerName.toUpperCase()}\n`;
+      text += `PHONE: ${order.customerPhone}\n`;
+      text += `Prev Points: ${order.customerPointsBefore || 0}\n`;
+      text += `Earned: +${order.customerPointsEarned || 0}  Redeemed: -${order.customerPointsRedeemed || 0}\n`;
+      text += `Total Points: ${order.customerPointsAfter || 0}\n`;
+    }
     text += dividerLine;
 
     order.items.forEach((it: any) => {
@@ -467,65 +562,91 @@ export default function BbCafePos() {
     return text;
   };
 
-  // print thermal receipt via Web/System Dialog
-  const handlePrintReceipt = async (order: any) => {
-    triggerBeep('tap');
-
-    // 1. Bluetooth ESC/POS Direct Print
-    if (printerType === 'thermal_bluetooth' && bleCharacteristic) {
-      const toastId = toast.loading("Sending directly to Bluetooth printer...");
+  // Print K.O.T Action
+  const handlePrintKot = async (order: any) => {
+    // A. Direct Hardware Printer chunked sending
+    if ((printerType === 'thermal_bluetooth' && bleCharacteristic) || (printerType === 'thermal_usb' && (serialPort || usbDevice))) {
       try {
-        const receiptText = generateEscPosText(order);
-        const encoder = new TextEncoder();
-        const bytes = encoder.encode(receiptText);
-        await bleCharacteristic.writeValue(bytes);
-        toast.dismiss(toastId);
-        toast.success("Printed directly via Bluetooth!");
+        const kotText = generateKotEscPosText(order);
+        await sendToPrinterInChunks(kotText);
       } catch (err) {
-        console.error(err);
-        toast.dismiss(toastId);
-        toast.error("Bluetooth print failed. Please reconnect.");
-        setPrinterConnected(false);
-        setBleCharacteristic(null);
+        toast.error("KOT hardware print failed, launching fallback...");
       }
       return;
     }
 
-    // 2. Direct USB Serial or WebUSB Print
-    if (printerType === 'thermal_usb' && (serialPort || usbDevice)) {
-      const toastId = toast.loading("Sending directly to USB printer...");
+    // B. System Print Dialog Fallback
+    const printWindow = window.open('', '_blank', 'width=340,height=600');
+    if (!printWindow) return;
+    
+    const itemsHtml = order.items.map((it: any) => `
+      <tr>
+        <td style="font-size: 13px; font-weight: bold; padding: 4px 0;">${it.name.toUpperCase()}</td>
+        <td style="font-size: 13px; font-weight: bold; text-align: right; padding: 4px 0;">x ${it.quantity}</td>
+      </tr>
+      ${it.note ? `<tr><td colspan="2" style="font-size: 11px; color: #333; padding-bottom: 4px;">* Note: ${it.note}</td></tr>` : ''}
+    `).join('');
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <style>
+            @page { size: ${printerPaperSize === '58mm' ? '58mm' : '80mm'} auto; margin: 0; }
+            body { font-family: monospace; padding: 6px; font-size: 12px; }
+            .center { text-align: center; }
+            .divider { border-top: 1.5px dotted #000; margin: 6px 0; }
+          </style>
+        </head>
+        <body>
+          <div class="center" style="font-size: 16px; font-weight: bold; border: 2px solid #000; padding: 4px;">K.O.T (KITCHEN)</div>
+          <div class="center" style="font-size: 11px; margin-top: 4px;">BUM BUM CAFE</div>
+          <div class="divider"></div>
+          <div><b>Token: #${order.tokenNumber}</b></div>
+          <div>Bill No: #${order.billNumber}</div>
+          <div>Type: ${order.fulfillmentType?.toUpperCase()} ${order.tableNumber ? `(${order.tableNumber})` : ''}</div>
+          <div class="divider"></div>
+          <table style="width:100%; border-collapse:collapse;">
+            ${itemsHtml}
+          </table>
+          ${order.chefInstructions ? `<div class="divider"></div><div><b>Instructions:</b> ${order.chefInstructions}</div>` : ''}
+          <div class="divider"></div>
+          <div class="center" style="font-size: 10px;">${new Date().toLocaleString('en-IN')}</div>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => {
+      printWindow.print();
+      printWindow.close();
+    }, 350);
+  };
+
+  // Print Customer Receipt Action
+  const handlePrintReceipt = async (order: any) => {
+    triggerBeep('tap');
+
+    // A. Direct Hardware Printer chunked sending
+    if ((printerType === 'thermal_bluetooth' && bleCharacteristic) || (printerType === 'thermal_usb' && (serialPort || usbDevice))) {
+      const toastId = toast.loading("Sending directly to thermal printer...");
       try {
         const receiptText = generateEscPosText(order);
-        const encoder = new TextEncoder();
-        const bytes = encoder.encode(receiptText);
-
-        if (serialPort) {
-          const writer = serialPort.writable.getWriter();
-          await writer.write(bytes);
-          writer.releaseLock();
-          toast.dismiss(toastId);
-          toast.success("Printed directly via USB Serial!");
-          return;
-        }
-
-        if (usbDevice) {
-          await usbDevice.transferOut(1, bytes);
-          toast.dismiss(toastId);
-          toast.success("Printed directly via WebUSB!");
-          return;
-        }
+        await sendToPrinterInChunks(receiptText);
+        toast.dismiss(toastId);
+        toast.success("Customer receipt printed!");
       } catch (err) {
         console.error(err);
         toast.dismiss(toastId);
-        toast.error("USB direct print failed. Please reconnect printer.");
+        toast.error("Hardware print failed, launching fallback...");
         setPrinterConnected(false);
+        setBleCharacteristic(null);
         setSerialPort(null);
         setUsbDevice(null);
       }
       return;
     }
 
-    // 3. System Print Dialog (Header Logo + Footer QR Code layout)
+    // B. Fallback: System Print Dialog with dynamic UPI QR Code and Loyalty inside Header
     const pageDimensionsWidth = printerPaperSize === '58mm' ? '58mm' : '80mm';
     const containerRenderWidth = printerPaperSize === '58mm' ? '48mm' : '72mm';
 
@@ -539,7 +660,6 @@ export default function BbCafePos() {
     hours = hours % 12 || 12;
     const formattedReceiptDate = `${day}/${month}/${year} ${hours}:${minutes} ${ampm}`;
 
-    // UPI QR Code Generator with dynamic payable amount
     const upiId = "9714293759@paytm"; 
     const upiLink = `upi://pay?pa=${upiId}&pn=Bum%20Bum%20Cafe&am=${order.total}&cu=INR`;
     const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=115x115&margin=0&data=${encodeURIComponent(upiLink)}`;
@@ -601,7 +721,6 @@ export default function BbCafePos() {
           </style>
         </head>
         <body>
-          <!-- HEADER: Stylized Brand Logo -->
           <div class="center" style="margin-top: 4px; margin-bottom: 8px;">
             <div style="display: inline-block; background-color: #000; color: #fff; padding: 5px 10px; font-size: 13px; font-weight: 900; border-radius: 4px; letter-spacing: 1px; margin-bottom: 4px;">
               🍕 BUM BUM CAFE 🍕
@@ -618,6 +737,17 @@ export default function BbCafePos() {
             <div>POS: Terminal 02</div>
             <div style="margin-top: 6px;">Customer: ${order.customerName || 'Walk-in Guest'}</div>
             ${phoneMarkup}
+
+            <!-- Loyalty Status printed directly in Receipt Header -->
+            ${order.customerPhone ? `
+            <div style="background-color: #f5f5f5; border: 1px dashed #000; padding: 5px; margin-top: 5px; font-size: 9px; border-radius: 4px;">
+              <div style="font-weight: 900; color: #b45309; text-align: center; margin-bottom: 3px;">LOYALTY POINTS STATUS</div>
+              <div style="display: flex; justify-content: space-between;"><span>Prev Balance:</span> <span>${order.customerPointsBefore || 0}</span></div>
+              <div style="display: flex; justify-content: space-between;"><span>Points Earned:</span> <span style="color: green;">+${order.customerPointsEarned || 0}</span></div>
+              <div style="display: flex; justify-content: space-between;"><span>Points Redeemed:</span> <span style="color: red;">-${order.customerPointsRedeemed || 0}</span></div>
+              <div style="display: flex; justify-content: space-between; font-weight: 900; border-top: 1px dotted #ccc; padding-top: 2px; margin-top: 2px;"><span>Total Points:</span> <span>${order.customerPointsAfter || 0}</span></div>
+            </div>
+            ` : ''}
           </div>
 
           <div class="divider"></div>
@@ -630,21 +760,6 @@ export default function BbCafePos() {
 
           <div class="divider"></div>
 
-          <!-- Loyalty points section -->
-          <div style="font-size: 10px; font-weight: 600; line-height: 1.5; color: #222;">
-            <div style="display: flex; justify-content: space-between;">
-              <span>Points earned</span>
-              <span>1</span>
-            </div>
-            <div style="display: flex; justify-content: space-between;">
-              <span>Points balance</span>
-              <span>1</span>
-            </div>
-          </div>
-
-          <div class="divider"></div>
-
-          <!-- Grand Total centered values -->
           <div style="display: flex; justify-content: space-between; align-items: center; padding: 1px 0;">
             <span style="font-size: 14px; font-weight: 900;">Total</span>
             <span style="font-size: 14px; font-weight: 900;">₹${order.total}</span>
@@ -656,7 +771,6 @@ export default function BbCafePos() {
 
           <div class="divider"></div>
 
-          <!-- FOOTER: UPI QR Code centered inside footer with exact bill amount -->
           <div class="center" style="margin-top: 10px; margin-bottom: 8px;">
             <div style="font-size: 9px; font-weight: 900; text-transform: uppercase; margin-bottom: 5px; color: #000; letter-spacing: 0.2px;">
               Scan To Pay: ₹${order.total}
@@ -665,7 +779,6 @@ export default function BbCafePos() {
             <div style="font-size: 7.5px; font-weight: 800; margin-top: 3px; letter-spacing: 0.5px; color: #333;">BHIM UPI PAYTM</div>
           </div>
 
-          <!-- Footer Social Media & Handles -->
           <div class="center" style="font-size: 9px; line-height: 1.4; margin-top: 6px; font-weight: 600; color: #111;">
             <div style="font-weight: 850; font-size: 9.5px; margin-bottom: 2px;">Follow us</div>
             <div>www.youtube.com/@bbcafe.i</div>
@@ -673,7 +786,6 @@ export default function BbCafePos() {
             <div style="margin-top: 6px; font-weight: 850; font-size: 10px; color: #000;">❤ Thank you, visit again. ❤</div>
           </div>
 
-          <!-- Receipt Timestamp and Bill Code -->
           <div style="display: flex; justify-content: space-between; font-size: 9.5px; font-family: monospace; color: #000; margin-top: 14px; font-weight: 850; border-top: 1px dashed #eee; padding-top: 4px;">
             <span>${formattedReceiptDate}</span>
             <span>#3-${order.billNumber}</span>
@@ -700,7 +812,7 @@ export default function BbCafePos() {
       if (!(navigator as any).bluetooth) { 
         toast.dismiss(toastId);
         setIsConnecting(false);
-        toast.error("Web Bluetooth is not supported on this browser/device. Please use Google Chrome on HTTPS.");
+        toast.error("Web Bluetooth is not supported on this browser/device.");
         return;
       }
       try {
@@ -736,7 +848,7 @@ export default function BbCafePos() {
       if (!(navigator as any).serial && !(navigator as any).usb) {
         toast.dismiss(toastId);
         setIsConnecting(false);
-        toast.error("Direct USB printing is not supported on this browser. Please use Google Chrome.");
+        toast.error("Direct USB printing is not supported on this browser.");
         return;
       }
       try {
@@ -760,7 +872,7 @@ export default function BbCafePos() {
       } catch (err) {
         console.error(err);
         toast.dismiss(toastId);
-        toast.error("Direct USB connection failed. Ensure printer is connected and not occupied.");
+        toast.error("Direct USB connection failed.");
       } finally {
         setIsConnecting(false);
       }
@@ -781,7 +893,7 @@ export default function BbCafePos() {
       fulfillmentType: 'test',
       paymentMethod: 'system',
       items: [
-        { name: '🍕 Direct Connection Active!', quantity: 1, price: 100 },
+        { name: '🍕 Connection Active!', quantity: 1, price: 100 },
         { name: '🍔 ESC/POS Print Test', quantity: 1, price: 50 }
       ],
       subtotal: 150,
@@ -814,6 +926,7 @@ export default function BbCafePos() {
     );
   };
 
+  // Place Order flow: Saves details, prints KOT first, then prints detailed Customer Bill
   const handlePlaceOrder = async (e: React.FormEvent) => {
     e.preventDefault();
     if (cart.length === 0 || isSubmittingOrder) return;
@@ -823,6 +936,11 @@ export default function BbCafePos() {
     const finalTotal = getTotalBillPrice();
     const token = Math.floor(1000 + Math.random() * 9000);
 
+    // Save detailed customer points configuration
+    const earned = Math.floor(finalTotal / 100);
+    const netPoints = customerPhone ? (earned - getTotalPointsRedeemedInCart() - pointsToRedeem) : 0;
+    const pointsAfterBill = customerPhone ? Math.max(0, customerPoints + netPoints) : 0;
+
     try {
       const billNumber = await runTransaction(db, async (txn) => {
         const snap = await txn.get(doc(db, "settings", "store_bill_counter"));
@@ -831,25 +949,61 @@ export default function BbCafePos() {
         return next;
       });
 
-      const orderObj = { billNumber, tokenNumber: token, customerName: customerName || "Walk-in Guest", customerPhone: customerPhone ? `+91${customerPhone}` : "", items: cart, subtotal, discount: discountCombined, gstRate: gstEnabled ? gstRate : 0, gstAmount: getGstAmountCalculated(), total: finalTotal, timestamp: new Date(), status: 'completed', fulfillmentType, deliveryArea: fulfillmentType === "delivery" ? selectedArea.name : "", tableNumber: fulfillmentType === 'table' ? tableNumber : '', paymentMethod, chefInstructions, noCutlery, source: 'POS' };
+      const orderObj = { 
+        billNumber, 
+        tokenNumber: token, 
+        customerName: customerName || "Walk-in Guest", 
+        customerPhone: customerPhone ? `+91${customerPhone}` : "", 
+        customerPointsBefore: customerPhone ? customerPoints : 0,
+        customerPointsEarned: customerPhone ? earned : 0,
+        customerPointsRedeemed: customerPhone ? pointsToRedeem : 0,
+        customerPointsAfter: customerPhone ? pointsAfterBill : 0,
+        items: cart, 
+        subtotal, 
+        discount: discountCombined, 
+        gstRate: gstEnabled ? gstRate : 0, 
+        gstAmount: getGstAmountCalculated(), 
+        total: finalTotal, 
+        timestamp: new Date(), 
+        status: 'completed', 
+        fulfillmentType, 
+        deliveryArea: fulfillmentType === "delivery" ? selectedArea.name : "", 
+        tableNumber: fulfillmentType === 'table' ? tableNumber : '', 
+        paymentMethod, 
+        chefInstructions, 
+        noCutlery, 
+        source: 'POS' 
+      };
+
       await addDoc(collection(db, "orders"), orderObj);
 
       if (customerPhone && customerPhone.trim().length === 10) {
         const phone = customerPhone.trim();
-        const earned = Math.floor(finalTotal / 100);
-        const netPoints = earned - getTotalPointsRedeemedInCart() - pointsToRedeem;
         await runTransaction(db, async (txn) => {
           const userRef = doc(db, "customer_points", phone);
           const snap = await txn.get(userRef);
-          if (!snap.exists()) txn.set(userRef, { name: customerName || "Walk-in Guest", phone, points: Math.max(0, netPoints), lastActive: new Date() });
-          else txn.update(userRef, { points: increment(netPoints), lastActive: new Date() });
+          if (!snap.exists()) txn.set(userRef, { name: customerName || "Walk-in Guest", phone, points: Math.max(0, pointsAfterBill), lastActive: new Date() });
+          else txn.update(userRef, { points: pointsAfterBill, lastActive: new Date() });
         });
         if (earned > 0) await addDoc(collection(db, "customer_points", phone, "history"), { type: 'earn', points: earned, description: `Earned Bill #${billNumber}`, timestamp: new Date() });
-        if (pointsToRedeem > 0) await addDoc(collection(db, "customer_points", phone, "history"), { type: 'redeem', points: pointsToRedeem, description: `Redeemed cash back Bill #${billNumber}`, timestamp: new Date() });
+        if (pointsToRedeem > 0) await addDoc(collection(db, "customer_points", phone, "history"), { type: 'redeem', points: pointsToRedeem, description: `Redeemed cashback Bill #${billNumber}`, timestamp: new Date() });
       }
 
-      triggerBeep('success'); toast.success(`Bill #${billNumber} completed!`);
-      handlePrintReceipt(orderObj);
+      triggerBeep('success'); 
+      toast.success(`Bill #${billNumber} saved successfully!`);
+      
+      // 1. First, print Kitchen Order Ticket (K.O.T)
+      toast.success("Printing KOT first...");
+      await handlePrintKot(orderObj);
+
+      // Wait 1.5 seconds for thermal printer buffer spacing
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+
+      // 2. Second, print detailed Customer Bill
+      toast.success("Printing Customer Receipt...");
+      await handlePrintReceipt(orderObj);
+
+      // Clear layout
       setCart([]); setCustomerPhone(''); setCustomerName(''); setCustomerPoints(0); setPointsToRedeem(0); setCustomDiscount(0); setIsCartOpen(false); setChefInstructions('');
     } catch (err) {
       toast.error("Counter transaction failed");
@@ -889,7 +1043,6 @@ export default function BbCafePos() {
     { id: 'settings', label: 'POS Settings', icon: SafeSettings }
   ];
 
-  // Concatenated outer container class to prevent SWC template literal bugs
   const mainClass = "min-h-screen flex flex-col md:flex-row font-sans antialiased overflow-hidden transition-colors duration-200 " + 
     (themeMode === "dark" ? "dark bg-[#050505] text-gray-100" : "bg-neutral-50 text-neutral-800");
 
@@ -1341,7 +1494,7 @@ export default function BbCafePos() {
         </>
       )}
 
-      {/* 3. MODULAR CHILD OVERLAYS */}
+      {/* OVERLAYS */}
       <PosCartDrawer 
         isHindi={false} isCartOpen={isCartOpen} setIsCartOpen={setIsCartOpen} cart={cart} setCart={setCart} customerPhone={customerPhone} setCustomerPhone={setCustomerPhone} customerName={customerName} setCustomerName={setCustomerName} customerPoints={customerPoints} setCustomerPoints={setCustomerPoints} pointsToRedeem={pointsToRedeem} setPointsToRedeem={setPointsToRedeem} customDiscount={customDiscount} setCustomDiscount={setCustomDiscount} fulfillmentType={fulfillmentType} setFulfillmentType={setFulfillmentType} selectedArea={selectedArea} setSelectedArea={setSelectedArea} DELIVERY_AREAS={DELIVERY_AREAS} address={address} setAddress={setAddress} tableNumber={tableNumber} setTableNumber={setTableNumber} chefInstructions={chefInstructions} setChefInstructions={setChefInstructions} isSubmittingOrder={isSubmittingOrder} paymentMethod={paymentMethod} setPaymentMethod={setPaymentMethod} noCutlery={noCutlery} setNoCutlery={setNoCutlery} getCartSubtotal={getCartSubtotal} getCartAddonsPrice={() => 0} getDeliveryCharge={getDeliveryCharge} getFreeDeliveryProgressPercent={getFreeDeliveryProgressPercent} getTotalPointsRedeemedInCart={getTotalPointsRedeemedInCart} getTotalBillPrice={getTotalBillPrice} loyaltyRules={loyaltyRules} handlePlaceOrder={handlePlaceOrder} handleDetectLocation={handleDetectLocation} setIsCustomerModalOpen={setIsCustomerModalOpen} searchDbCustomers={searchDbCustomers} handleUpdateCartQuantity={handleUpdateCartQuantity} handleUpdateCartItemNote={handleUpdateCartItemNote} showAddonsSection={false} triggerBeep={triggerBeep} handleCheckLoyalty={handleCheckLoyalty}
         
