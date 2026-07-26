@@ -622,7 +622,7 @@ export default function BbCafePos() {
               </tr>
             </thead>
             <tbody>
-              ${itemsRows}
+              ${itemsHtml}
             </tbody>
           </table>
           
@@ -1260,7 +1260,7 @@ export default function BbCafePos() {
                           {order.status === 'out_for_delivery' && (
                             <button onClick={() => handleUpdateStatus(order.id, 'completed')} className="flex-1 bg-green-600 text-white font-black py-2 rounded-xl text-[10px] uppercase">Delivered</button>
                           )}
-                          <button onClick={() => handlePrintReceipt(order)} className="p-2 bg-neutral-200 dark:bg-neutral-900 text-gray-500 rounded-xl">
+                          <button onClick={() => handlePrintReceipt(order)} className="p-2 bg-neutral-200 dark:bg-neutral-950 text-gray-500 rounded-xl">
                             <SafePrinter size={14} />
                           </button>
                         </div>
