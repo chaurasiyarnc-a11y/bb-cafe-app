@@ -85,6 +85,11 @@ export default function BbCafePos() {
   const [printerPaperSize, setPrinterPaperSize] = useState<'58mm' | '80mm'>('58mm');
   const [themeMode, setThemeMode] = useState<'dark' | 'light'>('dark');
 
+  // Printer Settings states
+  const [printerType, setPrinterType] = useState<'thermal_usb' | 'thermal_bluetooth' | 'network_ip' | 'laser'>('thermal_usb');
+  const [printerIp, setPrinterIp] = useState('192.168.1.100');
+  const [printCopies, setPrintCopies] = useState(1);
+
   const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false);
   const [customerSearchQuery, setCustomerSearchQuery] = useState('');
   const [searchedCustomers, setSearchedCustomers] = useState<any[]>([]);
@@ -164,6 +169,15 @@ export default function BbCafePos() {
     setGstEnabled(localStorage.getItem("bb_pos_gst_enabled") === 'true');
     setGstRate(Number(localStorage.getItem("bb_pos_gst_rate")) || 5);
     setPrinterPaperSize((localStorage.getItem("bb_pos_paper_size") as any) || '58mm');
+    
+    // Printer settings from local storage
+    const localPrinterType = localStorage.getItem("bb_pos_printer_type");
+    if (localPrinterType) setPrinterType(localPrinterType as any);
+    const localPrinterIp = localStorage.getItem("bb_pos_printer_ip");
+    if (localPrinterIp) setPrinterIp(localPrinterIp);
+    const localPrintCopies = localStorage.getItem("bb_pos_print_copies");
+    if (localPrintCopies) setPrintCopies(Number(localPrintCopies) || 1);
+
     const localTheme = localStorage.getItem("bb_pos_theme") || 'dark';
     setThemeMode(localTheme as any);
     if (localTheme === 'light') document.documentElement.classList.remove('dark');
@@ -519,11 +533,12 @@ export default function BbCafePos() {
   ];
 
   return (
-    <div className="min-h-screen bg-neutral-50 dark:bg-[#050505] text-neutral-800 dark:text-gray-100 flex flex-col md:flex-row font-sans antialiased overflow-hidden transition-colors duration-200">
+    // 🛠️ Dark / Light Mode fixes: forces "dark" class correctly inside client-container
+    <div className={`min-h-screen flex flex-col md:flex-row font-sans antialiased overflow-hidden transition-colors duration-200 ${themeMode === 'dark' ? 'dark bg-[#050505] text-gray-100' : 'bg-neutral-50 text-neutral-800'}`}>
       <Toaster position="top-center" />
 
       {!isLoggedIn ? (
-        <div className="fixed inset-0 bg-neutral-900 text-white flex flex-col items-center justify-center p-4 z-50">
+        <div className="fixed inset-0 bg-neutral-900 text-white flex flex-col items-center justify-center p-4 z-50 animate-fade-in">
           <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-sm bg-neutral-950 border border-white/5 rounded-3xl p-8 shadow-2xl space-y-6 text-center">
             <div className="flex flex-col items-center gap-2">
               <div className="p-4 bg-orange-500/10 text-orange-500 rounded-full border border-orange-500/20"><SafeLock size={32} /></div>
@@ -545,9 +560,11 @@ export default function BbCafePos() {
         </div>
       ) : (
         <>
-          {isSidebarOpen && <div onClick={() => setIsSidebarOpen(false)} className="fixed inset-0 bg-black/60 z-40 md:hidden backdrop-blur-sm" />}
+          {/* 🛠️ Mobile Backdrop Overlay layout fixed (Removed blur-sm for mobile performance, z-index set below sidebar) */}
+          {isSidebarOpen && <div onClick={() => setIsSidebarOpen(false)} className="fixed inset-0 bg-neutral-950/80 z-40 md:hidden transition-all duration-300" />}
 
-          <aside className={`bg-neutral-100 dark:bg-neutral-950 border-r border-neutral-200 dark:border-white/5 flex flex-col justify-between p-4 shrink-0 shadow-lg z-30 transition-all duration-300 fixed inset-y-0 left-0 md:relative md:translate-x-0 md:flex ${isSidebarOpen ? 'translate-x-0 w-64' : '-translate-x-full md:translate-x-0'} ${isSidebarCollapsed ? 'md:w-20' : 'md:w-64'}`}>
+          {/* 🛠️ Mobile Sidebar Blur fixed: set to z-50 when mobile drawer is toggled active, higher than backdrop */}
+          <aside className={`bg-neutral-100 dark:bg-neutral-950 border-r border-neutral-200 dark:border-white/5 flex flex-col justify-between p-4 shrink-0 shadow-lg transition-all duration-300 fixed inset-y-0 left-0 md:relative md:translate-x-0 md:flex ${isSidebarCollapsed ? 'md:w-20' : 'md:w-64'} ${isSidebarOpen ? 'translate-x-0 w-64 z-50 shadow-2xl' : '-translate-x-full md:translate-x-0 z-30 md:z-30'}`}>
             <div className="space-y-6">
               <div className="flex items-center justify-between px-1 py-1 border-b border-neutral-200 dark:border-white/5 pb-4 gap-2">
                 <div className="flex items-center gap-2">
@@ -584,15 +601,20 @@ export default function BbCafePos() {
               {activeTab === 'billing' && <button onClick={() => { triggerBeep('tap'); setIsCustomerModalOpen(true); searchDbCustomers(''); }} className="ml-auto p-2 bg-neutral-200 dark:bg-neutral-950 text-yellow-500 rounded-xl flex items-center gap-1 text-[10px] font-black uppercase"><SafeUsers size={14} /><span>Search Guest</span></button>}
             </div>
 
+            {/* 🛠️ Online Orders Highlight Layout and Prominent Accept / Reject controls added */}
             {activeTab === 'orders' && (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pb-20 overflow-y-auto flex-1">
                 {liveOrders.map((order) => {
                   if (order.status === 'completed' || order.status === 'rejected') return null;
+                  const isOnline = order.source && order.source !== 'POS';
                   return (
-                    <div key={order.id} className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-white/5 rounded-2xl p-4 flex flex-col justify-between shadow-lg h-fit">
+                    <div key={order.id} className={`border rounded-2xl p-4 flex flex-col justify-between shadow-lg h-fit transition-colors duration-200 ${isOnline ? 'bg-blue-50/50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-900/50' : 'bg-white dark:bg-neutral-900 border-neutral-200 dark:border-white/5'}`}>
                       <div>
                         <div className="flex justify-between items-start border-b border-neutral-200 dark:border-white/5 pb-2 mb-3">
-                          <div><p className="text-xs font-black text-yellow-600 dark:text-yellow-300 font-mono">Bill #${String(order.billNumber).padStart(4, '0')}</p></div>
+                          <div>
+                            <p className="text-xs font-black text-yellow-600 dark:text-yellow-300 font-mono">Bill #${String(order.billNumber).padStart(4, '0')}</p>
+                            {isOnline && <span className="text-[8px] font-black text-blue-500 uppercase tracking-widest block mt-1 animate-pulse">🌐 ONLINE ORDER ({order.source})</span>}
+                          </div>
                           <span className="bg-orange-500/10 text-orange-400 text-[8px] font-black uppercase px-2 py-0.5 rounded">{order.fulfillmentType}</span>
                         </div>
                         <p className="text-[10px] font-black">👤 {order.customerName}</p>
@@ -608,7 +630,13 @@ export default function BbCafePos() {
                       <div>
                         <div className="flex justify-between text-xs font-black text-green-400 mb-3 border-t border-neutral-200 dark:border-white/5 pt-2"><span>Total:</span><span>₹{order.total}</span></div>
                         <div className="flex gap-2">
-                          {order.status === 'pending' && <button onClick={() => handleUpdateStatus(order.id, 'preparing')} className="flex-1 bg-amber-500 text-black font-black py-2 rounded-xl text-[10px] uppercase">Accept</button>}
+                          {/* 🛠️ Accept & Reject controls for online/counter orders */}
+                          {order.status === 'pending' && (
+                            <div className="flex gap-2 w-full">
+                              <button onClick={() => handleUpdateStatus(order.id, 'preparing')} className="flex-1 bg-green-600 hover:bg-green-700 text-white font-black py-2 rounded-xl text-[10px] uppercase shadow-md active:scale-95 transition-all">Accept</button>
+                              <button onClick={() => handleUpdateStatus(order.id, 'rejected')} className="flex-1 bg-red-600 hover:bg-red-700 text-white font-black py-2 rounded-xl text-[10px] uppercase shadow-md active:scale-95 transition-all">Reject</button>
+                            </div>
+                          )}
                           {order.status === 'preparing' && <button onClick={() => handleUpdateStatus(order.id, order.fulfillmentType === 'delivery' ? 'out_for_delivery' : 'completed')} className="flex-1 bg-blue-600 text-white font-black py-2 rounded-xl text-[10px] uppercase">Dispatch</button>}
                           {order.status === 'out_for_delivery' && <button onClick={() => handleUpdateStatus(order.id, 'completed')} className="flex-1 bg-green-600 text-white font-black py-2 rounded-xl text-[10px] uppercase">Delivered</button>}
                           <button onClick={() => handlePrintReceipt(order)} className="p-2 bg-neutral-200 dark:bg-neutral-900 text-gray-500 rounded-xl"><SafePrinter size={14} /></button>
@@ -633,8 +661,8 @@ export default function BbCafePos() {
                     ))}
                   </div>
                   {loading ? <div className="flex items-center justify-center flex-1"><Loader2 className="animate-spin text-orange-500" size={24} /></div> : (
-                    /* 🛠️ Fixed layout (align-content: start) + strict 4-column responsive grid */
-                    <div className="grid grid-cols-4 gap-2.5 overflow-y-auto flex-1 pr-1 pb-16 content-start">
+                    /* 🛠️ Grid Layout fixed: Changed from grid-cols-4 to grid-cols-3 with padding alignment */
+                    <div className="grid grid-cols-3 gap-2.5 overflow-y-auto flex-1 pr-1 pb-16 content-start">
                       <AnimatePresence mode="popLayout">
                         {filteredMenu.map((item) => {
                           const isAvail = item.isAvailable !== false;
@@ -726,7 +754,7 @@ export default function BbCafePos() {
             )}
 
             {activeTab === 'settings' && (
-              <div className="bg-white dark:bg-neutral-950 border border-neutral-200 dark:border-white/5 p-6 rounded-3xl shadow-xl flex-grow max-xl space-y-6 overflow-y-auto">
+              <div className="bg-white dark:bg-neutral-950 border border-neutral-200 dark:border-white/5 p-6 rounded-3xl shadow-xl flex-grow max-w-xl space-y-6 overflow-y-auto">
                 <h3 className="text-sm font-black uppercase text-orange-500">POS Settings</h3>
                 <div className="border-b border-neutral-200 pb-4 space-y-3">
                   <p className="text-xs font-bold uppercase">A. UI Theme:</p>
@@ -740,11 +768,36 @@ export default function BbCafePos() {
                   <div className="flex items-center justify-between"><span className="text-xs">Enable GST:</span><button onClick={() => { const next = !gstEnabled; setGstEnabled(next); localStorage.setItem("bb_pos_gst_enabled", String(next)); }} className="text-orange-500">{gstEnabled ? <SafeToggleRight size={32} /> : <SafeToggleLeft size={32} />}</button></div>
                   {gstEnabled && <input type="number" value={gstRate} onChange={e => { const r = Math.max(0, Number(e.target.value)); setGstRate(r); localStorage.setItem("bb_pos_gst_rate", String(r)); }} className="w-full bg-neutral-100 dark:bg-neutral-900 border p-3 rounded-xl text-xs outline-none" />}
                 </div>
-                <div className="space-y-3">
+                <div className="border-b border-neutral-200 pb-4 space-y-3">
                   <p className="text-xs font-bold uppercase">C. Paper Size:</p>
                   <div className="flex bg-neutral-100 dark:bg-neutral-900 p-1 rounded-xl w-60">
                     <button onClick={() => { setPrinterPaperSize('58mm'); localStorage.setItem("bb_pos_paper_size", '58mm'); }} className={`flex-grow py-2 rounded-lg text-[10px] font-black uppercase ${printerPaperSize === '58mm' ? 'bg-[#050505] text-amber-400' : 'text-gray-400'}`}>58mm</button>
                     <button onClick={() => { setPrinterPaperSize('80mm'); localStorage.setItem("bb_pos_paper_size", '80mm'); }} className={`flex-grow py-2 rounded-lg text-[10px] font-black uppercase ${printerPaperSize === '80mm' ? 'bg-[#050505] text-amber-400' : 'text-gray-400'}`}>80mm</button>
+                  </div>
+                </div>
+
+                {/* 🛠️ Hardware Printer management setup panel added */}
+                <div className="space-y-3 pt-4 border-t border-neutral-200 dark:border-white/5">
+                  <p className="text-xs font-bold uppercase">D. Hardware Printer Connection Setup:</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {[
+                      { id: 'thermal_usb', label: 'Thermal USB' },
+                      { id: 'thermal_bluetooth', label: 'Thermal Bluetooth' },
+                      { id: 'network_ip', label: 'Network IP Printer' },
+                      { id: 'laser', label: 'Laser A4 Printer' }
+                    ].map(p => (
+                      <button key={p.id} onClick={() => { triggerBeep('tap'); setPrinterType(p.id as any); localStorage.setItem("bb_pos_printer_type", p.id); }} className={`p-2 rounded-xl border text-[9px] font-black uppercase tracking-wider transition-all ${printerType === p.id ? 'bg-[#050505] text-amber-400 border-amber-500' : 'bg-neutral-100 dark:bg-neutral-900 text-gray-400 border-neutral-200 dark:border-white/5'}`}>{p.label}</button>
+                    ))}
+                  </div>
+                  {printerType === 'network_ip' && (
+                    <div className="space-y-1 mt-2">
+                      <label className="text-[9px] font-black uppercase text-gray-500">Printer IP Address</label>
+                      <input type="text" value={printerIp} onChange={e => { setPrinterIp(e.target.value); localStorage.setItem("bb_pos_printer_ip", e.target.value); }} className="w-full bg-neutral-100 dark:bg-neutral-900 border border-neutral-200 dark:border-white/5 p-3 rounded-xl text-xs outline-none font-mono" placeholder="192.168.1.100" />
+                    </div>
+                  )}
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black uppercase text-gray-500">Number of Bill Copies</label>
+                    <input type="number" min={1} max={5} value={printCopies} onChange={e => { const v = Math.max(1, Number(e.target.value)); setPrintCopies(v); localStorage.setItem("bb_pos_print_copies", String(v)); }} className="w-full bg-neutral-100 dark:bg-neutral-900 border border-neutral-200 dark:border-white/5 p-3 rounded-xl text-xs outline-none font-mono" />
                   </div>
                 </div>
               </div>
