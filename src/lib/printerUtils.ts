@@ -1,3 +1,5 @@
+import toast from 'react-hot-toast';
+
 export interface PrintConfig {
   printerPaperSize: '58mm' | '80mm';
   printerType: 'thermal_usb' | 'thermal_bluetooth' | 'network_ip' | 'laser';
@@ -6,503 +8,430 @@ export interface PrintConfig {
   usbDevice?: any;
 }
 
-// फायरबेस टाइमस्टैम्प को सुरक्षित रूप से डेट स्ट्रिंग में बदलने का फंक्शन
-function formatDate(timestamp: any): string {
+// ==========================================
+// 1. सुरक्षित तिथि फ़ॉर्मेटिंग और अलाइनमेंट हेल्पर
+// ==========================================
+const getFormattedDate = (timestamp: any): string => {
+  if (!timestamp) return new Date().toLocaleString('en-IN');
   try {
-    if (!timestamp) return new Date().toLocaleString('en-IN');
-    if (typeof timestamp.toDate === 'function') {
-      return timestamp.toDate().toLocaleString('en-IN');
-    }
-    if (timestamp.seconds) {
-      return new Date(timestamp.seconds * 1000).toLocaleString('en-IN');
-    }
-    const date = new Date(timestamp);
-    return isNaN(date.getTime()) ? new Date().toLocaleString('en-IN') : date.toLocaleString('en-IN');
-  } catch (e) {
+    const dateObj = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+    return isNaN(dateObj.getTime()) ? new Date().toLocaleString('en-IN') : dateObj.toLocaleString('en-IN');
+  } catch {
     return new Date().toLocaleString('en-IN');
   }
-}
+};
 
-// दो तरफ के टेक्स्ट को थर्मल प्रिंटर की विड्थ के अनुसार अलाइन करने का हेल्पर (Bluetooth/Serial के लिए)
-function padSpaces(left: string, right: string, maxLen: number): string {
-  const leftLen = left.length;
-  const rightLen = right.length;
-  const spacesNeeded = maxLen - (leftLen + rightLen);
-  if (spacesNeeded <= 0) return left + " " + right;
-  return left + " ".repeat(spacesNeeded) + right;
-}
+const getFormattedReceiptDate = (timestamp: any): string => {
+  try {
+    const now = timestamp?.toDate ? timestamp.toDate() : new Date(timestamp || new Date());
+    const validNow = isNaN(now.getTime()) ? new Date() : now;
+    const day = String(validNow.getDate()).padStart(2, '0');
+    const month = String(validNow.getMonth() + 1).padStart(2, '0');
+    const year = String(validNow.getFullYear()).slice(-2);
+    let hours = validNow.getHours();
+    const minutes = String(validNow.getMinutes()).padStart(2, '0');
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    hours = hours % 12 || 12;
+    return `${day}/${month}/${year} ${hours}:${minutes} ${ampm}`;
+  } catch {
+    return getFormattedReceiptDate(new Date());
+  }
+};
 
-// KOT (Kitchen Order Ticket) प्रिंट करने का फंक्शन (Iframe Based)
-export async function handlePrintKot(order: any, config: PrintConfig) {
-  const is58 = config.printerPaperSize === '58mm';
-  const widthChars = is58 ? 32 : 48;
+const centerAlign = (text: string, cols: number): string => {
+  const trimmed = text.trim();
+  if (trimmed.length >= cols) return trimmed.slice(0, cols) + "\n";
+  const padding = Math.floor((cols - trimmed.length) / 2);
+  return " ".repeat(padding) + trimmed + "\n";
+};
 
-  // 1. यदि डायरेक्ट हार्डवेयर प्रिंटर एक्टिव है (Bluetooth/USB Serial)
-  if (
-    (config.printerType === 'thermal_bluetooth' && config.bleCharacteristic) ||
-    (config.printerType === 'thermal_usb' && (config.serialPort || config.usbDevice))
-  ) {
-    let text = "";
-    text += "================================\n";
-    text += "           K.O.T\n";
-    text += `Bill No: #${String(order.billNumber).padStart(4, '0')}\n`;
-    text += `Token No: #${order.tokenNumber}\n`;
-    text += `Type: ${order.fulfillmentType.toUpperCase()}\n`;
-    if (order.tableNumber) text += `Table: ${order.tableNumber}\n`;
-    text += `Date: ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}\n`;
-    text += "--------------------------------\n";
-    text += "Item Name               Qty\n";
-    text += "--------------------------------\n";
+const formatRow = (left: string, right: string, cols: number): string => {
+  const spaceForRight = cols - left.length;
+  if (spaceForRight <= 0) {
+    return left.slice(0, cols - right.length - 1) + " " + right + "\n";
+  }
+  return left + right.padStart(spaceForRight) + "\n";
+};
 
-    (order.items || []).forEach((it: any) => {
-      const name = it.name.substring(0, 24);
-      const qty = `x${it.quantity}`;
-      text += padSpaces(name, qty, widthChars) + "\n";
-      if (it.note) {
-        text += ` * Note: ${it.note}\n`;
-      }
-    });
+const formatThreeColumns = (col1: string, col2: string, col3: string, cols: number): string => {
+  const c1Width = cols === 48 ? 26 : 16;
+  const c2Width = 6;
+  const c3Width = cols === 48 ? 16 : 10;
+  let item = col1.trim();
+  if (item.length > c1Width) item = item.slice(0, c1Width - 1) + ".";
+  return item.padEnd(c1Width) + col2.trim().padStart(3).padEnd(c2Width) + col3.trim().padStart(c3Width) + "\n";
+};
 
-    text += "--------------------------------\n";
-    if (order.chefInstructions) {
-      text += `Inst: ${order.chefInstructions}\n`;
-    }
-    text += "\n\n\n\n";
+// ==========================================
+// 2. डायरेक्ट थर्मल प्रिंटर बाइट-कोड जेनरेटर
+// ==========================================
+export const generateEscPosQrBytes = (upiUrl: string): Uint8Array => {
+  const encoder = new TextEncoder();
+  const urlBytes = encoder.encode(upiUrl);
+  const pL = (urlBytes.length + 3) & 0xFF;
+  const pH = ((urlBytes.length + 3) >> 8) & 0xFF;
 
-    const encoder = new TextEncoder();
-    const dataBytes = encoder.encode(text);
-    const cutBytes = new Uint8Array([0x1d, 0x56, 0x42, 0x00]);
-    const finalBytes = new Uint8Array(dataBytes.length + cutBytes.length);
-    finalBytes.set(dataBytes);
-    finalBytes.set(cutBytes, dataBytes.length);
+  return new Uint8Array([
+    0x1B, 0x61, 0x01, // Center Align
+    0x1D, 0x28, 0x6B, 0x04, 0x00, 0x31, 0x41, 0x32, 0x00,
+    0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x43, 0x06,
+    0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x45, 0x30,
+    0x1D, 0x28, 0x6B, pL, pH, 0x31, 0x50, 0x30, ...Array.from(urlBytes),
+    0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x51, 0x30, // Fixed Print QR Command
+    0x0A, 0x1B, 0x61, 0x00, 0x0A // Reset Align
+  ]);
+};
 
+export const sendToPrinterInChunks = async (config: PrintConfig, text: string, upiUrl?: string) => {
+  const encoder = new TextEncoder();
+  const safeText = text.replace(/₹/g, 'Rs.');
+  const textBytes = encoder.encode(safeText);
+  let finalBytes = textBytes;
+
+  if (upiUrl) {
+    const qrBytes = generateEscPosQrBytes(upiUrl);
+    const combined = new Uint8Array(textBytes.length + qrBytes.length);
+    combined.set(textBytes);
+    combined.set(qrBytes, textBytes.length);
+    finalBytes = combined;
+  }
+
+  const chunkSize = 120;
+
+  if (config.printerType === 'thermal_bluetooth' && config.bleCharacteristic) {
     try {
-      if (config.printerType === 'thermal_bluetooth' && config.bleCharacteristic) {
-        await config.bleCharacteristic.writeValue(finalBytes);
-      } else if (config.printerType === 'thermal_usb' && config.serialPort) {
-        const writer = config.serialPort.writable.getWriter();
-        await writer.write(finalBytes);
-        writer.releaseLock();
-      } else if (config.printerType === 'thermal_usb' && config.usbDevice) {
-        await config.usbDevice.transferOut(3, finalBytes);
+      for (let i = 0; i < finalBytes.length; i += chunkSize) {
+        await config.bleCharacteristic.writeValue(finalBytes.slice(i, i + chunkSize));
+        await new Promise(r => setTimeout(r, 60));
       }
-      return;
+      return true;
     } catch (err) {
-      console.error("Direct KOT print failed, falling back to Iframe...", err);
+      console.error(err);
+      throw new Error("Bluetooth print failed");
     }
   }
 
-  // 2. Iframe आधारित सुरक्षित बैकग्राउंड प्रिंटिंग
-  const style = `
-    <style>
-      @media print {
-        @page { margin: 0; }
-        body {
-          margin: 0;
-          padding: 0;
-          background: #fff;
-          color: #000;
-          font-family: 'Courier New', Courier, monospace;
+  if (config.printerType === 'thermal_usb') {
+    try {
+      if (config.serialPort) {
+        const writer = config.serialPort.writable.getWriter();
+        try {
+          for (let i = 0; i < finalBytes.length; i += chunkSize) {
+            await writer.write(finalBytes.slice(i, i + chunkSize));
+            await new Promise(r => setTimeout(r, 40));
+          }
+        } finally {
+          writer.releaseLock(); // Safe lock release
         }
+        return true;
       }
-      .kot-container {
-        width: ${is58 ? '52mm' : '76mm'};
-        padding: 1.5mm 1mm;
-        margin: 0;
-        font-size: 10px;
-        line-height: 1.15;
+      if (config.usbDevice) {
+        for (let i = 0; i < finalBytes.length; i += chunkSize) {
+          await config.usbDevice.transferOut(1, finalBytes.slice(i, i + chunkSize));
+          await new Promise(r => setTimeout(r, 40));
+        }
+        return true;
       }
-      .kot-title {
-        font-size: 13px;
-        font-weight: bold;
-        text-align: center;
-        border-bottom: 1px dashed #000;
-        padding-bottom: 2px;
-        margin-bottom: 3px;
-      }
-      .kot-meta {
-        font-size: 9px;
-        margin-bottom: 4px;
-      }
-      .kot-table {
-        width: 100%;
-        font-size: 9px;
-        border-collapse: collapse;
-      }
-      .kot-table th {
-        border-bottom: 1px dashed #000;
-        text-align: left;
-        padding: 2px 0;
-      }
-      .kot-table td {
-        padding: 2px 0;
-        vertical-align: top;
-      }
-      .kot-divider {
-        border-top: 1px dashed #000;
-        margin: 4px 0;
-      }
-    </style>
-  `;
+    } catch (err) {
+      console.error(err);
+      throw new Error("USB print failed");
+    }
+  }
+  return false;
+};
 
-  const html = `
+// ==========================================
+// 3. K.O.T और रसीद टेक्स्ट डिज़ाइन (ESC/POS)
+// ==========================================
+export const generateKotEscPosText = (order: any, config?: PrintConfig): string => {
+  const cols = config?.printerPaperSize === '80mm' ? 48 : 32;
+  const dividerLine = "-".repeat(cols) + "\n";
+  const doubleDivider = "=".repeat(cols) + "\n";
+  const formattedDate = getFormattedDate(order.timestamp);
+  
+  let text = doubleDivider + centerAlign("K.O.T", cols) + centerAlign("BUM BUM CAFE - KITCHEN", cols) + doubleDivider;
+  text += formatRow(`Token: #${order.tokenNumber}`, `Bill: #${String(order.billNumber).padStart(4, '0')}`, cols);
+  text += `Date: ${formattedDate}\nType: ${order.fulfillmentType?.toUpperCase()}\n`;
+  if (order.fulfillmentType === 'table') text += `Table: ${order.tableNumber}\n`;
+  
+  text += dividerLine + formatRow("ITEM", "QTY", cols) + dividerLine;
+  order.items.forEach((it: any) => {
+    const itemLeft = it.name.toUpperCase();
+    text += itemLeft.length > (cols - 6) ? `${itemLeft}\n${formatRow("", String(it.quantity), cols)}` : formatRow(itemLeft, String(it.quantity), cols);
+    if (it.note) text += `  * Note: ${it.note.toUpperCase()}\n`;
+  });
+  
+  if (order.chefInstructions) text += dividerLine + `INSTRUCTIONS: ${order.chefInstructions.toUpperCase()}\n`;
+  return text + dividerLine + "\n\n\n\n";
+};
+
+export const generateEscPosText = (order: any, config?: PrintConfig): string => {
+  const cols = config?.printerPaperSize === '80mm' ? 48 : 32;
+  const dividerLine = "-".repeat(cols) + "\n";
+  const doubleDivider = "=".repeat(cols) + "\n";
+  const formattedDate = getFormattedDate(order.timestamp);
+  
+  let text = doubleDivider + centerAlign("BUM BUM CAFE", cols) + centerAlign("MOHANDRA, PANNA (M.P.)", cols) + doubleDivider;
+  text += `CUSTOMER DETAILS:\nName: ${order.customerName || 'Walk-in Guest'}\n`;
+  if (order.customerPhone) text += `Phone: ${order.customerPhone}\n`;
+  if (order.address) text += `Address: ${order.address}\n`;
+  
+  text += dividerLine;
+  text += formatRow(`Bill No: #${String(order.billNumber).padStart(4, '0')}`, `Token: #${order.tokenNumber}`, cols);
+  text += formatRow(`Type: ${order.fulfillmentType?.toUpperCase()}`, `Pay: ${order.paymentMethod?.toUpperCase()}`, cols);
+  
+  // टेबल नंबर रसीद में जोड़ने के लिए सुधार
+  if (order.fulfillmentType === 'table' && order.tableNumber) {
+    text += `Table: ${order.tableNumber}\n`;
+  }
+  
+  text += `Date: ${formattedDate}\n` + dividerLine;
+
+  text += formatThreeColumns("ITEM", "QTY", "AMOUNT", cols) + dividerLine;
+  order.items.forEach((it: any) => {
+    text += formatThreeColumns(it.name.toUpperCase(), String(it.quantity), `₹${it.price * it.quantity}`, cols);
+    if (it.note) text += `  * Note: ${it.note.toUpperCase()}\n`;
+  });
+
+  const customDiscountVal = order.discount - (order.customerPointsRedeemed || 0);
+  text += dividerLine;
+  text += formatRow("Total:", `₹${order.subtotal}`, cols);
+  text += formatRow("Discount:", `₹${customDiscountVal > 0 ? customDiscountVal : 0}`, cols);
+  text += formatRow("Coupon Discount:", `₹${order.customerPointsRedeemed || 0}`, cols);
+  if (order.gstAmount) text += formatRow(`GST (${order.gstRate}%):`, `₹${order.gstAmount}`, cols);
+  
+  text += dividerLine + formatRow("GRAND TOTAL:", `₹${order.total}`, cols);
+  if (order.customerPhone) {
+    text += dividerLine;
+    text += formatRow("Current Point:", `${order.customerPointsEarned || 0}`, cols);
+    text += formatRow("Balance Point:", `${order.customerPointsAfter || 0}`, cols);
+  }
+
+  text += dividerLine + centerAlign("SCAN TO PAY", cols) + "\n\n";
+  text += centerAlign("THANK YOU! VISIT AGAIN", cols) + centerAlign("www.bb-cafe-app.vercel.app", cols) + dividerLine;
+  text += formatRow(formattedDate.split(',')[0], `#3-${order.billNumber}`, cols);
+  return text + "\n\n\n\n";
+};
+
+// ==========================================
+// 4. ब्राउज़र वेब फ़ॉलबैक HTML टेम्पलेट्स
+// ==========================================
+export const generateKotHtml = (order: any, config: PrintConfig): string => {
+  const itemsHtml = order.items.map((it: any) => `
+    <tr style="border-bottom: 1px dashed #ccc;">
+      <td style="font-size: 13px; font-weight: 900; padding: 6px 0; color: #000; text-transform: uppercase;">
+        ${it.name.toUpperCase()}
+        ${it.note ? `<div style="font-size: 11px; color: #333; font-weight: 800; padding-left: 6px;">Note: ${it.note.toUpperCase()}</div>` : ''}
+      </td>
+      <td style="font-size: 14px; font-weight: 900; text-align: right; padding: 6px 0; font-family: monospace;">${it.quantity}</td>
+    </tr>
+  `).join('');
+
+  return `
     <html>
-      <head>${style}</head>
+      <head>
+        <style>
+          @page { size: ${config.printerPaperSize === '58mm' ? '58mm' : '80mm'} auto; margin: 0; }
+          body { font-family: monospace; padding: 6px; font-size: 12px; color: #000; background-color: #fff; margin: 0; }
+          .center { text-align: center; }
+          .divider { border-top: 1.5px dotted #000; margin: 6px 0; }
+        </style>
+      </head>
       <body>
-        <div class="kot-container">
-          <div class="kot-title">K.O.T (Kitchen Order)</div>
-          <div class="kot-meta">
-            <b>Bill No:</b> #${String(order.billNumber).padStart(4, '0')}<br/>
-            <b>Token No:</b> #${order.tokenNumber}<br/>
-            <b>Fulfillment:</b> ${order.fulfillmentType.toUpperCase()}<br/>
-            ${order.tableNumber ? `<b>Table:</b> ${order.tableNumber}<br/>` : ''}
-            <b>Time:</b> ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+        <div class="center" style="font-size: 16px; font-weight: 900; border: 2.5px solid #000; padding: 5px; background-color: #000; color: #fff;">K.O.T (KITCHEN)</div>
+        <div class="center" style="font-size: 10px; font-weight: bold; margin-top: 3px;">BUM BUM CAFE</div>
+        <div class="divider"></div>
+        <div style="font-size: 11px; font-weight: bold; line-height: 1.4;">
+          <div>Token No: <span style="font-size: 13px; font-weight: 900;">#${order.tokenNumber}</span></div>
+          <div>Bill No: #${order.billNumber}</div>
+          <div>Mode: <span style="text-transform: uppercase;">${order.fulfillmentType?.toUpperCase()} ${order.tableNumber ? `(${order.tableNumber})` : ''}</span></div>
+        </div>
+        <div class="divider"></div>
+        <table style="width:100%; border-collapse:collapse;">
+          <thead>
+            <tr style="border-bottom: 1px solid #000;">
+              <th style="text-align: left; font-size: 11px; font-weight: 900; padding-bottom: 4px;">ITEM</th>
+              <th style="text-align: right; font-size: 11px; font-weight: 900; padding-bottom: 4px;">QTY</th>
+            </tr>
+          </thead>
+          <tbody>${itemsHtml}</tbody>
+        </table>
+        ${order.chefInstructions ? `
+          <div style="margin-top: 10px; padding: 6px; border: 1.5px solid #000; background-color: #fafafa;">
+            <div style="font-size: 10px; font-weight: 900; text-decoration: underline;">CHEF INSTRUCTION:</div>
+            <div style="font-size: 12px; font-weight: 900;">${order.chefInstructions.toUpperCase()}</div>
           </div>
-          <div class="kot-divider"></div>
-          <table class="kot-table">
-            <thead>
-              <tr>
-                <th style="width: 75%;">Item</th>
-                <th style="width: 25%; text-align: right;">Qty</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${(order.items || []).map((it: any) => `
-                <tr>
-                  <td>
-                    <b>${it.name}</b>
-                    ${it.note ? `<br/><span style="font-size: 8px; color: #444;">* Note: ${it.note}</span>` : ''}
-                  </td>
-                  <td style="text-align: right; font-weight: bold;">x${it.quantity}</td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
-          <div class="kot-divider"></div>
-          ${order.chefInstructions ? `<div style="font-size: 9px;"><b>Chef Inst:</b> ${order.chefInstructions}</div>` : ''}
+        ` : ''}
+        <div class="divider"></div>
+        <div class="center" style="font-size: 9.5px; font-weight: bold;">Printed: ${getFormattedDate(order.timestamp)}</div>
+      </body>
+    </html>
+  `;
+};
+
+export const generateReceiptHtml = (order: any, config: PrintConfig): string => {
+  const upiId = "Q231198993@ybl"; 
+  const upiLink = `upi://pay?pa=${upiId}&pn=Bum%20Bum%20Cafe&am=${order.total}&cu=INR`;
+  const formattedReceiptDate = getFormattedReceiptDate(order.timestamp);
+  const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=115x115&margin=0&data=${encodeURIComponent(upiLink)}`;
+
+  const itemsRows = order.items.map((it: any) => `
+    <tr style="border-bottom: 1px dashed #eee;">
+      <td style="font-size: 11px; font-weight: bold; padding: 6px 0; color: #111; text-transform: uppercase;">${it.name.toUpperCase()}</td>
+      <td style="font-size: 11px; font-weight: bold; text-align: center; padding: 6px 0; font-family: monospace;">${it.quantity}</td>
+      <td style="font-size: 11px; font-weight: bold; text-align: right; padding: 6px 0; font-family: monospace;">₹${it.price * it.quantity}</td>
+    </tr>
+  `).join('');
+
+  const loyaltyMarkup = order.customerPhone ? `
+    <div style="background-color: #fafafa; border: 1px dashed #aaa; padding: 5px; margin-top: 6px; font-size: 8.5px; font-family: monospace;">
+      <div style="font-weight: 900; text-align: center; color: #b45309;">LOYALTY POINTS</div>
+      <div style="display: flex; justify-content: space-between;"><span>Current Point:</span> <span>+${order.customerPointsEarned || 0} pts</span></div>
+      <div style="display: flex; justify-content: space-between;"><span>Balance Point:</span> <span>${order.customerPointsAfter || 0} pts</span></div>
+    </div>
+  ` : '';
+
+  const customDiscountVal = order.discount - (order.customerPointsRedeemed || 0);
+
+  return `
+    <html>
+      <head>
+        <style>
+          @page { size: ${config.printerPaperSize === '58mm' ? '58mm' : '80mm'} auto; margin: 0; }
+          body { font-family: monospace; width: 100%; margin: 0; padding: 4px; color: #000; font-size: 11px; box-sizing: border-box; }
+          .center { text-align: center; }
+          .divider { border-top: 1.5px dotted #000; margin: 6px 0; height: 0; }
+          .double-divider { border-top: 1.5px dotted #000; border-bottom: 1.5px dotted #000; margin: 6px 0; height: 3px; }
+          table { width: 100%; border-collapse: collapse; }
+        </style>
+      </head>
+      <body>
+        <div class="center" style="margin-bottom: 6px;">
+          <div style="background-color: #000; color: #fff; padding: 4px 8px; font-size: 13px; font-weight: 900; display: inline-block;">BUM BUM CAFE</div>
+          <div style="font-size: 8px; font-weight: bold; color: #333; margin-top: 2px;">BUS STAND MOHANDRA, DIST. PANNA, M.P.</div>
+          <div style="font-size: 9px; font-weight: bold;">Mo. 9714293759</div>
+        </div>
+        <div class="divider"></div>
+        <div style="font-size: 10px; font-weight: bold;">
+          <div>Name: ${order.customerName || 'Walk-in Guest'}</div>
+          ${order.customerPhone ? `<div>Phone: ${order.customerPhone.replace('+91', '')}</div>` : ''}
+          ${order.address ? `<div>Address: ${order.address}</div>` : ''}
+          ${loyaltyMarkup}
+        </div>
+        <div class="divider"></div>
+        <div style="display: grid; grid-template-cols: 1fr 1fr; font-size: 9.5px; font-weight: bold;">
+          <div>Bill No: #${String(order.billNumber).padStart(4, '0')}</div>
+          <div style="text-align: right;">Token: #<strong>${order.tokenNumber}</strong></div>
+          
+          <!-- टेबल नंबर वेब रसीद में जोड़ने के लिए सुधार -->
+          <div>Mode: ${order.fulfillmentType?.toUpperCase()} ${order.tableNumber ? `(Table: ${order.tableNumber})` : ''}</div>
+          
+          <div style="text-align: right;">Pay: ${order.paymentMethod?.toUpperCase()}</div>
+          <div style="grid-column: span 2;">Date: ${formattedReceiptDate}</div>
+        </div>
+        <div class="divider" style="margin-top: 8px;"></div>
+        <table>
+          <thead>
+            <tr style="border-bottom: 1.5px solid #000;">
+              <th style="text-align: left; font-size: 11px; padding-bottom: 4px;">ITEM</th>
+              <th style="text-align: center; font-size: 11px; padding-bottom: 4px; width: 40px;">QTY</th>
+              <th style="text-align: right; font-size: 11px; padding-bottom: 4px; width: 70px;">AMT</th>
+            </tr>
+          </thead>
+          <tbody>${itemsRows}</tbody>
+        </table>
+        <div class="divider"></div>
+        <div style="font-size: 10.5px; font-weight: bold; line-height: 1.4;">
+          <div style="display: flex; justify-content: space-between;"><span>Total:</span><span>₹${order.subtotal}</span></div>
+          <div style="display: flex; justify-content: space-between;"><span>Discount:</span><span>-₹${customDiscountVal > 0 ? customDiscountVal : 0}</span></div>
+          <div style="display: flex; justify-content: space-between;"><span>Coupon Discount:</span><span>-₹${order.customerPointsRedeemed || 0}</span></div>
+          ${order.gstAmount ? `<div style="display: flex; justify-content: space-between;"><span>GST (${order.gstRate}%):</span><span>+₹${order.gstAmount}</span></div>` : ''}
+        </div>
+        <div class="double-divider"></div>
+        <div style="display: flex; justify-content: space-between; align-items: center; font-weight: 900; font-size: 13px;">
+          <span>Grand Total</span><span>₹${order.total}</span>
+        </div>
+        <div class="divider"></div>
+        <div class="center" style="margin: 8px 0;">
+          <img src="${qrCodeUrl}" style="width: 105px; height: 105px; border: 1.5px solid #000; padding: 2px; display: inline-block;" />
+          <div style="font-size: 8px; font-weight: 900; margin-top: 4px;">BHIM UPI PAYTM/PHONEPE</div>
+        </div>
+        <div class="divider"></div>
+        <div class="center" style="font-size: 8.5px; line-height: 1.4; font-weight: bold;">
+          <div>www.youtube.com/@bbcafe.i | @bbcafe.in</div>
+          <div style="font-weight: 900; font-size: 10px; margin-top: 4px; font-style: italic;">THANK YOU, VISIT AGAIN!</div>
+          <div style="font-size: 9px; margin-top: 2px;">www.bb-cafe-app.vercel.app</div>
+        </div>
+        <div style="display: flex; justify-content: space-between; font-size: 9px; margin-top: 10px; font-weight: bold; border-top: 1px dashed #ccc; padding-top: 4px;">
+          <span>${formattedReceiptDate}</span><span>#3-${order.billNumber}</span>
         </div>
       </body>
     </html>
   `;
+};
 
-  // अदृश्य Iframe बनाना या उपयोग करना
-  let iframe = document.getElementById('kot-print-iframe') as HTMLIFrameElement;
-  if (!iframe) {
-    iframe = document.createElement('iframe');
-    iframe.id = 'kot-print-iframe';
-    iframe.style.position = 'absolute';
-    iframe.style.width = '0px';
-    iframe.style.height = '0px';
-    iframe.style.border = 'none';
-    iframe.style.left = '-9999px';
-    document.body.appendChild(iframe);
-  }
-
-  const docObj = iframe.contentWindow?.document || iframe.contentDocument;
-  if (docObj) {
-    docObj.open();
-    docObj.write(html);
-    docObj.close();
-
-    setTimeout(() => {
-      try {
-        iframe.contentWindow?.focus();
-        iframe.contentWindow?.print();
-      } catch (err) {
-        console.error("Iframe print failed:", err);
-      }
-    }, 300);
-  }
-}
-
-// मुख्य ग्राहक रसीद प्रिंट करने का फंक्शन (Iframe Based)
-export async function handlePrintReceipt(order: any, config: PrintConfig) {
-  const is58 = config.printerPaperSize === '58mm';
-  const widthChars = is58 ? 32 : 48;
-
-  const upiId = "bumbumcafe@upi";
-  const upiUrl = `upi://pay?pa=${upiId}&pn=BumBumCafe&am=${order.total}&cu=INR`;
-  const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=75x75&data=${encodeURIComponent(upiUrl)}`;
-
-  // 1. यदि डायरेक्ट हार्डवेयर प्रिंटर एक्टिव है (Bluetooth/USB Serial)
+// ==========================================
+// 5. प्रिंट ट्रिगर करने वाले मुख्य फ़ंक्शंस
+// ==========================================
+export const handlePrintKot = async (order: any, config: PrintConfig) => {
   if (
-    (config.printerType === 'thermal_bluetooth' && config.bleCharacteristic) ||
+    (config.printerType === 'thermal_bluetooth' && config.bleCharacteristic) || 
     (config.printerType === 'thermal_usb' && (config.serialPort || config.usbDevice))
   ) {
-    let text = "";
-    text += "================================\n";
-    text += "         BUM BUM CAFE\n";
-    text += "      Mohandra Town, MP\n";
-    text += "        Ph: 9827XXXXXX\n";
-    text += "================================\n";
-    text += `Bill No: #${String(order.billNumber).padStart(4, '0')}\n`;
-    text += `Token: #${order.tokenNumber}\n`;
-    text += `Type: ${order.fulfillmentType.toUpperCase()}\n`;
-    if (order.tableNumber) text += `Table: ${order.tableNumber}\n`;
-    text += `Date: ${formatDate(order.timestamp)}\n`;
-    text += "--------------------------------\n";
-    text += "Item Name         Qty     Total\n";
-    text += "--------------------------------\n";
-
-    (order.items || []).forEach((it: any) => {
-      const leftCol = `${it.name.substring(0, 16)} x${it.quantity}`;
-      const rightCol = `₹${it.price * it.quantity}`;
-      text += padSpaces(leftCol, rightCol, widthChars) + "\n";
-      if (it.note) text += ` * Note: ${it.note}\n`;
-    });
-
-    text += "--------------------------------\n";
-    text += padSpaces("Subtotal:", `₹${order.subtotal}`, widthChars) + "\n";
-    if (order.discount > 0) {
-      text += padSpaces("Discount:", `-₹${order.discount}`, widthChars) + "\n";
-    }
-    if (order.gstAmount > 0) {
-      text += padSpaces(`GST (${order.gstRate}%):`, `+₹${order.gstAmount}`, widthChars) + "\n";
-    }
-    text += "--------------------------------\n";
-    text += padSpaces("GRAND TOTAL:", `₹${order.total}`, widthChars) + "\n";
-    text += "--------------------------------\n";
-    text += "       SCAN TO PAY (UPI)\n";
-    text += `      UPI: ${upiId}\n`;
-    text += `      Amount: ₹${order.total}\n`;
-    text += "--------------------------------\n";
-    text += "  Thank you! Visit Us Again.\n";
-    text += "\n\n\n\n";
-
-    const encoder = new TextEncoder();
-    const dataBytes = encoder.encode(text);
-    const cutBytes = new Uint8Array([0x1d, 0x56, 0x42, 0x00]);
-    const finalBytes = new Uint8Array(dataBytes.length + cutBytes.length);
-    finalBytes.set(dataBytes);
-    finalBytes.set(cutBytes, dataBytes.length);
-
     try {
-      if (config.printerType === 'thermal_bluetooth' && config.bleCharacteristic) {
-        await config.bleCharacteristic.writeValue(finalBytes);
-      } else if (config.printerType === 'thermal_usb' && config.serialPort) {
-        const writer = config.serialPort.writable.getWriter();
-        await writer.write(finalBytes);
-        writer.releaseLock();
-      } else if (config.printerType === 'thermal_usb' && config.usbDevice) {
-        await config.usbDevice.transferOut(3, finalBytes);
-      }
-      return;
-    } catch (err) {
-      console.error("Direct hardware print failed, falling back to Iframe...", err);
+      const kotText = generateKotEscPosText(order, config);
+      await sendToPrinterInChunks(config, kotText);
+    } catch {
+      toast.error("KOT hardware print failed, launching fallback...");
     }
+    return;
   }
 
-  // 2. Iframe आधारित सुरक्षित बैकग्राउंड प्रिंटिंग (QR Code "Scan To Pay" के ठीक नीचे सुव्यवस्थित)
-  const style = `
-    <style>
-      @media print {
-        @page { margin: 0; }
-        body {
-          margin: 0;
-          padding: 0;
-          background: #fff;
-          color: #000;
-          font-family: 'Courier New', Courier, monospace;
-        }
-      }
-      .bill-container {
-        width: ${is58 ? '52mm' : '76mm'};
-        padding: 2mm 1mm;
-        margin: 0;
-        font-size: 9.5px;
-        line-height: 1.15;
-        box-sizing: border-box;
-      }
-      .bill-header {
-        text-align: center;
-        margin-bottom: 4px;
-      }
-      .bill-title {
-        font-size: 13px;
-        font-weight: bold;
-        text-transform: uppercase;
-        margin: 0 0 1px 0;
-      }
-      .bill-subtitle {
-        font-size: 8px;
-        color: #333;
-        margin: 0;
-      }
-      .bill-meta {
-        font-size: 8.5px;
-        margin-bottom: 4px;
-      }
-      .bill-divider {
-        border-top: 1px dashed #000;
-        margin: 3px 0;
-      }
-      .bill-table {
-        width: 100%;
-        font-size: 8.5px;
-        border-collapse: collapse;
-      }
-      .bill-table th {
-        border-bottom: 1px dashed #000;
-        text-align: left;
-        padding: 2px 0;
-        font-weight: bold;
-      }
-      .bill-table td {
-        padding: 2px 0;
-        vertical-align: top;
-      }
-      .total-row {
-        display: flex;
-        justify-content: space-between;
-        font-size: 9px;
-        margin: 1.5px 0;
-      }
-      .grand-total {
-        font-size: 11px;
-        font-weight: bold;
-        border-top: 1px dashed #000;
-        border-bottom: 1px dashed #000;
-        padding: 3px 0;
-        margin-top: 3px;
-      }
-      .qr-box {
-        text-align: center;
-        margin: 5px auto;
-        padding: 4px;
-        border: 1px dashed #000;
-        border-radius: 4px;
-        max-width: 90%;
-        display: block;
-        box-sizing: border-box;
-      }
-      .qr-title {
-        font-size: 8.5px;
-        font-weight: bold;
-        letter-spacing: 0.5px;
-        margin-bottom: 2px;
-        display: block;
-      }
-      .qr-img {
-        width: 75px;
-        height: 75px;
-        display: block;
-        margin: 0 auto;
-      }
-      .qr-footer-text {
-        font-size: 7.5px;
-        color: #555;
-        margin-top: 2px;
-        display: block;
-      }
-    </style>
-  `;
+  const printWindow = window.open('', '_blank', 'width=340,height=600');
+  if (!printWindow) return;
+  
+  printWindow.document.write(generateKotHtml(order, config));
+  printWindow.document.close();
+  printWindow.focus();
+  setTimeout(() => {
+    printWindow.print();
+    printWindow.close();
+  }, 350);
+};
 
-  const html = `
-    <html>
-      <head>${style}</head>
-      <body>
-        <div class="bill-container">
-          <div class="bill-header">
-            <h1 class="bill-title">Bum Bum Cafe</h1>
-            <p class="bill-subtitle">Mohandra Town, Panna (M.P.)<br/>Ph: 9827XXXXXX</p>
-          </div>
-          <div class="bill-divider"></div>
-          <div class="bill-meta">
-            <b>Bill No:</b> #${String(order.billNumber).padStart(4, '0')}<br/>
-            <b>Token No:</b> #${order.tokenNumber}<br/>
-            <b>Fulfillment:</b> ${order.fulfillmentType.toUpperCase()}<br/>
-            ${order.tableNumber ? `<b>Table No:</b> ${order.tableNumber}<br/>` : ''}
-            <b>Date:</b> ${formatDate(order.timestamp)}
-          </div>
-          <div class="bill-divider"></div>
-          
-          <table class="bill-table">
-            <thead>
-              <tr>
-                <th style="width: 50%;">Item</th>
-                <th style="width: 15%; text-align: center;">Qty</th>
-                <th style="width: 35%; text-align: right;">Price</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${(order.items || []).map((it: any) => `
-                <tr>
-                  <td>
-                    ${it.name}
-                    ${it.note ? `<br/><span style="font-size: 7.5px; color: #444;">(${it.note})</span>` : ''}
-                  </td>
-                  <td style="text-align: center;">${it.quantity}</td>
-                  <td style="text-align: right;">₹${it.price * it.quantity}</td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
-          
-          <div class="bill-divider"></div>
-          
-          <div class="total-row">
-            <span>Subtotal:</span>
-            <span>₹${order.subtotal}</span>
-          </div>
-          ${order.discount > 0 ? `
-            <div class="total-row">
-              <span>Discount:</span>
-              <span>-₹${order.discount}</span>
-            </div>
-          ` : ''}
-          ${order.gstAmount > 0 ? `
-            <div class="total-row">
-              <span>GST (${order.gstRate}%):</span>
-              <span>+₹${order.gstAmount}</span>
-            </div>
-          ` : ''}
-          
-          <div class="total-row grand-total">
-            <span>GRAND TOTAL:</span>
-            <span>₹${order.total}</span>
-          </div>
+export const handlePrintReceipt = async (order: any, config: PrintConfig) => {
+  const upiId = "Q231198993@ybl"; 
+  const upiLink = `upi://pay?pa=${upiId}&pn=Bum%20Bum%20Cafe&am=${order.total}&cu=INR`;
 
-          <div class="qr-box">
-            <span class="qr-title">SCAN TO PAY (UPI)</span>
-            <img class="qr-img" src="${qrCodeUrl}" alt="UPI QR Code" />
-            <span class="qr-footer-text">Scan with GPay, BHIM, Paytm, PhonePe</span>
-          </div>
-
-          <div style="text-align: center; font-size: 8px; margin-top: 6px; border-top: 1px dashed #000; padding-top: 3px;">
-            Thank you! Visit Us Again.
-          </div>
-        </div>
-      </body>
-    </html>
-  `;
-
-  // अदृश्य Iframe बनाना या उपयोग करना
-  let iframe = document.getElementById('receipt-print-iframe') as HTMLIFrameElement;
-  if (!iframe) {
-    iframe = document.createElement('iframe');
-    iframe.id = 'receipt-print-iframe';
-    iframe.style.position = 'absolute';
-    iframe.style.width = '0px';
-    iframe.style.height = '0px';
-    iframe.style.border = 'none';
-    iframe.style.left = '-9999px';
-    document.body.appendChild(iframe);
+  if (
+    (config.printerType === 'thermal_bluetooth' && config.bleCharacteristic) || 
+    (config.printerType === 'thermal_usb' && (config.serialPort || config.usbDevice))
+  ) {
+    const toastId = toast.loading("Sending directly to thermal printer...");
+    try {
+      const receiptText = generateEscPosText(order, config);
+      await sendToPrinterInChunks(config, receiptText, upiLink);
+      toast.dismiss(toastId);
+      toast.success("Customer receipt printed!");
+    } catch (err) {
+      console.error(err);
+      toast.dismiss(toastId);
+      toast.error("Hardware print failed, launching fallback...");
+    }
+    return;
   }
 
-  const docObj = iframe.contentWindow?.document || iframe.contentDocument;
-  if (docObj) {
-    docObj.open();
-    docObj.write(html);
-    docObj.close();
-
-    // 500ms का सुरक्षित समय ताकि क्यूआर कोड की इमेज पूरी तरह रेंडर हो जाए
-    setTimeout(() => {
-      try {
-        iframe.contentWindow?.focus();
-        iframe.contentWindow?.print();
-      } catch (err) {
-        console.error("Iframe print failed:", err);
-      }
-    }, 500);
+  const printWindow = window.open('', '_blank', 'width=340,height=600');
+  if (!printWindow) {
+    toast.error("Popup blocked! Please allow popups for this POS.");
+    return;
   }
-}
+
+  printWindow.document.write(generateReceiptHtml(order, config));
+  printWindow.document.close();
+  printWindow.focus();
+  setTimeout(() => {
+    printWindow.print();
+    printWindow.close();
+  }, 350); 
+};
