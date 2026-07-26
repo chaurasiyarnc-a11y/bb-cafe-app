@@ -483,15 +483,17 @@ export default function BbCafePos() {
     return false;
   };
 
-  // 1. K.O.T ESC/POS Text Generator
+  // 1. K.O.T ESC/POS Text Generator (Clean ASCII / Items left aligned, Qty right aligned)
   const generateKotEscPosText = (order: any) => {
     const formattedDate = order.timestamp?.toDate ? order.timestamp.toDate().toLocaleString('en-IN') : new Date(order.timestamp).toLocaleString();
     const dividerLine = "--------------------------------\n";
+    const doubleDivider = "================================\n";
     
     let text = "";
-    text += "        ** K.O.T **             \n";
-    text += "      BUM BUM CAFE - KITCHEN    \n";
-    text += dividerLine;
+    text += doubleDivider;
+    text += "             K.O.T              \n";
+    text += "     BUM BUM CAFE - KITCHEN     \n";
+    text += doubleDivider;
     text += `Token No: #${order.tokenNumber}\n`;
     text += `Bill No: #${String(order.billNumber).padStart(4, '0')}\n`;
     text += `Date: ${formattedDate}\n`;
@@ -500,18 +502,20 @@ export default function BbCafePos() {
       text += `Table: ${order.tableNumber}\n`;
     }
     text += dividerLine;
-    text += "ITEMS:\n";
+    text += "ITEM                       QTY  \n";
+    text += dividerLine;
     
     order.items.forEach((it: any) => {
-      text += `${it.name.toUpperCase()} x ${it.quantity}\n`;
+      const itemLine = `${it.name.toUpperCase().slice(0, 24).padEnd(25)}${String(it.quantity).padStart(7)}\n`;
+      text += itemLine;
       if (it.note) {
-        text += `  * Note: ${it.note}\n`;
+        text += `  * Note: ${it.note.toUpperCase()}\n`;
       }
     });
     
     if (order.chefInstructions) {
       text += dividerLine;
-      text += `INSTRUCTIONS: ${order.chefInstructions}\n`;
+      text += `INSTRUCTIONS: ${order.chefInstructions.toUpperCase()}\n`;
     }
     
     text += dividerLine;
@@ -519,44 +523,69 @@ export default function BbCafePos() {
     return text;
   };
 
-  // 2. Customer Receipt ESC/POS Text Generator
+  // 2. Customer Receipt ESC/POS Text Generator (No Chinese garbage, logo on top, customer info in header)
   const generateEscPosText = (order: any) => {
     const formattedDate = order.timestamp?.toDate ? order.timestamp.toDate().toLocaleString('en-IN') : new Date(order.timestamp).toLocaleString();
     const dividerLine = "--------------------------------\n";
+    const doubleDivider = "================================\n";
     
     let text = "";
-    text += "        * BUM BUM CAFE *        \n";
-    text += "     Mohandra, Panna (M.P.)     \n";
+    text += doubleDivider;
+    text += "          BUM BUM CAFE          \n";
+    text += "     MOHANDRA, PANNA (M.P.)     \n";
+    text += doubleDivider;
+    
+    // Customer Details inside header
+    text += "CUSTOMER DETAILS:\n";
+    text += `Name: ${order.customerName || 'Walk-in Guest'}\n`;
+    if (order.customerPhone) {
+      text += `Phone: ${order.customerPhone}\n`;
+      text += `Prev Points: ${order.customerPointsBefore || 0}\n`;
+      text += `Earned: +${order.customerPointsEarned || 0}  Redeemed: -${order.customerPointsRedeemed || 0}\n`;
+      text += `New Balance: ${order.customerPointsAfter || 0}\n`;
+    }
     text += dividerLine;
+
+    // Invoice Metadata
     text += `Bill No: #${String(order.billNumber).padStart(4, '0')}\n`;
     text += `Token No: #${order.tokenNumber}\n`;
     text += `Date: ${formattedDate}\n`;
     text += `Type: ${order.fulfillmentType?.toUpperCase()}\n`;
     text += `Pay Mode: ${order.paymentMethod?.toUpperCase()}\n`;
-    
-    if (order.customerPhone) {
-      text += dividerLine;
-      text += `GUEST: ${order.customerName.toUpperCase()}\n`;
-      text += `PHONE: ${order.customerPhone}\n`;
-      text += `Prev Points: ${order.customerPointsBefore || 0}\n`;
-      text += `Earned: +${order.customerPointsEarned || 0}  Redeemed: -${order.customerPointsRedeemed || 0}\n`;
-      text += `Total Points: ${order.customerPointsAfter || 0}\n`;
-    }
     text += dividerLine;
 
+    // Items list (Item name on line 1, qty & price left, total right on line 2)
     order.items.forEach((it: any) => {
-      const itemText = `${it.name} x${it.quantity}`;
-      const itemPrice = `Rs.${it.price * it.quantity}`;
-      text += `${itemText.slice(0, 20).padEnd(20)}${itemPrice.padStart(12)}\n`;
-      if (it.note) text += `  (${it.note})\n`;
+      text += `${it.name.toUpperCase()}\n`;
+      const qtyPrice = `  ${it.quantity} x Rs.${it.price}`;
+      const itemTotal = `Rs.${it.price * it.quantity}`;
+      text += `${qtyPrice.padEnd(20)}${itemTotal.padStart(12)}\n`;
+      if (it.note) text += `  Note: (${it.note.toUpperCase()})\n`;
     });
 
+    // Vertical totals stack
     text += dividerLine;
-    text += `Subtotal: Rs.${order.subtotal}\n`;
-    if (order.discount) text += `Savings: -Rs.${order.discount}\n`;
-    text += `Total Bill: Rs.${order.total}\n`;
+    text += `Total:              Rs.${order.subtotal}\n`;
+    
+    const customDiscountVal = order.discount - (order.customerPointsRedeemed || 0);
+    text += `Discount:           Rs.${customDiscountVal > 0 ? customDiscountVal : 0}\n`;
+    text += `Coupon Discount:    Rs.${order.customerPointsRedeemed || 0}\n`;
+    
+    if (order.gstAmount) {
+      text += `GST (${order.gstRate}%):        Rs.${order.gstAmount}\n`;
+    }
+    
     text += dividerLine;
-    text += "    Thank you! Visit Again!🍕   \n";
+    text += `GRAND TOTAL:        Rs.${order.total}\n`;
+    text += dividerLine;
+    
+    // Centered Footer Instructions
+    text += "          SCAN TO PAY           \n";
+    text += "\n\n"; 
+    text += "    THANK YOU! VISIT AGAIN      \n";
+    text += "      BBCAFE.IN / YOUTUBE       \n";
+    text += dividerLine;
+    text += `Date: ${formattedDate}  #3-${order.billNumber}\n`;
     text += "\n\n\n\n";
     return text;
   };
@@ -579,11 +608,11 @@ export default function BbCafePos() {
     const itemsHtml = order.items.map((it: any) => `
       <tr style="border-bottom: 1px dashed #ccc;">
         <td style="font-size: 13px; font-weight: 900; padding: 6px 0; color: #000; text-transform: uppercase;">
-          ${it.name}
-          ${it.note ? `<div style="font-size: 11px; color: #d97706; font-weight: 800; padding-left: 6px; margin-top: 2px;">★ NOTE: ${it.note}</div>` : ''}
+          ${it.name.toUpperCase()}
+          ${it.note ? `<div style="font-size: 11px; color: #333; font-weight: 800; padding-left: 6px; margin-top: 2px;">Note: ${it.note.toUpperCase()}</div>` : ''}
         </td>
         <td style="font-size: 14px; font-weight: 900; text-align: right; padding: 6px 0; color: #000; font-family: monospace;">
-          x ${it.quantity}
+          ${it.quantity}
         </td>
       </tr>
     `).join('');
@@ -617,7 +646,7 @@ export default function BbCafePos() {
           <table style="width:100%; border-collapse:collapse;">
             <thead>
               <tr style="border-bottom: 1px solid #000;">
-                <th style="text-align: left; font-size: 11px; font-weight: 900; padding-bottom: 4px;">ITEM DESCRIPTION</th>
+                <th style="text-align: left; font-size: 11px; font-weight: 900; padding-bottom: 4px;">ITEM</th>
                 <th style="text-align: right; font-size: 11px; font-weight: 900; padding-bottom: 4px;">QTY</th>
               </tr>
             </thead>
@@ -628,8 +657,8 @@ export default function BbCafePos() {
           
           ${order.chefInstructions ? `
             <div style="margin-top: 10px; padding: 6px; border: 1.5px solid #000; background-color: #fafafa; border-radius: 4px;">
-              <div style="font-size: 10px; font-weight: 900; color: #000; text-decoration: underline; margin-bottom: 2px;">👨‍🍳 CHEF INSTRUCTION:</div>
-              <div style="font-size: 12px; font-weight: 900; line-height: 1.3;">${order.chefInstructions}</div>
+              <div style="font-size: 10px; font-weight: 900; color: #000; text-decoration: underline; margin-bottom: 2px;">CHEF INSTRUCTION:</div>
+              <div style="font-size: 12px; font-weight: 900; line-height: 1.3;">${order.chefInstructions.toUpperCase()}</div>
             </div>
           ` : ''}
           
@@ -703,22 +732,32 @@ export default function BbCafePos() {
       return `
         <tr>
           <td style="font-size: 11px; font-weight: bold; padding: 4px 0 1px 0; color: #111; vertical-align: top;">
-            ${it.name}
-            ${noteFormatted ? `<br/><span style="font-size: 9px; font-weight: bold; color: #555; padding-left: 4px; font-style: italic;">${noteFormatted}</span>` : ''}
-          </td>
-          <td style="font-size: 11px; font-weight: bold; text-align: right; padding: 4px 0 1px 0; color: #111; font-family: monospace; vertical-align: top;">
-            ₹${it.price * it.quantity}
+            ${it.name.toUpperCase()}
+            ${noteFormatted ? `<br/><span style="font-size: 9px; font-weight: bold; color: #555; padding-left: 4px; font-style: italic;">Note: ${noteFormatted}</span>` : ''}
           </td>
         </tr>
         <tr>
-          <td colspan="2" style="font-size: 9.5px; color: #666; padding-bottom: 4px; font-weight: 500; font-family: monospace; border-bottom: 1px dashed #eee;">
-            ${it.quantity} x ₹${it.price}
+          <td style="font-size: 9.5px; color: #666; padding-bottom: 4px; font-weight: 500; font-family: monospace; border-bottom: 1px dashed #eee; display: flex; justify-content: space-between;">
+            <span>${it.quantity} x Rs.${it.price}</span>
+            <span style="font-family: monospace; font-weight: bold; color: #111;">Rs.${it.price * it.quantity}</span>
           </td>
         </tr>
       `;
     }).join('');
 
-    const phoneMarkup = order.customerPhone ? `<div style="font-family: monospace; font-size: 10px; font-weight: bold; margin-top: 2px;">📞 ${order.customerPhone.replace('+91', '')}</div>` : '';
+    const phoneMarkup = order.customerPhone ? `<div style="font-family: monospace; font-size: 10px; font-weight: bold; margin-top: 2px;">Phone: ${order.customerPhone.replace('+91', '')}</div>` : '';
+
+    const loyaltyHeaderMarkup = order.customerPhone ? `
+      <div style="background-color: #fafafa; border: 1px dashed #aaa; padding: 5px; margin-top: 6px; font-size: 8.5px; border-radius: 4px; font-family: monospace;">
+        <div style="font-weight: 900; color: #b45309; text-align: center; margin-bottom: 3px; font-family: sans-serif; letter-spacing: 0.3px;">LOYALTY POINTS PROFILE</div>
+        <div style="display: flex; justify-content: space-between;"><span>Prev Balance:</span> <span>${order.customerPointsBefore || 0} pts</span></div>
+        <div style="display: flex; justify-content: space-between;"><span>Points Earned:</span> <span style="color: green;">+${order.customerPointsEarned || 0} pts</span></div>
+        <div style="display: flex; justify-content: space-between;"><span>Points Redeemed:</span> <span style="color: red;">-${order.customerPointsRedeemed || 0} pts</span></div>
+        <div style="display: flex; justify-content: space-between; font-weight: 900; border-top: 1px dotted #ccc; padding-top: 2px; margin-top: 2px; color: #000; font-size: 9px;"><span>New Balance:</span> <span>${order.customerPointsAfter || 0} pts</span></div>
+      </div>
+    ` : '';
+
+    const customDiscountVal = order.discount - (order.customerPointsRedeemed || 0);
 
     printWindow.document.write(`
       <html>
@@ -730,7 +769,7 @@ export default function BbCafePos() {
               margin: 0mm; 
             }
             body { 
-              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+              font-family: monospace;
               width: ${containerRenderWidth}; 
               margin: 0 auto; 
               padding: 4px; 
@@ -767,14 +806,24 @@ export default function BbCafePos() {
         </head>
         <body>
           <div class="center" style="margin-top: 2px; margin-bottom: 6px;">
-            <div style="display: inline-block; background-color: #000; color: #fff; padding: 4px 8px; font-size: 12.5px; font-weight: 900; border-radius: 3px; letter-spacing: 0.5px; margin-bottom: 3px;">
-              🍕 BUM BUM CAFE 🍕
+            <div style="display: inline-block; background-color: #000; color: #fff; padding: 4px 8px; font-size: 13px; font-weight: 900; border-radius: 3px; letter-spacing: 0.5px; margin-bottom: 3px;">
+              BUM BUM CAFE
             </div>
             <div style="font-size: 8.5px; line-height: 1.25; font-weight: bold; color: #333;">
-              बस स्टैंड मोहंद्रा, पीपल पेड़ के नीचे, मोहंद्रा,<br/>
-              जिला पन्ना, मध्य प्रदेश, 488442
+              BUS STAND MOHANDRA, PEOPLE TREE,<br/>
+              DIST. PANNA, MADHYA PRADESH, 488442
             </div>
             <div style="font-size: 9.5px; font-weight: 800; margin-top: 2px; color: #000; font-family: monospace;">Mo. 9714293759</div>
+          </div>
+
+          <div class="divider"></div>
+
+          <!-- Customer Details Strictly in the Header -->
+          <div style="font-size: 10px; line-height: 1.35; font-weight: bold; color: #111;">
+            <div style="font-size: 9px; color: #555; text-transform: uppercase;">CUSTOMER DETAILS:</div>
+            <div style="font-size: 10.5px; font-weight: 800; color: #000; margin-top: 1px;">Name: ${order.customerName || 'Walk-in Guest'}</div>
+            ${phoneMarkup}
+            ${loyaltyHeaderMarkup}
           </div>
 
           <div class="divider"></div>
@@ -784,24 +833,7 @@ export default function BbCafePos() {
             <div style="text-align: right;">Token: #<strong>${order.tokenNumber}</strong></div>
             <div>Mode: ${order.fulfillmentType?.toUpperCase()}</div>
             <div style="text-align: right;">Pay: ${order.paymentMethod?.toUpperCase()}</div>
-          </div>
-
-          <div class="divider"></div>
-
-          <div style="font-size: 10px; line-height: 1.35; font-weight: bold; color: #111;">
-            <div style="font-size: 9px; color: #555; text-transform: uppercase;">Customer Details:</div>
-            <div style="font-size: 10.5px; font-weight: 800; color: #000; margin-top: 1px;">👤 ${order.customerName || 'Walk-in Guest'}</div>
-            ${phoneMarkup}
-
-            ${order.customerPhone ? `
-            <div style="background-color: #fafafa; border: 1px dashed #aaa; padding: 5px; margin-top: 6px; font-size: 8.5px; border-radius: 4px; font-family: monospace;">
-              <div style="font-weight: 900; color: #b45309; text-align: center; margin-bottom: 3px; font-family: sans-serif; letter-spacing: 0.3px;">★ LOYALTY PROFILE ★</div>
-              <div style="display: flex; justify-content: space-between;"><span>Prev Balance:</span> <span>${order.customerPointsBefore || 0} pts</span></div>
-              <div style="display: flex; justify-content: space-between;"><span>Earned:</span> <span style="color: green;">+${order.customerPointsEarned || 0} pts</span></div>
-              <div style="display: flex; justify-content: space-between;"><span>Redeemed:</span> <span style="color: red;">-${order.customerPointsRedeemed || 0} pts</span></div>
-              <div style="display: flex; justify-content: space-between; font-weight: 900; border-top: 1px dotted #ccc; padding-top: 2px; margin-top: 2px; color: #000; font-size: 9px;"><span>New Balance:</span> <span>${order.customerPointsAfter || 0} pts</span></div>
-            </div>
-            ` : ''}
+            <div>Date: ${formattedReceiptDate}</div>
           </div>
 
           <div class="divider" style="margin-top: 8px;"></div>
@@ -816,33 +848,36 @@ export default function BbCafePos() {
 
           <div style="font-size: 10.5px; font-family: monospace; font-weight: bold; line-height: 1.45; color: #111;">
             <div style="display: flex; justify-content: space-between;">
-              <span>Subtotal:</span>
-              <span>₹${order.subtotal}</span>
+              <span>Total:</span>
+              <span>Rs.${order.subtotal}</span>
             </div>
-            ${order.discount ? `
-            <div style="display: flex; justify-content: space-between; color: green;">
-              <span>Savings:</span>
-              <span>-₹${order.discount}</span>
-            </div>` : ''}
+            <div style="display: flex; justify-content: space-between;">
+              <span>Discount:</span>
+              <span>-Rs.${customDiscountVal > 0 ? customDiscountVal : 0}</span>
+            </div>
+            <div style="display: flex; justify-content: space-between;">
+              <span>Coupon Discount:</span>
+              <span>-Rs.${order.customerPointsRedeemed || 0}</span>
+            </div>
             ${order.gstAmount ? `
             <div style="display: flex; justify-content: space-between; color: #444;">
               <span>GST (${order.gstRate}%):</span>
-              <span>+₹${order.gstAmount}</span>
+              <span>+Rs.${order.gstAmount}</span>
             </div>` : ''}
           </div>
 
           <div class="double-divider"></div>
 
           <div style="display: flex; justify-content: space-between; align-items: center; padding: 2px 0;">
-            <span style="font-size: 13.5px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.5px;">Grand Total</span>
-            <span style="font-size: 14.5px; font-weight: 900; font-family: monospace;">₹${order.total}</span>
+            <span style="font-size: 13px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.5px;">Grand Total</span>
+            <span style="font-size: 14px; font-weight: 900; font-family: monospace;">Rs.${order.total}</span>
           </div>
 
           <div class="divider"></div>
 
           <div class="center" style="margin-top: 8px; margin-bottom: 6px;">
             <div style="font-size: 9px; font-weight: 900; text-transform: uppercase; margin-bottom: 4px; color: #000; letter-spacing: 0.2px;">
-              Scan To Pay: ₹${order.total}
+              SCAN TO PAY: Rs.${order.total}
             </div>
             <img src="${qrCodeUrl}" style="width: 105px; height: 105px; display: inline-block; border: 1.5px solid #000; padding: 2px; border-radius: 4px;" />
             <div style="font-size: 8px; font-weight: 900; margin-top: 4px; letter-spacing: 0.5px; color: #000;">BHIM UPI PAYTM</div>
@@ -854,7 +889,7 @@ export default function BbCafePos() {
             <div style="font-weight: 900; font-size: 9px; margin-bottom: 1px;">Follow us</div>
             <div>www.youtube.com/@bbcafe.i</div>
             <div>Social Media: @bbcafe.in</div>
-            <div style="margin-top: 4px; font-weight: 900; font-size: 10px; color: #000; font-style: italic;">❤ Thank you, visit again! ❤</div>
+            <div style="margin-top: 4px; font-weight: 900; font-size: 10px; color: #000; font-style: italic;">THANK YOU, VISIT AGAIN!</div>
           </div>
 
           <div style="display: flex; justify-content: space-between; font-size: 9px; font-family: monospace; color: #444; margin-top: 10px; font-weight: bold; border-top: 1px dashed #ccc; padding-top: 4px;">
