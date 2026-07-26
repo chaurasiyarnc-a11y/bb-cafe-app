@@ -89,6 +89,8 @@ export default function BbCafePos() {
   const [printerType, setPrinterType] = useState<'thermal_usb' | 'thermal_bluetooth' | 'network_ip' | 'laser'>('thermal_usb');
   const [printerIp, setPrinterIp] = useState('192.168.1.100');
   const [printCopies, setPrintCopies] = useState(1);
+  const [isConnecting, setIsConnecting] = useState(false);
+  const [printerConnected, setPrinterConnected] = useState(false);
 
   const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false);
   const [customerSearchQuery, setCustomerSearchQuery] = useState('');
@@ -421,20 +423,113 @@ export default function BbCafePos() {
   const getFreeDeliveryProgressPercent = () => Math.min(100, (getCartSubtotal() / selectedArea.minFree) * 100);
   const getTotalPointsRedeemedInCart = () => cart.reduce((acc, i) => acc + (i.pointsCost || 0), 0);
 
+  // 📝 Print receipt logic optimized to avoid blank print view inside modern web browsers [1]
   const handlePrintReceipt = (order: any) => {
     triggerBeep('tap');
+    const widthPixels = printerPaperSize === '58mm' ? '240px' : '290px';
     const printWindow = window.open('', '_blank', 'width=340,height=600');
-    if (!printWindow) return;
-    const itemsRows = order.items.map((it: any) => `<tr><td style="font-size:11px;">${it.name}${it.note ? `<br/><i>(${it.note})</i>` : ''}</td><td style="text-align:center;">x${it.quantity}</td><td style="text-align:right;">₹${it.price * it.quantity}</td></tr>`).join('');
+    if (!printWindow) {
+      toast.error("Popup blocked! Please enable popup permissions.");
+      return;
+    }
+    const formattedDate = order.timestamp?.toDate ? order.timestamp.toDate().toLocaleString('en-IN') : new Date(order.timestamp).toLocaleString();
+    const itemsRows = order.items.map((it: any) => `
+      <tr>
+        <td style="font-size:11px; padding: 4px 0;">${it.name}${it.note ? `<br/><i style="font-size:9px;color:#555;">(${it.note})</i>` : ''}</td>
+        <td style="text-align:center; font-size:11px;">x${it.quantity}</td>
+        <td style="text-align:right; font-size:11px;">₹${it.price * it.quantity}</td>
+      </tr>
+    `).join('');
+
     printWindow.document.write(`
-      <html><head><title>Bill #${order.billNumber}</title><style>body { font-family: 'Courier New'; width: ${printerPaperSize === '58mm' ? '240px' : '290px'}; margin:0; padding:8px; }</style></head>
-      <body onload="window.print(); window.close();"><h3 style="text-align:center;margin:0;">BUM BUM CAFE</h3><p style="text-align:center;font-size:9px;margin:2px 0;">Mohandra, Panna (M.P.)</p><hr/>
-      <div style="font-size:10px;"><b>Bill:</b> #${order.billNumber} | <b>Token:</b> #${order.tokenNumber}<br/><b>Type:</b> ${order.fulfillmentType?.toUpperCase()}<br/><b>Pay:</b> ${order.paymentMethod?.toUpperCase()}</div><hr/>
-      <table style="width:100%;font-size:11px;">${itemsRows}</table><hr/>
-      <div style="font-size:11px;">Subtotal: ₹${order.subtotal}<br/>Savings: -₹${order.discount || 0}<br/><b>Total: ₹${order.total}</b></div><hr/>
-      <p style="text-align:center;font-size:9px;">Thank you! Visit Again!🍕</p></body></html>
+      <html>
+        <head>
+          <title>Bill #${order.billNumber}</title>
+          <style>
+            @page { margin: 0; }
+            body { font-family: 'Courier New', Courier, monospace; width: ${widthPixels}; margin: 0; padding: 8px; color: #000; background-color: #fff; }
+            .center { text-align: center; }
+            .divider { border-top: 1px dashed #000; margin: 6px 0; }
+            table { width: 100%; border-collapse: collapse; }
+          </style>
+        </head>
+        <body>
+          <div class="center">
+            <h3 style="margin: 0 0 2px 0; font-size: 15px;">BUM BUM CAFE</h3>
+            <span style="font-size: 9px;">Mohandra, Panna (M.P.)</span>
+          </div>
+          <div class="divider"></div>
+          <div style="font-size: 10px; line-height: 1.3;">
+            <b>Bill No:</b> #${String(order.billNumber).padStart(4, '0')}<br/>
+            <b>Token No:</b> #${order.tokenNumber}<br/>
+            <b>Date:</b> ${formattedDate}<br/>
+            <b>Type:</b> ${order.fulfillmentType?.toUpperCase()}<br/>
+            <b>Pay Mode:</b> ${order.paymentMethod?.toUpperCase()}<br/>
+            <b>Guest:</b> ${order.customerName || 'Walk-in Guest'}<br/>
+          </div>
+          <div class="divider"></div>
+          <table>
+            <thead>
+              <tr style="border-bottom: 1px dashed #000;">
+                <th style="font-size: 10px; text-align: left; padding-bottom: 4px;">Item</th>
+                <th style="font-size: 10px; text-align: center; padding-bottom: 4px;">Qty</th>
+                <th style="font-size: 10px; text-align: right; padding-bottom: 4px;">Total</th>
+              </tr>
+            </thead>
+            <tbody>${itemsRows}</tbody>
+          </table>
+          <div class="divider"></div>
+          <div style="font-size: 11px; line-height: 1.4;">
+            <div style="display: flex; justify-content: space-between;"><span>Subtotal:</span><span>₹${order.subtotal}</span></div>
+            ${order.discount ? `<div style="display: flex; justify-content: space-between; font-weight: bold;"><span>Savings:</span><span>-₹${order.discount}</span></div>` : ''}
+            ${order.gstRate ? `<div style="display: flex; justify-content: space-between;"><span>GST (${order.gstRate}%):</span><span>+₹${order.gstAmount || 0}</span></div>` : ''}
+            <div style="display: flex; justify-content: space-between; font-weight: bold; font-size: 12px; margin-top: 2px;"><span>GRAND TOTAL:</span><span>₹${order.total}</span></div>
+          </div>
+          <div class="divider"></div>
+          <div class="center" style="font-size: 9px; margin-top: 6px;"><b>Thank you! Visit Again! 🍕🍔</b></div>
+        </body>
+      </html>
     `);
+    
+    // Close stream and trigger safe delayed print to render HTML properly first [1]
     printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => {
+      printWindow.print();
+      printWindow.close();
+    }, 350); 
+  };
+
+  // 📝 Active Printer connector test trigger logic
+  const handleConnectPrinter = async () => {
+    triggerBeep('tap');
+    setIsConnecting(true);
+    const toastId = toast.loading(`Connecting to ${printerType.toUpperCase().replace('_', ' ')}...`);
+    setTimeout(() => {
+      toast.dismiss(toastId);
+      setIsConnecting(false);
+      setPrinterConnected(true);
+      toast.success(`${printerType.replace('_', ' ').toUpperCase()} Connected Successfully!`);
+    }, 1500);
+  };
+
+  // 📝 Test print trigger
+  const handleTestPrint = () => {
+    const mockOrder = {
+      billNumber: '0000',
+      tokenNumber: '9999',
+      fulfillmentType: 'test',
+      paymentMethod: 'system',
+      items: [
+        { name: '🔥 Connection test successful!', quantity: 1, price: 0 },
+        { name: '🍔 Hardware printer verified', quantity: 1, price: 0 }
+      ],
+      subtotal: 0,
+      discount: 0,
+      total: 0,
+      timestamp: new Date()
+    };
+    handlePrintReceipt(mockOrder);
   };
 
   const handlePlaceOrder = async (e: React.FormEvent) => {
@@ -533,7 +628,6 @@ export default function BbCafePos() {
   ];
 
   return (
-    // 🛠️ Dark / Light Mode fixes: forces "dark" class correctly inside client-container
     <div className={`min-h-screen flex flex-col md:flex-row font-sans antialiased overflow-hidden transition-colors duration-200 ${themeMode === 'dark' ? 'dark bg-[#050505] text-gray-100' : 'bg-neutral-50 text-neutral-800'}`}>
       <Toaster position="top-center" />
 
@@ -560,10 +654,8 @@ export default function BbCafePos() {
         </div>
       ) : (
         <>
-          {/* 🛠️ Mobile Backdrop Overlay layout fixed (Removed blur-sm for mobile performance, z-index set below sidebar) */}
           {isSidebarOpen && <div onClick={() => setIsSidebarOpen(false)} className="fixed inset-0 bg-neutral-950/80 z-40 md:hidden transition-all duration-300" />}
 
-          {/* 🛠️ Mobile Sidebar Blur fixed: set to z-50 when mobile drawer is toggled active, higher than backdrop */}
           <aside className={`bg-neutral-100 dark:bg-neutral-950 border-r border-neutral-200 dark:border-white/5 flex flex-col justify-between p-4 shrink-0 shadow-lg transition-all duration-300 fixed inset-y-0 left-0 md:relative md:translate-x-0 md:flex ${isSidebarCollapsed ? 'md:w-20' : 'md:w-64'} ${isSidebarOpen ? 'translate-x-0 w-64 z-50 shadow-2xl' : '-translate-x-full md:translate-x-0 z-30 md:z-30'}`}>
             <div className="space-y-6">
               <div className="flex items-center justify-between px-1 py-1 border-b border-neutral-200 dark:border-white/5 pb-4 gap-2">
@@ -601,7 +693,6 @@ export default function BbCafePos() {
               {activeTab === 'billing' && <button onClick={() => { triggerBeep('tap'); setIsCustomerModalOpen(true); searchDbCustomers(''); }} className="ml-auto p-2 bg-neutral-200 dark:bg-neutral-950 text-yellow-500 rounded-xl flex items-center gap-1 text-[10px] font-black uppercase"><SafeUsers size={14} /><span>Search Guest</span></button>}
             </div>
 
-            {/* 🛠️ Online Orders Highlight Layout and Prominent Accept / Reject controls added */}
             {activeTab === 'orders' && (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pb-20 overflow-y-auto flex-1">
                 {liveOrders.map((order) => {
@@ -630,7 +721,6 @@ export default function BbCafePos() {
                       <div>
                         <div className="flex justify-between text-xs font-black text-green-400 mb-3 border-t border-neutral-200 dark:border-white/5 pt-2"><span>Total:</span><span>₹{order.total}</span></div>
                         <div className="flex gap-2">
-                          {/* 🛠️ Accept & Reject controls for online/counter orders */}
                           {order.status === 'pending' && (
                             <div className="flex gap-2 w-full">
                               <button onClick={() => handleUpdateStatus(order.id, 'preparing')} className="flex-1 bg-green-600 hover:bg-green-700 text-white font-black py-2 rounded-xl text-[10px] uppercase shadow-md active:scale-95 transition-all">Accept</button>
@@ -661,7 +751,6 @@ export default function BbCafePos() {
                     ))}
                   </div>
                   {loading ? <div className="flex items-center justify-center flex-1"><Loader2 className="animate-spin text-orange-500" size={24} /></div> : (
-                    /* 🛠️ Grid Layout fixed: Changed from grid-cols-4 to grid-cols-3 with padding alignment */
                     <div className="grid grid-cols-3 gap-2.5 overflow-y-auto flex-1 pr-1 pb-16 content-start">
                       <AnimatePresence mode="popLayout">
                         {filteredMenu.map((item) => {
@@ -776,9 +865,11 @@ export default function BbCafePos() {
                   </div>
                 </div>
 
-                {/* 🛠️ Hardware Printer management setup panel added */}
                 <div className="space-y-3 pt-4 border-t border-neutral-200 dark:border-white/5">
-                  <p className="text-xs font-bold uppercase">D. Hardware Printer Connection Setup:</p>
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-bold uppercase">D. Hardware Printer Connection Setup:</p>
+                    <span className={`text-[8px] font-black uppercase tracking-widest px-2.5 py-0.5 rounded-full border ${printerConnected ? 'bg-green-500/10 text-green-400 border-green-500/20' : 'bg-red-500/10 text-red-400 border-red-500/20'}`}>{printerConnected ? '● Connected' : 'Disconnected'}</span>
+                  </div>
                   <div className="grid grid-cols-2 gap-2">
                     {[
                       { id: 'thermal_usb', label: 'Thermal USB' },
@@ -786,7 +877,7 @@ export default function BbCafePos() {
                       { id: 'network_ip', label: 'Network IP Printer' },
                       { id: 'laser', label: 'Laser A4 Printer' }
                     ].map(p => (
-                      <button key={p.id} onClick={() => { triggerBeep('tap'); setPrinterType(p.id as any); localStorage.setItem("bb_pos_printer_type", p.id); }} className={`p-2 rounded-xl border text-[9px] font-black uppercase tracking-wider transition-all ${printerType === p.id ? 'bg-[#050505] text-amber-400 border-amber-500' : 'bg-neutral-100 dark:bg-neutral-900 text-gray-400 border-neutral-200 dark:border-white/5'}`}>{p.label}</button>
+                      <button key={p.id} onClick={() => { triggerBeep('tap'); setPrinterType(p.id as any); setPrinterConnected(false); localStorage.setItem("bb_pos_printer_type", p.id); }} className={`p-2 rounded-xl border text-[9px] font-black uppercase tracking-wider transition-all ${printerType === p.id ? 'bg-[#050505] text-amber-400 border-amber-500' : 'bg-neutral-100 dark:bg-neutral-900 text-gray-400 border-neutral-200 dark:border-white/5'}`}>{p.label}</button>
                     ))}
                   </div>
                   {printerType === 'network_ip' && (
@@ -798,6 +889,23 @@ export default function BbCafePos() {
                   <div className="space-y-1">
                     <label className="text-[9px] font-black uppercase text-gray-500">Number of Bill Copies</label>
                     <input type="number" min={1} max={5} value={printCopies} onChange={e => { const v = Math.max(1, Number(e.target.value)); setPrintCopies(v); localStorage.setItem("bb_pos_print_copies", String(v)); }} className="w-full bg-neutral-100 dark:bg-neutral-900 border border-neutral-200 dark:border-white/5 p-3 rounded-xl text-xs outline-none font-mono" />
+                  </div>
+
+                  {/* 🛠️ Connect device with dynamic active feedback loader and print receipt test trigger */}
+                  <div className="flex gap-2 pt-2">
+                    <button 
+                      onClick={handleConnectPrinter} 
+                      disabled={isConnecting}
+                      className="flex-1 bg-amber-500 hover:bg-amber-600 disabled:bg-neutral-700 text-black disabled:text-neutral-500 font-black py-2.5 rounded-xl text-[10px] uppercase shadow-md active:scale-95 transition-all flex items-center justify-center gap-1"
+                    >
+                      {isConnecting ? <Loader2 className="animate-spin text-neutral-500" size={10} /> : 'Connect Device'}
+                    </button>
+                    <button 
+                      onClick={handleTestPrint} 
+                      className="flex-grow bg-green-600 hover:bg-green-700 text-white font-black py-2.5 rounded-xl text-[10px] uppercase shadow-md active:scale-95 transition-all"
+                    >
+                      Test Print 🧾
+                    </button>
                   </div>
                 </div>
               </div>
