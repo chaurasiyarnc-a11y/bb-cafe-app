@@ -235,7 +235,7 @@ export default function BbCafePos() {
         const uDoc = snap.docs[0].data();
         setIsLoggedIn(true);
         setCurrentUser({ id: snap.docs[0].id, ...uDoc });
-        localStorage.setItem("bb_pos_user", JSON.stringify({ id: snap.docs[0].id, ...uDoc })); // Fixed: Added closing parenthesis
+        localStorage.setItem("bb_pos_user", JSON.stringify({ id: snap.docs[0].id, ...uDoc })); // Fixed: Parenthesis properly closed
         toast.success(`Welcome, ${uDoc.name}!`);
       } else {
         toast.error("Incorrect PIN!");
@@ -546,14 +546,14 @@ export default function BbCafePos() {
     }, 350); 
   };
 
-  // 📝 Real-time bluetooth device connector
+  // 📝 Real-time bluetooth device connector (Fixed Type-Casting for browser compilation)
   const handleConnectPrinter = async () => {
     triggerBeep('tap');
     setIsConnecting(true);
     const toastId = toast.loading(`Connecting to ${printerType.toUpperCase().replace('_', ' ')}...`);
 
     if (printerType === 'thermal_bluetooth') {
-      if (!navigator.bluetooth) {
+      if (!(navigator as any).bluetooth) { // Fixed: Type casted navigator to 'any'
         toast.dismiss(toastId);
         setIsConnecting(false);
         toast.error("Web Bluetooth is not supported on this browser/device. Please use Google Chrome on HTTPS.");
@@ -561,7 +561,7 @@ export default function BbCafePos() {
       }
       try {
         // Request any Bluetooth Low Energy thermal printer
-        const device = await navigator.bluetooth.requestDevice({
+        const device = await (navigator as any).bluetooth.requestDevice({ // Fixed: Type casted navigator to 'any'
           acceptAllDevices: true,
           optionalServices: ['000018f0-0000-1000-8000-00805f9b34fb'] // Standard battery and SPP service UUID
         });
@@ -865,7 +865,7 @@ export default function BbCafePos() {
               <div className="bg-white dark:bg-neutral-950 border border-neutral-200 dark:border-white/5 p-5 flex-1 overflow-y-auto pb-20 rounded-3xl">
                 <div className="flex justify-between items-center mb-6">
                   <div><h2 className="text-sm font-black uppercase text-orange-500">Live Item Stock Control</h2><p className="text-[10px] text-neutral-500">Disable items instantly for customers.</p></div>
-                  <button onClick={async () => { triggerBeep('tap'); const snap = await getDocs(collection(db, "products")); setProducts(snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))); }} className="p-2 bg-neutral-200 dark:bg-neutral-950 text-gray-400 rounded-xl"><SafeRefreshCw size={14} /></button>
+                  <button onClick={async () => { triggerBeep('tap'); const snap = await getDocs(collection(db, "products")); setProducts(snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))); }} className="p-2 bg-neutral-200 dark:bg-neutral-900 text-gray-400 rounded-xl"><SafeRefreshCw size={14} /></button>
                 </div>
                 <div className="space-y-2 max-w-xl">
                   {products.map((item) => {
