@@ -173,6 +173,7 @@ export default function BbCafePos() {
     setGstRate(Number(localStorage.getItem("bb_pos_gst_rate")) || 5);
     setPrinterPaperSize((localStorage.getItem("bb_pos_paper_size") as any) || '58mm');
     
+    // Printer settings from local storage
     const localPrinterType = localStorage.getItem("bb_pos_printer_type");
     if (localPrinterType) setPrinterType(localPrinterType as any);
     const localPrinterIp = localStorage.getItem("bb_pos_printer_ip");
@@ -234,7 +235,7 @@ export default function BbCafePos() {
         const uDoc = snap.docs[0].data();
         setIsLoggedIn(true);
         setCurrentUser({ id: snap.docs[0].id, ...uDoc });
-        localStorage.setItem("bb_pos_user", JSON.stringify({ id: snap.docs[0].id, ...uDoc });
+        localStorage.setItem("bb_pos_user", JSON.stringify({ id: snap.docs[0].id, ...uDoc })); // Fixed: Added closing parenthesis
         toast.success(`Welcome, ${uDoc.name}!`);
       } else {
         toast.error("Incorrect PIN!");
@@ -423,7 +424,7 @@ export default function BbCafePos() {
   const getFreeDeliveryProgressPercent = () => Math.min(100, (getCartSubtotal() / selectedArea.minFree) * 100);
   const getTotalPointsRedeemedInCart = () => cart.reduce((acc, i) => acc + (i.pointsCost || 0), 0);
 
-  // 📝 Print receipt logic optimized to avoid blank print view + Bluetooth direct ESC/POS writing
+  // 📝 Print receipt logic optimized to avoid blank print view + Bluetooth direct ESC/POS writing [1]
   const handlePrintReceipt = async (order: any) => {
     triggerBeep('tap');
 
@@ -864,7 +865,7 @@ export default function BbCafePos() {
               <div className="bg-white dark:bg-neutral-950 border border-neutral-200 dark:border-white/5 p-5 flex-1 overflow-y-auto pb-20 rounded-3xl">
                 <div className="flex justify-between items-center mb-6">
                   <div><h2 className="text-sm font-black uppercase text-orange-500">Live Item Stock Control</h2><p className="text-[10px] text-neutral-500">Disable items instantly for customers.</p></div>
-                  <button onClick={async () => { triggerBeep('tap'); const snap = await getDocs(collection(db, "products")); setProducts(snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))); }} className="p-2 bg-neutral-200 dark:bg-neutral-900 text-gray-400 rounded-xl"><SafeRefreshCw size={14} /></button>
+                  <button onClick={async () => { triggerBeep('tap'); const snap = await getDocs(collection(db, "products")); setProducts(snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))); }} className="p-2 bg-neutral-200 dark:bg-neutral-950 text-gray-400 rounded-xl"><SafeRefreshCw size={14} /></button>
                 </div>
                 <div className="space-y-2 max-w-xl">
                   {products.map((item) => {
