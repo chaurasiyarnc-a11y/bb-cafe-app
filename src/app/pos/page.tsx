@@ -209,7 +209,8 @@ export default function BbCafePos() {
         const prodSnap = await getDocs(collection(db, "products"));
         const items = prodSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
         setProducts(items);
-        setCategories(['All', ...Array.from(new Set(items.map((i: any) => i.category).filter(Boolean))) as string[]]);
+        const uniqueCats = Array.from(new Set(items.map((i: any) => i.category).filter(Boolean))) as string[];
+        setCategories(['All', ...uniqueCats]);
         const rulesSnap = await getDocs(collection(db, "loyalty_rules"));
         setLoyaltyRules(rulesSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
       } catch (err) {
@@ -563,8 +564,6 @@ export default function BbCafePos() {
     }).join('');
 
     const phoneMarkup = order.customerPhone ? `<div style="font-family: monospace; font-size: 9.5px; font-weight: bold;">${order.customerPhone.replace('+91', '')}</div>` : '';
-    const discountMarkup = order.discount ? `<div style="display: flex; justify-content: space-between; font-weight: bold;"><span>Savings:</span><span>-₹${order.discount}</span></div>` : '';
-    const gstMarkup = order.gstRate ? `<div style="display: flex; justify-content: space-between;"><span>GST (${order.gstRate}%):</span><span>+₹${order.gstAmount || 0}</span></div>` : '';
 
     printWindow.document.write(`
       <html>
@@ -752,7 +751,7 @@ export default function BbCafePos() {
           toast.dismiss(toastId);
           toast.success("Direct USB Printer Connected via WebUSB!");
         }
-      } catch (err: any) {
+      } catch (err) {
         console.error(err);
         toast.dismiss(toastId);
         toast.error("Direct USB connection failed. Ensure printer is connected and not occupied.");
@@ -884,8 +883,13 @@ export default function BbCafePos() {
     { id: 'settings', label: 'POS Settings', icon: SafeSettings }
   ];
 
+  // isolated outer container class
+  const mainClass = `min-h-screen flex flex-col md:flex-row font-sans antialiased overflow-hidden transition-colors duration-200 ${
+    themeMode === 'dark' ? 'dark bg-[#050505] text-gray-100' : 'bg-neutral-50 text-neutral-800'
+  }`;
+
   return (
-    <div className={`min-h-screen flex flex-col md:flex-row font-sans antialiased overflow-hidden transition-colors duration-200 ${themeMode === 'dark' ? 'dark bg-[#050505] text-gray-100' : 'bg-neutral-50 text-neutral-800'}`}>
+    <div className={mainClass}>
       <Toaster position="top-center" />
 
       {!isLoggedIn ? (
@@ -1011,15 +1015,36 @@ export default function BbCafePos() {
                     <button onClick={() => { triggerBeep('tap'); setIsCartOpen(true); }} className="bg-orange-500 text-black font-black text-xs py-2 px-4 rounded-xl flex items-center gap-2 shadow-lg"><SafeShoppingBag size={14} /><span>Cart ({cart.reduce((sum, item) => sum + item.quantity, 0)})</span></button>
                   </div>
                   <div className="flex gap-1.5 overflow-x-auto pb-3 scrollbar-none">
-                    {categories.map((cat) => (
-                      <button key={cat} onClick={() => { triggerBeep('tap'); setSelectedCategory(cat); }} className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase border shrink-0 ${selectedCategory === cat ? 'bg-orange-500 text-black border-orange-500' : 'bg-neutral-100 dark:bg-neutral-900 text-gray-400 border-neutral-200 dark:border-white/5'}`}>{cat}</button>
-                    ))}
+                    {categories.map((cat) => {
+                      const isSelected = selectedCategory === cat;
+                      const btnClass = `px-3 py-1.5 rounded-lg text-[9px] font-black uppercase border shrink-0 ${
+                        isSelected 
+                          ? 'bg-orange-500 text-black border-orange-500' 
+                          : 'bg-neutral-100 dark:bg-neutral-900 text-gray-400 border-neutral-200 dark:border-white/5'
+                      }`;
+                      return (
+                        <button 
+                          key={cat} 
+                          onClick={() => { triggerBeep('tap'); setSelectedCategory(cat); }} 
+                          className={btnClass}
+                        >
+                          {cat}
+                        </button>
+                      );
+                    })}
                   </div>
-                  {loading ? <div className="flex items-center justify-center flex-1"><Loader2 className="animate-spin text-orange-500" size={24} /></div> : (
+                  {loading ? (
+                    <div className="flex items-center justify-center flex-1">
+                      <Loader2 className="animate-spin text-orange-500" size={24} />
+                    </div>
+                  ) : (
                     <div className="grid grid-cols-3 gap-2.5 overflow-y-auto flex-1 pr-1 pb-16 content-start">
                       <AnimatePresence mode="popLayout">
                         {filteredMenu.map((item) => {
                           const isAvail = item.isAvailable !== false;
+                          const cardClass = `bg-neutral-50 dark:bg-neutral-900 border p-2 rounded-2xl text-left flex flex-col justify-between h-24 hover:border-orange-500 active:scale-95 ${
+                            !isAvail ? 'opacity-40 border-white/5' : 'border-neutral-200 dark:border-white/5'
+                          }`;
                           return (
                             <motion.button 
                               layout
@@ -1030,10 +1055,16 @@ export default function BbCafePos() {
                               key={item.id} 
                               disabled={!isAvail} 
                               onClick={() => { triggerBeep('tap'); item.variants ? setSelectedProduct(item) : handleAddProductToCart(item); }} 
-                              className={`bg-neutral-50 dark:bg-neutral-900 border p-2 rounded-2xl text-left flex flex-col justify-between h-24 hover:border-orange-500 active:scale-95 ${!isAvail ? 'opacity-40 border-white/5' : 'border-neutral-200 dark:border-white/5'}`}
+                              className={cardClass}
                             >
-                              <div><p className="font-bold text-xs line-clamp-2 leading-snug">{item.name}</p><p className="text-[8px] text-gray-500 uppercase mt-0.5">{item.category}</p></div>
-                              <div className="flex justify-between items-end w-full"><p className="text-yellow-500 font-black text-xs font-mono">{getDisplayPrice(item)}</p>{!isAvail && <span className="text-[7px] font-black text-red-500 uppercase">Empty</span>}</div>
+                              <div>
+                                <p className="font-bold text-xs line-clamp-2 leading-snug">{item.name}</p>
+                                <p className="text-[8px] text-gray-500 uppercase mt-0.5">{item.category}</p>
+                              </div>
+                              <div className="flex justify-between items-end w-full">
+                                <p className="text-yellow-500 font-black text-xs font-mono">{getDisplayPrice(item)}</p>
+                                {!isAvail && <span className="text-[7px] font-black text-red-500 uppercase">Empty</span>}
+                              </div>
                             </motion.button>
                           );
                         })}
@@ -1077,8 +1108,15 @@ export default function BbCafePos() {
                   <div className="space-y-2 overflow-y-auto flex-1 pr-1 pb-16">
                     {filteredPastReceipts.map((order) => {
                       const isSelected = selectedReceipt?.id === order.id;
+                      const receiptClass = `bg-neutral-50 dark:bg-neutral-900 border p-4 rounded-2xl flex justify-between items-center cursor-pointer ${
+                        isSelected ? 'border-orange-500' : 'border-neutral-200 dark:border-white/5'
+                      }`;
                       return (
-                        <div key={order.id} onClick={() => { triggerBeep('tap'); setSelectedReceipt(order); }} className={`bg-neutral-50 dark:bg-neutral-900 border p-4 rounded-2xl flex justify-between items-center cursor-pointer ${isSelected ? 'border-orange-500' : 'border-neutral-200 dark:border-white/5'}`}>
+                        <div 
+                          key={order.id} 
+                          onClick={() => { triggerBeep('tap'); setSelectedReceipt(order); }} 
+                          className={receiptClass}
+                        >
                           <div><span className="font-bold text-xs block font-mono">Bill #${order.billNumber}</span><span className="text-[9px] text-gray-400 block font-mono">Token: #{order.tokenNumber} | {order.customerName}</span></div>
                           <div className="text-right"><span className="text-sm font-black text-green-400 font-mono">₹{order.total}</span></div>
                         </div>
@@ -1102,7 +1140,9 @@ export default function BbCafePos() {
                       </div>
                       <button onClick={() => handlePrintReceipt(selectedReceipt)} className="w-full bg-green-600 text-white font-black py-3 rounded-2xl text-xs uppercase flex items-center justify-center gap-2"><SafePrinter size={16} /> Reprint Invoice</button>
                     </div>
-                  ) : <p className="text-center text-gray-500 text-xs py-20 font-bold">Select past receipt</p>}
+                  ) : (
+                    <p className="text-center text-gray-500 text-xs py-20 font-bold">Select past receipt</p>
+                  )}
                 </div>
               </div>
             )}
@@ -1113,8 +1153,22 @@ export default function BbCafePos() {
                 <div className="border-b border-neutral-200 pb-4 space-y-3">
                   <p className="text-xs font-bold uppercase">A. UI Theme:</p>
                   <div className="flex bg-neutral-100 dark:bg-neutral-900 p-1 rounded-xl w-60">
-                    <button onClick={() => handleToggleTheme('dark')} className={`flex-grow py-2 rounded-lg text-[10px] font-black uppercase ${themeMode === 'dark' ? 'bg-[#050505] text-amber-400' : 'text-gray-400'}`}>Dark</button>
-                    <button onClick={() => handleToggleTheme('light')} className={`flex-grow py-2 rounded-lg text-[10px] font-black uppercase ${themeMode === 'light' ? 'bg-white text-orange-600' : 'text-gray-400'}`}>Light</button>
+                    <button 
+                      onClick={() => handleToggleTheme('dark')} 
+                      className={`flex-grow py-2 rounded-lg text-[10px] font-black uppercase ${
+                        themeMode === 'dark' ? 'bg-[#050505] text-amber-400' : 'text-gray-400'
+                      }`}
+                    >
+                      Dark
+                    </button>
+                    <button 
+                      onClick={() => handleToggleTheme('light')} 
+                      className={`flex-grow py-2 rounded-lg text-[10px] font-black uppercase ${
+                        themeMode === 'light' ? 'bg-white text-orange-600' : 'text-gray-400'
+                      }`}
+                    >
+                      Light
+                    </button>
                   </div>
                 </div>
                 <div className="border-b border-neutral-200 pb-4 space-y-3">
@@ -1125,8 +1179,22 @@ export default function BbCafePos() {
                 <div className="border-b border-neutral-200 pb-4 space-y-3">
                   <p className="text-xs font-bold uppercase">C. Paper Size:</p>
                   <div className="flex bg-neutral-100 dark:bg-neutral-900 p-1 rounded-xl w-60">
-                    <button onClick={() => { setPrinterPaperSize('58mm'); localStorage.setItem("bb_pos_paper_size", '58mm'); }} className={`flex-grow py-2 rounded-lg text-[10px] font-black uppercase ${printerPaperSize === '58mm' ? 'bg-[#050505] text-amber-400' : 'text-gray-400'}`}>58mm</button>
-                    <button onClick={() => { setPrinterPaperSize('80mm'); localStorage.setItem("bb_pos_paper_size", '80mm'); }} className={`flex-grow py-2 rounded-lg text-[10px] font-black uppercase ${printerPaperSize === '80mm' ? 'bg-[#050505] text-amber-400' : 'text-gray-400'}`}>80mm</button>
+                    <button 
+                      onClick={() => { setPrinterPaperSize('58mm'); localStorage.setItem("bb_pos_paper_size", '58mm'); }} 
+                      className={`flex-grow py-2 rounded-lg text-[10px] font-black uppercase ${
+                        printerPaperSize === '58mm' ? 'bg-[#050505] text-amber-400' : 'text-gray-400'
+                      }`}
+                    >
+                      58mm
+                    </button>
+                    <button 
+                      onClick={() => { setPrinterPaperSize('80mm'); localStorage.setItem("bb_pos_paper_size", '80mm'); }} 
+                      className={`flex-grow py-2 rounded-lg text-[10px] font-black uppercase ${
+                        printerPaperSize === '80mm' ? 'bg-[#050505] text-amber-400' : 'text-gray-400'
+                      }`}
+                    >
+                      80mm
+                    </button>
                   </div>
                 </div>
 
@@ -1141,9 +1209,29 @@ export default function BbCafePos() {
                       { id: 'thermal_bluetooth', label: 'Thermal Bluetooth' },
                       { id: 'network_ip', label: 'Network IP Printer' },
                       { id: 'laser', label: 'Laser A4 Printer' }
-                    ].map(p => (
-                      <button key={p.id} onClick={() => { triggerBeep('tap'); setPrinterType(p.id as any); setPrinterConnected(false); setBleCharacteristic(null); localStorage.setItem("bb_pos_printer_type", p.id); }} className={`p-2 rounded-xl border text-[9px] font-black uppercase tracking-wider transition-all ${printerType === p.id ? 'bg-[#050505] text-amber-400 border-amber-500' : 'bg-neutral-100 dark:bg-neutral-900 text-gray-400 border-neutral-200 dark:border-white/5'}`}>{p.label}</button>
-                    ))}
+                    ].map((p) => {
+                      const isSelected = printerType === p.id;
+                      const btnClass = `p-2 rounded-xl border text-[9px] font-black uppercase tracking-wider transition-all ${
+                        isSelected 
+                          ? 'bg-[#050505] text-amber-400 border-amber-500' 
+                          : 'bg-neutral-100 dark:bg-neutral-900 text-gray-400 border-neutral-200 dark:border-white/5'
+                      }`;
+                      return (
+                        <button 
+                          key={p.id} 
+                          onClick={() => { 
+                            triggerBeep('tap'); 
+                            setPrinterType(p.id as any); 
+                            setPrinterConnected(false); 
+                            setBleCharacteristic(null); 
+                            localStorage.setItem("bb_pos_printer_type", p.id); 
+                          }} 
+                          className={btnClass}
+                        >
+                          {p.label}
+                        </button>
+                      );
+                    })}
                   </div>
                   {printerType === 'network_ip' && (
                     <div className="space-y-1 mt-2">
@@ -1178,7 +1266,7 @@ export default function BbCafePos() {
         </>
       )}
 
-      {/* MODULAR CHILD OVERLAYS */}
+      {/* 3. MODULAR CHILD OVERLAYS */}
       <PosCartDrawer 
         isHindi={false} isCartOpen={isCartOpen} setIsCartOpen={setIsCartOpen} cart={cart} setCart={setCart} customerPhone={customerPhone} setCustomerPhone={setCustomerPhone} customerName={customerName} setCustomerName={setCustomerName} customerPoints={customerPoints} setCustomerPoints={setCustomerPoints} pointsToRedeem={pointsToRedeem} setPointsToRedeem={setPointsToRedeem} customDiscount={customDiscount} setCustomDiscount={setCustomDiscount} fulfillmentType={fulfillmentType} setFulfillmentType={setFulfillmentType} selectedArea={selectedArea} setSelectedArea={setSelectedArea} DELIVERY_AREAS={DELIVERY_AREAS} address={address} setAddress={setAddress} tableNumber={tableNumber} setTableNumber={setTableNumber} chefInstructions={chefInstructions} setChefInstructions={setChefInstructions} isSubmittingOrder={isSubmittingOrder} paymentMethod={paymentMethod} setPaymentMethod={setPaymentMethod} noCutlery={noCutlery} setNoCutlery={setNoCutlery} getCartSubtotal={getCartSubtotal} getCartAddonsPrice={() => 0} getDeliveryCharge={getDeliveryCharge} getFreeDeliveryProgressPercent={getFreeDeliveryProgressPercent} getTotalPointsRedeemedInCart={getTotalPointsRedeemedInCart} getTotalBillPrice={getTotalBillPrice} loyaltyRules={loyaltyRules} handlePlaceOrder={handlePlaceOrder} handleDetectLocation={handleDetectLocation} setIsCustomerModalOpen={setIsCustomerModalOpen} searchDbCustomers={searchDbCustomers} handleUpdateCartQuantity={handleUpdateCartQuantity} handleUpdateCartItemNote={handleUpdateCartItemNote} showAddonsSection={false} triggerBeep={triggerBeep} handleCheckLoyalty={handleCheckLoyalty}
         
