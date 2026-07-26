@@ -306,6 +306,14 @@ export default function BbCafePos() {
     }
   };
 
+  const handleStartEditProfile = (cust: any) => {
+    triggerBeep('tap');
+    setEditingCustomer(cust);
+    setNewCustName(cust.name);
+    setNewCustAddress(cust.address || '');
+    setEditCustPoints(cust.points || 0);
+  };
+
   const handleUpdateCustomerProfile = async () => {
     triggerBeep('tap');
     if (!newCustName.trim()) return toast.error("Name mandatory!");
