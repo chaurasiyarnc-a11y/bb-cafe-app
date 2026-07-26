@@ -546,7 +546,7 @@ export default function BbCafePos() {
       return;
     }
     
-    // 🛠️ Fixed: Removed Nested Escaped Backticks with Standard String Concatenation to resolve SWC parser errors [1]
+    // 🛠️ Fixed: Standard String Concatenation used inside template to avoid compiler errors [1]
     const itemsRows = order.items.map((it: any) => {
       let noteFormatted = "";
       if (it.note) {
@@ -695,7 +695,6 @@ export default function BbCafePos() {
         return;
       }
       try {
-        // Request any Bluetooth Low Energy thermal printer
         const device = await (navigator as any).bluetooth.requestDevice({ 
           acceptAllDevices: true,
           optionalServices: ['000018f0-0000-1000-8000-00805f9b34fb'] 
@@ -878,9 +877,12 @@ export default function BbCafePos() {
   const filteredPastReceipts = useMemo(() => liveOrders.filter((o) => String(o.billNumber).includes(receiptSearchQuery.trim()) || String(o.customerPhone || '').includes(receiptSearchQuery.trim()) || String(o.customerName || '').toLowerCase().includes(receiptSearchQuery.trim().toLowerCase())), [liveOrders, receiptSearchQuery]);
   const getDisplayPrice = (item: any) => item?.variants ? `₹${Math.min(...Object.values(item.variants).map(Number))}+` : `₹${item?.price || 0}`;
 
+  // 🛠️ Fixed: Arrow function extracted to local variable count to avoid compiler block issues
+  const liveOrdersBadgeCount = liveOrders.filter((o) => o.status !== 'completed' && o.status !== 'rejected').length;
+
   const navItems = [
     { id: 'billing', label: 'Counter Billing', icon: SafeShoppingBag },
-    { id: 'orders', label: 'Live Orders', icon: SafeClock, badge: liveOrders.filter((o) => o.status !== 'completed' && o.status !== 'rejected').length },
+    { id: 'orders', label: 'Live Orders', icon: SafeClock, badge: liveOrdersBadgeCount },
     { id: 'inventory', label: 'Stock Toggle', icon: SafeLayers },
     { id: 'receipts', label: 'Past Receipts', icon: SafePrinter },
     { id: 'settings', label: 'POS Settings', icon: SafeSettings }
@@ -1150,7 +1152,7 @@ export default function BbCafePos() {
                   {printerType === 'network_ip' && (
                     <div className="space-y-1 mt-2">
                       <label className="text-[9px] font-black uppercase text-gray-500">Printer IP Address</label>
-                      <input type="text" value={printerIp} onChange={e => { setPrinterIp(e.target.value); localStorage.setItem("bb_pos_printer_ip", e.target.value); }} className="w-full bg-neutral-100 dark:bg-neutral-900 border border-neutral-200 dark:border-white/5 p-3 rounded-xl text-xs outline-none font-mono" placeholder="192.168.1.100" />
+                      <input type="text" value={printerIp} onChange={e => { setPrinterIp(e.target.value); localStorage.setItem("bb_pos_printer_ip", e.target.value); }} className="w-full bg-neutral-100 dark:bg-neutral-900 border border-neutral-200 dark:border-white/5 p-3 rounded-xl text-xs outline-none font-mono" />
                     </div>
                   )}
                   <div className="space-y-1">
