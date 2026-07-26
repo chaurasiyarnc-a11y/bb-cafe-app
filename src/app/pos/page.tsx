@@ -633,16 +633,29 @@ export default function BbCafePos() {
                     ))}
                   </div>
                   {loading ? <div className="flex items-center justify-center flex-1"><Loader2 className="animate-spin text-orange-500" size={24} /></div> : (
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 overflow-y-auto flex-1 pr-1 pb-16">
-                      {filteredMenu.map((item) => {
-                        const isAvail = item.isAvailable !== false;
-                        return (
-                          <button key={item.id} disabled={!isAvail} onClick={() => { triggerBeep('tap'); item.variants ? setSelectedProduct(item) : handleAddProductToCart(item); }} className={`bg-neutral-50 dark:bg-neutral-900 border p-3 rounded-2xl text-left flex flex-col justify-between h-24 hover:border-orange-500 active:scale-95 ${!isAvail ? 'opacity-40 border-white/5' : 'border-neutral-200 dark:border-white/5'}`}>
-                            <div><p className="font-bold text-xs line-clamp-2 leading-snug">{item.name}</p><p className="text-[8px] text-gray-500 uppercase mt-0.5">{item.category}</p></div>
-                            <div className="flex justify-between items-end w-full"><p className="text-yellow-500 font-black text-xs font-mono">{getDisplayPrice(item)}</p>{!isAvail && <span className="text-[7px] font-black text-red-500 uppercase">Empty</span>}</div>
-                          </button>
-                        );
-                      })}
+                    /* 🛠️ Fixed layout (align-content: start) + strict 4-column responsive grid */
+                    <div className="grid grid-cols-4 gap-2.5 overflow-y-auto flex-1 pr-1 pb-16 content-start">
+                      <AnimatePresence mode="popLayout">
+                        {filteredMenu.map((item) => {
+                          const isAvail = item.isAvailable !== false;
+                          return (
+                            <motion.button 
+                              layout
+                              initial={{ opacity: 0, scale: 0.95 }}
+                              animate={{ opacity: 1, scale: 1 }}
+                              exit={{ opacity: 0, scale: 0.95 }}
+                              transition={{ duration: 0.15 }}
+                              key={item.id} 
+                              disabled={!isAvail} 
+                              onClick={() => { triggerBeep('tap'); item.variants ? setSelectedProduct(item) : handleAddProductToCart(item); }} 
+                              className={`bg-neutral-50 dark:bg-neutral-900 border p-2 rounded-2xl text-left flex flex-col justify-between h-24 hover:border-orange-500 active:scale-95 ${!isAvail ? 'opacity-40 border-white/5' : 'border-neutral-200 dark:border-white/5'}`}
+                            >
+                              <div><p className="font-bold text-xs line-clamp-2 leading-snug">{item.name}</p><p className="text-[8px] text-gray-500 uppercase mt-0.5">{item.category}</p></div>
+                              <div className="flex justify-between items-end w-full"><p className="text-yellow-500 font-black text-xs font-mono">{getDisplayPrice(item)}</p>{!isAvail && <span className="text-[7px] font-black text-red-500 uppercase">Empty</span>}</div>
+                            </motion.button>
+                          );
+                        })}
+                      </AnimatePresence>
                     </div>
                   )}
                 </div>
@@ -713,7 +726,7 @@ export default function BbCafePos() {
             )}
 
             {activeTab === 'settings' && (
-              <div className="bg-white dark:bg-neutral-950 border border-neutral-200 dark:border-white/5 p-6 rounded-3xl shadow-xl flex-grow max-w-xl space-y-6 overflow-y-auto">
+              <div className="bg-white dark:bg-neutral-950 border border-neutral-200 dark:border-white/5 p-6 rounded-3xl shadow-xl flex-grow max-xl space-y-6 overflow-y-auto">
                 <h3 className="text-sm font-black uppercase text-orange-500">POS Settings</h3>
                 <div className="border-b border-neutral-200 pb-4 space-y-3">
                   <p className="text-xs font-bold uppercase">A. UI Theme:</p>
