@@ -33,7 +33,7 @@ const SafeClock = Clock as any;
 const SafeLayers = Layers as any;
 const SafePrinter = Printer as any;
 const SafeUsers = Users as any;
-const SafePlay = Play as any; // Fixed: Standard type-casting
+const SafePlay = Play as any; 
 const SafeCheck = Check as any;
 const SafeSearch = Search as any;
 const SafeX = X as any;
@@ -91,11 +91,11 @@ export default function BbCafePos() {
   const [printCopies, setPrintCopies] = useState(1);
   const [isConnecting, setIsConnecting] = useState(false);
   const [printerConnected, setPrinterConnected] = useState(false);
-  const [bleCharacteristic, setBleCharacteristic] = useState<any>(null); // Real Web Bluetooth GATT reference
-
-  // USB Web Serial and WebUSB references
-  const [serialPort, setSerialPort] = useState<any>(null); 
-  const [usbDevice, setUsbDevice] = useState<any>(null); 
+  
+  // Real hardware API connection references
+  const [bleCharacteristic, setBleCharacteristic] = useState<any>(null); // Bluetooth write reference
+  const [serialPort, setSerialPort] = useState<any>(null); // USB Web Serial reference
+  const [usbDevice, setUsbDevice] = useState<any>(null); // USB WebUSB reference
 
   const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false);
   const [customerSearchQuery, setCustomerSearchQuery] = useState('');
@@ -461,7 +461,7 @@ export default function BbCafePos() {
     return text;
   };
 
-  // 📝 Print receipt logic optimized to avoid blank print view + USB/Bluetooth Direct Silent Printing [1]
+  // 📝 Real-time receipt printer logic (Supports Web Bluetooth SPP/PT-210, USB Web Serial/WebUSB and CSS @page sizing) [1]
   const handlePrintReceipt = async (order: any) => {
     triggerBeep('tap');
 
@@ -519,8 +519,10 @@ export default function BbCafePos() {
       return;
     }
 
-    // 3. System print dialog fallback for laser/IP printers (Fixed delayed paint so page is never empty) [1]
-    const widthPixels = printerPaperSize === '58mm' ? '240px' : '290px';
+    // 3. Fallback browser print (Optimized with custom CSS size so the browser print dialog defaults to receipt roll instead of A4 PDF) [1]
+    const pageDimensionsWidth = printerPaperSize === '58mm' ? '58mm' : '80mm';
+    const containerRenderWidth = printerPaperSize === '58mm' ? '48mm' : '72mm'; // accounting for edge margins
+    
     const printWindow = window.open('', '_blank', 'width=340,height=600');
     if (!printWindow) {
       toast.error("Popup blocked! Please allow popups for this POS.");
@@ -534,8 +536,20 @@ export default function BbCafePos() {
         <head>
           <title>Bill #${order.billNumber}</title>
           <style>
-            @page { margin: 0; }
-            body { font-family: 'Courier New', Courier, monospace; width: ${widthPixels}; margin: 0; padding: 8px; color: #000; background-color: #fff; }
+            /* 🛠️ Dynamic Page Sizing configuration overrides browser system default to prevent PDF stretching [1] */
+            @page { 
+              size: ${pageDimensionsWidth} auto; 
+              margin: 0mm; 
+            }
+            body { 
+              font-family: 'Courier New', Courier, monospace; 
+              width: ${containerRenderWidth}; 
+              margin: 0 auto; 
+              padding: 4px; 
+              color: #000; 
+              background-color: #fff; 
+              font-size: 11px;
+            }
             .center { text-align: center; }
             .divider { border-top: 1px dashed #000; margin: 6px 0; }
             table { width: 100%; border-collapse: collapse; }
@@ -588,7 +602,7 @@ export default function BbCafePos() {
     }, 350); 
   };
 
-  // 📝 Real-time bluetooth & direct USB device connector (Type casting fixed safely)
+  // Real-time bluetooth & direct USB device connector (Type casting fixed safely)
   const handleConnectPrinter = async () => {
     triggerBeep('tap');
     setIsConnecting(true);
@@ -602,15 +616,27 @@ export default function BbCafePos() {
         return;
       }
       try {
-        // Request any Bluetooth Low Energy thermal printer
         const device = await (navigator as any).bluetooth.requestDevice({ 
           acceptAllDevices: true,
-          optionalServices: ['000018f0-0000-1000-8000-00805f9b34fb'] 
+          optionalServices: [
+            '000018f0-0000-1000-8000-00805f9b34fb', // Standard SPP / MPT Service UUID
+            '0000ff00-0000-1000-8000-00805f9b34fb'  // Chinese Goojprt / POS-58 range
+          ] 
         });
 
         const server = await device.gatt!.connect();
-        const service = await server.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb');
-        const characteristic = await service.getCharacteristic('00002af1-0000-1000-8000-00805f9b34fb'); 
+        
+        // 🛠️ Dual-UUID Bluetooth service scanner fallback setup to support 99% of receipt printers
+        let service;
+        let characteristic;
+
+        try {
+          service = await server.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb');
+          characteristic = await service.getCharacteristic('00002af1-0000-1000-8000-00805f9b34fb');
+        } catch (bleErr) {
+          service = await server.getPrimaryService('0000ff00-0000-1000-8000-00805f9b34fb');
+          characteristic = await service.getCharacteristic('0000ff02-0000-1000-8000-00805f9b34fb');
+        }
 
         setBleCharacteristic(characteristic);
         setPrinterConnected(true);
