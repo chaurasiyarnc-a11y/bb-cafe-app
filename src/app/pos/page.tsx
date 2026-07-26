@@ -35,7 +35,7 @@ const SafeShoppingBag = ShoppingBag as any;
 const SafeClock = Clock as any; 
 const SafeLayers = Layers as any;
 const SafePrinter = Printer as any;
-const SafeUsers = Users as any;
+const SafeUsers = SafeUsers || (Users as any);
 const SafePlay = Play as any; 
 const SafeCheck = Check as any;
 const SafeSearch = Search as any;
@@ -129,7 +129,7 @@ export default function BbCafePos() {
   const [isSearchingReceipts, setIsSearchingReceipts] = useState(false);
   const [receiptSearchQuery, setReceiptSearchQuery] = useState('');
   const [selectedReceipt, setSelectedReceipt] = useState<any>(null);
-  const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false); // रसीद पॉपअप स्टेट
+  const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false); 
 
   const [cart, setCart] = useState<PosCartItem[]>([]);
   const [customerPhone, setCustomerPhone] = useState('');
@@ -144,13 +144,22 @@ export default function BbCafePos() {
   const [isSubmittingOrder, setIsSubmittingOrder] = useState(false);
   const [chefInstructions, setChefInstructions] = useState('');
   
-  // क्रेडिट कार्ड विकल्प हटाकर केवल cash और upi रखा गया है
+  // क्रेडिट कार्ड विकल्प हटाकर स्टेट में केवल cash और upi रखा गया है
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'upi'>('cash');
 
   const [selectedProduct, setSelectedProduct] = useState<any>(null); 
   const [normalPizzaSize, setNormalPizzaSize] = useState("");
   const [normalPizzaPrice, setNormalPizzaPrice] = useState(0);
   const [customizerChefNote, setCustomizerChefNote] = useState(""); 
+
+  // ड्रावर कंपोनेंट के लिए सेफ पेमेंट हैंडलर (कार्ड विकल्प को ब्लॉक करने के लिए)
+  const handleSetPaymentMethod = (val: 'cash' | 'upi' | 'card') => {
+    if (val === 'card') {
+      setPaymentMethod('cash'); // कार्ड चयन होने पर सुरक्षा के लिए वापस कैश पर सेट कर देगा
+    } else {
+      setPaymentMethod(val);
+    }
+  };
 
   const triggerBeep = (type: 'tap' | 'success') => {
     try {
@@ -210,7 +219,7 @@ export default function BbCafePos() {
     else document.documentElement.classList.add('dark');
   }, []);
 
-  // कनेक्शन रिसोर्स क्लीनअप
+  // रिसोर्स क्लीनअप
   useEffect(() => {
     return () => {
       if (serialPort) {
@@ -1374,7 +1383,7 @@ export default function BbCafePos() {
         setChefInstructions={setChefInstructions} 
         isSubmittingOrder={isSubmittingOrder} 
         paymentMethod={paymentMethod} 
-        setPaymentMethod={setPaymentMethod} 
+        setPaymentMethod={handleSetPaymentMethod} // सुधरा हुआ सेफ हैंडलर पास किया गया
         noCutlery={false} // ईको-फ्रेंडली पैक विकल्प को कार्ट से हटाया गया
         setNoCutlery={() => {}} 
         getCartSubtotal={getCartSubtotal} 
