@@ -19,7 +19,7 @@ import PosCartDrawer from '@/components/pos/PosCartDrawer';
 import CustomerDirectoryModal from '@/components/pos/CustomerDirectoryModal';
 import CustomizerModal from '@/components/pos/CustomizerModal';
 
-// नई यूटिलिटी फ़ाइल से इम्पोर्ट करें
+// यूटिलिटी फ़ाइल से प्रिंटर फंक्शन्स
 import { handlePrintKot, handlePrintReceipt, PrintConfig } from '@/lib/printerUtils';
 
 // Safe Lucide Icons
@@ -32,7 +32,7 @@ const SafeToggleLeft = ToggleLeft as any;
 const SafeMoon = Moon as any;
 const SafeSun = Sun as any;
 const SafeShoppingBag = ShoppingBag as any;
-const SafeClock = Clock as any;
+const SafeClock = SafeClock as any; // SafeClock alias
 const SafeLayers = Layers as any;
 const SafePrinter = Printer as any;
 const SafeUsers = Users as any;
@@ -437,7 +437,7 @@ export default function BbCafePos() {
   const getFreeDeliveryProgressPercent = () => Math.min(100, (getCartSubtotal() / selectedArea.minFree) * 100);
   const getTotalPointsRedeemedInCart = () => cart.reduce((acc, i) => acc + (i.pointsCost || 0), 0);
 
-  // प्रिंटिंग सेटिंग्स ऑब्जेक्ट
+  // प्रिंटिंग कॉन्फ़िगरेशन
   const getPrintConfig = (): PrintConfig => ({
     printerPaperSize,
     printerType,
@@ -615,7 +615,8 @@ export default function BbCafePos() {
         paymentMethod, 
         chefInstructions, 
         noCutlery, 
-        source: 'POS' 
+        source: 'POS',
+        address: address // एड्रेस को ऑर्डर में सेव कर लिया गया है
       };
 
       await addDoc(collection(db, "orders"), orderObj);
