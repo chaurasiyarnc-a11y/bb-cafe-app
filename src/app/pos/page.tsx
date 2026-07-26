@@ -66,7 +66,6 @@ interface DeliveryArea {
   range: string;
 }
 
-// ग्लोबल ऑडियो कॉन्टेक्स्ट (ताकि हर क्लिक पर नया इंस्टेंस न बने)
 let globalAudioCtx: AudioContext | null = null;
 
 export default function BbCafePos() {
@@ -125,6 +124,9 @@ export default function BbCafePos() {
   const [loyaltyRules, setLoyaltyRules] = useState<any[]>([]); 
   const [storeOpen, setStoreOpen] = useState(true);
   
+  // समर्पित रसीद/बिल स्टेट्स (Past Receipts Dedicated State)
+  const [pastReceipts, setPastReceipts] = useState<any[]>([]);
+  const [isSearchingReceipts, setIsSearchingReceipts] = useState(false);
   const [receiptSearchQuery, setReceiptSearchQuery] = useState('');
   const [selectedReceipt, setSelectedReceipt] = useState<any>(null);
 
@@ -148,7 +150,6 @@ export default function BbCafePos() {
   const [normalPizzaPrice, setNormalPizzaPrice] = useState(0);
   const [customizerChefNote, setCustomizerChefNote] = useState(""); 
 
-  // बीप सिस्टम का सुधरा हुआ रूप
   const triggerBeep = (type: 'tap' | 'success') => {
     try {
       if (!globalAudioCtx) {
@@ -177,7 +178,7 @@ export default function BbCafePos() {
         osc.stop(globalAudioCtx.currentTime + 0.4);
       }
     } catch (e) {
-      console.warn("Audio beeping is blocked on this environment:", e);
+      console.warn("Audio error:", e);
     }
   };
 
@@ -207,7 +208,7 @@ export default function BbCafePos() {
     else document.documentElement.classList.add('dark');
   }, []);
 
-  // हार्डवेयर कनेक्शन क्लीनअप (Cleanup active ports on unmount)
+  // हार्डवेयर क्लीनअप
   useEffect(() => {
     return () => {
       if (serialPort) {
@@ -222,7 +223,6 @@ export default function BbCafePos() {
     };
   }, [serialPort, usbDevice, bleCharacteristic]);
 
-  // डेटाबेस लोड को संतुलित करने के लिए limit को 40 किया गया है
   useEffect(() => {
     const q = query(collection(db, "orders"), orderBy("timestamp", "desc"), limit(40));
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -254,7 +254,37 @@ export default function BbCafePos() {
     })();
   }, [isLoggedIn]);
 
-  // सुरक्षित पिन लॉगिन (Hardcoded bypass removed)
+  // रसीद देखने और रीप्रिंट करने के लिए समर्पित रियल-टाइम लोड प्रक्रिया
+  useEffect(() => {
+    if (activeTab !== 'receipts') return;
+
+    const fetchPastReceipts = async () => {
+      setIsSearchingReceipts(true);
+      try {
+        let q;
+        if (receiptSearchQuery.trim()) {
+          // सर्च क्वेरी होने पर डेटाबेस से अधिक रिकॉर्ड्स मंगवाकर क्लाइंट-साइड मैच करेंगे ताकि पुराने रिकॉर्ड मिल सकें
+          q = query(collection(db, "orders"), orderBy("timestamp", "desc"), limit(120));
+        } else {
+          // सामान्य अवस्था में हाल के 50 रिकॉर्ड
+          q = query(collection(db, "orders"), orderBy("timestamp", "desc"), limit(50));
+        }
+        const snap = await getDocs(q);
+        setPastReceipts(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      } catch (err) {
+        console.error("Error loading past receipts:", err);
+      } finally {
+        setIsSearchingReceipts(false);
+      }
+    };
+
+    const delayDebounce = setTimeout(() => {
+      fetchPastReceipts();
+    }, 300);
+
+    return () => clearTimeout(delayDebounce);
+  }, [activeTab, receiptSearchQuery]);
+
   const handlePinLoginSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     const toastId = toast.loading("Verifying PIN...");
@@ -698,10 +728,24 @@ export default function BbCafePos() {
   };
 
   const filteredMenu = useMemo(() => products.filter((p) => (selectedCategory === 'All' || p.category === selectedCategory) && p.name.toLowerCase().includes(searchQuery.toLowerCase())), [products, selectedCategory, searchQuery]);
-  const filteredPastReceipts = useMemo(() => liveOrders.filter((o) => String(o.billNumber).includes(receiptSearchQuery.trim()) || String(o.customerPhone || '').includes(receiptSearchQuery.trim()) || String(o.customerName || '').toLowerCase().includes(receiptSearchQuery.trim().toLowerCase())), [liveOrders, receiptSearchQuery]);
+  
+  // रसीद सर्च प्रक्रिया अब लाइवऑर्डर्स की बजाय 'pastReceipts' का उपयोग करती है
+  const filteredPastReceipts = useMemo(() => {
+    return pastReceipts.filter((o) => 
+      String(o.billNumber).includes(receiptSearchQuery.trim()) || 
+      String(o.customerPhone || '').includes(receiptSearchQuery.trim()) || 
+      String(o.customerName || '').toLowerCase().includes(receiptSearchQuery.trim().toLowerCase())
+    );
+  }, [pastReceipts, receiptSearchQuery]);
+
+  // लाइव ऑर्डर्स का क्लाइंट-साइड सुदृढ़ फ़िल्टर (पूरे हुए या रिजेक्टेड ऑर्डर्स लाइव स्क्रीन से तुरंत हटेंगे)
+  const activeLiveOrders = useMemo(() => {
+    return liveOrders.filter((o) => o.status !== 'completed' && o.status !== 'rejected');
+  }, [liveOrders]);
+
   const getDisplayPrice = (item: any) => item?.variants ? `₹${Math.min(...Object.values(item.variants).map(Number))}+` : `₹${item?.price || 0}`;
 
-  const liveOrdersBadgeCount = liveOrders.filter((o) => o.status !== 'completed' && o.status !== 'rejected').length;
+  const liveOrdersBadgeCount = activeLiveOrders.length;
 
   const navItems = [
     { id: 'billing', label: 'Counter Billing', icon: SafeShoppingBag },
@@ -814,59 +858,66 @@ export default function BbCafePos() {
             </div>
 
             {activeTab === 'orders' && (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pb-20 overflow-y-auto flex-1">
-                {liveOrders.map((order) => {
-                  if (order.status === 'completed' || order.status === 'rejected') return null;
-                  const isOnline = order.source && order.source !== 'POS';
-                  const orderCardClass = "border rounded-2xl p-4 flex flex-col justify-between shadow-lg h-fit transition-colors duration-200 " + 
-                    (isOnline ? "bg-blue-50/50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-900/50" : "bg-white dark:bg-neutral-900 border-neutral-200 dark:border-white/5");
-                  return (
-                    <div key={order.id} className={orderCardClass}>
-                      <div>
-                        <div className="flex justify-between items-start border-b border-neutral-200 dark:border-white/5 pb-2 mb-3">
-                          <div>
-                            <p className="text-xs font-black text-yellow-600 dark:text-yellow-300 font-mono">Bill #${String(order.billNumber).padStart(4, '0')}</p>
-                            {isOnline && (
-                              <span className="text-[8px] font-black text-blue-500 uppercase tracking-widest block mt-1 animate-pulse">🌐 ONLINE ORDER ({order.source})</span>
-                            )}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pb-20 overflow-y-auto flex-1 font-sans">
+                {activeLiveOrders.length === 0 ? (
+                  <div className="col-span-full flex flex-col items-center justify-center py-20 text-center">
+                    <SafeClock size={40} className="text-gray-400 dark:text-neutral-600 mb-3 animate-pulse" />
+                    <p className="text-sm font-bold text-gray-500 dark:text-neutral-400">No active live orders</p>
+                    <span className="text-xs text-gray-400 dark:text-neutral-500">New orders will show up here</span>
+                  </div>
+                ) : (
+                  activeLiveOrders.map((order) => {
+                    const isOnline = order.source && order.source !== 'POS';
+                    const orderCardClass = "border rounded-2xl p-4 flex flex-col justify-between shadow-lg h-fit transition-colors duration-200 " + 
+                      (isOnline ? "bg-blue-50/50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-900/50" : "bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800");
+                    return (
+                      <div key={order.id} className={orderCardClass}>
+                        <div>
+                          <div className="flex justify-between items-start border-b border-neutral-200 dark:border-neutral-800 pb-2 mb-3">
+                            <div>
+                              <p className="text-xs font-black text-yellow-600 dark:text-yellow-300 font-mono">Bill #${String(order.billNumber).padStart(4, '0')}</p>
+                              {isOnline && (
+                                <span className="text-[8px] font-black text-blue-500 uppercase tracking-widest block mt-1 animate-pulse">🌐 ONLINE ORDER ({order.source})</span>
+                              )}
+                            </div>
+                            <span className="bg-orange-500/10 text-orange-400 text-[8px] font-black uppercase px-2 py-0.5 rounded">{order.fulfillmentType}</span>
                           </div>
-                          <span className="bg-orange-500/10 text-orange-400 text-[8px] font-black uppercase px-2 py-0.5 rounded">{order.fulfillmentType}</span>
+                          <p className="text-[10px] font-black text-gray-800 dark:text-gray-200">👤 {order.customerName}</p>
+                          <div className="space-y-1.5 pt-2 mb-4 border-t border-dashed border-neutral-200 dark:border-neutral-800">
+                            {order.items?.map((it: any, idx: number) => (
+                              <div key={idx} className="flex justify-between text-[11px] font-semibold text-gray-700 dark:text-gray-300">
+                                <span>{it.name} <span className="text-orange-500 font-bold">x{it.quantity}</span>{it.note && <span className="text-gray-400 italic block text-[9px]">({it.note})</span>}</span>
+                                <span>₹{it.price * it.quantity}</span>
+                              </div>
+                            ))}
+                          </div>
                         </div>
-                        <p className="text-[10px] font-black">👤 {order.customerName}</p>
-                        <div className="space-y-1.5 pt-2 mb-4 border-t border-dashed border-neutral-200 dark:border-white/5">
-                          {order.items?.map((it: any, idx: number) => (
-                            <div key={idx} className="flex justify-between text-[11px] font-semibold">
-                              <span>{it.name} <span className="text-orange-500">x{it.quantity}</span>{it.note && <span className="text-gray-400 italic block text-[9px]">({it.note})</span>}</span>
-                              <span>₹{it.price * it.quantity}</span>
-                            </div>
-                          ))}
+                        <div>
+                          <div className="flex justify-between text-xs font-black text-green-500 dark:text-green-400 mb-3 border-t border-neutral-200 dark:border-neutral-800 pt-2">
+                            <span>Total:</span><span>₹{order.total}</span>
+                          </div>
+                          <div className="flex gap-2">
+                            {order.status === 'pending' && (
+                              <div className="flex gap-2 w-full">
+                                <button onClick={() => handleUpdateStatus(order.id, 'preparing')} className="flex-1 bg-green-600 hover:bg-green-700 text-white font-black py-2 rounded-xl text-[10px] uppercase shadow-md active:scale-95 transition-all">Accept</button>
+                                <button onClick={() => handleUpdateStatus(order.id, 'rejected')} className="flex-1 bg-red-600 hover:bg-red-700 text-white font-black py-2 rounded-xl text-[10px] uppercase shadow-md active:scale-95 transition-all">Reject</button>
+                              </div>
+                            )}
+                            {order.status === 'preparing' && (
+                              <button onClick={() => handleUpdateStatus(order.id, order.fulfillmentType === 'delivery' ? 'out_for_delivery' : 'completed')} className="flex-1 bg-blue-600 text-white font-black py-2 rounded-xl text-[10px] uppercase">Dispatch</button>
+                            )}
+                            {order.status === 'out_for_delivery' && (
+                              <button onClick={() => handleUpdateStatus(order.id, 'completed')} className="flex-1 bg-green-600 text-white font-black py-2 rounded-xl text-[10px] uppercase">Delivered</button>
+                            )}
+                            <button onClick={() => handlePrintReceipt(order, getPrintConfig())} className="p-2 bg-neutral-200 dark:bg-neutral-950 text-gray-500 hover:text-orange-500 dark:text-neutral-400 rounded-xl transition-all">
+                              <SafePrinter size={14} />
+                            </button>
+                          </div>
                         </div>
                       </div>
-                      <div>
-                        <div className="flex justify-between text-xs font-black text-green-400 mb-3 border-t border-neutral-200 dark:border-white/5 pt-2">
-                          <span>Total:</span><span>₹{order.total}</span>
-                        </div>
-                        <div className="flex gap-2">
-                          {order.status === 'pending' && (
-                            <div className="flex gap-2 w-full">
-                              <button onClick={() => handleUpdateStatus(order.id, 'preparing')} className="flex-1 bg-green-600 hover:bg-green-700 text-white font-black py-2 rounded-xl text-[10px] uppercase shadow-md active:scale-95 transition-all">Accept</button>
-                              <button onClick={() => handleUpdateStatus(order.id, 'rejected')} className="flex-1 bg-red-600 hover:bg-red-700 text-white font-black py-2 rounded-xl text-[10px] uppercase shadow-md active:scale-95 transition-all">Reject</button>
-                            </div>
-                          )}
-                          {order.status === 'preparing' && (
-                            <button onClick={() => handleUpdateStatus(order.id, order.fulfillmentType === 'delivery' ? 'out_for_delivery' : 'completed')} className="flex-1 bg-blue-600 text-white font-black py-2 rounded-xl text-[10px] uppercase">Dispatch</button>
-                          )}
-                          {order.status === 'out_for_delivery' && (
-                            <button onClick={() => handleUpdateStatus(order.id, 'completed')} className="flex-1 bg-green-600 text-white font-black py-2 rounded-xl text-[10px] uppercase">Delivered</button>
-                          )}
-                          <button onClick={() => handlePrintReceipt(order, getPrintConfig())} className="p-2 bg-neutral-200 dark:bg-neutral-950 text-gray-500 rounded-xl">
-                            <SafePrinter size={14} />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })
+                )}
               </div>
             )}
 
@@ -876,17 +927,17 @@ export default function BbCafePos() {
                   <div className="flex gap-3 mb-4 items-center">
                     <div className="relative flex-1">
                       <SafeSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={14} />
-                      <input type="text" placeholder="Search menu..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="w-full bg-neutral-100 dark:bg-neutral-900 rounded-xl py-2 px-9 text-xs outline-none text-neutral-800 dark:text-white" />
+                      <input type="text" placeholder="Search menu..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="w-full bg-neutral-100 dark:bg-neutral-900 rounded-xl py-2 px-9 text-xs outline-none text-neutral-800 dark:text-gray-100 border border-transparent dark:border-neutral-800 focus:border-orange-500 transition-all" />
                     </div>
-                    <button onClick={() => { triggerBeep('tap'); setIsCartOpen(true); }} className="bg-orange-500 text-black font-black text-xs py-2 px-4 rounded-xl flex items-center gap-2 shadow-lg">
+                    <button onClick={() => { triggerBeep('tap'); setIsCartOpen(true); }} className="bg-orange-500 text-black font-black text-xs py-2 px-4 rounded-xl flex items-center gap-2 shadow-lg active:scale-95 transition-all">
                       <SafeShoppingBag size={14} /><span>Cart ({cart.reduce((sum, item) => sum + item.quantity, 0)})</span>
                     </button>
                   </div>
                   <div className="flex gap-1.5 overflow-x-auto pb-3 scrollbar-none">
                     {categories.map((cat) => {
                       const isSelected = selectedCategory === cat;
-                      const btnClass = "px-3 py-1.5 rounded-lg text-[9px] font-black uppercase border shrink-0 " + 
-                        (isSelected ? "bg-orange-500 text-black border-orange-500" : "bg-neutral-100 dark:bg-neutral-900 text-gray-400 border-neutral-200 dark:border-white/5");
+                      const btnClass = "px-3 py-1.5 rounded-lg text-[9px] font-black uppercase border shrink-0 transition-all " + 
+                        (isSelected ? "bg-orange-500 text-black border-orange-500" : "bg-neutral-100 dark:bg-neutral-900 text-gray-400 dark:text-gray-400 border-neutral-200 dark:border-neutral-800 hover:text-orange-500");
                       return (
                         <button 
                           key={cat} 
@@ -907,8 +958,8 @@ export default function BbCafePos() {
                       <AnimatePresence mode="popLayout">
                         {filteredMenu.map((item) => {
                           const isAvail = item.isAvailable !== false;
-                          const cardClass = "bg-neutral-50 dark:bg-neutral-900 border p-2 rounded-2xl text-left flex flex-col justify-between h-24 hover:border-orange-500 active:scale-95 " + 
-                            (!isAvail ? "opacity-40 border-white/5" : "border-neutral-200 dark:border-white/5");
+                          const cardClass = "bg-neutral-50 dark:bg-neutral-900 border p-2 rounded-2xl text-left flex flex-col justify-between h-24 hover:border-orange-500 active:scale-95 transition-all " + 
+                            (!isAvail ? "opacity-40 border-white/5" : "border-neutral-200 dark:border-neutral-800");
                           return (
                             <motion.button 
                               layout
@@ -922,11 +973,11 @@ export default function BbCafePos() {
                               className={cardClass}
                             >
                               <div>
-                                <p className="font-bold text-xs line-clamp-2 leading-snug">{item.name}</p>
-                                <p className="text-[8px] text-gray-500 uppercase mt-0.5">{item.category}</p>
+                                <p className="font-bold text-xs line-clamp-2 leading-snug text-neutral-800 dark:text-gray-200">{item.name}</p>
+                                <p className="text-[8px] text-gray-500 dark:text-gray-400 uppercase mt-0.5">{item.category}</p>
                               </div>
                               <div className="flex justify-between items-end w-full">
-                                <p className="text-yellow-500 font-black text-xs font-mono">{getDisplayPrice(item)}</p>
+                                <p className="text-yellow-600 dark:text-yellow-400 font-black text-xs font-mono">{getDisplayPrice(item)}</p>
                                 {!isAvail && <span className="text-[7px] font-black text-red-500 uppercase">Empty</span>}
                               </div>
                             </motion.button>
@@ -937,11 +988,11 @@ export default function BbCafePos() {
                   )}
                 </div>
                 {cart.length > 0 && !isCartOpen && (
-                  <motion.button initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} onClick={() => { triggerBeep('tap'); setIsCartOpen(true); }} className="fixed bottom-6 right-6 left-6 md:left-auto bg-green-600 text-white font-black px-6 py-4 rounded-2xl shadow-2xl flex items-center justify-between gap-4 z-40 active:scale-95">
+                  <motion.button initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} onClick={() => { triggerBeep('tap'); setIsCartOpen(true); }} className="fixed bottom-6 right-6 left-6 md:left-auto bg-green-600 text-white font-black px-6 py-4 rounded-2xl shadow-2xl flex items-center justify-between gap-4 z-40 active:scale-95 transition-all">
                     <div className="flex items-center gap-2.5">
                       <SafeShoppingBag size={16} />
                       <div className="text-left">
-                        <p className="text-[8px] uppercase text-green-100">Active Cart</p>
+                        <p className="text-[8px] uppercase text-green-100 font-bold">Active Cart</p>
                         <p className="text-xs font-mono">{cart.reduce((sum, item) => sum + item.quantity, 0)} Items</p>
                       </div>
                     </div>
@@ -958,9 +1009,9 @@ export default function BbCafePos() {
                 <div className="flex justify-between items-center mb-6">
                   <div>
                     <h2 className="text-sm font-black uppercase text-orange-500">Live Item Stock Control</h2>
-                    <p className="text-[10px] text-neutral-500">Disable items instantly for customers.</p>
+                    <p className="text-[10px] text-neutral-500 dark:text-neutral-400">Disable items instantly for customers.</p>
                   </div>
-                  <button onClick={async () => { triggerBeep('tap'); const snap = await getDocs(collection(db, "products")); setProducts(snap.docs.map((doc) => doc.data())); }} className="p-2 bg-neutral-200 dark:bg-neutral-900 text-gray-400 rounded-xl">
+                  <button onClick={async () => { triggerBeep('tap'); const snap = await getDocs(collection(db, "products")); setProducts(snap.docs.map((doc) => doc.data())); }} className="p-2 bg-neutral-200 dark:bg-neutral-900 text-gray-400 rounded-xl hover:text-orange-500">
                     <SafeRefreshCw size={14} />
                   </button>
                 </div>
@@ -968,16 +1019,16 @@ export default function BbCafePos() {
                   {products.map((item) => {
                     const isAvail = item.isAvailable !== false;
                     return (
-                      <div key={item.id} className="bg-neutral-100 dark:bg-neutral-900 border border-neutral-200 dark:border-white/5 p-3 rounded-2xl flex items-center justify-between">
+                      <div key={item.id} className="bg-neutral-100 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 p-3 rounded-2xl flex items-center justify-between">
                         <div>
-                          <span className="font-bold text-xs block">{item.name}</span>
-                          <span className="text-[8px] text-gray-500 block">Category: {item.category} | ₹{item.price}</span>
+                          <span className="font-bold text-xs block text-gray-800 dark:text-gray-200">{item.name}</span>
+                          <span className="text-[8px] text-gray-500 dark:text-gray-400 block">Category: {item.category} | ₹{item.price}</span>
                         </div>
                         <div className="flex items-center gap-4">
                           <span className={"text-[8px] font-black px-2 py-0.5 rounded-full border " + (isAvail ? "bg-green-500/10 text-green-400 border-green-500/20" : "bg-red-500/10 text-red-400 border-red-500/20")}>
                             {isAvail ? 'In Stock' : 'Out'}
                           </span>
-                          <button onClick={() => handleToggleStock(item.id, isAvail)} className={"text-[9px] font-black uppercase px-3 py-1.5 rounded-xl border " + (isAvail ? "text-red-400 border-red-500/20" : "text-green-400 border-green-500/20")}>
+                          <button onClick={() => handleToggleStock(item.id, isAvail)} className={"text-[9px] font-black uppercase px-3 py-1.5 rounded-xl border transition-all " + (isAvail ? "text-red-400 border-red-500/20 hover:bg-red-500/10" : "text-green-400 border-green-500/20 hover:bg-green-500/10")}>
                             {isAvail ? 'Disable' : 'Enable'}
                           </button>
                         </div>
@@ -993,51 +1044,111 @@ export default function BbCafePos() {
                 <div className="flex-1 bg-white dark:bg-neutral-950 border border-neutral-200 dark:border-white/5 rounded-3xl p-4 flex flex-col overflow-hidden shadow-xl">
                   <div className="relative mb-4">
                     <SafeSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={14} />
-                    <input type="text" placeholder="Search receipt..." value={receiptSearchQuery} onChange={e => setReceiptSearchQuery(e.target.value)} className="w-full bg-neutral-100 dark:bg-neutral-900 rounded-xl py-2 px-9 text-xs outline-none" />
+                    <input 
+                      type="text" 
+                      placeholder="Search past receipt..." 
+                      value={receiptSearchQuery} 
+                      onChange={e => setReceiptSearchQuery(e.target.value)} 
+                      className="w-full bg-neutral-100 dark:bg-neutral-900 border border-transparent dark:border-neutral-800 rounded-xl py-2 px-9 text-xs outline-none text-gray-900 dark:text-gray-100 focus:border-orange-500 transition-all" 
+                    />
                   </div>
-                  <div className="space-y-2 overflow-y-auto flex-1 pr-1 pb-16">
-                    {filteredPastReceipts.map((order) => {
-                      const isSelected = selectedReceipt?.id === order.id;
-                      const receiptClass = "bg-neutral-50 dark:bg-neutral-900 border p-4 rounded-2xl flex justify-between items-center cursor-pointer " + 
-                        (isSelected ? "border-orange-500" : "border-neutral-200 dark:border-white/5");
-                      return (
-                        <div 
-                          key={order.id} 
-                          onClick={() => { triggerBeep('tap'); setSelectedReceipt(order); }} 
-                          className={receiptClass}
-                        >
-                          <div>
-                            <span className="font-bold text-xs block font-mono">Bill #${order.billNumber}</span>
-                            <span className="text-[9px] text-gray-400 block font-mono">Token: #{order.tokenNumber} | {order.customerName}</span>
-                          </div>
-                          <div className="text-right">
-                            <span className="text-sm font-black text-green-400 font-mono">₹{order.total}</span>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
+                  {isSearchingReceipts ? (
+                    <div className="flex items-center justify-center flex-1">
+                      <Loader2 className="animate-spin text-orange-500" size={24} />
+                    </div>
+                  ) : (
+                    <div className="space-y-2 overflow-y-auto flex-1 pr-1 pb-16">
+                      {filteredPastReceipts.length === 0 ? (
+                        <p className="text-center text-gray-400 text-xs py-10">No matching past bills found</p>
+                      ) : (
+                        filteredPastReceipts.map((order) => {
+                          const isSelected = selectedReceipt?.id === order.id;
+                          const receiptClass = "bg-neutral-50 dark:bg-neutral-900 border p-4 rounded-2xl flex justify-between items-center cursor-pointer transition-all " + 
+                            (isSelected ? "border-orange-500" : "border-neutral-200 dark:border-neutral-800 hover:border-neutral-400 dark:hover:border-neutral-700");
+                          return (
+                            <div 
+                              key={order.id} 
+                              onClick={() => { triggerBeep('tap'); setSelectedReceipt(order); }} 
+                              className={receiptClass}
+                            >
+                              <div>
+                                <span className="font-bold text-xs block font-mono text-gray-900 dark:text-gray-100">Bill #${order.billNumber}</span>
+                                <span className="text-[9px] text-gray-500 dark:text-gray-400 block font-mono">Token: #{order.tokenNumber} | {order.customerName}</span>
+                              </div>
+                              <div className="text-right">
+                                <span className="text-sm font-black text-green-600 dark:text-green-400 font-mono">₹{order.total}</span>
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  )}
                 </div>
-                <div className="w-full md:w-[320px] bg-white dark:bg-neutral-950 border border-neutral-200 dark:border-white/5 p-4 rounded-3xl flex flex-col justify-between shadow-xl overflow-y-auto">
+                <div className="w-full md:w-[350px] bg-white dark:bg-neutral-950 border border-neutral-200 dark:border-white/5 p-4 rounded-3xl flex flex-col justify-between shadow-xl overflow-y-auto">
                   {selectedReceipt ? (
-                    <div className="space-y-4">
-                      <div className="border-b border-neutral-200 pb-3"><h3 className="text-base font-black">Bill #${selectedReceipt.billNumber}</h3></div>
-                      <div className="space-y-1 text-xs">
-                        <p>👤 <b>Guest:</b> {selectedReceipt.customerName}</p>
-                        {selectedReceipt.customerPhone && <p>📞 <b>Phone:</b> {selectedReceipt.customerPhone}</p>}
-                        <p>💳 <b>Pay:</b> {selectedReceipt.paymentMethod?.toUpperCase()}</p>
+                    <div className="space-y-4 text-gray-800 dark:text-gray-200">
+                      <div className="border-b border-neutral-200 dark:border-neutral-800 pb-3">
+                        <h3 className="text-base font-black text-gray-900 dark:text-white">Bill #${selectedReceipt.billNumber}</h3>
+                        <span className="text-[10px] text-gray-500 dark:text-gray-400 font-mono">
+                          {selectedReceipt.timestamp?.toDate ? new Date(selectedReceipt.timestamp.toDate()).toLocaleString() : new Date(selectedReceipt.timestamp).toLocaleString()}
+                        </span>
                       </div>
-                      <div className="space-y-1.5 pt-3 border-t border-neutral-200">
-                        {selectedReceipt.items?.map((it: any, idx: number) => (
-                          <div key={idx} className="flex justify-between text-xs"><span>{it.name} <span className="text-orange-500">x{it.quantity}</span></span><span>₹{it.price * it.quantity}</span></div>
-                        ))}
+                      <div className="space-y-1.5 text-xs text-gray-600 dark:text-gray-300 bg-neutral-50 dark:bg-neutral-900 p-3 rounded-2xl border border-neutral-200 dark:border-neutral-800">
+                        <p>👤 <b>Guest:</b> <span className="text-gray-900 dark:text-gray-100">{selectedReceipt.customerName}</span></p>
+                        {selectedReceipt.customerPhone && <p>📞 <b>Phone:</b> <span className="text-gray-900 dark:text-gray-100">{selectedReceipt.customerPhone}</span></p>}
+                        <p>💳 <b>Payment Method:</b> <span className="text-gray-900 dark:text-gray-100 uppercase">{selectedReceipt.paymentMethod}</span></p>
+                        <p>🍽️ <b>Type:</b> <span className="text-gray-900 dark:text-gray-100 uppercase">{selectedReceipt.fulfillmentType}</span></p>
+                        {selectedReceipt.tableNumber && <p>🪑 <b>Table:</b> <span className="text-gray-900 dark:text-gray-100 font-mono">{selectedReceipt.tableNumber}</span></p>}
                       </div>
-                      <button onClick={() => handlePrintReceipt(selectedReceipt, getPrintConfig())} className="w-full bg-green-600 text-white font-black py-3 rounded-2xl text-xs uppercase flex items-center justify-center gap-2">
+
+                      <div className="space-y-2 pt-3 border-t border-neutral-200 dark:border-neutral-800 text-gray-700 dark:text-gray-300">
+                        <p className="text-[10px] font-bold uppercase text-gray-500">Items Ordered:</p>
+                        <div className="space-y-1 bg-neutral-50 dark:bg-neutral-900 p-3 rounded-2xl border border-neutral-200 dark:border-neutral-800">
+                          {selectedReceipt.items?.map((it: any, idx: number) => (
+                            <div key={idx} className="flex justify-between text-xs py-0.5">
+                              <span>
+                                {it.name} <span className="text-orange-500 font-bold">x{it.quantity}</span>
+                                {it.note && <span className="text-gray-400 italic block text-[9px]">({it.note})</span>}
+                              </span>
+                              <span className="font-mono">₹{it.price * it.quantity}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="space-y-1.5 pt-3 border-t border-neutral-200 dark:border-neutral-800 text-xs text-gray-600 dark:text-gray-300">
+                        <div className="flex justify-between font-mono">
+                          <span>Subtotal:</span>
+                          <span>₹{selectedReceipt.subtotal}</span>
+                        </div>
+                        {selectedReceipt.discount > 0 && (
+                          <div className="flex justify-between text-red-500 font-mono">
+                            <span>Discount:</span>
+                            <span>-₹{selectedReceipt.discount}</span>
+                          </div>
+                        )}
+                        {selectedReceipt.gstAmount > 0 && (
+                          <div className="flex justify-between font-mono">
+                            <span>GST ({selectedReceipt.gstRate}%):</span>
+                            <span>+₹{selectedReceipt.gstAmount}</span>
+                          </div>
+                        )}
+                        <div className="flex justify-between text-sm font-black text-green-600 dark:text-green-400 font-mono pt-1 border-t border-dashed border-neutral-300 dark:border-neutral-800">
+                          <span>Grand Total:</span>
+                          <span>₹{selectedReceipt.total}</span>
+                        </div>
+                      </div>
+
+                      <button onClick={() => handlePrintReceipt(selectedReceipt, getPrintConfig())} className="w-full bg-green-600 hover:bg-green-700 text-white font-black py-3 rounded-2xl text-xs uppercase flex items-center justify-center gap-2 active:scale-95 transition-all mt-4">
                         <SafePrinter size={16} /> Reprint Invoice
                       </button>
                     </div>
                   ) : (
-                    <p className="text-center text-gray-500 text-xs py-20 font-bold">Select past receipt</p>
+                    <div className="flex flex-col items-center justify-center py-20 text-center">
+                      <SafePrinter size={30} className="text-gray-400 dark:text-neutral-600 mb-2" />
+                      <p className="text-gray-500 dark:text-neutral-400 text-xs font-bold">Select past receipt to view details</p>
+                    </div>
                   )}
                 </div>
               </div>
@@ -1046,56 +1157,56 @@ export default function BbCafePos() {
             {activeTab === 'settings' && (
               <div className="bg-white dark:bg-neutral-950 border border-neutral-200 dark:border-white/5 p-6 rounded-3xl shadow-xl flex-grow max-w-xl space-y-6 overflow-y-auto">
                 <h3 className="text-sm font-black uppercase text-orange-500">POS Settings</h3>
-                <div className="border-b border-neutral-200 pb-4 space-y-3">
-                  <p className="text-xs font-bold uppercase">A. UI Theme:</p>
-                  <div className="flex bg-neutral-100 dark:bg-neutral-900 p-1 rounded-xl w-60">
+                <div className="border-b border-neutral-200 dark:border-neutral-800 pb-4 space-y-3">
+                  <p className="text-xs font-bold uppercase text-gray-800 dark:text-gray-200">A. UI Theme:</p>
+                  <div className="flex bg-neutral-100 dark:bg-neutral-900 p-1 rounded-xl w-60 border border-transparent dark:border-neutral-800">
                     <button 
                       onClick={() => handleToggleTheme('dark')} 
-                      className={"flex-grow py-2 rounded-lg text-[10px] font-black uppercase " + (themeMode === 'dark' ? "bg-[#050505] text-amber-400" : "text-gray-400")}
+                      className={"flex-grow py-2 rounded-lg text-[10px] font-black uppercase transition-all " + (themeMode === 'dark' ? "bg-[#050505] text-amber-400 shadow-md" : "text-gray-400")}
                     >
                       Dark
                     </button>
                     <button 
                       onClick={() => handleToggleTheme('light')} 
-                      className={"flex-grow py-2 rounded-lg text-[10px] font-black uppercase " + (themeMode === 'light' ? "bg-white text-orange-600" : "text-gray-400")}
+                      className={"flex-grow py-2 rounded-lg text-[10px] font-black uppercase transition-all " + (themeMode === 'light' ? "bg-white text-orange-600 shadow-md" : "text-gray-400")}
                     >
                       Light
                     </button>
                   </div>
                 </div>
-                <div className="border-b border-neutral-200 pb-4 space-y-3">
-                  <p className="text-xs font-bold uppercase">B. GST Config:</p>
+                <div className="border-b border-neutral-200 dark:border-neutral-800 pb-4 space-y-3">
+                  <p className="text-xs font-bold uppercase text-gray-800 dark:text-gray-200">B. GST Config:</p>
                   <div className="flex items-center justify-between">
-                    <span className="text-xs">Enable GST:</span>
+                    <span className="text-xs text-gray-700 dark:text-gray-300">Enable GST:</span>
                     <button onClick={() => { const next = !gstEnabled; setGstEnabled(next); localStorage.setItem("bb_pos_gst_enabled", String(next)); }} className="text-orange-500">
                       {gstEnabled ? <SafeToggleRight size={32} /> : <SafeToggleLeft size={32} />}
                     </button>
                   </div>
                   {gstEnabled && (
-                    <input type="number" value={gstRate} onChange={e => { const r = Math.max(0, Number(e.target.value)); setGstRate(r); localStorage.setItem("bb_pos_gst_rate", String(r)); }} className="w-full bg-neutral-100 dark:bg-neutral-900 border p-3 rounded-xl text-xs outline-none" />
+                    <input type="number" value={gstRate} onChange={e => { const r = Math.max(0, Number(e.target.value)); setGstRate(r); localStorage.setItem("bb_pos_gst_rate", String(r)); }} className="w-full bg-neutral-100 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 p-3 rounded-xl text-xs outline-none text-gray-900 dark:text-gray-100" />
                   )}
                 </div>
-                <div className="border-b border-neutral-200 pb-4 space-y-3">
-                  <p className="text-xs font-bold uppercase">C. Paper Size:</p>
-                  <div className="flex bg-neutral-100 dark:bg-neutral-900 p-1 rounded-xl w-60">
+                <div className="border-b border-neutral-200 dark:border-neutral-800 pb-4 space-y-3">
+                  <p className="text-xs font-bold uppercase text-gray-800 dark:text-gray-200">C. Paper Size:</p>
+                  <div className="flex bg-neutral-100 dark:bg-neutral-900 p-1 rounded-xl w-60 border border-transparent dark:border-neutral-800">
                     <button 
                       onClick={() => { setPrinterPaperSize('58mm'); localStorage.setItem("bb_pos_paper_size", '58mm'); }} 
-                      className={"flex-grow py-2 rounded-lg text-[10px] font-black uppercase " + (printerPaperSize === '58mm' ? "bg-[#050505] text-amber-400" : "text-gray-400")}
+                      className={"flex-grow py-2 rounded-lg text-[10px] font-black uppercase transition-all " + (printerPaperSize === '58mm' ? "bg-[#050505] text-amber-400 shadow-md" : "text-gray-400")}
                     >
                       58mm
                     </button>
                     <button 
                       onClick={() => { setPrinterPaperSize('80mm'); localStorage.setItem("bb_pos_paper_size", '80mm'); }} 
-                      className={"flex-grow py-2 rounded-lg text-[10px] font-black uppercase " + (printerPaperSize === '80mm' ? "bg-white text-orange-600" : "text-gray-400")}
+                      className={"flex-grow py-2 rounded-lg text-[10px] font-black uppercase transition-all " + (printerPaperSize === '80mm' ? "bg-white text-orange-600 shadow-md" : "text-gray-400")}
                     >
                       80mm
                     </button>
                   </div>
                 </div>
 
-                <div className="space-y-3 pt-4 border-t border-neutral-200 dark:border-white/5">
+                <div className="space-y-3 pt-4 border-t border-neutral-200 dark:border-neutral-800">
                   <div className="flex items-center justify-between">
-                    <p className="text-xs font-bold uppercase">D. Hardware Printer Connection Setup:</p>
+                    <p className="text-xs font-bold uppercase text-gray-800 dark:text-gray-200">D. Hardware Printer Connection Setup:</p>
                     <span className={"text-[8px] font-black uppercase tracking-widest px-2.5 py-0.5 rounded-full border " + (printerConnected ? "bg-green-500/10 text-green-400 border-green-500/20" : "bg-red-500/10 text-red-400 border-red-500/20")}>
                       {printerConnected ? '● Connected' : 'Disconnected'}
                     </span>
@@ -1111,7 +1222,7 @@ export default function BbCafePos() {
                       const btnClass = "p-2 rounded-xl border text-[9px] font-black uppercase tracking-wider transition-all " + 
                         (isSelected 
                           ? "bg-[#050505] text-amber-400 border-amber-500" 
-                          : "bg-neutral-100 dark:bg-neutral-900 text-gray-400 border-neutral-200 dark:border-white/5");
+                          : "bg-neutral-100 dark:bg-neutral-900 text-gray-400 border-neutral-200 dark:border-neutral-800 hover:text-orange-500");
                       return (
                         <button 
                           key={p.id} 
@@ -1131,13 +1242,13 @@ export default function BbCafePos() {
                   </div>
                   {printerType === 'network_ip' && (
                     <div className="space-y-1 mt-2">
-                      <label className="text-[9px] font-black uppercase text-gray-500">Printer IP Address</label>
-                      <input type="text" value={printerIp} onChange={e => { setPrinterIp(e.target.value); localStorage.setItem("bb_pos_printer_ip", e.target.value); }} className="w-full bg-neutral-100 dark:bg-neutral-900 border border-neutral-200 dark:border-white/5 p-3 rounded-xl text-xs outline-none font-mono" />
+                      <label className="text-[9px] font-black uppercase text-gray-500 dark:text-gray-400">Printer IP Address</label>
+                      <input type="text" value={printerIp} onChange={e => { setPrinterIp(e.target.value); localStorage.setItem("bb_pos_printer_ip", e.target.value); }} className="w-full bg-neutral-100 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 p-3 rounded-xl text-xs outline-none font-mono text-gray-900 dark:text-gray-100" />
                     </div>
                   )}
                   <div className="space-y-1">
-                    <label className="text-[9px] font-black uppercase text-gray-500">Number of Bill Copies</label>
-                    <input type="number" min={1} max={5} value={printCopies} onChange={e => { const v = Math.max(1, Number(e.target.value)); setPrintCopies(v); localStorage.setItem("bb_pos_print_copies", String(v)); }} className="w-full bg-neutral-100 dark:bg-neutral-900 border border-neutral-200 dark:border-white/5 p-3 rounded-xl text-xs outline-none font-mono" />
+                    <label className="text-[9px] font-black uppercase text-gray-500 dark:text-gray-400">Number of Bill Copies</label>
+                    <input type="number" min={1} max={5} value={printCopies} onChange={e => { const v = Math.max(1, Number(e.target.value)); setPrintCopies(v); localStorage.setItem("bb_pos_print_copies", String(v)); }} className="w-full bg-neutral-100 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 p-3 rounded-xl text-xs outline-none font-mono text-gray-900 dark:text-gray-100" />
                   </div>
 
                   <div className="flex gap-2 pt-2">
