@@ -77,23 +77,32 @@ export const generateEscPosQrBytes = (upiUrl: string): Uint8Array => {
     0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x43, 0x06,
     0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x45, 0x30,
     0x1D, 0x28, 0x6B, pL, pH, 0x31, 0x50, 0x30, ...Array.from(urlBytes),
-    0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x51, 0x30, // Fixed Print QR Command
+    0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x51, 0x30, // Print QR Command
     0x0A, 0x1B, 0x61, 0x00, 0x0A // Reset Align
   ]);
 };
 
 export const sendToPrinterInChunks = async (config: PrintConfig, text: string, upiUrl?: string) => {
   const encoder = new TextEncoder();
-  const safeText = text.replace(/₹/g, 'Rs.');
-  const textBytes = encoder.encode(safeText);
-  let finalBytes = textBytes;
+  let finalBytes: Uint8Array;
 
-  if (upiUrl) {
+  // QR कोड की पोजीशन को "SCAN TO PAY" के ठीक नीचे सेट करने के लिए स्प्लिट लॉजिक
+  if (upiUrl && text.includes("{{QR_CODE_PLACEHOLDER}}")) {
+    const parts = text.split("{{QR_CODE_PLACEHOLDER}}");
+    const safePart1 = parts[0].replace(/₹/g, 'Rs.');
+    const safePart2 = parts[1].replace(/₹/g, 'Rs.');
+    
+    const part1Bytes = encoder.encode(safePart1);
+    const part2Bytes = encoder.encode(safePart2);
     const qrBytes = generateEscPosQrBytes(upiUrl);
-    const combined = new Uint8Array(textBytes.length + qrBytes.length);
-    combined.set(textBytes);
-    combined.set(qrBytes, textBytes.length);
-    finalBytes = combined;
+    
+    finalBytes = new Uint8Array(part1Bytes.length + qrBytes.length + part2Bytes.length);
+    finalBytes.set(part1Bytes);
+    finalBytes.set(qrBytes, part1Bytes.length);
+    finalBytes.set(part2Bytes, part1Bytes.length + qrBytes.length);
+  } else {
+    const safeText = text.replace(/₹/g, 'Rs.').replace("{{QR_CODE_PLACEHOLDER}}", "");
+    finalBytes = encoder.encode(safeText);
   }
 
   const chunkSize = 120;
@@ -121,7 +130,7 @@ export const sendToPrinterInChunks = async (config: PrintConfig, text: string, u
             await new Promise(r => setTimeout(r, 40));
           }
         } finally {
-          writer.releaseLock(); // Safe lock release
+          writer.releaseLock();
         }
         return true;
       }
@@ -180,7 +189,6 @@ export const generateEscPosText = (order: any, config?: PrintConfig): string => 
   text += formatRow(`Bill No: #${String(order.billNumber).padStart(4, '0')}`, `Token: #${order.tokenNumber}`, cols);
   text += formatRow(`Type: ${order.fulfillmentType?.toUpperCase()}`, `Pay: ${order.paymentMethod?.toUpperCase()}`, cols);
   
-  // टेबल नंबर रसीद में जोड़ने के लिए सुधार
   if (order.fulfillmentType === 'table' && order.tableNumber) {
     text += `Table: ${order.tableNumber}\n`;
   }
@@ -207,23 +215,29 @@ export const generateEscPosText = (order: any, config?: PrintConfig): string => 
     text += formatRow("Balance Point:", `${order.customerPointsAfter || 0}`, cols);
   }
 
-  text += dividerLine + centerAlign("SCAN TO PAY", cols) + "\n\n";
+  text += dividerLine;
+  text += centerAlign("SCAN TO PAY", cols);
+  
+  // QR कोड को फूटर के बजाय यहीं प्रिंट करने के लिए प्लेसहोल्डर सेट किया गया है
+  text += "{{QR_CODE_PLACEHOLDER}}"; 
+  text += "\n";
+
   text += centerAlign("THANK YOU! VISIT AGAIN", cols) + centerAlign("www.bb-cafe-app.vercel.app", cols) + dividerLine;
   text += formatRow(formattedDate.split(',')[0], `#3-${order.billNumber}`, cols);
   return text + "\n\n\n\n";
 };
 
 // ==========================================
-// 4. ब्राउज़र वेब फ़ॉलबैक HTML टेम्पलेट्स
+// 4. ब्राउज़र वेब फ़ॉलबैक HTML टेम्पलेट्स (छोटे साइज के साथ)
 // ==========================================
 export const generateKotHtml = (order: any, config: PrintConfig): string => {
   const itemsHtml = order.items.map((it: any) => `
     <tr style="border-bottom: 1px dashed #ccc;">
-      <td style="font-size: 13px; font-weight: 900; padding: 6px 0; color: #000; text-transform: uppercase;">
+      <td style="font-size: 11px; font-weight: 900; padding: 4px 0; color: #000; text-transform: uppercase;">
         ${it.name.toUpperCase()}
-        ${it.note ? `<div style="font-size: 11px; color: #333; font-weight: 800; padding-left: 6px;">Note: ${it.note.toUpperCase()}</div>` : ''}
+        ${it.note ? `<div style="font-size: 9px; color: #333; font-weight: 800; padding-left: 4px;">Note: ${it.note.toUpperCase()}</div>` : ''}
       </td>
-      <td style="font-size: 14px; font-weight: 900; text-align: right; padding: 6px 0; font-family: monospace;">${it.quantity}</td>
+      <td style="font-size: 11px; font-weight: 900; text-align: right; padding: 4px 0; font-family: monospace;">${it.quantity}</td>
     </tr>
   `).join('');
 
@@ -232,17 +246,17 @@ export const generateKotHtml = (order: any, config: PrintConfig): string => {
       <head>
         <style>
           @page { size: ${config.printerPaperSize === '58mm' ? '58mm' : '80mm'} auto; margin: 0; }
-          body { font-family: monospace; padding: 6px; font-size: 12px; color: #000; background-color: #fff; margin: 0; }
+          body { font-family: monospace; padding: 2px; font-size: 9.5px; color: #000; background-color: #fff; margin: 0; }
           .center { text-align: center; }
-          .divider { border-top: 1.5px dotted #000; margin: 6px 0; }
+          .divider { border-top: 1px dotted #000; margin: 4px 0; }
         </style>
       </head>
       <body>
-        <div class="center" style="font-size: 16px; font-weight: 900; border: 2.5px solid #000; padding: 5px; background-color: #000; color: #fff;">K.O.T (KITCHEN)</div>
-        <div class="center" style="font-size: 10px; font-weight: bold; margin-top: 3px;">BUM BUM CAFE</div>
+        <div class="center" style="font-size: 13px; font-weight: 900; border: 1.5px solid #000; padding: 3px; background-color: #000; color: #fff;">K.O.T (KITCHEN)</div>
+        <div class="center" style="font-size: 8.5px; font-weight: bold; margin-top: 2px;">BUM BUM CAFE</div>
         <div class="divider"></div>
-        <div style="font-size: 11px; font-weight: bold; line-height: 1.4;">
-          <div>Token No: <span style="font-size: 13px; font-weight: 900;">#${order.tokenNumber}</span></div>
+        <div style="font-size: 9px; font-weight: bold; line-height: 1.3;">
+          <div>Token No: <span style="font-size: 11px; font-weight: 900;">#${order.tokenNumber}</span></div>
           <div>Bill No: #${order.billNumber}</div>
           <div>Mode: <span style="text-transform: uppercase;">${order.fulfillmentType?.toUpperCase()} ${order.tableNumber ? `(${order.tableNumber})` : ''}</span></div>
         </div>
@@ -250,20 +264,20 @@ export const generateKotHtml = (order: any, config: PrintConfig): string => {
         <table style="width:100%; border-collapse:collapse;">
           <thead>
             <tr style="border-bottom: 1px solid #000;">
-              <th style="text-align: left; font-size: 11px; font-weight: 900; padding-bottom: 4px;">ITEM</th>
-              <th style="text-align: right; font-size: 11px; font-weight: 900; padding-bottom: 4px;">QTY</th>
+              <th style="text-align: left; font-size: 9.5px; font-weight: 900; padding-bottom: 3px;">ITEM</th>
+              <th style="text-align: right; font-size: 9.5px; font-weight: 900; padding-bottom: 3px;">QTY</th>
             </tr>
           </thead>
           <tbody>${itemsHtml}</tbody>
         </table>
         ${order.chefInstructions ? `
-          <div style="margin-top: 10px; padding: 6px; border: 1.5px solid #000; background-color: #fafafa;">
-            <div style="font-size: 10px; font-weight: 900; text-decoration: underline;">CHEF INSTRUCTION:</div>
-            <div style="font-size: 12px; font-weight: 900;">${order.chefInstructions.toUpperCase()}</div>
+          <div style="margin-top: 6px; padding: 4px; border: 1px solid #000; background-color: #fafafa;">
+            <div style="font-size: 8.5px; font-weight: 900; text-decoration: underline;">CHEF INSTRUCTION:</div>
+            <div style="font-size: 10px; font-weight: 900;">${order.chefInstructions.toUpperCase()}</div>
           </div>
         ` : ''}
         <div class="divider"></div>
-        <div class="center" style="font-size: 9.5px; font-weight: bold;">Printed: ${getFormattedDate(order.timestamp)}</div>
+        <div class="center" style="font-size: 8px; font-weight: bold;">Printed: ${getFormattedDate(order.timestamp)}</div>
       </body>
     </html>
   `;
@@ -273,21 +287,21 @@ export const generateReceiptHtml = (order: any, config: PrintConfig): string => 
   const upiId = "Q231198993@ybl"; 
   const upiLink = `upi://pay?pa=${upiId}&pn=Bum%20Bum%20Cafe&am=${order.total}&cu=INR`;
   const formattedReceiptDate = getFormattedReceiptDate(order.timestamp);
-  const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=115x115&margin=0&data=${encodeURIComponent(upiLink)}`;
+  const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=90x90&margin=0&data=${encodeURIComponent(upiLink)}`;
 
   const itemsRows = order.items.map((it: any) => `
     <tr style="border-bottom: 1px dashed #eee;">
-      <td style="font-size: 11px; font-weight: bold; padding: 6px 0; color: #111; text-transform: uppercase;">${it.name.toUpperCase()}</td>
-      <td style="font-size: 11px; font-weight: bold; text-align: center; padding: 6px 0; font-family: monospace;">${it.quantity}</td>
-      <td style="font-size: 11px; font-weight: bold; text-align: right; padding: 6px 0; font-family: monospace;">₹${it.price * it.quantity}</td>
+      <td style="font-size: 8.5px; font-weight: bold; padding: 4px 0; color: #111; text-transform: uppercase;">${it.name.toUpperCase()}</td>
+      <td style="font-size: 8.5px; font-weight: bold; text-align: center; padding: 4px 0; font-family: monospace;">${it.quantity}</td>
+      <td style="font-size: 8.5px; font-weight: bold; text-align: right; padding: 4px 0; font-family: monospace;">₹${it.price * it.quantity}</td>
     </tr>
   `).join('');
 
   const loyaltyMarkup = order.customerPhone ? `
-    <div style="background-color: #fafafa; border: 1px dashed #aaa; padding: 5px; margin-top: 6px; font-size: 8.5px; font-family: monospace;">
-      <div style="font-weight: 900; text-align: center; color: #b45309;">LOYALTY POINTS</div>
-      <div style="display: flex; justify-content: space-between;"><span>Current Point:</span> <span>+${order.customerPointsEarned || 0} pts</span></div>
-      <div style="display: flex; justify-content: space-between;"><span>Balance Point:</span> <span>${order.customerPointsAfter || 0} pts</span></div>
+    <div style="background-color: #fafafa; border: 1px dashed #aaa; padding: 4px; margin-top: 4px; font-size: 7.5px; font-family: monospace;">
+      <div style="font-weight: 900; text-align: center; color: #b45309; margin-bottom: 2px;">LOYALTY POINTS</div>
+      <div style="display: flex; justify-content: space-between;"><span>Current:</span> <span>+${order.customerPointsEarned || 0} pts</span></div>
+      <div style="display: flex; justify-content: space-between;"><span>Balance:</span> <span>${order.customerPointsAfter || 0} pts</span></div>
     </div>
   ` : '';
 
@@ -298,71 +312,72 @@ export const generateReceiptHtml = (order: any, config: PrintConfig): string => 
       <head>
         <style>
           @page { size: ${config.printerPaperSize === '58mm' ? '58mm' : '80mm'} auto; margin: 0; }
-          body { font-family: monospace; width: 100%; margin: 0; padding: 4px; color: #000; font-size: 11px; box-sizing: border-box; }
+          body { font-family: monospace; width: 100%; margin: 0; padding: 2px; color: #000; font-size: 9px; line-height: 1.25; box-sizing: border-box; }
           .center { text-align: center; }
-          .divider { border-top: 1.5px dotted #000; margin: 6px 0; height: 0; }
-          .double-divider { border-top: 1.5px dotted #000; border-bottom: 1.5px dotted #000; margin: 6px 0; height: 3px; }
+          .divider { border-top: 1px dotted #000; margin: 4px 0; height: 0; }
+          .double-divider { border-top: 1px dotted #000; border-bottom: 1px dotted #000; margin: 4px 0; height: 3px; }
           table { width: 100%; border-collapse: collapse; }
         </style>
       </head>
       <body>
-        <div class="center" style="margin-bottom: 6px;">
-          <div style="background-color: #000; color: #fff; padding: 4px 8px; font-size: 13px; font-weight: 900; display: inline-block;">BUM BUM CAFE</div>
-          <div style="font-size: 8px; font-weight: bold; color: #333; margin-top: 2px;">BUS STAND MOHANDRA, DIST. PANNA, M.P.</div>
-          <div style="font-size: 9px; font-weight: bold;">Mo. 9714293759</div>
+        <div class="center" style="margin-bottom: 4px;">
+          <div style="background-color: #000; color: #fff; padding: 3px 6px; font-size: 11px; font-weight: 900; display: inline-block;">BUM BUM CAFE</div>
+          <div style="font-size: 7.5px; font-weight: bold; color: #333; margin-top: 1px;">BUS STAND MOHANDRA, DIST. PANNA, M.P.</div>
+          <div style="font-size: 8px; font-weight: bold;">Mo. 9714293759</div>
         </div>
         <div class="divider"></div>
-        <div style="font-size: 10px; font-weight: bold;">
+        <div style="font-size: 8.5px; font-weight: bold;">
           <div>Name: ${order.customerName || 'Walk-in Guest'}</div>
           ${order.customerPhone ? `<div>Phone: ${order.customerPhone.replace('+91', '')}</div>` : ''}
           ${order.address ? `<div>Address: ${order.address}</div>` : ''}
           ${loyaltyMarkup}
         </div>
         <div class="divider"></div>
-        <div style="display: grid; grid-template-cols: 1fr 1fr; font-size: 9.5px; font-weight: bold;">
+        <div style="display: grid; grid-template-cols: 1fr 1fr; font-size: 8px; font-weight: bold; row-gap: 1px;">
           <div>Bill No: #${String(order.billNumber).padStart(4, '0')}</div>
           <div style="text-align: right;">Token: #<strong>${order.tokenNumber}</strong></div>
-          
-          <!-- टेबल नंबर वेब रसीद में जोड़ने के लिए सुधार -->
           <div>Mode: ${order.fulfillmentType?.toUpperCase()} ${order.tableNumber ? `(Table: ${order.tableNumber})` : ''}</div>
-          
           <div style="text-align: right;">Pay: ${order.paymentMethod?.toUpperCase()}</div>
           <div style="grid-column: span 2;">Date: ${formattedReceiptDate}</div>
         </div>
-        <div class="divider" style="margin-top: 8px;"></div>
+        <div class="divider" style="margin-top: 6px;"></div>
         <table>
           <thead>
-            <tr style="border-bottom: 1.5px solid #000;">
-              <th style="text-align: left; font-size: 11px; padding-bottom: 4px;">ITEM</th>
-              <th style="text-align: center; font-size: 11px; padding-bottom: 4px; width: 40px;">QTY</th>
-              <th style="text-align: right; font-size: 11px; padding-bottom: 4px; width: 70px;">AMT</th>
+            <tr style="border-bottom: 1px solid #000;">
+              <th style="text-align: left; font-size: 8.5px; padding-bottom: 3px;">ITEM</th>
+              <th style="text-align: center; font-size: 8.5px; padding-bottom: 3px; width: 30px;">QTY</th>
+              <th style="text-align: right; font-size: 8.5px; padding-bottom: 3px; width: 60px;">AMT</th>
             </tr>
           </thead>
           <tbody>${itemsRows}</tbody>
         </table>
         <div class="divider"></div>
-        <div style="font-size: 10.5px; font-weight: bold; line-height: 1.4;">
+        <div style="font-size: 8.5px; font-weight: bold; line-height: 1.3;">
           <div style="display: flex; justify-content: space-between;"><span>Total:</span><span>₹${order.subtotal}</span></div>
           <div style="display: flex; justify-content: space-between;"><span>Discount:</span><span>-₹${customDiscountVal > 0 ? customDiscountVal : 0}</span></div>
           <div style="display: flex; justify-content: space-between;"><span>Coupon Discount:</span><span>-₹${order.customerPointsRedeemed || 0}</span></div>
           ${order.gstAmount ? `<div style="display: flex; justify-content: space-between;"><span>GST (${order.gstRate}%):</span><span>+₹${order.gstAmount}</span></div>` : ''}
         </div>
         <div class="double-divider"></div>
-        <div style="display: flex; justify-content: space-between; align-items: center; font-weight: 900; font-size: 13px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; font-weight: 900; font-size: 11px;">
           <span>Grand Total</span><span>₹${order.total}</span>
         </div>
         <div class="divider"></div>
-        <div class="center" style="margin: 8px 0;">
-          <img src="${qrCodeUrl}" style="width: 105px; height: 105px; border: 1.5px solid #000; padding: 2px; display: inline-block;" />
-          <div style="font-size: 8px; font-weight: 900; margin-top: 4px;">BHIM UPI PAYTM/PHONEPE</div>
+        
+        <!-- QR कोड अब "SCAN TO PAY" के तुरंत नीचे व्यवस्थित रूप से दिखेगा -->
+        <div class="center" style="margin: 4px 0;">
+          <div style="font-size: 8px; font-weight: 900; margin-bottom: 4px; letter-spacing: 0.5px;">SCAN TO PAY</div>
+          <img src="${qrCodeUrl}" style="width: 80px; height: 80px; border: 1px solid #000; padding: 2px; display: inline-block;" />
+          <div style="font-size: 7px; font-weight: 900; margin-top: 3px;">BHIM UPI PAYTM/PHONEPE</div>
         </div>
+        
         <div class="divider"></div>
-        <div class="center" style="font-size: 8.5px; line-height: 1.4; font-weight: bold;">
+        <div class="center" style="font-size: 7.5px; line-height: 1.3; font-weight: bold;">
           <div>www.youtube.com/@bbcafe.i | @bbcafe.in</div>
-          <div style="font-weight: 900; font-size: 10px; margin-top: 4px; font-style: italic;">THANK YOU, VISIT AGAIN!</div>
-          <div style="font-size: 9px; margin-top: 2px;">www.bb-cafe-app.vercel.app</div>
+          <div style="font-weight: 900; font-size: 8.5px; margin-top: 2px; font-style: italic;">THANK YOU, VISIT AGAIN!</div>
+          <div style="font-size: 8px; margin-top: 1px;">www.bb-cafe-app.vercel.app</div>
         </div>
-        <div style="display: flex; justify-content: space-between; font-size: 9px; margin-top: 10px; font-weight: bold; border-top: 1px dashed #ccc; padding-top: 4px;">
+        <div style="display: flex; justify-content: space-between; font-size: 7.5px; margin-top: 6px; font-weight: bold; border-top: 1px dashed #ccc; padding-top: 3px;">
           <span>${formattedReceiptDate}</span><span>#3-${order.billNumber}</span>
         </div>
       </body>
