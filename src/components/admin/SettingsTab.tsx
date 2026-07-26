@@ -94,6 +94,7 @@ export default function SettingsTab({
   const [editingStaffName, setEditingStaffName] = useState("");
   const [editingStaffRole, setEditingStaffRole] = useState("delivery");
   const [editingStaffPin, setEditingStaffPin] = useState("");
+  const [editingStaffOriginalRole, setEditingStaffOriginalRole] = useState<string | null>(null); // मूल रोल ट्रैक करने के लिए
   const [revealPinId, setRevealPinId] = useState<string | null>(null);
 
   // Dine-In Table QR State
@@ -378,23 +379,54 @@ export default function SettingsTab({
     }
 
     try {
-      if (editingStaffRole === "godown") {
+      // स्थिति A: यदि रोल बदलकर 'godown' किया गया है लेकिन पहले वह कुछ और था (कलेक्शन माइग्रेशन)
+      if (editingStaffOriginalRole !== "godown" && editingStaffRole === "godown") {
+        // 1. नए कलेक्शन (cafe_users) में डालें
         await setDoc(doc(db, "cafe_users", editingStaffId), {
           id: editingStaffId,
           name: editingStaffName.trim().toUpperCase(),
           pin: editingStaffPin.trim(),
           role: "staff"
-        }, { merge: true });
-      } else {
+        });
+        // 2. पुराने कलेक्शन (staff_members) से डिलीट करें
+        await deleteDoc(doc(db, "staff_members", editingStaffId));
+      } 
+      // स्थिति B: यदि रोल 'godown' से बदलकर कुछ और किया गया है (कलेक्शन माइग्रेशन)
+      else if (editingStaffOriginalRole === "godown" && editingStaffRole !== "godown") {
+        // 1. नए कलेक्शन (staff_members) में डालें
         await setDoc(doc(db, "staff_members", editingStaffId), {
           name: editingStaffName.trim(),
           role: editingStaffRole,
           pin: editingStaffPin
-        }, { merge: true });
+        });
+        // 2. पुराने कलेक्शन (cafe_users) से डिलीट करें
+        await deleteDoc(doc(db, "cafe_users", editingStaffId));
+      } 
+      // स्थिति C: यदि कलेक्शन में कोई बदलाव नहीं हुआ है (केवल नाम या पिन बदला है)
+      else {
+        if (editingStaffRole === "godown") {
+          await setDoc(doc(db, "cafe_users", editingStaffId), {
+            id: editingStaffId,
+            name: editingStaffName.trim().toUpperCase(),
+            pin: editingStaffPin.trim(),
+            role: "staff"
+          }, { merge: true });
+        } else {
+          await setDoc(doc(db, "staff_members", editingStaffId), {
+            name: editingStaffName.trim(),
+            role: editingStaffRole,
+            pin: editingStaffPin
+          }, { merge: true });
+        }
       }
+
       setEditingStaffId(null);
+      setEditingStaffOriginalRole(null);
       toast.success("Staff member details updated!");
-    } catch (err) { toast.error("Update failed."); }
+    } catch (err) { 
+      console.error(err);
+      toast.error("Update failed."); 
+    }
   };
 
   const handleUpdatePasscodes = async (e: React.FormEvent) => {
@@ -853,7 +885,7 @@ export default function SettingsTab({
                 </div>
                 <div className="flex gap-2">
                   <button type="submit" className="flex-1 bg-green-600 text-white p-2 rounded-lg text-[10px] font-black uppercase">Save</button>
-                  <button type="button" onClick={() => setEditingStaffId(null)} className="bg-white/5 text-gray-400 p-2 rounded-lg text-[10px] font-black uppercase">Cancel</button>
+                  <button type="button" onClick={() => { setEditingStaffId(null); setEditingStaffOriginalRole(null); }} className="bg-white/5 text-gray-400 p-2 rounded-lg text-[10px] font-black uppercase">Cancel</button>
                 </div>
               </form>
             )}
@@ -881,6 +913,7 @@ export default function SettingsTab({
                         setEditingStaffName(member.name);
                         setEditingStaffRole(member.role);
                         setEditingStaffPin(member.pin);
+                        setEditingStaffOriginalRole(member.role); // मूल विभाग ट्रैक करने के लिए
                       }} className="p-2 bg-blue-500/10 text-blue-400 rounded-lg">⚙️</button>
                       <button onClick={() => handleDeleteStaffCombined(member.id, member.role)} className="p-2 bg-red-500/10 text-red-500 rounded-lg">🗑️</button>
                     </div>
