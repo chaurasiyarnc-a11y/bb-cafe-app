@@ -44,6 +44,7 @@ const SafePlus = Plus as any;
 const SafeMinus = Minus as any;
 const SafeChevronLeft = ChevronLeft as any;
 const SafeChevronRight = ChevronRight as any;
+const SafeSettings = Settings as any;
 
 interface PosCartItem {
   id: string;
@@ -475,6 +476,28 @@ export default function BbCafePos() {
     else document.documentElement.classList.add('dark');
   };
 
+  const handleDetectLocation = () => {
+    triggerBeep('tap');
+    if (typeof window === "undefined" || !navigator.geolocation) {
+      toast.error("Geolocation is not supported by your device.");
+      return;
+    }
+    const toastId = toast.loading("Detecting location...");
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        setAddress(`GPS Location: https://www.google.com/maps?q=${latitude.toFixed(6)},${longitude.toFixed(6)}`);
+        toast.dismiss(toastId);
+        toast.success("Location detected!");
+      },
+      () => {
+        toast.dismiss(toastId);
+        toast.error("Unable to retrieve location.");
+      },
+      { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+    );
+  };
+
   const filteredMenu = useMemo(() => products.filter(p => (selectedCategory === 'All' || p.category === selectedCategory) && p.name.toLowerCase().includes(searchQuery.toLowerCase())), [products, selectedCategory, searchQuery]);
   const filteredPastReceipts = useMemo(() => liveOrders.filter(o => String(o.billNumber).includes(receiptSearchQuery.trim()) || String(o.customerPhone || '').includes(receiptSearchQuery.trim()) || String(o.customerName || '').toLowerCase().includes(receiptSearchQuery.trim().toLowerCase())), [liveOrders, receiptSearchQuery]);
   const getDisplayPrice = (item: any) => item?.variants ? `₹${Math.min(...Object.values(item.variants).map(Number))}+` : `₹${item?.price || 0}`;
@@ -484,7 +507,7 @@ export default function BbCafePos() {
     { id: 'orders', label: 'Live Orders', icon: SafeClock, badge: liveOrders.filter(o => o.status !== 'completed' && o.status !== 'rejected').length },
     { id: 'inventory', label: 'Stock Toggle', icon: SafeLayers },
     { id: 'receipts', label: 'Past Receipts', icon: SafePrinter },
-    { id: 'settings', label: 'POS Settings', icon: Settings }
+    { id: 'settings', label: 'POS Settings', icon: SafeSettings }
   ];
 
   return (
@@ -713,7 +736,6 @@ export default function BbCafePos() {
       <PosCartDrawer 
         isHindi={false} isCartOpen={isCartOpen} setIsCartOpen={setIsCartOpen} cart={cart} setCart={setCart} customerPhone={customerPhone} setCustomerPhone={setCustomerPhone} customerName={customerName} setCustomerName={setCustomerName} customerPoints={customerPoints} setCustomerPoints={setCustomerPoints} pointsToRedeem={pointsToRedeem} setPointsToRedeem={setPointsToRedeem} customDiscount={customDiscount} setCustomDiscount={setCustomDiscount} fulfillmentType={fulfillmentType} setFulfillmentType={setFulfillmentType} selectedArea={selectedArea} setSelectedArea={setSelectedArea} DELIVERY_AREAS={DELIVERY_AREAS} address={address} setAddress={setAddress} tableNumber={tableNumber} setTableNumber={setTableNumber} chefInstructions={chefInstructions} setChefInstructions={setChefInstructions} isSubmittingOrder={isSubmittingOrder} paymentMethod={paymentMethod} setPaymentMethod={setPaymentMethod} noCutlery={noCutlery} setNoCutlery={setNoCutlery} getCartSubtotal={getCartSubtotal} getCartAddonsPrice={() => 0} getDeliveryCharge={getDeliveryCharge} getFreeDeliveryProgressPercent={getFreeDeliveryProgressPercent} getTotalPointsRedeemedInCart={getTotalPointsRedeemedInCart} getTotalBillPrice={getTotalBillPrice} loyaltyRules={loyaltyRules} handlePlaceOrder={handlePlaceOrder} handleDetectLocation={handleDetectLocation} setIsCustomerModalOpen={setIsCustomerModalOpen} searchDbCustomers={searchDbCustomers} handleUpdateCartQuantity={handleUpdateCartQuantity} handleUpdateCartItemNote={handleUpdateCartItemNote} showAddonsSection={false} triggerBeep={triggerBeep} handleCheckLoyalty={handleCheckLoyalty}
         
-        // 🛠️ TypeScript TS2607 type safety parameters passed as static/dummy props
         ketchupAddon={false}
         setKetchupAddon={() => {}}
         oreganoAddon={false}
