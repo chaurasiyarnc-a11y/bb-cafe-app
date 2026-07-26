@@ -546,7 +546,7 @@ export default function BbCafePos() {
       return;
     }
     
-    // 🛠️ Fixed: Standard String Concatenation used inside template to avoid compiler errors [1]
+    // 🛠️ Fixed: Standard String Concatenation used inside template to avoid SWC compiler errors [1]
     const itemsRows = order.items.map((it: any) => {
       let noteFormatted = "";
       if (it.note) {
@@ -565,6 +565,11 @@ export default function BbCafePos() {
         </tr>
       `;
     }).join('');
+
+    // 🛠️ Safe Conditional Markup variable generations to keep template clean and prevent tag-matching compiler errors [1]
+    const phoneMarkup = order.customerPhone ? `<div style="font-family: monospace; font-size: 9.5px; font-weight: bold;">${order.customerPhone.replace('+91', '')}</div>` : '';
+    const discountMarkup = order.discount ? `<div style="display: flex; justify-content: space-between; font-weight: bold;"><span>Savings:</span><span>-₹${order.discount}</span></div>` : '';
+    const gstMarkup = order.gstRate ? `<div style="display: flex; justify-content: space-between;"><span>GST (${order.gstRate}%):</span><span>+₹${order.gstAmount || 0}</span></div>` : '';
 
     printWindow.document.write(`
       <html>
@@ -616,7 +621,7 @@ export default function BbCafePos() {
             <div>Employee: Owner</div>
             <div>POS: POS 02</div>
             <div style="margin-top: 6px;">Customer: ${order.customerName || 'Walk-in Guest'}</div>
-            ${order.customerPhone ? `<div style="font-family: monospace; font-size: 9.5px; font-weight: bold;">${order.customerPhone.replace('+91', '')}</div>` : ''}
+            ${phoneMarkup}
           </div>
 
           <div class="divider"></div>
