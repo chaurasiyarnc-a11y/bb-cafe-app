@@ -33,7 +33,7 @@ const SafeClock = Clock as any;
 const SafeLayers = Layers as any;
 const SafePrinter = Printer as any;
 const SafeUsers = Users as any;
-const SafePlay = Play as any;
+const SafePlay = Play as any; 
 const SafeCheck = Check as any;
 const SafeSearch = Search as any;
 const SafeX = X as any;
@@ -91,11 +91,11 @@ export default function BbCafePos() {
   const [printCopies, setPrintCopies] = useState(1);
   const [isConnecting, setIsConnecting] = useState(false);
   const [printerConnected, setPrinterConnected] = useState(false);
-  
-  // Real hardware API connection references
-  const [bleCharacteristic, setBleCharacteristic] = useState<any>(null); // Bluetooth write reference
-  const [serialPort, setSerialPort] = useState<any>(null); // USB Web Serial reference
-  const [usbDevice, setUsbDevice] = useState<any>(null); // USB WebUSB reference
+  const [bleCharacteristic, setBleCharacteristic] = useState<any>(null); // Real Web Bluetooth GATT reference
+
+  // USB Web Serial and WebUSB references
+  const [serialPort, setSerialPort] = useState<any>(null); 
+  const [usbDevice, setUsbDevice] = useState<any>(null); 
 
   const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false);
   const [customerSearchQuery, setCustomerSearchQuery] = useState('');
@@ -194,7 +194,7 @@ export default function BbCafePos() {
   useEffect(() => {
     const q = query(collection(db, "orders"), orderBy("timestamp", "desc"), limit(60));
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      setLiveOrders(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      setLiveOrders(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
     });
     const unsubStore = onSnapshot(doc(db, "settings", "store"), (d) => {
       if (d.exists()) setStoreOpen(d.data().isOpen);
@@ -208,11 +208,11 @@ export default function BbCafePos() {
       setLoading(true);
       try {
         const prodSnap = await getDocs(collection(db, "products"));
-        const items = prodSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const items = prodSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
         setProducts(items);
         setCategories(['All', ...Array.from(new Set(items.map((i: any) => i.category).filter(Boolean))) as string[]]);
         const rulesSnap = await getDocs(collection(db, "loyalty_rules"));
-        setLoyaltyRules(rulesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        setLoyaltyRules(rulesSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
       } catch (err) {
         toast.error("Error loading products");
       } finally {
@@ -302,7 +302,7 @@ export default function BbCafePos() {
         : query(collection(db, "customer_points"), where("name", ">=", cleanText.charAt(0).toUpperCase() + cleanText.slice(1)), limit(15))
       ) : query(collection(db, "customer_points"), orderBy("lastActive", "desc"), limit(12));
       const snap = await getDocs(q);
-      setSearchedCustomers(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      setSearchedCustomers(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
     } catch (e) {
       console.error(e);
     } finally {
@@ -321,7 +321,7 @@ export default function BbCafePos() {
     setViewingHistoryCustomer(cust);
     try {
       const hSnap = await getDocs(query(collection(db, "customer_points", cust.phone, "history"), orderBy("timestamp", "desc"), limit(25)));
-      setCustomerHistoryList(hSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      setCustomerHistoryList(hSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
     } catch (e) {
       toast.error("Failed to load history");
     }
@@ -372,7 +372,7 @@ export default function BbCafePos() {
   const handleAddProductToCart = (item: any) => {
     triggerBeep('tap');
     setCart((prev) => {
-      const existingIndex = prev.findIndex(c => c.id === item.id);
+      const existingIndex = prev.findIndex((c) => c.id === item.id);
       if (existingIndex > -1) {
         const next = [...prev];
         next[existingIndex].quantity += 1;
@@ -391,7 +391,7 @@ export default function BbCafePos() {
     const compositeName = `${selectedProduct.name} (${normalPizzaSize.toUpperCase()})`;
 
     setCart((prev) => {
-      const existingIndex = prev.findIndex(c => c.id === compositeId && c.note === noteParts.join(' | '));
+      const existingIndex = prev.findIndex((c) => c.id === compositeId && c.note === noteParts.join(' | '));
       if (existingIndex > -1) {
         const next = [...prev];
         next[existingIndex].quantity += 1;
@@ -406,7 +406,7 @@ export default function BbCafePos() {
 
   const handleUpdateCartQuantity = (id: string, amount: number) => {
     triggerBeep('tap');
-    setCart((prev) => prev.map(item => {
+    setCart((prev) => prev.map((item) => {
       if (item.id === id) {
         const updatedQty = item.quantity + amount;
         return updatedQty > 0 ? { ...item, quantity: updatedQty } : null;
@@ -416,7 +416,7 @@ export default function BbCafePos() {
   };
 
   const handleUpdateCartItemNote = (itemId: string, noteValue: string) => {
-    setCart(prev => prev.map(item => item.id === itemId ? { ...item, note: noteValue } : item));
+    setCart((prev) => prev.map((item) => item.id === itemId ? { ...item, note: noteValue } : item));
   };
 
   // Billing Math
@@ -546,13 +546,11 @@ export default function BbCafePos() {
       return;
     }
     
-    // Generate clean billing items layout matching image design [1]
+    // 🛠️ Fixed: Removed Nested Escaped Backticks with Standard String Concatenation to resolve SWC parser errors [1]
     const itemsRows = order.items.map((it: any) => {
-      // Split notes clearly like `+ Half (₹60)`
       let noteFormatted = "";
       if (it.note) {
-        // format nicely if it is a variant or extra instruction
-        noteFormatted = it.note.startsWith("+") ? it.note : `+ ${it.note}`;
+        noteFormatted = it.note.startsWith("+") ? it.note : "+ " + it.note;
       }
       return `
         <tr>
@@ -562,7 +560,7 @@ export default function BbCafePos() {
         <tr>
           <td colspan="2" style="font-size: 10px; color: #444; padding-bottom: 5px; font-weight: 500;">
             ${it.quantity} x ₹${it.price}
-            ${noteFormatted ? `<br/><span style="padding-left: 2px; font-weight: bold; color: #222;">${noteFormatted}</span>` : ''}
+            ${noteFormatted ? '<br/><span style="padding-left: 2px; font-weight: bold; color: #222;">' + noteFormatted + '</span>' : ''}
           </td>
         </tr>
       `;
@@ -700,10 +698,7 @@ export default function BbCafePos() {
         // Request any Bluetooth Low Energy thermal printer
         const device = await (navigator as any).bluetooth.requestDevice({ 
           acceptAllDevices: true,
-          optionalServices: [
-            '000018f0-0000-1000-8000-00805f9b34fb', // Standard SPP / MPT Service UUID
-            '0000ff00-0000-1000-8000-00805f9b34fb'  // Chinese Goojprt / POS-58 range
-          ] 
+          optionalServices: ['000018f0-0000-1000-8000-00805f9b34fb'] 
         });
 
         const server = await device.gatt!.connect();
@@ -866,7 +861,7 @@ export default function BbCafePos() {
     triggerBeep('tap');
     try {
       await updateDoc(doc(db, "products", productId), { isAvailable: !currentStatus });
-      setProducts(prev => prev.map(p => p.id === productId ? { ...p, isAvailable: !currentStatus } : p));
+      setProducts(prev => prev.map((p) => p.id === productId ? { ...p, isAvailable: !currentStatus } : p));
       toast.success("Stock toggled!");
     } catch (err) {
       toast.error("Failed to toggle stock");
@@ -879,13 +874,13 @@ export default function BbCafePos() {
     else document.documentElement.classList.add('dark');
   };
 
-  const filteredMenu = useMemo(() => products.filter(p => (selectedCategory === 'All' || p.category === selectedCategory) && p.name.toLowerCase().includes(searchQuery.toLowerCase())), [products, selectedCategory, searchQuery]);
-  const filteredPastReceipts = useMemo(() => liveOrders.filter(o => String(o.billNumber).includes(receiptSearchQuery.trim()) || String(o.customerPhone || '').includes(receiptSearchQuery.trim()) || String(o.customerName || '').toLowerCase().includes(receiptSearchQuery.trim().toLowerCase())), [liveOrders, receiptSearchQuery]);
+  const filteredMenu = useMemo(() => products.filter((p) => (selectedCategory === 'All' || p.category === selectedCategory) && p.name.toLowerCase().includes(searchQuery.toLowerCase())), [products, selectedCategory, searchQuery]);
+  const filteredPastReceipts = useMemo(() => liveOrders.filter((o) => String(o.billNumber).includes(receiptSearchQuery.trim()) || String(o.customerPhone || '').includes(receiptSearchQuery.trim()) || String(o.customerName || '').toLowerCase().includes(receiptSearchQuery.trim().toLowerCase())), [liveOrders, receiptSearchQuery]);
   const getDisplayPrice = (item: any) => item?.variants ? `₹${Math.min(...Object.values(item.variants).map(Number))}+` : `₹${item?.price || 0}`;
 
   const navItems = [
     { id: 'billing', label: 'Counter Billing', icon: SafeShoppingBag },
-    { id: 'orders', label: 'Live Orders', icon: SafeClock, badge: liveOrders.filter(o => o.status !== 'completed' && o.status !== 'rejected').length },
+    { id: 'orders', label: 'Live Orders', icon: SafeClock, badge: liveOrders.filter((o) => o.status !== 'completed' && o.status !== 'rejected').length },
     { id: 'inventory', label: 'Stock Toggle', icon: SafeLayers },
     { id: 'receipts', label: 'Past Receipts', icon: SafePrinter },
     { id: 'settings', label: 'POS Settings', icon: SafeSettings }
@@ -907,10 +902,10 @@ export default function BbCafePos() {
               <input type="password" maxLength={4} value={pinInput} readOnly placeholder="••••" className="w-full bg-neutral-900 border border-white/5 text-center text-3xl font-mono py-4 rounded-2xl outline-none focus:border-orange-500 text-orange-400" />
               <div className="grid grid-cols-3 gap-3 max-w-xs mx-auto">
                 {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
-                  <button key={num} type="button" onClick={() => { triggerBeep('tap'); if (pinInput.length < 4) setPinInput(p => p + String(num)); }} className="aspect-square bg-neutral-900 hover:bg-neutral-800 font-black text-xl rounded-2xl border border-white/5 flex items-center justify-center">{num}</button>
+                  <button key={num} type="button" onClick={() => { triggerBeep('tap'); if (pinInput.length < 4) setPinInput((p) => p + String(num)); }} className="aspect-square bg-neutral-900 hover:bg-neutral-800 font-black text-xl rounded-2xl border border-white/5 flex items-center justify-center">{num}</button>
                 ))}
                 <button type="button" onClick={() => { triggerBeep('tap'); setPinInput(''); }} className="aspect-square bg-neutral-900 hover:bg-neutral-800 font-bold text-xs uppercase text-red-400 rounded-2xl border border-white/5 flex items-center justify-center">Clear</button>
-                <button type="button" onClick={() => { triggerBeep('tap'); if (pinInput.length < 4) setPinInput(p => p + '0'); }} className="aspect-square bg-neutral-900 hover:bg-neutral-800 font-black text-xl rounded-2xl border border-white/5 flex items-center justify-center">0</button>
+                <button type="button" onClick={() => { triggerBeep('tap'); if (pinInput.length < 4) setPinInput((p) => p + '0'); }} className="aspect-square bg-neutral-900 hover:bg-neutral-800 font-black text-xl rounded-2xl border border-white/5 flex items-center justify-center">0</button>
                 <button type="submit" className="aspect-square bg-orange-600 hover:bg-orange-500 font-bold text-xs uppercase rounded-2xl flex items-center justify-center">Login</button>
               </div>
             </form>
@@ -1058,7 +1053,7 @@ export default function BbCafePos() {
               <div className="bg-white dark:bg-neutral-950 border border-neutral-200 dark:border-white/5 p-5 flex-1 overflow-y-auto pb-20 rounded-3xl">
                 <div className="flex justify-between items-center mb-6">
                   <div><h2 className="text-sm font-black uppercase text-orange-500">Live Item Stock Control</h2><p className="text-[10px] text-neutral-500">Disable items instantly for customers.</p></div>
-                  <button onClick={async () => { triggerBeep('tap'); const snap = await getDocs(collection(db, "products")); setProducts(snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))); }} className="p-2 bg-neutral-200 dark:bg-neutral-900 text-gray-400 rounded-xl"><SafeRefreshCw size={14} /></button>
+                  <button onClick={async () => { triggerBeep('tap'); const snap = await getDocs(collection(db, "products")); setProducts(snap.docs.map((doc) => doc.data())); }} className="p-2 bg-neutral-200 dark:bg-neutral-900 text-gray-400 rounded-xl"><SafeRefreshCw size={14} /></button>
                 </div>
                 <div className="space-y-2 max-w-xl">
                   {products.map((item) => {
