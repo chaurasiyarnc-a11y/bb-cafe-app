@@ -32,12 +32,12 @@ function padSpaces(left: string, right: string, maxLen: number): string {
   return left + " ".repeat(spacesNeeded) + right;
 }
 
-// KOT (Kitchen Order Ticket) प्रिंट करने का फंक्शन
+// KOT (Kitchen Order Ticket) प्रिंट करने का फंक्शन (Iframe Based)
 export async function handlePrintKot(order: any, config: PrintConfig) {
   const is58 = config.printerPaperSize === '58mm';
   const widthChars = is58 ? 32 : 48;
 
-  // 1. यदि हार्डवेयर डायरेक्ट कनेक्शन एक्टिव है (Bluetooth/USB Serial)
+  // 1. यदि डायरेक्ट हार्डवेयर प्रिंटर एक्टिव है (Bluetooth/USB Serial)
   if (
     (config.printerType === 'thermal_bluetooth' && config.bleCharacteristic) ||
     (config.printerType === 'thermal_usb' && (config.serialPort || config.usbDevice))
@@ -67,7 +67,7 @@ export async function handlePrintKot(order: any, config: PrintConfig) {
     if (order.chefInstructions) {
       text += `Inst: ${order.chefInstructions}\n`;
     }
-    text += "\n\n\n\n"; // कटर स्पेस
+    text += "\n\n\n\n";
 
     const encoder = new TextEncoder();
     const dataBytes = encoder.encode(text);
@@ -88,14 +88,11 @@ export async function handlePrintKot(order: any, config: PrintConfig) {
       }
       return;
     } catch (err) {
-      console.error("Direct KOT hardware print failed, falling back to browser dialog...", err);
+      console.error("Direct KOT print failed, falling back to Iframe...", err);
     }
   }
 
-  // 2. Fallback: Browser Print Window (सिस्टम ड्राइवर आधारित प्रिंटिंग)
-  const printWindow = window.open('', '_blank', 'width=350,height=600');
-  if (!printWindow) return;
-
+  // 2. Iframe आधारित सुरक्षित बैकग्राउंड प्रिंटिंग
   const style = `
     <style>
       @media print {
@@ -184,31 +181,50 @@ export async function handlePrintKot(order: any, config: PrintConfig) {
           <div class="kot-divider"></div>
           ${order.chefInstructions ? `<div style="font-size: 9px;"><b>Chef Inst:</b> ${order.chefInstructions}</div>` : ''}
         </div>
-        <script>
-          window.onload = function() {
-            window.print();
-            setTimeout(function() { window.close(); }, 500);
-          };
-        </script>
       </body>
     </html>
   `;
 
-  printWindow.document.write(html);
-  printWindow.document.close();
+  // अदृश्य Iframe बनाना या उपयोग करना
+  let iframe = document.getElementById('kot-print-iframe') as HTMLIFrameElement;
+  if (!iframe) {
+    iframe = document.createElement('iframe');
+    iframe.id = 'kot-print-iframe';
+    iframe.style.position = 'absolute';
+    iframe.style.width = '0px';
+    iframe.style.height = '0px';
+    iframe.style.border = 'none';
+    iframe.style.left = '-9999px';
+    document.body.appendChild(iframe);
+  }
+
+  const docObj = iframe.contentWindow?.document || iframe.contentDocument;
+  if (docObj) {
+    docObj.open();
+    docObj.write(html);
+    docObj.close();
+
+    setTimeout(() => {
+      try {
+        iframe.contentWindow?.focus();
+        iframe.contentWindow?.print();
+      } catch (err) {
+        console.error("Iframe print failed:", err);
+      }
+    }, 300);
+  }
 }
 
-// मुख्य ग्राहक रसीद प्रिंट करने का फंक्शन
+// मुख्य ग्राहक रसीद प्रिंट करने का फंक्शन (Iframe Based)
 export async function handlePrintReceipt(order: any, config: PrintConfig) {
   const is58 = config.printerPaperSize === '58mm';
   const widthChars = is58 ? 32 : 48;
 
-  // यूपीआई भुगतान यूआरएल (UPI URL)
   const upiId = "bumbumcafe@upi";
   const upiUrl = `upi://pay?pa=${upiId}&pn=BumBumCafe&am=${order.total}&cu=INR`;
   const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=75x75&data=${encodeURIComponent(upiUrl)}`;
 
-  // 1. यदि हार्डवेयर डायरेक्ट कनेक्शन एक्टिव है (Bluetooth/USB Serial)
+  // 1. यदि डायरेक्ट हार्डवेयर प्रिंटर एक्टिव है (Bluetooth/USB Serial)
   if (
     (config.printerType === 'thermal_bluetooth' && config.bleCharacteristic) ||
     (config.printerType === 'thermal_usb' && (config.serialPort || config.usbDevice))
@@ -251,7 +267,7 @@ export async function handlePrintReceipt(order: any, config: PrintConfig) {
     text += `      Amount: ₹${order.total}\n`;
     text += "--------------------------------\n";
     text += "  Thank you! Visit Us Again.\n";
-    text += "\n\n\n\n"; // कटर स्पेस
+    text += "\n\n\n\n";
 
     const encoder = new TextEncoder();
     const dataBytes = encoder.encode(text);
@@ -272,14 +288,11 @@ export async function handlePrintReceipt(order: any, config: PrintConfig) {
       }
       return;
     } catch (err) {
-      console.error("Direct hardware print failed, falling back to browser window...", err);
+      console.error("Direct hardware print failed, falling back to Iframe...", err);
     }
   }
 
-  // 2. Fallback: Browser Print Window (कम्पैक्ट विजुअल लेआउट)
-  const printWindow = window.open('', '_blank', 'width=350,height=600');
-  if (!printWindow) return;
-
+  // 2. Iframe आधारित सुरक्षित बैकग्राउंड प्रिंटिंग (QR Code "Scan To Pay" के ठीक नीचे सुव्यवस्थित)
   const style = `
     <style>
       @media print {
@@ -449,7 +462,6 @@ export async function handlePrintReceipt(order: any, config: PrintConfig) {
             <span>₹${order.total}</span>
           </div>
 
-          <!-- क्यूआर कोड: "SCAN TO PAY" के ठीक नीचे और छोटे अलाइनमेंट में -->
           <div class="qr-box">
             <span class="qr-title">SCAN TO PAY (UPI)</span>
             <img class="qr-img" src="${qrCodeUrl}" alt="UPI QR Code" />
@@ -460,16 +472,37 @@ export async function handlePrintReceipt(order: any, config: PrintConfig) {
             Thank you! Visit Us Again.
           </div>
         </div>
-        <script>
-          window.onload = function() {
-            window.print();
-            setTimeout(function() { window.close(); }, 500);
-          };
-        </script>
       </body>
     </html>
   `;
 
-  printWindow.document.write(html);
-  printWindow.document.close();
+  // अदृश्य Iframe बनाना या उपयोग करना
+  let iframe = document.getElementById('receipt-print-iframe') as HTMLIFrameElement;
+  if (!iframe) {
+    iframe = document.createElement('iframe');
+    iframe.id = 'receipt-print-iframe';
+    iframe.style.position = 'absolute';
+    iframe.style.width = '0px';
+    iframe.style.height = '0px';
+    iframe.style.border = 'none';
+    iframe.style.left = '-9999px';
+    document.body.appendChild(iframe);
+  }
+
+  const docObj = iframe.contentWindow?.document || iframe.contentDocument;
+  if (docObj) {
+    docObj.open();
+    docObj.write(html);
+    docObj.close();
+
+    // 500ms का सुरक्षित समय ताकि क्यूआर कोड की इमेज पूरी तरह रेंडर हो जाए
+    setTimeout(() => {
+      try {
+        iframe.contentWindow?.focus();
+        iframe.contentWindow?.print();
+      } catch (err) {
+        console.error("Iframe print failed:", err);
+      }
+    }, 500);
+  }
 }
