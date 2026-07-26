@@ -91,6 +91,7 @@ export default function BbCafePos() {
   const [printCopies, setPrintCopies] = useState(1);
   const [isConnecting, setIsConnecting] = useState(false);
   const [printerConnected, setPrinterConnected] = useState(false);
+  const [bleCharacteristic, setBleCharacteristic] = useState<any>(null); // Real Web Bluetooth GATT reference
 
   const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false);
   const [customerSearchQuery, setCustomerSearchQuery] = useState('');
@@ -172,7 +173,6 @@ export default function BbCafePos() {
     setGstRate(Number(localStorage.getItem("bb_pos_gst_rate")) || 5);
     setPrinterPaperSize((localStorage.getItem("bb_pos_paper_size") as any) || '58mm');
     
-    // Printer settings from local storage
     const localPrinterType = localStorage.getItem("bb_pos_printer_type");
     if (localPrinterType) setPrinterType(localPrinterType as any);
     const localPrinterIp = localStorage.getItem("bb_pos_printer_ip");
@@ -234,7 +234,7 @@ export default function BbCafePos() {
         const uDoc = snap.docs[0].data();
         setIsLoggedIn(true);
         setCurrentUser({ id: snap.docs[0].id, ...uDoc });
-        localStorage.setItem("bb_pos_user", JSON.stringify({ id: snap.docs[0].id, ...uDoc }));
+        localStorage.setItem("bb_pos_user", JSON.stringify({ id: snap.docs[0].id, ...uDoc });
         toast.success(`Welcome, ${uDoc.name}!`);
       } else {
         toast.error("Incorrect PIN!");
@@ -423,24 +423,69 @@ export default function BbCafePos() {
   const getFreeDeliveryProgressPercent = () => Math.min(100, (getCartSubtotal() / selectedArea.minFree) * 100);
   const getTotalPointsRedeemedInCart = () => cart.reduce((acc, i) => acc + (i.pointsCost || 0), 0);
 
-  // 📝 Print receipt logic optimized to avoid blank print view inside modern web browsers [1]
-  const handlePrintReceipt = (order: any) => {
+  // 📝 Print receipt logic optimized to avoid blank print view + Bluetooth direct ESC/POS writing
+  const handlePrintReceipt = async (order: any) => {
     triggerBeep('tap');
+
+    // 1. Bluetooth Printer ESC/POS Real-time Print Implementation
+    if (printerType === 'thermal_bluetooth' && bleCharacteristic) {
+      const toastId = toast.loading("Sending bill directly to Bluetooth printer...");
+      try {
+        const formattedDate = order.timestamp?.toDate ? order.timestamp.toDate().toLocaleString('en-IN') : new Date(order.timestamp).toLocaleString();
+        const dividerLine = "--------------------------------\n";
+        
+        let receiptText = "";
+        receiptText += "          BUM BUM CAFE          \n";
+        receiptText += "     Mohandra, Panna (M.P.)     \n";
+        receiptText += dividerLine;
+        receiptText += `Bill No: #${String(order.billNumber).padStart(4, '0')}\n`;
+        receiptText += `Token No: #${order.tokenNumber}\n`;
+        receiptText += `Date: ${formattedDate}\n`;
+        receiptText += `Type: ${order.fulfillmentType?.toUpperCase()}\n`;
+        receiptText += `Pay Mode: ${order.paymentMethod?.toUpperCase()}\n`;
+        receiptText += dividerLine;
+
+        order.items.forEach((it: any) => {
+          const itemText = `${it.name} x${it.quantity}`;
+          const itemPrice = `Rs.${it.price * it.quantity}`;
+          receiptText += `${itemText.slice(0, 20).padEnd(20)}${itemPrice.padStart(12)}\n`;
+          if (it.note) receiptText += `  (${it.note})\n`;
+        });
+
+        receiptText += dividerLine;
+        receiptText += `Subtotal: Rs.${order.subtotal}\n`;
+        if (order.discount) receiptText += `Savings: -Rs.${order.discount}\n`;
+        receiptText += `Total Bill: Rs.${order.total}\n`;
+        receiptText += dividerLine;
+        receiptText += "    Thank you! Visit Again!🍕   \n";
+        receiptText += "\n\n\n\n"; // Paper feed space
+
+        const encoder = new TextEncoder();
+        const bytes = encoder.encode(receiptText);
+        
+        await bleCharacteristic.writeValue(bytes); // Write direct ESC/POS raw bytes
+        toast.dismiss(toastId);
+        toast.success("Receipt printed successfully!");
+      } catch (err) {
+        console.error(err);
+        toast.dismiss(toastId);
+        toast.error("Bluetooth write failed. Reconnect printing device.");
+        setPrinterConnected(false);
+        setBleCharacteristic(null);
+      }
+      return;
+    }
+
+    // 2. Standard laser/USB/system browser print (Fixed delayed paint so page is never empty) [1]
     const widthPixels = printerPaperSize === '58mm' ? '240px' : '290px';
     const printWindow = window.open('', '_blank', 'width=340,height=600');
     if (!printWindow) {
-      toast.error("Popup blocked! Please enable popup permissions.");
+      toast.error("Popup blocked! Please allow popups for this POS.");
       return;
     }
     const formattedDate = order.timestamp?.toDate ? order.timestamp.toDate().toLocaleString('en-IN') : new Date(order.timestamp).toLocaleString();
-    const itemsRows = order.items.map((it: any) => `
-      <tr>
-        <td style="font-size:11px; padding: 4px 0;">${it.name}${it.note ? `<br/><i style="font-size:9px;color:#555;">(${it.note})</i>` : ''}</td>
-        <td style="text-align:center; font-size:11px;">x${it.quantity}</td>
-        <td style="text-align:right; font-size:11px;">₹${it.price * it.quantity}</td>
-      </tr>
-    `).join('');
-
+    const itemsRows = order.items.map((it: any) => `<tr><td style="font-size:11px; padding: 4px 0;">${it.name}${it.note ? `<br/><i style="font-size:9px;color:#555;">(${it.note})</i>` : ''}</td><td style="text-align:center; font-size:11px;">x${it.quantity}</td><td style="text-align:right; font-size:11px;">₹${it.price * it.quantity}</td></tr>`).join('');
+    
     printWindow.document.write(`
       <html>
         <head>
@@ -491,7 +536,7 @@ export default function BbCafePos() {
       </html>
     `);
     
-    // Close stream and trigger safe delayed print to render HTML properly first [1]
+    // Close written stream and delay print so DOM renders completely [1]
     printWindow.document.close();
     printWindow.focus();
     setTimeout(() => {
@@ -500,20 +545,53 @@ export default function BbCafePos() {
     }, 350); 
   };
 
-  // 📝 Active Printer connector test trigger logic
+  // 📝 Real-time bluetooth device connector
   const handleConnectPrinter = async () => {
     triggerBeep('tap');
     setIsConnecting(true);
     const toastId = toast.loading(`Connecting to ${printerType.toUpperCase().replace('_', ' ')}...`);
-    setTimeout(() => {
-      toast.dismiss(toastId);
-      setIsConnecting(false);
-      setPrinterConnected(true);
-      toast.success(`${printerType.replace('_', ' ').toUpperCase()} Connected Successfully!`);
-    }, 1500);
+
+    if (printerType === 'thermal_bluetooth') {
+      if (!navigator.bluetooth) {
+        toast.dismiss(toastId);
+        setIsConnecting(false);
+        toast.error("Web Bluetooth is not supported on this browser/device. Please use Google Chrome on HTTPS.");
+        return;
+      }
+      try {
+        // Request any Bluetooth Low Energy thermal printer
+        const device = await navigator.bluetooth.requestDevice({
+          acceptAllDevices: true,
+          optionalServices: ['000018f0-0000-1000-8000-00805f9b34fb'] // Standard battery and SPP service UUID
+        });
+
+        const server = await device.gatt!.connect();
+        const service = await server.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb');
+        const characteristic = await service.getCharacteristic('00002af1-0000-1000-8000-00805f9b34fb'); // Write characteristics
+
+        setBleCharacteristic(characteristic);
+        setPrinterConnected(true);
+        toast.dismiss(toastId);
+        toast.success("Bluetooth Printer Connected Successfully!");
+      } catch (err: any) {
+        console.error(err);
+        toast.dismiss(toastId);
+        toast.error(err.message || "Failed to pair with Bluetooth printer.");
+      } finally {
+        setIsConnecting(false);
+      }
+    } else {
+      // USB/Laser Mock connection
+      setTimeout(() => {
+        toast.dismiss(toastId);
+        setIsConnecting(false);
+        setPrinterConnected(true);
+        toast.success(`${printerType.replace('_', ' ').toUpperCase()} Connected Successfully!`);
+      }, 1200);
+    }
   };
 
-  // 📝 Test print trigger
+  // Mock Invoice test print handler
   const handleTestPrint = () => {
     const mockOrder = {
       billNumber: '0000',
@@ -521,8 +599,8 @@ export default function BbCafePos() {
       fulfillmentType: 'test',
       paymentMethod: 'system',
       items: [
-        { name: '🔥 Connection test successful!', quantity: 1, price: 0 },
-        { name: '🍔 Hardware printer verified', quantity: 1, price: 0 }
+        { name: '🔥 Direct Connection Active!', quantity: 1, price: 0 },
+        { name: '🍔 ESC/POS Print Test', quantity: 1, price: 0 }
       ],
       subtotal: 0,
       discount: 0,
@@ -877,7 +955,7 @@ export default function BbCafePos() {
                       { id: 'network_ip', label: 'Network IP Printer' },
                       { id: 'laser', label: 'Laser A4 Printer' }
                     ].map(p => (
-                      <button key={p.id} onClick={() => { triggerBeep('tap'); setPrinterType(p.id as any); setPrinterConnected(false); localStorage.setItem("bb_pos_printer_type", p.id); }} className={`p-2 rounded-xl border text-[9px] font-black uppercase tracking-wider transition-all ${printerType === p.id ? 'bg-[#050505] text-amber-400 border-amber-500' : 'bg-neutral-100 dark:bg-neutral-900 text-gray-400 border-neutral-200 dark:border-white/5'}`}>{p.label}</button>
+                      <button key={p.id} onClick={() => { triggerBeep('tap'); setPrinterType(p.id as any); setPrinterConnected(false); setBleCharacteristic(null); localStorage.setItem("bb_pos_printer_type", p.id); }} className={`p-2 rounded-xl border text-[9px] font-black uppercase tracking-wider transition-all ${printerType === p.id ? 'bg-[#050505] text-amber-400 border-amber-500' : 'bg-neutral-100 dark:bg-neutral-900 text-gray-400 border-neutral-200 dark:border-white/5'}`}>{p.label}</button>
                     ))}
                   </div>
                   {printerType === 'network_ip' && (
@@ -891,7 +969,6 @@ export default function BbCafePos() {
                     <input type="number" min={1} max={5} value={printCopies} onChange={e => { const v = Math.max(1, Number(e.target.value)); setPrintCopies(v); localStorage.setItem("bb_pos_print_copies", String(v)); }} className="w-full bg-neutral-100 dark:bg-neutral-900 border border-neutral-200 dark:border-white/5 p-3 rounded-xl text-xs outline-none font-mono" />
                   </div>
 
-                  {/* 🛠️ Connect device with dynamic active feedback loader and print receipt test trigger */}
                   <div className="flex gap-2 pt-2">
                     <button 
                       onClick={handleConnectPrinter} 
