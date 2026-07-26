@@ -1,3 +1,4 @@
+
 'use client';
 import React, { useState, useEffect, useMemo } from 'react';
 import { db } from '@/lib/firebase'; 
@@ -19,7 +20,7 @@ import PosCartDrawer from '@/components/pos/PosCartDrawer';
 import CustomerDirectoryModal from '@/components/pos/CustomerDirectoryModal';
 import CustomizerModal from '@/components/pos/CustomizerModal';
 
-// यूटिलिटी फ़ाइल से प्रिंटर और रसीद प्रिव्यू फ़ंक्शंस को इम्पोर्ट करना
+// सुधारा गया: रसीद प्रिव्यू फ़ंक्शन को भी इम्पोर्ट लिस्ट में शामिल किया गया
 import { 
   handlePrintKot, 
   handlePrintReceipt, 
@@ -102,7 +103,7 @@ export default function BbCafePos() {
   const [isConnecting, setIsConnecting] = useState(false);
   const [printerConnected, setPrinterConnected] = useState(false);
   const [bleCharacteristic, setBleCharacteristic] = useState<any>(null);
-  const [fontSize, setFontSize] = useState<number>(9); // डायनामिक फ़ॉन्ट साइज स्टेट
+  const [fontSize, setFontSize] = useState<number>(9); // dynamic font size state
 
   // USB Web Serial and WebUSB references
   const [serialPort, setSerialPort] = useState<any>(null); 
@@ -159,7 +160,7 @@ export default function BbCafePos() {
 
   const handleSetPaymentMethod = (val: 'cash' | 'upi' | 'card') => {
     if (val === 'card') {
-      setPaymentMethod('cash');
+      setPaymentMethod('cash'); 
     } else {
       setPaymentMethod(val);
     }
@@ -217,7 +218,7 @@ export default function BbCafePos() {
     const localPrintCopies = localStorage.getItem("bb_pos_print_copies");
     if (localPrintCopies) setPrintCopies(Number(localPrintCopies) || 1);
 
-    // लोकल स्टोरेज से फ़ॉन्ट साइज लोड करना
+    // फ़ॉन्ट साइज लोकल स्टोरेज से लोड करना
     const localFontSize = localStorage.getItem("bb_pos_font_size");
     if (localFontSize) setFontSize(Number(localFontSize) || 9);
 
@@ -226,6 +227,52 @@ export default function BbCafePos() {
     if (localTheme === 'light') document.documentElement.classList.remove('dark');
     else document.documentElement.classList.add('dark');
   }, []);
+
+  // ऑटो-कनेक्ट फ़ंक्शन (रीफ्रेश होने पर USB पोर्ट को स्वचालित रूप से खोलने के लिए)
+  useEffect(() => {
+    const autoReconnectUSB = async () => {
+      const savedType = localStorage.getItem("bb_pos_printer_type");
+      if (savedType !== 'thermal_usb' || typeof window === 'undefined') return;
+
+      // 1. Web Serial का इस्तेमाल करके ऑटो-कनेक्ट करना
+      if ('serial' in navigator) {
+        try {
+          const ports = await (navigator as any).serial.getPorts();
+          if (ports.length > 0) {
+            const port = ports[0];
+            await port.open({ baudRate: 9600 });
+            setSerialPort(port);
+            setPrinterConnected(true);
+            console.log("USB Web Serial auto-reconnected successfully!");
+          }
+        } catch (e) {
+          console.warn("Serial auto-reconnect failed:", e);
+        }
+      } 
+      // 2. WebUSB का इस्तेमाल करके ऑटो-कनेक्ट करना
+      else if ('usb' in navigator) {
+        try {
+          const devices = await (navigator as any).usb.getDevices();
+          if (devices.length > 0) {
+            const device = devices[0];
+            await device.open();
+            await device.selectConfiguration(1);
+            await device.claimInterface(0);
+            setUsbDevice(device);
+            setPrinterConnected(true);
+            console.log("WebUSB auto-reconnected successfully!");
+          }
+        } catch (e) {
+          console.warn("WebUSB auto-reconnect failed:", e);
+        }
+      }
+    };
+
+    // कंपोनेंट रेंडर होने पर ऑटो-कनेक्ट ट्रिगर करना
+    if (isLoggedIn) {
+      autoReconnectUSB();
+    }
+  }, [isLoggedIn]);
 
   // रिसोर्स क्लीनअप
   useEffect(() => {
@@ -527,14 +574,6 @@ export default function BbCafePos() {
   const getTotalBillPrice = () => Math.max(0, getCartSubtotal() + getGstAmountCalculated() - (getLoyaltyDiscount() + customDiscount)) + getDeliveryCharge();
   const getFreeDeliveryProgressPercent = () => Math.min(100, (getCartSubtotal() / selectedArea.minFree) * 100);
   const getTotalPointsRedeemedInCart = () => cart.reduce((acc, i) => acc + (i.pointsCost || 0), 0);
-
-  // फ़ॉन्ट साइज कंट्रोल फंक्शन
-  const handleFontSizeChange = (newSize: number) => {
-    if (newSize >= 6 && newSize <= 24) {
-      setFontSize(newSize);
-      localStorage.setItem("bb_pos_font_size", String(newSize));
-    }
-  };
 
   // प्रिंटिंग कॉन्फ़िगरेशन (फ़ॉन्ट साइज के साथ अपडेटेड)
   const getPrintConfig = (): PrintConfig => ({
@@ -927,6 +966,7 @@ export default function BbCafePos() {
               )}
             </div>
 
+            {/* LIVE ORDERS */}
             {activeTab === 'orders' && (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pb-20 overflow-y-auto flex-1 font-sans">
                 {activeLiveOrders.length === 0 ? (
