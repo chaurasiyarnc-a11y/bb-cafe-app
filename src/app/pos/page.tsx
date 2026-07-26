@@ -32,7 +32,7 @@ const SafeToggleLeft = ToggleLeft as any;
 const SafeMoon = Moon as any;
 const SafeSun = Sun as any;
 const SafeShoppingBag = ShoppingBag as any;
-const SafeClock = Clock as any; // अब यहाँ 'Clock as any' सही ढंग से सेट है
+const SafeClock = Clock as any; 
 const SafeLayers = Layers as any;
 const SafePrinter = Printer as any;
 const SafeUsers = Users as any;
@@ -65,6 +65,9 @@ interface DeliveryArea {
   minFree: number;
   range: string;
 }
+
+// ग्लोबल ऑडियो कॉन्टेक्स्ट (ताकि हर क्लिक पर नया इंस्टेंस न बने)
+let globalAudioCtx: AudioContext | null = null;
 
 export default function BbCafePos() {
   const DELIVERY_AREAS: DeliveryArea[] = useMemo(() => [
@@ -145,26 +148,37 @@ export default function BbCafePos() {
   const [normalPizzaPrice, setNormalPizzaPrice] = useState(0);
   const [customizerChefNote, setCustomizerChefNote] = useState(""); 
 
+  // बीप सिस्टम का सुधरा हुआ रूप
   const triggerBeep = (type: 'tap' | 'success') => {
     try {
-      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
-      const osc = audioCtx.createOscillator();
-      const gain = audioCtx.createGain();
-      osc.connect(gain);
-      gain.connect(audioCtx.destination);
-      if (type === 'tap') {
-        osc.frequency.setValueAtTime(600, audioCtx.currentTime);
-        gain.gain.setValueAtTime(0.05, audioCtx.currentTime);
-        osc.start(); osc.stop(audioCtx.currentTime + 0.08);
-      } else {
-        osc.frequency.setValueAtTime(523, audioCtx.currentTime);
-        gain.gain.setValueAtTime(0.05, audioCtx.currentTime);
-        osc.start();
-        osc.frequency.setValueAtTime(659, audioCtx.currentTime + 0.12);
-        osc.frequency.setValueAtTime(880, audioCtx.currentTime + 0.24);
-        osc.stop(audioCtx.currentTime + 0.4);
+      if (!globalAudioCtx) {
+        globalAudioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
       }
-    } catch (e) {}
+      if (globalAudioCtx.state === 'suspended') {
+        globalAudioCtx.resume();
+      }
+
+      const osc = globalAudioCtx.createOscillator();
+      const gain = globalAudioCtx.createGain();
+      osc.connect(gain);
+      gain.connect(globalAudioCtx.destination);
+
+      if (type === 'tap') {
+        osc.frequency.setValueAtTime(600, globalAudioCtx.currentTime);
+        gain.gain.setValueAtTime(0.05, globalAudioCtx.currentTime);
+        osc.start(); 
+        osc.stop(globalAudioCtx.currentTime + 0.08);
+      } else {
+        osc.frequency.setValueAtTime(523, globalAudioCtx.currentTime);
+        gain.gain.setValueAtTime(0.05, globalAudioCtx.currentTime);
+        osc.start();
+        osc.frequency.setValueAtTime(659, globalAudioCtx.currentTime + 0.12);
+        osc.frequency.setValueAtTime(880, globalAudioCtx.currentTime + 0.24);
+        osc.stop(globalAudioCtx.currentTime + 0.4);
+      }
+    } catch (e) {
+      console.warn("Audio beeping is blocked on this environment:", e);
+    }
   };
 
   useEffect(() => {
@@ -193,8 +207,24 @@ export default function BbCafePos() {
     else document.documentElement.classList.add('dark');
   }, []);
 
+  // हार्डवेयर कनेक्शन क्लीनअप (Cleanup active ports on unmount)
   useEffect(() => {
-    const q = query(collection(db, "orders"), orderBy("timestamp", "desc"), limit(60));
+    return () => {
+      if (serialPort) {
+        serialPort.close().catch(() => {});
+      }
+      if (usbDevice) {
+        usbDevice.close().catch(() => {});
+      }
+      if (bleCharacteristic && bleCharacteristic.service && bleCharacteristic.service.device) {
+        bleCharacteristic.service.device.gatt.disconnect();
+      }
+    };
+  }, [serialPort, usbDevice, bleCharacteristic]);
+
+  // डेटाबेस लोड को संतुलित करने के लिए limit को 40 किया गया है
+  useEffect(() => {
+    const q = query(collection(db, "orders"), orderBy("timestamp", "desc"), limit(40));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       setLiveOrders(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
     });
@@ -224,16 +254,9 @@ export default function BbCafePos() {
     })();
   }, [isLoggedIn]);
 
+  // सुरक्षित पिन लॉगिन (Hardcoded bypass removed)
   const handlePinLoginSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (pinInput === "1234") {
-      setIsLoggedIn(true);
-      setCurrentUser({ name: "Demo Boss", role: "admin" });
-      localStorage.setItem("bb_pos_user", JSON.stringify({ name: "Demo Boss", role: "admin" }));
-      toast.success("Welcome, Boss!");
-      setPinInput('');
-      return;
-    }
     const toastId = toast.loading("Verifying PIN...");
     try {
       const snap = await getDocs(query(collection(db, "cafe_users"), where("pin", "==", pinInput)));
@@ -251,6 +274,7 @@ export default function BbCafePos() {
     } catch (err) {
       toast.dismiss(toastId);
       toast.error("Connection timeout");
+      setPinInput('');
     }
   };
 
@@ -446,7 +470,6 @@ export default function BbCafePos() {
     usbDevice
   });
 
-  // Direct Hardware Connection Printer setup trigger
   const handleConnectPrinter = async () => {
     triggerBeep('tap');
     setIsConnecting(true);
@@ -570,7 +593,7 @@ export default function BbCafePos() {
     );
   };
 
-  // Place Order transaction flow (Includes K.O.T -> Customer Receipt printing sequence)
+  // Place Order transaction flow
   const handlePlaceOrder = async (e: React.FormEvent) => {
     e.preventDefault();
     if (cart.length === 0 || isSubmittingOrder) return;
@@ -616,7 +639,7 @@ export default function BbCafePos() {
         chefInstructions, 
         noCutlery, 
         source: 'POS',
-        address: address // एड्रेस को ऑर्डर में सेव कर लिया गया है
+        address: address
       };
 
       await addDoc(collection(db, "orders"), orderObj);
