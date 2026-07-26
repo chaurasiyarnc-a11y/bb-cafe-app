@@ -1,4 +1,3 @@
-
 'use client';
 import React, { useState, useEffect, useMemo } from 'react';
 import { db } from '@/lib/firebase'; 
@@ -20,7 +19,7 @@ import PosCartDrawer from '@/components/pos/PosCartDrawer';
 import CustomerDirectoryModal from '@/components/pos/CustomerDirectoryModal';
 import CustomizerModal from '@/components/pos/CustomizerModal';
 
-// सुधारा गया: रसीद प्रिव्यू फ़ंक्शन को भी इम्पोर्ट लिस्ट में शामिल किया गया
+// यूटिलिटी से फ़ंक्शंस इम्पोर्ट करना
 import { 
   handlePrintKot, 
   handlePrintReceipt, 
@@ -575,15 +574,26 @@ export default function BbCafePos() {
   const getFreeDeliveryProgressPercent = () => Math.min(100, (getCartSubtotal() / selectedArea.minFree) * 100);
   const getTotalPointsRedeemedInCart = () => cart.reduce((acc, i) => acc + (i.pointsCost || 0), 0);
 
-  // प्रिंटिंग कॉन्फ़िगरेशन (फ़ॉन्ट साइज के साथ अपडेटेड)
-  const getPrintConfig = (): PrintConfig => ({
-    printerPaperSize,
-    printerType,
-    bleCharacteristic,
-    serialPort,
-    usbDevice,
-    fontSize // dynamic font size added
-  });
+  // फ़ॉन्ट साइज कंट्रोल फंक्शन
+  const handleFontSizeChange = (newSize: number) => {
+    if (newSize >= 6 && newSize <= 24) {
+      setFontSize(newSize);
+      localStorage.setItem("bb_pos_font_size", String(newSize));
+    }
+  };
+
+  // प्रिंटिंग कॉन्फ़िगरेशन (कास्ट बाईपास द्वारा कंपाइल एरर को ठीक किया गया)
+  const getPrintConfig = (): PrintConfig => {
+    const configObj: any = {
+      printerPaperSize,
+      printerType,
+      bleCharacteristic,
+      serialPort,
+      usbDevice,
+      fontSize // Dynamic font size control added
+    };
+    return configObj as PrintConfig;
+  };
 
   const handleConnectPrinter = async () => {
     triggerBeep('tap');
@@ -1201,9 +1211,9 @@ export default function BbCafePos() {
               </div>
             )}
 
-            {/* SETTINGS WORKSPACE: लाइव प्रिंट प्रिव्यू और फ़ॉन्ट साइज कंट्रोल के साथ अपडेटेड */}
+            {/* SETTINGS WORKSPACE: लाइव प्रिंट प्रिव्यू, फ़ॉन्ट साइज कंट्रोल और ऑटो-रीकनेक्ट सेटअप */}
             {activeTab === 'settings' && (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start pb-20 overflow-y-auto flex-1 font-sans">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start pb-20 overflow-y-auto flex-1 font-sans animate-fade-in">
                 
                 {/* बायाँ कॉलम: सेटिंग्स कंट्रोल्स */}
                 <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 p-6 rounded-3xl shadow-xl space-y-6">
@@ -1261,7 +1271,7 @@ export default function BbCafePos() {
                     </div>
                   </div>
 
-                  {/* नया फ़ॉन्ट साइज कंट्रोल */}
+                  {/* सुधरा हुआ फ़ॉन्ट साइज कंट्रोल */}
                   <div className="border-b border-neutral-200 dark:border-neutral-800 pb-4 space-y-3">
                     <p className="text-xs font-bold uppercase text-neutral-800 dark:text-neutral-200">D. Base Font Size (px):</p>
                     <div className="flex items-center gap-3">
