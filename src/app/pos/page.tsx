@@ -33,7 +33,7 @@ const SafeClock = Clock as any;
 const SafeLayers = Layers as any;
 const SafePrinter = Printer as any;
 const SafeUsers = Users as any;
-const SafePlay = SafePlay as any || Play;
+const SafePlay = Play as any; // Fixed: Standard type-casting
 const SafeCheck = Check as any;
 const SafeSearch = Search as any;
 const SafeX = X as any;
@@ -92,6 +92,10 @@ export default function BbCafePos() {
   const [isConnecting, setIsConnecting] = useState(false);
   const [printerConnected, setPrinterConnected] = useState(false);
   const [bleCharacteristic, setBleCharacteristic] = useState<any>(null); // Real Web Bluetooth GATT reference
+
+  // USB Web Serial and WebUSB references
+  const [serialPort, setSerialPort] = useState<any>(null); 
+  const [usbDevice, setUsbDevice] = useState<any>(null); 
 
   const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false);
   const [customerSearchQuery, setCustomerSearchQuery] = useState('');
@@ -827,7 +831,7 @@ export default function BbCafePos() {
                       onClick={() => { 
                         triggerBeep('tap'); 
                         setActiveTab(item.id as any); 
-                        setIsSidebarOpen(false); // 🛠️ Tab select karte hi drawer automatically close ho jayega
+                        setIsSidebarOpen(false); // 🛠️ Tab select करते ही ड्रावर बंद हो जाएगा
                       }} 
                       className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-200 ${activeTab === item.id ? 'bg-orange-600 text-white' : 'text-gray-400 hover:bg-neutral-200 dark:hover:bg-neutral-900'}`}
                     >
@@ -946,7 +950,7 @@ export default function BbCafePos() {
               <div className="bg-white dark:bg-neutral-950 border border-neutral-200 dark:border-white/5 p-5 flex-1 overflow-y-auto pb-20 rounded-3xl">
                 <div className="flex justify-between items-center mb-6">
                   <div><h2 className="text-sm font-black uppercase text-orange-500">Live Item Stock Control</h2><p className="text-[10px] text-neutral-500">Disable items instantly for customers.</p></div>
-                  <button onClick={async () => { triggerBeep('tap'); const snap = await getDocs(collection(db, "products")); setProducts(snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))); }} className="p-2 bg-neutral-200 dark:bg-neutral-950 text-gray-400 rounded-xl"><SafeRefreshCw size={14} /></button>
+                  <button onClick={async () => { triggerBeep('tap'); const snap = await getDocs(collection(db, "products")); setProducts(snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))); }} className="p-2 bg-neutral-200 dark:bg-neutral-900 text-gray-400 rounded-xl"><SafeRefreshCw size={14} /></button>
                 </div>
                 <div className="space-y-2 max-w-xl">
                   {products.map((item) => {
