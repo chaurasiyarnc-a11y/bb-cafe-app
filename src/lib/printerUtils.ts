@@ -94,13 +94,13 @@ export const generateEscPosQrBytes = (upiUrl: string): Uint8Array => {
   const pH = ((urlBytes.length + 3) >> 8) & 0xFF;
 
   return new Uint8Array([
-    0x1B, 0x61, 0x01, // Center Align
+    0x1B, 0x61, 0x01,
     0x1D, 0x28, 0x6B, 0x04, 0x00, 0x31, 0x41, 0x32, 0x00,
     0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x43, 0x06,
     0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x45, 0x30,
     0x1D, 0x28, 0x6B, pL, pH, 0x31, 0x50, 0x30, ...Array.from(urlBytes),
-    0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x51, 0x30, // Print QR Command
-    0x0A, 0x1B, 0x61, 0x00 // सुधारा गया: अतिरिक्त 0x0A को हटाकर गैप कम किया गया
+    0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x51, 0x30,
+    0x0A, 0x1B, 0x61, 0x00
   ]);
 };
 
@@ -108,10 +108,11 @@ export const sendToPrinterInChunks = async (config: PrintConfig, text: string, u
   const encoder = new TextEncoder();
   let finalBytes: Uint8Array;
 
+  // सुधारा गया: रसीद पर वास्तविक '₹' चिह्न भेजने के लिए .replace(/₹/g, 'Rs.') को हटा दिया गया है
   if (upiUrl && text.includes("{{QR_CODE_PLACEHOLDER}}")) {
     const parts = text.split("{{QR_CODE_PLACEHOLDER}}");
-    const safePart1 = parts[0].replace(/₹/g, 'Rs.');
-    const safePart2 = parts[1].replace(/₹/g, 'Rs.');
+    const safePart1 = parts[0]; 
+    const safePart2 = parts[1]; 
     
     const part1Bytes = encoder.encode(safePart1);
     const part2Bytes = encoder.encode(safePart2);
@@ -122,7 +123,7 @@ export const sendToPrinterInChunks = async (config: PrintConfig, text: string, u
     finalBytes.set(qrBytes, part1Bytes.length);
     finalBytes.set(part2Bytes, part1Bytes.length + qrBytes.length);
   } else {
-    const safeText = text.replace(/₹/g, 'Rs.').replace("{{QR_CODE_PLACEHOLDER}}", "");
+    const safeText = text.replace("{{QR_CODE_PLACEHOLDER}}", ""); 
     finalBytes = encoder.encode(safeText);
   }
 
@@ -234,9 +235,18 @@ export const generateEscPosText = (order: any, config: PrintConfig): string => {
   const customDiscountVal = order.discount - (order.customerPointsRedeemed || 0);
   text += dividerLine;
   text += formatRow("Total:", `₹${order.subtotal}`, cols);
-  text += formatRow("Discount:", `₹${customDiscountVal > 0 ? customDiscountVal : 0}`, cols);
-  text += formatRow("Coupon Discount:", `₹${order.customerPointsRedeemed || 0}`, cols);
-  if (order.gstAmount) text += formatRow("GST (5%):", `₹${order.gstAmount}`, cols);
+  
+  // सुधरा हुआ: डिस्काउंट और कूपन डिस्काउंट केवल तभी छपेंगे जब वैल्यू 0 से ज्यादा होगी
+  if (customDiscountVal > 0) {
+    text += formatRow("Discount:", `₹${customDiscountVal}`, cols);
+  }
+  if (order.customerPointsRedeemed && order.customerPointsRedeemed > 0) {
+    text += formatRow("Coupon Discount:", `₹${order.customerPointsRedeemed}`, cols);
+  }
+  // सुधरा हुआ: GST भी केवल तभी छपेगा जब GST की वैल्यू 0 से बड़ी होगी
+  if (order.gstAmount && order.gstAmount > 0) {
+    text += formatRow(`GST (${order.gstRate}%):`, `₹${order.gstAmount}`, cols);
+  }
   
   text += dividerLine + formatRow("GRAND TOTAL:", `₹${order.total}`, cols);
   if (order.customerPhone) {
@@ -248,7 +258,6 @@ export const generateEscPosText = (order: any, config: PrintConfig): string => {
   text += dividerLine;
   text += centerAlign("SCAN TO PAY", cols);
   
-  // सुधरा हुआ: QR कोड के बाद का अतिरिक्त \n हटा दिया गया ताकि फूटर बहुत नीचे न खिसके
   text += "\n{{QR_CODE_PLACEHOLDER}}"; 
 
   text += centerAlign("THANK YOU! VISIT AGAIN", cols) + centerAlign("www.bb-cafe-app.vercel.app", cols) + dividerLine;
@@ -376,7 +385,7 @@ export const generateReceiptHtml = (order: any, config: PrintConfig): string => 
           <div style="text-align: right;">Token: #<strong>${order.tokenNumber}</strong></div>
           <div>Mode: ${order.fulfillmentType?.toUpperCase()} ${order.tableNumber ? `(Table: ${order.tableNumber})` : ''}</div>
           <div style="text-align: right;">Pay: ${order.paymentMethod?.toUpperCase()}</div>
-          <div style="grid-column: span 2;">Date: ${formattedReceiptDate}</div>
+          <div>Date: ${formattedReceiptDate}</div>
         </div>
         <div class="divider" style="margin-top: 6px;"></div>
         <table>
@@ -392,9 +401,25 @@ export const generateReceiptHtml = (order: any, config: PrintConfig): string => 
         <div class="divider"></div>
         <div style="font-size: 8.5px; font-weight: bold; line-height: 1.3;">
           <div style="display: flex; justify-content: space-between;"><span>Total:</span><span>₹${order.subtotal}</span></div>
-          <div style="display: flex; justify-content: space-between;"><span>Discount:</span><span>-₹${customDiscountVal > 0 ? customDiscountVal : 0}</span></div>
-          <div style="display: flex; justify-content: space-between;"><span>Coupon Discount:</span><span>-₹${order.customerPointsRedeemed || 0}</span></div>
-          ${order.gstAmount ? `<div style="display: flex; justify-content: space-between;"><span>GST (5%):</span><span>+₹${order.gstAmount}</span></div>` : ''}
+          
+          <!-- वेब रसीद में भी डिस्काउंट तभी छपेगा जब वैल्यू 0 से ज्यादा होगी -->
+          ${customDiscountVal > 0 ? `
+          <div style="display: flex; justify-content: space-between; color: green;">
+            <span>Discount:</span>
+            <span>-₹${customDiscountVal}</span>
+          </div>` : ''}
+          
+          ${order.customerPointsRedeemed > 0 ? `
+          <div style="display: flex; justify-content: space-between; color: green;">
+            <span>Coupon Discount:</span>
+            <span>-₹${order.customerPointsRedeemed}</span>
+          </div>` : ''}
+          
+          ${order.gstAmount && order.gstAmount > 0 ? `
+          <div style="display: flex; justify-content: space-between;">
+            <span>GST (${order.gstRate}%):</span>
+            <span>+₹${order.gstAmount}</span>
+          </div>` : ''}
         </div>
         <div class="double-divider"></div>
         <div style="display: flex; justify-content: space-between; align-items: center; font-weight: 900; font-size: 11px;">
