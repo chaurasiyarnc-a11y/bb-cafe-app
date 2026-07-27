@@ -2,7 +2,7 @@
   "name": "Pos",
   "short_name": "Pos",
   "description": "Bum Bum Cafe POS - Billing & Order Management System",
-  "start_url": "/",
+  "start_url": "/pos",
   "display": "standalone",
   "background_color": "#0a0a0a",
   "theme_color": "#d97706",
