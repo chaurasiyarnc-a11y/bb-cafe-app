@@ -1,3 +1,5 @@
+
+
 'use client';
 import React, { useState, useEffect, useMemo } from 'react';
 import { db } from '@/lib/firebase'; 
@@ -19,7 +21,6 @@ import PosCartDrawer from '@/components/pos/PosCartDrawer';
 import CustomerDirectoryModal from '@/components/pos/CustomerDirectoryModal';
 import CustomizerModal from '@/components/pos/CustomizerModal';
 
-// यूटिलिटी से सभी आवश्यक प्रिंटर फ़ंक्शंस का इम्पोर्ट
 import { 
   handlePrintKot, 
   handlePrintReceipt, 
@@ -103,6 +104,7 @@ export default function BbCafePos() {
   const [printerConnected, setPrinterConnected] = useState(false);
   const [bleCharacteristic, setBleCharacteristic] = useState<any>(null);
   const [fontSize, setFontSize] = useState<number>(9); // dynamic font size state
+  const [kotEnabled, setKotEnabled] = useState<boolean>(true); // KOT ON/OFF Switch State
 
   // USB Web Serial and WebUSB references
   const [serialPort, setSerialPort] = useState<any>(null); 
@@ -165,7 +167,7 @@ export default function BbCafePos() {
     }
   };
 
-  // लाइव ऑर्डर्स स्क्रीन को एक क्लिक में साफ़ करने का सुरक्षित फंक्शन (शीर्ष पर रीलोकेट किया गया)
+  // लाइव ऑर्डर्स स्क्रीन को एक क्लिक में साफ़ करने का सुरक्षित फंक्शन
   const handleClearAllLiveOrders = async () => {
     triggerBeep('tap');
     const confirmClear = window.confirm("क्या आप वाकई सभी एक्टिव लाइव ऑर्डर्स को साफ़ (Complete) करना चाहते हैं?");
@@ -237,6 +239,7 @@ export default function BbCafePos() {
     setGstEnabled(localStorage.getItem("bb_pos_gst_enabled") === 'true');
     setGstRate(Number(localStorage.getItem("bb_pos_gst_rate")) || 5);
     setPrinterPaperSize((localStorage.getItem("bb_pos_paper_size") as any) || '58mm');
+    setKotEnabled(localStorage.getItem("bb_pos_kot_enabled") !== 'false'); // KOT ON/OFF Switch Load
     
     const localPrinterType = localStorage.getItem("bb_pos_printer_type");
     if (localPrinterType) setPrinterType(localPrinterType as any);
@@ -245,7 +248,6 @@ export default function BbCafePos() {
     const localPrintCopies = localStorage.getItem("bb_pos_print_copies");
     if (localPrintCopies) setPrintCopies(Number(localPrintCopies) || 1);
 
-    // फ़ॉन्ट साइज लोकल स्टोरेज से लोड करना
     const localFontSize = localStorage.getItem("bb_pos_font_size");
     if (localFontSize) setFontSize(Number(localFontSize) || 9);
 
@@ -261,7 +263,6 @@ export default function BbCafePos() {
       const savedType = localStorage.getItem("bb_pos_printer_type");
       if (typeof window === 'undefined') return;
 
-      // ब्राउज़र को पेरिफेरल्स स्कैन करने के लिए 500ms का समय देना
       setTimeout(async () => {
         // 1. ब्लूटूथ (Bluetooth) ऑटो-कनेक्ट
         if (savedType === 'thermal_bluetooth' && 'bluetooth' in navigator && !bleCharacteristic) {
@@ -648,6 +649,26 @@ export default function BbCafePos() {
     return configObj as PrintConfig;
   };
 
+  // लाइव ऑर्डर्स स्क्रीन को एक क्लिक में साफ़ करने का सुरक्षित फंक्शन
+  const handleClearAllLiveOrders = async () => {
+    triggerBeep('tap');
+    const confirmClear = window.confirm("क्या आप वाकई सभी एक्टिव लाइव ऑर्डर्स को साफ़ (Complete) करना चाहते हैं?");
+    if (!confirmClear) return;
+    
+    const toastId = toast.loading("Clearing active orders...");
+    try {
+      const promises = activeLiveOrders.map(order => 
+        updateDoc(doc(db, "orders", order.id), { status: 'completed' })
+      );
+      await Promise.all(promises);
+      toast.dismiss(toastId);
+      toast.success("Active orders cleared successfully!");
+    } catch (err) {
+      toast.dismiss(toastId);
+      toast.error("Failed to clear active orders");
+    }
+  };
+
   const handleConnectPrinter = async () => {
     triggerBeep('tap');
     setIsConnecting(true);
@@ -838,10 +859,12 @@ export default function BbCafePos() {
       
       const pConfig = getPrintConfig();
 
-      toast.success("Printing KOT first...");
-      await handlePrintKot(orderObj, pConfig);
-
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+      // KOT प्रिंट तभी होगा जब kotEnabled switch 'ON' रहेगा
+      if (kotEnabled) {
+        toast.success("Printing KOT first...");
+        await handlePrintKot(orderObj, pConfig);
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+      }
 
       toast.success("Printing Customer Receipt...");
       await handlePrintReceipt(orderObj, pConfig);
@@ -896,36 +919,6 @@ export default function BbCafePos() {
     { id: 'receipts', label: 'Past Receipts', icon: SafePrinter },
     { id: 'settings', label: 'POS Settings', icon: SafeSettings }
   ];
-
-  // लाइव प्रिंट प्रिव्यू के लिए एक्टिव डेटा या सैंपल डेटा लोड करना
-  const sampleOrderForPreview = useMemo(() => {
-    return {
-      billNumber: 45,
-      tokenNumber: 12,
-      timestamp: new Date(),
-      customerName: customerName || "Walk-in Guest",
-      customerPhone: customerPhone ? `+91${customerPhone}` : "",
-      address: address || "Mohandra Bus Stand, Panna, MP",
-      fulfillmentType,
-      tableNumber: tableNumber || "T-1",
-      paymentMethod,
-      items: cart.length > 0 ? cart : [
-        { name: "PANEER TIKKA", quantity: 2, price: 180, note: "EXTRA SPICY" },
-        { name: "VEG BURGER", quantity: 1, price: 90 },
-        { name: "MASALA CHAI", quantity: 3, price: 20 }
-      ],
-      subtotal: cart.length > 0 ? getCartSubtotal() : 510,
-      discount: cart.length > 0 ? (customDiscount + getLoyaltyDiscount()) : 10,
-      customerPointsRedeemed: pointsToRedeem,
-      customerPointsEarned: cart.length > 0 ? Math.floor(getTotalBillPrice() / 100) : 5,
-      customerPointsAfter: customerPhone ? Math.max(0, customerPoints + (Math.floor(getTotalBillPrice() / 100) - getTotalPointsRedeemedInCart() - pointsToRedeem)) : 25,
-      total: cart.length > 0 ? getTotalBillPrice() : 500
-    };
-  }, [cart, customerName, customerPhone, address, fulfillmentType, tableNumber, paymentMethod, customDiscount, pointsToRedeem, customerPoints]);
-
-  const receiptHtmlContent = useMemo(() => {
-    return generateReceiptHtml(sampleOrderForPreview, getPrintConfig());
-  }, [sampleOrderForPreview, printerPaperSize, printerType, fontSize]);
 
   const mainClass = "min-h-screen flex flex-col md:flex-row font-sans antialiased overflow-hidden transition-colors duration-200 " + 
     (themeMode === "dark" ? "dark bg-[#0a0a0a] text-neutral-100" : "bg-neutral-50 text-neutral-800");
@@ -1032,7 +1025,6 @@ export default function BbCafePos() {
             {/* LIVE ORDERS */}
             {activeTab === 'orders' && (
               <div className="flex flex-col flex-1 overflow-hidden font-sans">
-                {/* लाइव ऑर्डर्स का शीर्ष हेडर */}
                 <div className="flex justify-between items-center mb-3">
                   <span className="text-[10px] font-black uppercase text-neutral-500">
                     Active Live Orders ({activeLiveOrders.length})
@@ -1075,7 +1067,7 @@ export default function BbCafePos() {
                             <div className="space-y-1.5 pt-2 mb-4 border-t border-dashed border-neutral-200 dark:border-neutral-800">
                               {order.items?.map((it: any, idx: number) => (
                                 <div key={idx} className="flex justify-between text-[11px] font-semibold text-neutral-700 dark:text-neutral-300">
-                                  <span>{it.name} <span className="text-orange-500 font-bold">x{it.quantity}</span>{it.note && <span className="text-neutral-400 italic block text-[9px]">({it.note})</span>}</span>
+                                  <span>{it.name} <span className="text-orange-500 font-bold">x{it.quantity}</span></span>
                                   <span className="font-mono">₹{it.price * it.quantity}</span>
                                 </div>
                               ))}
@@ -1281,11 +1273,10 @@ export default function BbCafePos() {
               </div>
             )}
 
-            {/* SETTINGS WORKSPACE */}
+            {/* SETTINGS WORKSPACE: सरलीकृत लेआउट और KOT ON/OFF Switch */}
             {activeTab === 'settings' && (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start pb-20 overflow-y-auto flex-1 font-sans animate-fade-in">
+              <div className="max-w-xl mx-auto w-full pb-20 overflow-y-auto flex-1 font-sans animate-fade-in">
                 
-                {/* बायाँ कॉलम: सेटिंग्स कंट्रोल्स */}
                 <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 p-6 rounded-3xl shadow-xl space-y-6">
                   <h3 className="text-sm font-black uppercase text-orange-500">POS Settings</h3>
                   
@@ -1322,60 +1313,28 @@ export default function BbCafePos() {
                     )}
                   </div>
 
-                  {/* पेपर साइज */}
+                  {/* नया बदलाव: KOT ON/OFF Switch (C Paper Size और D Base Font को हटाया गया) */}
                   <div className="border-b border-neutral-200 dark:border-neutral-800 pb-4 space-y-3">
-                    <p className="text-xs font-bold uppercase text-neutral-800 dark:text-neutral-200">C. Paper Size:</p>
-                    <div className="flex bg-neutral-100 dark:bg-neutral-800 p-1 rounded-xl w-60 border border-transparent dark:border-neutral-700">
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs font-bold uppercase text-neutral-800 dark:text-neutral-200">C. Enable KOT Printing:</p>
                       <button 
-                        onClick={() => { setPrinterPaperSize('58mm'); localStorage.setItem("bb_pos_paper_size", '58mm'); }} 
-                        className={"flex-grow py-2 rounded-lg text-[10px] font-black uppercase transition-all " + (printerPaperSize === '58mm' ? "bg-neutral-950 text-amber-400 shadow-md" : "text-neutral-400")}
+                        onClick={() => { 
+                          const next = !kotEnabled; 
+                          setKotEnabled(next); 
+                          localStorage.setItem("bb_pos_kot_enabled", String(next)); 
+                          toast.success(next ? "KOT Printing ON" : "KOT Printing OFF");
+                        }} 
+                        className="text-orange-500"
                       >
-                        58mm
+                        {kotEnabled ? <SafeToggleRight size={32} /> : <SafeToggleLeft size={32} />}
                       </button>
-                      <button 
-                        onClick={() => { setPrinterPaperSize('80mm'); localStorage.setItem("bb_pos_paper_size", '80mm'); }} 
-                        className={"flex-grow py-2 rounded-lg text-[10px] font-black uppercase transition-all " + (printerPaperSize === '80mm' ? "bg-white text-orange-600 shadow-md" : "text-neutral-400")}
-                      >
-                        80mm
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* फ़ॉन्ट साइज कंट्रोल */}
-                  <div className="border-b border-neutral-200 dark:border-neutral-800 pb-4 space-y-3">
-                    <p className="text-xs font-bold uppercase text-neutral-800 dark:text-neutral-200">D. Base Font Size (px):</p>
-                    <div className="flex items-center gap-3">
-                      <button
-                        type="button"
-                        onClick={() => handleFontSizeChange(fontSize - 0.5)}
-                        className="bg-neutral-100 dark:bg-neutral-850 hover:bg-neutral-200 dark:hover:bg-neutral-700 border border-neutral-200 dark:border-neutral-750 w-10 h-10 rounded-lg font-bold text-base text-gray-700 dark:text-white flex items-center justify-center transition"
-                      >
-                        -
-                      </button>
-                      <input
-                        type="number"
-                        step="0.5"
-                        min="6"
-                        max="24"
-                        value={fontSize}
-                        onChange={(e) => handleFontSizeChange(parseFloat(e.target.value) || 9)}
-                        className="w-20 text-center font-bold text-xs bg-neutral-100 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-100 p-2 border border-neutral-200 dark:border-neutral-700 rounded-lg h-10 focus:outline-orange-500"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => handleFontSizeChange(fontSize + 0.5)}
-                        className="bg-neutral-100 dark:bg-neutral-850 hover:bg-neutral-200 dark:hover:bg-neutral-700 border border-neutral-200 dark:border-neutral-750 w-10 h-10 rounded-lg font-bold text-base text-gray-700 dark:text-white flex items-center justify-center transition"
-                      >
-                        +
-                      </button>
-                      <span className="text-[10px] text-gray-400 font-semibold ml-1">Normal: 8.5px - 10px</span>
                     </div>
                   </div>
 
                   {/* हार्डवेयर प्रिंटर कनेक्शन */}
-                  <div className="space-y-3 pt-4 border-t border-neutral-200 dark:border-neutral-800">
+                  <div className="space-y-3 pt-4">
                     <div className="flex items-center justify-between">
-                      <p className="text-xs font-bold uppercase text-neutral-800 dark:text-neutral-200">E. Hardware Printer Connection:</p>
+                      <p className="text-xs font-bold uppercase text-neutral-800 dark:text-neutral-200">D. Hardware Printer Connection:</p>
                       <span className={"text-[8px] font-black uppercase tracking-widest px-2.5 py-0.5 rounded-full border " + (printerConnected ? "bg-green-500/10 text-green-400 border-green-500/20" : "bg-red-500/10 text-red-400 border-red-500/20")}>
                         {printerConnected ? '● Connected' : 'Disconnected'}
                       </span>
@@ -1438,38 +1397,13 @@ export default function BbCafePos() {
                   </div>
                 </div>
 
-                {/* दायाँ कॉलम: लाइव थर्मल प्रिव्यू */}
-                <div className="flex flex-col items-center">
-                  <span className="text-xs font-bold text-neutral-500 mb-2">Live Thermal Roll Preview</span>
-                  
-                  {/* थर्मल रसीद सिमुलेटर (Iframe Isolator) */}
-                  <div className="bg-neutral-200 dark:bg-neutral-800 p-4 rounded-3xl border border-neutral-300 dark:border-neutral-850 max-w-full flex justify-center shadow-inner">
-                    <iframe
-                      srcDoc={receiptHtmlContent}
-                      style={{
-                        width: printerPaperSize === '58mm' ? '250px' : '340px',
-                        height: '460px',
-                        border: 'none',
-                        backgroundColor: '#fff',
-                        boxShadow: '0 4px 10px rgba(0,0,0,0.15)',
-                        borderRadius: '8px',
-                        transition: 'width 0.2s ease'
-                      }}
-                      title="Live Print Preview"
-                    />
-                  </div>
-                  <p className="text-[10px] text-neutral-400 mt-2 text-center max-w-xs">
-                    * जब आप कार्ट में असली आइटम्स जोड़ेंगे, तो यह लाइव बिल दिखाने लगेगा।
-                  </p>
-                </div>
-
               </div>
             )}
           </main>
         </>
       )}
 
-      {/* 5. PAST BILL REPRINT & REFUND POPUP MODAL */}
+      {/* PAST BILL REPRINT & REFUND POPUP MODAL */}
       <AnimatePresence>
         {isReceiptModalOpen && selectedReceipt && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -1524,7 +1458,6 @@ export default function BbCafePos() {
                       <div key={idx} className="flex justify-between text-xs py-1 border-b border-neutral-100 dark:border-neutral-800/50 last:border-0">
                         <span className="text-neutral-850 dark:text-neutral-300">
                           {it.name} <span className="text-orange-500 font-bold">x{it.quantity}</span>
-                          {it.note && <span className="text-neutral-500 italic block text-[9px]">({it.note})</span>}
                         </span>
                         <span className="font-mono font-medium text-neutral-900 dark:text-white">₹{it.price * it.quantity}</span>
                       </div>
@@ -1546,7 +1479,7 @@ export default function BbCafePos() {
                   )}
                   {selectedReceipt.gstAmount > 0 && (
                     <div className="flex justify-between font-mono text-neutral-600 dark:text-neutral-400">
-                      <span>GST ({selectedReceipt.gstRate}%):</span>
+                      <span>GST (5%):</span>
                       <span>+₹{selectedReceipt.gstAmount}</span>
                     </div>
                   )}
