@@ -101,8 +101,8 @@ export default function BbCafePos() {
   const [isConnecting, setIsConnecting] = useState(false);
   const [printerConnected, setPrinterConnected] = useState(false);
   const [bleCharacteristic, setBleCharacteristic] = useState<any>(null);
-  const [fontSize, setFontSize] = useState<number>(9); // dynamic font size state
-  const [kotEnabled, setKotEnabled] = useState<boolean>(true); // KOT ON/OFF Switch State
+  const [fontSize, setFontSize] = useState<number>(9); 
+  const [kotEnabled, setKotEnabled] = useState<boolean>(true); 
 
   // USB Web Serial and WebUSB references
   const [serialPort, setSerialPort] = useState<any>(null); 
@@ -157,7 +157,6 @@ export default function BbCafePos() {
   const [normalPizzaPrice, setNormalPizzaPrice] = useState(0);
   const [customizerChefNote, setCustomizerChefNote] = useState(""); 
 
-  // फ़ॉन्ट साइज कंट्रोल फंक्शन
   const handleFontSizeChange = (newSize: number) => {
     if (newSize >= 6 && newSize <= 24) {
       setFontSize(newSize);
@@ -165,7 +164,6 @@ export default function BbCafePos() {
     }
   };
 
-  // लाइव ऑर्डर्स स्क्रीन को एक क्लिक में साफ़ करने का सुरक्षित फंक्शन
   const handleClearAllLiveOrders = async () => {
     triggerBeep('tap');
     const confirmClear = window.confirm("क्या आप वाकई सभी एक्टिव लाइव ऑर्डर्स को साफ़ (Complete) करना चाहते हैं?");
@@ -225,10 +223,9 @@ export default function BbCafePos() {
     }
   };
 
-  // नया प्रभाव: PWA सर्विस वर्कर रजिस्ट्रेशन और डायनामिक मैनिफ़ेस्ट लिंक इंजेक्शन
+  // PWA & Service Worker Setup
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      // 1. डायनामिक रूप से pos-menifasto.json को हेड में इंजेक्ट करना
       let link = document.querySelector('link[rel="manifest"]') as HTMLLinkElement;
       if (!link) {
         link = document.createElement('link');
@@ -237,7 +234,6 @@ export default function BbCafePos() {
       }
       link.href = '/pos-menifasto.json';
 
-      // 2. ऑफ़लाइन सपोर्ट के लिए sw.js रजिस्टर करना
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
           navigator.serviceWorker.register('/sw.js')
@@ -248,6 +244,7 @@ export default function BbCafePos() {
     }
   }, []);
 
+  // initial load states (including Cart Restoration from LocalStorage)
   useEffect(() => {
     const savedUser = localStorage.getItem("bb_pos_user");
     if (savedUser) {
@@ -260,7 +257,7 @@ export default function BbCafePos() {
     setGstEnabled(localStorage.getItem("bb_pos_gst_enabled") === 'true');
     setGstRate(Number(localStorage.getItem("bb_pos_gst_rate")) || 5);
     setPrinterPaperSize((localStorage.getItem("bb_pos_paper_size") as any) || '58mm');
-    setKotEnabled(localStorage.getItem("bb_pos_kot_enabled") !== 'false'); // KOT ON/OFF Switch Load
+    setKotEnabled(localStorage.getItem("bb_pos_kot_enabled") !== 'false'); 
     
     const localPrinterType = localStorage.getItem("bb_pos_printer_type");
     if (localPrinterType) setPrinterType(localPrinterType as any);
@@ -276,16 +273,43 @@ export default function BbCafePos() {
     setThemeMode(localTheme as any);
     if (localTheme === 'light') document.documentElement.classList.remove('dark');
     else document.documentElement.classList.add('dark');
+
+    // Cart and Customer offline recovery on startup
+    const savedCart = localStorage.getItem("bb_pos_saved_cart");
+    if (savedCart) {
+      try { setCart(JSON.parse(savedCart)); } catch (err) {}
+    }
+    setCustomerPhone(localStorage.getItem("bb_pos_saved_cust_phone") || '');
+    setCustomerName(localStorage.getItem("bb_pos_saved_cust_name") || '');
+    setCustomerPoints(Number(localStorage.getItem("bb_pos_saved_cust_points")) || 0);
+    setAddress(localStorage.getItem("bb_pos_saved_cust_address") || '');
+    setFulfillmentType((localStorage.getItem("bb_pos_saved_fulfillment_type") as any) || 'table');
+    setTableNumber(localStorage.getItem("bb_pos_saved_table_number") || 'Table 1');
+    setChefInstructions(localStorage.getItem("bb_pos_saved_chef_instructions") || '');
   }, []);
 
-  // सुधरा हुआ ऑटो-कनेक्ट फ़ंक्शन (Bluetooth और USB ऑटो-कनेक्शन के साथ)
+  // Sync Cart and Customer details live to LocalStorage so data never vanishes on refresh
+  useEffect(() => {
+    localStorage.setItem("bb_pos_saved_cart", JSON.stringify(cart));
+  }, [cart]);
+
+  useEffect(() => {
+    localStorage.setItem("bb_pos_saved_cust_phone", customerPhone);
+    localStorage.setItem("bb_pos_saved_cust_name", customerName);
+    localStorage.setItem("bb_pos_saved_cust_points", String(customerPoints));
+    localStorage.setItem("bb_pos_saved_cust_address", address);
+    localStorage.setItem("bb_pos_saved_fulfillment_type", fulfillmentType);
+    localStorage.setItem("bb_pos_saved_table_number", tableNumber);
+    localStorage.setItem("bb_pos_saved_chef_instructions", chefInstructions);
+  }, [customerPhone, customerName, customerPoints, address, fulfillmentType, tableNumber, chefInstructions]);
+
+  // Auto-connect printers
   useEffect(() => {
     const autoReconnectPrinters = async () => {
       const savedType = localStorage.getItem("bb_pos_printer_type");
       if (typeof window === 'undefined') return;
 
       setTimeout(async () => {
-        // 1. ब्लूटूथ (Bluetooth) ऑटो-कनेक्ट
         if (savedType === 'thermal_bluetooth' && 'bluetooth' in navigator && !bleCharacteristic) {
           try {
             const devices = await (navigator as any).bluetooth.getDevices();
@@ -305,15 +329,11 @@ export default function BbCafePos() {
 
               setBleCharacteristic(characteristic);
               setPrinterConnected(true);
-              console.log("Bluetooth Printer auto-reconnected successfully!");
               toast.success("Bluetooth Printer Reconnected!");
             }
-          } catch (e) {
-            console.warn("Bluetooth auto-reconnect failed:", e);
-          }
+          } catch (e) {}
         }
 
-        // 2. यूएसबी Web Serial ऑटो-कनेक्ट
         if (savedType === 'thermal_usb' && 'serial' in navigator && !serialPort) {
           try {
             const ports = await (navigator as any).serial.getPorts();
@@ -322,15 +342,11 @@ export default function BbCafePos() {
               await port.open({ baudRate: 9600 });
               setSerialPort(port);
               setPrinterConnected(true);
-              console.log("USB Web Serial auto-reconnected successfully!");
               toast.success("USB Printer Reconnected!");
             }
-          } catch (e) {
-            console.warn("Serial auto-reconnect failed:", e);
-          }
+          } catch (e) {}
         } 
         
-        // 3. यूएसबी WebUSB ऑटो-कनेक्ट (यदि सीरियल फेल हो गया हो)
         if (savedType === 'thermal_usb' && 'usb' in navigator && !serialPort && !usbDevice) {
           try {
             const devices = await (navigator as any).usb.getDevices();
@@ -341,12 +357,9 @@ export default function BbCafePos() {
               await device.claimInterface(0);
               setUsbDevice(device);
               setPrinterConnected(true);
-              console.log("WebUSB auto-reconnected successfully!");
               toast.success("USB Printer Reconnected!");
             }
-          } catch (e) {
-            console.warn("WebUSB auto-reconnect failed:", e);
-          }
+          } catch (e) {}
         }
       }, 500);
     };
@@ -356,7 +369,7 @@ export default function BbCafePos() {
     }
   }, [isLoggedIn, serialPort, usbDevice, bleCharacteristic]);
 
-  // रिसोर्स क्लीनअप
+  // Cleanups
   useEffect(() => {
     return () => {
       if (serialPort) {
@@ -657,7 +670,6 @@ export default function BbCafePos() {
   const getFreeDeliveryProgressPercent = () => Math.min(100, (getCartSubtotal() / selectedArea.minFree) * 100);
   const getTotalPointsRedeemedInCart = () => cart.reduce((acc, i) => acc + (i.pointsCost || 0), 0);
 
-  // प्रिंटिंग कॉन्फ़िगरेशन (कास्ट बाईपास द्वारा कंपाइल एरर को पूरी तरह हल किया गया)
   const getPrintConfig = (): PrintConfig => {
     const configObj: any = {
       printerPaperSize,
@@ -665,7 +677,7 @@ export default function BbCafePos() {
       bleCharacteristic,
       serialPort,
       usbDevice,
-      fontSize // Dynamic font size control added
+      fontSize 
     };
     return configObj as PrintConfig;
   };
@@ -703,7 +715,7 @@ export default function BbCafePos() {
         setBleCharacteristic(characteristic);
         setPrinterConnected(true);
         toast.dismiss(toastId);
-        toast.success("Bluetooth Printer Connected Successfully!");
+        toast.success("Bluetooth Printer Connected!");
       } catch (err: any) {
         console.error(err);
         toast.dismiss(toastId);
@@ -793,11 +805,20 @@ export default function BbCafePos() {
     );
   };
 
-  // Place Order transaction flow
+  // Safe offline bill number sequence backup generator
+  const getNextLocalBillNumber = () => {
+    const currentLocal = Number(localStorage.getItem("bb_pos_local_bill_counter")) || 5000;
+    const nextLocal = currentLocal + 1;
+    localStorage.setItem("bb_pos_local_bill_counter", String(nextLocal));
+    return nextLocal;
+  };
+
+  // Place Order transaction flow (Offline Safe + Auto Sync)
   const handlePlaceOrder = async (e: React.FormEvent) => {
     e.preventDefault();
     if (cart.length === 0 || isSubmittingOrder) return;
     setIsSubmittingOrder(true);
+    
     const subtotal = getCartSubtotal();
     const discountCombined = customDiscount + getLoyaltyDiscount();
     const finalTotal = getTotalBillPrice();
@@ -807,13 +828,28 @@ export default function BbCafePos() {
     const netPoints = customerPhone ? (earned - getTotalPointsRedeemedInCart() - pointsToRedeem) : 0;
     const pointsAfterBill = customerPhone ? Math.max(0, customerPoints + netPoints) : 0;
 
+    const isOnline = typeof navigator !== 'undefined' ? navigator.onLine : true;
+    let billNumber: number;
+
     try {
-      const billNumber = await runTransaction(db, async (txn) => {
-        const snap = await txn.get(doc(db, "settings", "store_bill_counter"));
-        const next = snap.exists() ? (snap.data().nextBillNumber || 1) : 1;
-        txn.set(doc(db, "settings", "store_bill_counter"), { nextBillNumber: next + 1 });
-        return next;
-      });
+      // 1. Get Bill Number (Online uses transaction, Offline falls back safely to sequential localStorage)
+      if (isOnline) {
+        try {
+          billNumber = await runTransaction(db, async (txn) => {
+            const snap = await txn.get(doc(db, "settings", "store_bill_counter"));
+            const next = snap.exists() ? (snap.data().nextBillNumber || 1) : 1;
+            txn.set(doc(db, "settings", "store_bill_counter"), { nextBillNumber: next + 1 });
+            return next;
+          });
+          // sync local counter with latest fetched online number
+          localStorage.setItem("bb_pos_local_bill_counter", String(billNumber));
+        } catch (transactionErr) {
+          console.warn("Online transaction failed, using local sequence fallback", transactionErr);
+          billNumber = getNextLocalBillNumber();
+        }
+      } else {
+        billNumber = getNextLocalBillNumber();
+      }
 
       const orderObj = { 
         billNumber, 
@@ -841,18 +877,39 @@ export default function BbCafePos() {
         address: address
       };
 
+      // Firestore will hold this in offline queue and auto-upload on internet restoration
       await addDoc(collection(db, "orders"), orderObj);
 
+      // 2. Customer Points Updates (No Transactions on failure/offline to prevent blocking)
       if (customerPhone && customerPhone.trim().length === 10) {
         const phone = customerPhone.trim();
-        await runTransaction(db, async (txn) => {
-          const userRef = doc(db, "customer_points", phone);
-          const snap = await txn.get(userRef);
-          if (!snap.exists()) txn.set(userRef, { name: customerName || "Walk-in Guest", phone, points: Math.max(0, pointsAfterBill), lastActive: new Date() });
-          else txn.update(userRef, { points: pointsAfterBill, lastActive: new Date() });
-        });
-        if (earned > 0) await addDoc(collection(db, "customer_points", phone, "history"), { type: 'earn', points: earned, description: `Earned Bill #${billNumber}`, timestamp: new Date() });
-        if (pointsToRedeem > 0) await addDoc(collection(db, "customer_points", phone, "history"), { type: 'redeem', points: pointsToRedeem, description: `Redeemed cashback Bill #${billNumber}`, timestamp: new Date() });
+        const userRef = doc(db, "customer_points", phone);
+
+        if (isOnline) {
+          try {
+            await runTransaction(db, async (txn) => {
+              const snap = await txn.get(userRef);
+              if (!snap.exists()) {
+                txn.set(userRef, { name: customerName || "Walk-in Guest", phone, points: Math.max(0, pointsAfterBill), lastActive: new Date() });
+              } else {
+                txn.update(userRef, { points: pointsAfterBill, lastActive: new Date() });
+              }
+            });
+          } catch (e) {
+            // Transaction failed online but direct setDoc is robust and works offline
+            await setDoc(userRef, { name: customerName || "Walk-in Guest", phone, points: Math.max(0, pointsAfterBill), lastActive: new Date() }, { merge: true });
+          }
+        } else {
+          // Pure Offline - directly set/merge (queued locally and synced online automatically)
+          await setDoc(userRef, { name: customerName || "Walk-in Guest", phone, points: Math.max(0, pointsAfterBill), lastActive: new Date() }, { merge: true });
+        }
+
+        if (earned > 0) {
+          await addDoc(collection(db, "customer_points", phone, "history"), { type: 'earn', points: earned, description: `Earned Bill #${billNumber}`, timestamp: new Date() });
+        }
+        if (pointsToRedeem > 0) {
+          await addDoc(collection(db, "customer_points", phone, "history"), { type: 'redeem', points: pointsToRedeem, description: `Redeemed cashback Bill #${billNumber}`, timestamp: new Date() });
+        }
       }
 
       triggerBeep('success'); 
@@ -860,7 +917,6 @@ export default function BbCafePos() {
       
       const pConfig = getPrintConfig();
 
-      // KOT प्रिंट तभी होगा जब kotEnabled switch 'ON' रहेगा
       if (kotEnabled) {
         toast.success("Printing KOT first...");
         await handlePrintKot(orderObj, pConfig);
@@ -870,9 +926,12 @@ export default function BbCafePos() {
       toast.success("Printing Customer Receipt...");
       await handlePrintReceipt(orderObj, pConfig);
 
+      // Reset states and clear backup storage to start clean
       setCart([]); setCustomerPhone(''); setCustomerName(''); setCustomerPoints(0); setPointsToRedeem(0); setCustomDiscount(0); setIsCartOpen(false); setChefInstructions('');
+      localStorage.removeItem("bb_pos_saved_cart");
     } catch (err) {
-      toast.error("Counter transaction failed");
+      console.error(err);
+      toast.error("Failed to place order offline");
     } finally {
       setIsSubmittingOrder(false);
     }
@@ -913,15 +972,14 @@ export default function BbCafePos() {
 
   const liveOrdersBadgeCount = activeLiveOrders.length;
 
+  // Live Orders Navigation completely removed from Sidebar to clear space
   const navItems = [
     { id: 'billing', label: 'Counter Billing', icon: SafeShoppingBag },
-    { id: 'orders', label: 'Live Orders', icon: SafeClock, badge: liveOrdersBadgeCount },
     { id: 'inventory', label: 'Stock Toggle', icon: SafeLayers },
     { id: 'receipts', label: 'Past Receipts', icon: SafePrinter },
     { id: 'settings', label: 'POS Settings', icon: SafeSettings }
   ];
 
-  // लाइव प्रिंट प्रिव्यू के लिए एक्टिव डेटा या सैंपल डेटा लोड करना
   const sampleOrderForPreview = useMemo(() => {
     return {
       billNumber: 45,
@@ -1022,9 +1080,6 @@ export default function BbCafePos() {
                         <Icon size={14} />
                         {!isSidebarCollapsed && <span>{item.label}</span>}
                       </div>
-                      {item.badge !== undefined && item.badge > 0 && (
-                        <span className="bg-yellow-400 text-black font-black text-[9px] px-2 py-0.5 rounded-full font-mono">{item.badge}</span>
-                      )}
                     </button>
                   );
                 })}
@@ -1046,11 +1101,21 @@ export default function BbCafePos() {
                 <h2 className="text-[10px] font-black uppercase text-orange-500">{activeTab} Workspace</h2>
                 <span className="text-[9px] text-neutral-500 dark:text-neutral-400 font-bold">Bum Bum Cafe • Mohandra</span>
               </div>
-              {activeTab === 'billing' && (
-                <button onClick={() => { triggerBeep('tap'); setIsCustomerModalOpen(true); searchDbCustomers(''); }} className="ml-auto p-2 bg-neutral-200 dark:bg-neutral-800 text-yellow-500 hover:text-yellow-600 rounded-xl flex items-center gap-1 text-[10px] font-black uppercase transition-all">
-                  <SafeUsers size={14} /><span>Search Guest</span>
-                </button>
-              )}
+              
+              {/* Shifted Live Orders from Sidebar directly into Header Top-Right Area */}
+              <button 
+                onClick={() => { triggerBeep('tap'); setActiveTab('orders'); }} 
+                className={"ml-auto p-2 rounded-xl flex items-center gap-2 text-[10px] font-black uppercase transition-all relative shadow-sm hover:scale-[1.02] active:scale-95 " + 
+                  (activeTab === 'orders' ? "bg-orange-600 text-white" : "bg-neutral-200 dark:bg-neutral-800 text-orange-500")}
+              >
+                <SafeClock size={14} />
+                <span>Live Orders</span>
+                {liveOrdersBadgeCount > 0 && (
+                  <span className="bg-yellow-400 text-black font-black text-[9px] px-2 py-0.5 rounded-full font-mono animate-pulse">
+                    {liveOrdersBadgeCount}
+                  </span>
+                )}
+              </button>
             </div>
 
             {/* LIVE ORDERS */}
@@ -1600,6 +1665,7 @@ export default function BbCafePos() {
         setChiliFlakesAddon={() => {}}
       />
 
+      {/* Guest Directory Modal remains accessible directly inside the Cart Drawer when cashier manages customer loyalty */}
       <CustomerDirectoryModal 
         isCustomerModalOpen={isCustomerModalOpen} setIsCustomerModalOpen={setIsCustomerModalOpen} customerSearchQuery={customerSearchQuery} setCustomerSearchQuery={setCustomerSearchQuery} searchedCustomers={searchedCustomers} isSearchingCustomer={isSearchingCustomer} newCustName={newCustName} setNewCustName={setNewCustName} newCustPhone={newCustPhone} setNewCustPhone={setNewCustPhone} newCustAddress={newCustAddress} setNewCustAddress={setNewCustAddress} editingCustomer={editingCustomer} viewingHistoryCustomer={viewingHistoryCustomer} customerHistoryList={customerHistoryList} editCustPoints={editCustPoints} setEditCustPoints={setEditCustPoints} handleSelectCustomer={handleSelectCustomer} handleLoadCustomerHistory={handleLoadCustomerHistory} handleStartEditProfile={handleStartEditProfile} handleUpdateCustomerProfile={handleUpdateCustomerProfile} handleSaveNewCustomer={handleSaveNewCustomer} setViewingHistoryCustomer={setViewingHistoryCustomer} setCustomerHistoryList={setCustomerHistoryList} setEditingCustomer={setEditingCustomer} searchDbCustomers={searchDbCustomers} triggerBeep={triggerBeep}
       />
