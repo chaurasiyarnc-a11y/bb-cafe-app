@@ -1,5 +1,3 @@
-
-
 'use client';
 import React, { useState, useEffect, useMemo } from 'react';
 import { db } from '@/lib/firebase'; 
@@ -167,7 +165,7 @@ export default function BbCafePos() {
     }
   };
 
-  // लाइव ऑर्डर्स स्क्रीन को एक क्लिक में साफ़ करने का सुरक्षित फंक्शन
+  // लाइव ऑर्डर्स स्क्रीन को एक क्लिक में साफ़ करने का सुरक्षित फंक्शन (केवल एक बार यहाँ डिक्लेअर किया गया है)
   const handleClearAllLiveOrders = async () => {
     triggerBeep('tap');
     const confirmClear = window.confirm("क्या आप वाकई सभी एक्टिव लाइव ऑर्डर्स को साफ़ (Complete) करना चाहते हैं?");
@@ -263,6 +261,7 @@ export default function BbCafePos() {
       const savedType = localStorage.getItem("bb_pos_printer_type");
       if (typeof window === 'undefined') return;
 
+      // ब्राउज़र को पेरिफेरल्स स्कैन करने के लिए 500ms का समय देना
       setTimeout(async () => {
         // 1. ब्लूटूथ (Bluetooth) ऑटो-कनेक्ट
         if (savedType === 'thermal_bluetooth' && 'bluetooth' in navigator && !bleCharacteristic) {
@@ -647,26 +646,6 @@ export default function BbCafePos() {
       fontSize // Dynamic font size control added
     };
     return configObj as PrintConfig;
-  };
-
-  // लाइव ऑर्डर्स स्क्रीन को एक क्लिक में साफ़ करने का सुरक्षित फंक्शन
-  const handleClearAllLiveOrders = async () => {
-    triggerBeep('tap');
-    const confirmClear = window.confirm("क्या आप वाकई सभी एक्टिव लाइव ऑर्डर्स को साफ़ (Complete) करना चाहते हैं?");
-    if (!confirmClear) return;
-    
-    const toastId = toast.loading("Clearing active orders...");
-    try {
-      const promises = activeLiveOrders.map(order => 
-        updateDoc(doc(db, "orders", order.id), { status: 'completed' })
-      );
-      await Promise.all(promises);
-      toast.dismiss(toastId);
-      toast.success("Active orders cleared successfully!");
-    } catch (err) {
-      toast.dismiss(toastId);
-      toast.error("Failed to clear active orders");
-    }
   };
 
   const handleConnectPrinter = async () => {
@@ -1068,7 +1047,6 @@ export default function BbCafePos() {
                               {order.items?.map((it: any, idx: number) => (
                                 <div key={idx} className="flex justify-between text-[11px] font-semibold text-neutral-700 dark:text-neutral-300">
                                   <span>{it.name} <span className="text-orange-500 font-bold">x{it.quantity}</span></span>
-                                  <span className="font-mono">₹{it.price * it.quantity}</span>
                                 </div>
                               ))}
                             </div>
@@ -1273,7 +1251,7 @@ export default function BbCafePos() {
               </div>
             )}
 
-            {/* SETTINGS WORKSPACE: सरलीकृत लेआउट और KOT ON/OFF Switch */}
+            {/* SETTINGS WORKSPACE */}
             {activeTab === 'settings' && (
               <div className="max-w-xl mx-auto w-full pb-20 overflow-y-auto flex-1 font-sans animate-fade-in">
                 
@@ -1313,7 +1291,7 @@ export default function BbCafePos() {
                     )}
                   </div>
 
-                  {/* नया बदलाव: KOT ON/OFF Switch (C Paper Size और D Base Font को हटाया गया) */}
+                  {/* KOT ON/OFF Switch */}
                   <div className="border-b border-neutral-200 dark:border-neutral-800 pb-4 space-y-3">
                     <div className="flex items-center justify-between">
                       <p className="text-xs font-bold uppercase text-neutral-800 dark:text-neutral-200">C. Enable KOT Printing:</p>
