@@ -45,6 +45,35 @@ export const getFormattedReceiptDate = (timestamp: any): string => {
 };
 
 // ==========================================
+// SMART WORD WRAPPING HELPER (नए लाइन ब्रेक के लिए)
+// ==========================================
+const wrapText = (text: string, width: number): string[] => {
+  const words = text.split(" ");
+  const lines: string[] = [];
+  let currentLine = "";
+
+  for (const word of words) {
+    if ((currentLine + (currentLine ? " " : "") + word).length <= width) {
+      currentLine += (currentLine ? " " : "") + word;
+    } else {
+      if (currentLine) {
+        lines.push(currentLine);
+      }
+      let remainingWord = word;
+      while (remainingWord.length > width) {
+        lines.push(remainingWord.slice(0, width));
+        remainingWord = remainingWord.slice(width);
+      }
+      currentLine = remainingWord;
+    }
+  }
+  if (currentLine) {
+    lines.push(currentLine);
+  }
+  return lines.length > 0 ? lines : [""];
+};
+
+// ==========================================
 // ALIGNMENT & TEXT FORMATTING HELPERS
 // ==========================================
 export const centerAlign = (text: string, cols: number): string => {
@@ -66,19 +95,28 @@ export const formatRow = (left: string, right: string, cols: number): string => 
   }
 };
 
+// सुधरा हुआ 3-कॉलम अलाइनर (आइटम लंबा होने पर आखिरी लाइन के सामने Qty और Amount प्रिंट करेगा)
 export const formatThreeColumns = (col1: string, col2: string, col3: string, cols: number): string => {
-  // कड़ाई से मोनोस्पेस संरेखण के लिए मानक चौड़ाई
   const c1Width = cols === 48 ? 26 : 16;
   const c2Width = cols === 48 ? 6 : 6;
   const c3Width = cols === 48 ? 16 : 10;
-  let item = col1.trim();
-  if (item.length > c1Width) item = item.slice(0, c1Width - 1) + ".";
+
+  // आइटम के नाम को शब्दों के अनुसार रैप (wrap) करना
+  const itemLines = wrapText(col1.trim(), c1Width);
+  const p2 = col2.trim().padStart(2).padEnd(c2Width); 
+  const p3 = col3.trim().padStart(c3Width); 
+
+  let output = "";
+  // अंतिम लाइन को छोड़कर बाकी सभी लाइनों को केवल नाम के साथ प्रिंट करेंगे
+  for (let i = 0; i < itemLines.length - 1; i++) {
+    output += itemLines[i] + "\n";
+  }
   
-  const p1 = item.padEnd(c1Width);
-  const p2 = col2.trim().padStart(2).padEnd(c2Width); // 2-स्पेस पैडेड क्वांटिटी
-  const p3 = col3.trim().padStart(c3Width); // राइट अलाइन्ड अमाउंट
-  
-  return p1 + p2 + p3 + "\n";
+  // आखरी लाइन में बचा हुआ नाम + Qty + Amount एक साथ अलाइन होंगे
+  const lastLineItem = itemLines[itemLines.length - 1].padEnd(c1Width);
+  output += lastLineItem + p2 + p3 + "\n";
+
+  return output;
 };
 
 const cleanTableNum = (tableStr: string): string => {
@@ -122,39 +160,39 @@ export const generateEscPosQrBytes = (upiUrl: string): Uint8Array => {
 
 export const sendToPrinterInChunks = async (config: PrintConfig, text: string, upiUrl?: string) => {
   const encoder = new TextEncoder();
-  let textBytes: Uint8Array;
+  let finalBytes: Uint8Array;
 
   if (upiUrl && text.includes("{{QR_CODE_PLACEHOLDER}}")) {
     const parts = text.split("{{QR_CODE_PLACEHOLDER}}");
-    const safePart1 = parts[0]; 
-    const safePart2 = parts[1]; 
+    const safePart1 = parts[0].replace(/₹/g, 'Rs.'); 
+    const safePart2 = parts[1].replace(/₹/g, 'Rs.'); 
     
     const part1Bytes = encoder.encode(safePart1);
     const part2Bytes = encoder.encode(safePart2);
     const qrBytes = generateEscPosQrBytes(upiUrl);
     
-    textBytes = new Uint8Array(part1Bytes.length + qrBytes.length + part2Bytes.length);
-    textBytes.set(part1Bytes);
-    textBytes.set(qrBytes, part1Bytes.length);
-    textBytes.set(part2Bytes, part1Bytes.length + qrBytes.length);
+    finalBytes = new Uint8Array(part1Bytes.length + qrBytes.length + part2Bytes.length);
+    finalBytes.set(part1Bytes);
+    finalBytes.set(qrBytes, part1Bytes.length);
+    finalBytes.set(part2Bytes, part1Bytes.length + qrBytes.length);
   } else {
-    const safeText = text.replace("{{QR_CODE_PLACEHOLDER}}", ""); 
-    textBytes = encoder.encode(safeText);
+    const safeText = text.replace(/₹/g, 'Rs.').replace("{{QR_CODE_PLACEHOLDER}}", ""); 
+    finalBytes = encoder.encode(safeText);
   }
 
-  // प्रिंटर इनिशियलाइज़ेशन (ESC @) और फ़ॉन्ट-A मोनोस्पेस लॉक (ESC ! 0x00) कमांड्स जोड़ना
+  // मोनोस्पेस फ़ॉन्ट लॉक करने के लिए कड़ा प्रिंटर इनिशियलाइज़ेशन कमांड्स
   const initBytes = new Uint8Array([0x1B, 0x40, 0x1B, 0x21, 0x00]);
   
-  const finalBytes = new Uint8Array(initBytes.length + textBytes.length);
-  finalBytes.set(initBytes);
-  finalBytes.set(textBytes, initBytes.length);
+  const finalBytesWithInit = new Uint8Array(initBytes.length + finalBytes.length);
+  finalBytesWithInit.set(initBytes);
+  finalBytesWithInit.set(finalBytes, initBytes.length);
 
   const chunkSize = 120;
 
   if (config.printerType === 'thermal_bluetooth' && config.bleCharacteristic) {
     try {
-      for (let i = 0; i < finalBytes.length; i += chunkSize) {
-        await config.bleCharacteristic.writeValue(finalBytes.slice(i, i + chunkSize));
+      for (let i = 0; i < finalBytesWithInit.length; i += chunkSize) {
+        await config.bleCharacteristic.writeValue(finalBytesWithInit.slice(i, i + chunkSize));
         await new Promise(r => setTimeout(r, 60));
       }
       return true;
@@ -168,8 +206,8 @@ export const sendToPrinterInChunks = async (config: PrintConfig, text: string, u
       if (config.serialPort) {
         const writer = config.serialPort.writable.getWriter();
         try {
-          for (let i = 0; i < finalBytes.length; i += chunkSize) {
-            await writer.write(finalBytes.slice(i, i + chunkSize));
+          for (let i = 0; i < finalBytesWithInit.length; i += chunkSize) {
+            await writer.write(finalBytesWithInit.slice(i, i + chunkSize));
             await new Promise(r => setTimeout(r, 40));
           }
         } finally {
@@ -178,8 +216,8 @@ export const sendToPrinterInChunks = async (config: PrintConfig, text: string, u
         return true;
       }
       if (config.usbDevice) {
-        for (let i = 0; i < finalBytes.length; i += chunkSize) {
-          await config.usbDevice.transferOut(1, finalBytes.slice(i, i + chunkSize));
+        for (let i = 0; i < finalBytesWithInit.length; i += chunkSize) {
+          await config.usbDevice.transferOut(1, finalBytesWithInit.slice(i, i + chunkSize));
           await new Promise(r => setTimeout(r, 40));
         }
         return true;
@@ -195,7 +233,7 @@ export const sendToPrinterInChunks = async (config: PrintConfig, text: string, u
 // K.O.T & RECEIPT TEXT GENERATORS (ESC/POS)
 // ==========================================
 export const generateKotEscPosText = (order: any, config: PrintConfig): string => {
-  const cols = config.printerPaperSize === '80mm' ? 48 : 32; // मानक 32 कैरेक्टर चौड़ाई पर वापस सेट किया गया
+  const cols = config.printerPaperSize === '80mm' ? 48 : 32; 
   const dividerLine = "-".repeat(cols) + "\n";
   const doubleDivider = "=".repeat(cols) + "\n";
   const formattedDate = getFormattedDate(order.timestamp);
@@ -212,8 +250,14 @@ export const generateKotEscPosText = (order: any, config: PrintConfig): string =
   text += dividerLine + formatRow("ITEM", "QTY", cols) + dividerLine;
   order.items.forEach((it: any) => {
     const itemLeft = cleanAsciiOnly(it.name).toUpperCase();
-    text += itemLeft.length > (cols - 6) ? `${itemLeft}\n${formatRow("", String(it.quantity), cols)}` : formatRow(itemLeft, String(it.quantity), cols);
-    if (it.note) text += `  * Note: ${it.note.toUpperCase()}\n`;
+    const c1WidthKOT = cols - 6; // Qty के लिए 6 कैरेक्टर छोड़कर आइटम चौड़ाई
+    
+    // सुधरा हुआ KOT वर्ड रैप लॉजिक (KOT में भी मात्रा आखरी लाइन के सामने प्रिंट होगी)
+    const itemLines = wrapText(itemLeft, c1WidthKOT);
+    for (let i = 0; i < itemLines.length - 1; i++) {
+      text += itemLines[i] + "\n";
+    }
+    text += formatRow(itemLines[itemLines.length - 1], String(it.quantity), cols);
   });
   
   if (order.chefInstructions) text += dividerLine + `INSTRUCTIONS: ${order.chefInstructions.toUpperCase()}\n`;
@@ -221,7 +265,7 @@ export const generateKotEscPosText = (order: any, config: PrintConfig): string =
 };
 
 export const generateEscPosText = (order: any, config: PrintConfig): string => {
-  const cols = config.printerPaperSize === '80mm' ? 48 : 32; // मानक 32 कैरेक्टर चौड़ाई पर वापस सेट किया गया
+  const cols = config.printerPaperSize === '80mm' ? 48 : 32; 
   const dividerLine = "-".repeat(cols) + "\n";
   const doubleDivider = "=".repeat(cols) + "\n";
   const formattedDate = getFormattedDate(order.timestamp);
@@ -251,8 +295,8 @@ export const generateEscPosText = (order: any, config: PrintConfig): string => {
   text += formatThreeColumns("ITEM", "QTY", "AMOUNT", cols) + dividerLine;
   order.items.forEach((it: any) => {
     const itemCleanName = cleanAsciiOnly(it.name).toUpperCase();
+    // 3-कॉलम संरेखण लागू किया गया (नाम बड़ा होने पर आखरी लाइन के सामने Qty और Amount आएगा)
     text += formatThreeColumns(itemCleanName, String(it.quantity), `₹${it.price * it.quantity}`, cols);
-    if (it.note) text += `  * Note: ${it.note.toUpperCase()}\n`;
   });
 
   const customDiscountVal = order.discount - (order.customerPointsRedeemed || 0);
@@ -281,7 +325,7 @@ export const generateEscPosText = (order: any, config: PrintConfig): string => {
   
   text += "\n{{QR_CODE_PLACEHOLDER}}"; 
 
-  // सुधरा हुआ: नीचे की तारीख, समय और बिल नंबर वाली फूटर लाइन को पूरी तरह हटा दिया गया है
+  // फूटर की तारीख, समय और रसीद संख्या पूरी तरह हटा दी गई है
   text += centerAlign("THANK YOU! VISIT AGAIN", cols) + centerAlign("www.bb-cafe-app.vercel.app", cols);
   return text + "\n\n\n\n";
 };
@@ -295,7 +339,6 @@ export const generateKotHtml = (order: any, config: PrintConfig): string => {
     <tr style="border-bottom: 1px dashed #ccc;">
       <td style="font-size: ${fSize}px; font-weight: 900; padding: 4px 0; color: #000; text-transform: uppercase; width: 75%; word-break: break-word; white-space: normal;">
         ${it.name.toUpperCase()}
-        ${it.note ? `<div style="font-size: ${fSize - 1.5}px; color: #333; font-weight: 800; padding-left: 4px;">Note: ${it.note.toUpperCase()}</div>` : ''}
       </td>
       <td style="font-size: ${fSize}px; font-weight: 900; text-align: right; padding: 4px 0; font-family: monospace; width: 25%;">${it.quantity}</td>
     </tr>
@@ -406,7 +449,7 @@ export const generateReceiptHtml = (order: any, config: PrintConfig): string => 
           <div style="text-align: right;">Token: #<strong>${order.tokenNumber}</strong></div>
           <div>Mode: ${order.fulfillmentType?.toUpperCase()} ${order.tableNumber ? `(Table: ${order.tableNumber})` : ''}</div>
           <div style="text-align: right;">Pay: ${order.paymentMethod?.toUpperCase()}</div>
-          <div>Date: ${formattedReceiptDate}</div>
+          <div style="grid-column: span 2;">Date: ${formattedReceiptDate}</div>
         </div>
         <div class="divider" style="margin-top: 6px;"></div>
         <table>
@@ -460,7 +503,7 @@ export const generateReceiptHtml = (order: any, config: PrintConfig): string => 
           <div style="font-size: 8px; margin-top: 1px;">www.bb-cafe-app.vercel.app</div>
         </div>
         
-        <!-- सुधरा हुआ: नीचे की तारीख, समय और बिल नंबर वाली एक्स्ट्रा फूटर लाइन को यहाँ से भी पूरी तरह हटा दिया गया है -->
+        <!-- सुधरा हुआ: तारीख, समय और फूटर लाइन को यहाँ से भी पूरी तरह हटा दिया गया है -->
       </body>
     </html>
   `;
