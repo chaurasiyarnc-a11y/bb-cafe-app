@@ -67,12 +67,18 @@ export const formatRow = (left: string, right: string, cols: number): string => 
 };
 
 export const formatThreeColumns = (col1: string, col2: string, col3: string, cols: number): string => {
-  const c1Width = cols === 48 ? 26 : 15;
-  const c2Width = cols === 48 ? 6 : 5;
+  // कड़ाई से मोनोस्पेस संरेखण के लिए मानक चौड़ाई
+  const c1Width = cols === 48 ? 26 : 16;
+  const c2Width = cols === 48 ? 6 : 6;
   const c3Width = cols === 48 ? 16 : 10;
   let item = col1.trim();
   if (item.length > c1Width) item = item.slice(0, c1Width - 1) + ".";
-  return item.padEnd(c1Width) + col2.trim().padStart(3).padEnd(c2Width) + col3.trim().padStart(c3Width) + "\n";
+  
+  const p1 = item.padEnd(c1Width);
+  const p2 = col2.trim().padStart(2).padEnd(c2Width); // 2-स्पेस पैडेड क्वांटिटी
+  const p3 = col3.trim().padStart(c3Width); // राइट अलाइन्ड अमाउंट
+  
+  return p1 + p2 + p3 + "\n";
 };
 
 const cleanTableNum = (tableStr: string): string => {
@@ -84,14 +90,13 @@ const cleanTableNum = (tableStr: string): string => {
   return tableStr;
 };
 
-// थर्मल प्रिंटर के लिए आइटम के नाम से हिंदी/नॉन-ASCII शब्द हटाने का नया सुरक्षित फ़ंक्शन
 const cleanAsciiOnly = (str: string): string => {
   if (!str) return "";
   return str
-    .replace(/[^\x00-\x7F]/g, "") // सभी हिंदी और नॉन-ASCII अक्षर हटाएँ
-    .replace(/\(\s*\)/g, "")      // खाली ब्रैकेट () हटाएँ
-    .replace(/\[\s*\]/g, "")      // खाली ब्रैकेट [] हटाएँ
-    .replace(/\s+/g, " ")         // अतिरिक्त स्पेस को साफ़ करें
+    .replace(/[^\x00-\x7F]/g, "") 
+    .replace(/\(\s*\)/g, "")      
+    .replace(/\[\s*\]/g, "")      
+    .replace(/\s+/g, " ")         
     .trim();
 };
 
@@ -117,26 +122,32 @@ export const generateEscPosQrBytes = (upiUrl: string): Uint8Array => {
 
 export const sendToPrinterInChunks = async (config: PrintConfig, text: string, upiUrl?: string) => {
   const encoder = new TextEncoder();
-  let finalBytes: Uint8Array;
+  let textBytes: Uint8Array;
 
-  // रसीद प्रिंटर पर भेजने से ठीक पहले सभी ₹ को Rs. में बदलेंगे ताकि चीनी कचरा अक्षरों की जगह साफ Rs. प्रिंट हो सके
   if (upiUrl && text.includes("{{QR_CODE_PLACEHOLDER}}")) {
     const parts = text.split("{{QR_CODE_PLACEHOLDER}}");
-    const safePart1 = parts[0].replace(/₹/g, 'Rs.'); 
-    const safePart2 = parts[1].replace(/₹/g, 'Rs.'); 
+    const safePart1 = parts[0]; 
+    const safePart2 = parts[1]; 
     
     const part1Bytes = encoder.encode(safePart1);
     const part2Bytes = encoder.encode(safePart2);
     const qrBytes = generateEscPosQrBytes(upiUrl);
     
-    finalBytes = new Uint8Array(part1Bytes.length + qrBytes.length + part2Bytes.length);
-    finalBytes.set(part1Bytes);
-    finalBytes.set(qrBytes, part1Bytes.length);
-    finalBytes.set(part2Bytes, part1Bytes.length + qrBytes.length);
+    textBytes = new Uint8Array(part1Bytes.length + qrBytes.length + part2Bytes.length);
+    textBytes.set(part1Bytes);
+    textBytes.set(qrBytes, part1Bytes.length);
+    textBytes.set(part2Bytes, part1Bytes.length + qrBytes.length);
   } else {
-    const safeText = text.replace(/₹/g, 'Rs.').replace("{{QR_CODE_PLACEHOLDER}}", ""); 
-    finalBytes = encoder.encode(safeText);
+    const safeText = text.replace("{{QR_CODE_PLACEHOLDER}}", ""); 
+    textBytes = encoder.encode(safeText);
   }
+
+  // प्रिंटर इनिशियलाइज़ेशन (ESC @) और फ़ॉन्ट-A मोनोस्पेस लॉक (ESC ! 0x00) कमांड्स जोड़ना
+  const initBytes = new Uint8Array([0x1B, 0x40, 0x1B, 0x21, 0x00]);
+  
+  const finalBytes = new Uint8Array(initBytes.length + textBytes.length);
+  finalBytes.set(initBytes);
+  finalBytes.set(textBytes, initBytes.length);
 
   const chunkSize = 120;
 
@@ -184,7 +195,7 @@ export const sendToPrinterInChunks = async (config: PrintConfig, text: string, u
 // K.O.T & RECEIPT TEXT GENERATORS (ESC/POS)
 // ==========================================
 export const generateKotEscPosText = (order: any, config: PrintConfig): string => {
-  const cols = config.printerPaperSize === '80mm' ? 48 : 30;
+  const cols = config.printerPaperSize === '80mm' ? 48 : 32; // मानक 32 कैरेक्टर चौड़ाई पर वापस सेट किया गया
   const dividerLine = "-".repeat(cols) + "\n";
   const doubleDivider = "=".repeat(cols) + "\n";
   const formattedDate = getFormattedDate(order.timestamp);
@@ -200,7 +211,6 @@ export const generateKotEscPosText = (order: any, config: PrintConfig): string =
   
   text += dividerLine + formatRow("ITEM", "QTY", cols) + dividerLine;
   order.items.forEach((it: any) => {
-    // सुधरा हुआ: KOT आइटम नाम से हिंदी कचरा शब्द हटाए गए
     const itemLeft = cleanAsciiOnly(it.name).toUpperCase();
     text += itemLeft.length > (cols - 6) ? `${itemLeft}\n${formatRow("", String(it.quantity), cols)}` : formatRow(itemLeft, String(it.quantity), cols);
     if (it.note) text += `  * Note: ${it.note.toUpperCase()}\n`;
@@ -211,7 +221,7 @@ export const generateKotEscPosText = (order: any, config: PrintConfig): string =
 };
 
 export const generateEscPosText = (order: any, config: PrintConfig): string => {
-  const cols = config.printerPaperSize === '80mm' ? 48 : 30;
+  const cols = config.printerPaperSize === '80mm' ? 48 : 32; // मानक 32 कैरेक्टर चौड़ाई पर वापस सेट किया गया
   const dividerLine = "-".repeat(cols) + "\n";
   const doubleDivider = "=".repeat(cols) + "\n";
   const formattedDate = getFormattedDate(order.timestamp);
@@ -240,7 +250,6 @@ export const generateEscPosText = (order: any, config: PrintConfig): string => {
 
   text += formatThreeColumns("ITEM", "QTY", "AMOUNT", cols) + dividerLine;
   order.items.forEach((it: any) => {
-    // सुधरा हुआ: बिल रसीद के आइटम नाम से भी हिंदी कचरा शब्द हटाए गए
     const itemCleanName = cleanAsciiOnly(it.name).toUpperCase();
     text += formatThreeColumns(itemCleanName, String(it.quantity), `₹${it.price * it.quantity}`, cols);
     if (it.note) text += `  * Note: ${it.note.toUpperCase()}\n`;
@@ -272,8 +281,8 @@ export const generateEscPosText = (order: any, config: PrintConfig): string => {
   
   text += "\n{{QR_CODE_PLACEHOLDER}}"; 
 
-  text += centerAlign("THANK YOU! VISIT AGAIN", cols) + centerAlign("www.bb-cafe-app.vercel.app", cols) + dividerLine;
-  text += formatRow(formattedDate.split(',')[0], `#3-${order.billNumber}`, cols);
+  // सुधरा हुआ: नीचे की तारीख, समय और बिल नंबर वाली फूटर लाइन को पूरी तरह हटा दिया गया है
+  text += centerAlign("THANK YOU! VISIT AGAIN", cols) + centerAlign("www.bb-cafe-app.vercel.app", cols);
   return text + "\n\n\n\n";
 };
 
@@ -284,7 +293,6 @@ export const generateKotHtml = (order: any, config: PrintConfig): string => {
   const fSize = config.fontSize || 9.5;
   const itemsHtml = order.items.map((it: any) => `
     <tr style="border-bottom: 1px dashed #ccc;">
-      <!-- स्क्रीन पर जीरा राइस हिंदी में पूरा दिखेगा क्योंकि स्क्रीन हिंदी सपोर्ट करती है -->
       <td style="font-size: ${fSize}px; font-weight: 900; padding: 4px 0; color: #000; text-transform: uppercase; width: 75%; word-break: break-word; white-space: normal;">
         ${it.name.toUpperCase()}
         ${it.note ? `<div style="font-size: ${fSize - 1.5}px; color: #333; font-weight: 800; padding-left: 4px;">Note: ${it.note.toUpperCase()}</div>` : ''}
@@ -348,7 +356,6 @@ export const generateReceiptHtml = (order: any, config: PrintConfig): string => 
 
   const itemsRows = order.items.map((it: any) => `
     <tr style="border-bottom: 1px dashed #eee;">
-      <!-- स्क्रीन पर जीरा राइस हिंदी में पूरा दिखेगा क्योंकि स्क्रीन हिंदी सपोर्ट करती है -->
       <td style="font-size: ${fSize}px; font-weight: bold; padding: 4px 0; color: #111; text-transform: uppercase; width: 55%; word-break: break-word; white-space: normal;">${it.name.toUpperCase()}</td>
       <td style="font-size: ${fSize}px; font-weight: bold; text-align: center; padding: 4px 0; font-family: monospace; width: 15%;">${it.quantity}</td>
       <td style="font-size: ${fSize}px; font-weight: bold; text-align: right; padding: 4px 0; font-family: monospace; width: 30%;">₹${it.price * it.quantity}</td>
@@ -399,7 +406,7 @@ export const generateReceiptHtml = (order: any, config: PrintConfig): string => 
           <div style="text-align: right;">Token: #<strong>${order.tokenNumber}</strong></div>
           <div>Mode: ${order.fulfillmentType?.toUpperCase()} ${order.tableNumber ? `(Table: ${order.tableNumber})` : ''}</div>
           <div style="text-align: right;">Pay: ${order.paymentMethod?.toUpperCase()}</div>
-          <div style="grid-column: span 2;">Date: ${formattedReceiptDate}</div>
+          <div>Date: ${formattedReceiptDate}</div>
         </div>
         <div class="divider" style="margin-top: 6px;"></div>
         <table>
@@ -441,7 +448,7 @@ export const generateReceiptHtml = (order: any, config: PrintConfig): string => 
         <div class="divider"></div>
         
         <div class="center" style="margin: 4px 0;">
-          <div style="font-size: 8px; font-weight: 900; margin-bottom: 4.5px;">SCAN TO PAY</div>
+          <div style="font-size: 8px; margin-bottom: 4.5px; font-weight: bold;">SCAN TO PAY</div>
           <img src="${qrCodeUrl}" style="width: 80px; height: 80px; border: 1px solid #000; padding: 2px; display: inline-block;" />
           <div style="font-size: 7px; font-weight: 900; margin-top: 4.5px;">BHIM UPI PAYTM/PHONEPE</div>
         </div>
@@ -452,9 +459,8 @@ export const generateReceiptHtml = (order: any, config: PrintConfig): string => 
           <div style="font-weight: 900; font-size: 8.5px; margin-top: 2px; font-style: italic;">THANK YOU, VISIT AGAIN!</div>
           <div style="font-size: 8px; margin-top: 1px;">www.bb-cafe-app.vercel.app</div>
         </div>
-        <div style="display: flex; justify-content: space-between; font-size: 7.5px; margin-top: 6px; font-weight: bold; border-top: 1px dashed #ccc; padding-top: 3px;">
-          <span>${formattedReceiptDate}</span><span>#3-${order.billNumber}</span>
-        </div>
+        
+        <!-- सुधरा हुआ: नीचे की तारीख, समय और बिल नंबर वाली एक्स्ट्रा फूटर लाइन को यहाँ से भी पूरी तरह हटा दिया गया है -->
       </body>
     </html>
   `;
