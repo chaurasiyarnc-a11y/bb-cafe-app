@@ -19,7 +19,6 @@ export const getFormattedDate = (timestamp: any): string => {
   if (!timestamp) return new Date().toLocaleString('en-IN');
   try {
     const dateObj = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-    // टोस्ट/प्रिंट में am/pm को बड़े अक्षरों (AM/PM) में बदलने के लिए .toUpperCase() जोड़ा गया
     return isNaN(dateObj.getTime()) 
       ? new Date().toLocaleString('en-IN').toUpperCase() 
       : dateObj.toLocaleString('en-IN').toUpperCase();
@@ -56,11 +55,15 @@ export const centerAlign = (text: string, cols: number): string => {
 };
 
 export const formatRow = (left: string, right: string, cols: number): string => {
-  const spaceForRight = cols - left.length;
-  if (spaceForRight <= 0) {
-    return left.slice(0, cols - right.length - 1) + " " + right + "\n";
+  const minGap = 2; // न्यूनतम स्पेस गैप
+  const availableSpace = cols - left.length - right.length;
+  
+  if (availableSpace >= minGap) {
+    return left + " ".repeat(availableSpace) + right + "\n";
+  } else {
+    const truncatedLeft = left.slice(0, cols - right.length - minGap);
+    return truncatedLeft + " ".repeat(minGap) + right + "\n";
   }
-  return left + right.padStart(spaceForRight) + "\n";
 };
 
 export const formatThreeColumns = (col1: string, col2: string, col3: string, cols: number): string => {
@@ -70,6 +73,15 @@ export const formatThreeColumns = (col1: string, col2: string, col3: string, col
   let item = col1.trim();
   if (item.length > c1Width) item = item.slice(0, c1Width - 1) + ".";
   return item.padEnd(c1Width) + col2.trim().padStart(3).padEnd(c2Width) + col3.trim().padStart(c3Width) + "\n";
+};
+
+const cleanTableNum = (tableStr: string): string => {
+  if (!tableStr) return "";
+  const upper = tableStr.toUpperCase().trim();
+  if (upper.startsWith("TABLE ")) {
+    return "T-" + upper.replace("TABLE ", "");
+  }
+  return tableStr;
 };
 
 // ==========================================
@@ -88,7 +100,7 @@ export const generateEscPosQrBytes = (upiUrl: string): Uint8Array => {
     0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x45, 0x30,
     0x1D, 0x28, 0x6B, pL, pH, 0x31, 0x50, 0x30, ...Array.from(urlBytes),
     0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x51, 0x30, // Print QR Command
-    0x0A, 0x1B, 0x61, 0x00, 0x0A // Reset Align
+    0x0A, 0x1B, 0x61, 0x00 // सुधारा गया: अतिरिक्त 0x0A को हटाकर गैप कम किया गया
   ]);
 };
 
@@ -168,9 +180,9 @@ export const generateKotEscPosText = (order: any, config: PrintConfig): string =
   let text = doubleDivider + centerAlign("K.O.T", cols) + centerAlign("BUM BUM CAFE - KITCHEN", cols) + doubleDivider;
   text += formatRow(`Token: #${order.tokenNumber}`, `Bill: #${String(order.billNumber).padStart(4, '0')}`, cols);
   
-  // टेबल नंबर को आर्डर टाइप के साथ एक ही लाइन में मर्ज किया गया ताकि पेपर बचे
-  const typeLabel = order.fulfillmentType?.toUpperCase() === 'TABLE' && order.tableNumber
-    ? `Type: TABLE (${order.tableNumber})`
+  const tableDisplay = order.tableNumber ? cleanTableNum(order.tableNumber) : "";
+  const typeLabel = order.fulfillmentType?.toUpperCase() === 'TABLE' && tableDisplay
+    ? `Type: TABLE (${tableDisplay})`
     : `Type: ${order.fulfillmentType?.toUpperCase()}`;
   text += `${typeLabel}\nDate: ${formattedDate}\n`;
   
@@ -193,7 +205,6 @@ export const generateEscPosText = (order: any, config: PrintConfig): string => {
   
   let text = doubleDivider + centerAlign("BUM BUM CAFE", cols) + centerAlign("MOHANDRA, PANNA (M.P.)", cols) + doubleDivider;
   
-  // पेपर बचाने के लिए Walk-in Guest (बिना फ़ोन/पते वाले आर्डर) की लाइन स्पेसिंग को छोटा किया गया
   if (order.customerPhone || order.address) {
     text += "CUSTOMER DETAILS:\n";
     text += `Name: ${order.customerName || 'Walk-in Guest'}\n`;
@@ -206,9 +217,9 @@ export const generateEscPosText = (order: any, config: PrintConfig): string => {
   text += dividerLine;
   text += formatRow(`Bill No: #${String(order.billNumber).padStart(4, '0')}`, `Token: #${order.tokenNumber}`, cols);
   
-  // आर्डर टाइप और टेबल नंबर को एक ही लाइन में मर्ज करके पेपर की बचत की गई
-  const typeText = order.fulfillmentType?.toUpperCase() === 'TABLE' && order.tableNumber
-    ? `Type: TABLE (${order.tableNumber})`
+  const tableDisplay = order.tableNumber ? cleanTableNum(order.tableNumber) : "";
+  const typeText = order.fulfillmentType?.toUpperCase() === 'TABLE' && tableDisplay
+    ? `Type: TABLE (${tableDisplay})`
     : `Type: ${order.fulfillmentType?.toUpperCase()}`;
     
   text += formatRow(typeText, `Pay: ${order.paymentMethod?.toUpperCase()}`, cols);
@@ -225,7 +236,7 @@ export const generateEscPosText = (order: any, config: PrintConfig): string => {
   text += formatRow("Total:", `₹${order.subtotal}`, cols);
   text += formatRow("Discount:", `₹${customDiscountVal > 0 ? customDiscountVal : 0}`, cols);
   text += formatRow("Coupon Discount:", `₹${order.customerPointsRedeemed || 0}`, cols);
-  if (order.gstAmount) text += formatRow(`GST (${order.gstRate}%):`, `₹${order.gstAmount}`, cols);
+  if (order.gstAmount) text += formatRow("GST (5%):", `₹${order.gstAmount}`, cols);
   
   text += dividerLine + formatRow("GRAND TOTAL:", `₹${order.total}`, cols);
   if (order.customerPhone) {
@@ -237,8 +248,8 @@ export const generateEscPosText = (order: any, config: PrintConfig): string => {
   text += dividerLine;
   text += centerAlign("SCAN TO PAY", cols);
   
-  // QR कोड के ऊपर और नीचे 1-1 खाली लाइन (\n) जोड़ी गई ताकि स्कैनिंग आसान हो
-  text += "\n{{QR_CODE_PLACEHOLDER}}\n";
+  // सुधरा हुआ: QR कोड के बाद का अतिरिक्त \n हटा दिया गया ताकि फूटर बहुत नीचे न खिसके
+  text += "\n{{QR_CODE_PLACEHOLDER}}"; 
 
   text += centerAlign("THANK YOU! VISIT AGAIN", cols) + centerAlign("www.bb-cafe-app.vercel.app", cols) + dividerLine;
   text += formatRow(formattedDate.split(',')[0], `#3-${order.billNumber}`, cols);
@@ -383,7 +394,7 @@ export const generateReceiptHtml = (order: any, config: PrintConfig): string => 
           <div style="display: flex; justify-content: space-between;"><span>Total:</span><span>₹${order.subtotal}</span></div>
           <div style="display: flex; justify-content: space-between;"><span>Discount:</span><span>-₹${customDiscountVal > 0 ? customDiscountVal : 0}</span></div>
           <div style="display: flex; justify-content: space-between;"><span>Coupon Discount:</span><span>-₹${order.customerPointsRedeemed || 0}</span></div>
-          ${order.gstAmount ? `<div style="display: flex; justify-content: space-between;"><span>GST (${order.gstRate}%):</span><span>+₹${order.gstAmount}</span></div>` : ''}
+          ${order.gstAmount ? `<div style="display: flex; justify-content: space-between;"><span>GST (5%):</span><span>+₹${order.gstAmount}</span></div>` : ''}
         </div>
         <div class="double-divider"></div>
         <div style="display: flex; justify-content: space-between; align-items: center; font-weight: 900; font-size: 11px;">
