@@ -95,7 +95,6 @@ export const formatRow = (left: string, right: string, cols: number): string => 
   }
 };
 
-// सुधरा हुआ 3-कॉलम अलाइनर (मांग के अनुसार 19 + 5 + 6 = 30 का गणित लागू किया गया)
 export const formatThreeColumns = (col1: string, col2: string, col3: string, cols: number): string => {
   const c1Width = cols === 48 ? 26 : 19; // डिश नाम के लिए 19 कैरेक्टर चौड़ाई
   const c2Width = cols === 48 ? 6 : 5;  // Quantity के लिए 5 कैरेक्टर चौड़ाई
@@ -242,7 +241,13 @@ export const generateKotEscPosText = (order: any, config: PrintConfig): string =
   const typeLabel = order.fulfillmentType?.toUpperCase() === 'TABLE' && tableDisplay
     ? `Type: TABLE (${tableDisplay})`
     : `Type: ${order.fulfillmentType?.toUpperCase()}`;
-  text += `${typeLabel}\nDate: ${formattedDate}\n`;
+  
+  const dateParts = formattedDate.split(', ');
+  const dateOnly = dateParts[0];
+  const timeOnly = dateParts[1] || "";
+  
+  text += `${typeLabel}\n`;
+  text += formatRow(`Date: ${dateOnly}`, timeOnly, cols);
   
   text += dividerLine + formatRow("ITEM", "QTY", cols) + dividerLine;
   order.items.forEach((it: any) => {
@@ -286,9 +291,16 @@ export const generateEscPosText = (order: any, config: PrintConfig): string => {
     : `Type: ${order.fulfillmentType?.toUpperCase()}`;
     
   text += formatRow(typeText, `Pay: ${order.paymentMethod?.toUpperCase()}`, cols);
-  text += `Date: ${formattedDate}\n` + dividerLine;
+  
+  // तारीख को लेफ्ट में और समय को पूरी तरह से राइट में अलाइन किया गया
+  const dateParts = formattedDate.split(', ');
+  const dateOnly = dateParts[0];
+  const timeOnly = dateParts[1] || "";
+  text += formatRow(`Date: ${dateOnly}`, timeOnly, cols);
+  
+  text += dividerLine;
 
-  text += formatThreeColumns("ITEM", "QTY", "AMOUNT", cols) + dividerLine;
+  text += formatThreeColumns("ITEM", "QTY", "AMT", cols) + dividerLine;
   order.items.forEach((it: any) => {
     const itemCleanName = cleanAsciiOnly(it.name).toUpperCase();
     text += formatThreeColumns(itemCleanName, String(it.quantity), `₹${it.price * it.quantity}`, cols);
@@ -326,7 +338,7 @@ export const generateEscPosText = (order: any, config: PrintConfig): string => {
 };
 
 // ==========================================
-// DYNAMIC COMPACT HTML GENERATORS (BROWSER FALLBACK)
+// DYNAMIC COMPACT HTML GENERATORS (BROWSER FALLBACK - VERDANA)
 // ==========================================
 export const generateKotHtml = (order: any, config: PrintConfig): string => {
   const fSize = config.fontSize || 9.5;
@@ -335,7 +347,7 @@ export const generateKotHtml = (order: any, config: PrintConfig): string => {
       <td style="font-size: ${fSize}px; font-weight: 900; padding: 4px 0; color: #000; text-transform: uppercase; width: 75%; word-break: break-word; white-space: normal;">
         ${it.name.toUpperCase()}
       </td>
-      <td style="font-size: ${fSize}px; font-weight: 900; text-align: right; padding: 4px 0; font-family: monospace; width: 25%;">${it.quantity}</td>
+      <td style="font-size: ${fSize}px; font-weight: 900; text-align: right; padding: 4px 0; width: 25%;">${it.quantity}</td>
     </tr>
   `).join('');
 
@@ -347,15 +359,17 @@ export const generateKotHtml = (order: any, config: PrintConfig): string => {
             @page { size: ${config.printerPaperSize === '58mm' ? '58mm' : '80mm'} auto; margin: 0; }
             body { margin: 0; padding: 2px; }
           }
-          body { font-family: monospace; padding: 2px; font-size: ${fSize}px; color: #000; background-color: #fff; margin: 0; }
+          /* सुधरा हुआ: मोनोस्पेस से बदलकर 'Verdana', sans-serif किया गया */
+          body { font-family: 'Verdana', sans-serif; padding: 2px; font-size: ${fSize}px; color: #000; background-color: #fff; margin: 0; }
           .center { text-align: center; }
           .divider { border-top: 1px dotted #000; margin: 4px 0; }
           table { width: 100%; border-collapse: collapse; table-layout: fixed; }
         </style>
       </head>
       <body>
-        <div class="center" style="font-size: ${fSize + 3}px; font-weight: 900; border: 1.5px solid #000; padding: 3px; background-color: #000; color: #fff;">K.O.T (KITCHEN)</div>
-        <div class="center" style="font-size: ${fSize - 1}px; font-weight: bold; margin-top: 2px;">BUM BUM CAFE</div>
+        <!-- सुधरा हुआ: KOT हेडर को डार्क बोल्ड बॉर्डर बॉक्स में बड़ा और स्पष्ट किया गया -->
+        <div class="center" style="font-family: 'Verdana', sans-serif; font-size: ${fSize + 5}px; font-weight: 900; border: 2px solid #000; padding: 4px; color: #000; letter-spacing: 1px;">K.O.T (KITCHEN)</div>
+        <div class="center" style="font-size: ${fSize + 1}px; font-weight: 900; margin-top: 3px; color: #000;">BUM BUM CAFE</div>
         <div class="divider"></div>
         <div style="font-size: ${fSize - 0.5}px; font-weight: bold; line-height: 1.3;">
           <div>Token No: <span style="font-size: ${fSize + 1.5}px; font-weight: 900;">#${order.tokenNumber}</span></div>
@@ -366,8 +380,8 @@ export const generateKotHtml = (order: any, config: PrintConfig): string => {
         <table>
           <thead>
             <tr style="border-bottom: 1px solid #000;">
-              <th style="text-align: left; font-size: 9.5px; font-weight: 900; padding-bottom: 3px; width: 75%;">ITEM</th>
-              <th style="text-align: right; font-size: 9.5px; font-weight: 900; padding-bottom: 3px; width: 25%;">QTY</th>
+              <th style="text-align: left; font-size: 8.5px; padding-bottom: 3px; width: 75%;">ITEM</th>
+              <th style="text-align: right; font-size: 8.5px; padding-bottom: 3px; width: 25%;">QTY</th>
             </tr>
           </thead>
           <tbody>${itemsHtml}</tbody>
@@ -395,8 +409,8 @@ export const generateReceiptHtml = (order: any, config: PrintConfig): string => 
   const itemsRows = order.items.map((it: any) => `
     <tr style="border-bottom: 1px dashed #eee;">
       <td style="font-size: ${fSize}px; font-weight: bold; padding: 4px 0; color: #111; text-transform: uppercase; width: 55%; word-break: break-word; white-space: normal;">${it.name.toUpperCase()}</td>
-      <td style="font-size: ${fSize}px; font-weight: bold; text-align: center; padding: 4px 0; font-family: monospace; width: 15%;">${it.quantity}</td>
-      <td style="font-size: ${fSize}px; font-weight: bold; text-align: right; padding: 4px 0; font-family: monospace; width: 30%;">₹${it.price * it.quantity}</td>
+      <td style="font-size: ${fSize}px; font-weight: bold; text-align: center; padding: 4px 0; width: 15%;">${it.quantity}</td>
+      <td style="font-size: ${fSize}px; font-weight: bold; text-align: right; padding: 4px 0; width: 30%;">₹${it.price * it.quantity}</td>
     </tr>
   `).join('');
 
@@ -418,16 +432,18 @@ export const generateReceiptHtml = (order: any, config: PrintConfig): string => 
             @page { size: ${config.printerPaperSize === '58mm' ? '58mm' : '80mm'} auto; margin: 0; }
             body { margin: 0; padding: 2px; }
           }
-          body { font-family: monospace; width: 100%; margin: 0; padding: 2px; color: #000; font-size: ${fSize}px; line-height: 1.25; box-sizing: border-box; }
+          /* सुधरा हुआ: मोनोस्पेस से बदलकर 'Verdana', sans-serif किया गया */
+          body { font-family: 'Verdana', sans-serif; width: 100%; margin: 0; padding: 2px; color: #000; font-size: ${fSize}px; line-height: 1.25; box-sizing: border-box; }
           .center { text-align: center; }
-          .divider { border-top: 1.5px dotted #000; margin: 4px 0; height: 0; }
-          .double-divider { border-top: 1.5px dotted #000; border-bottom: 1.5px dotted #000; margin: 4px 0; height: 3px; }
+          .divider { border-top: 1px dotted #000; margin: 4px 0; height: 0; }
+          .double-divider { border-top: 1px dotted #000; border-bottom: 1.5px dotted #000; margin: 4px 0; height: 3px; }
           table { width: 100%; border-collapse: collapse; table-layout: fixed; }
         </style>
       </head>
       <body>
         <div class="center" style="margin-bottom: 4px;">
-          <div style="background-color: #000; color: #fff; padding: 3px 6px; font-size: ${fSize + 2}px; font-weight: 900; display: inline-block;">BUM BUM CAFE</div>
+          <!-- सुधरा हुआ: हेडर को डार्क बोल्ड, बड़ा और साफ़ किया गया -->
+          <div style="font-family: 'Verdana', sans-serif; font-size: ${fSize + 5}px; font-weight: 900; color: #000; text-transform: uppercase; margin-bottom: 2px; letter-spacing: 0.5px;">BUM BUM CAFE</div>
           <div style="font-size: ${fSize - 1.5}px; font-weight: bold; color: #333; margin-top: 1px;">BUS STAND MOHANDRA, DIST. PANNA, M.P.</div>
           <div style="font-size: 8px; font-weight: bold;">Mo. 9714293759</div>
         </div>
@@ -452,6 +468,7 @@ export const generateReceiptHtml = (order: any, config: PrintConfig): string => 
             <tr style="border-bottom: 1px solid #000;">
               <th style="text-align: left; font-size: 8.5px; padding-bottom: 3px; width: 55%;">ITEM</th>
               <th style="text-align: center; font-size: 8.5px; padding-bottom: 3px; width: 15%;">QTY</th>
+              <!-- हेडर में भी नया "AMT" संरेखित शब्द जोड़ा गया -->
               <th style="text-align: right; font-size: 8.5px; padding-bottom: 3px; width: 30%;">AMT</th>
             </tr>
           </thead>
@@ -498,7 +515,7 @@ export const generateReceiptHtml = (order: any, config: PrintConfig): string => 
           <div style="font-size: 8px; margin-top: 1px;">www.bb-cafe-app.vercel.app</div>
         </div>
         
-        <!-- सुधरा हुआ: तारीख, समय और फूटर लाइन को यहाँ से भी पूरी तरह हटा दिया गया है -->
+        <!-- सुधरा हुआ: नीचे की तारीख, समय और फूटर लाइन को यहाँ से भी पूरी तरह हटा दिया गया है -->
       </body>
     </html>
   `;
