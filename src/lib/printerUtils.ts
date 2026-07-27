@@ -95,10 +95,10 @@ export const formatRow = (left: string, right: string, cols: number): string => 
   }
 };
 
-// सुधरा हुआ 3-कॉलम अलाइनर (Rs को हमेशा एक वर्टिकल लाइन पर लॉक रखेगा)
+// सुधरा हुआ 3-कॉलम अलाइनर (मांग के अनुसार "Rs" हटाकर केवल दाम को "AMT" के नीचे अलाइन किया गया)
 export const formatThreeColumns = (col1: string, col2: string, col3: string, cols: number): string => {
   const c1Width = cols === 48 ? 26 : 19; // डिश नाम के लिए 19 कैरेक्टर चौड़ाई
-  const c2Width = cols === 48 ? 6 : 4;  // Quantity के लिए 4 कैरेक्टर चौड़ाई (Strict Layout Safety)
+  const c2Width = cols === 48 ? 6 : 5;  // Quantity के लिए 5 कैरेक्टर चौड़ाई
   const c3Width = cols === 48 ? 16 : 6;  // Amount के लिए 6 कैरेक्टर चौड़ाई
 
   const itemLines = wrapText(col1.trim(), c1Width);
@@ -109,10 +109,9 @@ export const formatThreeColumns = (col1: string, col2: string, col3: string, col
   if (isNaN(Number(col3.replace(/[₹Rs\.]/g, "").trim()))) {
     p3 = col3.trim().padStart(c3Width);
   } else {
+    // सुधरा हुआ: "Rs" हटाकर केवल शुद्ध दाम को सीधे "AMT" के नीचे राइट-अलाइन किया गया
     const rawNumberStr = col3.replace(/[₹Rs\.]/g, "").trim();
-    const numWidth = c3Width - 2; // "Rs" (2 कैरेक्टर) को घटाकर बची चौड़ाई
-    const formattedNum = rawNumberStr.padStart(numWidth);
-    p3 = "Rs" + formattedNum; // Rs हमेशा कॉलम के प्रारंभ (इंडेक्स 24) पर लॉक रहेगा
+    p3 = rawNumberStr.padStart(c3Width); 
   }
 
   let output = "";
@@ -126,7 +125,7 @@ export const formatThreeColumns = (col1: string, col2: string, col3: string, col
   return output;
 };
 
-// सुधरा हुआ: टोटल ब्लॉक के 'Rs' को भी एक सीध में अलाइन करने के लिए नया हेल्पर
+// टोटल ब्लॉक के 'Rs' को एक सीध में अलाइन करने के लिए हेल्पर
 const formatTotalRow = (label: string, value: number, cols: number): string => {
   const rightWidth = cols === 48 ? 16 : 6;
   const numWidth = rightWidth - 2; // "Rs" (2 कैरेक्टर) को घटाकर बची चौड़ाई
@@ -191,7 +190,7 @@ export const generateEscPosQrBytes = (upiUrl: string): Uint8Array => {
   return new Uint8Array([
     0x1B, 0x61, 0x01, // Center Align
     0x1D, 0x28, 0x6B, 0x04, 0x00, 0x31, 0x41, 0x32, 0x00,
-    0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x43, 0x04, // कड़ाई से सीधे मॉड्यूल साइज 0x04 किया गया (25% छोटा)
+    0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x43, 0x04, // सीधे मॉड्यूल साइज 0x04 किया गया (25% छोटा)
     0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x45, 0x30,
     0x1D, 0x28, 0x6B, pL, pH, 0x31, 0x50, 0x30, ...Array.from(urlBytes),
     0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x51, 0x30, // Print QR Command
@@ -359,7 +358,7 @@ export const generateEscPosText = (order: any, config: PrintConfig): string => {
   const customDiscountVal = order.discount - (order.customerPointsRedeemed || 0);
   text += dividerLine;
   
-  // सुधरा हुआ: Total, Discount, और Grand Total में 'Rs' को एक सीध में अलाइन किया गया
+  // Total, Discount, और Grand Total में 'Rs' को स्केल की तरह एक सीध में अलाइन किया गया
   text += formatTotalRow("Total:", order.subtotal, cols);
   if (customDiscountVal > 0) {
     text += formatTotalRow("Discount:", customDiscountVal, cols);
@@ -483,8 +482,8 @@ export const generateReceiptHtml = (order: any, config: PrintConfig): string => 
           }
           body { font-family: 'Verdana', sans-serif; width: 100%; margin: 0; padding: 2px; color: #000; font-size: ${fSize}px; line-height: 1.25; box-sizing: border-box; }
           .center { text-align: center; }
-          .divider { border-top: 1px dotted #000; margin: 4px 0; height: 0; }
-          .double-divider { border-top: 1px dotted #000; border-bottom: 1.5px dotted #000; margin: 4px 0; height: 3px; }
+          .divider { border-top: 1.5px dotted #000; margin: 4px 0; height: 0; }
+          .double-divider { border-top: 1.5px dotted #000; border-bottom: 1.5px dotted #000; margin: 4px 0; height: 3px; }
           table { width: 100%; border-collapse: collapse; table-layout: fixed; }
         </style>
       </head>
@@ -562,8 +561,6 @@ export const generateReceiptHtml = (order: any, config: PrintConfig): string => 
           <div style="font-weight: 900; font-size: 8.5px; margin-top: 2px; font-style: italic;">THANK YOU, VISIT AGAIN!</div>
           <div style="font-size: 8px; margin-top: 1px;">www.bb-cafe-app.vercel.app</div>
         </div>
-        
-        <!-- सुधरा हुआ: तारीख, समय और फूटर लाइन को यहाँ से भी पूरी तरह हटा दिया गया है -->
       </body>
     </html>
   `;
