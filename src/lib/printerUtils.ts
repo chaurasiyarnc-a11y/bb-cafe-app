@@ -84,6 +84,17 @@ const cleanTableNum = (tableStr: string): string => {
   return tableStr;
 };
 
+// थर्मल प्रिंटर के लिए आइटम के नाम से हिंदी/नॉन-ASCII शब्द हटाने का नया सुरक्षित फ़ंक्शन
+const cleanAsciiOnly = (str: string): string => {
+  if (!str) return "";
+  return str
+    .replace(/[^\x00-\x7F]/g, "") // सभी हिंदी और नॉन-ASCII अक्षर हटाएँ
+    .replace(/\(\s*\)/g, "")      // खाली ब्रैकेट () हटाएँ
+    .replace(/\[\s*\]/g, "")      // खाली ब्रैकेट [] हटाएँ
+    .replace(/\s+/g, " ")         // अतिरिक्त स्पेस को साफ़ करें
+    .trim();
+};
+
 // ==========================================
 // ESC/POS DIRECT PRINTER CODE GENERATORS
 // ==========================================
@@ -94,12 +105,12 @@ export const generateEscPosQrBytes = (upiUrl: string): Uint8Array => {
   const pH = ((urlBytes.length + 3) >> 8) & 0xFF;
 
   return new Uint8Array([
-    0x1B, 0x61, 0x01,
+    0x1B, 0x61, 0x01, // Center Align
     0x1D, 0x28, 0x6B, 0x04, 0x00, 0x31, 0x41, 0x32, 0x00,
     0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x43, 0x06,
     0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x45, 0x30,
     0x1D, 0x28, 0x6B, pL, pH, 0x31, 0x50, 0x30, ...Array.from(urlBytes),
-    0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x51, 0x30,
+    0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x51, 0x30, // Print QR Command
     0x0A, 0x1B, 0x61, 0x00
   ]);
 };
@@ -108,11 +119,11 @@ export const sendToPrinterInChunks = async (config: PrintConfig, text: string, u
   const encoder = new TextEncoder();
   let finalBytes: Uint8Array;
 
-  // सुधारा गया: रसीद पर वास्तविक '₹' चिह्न भेजने के लिए .replace(/₹/g, 'Rs.') को हटा दिया गया है
+  // रसीद प्रिंटर पर भेजने से ठीक पहले सभी ₹ को Rs. में बदलेंगे ताकि चीनी कचरा अक्षरों की जगह साफ Rs. प्रिंट हो सके
   if (upiUrl && text.includes("{{QR_CODE_PLACEHOLDER}}")) {
     const parts = text.split("{{QR_CODE_PLACEHOLDER}}");
-    const safePart1 = parts[0]; 
-    const safePart2 = parts[1]; 
+    const safePart1 = parts[0].replace(/₹/g, 'Rs.'); 
+    const safePart2 = parts[1].replace(/₹/g, 'Rs.'); 
     
     const part1Bytes = encoder.encode(safePart1);
     const part2Bytes = encoder.encode(safePart2);
@@ -123,7 +134,7 @@ export const sendToPrinterInChunks = async (config: PrintConfig, text: string, u
     finalBytes.set(qrBytes, part1Bytes.length);
     finalBytes.set(part2Bytes, part1Bytes.length + qrBytes.length);
   } else {
-    const safeText = text.replace("{{QR_CODE_PLACEHOLDER}}", ""); 
+    const safeText = text.replace(/₹/g, 'Rs.').replace("{{QR_CODE_PLACEHOLDER}}", ""); 
     finalBytes = encoder.encode(safeText);
   }
 
@@ -189,7 +200,8 @@ export const generateKotEscPosText = (order: any, config: PrintConfig): string =
   
   text += dividerLine + formatRow("ITEM", "QTY", cols) + dividerLine;
   order.items.forEach((it: any) => {
-    const itemLeft = it.name.toUpperCase();
+    // सुधरा हुआ: KOT आइटम नाम से हिंदी कचरा शब्द हटाए गए
+    const itemLeft = cleanAsciiOnly(it.name).toUpperCase();
     text += itemLeft.length > (cols - 6) ? `${itemLeft}\n${formatRow("", String(it.quantity), cols)}` : formatRow(itemLeft, String(it.quantity), cols);
     if (it.note) text += `  * Note: ${it.note.toUpperCase()}\n`;
   });
@@ -228,7 +240,9 @@ export const generateEscPosText = (order: any, config: PrintConfig): string => {
 
   text += formatThreeColumns("ITEM", "QTY", "AMOUNT", cols) + dividerLine;
   order.items.forEach((it: any) => {
-    text += formatThreeColumns(it.name.toUpperCase(), String(it.quantity), `₹${it.price * it.quantity}`, cols);
+    // सुधरा हुआ: बिल रसीद के आइटम नाम से भी हिंदी कचरा शब्द हटाए गए
+    const itemCleanName = cleanAsciiOnly(it.name).toUpperCase();
+    text += formatThreeColumns(itemCleanName, String(it.quantity), `₹${it.price * it.quantity}`, cols);
     if (it.note) text += `  * Note: ${it.note.toUpperCase()}\n`;
   });
 
@@ -236,14 +250,12 @@ export const generateEscPosText = (order: any, config: PrintConfig): string => {
   text += dividerLine;
   text += formatRow("Total:", `₹${order.subtotal}`, cols);
   
-  // सुधरा हुआ: डिस्काउंट और कूपन डिस्काउंट केवल तभी छपेंगे जब वैल्यू 0 से ज्यादा होगी
   if (customDiscountVal > 0) {
     text += formatRow("Discount:", `₹${customDiscountVal}`, cols);
   }
   if (order.customerPointsRedeemed && order.customerPointsRedeemed > 0) {
     text += formatRow("Coupon Discount:", `₹${order.customerPointsRedeemed}`, cols);
   }
-  // सुधरा हुआ: GST भी केवल तभी छपेगा जब GST की वैल्यू 0 से बड़ी होगी
   if (order.gstAmount && order.gstAmount > 0) {
     text += formatRow(`GST (${order.gstRate}%):`, `₹${order.gstAmount}`, cols);
   }
@@ -272,6 +284,7 @@ export const generateKotHtml = (order: any, config: PrintConfig): string => {
   const fSize = config.fontSize || 9.5;
   const itemsHtml = order.items.map((it: any) => `
     <tr style="border-bottom: 1px dashed #ccc;">
+      <!-- स्क्रीन पर जीरा राइस हिंदी में पूरा दिखेगा क्योंकि स्क्रीन हिंदी सपोर्ट करती है -->
       <td style="font-size: ${fSize}px; font-weight: 900; padding: 4px 0; color: #000; text-transform: uppercase; width: 75%; word-break: break-word; white-space: normal;">
         ${it.name.toUpperCase()}
         ${it.note ? `<div style="font-size: ${fSize - 1.5}px; color: #333; font-weight: 800; padding-left: 4px;">Note: ${it.note.toUpperCase()}</div>` : ''}
@@ -335,6 +348,7 @@ export const generateReceiptHtml = (order: any, config: PrintConfig): string => 
 
   const itemsRows = order.items.map((it: any) => `
     <tr style="border-bottom: 1px dashed #eee;">
+      <!-- स्क्रीन पर जीरा राइस हिंदी में पूरा दिखेगा क्योंकि स्क्रीन हिंदी सपोर्ट करती है -->
       <td style="font-size: ${fSize}px; font-weight: bold; padding: 4px 0; color: #111; text-transform: uppercase; width: 55%; word-break: break-word; white-space: normal;">${it.name.toUpperCase()}</td>
       <td style="font-size: ${fSize}px; font-weight: bold; text-align: center; padding: 4px 0; font-family: monospace; width: 15%;">${it.quantity}</td>
       <td style="font-size: ${fSize}px; font-weight: bold; text-align: right; padding: 4px 0; font-family: monospace; width: 30%;">₹${it.price * it.quantity}</td>
@@ -385,7 +399,7 @@ export const generateReceiptHtml = (order: any, config: PrintConfig): string => 
           <div style="text-align: right;">Token: #<strong>${order.tokenNumber}</strong></div>
           <div>Mode: ${order.fulfillmentType?.toUpperCase()} ${order.tableNumber ? `(Table: ${order.tableNumber})` : ''}</div>
           <div style="text-align: right;">Pay: ${order.paymentMethod?.toUpperCase()}</div>
-          <div>Date: ${formattedReceiptDate}</div>
+          <div style="grid-column: span 2;">Date: ${formattedReceiptDate}</div>
         </div>
         <div class="divider" style="margin-top: 6px;"></div>
         <table>
@@ -402,7 +416,6 @@ export const generateReceiptHtml = (order: any, config: PrintConfig): string => 
         <div style="font-size: 8.5px; font-weight: bold; line-height: 1.3;">
           <div style="display: flex; justify-content: space-between;"><span>Total:</span><span>₹${order.subtotal}</span></div>
           
-          <!-- वेब रसीद में भी डिस्काउंट तभी छपेगा जब वैल्यू 0 से ज्यादा होगी -->
           ${customDiscountVal > 0 ? `
           <div style="display: flex; justify-content: space-between; color: green;">
             <span>Discount:</span>
