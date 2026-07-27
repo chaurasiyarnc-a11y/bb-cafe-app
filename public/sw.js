@@ -2,7 +2,7 @@ const CACHE_NAME = 'bb-cafe-cache-v4'; // कैशे का नाम v4 क�
 
 const ASSETS_TO_CACHE = [
   '/',
-  '/manifest.json',
+  '/pos-menifasto.json', // सुधरा हुआ: नया मैनिफेस्ट पाथ यहाँ अपडेट किया गया है
   '/delivery',
   '/delivery-manifest.json',
   '/kitchen',
@@ -11,7 +11,7 @@ const ASSETS_TO_CACHE = [
   '/admin-manifest.json',
   '/icon-192x192.png',
   '/icon-512x512.png',
-  // आपके public फोल्डर की सभी महत्वपूर्ण इमेजेस और साउंड्स को जोड़ा गया है
+  // आपके public फोल्डर की सभी महत्वपूर्ण इमेजेस और साउंड्स
   '/facebook.png',
   '/instagram.png',
   '/snapchat.png',
@@ -49,7 +49,8 @@ self.addEventListener('activate', (event) => {
       );
     })
   );
-  self.clientsClaim();
+  // सुधरा हुआ: सिंटैक्स एरर और कंपाइल क्रैश को ठीक करने के लिए 'self.clients.claim()' किया गया
+  self.clients.claim(); 
 });
 
 // Fetch Event (Hybrid Smooth Strategy)
