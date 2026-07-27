@@ -7,7 +7,7 @@ import { ShoppingBag, Plus, Search, X, MapPin, Phone, User, Sparkles, Star, Gift
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
 import { useCartStore } from '../store/useCartStore';
-import { useEffect } from 'react';
+
 import { useRouter } from 'next/navigation';
 import { Capacitor } from '@capacitor/core';
 
