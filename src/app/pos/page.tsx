@@ -1,3 +1,4 @@
+
 'use client';
 import React, { useState, useEffect, useMemo } from 'react';
 import { db } from '@/lib/firebase'; 
@@ -19,6 +20,7 @@ import PosCartDrawer from '@/components/pos/PosCartDrawer';
 import CustomerDirectoryModal from '@/components/pos/CustomerDirectoryModal';
 import CustomizerModal from '@/components/pos/CustomizerModal';
 
+// यूटिलिटी से सभी आवश्यक प्रिंटर फ़ंक्शंस का इम्पोर्ट
 import { 
   handlePrintKot, 
   handlePrintReceipt, 
@@ -226,16 +228,44 @@ export default function BbCafePos() {
     else document.documentElement.classList.add('dark');
   }, []);
 
-  // सुधरा हुआ ऑटो-कनेक्ट फ़ंक्शन (सुरक्षित Timeout Delay के साथ)
+  // सुधरा हुआ ऑटो-कनेक्ट फ़ंक्शन (Bluetooth और USB ऑटो-कनेक्शन के साथ)
   useEffect(() => {
-    const autoReconnectUSB = async () => {
+    const autoReconnectPrinters = async () => {
       const savedType = localStorage.getItem("bb_pos_printer_type");
-      if (savedType !== 'thermal_usb' || typeof window === 'undefined') return;
+      if (typeof window === 'undefined') return;
 
-      // ब्राउज़र को USB पोर्ट्स स्कैन करने के लिए 500ms का समय देना
+      // ब्राउज़र को पेरिफेरल्स स्कैन करने के लिए 500ms का समय देना
       setTimeout(async () => {
-        // 1. Web Serial का इस्तेमाल करके ऑटो-कनेक्ट करना
-        if ('serial' in navigator && !serialPort) {
+        // 1. ब्लूटूथ (Bluetooth) ऑटो-कनेक्ट
+        if (savedType === 'thermal_bluetooth' && 'bluetooth' in navigator && !bleCharacteristic) {
+          try {
+            const devices = await (navigator as any).bluetooth.getDevices();
+            if (devices.length > 0) {
+              const device = devices[0];
+              const server = await device.gatt.connect();
+              let service;
+              let characteristic;
+
+              try {
+                service = await server.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb');
+                characteristic = await service.getCharacteristic('00002af1-0000-1000-8000-00805f9b34fb');
+              } catch (bleErr) {
+                service = await server.getPrimaryService('0000ff00-0000-1000-8000-00805f9b34fb');
+                characteristic = await service.getCharacteristic('0000ff02-0000-1000-8000-00805f9b34fb');
+              }
+
+              setBleCharacteristic(characteristic);
+              setPrinterConnected(true);
+              console.log("Bluetooth Printer auto-reconnected successfully!");
+              toast.success("Bluetooth Printer Reconnected!");
+            }
+          } catch (e) {
+            console.warn("Bluetooth auto-reconnect failed:", e);
+          }
+        }
+
+        // 2. यूएसबी Web Serial ऑटो-कनेक्ट
+        if (savedType === 'thermal_usb' && 'serial' in navigator && !serialPort) {
           try {
             const ports = await (navigator as any).serial.getPorts();
             if (ports.length > 0) {
@@ -251,8 +281,8 @@ export default function BbCafePos() {
           }
         } 
         
-        // 2. WebUSB का इस्तेमाल करके ऑटो-कनेक्ट करना (यदि सीरियल फेल हो गया हो)
-        if ('usb' in navigator && !serialPort && !usbDevice) {
+        // 3. यूएसबी WebUSB ऑटो-कनेक्ट (यदि सीरियल फेल हो गया हो)
+        if (savedType === 'thermal_usb' && 'usb' in navigator && !serialPort && !usbDevice) {
           try {
             const devices = await (navigator as any).usb.getDevices();
             if (devices.length > 0) {
@@ -273,9 +303,9 @@ export default function BbCafePos() {
     };
 
     if (isLoggedIn) {
-      autoReconnectUSB();
+      autoReconnectPrinters();
     }
-  }, [isLoggedIn, serialPort, usbDevice]);
+  }, [isLoggedIn, serialPort, usbDevice, bleCharacteristic]);
 
   // रिसोर्स क्लीनअप
   useEffect(() => {
@@ -578,15 +608,7 @@ export default function BbCafePos() {
   const getFreeDeliveryProgressPercent = () => Math.min(100, (getCartSubtotal() / selectedArea.minFree) * 100);
   const getTotalPointsRedeemedInCart = () => cart.reduce((acc, i) => acc + (i.pointsCost || 0), 0);
 
-  // फ़ॉन्ट साइज कंट्रोल फंक्शन
-  const handleFontSizeChange = (newSize: number) => {
-    if (newSize >= 6 && newSize <= 24) {
-      setFontSize(newSize);
-      localStorage.setItem("bb_pos_font_size", String(newSize));
-    }
-  };
-
-  // प्रिंटिंग कॉन्फ़िगरेशन (कास्ट बाईपास द्वारा कंपाइल एरर को ठीक किया गया)
+  // प्रिंटिंग कॉन्फ़िगरेशन (कास्ट बाईपास द्वारा कंपाइल एरर को पूरी तरह हल किया गया)
   const getPrintConfig = (): PrintConfig => {
     const configObj: any = {
       printerPaperSize,
@@ -1203,7 +1225,7 @@ export default function BbCafePos() {
             {activeTab === 'receipts' && (
               <div className="flex-1 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-3xl p-4 flex flex-col overflow-hidden shadow-xl max-w-5xl w-full mx-auto font-sans">
                 <div className="relative mb-4">
-                  <SafeSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" size={14} />
+                  <SafeSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={14} />
                   <input 
                     type="text" 
                     placeholder="Search past receipt..." 
@@ -1252,7 +1274,7 @@ export default function BbCafePos() {
               </div>
             )}
 
-            {/* SETTINGS WORKSPACE */}
+            {/* SETTINGS WORKSPACE: लाइव प्रिंट प्रिव्यू और ऑटो-रीकनेक्ट सेटअप */}
             {activeTab === 'settings' && (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start pb-20 overflow-y-auto flex-1 font-sans animate-fade-in">
                 
@@ -1319,7 +1341,7 @@ export default function BbCafePos() {
                       <button
                         type="button"
                         onClick={() => handleFontSizeChange(fontSize - 0.5)}
-                        className="bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 border border-neutral-200 dark:border-neutral-750 w-10 h-10 rounded-lg font-bold text-base text-gray-700 dark:text-white flex items-center justify-center transition"
+                        className="bg-neutral-100 dark:bg-neutral-850 hover:bg-neutral-200 dark:hover:bg-neutral-700 border border-neutral-200 dark:border-neutral-750 w-10 h-10 rounded-lg font-bold text-base text-gray-700 dark:text-white flex items-center justify-center transition"
                       >
                         -
                       </button>
@@ -1335,7 +1357,7 @@ export default function BbCafePos() {
                       <button
                         type="button"
                         onClick={() => handleFontSizeChange(fontSize + 0.5)}
-                        className="bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 border border-neutral-200 dark:border-neutral-750 w-10 h-10 rounded-lg font-bold text-base text-gray-700 dark:text-white flex items-center justify-center transition"
+                        className="bg-neutral-100 dark:bg-neutral-850 hover:bg-neutral-200 dark:hover:bg-neutral-700 border border-neutral-200 dark:border-neutral-750 w-10 h-10 rounded-lg font-bold text-base text-gray-700 dark:text-white flex items-center justify-center transition"
                       >
                         +
                       </button>
