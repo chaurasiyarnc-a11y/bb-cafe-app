@@ -3,7 +3,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { db } from '@/lib/firebase'; 
 import { 
   collection, onSnapshot, query, orderBy, limit, doc, 
-  updateDoc, addDoc, runTransaction, increment, getDoc, getDocs, where, setDoc 
+  updateDoc, addDoc, runTransaction, increment, getDoc, getDocs, where, setDoc,
+  waitForPendingWrites
 } from 'firebase/firestore';
 import { 
   ShoppingBag, Plus, Minus, Search, X, User, Star, Gift, 
@@ -130,12 +131,16 @@ export default function BbCafePos() {
   const [loyaltyRules, setLoyaltyRules] = useState<any[]>([]); 
   const [storeOpen, setStoreOpen] = useState(true);
   
-  // रसीद (Past Bills) स्टेट्स और पॉपअप ट्रिगर
+  // रसीद (Past Bills) स्टेट्स और पेजिनेशन लिमिट
   const [pastReceipts, setPastReceipts] = useState<any[]>([]);
   const [isSearchingReceipts, setIsSearchingReceipts] = useState(false);
   const [receiptSearchQuery, setReceiptSearchQuery] = useState('');
   const [selectedReceipt, setSelectedReceipt] = useState<any>(null);
   const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false); 
+  const [receiptsLimit, setReceiptsLimit] = useState(20);
+
+  // सिंकिंग स्टेट्स
+  const [isSyncing, setIsSyncing] = useState(false);
 
   const [cart, setCart] = useState<PosCartItem[]>([]);
   const [customerPhone, setCustomerPhone] = useState('');
@@ -223,7 +228,7 @@ export default function BbCafePos() {
     }
   };
 
-  // PWA & Service Worker Setup
+  // Service Worker Setup
   useEffect(() => {
     if (typeof window !== 'undefined') {
       let link = document.querySelector('link[rel="manifest"]') as HTMLLinkElement;
@@ -244,7 +249,27 @@ export default function BbCafePos() {
     }
   }, []);
 
-  // initial load states (including Cart Restoration from LocalStorage)
+  // Safe manual printer disconnect helper
+  const handleDisconnectPrinter = () => {
+    triggerBeep('tap');
+    if (serialPort) {
+      serialPort.close().catch(() => {});
+      setSerialPort(null);
+    }
+    if (usbDevice) {
+      usbDevice.close().catch(() => {});
+      setUsbDevice(null);
+    }
+    if (bleCharacteristic && bleCharacteristic.service && bleCharacteristic.service.device) {
+      bleCharacteristic.service.device.gatt.disconnect();
+      setBleCharacteristic(null);
+    }
+    setPrinterConnected(false);
+    localStorage.removeItem("bb_pos_printer_connected");
+    toast.success("Printer disconnected explicitly!");
+  };
+
+  // Recovery configuration & LocalStorage Backup load
   useEffect(() => {
     const savedUser = localStorage.getItem("bb_pos_user");
     if (savedUser) {
@@ -274,7 +299,7 @@ export default function BbCafePos() {
     if (localTheme === 'light') document.documentElement.classList.remove('dark');
     else document.documentElement.classList.add('dark');
 
-    // Cart and Customer offline recovery on startup
+    // Restore saved inputs and Active Cart state on startup
     const savedCart = localStorage.getItem("bb_pos_saved_cart");
     if (savedCart) {
       try { setCart(JSON.parse(savedCart)); } catch (err) {}
@@ -288,7 +313,7 @@ export default function BbCafePos() {
     setChefInstructions(localStorage.getItem("bb_pos_saved_chef_instructions") || '');
   }, []);
 
-  // Sync Cart and Customer details live to LocalStorage so data never vanishes on refresh
+  // Keep cart & customer states saved to LocalStorage across refreshes
   useEffect(() => {
     localStorage.setItem("bb_pos_saved_cart", JSON.stringify(cart));
   }, [cart]);
@@ -303,13 +328,17 @@ export default function BbCafePos() {
     localStorage.setItem("bb_pos_saved_chef_instructions", chefInstructions);
   }, [customerPhone, customerName, customerPoints, address, fulfillmentType, tableNumber, chefInstructions]);
 
-  // Auto-connect printers
+  // Robust Persistent Auto-reconnect Printer on refresh (Starts immediately on Login)
   useEffect(() => {
     const autoReconnectPrinters = async () => {
-      const savedType = localStorage.getItem("bb_pos_printer_type");
+      const isSavedConnected = localStorage.getItem("bb_pos_printer_connected") === 'true';
+      if (!isSavedConnected) return;
+
+      const savedType = localStorage.getItem("bb_pos_printer_type") || 'thermal_usb';
       if (typeof window === 'undefined') return;
 
       setTimeout(async () => {
+        // Bluetooth Auto-connect using granted permission check
         if (savedType === 'thermal_bluetooth' && 'bluetooth' in navigator && !bleCharacteristic) {
           try {
             const devices = await (navigator as any).bluetooth.getDevices();
@@ -331,9 +360,12 @@ export default function BbCafePos() {
               setPrinterConnected(true);
               toast.success("Bluetooth Printer Reconnected!");
             }
-          } catch (e) {}
+          } catch (e) {
+            console.warn("Bluetooth auto-reconnect failed:", e);
+          }
         }
 
+        // Web Serial USB Auto-connect
         if (savedType === 'thermal_usb' && 'serial' in navigator && !serialPort) {
           try {
             const ports = await (navigator as any).serial.getPorts();
@@ -344,9 +376,12 @@ export default function BbCafePos() {
               setPrinterConnected(true);
               toast.success("USB Printer Reconnected!");
             }
-          } catch (e) {}
+          } catch (e) {
+            console.warn("Serial auto-reconnect failed:", e);
+          }
         } 
         
+        // WebUSB fallback auto-connect
         if (savedType === 'thermal_usb' && 'usb' in navigator && !serialPort && !usbDevice) {
           try {
             const devices = await (navigator as any).usb.getDevices();
@@ -359,7 +394,9 @@ export default function BbCafePos() {
               setPrinterConnected(true);
               toast.success("USB Printer Reconnected!");
             }
-          } catch (e) {}
+          } catch (e) {
+            console.warn("WebUSB auto-reconnect failed:", e);
+          }
         }
       }, 500);
     };
@@ -369,29 +406,28 @@ export default function BbCafePos() {
     }
   }, [isLoggedIn, serialPort, usbDevice, bleCharacteristic]);
 
-  // Cleanups
-  useEffect(() => {
-    return () => {
-      if (serialPort) {
-        serialPort.close().catch(() => {});
-      }
-      if (usbDevice) {
-        usbDevice.close().catch(() => {});
-      }
-      if (bleCharacteristic && bleCharacteristic.service && bleCharacteristic.service.device) {
-        bleCharacteristic.service.device.gatt.disconnect();
-      }
-    };
-  }, [serialPort, usbDevice, bleCharacteristic]);
-
+  // Sync Live Orders and Align local offline bill sequence
   useEffect(() => {
     const q = query(collection(db, "orders"), orderBy("timestamp", "desc"), limit(40));
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      setLiveOrders(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
+      const list = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+      setLiveOrders(list);
+
+      // Extract highest sequence number online and lock it in offline counter local sequence
+      let maxBill = Number(localStorage.getItem("bb_pos_local_bill_counter")) || 5000;
+      list.forEach((ord: any) => {
+        const bNum = Number(ord.billNumber);
+        if (!isNaN(bNum) && bNum > maxBill) {
+          maxBill = bNum;
+        }
+      });
+      localStorage.setItem("bb_pos_local_bill_counter", String(maxBill));
     });
+
     const unsubStore = onSnapshot(doc(db, "settings", "store"), (d) => {
       if (d.exists()) setStoreOpen(d.data().isOpen);
     });
+
     return () => { unsubscribe(); unsubStore(); };
   }, []);
 
@@ -415,6 +451,7 @@ export default function BbCafePos() {
     })();
   }, [isLoggedIn]);
 
+  // Past Receipts with pagination limit of 20 and manual "Load More"
   useEffect(() => {
     if (activeTab !== 'receipts') return;
 
@@ -423,9 +460,9 @@ export default function BbCafePos() {
       try {
         let q;
         if (receiptSearchQuery.trim()) {
-          q = query(collection(db, "orders"), orderBy("timestamp", "desc"), limit(120));
+          q = query(collection(db, "orders"), orderBy("timestamp", "desc"), limit(100)); // allow deeper search query
         } else {
-          q = query(collection(db, "orders"), orderBy("timestamp", "desc"), limit(50));
+          q = query(collection(db, "orders"), orderBy("timestamp", "desc"), limit(receiptsLimit));
         }
         const snap = await getDocs(q);
         setPastReceipts(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
@@ -441,7 +478,40 @@ export default function BbCafePos() {
     }, 300);
 
     return () => clearTimeout(delayDebounce);
-  }, [activeTab, receiptSearchQuery]);
+  }, [activeTab, receiptSearchQuery, receiptsLimit]);
+
+  // Sidebar Manual Sync Handler
+  const handleManualSync = async () => {
+    triggerBeep('tap');
+    if (!navigator.onLine) {
+      toast.error("You are offline! Connect to the internet first.");
+      return;
+    }
+    setIsSyncing(true);
+    const toastId = toast.loading("Force syncing data with server database...");
+    try {
+      // Force sync pending writes queue in Firebase
+      await waitForPendingWrites(db);
+
+      // Re-download fresh items & loyalty rules to ensure sync
+      const prodSnap = await getDocs(collection(db, "products"));
+      const items = prodSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+      setProducts(items);
+      const uniqueCats = Array.from(new Set(items.map((i: any) => i.category).filter(Boolean))) as string[];
+      setCategories(['All', ...uniqueCats]);
+      
+      const rulesSnap = await getDocs(collection(db, "loyalty_rules"));
+      setLoyaltyRules(rulesSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
+      
+      toast.dismiss(toastId);
+      toast.success("System fully Synced!");
+    } catch (err) {
+      toast.dismiss(toastId);
+      toast.error("Sync incomplete or connection timeout");
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   const handlePinLoginSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -714,6 +784,7 @@ export default function BbCafePos() {
 
         setBleCharacteristic(characteristic);
         setPrinterConnected(true);
+        localStorage.setItem("bb_pos_printer_connected", "true");
         toast.dismiss(toastId);
         toast.success("Bluetooth Printer Connected!");
       } catch (err: any) {
@@ -736,6 +807,7 @@ export default function BbCafePos() {
           await port.open({ baudRate: 9600 });
           setSerialPort(port);
           setPrinterConnected(true);
+          localStorage.setItem("bb_pos_printer_connected", "true");
           toast.dismiss(toastId);
           toast.success("Direct USB Printer Connected via Web Serial!");
         } else {
@@ -745,6 +817,7 @@ export default function BbCafePos() {
           await device.claimInterface(0);
           setUsbDevice(device);
           setPrinterConnected(true);
+          localStorage.setItem("bb_pos_printer_connected", "true");
           toast.dismiss(toastId);
           toast.success("Direct USB Printer Connected via WebUSB!");
         }
@@ -760,6 +833,7 @@ export default function BbCafePos() {
         toast.dismiss(toastId);
         setIsConnecting(false);
         setPrinterConnected(true);
+        localStorage.setItem("bb_pos_printer_connected", "true");
         toast.success(`${printerType.replace('_', ' ').toUpperCase()} Connected Successfully!`);
       }, 1200);
     }
@@ -805,7 +879,7 @@ export default function BbCafePos() {
     );
   };
 
-  // Safe offline bill number sequence backup generator
+  // Safe offline bill sequence generation
   const getNextLocalBillNumber = () => {
     const currentLocal = Number(localStorage.getItem("bb_pos_local_bill_counter")) || 5000;
     const nextLocal = currentLocal + 1;
@@ -813,7 +887,7 @@ export default function BbCafePos() {
     return nextLocal;
   };
 
-  // Place Order transaction flow (Offline Safe + Auto Sync)
+  // Place Order flow (Offline sequence resilient & auto-queue sync)
   const handlePlaceOrder = async (e: React.FormEvent) => {
     e.preventDefault();
     if (cart.length === 0 || isSubmittingOrder) return;
@@ -832,7 +906,6 @@ export default function BbCafePos() {
     let billNumber: number;
 
     try {
-      // 1. Get Bill Number (Online uses transaction, Offline falls back safely to sequential localStorage)
       if (isOnline) {
         try {
           billNumber = await runTransaction(db, async (txn) => {
@@ -841,10 +914,9 @@ export default function BbCafePos() {
             txn.set(doc(db, "settings", "store_bill_counter"), { nextBillNumber: next + 1 });
             return next;
           });
-          // sync local counter with latest fetched online number
           localStorage.setItem("bb_pos_local_bill_counter", String(billNumber));
-        } catch (transactionErr) {
-          console.warn("Online transaction failed, using local sequence fallback", transactionErr);
+        } catch (txnError) {
+          console.warn("Transaction failed online, falling back to local counter logic:", txnError);
           billNumber = getNextLocalBillNumber();
         }
       } else {
@@ -877,10 +949,9 @@ export default function BbCafePos() {
         address: address
       };
 
-      // Firestore will hold this in offline queue and auto-upload on internet restoration
+      // Safely write document (stored in offline sync queue if network drops)
       await addDoc(collection(db, "orders"), orderObj);
 
-      // 2. Customer Points Updates (No Transactions on failure/offline to prevent blocking)
       if (customerPhone && customerPhone.trim().length === 10) {
         const phone = customerPhone.trim();
         const userRef = doc(db, "customer_points", phone);
@@ -896,11 +967,9 @@ export default function BbCafePos() {
               }
             });
           } catch (e) {
-            // Transaction failed online but direct setDoc is robust and works offline
             await setDoc(userRef, { name: customerName || "Walk-in Guest", phone, points: Math.max(0, pointsAfterBill), lastActive: new Date() }, { merge: true });
           }
         } else {
-          // Pure Offline - directly set/merge (queued locally and synced online automatically)
           await setDoc(userRef, { name: customerName || "Walk-in Guest", phone, points: Math.max(0, pointsAfterBill), lastActive: new Date() }, { merge: true });
         }
 
@@ -926,7 +995,7 @@ export default function BbCafePos() {
       toast.success("Printing Customer Receipt...");
       await handlePrintReceipt(orderObj, pConfig);
 
-      // Reset states and clear backup storage to start clean
+      // Clean backup logs to start fresh
       setCart([]); setCustomerPhone(''); setCustomerName(''); setCustomerPoints(0); setPointsToRedeem(0); setCustomDiscount(0); setIsCartOpen(false); setChefInstructions('');
       localStorage.removeItem("bb_pos_saved_cart");
     } catch (err) {
@@ -972,7 +1041,7 @@ export default function BbCafePos() {
 
   const liveOrdersBadgeCount = activeLiveOrders.length;
 
-  // Live Orders Navigation completely removed from Sidebar to clear space
+  // Navigation Items (Live Orders Shifted out of Sidebar navigation to Header)
   const navItems = [
     { id: 'billing', label: 'Counter Billing', icon: SafeShoppingBag },
     { id: 'inventory', label: 'Stock Toggle', icon: SafeLayers },
@@ -1085,8 +1154,19 @@ export default function BbCafePos() {
                 })}
               </nav>
             </div>
-            <div className="space-y-4 pt-4 border-t border-neutral-200 dark:border-neutral-800">
-              <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-[10px] font-black uppercase text-red-500 hover:bg-red-500/10">
+
+            {/* Sidebar bottom action layout - lock & manual sync */}
+            <div className="space-y-2 pt-4 border-t border-neutral-200 dark:border-neutral-800">
+              <button 
+                onClick={handleManualSync} 
+                disabled={isSyncing}
+                className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase text-yellow-500 hover:bg-yellow-500/10 disabled:opacity-50"
+              >
+                {isSyncing ? <Loader2 className="animate-spin" size={14} /> : <SafeRefreshCw size={14} />}
+                {!isSidebarCollapsed && <span>Sync Now</span>}
+              </button>
+              
+              <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase text-red-500 hover:bg-red-500/10">
                 <SafeLogOut size={14} />{!isSidebarCollapsed && <span>Lock POS</span>}
               </button>
             </div>
@@ -1102,7 +1182,7 @@ export default function BbCafePos() {
                 <span className="text-[9px] text-neutral-500 dark:text-neutral-400 font-bold">Bum Bum Cafe • Mohandra</span>
               </div>
               
-              {/* Shifted Live Orders from Sidebar directly into Header Top-Right Area */}
+              {/* Header Shift - "Live Orders" badge button replaces "Search Guest" */}
               <button 
                 onClick={() => { triggerBeep('tap'); setActiveTab('orders'); }} 
                 className={"ml-auto p-2 rounded-xl flex items-center gap-2 text-[10px] font-black uppercase transition-all relative shadow-sm hover:scale-[1.02] active:scale-95 " + 
@@ -1363,6 +1443,18 @@ export default function BbCafePos() {
                         );
                       })
                     )}
+                    
+                    {/* Load More Pagination Trigger */}
+                    {filteredPastReceipts.length >= receiptsLimit && !receiptSearchQuery.trim() && (
+                      <div className="pt-4 flex justify-center">
+                        <button 
+                          onClick={() => { triggerBeep('tap'); setReceiptsLimit(prev => prev + 20); }} 
+                          className="bg-orange-500 hover:bg-orange-600 text-black font-black text-xs py-2.5 px-6 rounded-xl shadow-md transition-all active:scale-95 uppercase"
+                        >
+                          Load More Bills ➔
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -1489,9 +1581,16 @@ export default function BbCafePos() {
                         Test Print 🧾
                       </button>
                     </div>
+                    {printerConnected && (
+                      <button 
+                        onClick={handleDisconnectPrinter} 
+                        className="w-full mt-2 bg-red-600/10 text-red-500 hover:bg-red-600 hover:text-white border border-red-500/20 font-black py-2 rounded-xl text-[9px] uppercase tracking-wider transition-all"
+                      >
+                        Disconnect Printer
+                      </button>
+                    )}
                   </div>
                 </div>
-
               </div>
             )}
           </main>
@@ -1665,7 +1764,6 @@ export default function BbCafePos() {
         setChiliFlakesAddon={() => {}}
       />
 
-      {/* Guest Directory Modal remains accessible directly inside the Cart Drawer when cashier manages customer loyalty */}
       <CustomerDirectoryModal 
         isCustomerModalOpen={isCustomerModalOpen} setIsCustomerModalOpen={setIsCustomerModalOpen} customerSearchQuery={customerSearchQuery} setCustomerSearchQuery={setCustomerSearchQuery} searchedCustomers={searchedCustomers} isSearchingCustomer={isSearchingCustomer} newCustName={newCustName} setNewCustName={setNewCustName} newCustPhone={newCustPhone} setNewCustPhone={setNewCustPhone} newCustAddress={newCustAddress} setNewCustAddress={setNewCustAddress} editingCustomer={editingCustomer} viewingHistoryCustomer={viewingHistoryCustomer} customerHistoryList={customerHistoryList} editCustPoints={editCustPoints} setEditCustPoints={setEditCustPoints} handleSelectCustomer={handleSelectCustomer} handleLoadCustomerHistory={handleLoadCustomerHistory} handleStartEditProfile={handleStartEditProfile} handleUpdateCustomerProfile={handleUpdateCustomerProfile} handleSaveNewCustomer={handleSaveNewCustomer} setViewingHistoryCustomer={setViewingHistoryCustomer} setCustomerHistoryList={setCustomerHistoryList} setEditingCustomer={setEditingCustomer} searchDbCustomers={searchDbCustomers} triggerBeep={triggerBeep}
       />
