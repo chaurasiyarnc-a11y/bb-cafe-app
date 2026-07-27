@@ -181,7 +181,9 @@ export default function BbCafePos() {
     
     const toastId = toast.loading("Clearing active orders...");
     try {
-      const promises = activeLiveOrders.map(order => 
+      // Compiled-safely filters liveOrders directly to prevent temporal dead zone compiler issues
+      const activeOrdersToClear = liveOrders.filter((o) => o.status !== 'completed' && o.status !== 'rejected');
+      const promises = activeOrdersToClear.map(order => 
         updateDoc(doc(db, "orders", order.id), { status: 'completed' })
       );
       await Promise.all(promises);
@@ -795,6 +797,61 @@ export default function BbCafePos() {
   const containerPanelClass = "flex-1 border rounded-3xl p-4 flex flex-col overflow-hidden shadow-xl transition-colors duration-200 " + 
     (themeMode === 'dark' ? "bg-neutral-900/90 border-neutral-800" : "bg-white border-neutral-200");
 
+  const filteredMenu = useMemo(() => products.filter((p) => (selectedCategory === 'All' || p.category === selectedCategory) && p.name.toLowerCase().includes(searchQuery.toLowerCase())), [products, selectedCategory, searchQuery]);
+  
+  const filteredPastReceipts = useMemo(() => {
+    return pastReceipts.filter((o) => 
+      String(o.billNumber).includes(receiptSearchQuery.trim()) || 
+      String(o.customerPhone || '').includes(receiptSearchQuery.trim()) || 
+      String(o.customerName || '').toLowerCase().includes(receiptSearchQuery.trim().toLowerCase())
+    );
+  }, [pastReceipts, receiptSearchQuery]);
+
+  const activeLiveOrders = useMemo(() => {
+    return liveOrders.filter((o) => o.status !== 'completed' && o.status !== 'rejected');
+  }, [liveOrders]);
+
+  const getDisplayPrice = (item: any) => item?.variants ? `₹${Math.min(...Object.values(item.variants).map(Number))}+` : `₹${item?.price || 0}`;
+
+  const liveOrdersBadgeCount = activeLiveOrders.length;
+
+  // Navigation Items (Live Orders Shifted out of Sidebar navigation to Header)
+  const navItems = [
+    { id: 'billing', label: 'Counter Billing', icon: SafeShoppingBag },
+    { id: 'inventory', label: 'Stock Toggle', icon: SafeLayers },
+    { id: 'receipts', label: 'Past Receipts', icon: SafePrinter },
+    { id: 'settings', label: 'POS Settings', icon: SafeSettings }
+  ];
+
+  const sampleOrderForPreview = useMemo(() => {
+    return {
+      billNumber: 45,
+      tokenNumber: 12,
+      timestamp: new Date(),
+      customerName: customerName || "Walk-in Guest",
+      customerPhone: customerPhone ? `+91${customerPhone}` : "",
+      address: address || "Mohandra Bus Stand, Panna, MP",
+      fulfillmentType,
+      tableNumber: tableNumber || "T-1",
+      paymentMethod,
+      items: cart.length > 0 ? cart : [
+        { name: "PANEER TIKKA", quantity: 2, price: 180, note: "EXTRA SPICY" },
+        { name: "VEG BURGER", quantity: 1, price: 90 },
+        { name: "MASALA CHAI", quantity: 3, price: 20 }
+      ],
+      subtotal: cart.length > 0 ? getCartSubtotal() : 510,
+      discount: cart.length > 0 ? (customDiscount + getLoyaltyDiscount()) : 10,
+      customerPointsRedeemed: pointsToRedeem,
+      customerPointsEarned: cart.length > 0 ? Math.floor(getTotalBillPrice() / 100) : 5,
+      customerPointsAfter: customerPhone ? Math.max(0, customerPoints + (Math.floor(getTotalBillPrice() / 100) - getTotalPointsRedeemedInCart() - pointsToRedeem)) : 25,
+      total: cart.length > 0 ? getTotalBillPrice() : 500
+    };
+  }, [cart, customerName, customerPhone, address, fulfillmentType, tableNumber, paymentMethod, customDiscount, pointsToRedeem, customerPoints]);
+
+  const receiptHtmlContent = useMemo(() => {
+    return generateReceiptHtml(sampleOrderForPreview, getPrintConfig());
+  }, [sampleOrderForPreview, printerPaperSize, printerType, fontSize]);
+
   return (
     <div className={mainClass}>
       <Toaster position="top-center" />
@@ -855,7 +912,7 @@ export default function BbCafePos() {
                       }} 
                       className={"w-full flex items-center justify-between px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-200 " + 
                         (activeTab === item.id 
-                          ? "bg-orange-600 text-white" 
+                          ? "bg-orange-600 text-white shadow-md" 
                           : (themeMode === 'dark' 
                             ? "text-neutral-400 hover:bg-neutral-800 hover:text-white" 
                             : "text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900"
@@ -872,7 +929,7 @@ export default function BbCafePos() {
               </nav>
             </div>
 
-            {/* Sidebar bottom actions - lock, logout, sync */}
+            {/* Sidebar bottom action layout - lock & manual sync */}
             <div className="space-y-2 pt-4 border-t border-neutral-200 dark:border-neutral-800">
               <button 
                 onClick={handleManualSync} 
@@ -889,7 +946,7 @@ export default function BbCafePos() {
             </div>
           </aside>
 
-          <main className="flex-1 p-3 md:p-5 overflow-y-auto flex flex-col h-screen">
+          <main className="flex-1 p-3 md:p-5 overflow-y-auto flex flex-col h-screen animate-fade-in">
             <div className="flex items-center gap-3 mb-4 border-b border-neutral-200 dark:border-neutral-800 pb-3">
               <button onClick={() => { triggerBeep('tap'); setIsSidebarOpen(true); }} className="p-2.5 bg-neutral-200 dark:bg-neutral-850 text-orange-500 rounded-xl md:hidden">
                 <SafeMenu size={16} />
@@ -899,7 +956,7 @@ export default function BbCafePos() {
                 <span className="text-[9px] text-neutral-500 dark:text-neutral-400 font-bold">Bum Bum Cafe • Mohandra</span>
               </div>
               
-              {/* Header "Live Orders" badge button */}
+              {/* Header Shift - "Live Orders" badge button replaces "Search Guest" */}
               <button 
                 onClick={() => { triggerBeep('tap'); setActiveTab('orders'); }} 
                 className={"ml-auto p-2 rounded-xl flex items-center gap-2 text-[10px] font-black uppercase transition-all relative shadow-sm hover:scale-[1.02] active:scale-95 " + 
@@ -1078,6 +1135,7 @@ export default function BbCafePos() {
                               onClick={() => { triggerBeep('tap'); item.variants ? setSelectedProduct(item) : handleAddProductToCart(item); }} 
                               className={cardClass}
                             >
+                              {/* Full-width Image design on top with Name only (No Price) below */}
                               {hasImage ? (
                                 <img 
                                   src={item.image || item.imageUrl || item.img} 
