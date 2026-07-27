@@ -45,7 +45,7 @@ export const getFormattedReceiptDate = (timestamp: any): string => {
 };
 
 // ==========================================
-// SMART WORD WRAPPING HELPER (नए लाइन ब्रेक के लिए)
+// SMART WORD WRAPPING HELPER
 // ==========================================
 const wrapText = (text: string, width: number): string[] => {
   const words = text.split(" ");
@@ -95,10 +95,11 @@ export const formatRow = (left: string, right: string, cols: number): string => 
   }
 };
 
+// सुधरा हुआ 18 + 5 + 6 = 29 का गणित (ताकि दाईं तरफ 1 कैरेक्टर का सुरक्षित खाली स्पेस बना रहे)
 export const formatThreeColumns = (col1: string, col2: string, col3: string, cols: number): string => {
-  const c1Width = cols === 48 ? 26 : 19; // डिश नाम के लिए 19 कैरेक्टर चौड़ाई
-  const c2Width = cols === 48 ? 6 : 5;  // Quantity के लिए 5 कैरेक्टर चौड़ाई
-  const c3Width = cols === 48 ? 16 : 6;  // Amount (Rs.) के लिए 6 कैरेक्टर चौड़ाई
+  const c1Width = cols === 48 ? 26 : 18; // 29 कैरेक्टर सीमा के लिए 18 पर लॉक किया गया
+  const c2Width = cols === 48 ? 6 : 5;  // Qty के लिए 5 पर लॉक किया गया
+  const c3Width = cols === 48 ? 16 : 6;  // Amount (Rs.) के लिए 6 पर लॉक किया गया
 
   const itemLines = wrapText(col1.trim(), c1Width);
   const p2 = col2.trim().padStart(2).padEnd(c2Width); 
@@ -134,6 +135,32 @@ const cleanAsciiOnly = (str: string): string => {
     .trim();
 };
 
+// फ़ॉन्ट-होल्डर कमांड्स के साथ सुरक्षित बाइट एनकोडर (बिना करप्शन के फ़ॉन्ट साइज बदलने के लिए)
+const encodeWithFontPlaceholders = (text: string, encoder: TextEncoder): Uint8Array => {
+  const cleanText = text.replace(/₹/g, 'Rs.');
+  const parts = cleanText.split(/({{[A-Z0-9_]+}})/g);
+  const byteArrays: Uint8Array[] = [];
+  
+  for (const part of parts) {
+    if (part === "{{FONT_2X}}") {
+      byteArrays.push(new Uint8Array([0x1B, 0x21, 0x30])); // ESC ! 0x30 (Double size font)
+    } else if (part === "{{FONT_NORMAL}}") {
+      byteArrays.push(new Uint8Array([0x1B, 0x21, 0x00])); // ESC ! 0x00 (Normal size font)
+    } else if (part) {
+      byteArrays.push(encoder.encode(part));
+    }
+  }
+  
+  const totalLength = byteArrays.reduce((sum, arr) => sum + arr.length, 0);
+  const result = new Uint8Array(totalLength);
+  let offset = 0;
+  for (const arr of byteArrays) {
+    result.set(arr, offset);
+    offset += arr.length;
+  }
+  return result;
+};
+
 // ==========================================
 // ESC/POS DIRECT PRINTER CODE GENERATORS
 // ==========================================
@@ -158,26 +185,26 @@ export const sendToPrinterInChunks = async (config: PrintConfig, text: string, u
   const encoder = new TextEncoder();
   let finalBytes: Uint8Array;
 
+  // रसीद प्रिंटर पर भेजने से ठीक पहले सभी ₹ को Rs. में बदलेंगे
   if (upiUrl && text.includes("{{QR_CODE_PLACEHOLDER}}")) {
     const parts = text.split("{{QR_CODE_PLACEHOLDER}}");
-    const safePart1 = parts[0].replace(/₹/g, 'Rs.'); 
-    const safePart2 = parts[1].replace(/₹/g, 'Rs.'); 
-    
-    const part1Bytes = encoder.encode(safePart1);
-    const part2Bytes = encoder.encode(safePart2);
+    const safePart1 = encodeWithFontPlaceholders(parts[0], encoder);
+    const safePart2 = encodeWithFontPlaceholders(parts[1], encoder);
     const qrBytes = generateEscPosQrBytes(upiUrl);
     
-    finalBytes = new Uint8Array(part1Bytes.length + qrBytes.length + part2Bytes.length);
-    finalBytes.set(part1Bytes);
-    finalBytes.set(qrBytes, part1Bytes.length);
-    finalBytes.set(part2Bytes, part1Bytes.length + qrBytes.length);
+    // QR कोड का मॉड्यूल साइज कमांड 0x06 से घटाकर 0x04 किया गया (25% छोटा करने के लिए)
+    qrBytes[qrBytes.length - 11] = 0x04; 
+
+    finalBytes = new Uint8Array(safePart1.length + qrBytes.length + safePart2.length);
+    finalBytes.set(safePart1);
+    finalBytes.set(qrBytes, safePart1.length);
+    finalBytes.set(safePart2, safePart1.length + qrBytes.length);
   } else {
-    const safeText = text.replace(/₹/g, 'Rs.').replace("{{QR_CODE_PLACEHOLDER}}", ""); 
-    finalBytes = encoder.encode(safeText);
+    finalBytes = encodeWithFontPlaceholders(text.replace("{{QR_CODE_PLACEHOLDER}}", ""), encoder);
   }
 
   // मोनोस्पेस फ़ॉन्ट लॉक करने के लिए कड़ा प्रिंटर इनिशियलाइज़ेशन कमांड्स
-  const initBytes = new Uint8Array([0x1B, 0x40, 0x1B, 0x21, 0x00]);
+  const initBytes = new Uint8Array([0x1B, 0x40]);
   
   const finalBytesWithInit = new Uint8Array(initBytes.length + finalBytes.length);
   finalBytesWithInit.set(initBytes);
@@ -229,12 +256,17 @@ export const sendToPrinterInChunks = async (config: PrintConfig, text: string, u
 // K.O.T & RECEIPT TEXT GENERATORS (ESC/POS)
 // ==========================================
 export const generateKotEscPosText = (order: any, config: PrintConfig): string => {
-  const cols = config.printerPaperSize === '80mm' ? 48 : 30; // 58mm चौड़ाई को सुरक्षित 30 पर सेट किया गया
+  const cols = config.printerPaperSize === '80mm' ? 48 : 29; // 58mm चौड़ाई को कड़ाई से 29 पर सेट किया गया
   const dividerLine = "-".repeat(cols) + "\n";
   const doubleDivider = "=".repeat(cols) + "\n";
   const formattedDate = getFormattedDate(order.timestamp);
   
-  let text = doubleDivider + centerAlign("K.O.T", cols) + centerAlign("BUM BUM CAFE - KITCHEN", cols) + doubleDivider;
+  let text = doubleDivider;
+  // BUM BUM CAFE - KITCHEN को बड़ा करने के लिए 2X फ़ॉन्ट लागू किया गया
+  text += "{{FONT_2X}}" + centerAlign("K.O.T", 14) + "{{FONT_NORMAL}}";
+  text += centerAlign("BUM BUM CAFE - KITCHEN", cols);
+  text += doubleDivider;
+  
   text += formatRow(`Token: #${order.tokenNumber}`, `Bill: #${String(order.billNumber).padStart(4, '0')}`, cols);
   
   const tableDisplay = order.tableNumber ? cleanTableNum(order.tableNumber) : "";
@@ -266,12 +298,18 @@ export const generateKotEscPosText = (order: any, config: PrintConfig): string =
 };
 
 export const generateEscPosText = (order: any, config: PrintConfig): string => {
-  const cols = config.printerPaperSize === '80mm' ? 48 : 30; // 58mm चौड़ाई को सुरक्षित 30 पर सेट किया गया
+  const cols = config.printerPaperSize === '80mm' ? 48 : 29; // 58mm चौड़ाई को कड़ाई से 29 पर सेट किया गया (Strict Right Margin Lock)
   const dividerLine = "-".repeat(cols) + "\n";
   const doubleDivider = "=".repeat(cols) + "\n";
   const formattedDate = getFormattedDate(order.timestamp);
   
-  let text = doubleDivider + centerAlign("BUM BUM CAFE", cols) + centerAlign("MOHANDRA, PANNA (M.P.)", cols) + doubleDivider;
+  let text = doubleDivider;
+  // BUM BUM CAFE को 2 गुना बड़ा करने के लिए FONT_2X लागू किया गया (12 अक्षर 14 के कॉलम में परफेक्ट सेंटर होंगे)
+  text += "{{FONT_2X}}" + centerAlign("BUM BUM CAFE", 14) + "{{FONT_NORMAL}}";
+  text += centerAlign("NEW BUS STAND MOHANDRA,", cols);
+  text += centerAlign("POLICE CHOKI KE SAMNE,", cols);
+  text += centerAlign("PANNA M.P.", cols);
+  text += doubleDivider;
   
   if (order.customerPhone || order.address) {
     text += "CUSTOMER DETAILS:\n";
@@ -292,7 +330,7 @@ export const generateEscPosText = (order: any, config: PrintConfig): string => {
     
   text += formatRow(typeText, `Pay: ${order.paymentMethod?.toUpperCase()}`, cols);
   
-  // तारीख को लेफ्ट में और समय को पूरी तरह से राइट में अलाइन किया गया
+  // तारीख लेफ्ट में और समय दाईं तरफ बिल्कुल सीधा अलाइन रहेगा
   const dateParts = formattedDate.split(', ');
   const dateOnly = dateParts[0];
   const timeOnly = dateParts[1] || "";
@@ -332,7 +370,7 @@ export const generateEscPosText = (order: any, config: PrintConfig): string => {
   
   text += "\n{{QR_CODE_PLACEHOLDER}}"; 
 
-  // फूटर की तारीख, समय और रसीद संख्या पूरी तरह हटा दी गई है
+  // फूटर
   text += centerAlign("THANK YOU! VISIT AGAIN", cols) + centerAlign("www.bb-cafe-app.vercel.app", cols);
   return text + "\n\n\n\n";
 };
@@ -359,7 +397,6 @@ export const generateKotHtml = (order: any, config: PrintConfig): string => {
             @page { size: ${config.printerPaperSize === '58mm' ? '58mm' : '80mm'} auto; margin: 0; }
             body { margin: 0; padding: 2px; }
           }
-          /* सुधरा हुआ: मोनोस्पेस से बदलकर 'Verdana', sans-serif किया गया */
           body { font-family: 'Verdana', sans-serif; padding: 2px; font-size: ${fSize}px; color: #000; background-color: #fff; margin: 0; }
           .center { text-align: center; }
           .divider { border-top: 1px dotted #000; margin: 4px 0; }
@@ -367,7 +404,6 @@ export const generateKotHtml = (order: any, config: PrintConfig): string => {
         </style>
       </head>
       <body>
-        <!-- सुधरा हुआ: KOT हेडर को डार्क बोल्ड बॉर्डर बॉक्स में बड़ा और स्पष्ट किया गया -->
         <div class="center" style="font-family: 'Verdana', sans-serif; font-size: ${fSize + 5}px; font-weight: 900; border: 2px solid #000; padding: 4px; color: #000; letter-spacing: 1px;">K.O.T (KITCHEN)</div>
         <div class="center" style="font-size: ${fSize + 1}px; font-weight: 900; margin-top: 3px; color: #000;">BUM BUM CAFE</div>
         <div class="divider"></div>
@@ -404,7 +440,8 @@ export const generateReceiptHtml = (order: any, config: PrintConfig): string => 
   const upiLink = `upi://pay?pa=${upiId}&pn=Bum%20Bum%20Cafe&am=${order.total}&cu=INR`;
   const fSize = config.fontSize || 9;
   const formattedReceiptDate = getFormattedReceiptDate(order.timestamp);
-  const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=90x90&margin=0&data=${encodeURIComponent(upiLink)}`;
+  // वेब प्रिव्यू में भी QR कोड को 25% छोटा किया गया (90x90 से घटाकर 65x65 किया गया)
+  const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=65x65&margin=0&data=${encodeURIComponent(upiLink)}`;
 
   const itemsRows = order.items.map((it: any) => `
     <tr style="border-bottom: 1px dashed #eee;">
@@ -432,20 +469,21 @@ export const generateReceiptHtml = (order: any, config: PrintConfig): string => 
             @page { size: ${config.printerPaperSize === '58mm' ? '58mm' : '80mm'} auto; margin: 0; }
             body { margin: 0; padding: 2px; }
           }
-          /* सुधरा हुआ: मोनोस्पेस से बदलकर 'Verdana', sans-serif किया गया */
           body { font-family: 'Verdana', sans-serif; width: 100%; margin: 0; padding: 2px; color: #000; font-size: ${fSize}px; line-height: 1.25; box-sizing: border-box; }
           .center { text-align: center; }
-          .divider { border-top: 1px dotted #000; margin: 4px 0; height: 0; }
-          .double-divider { border-top: 1px dotted #000; border-bottom: 1.5px dotted #000; margin: 4px 0; height: 3px; }
+          .divider { border-top: 1.5px dotted #000; margin: 4px 0; height: 0; }
+          .double-divider { border-top: 1.5px dotted #000; border-bottom: 1.5px dotted #000; margin: 4px 0; height: 3px; }
           table { width: 100%; border-collapse: collapse; table-layout: fixed; }
         </style>
       </head>
       <body>
         <div class="center" style="margin-bottom: 4px;">
-          <!-- सुधरा हुआ: हेडर को डार्क बोल्ड, बड़ा और साफ़ किया गया -->
           <div style="font-family: 'Verdana', sans-serif; font-size: ${fSize + 5}px; font-weight: 900; color: #000; text-transform: uppercase; margin-bottom: 2px; letter-spacing: 0.5px;">BUM BUM CAFE</div>
-          <div style="font-size: ${fSize - 1.5}px; font-weight: bold; color: #333; margin-top: 1px;">BUS STAND MOHANDRA, DIST. PANNA, M.P.</div>
-          <div style="font-size: 8px; font-weight: bold;">Mo. 9714293759</div>
+          <!-- सुधरा हुआ: नया पता वेब प्रिव्यू में भी अपडेट कर दिया गया है -->
+          <div style="font-size: ${fSize - 1.5}px; font-weight: bold; color: #333; margin-top: 1px; max-width: 100%; word-wrap: break-word;">
+            NEW BUS STAND MOHANDRA, POLICE CHOKI KE SAMNE, PANNA M.P.
+          </div>
+          <div style="font-size: 8px; font-weight: bold; margin-top: 2px;">Mo. 9714293759</div>
         </div>
         <div class="divider"></div>
         <div style="font-size: 8.5px; font-weight: bold;">
@@ -468,7 +506,6 @@ export const generateReceiptHtml = (order: any, config: PrintConfig): string => 
             <tr style="border-bottom: 1px solid #000;">
               <th style="text-align: left; font-size: 8.5px; padding-bottom: 3px; width: 55%;">ITEM</th>
               <th style="text-align: center; font-size: 8.5px; padding-bottom: 3px; width: 15%;">QTY</th>
-              <!-- हेडर में भी नया "AMT" संरेखित शब्द जोड़ा गया -->
               <th style="text-align: right; font-size: 8.5px; padding-bottom: 3px; width: 30%;">AMT</th>
             </tr>
           </thead>
@@ -504,7 +541,8 @@ export const generateReceiptHtml = (order: any, config: PrintConfig): string => 
         
         <div class="center" style="margin: 4px 0;">
           <div style="font-size: 8px; margin-bottom: 4.5px; font-weight: bold;">SCAN TO PAY</div>
-          <img src="${qrCodeUrl}" style="width: 80px; height: 80px; border: 1px solid #000; padding: 2px; display: inline-block;" />
+          <!-- सुधरा हुआ: QR कोड को वेब प्रिव्यू में भी 25% छोटा (65px) किया गया है -->
+          <img src="${qrCodeUrl}" style="width: 65px; height: 65px; border: 1px solid #000; padding: 2px; display: inline-block;" />
           <div style="font-size: 7px; font-weight: 900; margin-top: 4.5px;">BHIM UPI PAYTM/PHONEPE</div>
         </div>
         
@@ -514,8 +552,6 @@ export const generateReceiptHtml = (order: any, config: PrintConfig): string => 
           <div style="font-weight: 900; font-size: 8.5px; margin-top: 2px; font-style: italic;">THANK YOU, VISIT AGAIN!</div>
           <div style="font-size: 8px; margin-top: 1px;">www.bb-cafe-app.vercel.app</div>
         </div>
-        
-        <!-- सुधरा हुआ: नीचे की तारीख, समय और फूटर लाइन को यहाँ से भी पूरी तरह हटा दिया गया है -->
       </body>
     </html>
   `;
