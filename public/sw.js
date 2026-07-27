@@ -2,7 +2,8 @@ const CACHE_NAME = 'bb-cafe-cache-v4'; // कैशे का नाम v4 क�
 
 const ASSETS_TO_CACHE = [
   '/',
-  '/pos-menifasto.json', // सुधरा हुआ: नया मैनिफेस्ट पाथ यहाँ अपडेट किया गया है
+  '/pos-menifasto.json', 
+  '/pos', // सुधरा हुआ: POS पाथ को यहाँ ऑफ़लाइन कैशिंग के लिए जोड़ा गया है
   '/delivery',
   '/delivery-manifest.json',
   '/kitchen',
