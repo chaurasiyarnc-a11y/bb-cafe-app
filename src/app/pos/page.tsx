@@ -40,7 +40,7 @@ const SafeShoppingBag = ShoppingBag as any;
 const SafeClock = Clock as any; 
 const SafeLayers = Layers as any;
 const SafePrinter = Printer as any;
-const SafeUsers = SafeUsers = Users as any; 
+const SafeUsers = Users as any; 
 const SafePlay = Play as any; 
 const SafeCheck = Check as any;
 const SafeSearch = Search as any;
@@ -471,6 +471,44 @@ export default function BbCafePos() {
     }
   };
 
+  // Touch handlers for Category horizontal Swipe gestures
+  const handleTouchStart = (e: React.TouchEvent) => {
+    setTouchEnd(null);
+    setTouchStart(e.targetTouches[0].clientX);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    setTouchEnd(e.targetTouches[0].clientX);
+  };
+
+  const handleTouchEnd = () => {
+    if (!touchStart || !touchEnd) return;
+    const distance = touchStart - touchEnd;
+    const isLeftSwipe = distance > minSwipeDistance;
+    const isRightSwipe = distance < -minSwipeDistance;
+
+    if (isLeftSwipe || isRightSwipe) {
+      const curIdx = categories.indexOf(selectedCategory);
+      if (isLeftSwipe) {
+        // Left Swipe -> Next Category
+        if (curIdx < categories.length - 1) {
+          const nextCat = categories[curIdx + 1];
+          setSelectedCategory(nextCat);
+          triggerBeep('tap');
+          toast.success(`Category: ${nextCat}`, { id: 'swipe-toast', duration: 1000 });
+        }
+      } else if (isRightSwipe) {
+        // Right Swipe -> Previous Category
+        if (curIdx > 0) {
+          const prevCat = categories[curIdx - 1];
+          setSelectedCategory(prevCat);
+          triggerBeep('tap');
+          toast.success(`Category: ${prevCat}`, { id: 'swipe-toast', duration: 1000 });
+        }
+      }
+    }
+  };
+
   const handlePinLoginSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     const toastId = toast.loading("Verifying PIN...");
@@ -764,125 +802,6 @@ export default function BbCafePos() {
   const containerPanelClass = "flex-1 border rounded-3xl p-4 flex flex-col overflow-hidden shadow-xl transition-colors duration-200 " + 
     (themeMode === 'dark' ? "bg-neutral-900/90 border-neutral-800" : "bg-white border-neutral-200");
 
-  // Place Order flow (Offline sequence resilient & auto-queue sync)
-  const handlePlaceOrder = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (cart.length === 0 || isSubmittingOrder) return;
-    setIsSubmittingOrder(true);
-    
-    const subtotal = getCartSubtotal();
-    const discountCombined = customDiscount + getLoyaltyDiscount();
-    const finalTotal = getTotalBillPrice();
-    const token = Math.floor(1000 + Math.random() * 9000);
-
-    const earned = Math.floor(finalTotal / 100);
-    const netPoints = customerPhone ? (earned - getTotalPointsRedeemedInCart() - pointsToRedeem) : 0;
-    const pointsAfterBill = customerPhone ? Math.max(0, customerPoints + netPoints) : 0;
-
-    const isOnline = typeof navigator !== 'undefined' ? navigator.onLine : true;
-    let billNumber: number;
-
-    try {
-      if (isOnline) {
-        try {
-          billNumber = await runTransaction(db, async (txn) => {
-            const snap = await txn.get(doc(db, "settings", "store_bill_counter"));
-            const next = snap.exists() ? (snap.data().nextBillNumber || 1) : 1;
-            txn.set(doc(db, "settings", "store_bill_counter"), { nextBillNumber: next + 1 });
-            return next;
-          });
-          localStorage.setItem("bb_pos_local_bill_counter", String(billNumber));
-        } catch (txnError) {
-          console.warn("Transaction failed online, falling back to local counter logic:", txnError);
-          billNumber = getNextLocalBillNumber();
-        }
-      } else {
-        billNumber = getNextLocalBillNumber();
-      }
-
-      const orderObj = { 
-        billNumber, 
-        tokenNumber: token, 
-        customerName: customerName || "Walk-in Guest", 
-        customerPhone: customerPhone ? `+91${customerPhone}` : "", 
-        customerPointsBefore: customerPhone ? customerPoints : 0,
-        customerPointsEarned: customerPhone ? earned : 0,
-        customerPointsRedeemed: customerPhone ? pointsToRedeem : 0,
-        customerPointsAfter: customerPhone ? pointsAfterBill : 0,
-        items: cart, 
-        subtotal, 
-        discount: discountCombined, 
-        gstRate: gstEnabled ? gstRate : 0, 
-        gstAmount: getGstAmountCalculated(), 
-        total: finalTotal, 
-        timestamp: new Date(), 
-        status: 'completed', 
-        fulfillmentType, 
-        deliveryArea: fulfillmentType === "delivery" ? selectedArea.name : "", 
-        tableNumber: fulfillmentType === 'table' ? tableNumber : '', 
-        paymentMethod, 
-        chefInstructions, 
-        source: 'POS',
-        address: address
-      };
-
-      // Safely write document (stored in offline sync queue if network drops)
-      await addDoc(collection(db, "orders"), orderObj);
-
-      if (customerPhone && customerPhone.trim().length === 10) {
-        const phone = customerPhone.trim();
-        const userRef = doc(db, "customer_points", phone);
-
-        if (isOnline) {
-          try {
-            await runTransaction(db, async (txn) => {
-              const snap = await txn.get(userRef);
-              if (!snap.exists()) {
-                txn.set(userRef, { name: customerName || "Walk-in Guest", phone, points: Math.max(0, pointsAfterBill), lastActive: new Date() });
-              } else {
-                txn.update(userRef, { points: pointsAfterBill, lastActive: new Date() });
-              }
-            });
-          } catch (e) {
-            await setDoc(userRef, { name: customerName || "Walk-in Guest", phone, points: Math.max(0, pointsAfterBill), lastActive: new Date() }, { merge: true });
-          }
-        } else {
-          await setDoc(userRef, { name: customerName || "Walk-in Guest", phone, points: Math.max(0, pointsAfterBill), lastActive: new Date() }, { merge: true });
-        }
-
-        if (earned > 0) {
-          await addDoc(collection(db, "customer_points", phone, "history"), { type: 'earn', points: earned, description: `Earned Bill #${billNumber}`, timestamp: new Date() });
-        }
-        if (pointsToRedeem > 0) {
-          await addDoc(collection(db, "customer_points", phone, "history"), { type: 'redeem', points: pointsToRedeem, description: `Redeemed cashback Bill #${billNumber}`, timestamp: new Date() });
-        }
-      }
-
-      triggerBeep('success'); 
-      toast.success(`Bill #${billNumber} saved successfully!`);
-      
-      const pConfig = getPrintConfig();
-
-      if (kotEnabled) {
-        toast.success("Printing KOT first...");
-        await handlePrintKot(orderObj, pConfig);
-        await new Promise((resolve) => setTimeout(resolve, 1500));
-      }
-
-      toast.success("Printing Customer Receipt...");
-      await handlePrintReceipt(orderObj, pConfig);
-
-      // Clean backup logs to start fresh
-      setCart([]); setCustomerPhone(''); setCustomerName(''); setCustomerPoints(0); setPointsToRedeem(0); setCustomDiscount(0); setIsCartOpen(false); setChefInstructions('');
-      localStorage.removeItem("bb_pos_saved_cart");
-    } catch (err) {
-      console.error(err);
-      toast.error("Failed to place order offline");
-    } finally {
-      setIsSubmittingOrder(false);
-    }
-  };
-
   return (
     <div className={mainClass}>
       <Toaster position="top-center" />
@@ -1095,11 +1014,11 @@ export default function BbCafePos() {
                         value={searchQuery} 
                         onChange={e => setSearchQuery(e.target.value)} 
                         className={"w-full rounded-xl py-2 px-9 text-xs outline-none focus:border-orange-500 transition-all border " + 
-                          (themeMode === 'dark' ? "bg-neutral-800 border-neutral-700 text-neutral-100" : "bg-neutral-100 border-neutral-200 text-neutral-800")
+                          (themeMode === 'dark' ? "bg-neutral-800 border-neutral-700 text-neutral-100" : "bg-neutral-100 border-neutral-200 text-neutral-850")
                         } 
                       />
                     </div>
-                    <button onClick={() => { triggerBeep('tap'); setIsCartOpen(true); }} className="bg-orange-500 text-black font-black text-xs py-2 px-4 rounded-xl flex items-center gap-2 shadow-lg active:scale-95 transition-all shrink-0">
+                    <button onClick={() => { triggerBeep('tap'); setIsCartOpen(true); }} className="bg-orange-500 text-black font-black text-xs py-2.5 px-4 rounded-xl flex items-center gap-2 shadow-lg active:scale-95 transition-all shrink-0">
                       <SafeShoppingBag size={14} /><span>Cart ({cart.reduce((sum, item) => sum + item.quantity, 0)})</span>
                     </button>
                   </div>
