@@ -19,7 +19,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
-          java-version: '21' # [NEW] जावा वर्ज़न 17 से बदलकर 21 किया गया
+          java-version: '21'
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -40,6 +40,11 @@ jobs:
         run: |
           npx cap add android || true
           npx cap sync android
+
+      # [NEW AUTO-PATCH] डुप्लीकेट क्लासेस को रोकने के लिए जबरन वर्जन सिंक करने का पैच
+      - name: Fix Duplicate Kotlin Classes
+        run: |
+          echo -e "\nsubprojects { configurations.all { resolutionStrategy { force 'org.jetbrains.kotlin:kotlin-stdlib:1.8.22'; force 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.8.22'; force 'org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.8.22' } } }" >> android/build.gradle
 
       - name: Build Android Debug APK
         run: |
