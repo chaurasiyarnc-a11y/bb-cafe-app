@@ -67,6 +67,7 @@ export const formatRow = (left: string, right: string, cols: number): string => 
 };
 
 export const formatThreeColumns = (col1: string, col2: string, col3: string, cols: number): string => {
+  // कड़ाई से मोनोस्पेस संरेखण के लिए मानक चौड़ाई
   const c1Width = cols === 48 ? 26 : 16;
   const c2Width = cols === 48 ? 6 : 6;
   const c3Width = cols === 48 ? 16 : 10;
@@ -74,8 +75,8 @@ export const formatThreeColumns = (col1: string, col2: string, col3: string, col
   if (item.length > c1Width) item = item.slice(0, c1Width - 1) + ".";
   
   const p1 = item.padEnd(c1Width);
-  const p2 = col2.trim().padStart(2).padEnd(c2Width); 
-  const p3 = col3.trim().padStart(c3Width); 
+  const p2 = col2.trim().padStart(2).padEnd(c2Width); // 2-स्पेस पैडेड क्वांटिटी
+  const p3 = col3.trim().padStart(c3Width); // राइट अलाइन्ड अमाउंट
   
   return p1 + p2 + p3 + "\n";
 };
@@ -141,6 +142,7 @@ export const sendToPrinterInChunks = async (config: PrintConfig, text: string, u
     textBytes = encoder.encode(safeText);
   }
 
+  // प्रिंटर इनिशियलाइज़ेशन (ESC @) और फ़ॉन्ट-A मोनोस्पेस लॉक (ESC ! 0x00) कमांड्स जोड़ना
   const initBytes = new Uint8Array([0x1B, 0x40, 0x1B, 0x21, 0x00]);
   
   const finalBytes = new Uint8Array(initBytes.length + textBytes.length);
@@ -193,7 +195,7 @@ export const sendToPrinterInChunks = async (config: PrintConfig, text: string, u
 // K.O.T & RECEIPT TEXT GENERATORS (ESC/POS)
 // ==========================================
 export const generateKotEscPosText = (order: any, config: PrintConfig): string => {
-  const cols = config.printerPaperSize === '80mm' ? 48 : 32; 
+  const cols = config.printerPaperSize === '80mm' ? 48 : 32; // मानक 32 कैरेक्टर चौड़ाई पर वापस सेट किया गया
   const dividerLine = "-".repeat(cols) + "\n";
   const doubleDivider = "=".repeat(cols) + "\n";
   const formattedDate = getFormattedDate(order.timestamp);
@@ -211,7 +213,7 @@ export const generateKotEscPosText = (order: any, config: PrintConfig): string =
   order.items.forEach((it: any) => {
     const itemLeft = cleanAsciiOnly(it.name).toUpperCase();
     text += itemLeft.length > (cols - 6) ? `${itemLeft}\n${formatRow("", String(it.quantity), cols)}` : formatRow(itemLeft, String(it.quantity), cols);
-    // सुधरा हुआ: KOT आइटम के नीचे विशेष निर्देश प्रिंट होना पूरी तरह बंद कर दिया गया है
+    if (it.note) text += `  * Note: ${it.note.toUpperCase()}\n`;
   });
   
   if (order.chefInstructions) text += dividerLine + `INSTRUCTIONS: ${order.chefInstructions.toUpperCase()}\n`;
@@ -219,7 +221,7 @@ export const generateKotEscPosText = (order: any, config: PrintConfig): string =
 };
 
 export const generateEscPosText = (order: any, config: PrintConfig): string => {
-  const cols = config.printerPaperSize === '80mm' ? 48 : 32; 
+  const cols = config.printerPaperSize === '80mm' ? 48 : 32; // मानक 32 कैरेक्टर चौड़ाई पर वापस सेट किया गया
   const dividerLine = "-".repeat(cols) + "\n";
   const doubleDivider = "=".repeat(cols) + "\n";
   const formattedDate = getFormattedDate(order.timestamp);
@@ -250,7 +252,7 @@ export const generateEscPosText = (order: any, config: PrintConfig): string => {
   order.items.forEach((it: any) => {
     const itemCleanName = cleanAsciiOnly(it.name).toUpperCase();
     text += formatThreeColumns(itemCleanName, String(it.quantity), `₹${it.price * it.quantity}`, cols);
-    // सुधरा हुआ: ग्राहक रसीद के आइटम के नीचे विशेष निर्देश प्रिंट होना पूरी तरह बंद कर दिया गया है
+    if (it.note) text += `  * Note: ${it.note.toUpperCase()}\n`;
   });
 
   const customDiscountVal = order.discount - (order.customerPointsRedeemed || 0);
@@ -279,6 +281,7 @@ export const generateEscPosText = (order: any, config: PrintConfig): string => {
   
   text += "\n{{QR_CODE_PLACEHOLDER}}"; 
 
+  // सुधरा हुआ: नीचे की तारीख, समय और बिल नंबर वाली फूटर लाइन को पूरी तरह हटा दिया गया है
   text += centerAlign("THANK YOU! VISIT AGAIN", cols) + centerAlign("www.bb-cafe-app.vercel.app", cols);
   return text + "\n\n\n\n";
 };
@@ -292,7 +295,7 @@ export const generateKotHtml = (order: any, config: PrintConfig): string => {
     <tr style="border-bottom: 1px dashed #ccc;">
       <td style="font-size: ${fSize}px; font-weight: 900; padding: 4px 0; color: #000; text-transform: uppercase; width: 75%; word-break: break-word; white-space: normal;">
         ${it.name.toUpperCase()}
-        <!-- HTML KOT से भी आइटम नोट्स हटा दिए गए हैं -->
+        ${it.note ? `<div style="font-size: ${fSize - 1.5}px; color: #333; font-weight: 800; padding-left: 4px;">Note: ${it.note.toUpperCase()}</div>` : ''}
       </td>
       <td style="font-size: ${fSize}px; font-weight: 900; text-align: right; padding: 4px 0; font-family: monospace; width: 25%;">${it.quantity}</td>
     </tr>
@@ -403,7 +406,7 @@ export const generateReceiptHtml = (order: any, config: PrintConfig): string => 
           <div style="text-align: right;">Token: #<strong>${order.tokenNumber}</strong></div>
           <div>Mode: ${order.fulfillmentType?.toUpperCase()} ${order.tableNumber ? `(Table: ${order.tableNumber})` : ''}</div>
           <div style="text-align: right;">Pay: ${order.paymentMethod?.toUpperCase()}</div>
-          <div style="grid-column: span 2;">Date: ${formattedReceiptDate}</div>
+          <div>Date: ${formattedReceiptDate}</div>
         </div>
         <div class="divider" style="margin-top: 6px;"></div>
         <table>
