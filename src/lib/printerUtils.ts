@@ -95,24 +95,21 @@ export const formatRow = (left: string, right: string, cols: number): string => 
   }
 };
 
-// सुधरा हुआ 3-कॉलम अलाइनर (आइटम लंबा होने पर आखिरी लाइन के सामने Qty और Amount प्रिंट करेगा)
+// सुधरा हुआ 3-कॉलम अलाइनर (मांग के अनुसार 19 + 5 + 6 = 30 का गणित लागू किया गया)
 export const formatThreeColumns = (col1: string, col2: string, col3: string, cols: number): string => {
-  const c1Width = cols === 48 ? 26 : 16;
-  const c2Width = cols === 48 ? 6 : 6;
-  const c3Width = cols === 48 ? 16 : 10;
+  const c1Width = cols === 48 ? 26 : 19; // डिश नाम के लिए 19 कैरेक्टर चौड़ाई
+  const c2Width = cols === 48 ? 6 : 5;  // Quantity के लिए 5 कैरेक्टर चौड़ाई
+  const c3Width = cols === 48 ? 16 : 6;  // Amount (Rs.) के लिए 6 कैरेक्टर चौड़ाई
 
-  // आइटम के नाम को शब्दों के अनुसार रैप (wrap) करना
   const itemLines = wrapText(col1.trim(), c1Width);
   const p2 = col2.trim().padStart(2).padEnd(c2Width); 
   const p3 = col3.trim().padStart(c3Width); 
 
   let output = "";
-  // अंतिम लाइन को छोड़कर बाकी सभी लाइनों को केवल नाम के साथ प्रिंट करेंगे
   for (let i = 0; i < itemLines.length - 1; i++) {
     output += itemLines[i] + "\n";
   }
   
-  // आखरी लाइन में बचा हुआ नाम + Qty + Amount एक साथ अलाइन होंगे
   const lastLineItem = itemLines[itemLines.length - 1].padEnd(c1Width);
   output += lastLineItem + p2 + p3 + "\n";
 
@@ -233,7 +230,7 @@ export const sendToPrinterInChunks = async (config: PrintConfig, text: string, u
 // K.O.T & RECEIPT TEXT GENERATORS (ESC/POS)
 // ==========================================
 export const generateKotEscPosText = (order: any, config: PrintConfig): string => {
-  const cols = config.printerPaperSize === '80mm' ? 48 : 32; 
+  const cols = config.printerPaperSize === '80mm' ? 48 : 30; // 58mm चौड़ाई को सुरक्षित 30 पर सेट किया गया
   const dividerLine = "-".repeat(cols) + "\n";
   const doubleDivider = "=".repeat(cols) + "\n";
   const formattedDate = getFormattedDate(order.timestamp);
@@ -250,9 +247,8 @@ export const generateKotEscPosText = (order: any, config: PrintConfig): string =
   text += dividerLine + formatRow("ITEM", "QTY", cols) + dividerLine;
   order.items.forEach((it: any) => {
     const itemLeft = cleanAsciiOnly(it.name).toUpperCase();
-    const c1WidthKOT = cols - 6; // Qty के लिए 6 कैरेक्टर छोड़कर आइटम चौड़ाई
+    const c1WidthKOT = cols - 6; 
     
-    // सुधरा हुआ KOT वर्ड रैप लॉजिक (KOT में भी मात्रा आखरी लाइन के सामने प्रिंट होगी)
     const itemLines = wrapText(itemLeft, c1WidthKOT);
     for (let i = 0; i < itemLines.length - 1; i++) {
       text += itemLines[i] + "\n";
@@ -265,7 +261,7 @@ export const generateKotEscPosText = (order: any, config: PrintConfig): string =
 };
 
 export const generateEscPosText = (order: any, config: PrintConfig): string => {
-  const cols = config.printerPaperSize === '80mm' ? 48 : 32; 
+  const cols = config.printerPaperSize === '80mm' ? 48 : 30; // 58mm चौड़ाई को सुरक्षित 30 पर सेट किया गया
   const dividerLine = "-".repeat(cols) + "\n";
   const doubleDivider = "=".repeat(cols) + "\n";
   const formattedDate = getFormattedDate(order.timestamp);
@@ -295,7 +291,6 @@ export const generateEscPosText = (order: any, config: PrintConfig): string => {
   text += formatThreeColumns("ITEM", "QTY", "AMOUNT", cols) + dividerLine;
   order.items.forEach((it: any) => {
     const itemCleanName = cleanAsciiOnly(it.name).toUpperCase();
-    // 3-कॉलम संरेखण लागू किया गया (नाम बड़ा होने पर आखरी लाइन के सामने Qty और Amount आएगा)
     text += formatThreeColumns(itemCleanName, String(it.quantity), `₹${it.price * it.quantity}`, cols);
   });
 
