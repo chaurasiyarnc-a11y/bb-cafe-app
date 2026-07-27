@@ -142,6 +142,11 @@ export default function BbCafePos() {
   // सिंकिंग स्टेट्स
   const [isSyncing, setIsSyncing] = useState(false);
 
+  // जेस्चर (Swipe) स्टेट्स
+  const [touchStart, setTouchStart] = useState<number | null>(null);
+  const [touchEnd, setTouchEnd] = useState<number | null>(null);
+  const minSwipeDistance = 60;
+
   const [cart, setCart] = useState<PosCartItem[]>([]);
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerName, setCustomerName] = useState('');
@@ -328,45 +333,18 @@ export default function BbCafePos() {
     localStorage.setItem("bb_pos_saved_chef_instructions", chefInstructions);
   }, [customerPhone, customerName, customerPoints, address, fulfillmentType, tableNumber, chefInstructions]);
 
-  // Robust Persistent Auto-reconnect Printer on refresh (Starts immediately on Login)
+  // Safe Multi-Faceted Auto-reconnect Printer on first user interaction or mount
   useEffect(() => {
-    const autoReconnectPrinters = async () => {
+    const attemptReconnect = async () => {
       const isSavedConnected = localStorage.getItem("bb_pos_printer_connected") === 'true';
-      if (!isSavedConnected) return;
+      if (!isSavedConnected || printerConnected) return;
 
       const savedType = localStorage.getItem("bb_pos_printer_type") || 'thermal_usb';
       if (typeof window === 'undefined') return;
 
-      setTimeout(async () => {
-        // Bluetooth Auto-connect using granted permission check
-        if (savedType === 'thermal_bluetooth' && 'bluetooth' in navigator && !bleCharacteristic) {
-          try {
-            const devices = await (navigator as any).bluetooth.getDevices();
-            if (devices.length > 0) {
-              const device = devices[0];
-              const server = await device.gatt.connect();
-              let service;
-              let characteristic;
-
-              try {
-                service = await server.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb');
-                characteristic = await service.getCharacteristic('00002af1-0000-1000-8000-00805f9b34fb');
-              } catch (bleErr) {
-                service = await server.getPrimaryService('0000ff00-0000-1000-8000-00805f9b34fb');
-                characteristic = await service.getCharacteristic('0000ff02-0000-1000-8000-00805f9b34fb');
-              }
-
-              setBleCharacteristic(characteristic);
-              setPrinterConnected(true);
-              toast.success("Bluetooth Printer Reconnected!");
-            }
-          } catch (e) {
-            console.warn("Bluetooth auto-reconnect failed:", e);
-          }
-        }
-
-        // Web Serial USB Auto-connect
-        if (savedType === 'thermal_usb' && 'serial' in navigator && !serialPort) {
+      // Web Serial USB Re-connect
+      if (savedType === 'thermal_usb') {
+        if ('serial' in navigator && !serialPort) {
           try {
             const ports = await (navigator as any).serial.getPorts();
             if (ports.length > 0) {
@@ -375,14 +353,10 @@ export default function BbCafePos() {
               setSerialPort(port);
               setPrinterConnected(true);
               toast.success("USB Printer Reconnected!");
+              cleanupListeners();
             }
-          } catch (e) {
-            console.warn("Serial auto-reconnect failed:", e);
-          }
-        } 
-        
-        // WebUSB fallback auto-connect
-        if (savedType === 'thermal_usb' && 'usb' in navigator && !serialPort && !usbDevice) {
+          } catch (e) {}
+        } else if ('usb' in navigator && !usbDevice) {
           try {
             const devices = await (navigator as any).usb.getDevices();
             if (devices.length > 0) {
@@ -393,18 +367,58 @@ export default function BbCafePos() {
               setUsbDevice(device);
               setPrinterConnected(true);
               toast.success("USB Printer Reconnected!");
+              cleanupListeners();
             }
-          } catch (e) {
-            console.warn("WebUSB auto-reconnect failed:", e);
-          }
+          } catch (e) {}
         }
-      }, 500);
+      }
+
+      // Web Bluetooth Re-connect
+      if (savedType === 'thermal_bluetooth' && 'bluetooth' in navigator && !bleCharacteristic) {
+        try {
+          const devices = await (navigator as any).bluetooth.getDevices();
+          if (devices.length > 0) {
+            const device = devices[0];
+            const server = await device.gatt!.connect();
+            let service;
+            let characteristic;
+
+            try {
+              service = await server.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb');
+              characteristic = await service.getCharacteristic('00002af1-0000-1000-8000-00805f9b34fb');
+            } catch (bleErr) {
+              service = await server.getPrimaryService('0000ff00-0000-1000-8000-00805f9b34fb');
+              characteristic = await service.getCharacteristic('0000ff02-0000-1000-8000-00805f9b34fb');
+            }
+
+            setBleCharacteristic(characteristic);
+            setPrinterConnected(true);
+            toast.success("Bluetooth Printer Reconnected!");
+            cleanupListeners();
+          }
+        } catch (e) {}
+      }
+    };
+
+    const handleInitialUserAction = () => {
+      attemptReconnect();
+    };
+
+    const cleanupListeners = () => {
+      window.removeEventListener('click', handleInitialUserAction);
+      window.removeEventListener('touchstart', handleInitialUserAction);
     };
 
     if (isLoggedIn) {
-      autoReconnectPrinters();
+      attemptReconnect(); // Try immediately first
+      window.addEventListener('click', handleInitialUserAction, { once: true });
+      window.addEventListener('touchstart', handleInitialUserAction, { once: true });
     }
-  }, [isLoggedIn, serialPort, usbDevice, bleCharacteristic]);
+
+    return () => {
+      cleanupListeners();
+    };
+  }, [isLoggedIn, printerConnected, serialPort, usbDevice, bleCharacteristic]);
 
   // Sync Live Orders and Align local offline bill sequence
   useEffect(() => {
@@ -510,6 +524,44 @@ export default function BbCafePos() {
       toast.error("Sync incomplete or connection timeout");
     } finally {
       setIsSyncing(false);
+    }
+  };
+
+  // Touch handlers for Category horizontal Swipe gestures
+  const handleTouchStart = (e: React.TouchEvent) => {
+    setTouchEnd(null);
+    setTouchStart(e.targetTouches[0].clientX);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    setTouchEnd(e.targetTouches[0].clientX);
+  };
+
+  const handleTouchEnd = () => {
+    if (!touchStart || !touchEnd) return;
+    const distance = touchStart - touchEnd;
+    const isLeftSwipe = distance > minSwipeDistance;
+    const isRightSwipe = distance < -minSwipeDistance;
+
+    if (isLeftSwipe || isRightSwipe) {
+      const curIdx = categories.indexOf(selectedCategory);
+      if (isLeftSwipe) {
+        // Left Swipe -> Next Category
+        if (curIdx < categories.length - 1) {
+          const nextCat = categories[curIdx + 1];
+          setSelectedCategory(nextCat);
+          triggerBeep('tap');
+          toast.success(`Category: ${nextCat}`, { id: 'swipe-toast', duration: 1000 });
+        }
+      } else if (isRightSwipe) {
+        // Right Swipe -> Previous Category
+        if (curIdx > 0) {
+          const prevCat = categories[curIdx - 1];
+          setSelectedCategory(prevCat);
+          triggerBeep('tap');
+          toast.success(`Category: ${prevCat}`, { id: 'swipe-toast', duration: 1000 });
+        }
+      }
     }
   };
 
@@ -731,366 +783,24 @@ export default function BbCafePos() {
     setCart((prev) => prev.map((item) => item.id === itemId ? { ...item, note: noteValue } : item));
   };
 
-  // Billing Math
-  const getCartSubtotal = () => cart.reduce((acc, i) => acc + (i.price * i.quantity), 0);
-  const getDeliveryCharge = () => (fulfillmentType === "pickup" || fulfillmentType === "table" || getCartSubtotal() === 0) ? 0 : (getCartSubtotal() >= selectedArea.minFree ? 0 : selectedArea.fee);
-  const getLoyaltyDiscount = () => Math.min(pointsToRedeem, getCartSubtotal());
-  const getGstAmountCalculated = () => gstEnabled ? Number(((getCartSubtotal() * gstRate) / 100).toFixed(2)) : 0;
-  const getTotalBillPrice = () => Math.max(0, getCartSubtotal() + getGstAmountCalculated() - (getLoyaltyDiscount() + customDiscount)) + getDeliveryCharge();
-  const getFreeDeliveryProgressPercent = () => Math.min(100, (getCartSubtotal() / selectedArea.minFree) * 100);
-  const getTotalPointsRedeemedInCart = () => cart.reduce((acc, i) => acc + (i.pointsCost || 0), 0);
-
-  const getPrintConfig = (): PrintConfig => {
-    const configObj: any = {
-      printerPaperSize,
-      printerType,
-      bleCharacteristic,
-      serialPort,
-      usbDevice,
-      fontSize 
-    };
-    return configObj as PrintConfig;
-  };
-
-  const handleConnectPrinter = async () => {
-    triggerBeep('tap');
-    setIsConnecting(true);
-    const toastId = toast.loading(`Connecting to ${printerType.toUpperCase().replace('_', ' ')}...`);
-
-    if (printerType === 'thermal_bluetooth') {
-      if (!(navigator as any).bluetooth) { 
-        toast.dismiss(toastId);
-        setIsConnecting(false);
-        toast.error("Web Bluetooth is not supported on this browser/device.");
-        return;
-      }
-      try {
-        const device = await (navigator as any).bluetooth.requestDevice({ 
-          acceptAllDevices: true,
-          optionalServices: ['000018f0-0000-1000-8000-00805f9b34fb'] 
-        });
-
-        const server = await device.gatt!.connect();
-        let service;
-        let characteristic;
-
-        try {
-          service = await server.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb');
-          characteristic = await service.getCharacteristic('00002af1-0000-1000-8000-00805f9b34fb');
-        } catch (bleErr) {
-          service = await server.getPrimaryService('0000ff00-0000-1000-8000-00805f9b34fb');
-          characteristic = await service.getCharacteristic('0000ff02-0000-1000-8000-00805f9b34fb');
-        }
-
-        setBleCharacteristic(characteristic);
-        setPrinterConnected(true);
-        localStorage.setItem("bb_pos_printer_connected", "true");
-        toast.dismiss(toastId);
-        toast.success("Bluetooth Printer Connected!");
-      } catch (err: any) {
-        console.error(err);
-        toast.dismiss(toastId);
-        toast.error(err.message || "Failed to pair with Bluetooth printer.");
-      } finally {
-        setIsConnecting(false);
-      }
-    } else if (printerType === 'thermal_usb') {
-      if (!(navigator as any).serial && !(navigator as any).usb) {
-        toast.dismiss(toastId);
-        setIsConnecting(false);
-        toast.error("Direct USB printing is not supported on this browser.");
-        return;
-      }
-      try {
-        if ((navigator as any).serial) {
-          const port = await (navigator as any).serial.requestPort();
-          await port.open({ baudRate: 9600 });
-          setSerialPort(port);
-          setPrinterConnected(true);
-          localStorage.setItem("bb_pos_printer_connected", "true");
-          toast.dismiss(toastId);
-          toast.success("Direct USB Printer Connected via Web Serial!");
-        } else {
-          const device = await (navigator as any).usb.requestDevice({ filters: [] });
-          await device.open();
-          await device.selectConfiguration(1);
-          await device.claimInterface(0);
-          setUsbDevice(device);
-          setPrinterConnected(true);
-          localStorage.setItem("bb_pos_printer_connected", "true");
-          toast.dismiss(toastId);
-          toast.success("Direct USB Printer Connected via WebUSB!");
-        }
-      } catch (err) {
-        console.error(err);
-        toast.dismiss(toastId);
-        toast.error("Direct USB connection failed.");
-      } finally {
-        setIsConnecting(false);
-      }
-    } else {
-      setTimeout(() => {
-        toast.dismiss(toastId);
-        setIsConnecting(false);
-        setPrinterConnected(true);
-        localStorage.setItem("bb_pos_printer_connected", "true");
-        toast.success(`${printerType.replace('_', ' ').toUpperCase()} Connected Successfully!`);
-      }, 1200);
-    }
-  };
-
-  const handleTestPrint = () => {
-    const mockOrder = {
-      billNumber: '0000',
-      tokenNumber: '9999',
-      fulfillmentType: 'test',
-      paymentMethod: 'system',
-      items: [
-        { name: 'Connection Active!', quantity: 1, price: 100 },
-        { name: 'ESC/POS Print Test', quantity: 1, price: 50 }
-      ],
-      subtotal: 150,
-      discount: 0,
-      total: 150,
-      timestamp: new Date()
-    };
-    handlePrintReceipt(mockOrder, getPrintConfig());
-  };
-
-  const handleDetectLocation = () => {
-    triggerBeep('tap');
-    if (typeof window === "undefined" || !navigator.geolocation) {
-      toast.error("Geolocation is not supported by your device.");
-      return;
-    }
-    const toastId = toast.loading("Detecting location...");
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const { latitude, longitude } = position.coords;
-        setAddress(`GPS Location: https://www.google.com/maps?q=${latitude.toFixed(6)},${longitude.toFixed(6)}`);
-        toast.dismiss(toastId);
-        toast.success("Location detected!");
-      },
-      () => {
-        toast.dismiss(toastId);
-        toast.error("Unable to retrieve location.");
-      },
-      { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
-    );
-  };
-
-  // Safe offline bill sequence generation
-  const getNextLocalBillNumber = () => {
-    const currentLocal = Number(localStorage.getItem("bb_pos_local_bill_counter")) || 5000;
-    const nextLocal = currentLocal + 1;
-    localStorage.setItem("bb_pos_local_bill_counter", String(nextLocal));
-    return nextLocal;
-  };
-
-  // Place Order flow (Offline sequence resilient & auto-queue sync)
-  const handlePlaceOrder = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (cart.length === 0 || isSubmittingOrder) return;
-    setIsSubmittingOrder(true);
-    
-    const subtotal = getCartSubtotal();
-    const discountCombined = customDiscount + getLoyaltyDiscount();
-    const finalTotal = getTotalBillPrice();
-    const token = Math.floor(1000 + Math.random() * 9000);
-
-    const earned = Math.floor(finalTotal / 100);
-    const netPoints = customerPhone ? (earned - getTotalPointsRedeemedInCart() - pointsToRedeem) : 0;
-    const pointsAfterBill = customerPhone ? Math.max(0, customerPoints + netPoints) : 0;
-
-    const isOnline = typeof navigator !== 'undefined' ? navigator.onLine : true;
-    let billNumber: number;
-
-    try {
-      if (isOnline) {
-        try {
-          billNumber = await runTransaction(db, async (txn) => {
-            const snap = await txn.get(doc(db, "settings", "store_bill_counter"));
-            const next = snap.exists() ? (snap.data().nextBillNumber || 1) : 1;
-            txn.set(doc(db, "settings", "store_bill_counter"), { nextBillNumber: next + 1 });
-            return next;
-          });
-          localStorage.setItem("bb_pos_local_bill_counter", String(billNumber));
-        } catch (txnError) {
-          console.warn("Transaction failed online, falling back to local counter logic:", txnError);
-          billNumber = getNextLocalBillNumber();
-        }
-      } else {
-        billNumber = getNextLocalBillNumber();
-      }
-
-      const orderObj = { 
-        billNumber, 
-        tokenNumber: token, 
-        customerName: customerName || "Walk-in Guest", 
-        customerPhone: customerPhone ? `+91${customerPhone}` : "", 
-        customerPointsBefore: customerPhone ? customerPoints : 0,
-        customerPointsEarned: customerPhone ? earned : 0,
-        customerPointsRedeemed: customerPhone ? pointsToRedeem : 0,
-        customerPointsAfter: customerPhone ? pointsAfterBill : 0,
-        items: cart, 
-        subtotal, 
-        discount: discountCombined, 
-        gstRate: gstEnabled ? gstRate : 0, 
-        gstAmount: getGstAmountCalculated(), 
-        total: finalTotal, 
-        timestamp: new Date(), 
-        status: 'completed', 
-        fulfillmentType, 
-        deliveryArea: fulfillmentType === "delivery" ? selectedArea.name : "", 
-        tableNumber: fulfillmentType === 'table' ? tableNumber : '', 
-        paymentMethod, 
-        chefInstructions, 
-        source: 'POS',
-        address: address
-      };
-
-      // Safely write document (stored in offline sync queue if network drops)
-      await addDoc(collection(db, "orders"), orderObj);
-
-      if (customerPhone && customerPhone.trim().length === 10) {
-        const phone = customerPhone.trim();
-        const userRef = doc(db, "customer_points", phone);
-
-        if (isOnline) {
-          try {
-            await runTransaction(db, async (txn) => {
-              const snap = await txn.get(userRef);
-              if (!snap.exists()) {
-                txn.set(userRef, { name: customerName || "Walk-in Guest", phone, points: Math.max(0, pointsAfterBill), lastActive: new Date() });
-              } else {
-                txn.update(userRef, { points: pointsAfterBill, lastActive: new Date() });
-              }
-            });
-          } catch (e) {
-            await setDoc(userRef, { name: customerName || "Walk-in Guest", phone, points: Math.max(0, pointsAfterBill), lastActive: new Date() }, { merge: true });
-          }
-        } else {
-          await setDoc(userRef, { name: customerName || "Walk-in Guest", phone, points: Math.max(0, pointsAfterBill), lastActive: new Date() }, { merge: true });
-        }
-
-        if (earned > 0) {
-          await addDoc(collection(db, "customer_points", phone, "history"), { type: 'earn', points: earned, description: `Earned Bill #${billNumber}`, timestamp: new Date() });
-        }
-        if (pointsToRedeem > 0) {
-          await addDoc(collection(db, "customer_points", phone, "history"), { type: 'redeem', points: pointsToRedeem, description: `Redeemed cashback Bill #${billNumber}`, timestamp: new Date() });
-        }
-      }
-
-      triggerBeep('success'); 
-      toast.success(`Bill #${billNumber} saved successfully!`);
-      
-      const pConfig = getPrintConfig();
-
-      if (kotEnabled) {
-        toast.success("Printing KOT first...");
-        await handlePrintKot(orderObj, pConfig);
-        await new Promise((resolve) => setTimeout(resolve, 1500));
-      }
-
-      toast.success("Printing Customer Receipt...");
-      await handlePrintReceipt(orderObj, pConfig);
-
-      // Clean backup logs to start fresh
-      setCart([]); setCustomerPhone(''); setCustomerName(''); setCustomerPoints(0); setPointsToRedeem(0); setCustomDiscount(0); setIsCartOpen(false); setChefInstructions('');
-      localStorage.removeItem("bb_pos_saved_cart");
-    } catch (err) {
-      console.error(err);
-      toast.error("Failed to place order offline");
-    } finally {
-      setIsSubmittingOrder(false);
-    }
-  };
-
-  const handleToggleStock = async (productId: string, currentStatus: boolean) => {
-    triggerBeep('tap');
-    try {
-      await updateDoc(doc(db, "products", productId), { isAvailable: !currentStatus });
-      setProducts(prev => prev.map((p) => p.id === productId ? { ...p, isAvailable: !currentStatus } : p));
-      toast.success("Stock toggled!");
-    } catch (err) {
-      toast.error("Failed to toggle stock");
-    }
-  };
-
-  const handleToggleTheme = (mode: 'dark' | 'light') => {
-    triggerBeep('tap'); setThemeMode(mode); localStorage.setItem("bb_pos_theme", mode);
-    if (mode === 'light') document.documentElement.classList.remove('dark');
-    else document.documentElement.classList.add('dark');
-  };
-
-  const filteredMenu = useMemo(() => products.filter((p) => (selectedCategory === 'All' || p.category === selectedCategory) && p.name.toLowerCase().includes(searchQuery.toLowerCase())), [products, selectedCategory, searchQuery]);
-  
-  const filteredPastReceipts = useMemo(() => {
-    return pastReceipts.filter((o) => 
-      String(o.billNumber).includes(receiptSearchQuery.trim()) || 
-      String(o.customerPhone || '').includes(receiptSearchQuery.trim()) || 
-      String(o.customerName || '').toLowerCase().includes(receiptSearchQuery.trim().toLowerCase())
-    );
-  }, [pastReceipts, receiptSearchQuery]);
-
-  const activeLiveOrders = useMemo(() => {
-    return liveOrders.filter((o) => o.status !== 'completed' && o.status !== 'rejected');
-  }, [liveOrders]);
-
-  const getDisplayPrice = (item: any) => item?.variants ? `₹${Math.min(...Object.values(item.variants).map(Number))}+` : `₹${item?.price || 0}`;
-
-  const liveOrdersBadgeCount = activeLiveOrders.length;
-
-  // Navigation Items (Live Orders Shifted out of Sidebar navigation to Header)
-  const navItems = [
-    { id: 'billing', label: 'Counter Billing', icon: SafeShoppingBag },
-    { id: 'inventory', label: 'Stock Toggle', icon: SafeLayers },
-    { id: 'receipts', label: 'Past Receipts', icon: SafePrinter },
-    { id: 'settings', label: 'POS Settings', icon: SafeSettings }
-  ];
-
-  const sampleOrderForPreview = useMemo(() => {
-    return {
-      billNumber: 45,
-      tokenNumber: 12,
-      timestamp: new Date(),
-      customerName: customerName || "Walk-in Guest",
-      customerPhone: customerPhone ? `+91${customerPhone}` : "",
-      address: address || "Mohandra Bus Stand, Panna, MP",
-      fulfillmentType,
-      tableNumber: tableNumber || "T-1",
-      paymentMethod,
-      items: cart.length > 0 ? cart : [
-        { name: "PANEER TIKKA", quantity: 2, price: 180, note: "EXTRA SPICY" },
-        { name: "VEG BURGER", quantity: 1, price: 90 },
-        { name: "MASALA CHAI", quantity: 3, price: 20 }
-      ],
-      subtotal: cart.length > 0 ? getCartSubtotal() : 510,
-      discount: cart.length > 0 ? (customDiscount + getLoyaltyDiscount()) : 10,
-      customerPointsRedeemed: pointsToRedeem,
-      customerPointsEarned: cart.length > 0 ? Math.floor(getTotalBillPrice() / 100) : 5,
-      customerPointsAfter: customerPhone ? Math.max(0, customerPoints + (Math.floor(getTotalBillPrice() / 100) - getTotalPointsRedeemedInCart() - pointsToRedeem)) : 25,
-      total: cart.length > 0 ? getTotalBillPrice() : 500
-    };
-  }, [cart, customerName, customerPhone, address, fulfillmentType, tableNumber, paymentMethod, customDiscount, pointsToRedeem, customerPoints]);
-
-  const receiptHtmlContent = useMemo(() => {
-    return generateReceiptHtml(sampleOrderForPreview, getPrintConfig());
-  }, [sampleOrderForPreview, printerPaperSize, printerType, fontSize]);
-
+  // Direct CSS Theme Conditionals - Bypasses Tailwind dark config bugs safely
   const mainClass = "min-h-screen flex flex-col md:flex-row font-sans antialiased overflow-hidden transition-colors duration-200 " + 
-    (themeMode === "dark" ? "dark bg-[#0a0a0a] text-neutral-100" : "bg-neutral-50 text-neutral-800");
+    (themeMode === "dark" ? "bg-[#0c0c0c] text-neutral-100" : "bg-neutral-50 text-neutral-800");
 
-  const asideClass = "bg-white dark:bg-neutral-900 border-r border-neutral-200 dark:border-neutral-800 flex flex-col justify-between p-4 shrink-0 shadow-lg transition-all duration-300 fixed inset-y-0 left-0 md:relative md:translate-x-0 md:flex " + 
+  const asideClass = "border-r flex flex-col justify-between p-4 shrink-0 shadow-lg transition-all duration-300 fixed inset-y-0 left-0 md:relative md:translate-x-0 md:flex z-30 " + 
+    (themeMode === 'dark' ? "bg-neutral-900 border-neutral-800 text-neutral-100" : "bg-white border-neutral-200 text-neutral-850") + " " + 
     (isSidebarCollapsed ? "md:w-20" : "md:w-64") + " " + 
-    (isSidebarOpen ? "translate-x-0 w-64 z-50 shadow-2xl" : "-translate-x-full md:translate-x-0 z-30 md:z-30");
+    (isSidebarOpen ? "translate-x-0 w-64 shadow-2xl" : "-translate-x-full md:translate-x-0");
+
+  const containerPanelClass = "flex-1 border rounded-3xl p-4 flex flex-col overflow-hidden shadow-xl transition-colors duration-200 " + 
+    (themeMode === 'dark' ? "bg-neutral-900/90 border-neutral-800" : "bg-white border-neutral-200");
 
   return (
     <div className={mainClass}>
       <Toaster position="top-center" />
 
       {!isLoggedIn ? (
-        <div className="fixed inset-0 bg-neutral-900 text-white flex flex-col items-center justify-center p-4 z-50 animate-fade-in">
+        <div className="fixed inset-0 bg-neutral-900 text-white flex flex-col items-center justify-center p-4 z-50 animate-fade-in font-sans">
           <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-sm bg-neutral-950 border border-neutral-800 rounded-3xl p-8 shadow-2xl space-y-6 text-center">
             <div className="flex flex-col items-center gap-2">
               <div className="p-4 bg-orange-500/10 text-orange-500 rounded-full border border-orange-500/20"><SafeLock size={32} /></div>
@@ -1143,7 +853,14 @@ export default function BbCafePos() {
                         setActiveTab(item.id as any); 
                         setIsSidebarOpen(false); 
                       }} 
-                      className={"w-full flex items-center justify-between px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-200 " + (activeTab === item.id ? "bg-orange-600 text-white" : "text-neutral-500 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800 hover:text-neutral-900 dark:hover:text-white")}
+                      className={"w-full flex items-center justify-between px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-200 " + 
+                        (activeTab === item.id 
+                          ? "bg-orange-600 text-white" 
+                          : (themeMode === 'dark' 
+                            ? "text-neutral-400 hover:bg-neutral-800 hover:text-white" 
+                            : "text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900"
+                          )
+                        )}
                     >
                       <div className="flex items-center gap-3">
                         <Icon size={14} />
@@ -1155,7 +872,7 @@ export default function BbCafePos() {
               </nav>
             </div>
 
-            {/* Sidebar bottom action layout - lock & manual sync */}
+            {/* Sidebar bottom actions - lock, logout, sync */}
             <div className="space-y-2 pt-4 border-t border-neutral-200 dark:border-neutral-800">
               <button 
                 onClick={handleManualSync} 
@@ -1182,7 +899,7 @@ export default function BbCafePos() {
                 <span className="text-[9px] text-neutral-500 dark:text-neutral-400 font-bold">Bum Bum Cafe • Mohandra</span>
               </div>
               
-              {/* Header Shift - "Live Orders" badge button replaces "Search Guest" */}
+              {/* Header "Live Orders" badge button */}
               <button 
                 onClick={() => { triggerBeep('tap'); setActiveTab('orders'); }} 
                 className={"ml-auto p-2 rounded-xl flex items-center gap-2 text-[10px] font-black uppercase transition-all relative shadow-sm hover:scale-[1.02] active:scale-95 " + 
@@ -1226,7 +943,7 @@ export default function BbCafePos() {
                     activeLiveOrders.map((order) => {
                       const isOnline = order.source && order.source !== 'POS';
                       const orderCardClass = "border rounded-2xl p-4 flex flex-col justify-between shadow-lg h-fit transition-colors duration-200 " + 
-                        (isOnline ? "bg-blue-50/50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-900/50" : "bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800");
+                        (isOnline ? "bg-blue-50/50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-900/50" : (themeMode === 'dark' ? "bg-neutral-900 border-neutral-800 text-neutral-100" : "bg-white border-neutral-200 text-neutral-800"));
                       return (
                         <div key={order.id} className={orderCardClass}>
                           <div>
@@ -1239,10 +956,10 @@ export default function BbCafePos() {
                               </div>
                               <span className="bg-orange-500/10 text-orange-400 text-[8px] font-black uppercase px-2 py-0.5 rounded">{order.fulfillmentType}</span>
                             </div>
-                            <p className="text-[10px] font-black text-neutral-800 dark:text-neutral-200">👤 {order.customerName}</p>
+                            <p className="text-[10px] font-black">👤 {order.customerName}</p>
                             <div className="space-y-1.5 pt-2 mb-4 border-t border-dashed border-neutral-200 dark:border-neutral-800">
                               {order.items?.map((it: any, idx: number) => (
-                                <div key={idx} className="flex justify-between text-[11px] font-semibold text-neutral-700 dark:text-neutral-300">
+                                <div key={idx} className="flex justify-between text-[11px] font-semibold">
                                   <span>{it.name} <span className="text-orange-500 font-bold">x{it.quantity}</span></span>
                                 </div>
                               ))}
@@ -1278,23 +995,40 @@ export default function BbCafePos() {
               </div>
             )}
 
+            {/* COUNTER BILLING - Swipe gesture fully integrated on Product grid */}
             {activeTab === 'billing' && (
               <div className="flex-1 flex flex-col overflow-hidden relative">
-                <div className="flex-1 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-3xl p-4 flex flex-col overflow-hidden shadow-xl">
+                <div className={containerPanelClass}>
                   <div className="flex gap-3 mb-4 items-center">
                     <div className="relative flex-1">
                       <SafeSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={14} />
-                      <input type="text" placeholder="Search menu..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="w-full bg-neutral-100 dark:bg-neutral-800 rounded-xl py-2 px-9 text-xs outline-none text-neutral-800 dark:text-neutral-100 border border-transparent dark:border-neutral-700 focus:border-orange-500 transition-all" />
+                      <input 
+                        type="text" 
+                        placeholder="Search menu..." 
+                        value={searchQuery} 
+                        onChange={e => setSearchQuery(e.target.value)} 
+                        className={"w-full rounded-xl py-2 px-9 text-xs outline-none focus:border-orange-500 transition-all border " + 
+                          (themeMode === 'dark' ? "bg-neutral-800 border-neutral-700 text-neutral-100" : "bg-neutral-100 border-neutral-200 text-neutral-800")
+                        } 
+                      />
                     </div>
-                    <button onClick={() => { triggerBeep('tap'); setIsCartOpen(true); }} className="bg-orange-500 text-black font-black text-xs py-2 px-4 rounded-xl flex items-center gap-2 shadow-lg active:scale-95 transition-all">
+                    <button onClick={() => { triggerBeep('tap'); setIsCartOpen(true); }} className="bg-orange-500 text-black font-black text-xs py-2 px-4 rounded-xl flex items-center gap-2 shadow-lg active:scale-95 transition-all shrink-0">
                       <SafeShoppingBag size={14} /><span>Cart ({cart.reduce((sum, item) => sum + item.quantity, 0)})</span>
                     </button>
                   </div>
-                  <div className="flex gap-1.5 overflow-x-auto pb-3 scrollbar-none">
+                  
+                  {/* Category Buttons List */}
+                  <div className="flex gap-1.5 overflow-x-auto pb-3 scrollbar-none shrink-0">
                     {categories.map((cat) => {
                       const isSelected = selectedCategory === cat;
                       const btnClass = "px-3 py-1.5 rounded-lg text-[9px] font-black uppercase border shrink-0 transition-all " + 
-                        (isSelected ? "bg-orange-500 text-black border-orange-500" : "bg-neutral-100 dark:bg-neutral-800 text-neutral-400 border-neutral-200 dark:border-neutral-700 hover:text-orange-500 dark:hover:text-orange-400");
+                        (isSelected 
+                          ? "bg-orange-500 text-black border-orange-500" 
+                          : (themeMode === 'dark' 
+                            ? "bg-neutral-850 text-neutral-400 border-neutral-800 hover:text-orange-500" 
+                            : "bg-neutral-100 text-neutral-400 border-neutral-200 hover:text-orange-500"
+                          )
+                        );
                       return (
                         <button 
                           key={cat} 
@@ -1306,18 +1040,32 @@ export default function BbCafePos() {
                       );
                     })}
                   </div>
+
                   {loading ? (
                     <div className="flex items-center justify-center flex-1">
                       <Loader2 className="animate-spin text-orange-500" size={24} />
                     </div>
                   ) : (
-                    <div className="grid grid-cols-3 gap-2.5 overflow-y-auto flex-1 pr-1 pb-16 content-start">
+                    /* Touch Event Handlers for Categories Swipe integrated directly below */
+                    <div 
+                      onTouchStart={handleTouchStart}
+                      onTouchMove={handleTouchMove}
+                      onTouchEnd={handleTouchEnd}
+                      className="grid grid-cols-3 gap-2.5 overflow-y-auto flex-1 pr-1 pb-16 content-start touch-pan-y"
+                    >
                       <AnimatePresence mode="popLayout">
                         {filteredMenu.map((item) => {
                           const isAvail = item.isAvailable !== false;
                           const hasImage = item.image || item.imageUrl || item.img;
-                          const cardClass = "bg-neutral-50 dark:bg-neutral-800/40 border rounded-2xl text-left flex flex-col overflow-hidden h-36 hover:border-orange-500 dark:hover:border-orange-500 hover:bg-white dark:hover:bg-neutral-800 active:scale-95 transition-all " + 
-                            (!isAvail ? "opacity-40 border-neutral-200 dark:border-neutral-800" : "border-neutral-200 dark:border-neutral-800");
+                          
+                          // Direct Conditional Dark Theme Classes
+                          const cardBg = themeMode === 'dark' 
+                            ? "bg-neutral-800 border-neutral-700 hover:bg-neutral-750" 
+                            : "bg-neutral-50 border-neutral-200 hover:bg-white";
+                          const cardText = themeMode === 'dark' ? "text-neutral-100" : "text-neutral-800";
+                          const cardClass = `border rounded-2xl text-left flex flex-col overflow-hidden h-36 active:scale-95 transition-all ${cardBg} ${cardText} ` + 
+                            (!isAvail ? "opacity-40" : "");
+
                           return (
                             <motion.button 
                               layout
@@ -1330,7 +1078,6 @@ export default function BbCafePos() {
                               onClick={() => { triggerBeep('tap'); item.variants ? setSelectedProduct(item) : handleAddProductToCart(item); }} 
                               className={cardClass}
                             >
-                              {/* Full-width Image design on top with Name only (No Price) below */}
                               {hasImage ? (
                                 <img 
                                   src={item.image || item.imageUrl || item.img} 
@@ -1339,12 +1086,14 @@ export default function BbCafePos() {
                                   onError={(e) => { (e.target as any).style.display = 'none'; }}
                                 />
                               ) : (
-                                <div className="w-full h-24 bg-neutral-200 dark:bg-neutral-800 flex items-center justify-center text-neutral-400 text-[10px] font-bold uppercase shrink-0">
+                                <div className={"w-full h-24 flex items-center justify-center text-[10px] font-bold uppercase shrink-0 " + 
+                                  (themeMode === 'dark' ? "bg-neutral-850 text-neutral-500" : "bg-neutral-200 text-neutral-400")}>
                                   {item.category || "No Image"}
                                 </div>
                               )}
                               <div className="p-2 flex-grow flex flex-col justify-center">
-                                <p className="font-bold text-[11px] line-clamp-2 leading-tight text-neutral-800 dark:text-neutral-200">
+                                <p className={"font-bold text-[11px] line-clamp-2 leading-tight " + 
+                                  (themeMode === 'dark' ? "text-neutral-200" : "text-neutral-800")}>
                                   {item.name}
                                 </p>
                               </div>
@@ -1373,7 +1122,8 @@ export default function BbCafePos() {
             )}
 
             {activeTab === 'inventory' && (
-              <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 p-5 flex-1 overflow-y-auto pb-20 rounded-3xl shadow-xl">
+              <div className={"border p-5 flex-grow overflow-y-auto pb-20 rounded-3xl shadow-xl transition-colors duration-200 " + 
+                (themeMode === 'dark' ? "bg-neutral-900 border-neutral-800" : "bg-white border-neutral-200")}>
                 <div className="flex justify-between items-center mb-6">
                   <div>
                     <h2 className="text-sm font-black uppercase text-orange-500">Live Item Stock Control</h2>
@@ -1386,10 +1136,12 @@ export default function BbCafePos() {
                 <div className="space-y-2 max-w-xl">
                   {products.map((item) => {
                     const isAvail = item.isAvailable !== false;
+                    const stockCardClass = "border p-3 rounded-2xl flex items-center justify-between " + 
+                      (themeMode === 'dark' ? "bg-neutral-800/40 border-neutral-800 text-neutral-100" : "bg-neutral-50 border-neutral-200 text-neutral-800");
                     return (
-                      <div key={item.id} className="bg-neutral-50 dark:bg-neutral-800/40 border border-neutral-200 dark:border-neutral-800 p-3 rounded-2xl flex items-center justify-between">
+                      <div key={item.id} className={stockCardClass}>
                         <div>
-                          <span className="font-bold text-xs block text-neutral-800 dark:text-neutral-200">{item.name}</span>
+                          <span className="font-bold text-xs block">{item.name}</span>
                           <span className="text-[8px] text-neutral-500 dark:text-neutral-400 block">Category: {item.category} | ₹{item.price}</span>
                         </div>
                         <div className="flex items-center gap-4">
@@ -1408,7 +1160,8 @@ export default function BbCafePos() {
             )}
 
             {activeTab === 'receipts' && (
-              <div className="flex-1 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-3xl p-4 flex flex-col overflow-hidden shadow-xl max-w-5xl w-full mx-auto font-sans">
+              <div className={"border rounded-3xl p-4 flex flex-col overflow-hidden shadow-xl max-w-5xl w-full mx-auto font-sans transition-colors duration-200 " + 
+                (themeMode === 'dark' ? "bg-neutral-900 border-neutral-800" : "bg-white border-neutral-200")}>
                 <div className="relative mb-4">
                   <SafeSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={14} />
                   <input 
@@ -1416,7 +1169,9 @@ export default function BbCafePos() {
                     placeholder="Search past receipt..." 
                     value={receiptSearchQuery} 
                     onChange={e => setReceiptSearchQuery(e.target.value)} 
-                    className="w-full bg-neutral-100 dark:bg-neutral-800 border border-transparent dark:border-neutral-700 rounded-xl py-2 px-9 text-xs outline-none text-neutral-800 dark:text-neutral-100 focus:border-orange-500 transition-all" 
+                    className={"w-full rounded-xl py-2 px-9 text-xs outline-none focus:border-orange-500 transition-all border " + 
+                      (themeMode === 'dark' ? "bg-neutral-800 border-neutral-700 text-neutral-100" : "bg-neutral-100 border-neutral-200 text-neutral-800")
+                    } 
                   />
                 </div>
                 {isSearchingReceipts ? (
@@ -1430,6 +1185,8 @@ export default function BbCafePos() {
                     ) : (
                       filteredPastReceipts.map((order) => {
                         const isRefunded = order.status === 'refunded';
+                        const receiptCardClass = "border p-4 rounded-2xl flex justify-between items-center cursor-pointer transition-all " + 
+                          (themeMode === 'dark' ? "bg-neutral-800/30 border-neutral-800/80 hover:bg-neutral-850 hover:border-orange-500" : "bg-neutral-50 border-neutral-200 hover:bg-neutral-100 hover:border-orange-500");
                         return (
                           <div 
                             key={order.id} 
@@ -1438,10 +1195,10 @@ export default function BbCafePos() {
                               setSelectedReceipt(order); 
                               setIsReceiptModalOpen(true); 
                             }} 
-                            className="bg-neutral-50 dark:bg-neutral-800/30 border border-neutral-200 dark:border-neutral-850 p-4 rounded-2xl flex justify-between items-center cursor-pointer hover:border-orange-500 dark:hover:border-orange-500 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-all"
+                            className={receiptCardClass}
                           >
                             <div className="space-y-0.5">
-                              <span className="font-bold text-xs block font-mono text-neutral-900 dark:text-neutral-100">Bill #${order.billNumber}</span>
+                              <span className="font-bold text-xs block font-mono">Bill #${order.billNumber}</span>
                               <span className="text-[9px] text-neutral-500 dark:text-neutral-400 block font-mono">Token: #{order.tokenNumber} | {order.customerName}</span>
                               {isRefunded && (
                                 <span className="text-[7px] font-black uppercase text-red-500 border border-red-500/20 px-1 py-0.2 rounded bg-red-500/5">Refunded</span>
@@ -1455,7 +1212,6 @@ export default function BbCafePos() {
                       })
                     )}
                     
-                    {/* Load More Pagination Trigger */}
                     {filteredPastReceipts.length >= receiptsLimit && !receiptSearchQuery.trim() && (
                       <div className="pt-4 flex justify-center">
                         <button 
@@ -1471,16 +1227,16 @@ export default function BbCafePos() {
               </div>
             )}
 
-            {/* SETTINGS WORKSPACE */}
+            {/* SETTINGS WORKSPACE - Refactored printer UI with beautiful state indicators */}
             {activeTab === 'settings' && (
               <div className="max-w-xl mx-auto w-full pb-20 overflow-y-auto flex-1 font-sans animate-fade-in">
-                
-                <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 p-6 rounded-3xl shadow-xl space-y-6">
+                <div className={"border p-6 rounded-3xl shadow-xl space-y-6 transition-colors duration-200 " + 
+                  (themeMode === 'dark' ? "bg-neutral-900 border-neutral-800 text-neutral-100" : "bg-white border-neutral-200 text-neutral-800")}>
                   <h3 className="text-sm font-black uppercase text-orange-500">POS Settings</h3>
                   
-                  {/* UI थीम */}
+                  {/* Theme Mode Toggle Section */}
                   <div className="border-b border-neutral-200 dark:border-neutral-800 pb-4 space-y-3">
-                    <p className="text-xs font-bold uppercase text-neutral-800 dark:text-neutral-200">A. UI Theme:</p>
+                    <p className="text-xs font-bold uppercase">A. UI Theme:</p>
                     <div className="flex bg-neutral-100 dark:bg-neutral-800 p-1 rounded-xl w-60 border border-transparent dark:border-neutral-700">
                       <button 
                         onClick={() => handleToggleTheme('dark')} 
@@ -1497,9 +1253,9 @@ export default function BbCafePos() {
                     </div>
                   </div>
 
-                  {/* GST सेटिंग्स */}
+                  {/* GST Configuration */}
                   <div className="border-b border-neutral-200 dark:border-neutral-800 pb-4 space-y-3">
-                    <p className="text-xs font-bold uppercase text-neutral-800 dark:text-neutral-200">B. GST Config:</p>
+                    <p className="text-xs font-bold uppercase">B. GST Config:</p>
                     <div className="flex items-center justify-between">
                       <span className="text-xs text-neutral-700 dark:text-neutral-300">Enable GST:</span>
                       <button onClick={() => { const next = !gstEnabled; setGstEnabled(next); localStorage.setItem("bb_pos_gst_enabled", String(next)); }} className="text-orange-500">
@@ -1507,14 +1263,21 @@ export default function BbCafePos() {
                       </button>
                     </div>
                     {gstEnabled && (
-                      <input type="number" value={gstRate} onChange={e => { const r = Math.max(0, Number(e.target.value)); setGstRate(r); localStorage.setItem("bb_pos_gst_rate", String(r)); }} className="w-full bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 p-3 rounded-xl text-xs outline-none text-neutral-900 dark:text-neutral-100" />
+                      <input 
+                        type="number" 
+                        value={gstRate} 
+                        onChange={e => { const r = Math.max(0, Number(e.target.value)); setGstRate(r); localStorage.setItem("bb_pos_gst_rate", String(r)); }} 
+                        className={"w-full border p-3 rounded-xl text-xs outline-none " + 
+                          (themeMode === 'dark' ? "bg-neutral-800 border-neutral-700 text-neutral-100" : "bg-neutral-100 border-neutral-200 text-neutral-800")
+                        } 
+                      />
                     )}
                   </div>
 
-                  {/* KOT ON/OFF Switch */}
+                  {/* KOT Configuration */}
                   <div className="border-b border-neutral-200 dark:border-neutral-800 pb-4 space-y-3">
                     <div className="flex items-center justify-between">
-                      <p className="text-xs font-bold uppercase text-neutral-800 dark:text-neutral-200">C. Enable KOT Printing:</p>
+                      <p className="text-xs font-bold uppercase">C. Enable KOT Printing:</p>
                       <button 
                         onClick={() => { 
                           const next = !kotEnabled; 
@@ -1529,14 +1292,24 @@ export default function BbCafePos() {
                     </div>
                   </div>
 
-                  {/* हार्डवेयर प्रिंटर कनेक्शन */}
-                  <div className="space-y-3 pt-4">
-                    <div className="flex items-center justify-between">
-                      <p className="text-xs font-bold uppercase text-neutral-800 dark:text-neutral-200">D. Hardware Printer Connection:</p>
-                      <span className={"text-[8px] font-black uppercase tracking-widest px-2.5 py-0.5 rounded-full border " + (printerConnected ? "bg-green-500/10 text-green-400 border-green-500/20" : "bg-red-500/10 text-red-400 border-red-500/20")}>
-                        {printerConnected ? '● Connected' : 'Disconnected'}
-                      </span>
+                  {/* Improved Hardware Printer UI Connection section */}
+                  <div className="space-y-4 pt-2">
+                    <div className="flex items-center justify-between border-b border-neutral-200 dark:border-neutral-800 pb-3">
+                      <p className="text-xs font-bold uppercase">D. Hardware Printer Connection:</p>
+                      <div className="flex items-center gap-2">
+                        {/* State visual indicator breathing pulse */}
+                        <span className={`w-2.5 h-2.5 rounded-full ${printerConnected ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
+                        <span className={"text-[9px] font-black uppercase tracking-wider px-3 py-1 rounded-full border " + 
+                          (printerConnected 
+                            ? "bg-green-500/10 text-green-400 border-green-500/20" 
+                            : "bg-red-500/10 text-red-400 border-red-500/20"
+                          )}
+                        >
+                          {printerConnected ? 'Connected' : 'Disconnected'}
+                        </span>
+                      </div>
                     </div>
+                    
                     <div className="grid grid-cols-2 gap-2">
                       {[
                         { id: 'thermal_usb', label: 'Thermal USB' },
@@ -1545,10 +1318,14 @@ export default function BbCafePos() {
                         { id: 'laser', label: 'Laser A4 Printer' }
                       ].map((p) => {
                         const isSelected = printerType === p.id;
-                        const btnClass = "p-2 rounded-xl border text-[9px] font-black uppercase tracking-wider transition-all " + 
+                        const btnClass = "p-3 rounded-xl border text-[9px] font-black uppercase tracking-wider transition-all " + 
                           (isSelected 
-                            ? "bg-neutral-950 text-amber-400 border-amber-500" 
-                            : "bg-neutral-100 dark:bg-neutral-800 border-neutral-200 dark:border-neutral-700 hover:text-orange-500 dark:hover:text-orange-400");
+                            ? "bg-neutral-950 text-amber-400 border-amber-500 shadow-md" 
+                            : (themeMode === 'dark' 
+                              ? "bg-neutral-800 border-neutral-700 text-neutral-400 hover:text-orange-400" 
+                              : "bg-neutral-100 border-neutral-200 text-neutral-500 hover:text-orange-500"
+                            )
+                          );
                         return (
                           <button 
                             key={p.id} 
@@ -1569,25 +1346,41 @@ export default function BbCafePos() {
                     {printerType === 'network_ip' && (
                       <div className="space-y-1 mt-2">
                         <label className="text-[9px] font-black uppercase text-gray-500 dark:text-gray-400">Printer IP Address</label>
-                        <input type="text" value={printerIp} onChange={e => { setPrinterIp(e.target.value); localStorage.setItem("bb_pos_printer_ip", e.target.value); }} className="w-full bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 p-3 rounded-xl text-xs outline-none font-mono text-neutral-800 dark:text-neutral-100" />
+                        <input 
+                          type="text" 
+                          value={printerIp} 
+                          onChange={e => { setPrinterIp(e.target.value); localStorage.setItem("bb_pos_printer_ip", e.target.value); }} 
+                          className={"w-full border p-3 rounded-xl text-xs outline-none font-mono " + 
+                            (themeMode === 'dark' ? "bg-neutral-800 border-neutral-700 text-neutral-100" : "bg-neutral-100 border-neutral-200 text-neutral-850")
+                          } 
+                        />
                       </div>
                     )}
                     <div className="space-y-1">
                       <label className="text-[9px] font-black uppercase text-gray-500 dark:text-gray-400">Number of Bill Copies</label>
-                      <input type="number" min={1} max={5} value={printCopies} onChange={e => { const v = Math.max(1, Number(e.target.value)); setPrintCopies(v); localStorage.setItem("bb_pos_print_copies", String(v)); }} className="w-full bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 p-3 rounded-xl text-xs outline-none font-mono text-neutral-800 dark:text-neutral-100" />
+                      <input 
+                        type="number" 
+                        min={1} 
+                        max={5} 
+                        value={printCopies} 
+                        onChange={e => { const v = Math.max(1, Number(e.target.value)); setPrintCopies(v); localStorage.setItem("bb_pos_print_copies", String(v)); }} 
+                        className={"w-full border p-3 rounded-xl text-xs outline-none font-mono " + 
+                          (themeMode === 'dark' ? "bg-neutral-800 border-neutral-700 text-neutral-100" : "bg-neutral-100 border-neutral-200 text-neutral-850")
+                        } 
+                      />
                     </div>
 
                     <div className="flex gap-2 pt-2">
                       <button 
                         onClick={handleConnectPrinter} 
                         disabled={isConnecting}
-                        className="flex-1 bg-amber-500 hover:bg-amber-600 disabled:bg-neutral-750 text-black disabled:text-neutral-500 font-black py-2.5 rounded-xl text-[10px] uppercase shadow-md active:scale-95 transition-all flex items-center justify-center gap-1"
+                        className="flex-1 bg-amber-500 hover:bg-amber-600 disabled:bg-neutral-700 text-black disabled:text-neutral-500 font-black py-3 rounded-xl text-[10px] uppercase shadow-md active:scale-95 transition-all flex items-center justify-center gap-1"
                       >
                         {isConnecting ? <Loader2 className="animate-spin text-neutral-500" size={10} /> : 'Connect Device'}
                       </button>
                       <button 
                         onClick={handleTestPrint} 
-                        className="flex-grow bg-green-600 hover:bg-green-700 text-white font-black py-2.5 rounded-xl text-[10px] uppercase shadow-md active:scale-95 transition-all"
+                        className="flex-grow bg-green-600 hover:bg-green-700 text-white font-black py-3 rounded-xl text-[10px] uppercase shadow-md active:scale-95 transition-all"
                       >
                         Test Print 🧾
                       </button>
@@ -1595,9 +1388,9 @@ export default function BbCafePos() {
                     {printerConnected && (
                       <button 
                         onClick={handleDisconnectPrinter} 
-                        className="w-full mt-2 bg-red-600/10 text-red-500 hover:bg-red-600 hover:text-white border border-red-500/20 font-black py-2 rounded-xl text-[9px] uppercase tracking-wider transition-all"
+                        className="w-full mt-2 bg-red-600/10 text-red-500 hover:bg-red-600 hover:text-white border border-red-500/20 font-black py-2.5 rounded-xl text-[9px] uppercase tracking-wider transition-all"
                       >
-                        Disconnect Printer
+                        Disconnect Printer Explicitly 🔌
                       </button>
                     )}
                   </div>
