@@ -19,7 +19,7 @@ import PosCartDrawer from '@/components/pos/PosCartDrawer';
 import CustomerDirectoryModal from '@/components/pos/CustomerDirectoryModal';
 import CustomizerModal from '@/components/pos/CustomizerModal';
 
-// यूटिलिटी से फ़ंक्शंस इम्पोर्ट करना
+// यूटिलिटी से सभी आवश्यक प्रिंटर फ़ंक्शंस का इम्पोर्ट
 import { 
   handlePrintKot, 
   handlePrintReceipt, 
@@ -162,6 +162,26 @@ export default function BbCafePos() {
     if (newSize >= 6 && newSize <= 24) {
       setFontSize(newSize);
       localStorage.setItem("bb_pos_font_size", String(newSize));
+    }
+  };
+
+  // लाइव ऑर्डर्स स्क्रीन को एक क्लिक में साफ़ करने का सुरक्षित फंक्शन (शीर्ष पर रीलोकेट किया गया)
+  const handleClearAllLiveOrders = async () => {
+    triggerBeep('tap');
+    const confirmClear = window.confirm("क्या आप वाकई सभी एक्टिव लाइव ऑर्डर्स को साफ़ (Complete) करना चाहते हैं?");
+    if (!confirmClear) return;
+    
+    const toastId = toast.loading("Clearing active orders...");
+    try {
+      const promises = activeLiveOrders.map(order => 
+        updateDoc(doc(db, "orders", order.id), { status: 'completed' })
+      );
+      await Promise.all(promises);
+      toast.dismiss(toastId);
+      toast.success("Active orders cleared successfully!");
+    } catch (err) {
+      toast.dismiss(toastId);
+      toast.error("Failed to clear active orders");
     }
   };
 
@@ -628,6 +648,212 @@ export default function BbCafePos() {
     return configObj as PrintConfig;
   };
 
+  const handleConnectPrinter = async () => {
+    triggerBeep('tap');
+    setIsConnecting(true);
+    const toastId = toast.loading(`Connecting to ${printerType.toUpperCase().replace('_', ' ')}...`);
+
+    if (printerType === 'thermal_bluetooth') {
+      if (!(navigator as any).bluetooth) { 
+        toast.dismiss(toastId);
+        setIsConnecting(false);
+        toast.error("Web Bluetooth is not supported on this browser/device.");
+        return;
+      }
+      try {
+        const device = await (navigator as any).bluetooth.requestDevice({ 
+          acceptAllDevices: true,
+          optionalServices: ['000018f0-0000-1000-8000-00805f9b34fb'] 
+        });
+
+        const server = await device.gatt!.connect();
+        let service;
+        let characteristic;
+
+        try {
+          service = await server.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb');
+          characteristic = await service.getCharacteristic('00002af1-0000-1000-8000-00805f9b34fb');
+        } catch (bleErr) {
+          service = await server.getPrimaryService('0000ff00-0000-1000-8000-00805f9b34fb');
+          characteristic = await service.getCharacteristic('0000ff02-0000-1000-8000-00805f9b34fb');
+        }
+
+        setBleCharacteristic(characteristic);
+        setPrinterConnected(true);
+        toast.dismiss(toastId);
+        toast.success("Bluetooth Printer Connected Successfully!");
+      } catch (err: any) {
+        console.error(err);
+        toast.dismiss(toastId);
+        toast.error(err.message || "Failed to pair with Bluetooth printer.");
+      } finally {
+        setIsConnecting(false);
+      }
+    } else if (printerType === 'thermal_usb') {
+      if (!(navigator as any).serial && !(navigator as any).usb) {
+        toast.dismiss(toastId);
+        setIsConnecting(false);
+        toast.error("Direct USB printing is not supported on this browser.");
+        return;
+      }
+      try {
+        if ((navigator as any).serial) {
+          const port = await (navigator as any).serial.requestPort();
+          await port.open({ baudRate: 9600 });
+          setSerialPort(port);
+          setPrinterConnected(true);
+          toast.dismiss(toastId);
+          toast.success("Direct USB Printer Connected via Web Serial!");
+        } else {
+          const device = await (navigator as any).usb.requestDevice({ filters: [] });
+          await device.open();
+          await device.selectConfiguration(1);
+          await device.claimInterface(0);
+          setUsbDevice(device);
+          setPrinterConnected(true);
+          toast.dismiss(toastId);
+          toast.success("Direct USB Printer Connected via WebUSB!");
+        }
+      } catch (err) {
+        console.error(err);
+        toast.dismiss(toastId);
+        toast.error("Direct USB connection failed.");
+      } finally {
+        setIsConnecting(false);
+      }
+    } else {
+      setTimeout(() => {
+        toast.dismiss(toastId);
+        setIsConnecting(false);
+        setPrinterConnected(true);
+        toast.success(`${printerType.replace('_', ' ').toUpperCase()} Connected Successfully!`);
+      }, 1200);
+    }
+  };
+
+  const handleTestPrint = () => {
+    const mockOrder = {
+      billNumber: '0000',
+      tokenNumber: '9999',
+      fulfillmentType: 'test',
+      paymentMethod: 'system',
+      items: [
+        { name: 'Connection Active!', quantity: 1, price: 100 },
+        { name: 'ESC/POS Print Test', quantity: 1, price: 50 }
+      ],
+      subtotal: 150,
+      discount: 0,
+      total: 150,
+      timestamp: new Date()
+    };
+    handlePrintReceipt(mockOrder, getPrintConfig());
+  };
+
+  const handleDetectLocation = () => {
+    triggerBeep('tap');
+    if (typeof window === "undefined" || !navigator.geolocation) {
+      toast.error("Geolocation is not supported by your device.");
+      return;
+    }
+    const toastId = toast.loading("Detecting location...");
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        setAddress(`GPS Location: https://www.google.com/maps?q=${latitude.toFixed(6)},${longitude.toFixed(6)}`);
+        toast.dismiss(toastId);
+        toast.success("Location detected!");
+      },
+      () => {
+        toast.dismiss(toastId);
+        toast.error("Unable to retrieve location.");
+      },
+      { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+    );
+  };
+
+  // Place Order transaction flow
+  const handlePlaceOrder = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (cart.length === 0 || isSubmittingOrder) return;
+    setIsSubmittingOrder(true);
+    const subtotal = getCartSubtotal();
+    const discountCombined = customDiscount + getLoyaltyDiscount();
+    const finalTotal = getTotalBillPrice();
+    const token = Math.floor(1000 + Math.random() * 9000);
+
+    const earned = Math.floor(finalTotal / 100);
+    const netPoints = customerPhone ? (earned - getTotalPointsRedeemedInCart() - pointsToRedeem) : 0;
+    const pointsAfterBill = customerPhone ? Math.max(0, customerPoints + netPoints) : 0;
+
+    try {
+      const billNumber = await runTransaction(db, async (txn) => {
+        const snap = await txn.get(doc(db, "settings", "store_bill_counter"));
+        const next = snap.exists() ? (snap.data().nextBillNumber || 1) : 1;
+        txn.set(doc(db, "settings", "store_bill_counter"), { nextBillNumber: next + 1 });
+        return next;
+      });
+
+      const orderObj = { 
+        billNumber, 
+        tokenNumber: token, 
+        customerName: customerName || "Walk-in Guest", 
+        customerPhone: customerPhone ? `+91${customerPhone}` : "", 
+        customerPointsBefore: customerPhone ? customerPoints : 0,
+        customerPointsEarned: customerPhone ? earned : 0,
+        customerPointsRedeemed: customerPhone ? pointsToRedeem : 0,
+        customerPointsAfter: customerPhone ? pointsAfterBill : 0,
+        items: cart, 
+        subtotal, 
+        discount: discountCombined, 
+        gstRate: gstEnabled ? gstRate : 0, 
+        gstAmount: getGstAmountCalculated(), 
+        total: finalTotal, 
+        timestamp: new Date(), 
+        status: 'completed', 
+        fulfillmentType, 
+        deliveryArea: fulfillmentType === "delivery" ? selectedArea.name : "", 
+        tableNumber: fulfillmentType === 'table' ? tableNumber : '', 
+        paymentMethod, 
+        chefInstructions, 
+        source: 'POS',
+        address: address
+      };
+
+      await addDoc(collection(db, "orders"), orderObj);
+
+      if (customerPhone && customerPhone.trim().length === 10) {
+        const phone = customerPhone.trim();
+        await runTransaction(db, async (txn) => {
+          const userRef = doc(db, "customer_points", phone);
+          const snap = await txn.get(userRef);
+          if (!snap.exists()) txn.set(userRef, { name: customerName || "Walk-in Guest", phone, points: Math.max(0, pointsAfterBill), lastActive: new Date() });
+          else txn.update(userRef, { points: pointsAfterBill, lastActive: new Date() });
+        });
+        if (earned > 0) await addDoc(collection(db, "customer_points", phone, "history"), { type: 'earn', points: earned, description: `Earned Bill #${billNumber}`, timestamp: new Date() });
+        if (pointsToRedeem > 0) await addDoc(collection(db, "customer_points", phone, "history"), { type: 'redeem', points: pointsToRedeem, description: `Redeemed cashback Bill #${billNumber}`, timestamp: new Date() });
+      }
+
+      triggerBeep('success'); 
+      toast.success(`Bill #${billNumber} saved successfully!`);
+      
+      const pConfig = getPrintConfig();
+
+      toast.success("Printing KOT first...");
+      await handlePrintKot(orderObj, pConfig);
+
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+
+      toast.success("Printing Customer Receipt...");
+      await handlePrintReceipt(orderObj, pConfig);
+
+      setCart([]); setCustomerPhone(''); setCustomerName(''); setCustomerPoints(0); setPointsToRedeem(0); setCustomDiscount(0); setIsCartOpen(false); setChefInstructions('');
+    } catch (err) {
+      toast.error("Counter transaction failed");
+    } finally {
+      setIsSubmittingOrder(false);
+    }
+  };
+
   const handleToggleStock = async (productId: string, currentStatus: boolean) => {
     triggerBeep('tap');
     try {
@@ -803,7 +1029,7 @@ export default function BbCafePos() {
               )}
             </div>
 
-            {/* LIVE ORDERS: एक्टिव लाइव ऑर्डर्स को साफ़ करने के विकल्प के साथ */}
+            {/* LIVE ORDERS */}
             {activeTab === 'orders' && (
               <div className="flex flex-col flex-1 overflow-hidden font-sans">
                 {/* लाइव ऑर्डर्स का शीर्ष हेडर */}
@@ -816,7 +1042,7 @@ export default function BbCafePos() {
                       onClick={handleClearAllLiveOrders} 
                       className="text-[9px] font-black uppercase px-3 py-1.5 bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white border border-red-500/20 rounded-xl transition-all shadow-sm active:scale-95"
                     >
-                      🧹 Clear Active Workspace
+                      Clean Workspace 🧹
                     </button>
                   )}
                 </div>
@@ -1055,7 +1281,7 @@ export default function BbCafePos() {
               </div>
             )}
 
-            {/* SETTINGS WORKSPACE: लाइव प्रिंट प्रिव्यू, फ़ॉन्ट साइज कंट्रोल और ऑटो-रीकनेक्ट सेटअप */}
+            {/* SETTINGS WORKSPACE */}
             {activeTab === 'settings' && (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start pb-20 overflow-y-auto flex-1 font-sans animate-fade-in">
                 
