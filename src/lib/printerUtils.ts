@@ -1,17 +1,19 @@
-import toast from 'react-hot-toast';
-
+// ==========================================
+// TYPES & CONFIGURATION
+// ==========================================
 export interface PrintConfig {
   printerPaperSize: '58mm' | '80mm';
   printerType: 'thermal_usb' | 'thermal_bluetooth' | 'network_ip' | 'laser';
+  fontSize?: number; // Dynamic font size control
   bleCharacteristic?: any;
   serialPort?: any;
   usbDevice?: any;
 }
 
 // ==========================================
-// 1. सुरक्षित तिथि फ़ॉर्मेटिंग और अलाइनमेंट हेल्पर
+// SAFE DATE FORMATTING HELPERS
 // ==========================================
-const getFormattedDate = (timestamp: any): string => {
+export const getFormattedDate = (timestamp: any): string => {
   if (!timestamp) return new Date().toLocaleString('en-IN');
   try {
     const dateObj = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
@@ -21,7 +23,7 @@ const getFormattedDate = (timestamp: any): string => {
   }
 };
 
-const getFormattedReceiptDate = (timestamp: any): string => {
+export const getFormattedReceiptDate = (timestamp: any): string => {
   try {
     const now = timestamp?.toDate ? timestamp.toDate() : new Date(timestamp || new Date());
     const validNow = isNaN(now.getTime()) ? new Date() : now;
@@ -38,14 +40,17 @@ const getFormattedReceiptDate = (timestamp: any): string => {
   }
 };
 
-const centerAlign = (text: string, cols: number): string => {
+// ==========================================
+// ALIGNMENT & TEXT FORMATTING HELPERS
+// ==========================================
+export const centerAlign = (text: string, cols: number): string => {
   const trimmed = text.trim();
   if (trimmed.length >= cols) return trimmed.slice(0, cols) + "\n";
   const padding = Math.floor((cols - trimmed.length) / 2);
   return " ".repeat(padding) + trimmed + "\n";
 };
 
-const formatRow = (left: string, right: string, cols: number): string => {
+export const formatRow = (left: string, right: string, cols: number): string => {
   const spaceForRight = cols - left.length;
   if (spaceForRight <= 0) {
     return left.slice(0, cols - right.length - 1) + " " + right + "\n";
@@ -53,9 +58,10 @@ const formatRow = (left: string, right: string, cols: number): string => {
   return left + right.padStart(spaceForRight) + "\n";
 };
 
-const formatThreeColumns = (col1: string, col2: string, col3: string, cols: number): string => {
-  const c1Width = cols === 48 ? 26 : 16;
-  const c2Width = 6;
+export const formatThreeColumns = (col1: string, col2: string, col3: string, cols: number): string => {
+  // 58mm प्रिंटर पर मार्जिन ओवरफ़्लो रोकने के लिए कैरेक्टर साइज एडजस्ट किया गया
+  const c1Width = cols === 48 ? 26 : 15;
+  const c2Width = cols === 48 ? 6 : 5;
   const c3Width = cols === 48 ? 16 : 10;
   let item = col1.trim();
   if (item.length > c1Width) item = item.slice(0, c1Width - 1) + ".";
@@ -63,7 +69,7 @@ const formatThreeColumns = (col1: string, col2: string, col3: string, cols: numb
 };
 
 // ==========================================
-// 2. डायरेक्ट थर्मल प्रिंटर बाइट-कोड जेनरेटर
+// ESC/POS DIRECT PRINTER CODE GENERATORS
 // ==========================================
 export const generateEscPosQrBytes = (upiUrl: string): Uint8Array => {
   const encoder = new TextEncoder();
@@ -86,7 +92,6 @@ export const sendToPrinterInChunks = async (config: PrintConfig, text: string, u
   const encoder = new TextEncoder();
   let finalBytes: Uint8Array;
 
-  // QR कोड की पोजीशन को "SCAN TO PAY" के ठीक नीचे सेट करने के लिए स्प्लिट लॉजिक
   if (upiUrl && text.includes("{{QR_CODE_PLACEHOLDER}}")) {
     const parts = text.split("{{QR_CODE_PLACEHOLDER}}");
     const safePart1 = parts[0].replace(/₹/g, 'Rs.');
@@ -114,8 +119,7 @@ export const sendToPrinterInChunks = async (config: PrintConfig, text: string, u
         await new Promise(r => setTimeout(r, 60));
       }
       return true;
-    } catch (err) {
-      console.error(err);
+    } catch {
       throw new Error("Bluetooth print failed");
     }
   }
@@ -141,8 +145,7 @@ export const sendToPrinterInChunks = async (config: PrintConfig, text: string, u
         }
         return true;
       }
-    } catch (err) {
-      console.error(err);
+    } catch {
       throw new Error("USB print failed");
     }
   }
@@ -150,10 +153,10 @@ export const sendToPrinterInChunks = async (config: PrintConfig, text: string, u
 };
 
 // ==========================================
-// 3. K.O.T और रसीद टेक्स्ट डिज़ाइन (ESC/POS)
+// K.O.T & RECEIPT TEXT GENERATORS (ESC/POS)
 // ==========================================
-export const generateKotEscPosText = (order: any, config?: PrintConfig): string => {
-  const cols = config?.printerPaperSize === '80mm' ? 48 : 32;
+export const generateKotEscPosText = (order: any, config: PrintConfig): string => {
+  const cols = config.printerPaperSize === '80mm' ? 48 : 30; // 58mm के लिए 32 से घटाकर 30 (Safety Margin) किया गया
   const dividerLine = "-".repeat(cols) + "\n";
   const doubleDivider = "=".repeat(cols) + "\n";
   const formattedDate = getFormattedDate(order.timestamp);
@@ -174,8 +177,8 @@ export const generateKotEscPosText = (order: any, config?: PrintConfig): string 
   return text + dividerLine + "\n\n\n\n";
 };
 
-export const generateEscPosText = (order: any, config?: PrintConfig): string => {
-  const cols = config?.printerPaperSize === '80mm' ? 48 : 32;
+export const generateEscPosText = (order: any, config: PrintConfig): string => {
+  const cols = config.printerPaperSize === '80mm' ? 48 : 30; // 58mm के लिए 32 से घटाकर 30 (Safety Margin) किया गया
   const dividerLine = "-".repeat(cols) + "\n";
   const doubleDivider = "=".repeat(cols) + "\n";
   const formattedDate = getFormattedDate(order.timestamp);
@@ -218,7 +221,6 @@ export const generateEscPosText = (order: any, config?: PrintConfig): string => 
   text += dividerLine;
   text += centerAlign("SCAN TO PAY", cols);
   
-  // QR कोड को फूटर के बजाय यहीं प्रिंट करने के लिए प्लेसहोल्डर सेट किया गया है
   text += "{{QR_CODE_PLACEHOLDER}}"; 
   text += "\n";
 
@@ -228,16 +230,18 @@ export const generateEscPosText = (order: any, config?: PrintConfig): string => 
 };
 
 // ==========================================
-// 4. ब्राउज़र वेब फ़ॉलबैक HTML टेम्पलेट्स (छोटे साइज के साथ)
+// DYNAMIC COMPACT HTML GENERATORS (BROWSER FALLBACK)
 // ==========================================
 export const generateKotHtml = (order: any, config: PrintConfig): string => {
+  const fSize = config.fontSize || 9.5;
   const itemsHtml = order.items.map((it: any) => `
     <tr style="border-bottom: 1px dashed #ccc;">
-      <td style="font-size: 11px; font-weight: 900; padding: 4px 0; color: #000; text-transform: uppercase;">
+      <!-- KOT में ITEM नाम को 75% और Qty को 25% पर लॉक किया गया -->
+      <td style="font-size: ${fSize}px; font-weight: 900; padding: 4px 0; color: #000; text-transform: uppercase; width: 75%; word-break: break-word; white-space: normal;">
         ${it.name.toUpperCase()}
-        ${it.note ? `<div style="font-size: 9px; color: #333; font-weight: 800; padding-left: 4px;">Note: ${it.note.toUpperCase()}</div>` : ''}
+        ${it.note ? `<div style="font-size: ${fSize - 1.5}px; color: #333; font-weight: 800; padding-left: 4px;">Note: ${it.note.toUpperCase()}</div>` : ''}
       </td>
-      <td style="font-size: 11px; font-weight: 900; text-align: right; padding: 4px 0; font-family: monospace;">${it.quantity}</td>
+      <td style="font-size: ${fSize}px; font-weight: 900; text-align: right; padding: 4px 0; font-family: monospace; width: 25%;">${it.quantity}</td>
     </tr>
   `).join('');
 
@@ -245,33 +249,37 @@ export const generateKotHtml = (order: any, config: PrintConfig): string => {
     <html>
       <head>
         <style>
-          @page { size: ${config.printerPaperSize === '58mm' ? '58mm' : '80mm'} auto; margin: 0; }
-          body { font-family: monospace; padding: 2px; font-size: 9.5px; color: #000; background-color: #fff; margin: 0; }
+          @media print {
+            @page { size: ${config.printerPaperSize === '58mm' ? '58mm' : '80mm'} auto; margin: 0; }
+            body { margin: 0; padding: 2px; }
+          }
+          body { font-family: monospace; padding: 2px; font-size: ${fSize}px; color: #000; background-color: #fff; margin: 0; }
           .center { text-align: center; }
           .divider { border-top: 1px dotted #000; margin: 4px 0; }
+          table { width: 100%; border-collapse: collapse; table-layout: fixed; }
         </style>
       </head>
       <body>
-        <div class="center" style="font-size: 13px; font-weight: 900; border: 1.5px solid #000; padding: 3px; background-color: #000; color: #fff;">K.O.T (KITCHEN)</div>
-        <div class="center" style="font-size: 8.5px; font-weight: bold; margin-top: 2px;">BUM BUM CAFE</div>
+        <div class="center" style="font-size: ${fSize + 3}px; font-weight: 900; border: 1.5px solid #000; padding: 3px; background-color: #000; color: #fff;">K.O.T (KITCHEN)</div>
+        <div class="center" style="font-size: ${fSize - 1}px; font-weight: bold; margin-top: 2px;">BUM BUM CAFE</div>
         <div class="divider"></div>
-        <div style="font-size: 9px; font-weight: bold; line-height: 1.3;">
-          <div>Token No: <span style="font-size: 11px; font-weight: 900;">#${order.tokenNumber}</span></div>
+        <div style="font-size: ${fSize - 0.5}px; font-weight: bold; line-height: 1.3;">
+          <div>Token No: <span style="font-size: ${fSize + 1.5}px; font-weight: 900;">#${order.tokenNumber}</span></div>
           <div>Bill No: #${order.billNumber}</div>
           <div>Mode: <span style="text-transform: uppercase;">${order.fulfillmentType?.toUpperCase()} ${order.tableNumber ? `(${order.tableNumber})` : ''}</span></div>
         </div>
         <div class="divider"></div>
-        <table style="width:100%; border-collapse:collapse;">
+        <table>
           <thead>
             <tr style="border-bottom: 1px solid #000;">
-              <th style="text-align: left; font-size: 9.5px; font-weight: 900; padding-bottom: 3px;">ITEM</th>
-              <th style="text-align: right; font-size: 9.5px; font-weight: 900; padding-bottom: 3px;">QTY</th>
+              <th style="text-align: left; font-size: 9.5px; font-weight: 900; padding-bottom: 3px; width: 75%;">ITEM</th>
+              <th style="text-align: right; font-size: 9.5px; font-weight: 900; padding-bottom: 3px; width: 25%;">QTY</th>
             </tr>
           </thead>
           <tbody>${itemsHtml}</tbody>
         </table>
         ${order.chefInstructions ? `
-          <div style="margin-top: 6px; padding: 4px; border: 1px solid #000; background-color: #fafafa;">
+          <div style="margin-top: 6px; padding: 4px; border: 1.5px solid #000; background-color: #fafafa;">
             <div style="font-size: 8.5px; font-weight: 900; text-decoration: underline;">CHEF INSTRUCTION:</div>
             <div style="font-size: 10px; font-weight: 900;">${order.chefInstructions.toUpperCase()}</div>
           </div>
@@ -286,14 +294,16 @@ export const generateKotHtml = (order: any, config: PrintConfig): string => {
 export const generateReceiptHtml = (order: any, config: PrintConfig): string => {
   const upiId = "Q231198993@ybl"; 
   const upiLink = `upi://pay?pa=${upiId}&pn=Bum%20Bum%20Cafe&am=${order.total}&cu=INR`;
+  const fSize = config.fontSize || 9;
   const formattedReceiptDate = getFormattedReceiptDate(order.timestamp);
   const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=90x90&margin=0&data=${encodeURIComponent(upiLink)}`;
 
   const itemsRows = order.items.map((it: any) => `
     <tr style="border-bottom: 1px dashed #eee;">
-      <td style="font-size: 8.5px; font-weight: bold; padding: 4px 0; color: #111; text-transform: uppercase;">${it.name.toUpperCase()}</td>
-      <td style="font-size: 8.5px; font-weight: bold; text-align: center; padding: 4px 0; font-family: monospace;">${it.quantity}</td>
-      <td style="font-size: 8.5px; font-weight: bold; text-align: right; padding: 4px 0; font-family: monospace;">₹${it.price * it.quantity}</td>
+      <!-- आइटम के नाम को 55%, क्वांटिटी को 15% और अमाउंट को 30% पर कड़ाई से लॉक किया गया -->
+      <td style="font-size: ${fSize}px; font-weight: bold; padding: 4px 0; color: #111; text-transform: uppercase; width: 55%; word-break: break-word; white-space: normal;">${it.name.toUpperCase()}</td>
+      <td style="font-size: ${fSize}px; font-weight: bold; text-align: center; padding: 4px 0; font-family: monospace; width: 15%;">${it.quantity}</td>
+      <td style="font-size: ${fSize}px; font-weight: bold; text-align: right; padding: 4px 0; font-family: monospace; width: 30%;">₹${it.price * it.quantity}</td>
     </tr>
   `).join('');
 
@@ -311,18 +321,21 @@ export const generateReceiptHtml = (order: any, config: PrintConfig): string => 
     <html>
       <head>
         <style>
-          @page { size: ${config.printerPaperSize === '58mm' ? '58mm' : '80mm'} auto; margin: 0; }
-          body { font-family: monospace; width: 100%; margin: 0; padding: 2px; color: #000; font-size: 9px; line-height: 1.25; box-sizing: border-box; }
+          @media print {
+            @page { size: ${config.printerPaperSize === '58mm' ? '58mm' : '80mm'} auto; margin: 0; }
+            body { margin: 0; padding: 2px; }
+          }
+          body { font-family: monospace; width: 100%; margin: 0; padding: 2px; color: #000; font-size: ${fSize}px; line-height: 1.25; box-sizing: border-box; }
           .center { text-align: center; }
-          .divider { border-top: 1px dotted #000; margin: 4px 0; height: 0; }
-          .double-divider { border-top: 1px dotted #000; border-bottom: 1px dotted #000; margin: 4px 0; height: 3px; }
-          table { width: 100%; border-collapse: collapse; }
+          .divider { border-top: 1.5px dotted #000; margin: 4px 0; height: 0; }
+          .double-divider { border-top: 1.5px dotted #000; border-bottom: 1.5px dotted #000; margin: 4px 0; height: 3px; }
+          table { width: 100%; border-collapse: collapse; table-layout: fixed; }
         </style>
       </head>
       <body>
         <div class="center" style="margin-bottom: 4px;">
-          <div style="background-color: #000; color: #fff; padding: 3px 6px; font-size: 11px; font-weight: 900; display: inline-block;">BUM BUM CAFE</div>
-          <div style="font-size: 7.5px; font-weight: bold; color: #333; margin-top: 1px;">BUS STAND MOHANDRA, DIST. PANNA, M.P.</div>
+          <div style="background-color: #000; color: #fff; padding: 3px 6px; font-size: ${fSize + 2}px; font-weight: 900; display: inline-block;">BUM BUM CAFE</div>
+          <div style="font-size: ${fSize - 1.5}px; font-weight: bold; color: #333; margin-top: 1px;">BUS STAND MOHANDRA, DIST. PANNA, M.P.</div>
           <div style="font-size: 8px; font-weight: bold;">Mo. 9714293759</div>
         </div>
         <div class="divider"></div>
@@ -344,9 +357,10 @@ export const generateReceiptHtml = (order: any, config: PrintConfig): string => 
         <table>
           <thead>
             <tr style="border-bottom: 1px solid #000;">
-              <th style="text-align: left; font-size: 8.5px; padding-bottom: 3px;">ITEM</th>
-              <th style="text-align: center; font-size: 8.5px; padding-bottom: 3px; width: 30px;">QTY</th>
-              <th style="text-align: right; font-size: 8.5px; padding-bottom: 3px; width: 60px;">AMT</th>
+              <!-- हेडर में भी कॉलम चौड़ाई लॉक की गई -->
+              <th style="text-align: left; font-size: 8.5px; padding-bottom: 3px; width: 55%;">ITEM</th>
+              <th style="text-align: center; font-size: 8.5px; padding-bottom: 3px; width: 15%;">QTY</th>
+              <th style="text-align: right; font-size: 8.5px; padding-bottom: 3px; width: 30%;">AMT</th>
             </tr>
           </thead>
           <tbody>${itemsRows}</tbody>
@@ -364,7 +378,6 @@ export const generateReceiptHtml = (order: any, config: PrintConfig): string => 
         </div>
         <div class="divider"></div>
         
-        <!-- QR कोड अब "SCAN TO PAY" के तुरंत नीचे व्यवस्थित रूप से दिखेगा -->
         <div class="center" style="margin: 4px 0;">
           <div style="font-size: 8px; font-weight: 900; margin-bottom: 4px; letter-spacing: 0.5px;">SCAN TO PAY</div>
           <img src="${qrCodeUrl}" style="width: 80px; height: 80px; border: 1px solid #000; padding: 2px; display: inline-block;" />
@@ -383,70 +396,4 @@ export const generateReceiptHtml = (order: any, config: PrintConfig): string => 
       </body>
     </html>
   `;
-};
-
-// ==========================================
-// 5. प्रिंट ट्रिगर करने वाले मुख्य फ़ंक्शंस
-// ==========================================
-export const handlePrintKot = async (order: any, config: PrintConfig) => {
-  if (
-    (config.printerType === 'thermal_bluetooth' && config.bleCharacteristic) || 
-    (config.printerType === 'thermal_usb' && (config.serialPort || config.usbDevice))
-  ) {
-    try {
-      const kotText = generateKotEscPosText(order, config);
-      await sendToPrinterInChunks(config, kotText);
-    } catch {
-      toast.error("KOT hardware print failed, launching fallback...");
-    }
-    return;
-  }
-
-  const printWindow = window.open('', '_blank', 'width=340,height=600');
-  if (!printWindow) return;
-  
-  printWindow.document.write(generateKotHtml(order, config));
-  printWindow.document.close();
-  printWindow.focus();
-  setTimeout(() => {
-    printWindow.print();
-    printWindow.close();
-  }, 350);
-};
-
-export const handlePrintReceipt = async (order: any, config: PrintConfig) => {
-  const upiId = "Q231198993@ybl"; 
-  const upiLink = `upi://pay?pa=${upiId}&pn=Bum%20Bum%20Cafe&am=${order.total}&cu=INR`;
-
-  if (
-    (config.printerType === 'thermal_bluetooth' && config.bleCharacteristic) || 
-    (config.printerType === 'thermal_usb' && (config.serialPort || config.usbDevice))
-  ) {
-    const toastId = toast.loading("Sending directly to thermal printer...");
-    try {
-      const receiptText = generateEscPosText(order, config);
-      await sendToPrinterInChunks(config, receiptText, upiLink);
-      toast.dismiss(toastId);
-      toast.success("Customer receipt printed!");
-    } catch (err) {
-      console.error(err);
-      toast.dismiss(toastId);
-      toast.error("Hardware print failed, launching fallback...");
-    }
-    return;
-  }
-
-  const printWindow = window.open('', '_blank', 'width=340,height=600');
-  if (!printWindow) {
-    toast.error("Popup blocked! Please allow popups for this POS.");
-    return;
-  }
-
-  printWindow.document.write(generateReceiptHtml(order, config));
-  printWindow.document.close();
-  printWindow.focus();
-  setTimeout(() => {
-    printWindow.print();
-    printWindow.close();
-  }, 350); 
 };
