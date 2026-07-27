@@ -19,9 +19,12 @@ export const getFormattedDate = (timestamp: any): string => {
   if (!timestamp) return new Date().toLocaleString('en-IN');
   try {
     const dateObj = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-    return isNaN(dateObj.getTime()) ? new Date().toLocaleString('en-IN') : dateObj.toLocaleString('en-IN');
+    // टोस्ट/प्रिंट में am/pm को बड़े अक्षरों (AM/PM) में बदलने के लिए .toUpperCase() जोड़ा गया
+    return isNaN(dateObj.getTime()) 
+      ? new Date().toLocaleString('en-IN').toUpperCase() 
+      : dateObj.toLocaleString('en-IN').toUpperCase();
   } catch {
-    return new Date().toLocaleString('en-IN');
+    return new Date().toLocaleString('en-IN').toUpperCase();
   }
 };
 
@@ -79,13 +82,13 @@ export const generateEscPosQrBytes = (upiUrl: string): Uint8Array => {
   const pH = ((urlBytes.length + 3) >> 8) & 0xFF;
 
   return new Uint8Array([
-    0x1B, 0x61, 0x01,
+    0x1B, 0x61, 0x01, // Center Align
     0x1D, 0x28, 0x6B, 0x04, 0x00, 0x31, 0x41, 0x32, 0x00,
     0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x43, 0x06,
     0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x45, 0x30,
     0x1D, 0x28, 0x6B, pL, pH, 0x31, 0x50, 0x30, ...Array.from(urlBytes),
-    0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x51, 0x30,
-    0x0A, 0x1B, 0x61, 0x00, 0x0A
+    0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x51, 0x30, // Print QR Command
+    0x0A, 0x1B, 0x61, 0x00, 0x0A // Reset Align
   ]);
 };
 
@@ -164,8 +167,12 @@ export const generateKotEscPosText = (order: any, config: PrintConfig): string =
   
   let text = doubleDivider + centerAlign("K.O.T", cols) + centerAlign("BUM BUM CAFE - KITCHEN", cols) + doubleDivider;
   text += formatRow(`Token: #${order.tokenNumber}`, `Bill: #${String(order.billNumber).padStart(4, '0')}`, cols);
-  text += `Date: ${formattedDate}\nType: ${order.fulfillmentType?.toUpperCase()}\n`;
-  if (order.fulfillmentType === 'table') text += `Table: ${order.tableNumber}\n`;
+  
+  // टेबल नंबर को आर्डर टाइप के साथ एक ही लाइन में मर्ज किया गया ताकि पेपर बचे
+  const typeLabel = order.fulfillmentType?.toUpperCase() === 'TABLE' && order.tableNumber
+    ? `Type: TABLE (${order.tableNumber})`
+    : `Type: ${order.fulfillmentType?.toUpperCase()}`;
+  text += `${typeLabel}\nDate: ${formattedDate}\n`;
   
   text += dividerLine + formatRow("ITEM", "QTY", cols) + dividerLine;
   order.items.forEach((it: any) => {
@@ -185,18 +192,26 @@ export const generateEscPosText = (order: any, config: PrintConfig): string => {
   const formattedDate = getFormattedDate(order.timestamp);
   
   let text = doubleDivider + centerAlign("BUM BUM CAFE", cols) + centerAlign("MOHANDRA, PANNA (M.P.)", cols) + doubleDivider;
-  text += `CUSTOMER DETAILS:\nName: ${order.customerName || 'Walk-in Guest'}\n`;
-  if (order.customerPhone) text += `Phone: ${order.customerPhone}\n`;
-  if (order.address) text += `Address: ${order.address}\n`;
+  
+  // पेपर बचाने के लिए Walk-in Guest (बिना फ़ोन/पते वाले आर्डर) की लाइन स्पेसिंग को छोटा किया गया
+  if (order.customerPhone || order.address) {
+    text += "CUSTOMER DETAILS:\n";
+    text += `Name: ${order.customerName || 'Walk-in Guest'}\n`;
+    if (order.customerPhone) text += `Phone: ${order.customerPhone}\n`;
+    if (order.address) text += `Address: ${order.address}\n`;
+  } else {
+    text += `Name: ${order.customerName || 'Walk-in Guest'}\n`;
+  }
   
   text += dividerLine;
   text += formatRow(`Bill No: #${String(order.billNumber).padStart(4, '0')}`, `Token: #${order.tokenNumber}`, cols);
-  text += formatRow(`Type: ${order.fulfillmentType?.toUpperCase()}`, `Pay: ${order.paymentMethod?.toUpperCase()}`, cols);
   
-  if (order.fulfillmentType === 'table' && order.tableNumber) {
-    text += `Table: ${order.tableNumber}\n`;
-  }
-  
+  // आर्डर टाइप और टेबल नंबर को एक ही लाइन में मर्ज करके पेपर की बचत की गई
+  const typeText = order.fulfillmentType?.toUpperCase() === 'TABLE' && order.tableNumber
+    ? `Type: TABLE (${order.tableNumber})`
+    : `Type: ${order.fulfillmentType?.toUpperCase()}`;
+    
+  text += formatRow(typeText, `Pay: ${order.paymentMethod?.toUpperCase()}`, cols);
   text += `Date: ${formattedDate}\n` + dividerLine;
 
   text += formatThreeColumns("ITEM", "QTY", "AMOUNT", cols) + dividerLine;
@@ -222,8 +237,8 @@ export const generateEscPosText = (order: any, config: PrintConfig): string => {
   text += dividerLine;
   text += centerAlign("SCAN TO PAY", cols);
   
-  text += "{{QR_CODE_PLACEHOLDER}}"; 
-  text += "\n";
+  // QR कोड के ऊपर और नीचे 1-1 खाली लाइन (\n) जोड़ी गई ताकि स्कैनिंग आसान हो
+  text += "\n{{QR_CODE_PLACEHOLDER}}\n";
 
   text += centerAlign("THANK YOU! VISIT AGAIN", cols) + centerAlign("www.bb-cafe-app.vercel.app", cols) + dividerLine;
   text += formatRow(formattedDate.split(',')[0], `#3-${order.billNumber}`, cols);
@@ -377,9 +392,9 @@ export const generateReceiptHtml = (order: any, config: PrintConfig): string => 
         <div class="divider"></div>
         
         <div class="center" style="margin: 4px 0;">
-          <div style="font-size: 8px; font-weight: 900; margin-bottom: 4px; letter-spacing: 0.5px;">SCAN TO PAY</div>
+          <div style="font-size: 8px; font-weight: 900; margin-bottom: 4.5px;">SCAN TO PAY</div>
           <img src="${qrCodeUrl}" style="width: 80px; height: 80px; border: 1px solid #000; padding: 2px; display: inline-block;" />
-          <div style="font-size: 7px; font-weight: 900; margin-top: 3px;">BHIM UPI PAYTM/PHONEPE</div>
+          <div style="font-size: 7px; font-weight: 900; margin-top: 4.5px;">BHIM UPI PAYTM/PHONEPE</div>
         </div>
         
         <div class="divider"></div>
@@ -397,7 +412,7 @@ export const generateReceiptHtml = (order: any, config: PrintConfig): string => 
 };
 
 // ==========================================
-// 6. MAIN TRIGGER PRINT FUNCTIONS (KOT & RECEIPT)
+// MAIN TRIGGER PRINT FUNCTIONS (KOT & RECEIPT)
 // ==========================================
 export const handlePrintKot = async (order: any, config: PrintConfig) => {
   if (
