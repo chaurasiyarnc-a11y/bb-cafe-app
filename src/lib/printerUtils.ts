@@ -95,24 +95,24 @@ export const formatRow = (left: string, right: string, cols: number): string => 
   }
 };
 
-// सुधरा हुआ 3-कॉलम अलाइनर (Rs. को हमेशा एक वर्टिकल लाइन पर लॉक रखेगा)
+// सुधरा हुआ 3-कॉलम अलाइनर (Rs को हमेशा एक वर्टिकल लाइन पर लॉक रखेगा)
 export const formatThreeColumns = (col1: string, col2: string, col3: string, cols: number): string => {
   const c1Width = cols === 48 ? 26 : 19; // डिश नाम के लिए 19 कैरेक्टर चौड़ाई
-  const c2Width = cols === 48 ? 6 : 5;  // Quantity के लिए 5 कैरेक्टर चौड़ाई
+  const c2Width = cols === 48 ? 6 : 4;  // Quantity के लिए 4 कैरेक्टर चौड़ाई (Strict Layout Safety)
   const c3Width = cols === 48 ? 16 : 6;  // Amount के लिए 6 कैरेक्टर चौड़ाई
 
   const itemLines = wrapText(col1.trim(), c1Width);
   const p2 = col2.trim().padStart(2).padEnd(c2Width); 
-  
-  // सुधरा हुआ: अमाउंट के 'Rs.' को एक ही कॉलम पर लॉक करने का लॉजिक
+
   let p3 = "";
+  // यदि col3 कोई संख्या नहीं है (जैसे कि हेडर "AMT"), तो सामान्य रूप से पैड करेंगे
   if (isNaN(Number(col3.replace(/[₹Rs\.]/g, "").trim()))) {
-    p3 = col3.trim().padStart(c3Width); // यदि हेडर "AMT" है, तो नॉर्मल पैड
+    p3 = col3.trim().padStart(c3Width);
   } else {
     const rawNumberStr = col3.replace(/[₹Rs\.]/g, "").trim();
-    const numWidth = c3Width - 3; // "Rs." के 3 कैरेक्टर घटाकर बची चौड़ाई
+    const numWidth = c3Width - 2; // "Rs" (2 कैरेक्टर) को घटाकर बची चौड़ाई
     const formattedNum = rawNumberStr.padStart(numWidth);
-    p3 = "Rs." + formattedNum; // Rs. हमेशा कॉलम के प्रारंभ (इंडेक्स 24) पर लॉक रहेगा
+    p3 = "Rs" + formattedNum; // Rs हमेशा कॉलम के प्रारंभ (इंडेक्स 24) पर लॉक रहेगा
   }
 
   let output = "";
@@ -126,11 +126,11 @@ export const formatThreeColumns = (col1: string, col2: string, col3: string, col
   return output;
 };
 
-// सुधरा हुआ: टोटल ब्लॉक के 'Rs.' को भी एक सीध में अलाइन करने के लिए नया हेल्पर
+// सुधरा हुआ: टोटल ब्लॉक के 'Rs' को भी एक सीध में अलाइन करने के लिए नया हेल्पर
 const formatTotalRow = (label: string, value: number, cols: number): string => {
   const rightWidth = cols === 48 ? 16 : 6;
-  const numWidth = rightWidth - 3;
-  const rightText = "Rs." + String(value).padStart(numWidth);
+  const numWidth = rightWidth - 2; // "Rs" (2 कैरेक्टर) को घटाकर बची चौड़ाई
+  const rightText = "Rs" + String(value).padStart(numWidth);
   return formatRow(label, rightText, cols);
 };
 
@@ -155,7 +155,7 @@ const cleanAsciiOnly = (str: string): string => {
 
 // फ़ॉन्ट-होल्डर कमांड्स के साथ सुरक्षित बाइट एनकोडर (100% यूनिवर्सल GS ! कमांड के साथ)
 const encodeWithFontPlaceholders = (text: string, encoder: TextEncoder): Uint8Array => {
-  const cleanText = text.replace(/₹/g, 'Rs.');
+  const cleanText = text.replace(/₹/g, 'Rs');
   const parts = cleanText.split(/({{[A-Z0-9_]+}})/g);
   const byteArrays: Uint8Array[] = [];
   
@@ -203,7 +203,7 @@ export const sendToPrinterInChunks = async (config: PrintConfig, text: string, u
   const encoder = new TextEncoder();
   let finalBytes: Uint8Array;
 
-  // रसीद प्रिंटर पर भेजने से ठीक पहले सभी ₹ को Rs. में बदलेंगे
+  // रसीद प्रिंटर पर भेजने से ठीक पहले सभी ₹ को Rs में बदलेंगे
   if (upiUrl && text.includes("{{QR_CODE_PLACEHOLDER}}")) {
     const parts = text.split("{{QR_CODE_PLACEHOLDER}}");
     const safePart1 = encodeWithFontPlaceholders(parts[0], encoder);
@@ -271,7 +271,7 @@ export const sendToPrinterInChunks = async (config: PrintConfig, text: string, u
 // K.O.T & RECEIPT TEXT GENERATORS (ESC/POS)
 // ==========================================
 export const generateKotEscPosText = (order: any, config: PrintConfig): string => {
-  const cols = config.printerPaperSize === '80mm' ? 48 : 29; // 58mm चौड़ाई को कड़ाई से 29 पर सेट किया गया
+  const cols = config.printerPaperSize === '80mm' ? 48 : 29; // 58mm चौड़ाई को कड़ाई से 29 पर सेट किया गया (Strict Safety Margin)
   const dividerLine = "-".repeat(cols) + "\n";
   const doubleDivider = "=".repeat(cols) + "\n";
   const formattedDate = getFormattedDate(order.timestamp);
@@ -359,7 +359,7 @@ export const generateEscPosText = (order: any, config: PrintConfig): string => {
   const customDiscountVal = order.discount - (order.customerPointsRedeemed || 0);
   text += dividerLine;
   
-  // सुधरा हुआ: Total, Discount, और Grand Total में 'Rs.' को एक सीध में अलाइन किया गया
+  // सुधरा हुआ: Total, Discount, और Grand Total में 'Rs' को एक सीध में अलाइन किया गया
   text += formatTotalRow("Total:", order.subtotal, cols);
   if (customDiscountVal > 0) {
     text += formatTotalRow("Discount:", customDiscountVal, cols);
@@ -383,6 +383,7 @@ export const generateEscPosText = (order: any, config: PrintConfig): string => {
   
   text += "\n{{QR_CODE_PLACEHOLDER}}"; 
 
+  // फूटर
   text += centerAlign("THANK YOU! VISIT AGAIN", cols) + centerAlign("www.bb-cafe-app.vercel.app", cols);
   return text + "\n\n\n\n";
 };
@@ -561,6 +562,8 @@ export const generateReceiptHtml = (order: any, config: PrintConfig): string => 
           <div style="font-weight: 900; font-size: 8.5px; margin-top: 2px; font-style: italic;">THANK YOU, VISIT AGAIN!</div>
           <div style="font-size: 8px; margin-top: 1px;">www.bb-cafe-app.vercel.app</div>
         </div>
+        
+        <!-- सुधरा हुआ: तारीख, समय और फूटर लाइन को यहाँ से भी पूरी तरह हटा दिया गया है -->
       </body>
     </html>
   `;
