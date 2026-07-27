@@ -1,3 +1,5 @@
+import toast from 'react-hot-toast';
+
 // ==========================================
 // TYPES & CONFIGURATION
 // ==========================================
@@ -59,7 +61,6 @@ export const formatRow = (left: string, right: string, cols: number): string => 
 };
 
 export const formatThreeColumns = (col1: string, col2: string, col3: string, cols: number): string => {
-  // 58mm प्रिंटर पर मार्जिन ओवरफ़्लो रोकने के लिए कैरेक्टर साइज एडजस्ट किया गया
   const c1Width = cols === 48 ? 26 : 15;
   const c2Width = cols === 48 ? 6 : 5;
   const c3Width = cols === 48 ? 16 : 10;
@@ -78,13 +79,13 @@ export const generateEscPosQrBytes = (upiUrl: string): Uint8Array => {
   const pH = ((urlBytes.length + 3) >> 8) & 0xFF;
 
   return new Uint8Array([
-    0x1B, 0x61, 0x01, // Center Align
+    0x1B, 0x61, 0x01,
     0x1D, 0x28, 0x6B, 0x04, 0x00, 0x31, 0x41, 0x32, 0x00,
     0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x43, 0x06,
     0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x45, 0x30,
     0x1D, 0x28, 0x6B, pL, pH, 0x31, 0x50, 0x30, ...Array.from(urlBytes),
-    0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x51, 0x30, // Print QR Command
-    0x0A, 0x1B, 0x61, 0x00, 0x0A // Reset Align
+    0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x51, 0x30,
+    0x0A, 0x1B, 0x61, 0x00, 0x0A
   ]);
 };
 
@@ -156,7 +157,7 @@ export const sendToPrinterInChunks = async (config: PrintConfig, text: string, u
 // K.O.T & RECEIPT TEXT GENERATORS (ESC/POS)
 // ==========================================
 export const generateKotEscPosText = (order: any, config: PrintConfig): string => {
-  const cols = config.printerPaperSize === '80mm' ? 48 : 30; // 58mm के लिए 32 से घटाकर 30 (Safety Margin) किया गया
+  const cols = config.printerPaperSize === '80mm' ? 48 : 30;
   const dividerLine = "-".repeat(cols) + "\n";
   const doubleDivider = "=".repeat(cols) + "\n";
   const formattedDate = getFormattedDate(order.timestamp);
@@ -178,7 +179,7 @@ export const generateKotEscPosText = (order: any, config: PrintConfig): string =
 };
 
 export const generateEscPosText = (order: any, config: PrintConfig): string => {
-  const cols = config.printerPaperSize === '80mm' ? 48 : 30; // 58mm के लिए 32 से घटाकर 30 (Safety Margin) किया गया
+  const cols = config.printerPaperSize === '80mm' ? 48 : 30;
   const dividerLine = "-".repeat(cols) + "\n";
   const doubleDivider = "=".repeat(cols) + "\n";
   const formattedDate = getFormattedDate(order.timestamp);
@@ -236,7 +237,6 @@ export const generateKotHtml = (order: any, config: PrintConfig): string => {
   const fSize = config.fontSize || 9.5;
   const itemsHtml = order.items.map((it: any) => `
     <tr style="border-bottom: 1px dashed #ccc;">
-      <!-- KOT में ITEM नाम को 75% और Qty को 25% पर लॉक किया गया -->
       <td style="font-size: ${fSize}px; font-weight: 900; padding: 4px 0; color: #000; text-transform: uppercase; width: 75%; word-break: break-word; white-space: normal;">
         ${it.name.toUpperCase()}
         ${it.note ? `<div style="font-size: ${fSize - 1.5}px; color: #333; font-weight: 800; padding-left: 4px;">Note: ${it.note.toUpperCase()}</div>` : ''}
@@ -300,7 +300,6 @@ export const generateReceiptHtml = (order: any, config: PrintConfig): string => 
 
   const itemsRows = order.items.map((it: any) => `
     <tr style="border-bottom: 1px dashed #eee;">
-      <!-- आइटम के नाम को 55%, क्वांटिटी को 15% और अमाउंट को 30% पर कड़ाई से लॉक किया गया -->
       <td style="font-size: ${fSize}px; font-weight: bold; padding: 4px 0; color: #111; text-transform: uppercase; width: 55%; word-break: break-word; white-space: normal;">${it.name.toUpperCase()}</td>
       <td style="font-size: ${fSize}px; font-weight: bold; text-align: center; padding: 4px 0; font-family: monospace; width: 15%;">${it.quantity}</td>
       <td style="font-size: ${fSize}px; font-weight: bold; text-align: right; padding: 4px 0; font-family: monospace; width: 30%;">₹${it.price * it.quantity}</td>
@@ -357,7 +356,6 @@ export const generateReceiptHtml = (order: any, config: PrintConfig): string => 
         <table>
           <thead>
             <tr style="border-bottom: 1px solid #000;">
-              <!-- हेडर में भी कॉलम चौड़ाई लॉक की गई -->
               <th style="text-align: left; font-size: 8.5px; padding-bottom: 3px; width: 55%;">ITEM</th>
               <th style="text-align: center; font-size: 8.5px; padding-bottom: 3px; width: 15%;">QTY</th>
               <th style="text-align: right; font-size: 8.5px; padding-bottom: 3px; width: 30%;">AMT</th>
@@ -396,4 +394,70 @@ export const generateReceiptHtml = (order: any, config: PrintConfig): string => 
       </body>
     </html>
   `;
+};
+
+// ==========================================
+// 6. MAIN TRIGGER PRINT FUNCTIONS (KOT & RECEIPT)
+// ==========================================
+export const handlePrintKot = async (order: any, config: PrintConfig) => {
+  if (
+    (config.printerType === 'thermal_bluetooth' && config.bleCharacteristic) || 
+    (config.printerType === 'thermal_usb' && (config.serialPort || config.usbDevice))
+  ) {
+    try {
+      const kotText = generateKotEscPosText(order, config);
+      await sendToPrinterInChunks(config, kotText);
+    } catch {
+      toast.error("KOT hardware print failed, launching fallback...");
+    }
+    return;
+  }
+
+  const printWindow = window.open('', '_blank', 'width=340,height=600');
+  if (!printWindow) return;
+  
+  printWindow.document.write(generateKotHtml(order, config));
+  printWindow.document.close();
+  printWindow.focus();
+  setTimeout(() => {
+    printWindow.print();
+    printWindow.close();
+  }, 350);
+};
+
+export const handlePrintReceipt = async (order: any, config: PrintConfig) => {
+  const upiId = "Q231198993@ybl"; 
+  const upiLink = `upi://pay?pa=${upiId}&pn=Bum%20Bum%20Cafe&am=${order.total}&cu=INR`;
+
+  if (
+    (config.printerType === 'thermal_bluetooth' && config.bleCharacteristic) || 
+    (config.printerType === 'thermal_usb' && (config.serialPort || config.usbDevice))
+  ) {
+    const toastId = toast.loading("Sending directly to thermal printer...");
+    try {
+      const receiptText = generateEscPosText(order, config);
+      await sendToPrinterInChunks(config, receiptText, upiLink);
+      toast.dismiss(toastId);
+      toast.success("Customer receipt printed!");
+    } catch (err) {
+      console.error(err);
+      toast.dismiss(toastId);
+      toast.error("Hardware print failed, launching fallback...");
+    }
+    return;
+  }
+
+  const printWindow = window.open('', '_blank', 'width=340,height=600');
+  if (!printWindow) {
+    toast.error("Popup blocked! Please allow popups for this POS.");
+    return;
+  }
+
+  printWindow.document.write(generateReceiptHtml(order, config));
+  printWindow.document.close();
+  printWindow.focus();
+  setTimeout(() => {
+    printWindow.print();
+    printWindow.close();
+  }, 350); 
 };
