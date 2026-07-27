@@ -19,7 +19,6 @@ import PosCartDrawer from '@/components/pos/PosCartDrawer';
 import CustomerDirectoryModal from '@/components/pos/CustomerDirectoryModal';
 import CustomizerModal from '@/components/pos/CustomizerModal';
 
-// यूटिलिटी से फ़ंक्शंस इम्पोर्ट करना
 import { 
   handlePrintKot, 
   handlePrintReceipt, 
@@ -227,51 +226,56 @@ export default function BbCafePos() {
     else document.documentElement.classList.add('dark');
   }, []);
 
-  // ऑटो-कनेक्ट फ़ंक्शन (रीफ्रेश होने पर USB पोर्ट को स्वचालित रूप से खोलने के लिए)
+  // सुधरा हुआ ऑटो-कनेक्ट फ़ंक्शन (सुरक्षित Timeout Delay के साथ)
   useEffect(() => {
     const autoReconnectUSB = async () => {
       const savedType = localStorage.getItem("bb_pos_printer_type");
       if (savedType !== 'thermal_usb' || typeof window === 'undefined') return;
 
-      // 1. Web Serial का इस्तेमाल करके ऑटो-कनेक्ट करना
-      if ('serial' in navigator) {
-        try {
-          const ports = await (navigator as any).serial.getPorts();
-          if (ports.length > 0) {
-            const port = ports[0];
-            await port.open({ baudRate: 9600 });
-            setSerialPort(port);
-            setPrinterConnected(true);
-            console.log("USB Web Serial auto-reconnected successfully!");
+      // ब्राउज़र को USB पोर्ट्स स्कैन करने के लिए 500ms का समय देना
+      setTimeout(async () => {
+        // 1. Web Serial का इस्तेमाल करके ऑटो-कनेक्ट करना
+        if ('serial' in navigator && !serialPort) {
+          try {
+            const ports = await (navigator as any).serial.getPorts();
+            if (ports.length > 0) {
+              const port = ports[0];
+              await port.open({ baudRate: 9600 });
+              setSerialPort(port);
+              setPrinterConnected(true);
+              console.log("USB Web Serial auto-reconnected successfully!");
+              toast.success("USB Printer Reconnected!");
+            }
+          } catch (e) {
+            console.warn("Serial auto-reconnect failed:", e);
           }
-        } catch (e) {
-          console.warn("Serial auto-reconnect failed:", e);
-        }
-      } 
-      // 2. WebUSB का इस्तेमाल करके ऑटो-कनेक्ट करना
-      else if ('usb' in navigator) {
-        try {
-          const devices = await (navigator as any).usb.getDevices();
-          if (devices.length > 0) {
-            const device = devices[0];
-            await device.open();
-            await device.selectConfiguration(1);
-            await device.claimInterface(0);
-            setUsbDevice(device);
-            setPrinterConnected(true);
-            console.log("WebUSB auto-reconnected successfully!");
+        } 
+        
+        // 2. WebUSB का इस्तेमाल करके ऑटो-कनेक्ट करना (यदि सीरियल फेल हो गया हो)
+        if ('usb' in navigator && !serialPort && !usbDevice) {
+          try {
+            const devices = await (navigator as any).usb.getDevices();
+            if (devices.length > 0) {
+              const device = devices[0];
+              await device.open();
+              await device.selectConfiguration(1);
+              await device.claimInterface(0);
+              setUsbDevice(device);
+              setPrinterConnected(true);
+              console.log("WebUSB auto-reconnected successfully!");
+              toast.success("USB Printer Reconnected!");
+            }
+          } catch (e) {
+            console.warn("WebUSB auto-reconnect failed:", e);
           }
-        } catch (e) {
-          console.warn("WebUSB auto-reconnect failed:", e);
         }
-      }
+      }, 500);
     };
 
-    // कंपोनेंट रेंडर होने पर ऑटो-कनेक्ट ट्रिगर करना
     if (isLoggedIn) {
       autoReconnectUSB();
     }
-  }, [isLoggedIn]);
+  }, [isLoggedIn, serialPort, usbDevice]);
 
   // रिसोर्स क्लीनअप
   useEffect(() => {
@@ -593,6 +597,26 @@ export default function BbCafePos() {
       fontSize // Dynamic font size control added
     };
     return configObj as PrintConfig;
+  };
+
+  // लाइव ऑर्डर्स स्क्रीन को एक क्लिक में साफ़ करने का सुरक्षित फंक्शन
+  const handleClearAllLiveOrders = async () => {
+    triggerBeep('tap');
+    const confirmClear = window.confirm("क्या आप वाकई सभी एक्टिव लाइव ऑर्डर्स को साफ़ (Complete) करना चाहते हैं?");
+    if (!confirmClear) return;
+    
+    const toastId = toast.loading("Clearing active orders...");
+    try {
+      const promises = activeLiveOrders.map(order => 
+        updateDoc(doc(db, "orders", order.id), { status: 'completed' })
+      );
+      await Promise.all(promises);
+      toast.dismiss(toastId);
+      toast.success("Active orders cleared successfully!");
+    } catch (err) {
+      toast.dismiss(toastId);
+      toast.error("Failed to clear active orders");
+    }
   };
 
   const handleConnectPrinter = async () => {
@@ -976,68 +1000,85 @@ export default function BbCafePos() {
               )}
             </div>
 
-            {/* LIVE ORDERS */}
+            {/* LIVE ORDERS: एक्टिव लाइव ऑर्डर्स को साफ़ करने के विकल्प के साथ */}
             {activeTab === 'orders' && (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pb-20 overflow-y-auto flex-1 font-sans">
-                {activeLiveOrders.length === 0 ? (
-                  <div className="col-span-full flex flex-col items-center justify-center py-24 text-center">
-                    <SafeClock size={48} className="text-neutral-400 dark:text-neutral-600 mb-4 animate-pulse" />
-                    <p className="text-base font-black text-neutral-500 dark:text-neutral-400">Order Workspace Empty</p>
-                    <span className="text-xs text-neutral-400 dark:text-neutral-500 mt-1">All orders are completed and dispatched!</span>
-                  </div>
-                ) : (
-                  activeLiveOrders.map((order) => {
-                    const isOnline = order.source && order.source !== 'POS';
-                    const orderCardClass = "border rounded-2xl p-4 flex flex-col justify-between shadow-lg h-fit transition-colors duration-200 " + 
-                      (isOnline ? "bg-blue-50/50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-900/50" : "bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800");
-                    return (
-                      <div key={order.id} className={orderCardClass}>
-                        <div>
-                          <div className="flex justify-between items-start border-b border-neutral-200 dark:border-neutral-800 pb-2 mb-3">
-                            <div>
-                              <p className="text-xs font-black text-yellow-600 dark:text-yellow-300 font-mono">Bill #${String(order.billNumber).padStart(4, '0')}</p>
-                              {isOnline && (
-                                <span className="text-[8px] font-black text-blue-500 uppercase tracking-widest block mt-1 animate-pulse">🌐 ONLINE ORDER ({order.source})</span>
-                              )}
+              <div className="flex flex-col flex-1 overflow-hidden font-sans">
+                {/* लाइव ऑर्डर्स का शीर्ष हेडर */}
+                <div className="flex justify-between items-center mb-3">
+                  <span className="text-[10px] font-black uppercase text-neutral-500">
+                    Active Live Orders ({activeLiveOrders.length})
+                  </span>
+                  {activeLiveOrders.length > 0 && (
+                    <button 
+                      onClick={handleClearAllLiveOrders} 
+                      className="text-[9px] font-black uppercase px-3 py-1.5 bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white border border-red-500/20 rounded-xl transition-all shadow-sm active:scale-95"
+                    >
+                      🧹 Clear Active Workspace
+                    </button>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pb-20 overflow-y-auto flex-grow">
+                  {activeLiveOrders.length === 0 ? (
+                    <div className="col-span-full flex flex-col items-center justify-center py-24 text-center">
+                      <SafeClock size={48} className="text-neutral-400 dark:text-neutral-600 mb-4 animate-pulse" />
+                      <p className="text-base font-black text-neutral-500 dark:text-neutral-400">Order Workspace Empty</p>
+                      <span className="text-xs text-neutral-400 dark:text-neutral-500 mt-1">All orders are completed and dispatched!</span>
+                    </div>
+                  ) : (
+                    activeLiveOrders.map((order) => {
+                      const isOnline = order.source && order.source !== 'POS';
+                      const orderCardClass = "border rounded-2xl p-4 flex flex-col justify-between shadow-lg h-fit transition-colors duration-200 " + 
+                        (isOnline ? "bg-blue-50/50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-900/50" : "bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800");
+                      return (
+                        <div key={order.id} className={orderCardClass}>
+                          <div>
+                            <div className="flex justify-between items-start border-b border-neutral-200 dark:border-neutral-800 pb-2 mb-3">
+                              <div>
+                                <p className="text-xs font-black text-yellow-600 dark:text-yellow-300 font-mono">Bill #${String(order.billNumber).padStart(4, '0')}</p>
+                                {isOnline && (
+                                  <span className="text-[8px] font-black text-blue-500 uppercase tracking-widest block mt-1 animate-pulse">🌐 ONLINE ORDER ({order.source})</span>
+                                )}
+                              </div>
+                              <span className="bg-orange-500/10 text-orange-400 text-[8px] font-black uppercase px-2 py-0.5 rounded">{order.fulfillmentType}</span>
                             </div>
-                            <span className="bg-orange-500/10 text-orange-400 text-[8px] font-black uppercase px-2 py-0.5 rounded">{order.fulfillmentType}</span>
+                            <p className="text-[10px] font-black text-neutral-800 dark:text-neutral-200">👤 {order.customerName}</p>
+                            <div className="space-y-1.5 pt-2 mb-4 border-t border-dashed border-neutral-200 dark:border-neutral-800">
+                              {order.items?.map((it: any, idx: number) => (
+                                <div key={idx} className="flex justify-between text-[11px] font-semibold text-neutral-700 dark:text-neutral-300">
+                                  <span>{it.name} <span className="text-orange-500 font-bold">x{it.quantity}</span>{it.note && <span className="text-neutral-400 italic block text-[9px]">({it.note})</span>}</span>
+                                  <span className="font-mono">₹{it.price * it.quantity}</span>
+                                </div>
+                              ))}
+                            </div>
                           </div>
-                          <p className="text-[10px] font-black text-neutral-800 dark:text-neutral-200">👤 {order.customerName}</p>
-                          <div className="space-y-1.5 pt-2 mb-4 border-t border-dashed border-neutral-200 dark:border-neutral-800">
-                            {order.items?.map((it: any, idx: number) => (
-                              <div key={idx} className="flex justify-between text-[11px] font-semibold text-neutral-700 dark:text-neutral-300">
-                                <span>{it.name} <span className="text-orange-500 font-bold">x{it.quantity}</span>{it.note && <span className="text-neutral-400 italic block text-[9px]">({it.note})</span>}</span>
-                                <span className="font-mono">₹{it.price * it.quantity}</span>
-                              </div>
-                            ))}
+                          <div>
+                            <div className="flex justify-between text-xs font-black text-green-500 dark:text-green-400 mb-3 border-t border-neutral-200 dark:border-neutral-800 pt-2">
+                              <span>Total:</span><span className="font-mono">₹{order.total}</span>
+                            </div>
+                            <div className="flex gap-2">
+                              {order.status === 'pending' && (
+                                <div className="flex gap-2 w-full">
+                                  <button onClick={() => handleUpdateStatus(order.id, 'preparing')} className="flex-1 bg-green-600 hover:bg-green-700 text-white font-black py-2 rounded-xl text-[10px] uppercase shadow-md active:scale-95 transition-all">Accept</button>
+                                  <button onClick={() => handleUpdateStatus(order.id, 'rejected')} className="flex-1 bg-red-600 hover:bg-red-700 text-white font-black py-2 rounded-xl text-[10px] uppercase shadow-md active:scale-95 transition-all">Reject</button>
+                                </div>
+                              )}
+                              {order.status === 'preparing' && (
+                                <button onClick={() => handleUpdateStatus(order.id, order.fulfillmentType === 'delivery' ? 'out_for_delivery' : 'completed')} className="flex-1 bg-blue-600 text-white font-black py-2 rounded-xl text-[10px] uppercase">Dispatch</button>
+                              )}
+                              {order.status === 'out_for_delivery' && (
+                                <button onClick={() => handleUpdateStatus(order.id, 'completed')} className="flex-1 bg-green-600 text-white font-black py-2 rounded-xl text-[10px] uppercase">Delivered</button>
+                              )}
+                              <button onClick={() => handlePrintReceipt(order, getPrintConfig())} className="p-2 bg-neutral-200 dark:bg-neutral-800 text-neutral-500 dark:text-neutral-400 hover:text-orange-500 dark:hover:text-orange-400 rounded-xl transition-all">
+                                <SafePrinter size={14} />
+                              </button>
+                            </div>
                           </div>
                         </div>
-                        <div>
-                          <div className="flex justify-between text-xs font-black text-green-500 dark:text-green-400 mb-3 border-t border-neutral-200 dark:border-neutral-800 pt-2">
-                            <span>Total:</span><span className="font-mono">₹{order.total}</span>
-                          </div>
-                          <div className="flex gap-2">
-                            {order.status === 'pending' && (
-                              <div className="flex gap-2 w-full">
-                                <button onClick={() => handleUpdateStatus(order.id, 'preparing')} className="flex-1 bg-green-600 hover:bg-green-700 text-white font-black py-2 rounded-xl text-[10px] uppercase shadow-md active:scale-95 transition-all">Accept</button>
-                                <button onClick={() => handleUpdateStatus(order.id, 'rejected')} className="flex-1 bg-red-600 hover:bg-red-700 text-white font-black py-2 rounded-xl text-[10px] uppercase shadow-md active:scale-95 transition-all">Reject</button>
-                              </div>
-                            )}
-                            {order.status === 'preparing' && (
-                              <button onClick={() => handleUpdateStatus(order.id, order.fulfillmentType === 'delivery' ? 'out_for_delivery' : 'completed')} className="flex-1 bg-blue-600 text-white font-black py-2 rounded-xl text-[10px] uppercase">Dispatch</button>
-                            )}
-                            {order.status === 'out_for_delivery' && (
-                              <button onClick={() => handleUpdateStatus(order.id, 'completed')} className="flex-1 bg-green-600 text-white font-black py-2 rounded-xl text-[10px] uppercase">Delivered</button>
-                            )}
-                            <button onClick={() => handlePrintReceipt(order, getPrintConfig())} className="p-2 bg-neutral-200 dark:bg-neutral-800 text-neutral-500 dark:text-neutral-400 hover:text-orange-500 dark:hover:text-orange-400 rounded-xl transition-all">
-                              <SafePrinter size={14} />
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
+                      );
+                    })
+                  )}
+                </div>
               </div>
             )}
 
@@ -1211,7 +1252,7 @@ export default function BbCafePos() {
               </div>
             )}
 
-            {/* SETTINGS WORKSPACE: लाइव प्रिंट प्रिव्यू, फ़ॉन्ट साइज कंट्रोल और ऑटो-रीकनेक्ट सेटअप */}
+            {/* SETTINGS WORKSPACE */}
             {activeTab === 'settings' && (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start pb-20 overflow-y-auto flex-1 font-sans animate-fade-in">
                 
@@ -1271,7 +1312,7 @@ export default function BbCafePos() {
                     </div>
                   </div>
 
-                  {/* सुधरा हुआ फ़ॉन्ट साइज कंट्रोल */}
+                  {/* फ़ॉन्ट साइज कंट्रोल */}
                   <div className="border-b border-neutral-200 dark:border-neutral-800 pb-4 space-y-3">
                     <p className="text-xs font-bold uppercase text-neutral-800 dark:text-neutral-200">D. Base Font Size (px):</p>
                     <div className="flex items-center gap-3">
