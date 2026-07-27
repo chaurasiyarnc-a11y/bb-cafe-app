@@ -167,6 +167,15 @@ export default function BbCafePos() {
   const [normalPizzaPrice, setNormalPizzaPrice] = useState(0);
   const [customizerChefNote, setCustomizerChefNote] = useState(""); 
 
+  // --- Billing Math (Placed top-level to prevent Temporal Dead Zone compilation errors) ---
+  const getCartSubtotal = () => cart.reduce((acc, i) => acc + (i.price * i.quantity), 0);
+  const getDeliveryCharge = () => (fulfillmentType === "pickup" || fulfillmentType === "table" || getCartSubtotal() === 0) ? 0 : (getCartSubtotal() >= selectedArea.minFree ? 0 : selectedArea.fee);
+  const getLoyaltyDiscount = () => Math.min(pointsToRedeem, getCartSubtotal());
+  const getGstAmountCalculated = () => gstEnabled ? Number(((getCartSubtotal() * gstRate) / 100).toFixed(2)) : 0;
+  const getTotalBillPrice = () => Math.max(0, getCartSubtotal() + getGstAmountCalculated() - (getLoyaltyDiscount() + customDiscount)) + getDeliveryCharge();
+  const getFreeDeliveryProgressPercent = () => Math.min(100, (getCartSubtotal() / selectedArea.minFree) * 100);
+  const getTotalPointsRedeemedInCart = () => cart.reduce((acc, i) => acc + (i.pointsCost || 0), 0);
+
   const handleFontSizeChange = (newSize: number) => {
     if (newSize >= 6 && newSize <= 24) {
       setFontSize(newSize);
@@ -785,37 +794,8 @@ export default function BbCafePos() {
     setCart((prev) => prev.map((item) => item.id === itemId ? { ...item, note: noteValue } : item));
   };
 
-  // Direct CSS Theme Conditionals - Bypasses Tailwind dark config bugs safely
-  const mainClass = "min-h-screen flex flex-col md:flex-row font-sans antialiased overflow-hidden transition-colors duration-200 " + 
-    (themeMode === "dark" ? "bg-[#0c0c0c] text-neutral-100" : "bg-neutral-50 text-neutral-800");
-
-  const asideClass = "border-r flex flex-col justify-between p-4 shrink-0 shadow-lg transition-all duration-300 fixed inset-y-0 left-0 md:relative md:translate-x-0 md:flex z-30 " + 
-    (themeMode === 'dark' ? "bg-neutral-900 border-neutral-800 text-neutral-100" : "bg-white border-neutral-200 text-neutral-850") + " " + 
-    (isSidebarCollapsed ? "md:w-20" : "md:w-64") + " " + 
-    (isSidebarOpen ? "translate-x-0 w-64 shadow-2xl" : "-translate-x-full md:translate-x-0");
-
-  const containerPanelClass = "flex-1 border rounded-3xl p-4 flex flex-col overflow-hidden shadow-xl transition-colors duration-200 " + 
-    (themeMode === 'dark' ? "bg-neutral-900/90 border-neutral-800" : "bg-white border-neutral-200");
-
-  const filteredMenu = useMemo(() => products.filter((p) => (selectedCategory === 'All' || p.category === selectedCategory) && p.name.toLowerCase().includes(searchQuery.toLowerCase())), [products, selectedCategory, searchQuery]);
-  
-  const filteredPastReceipts = useMemo(() => {
-    return pastReceipts.filter((o) => 
-      String(o.billNumber).includes(receiptSearchQuery.trim()) || 
-      String(o.customerPhone || '').includes(receiptSearchQuery.trim()) || 
-      String(o.customerName || '').toLowerCase().includes(receiptSearchQuery.trim().toLowerCase())
-    );
-  }, [pastReceipts, receiptSearchQuery]);
-
-  const activeLiveOrders = useMemo(() => {
-    return liveOrders.filter((o) => o.status !== 'completed' && o.status !== 'rejected');
-  }, [liveOrders]);
-
-  const getDisplayPrice = (item: any) => item?.variants ? `₹${Math.min(...Object.values(item.variants).map(Number))}+` : `₹${item?.price || 0}`;
-
   const liveOrdersBadgeCount = activeLiveOrders.length;
 
-  // Navigation Items (Live Orders Shifted out of Sidebar navigation to Header)
   const navItems = [
     { id: 'billing', label: 'Counter Billing', icon: SafeShoppingBag },
     { id: 'inventory', label: 'Stock Toggle', icon: SafeLayers },
@@ -1052,7 +1032,6 @@ export default function BbCafePos() {
               </div>
             )}
 
-            {/* COUNTER BILLING - Swipe gesture fully integrated on Product grid */}
             {activeTab === 'billing' && (
               <div className="flex-1 flex flex-col overflow-hidden relative">
                 <div className={containerPanelClass}>
@@ -1326,7 +1305,7 @@ export default function BbCafePos() {
                         value={gstRate} 
                         onChange={e => { const r = Math.max(0, Number(e.target.value)); setGstRate(r); localStorage.setItem("bb_pos_gst_rate", String(r)); }} 
                         className={"w-full border p-3 rounded-xl text-xs outline-none " + 
-                          (themeMode === 'dark' ? "bg-neutral-800 border-neutral-700 text-neutral-100" : "bg-neutral-100 border-neutral-200 text-neutral-800")
+                          (themeMode === 'dark' ? "bg-neutral-800 border-neutral-700 text-neutral-100" : "bg-neutral-100 border-neutral-200 text-neutral-850")
                         } 
                       />
                     )}
@@ -1432,7 +1411,7 @@ export default function BbCafePos() {
                       <button 
                         onClick={handleConnectPrinter} 
                         disabled={isConnecting}
-                        className="flex-1 bg-amber-500 hover:bg-amber-600 disabled:bg-neutral-700 text-black disabled:text-neutral-500 font-black py-3 rounded-xl text-[10px] uppercase shadow-md active:scale-95 transition-all flex items-center justify-center gap-1"
+                        className="flex-1 bg-amber-500 hover:bg-amber-600 disabled:bg-neutral-750 text-black disabled:text-neutral-500 font-black py-3 rounded-xl text-[10px] uppercase shadow-md active:scale-95 transition-all flex items-center justify-center gap-1"
                       >
                         {isConnecting ? <Loader2 className="animate-spin text-neutral-500" size={10} /> : 'Connect Device'}
                       </button>
