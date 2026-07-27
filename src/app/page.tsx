@@ -99,7 +99,16 @@ export default function BbCafeHome() {
   const clearCart = store?.clearCart || (() => {});
 
   const menuRef = useRef<HTMLDivElement | null>(null);
+  
+const router = useRouter();
 
+useEffect(() => {
+  // यदि ऐप असली एंड्रॉइड डिवाइस के अंदर खुला है (APK में)
+  if (Capacitor.isNativePlatform()) {
+    router.replace('/staff'); // तुरंत स्टाफ लॉन्चर पेज पर भेजें
+  }
+}, [router]);
+  
   // --- STATE VARIABLES ---
   const [menu, setMenu] = useState<any[]>([]);
   const [menuLoading, setMenuLoading] = useState(false);
