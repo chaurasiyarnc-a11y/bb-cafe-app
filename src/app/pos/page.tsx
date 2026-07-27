@@ -1315,7 +1315,8 @@ export default function BbCafePos() {
                       <AnimatePresence mode="popLayout">
                         {filteredMenu.map((item) => {
                           const isAvail = item.isAvailable !== false;
-                          const cardClass = "bg-neutral-50 dark:bg-neutral-800/40 border p-2 rounded-2xl text-left flex flex-col justify-between h-24 hover:border-orange-500 dark:hover:border-orange-500 hover:bg-white dark:hover:bg-neutral-800 active:scale-95 transition-all " + 
+                          const hasImage = item.image || item.imageUrl || item.img;
+                          const cardClass = "bg-neutral-50 dark:bg-neutral-800/40 border p-2.5 rounded-2xl text-left flex flex-col justify-between h-28 hover:border-orange-500 dark:hover:border-orange-500 hover:bg-white dark:hover:bg-neutral-800 active:scale-95 transition-all " + 
                             (!isAvail ? "opacity-40 border-neutral-200 dark:border-neutral-800" : "border-neutral-200 dark:border-neutral-800");
                           return (
                             <motion.button 
@@ -1329,11 +1330,21 @@ export default function BbCafePos() {
                               onClick={() => { triggerBeep('tap'); item.variants ? setSelectedProduct(item) : handleAddProductToCart(item); }} 
                               className={cardClass}
                             >
-                              <div>
-                                <p className="font-bold text-xs line-clamp-2 leading-snug text-neutral-800 dark:text-neutral-200">{item.name}</p>
-                                <p className="text-[8px] text-neutral-500 dark:text-neutral-400 uppercase mt-0.5">{item.category}</p>
+                              <div className="flex gap-2 items-start w-full justify-between">
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-bold text-xs line-clamp-2 leading-snug text-neutral-800 dark:text-neutral-200">{item.name}</p>
+                                  <p className="text-[8px] text-neutral-500 dark:text-neutral-400 uppercase mt-0.5">{item.category}</p>
+                                </div>
+                                {hasImage && (
+                                  <img 
+                                    src={item.image || item.imageUrl || item.img} 
+                                    alt={item.name} 
+                                    className="w-11 h-11 object-cover rounded-xl shrink-0 bg-neutral-200 dark:bg-neutral-700 shadow-sm border border-neutral-200/50 dark:border-neutral-800"
+                                    onError={(e) => { (e.target as any).style.display = 'none'; }}
+                                  />
+                                )}
                               </div>
-                              <div className="flex justify-between items-end w-full">
+                              <div className="flex justify-between items-end w-full pt-1">
                                 <p className="text-yellow-600 dark:text-yellow-400 font-black text-xs font-mono">{getDisplayPrice(item)}</p>
                                 {!isAvail && <span className="text-[7px] font-black text-red-500 uppercase">Empty</span>}
                               </div>
