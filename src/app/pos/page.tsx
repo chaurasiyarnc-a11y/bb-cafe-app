@@ -165,7 +165,7 @@ export default function BbCafePos() {
     }
   };
 
-  // लाइव ऑर्डर्स स्क्रीन को एक क्लिक में साफ़ करने का सुरक्षित फंक्शन (केवल एक बार यहाँ डिक्लेअर किया गया है)
+  // लाइव ऑर्डर्स स्क्रीन को एक क्लिक में साफ़ करने का सुरक्षित फंक्शन
   const handleClearAllLiveOrders = async () => {
     triggerBeep('tap');
     const confirmClear = window.confirm("क्या आप वाकई सभी एक्टिव लाइव ऑर्डर्स को साफ़ (Complete) करना चाहते हैं?");
@@ -225,6 +225,29 @@ export default function BbCafePos() {
     }
   };
 
+  // नया प्रभाव: PWA सर्विस वर्कर रजिस्ट्रेशन और डायनामिक मैनिफ़ेस्ट लिंक इंजेक्शन
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      // 1. डायनामिक रूप से pos-menifasto.json को हेड में इंजेक्ट करना
+      let link = document.querySelector('link[rel="manifest"]') as HTMLLinkElement;
+      if (!link) {
+        link = document.createElement('link');
+        link.rel = 'manifest';
+        document.head.appendChild(link);
+      }
+      link.href = '/pos-menifasto.json';
+
+      // 2. ऑफ़लाइन सपोर्ट के लिए sw.js रजिस्टर करना
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js')
+            .then((reg) => console.log('Service Worker Registered successfully!', reg.scope))
+            .catch((err) => console.warn('Service Worker registration failed:', err));
+        });
+      }
+    }
+  }, []);
+
   useEffect(() => {
     const savedUser = localStorage.getItem("bb_pos_user");
     if (savedUser) {
@@ -261,7 +284,6 @@ export default function BbCafePos() {
       const savedType = localStorage.getItem("bb_pos_printer_type");
       if (typeof window === 'undefined') return;
 
-      // ब्राउज़र को पेरिफेरल्स स्कैन करने के लिए 500ms का समय देना
       setTimeout(async () => {
         // 1. ब्लूटूथ (Bluetooth) ऑटो-कनेक्ट
         if (savedType === 'thermal_bluetooth' && 'bluetooth' in navigator && !bleCharacteristic) {
@@ -898,6 +920,36 @@ export default function BbCafePos() {
     { id: 'receipts', label: 'Past Receipts', icon: SafePrinter },
     { id: 'settings', label: 'POS Settings', icon: SafeSettings }
   ];
+
+  // लाइव प्रिंट प्रिव्यू के लिए एक्टिव डेटा या सैंपल डेटा लोड करना
+  const sampleOrderForPreview = useMemo(() => {
+    return {
+      billNumber: 45,
+      tokenNumber: 12,
+      timestamp: new Date(),
+      customerName: customerName || "Walk-in Guest",
+      customerPhone: customerPhone ? `+91${customerPhone}` : "",
+      address: address || "Mohandra Bus Stand, Panna, MP",
+      fulfillmentType,
+      tableNumber: tableNumber || "T-1",
+      paymentMethod,
+      items: cart.length > 0 ? cart : [
+        { name: "PANEER TIKKA", quantity: 2, price: 180, note: "EXTRA SPICY" },
+        { name: "VEG BURGER", quantity: 1, price: 90 },
+        { name: "MASALA CHAI", quantity: 3, price: 20 }
+      ],
+      subtotal: cart.length > 0 ? getCartSubtotal() : 510,
+      discount: cart.length > 0 ? (customDiscount + getLoyaltyDiscount()) : 10,
+      customerPointsRedeemed: pointsToRedeem,
+      customerPointsEarned: cart.length > 0 ? Math.floor(getTotalBillPrice() / 100) : 5,
+      customerPointsAfter: customerPhone ? Math.max(0, customerPoints + (Math.floor(getTotalBillPrice() / 100) - getTotalPointsRedeemedInCart() - pointsToRedeem)) : 25,
+      total: cart.length > 0 ? getTotalBillPrice() : 500
+    };
+  }, [cart, customerName, customerPhone, address, fulfillmentType, tableNumber, paymentMethod, customDiscount, pointsToRedeem, customerPoints]);
+
+  const receiptHtmlContent = useMemo(() => {
+    return generateReceiptHtml(sampleOrderForPreview, getPrintConfig());
+  }, [sampleOrderForPreview, printerPaperSize, printerType, fontSize]);
 
   const mainClass = "min-h-screen flex flex-col md:flex-row font-sans antialiased overflow-hidden transition-colors duration-200 " + 
     (themeMode === "dark" ? "dark bg-[#0a0a0a] text-neutral-100" : "bg-neutral-50 text-neutral-800");
