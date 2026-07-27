@@ -40,7 +40,7 @@ const SafeShoppingBag = ShoppingBag as any;
 const SafeClock = Clock as any; 
 const SafeLayers = Layers as any;
 const SafePrinter = Printer as any;
-const SafeUsers = Users as any; 
+const SafeUsers = SafeUsers = Users as any; 
 const SafePlay = Play as any; 
 const SafeCheck = Check as any;
 const SafeSearch = Search as any;
@@ -175,6 +175,13 @@ export default function BbCafePos() {
   const getTotalBillPrice = () => Math.max(0, getCartSubtotal() + getGstAmountCalculated() - (getLoyaltyDiscount() + customDiscount)) + getDeliveryCharge();
   const getFreeDeliveryProgressPercent = () => Math.min(100, (getCartSubtotal() / selectedArea.minFree) * 100);
   const getTotalPointsRedeemedInCart = () => cart.reduce((acc, i) => acc + (i.pointsCost || 0), 0);
+
+  // --- Active Live Orders Memo & Badge Count (Declared early to prevent TDZ Errors) ---
+  const activeLiveOrders = useMemo(() => {
+    return liveOrders.filter((o) => o.status !== 'completed' && o.status !== 'rejected');
+  }, [liveOrders]);
+
+  const liveOrdersBadgeCount = activeLiveOrders.length;
 
   const handleFontSizeChange = (newSize: number) => {
     if (newSize >= 6 && newSize <= 24) {
@@ -431,80 +438,6 @@ export default function BbCafePos() {
     };
   }, [isLoggedIn, printerConnected, serialPort, usbDevice, bleCharacteristic]);
 
-  // Sync Live Orders and Align local offline bill sequence
-  useEffect(() => {
-    const q = query(collection(db, "orders"), orderBy("timestamp", "desc"), limit(40));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const list = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-      setLiveOrders(list);
-
-      // Extract highest sequence number online and lock it in offline counter local sequence
-      let maxBill = Number(localStorage.getItem("bb_pos_local_bill_counter")) || 5000;
-      list.forEach((ord: any) => {
-        const bNum = Number(ord.billNumber);
-        if (!isNaN(bNum) && bNum > maxBill) {
-          maxBill = bNum;
-        }
-      });
-      localStorage.setItem("bb_pos_local_bill_counter", String(maxBill));
-    });
-
-    const unsubStore = onSnapshot(doc(db, "settings", "store"), (d) => {
-      if (d.exists()) setStoreOpen(d.data().isOpen);
-    });
-
-    return () => { unsubscribe(); unsubStore(); };
-  }, []);
-
-  useEffect(() => {
-    if (!isLoggedIn) return;
-    (async () => {
-      setLoading(true);
-      try {
-        const prodSnap = await getDocs(collection(db, "products"));
-        const items = prodSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-        setProducts(items);
-        const uniqueCats = Array.from(new Set(items.map((i: any) => i.category).filter(Boolean))) as string[];
-        setCategories(['All', ...uniqueCats]);
-        const rulesSnap = await getDocs(collection(db, "loyalty_rules"));
-        setLoyaltyRules(rulesSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
-      } catch (err) {
-        toast.error("Error loading products");
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, [isLoggedIn]);
-
-  // Past Receipts with pagination limit of 20 and manual "Load More"
-  useEffect(() => {
-    if (activeTab !== 'receipts') return;
-
-    const fetchPastReceipts = async () => {
-      setIsSearchingReceipts(true);
-      try {
-        let q;
-        if (receiptSearchQuery.trim()) {
-          q = query(collection(db, "orders"), orderBy("timestamp", "desc"), limit(100)); // allow deeper search query
-        } else {
-          q = query(collection(db, "orders"), orderBy("timestamp", "desc"), limit(receiptsLimit));
-        }
-        const snap = await getDocs(q);
-        setPastReceipts(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-      } catch (err) {
-        console.error("Error loading receipts:", err);
-      } finally {
-        setIsSearchingReceipts(false);
-      }
-    };
-
-    const delayDebounce = setTimeout(() => {
-      fetchPastReceipts();
-    }, 300);
-
-    return () => clearTimeout(delayDebounce);
-  }, [activeTab, receiptSearchQuery, receiptsLimit]);
-
   // Sidebar Manual Sync Handler
   const handleManualSync = async () => {
     triggerBeep('tap');
@@ -535,44 +468,6 @@ export default function BbCafePos() {
       toast.error("Sync incomplete or connection timeout");
     } finally {
       setIsSyncing(false);
-    }
-  };
-
-  // Touch handlers for Category horizontal Swipe gestures
-  const handleTouchStart = (e: React.TouchEvent) => {
-    setTouchEnd(null);
-    setTouchStart(e.targetTouches[0].clientX);
-  };
-
-  const handleTouchMove = (e: React.TouchEvent) => {
-    setTouchEnd(e.targetTouches[0].clientX);
-  };
-
-  const handleTouchEnd = () => {
-    if (!touchStart || !touchEnd) return;
-    const distance = touchStart - touchEnd;
-    const isLeftSwipe = distance > minSwipeDistance;
-    const isRightSwipe = distance < -minSwipeDistance;
-
-    if (isLeftSwipe || isRightSwipe) {
-      const curIdx = categories.indexOf(selectedCategory);
-      if (isLeftSwipe) {
-        // Left Swipe -> Next Category
-        if (curIdx < categories.length - 1) {
-          const nextCat = categories[curIdx + 1];
-          setSelectedCategory(nextCat);
-          triggerBeep('tap');
-          toast.success(`Category: ${nextCat}`, { id: 'swipe-toast', duration: 1000 });
-        }
-      } else if (isRightSwipe) {
-        // Right Swipe -> Previous Category
-        if (curIdx > 0) {
-          const prevCat = categories[curIdx - 1];
-          setSelectedCategory(prevCat);
-          triggerBeep('tap');
-          toast.success(`Category: ${prevCat}`, { id: 'swipe-toast', duration: 1000 });
-        }
-      }
     }
   };
 
@@ -794,8 +689,6 @@ export default function BbCafePos() {
     setCart((prev) => prev.map((item) => item.id === itemId ? { ...item, note: noteValue } : item));
   };
 
-  const liveOrdersBadgeCount = activeLiveOrders.length;
-
   const navItems = [
     { id: 'billing', label: 'Counter Billing', icon: SafeShoppingBag },
     { id: 'inventory', label: 'Stock Toggle', icon: SafeLayers },
@@ -831,6 +724,164 @@ export default function BbCafePos() {
   const receiptHtmlContent = useMemo(() => {
     return generateReceiptHtml(sampleOrderForPreview, getPrintConfig());
   }, [sampleOrderForPreview, printerPaperSize, printerType, fontSize]);
+
+  const handleToggleStock = async (productId: string, currentStatus: boolean) => {
+    triggerBeep('tap');
+    try {
+      await updateDoc(doc(db, "products", productId), { isAvailable: !currentStatus });
+      setProducts(prev => prev.map((p) => p.id === productId ? { ...p, isAvailable: !currentStatus } : p));
+      toast.success("Stock toggled!");
+    } catch (err) {
+      toast.error("Failed to toggle stock");
+    }
+  };
+
+  const handleToggleTheme = (mode: 'dark' | 'light') => {
+    triggerBeep('tap'); setThemeMode(mode); localStorage.setItem("bb_pos_theme", mode);
+    if (mode === 'light') document.documentElement.classList.remove('dark');
+    else document.documentElement.classList.add('dark');
+  };
+
+  const filteredMenu = useMemo(() => products.filter((p) => (selectedCategory === 'All' || p.category === selectedCategory) && p.name.toLowerCase().includes(searchQuery.toLowerCase())), [products, selectedCategory, searchQuery]);
+  
+  const filteredPastReceipts = useMemo(() => {
+    return pastReceipts.filter((o) => 
+      String(o.billNumber).includes(receiptSearchQuery.trim()) || 
+      String(o.customerPhone || '').includes(receiptSearchQuery.trim()) || 
+      String(o.customerName || '').toLowerCase().includes(receiptSearchQuery.trim().toLowerCase())
+    );
+  }, [pastReceipts, receiptSearchQuery]);
+
+  // Direct CSS Theme Conditionals - Bypasses Tailwind dark config bugs safely
+  const mainClass = "min-h-screen flex flex-col md:flex-row font-sans antialiased overflow-hidden transition-colors duration-200 " + 
+    (themeMode === "dark" ? "bg-[#0c0c0c] text-neutral-100" : "bg-neutral-50 text-neutral-800");
+
+  const asideClass = "border-r flex flex-col justify-between p-4 shrink-0 shadow-lg transition-all duration-300 fixed inset-y-0 left-0 md:relative md:translate-x-0 md:flex z-30 " + 
+    (themeMode === 'dark' ? "bg-neutral-900 border-neutral-800 text-neutral-100" : "bg-white border-neutral-200 text-neutral-850") + " " + 
+    (isSidebarCollapsed ? "md:w-20" : "md:w-64") + " " + 
+    (isSidebarOpen ? "translate-x-0 w-64 shadow-2xl" : "-translate-x-full md:translate-x-0");
+
+  const containerPanelClass = "flex-1 border rounded-3xl p-4 flex flex-col overflow-hidden shadow-xl transition-colors duration-200 " + 
+    (themeMode === 'dark' ? "bg-neutral-900/90 border-neutral-800" : "bg-white border-neutral-200");
+
+  // Place Order flow (Offline sequence resilient & auto-queue sync)
+  const handlePlaceOrder = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (cart.length === 0 || isSubmittingOrder) return;
+    setIsSubmittingOrder(true);
+    
+    const subtotal = getCartSubtotal();
+    const discountCombined = customDiscount + getLoyaltyDiscount();
+    const finalTotal = getTotalBillPrice();
+    const token = Math.floor(1000 + Math.random() * 9000);
+
+    const earned = Math.floor(finalTotal / 100);
+    const netPoints = customerPhone ? (earned - getTotalPointsRedeemedInCart() - pointsToRedeem) : 0;
+    const pointsAfterBill = customerPhone ? Math.max(0, customerPoints + netPoints) : 0;
+
+    const isOnline = typeof navigator !== 'undefined' ? navigator.onLine : true;
+    let billNumber: number;
+
+    try {
+      if (isOnline) {
+        try {
+          billNumber = await runTransaction(db, async (txn) => {
+            const snap = await txn.get(doc(db, "settings", "store_bill_counter"));
+            const next = snap.exists() ? (snap.data().nextBillNumber || 1) : 1;
+            txn.set(doc(db, "settings", "store_bill_counter"), { nextBillNumber: next + 1 });
+            return next;
+          });
+          localStorage.setItem("bb_pos_local_bill_counter", String(billNumber));
+        } catch (txnError) {
+          console.warn("Transaction failed online, falling back to local counter logic:", txnError);
+          billNumber = getNextLocalBillNumber();
+        }
+      } else {
+        billNumber = getNextLocalBillNumber();
+      }
+
+      const orderObj = { 
+        billNumber, 
+        tokenNumber: token, 
+        customerName: customerName || "Walk-in Guest", 
+        customerPhone: customerPhone ? `+91${customerPhone}` : "", 
+        customerPointsBefore: customerPhone ? customerPoints : 0,
+        customerPointsEarned: customerPhone ? earned : 0,
+        customerPointsRedeemed: customerPhone ? pointsToRedeem : 0,
+        customerPointsAfter: customerPhone ? pointsAfterBill : 0,
+        items: cart, 
+        subtotal, 
+        discount: discountCombined, 
+        gstRate: gstEnabled ? gstRate : 0, 
+        gstAmount: getGstAmountCalculated(), 
+        total: finalTotal, 
+        timestamp: new Date(), 
+        status: 'completed', 
+        fulfillmentType, 
+        deliveryArea: fulfillmentType === "delivery" ? selectedArea.name : "", 
+        tableNumber: fulfillmentType === 'table' ? tableNumber : '', 
+        paymentMethod, 
+        chefInstructions, 
+        source: 'POS',
+        address: address
+      };
+
+      // Safely write document (stored in offline sync queue if network drops)
+      await addDoc(collection(db, "orders"), orderObj);
+
+      if (customerPhone && customerPhone.trim().length === 10) {
+        const phone = customerPhone.trim();
+        const userRef = doc(db, "customer_points", phone);
+
+        if (isOnline) {
+          try {
+            await runTransaction(db, async (txn) => {
+              const snap = await txn.get(userRef);
+              if (!snap.exists()) {
+                txn.set(userRef, { name: customerName || "Walk-in Guest", phone, points: Math.max(0, pointsAfterBill), lastActive: new Date() });
+              } else {
+                txn.update(userRef, { points: pointsAfterBill, lastActive: new Date() });
+              }
+            });
+          } catch (e) {
+            await setDoc(userRef, { name: customerName || "Walk-in Guest", phone, points: Math.max(0, pointsAfterBill), lastActive: new Date() }, { merge: true });
+          }
+        } else {
+          await setDoc(userRef, { name: customerName || "Walk-in Guest", phone, points: Math.max(0, pointsAfterBill), lastActive: new Date() }, { merge: true });
+        }
+
+        if (earned > 0) {
+          await addDoc(collection(db, "customer_points", phone, "history"), { type: 'earn', points: earned, description: `Earned Bill #${billNumber}`, timestamp: new Date() });
+        }
+        if (pointsToRedeem > 0) {
+          await addDoc(collection(db, "customer_points", phone, "history"), { type: 'redeem', points: pointsToRedeem, description: `Redeemed cashback Bill #${billNumber}`, timestamp: new Date() });
+        }
+      }
+
+      triggerBeep('success'); 
+      toast.success(`Bill #${billNumber} saved successfully!`);
+      
+      const pConfig = getPrintConfig();
+
+      if (kotEnabled) {
+        toast.success("Printing KOT first...");
+        await handlePrintKot(orderObj, pConfig);
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+      }
+
+      toast.success("Printing Customer Receipt...");
+      await handlePrintReceipt(orderObj, pConfig);
+
+      // Clean backup logs to start fresh
+      setCart([]); setCustomerPhone(''); setCustomerName(''); setCustomerPoints(0); setPointsToRedeem(0); setCustomDiscount(0); setIsCartOpen(false); setChefInstructions('');
+      localStorage.removeItem("bb_pos_saved_cart");
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to place order offline");
+    } finally {
+      setIsSubmittingOrder(false);
+    }
+  };
 
   return (
     <div className={mainClass}>
@@ -1322,8 +1373,7 @@ export default function BbCafePos() {
                           localStorage.setItem("bb_pos_kot_enabled", String(next)); 
                           toast.success(next ? "KOT Printing ON" : "KOT Printing OFF");
                         }} 
-                        className="text-orange-500"
-                      >
+                        className="text-orange-500">
                         {kotEnabled ? <SafeToggleRight size={32} /> : <SafeToggleLeft size={32} />}
                       </button>
                     </div>
@@ -1411,7 +1461,7 @@ export default function BbCafePos() {
                       <button 
                         onClick={handleConnectPrinter} 
                         disabled={isConnecting}
-                        className="flex-1 bg-amber-500 hover:bg-amber-600 disabled:bg-neutral-750 text-black disabled:text-neutral-500 font-black py-3 rounded-xl text-[10px] uppercase shadow-md active:scale-95 transition-all flex items-center justify-center gap-1"
+                        className="flex-1 bg-amber-500 hover:bg-amber-600 disabled:bg-neutral-700 text-black disabled:text-neutral-500 font-black py-3 rounded-xl text-[10px] uppercase shadow-md active:scale-95 transition-all flex items-center justify-center gap-1"
                       >
                         {isConnecting ? <Loader2 className="animate-spin text-neutral-500" size={10} /> : 'Connect Device'}
                       </button>
