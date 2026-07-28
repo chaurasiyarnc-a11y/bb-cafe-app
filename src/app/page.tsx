@@ -2,6 +2,7 @@
 'use client';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { db } from '../lib/firebase'; 
+import { getStorage, ref, uploadString, getDownloadURL } from 'firebase/storage';
 import { collection, onSnapshot, query, addDoc, doc, setDoc, increment, runTransaction, getDoc, getDocs, where, limit, orderBy } from 'firebase/firestore';
 import { ShoppingBag, Plus, Search, MapPin, Phone, User, Star, Gift, Loader2, Heart, Clock, ChevronRight, WifiOff, Globe } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
