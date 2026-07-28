@@ -146,6 +146,10 @@ export default function BbCafeHome() {
   const [bannerIndex, setBannerIndex] = useState(0);
   const [bannerError, setBannerError] = useState(false);
 
+  // कूपन से जुड़े हुए स्टेट्स (जिन्हें वापस रीस्टोर किया गया है)
+  const [enteredCoupon, setEnteredCoupon] = useState("");
+  const [appliedCoupon, setAppliedCoupon] = useState<any>(null);
+
   // Normal Pizza Customization Addons
   const [normalPizzaSize, setNormalPizzaSize] = useState("");
   const [normalPizzaPrice, setNormalPizzaPrice] = useState(0);
@@ -1223,156 +1227,126 @@ export default function BbCafeHome() {
     reader.readAsDataURL(file);
   };
 
-  // --- INITIAL MOUNT & SWR BACKGROUND DATABASE SYNCHRONIZER ---
+  // --- BACKGROUND CLOCKS, DEBOUNCING, AND FIRESTORE LISTENERS ---
+
+  // 1. Search Query Debouncing & Automatic Hinglish Translation 
   useEffect(() => {
-    setMounted(true);
-
-    const handleBeforeInstallPrompt = (e: Event) => {
-      e.preventDefault();
-      setDeferredPrompt(e);
-      const dismissed = localStorage.getItem('bb_app_installed_or_dismissed');
-      if (!dismissed) {
-        setShowInstallBanner(true);
-      }
-    };
-
-    const handleOnline = () => setIsOnline(true);
-    const handleOffline = () => setIsOnline(false);
-
-    if (typeof window !== "undefined") {
-      setIsOnline(window.navigator.onLine);
-      window.addEventListener("online", handleOnline);
-      window.addEventListener("offline", handleOffline);
-      window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
-    }
-
-    try {
-      const cachedMenu = localStorage.getItem('bb_cached_menu');
-      if (cachedMenu) setMenu(JSON.parse(cachedMenu));
-
-      const cachedSocial = localStorage.getItem('bb_cached_social_counts');
-      if (cachedSocial) setSocialCounts(JSON.parse(cachedSocial));
-
-      const cachedRules = localStorage.getItem('bb_cached_loyalty_rules');
-      if (cachedRules) setLoyaltyRules(JSON.parse(cachedRules));
-
-      const cachedCats = localStorage.getItem('bb_cached_categories');
-      if (cachedCats) setDbCategories(JSON.parse(cachedCats));
-
-      const cachedBanners = localStorage.getItem('bb_cached_banners');
-      if (cachedBanners) setBanners(JSON.parse(cachedBanners));
-
-      const cachedReels = localStorage.getItem('bb_cached_reels');
-      if (cachedReels) setStories(JSON.parse(cachedReels));
-
-      const savedDetails = localStorage.getItem('bb_cafe_customer');
-      if (savedDetails) {
-        const parsed = JSON.parse(savedDetails);
-        if (parsed && parsed.name && parsed.phone) {
-          setCustomerDetails(parsed);
-          setTempName(parsed.name);
-          setTempPhone(parsed.phone.replace("+91", ""));
-          if (parsed.pin) setTempPin(parsed.pin);
+    const handler = setTimeout(() => {
+      let queryClean = searchQuery.toLowerCase().trim();
+      Object.entries(HINGLISH_DICT).forEach(([typo, corrected]) => {
+        if (queryClean.includes(typo)) {
+          queryClean = queryClean.replace(new RegExp(typo, 'g'), corrected);
         }
-      }
+      });
+      setDebouncedSearchQuery(queryClean);
+    }, 350);
 
-      const cachedPast = localStorage.getItem('bb_past_orders');
-      if (cachedPast) setPastOrders(JSON.parse(cachedPast));
+    return () => clearTimeout(handler);
+  }, [searchQuery]);
 
-      const cachedFavs = localStorage.getItem('bb_favorites');
-      if (cachedFavs) setFavorites(JSON.parse(cachedFavs));
-    } catch (e) {
-      console.warn("Local storage cache load bypassed:", e);
-    }
+  // 2. Banner Auto Carousel Clock
+  useEffect(() => {
+    if (banners.length <= 1) return;
+    const interval = setInterval(() => {
+      setBannerIndex((prev) => (prev + 1) % banners.length);
+    }, 6000);
+    return () => clearInterval(interval);
+  }, [banners]);
 
-    const fetchFreshDbData = async () => {
-      setMenuLoading(true);
-      try {
-        const [
-          storeSnap,
-          productsSnap,
-          catsSnap,
-          bannersSnap,
-          reelsSnap,
-          rulesSnap,
-          socialSnap
-        ] = await Promise.all([
-          getDoc(doc(db, "settings", "store")),
-          getDocs(collection(db, "products")),
-          getDocs(collection(db, "categories")),
-          getDocs(collection(db, "banners")),
-          getDocs(collection(db, "reels")),
-          getDocs(collection(db, "loyalty_rules")),
-          getDoc(doc(db, "settings", "social_counts"))
-        ]);
-
-        if (storeSnap.exists()) {
-          const storeData = storeSnap.data();
-          setStoreOpen(storeData.isOpen);
-          setIsBannerEnabled(storeData.isBannerEnabled ?? storeData.showPromoBanner ?? true);
-          setIsInlineBannerEnabled(storeData.isInlineBannerEnabled ?? storeData.showInlinePromo ?? true);
-          if (storeData.whatsappNumber) setWhatsappNumber(storeData.whatsappNumber);
-          if (storeData.upiId) setUpiId(storeData.upiId);
-          if (storeData.latitude && storeData.longitude) {
-            setStoreCoordinates({ lat: Number(storeData.latitude), lng: Number(storeData.longitude) });
-          }
-          if (storeData.timingHindi) setStoreTimingHindi(storeData.timingHindi);
-          if (storeData.timingEnglish) setStoreTimingEnglish(storeData.timingEnglish);
-          if (storeData.closingMinutesLeft !== undefined) setClosingMinutesLeft(storeData.closingMinutesLeft);
-        }
-
-        const items = productsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter((i: any) => i.isVisible !== false);
-        setMenu(shuffleArray(items));
-        localStorage.setItem('bb_cached_menu', JSON.stringify(items));
-
-        const cats = catsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-        setDbCategories(cats);
-        localStorage.setItem('bb_cached_categories', JSON.stringify(cats));
-
-        const banData = bannersSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-        setBanners(banData);
-        localStorage.setItem('bb_cached_banners', JSON.stringify(banData));
-
-        const reelData = reelsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-        setStories(reelData);
-        localStorage.setItem('bb_cached_reels', JSON.stringify(reelData));
-
-        const ruleData = rulesSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-        setLoyaltyRules(ruleData);
-        localStorage.setItem('bb_cached_loyalty_rules', JSON.stringify(ruleData));
-
-        if (socialSnap.exists()) {
-          const data = socialSnap.data();
-          setSocialCounts(data);
-          localStorage.setItem('bb_cached_social_counts', JSON.stringify(data));
-        }
-
-      } catch (err) {
-        console.warn("Background fetch warning (Offline Mode Active):", err);
-      } finally {
-        setMenuLoading(false);
-      }
-    };
-
-    fetchFreshDbData();
-
-    return () => { 
-      if (typeof window !== "undefined") {
-        window.removeEventListener("online", handleOnline);
-        window.removeEventListener("offline", handleOffline);
-        window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
-      }
-    };
+  // 3. Social Proof Alerts Auto Cycle
+  useEffect(() => {
+    const proofTemplates = [
+      { text: "Rahul from Mohandra Town just ordered Special Pizza 🍕" },
+      { text: "Pooja just claimed 5 free points on Instagram! 📸" },
+      { text: "Ankit just redeemed a free Special Thali 🎁" },
+      { text: "Preeti from 5km range just ordered Paneer Special & Fries! 🛵" },
+      { text: "A user is customization-building their DIY Pizza right now 🍕" }
+    ];
+    setSocialProofs(proofTemplates);
   }, []);
 
-  if (!mounted) {
-    return (
-      <div className="min-h-screen bg-neutral-950 flex flex-col items-center justify-center text-white">
-        <Loader2 className="animate-spin text-orange-500 mb-2" size={32} />
-        <span className="text-xs font-bold uppercase tracking-wider">Bum Bum Cafe Loading...</span>
-      </div>
+  useEffect(() => {
+    if (socialProofs.length === 0) return;
+    const showInterval = setInterval(() => {
+      setSocialAlertIndex((prev) => (prev + 1) % socialProofs.length);
+      setShowSocialAlert(true);
+      setTimeout(() => {
+        setShowSocialAlert(false);
+      }, 5000);
+    }, 18000);
+
+    return () => clearInterval(showInterval);
+  }, [socialProofs]);
+
+  // 4. Real-time Customer Points and Points History Subcollection Synchronizer
+  useEffect(() => {
+    if (!customerDetails?.phone) {
+      setCustomerPoints(0);
+      setPointsHistory([]);
+      return;
+    }
+
+    const phoneClean = customerDetails.phone.replace("+91", "");
+    
+    // Listen to parent customer points
+    const pointsDocRef = doc(db, "customer_points", phoneClean);
+    const unsubPoints = onSnapshot(pointsDocRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setCustomerPoints(data.points || 0);
+      }
+    }, (error) => {
+      console.warn("Points sync disabled background offline mode:", error);
+    });
+
+    // Listen to live points history logs
+    const historyColRef = collection(db, "customer_points", phoneClean, "history");
+    const q = query(historyColRef, orderBy("timestamp", "desc"), limit(15));
+    const unsubHistory = onSnapshot(q, (querySnap) => {
+      const historyList = querySnap.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setPointsHistory(historyList);
+    }, (error) => {
+      console.warn("Points history sync offline mode:", error);
+    });
+
+    return () => {
+      unsubPoints();
+      unsubHistory();
+    };
+  }, [customerDetails]);
+
+  // 5. Active Live Order Status Tracker Listener (Dynamic SWR)
+  useEffect(() => {
+    if (!customerDetails?.phone) return;
+    
+    const ordersRef = collection(db, "orders");
+    const q = query(
+      ordersRef,
+      where("customerPhone", "==", customerDetails.phone),
+      orderBy("timestamp", "desc"),
+      limit(1)
     );
-  }
+
+    const unsubLiveOrder = onSnapshot(q, (snapshot) => {
+      if (!snapshot.empty) {
+        const latestOrder = { id: snapshot.docs[0].id, ...snapshot.docs[0].data() } as any;
+        if (latestOrder.status !== 'delivered' && latestOrder.status !== 'cancelled') {
+          setLiveOrder(latestOrder);
+        } else {
+          setLiveOrder(null);
+        }
+      } else {
+        setLiveOrder(null);
+      }
+    }, (error) => {
+      console.warn("Live order sync offline mode:", error);
+    });
+
+    return () => unsubLiveOrder();
+  }, [customerDetails]);
 
   return (
     <div className="dark:bg-[#050505] bg-neutral-50 min-h-screen dark:text-white text-neutral-800 pb-32 font-sans relative overflow-x-clip transition-colors duration-200">
