@@ -18,6 +18,7 @@ export default function DeliveryDashboard() {
 
   // सेटिंग्स बैनर और वेक लॉक
   const [showBatteryWarning, setShowBatteryWarning] = useState(true);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
   const wakeLockRef = useRef<any>(null);
 
   // लाइव टाइम दिखाने के लिए स्टेट (ताकि 'time ago' हर मिनट अपडेट हो)
@@ -28,6 +29,16 @@ export default function DeliveryDashboard() {
     const interval = setInterval(() => setNow(new Date()), 60000);
     return () => clearInterval(interval);
   }, []);
+
+  // --- नया: लॉगिन होने के 8 सेकंड बाद बैटरी बैनर अपने आप बंद करने का टाइमर ---
+  useEffect(() => {
+    if (!isLocked) {
+      const timer = setTimeout(() => {
+        setShowBatteryWarning(false);
+      }, 8000); // 8000ms = 8 सेकंड
+      return () => clearTimeout(timer);
+    }
+  }, [isLocked]);
 
   // ब्राउज़र ऑडियो अनलॉक और रिंगटोन बजाने का फंक्शन
   const playNotificationRing = () => {
@@ -104,7 +115,7 @@ export default function DeliveryDashboard() {
         vibrate: [300, 100, 300, 100, 450],
         tag: 'new-delivery-order',
         requireInteraction: true
-      } as any); // Type casted to satisfy strict TypeScript DOM compile check
+      } as any); // TypeScript DOM कंपाइलर चेक के लिए 'as any' टाइप कास्ट
 
       // मोबाइल के वाइब्रेटर हार्डवेयर को सीधे ट्रिगर करने के लिए बैकअप
       if ('vibrate' in navigator) {
@@ -200,30 +211,40 @@ export default function DeliveryDashboard() {
   // LOGIN: Verifies entered Username & PIN
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isLoggingIn) return; // डबल-सबमिशन रोकने के लिए
+
     if (!usernameInput.trim() || !pinInput.trim()) {
       return toast.error("कृपया Username और PIN दोनों भरें।");
     }
 
+    setIsLoggingIn(true);
     const toastId = toast.loading("Verifying credentials...");
+    
     try {
+      // 100% वर्किंग पुरानी क्वेरी (केवल PIN और Role)
       const q = query(
         collection(db, "staff_members"),
-        where("name", "==", usernameInput.trim()),
         where("pin", "==", pinInput.trim()),
         where("role", "==", "delivery")
       );
+
       const snap = await getDocs(q);
-      toast.dismiss(toastId);
       
-      if (!snap.empty) {
-        const riderDoc = snap.docs[0];
-        const rider = riderDoc.data();
+      // फ़ायरबेस से डेटा मिलने के बाद, क्लाइंट-साइड ही नाम का मिलान (केस-सेंसिटिव की समस्या हल करने के लिए)
+      const matchedRiderDoc = snap.docs.find(doc => {
+        const dbName = String(doc.data().name || "").trim().toLowerCase();
+        const inputName = usernameInput.trim().toLowerCase();
+        return dbName === inputName;
+      });
+
+      if (matchedRiderDoc) {
+        const rider = matchedRiderDoc.data();
         
         localStorage.setItem('bb_delivery_verified', 'true');
         localStorage.setItem('bb_delivery_boy_name', rider.name);
-        localStorage.setItem('bb_delivery_boy_id', riderDoc.id); 
+        localStorage.setItem('bb_delivery_boy_id', matchedRiderDoc.id); 
         
-        // ब्राउज़र पर ऑडियो अनलॉक करने के लिए एक छोटा सा साइलेंट बीप प्ले करें
+        // ऑडियो अनलॉक करने के लिए एक छोटा सा साइलेंट बीप प्ले करें
         try {
           const context = new (window.AudioContext || (window as any).webkitAudioContext)();
           const osc = context.createOscillator();
@@ -240,9 +261,12 @@ export default function DeliveryDashboard() {
         toast.error("गलत Username या PIN! एक्सेस अस्वीकृत। ❌");
         setPinInput("");
       }
-    } catch (err) {
+    } catch (err: any) {
+      toast.error("कनेक्शन धीमा है या डेटाबेस लोड नहीं हो सका।");
+      console.error(err);
+    } finally {
       toast.dismiss(toastId);
-      toast.error("Login verification failed. Database error.");
+      setIsLoggingIn(false); // बटन दोबारा चालू करने के लिए
     }
   };
 
@@ -312,7 +336,8 @@ export default function DeliveryDashboard() {
               placeholder="Enter Your Name / Username" 
               value={usernameInput} 
               onChange={(e) => setUsernameInput(e.target.value)} 
-              className="w-full bg-black/60 border border-white/10 rounded-2xl p-4 text-center outline-none focus:border-orange-500 text-sm font-bold text-white uppercase placeholder:normal-case"
+              // यहाँ से 'uppercase' क्लास हटा दी गई है ताकि आप छोटे/बड़े लेटर्स सामान्य रूप से लिख सकें
+              className="w-full bg-black/60 border border-white/10 rounded-2xl p-4 text-center outline-none focus:border-orange-500 text-sm font-bold text-white placeholder:normal-case"
               required 
             />
             <input 
@@ -326,9 +351,10 @@ export default function DeliveryDashboard() {
             />
             <button 
               type="submit" 
-              className="w-full bg-orange-500 hover:bg-orange-600 text-white p-4 rounded-2xl font-black text-xs uppercase tracking-wider transition-all"
+              disabled={isLoggingIn} // लोडिंग के समय बटन डिसेबल हो जाएगा ताकि लोडिंग स्पैम न हो
+              className="w-full bg-orange-500 hover:bg-orange-600 disabled:bg-orange-500/50 disabled:cursor-not-allowed text-white p-4 rounded-2xl font-black text-xs uppercase tracking-wider transition-all"
             >
-              Unlock Terminal
+              {isLoggingIn ? "Verifying..." : "Unlock Terminal"}
             </button>
           </form>
         </div>
@@ -382,7 +408,7 @@ export default function DeliveryDashboard() {
         </div>
       </header>
 
-      {/* बैटरी चेतावनी बैनर */}
+      {/* बैटरी चेतावनी बैनर (लॉगिन के 8 सेकंड बाद अपने आप बंद हो जाएगा) */}
       {showBatteryWarning && (
         <div className="bg-orange-500/10 border border-orange-500/30 p-5 rounded-3xl mb-6 relative">
           <button 
