@@ -1,14 +1,14 @@
 'use client';
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Phone } from 'lucide-react';
+import { X, Phone, Lock } from 'lucide-react';
 
 interface LiveOrderTrackerProps {
   isHindi: boolean;
   liveOrder: any;
   setLiveOrder: (order: any) => void;
   formatBillNumber: (num: number) => string;
-  whatsappNumber: string; // कैफ़े का डिफ़ॉल्ट नंबर
+  whatsappNumber: string;
   triggerHaptic: (ms?: number) => void;
 }
 
@@ -94,8 +94,23 @@ export default function LiveOrderTracker({
             </p>
           </div>
 
+          {/* --- नया सुधारात्मक क्षेत्र: डिलीवरी पिन (OTP) ग्राहक की स्क्रीन पर चमकेगा --- */}
+          {liveOrder.status !== 'delivered' && liveOrder.status !== 'completed' && liveOrder.status !== 'rejected' && liveOrder.deliveryPin && (
+            <div className="bg-yellow-500/10 border border-yellow-500/20 p-3 rounded-2xl text-center space-y-1.5 shadow-inner">
+              <p className="text-[9px] uppercase tracking-wider text-yellow-500 font-black flex items-center justify-center gap-1 leading-none">
+                <Lock size={10} />
+                <span>{isHindi ? "🔑 डिलीवरी पुष्टि पिन (RIDER OTP):" : "🔑 Delivery Security PIN / OTP:"}</span>
+              </p>
+              <p className="text-2xl font-black text-white tracking-widest font-mono leading-none py-0.5">
+                {liveOrder.deliveryPin}
+              </p>
+              <p className="text-[8px] text-gray-400 font-bold uppercase leading-none">
+                {isHindi ? "(राइडर को यह पिन देकर ही अपना भोजन प्राप्त करें)" : "(Please share this PIN with rider to confirm delivery)"}
+              </p>
+            </div>
+          )}
+
           <div className="flex gap-2">
-            {/* नया: सीधे फ़ोन कॉल का बटन (व्हाट्सएप ट्रैकिंग की जगह इसे जोड़ा गया है) */}
             <a 
               href={`tel:+${whatsappNumber}`}
               onClick={() => triggerHaptic(20)}
