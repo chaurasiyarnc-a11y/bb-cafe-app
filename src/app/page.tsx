@@ -692,6 +692,232 @@ export default function BbCafeHome() {
     }
   };
 
+  // --- RESTORED sendWhatsAppOrder DEFINITION ---
+  const sendWhatsAppOrder = async () => {
+    triggerHaptic();
+    
+    if (isSubmittingOrder) return;
+    setIsSubmittingOrder(true);
+
+    try {
+      if (!customerDetails) { 
+        setIsProfileOpen(true); 
+        toast.error("ऑर्डर करने के लिए पहले अपनी प्रोफाइल बनाएं! 👤");
+        return; 
+      }
+
+      if (fulfillmentType === "delivery" && (!address || address.trim().length < 10)) {
+        return toast.error("Please enter full address!");
+      }
+
+      if (fulfillmentType === "table" && !tableNumber) {
+        return toast.error(isHindi ? "कृपया टेबल चुनें!" : "Please select a table!");
+      }
+
+      if (paymentMethod === "upi" && !paymentScreenshot) {
+        return toast.error(isHindi ? "कृपया आगे बढ़ने से पहले यूपीआई भुगतान का स्क्रीनशॉट अपलोड करें!" : "Please upload UPI payment screenshot!");
+      }
+
+      const tokenNumber = Math.floor(1000 + Math.random() * 9000);
+      const deliveryPin = Math.floor(1000 + Math.random() * 9000);
+
+      let billNumber = 1;
+      const counterDocRef = doc(db, "settings", "store_bill_counter");
+
+      try {
+        await runTransaction(db, async (transaction) => {
+          const counterDoc = await transaction.get(counterDocRef);
+          if (!counterDoc.exists()) {
+            transaction.set(counterDocRef, { nextBillNumber: 2 });
+            billNumber = 1;
+          } else {
+            billNumber = counterDoc.data().nextBillNumber || 1;
+            transaction.update(counterDocRef, { nextBillNumber: billNumber + 1 });
+          }
+        });
+      } catch (e) { 
+        billNumber = Math.floor((Date.now() / 1000) % 100000); 
+      }
+
+      const formattedBillStr = formatBillNumber(billNumber);
+      const subtotal = getCartSubtotal();
+      const addOnsCost = getCartAddonsPrice();
+      const deliveryCharge = getDeliveryCharge();
+      const couponDiscount = getCouponDiscountAmount();
+      const finalTotal = getTotalBillPrice();
+      
+      const pointsEarned = Math.floor(finalTotal / 100);
+      const totalPointsCost = cart.reduce((acc: number, i: any) => acc + (i.pointsCost || 0), 0);
+
+      // --- SCREENSHOT UPLOAD TO FIREBASE STORAGE (WITH 10s ROBUST TIMEOUT) ---
+      let screenshotUrl = "";
+      if (paymentMethod === "upi" && paymentScreenshot) {
+        const toastId = toast.loading(isHindi ? "स्क्रीनशॉट अपलोड हो रहा है..." : "Uploading screenshot...");
+        try {
+          const storage = getStorage();
+          const storageRef = ref(storage, `payment_screenshots/bill_${formattedBillStr}_${Date.now()}.jpg`);
+          
+          const uploadPromise = uploadString(storageRef, paymentScreenshot, 'data_url').then(async (uploadResult) => {
+            return await getDownloadURL(uploadResult.ref);
+          });
+          
+          const timeoutPromise = new Promise<string>((_, reject) => 
+            setTimeout(() => reject(new Error("Timeout")), 10000)
+          );
+
+          screenshotUrl = await Promise.race([uploadPromise, timeoutPromise]);
+          toast.dismiss(toastId);
+        } catch (err) {
+          console.warn("Storage upload bypassed (Proceeding with local base64):", err);
+          toast.dismiss(toastId);
+        }
+      }
+
+      const orderObj = {
+        billNumber, tokenNumber, deliveryPin, customerName: customerDetails.name, customerPhone: customerDetails.phone,
+        address: fulfillmentType === "delivery" ? address : `Mode: ${fulfillmentType.toUpperCase()} ${fulfillmentType === 'table' ? `Table: ${tableNumber}` : ''}`, 
+        items: cart, subtotal, discount: couponDiscount, total: finalTotal, timestamp: new Date(), status: 'pending',
+        deliveryArea: fulfillmentType === "delivery" ? selectedArea.name : fulfillmentType.toUpperCase(), noCutlery, ketchupAddon, oreganoAddon, chiliFlakesAddon,
+        fulfillmentType, tableNumber: fulfillmentType === "table" ? tableNumber : "", paymentMethod,
+        paymentScreenshot: paymentScreenshot || "",
+        screenshotUrl: screenshotUrl || ""
+      };
+
+      await addDoc(collection(db, "orders"), orderObj);
+      const phoneClean = customerDetails.phone.replace("+91", "");
+      if (pointsEarned > 0 || totalPointsCost > 0) {
+        await setDoc(doc(db, "customer_points", phoneClean), {
+          name: customerDetails.name, phone: phoneClean, points: increment(pointsEarned - totalPointsCost), lastActive: new Date()
+        }, { merge: true });
+
+        if (pointsEarned > 0) {
+          await addDoc(collection(db, "customer_points", phoneClean, "history"), {
+            type: 'earn',
+            points: pointsEarned,
+            description: `Ordered Bill #${formattedBillStr} 🍕`,
+            timestamp: new Date()
+          });
+        }
+        if (totalPointsCost > 0) {
+          await addDoc(collection(db, "customer_points", phoneClean, "history"), {
+            type: 'redeem',
+            points: totalPointsCost,
+            description: `Redeemed rewards on Bill #${formattedBillStr} 🎁`,
+            timestamp: new Date()
+          });
+        }
+      }
+
+      const updatedPastOrders = [orderObj, ...pastOrders];
+      setPastOrders(updatedPastOrders);
+      localStorage.setItem('bb_past_orders', JSON.stringify(updatedPastOrders));
+      setLastPlacedOrder(orderObj);
+
+      let itemsText = "";
+      cart.forEach((i: any) => {
+        itemsText += `• ${i.name || "Item"} x${i.quantity || 1} - ₹${(i.price || 0) * (i.quantity || 1)}\n`;
+        if (i.note) {
+          itemsText += `  └─ *Note:* ${i.note}\n`;
+        }
+      });
+      
+      if (ketchupAddon) itemsText += `• Extra Tomato Ketchup x1 - ₹10\n`;
+      if (oreganoAddon) itemsText += `• Extra Oregano x1 - ₹10\n`;
+      if (chiliFlakesAddon) itemsText += `• Extra Chili Flakes x1 - ₹10\n`;
+      if (noCutlery) itemsText += `🌱 (Eco-Friendly: No plastic cutlery requested)\n`;
+
+      const refCode = getReferralCode();
+      const modeLabel = fulfillmentType === "delivery" ? `Delivery (${selectedArea.name})` : fulfillmentType === "pickup" ? "Self-Pickup 🛍️" : `Dine-In (Table: ${tableNumber}) 🍽️`;
+      const payModeLabel = paymentMethod === "cod" 
+        ? (fulfillmentType === "delivery" ? "Cash on Delivery (COD) 💵" : "Cash at Counter 💵")
+        : "UPI Online Payment 📱";
+
+      let msg = `🔥 *BAM BAM CAFE - NEW ORDER*\n\n`;
+      msg += `*Bill No:* #${formattedBillStr}\n`;
+      msg += `*Token No:* #${tokenNumber}\n`;
+      msg += `*Customer:* ${customerDetails.name}\n`;
+      msg += `*Phone:* ${customerDetails.phone}\n`;
+      msg += `*Fulfillment Mode:* ${modeLabel}\n`;
+      
+      if (fulfillmentType === 'delivery') {
+        msg += `*Address:* ${address}\n`;
+      }
+      msg += `*Payment Method:* ${payModeLabel}\n\n`;
+
+      msg += `*ITEMS:*\n${itemsText}\n`;
+      msg += `*Subtotal:* ₹${subtotal + addOnsCost}\n`;
+      msg += `*Coupon Discount:* -₹${couponDiscount}\n`;
+      
+      if (fulfillmentType === 'delivery') {
+        msg += `*Delivery:* ₹${deliveryCharge}\n`;
+      }
+      msg += `*TOTAL BILL: ₹${finalTotal}*\n\n`;
+
+      if (fulfillmentType === 'delivery') {
+        msg += `🔑 *Delivery PIN:* ${deliveryPin} (Rider ko ye confirm karke hi order le)\n`;
+      }
+      
+      msg += `*Invite Code:* ${refCode}\n`;
+      msg += `*Points Earned:* +${pointsEarned} Pts\n`;
+      if (totalPointsCost > 0) {
+        msg += `*Points Redeemed:* -${totalPointsCost} Pts\n`;
+      }
+
+      if (paymentMethod === "upi") {
+        if (screenshotUrl) {
+          msg += `\n📸 *Payment Screenshot Link (JPG):*\n${screenshotUrl}\n`;
+        } else {
+          msg += `\n📸 *भुगतान स्क्रीनशॉट:* बिल #${formattedBillStr} के साथ डेटाबेस में सफलतापूर्वक सेव कर दिया गया है!\n`;
+        }
+      }
+
+      msg += `\n_Confirm order by replying 'YES'_`;
+      
+      playSoundEffect('success');
+      setConfettiActive(true);
+      setTimeout(() => setConfettiActive(false), 5000);
+
+      try {
+        await navigator.clipboard.writeText(msg);
+        toast.success(isHindi ? "ऑर्डर विवरण कॉपी कर लिया गया है!" : "Order details copied to clipboard!");
+      } catch (err) {}
+
+      setTimeout(() => {
+        window.open(`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(msg)}`, '_blank');
+        clearCart(); 
+        setKetchupAddon(false);
+        setOreganoAddon(false);
+        setChiliFlakesAddon(false);
+        setNoCutlery(false);
+        setAppliedCoupon(null); 
+        setEnteredCoupon(""); 
+        setIsCartOpen(false);
+        setPaymentScreenshot(null);
+        setIsUpiPopupOpen(false);
+      }, 1500);
+
+    } catch (error) {
+      console.error("Critical submission error caught:", error);
+      toast.error(isHindi ? "ऑर्डर जमा करने में समस्या आई! दोबारा कोशिश करें।" : "Error submitting order. Please try again.");
+    } finally {
+      setIsSubmittingOrder(false);
+    }
+  };
+
+  const handleCheckoutClick = () => {
+    triggerHaptic();
+    if (!customerDetails) {
+      setIsProfileOpen(true);
+      toast.error(isHindi ? "कृपया पहले अपनी प्रोफाइल कस्टमाइज़ करें!" : "Please set up your profile first!");
+      return;
+    }
+    if (paymentMethod === "upi") {
+      setIsUpiPopupOpen(true);
+    } else {
+      sendWhatsAppOrder();
+    }
+  };
+
   const handleDismissInstallBanner = () => {
     triggerHaptic();
     setShowInstallBanner(false);
@@ -749,379 +975,6 @@ export default function BbCafeHome() {
       toast.error(isHindi ? "कूपन जांचने में समस्या आई!" : "Error applying coupon!");
     }
   };
-
-  const handleCheckoutClick = () => {
-    triggerHaptic();
-    if (!customerDetails) {
-      setIsProfileOpen(true);
-      toast.error(isHindi ? "कृपया पहले अपनी प्रोफाइल कस्टमाइज़ करें!" : "Please set up your profile first!");
-      return;
-    }
-    if (paymentMethod === "upi") {
-      setIsUpiPopupOpen(true);
-    } else {
-      sendWhatsAppOrder();
-    }
-  };
-
-  const handleGiftPoints = async (e: React.FormEvent) => {
-    e.preventDefault();
-    triggerHaptic();
-    
-    if (!customerDetails?.phone) {
-      toast.error(isHindi ? "कृपया पहले अपनी प्रोफाइल कस्टमाइज़ करें!" : "Please set up your profile first!");
-      return;
-    }
-    
-    const senderPhoneClean = customerDetails.phone.replace("+91", "").trim();
-    const receiverPhoneClean = giftPhone.trim();
-    const pointsToGift = Number(giftPointsAmount);
-
-    if (!receiverPhoneClean || receiverPhoneClean.length !== 10) {
-      toast.error(isHindi ? "गिफ्ट प्राप्तकर्ता का नंबर 10 अंकों का होना चाहिए!" : "Friend's number must be 10 digits!");
-      return;
-    }
-    if (senderPhoneClean === receiverPhoneClean) {
-      toast.error(isHindi ? "आप स्वयं को पॉइंट्स गिफ्ट नहीं कर सकते!" : "You cannot gift points to yourself!");
-      return;
-    }
-    if (isNaN(pointsToGift) || pointsToGift <= 0) {
-      toast.error(isHindi ? "कृपया सही पॉइंट्स संख्या दर्ज करें!" : "Please enter a valid amount of points!");
-      return;
-    }
-    if (customerPoints < pointsToGift) {
-      toast.error(isHindi ? "आपके पास पर्याप्त पॉइंट्स उपलब्ध नहीं हैं!" : "You do not have enough points!");
-      return;
-    }
-    if (giftSenderPin !== customerDetails.pin) {
-      toast.error(isHindi ? "सुरक्षा पिन गलत है!" : "Invalid security PIN!");
-      return;
-    }
-
-    setIsGiftingLoading(true);
-    const toastId = toast.loading(isHindi ? "पॉइंट्स ट्रांसफर किए जा रहे हैं..." : "Transferring points...");
-
-    try {
-      const receiverDocRef = doc(db, "customer_points", receiverPhoneClean);
-      const receiverSnap = await getDoc(receiverDocRef);
-
-      if (!receiverSnap.exists()) {
-        toast.dismiss(toastId);
-        toast.error(isHindi ? "गिफ्ट पाने वाले का नंबर पंजीकृत नहीं है!" : "The receiver's number is not registered!");
-        setIsGiftingLoading(false);
-        return;
-      }
-
-      const senderDocRef = doc(db, "customer_points", senderPhoneClean);
-
-      await runTransaction(db, async (transaction) => {
-        const senderSnap = await transaction.get(senderDocRef);
-        if (!senderSnap.exists()) throw new Error("Sender records not found.");
-        
-        const currentSenderPoints = senderSnap.data().points || 0;
-        if (currentSenderPoints < pointsToGift) throw new Error("Insufficient points balance.");
-
-        transaction.update(senderDocRef, { points: increment(-pointsToGift) });
-        transaction.update(receiverDocRef, { points: increment(pointsToGift) });
-      });
-
-      await addDoc(collection(db, "customer_points", senderPhoneClean, "history"), {
-        type: 'redeem',
-        points: pointsToGift,
-        description: `Gifted points to ${receiverPhoneClean} 🎁`,
-        timestamp: new Date()
-      });
-
-      await addDoc(collection(db, "customer_points", receiverPhoneClean, "history"), {
-        type: 'earn',
-        points: pointsToGift,
-        description: `Received points from ${senderPhoneClean} 🎁`,
-        timestamp: new Date()
-      });
-
-      setCustomerPoints(prev => prev - pointsToGift);
-      toast.dismiss(toastId);
-      toast.success(isHindi ? "पॉइंट्स गिफ्ट कर दिए गए!" : "Points gifted successfully!");
-      
-      setIsGiftModalOpen(false);
-      setGiftPhone("");
-      setGiftPointsAmount("");
-      setGiftSenderPin("");
-    } catch (err: any) {
-      toast.dismiss(toastId);
-      toast.error(isHindi ? `स्थानांतरण विफल: ${err.message}` : `Transfer failed: ${err.message}`);
-    } finally {
-      setIsGiftingLoading(false);
-    }
-  };
-
-  const handleDetectLocation = () => {
-    triggerHaptic();
-    if (typeof window === "undefined" || !navigator.geolocation) {
-      toast.error(isHindi ? "जियोलोकेशन आपके डिवाइस पर समर्थित नहीं है।" : "Geolocation is not supported by your device.");
-      return;
-    }
-
-    const toastId = toast.loading(isHindi ? "लोकेशन खोजी जा रही है..." : "Detecting live location...");
-    
-    const successCallback = (position: any) => {
-      const { latitude, longitude } = position.coords;
-      const distance = calculateDistanceInKm(latitude, longitude, storeCoordinates.lat, storeCoordinates.lng);
-      setDistanceKm(Number(distance.toFixed(2)));
-
-      const gpsUrl = `https://www.google.com/maps?q=${latitude.toFixed(6)},${longitude.toFixed(6)}`;
-      setAddress(gpsUrl);
-      toast.dismiss(toastId);
-      toast.success(isHindi ? "लोकेशन सफलतापूर्वक डिटेक्ट की गई!" : "Location successfully detected!");
-    };
-
-    const errorCallback = (error: any) => {
-      if (error.code === error.TIMEOUT) {
-        navigator.geolocation.getCurrentPosition(
-          successCallback,
-          () => {
-            toast.dismiss(toastId);
-            toast.error(isHindi ? "लोकेशन एक्सेस करने में असमर्थ।" : "Unable to retrieve your location.");
-          },
-          { enableHighAccuracy: false, timeout: 10000 }
-        );
-      } else {
-        toast.dismiss(toastId);
-        toast.error(isHindi ? "लोकेशन एक्सेस करने में असमर्थ। कृपया जीपीएस अनुमति की जांच करें।" : "Unable to retrieve location. Please check GPS permission.");
-      }
-    };
-
-    navigator.geolocation.getCurrentPosition(
-      successCallback,
-      errorCallback,
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
-    );
-  };
-
-  const handleShareApp = async () => {
-    triggerHaptic();
-    const shareText = isHindi 
-      ? `बम बम कैफ़े से स्वादिष्ट भोजन आर्डर करें! मेरा इनवाइट कोड इस्तेमाल करें: ${getReferralCode()} 🍕` 
-      : `Order delicious food from Bum Bum Cafe! Use my invite code: ${getReferralCode()} 🍕`;
-    
-    const shareUrl = typeof window !== 'undefined' ? window.location.href : 'https://bbcafe.in';
-
-    const performClipboardCopy = () => {
-      navigator.clipboard.writeText(`${shareText} ${shareUrl}`);
-      toast.success(isHindi ? "शेयर लिंक क्लिपबोर्ड पर कॉपी हो गया!" : "Share link copied to clipboard!");
-      updateShareCount();
-    };
-
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: 'Bum Bum Cafe',
-          text: shareText,
-          url: shareUrl,
-        });
-        updateShareCount();
-      } catch (err) {
-        performClipboardCopy();
-      }
-    } else {
-      performClipboardCopy();
-    }
-  };
-
-  const updateShareCount = async () => {
-    const nextCount = shareCount + 1;
-    setShareCount(nextCount);
-    if (nextCount % 5 === 0 && customerDetails?.phone) {
-      const phoneClean = customerDetails.phone.replace("+91", "").trim();
-      const userDocRef = doc(db, "customer_points", phoneClean);
-      try {
-        await setDoc(userDocRef, {
-          points: increment(1)
-        }, { merge: true });
-        
-        await addDoc(collection(db, "customer_points", phoneClean, "history"), {
-          type: 'earn',
-          points: 1,
-          description: `Shared app 5 times! 🎁`,
-          timestamp: new Date()
-        });
-        setCustomerPoints(p => p + 1);
-        toast.success(isHindi ? "मुफ़्त +1 पॉइंट आपके अकाउंट में जोड़ा गया!" : "Free +1 point added to your account!");
-      } catch (err) {
-        console.error(err);
-      }
-    }
-  };
-
-  const handleCustomerRedeem = (ruleId: string, rewardName: string, pointsCost: number) => {
-    triggerHaptic();
-    if (!customerDetails?.phone) {
-      toast.error(isHindi ? "कृपया पहले प्रोफाइल बनाएं!" : "Please create profile first!");
-      return;
-    }
-    
-    addItem({
-      id: ruleId,
-      name: rewardName,
-      price: 0,
-      quantity: 1,
-      isReward: true,
-      pointsCost: pointsCost,
-      category: "Special"
-    });
-    
-    toast.success(isHindi ? `${rewardName} आपके कार्ट में मुफ़्त जोड़ा गया!` : `${rewardName} added to your cart for free!`);
-  };
-
-  const handleAddDiyPizzaToCart = () => {
-    triggerHaptic();
-    if (calculatedDiyPizzaPrice <= 0) {
-      toast.error(isHindi ? "कृपया कोई आकार और सामग्री चुनें!" : "Please choose a size and toppings!");
-      return;
-    }
-
-    const toppingsList: string[] = [];
-    Object.entries(diyVegSelection).forEach(([v, selected]) => { if (selected) toppingsList.push(v); });
-    Object.entries(diyPremiumToppings).forEach(([t, selected]) => { if (selected) toppingsList.push(t); });
-    
-    const description = `${diySize.toUpperCase()} Base, Sauce: ${diySauce ? 'Yes' : 'No'}, Cheese: ${diyMozzarella ? 'Yes' : 'No'}, Toppings: ${toppingsList.join(', ') || 'None'}`;
-
-    addItem({
-      id: `diy-pizza-${Date.now()}`,
-      name: isHindi ? `डीआईवाई पिज्जा (${diySize})` : `DIY Pizza (${diySize})`,
-      price: calculatedDiyPizzaPrice,
-      quantity: 1,
-      note: diyChefNote || description,
-      category: "DIY Pizza"
-    });
-
-    setDiySize("small");
-    setDiySauce(true);
-    setDiyMozzarella(true);
-    setDiyVegSelection({ onion: false, tomato: false, capsicum: false, corn: false });
-    setDiyPremiumToppings({ black_olive: false, jalapeno: false, red_peprica: false, paneer: false, mushroom: false });
-    setDiyChefNote("");
-
-    toast.success(isHindi ? "कास्ट पिज्जा कार्ट में जोड़ा गया!" : "Your custom Pizza has been added to cart!");
-  };
-
-  const handleNormalPizzaAdd = () => {
-    triggerHaptic();
-    if (!normalPizzaSize) {
-      toast.error(isHindi ? "कृपया साइज चुनें!" : "Please select size!");
-      return;
-    }
-
-    let finalPrice = normalPizzaPrice;
-    const selectedAddons: string[] = [];
-    
-    Object.entries(normalPizzaAddons).forEach(([addon, isSelected]) => {
-      if (isSelected) {
-        const cost = PIZZA_ADDONS[normalPizzaSize.toLowerCase()]?.[addon] || 0;
-        finalPrice += cost;
-        selectedAddons.push(addon);
-      }
-    });
-
-    const noteParts = [];
-    if (selectedAddons.length > 0) noteParts.push(`Add-ons: ${selectedAddons.join(', ')}`);
-    if (chefNote) noteParts.push(`Note: ${chefNote}`);
-
-    addItem({
-      id: `${selectedProduct.id}-${normalPizzaSize.toLowerCase()}`,
-      name: `${selectedProduct.name} (${normalPizzaSize.toUpperCase()})`,
-      price: finalPrice,
-      quantity: 1,
-      note: noteParts.join(' | '),
-      category: selectedProduct.category
-    });
-
-    setSelectedProduct(null);
-    setNormalPizzaSize("");
-    setNormalPizzaPrice(0);
-    setNormalPizzaAddons({});
-    setChefNote("");
-
-    toast.success(isHindi ? "कस्टमाइज्ड पिज्जा कार्ट में जोड़ा गया!" : "Customized Pizza added to cart!");
-  };
-
-  const handleReelEnded = () => {
-    triggerHaptic();
-    setActiveStory(null);
-  };
-
-  const handleQuickAddFromStory = (title: string, price: number) => {
-    triggerHaptic();
-    const matchedItem = menu.find(item => item.name?.toLowerCase() === title?.toLowerCase());
-    if (matchedItem) {
-      addItem(matchedItem);
-    } else {
-      addItem({
-        id: `story-${title.replace(/\s+/g, '-').toLowerCase()}`,
-        name: title,
-        price: price,
-        quantity: 1,
-        category: "Fast Food"
-      });
-    }
-    setActiveStory(null);
-    toast.success(isHindi ? "आइटम कार्ट में जोड़ा गया!" : "Item added to cart!");
-  };
-
-  // --- Real-time Watchers ---
-  useEffect(() => {
-    if (!customerDetails?.phone) {
-      setCustomerPoints(0);
-      setPointsHistory([]);
-      setLiveOrder(null);
-      return;
-    }
-    
-    const phoneClean = customerDetails.phone.replace("+91", "").trim();
-    
-    const unsubPoints = onSnapshot(doc(db, "customer_points", phoneClean), (snap) => {
-      if (snap.exists()) {
-        setCustomerPoints(snap.data().points || 0);
-      }
-    }, (error) => console.warn("Points live check subscription bypassed:", error));
-
-    const unsubHistory = onSnapshot(
-      query(collection(db, "customer_points", phoneClean, "history"), orderBy("timestamp", "desc")),
-      (snap) => {
-        setPointsHistory(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-      },
-      (error) => console.warn("Points history subscription bypassed:", error)
-    );
-
-    const unsubLive = onSnapshot(
-      query(
-        collection(db, "orders"),
-        where("customerPhone", "==", customerDetails.phone),
-        orderBy("timestamp", "desc"),
-        limit(1)
-      ),
-      (snap) => {
-        if (!snap.empty) {
-          const latestOrder = { id: snap.docs[0].id, ...snap.docs[0].data() } as any;
-          const dismissedRejected = JSON.parse(localStorage.getItem('bb_dismissed_rejected_orders') || '[]');
-          if (latestOrder.status !== 'completed' && !dismissedRejected.includes(latestOrder.id)) {
-            setLiveOrder(latestOrder);
-          } else {
-            setLiveOrder(null);
-          }
-        } else {
-          setLiveOrder(null);
-        }
-      },
-      (error) => console.warn("Live order subscription bypassed (index may be building):", error)
-    );
-
-    return () => {
-      unsubPoints();
-      unsubHistory();
-      unsubLive();
-    };
-  }, [customerDetails?.phone]);
 
   // --- Search Debouncing & Hinglish Optimizer ---
   useEffect(() => {
@@ -1422,7 +1275,7 @@ export default function BbCafeHome() {
               {isHindi ? "बम बम कैफ़े" : "Bum Bum Cafe"}
             </h1>
             <p className="text-[9px] text-gray-300 font-bold">
-              {isHindi ? "पिज्जा, स्पेशल सैंडविच और पनीर डिलाइट्स तुरंत आदेश करें!" : "Order Pizza, Special Sandwich & Paneer Delights instantly!"}
+              {isHindi ? "पिज्जा, स्पेशल सैंडविच और पनीर डिलाइट्स तुरंत आदेश करें!" : "Order Pizza, Special Sandwich & Pure Paneer Delights instantly!"}
             </p>
           </motion.div>
           <button 
