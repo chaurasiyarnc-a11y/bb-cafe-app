@@ -176,7 +176,6 @@ export default function BbCafeHome() {
   const [oreganoAddon, setOreganoAddon] = useState(false);
   const [chiliFlakesAddon, setChiliFlakesAddon] = useState(false);
 
-  const [noCutlery, setNoCutlery] = useState(false);
   const [selectedArea, setSelectedArea] = useState(DELIVERY_AREAS[0]);
   const [favorites, setFavorites] = useState<string[]>([]);
   const [, setLastPlacedOrder] = useState<any>(null);
@@ -343,10 +342,6 @@ export default function BbCafeHome() {
 
   // --- CALCULATION MEMOS ---
 
-  const ecoCutlerySaves = useMemo(() => {
-    return pastOrders.filter(o => o.noCutlery === true).length;
-  }, [pastOrders]);
-
   const greetingText = useMemo(() => {
     const now = new Date();
     const hours = now.getHours();
@@ -437,7 +432,7 @@ export default function BbCafeHome() {
     });
 
     const listWithoutSpecial = result.filter(c => c !== "All" && c !== "DIY Pizza");
-    const finalized = ["All", ...listWithoutSpecial]; // "DIY Pizza" को श्रेणियों से हटाया गया
+    const finalized = ["All", ...listWithoutSpecial]; // DIY Pizza removed!
 
     return Array.from(new Set(finalized));
   }, [dbCategories]);
@@ -995,7 +990,7 @@ export default function BbCafeHome() {
         billNumber, tokenNumber, deliveryPin, customerName: customerDetails.name, customerPhone: customerDetails.phone,
         address: fulfillmentType === "delivery" ? address : `Mode: ${fulfillmentType.toUpperCase()} ${fulfillmentType === 'table' ? `Table: ${tableNumber}` : ''}`, 
         items: cart, subtotal, discount: couponDiscount, total: finalTotal, timestamp: new Date(), status: 'pending',
-        deliveryArea: fulfillmentType === "delivery" ? selectedArea.name : fulfillmentType.toUpperCase(), noCutlery, ketchupAddon, oreganoAddon, chiliFlakesAddon,
+        deliveryArea: fulfillmentType === "delivery" ? selectedArea.name : fulfillmentType.toUpperCase(), ketchupAddon, oreganoAddon, chiliFlakesAddon,
         fulfillmentType, tableNumber: fulfillmentType === "table" ? tableNumber : "", paymentMethod,
         paymentScreenshot: paymentScreenshot || "",
         screenshotUrl: screenshotUrl || ""
@@ -1042,7 +1037,6 @@ export default function BbCafeHome() {
       if (ketchupAddon) itemsText += `• Extra Tomato Ketchup x1 - ₹10\n`;
       if (oreganoAddon) itemsText += `• Extra Oregano x1 - ₹10\n`;
       if (chiliFlakesAddon) itemsText += `• Extra Chili Flakes x1 - ₹10\n`;
-      if (noCutlery) itemsText += `🌱 (Eco-Friendly: No plastic cutlery requested)\n`;
 
       const refCode = getReferralCode();
       const modeLabel = fulfillmentType === "delivery" ? `Delivery (${selectedArea.name})` : fulfillmentType === "pickup" ? "Self-Pickup 🛍️" : `Dine-In (Table: ${tableNumber}) 🍽️`;
@@ -1106,7 +1100,6 @@ export default function BbCafeHome() {
         setKetchupAddon(false);
         setOreganoAddon(false);
         setChiliFlakesAddon(false);
-        setNoCutlery(false);
         setAppliedCoupon(null); 
         setEnteredCoupon(""); 
         setIsCartOpen(false);
@@ -1392,15 +1385,6 @@ export default function BbCafeHome() {
       }
     };
   }, []);
-
-  if (!mounted) {
-    return (
-      <div className="min-h-screen bg-neutral-950 flex flex-col items-center justify-center text-white">
-        <Loader2 className="animate-spin text-orange-500 mb-2" size={32} />
-        <span className="text-xs font-bold uppercase tracking-wider">Bum Bum Cafe Loading...</span>
-      </div>
-    );
-  }
 
   return (
     <div className="dark:bg-[#050505] bg-neutral-50 min-h-screen dark:text-white text-neutral-800 pb-32 font-sans relative overflow-x-clip transition-colors duration-200">
@@ -1991,7 +1975,9 @@ export default function BbCafeHome() {
       {/* (5) PROFILE & LOYALTY DATABASE DRAWER */}
       <ProfileDrawerAny 
         isOpen={isProfileOpen}
+        open={isProfileOpen}
         onClose={() => setIsProfileOpen(false)}
+        onOpenChange={(val: boolean) => !val && setIsProfileOpen(false)}
         customerDetails={customerDetails}
         setCustomerDetails={setCustomerDetails}
         tempName={tempName}
@@ -2003,7 +1989,6 @@ export default function BbCafeHome() {
         tempRefCode={tempRefCode}
         setTempRefCode={setTempRefCode}
         handleSaveDetails={handleSaveDetails}
-        ecoCutlerySaves={ecoCutlerySaves}
         customerPoints={customerPoints}
         pointsHistory={pointsHistory}
         shareCount={shareCount}
@@ -2047,8 +2032,6 @@ export default function BbCafeHome() {
         handleDetectLocation={handleDetectLocation}
         tableNumber={tableNumber}
         setTableNumber={setTableNumber}
-        noCutlery={noCutlery}
-        setNoCutlery={setNoCutlery}
         enteredCoupon={enteredCoupon}
         setEnteredCoupon={setEnteredCoupon}
         appliedCoupon={appliedCoupon}
