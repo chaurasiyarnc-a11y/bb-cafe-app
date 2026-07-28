@@ -24,7 +24,7 @@ import ProfileDrawer from '@/components/home/ProfileDrawer';
 import ReelsViewer from '@/components/home/ReelsViewer';
 import ReviewFormModal from '@/components/home/ReviewFormModal';
 
-// TypeScript कंपाइलर एरर को पूरी तरह से बाईपास करने के लिए cast any किया गया है
+// TypeScript JSX वैलिडेशन एरर को बायपास करने के लिए cast any किया गया है
 const ReviewFormModalAny = ReviewFormModal as any;
 
 const FALLBACK_CATEGORIES = ["All", "Special Pizza", "Special Thali", "Paneer Special", "Special Mix veg", "Fast Food", "Super Cool", "Indian Bread", "Special Rice"];
@@ -2179,7 +2179,7 @@ export default function BbCafeHome() {
               
               <p className="text-[11.5px] text-neutral-800 dark:text-gray-300 leading-relaxed max-w-sm mx-auto font-medium">
                 {isHindi ? 
-                  "हमने BAM BAM CAFE की शुरुआत एक छोटे से सपने के साथ की थी—लोगों को घर जैसा स्वाद और कैफे वाला माहौल देने के लिए।  यहाँ हर कप कॉफी और हर स्लाइस पिज्जा प्यार और शुद्धता के साथ बनाया जाता है।  हमारी कोशिश है कि आप जब भी यहाँ आएँ, एक प्यारी मुस्कान के साथ वापस जाएँ।  ❤️" :
+                  "हमने BAM BAM CAFE की शुरुआत एक छोटे से सपने के साथ की थी—लोगों को घर जैसा स्वाद और कैफे वाला माहौल देने के लिए।  हमारी कोशिश है कि आप जब भी यहाँ आएँ, एक प्यारी मुस्कान के साथ वापस जाएँ।  ❤️" :
                   "We started BAM BAM CAFE with a simple dream - to serve hygienic, delicious, home-style fast food in Mohandra town. Every slice of pizza and plate of thali here is crafted with ultimate love, purity and hygiene. Feel free to dine-in or order online! ❤️"
                 }
               </p>
@@ -2298,6 +2298,7 @@ export default function BbCafeHome() {
         setSelectedProduct={setSelectedProduct}
         normalPizzaSize={normalPizzaSize}
         setNormalPizzaSize={setNormalPizzaSize}
+        normalPizzaPrice={normalPizzaPrice}
         setNormalPizzaPrice={setNormalPizzaPrice}
         normalPizzaAddons={normalPizzaAddons}
         setNormalPizzaAddons={setNormalPizzaAddons}
