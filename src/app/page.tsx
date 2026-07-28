@@ -9,7 +9,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
 import { useCartStore } from '../store/useCartStore';
 
-// --- components/home/ फ़ोल्डर से इम्पोर्ट्स (१२ कम्पोनेंट्स) ---
+// --- सभी १२ कंपोनेंट्स सीधे 'components/home/' फ़ोल्डर से इम्पोर्ट हो रहे हैं ---
 import CategorySlider from '../components/home/CategorySlider';
 import DiyPizzaBuilder from '../components/home/DiyPizzaBuilder';
 import CartDrawer from '../components/home/CartDrawer';
@@ -1264,19 +1264,19 @@ export default function BbCafeHome() {
     const unsubLive = onSnapshot(
       query(
         collection(db, "orders"),
-        where("customerPhone", "==", customerDetails.phone) // केवल फ़ोन नंबर से फ़िल्टर (नो इंडेक्स नीडेड)
+        where("customerPhone", "==", customerDetails.phone) 
       ),
       (snap) => {
         if (!snap.empty) {
           const userOrders = snap.docs.map(doc => ({ id: doc.id, ...doc.data() as any }));
           
-          // मोबाइल के अंदर ही केवल एक्टिव आर्डर्स को फ़िल्टर करें (pending, preparing, out_for_delivery)
+          // केवल एक्टिव आर्डर्स को ही फ़िल्टर करें (pending, preparing, out_for_delivery)
           const activeOrders = userOrders.filter(o => 
             o.status === 'pending' || o.status === 'preparing' || o.status === 'out_for_delivery'
           );
 
           if (activeOrders.length > 0) {
-            // मोबाइल के अंदर ही तारीख के हिसाब से सबसे नया आर्डर सॉर्ट करें
+            // मोबाइल के अंदर ही सबसे नया आर्डर सॉर्ट करें
             activeOrders.sort((a, b) => {
               const tA = a.timestamp?.toDate ? a.timestamp.toDate() : new Date(a.timestamp || 0);
               const tB = b.timestamp?.toDate ? b.timestamp.toDate() : new Date(b.timestamp || 0);
@@ -1287,12 +1287,12 @@ export default function BbCafeHome() {
             const dismissedRejected = JSON.parse(localStorage.getItem('bb_dismissed_rejected_orders') || '[]');
             
             if (!dismissedRejected.includes(latestActiveOrder.id)) {
-              setLiveOrder(latestActiveOrder); // लाइव ट्रैकर में सेट करें
+              setLiveOrder(latestActiveOrder); 
             } else {
               setLiveOrder(null);
             }
           } else {
-            // यदि कोई भी आर्डर एक्टिव नहीं है (डिलीवर हो गया है), तो मैप तुरंत बंद करें!
+            // यदि कोई भी आर्डर एक्टिव नहीं है, तो मैप बंद करें
             setLiveOrder(null);
           }
         } else {
@@ -1389,144 +1389,6 @@ export default function BbCafeHome() {
     return () => window.removeEventListener("popstate", handlePopState);
   }, [mounted, isCartOpen, isProfileOpen, isUpiPopupOpen]);
 
-  // --- INITIAL MOUNT & SWR BACKGROUND DATABASE SYNCHRONIZER ---
-  useEffect(() => {
-    setMounted(true);
-
-    const handleBeforeInstallPrompt = (e: Event) => {
-      e.preventDefault();
-      setDeferredPrompt(e);
-      const dismissed = localStorage.getItem('bb_app_installed_or_dismissed');
-      if (!dismissed) {
-        setShowInstallBanner(true);
-      }
-    };
-
-    const handleOnline = () => setIsOnline(true);
-    const handleOffline = () => setIsOnline(false);
-
-    if (typeof window !== "undefined") {
-      setIsOnline(window.navigator.onLine);
-      window.addEventListener("online", handleOnline);
-      window.addEventListener("offline", handleOffline);
-      window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
-    }
-
-    try {
-      const cachedMenu = localStorage.getItem('bb_cached_menu');
-      if (cachedMenu) setMenu(JSON.parse(cachedMenu));
-
-      const cachedSocial = localStorage.getItem('bb_cached_social_counts');
-      if (cachedSocial) setSocialCounts(JSON.parse(cachedSocial));
-
-      const cachedRules = localStorage.getItem('bb_cached_loyalty_rules');
-      if (cachedRules) setLoyaltyRules(JSON.parse(cachedRules));
-
-      const cachedCats = localStorage.getItem('bb_cached_categories');
-      if (cachedCats) setDbCategories(JSON.parse(cachedCats));
-
-      const cachedBanners = localStorage.getItem('bb_cached_banners');
-      if (cachedBanners) setBanners(JSON.parse(cachedBanners));
-
-      const cachedReels = localStorage.getItem('bb_cached_reels');
-      if (cachedReels) setStories(JSON.parse(cachedReels));
-
-      const cachedReviews = localStorage.getItem('bb_cached_reviews');
-      if (cachedReviews) setReviews(JSON.parse(cachedReviews));
-
-      const savedDetails = localStorage.getItem('bb_cafe_customer');
-      if (savedDetails) {
-        const parsed = JSON.parse(savedDetails);
-        if (parsed && parsed.name && parsed.phone) {
-          setCustomerDetails(parsed);
-          setTempName(parsed.name);
-          setTempPhone(parsed.phone.replace("+91", ""));
-        }
-      }
-
-      const cachedPast = localStorage.getItem('bb_past_orders');
-      if (cachedPast) setPastOrders(JSON.parse(cachedPast));
-
-      const cachedFavs = localStorage.getItem('bb_favorites');
-      if (cachedFavs) setFavorites(JSON.parse(cachedFavs));
-    } catch (e) {
-      console.warn("Local storage cache load bypassed:", e);
-    }
-
-    const fetchFreshDbData = async () => {
-      setMenuLoading(true);
-      try {
-        const storeSnap = await getDoc(doc(db, "settings", "store"));
-        if (storeSnap.exists()) {
-          const storeData = storeSnap.data();
-          setStoreOpen(storeData.isOpen);
-          setIsBannerEnabled(storeData.isBannerEnabled ?? storeData.showPromoBanner ?? true);
-          setIsInlineBannerEnabled(storeData.isInlineBannerEnabled ?? storeData.showInlinePromo ?? true);
-          if (storeData.whatsappNumber) setWhatsappNumber(storeData.whatsappNumber);
-          if (storeData.upiId) setUpiId(storeData.upiId);
-          if (storeData.latitude && storeData.longitude) {
-            setStoreCoordinates({ lat: Number(storeData.latitude), lng: Number(storeData.longitude) });
-          }
-          if (storeData.timingHindi) setStoreTimingHindi(storeData.timingHindi);
-          if (storeData.timingEnglish) setStoreTimingEnglish(storeData.timingEnglish);
-          if (storeData.closingMinutesLeft !== undefined) setClosingMinutesLeft(storeData.closingMinutesLeft);
-        }
-
-        const productsSnap = await getDocs(collection(db, "products"));
-        const items = productsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter((i: any) => i.isVisible !== false);
-        setMenu(shuffleArray(items));
-        localStorage.setItem('bb_cached_menu', JSON.stringify(items));
-
-        const catsSnap = await getDocs(collection(db, "categories"));
-        const cats = catsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-        setDbCategories(cats);
-        localStorage.setItem('bb_cached_categories', JSON.stringify(cats));
-
-        const bannersSnap = await getDocs(collection(db, "banners"));
-        const banData = bannersSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-        setBanners(banData);
-        localStorage.setItem('bb_cached_banners', JSON.stringify(banData));
-
-        const reelsSnap = await getDocs(collection(db, "reels"));
-        const reelData = reelsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-        setStories(reelData);
-        localStorage.setItem('bb_cached_reels', JSON.stringify(reelData));
-
-        const revsSnap = await getDocs(collection(db, "reviews"));
-        const revData = revsSnap.docs.map(d => ({ id: d.id, ...d.data() as any })).filter((r: any) => r.isApproved === true || r.isApproved === "approved" || r.approved === true);
-        setReviews(revData);
-        localStorage.setItem('bb_cached_reviews', JSON.stringify(revData));
-
-        const rulesSnap = await getDocs(collection(db, "loyalty_rules"));
-        const ruleData = rulesSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-        setLoyaltyRules(ruleData);
-        localStorage.setItem('bb_cached_loyalty_rules', JSON.stringify(ruleData));
-
-        const socialSnap = await getDoc(doc(db, "settings", "social_counts"));
-        if (socialSnap.exists()) {
-          const data = socialSnap.data();
-          setSocialCounts(data);
-          localStorage.setItem('bb_cached_social_counts', JSON.stringify(data));
-        }
-
-      } catch (err) {
-        console.warn("Background fetch warning (Offline Mode Active):", err);
-      } finally {
-        setMenuLoading(false);
-      }
-    };
-
-    fetchFreshDbData();
-
-    return () => { 
-      if (typeof window !== "undefined") {
-        window.removeEventListener("online", handleOnline);
-        window.removeEventListener("offline", handleOffline);
-        window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
-      }
-    };
-  }, []);
-
   return (
     <div className="dark:bg-[#050505] bg-neutral-50 min-h-screen dark:text-white text-neutral-800 pb-32 font-sans relative overflow-x-clip transition-colors duration-200">
       
@@ -1566,7 +1428,7 @@ export default function BbCafeHome() {
 
       {/* PREMIUM HERO HEADER */}
       <header className="relative pt-6 pb-4 px-4 overflow-hidden shadow-md flex flex-col justify-end min-h-[120px] bg-neutral-950 border-b dark:border-white/5 border-neutral-200">
-        <div className="relative z-20 max-w-[85%] mt-auto bg-black/40 backdrop-blur-sm p-2.5 rounded-xl border border-white/10 shadow-md">
+        <div className="relative z-20 max-w-[85%] mt-auto bg-black/40 backdrop-blur-sm p-2.5 rounded-xl border border-white/10 shadow-md font-bold">
           <motion.div
             initial={{ x: -25, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
@@ -1677,7 +1539,7 @@ export default function BbCafeHome() {
           </div>
         )}
 
-        {/* --- लाइव आर्डर लाइव रोड-मैप ट्रैकिंग (नॉन-इंडेक्स ऑप्टिमाइज्ड) --- */}
+        {/* --- लाइव आर्डर लाइव रोड-मैप ट्रैकिंग --- */}
         <LiveOrderTracker 
           isHindi={isHindi}
           liveOrder={liveOrder}
@@ -2258,7 +2120,7 @@ export default function BbCafeHome() {
           <PointsClaimModal 
             isHindi={isHindi}
             isClaimModalOpen={isClaimModalOpen}
-            setIsClaimModalOpen={setIsClaimOpen} // Sagi spelling fix for compilation
+            setIsClaimModalOpen={setIsClaimModalOpen} // टाइप एरर पूरी तरह हल (setIsClaimModalOpen कर दिया गया है)
             claimingPlatform={claimingPlatform}
             claimUsername={claimUsername}
             setClaimUsername={setClaimUsername}
