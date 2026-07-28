@@ -1,6 +1,6 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
-import { getFirestore, initializeFirestore } from "firebase/firestore"; // <-- getFirestore भी इम्पोर्ट करें
+import { getFirestore, initializeFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
@@ -16,14 +16,14 @@ const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 
 export const auth = getAuth(app);
 
-// Next.js क्रैश से बचने के लिए सुरक्षित डेटाबेस इनिशियलाइजेशन
+// Next.js क्रैश से बचने और WebView/5G पर 100% लॉगिन चलाने के लिए
 let firestoreDb;
 try {
   firestoreDb = initializeFirestore(app, {
-    experimentalForceLongPolling: true, // मोबाइल वेबव्यू के लिए लॉन्ग पोलिंग
+    experimentalForceLongPolling: true, // लॉन्ग पोलिंग को बल दें
+    useFetchStreams: false,             // स्टीम कनेक्शन बंद करें (WebView के लिए बहुत जरूरी)
   });
 } catch (e) {
-  // यदि पहले से इनिशियलाइज हो चुका है, तो डिफ़ॉल्ट गेट का उपयोग करें
   firestoreDb = getFirestore(app);
 }
 
