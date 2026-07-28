@@ -160,11 +160,6 @@ export default function BbCafeHome() {
   const [stories, setStories] = useState<any[]>([]);
   const [activeStory, setActiveStory] = useState<any | null>(null);
 
-  // Social Proof Alerts States
-  const [socialProofs, setSocialProofs] = useState<any[]>([]);
-  const [socialAlertIndex, setSocialAlertIndex] = useState(0);
-  const [showSocialAlert, setShowSocialAlert] = useState(false);
-
   // Social Media Point Claims States
   const [isClaimModalOpen, setIsClaimModalOpen] = useState(false);
   const [claimingPlatform, setClaimingPlatform] = useState<any>(null);
@@ -515,35 +510,40 @@ export default function BbCafeHome() {
   const handleSaveDetails = async (e: React.FormEvent) => {
     e.preventDefault();
     triggerHaptic();
-    if (!tempName || !tempPhone || tempPhone.length !== 10 || !tempPin || tempPin.length !== 4) {
-      toast.error(isHindi ? "कृपया सभी सही विवरण दर्ज करें!" : "Please enter correct details!");
+
+    // फ़ोन नंबर और पिन को साफ़ (sanitize) करना
+    const rawPhone = tempPhone.trim().replace(/\s+/g, '').replace(/^\+91/, '').replace(/\D/g, '');
+    const cleanPin = tempPin.trim().replace(/\D/g, '');
+
+    if (!tempName || rawPhone.length !== 10 || cleanPin.length !== 4) {
+      toast.error(isHindi ? "कृपया सभी सही विवरण दर्ज करें! (10 अंकों का फोन और 4 अंकों का पिन)" : "Please enter correct details! (10-digit phone & 4-digit PIN)");
       return;
     }
-    const phoneClean = tempPhone.trim();
-    const formattedPhone = `+91${phoneClean}`;
+    
+    const formattedPhone = `+91${rawPhone}`;
     
     const customerObj = {
       name: tempName.trim(),
       phone: formattedPhone,
-      pin: tempPin,
+      pin: cleanPin,
       refCode: tempRefCode.trim() || undefined
     };
     
     const toastId = toast.loading(isHindi ? "प्रोफाइल सहेज रहा है..." : "Saving profile...");
     try {
-      const userDocRef = doc(db, "customer_points", phoneClean);
+      const userDocRef = doc(db, "customer_points", rawPhone);
       const userSnap = await getDoc(userDocRef);
       
       if (!userSnap.exists()) {
         await setDoc(userDocRef, {
           name: customerObj.name,
-          phone: phoneClean,
+          phone: rawPhone,
           pin: customerObj.pin,
           points: tempRefCode ? 5 : 0, 
           lastActive: new Date()
         });
         if (tempRefCode) {
-          await addDoc(collection(db, "customer_points", phoneClean, "history"), {
+          await addDoc(collection(db, "customer_points", rawPhone, "history"), {
             type: 'earn',
             points: 5,
             description: 'Welcome Referral Bonus 🎁',
@@ -582,6 +582,7 @@ export default function BbCafeHome() {
     }
     setIsClaimingLoading(true);
     try {
+      const phoneClean = customerDetails.phone.replace("+91", "");
       await addDoc(collection(db, "point_claims"), {
         customerName: customerDetails.name,
         customerPhone: customerDetails.phone,
@@ -1033,6 +1034,7 @@ export default function BbCafeHome() {
       setPastOrders(updatedPastOrders);
       localStorage.setItem('bb_past_orders', JSON.stringify(updatedPastOrders));
       setLastPlacedOrder(orderObj);
+      setLiveOrder(orderObj); // नया ऑर्डर आते ही ग्राहक की स्क्रीन पर तुरंत लाइव ट्रैकर दिखाएं
 
       let itemsText = "";
       cart.forEach((i: any) => {
@@ -1228,7 +1230,39 @@ export default function BbCafeHome() {
     reader.readAsDataURL(file);
   };
 
-  // --- Real-Time Firestore Sync for Customer Points, Points History & Past Orders ---
+  // --- 1. ऑटोमैटिक रेफरल डिटेक्शन (URL Detect) ---
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const refParam = params.get('ref');
+      if (refParam) {
+        setTempRefCode(refParam.toUpperCase().trim());
+        const saved = localStorage.getItem('bb_cafe_customer');
+        if (!saved) {
+          setIsProfileOpen(true);
+          toast.success(isHindi 
+            ? `रेफरल कोड "${refParam}" अपने आप लागू हो गया है! बोनस 5 पॉइंट्स पाने के लिए प्रोफाइल सहेजें।` 
+            : `Referral code "${refParam}" applied automatically! Save your profile to claim 5 points.`
+          );
+        }
+      }
+    }
+  }, [isHindi]);
+
+  // --- 2. PWA सर्विस वर्कर रजिस्ट्रेशन ---
+  useEffect(() => {
+    if ('serviceWorker' in navigator && typeof window !== 'undefined') {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js').then((reg) => {
+          console.log('Service worker scope: ', reg.scope);
+        }).catch((err) => {
+          console.warn('Service worker registration failed: ', err);
+        });
+      });
+    }
+  }, []);
+
+  // --- 3. रियल-टाइम कस्टमर पॉइंट्स, पॉइंट्स हिस्ट्री और पास्ट आर्डर्स सिंकिंग ---
   useEffect(() => {
     if (!customerDetails?.phone) {
       setCustomerPoints(0);
@@ -1238,7 +1272,7 @@ export default function BbCafeHome() {
 
     const phoneClean = customerDetails.phone.replace("+91", "").trim();
 
-    // 1. Points document real-time sync
+    // कस्टमर पॉइंट्स रियल-टाइम सिंकिंग
     const pointsDocRef = doc(db, "customer_points", phoneClean);
     const unsubscribePoints = onSnapshot(pointsDocRef, (docSnap) => {
       if (docSnap.exists()) {
@@ -1250,7 +1284,7 @@ export default function BbCafeHome() {
       console.warn("Error subscribing to customer points:", err);
     });
 
-    // 2. Points History subcollection real-time sync
+    // कस्टमर पॉइंट्स हिस्ट्री रियल-टाइम सिंकिंग
     const historyCollRef = collection(db, "customer_points", phoneClean, "history");
     const historyQuery = query(historyCollRef, orderBy("timestamp", "desc"));
     const unsubscribeHistory = onSnapshot(historyQuery, (querySnap) => {
@@ -1264,7 +1298,7 @@ export default function BbCafeHome() {
       console.warn("Error subscribing to points history:", err);
     });
 
-    // 3. Past orders real-time sync
+    // पुराने सभी ऑर्डर्स रियल-टाइम सिंकिंग
     const ordersRef = collection(db, "orders");
     const ordersQuery = query(
       ordersRef,
@@ -1288,6 +1322,39 @@ export default function BbCafeHome() {
       unsubscribeHistory();
       unsubscribeOrders();
     };
+  }, [customerDetails]);
+
+  // --- 4. ग्राहकों के एक्टिव/सक्रिय आर्डर्स की लाइव ट्रैकिंग ---
+  useEffect(() => {
+    if (!customerDetails?.phone) {
+      setLiveOrder(null);
+      return;
+    }
+
+    const ordersRef = collection(db, "orders");
+    const activeOrdersQuery = query(
+      ordersRef,
+      where("customerPhone", "==", customerDetails.phone),
+      where("status", "in", ["pending", "preparing", "out_for_delivery", "preparing_food", "ready_for_pickup"])
+    );
+
+    const unsubscribeActiveOrder = onSnapshot(activeOrdersQuery, (querySnap) => {
+      if (!querySnap.empty) {
+        const sortedActiveDocs = querySnap.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data(),
+          timestamp: doc.data().timestamp?.toDate ? doc.data().timestamp.toDate() : doc.data().timestamp
+        })).sort((a: any, b: any) => b.timestamp - a.timestamp);
+        
+        setLiveOrder(sortedActiveDocs[0]);
+      } else {
+        setLiveOrder(null);
+      }
+    }, (err) => {
+      console.warn("Error listening to active orders:", err);
+    });
+
+    return () => unsubscribeActiveOrder();
   }, [customerDetails]);
 
   // --- INITIAL MOUNT & BACKGROUND DATABASE SYNCHRONIZER ---
@@ -1487,47 +1554,6 @@ export default function BbCafeHome() {
         <div className="bg-gradient-to-r from-amber-500 to-orange-600 text-white font-extrabold py-2 px-4 text-center text-[10px] flex items-center justify-center gap-1.5 shadow-md">
           <span>⏰</span>
           <span>आर्डर चेतावनी:  बम बम कैफ़े अगले {closingMinutesLeft} minute में बंद होने वाला है!  आर्डर जल्दी पूरा करें।</span>
-        </div>
-      )}
-
-      {/* Social Proof Toast Alert */}
-      <AnimatePresence>
-        {showSocialAlert && socialProofs.length > 0 && (
-          <motion.div 
-            initial={{ opacity: 0, y: 50, x: '-50%' }}
-            animate={{ opacity: 1, y: 0, x: '-50%' }}
-            exit={{ opacity: 0, y: 20, x: '-50%' }}
-            className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[100] bg-black/90 backdrop-blur-md border border-orange-500/30 text-white px-4 py-2.5 rounded-full shadow-2xl flex items-center gap-2 max-w-[90%] text-center"
-          >
-            <span className="text-sm">🔥</span>
-            <span className="text-[10px] font-black tracking-wide truncate text-white">{socialProofs[socialAlertIndex]?.text}</span>
-          </motion.div>
-        )}
-      </AnimatePresence>
-      
-      {confettiActive && (
-        <div className="fixed inset-0 pointer-events-none z-[999] overflow-hidden">
-          {Array.from({ length: 105 }).map((_, i) => (
-            <motion.div
-              key={i}
-              className="absolute w-2 h-2 rounded-full"
-              style={{
-                backgroundColor: ["#facc15", "#f97316", "#ef4444", "#3b82f6", "#10b981"][i % 5],
-                left: `${Math.random() * 100}%`,
-                top: `-10px`
-              }}
-              animate={{
-                y: [0, window.innerHeight],
-                x: [0, (Math.random() - 0.5) * 200],
-                rotate: [0, 360]
-              }}
-              transition={{
-                duration: 2 + Math.random() * 3,
-                ease: "easeOut",
-                repeat: Infinity
-              }}
-            />
-          ))}
         </div>
       )}
 
