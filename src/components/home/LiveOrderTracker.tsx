@@ -1,13 +1,14 @@
 'use client';
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { X, Phone } from 'lucide-react';
 
 interface LiveOrderTrackerProps {
   isHindi: boolean;
   liveOrder: any;
   setLiveOrder: (order: any) => void;
   formatBillNumber: (num: number) => string;
-  whatsappNumber: string;
+  whatsappNumber: string; // कैफ़े का डिफ़ॉल्ट नंबर
   triggerHaptic: (ms?: number) => void;
 }
 
@@ -94,13 +95,14 @@ export default function LiveOrderTracker({
           </div>
 
           <div className="flex gap-2">
+            {/* नया: सीधे फ़ोन कॉल का बटन (व्हाट्सएप ट्रैकिंग की जगह इसे जोड़ा गया है) */}
             <a 
-              href={`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(`नमस्ते बम बम कैफ़े! कृपया मेरे आर्डर नंबर #${formatBillNumber(liveOrder.billNumber)} (टोकन नंबर: #${liveOrder.tokenNumber}) का लाइव स्टेटस बताएं।`)}`}
-              target="_blank"
-              rel="noreferrer"
-              className="flex-1 bg-white/5 hover:bg-white/10 text-center text-[10px] text-yellow-400 py-3 rounded-xl border border-white/5 transition-all"
+              href={`tel:+${whatsappNumber}`}
+              onClick={() => triggerHaptic(20)}
+              className="flex-1 bg-green-600 hover:bg-green-700 text-white text-center text-[10px] py-3 rounded-xl border border-transparent transition-all flex items-center justify-center gap-1 uppercase"
             >
-              Track Live Status on WA 🔍
+              <Phone size={12} />
+              <span>{isHindi ? "कैफ़े को कॉल करें" : "Call Cafe"}</span>
             </a>
             <button 
               type="button"
