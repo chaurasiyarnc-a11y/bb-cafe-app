@@ -146,7 +146,7 @@ export default function BbCafeHome() {
   const [bannerIndex, setBannerIndex] = useState(0);
   const [bannerError, setBannerError] = useState(false);
 
-  // कूपन से जुड़े हुए स्टेट्स (जिन्हें वापस रीस्टोर किया गया है)
+  // कूपन से जुड़े हुए स्टेट्स
   const [enteredCoupon, setEnteredCoupon] = useState("");
   const [appliedCoupon, setAppliedCoupon] = useState<any>(null);
 
@@ -334,7 +334,7 @@ export default function BbCafeHome() {
   };
 
   const getReferralCode = () => {
-    if (!customerDetails) return "WELCOME";
+    if (!customerDetails || !customerDetails.name || !customerDetails.phone) return "WELCOME";
     const namePart = customerDetails.name.trim().split(" ")[0].substring(0, 4).toUpperCase();
     const phonePart = customerDetails.phone.slice(-4);
     return `${namePart}${phonePart}`;
@@ -432,7 +432,7 @@ export default function BbCafeHome() {
     });
 
     const listWithoutSpecial = result.filter(c => c !== "All" && c !== "DIY Pizza");
-    const finalized = ["All", ...listWithoutSpecial]; // DIY Pizza removed!
+    const finalized = ["All", ...listWithoutSpecial]; 
 
     return Array.from(new Set(finalized));
   }, [dbCategories]);
@@ -542,6 +542,14 @@ export default function BbCafeHome() {
           points: tempRefCode ? 5 : 0, 
           lastActive: new Date()
         });
+        if (tempRefCode) {
+          await addDoc(collection(db, "customer_points", phoneClean, "history"), {
+            type: 'earn',
+            points: 5,
+            description: 'Welcome Referral Bonus 🎁',
+            timestamp: new Date()
+          });
+        }
       } else {
         await setDoc(userDocRef, {
           name: customerObj.name,
@@ -962,7 +970,7 @@ export default function BbCafeHome() {
       const pointsEarned = Math.floor(finalTotal / 100);
       const totalPointsCost = cart.reduce((acc: number, i: any) => acc + (i.pointsCost || 0), 0);
 
-      // --- SCREENSHOT UPLOAD TO FIREBASE STORAGE (WITH 10s ROBUST TIMEOUT) ---
+      // --- SCREENSHOT UPLOAD TO FIREBASE STORAGE ---
       let screenshotUrl = "";
       if (paymentMethod === "upi" && paymentScreenshot) {
         const toastId = toast.loading(isHindi ? "स्क्रीनशॉट अपलोड हो रहा है..." : "Uploading screenshot...");
@@ -1220,7 +1228,69 @@ export default function BbCafeHome() {
     reader.readAsDataURL(file);
   };
 
-  // --- INITIAL MOUNT & SWR BACKGROUND DATABASE SYNCHRONIZER ---
+  // --- Real-Time Firestore Sync for Customer Points, Points History & Past Orders ---
+  useEffect(() => {
+    if (!customerDetails?.phone) {
+      setCustomerPoints(0);
+      setPointsHistory([]);
+      return;
+    }
+
+    const phoneClean = customerDetails.phone.replace("+91", "").trim();
+
+    // 1. Points document real-time sync
+    const pointsDocRef = doc(db, "customer_points", phoneClean);
+    const unsubscribePoints = onSnapshot(pointsDocRef, (docSnap) => {
+      if (docSnap.exists()) {
+        setCustomerPoints(docSnap.data().points || 0);
+      } else {
+        setCustomerPoints(0);
+      }
+    }, (err) => {
+      console.warn("Error subscribing to customer points:", err);
+    });
+
+    // 2. Points History subcollection real-time sync
+    const historyCollRef = collection(db, "customer_points", phoneClean, "history");
+    const historyQuery = query(historyCollRef, orderBy("timestamp", "desc"));
+    const unsubscribeHistory = onSnapshot(historyQuery, (querySnap) => {
+      const list = querySnap.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        timestamp: doc.data().timestamp?.toDate ? doc.data().timestamp.toDate() : doc.data().timestamp
+      }));
+      setPointsHistory(list);
+    }, (err) => {
+      console.warn("Error subscribing to points history:", err);
+    });
+
+    // 3. Past orders real-time sync
+    const ordersRef = collection(db, "orders");
+    const ordersQuery = query(
+      ordersRef,
+      where("customerPhone", "==", customerDetails.phone),
+      orderBy("timestamp", "desc")
+    );
+    const unsubscribeOrders = onSnapshot(ordersQuery, (querySnap) => {
+      const list = querySnap.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        timestamp: doc.data().timestamp?.toDate ? doc.data().timestamp.toDate() : doc.data().timestamp
+      }));
+      setPastOrders(list);
+      localStorage.setItem('bb_past_orders', JSON.stringify(list));
+    }, (err) => {
+      console.warn("Error subscribing to past orders:", err);
+    });
+
+    return () => {
+      unsubscribePoints();
+      unsubscribeHistory();
+      unsubscribeOrders();
+    };
+  }, [customerDetails]);
+
+  // --- INITIAL MOUNT & BACKGROUND DATABASE SYNCHRONIZER ---
   useEffect(() => {
     setMounted(true);
 
@@ -1658,7 +1728,7 @@ export default function BbCafeHome() {
           </div>
         )}
 
-        {/* STANDARD PRODUCTS (DIY Pizza Builder and Reviews sections removed) */}
+        {/* STANDARD PRODUCTS */}
         <div className="grid grid-cols-1 gap-4 pt-1 font-bold">
           {menuLoading ? (
             Array.from({ length: 3 }).map((_, idx) => (
@@ -1863,7 +1933,7 @@ export default function BbCafeHome() {
             </div>
           </div>
 
-          {/* Social Icons Container with dynamically fetched Follower Counts */}
+          {/* Social Icons Container */}
           <div className="social-icons flex flex-wrap justify-center gap-6 py-5 dark:bg-white/[0.02] bg-white border dark:border-white/5 border-neutral-200 rounded-2xl shadow-sm">
             {SOCIAL_LINKS.map((link: any) => (
               <a 
@@ -1905,7 +1975,7 @@ export default function BbCafeHome() {
         </footer>
       </main>
 
-      {/* STICKY FLOATING CART BUTTON / BOTTOM NAV */}
+      {/* STICKY FLOATING CART BUTTON */}
       <div className="fixed bottom-6 inset-x-0 z-[80] flex justify-center pointer-events-none font-sans font-bold">
         <div className="flex gap-4 pointer-events-auto">
           {cart.length > 0 && (
