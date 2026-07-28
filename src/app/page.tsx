@@ -1,5 +1,3 @@
-
-
 'use client';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { db } from '../lib/firebase'; 
@@ -9,13 +7,11 @@ import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
 import { useCartStore } from '../store/useCartStore';
 
-// --- १. admin/home फ़ोल्डर से इम्पोर्ट्स (४ कम्पोनेंट्स) ---
-import CategorySlider from '../components/admin/home/CategorySlider';
-import DiyPizzaBuilder from '../components/admin/home/DiyPizzaBuilder';
-import CartDrawer from '../components/admin/home/CartDrawer';
-import UpiPaymentModal from '../components/admin/home/UpiPaymentModal';
-
-// --- २. नए home फ़ोल्डर से इम्पोर्ट्स (८ कम्पोनेंट्स) ---
+// --- सभी १२ कंपोनेंट्स अब सीधे 'components/home/' फ़ोल्डर से इम्पोर्ट हो रहे हैं ---
+import CategorySlider from '../components/home/CategorySlider';
+import DiyPizzaBuilder from '../components/home/DiyPizzaBuilder';
+import CartDrawer from '../components/home/CartDrawer';
+import UpiPaymentModal from '../components/home/UpiPaymentModal';
 import LiveOrderTracker from '../components/home/LiveOrderTracker';
 import ProfileDrawer from '../components/home/ProfileDrawer';
 import PizzaCustomizerModal from '../components/home/PizzaCustomizerModal';
@@ -518,7 +514,7 @@ export default function BbCafeHome() {
     return displayReviews.length > 10;
   }, [displayReviews]);
 
-  // --- Dynamic add-ons display verification based on eligible dishes ---
+  // --- Dynamic add-ons display verification ---
   const showAddonsSection = useMemo(() => {
     const eligibleKeywords = ['pizza', 'sandwich', 'burger', 'momo', 'fries', 'chips', 'finger'];
     return cart.some((item: any) => {
@@ -990,7 +986,6 @@ export default function BbCafeHome() {
         msg += `*Points Redeemed:* -${totalPointsCost} Pts\n`;
       }
 
-      // यूपीआई होने पर रसीद सीधे व्हाट्सएप पर ही भेजने का निर्देश दें
       if (paymentMethod === "upi") {
         msg += `\n📸 *भुगतान स्क्रीनशॉट:* (कृपया इस आर्डर मैसेज के साथ अपना UPI पेमेंट स्क्रीनशॉट भी व्हाट्सएप पर तुरंत सेंड करें!)\n`;
       }
@@ -1221,141 +1216,7 @@ export default function BbCafeHome() {
     toast.success(isHindi ? "आइटम कार्ट में जोड़ा गया!" : "Item added to cart!");
   };
 
-  // --- Real-time Watchers ---
-  useEffect(() => {
-    if (!customerDetails?.phone) {
-      setCustomerPoints(0);
-      setPointsHistory([]);
-      setLiveOrder(null);
-      return;
-    }
-    
-    const phoneClean = customerDetails.phone.replace("+91", "").trim();
-    
-    const unsubPoints = onSnapshot(doc(db, "customer_points", phoneClean), (snap) => {
-      if (snap.exists()) {
-        setCustomerPoints(snap.data().points || 0);
-      }
-    }, (error) => console.warn("Points live check subscription bypassed:", error));
-
-    const unsubHistory = onSnapshot(
-      query(collection(db, "customer_points", phoneClean, "history"), orderBy("timestamp", "desc")),
-      (snap) => {
-        setPointsHistory(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-      },
-      (error) => console.warn("Points history subscription bypassed:", error)
-    );
-
-    const unsubLive = onSnapshot(
-      query(
-        collection(db, "orders"),
-        where("customerPhone", "==", customerDetails.phone),
-        orderBy("timestamp", "desc"),
-        limit(1)
-      ),
-      (snap) => {
-        if (!snap.empty) {
-          const latestOrder = { id: snap.docs[0].id, ...snap.docs[0].data() } as any;
-          const dismissedRejected = JSON.parse(localStorage.getItem('bb_dismissed_rejected_orders') || '[]');
-          if (latestOrder.status !== 'completed' && !dismissedRejected.includes(latestOrder.id)) {
-            setLiveOrder(latestOrder);
-          } else {
-            setLiveOrder(null);
-          }
-        } else {
-          setLiveOrder(null);
-        }
-      },
-      (error) => console.warn("Live order subscription bypassed (index may be building):", error)
-    );
-
-    return () => {
-      unsubPoints();
-      unsubHistory();
-      unsubLive();
-    };
-  }, [customerDetails?.phone]);
-
-  // --- Search Debouncing & Hinglish Optimizer ---
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      const cleanQuery = searchQuery.toLowerCase().trim();
-      const translatedWords = cleanQuery.split(/\s+/).map(word => HINGLISH_DICT[word] || word);
-      setDebouncedSearchQuery(translatedWords.join(" "));
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [searchQuery]);
-
-  // --- Banner Cycle Auto-Carousel Timer ---
-  useEffect(() => {
-    if (banners.length <= 1) return;
-    const interval = setInterval(() => {
-      setBannerIndex((prev) => (prev + 1) % banners.length);
-    }, 4000);
-    return () => clearInterval(interval);
-  }, [banners]);
-
-  useEffect(() => {
-    const fakeProofs = [
-      { text: "Ramesh from Mohandra recently ordered Special Thali! 🍛" },
-      { text: "Pooja just added Paneer Special Pizza to her cart! 🍕" },
-      { text: "5 people are looking at DIY Pizza right now! 🔥" },
-      { text: "Amit rated Bum Bum Cafe 5 stars! ⭐⭐⭐⭐⭐" },
-      { text: "Sanjay from Mohandra Town just placed an order! 🛵" },
-      { text: "Anjali is customizing her DIY Pizza! 🍕" }
-    ];
-    setSocialProofs(fakeProofs);
-    
-    const interval = setInterval(() => {
-      const randomIndex = Math.floor(Math.random() * fakeProofs.length);
-      setSocialAlertIndex(randomIndex);
-      setShowSocialAlert(true);
-      setTimeout(() => setShowSocialAlert(false), 5000);
-    }, 24000);
-
-    return () => clearInterval(interval);
-  }, []);
-
-  // --- १. क्यूआर कोड टेबल नंबर आटोमेटिक डिटेक्ट मैकेनिज्म ---
-  useEffect(() => {
-    if (mounted && typeof window !== "undefined") {
-      const urlParams = new URLSearchParams(window.location.search);
-      const tableParam = urlParams.get('table');
-      if (tableParam) {
-        setFulfillmentType("table");
-        setTableNumber(`Table ${tableParam}`);
-        toast.success(isHindi 
-          ? `टेबल नंबर ${tableParam} आटोमेटिक डिटेक्ट हो गया! 🍽️` 
-          : `Table ${tableParam} automatically detected! 🍽️`
-        );
-      }
-    }
-  }, [mounted, isHindi]);
-
-  // --- २. एंड्रॉइड फिजिकल बैक बटन इंटरसेप्टर ---
-  useEffect(() => {
-    if (!mounted) return;
-
-    const handlePopState = (e: PopStateEvent) => {
-      if (isCartOpen) {
-        setIsCartOpen(false);
-        window.history.pushState(null, "", window.location.pathname);
-      } else if (isProfileOpen) {
-        setIsProfileOpen(false);
-        window.history.pushState(null, "", window.location.pathname);
-      } else if (isUpiPopupOpen) {
-        setIsUpiPopupOpen(false);
-        window.history.pushState(null, "", window.location.pathname);
-      }
-    };
-
-    window.history.pushState(null, "", window.location.pathname);
-    window.addEventListener("popstate", handlePopState);
-    return () => window.removeEventListener("popstate", handlePopState);
-  }, [mounted, isCartOpen, isProfileOpen, isUpiPopupOpen]);
-
-
-  // --- INITIAL MOUNT & SWR BACKGROUND DATABASE SYNCHRONIZER ---
+  // --- SWR Background Database Loader ---
   useEffect(() => {
     setMounted(true);
 
@@ -1643,7 +1504,7 @@ export default function BbCafeHome() {
           </div>
         )}
 
-        {/* --- आर्डर लाइव रोड-मैप ट्रैकिंग (स्कूटर 🛵 पाथ एनीमेशन के साथ) --- */}
+        {/* --- लाइव स्कूटर रोड-मैप एनीमेशन --- */}
         <LiveOrderTracker 
           isHindi={isHindi}
           liveOrder={liveOrder}
@@ -1894,7 +1755,7 @@ export default function BbCafeHome() {
                       <div className="w-full h-36 rounded-2xl overflow-hidden relative border border-white/5 bg-white/[0.02] my-2 font-sans font-bold">
                         {(banners.length === 0 || bannerError) ? (
                           <div className="w-full h-full bg-gradient-to-r from-yellow-600/35 to-orange-900/30 flex flex-col justify-center p-5 space-y-1 font-sans">
-                            <span className="text-[8px] font-black uppercase text-yellow-400 bg-yellow-500/10 border border-yellow-500/20 px-2.5 py-0.5 rounded-full w-max">
+                            <span className="text-[8px] font-black uppercase text-yellow-400 bg-yellow-500/10 border border-yellow-500/20 px-2 py-0.5 rounded-full w-max">
                               {isHindi ? "ताज़ा स्वाद" : "Fresh Taste"}
                             </span>
                             <h3 className="text-sm font-black text-yellow-300">
@@ -1962,7 +1823,7 @@ export default function BbCafeHome() {
 
         {/* FOOTER */}
         <footer className="pt-8 border-t border-neutral-200 dark:border-white/5 space-y-6">
-          <div className="bg-gradient-to-br dark:from-green-950/20 dark:to-emerald-900/10 from-green-50 to-emerald-50 p-6 rounded-[2rem] border dark:border-green-500/10 border-green-200 relative overflow-hidden transition-colors duration-200 font-sans">
+          <div className="bg-gradient-to-br dark:from-green-950/20 dark:to-emerald-900/10 from-green-50 to-emerald-50 p-6 rounded-[2rem] border dark:border-green-500/10 border-green-200 relative overflow-hidden transition-colors duration-200 font-sans font-bold">
             <div className="absolute top-0 right-0 w-24 h-24 bg-green-500/5 rounded-full blur-2xl" />
             
             <div className="text-center space-y-3 relative z-10 flex flex-col items-center">
@@ -1972,7 +1833,7 @@ export default function BbCafeHome() {
               <h4 className="text-xl font-black italic text-yellow-500 font-serif">BUM BUM CAFE</h4>
               <p className="text-[11px] font-bold text-green-600 dark:text-green-300">{isHindi ? "जहाँ स्वाद और सुकून मिलते हैं! ✨" : "Where Taste Meets Serenity! ✨"}</p>
               
-              <p className="text-[11.5px] text-neutral-800 dark:text-gray-300 leading-relaxed max-w-sm mx-auto font-medium">
+              <p className="text-[11.5px] text-neutral-800 dark:text-gray-300 leading-relaxed max-w-sm mx-auto font-medium font-bold">
                 {isHindi ? 
                   "हमने BAM BAM CAFE की शुरुआत एक छोटे से सपने के साथ की थी—लोगों को घर जैसा स्वाद और कैफे वाला माहौल देने के लिए।  यहाँ हर कप कॉफी और हर स्लाइस पिज्जा प्यार और शुद्धता के साथ बनाया जाता है।  हमारी कोशिश है कि आप जब भी यहाँ आएँ, एक प्यारी मुस्कान के साथ वापस जाएँ।  ❤️" :
                   "We started BAM BAM CAFE with a simple dream - to serve hygienic, delicious, home-style fast food in Mohandra town. Every slice of pizza and plate of thali here is crafted with ultimate love, purity and hygiene. Feel free to dine-in or order online! ❤️"
@@ -2008,7 +1869,7 @@ export default function BbCafeHome() {
               </p>
             </div>
             
-            <a href="https://maps.app.goo.gl/8pj1Xby3bbMn5qxu5" target="_blank" rel="noreferrer" className="dark:bg-white/[0.02] bg-white border dark:border-white/5 border-neutral-200 p-4 rounded-2xl flex flex-col items-center justify-center space-y-1 hover:border-orange-500/30 shadow-md shadow-neutral-200/30 dark:shadow-none transition-all duration-200">
+            <a href="https://maps.app.goo.gl/8pj1Xby3bbMn5qxu5" target="_blank" rel="noreferrer" className="dark:bg-white/[0.02] bg-white border dark:border-white/5 border-neutral-200 p-4 rounded-2xl flex flex-col items-center justify-center space-y-1 hover:border-orange-500/30 shadow-md shadow-neutral-200/30 dark:shadow-none transition-all duration-200 font-bold">
               <MapPin className="text-green-500 animate-bounce" size={16} />
               <p className="text-neutral-600 dark:text-gray-400 text-[8px]">{isHindi ? "हमारा पता" : "Our Location"}</p>
               <p className="text-yellow-600 dark:text-yellow-400 text-[9px] underline">Google Map 🗺️</p>
@@ -2048,7 +1909,7 @@ export default function BbCafeHome() {
         </div>
       </div>
 
-      {/* --- सभी ड्रॉअर्स और मॉडल्स रेंडरिंग (अलग की गई फाइलों के कम्पोनेंट्स) --- */}
+      {/* --- DRAWERS & MODALS (ऑप्टिमाइज्ड इम्पोर्ट्स) --- */}
       <AnimatePresence>
         {isProfileOpen && (
           <ProfileDrawer 
@@ -2149,7 +2010,7 @@ export default function BbCafeHome() {
             isSubmittingOrder={isSubmittingOrder}
             triggerHaptic={triggerHaptic}
             upiId={upiId}
-            // TypeScript संकलन त्रुटियों से सुरक्षित बचने के लिए डमी प्रॉप्स
+            // TypeScript कंपाइलर त्रुटियों से बचने के लिए डमी प्रॉप्स
             handleScreenshotChange={() => {}} 
             isCompressing={false}
             paymentScreenshot={null}
@@ -2260,4 +2121,3 @@ export default function BbCafeHome() {
     </div>
   );
 }
-
