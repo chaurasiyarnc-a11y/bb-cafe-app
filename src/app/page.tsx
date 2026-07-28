@@ -459,7 +459,7 @@ export default function BbCafeHome() {
     });
 
     const listWithoutSpecial = result.filter(c => c !== "All" && c !== "DIY Pizza");
-    const finalized = ["All", ...listWithoutSpecial]; // DIY Pizza को श्रेणियों से पूरी तरह हटा दिया गया
+    const finalized = ["All", ...listWithoutSpecial]; // "DIY Pizza" को श्रेणियों से हटाया गया
 
     return Array.from(new Set(finalized));
   }, [dbCategories]);
@@ -531,7 +531,7 @@ export default function BbCafeHome() {
   const quickAppendInstruction = (tag: string, type: "diy" | "normal") => {
     triggerHaptic(20);
     if (type === "diy") {
-      // DIY Pizza removed, keeping logic empty or fallback safely
+      // DIY Pizza Removed
     } else {
       setChefNote(prev => prev ? `${prev}, ${tag}` : tag);
     }
@@ -656,7 +656,7 @@ export default function BbCafeHome() {
     }
   };
 
-  // --- COMPONENT HANDLERS ---
+  // --- REELS & STORY HANDLERS ---
 
   const handleReelEnded = () => {
     if (!activeStory) return;
@@ -788,7 +788,7 @@ export default function BbCafeHome() {
 
     addItem(rewardCartItem);
     toast.success(isHindi 
-      ? `${rule.rewardName || rule.name || 'उपहार'} कर्ट में जोड़ा गया! (${rule.pointsRequired} पॉइंट्स उपयोग होंगे)` 
+      ? `${rule.rewardName || rule.name || 'उपहार'} कर्ट में जोड़ा गया! (${rule.pointsRequired}  पॉइंट्स उपयोग होंगे)` 
       : `${rule.rewardName || rule.name || 'Reward'} added to cart! (${rule.pointsRequired} pts will be claimed on checkout)`
     );
   };
@@ -948,126 +948,502 @@ export default function BbCafeHome() {
     }
   };
 
-  // --- BACKGROUND CLOCKS, DEBOUNCING, AND FIRESTORE LISTENERS ---
+  const handleDismissInstallBanner = () => {
+    triggerHaptic();
+    setShowInstallBanner(false);
+    localStorage.setItem('bb_app_installed_or_dismissed', 'true');
+  };
 
-  // 1. Search Query Debouncing & Automatic Hinglish Translation 
-  useEffect(() => {
-    const handler = setTimeout(() => {
-      let queryClean = searchQuery.toLowerCase().trim();
-      Object.entries(HINGLISH_DICT).forEach(([typo, corrected]) => {
-        if (queryClean.includes(typo)) {
-          queryClean = queryClean.replace(new RegExp(typo, 'g'), corrected);
+  const handleInstallClick = async () => {
+    triggerHaptic();
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === 'accepted') {
+        localStorage.setItem('bb_app_installed_or_dismissed', 'true');
+        setShowInstallBanner(false);
+      }
+      setDeferredPrompt(null);
+    } else {
+      setIsInstallModalOpen(true);
+    }
+  };
+
+  const sendWhatsAppOrder = async () => {
+    triggerHaptic();
+    
+    if (isSubmittingOrder) return;
+    setIsSubmittingOrder(true);
+
+    try {
+      if (!customerDetails) { 
+        setIsProfileOpen(true); 
+        toast.error("ऑर्डर करने के लिए पहले अपनी प्रोफाइल बनाएं! 👤");
+        return; 
+      }
+
+      if (fulfillmentType === "delivery" && (!address || address.trim().length < 10)) {
+        return toast.error("Please enter full address!");
+      }
+
+      if (fulfillmentType === "table" && !tableNumber) {
+        return toast.error(isHindi ? "कृपया टेबल चुनें!" : "Please select a table!");
+      }
+
+      if (paymentMethod === "upi" && !paymentScreenshot) {
+        return toast.error(isHindi ? "कृपया आगे बढ़ने से पहले यूपीआई भुगतान का स्क्रीनशॉट अपलोड करें!" : "Please upload UPI payment screenshot!");
+      }
+
+      const tokenNumber = Math.floor(1000 + Math.random() * 9000);
+      const deliveryPin = Math.floor(1000 + Math.random() * 9000);
+
+      let billNumber = 1;
+      const counterDocRef = doc(db, "settings", "store_bill_counter");
+
+      try {
+        await runTransaction(db, async (transaction) => {
+          const counterDoc = await transaction.get(counterDocRef);
+          if (!counterDoc.exists()) {
+            transaction.set(counterDocRef, { nextBillNumber: 2 });
+            billNumber = 1;
+          } else {
+            billNumber = counterDoc.data().nextBillNumber || 1;
+            transaction.update(counterDocRef, { nextBillNumber: billNumber + 1 });
+          }
+        });
+      } catch (e) { 
+        billNumber = Math.floor((Date.now() / 1000) % 100000); 
+      }
+
+      const formattedBillStr = formatBillNumber(billNumber);
+      const subtotal = getCartSubtotal();
+      const addOnsCost = getCartAddonsPrice();
+      const deliveryCharge = getDeliveryCharge();
+      const couponDiscount = getCouponDiscountAmount();
+      const finalTotal = getTotalBillPrice();
+      
+      const pointsEarned = Math.floor(finalTotal / 100);
+      const totalPointsCost = cart.reduce((acc: number, i: any) => acc + (i.pointsCost || 0), 0);
+
+      // --- SCREENSHOT UPLOAD TO FIREBASE STORAGE (WITH 10s ROBUST TIMEOUT) ---
+      let screenshotUrl = "";
+      if (paymentMethod === "upi" && paymentScreenshot) {
+        const toastId = toast.loading(isHindi ? "स्क्रीनशॉट अपलोड हो रहा है..." : "Uploading screenshot...");
+        try {
+          const storage = getStorage();
+          const storageRef = ref(storage, `payment_screenshots/bill_${formattedBillStr}_${Date.now()}.jpg`);
+          
+          const uploadPromise = uploadString(storageRef, paymentScreenshot, 'data_url').then(async (uploadResult) => {
+            return await getDownloadURL(uploadResult.ref);
+          });
+          
+          const timeoutPromise = new Promise<string>((_, reject) => 
+            setTimeout(() => reject(new Error("Timeout")), 10000)
+          );
+
+          screenshotUrl = await Promise.race([uploadPromise, timeoutPromise]);
+          toast.dismiss(toastId);
+        } catch (err) {
+          console.warn("Storage upload bypassed (Proceeding with local base64):", err);
+          toast.dismiss(toastId);
+        }
+      }
+
+      const orderObj = {
+        billNumber, tokenNumber, deliveryPin, customerName: customerDetails.name, customerPhone: customerDetails.phone,
+        address: fulfillmentType === "delivery" ? address : `Mode: ${fulfillmentType.toUpperCase()} ${fulfillmentType === 'table' ? `Table: ${tableNumber}` : ''}`, 
+        items: cart, subtotal, discount: couponDiscount, total: finalTotal, timestamp: new Date(), status: 'pending',
+        deliveryArea: fulfillmentType === "delivery" ? selectedArea.name : fulfillmentType.toUpperCase(), noCutlery, ketchupAddon, oreganoAddon, chiliFlakesAddon,
+        fulfillmentType, tableNumber: fulfillmentType === "table" ? tableNumber : "", paymentMethod,
+        paymentScreenshot: paymentScreenshot || "",
+        screenshotUrl: screenshotUrl || ""
+      };
+
+      await addDoc(collection(db, "orders"), orderObj);
+      const phoneClean = customerDetails.phone.replace("+91", "");
+      if (pointsEarned > 0 || totalPointsCost > 0) {
+        await setDoc(doc(db, "customer_points", phoneClean), {
+          name: customerDetails.name, phone: phoneClean, points: increment(pointsEarned - totalPointsCost), lastActive: new Date()
+        }, { merge: true });
+
+        if (pointsEarned > 0) {
+          await addDoc(collection(db, "customer_points", phoneClean, "history"), {
+            type: 'earn',
+            points: pointsEarned,
+            description: `Ordered Bill #${formattedBillStr} 🍕`,
+            timestamp: new Date()
+          });
+        }
+        if (totalPointsCost > 0) {
+          await addDoc(collection(db, "customer_points", phoneClean, "history"), {
+            type: 'redeem',
+            points: totalPointsCost,
+            description: `Redeemed rewards on Bill #${formattedBillStr} 🎁`,
+            timestamp: new Date()
+          });
+        }
+      }
+
+      const updatedPastOrders = [orderObj, ...pastOrders];
+      setPastOrders(updatedPastOrders);
+      localStorage.setItem('bb_past_orders', JSON.stringify(updatedPastOrders));
+      setLastPlacedOrder(orderObj);
+
+      let itemsText = "";
+      cart.forEach((i: any) => {
+        itemsText += `• ${i.name || "Item"} x${i.quantity || 1} - ₹${(i.price || 0) * (i.quantity || 1)}\n`;
+        if (i.note) {
+          itemsText += `  └─ *Note:* ${i.note}\n`;
         }
       });
-      setDebouncedSearchQuery(queryClean);
-    }, 350);
+      
+      if (ketchupAddon) itemsText += `• Extra Tomato Ketchup x1 - ₹10\n`;
+      if (oreganoAddon) itemsText += `• Extra Oregano x1 - ₹10\n`;
+      if (chiliFlakesAddon) itemsText += `• Extra Chili Flakes x1 - ₹10\n`;
+      if (noCutlery) itemsText += `🌱 (Eco-Friendly: No plastic cutlery requested)\n`;
 
-    return () => clearTimeout(handler);
-  }, [searchQuery]);
+      const refCode = getReferralCode();
+      const modeLabel = fulfillmentType === "delivery" ? `Delivery (${selectedArea.name})` : fulfillmentType === "pickup" ? "Self-Pickup 🛍️" : `Dine-In (Table: ${tableNumber}) 🍽️`;
+      const payModeLabel = paymentMethod === "cod" 
+        ? (fulfillmentType === "delivery" ? "Cash on Delivery (COD) 💵" : "Cash at Counter 💵")
+        : "UPI Online Payment 📱";
 
-  // 2. Banner Auto Carousel Clock
-  useEffect(() => {
-    if (banners.length <= 1) return;
-    const interval = setInterval(() => {
-      setBannerIndex((prev) => (prev + 1) % banners.length);
-    }, 6000);
-    return () => clearInterval(interval);
-  }, [banners]);
+      let msg = `🔥 *BAM BAM CAFE - NEW ORDER*\n\n`;
+      msg += `*Bill No:* #${formattedBillStr}\n`;
+      msg += `*Token No:* #${tokenNumber}\n`;
+      msg += `*Customer:* ${customerDetails.name}\n`;
+      msg += `*Phone:* ${customerDetails.phone}\n`;
+      msg += `*Fulfillment Mode:* ${modeLabel}\n`;
+      
+      if (fulfillmentType === 'delivery') {
+        msg += `*Address:* ${address}\n`;
+      }
+      msg += `*Payment Method:* ${payModeLabel}\n\n`;
 
-  // 3. Social Proof Alerts Auto Cycle
-  useEffect(() => {
-    const proofTemplates = [
-      { text: "Rahul from Mohandra Town just ordered Special Pizza 🍕" },
-      { text: "Pooja just claimed 5 free points on Instagram! 📸" },
-      { text: "Ankit just redeemed a free Special Thali 🎁" },
-      { text: "Preeti from 5km range just ordered Paneer Special & Fries! 🛵" },
-      { text: "A user is customization-building their DIY Pizza right now 🍕" }
-    ];
-    setSocialProofs(proofTemplates);
-  }, []);
+      msg += `*ITEMS:*\n${itemsText}\n`;
+      msg += `*Subtotal:* ₹${subtotal + addOnsCost}\n`;
+      msg += `*Coupon Discount:* -₹${couponDiscount}\n`;
+      
+      if (fulfillmentType === 'delivery') {
+        msg += `*Delivery:* ₹${deliveryCharge}\n`;
+      }
+      msg += `*TOTAL BILL: ₹${finalTotal}*\n\n`;
 
-  useEffect(() => {
-    if (socialProofs.length === 0) return;
-    const showInterval = setInterval(() => {
-      setSocialAlertIndex((prev) => (prev + 1) % socialProofs.length);
-      setShowSocialAlert(true);
+      if (fulfillmentType === 'delivery') {
+        msg += `🔑 *Delivery PIN:* ${deliveryPin} (Rider ko ye confirm karke hi order le)\n`;
+      }
+      
+      msg += `*Invite Code:* ${refCode}\n`;
+      msg += `*Points Earned:* +${pointsEarned} Pts\n`;
+      if (totalPointsCost > 0) {
+        msg += `*Points Redeemed:* -${totalPointsCost} Pts\n`;
+      }
+
+      if (paymentMethod === "upi") {
+        if (screenshotUrl) {
+          msg += `\n📸 *Payment Screenshot Link (JPG):*\n${screenshotUrl}\n`;
+        } else {
+          msg += `\n📸 *भुगतान स्क्रीनशॉट:* बिल #${formattedBillStr} के साथ डेटाबेस में सफलतापूर्वक सेव कर दिया गया है!\n`;
+        }
+      }
+
+      msg += `\n_Confirm order by replying 'YES'_`;
+      
+      playSoundEffect('success');
+      setConfettiActive(true);
+      setTimeout(() => setConfettiActive(false), 5000);
+
+      try {
+        await navigator.clipboard.writeText(msg);
+        toast.success(isHindi ? "ऑर्डर विवरण कॉपी कर लिया गया है!" : "Order details copied to clipboard!");
+      } catch (err) {}
+
       setTimeout(() => {
-        setShowSocialAlert(false);
-      }, 5000);
-    }, 18000);
+        window.open(`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(msg)}`, '_blank');
+        clearCart(); 
+        setKetchupAddon(false);
+        setOreganoAddon(false);
+        setChiliFlakesAddon(false);
+        setNoCutlery(false);
+        setAppliedCoupon(null); 
+        setEnteredCoupon(""); 
+        setIsCartOpen(false);
+        setPaymentScreenshot(null);
+        setIsUpiPopupOpen(false);
+      }, 1500);
 
-    return () => clearInterval(showInterval);
-  }, [socialProofs]);
+    } catch (error) {
+      console.error("Critical submission error caught:", error);
+      toast.error(isHindi ? "ऑर्डर जमा करने में समस्या आई! दोबारा कोशिश करें।" : "Error submitting order. Please try again.");
+    } finally {
+      setIsSubmittingOrder(false);
+    }
+  };
 
-  // 4. Real-time Customer Points and Points History Subcollection Synchronizer
-  useEffect(() => {
-    if (!customerDetails?.phone) {
-      setCustomerPoints(0);
-      setPointsHistory([]);
+  const handleCheckoutClick = () => {
+    triggerHaptic();
+    if (!customerDetails) {
+      setIsProfileOpen(true);
+      toast.error(isHindi ? "कृपया पहले अपनी प्रोफाइल कस्टमाइज़ करें!" : "Please set up your profile first!");
       return;
     }
+    if (paymentMethod === "upi") {
+      setIsUpiPopupOpen(true);
+    } else {
+      sendWhatsAppOrder();
+    }
+  };
 
-    const phoneClean = customerDetails.phone.replace("+91", "");
-    
-    // Listen to parent customer points
-    const pointsDocRef = doc(db, "customer_points", phoneClean);
-    const unsubPoints = onSnapshot(pointsDocRef, (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        setCustomerPoints(data.points || 0);
-      }
-    }, (error) => {
-      console.warn("Points sync disabled background offline mode:", error);
-    });
-
-    // Listen to live points history logs
-    const historyColRef = collection(db, "customer_points", phoneClean, "history");
-    const q = query(historyColRef, orderBy("timestamp", "desc"), limit(15));
-    const unsubHistory = onSnapshot(q, (querySnap) => {
-      const historyList = querySnap.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      setPointsHistory(historyList);
-    }, (error) => {
-      console.warn("Points history sync offline mode:", error);
-    });
-
-    return () => {
-      unsubPoints();
-      unsubHistory();
-    };
-  }, [customerDetails]);
-
-  // 5. Active Live Order Status Tracker Listener (Dynamic SWR)
-  useEffect(() => {
-    if (!customerDetails?.phone) return;
-    
-    const ordersRef = collection(db, "orders");
-    const q = query(
-      ordersRef,
-      where("customerPhone", "==", customerDetails.phone),
-      orderBy("timestamp", "desc"),
-      limit(1)
-    );
-
-    const unsubLiveOrder = onSnapshot(q, (snapshot) => {
-      if (!snapshot.empty) {
-        const latestOrder = { id: snapshot.docs[0].id, ...snapshot.docs[0].data() } as any;
-        if (latestOrder.status !== 'delivered' && latestOrder.status !== 'cancelled') {
-          setLiveOrder(latestOrder);
-        } else {
-          setLiveOrder(null);
+  const handleApplyCoupon = async () => {
+    triggerHaptic();
+    if (!enteredCoupon.trim()) {
+      toast.error(isHindi ? "कृपया कूपन कोड दर्ज करें!" : "Please enter a coupon code!");
+      return;
+    }
+    const codeUpper = enteredCoupon.trim().toUpperCase();
+    const toastId = toast.loading(isHindi ? "कूपन जाँचा जा रहा है..." : "Validating coupon...");
+    try {
+      const couponRef = doc(db, "coupons", codeUpper);
+      const couponSnap = await getDoc(couponRef);
+      if (couponSnap.exists()) {
+        const data = couponSnap.data();
+        const subtotal = getCartSubtotal();
+        if (subtotal < (data.minOrder || 0)) {
+          toast.dismiss(toastId);
+          toast.error(isHindi ? `न्यूनतम ऑर्डर राशि ₹${data.minOrder} होनी चाहिए!` : `Minimum order must be ₹${data.minOrder}!`);
+          return;
         }
+        
+        setAppliedCoupon({
+          code: codeUpper,
+          discountValue: data.discount !== undefined ? data.discount : (data.discountValue !== undefined ? data.discountValue : 0),
+          type: data.type || data.discountType || 'flat'
+        });
+        toast.dismiss(toastId);
+        toast.success(isHindi ? "कूपन सफलतापूर्वक लागू किया गया!" : "Coupon applied successfully!");
       } else {
-        setLiveOrder(null);
+        toast.dismiss(toastId);
+        toast.error(isHindi ? "अमान्य कूपन कोड! यह कूपन मौजूद नहीं है।" : "Invalid coupon code! This coupon does not exist.");
       }
-    }, (error) => {
-      console.warn("Live order sync offline mode:", error);
-    });
+    } catch (e) {
+      toast.dismiss(toastId);
+      toast.error(isHindi ? "कूपन जांचने में समस्या आई!" : "Error applying coupon!");
+    }
+  };
 
-    return () => unsubLiveOrder();
-  }, [customerDetails]);
+  const handleScreenshotChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    triggerHaptic();
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsCompressing(true);
+    const reader = new FileReader();
+    
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+
+        const MAX_DIM = 800;
+        if (width > MAX_DIM || height > MAX_DIM) {
+          if (width > height) {
+            height = Math.round((height * MAX_DIM) / width);
+            width = MAX_DIM;
+          } else {
+            width = Math.round((width * MAX_DIM) / height);
+            height = MAX_DIM;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          const compressedBase64 = canvas.toDataURL('image/jpeg', 0.6);
+          setPaymentScreenshot(compressedBase64);
+          toast.success(isHindi ? "स्क्रीनशॉट लोड और कंप्रेस हो गया!" : "Screenshot compressed & loaded!");
+        } else {
+          setPaymentScreenshot(event.target?.result as string);
+        }
+        setIsCompressing(false);
+      };
+      img.onerror = () => {
+        setIsCompressing(false);
+        toast.error("Error compressing screen");
+      };
+      img.src = event.target?.result as string;
+    };
+
+    reader.onerror = () => {
+      setIsCompressing(false);
+      toast.error(isHindi ? "फाइल लोड करने में समस्या आई।" : "Error loading file.");
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // --- INITIAL MOUNT & SWR BACKGROUND DATABASE SYNCHRONIZER ---
+  useEffect(() => {
+    setMounted(true);
+
+    const handleBeforeInstallPrompt = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      const dismissed = localStorage.getItem('bb_app_installed_or_dismissed');
+      if (!dismissed) {
+        setShowInstallBanner(true);
+      }
+    };
+
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    if (typeof window !== "undefined") {
+      setIsOnline(window.navigator.onLine);
+      window.addEventListener("online", handleOnline);
+      window.addEventListener("offline", handleOffline);
+      window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+    }
+
+    try {
+      const cachedMenu = localStorage.getItem('bb_cached_menu');
+      if (cachedMenu) setMenu(JSON.parse(cachedMenu));
+
+      const cachedSocial = localStorage.getItem('bb_cached_social_counts');
+      if (cachedSocial) setSocialCounts(JSON.parse(cachedSocial));
+
+      const cachedRules = localStorage.getItem('bb_cached_loyalty_rules');
+      if (cachedRules) setLoyaltyRules(JSON.parse(cachedRules));
+
+      const cachedCats = localStorage.getItem('bb_cached_categories');
+      if (cachedCats) setDbCategories(JSON.parse(cachedCats));
+
+      const cachedBanners = localStorage.getItem('bb_cached_banners');
+      if (cachedBanners) setBanners(JSON.parse(cachedBanners));
+
+      const cachedReels = localStorage.getItem('bb_cached_reels');
+      if (cachedReels) setStories(JSON.parse(cachedReels));
+
+      const cachedReviews = localStorage.getItem('bb_cached_reviews');
+      if (cachedReviews) setReviews(JSON.parse(cachedReviews));
+
+      const savedDetails = localStorage.getItem('bb_cafe_customer');
+      if (savedDetails) {
+        const parsed = JSON.parse(savedDetails);
+        if (parsed && parsed.name && parsed.phone) {
+          setCustomerDetails(parsed);
+          setTempName(parsed.name);
+          setTempPhone(parsed.phone.replace("+91", ""));
+          if (parsed.pin) setTempPin(parsed.pin);
+        }
+      }
+
+      const cachedPast = localStorage.getItem('bb_past_orders');
+      if (cachedPast) setPastOrders(JSON.parse(cachedPast));
+
+      const cachedFavs = localStorage.getItem('bb_favorites');
+      if (cachedFavs) setFavorites(JSON.parse(cachedFavs));
+    } catch (e) {
+      console.warn("Local storage cache load bypassed:", e);
+    }
+
+    const fetchFreshDbData = async () => {
+      setMenuLoading(true);
+      try {
+        const [
+          storeSnap,
+          productsSnap,
+          catsSnap,
+          bannersSnap,
+          reelsSnap,
+          revsSnap,
+          rulesSnap,
+          socialSnap
+        ] = await Promise.all([
+          getDoc(doc(db, "settings", "store")),
+          getDocs(collection(db, "products")),
+          getDocs(collection(db, "categories")),
+          getDocs(collection(db, "banners")),
+          getDocs(collection(db, "reels")),
+          getDocs(collection(db, "reviews")),
+          getDocs(collection(db, "loyalty_rules")),
+          getDoc(doc(db, "settings", "social_counts"))
+        ]);
+
+        if (storeSnap.exists()) {
+          const storeData = storeSnap.data();
+          setStoreOpen(storeData.isOpen);
+          setIsBannerEnabled(storeData.isBannerEnabled ?? storeData.showPromoBanner ?? true);
+          setIsInlineBannerEnabled(storeData.isInlineBannerEnabled ?? storeData.showInlinePromo ?? true);
+          if (storeData.whatsappNumber) setWhatsappNumber(storeData.whatsappNumber);
+          if (storeData.upiId) setUpiId(storeData.upiId);
+          if (storeData.latitude && storeData.longitude) {
+            setStoreCoordinates({ lat: Number(storeData.latitude), lng: Number(storeData.longitude) });
+          }
+          if (storeData.timingHindi) setStoreTimingHindi(storeData.timingHindi);
+          if (storeData.timingEnglish) setStoreTimingEnglish(storeData.timingEnglish);
+          if (storeData.closingMinutesLeft !== undefined) setClosingMinutesLeft(storeData.closingMinutesLeft);
+        }
+
+        const items = productsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter((i: any) => i.isVisible !== false);
+        setMenu(shuffleArray(items));
+        localStorage.setItem('bb_cached_menu', JSON.stringify(items));
+
+        const cats = catsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+        setDbCategories(cats);
+        localStorage.setItem('bb_cached_categories', JSON.stringify(cats));
+
+        const banData = bannersSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+        setBanners(banData);
+        localStorage.setItem('bb_cached_banners', JSON.stringify(banData));
+
+        const reelData = reelsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+        setStories(reelData);
+        localStorage.setItem('bb_cached_reels', JSON.stringify(reelData));
+
+        const revData = revsSnap.docs.map(d => ({ id: d.id, ...d.data() as any })).filter((r: any) => r.isApproved === true || r.isApproved === "approved" || r.approved === true);
+        setReviews(revData);
+        localStorage.setItem('bb_cached_reviews', JSON.stringify(revData));
+
+        const ruleData = rulesSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+        setLoyaltyRules(ruleData);
+        localStorage.setItem('bb_cached_loyalty_rules', JSON.stringify(ruleData));
+
+        if (socialSnap.exists()) {
+          const data = socialSnap.data();
+          setSocialCounts(data);
+          localStorage.setItem('bb_cached_social_counts', JSON.stringify(data));
+        }
+
+      } catch (err) {
+        console.warn("Background fetch warning (Offline Mode Active):", err);
+      } finally {
+        setMenuLoading(false);
+      }
+    };
+
+    fetchFreshDbData();
+
+    return () => { 
+      if (typeof window !== "undefined") {
+        window.removeEventListener("online", handleOnline);
+        window.removeEventListener("offline", handleOffline);
+        window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+      }
+    };
+  }, []);
+
+  if (!mounted) {
+    return (
+      <div className="min-h-screen bg-neutral-950 flex flex-col items-center justify-center text-white">
+        <Loader2 className="animate-spin text-orange-500 mb-2" size={32} />
+        <span className="text-xs font-bold uppercase tracking-wider">Bum Bum Cafe Loading...</span>
+      </div>
+    );
+  }
 
   return (
     <div className="dark:bg-[#050505] bg-neutral-50 min-h-screen dark:text-white text-neutral-800 pb-32 font-sans relative overflow-x-clip transition-colors duration-200">
