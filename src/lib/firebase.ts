@@ -1,6 +1,6 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
+import { initializeFirestore } from "firebase/firestore"; // <-- 'getFirestore' की जगह 'initializeFirestore' का उपयोग
 import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
@@ -15,7 +15,12 @@ const firebaseConfig = {
 const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 
 export const auth = getAuth(app);
-export const db = getFirestore(app);
+
+// केवल डेटाबेस कनेक्शन को सुचारू बनाने के लिए Long Polling इनेबल की गई है
+export const db = initializeFirestore(app, {
+  experimentalForceLongPolling: true, // <-- मोबाइल/एंड्रॉइड ऐप पर हैंग होने से बचाने वाली सेटिंग
+});
+
 export const storage = getStorage(app);
 
 export default app;
