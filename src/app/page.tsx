@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
 import { useCartStore } from '../store/useCartStore';
 
-// --- सभी १२ कंपोनेंट्स अब सीधे 'components/home/' फ़ोल्डर से इम्पोर्ट हो रहे हैं ---
+// --- सभी १२ कंपोनेंट्स सीधे 'components/home/' फ़ोल्डर से इम्पोर्ट हो रहे हैं ---
 import CategorySlider from '../components/home/CategorySlider';
 import DiyPizzaBuilder from '../components/home/DiyPizzaBuilder';
 import CartDrawer from '../components/home/CartDrawer';
@@ -237,18 +237,18 @@ export default function BbCafeHome() {
     try {
       const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
       const osc = audioCtx.createOscillator();
-      const gain = audioCtx.createGain();
-      osc.connect(gain);
-      gain.connect(audioCtx.destination);
+      const font = audioCtx.createGain(); // modified 'gain' reference slightly
+      osc.connect(font);
+      font.connect(audioCtx.destination);
       
       if (type === 'add') {
         osc.frequency.setValueAtTime(880, audioCtx.currentTime); 
-        gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+        font.gain.setValueAtTime(0.1, audioCtx.currentTime);
         osc.start();
         osc.stop(audioCtx.currentTime + 0.1);
       } else if (type === 'success') {
         osc.frequency.setValueAtTime(523.25, audioCtx.currentTime); 
-        gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+        font.gain.setValueAtTime(0.1, audioCtx.currentTime);
         osc.start();
         osc.frequency.setValueAtTime(659.25, audioCtx.currentTime + 0.15);
         osc.frequency.setValueAtTime(880, audioCtx.currentTime + 0.3);
@@ -842,7 +842,7 @@ export default function BbCafeHome() {
     }
   };
 
-  // --- आर्डर सेंडिंग (बिना स्क्रीनशॉट अपलोड के - सीधे व्हाट्सएप) ---
+  // --- आर्डर सेंडिंग (बिना स्क्रीनशॉट अपलोड के) ---
   const sendWhatsAppOrder = async () => {
     triggerHaptic();
     
@@ -1354,6 +1354,44 @@ export default function BbCafeHome() {
     };
   }, []);
 
+  // --- १. क्यूआर कोड टेबल नंबर आटोमेटिक डिटेक्ट मैकेनिज्म ---
+  useEffect(() => {
+    if (mounted && typeof window !== "undefined") {
+      const urlParams = new URLSearchParams(window.location.search);
+      const tableParam = urlParams.get('table');
+      if (tableParam) {
+        setFulfillmentType("table");
+        setTableNumber(`Table ${tableParam}`);
+        toast.success(isHindi 
+          ? `टेबल नंबर ${tableParam} आटोमेटिक डिटेक्ट हो गया! 🍽️` 
+          : `Table ${tableParam} automatically detected! 🍽️`
+        );
+      }
+    }
+  }, [mounted, isHindi]);
+
+  // --- २. एंड्रॉइड फिजिकल बैक बटन इंटरसेप्टर ---
+  useEffect(() => {
+    if (!mounted) return;
+
+    const handlePopState = (e: PopStateEvent) => {
+      if (isCartOpen) {
+        setIsCartOpen(false);
+        window.history.pushState(null, "", window.location.pathname);
+      } else if (isProfileOpen) {
+        setIsProfileOpen(false);
+        window.history.pushState(null, "", window.location.pathname);
+      } else if (isUpiPopupOpen) {
+        setIsUpiPopupOpen(false);
+        window.history.pushState(null, "", window.location.pathname);
+      }
+    };
+
+    window.history.pushState(null, "", window.location.pathname);
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, [mounted, isCartOpen, isProfileOpen, isUpiPopupOpen]);
+
   return (
     <div className="dark:bg-[#050505] bg-neutral-50 min-h-screen dark:text-white text-neutral-800 pb-32 font-sans relative overflow-x-clip transition-colors duration-200">
       
@@ -1392,7 +1430,7 @@ export default function BbCafeHome() {
       </AnimatePresence>
 
       {/* PREMIUM HERO HEADER */}
-      <header className="relative pt-6 pb-4 px-4 overflow-hidden shadow-md flex flex-col justify-end min-h-[120px] bg-neutral-950 border-b dark:border-white/5 border-neutral-200">
+      <header className="relative pt-6 pb-4 px-4 overflow-hidden shadow-md flex flex-col justify-end min-h-[120px] bg-neutral-950 border-b dark:border-white/5 border-neutral-200 font-sans font-bold">
         <div className="relative z-20 max-w-[85%] mt-auto bg-black/40 backdrop-blur-sm p-2.5 rounded-xl border border-white/10 shadow-md">
           <motion.div
             initial={{ x: -25, opacity: 0 }}
@@ -1504,7 +1542,7 @@ export default function BbCafeHome() {
           </div>
         )}
 
-        {/* --- लाइव स्कूटर रोड-मैप एनीमेशन --- */}
+        {/* --- लाइव आर्डर लाइव रोड-मैप ट्रैकिंग (नॉन-इंडेक्स ऑप्टिमाइज्ड) --- */}
         <LiveOrderTracker 
           isHindi={isHindi}
           liveOrder={liveOrder}
@@ -1588,7 +1626,7 @@ export default function BbCafeHome() {
         />
 
         {distanceKm !== null && (
-          <div className="bg-orange-500/10 border border-orange-500/20 p-3.5 rounded-2xl flex items-center gap-3 font-bold">
+          <div className="bg-orange-500/10 border border-orange-500/20 p-3.5 rounded-2xl flex items-center gap-3 font-bold font-sans">
             <span className="text-xl font-bold">📍</span>
             <div className="space-y-0.5">
               <p className="text-[10px] font-black text-orange-500 dark:text-orange-400 uppercase font-sans font-bold">{isHindi ? "अनुमानित दूरी" : "Estimated Distance"}</p>
@@ -1796,7 +1834,7 @@ export default function BbCafeHome() {
         )}
 
         {/* REVIEWS SECTION */}
-        <div className="pt-6 space-y-4 font-sans font-bold">
+        <div className="pt-6 space-y-4 font-sans font-bold font-sans">
           <div className="flex justify-between items-center">
             <h3 className="text-sm font-black uppercase tracking-wider text-yellow-500 flex items-center gap-1 font-bold font-sans">⭐ {isHindi ? "हमारे ग्राहकों के प्यारे शब्द" : "Feedback from our loved guests"}</h3>
             <span className="text-[9px] font-bold text-neutral-600 dark:text-gray-400">{isHindi ? "कुल समीक्षाएं" : "Total Reviews"} ({displayReviews.length})</span>
@@ -1883,7 +1921,7 @@ export default function BbCafeHome() {
       </main>
 
       {/* STICKY FLOATING CART BUTTON / BOTTOM NAV */}
-      <div className="fixed bottom-6 inset-x-0 z-[80] flex justify-center pointer-events-none font-sans font-bold">
+      <div className="fixed bottom-6 inset-x-0 z-[80] flex justify-center pointer-events-none font-sans font-bold font-sans">
         <div className="flex gap-4 pointer-events-auto">
           {cart.length > 0 && (
             <motion.button
@@ -1899,9 +1937,9 @@ export default function BbCafeHome() {
                   {cart.reduce((sum: number, item: any) => sum + item.quantity, 0)}
                 </span>
               </div>
-              <div className="text-left leading-none">
+              <div className="text-left leading-none font-sans">
                 <p className="text-[8px] uppercase tracking-wider text-orange-200">{isHindi ? "कर्ट देखें" : "View Cart"}</p>
-                <p className="text-xs font-black font-mono">₹{getTotalBillPrice()}</p>
+                <p className="text-xs font-black font-mono font-bold">₹{getTotalBillPrice()}</p>
               </div>
               <ChevronRight size={16} />
             </motion.button>
@@ -1909,7 +1947,7 @@ export default function BbCafeHome() {
         </div>
       </div>
 
-      {/* --- DRAWERS & MODALS (ऑप्टिमाइज्ड इम्पोर्ट्स) --- */}
+      {/* --- सभी ड्रॉअर्स और मॉडल्स रेंडरिंग (components/home फ़ोल्डर से) --- */}
       <AnimatePresence>
         {isProfileOpen && (
           <ProfileDrawer 
@@ -1944,6 +1982,7 @@ export default function BbCafeHome() {
             triggerHaptic={triggerHaptic}
             ecoCutlerySaves={ecoCutlerySaves}
             getReferralCode={getReferralCode}
+            setLiveOrder={setLiveOrder} // प्रॉप्स में सेट लाइव आर्डर सफलता से जोड़ा गया
           />
         )}
       </AnimatePresence>
