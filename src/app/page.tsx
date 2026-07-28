@@ -19,7 +19,6 @@ import PizzaCustomizerModal from '@/components/home/PizzaCustomizerModal';
 import PointsClaimModal from '@/components/home/PointsClaimModal';
 import ProfileDrawer from '@/components/home/ProfileDrawer';
 import ReelsViewer from '@/components/home/ReelsViewer';
-import ReviewFormModal from '@/components/home/ReviewFormModal';
 
 // TypeScript JSX वैलिडेशन एरर को बायपास करने के लिए cast any किया गया है
 const CategorySliderAny = CategorySlider as any;
@@ -32,7 +31,6 @@ const PizzaCustomizerModalAny = PizzaCustomizerModal as any;
 const PointsClaimModalAny = PointsClaimModal as any;
 const ProfileDrawerAny = ProfileDrawer as any;
 const ReelsViewerAny = ReelsViewer as any;
-const ReviewFormModalAny = ReviewFormModal as any;
 
 const FALLBACK_CATEGORIES = ["All", "Special Pizza", "Special Thali", "Paneer Special", "Special Mix veg", "Fast Food", "Super Cool", "Indian Bread", "Special Rice"];
 
@@ -74,20 +72,6 @@ const SOCIAL_LINKS = [
   { id: 'whatsapp_channel', label: '📢 WhatsApp Channel', icon: '/whatsapp.png', points: 1, url: 'https://whatsapp.com/channel/0029VaLhggoGE56natoQI43y' },
   { id: 'snapchat', label: '👻 Snapchat', icon: '/snapchat.png', points: 1, url: 'https://www.snapchat.com/add/bbcafe.in' },
   { id: 'youtube', label: '🔴 YouTube', icon: '/youtube.png', points: 1, url: 'https://www.youtube.com/@bbcafe.i' }
-];
-
-const SUGGESTED_REVIEWS = [
-  "पिज्जा का स्वाद लाजवाब है! मज़ा आ गया 🍕😋",
-  "मोहांद्रा में सबसे बेस्ट सर्विस और स्वाद! ⭐⭐⭐⭐⭐",
-  "सुपर फास्ट डिलीवरी और शानदार पैकेजिंग! 🛵📦",
-  "साफ़-सफ़ाई और शुद्धता 10/10 है! 🧼👌"
-];
-
-const PERMANENT_REVIEWS = [
-  { id: "rev1", name: "Gaurav Soni", rating: 5, comment: "बम बम कैफे की पनीर पिज्जा सच में पूरे मोहांद्रा में बेस्ट है! एक्स्ट्रा चीज़ लव है। ⭐⭐⭐⭐⭐" },
-  { id: "rev2", name: "Anjali Patel", rating: 5, comment: "फास्ट फ़ूड की पैकिंग बहुत अच्छी थी, डिलीवरी बॉय का व्यवहार भी बहुत विनम्र था। ⭐⭐⭐⭐⭐" },
-  { id: "rev3", name: "Shubham Dwivedi", rating: 5, comment: "स्पेशल थाली का स्वाद एकदम घर जैसा है। सफ़ाई और शुद्धता लाजवाब है। ⭐⭐⭐⭐⭐" },
-  { id: "rev4", name: "Neha Chaurasia", rating: 5, comment: "इस क्षेत्र का सबसे अच्छा कैफे। पिज्जा विभाग ताज़ा है और क्रस्ट बहुत सॉफ्ट है! ⭐⭐⭐⭐⭐" }
 ];
 
 export default function BbCafeHome() {
@@ -161,16 +145,6 @@ export default function BbCafeHome() {
   const [banners, setBanners] = useState<any[]>([]);
   const [bannerIndex, setBannerIndex] = useState(0);
   const [bannerError, setBannerError] = useState(false);
-  const [reviews, setReviews] = useState<any[]>([]);
-  
-  const [isReviewsDrawerOpen, setIsReviewsDrawerOpen] = useState(false);
-  const [isReviewFormOpen, setIsReviewFormOpen] = useState(false);
-  const [reviewName, setReviewName] = useState("");
-  const [reviewComment, setReviewComment] = useState("");
-  const [reviewRating, setReviewRating] = useState(5);
-  
-  const [enteredCoupon, setEnteredCoupon] = useState("");
-  const [appliedCoupon, setAppliedCoupon] = useState<any>(null);
 
   // Normal Pizza Customization Addons
   const [normalPizzaSize, setNormalPizzaSize] = useState("");
@@ -459,7 +433,7 @@ export default function BbCafeHome() {
     });
 
     const listWithoutSpecial = result.filter(c => c !== "All" && c !== "DIY Pizza");
-    const finalized = ["All", ...listWithoutSpecial]; // "DIY Pizza" को श्रेणियों से हटाया गया
+    const finalized = ["All", ...listWithoutSpecial]; // DIY Pizza removed!
 
     return Array.from(new Set(finalized));
   }, [dbCategories]);
@@ -476,14 +450,6 @@ export default function BbCafeHome() {
     const found = pastOrders.find(o => o.fulfillmentType === "delivery" && o.address);
     return found ? found.address : "";
   }, [pastOrders]);
-
-  const displayReviews = useMemo(() => {
-    return reviews.length > 0 ? reviews : PERMANENT_REVIEWS;
-  }, [reviews]);
-
-  const hasManyReviews = useMemo(() => {
-    return displayReviews.length > 10;
-  }, [displayReviews]);
 
   // --- Dynamic add-ons display verification based on eligible dishes ---
   const showAddonsSection = useMemo(() => {
@@ -545,34 +511,6 @@ export default function BbCafeHome() {
       localStorage.setItem('bb_favorites', JSON.stringify(next));
       return next;
     });
-  };
-
-  const handleReviewSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    triggerHaptic();
-    if (!reviewName || !reviewComment) {
-      toast.error(isHindi ? "सभी फ़ील्ड भरें!" : "Please fill all fields!");
-      return;
-    }
-    const toastId = toast.loading(isHindi ? "समीक्षा सबमिट की जा रही है..." : "Submitting review...");
-    try {
-      await addDoc(collection(db, "reviews"), {
-        name: reviewName,
-        comment: reviewComment,
-        rating: reviewRating,
-        isApproved: false,
-        timestamp: new Date()
-      });
-      toast.dismiss(toastId);
-      toast.success(isHindi ? "समीक्षा सबमिट हो गई! वेरिफिकेशन के बाद दिखेगी।" : "Review submitted successfully! Post approval it will be shown.");
-      setReviewName("");
-      setReviewComment("");
-      setReviewRating(5);
-      setIsReviewFormOpen(false);
-    } catch (err) {
-      toast.dismiss(toastId);
-      toast.error(isHindi ? "त्रुटि! कृपया दोबारा प्रयास करें।" : "Error! Please try again.");
-    }
   };
 
   const handleSaveDetails = async (e: React.FormEvent) => {
@@ -1327,9 +1265,6 @@ export default function BbCafeHome() {
       const cachedReels = localStorage.getItem('bb_cached_reels');
       if (cachedReels) setStories(JSON.parse(cachedReels));
 
-      const cachedReviews = localStorage.getItem('bb_cached_reviews');
-      if (cachedReviews) setReviews(JSON.parse(cachedReviews));
-
       const savedDetails = localStorage.getItem('bb_cafe_customer');
       if (savedDetails) {
         const parsed = JSON.parse(savedDetails);
@@ -1359,7 +1294,6 @@ export default function BbCafeHome() {
           catsSnap,
           bannersSnap,
           reelsSnap,
-          revsSnap,
           rulesSnap,
           socialSnap
         ] = await Promise.all([
@@ -1368,7 +1302,6 @@ export default function BbCafeHome() {
           getDocs(collection(db, "categories")),
           getDocs(collection(db, "banners")),
           getDocs(collection(db, "reels")),
-          getDocs(collection(db, "reviews")),
           getDocs(collection(db, "loyalty_rules")),
           getDoc(doc(db, "settings", "social_counts"))
         ]);
@@ -1403,10 +1336,6 @@ export default function BbCafeHome() {
         const reelData = reelsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
         setStories(reelData);
         localStorage.setItem('bb_cached_reels', JSON.stringify(reelData));
-
-        const revData = revsSnap.docs.map(d => ({ id: d.id, ...d.data() as any })).filter((r: any) => r.isApproved === true || r.isApproved === "approved" || r.approved === true);
-        setReviews(revData);
-        localStorage.setItem('bb_cached_reviews', JSON.stringify(revData));
 
         const ruleData = rulesSnap.docs.map(d => ({ id: d.id, ...d.data() }));
         setLoyaltyRules(ruleData);
@@ -1519,17 +1448,6 @@ export default function BbCafeHome() {
           ))}
         </div>
       )}
-
-      {/* Sticky Right Side Review Tab */}
-      <div className="fixed right-0 top-1/2 -translate-y-1/2 z-50">
-        <button 
-          onClick={() => { triggerHaptic(); setIsReviewFormOpen(true); }}
-          className="bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[10px] py-3 px-1.5 rounded-l-xl shadow-2xl border-l border-y border-white/20 flex flex-col items-center gap-1 transition-all active:translate-x-1"
-          style={{ writingMode: 'vertical-rl' }}
-        >
-          <span className="uppercase tracking-wider font-bold">{isHindi ? "समीक्षा" : "Reviews"}</span>
-        </button>
-      </div>
 
       {/* PREMIUM HERO HEADER */}
       <header className="relative pt-6 pb-4 px-4 overflow-hidden shadow-md flex flex-col justify-end min-h-[120px] bg-neutral-950 border-b dark:border-white/5 border-neutral-200">
@@ -1728,7 +1646,7 @@ export default function BbCafeHome() {
           </div>
         )}
 
-        {/* STANDARD PRODUCTS (DIY Pizza Builder removed) */}
+        {/* STANDARD PRODUCTS (DIY Pizza Builder and Reviews sections removed) */}
         <div className="grid grid-cols-1 gap-4 pt-1 font-bold">
           {menuLoading ? (
             Array.from({ length: 3 }).map((_, idx) => (
@@ -1912,32 +1830,6 @@ export default function BbCafeHome() {
           )}
         </div>
 
-        {/* REVIEWS SECTION */}
-        <div className="pt-6 space-y-4 font-sans font-bold">
-          <div className="flex justify-between items-center">
-            <h3 className="text-sm font-black uppercase tracking-wider text-yellow-500 flex items-center gap-1 font-bold font-sans">⭐ {isHindi ? "हमारे ग्राहकों के प्यारे शब्द" : "Feedback from our loved guests"}</h3>
-            <span className="text-[9px] font-bold text-neutral-600 dark:text-gray-400">{isHindi ? "कुल समीक्षाएं" : "Total Reviews"} ({displayReviews.length})</span>
-          </div>
-          
-          <div className={hasManyReviews ? "max-h-[380px] overflow-y-auto pr-1 space-y-3.5 scrollbar-thin scrollbar-thumb-orange-500 font-sans" : "space-y-3.5 font-sans"}>
-            {displayReviews.map((r: any) => (
-              <div key={r.id} className="dark:bg-white/[0.02] bg-white border dark:border-white/5 border-neutral-200 p-4 rounded-2xl space-y-2 shadow-md shadow-neutral-200/30">
-                <div className="flex justify-between items-center">
-                  <h4 className="font-black text-xs text-orange-600 font-bold">{r.name}</h4>
-                  <div className="flex items-center gap-0.5">
-                    <Star size={10} style={{ color: '#fbbf24', fill: '#fbbf24' }} />
-                    <Star size={10} style={{ color: '#fbbf24', fill: '#fbbf24' }} />
-                    <Star size={10} style={{ color: '#fbbf24', fill: '#fbbf24' }} />
-                    <Star size={10} style={{ color: '#fbbf24', fill: '#fbbf24' }} />
-                    <Star size={10} style={{ color: '#fbbf24', fill: '#fbbf24' }} />
-                  </div>
-                </div>
-                <p className="text-[10.5px] text-neutral-800 dark:text-gray-300 italic leading-relaxed">"{r.comment}"</p>
-              </div>
-            ))}
-          </div>
-        </div>
-
         {/* FOOTER */}
         <footer className="pt-8 border-t border-neutral-200 dark:border-white/5 space-y-6">
           <div className="bg-gradient-to-br dark:from-green-950/20 dark:to-emerald-900/10 from-green-50 to-emerald-50 p-6 rounded-[2rem] border dark:border-green-500/10 border-green-200 relative overflow-hidden transition-colors duration-200 font-sans">
@@ -2048,23 +1940,6 @@ export default function BbCafeHome() {
         isHindi={isHindi}
       />
 
-      {/* (3) WRITE REVIEW MODAL COMPONENT */}
-      {isReviewFormOpen && (
-        <ReviewFormModalAny 
-          onClose={() => setIsReviewFormOpen(false)}
-          reviewName={reviewName}
-          setReviewName={setReviewName}
-          reviewRating={reviewRating}
-          setReviewRating={setReviewRating}
-          reviewComment={reviewComment}
-          setReviewComment={setReviewComment}
-          SUGGESTED_REVIEWS={SUGGESTED_REVIEWS}
-          handleReviewSubmit={handleReviewSubmit}
-          isHindi={isHindi}
-          triggerHaptic={triggerHaptic}
-        />
-      )}
-
       {/* (4) REGULAR PIZZA PORTION CUSTOMIZER MODAL */}
       <PizzaCustomizerModalAny 
         selectedProduct={selectedProduct}
@@ -2086,39 +1961,37 @@ export default function BbCafeHome() {
       />
 
       {/* (5) PROFILE & LOYALTY DATABASE DRAWER */}
-      {isProfileOpen && (
-        <ProfileDrawerAny 
-          isOpen={isProfileOpen}
-          onClose={() => setIsProfileOpen(false)}
-          customerDetails={customerDetails}
-          setCustomerDetails={setCustomerDetails}
-          tempName={tempName}
-          setTempName={setTempName}
-          tempPhone={tempPhone}
-          setTempPhone={setTempPhone}
-          tempPin={tempPin}
-          setTempPin={setTempPin}
-          tempRefCode={tempRefCode}
-          setTempRefCode={setTempRefCode}
-          handleSaveDetails={handleSaveDetails}
-          ecoCutlerySaves={ecoCutlerySaves}
-          customerPoints={customerPoints}
-          pointsHistory={pointsHistory}
-          shareCount={shareCount}
-          handleShareApp={handleShareApp}
-          setIsGiftModalOpen={setIsGiftModalOpen}
-          SOCIAL_LINKS={SOCIAL_LINKS}
-          setClaimingPlatform={setClaimingPlatform}
-          setIsClaimModalOpen={setIsClaimModalOpen}
-          loyaltyRules={loyaltyRules}
-          handleCustomerRedeem={handleCustomerRedeem}
-          pastOrders={pastOrders}
-          whatsappNumber={whatsappNumber}
-          isHindi={isHindi}
-          triggerHaptic={triggerHaptic}
-          getReferralCode={getReferralCode}
-        />
-      )}
+      <ProfileDrawerAny 
+        isOpen={isProfileOpen}
+        onClose={() => setIsProfileOpen(false)}
+        customerDetails={customerDetails}
+        setCustomerDetails={setCustomerDetails}
+        tempName={tempName}
+        setTempName={setTempName}
+        tempPhone={tempPhone}
+        setTempPhone={setTempPhone}
+        tempPin={tempPin}
+        setTempPin={setTempPin}
+        tempRefCode={tempRefCode}
+        setTempRefCode={setTempRefCode}
+        handleSaveDetails={handleSaveDetails}
+        ecoCutlerySaves={ecoCutlerySaves}
+        customerPoints={customerPoints}
+        pointsHistory={pointsHistory}
+        shareCount={shareCount}
+        handleShareApp={handleShareApp}
+        setIsGiftModalOpen={setIsGiftModalOpen}
+        SOCIAL_LINKS={SOCIAL_LINKS}
+        setClaimingPlatform={setClaimingPlatform}
+        setIsClaimModalOpen={setIsClaimModalOpen}
+        loyaltyRules={loyaltyRules}
+        handleCustomerRedeem={handleCustomerRedeem}
+        pastOrders={pastOrders}
+        whatsappNumber={whatsappNumber}
+        isHindi={isHindi}
+        triggerHaptic={triggerHaptic}
+        getReferralCode={getReferralCode}
+      />
 
       {/* (6) MODULAR CART DRAWER */}
       <CartDrawerAny 
