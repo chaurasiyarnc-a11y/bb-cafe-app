@@ -1,3 +1,5 @@
+
+
 'use client';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { db } from '../lib/firebase'; 
@@ -7,7 +9,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
 import { useCartStore } from '../store/useCartStore';
 
-// --- सभी १२ कंपोनेंट्स सीधे 'components/home/' फ़ोल्डर से इम्पोर्ट हो रहे हैं ---
+// --- components/home/ फ़ोल्डर से इम्पोर्ट्स (१२ कम्पोनेंट्स) ---
 import CategorySlider from '../components/home/CategorySlider';
 import DiyPizzaBuilder from '../components/home/DiyPizzaBuilder';
 import CartDrawer from '../components/home/CartDrawer';
@@ -237,7 +239,7 @@ export default function BbCafeHome() {
     try {
       const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
       const osc = audioCtx.createOscillator();
-      const font = audioCtx.createGain(); // modified 'gain' reference slightly
+      const font = audioCtx.createGain(); 
       osc.connect(font);
       font.connect(audioCtx.destination);
       
@@ -1028,22 +1030,40 @@ export default function BbCafeHome() {
     }
 
     const toastId = toast.loading(isHindi ? "लोकेशन खोजी जा रही है..." : "Detecting live location...");
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const { latitude, longitude } = position.coords;
-        const distance = calculateDistanceInKm(latitude, longitude, storeCoordinates.lat, storeCoordinates.lng);
-        setDistanceKm(Number(distance.toFixed(2)));
+    
+    const optionsHigh = { enableHighAccuracy: true, timeout: 8000, maximumAge: 10000 };
+    const optionsLow = { enableHighAccuracy: false, timeout: 15000, maximumAge: 60000 };
 
-        setAddress(isHindi ? `My GPS Location: https://www.google.com/maps?q=${latitude.toFixed(6)},${longitude.toFixed(6)}` : `My GPS Location: https://www.google.com/maps?q=${latitude.toFixed(6)},${longitude.toFixed(6)}`);
-        toast.dismiss(toastId);
-        toast.success(isHindi ? "लोकेशन सफलतापूर्वक डिटेक्ट की गई!" : "Location successfully detected!");
-      },
-      () => {
-        toast.dismiss(toastId);
-        toast.error(isHindi ? "लोकेशन एक्सेस करने में असमर्थ।" : "Unable to retrieve your location.");
-      },
-      { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
-    );
+    const successCallback = (position: any) => {
+      const { latitude, longitude } = position.coords;
+      const distance = calculateDistanceInKm(latitude, longitude, storeCoordinates.lat, storeCoordinates.lng);
+      setDistanceKm(Number(distance.toFixed(2)));
+
+      setAddress(isHindi 
+        ? `My GPS Location: https://www.google.com/maps?q=${latitude.toFixed(6)},${longitude.toFixed(6)}` 
+        : `My GPS Location: https://www.google.com/maps?q=${latitude.toFixed(6)},${longitude.toFixed(6)}`
+      );
+      toast.dismiss(toastId);
+      toast.success(isHindi ? "लोकेशन सफलतापूर्वक डिटेक्ट की गई!" : "Location successfully detected!");
+    };
+
+    const errorCallback = (error: any) => {
+      console.warn("High accuracy GPS timed out/failed. Attempting network triangulation...", error);
+      
+      navigator.geolocation.getCurrentPosition(
+        successCallback,
+        () => {
+          toast.dismiss(toastId);
+          toast.error(isHindi 
+            ? "लोकेशन एक्सेस करने में असमर्थ। कृपया अपने फोन की GPS परमिशन चेक करें।" 
+            : "Unable to retrieve your location. Please check your phone's GPS settings."
+          );
+        },
+        optionsLow
+      );
+    };
+
+    navigator.geolocation.getCurrentPosition(successCallback, errorCallback, optionsHigh);
   };
 
   const handleShareApp = async () => {
@@ -1216,7 +1236,160 @@ export default function BbCafeHome() {
     toast.success(isHindi ? "आइटम कार्ट में जोड़ा गया!" : "Item added to cart!");
   };
 
-  // --- SWR Background Database Loader ---
+  // --- १. आटोमेटिक लाइव आर्डर एक्टिव-ट्रैकर लिसनर (इंडेक्स फ्री) ---
+  useEffect(() => {
+    if (!customerDetails?.phone) {
+      setCustomerPoints(0);
+      setPointsHistory([]);
+      setLiveOrder(null);
+      return;
+    }
+    
+    const phoneClean = customerDetails.phone.replace("+91", "").trim();
+    
+    const unsubPoints = onSnapshot(doc(db, "customer_points", phoneClean), (snap) => {
+      if (snap.exists()) {
+        setCustomerPoints(snap.data().points || 0);
+      }
+    });
+
+    const unsubHistory = onSnapshot(
+      query(collection(db, "customer_points", phoneClean, "history"), orderBy("timestamp", "desc")),
+      (snap) => {
+        setPointsHistory(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      }
+    );
+
+    // --- सुधरा हुआ इंडेक्स-फ्री और इंस्टेंट रिएक्ट करने वाला लाइव आर्डर ट्रैकर लिसनर ---
+    const unsubLive = onSnapshot(
+      query(
+        collection(db, "orders"),
+        where("customerPhone", "==", customerDetails.phone) // केवल फ़ोन नंबर से फ़िल्टर (नो इंडेक्स नीडेड)
+      ),
+      (snap) => {
+        if (!snap.empty) {
+          const userOrders = snap.docs.map(doc => ({ id: doc.id, ...doc.data() as any }));
+          
+          // मोबाइल के अंदर ही केवल एक्टिव आर्डर्स को फ़िल्टर करें (pending, preparing, out_for_delivery)
+          const activeOrders = userOrders.filter(o => 
+            o.status === 'pending' || o.status === 'preparing' || o.status === 'out_for_delivery'
+          );
+
+          if (activeOrders.length > 0) {
+            // मोबाइल के अंदर ही तारीख के हिसाब से सबसे नया आर्डर सॉर्ट करें
+            activeOrders.sort((a, b) => {
+              const tA = a.timestamp?.toDate ? a.timestamp.toDate() : new Date(a.timestamp || 0);
+              const tB = b.timestamp?.toDate ? b.timestamp.toDate() : new Date(b.timestamp || 0);
+              return tB.getTime() - tA.getTime();
+            });
+
+            const latestActiveOrder = activeOrders[0];
+            const dismissedRejected = JSON.parse(localStorage.getItem('bb_dismissed_rejected_orders') || '[]');
+            
+            if (!dismissedRejected.includes(latestActiveOrder.id)) {
+              setLiveOrder(latestActiveOrder); // लाइव ट्रैकर में सेट करें
+            } else {
+              setLiveOrder(null);
+            }
+          } else {
+            // यदि कोई भी आर्डर एक्टिव नहीं है (डिलीवर हो गया है), तो मैप तुरंत बंद करें!
+            setLiveOrder(null);
+          }
+        } else {
+          setLiveOrder(null);
+        }
+      },
+      (error) => {
+        console.error("Live order query failed silently:", error);
+      }
+    );
+
+    return () => {
+      unsubPoints();
+      unsubHistory();
+      unsubLive();
+    };
+  }, [customerDetails?.phone]);
+
+  // --- Search Debouncing & Hinglish Optimizer ---
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const cleanQuery = searchQuery.toLowerCase().trim();
+      const translatedWords = cleanQuery.split(/\s+/).map(word => HINGLISH_DICT[word] || word);
+      setDebouncedSearchQuery(translatedWords.join(" "));
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // --- Banner Cycle Auto-Carousel Timer ---
+  useEffect(() => {
+    if (banners.length <= 1) return;
+    const interval = setInterval(() => {
+      setBannerIndex((prev) => (prev + 1) % banners.length);
+    }, 4000);
+    return () => clearInterval(interval);
+  }, [banners]);
+
+  useEffect(() => {
+    const fakeProofs = [
+      { text: "Ramesh from Mohandra recently ordered Special Thali! 🍛" },
+      { text: "Pooja just added Paneer Special Pizza to her cart! 🍕" },
+      { text: "5 people are looking at DIY Pizza right now! 🔥" },
+      { text: "Amit rated Bum Bum Cafe 5 stars! ⭐⭐⭐⭐⭐" },
+      { text: "Sanjay from Mohandra Town just placed an order! 🛵" },
+      { text: "Anjali is customizing her DIY Pizza! 🍕" }
+    ];
+    setSocialProofs(fakeProofs);
+    
+    const interval = setInterval(() => {
+      const randomIndex = Math.floor(Math.random() * fakeProofs.length);
+      setSocialAlertIndex(randomIndex);
+      setShowSocialAlert(true);
+      setTimeout(() => setShowSocialAlert(false), 5000);
+    }, 24000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  // --- क्यूआर कोड टेबल नंबर आटोमेटिक डिटेक्ट मैकेनिज्म ---
+  useEffect(() => {
+    if (mounted && typeof window !== "undefined") {
+      const urlParams = new URLSearchParams(window.location.search);
+      const tableParam = urlParams.get('table');
+      if (tableParam) {
+        setFulfillmentType("table");
+        setTableNumber(`Table ${tableParam}`);
+        toast.success(isHindi 
+          ? `टेबल नंबर ${tableParam} आटोमेटिक डिटेक्ट हो गया! 🍽️` 
+          : `Table ${tableParam} automatically detected! 🍽️`
+        );
+      }
+    }
+  }, [mounted, isHindi]);
+
+  // --- एंड्रॉइड फिजिकल बैक बटन इंटरसेप्टर ---
+  useEffect(() => {
+    if (!mounted) return;
+
+    const handlePopState = (e: PopStateEvent) => {
+      if (isCartOpen) {
+        setIsCartOpen(false);
+        window.history.pushState(null, "", window.location.pathname);
+      } else if (isProfileOpen) {
+        setIsProfileOpen(false);
+        window.history.pushState(null, "", window.location.pathname);
+      } else if (isUpiPopupOpen) {
+        setIsUpiPopupOpen(false);
+        window.history.pushState(null, "", window.location.pathname);
+      }
+    };
+
+    window.history.pushState(null, "", window.location.pathname);
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, [mounted, isCartOpen, isProfileOpen, isUpiPopupOpen]);
+
+  // --- INITIAL MOUNT & SWR BACKGROUND DATABASE SYNCHRONIZER ---
   useEffect(() => {
     setMounted(true);
 
@@ -1354,44 +1527,6 @@ export default function BbCafeHome() {
     };
   }, []);
 
-  // --- १. क्यूआर कोड टेबल नंबर आटोमेटिक डिटेक्ट मैकेनिज्म ---
-  useEffect(() => {
-    if (mounted && typeof window !== "undefined") {
-      const urlParams = new URLSearchParams(window.location.search);
-      const tableParam = urlParams.get('table');
-      if (tableParam) {
-        setFulfillmentType("table");
-        setTableNumber(`Table ${tableParam}`);
-        toast.success(isHindi 
-          ? `टेबल नंबर ${tableParam} आटोमेटिक डिटेक्ट हो गया! 🍽️` 
-          : `Table ${tableParam} automatically detected! 🍽️`
-        );
-      }
-    }
-  }, [mounted, isHindi]);
-
-  // --- २. एंड्रॉइड फिजिकल बैक बटन इंटरसेप्टर ---
-  useEffect(() => {
-    if (!mounted) return;
-
-    const handlePopState = (e: PopStateEvent) => {
-      if (isCartOpen) {
-        setIsCartOpen(false);
-        window.history.pushState(null, "", window.location.pathname);
-      } else if (isProfileOpen) {
-        setIsProfileOpen(false);
-        window.history.pushState(null, "", window.location.pathname);
-      } else if (isUpiPopupOpen) {
-        setIsUpiPopupOpen(false);
-        window.history.pushState(null, "", window.location.pathname);
-      }
-    };
-
-    window.history.pushState(null, "", window.location.pathname);
-    window.addEventListener("popstate", handlePopState);
-    return () => window.removeEventListener("popstate", handlePopState);
-  }, [mounted, isCartOpen, isProfileOpen, isUpiPopupOpen]);
-
   return (
     <div className="dark:bg-[#050505] bg-neutral-50 min-h-screen dark:text-white text-neutral-800 pb-32 font-sans relative overflow-x-clip transition-colors duration-200">
       
@@ -1430,7 +1565,7 @@ export default function BbCafeHome() {
       </AnimatePresence>
 
       {/* PREMIUM HERO HEADER */}
-      <header className="relative pt-6 pb-4 px-4 overflow-hidden shadow-md flex flex-col justify-end min-h-[120px] bg-neutral-950 border-b dark:border-white/5 border-neutral-200 font-sans font-bold">
+      <header className="relative pt-6 pb-4 px-4 overflow-hidden shadow-md flex flex-col justify-end min-h-[120px] bg-neutral-950 border-b dark:border-white/5 border-neutral-200">
         <div className="relative z-20 max-w-[85%] mt-auto bg-black/40 backdrop-blur-sm p-2.5 rounded-xl border border-white/10 shadow-md">
           <motion.div
             initial={{ x: -25, opacity: 0 }}
@@ -1663,15 +1798,15 @@ export default function BbCafeHome() {
           <div className="grid grid-cols-1 gap-4 pt-1 font-bold">
             {menuLoading ? (
               Array.from({ length: 3 }).map((_, idx) => (
-                <div key={idx} className="dark:bg-white/[0.02] bg-white rounded-2xl border dark:border-white/5 border-neutral-200 p-4 space-y-4 animate-pulse font-sans">
-                  <div className="h-44 bg-neutral-300 dark:bg-neutral-800 rounded-xl w-full" />
+                <div key={idx} className="dark:bg-[#111] bg-white rounded-2xl border dark:border-white/5 border-neutral-200 p-4 space-y-4 animate-pulse font-sans">
+                  <div className="h-44 bg-neutral-300 dark:bg-neutral-850 rounded-xl w-full" />
                   <div className="space-y-2">
-                    <div className="h-4 bg-neutral-300 dark:bg-neutral-800 rounded w-1/2" />
-                    <div className="h-3 bg-neutral-300 dark:bg-neutral-800 rounded w-1/4" />
+                    <div className="h-4 bg-neutral-300 dark:bg-neutral-850 rounded w-1/2" />
+                    <div className="h-3 bg-neutral-300 dark:bg-neutral-850 rounded w-1/4" />
                   </div>
                   <div className="flex justify-between items-center">
-                    <div className="h-6 bg-neutral-300 dark:bg-neutral-800 rounded w-1/6" />
-                    <div className="h-8 bg-neutral-300 dark:bg-neutral-800 rounded w-1/5" />
+                    <div className="h-6 bg-neutral-300 dark:bg-neutral-850 rounded w-1/6" />
+                    <div className="h-8 bg-neutral-300 dark:bg-neutral-850 rounded w-1/5" />
                   </div>
                 </div>
               ))
@@ -1685,7 +1820,7 @@ export default function BbCafeHome() {
                   <React.Fragment key={item.id}>
                     <motion.div 
                       layout 
-                      className={`group dark:bg-white/[0.02] bg-white rounded-2xl border dark:border-white/5 border-neutral-200 overflow-hidden flex flex-col relative shadow-md shadow-neutral-100 dark:shadow-none transition-all duration-300 hover:shadow-lg ${!isItemAvailable ? 'opacity-70' : ''}`}
+                      className={`group dark:bg-[#111] bg-white rounded-2xl border dark:border-white/5 border-neutral-200 overflow-hidden flex flex-col relative shadow-md shadow-neutral-100 dark:shadow-none transition-all duration-300 hover:shadow-lg ${!isItemAvailable ? 'opacity-70' : ''}`}
                       initial={{ opacity: 0, y: 30 }}
                       whileInView={{ opacity: 1, y: 0 }}
                       viewport={{ once: true, margin: "-50px" }}
@@ -1775,7 +1910,7 @@ export default function BbCafeHome() {
                             </h4>
                             <p className="text-[10px] text-orange-100 font-bold leading-normal font-sans">
                               {customerDetails ? (
-                                isHindi ? "आपका प्रोमो पास एक्टिवेटेड है! ✅ हर ₹100 पर 1 पॉइंट कमाएं।  यहाँ क्लिक करके अपने  रिवॉर्ड्स देखें ➔" : "Your promo pass is active! ✅ Earn 1 point per ₹100. Click here to view rewards ➔"
+                                isHindi ? "का आपका प्रोमो पास एक्टिवेटेड है! ✅ हर ₹100 पर 1 पॉइंट कमाएं।  यहाँ क्लिक करके अपने  रिवॉर्ड्स देखें ➔" : "Your promo pass is active! ✅ Earn 1 point per ₹100. Click here to view rewards ➔"
                               ) : (
                                 isHindi ? "अपना Name और Number दर्ज करके इस पास को एक्टिवेट करें! 🎁 हर ₹100 पर 1 पॉइंट कमाएं।  टच करें ➔" : "Enter your Name & Number to activate this pass! 🎁 Earn 1 point per ₹100. Tap to activate ➔"
                               )}
@@ -2123,7 +2258,7 @@ export default function BbCafeHome() {
           <PointsClaimModal 
             isHindi={isHindi}
             isClaimModalOpen={isClaimModalOpen}
-            setIsClaimModalOpen={setIsClaimModalOpen}
+            setIsClaimModalOpen={setIsClaimOpen} // Sagi spelling fix for compilation
             claimingPlatform={claimingPlatform}
             claimUsername={claimUsername}
             setClaimUsername={setClaimUsername}
@@ -2160,3 +2295,4 @@ export default function BbCafeHome() {
     </div>
   );
 }
+
