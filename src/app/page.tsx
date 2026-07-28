@@ -980,7 +980,6 @@ export default function BbCafeHome() {
         msg += `*Points Redeemed:* -${totalPointsCost} Pts\n`;
       }
 
-      // यूपीआई होने पर रसीद सीधे व्हाट्सएप पर ही भेजने का निर्देश दें
       if (paymentMethod === "upi") {
         msg += `\n📸 *भुगतान स्क्रीनशॉट:* (कृपया इस आर्डर मैसेज के साथ अपना UPI पेमेंट स्क्रीनशॉट भी व्हाट्सएप पर तुरंत सेंड करें!)\n`;
       }
@@ -1322,7 +1321,7 @@ export default function BbCafeHome() {
     }
   }, [mounted, isHindi]);
 
-  // --- २. एंड्रॉइड फिजिकल बैक बटन इंटरसेप्टर (Drawer/Modal को बंद करने के लिए) ---
+  // --- २. एंड्रॉइड फिजिकल बैक बटन इंटरसेप्टर ---
   useEffect(() => {
     if (!mounted) return;
 
@@ -1675,7 +1674,7 @@ export default function BbCafeHome() {
                     <span className="text-[7px] text-gray-500 font-bold uppercase tracking-wider mt-1">{isHindi ? "कैफ़े" : "Cafe"}</span>
                   </div>
 
-                  {/* मंज़िल (कस्टमर का घर) */}
+                  {/* मज़िल (कस्टमर का घर) */}
                   <div className="absolute right-0 z-10 flex flex-col items-center">
                     <span className="text-lg bg-neutral-800 p-1.5 rounded-full border border-white/10 shadow">🏠</span>
                     <span className="text-[7px] text-gray-500 font-bold uppercase tracking-wider mt-1">{isHindi ? "आपका घर" : "Home"}</span>
@@ -1879,7 +1878,7 @@ export default function BbCafeHome() {
                     >
                       <div className="relative h-44 w-full overflow-hidden font-sans">
                         <img 
-                          src={(item.image || item.imageUrl || item.url || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=500&q=80") + "&w=400&q=60"} // अनस्प्लैश इमेज कम्प्रेशन सपोर्ट
+                          src={(item.image || item.imageUrl || item.url || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=500&q=80") + "&w=400&q=60"} 
                           className="w-full h-full object-cover origin-center transition-transform duration-700 ease-out group-hover:scale-110" 
                           alt={item.name} 
                           loading="lazy"
@@ -2650,6 +2649,11 @@ export default function BbCafeHome() {
             isSubmittingOrder={isSubmittingOrder}
             triggerHaptic={triggerHaptic}
             upiId={upiId}
+            // --- डमी प्रॉप्स (TypeScript एरर को पूरी तरह हल करने के लिए) ---
+            handleScreenshotChange={() => {}} 
+            isCompressing={false}
+            paymentScreenshot={null}
+            setPaymentScreenshot={() => {}}
           />
         )}
       </AnimatePresence>
@@ -2773,3 +2777,4 @@ export default function BbCafeHome() {
     </div>
   );
 }
+
