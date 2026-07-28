@@ -1,3 +1,5 @@
+
+
 'use client';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { db } from '../lib/firebase'; 
@@ -692,6 +694,458 @@ export default function BbCafeHome() {
     }
   };
 
+  // --- MISSING EVENT HANDLERS IMPLEMENTATION ---
+
+  const handleReelEnded = () => {
+    if (!activeStory) return;
+    const currentIndex = stories.findIndex((s) => s.id === activeStory.id);
+    if (currentIndex !== -1 && currentIndex < stories.length - 1) {
+      setActiveStory(stories[currentIndex + 1]);
+    } else {
+      setActiveStory(null);
+    }
+  };
+
+  const handleQuickAddFromStory = (story: any) => {
+    triggerHaptic();
+    const matchingItem = menu.find(
+      (item) =>
+        item.name.toLowerCase().includes(story.title.toLowerCase()) ||
+        story.title.toLowerCase().includes(item.name.toLowerCase())
+    );
+    if (matchingItem) {
+      if (matchingItem.variants) {
+        setSelectedProduct(matchingItem);
+        setActiveStory(null); 
+        toast.success(isHindi ? "विकल्प चुनें!" : "Please select options!");
+      } else {
+        addItem(matchingItem);
+        playSoundEffect('add');
+        toast.success(isHindi ? `${matchingItem.name} कर्ट में जोड़ा गया!` : `${matchingItem.name} added to cart!`);
+      }
+    } else {
+      const fallbackItem = {
+        id: `story_${story.id}`,
+        name: story.title,
+        price: story.price || 120, 
+        category: "Special",
+        isAvailable: true
+      };
+      addItem(fallbackItem);
+      playSoundEffect('add');
+      toast.success(isHindi ? `${fallbackItem.name} कर्ट में जोड़ा गया!` : `${fallbackItem.name} added to cart!`);
+    }
+  };
+
+  const handleNormalPizzaAdd = () => {
+    triggerHaptic();
+    if (!selectedProduct) return;
+    
+    const sizeKey = normalPizzaSize.toLowerCase() || "small";
+    const addonsList = Object.entries(normalPizzaAddons)
+      .filter(([_, checked]) => checked)
+      .map(([name]) => name);
+
+    const addonsPrice = addonsList.reduce((acc, addonName) => {
+      const sizeAddons = PIZZA_ADDONS[sizeKey] || {};
+      return acc + (sizeAddons[addonName] || 0);
+    }, 0);
+
+    const basePrice = normalPizzaPrice;
+    const finalItemPrice = basePrice + addonsPrice;
+
+    const customizedItem = {
+      id: `${selectedProduct.id}_${sizeKey}_${addonsList.join('_')}`,
+      name: `${selectedProduct.name} (${normalPizzaSize.toUpperCase()})`,
+      price: finalItemPrice,
+      quantity: 1,
+      category: selectedProduct.category,
+      note: `${chefNote}${addonsList.length > 0 ? ` [Addons: ${addonsList.join(', ')}]` : ''}`.trim()
+    };
+
+    addItem(customizedItem);
+    playSoundEffect('add');
+    toast.success(isHindi ? "पिज्जा कस्टमाइज करके कर्ट में जोड़ा गया!" : "Customized pizza added to cart!");
+    
+    setSelectedProduct(null);
+    setNormalPizzaSize("");
+    setNormalPizzaAddons({});
+    setChefNote("");
+  };
+
+  const handleShareApp = async () => {
+    triggerHaptic();
+    const refCode = getReferralCode();
+    const shareUrl = typeof window !== 'undefined' ? `${window.location.origin}?ref=${refCode}` : 'https://bbcafe.in';
+    const shareText = isHindi 
+      ? `🔥 बम बम कैफ़े से स्वादिष्ट पिज्जा और सैंडविच ऑर्डर करें! मेरा रेफरल कोड "${refCode}" इस्तेमाल करें। यहाँ क्लिक करें: ${shareUrl}` 
+      : `🔥 Order delicious Pizza & Sandwiches from Bum Bum Cafe! Use my referral code "${refCode}". Tap here: ${shareUrl}`;
+    
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'Bum Bum Cafe',
+          text: shareText,
+          url: shareUrl,
+        });
+        setShareCount(prev => prev + 1);
+      } catch (err) {
+        console.log('Error sharing:', err);
+      }
+    } else {
+      try {
+        await navigator.clipboard.writeText(shareText);
+        toast.success(isHindi ? "रेफरल संदेश कॉपी हो गया!" : "Referral message copied to clipboard!");
+        setShareCount(prev => prev + 1);
+      } catch (err) {
+        toast.error(isHindi ? "शेयर करने में विफल!" : "Failed to share!");
+      }
+    }
+  };
+
+  const handleCustomerRedeem = async (rule: any) => {
+    triggerHaptic();
+    if (!customerDetails) {
+      toast.error(isHindi ? "कृपया पहले अपनी प्रोफ़ाइल बनाएँ!" : "Please create your profile first!");
+      return;
+    }
+    if (customerPoints < rule.pointsRequired) {
+      toast.error(isHindi ? "आपके पास पर्याप्त पॉइंट्स नहीं हैं!" : "You do not have enough points!");
+      return;
+    }
+
+    const rewardCartItem = {
+      id: `reward_${rule.id}_${Date.now()}`,
+      name: `🎁 FREE ${rule.rewardName || rule.name || 'Reward Item'}`,
+      price: 0,
+      quantity: 1,
+      category: "Reward",
+      pointsCost: Number(rule.pointsRequired || 0),
+      note: "Loyalty Reward Item"
+    };
+
+    addItem(rewardCartItem);
+    toast.success(isHindi 
+      ? `${rule.rewardName || rule.name || 'उपहार'} कर्ट में जोड़ा गया! (${rule.pointsRequired} पॉइंट्स उपयोग होंगे)` 
+      : `${rule.rewardName || rule.name || 'Reward'} added to cart! (${rule.pointsRequired} pts will be claimed on checkout)`
+    );
+  };
+
+  const handleDetectLocation = () => {
+    triggerHaptic();
+    if (!navigator.geolocation) {
+      toast.error(isHindi ? "जियोलोकेशन आपके ब्राउज़र द्वारा समर्थित नहीं है!" : "Geolocation is not supported by your browser!");
+      return;
+    }
+
+    const toastId = toast.loading(isHindi ? "आपकी लोकेशन जाँची जा रही है..." : "Detecting your location...");
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        toast.dismiss(toastId);
+        const userLat = position.coords.latitude;
+        const userLng = position.coords.longitude;
+        
+        const distance = calculateDistanceInKm(
+          storeCoordinates.lat,
+          storeCoordinates.lng,
+          userLat,
+          userLng
+        );
+        
+        const roundedDistance = Math.round(distance * 10) / 10;
+        setDistanceKm(roundedDistance);
+
+        if (roundedDistance <= 2.0) {
+          setSelectedArea(DELIVERY_AREAS[0]);
+          toast.success(isHindi 
+            ? `आप ${roundedDistance} KM दूर हैं (Mohandra Town चयनित)` 
+            : `You are ${roundedDistance} KM away (Mohandra Town selected)`
+          );
+        } else if (roundedDistance <= 5.0) {
+          setSelectedArea(DELIVERY_AREAS[1]);
+          toast.success(isHindi 
+            ? `आप ${roundedDistance} KM दूर हैं (Within 5 KM चयनित)` 
+            : `You are ${roundedDistance} KM away (Within 5 KM selected)`
+          );
+        } else if (roundedDistance <= 12.0) {
+          setSelectedArea(DELIVERY_AREAS[2]);
+          toast.success(isHindi 
+            ? `आप ${roundedDistance} KM दूर हैं (Within 12 KM चयनित)` 
+            : `You are ${roundedDistance} KM away (Within 12 KM selected)`
+          );
+        } else {
+          toast.error(isHindi 
+            ? `आप काफी दूर हैं (${roundedDistance} KM)। कृपया पिकअप चुनें या कैफ़े से संपर्क करें!` 
+            : `You are too far (${roundedDistance} KM). Please choose self-pickup or contact cafe!`
+          );
+        }
+      },
+      (error) => {
+        toast.dismiss(toastId);
+        toast.error(isHindi ? "लोकेशन एक्सेस करने में विफल! कृपया अनुमति प्रदान करें।" : "Failed to access location! Please grant permission.");
+      },
+      { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+    );
+  };
+
+  const handleGiftPoints = async (e: React.FormEvent) => {
+    e.preventDefault();
+    triggerHaptic();
+
+    if (!customerDetails?.phone) {
+      toast.error(isHindi ? "कृपया पहले अपनी प्रोफाइल सेट करें!" : "Please setup your profile first!");
+      return;
+    }
+
+    const senderPhoneClean = customerDetails.phone.replace("+91", "");
+    const receiverPhoneClean = giftPhone.trim();
+    const amount = Number(giftPointsAmount);
+
+    if (!receiverPhoneClean || receiverPhoneClean.length !== 10) {
+      toast.error(isHindi ? "प्राप्तकर्ता का सही 10 अंकों का नंबर लिखें!" : "Enter valid 10-digit receiver phone!");
+      return;
+    }
+    if (senderPhoneClean === receiverPhoneClean) {
+      toast.error(isHindi ? "आप स्वयं को पॉइंट्स उपहार में नहीं दे सकते!" : "You cannot gift points to yourself!");
+      return;
+    }
+    if (isNaN(amount) || amount <= 0) {
+      toast.error(isHindi ? "कृपया सही पॉइंट्स संख्या दर्ज करें!" : "Please enter a valid points amount!");
+      return;
+    }
+    if (amount > customerPoints) {
+      toast.error(isHindi ? "आपके पास पर्याप्त पॉइंट्स नहीं हैं!" : "Insufficient points balance!");
+      return;
+    }
+    if (giftSenderPin !== customerDetails.pin) {
+      toast.error(isHindi ? "गलत सुरक्षा पिन!" : "Incorrect security PIN!");
+      return;
+    }
+
+    setIsGiftingLoading(true);
+    const toastId = toast.loading(isHindi ? "पॉइंट्स ट्रांसफर किए जा रहे हैं..." : "Transferring points...");
+
+    try {
+      const receiverDocRef = doc(db, "customer_points", receiverPhoneClean);
+      const receiverSnap = await getDoc(receiverDocRef);
+
+      if (!receiverSnap.exists()) {
+        toast.dismiss(toastId);
+        toast.error(isHindi ? "यह नंबर पंजीकृत नहीं है!" : "Receiver phone number is not registered!");
+        setIsGiftingLoading(false);
+        return;
+      }
+
+      const senderDocRef = doc(db, "customer_points", senderPhoneClean);
+
+      await runTransaction(db, async (transaction) => {
+        const senderSnap = await transaction.get(senderDocRef);
+        if (!senderSnap.exists()) throw new Error("Sender not found");
+        
+        const currentSenderPoints = senderSnap.data().points || 0;
+        if (currentSenderPoints < amount) throw new Error("Insufficient points");
+
+        transaction.update(senderDocRef, {
+          points: increment(-amount)
+        });
+        transaction.update(receiverDocRef, {
+          points: increment(amount)
+        });
+
+        const senderHistRef = doc(collection(db, "customer_points", senderPhoneClean, "history"));
+        const receiverHistRef = doc(collection(db, "customer_points", receiverPhoneClean, "history"));
+
+        transaction.set(senderHistRef, {
+          type: 'gift_send',
+          points: amount,
+          description: `Sent gift points to +91${receiverPhoneClean}`,
+          timestamp: new Date()
+        });
+
+        transaction.set(receiverHistRef, {
+          type: 'gift_receive',
+          points: amount,
+          description: `Received gift points from +91${senderPhoneClean}`,
+          timestamp: new Date()
+        });
+      });
+
+      toast.dismiss(toastId);
+      toast.success(isHindi ? "पॉइंट्स सफलतापूर्वक ट्रांसफर किए गए! 🎁" : "Points gifted successfully! 🎁");
+      
+      setGiftPhone("");
+      setGiftPointsAmount("");
+      setGiftSenderPin("");
+      setIsGiftModalOpen(false);
+    } catch (err: any) {
+      toast.dismiss(toastId);
+      toast.error(isHindi ? "ट्रांसफर विफल! पुनः प्रयास करें।" : "Transfer failed. Please try again.");
+    } finally {
+      setIsGiftingLoading(false);
+    }
+  };
+
+  const handleAddDiyPizzaToCart = () => {
+    triggerHaptic();
+    
+    const vegList = Object.entries(diyVegSelection)
+      .filter(([_, active]) => active)
+      .map(([veg]) => veg.charAt(0).toUpperCase() + veg.slice(1));
+      
+    const premList = Object.entries(diyPremiumToppings)
+      .filter(([_, active]) => active)
+      .map(([top]) => top.replace('_', ' ').split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' '));
+
+    const allSelections = [
+      diySauce ? "Sauce" : "",
+      diyMozzarella ? "Mozzarella" : "",
+      ...vegList,
+      ...premList
+    ].filter(Boolean);
+
+    const diyPizzaItem = {
+      id: `diy_${diySize}_${Date.now()}`,
+      name: `🍕 DIY PIZZA (${diySize.toUpperCase()})`,
+      price: calculatedDiyPizzaPrice,
+      quantity: 1,
+      category: "DIY Pizza",
+      note: `Base & Sauce. Toppings: ${allSelections.join(', ')}. Note: ${diyChefNote}`.trim()
+    };
+
+    addItem(diyPizzaItem);
+    playSoundEffect('add');
+    toast.success(isHindi ? "कस्टम DIY पिज़्ज़ा कर्ट में जोड़ा गया!" : "Your custom DIY Pizza added to cart!");
+    
+    setDiySize("small");
+    setDiySauce(true);
+    setDiyMozzarella(true);
+    setDiyVegSelection({ onion: false, tomato: false, capsicum: false, corn: false });
+    setDiyPremiumToppings({ black_olive: false, jalapeno: false, red_peprica: false, paneer: false, mushroom: false });
+    setDiyChefNote("");
+  };
+
+  // --- BACKGROUND CLOCKS, DEBOUNCING, AND FIRESTORE LISTENERS ---
+
+  // 1. Search Query Debouncing & Automatic Hinglish Translation 
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      let queryClean = searchQuery.toLowerCase().trim();
+      Object.entries(HINGLISH_DICT).forEach(([typo, corrected]) => {
+        if (queryClean.includes(typo)) {
+          queryClean = queryClean.replace(new RegExp(typo, 'g'), corrected);
+        }
+      });
+      setDebouncedSearchQuery(queryClean);
+    }, 350);
+
+    return () => clearTimeout(handler);
+  }, [searchQuery]);
+
+  // 2. Banner Auto Carousel Clock
+  useEffect(() => {
+    if (banners.length <= 1) return;
+    const interval = setInterval(() => {
+      setBannerIndex((prev) => (prev + 1) % banners.length);
+    }, 6000);
+    return () => clearInterval(interval);
+  }, [banners]);
+
+  // 3. Social Proof Alerts Auto Cycle
+  useEffect(() => {
+    const proofTemplates = [
+      { text: "Rahul from Mohandra Town just ordered Special Pizza 🍕" },
+      { text: "Pooja just claimed 5 free points on Instagram! 📸" },
+      { text: "Ankit just redeemed a free Special Thali 🎁" },
+      { text: "Preeti from 5km range just ordered Paneer Special & Fries! 🛵" },
+      { text: "A user is customization-building their DIY Pizza right now 🍕" }
+    ];
+    setSocialProofs(proofTemplates);
+  }, []);
+
+  useEffect(() => {
+    if (socialProofs.length === 0) return;
+    const showInterval = setInterval(() => {
+      setSocialAlertIndex((prev) => (prev + 1) % socialProofs.length);
+      setShowSocialAlert(true);
+      setTimeout(() => {
+        setShowSocialAlert(false);
+      }, 5000);
+    }, 18000);
+
+    return () => clearInterval(showInterval);
+  }, [socialProofs]);
+
+  // 4. Real-time Customer Points and Points History Subcollection Synchronizer
+  useEffect(() => {
+    if (!customerDetails?.phone) {
+      setCustomerPoints(0);
+      setPointsHistory([]);
+      return;
+    }
+
+    const phoneClean = customerDetails.phone.replace("+91", "");
+    
+    // Listen to parent customer points
+    const pointsDocRef = doc(db, "customer_points", phoneClean);
+    const unsubPoints = onSnapshot(pointsDocRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setCustomerPoints(data.points || 0);
+      }
+    }, (error) => {
+      console.warn("Points sync disabled background offline mode:", error);
+    });
+
+    // Listen to live points history logs
+    const historyColRef = collection(db, "customer_points", phoneClean, "history");
+    const q = query(historyColRef, orderBy("timestamp", "desc"), limit(15));
+    const unsubHistory = onSnapshot(q, (querySnap) => {
+      const historyList = querySnap.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setPointsHistory(historyList);
+    }, (error) => {
+      console.warn("Points history sync offline mode:", error);
+    });
+
+    return () => {
+      unsubPoints();
+      unsubHistory();
+    };
+  }, [customerDetails]);
+
+  // 5. Active Live Order Status Tracker Listener (Dynamic SWR)
+  useEffect(() => {
+    if (!customerDetails?.phone) return;
+    
+    const ordersRef = collection(db, "orders");
+    const q = query(
+      ordersRef,
+      where("customerPhone", "==", customerDetails.phone),
+      orderBy("timestamp", "desc"),
+      limit(1)
+    );
+
+    const unsubLiveOrder = onSnapshot(q, (snapshot) => {
+      if (!snapshot.empty) {
+        const latestOrder = { id: snapshot.docs[0].id, ...snapshot.docs[0].data() } as any;
+        if (latestOrder.status !== 'delivered' && latestOrder.status !== 'cancelled') {
+          setLiveOrder(latestOrder);
+        } else {
+          setLiveOrder(null);
+        }
+      } else {
+        setLiveOrder(null);
+      }
+    }, (error) => {
+      console.warn("Live order sync offline mode:", error);
+    });
+
+    return () => unsubLiveOrder();
+  }, [customerDetails]);
+
   // --- RESTORED sendWhatsAppOrder DEFINITION ---
   const sendWhatsAppOrder = async () => {
     triggerHaptic();
@@ -1030,7 +1484,7 @@ export default function BbCafeHome() {
     reader.readAsDataURL(file);
   };
 
-  // --- INITIAL MOUNT & SWR BACKGROUND DATABASE SYNCHRONIZER (OPTIMIZED WITH Promise.all) ---
+  // --- INITIAL MOUNT & SWR BACKGROUND DATABASE SYNCHRONIZER ---
   useEffect(() => {
     setMounted(true);
 
@@ -1220,7 +1674,7 @@ export default function BbCafeHome() {
       {closingMinutesLeft !== null && storeOpen && (
         <div className="bg-gradient-to-r from-amber-500 to-orange-600 text-white font-extrabold py-2 px-4 text-center text-[10px] flex items-center justify-center gap-1.5 shadow-md">
           <span>⏰</span>
-          <span>आर्डर चेतावनी:  बम बम कैफ़े अगले {closingMinutesLeft} minute में बंद होने वाला है!  आर्डर जल्दी पूरा करें।</span>
+          <span>आर्डर चेतावनी: बम बम कैफ़े अगले {closingMinutesLeft} minute में बंद होने वाला है! आर्डर जल्दी पूरा करें।</span>
         </div>
       )}
 
@@ -1345,7 +1799,7 @@ export default function BbCafeHome() {
       {!storeOpen && (
         <div className="bg-red-600 text-white font-black py-3 px-4 text-center text-xs flex items-center justify-center gap-2 shadow-lg border-b border-red-500">
           <span className="animate-pulse">⚠️</span>
-          <span>{isHindi ? "बम बम कैफ़े अभी बंद है।  आप केवल हमारा मेनू देख सकते हैं।" : "Bum Bum Cafe is closed now. You can only view our menu."}</span>
+          <span>{isHindi ? "बम बम कैफ़े अभी बंद है। आप केवल हमारा मेनू देख सकते हैं।" : "Bum Bum Cafe is closed now. You can only view our menu."}</span>
         </div>
       )}
 
@@ -1393,7 +1847,7 @@ export default function BbCafeHome() {
         {/* Dynamic Video Stories */}
         {stories.length > 0 && (
           <div className="space-y-1 px-1">
-            <p className="text-[8px] font-black uppercase tracking-wider text-orange-500">{isHindi ? "खूबसूरत  फ़ूड रील्स" : "Daily Food Reels"}</p>
+            <p className="text-[8px] font-black uppercase tracking-wider text-orange-500">{isHindi ? "खूबसूरत फ़ूड रील्स" : "Daily Food Reels"}</p>
             <div className="flex gap-4 overflow-x-auto py-1.5 scrollbar-none [&::-webkit-scrollbar]:hidden font-sans">
               {stories.map((story: any) => (
                 <button 
@@ -1624,9 +2078,9 @@ export default function BbCafeHome() {
                             </h4>
                             <p className="text-[10px] text-orange-100 font-bold leading-normal font-sans">
                               {customerDetails ? (
-                                isHindi ? "आपका प्रोमो पास एक्टिवेटेड है! ✅ हर ₹100 पर 1 पॉइंट कमाएं।  यहाँ क्लिक करके अपने  रिवॉर्ड्स देखें ➔" : "Your promo pass is active! ✅ Earn 1 point per ₹100. Click here to view rewards ➔"
+                                isHindi ? "आपका प्रोमो पास एक्टिवेटेड है! ✅ हर ₹100 पर 1 पॉइंट कमाएं। यहाँ क्लिक करके अपने रिवॉर्ड्स देखें ➔" : "Your promo pass is active! ✅ Earn 1 point per ₹100. Click here to view rewards ➔"
                               ) : (
-                                isHindi ? "अपना Name और Number दर्ज करके इस पास को एक्टिवेट करें! 🎁 हर ₹100 पर 1 पॉइंट कमाएं।  टच करें ➔" : "Enter your Name & Number to activate this pass! 🎁 Earn 1 point per ₹100. Tap to activate ➔"
+                                isHindi ? "अपना Name and Number दर्ज करके इस पास को एक्टिवेट करें! 🎁 हर ₹100 पर 1 पॉइंट कमाएं। टच करें ➔" : "Enter your Name & Number to activate this pass! 🎁 Earn 1 point per ₹100. Tap to activate ➔"
                               )}
                             </p>
                           </div>
@@ -1722,7 +2176,7 @@ export default function BbCafeHome() {
               
               <p className="text-[11.5px] text-neutral-800 dark:text-gray-300 leading-relaxed max-w-sm mx-auto font-medium">
                 {isHindi ? 
-                  "हमने BAM BAM CAFE की शुरुआत एक छोटे से सपने के साथ की थी—लोगों को घर जैसा स्वाद और कैफे वाला माहौल देने के लिए।  यहाँ हर कप कॉफी और हर स्लाइस पिज्जा प्यार और शुद्धता के साथ बनाया जाता है।  हमारी कोशिश है कि आप जब भी यहाँ आएँ, एक प्यारी मुस्कान के साथ वापस जाएँ।  ❤️" :
+                  "हमने BAM BAM CAFE की शुरुआत एक छोटे से सपने के साथ की थी—लोगों को घर जैसा स्वाद और कैफे वाला माहौल देने के लिए। यहाँ हर कप कॉफी और हर स्लाइस पिज्जा प्यार और शुद्धता के साथ बनाया जाता है। हमारी कोशिश है कि आप जब भी यहाँ आएँ, एक प्यारी मुस्कान के साथ वापस जाएँ। ❤️" :
                   "We started BAM BAM CAFE with a simple dream - to serve hygienic, delicious, home-style fast food in Mohandra town. Every slice of pizza and plate of thali here is crafted with ultimate love, purity and hygiene. Feel free to dine-in or order online! ❤️"
                 }
               </p>
