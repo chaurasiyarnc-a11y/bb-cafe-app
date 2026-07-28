@@ -95,7 +95,7 @@ export default function DeliveryDashboard() {
     };
   }, [isLocked]);
 
-  // पुश नोटिफिकेशन बैनर ट्रिगर
+  // मोबाइल पर पुश नोटिफिकेशन दिखाने का फंक्शन (TypeScript त्रुटि निवारण के साथ)
   const showLocalNotification = (billNo: string) => {
     if ('Notification' in window && Notification.permission === 'granted') {
       const n = new Notification("नया ऑर्डर आया है! 🛵", {
@@ -104,7 +104,13 @@ export default function DeliveryDashboard() {
         vibrate: [300, 100, 300, 100, 450],
         tag: 'new-delivery-order',
         requireInteraction: true
-      });
+      } as any); // Type casted to satisfy strict TypeScript DOM compile check
+
+      // मोबाइल के वाइब्रेटर हार्डवेयर को सीधे ट्रिगर करने के लिए बैकअप
+      if ('vibrate' in navigator) {
+        navigator.vibrate([300, 100, 300, 100, 450]);
+      }
+
       n.onclick = () => {
         window.focus();
       };
@@ -162,7 +168,6 @@ export default function DeliveryDashboard() {
       setOrders((prevOrders) => {
         if (prevOrders.length > 0) {
           const prevIds = new Set(prevOrders.map(o => o.id));
-          // चेक करें कि क्या सच में कोई नया ID जुड़ा है (भले ही टोटल संख्या न बढ़ी हो)
           const newAddedOrder = deliveryOrders.find(o => !prevIds.has(o.id));
           if (newAddedOrder) {
             playNotificationRing();
@@ -222,7 +227,7 @@ export default function DeliveryDashboard() {
         try {
           const context = new (window.AudioContext || (window as any).webkitAudioContext)();
           const osc = context.createOscillator();
-          osc.frequency.value = 1; // सुनाई न देने वाली फ्रीक्वेंसी
+          osc.frequency.value = 1;
           osc.connect(context.destination);
           osc.start();
           osc.stop(0.1);
@@ -278,7 +283,6 @@ export default function DeliveryDashboard() {
     const diffMs = now.getTime() - orderDate.getTime();
     const diffMins = Math.max(0, Math.floor(diffMs / 60000));
     
-    // फ़ॉर्मेटेड टाइम (जैसे: 12:45 PM)
     const formattedTime = orderDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
 
     if (diffMins < 1) return `${formattedTime} (Just Now)`;
@@ -353,7 +357,6 @@ export default function DeliveryDashboard() {
           <h1 className="text-xl font-black text-orange-500 italic uppercase flex items-center gap-1.5">
             🛵 Delivery Portal {riderName ? `- ${riderName}` : ''}
           </h1>
-          {/* लाइव कनेक्शन इंडिकेटर */}
           <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider flex items-center gap-1.5 mt-0.5">
             <span className="inline-block w-2 h-2 rounded-full bg-green-500 animate-pulse" />
             Live Syncing with Database
@@ -447,7 +450,6 @@ export default function DeliveryDashboard() {
                       <User size={13} className="text-orange-500"/>
                       <span>Customer: {o.customerName || "Guest User"}</span>
                     </p>
-                    {/* टाइमस्टैम्प दिखाने की नई सुविधा */}
                     <p className="text-[10px] font-medium text-gray-400 flex items-center gap-1.5">
                       <Clock size={12} className="text-yellow-500" />
                       <span>{getRelativeTime(o.timestamp)}</span>
