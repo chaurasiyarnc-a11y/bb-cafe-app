@@ -1,4 +1,5 @@
 
+
 'use client';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { db } from '../lib/firebase'; 
@@ -825,7 +826,7 @@ export default function BbCafeHome() {
 
     addItem(rewardCartItem);
     toast.success(isHindi 
-      ? `${rule.rewardName || rule.name || 'उपहार'} कर्ट में जोड़ा गया! (${rule.pointsRequired} पॉइंट्स उपयोग होंगे)` 
+      ? `${rule.rewardName || rule.name || 'उपहार'} कर्ट में जोड़ा गया! (${rule.pointsRequired}  पॉइंट्स उपयोग होंगे)` 
       : `${rule.rewardName || rule.name || 'Reward'} added to cart! (${rule.pointsRequired} pts will be claimed on checkout)`
     );
   };
@@ -1673,7 +1674,7 @@ export default function BbCafeHome() {
       {closingMinutesLeft !== null && storeOpen && (
         <div className="bg-gradient-to-r from-amber-500 to-orange-600 text-white font-extrabold py-2 px-4 text-center text-[10px] flex items-center justify-center gap-1.5 shadow-md">
           <span>⏰</span>
-          <span>आर्डर चेतावनी: बम बम कैफ़े अगले {closingMinutesLeft} minute में बंद होने वाला है! आर्डर जल्दी पूरा करें।</span>
+          <span>आर्डर चेतावनी:  बम बम कैफ़े अगले {closingMinutesLeft} minute में बंद होने वाला है!  आर्डर जल्दी पूरा करें।</span>
         </div>
       )}
 
@@ -1798,7 +1799,7 @@ export default function BbCafeHome() {
       {!storeOpen && (
         <div className="bg-red-600 text-white font-black py-3 px-4 text-center text-xs flex items-center justify-center gap-2 shadow-lg border-b border-red-500">
           <span className="animate-pulse">⚠️</span>
-          <span>{isHindi ? "बम बम कैफ़े अभी बंद है। आप केवल हमारा मेनू देख सकते हैं।" : "Bum Bum Cafe is closed now. You can only view our menu."}</span>
+          <span>{isHindi ? "बम बम कैफ़े अभी बंद है।  आप केवल हमारा मेनू देख सकते हैं।" : "Bum Bum Cafe is closed now. You can only view our menu."}</span>
         </div>
       )}
 
@@ -2272,20 +2273,21 @@ export default function BbCafeHome() {
       />
 
       {/* (3) WRITE REVIEW MODAL COMPONENT */}
-      <ReviewFormModal 
-        isOpen={isReviewFormOpen}
-        onClose={() => setIsReviewFormOpen(false)}
-        reviewName={reviewName}
-        setReviewName={setReviewName}
-        reviewRating={reviewRating}
-        setReviewRating={setReviewRating}
-        reviewComment={reviewComment}
-        setReviewComment={setReviewComment}
-        SUGGESTED_REVIEWS={SUGGESTED_REVIEWS}
-        handleReviewSubmit={handleReviewSubmit}
-        isHindi={isHindi}
-        triggerHaptic={triggerHaptic}
-      />
+      {isReviewFormOpen && (
+        <ReviewFormModal 
+          onClose={() => setIsReviewFormOpen(false)}
+          reviewName={reviewName}
+          setReviewName={setReviewName}
+          reviewRating={reviewRating}
+          setReviewRating={setReviewRating}
+          reviewComment={reviewComment}
+          setReviewComment={setReviewComment}
+          SUGGESTED_REVIEWS={SUGGESTED_REVIEWS}
+          handleReviewSubmit={handleReviewSubmit}
+          isHindi={isHindi}
+          triggerHaptic={triggerHaptic}
+        />
+      )}
 
       {/* (4) REGULAR PIZZA PORTION CUSTOMIZER MODAL */}
       <PizzaCustomizerModal 
@@ -2329,7 +2331,7 @@ export default function BbCafeHome() {
         setIsGiftModalOpen={setIsGiftModalOpen}
         SOCIAL_LINKS={SOCIAL_LINKS}
         setClaimingPlatform={setClaimingPlatform}
-        setIsClaimModalOpen={setIsClaimModalOpen}
+        setIsClaimModalOpen={setIsClaimOpen => setIsClaimModalOpen(setIsClaimOpen)}
         loyaltyRules={loyaltyRules}
         handleCustomerRedeem={handleCustomerRedeem}
         pastOrders={pastOrders}
