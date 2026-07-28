@@ -21,7 +21,7 @@ export default function DeliveryDashboard() {
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const wakeLockRef = useRef<any>(null);
 
-  // लाइव टाइम दिखाने के लिए स्टेट (ताकि 'time ago' हर मिनट अपडेट हो)
+  // लाइव टाइम दिखाने के लिए स्टेट
   const [now, setNow] = useState(new Date());
 
   // 'time ago' को हर मिनट अपडेट करने के लिए टाइमर
@@ -30,12 +30,12 @@ export default function DeliveryDashboard() {
     return () => clearInterval(interval);
   }, []);
 
-  // --- नया: लॉगिन होने के 8 सेकंड बाद बैटरी बैनर अपने आप बंद करने का टाइमर ---
+  // लॉगिन होने के 8 सेकंड बाद बैटरी बैनर अपने आप बंद करने का टाइमर
   useEffect(() => {
     if (!isLocked) {
       const timer = setTimeout(() => {
         setShowBatteryWarning(false);
-      }, 8000); // 8000ms = 8 सेकंड
+      }, 8000);
       return () => clearTimeout(timer);
     }
   }, [isLocked]);
@@ -45,7 +45,6 @@ export default function DeliveryDashboard() {
     try {
       const audio = new Audio('/ringtone.mp3');
       audio.play().catch(() => {
-        // यदि mp3 उपलब्ध न हो, तो सिंथेसाइज़र टोन बजाएं
         const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
         if (audioCtx.state === 'suspended') {
           audioCtx.resume();
@@ -64,7 +63,6 @@ export default function DeliveryDashboard() {
             osc.stop(audioCtx.currentTime + duration);
           }, delay);
         };
-        // धुन पैटर्न
         playBeep(0, 880, 0.25);   
         playBeep(350, 880, 0.25); 
         playBeep(700, 1100, 0.5); 
@@ -106,7 +104,7 @@ export default function DeliveryDashboard() {
     };
   }, [isLocked]);
 
-  // मोबाइल पर पुश नोटिफिकेशन दिखाने का फंक्शन (TypeScript त्रुटि निवारण के साथ)
+  // मोबाइल पर पुश नोटिफिकेशन दिखाने का फंक्शन
   const showLocalNotification = (billNo: string) => {
     if ('Notification' in window && Notification.permission === 'granted') {
       const n = new Notification("नया ऑर्डर आया है! 🛵", {
@@ -115,9 +113,8 @@ export default function DeliveryDashboard() {
         vibrate: [300, 100, 300, 100, 450],
         tag: 'new-delivery-order',
         requireInteraction: true
-      } as any); // TypeScript DOM कंपाइलर चेक के लिए 'as any' टाइप कास्ट
+      } as any);
 
-      // मोबाइल के वाइब्रेटर हार्डवेयर को सीधे ट्रिगर करने के लिए बैकअप
       if ('vibrate' in navigator) {
         navigator.vibrate([300, 100, 300, 100, 450]);
       }
@@ -148,7 +145,7 @@ export default function DeliveryDashboard() {
     setLoading(false);
   }, []);
 
-  // Real-time listener for orders with improved incoming detection logic
+  // Real-time listener for orders
   useEffect(() => {
     if (isLocked) return;
 
@@ -175,7 +172,6 @@ export default function DeliveryDashboard() {
         return tA.getTime() - tB.getTime();
       });
 
-      // --- सुधरा हुआ ID-बेस्ड चेक ---
       setOrders((prevOrders) => {
         if (prevOrders.length > 0) {
           const prevIds = new Set(prevOrders.map(o => o.id));
@@ -211,7 +207,7 @@ export default function DeliveryDashboard() {
   // LOGIN: Verifies entered Username & PIN
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isLoggingIn) return; // डबल-सबमिशन रोकने के लिए
+    if (isLoggingIn) return;
 
     if (!usernameInput.trim() || !pinInput.trim()) {
       return toast.error("कृपया Username और PIN दोनों भरें।");
@@ -221,17 +217,27 @@ export default function DeliveryDashboard() {
     const toastId = toast.loading("Verifying credentials...");
     
     try {
-      // 100% वर्किंग पुरानी क्वेरी (केवल PIN और Role)
+      // 100% वर्किंग पुरानी सुरक्षित क्वेरी (केवल PIN और Role)
       const q = query(
         collection(db, "staff_members"),
         where("pin", "==", pinInput.trim()),
         where("role", "==", "delivery")
       );
 
-      const snap = await getDocs(q);
+      // --- टाइमआउट मैकेनिज्म (8 सेकंड का सेफ्टी गार्ड) ---
+      const getDocsWithTimeout = (queryObj: any, timeoutMs = 8000) => {
+        return Promise.race([
+          getDocs(queryObj),
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error("DATABASE_TIMEOUT")), timeoutMs)
+          )
+        ]);
+      };
+
+      const snap = (await getDocsWithTimeout(q)) as any;
       
-      // फ़ायरबेस से डेटा मिलने के बाद, क्लाइंट-साइड ही नाम का मिलान (केस-सेंसिटिव की समस्या हल करने के लिए)
-      const matchedRiderDoc = snap.docs.find(doc => {
+      // फ़ायरबेस से डेटा मिलने के बाद क्लाइंट-साइड ही नाम का मिलान
+      const matchedRiderDoc = snap.docs.find((doc: any) => {
         const dbName = String(doc.data().name || "").trim().toLowerCase();
         const inputName = usernameInput.trim().toLowerCase();
         return dbName === inputName;
@@ -244,7 +250,6 @@ export default function DeliveryDashboard() {
         localStorage.setItem('bb_delivery_boy_name', rider.name);
         localStorage.setItem('bb_delivery_boy_id', matchedRiderDoc.id); 
         
-        // ऑडियो अनलॉक करने के लिए एक छोटा सा साइलेंट बीप प्ले करें
         try {
           const context = new (window.AudioContext || (window as any).webkitAudioContext)();
           const osc = context.createOscillator();
@@ -262,11 +267,15 @@ export default function DeliveryDashboard() {
         setPinInput("");
       }
     } catch (err: any) {
-      toast.error("कनेक्शन धीमा है या डेटाबेस लोड नहीं हो सका।");
+      if (err.message === "DATABASE_TIMEOUT") {
+        toast.error("नेटवर्क धीमा है या डेटाबेस लोड नहीं हो सका! कृपया दोबारा प्रयास करें। ❌");
+      } else {
+        toast.error("लॉगिन वेरिफिकेशन फेल हुआ। डेटाबेस एरर।");
+      }
       console.error(err);
     } finally {
       toast.dismiss(toastId);
-      setIsLoggingIn(false); // बटन दोबारा चालू करने के लिए
+      setIsLoggingIn(false);
     }
   };
 
@@ -336,7 +345,6 @@ export default function DeliveryDashboard() {
               placeholder="Enter Your Name / Username" 
               value={usernameInput} 
               onChange={(e) => setUsernameInput(e.target.value)} 
-              // यहाँ से 'uppercase' क्लास हटा दी गई है ताकि आप छोटे/बड़े लेटर्स सामान्य रूप से लिख सकें
               className="w-full bg-black/60 border border-white/10 rounded-2xl p-4 text-center outline-none focus:border-orange-500 text-sm font-bold text-white placeholder:normal-case"
               required 
             />
@@ -351,7 +359,7 @@ export default function DeliveryDashboard() {
             />
             <button 
               type="submit" 
-              disabled={isLoggingIn} // लोडिंग के समय बटन डिसेबल हो जाएगा ताकि लोडिंग स्पैम न हो
+              disabled={isLoggingIn} // लोडिंग के समय बटन डिसेबल हो जाएगा
               className="w-full bg-orange-500 hover:bg-orange-600 disabled:bg-orange-500/50 disabled:cursor-not-allowed text-white p-4 rounded-2xl font-black text-xs uppercase tracking-wider transition-all"
             >
               {isLoggingIn ? "Verifying..." : "Unlock Terminal"}
@@ -408,7 +416,7 @@ export default function DeliveryDashboard() {
         </div>
       </header>
 
-      {/* बैटरी चेतावनी बैनर (लॉगिन के 8 सेकंड बाद अपने आप बंद हो जाएगा) */}
+      {/* बैटरी चेतावनी बैनर */}
       {showBatteryWarning && (
         <div className="bg-orange-500/10 border border-orange-500/30 p-5 rounded-3xl mb-6 relative">
           <button 
