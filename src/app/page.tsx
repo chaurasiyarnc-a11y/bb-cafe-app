@@ -3,7 +3,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { db } from '../lib/firebase'; 
 import { collection, onSnapshot, query, addDoc, doc, setDoc, increment, runTransaction, getDoc, getDocs, where, limit, orderBy } from 'firebase/firestore';
 import { getStorage, ref, uploadString, getDownloadURL } from 'firebase/storage'; 
-import { ShoppingBag, Plus, Search, X, MapPin, Phone, User, Star, Gift, Loader2, Heart, Clock, ChevronRight, WifiOff, Globe } from 'lucide-react';
+import { ShoppingBag, Plus, Search, X, MapPin, Phone, User, Play, Star, Gift, Loader2, Heart, Clock, ChevronRight, WifiOff, Globe } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
 import { useCartStore } from '../store/useCartStore';
@@ -976,45 +976,59 @@ export default function BbCafeHome() {
     }
   };
 
-  // --- Search Debouncing & Hinglish Optimizer ---
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      const cleanQuery = searchQuery.toLowerCase().trim();
-      const translatedWords = cleanQuery.split(/\s+/).map(word => HINGLISH_DICT[word] || word);
-      setDebouncedSearchQuery(translatedWords.join(" "));
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [searchQuery]);
+  const handleScreenshotChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    triggerHaptic();
+    const file = e.target.files?.[0];
+    if (!file) return;
 
-  // --- Banner Cycle Auto-Carousel Timer ---
-  useEffect(() => {
-    if (banners.length <= 1) return;
-    const interval = setInterval(() => {
-      setBannerIndex((prev) => (prev + 1) % banners.length);
-    }, 4000);
-    return () => clearInterval(interval);
-  }, [banners]);
-
-  useEffect(() => {
-    const fakeProofs = [
-      { text: "Ramesh from Mohandra recently ordered Special Thali! 🍛" },
-      { text: "Pooja just added Paneer Special Pizza to her cart! 🍕" },
-      { text: "5 people are looking at DIY Pizza right now! 🔥" },
-      { text: "Amit rated Bum Bum Cafe 5 stars! ⭐⭐⭐⭐⭐" },
-      { text: "Sanjay from Mohandra Town just placed an order! 🛵" },
-      { text: "Anjali is customizing her DIY Pizza! 🍕" }
-    ];
-    setSocialProofs(fakeProofs);
+    setIsCompressing(true);
+    const reader = new FileReader();
     
-    const interval = setInterval(() => {
-      const randomIndex = Math.floor(Math.random() * fakeProofs.length);
-      setSocialAlertIndex(randomIndex);
-      setShowSocialAlert(true);
-      setTimeout(() => setShowSocialAlert(false), 5000);
-    }, 24000);
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
 
-    return () => clearInterval(interval);
-  }, []);
+        const MAX_DIM = 800;
+        if (width > MAX_DIM || height > MAX_DIM) {
+          if (width > height) {
+            height = Math.round((height * MAX_DIM) / width);
+            width = MAX_DIM;
+          } else {
+            width = Math.round((width * MAX_DIM) / height);
+            height = MAX_DIM;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          const compressedBase64 = canvas.toDataURL('image/jpeg', 0.6);
+          setPaymentScreenshot(compressedBase64);
+          toast.success(isHindi ? "स्क्रीनशॉट लोड और कंप्रेस हो गया!" : "Screenshot compressed & loaded!");
+        } else {
+          setPaymentScreenshot(event.target?.result as string);
+        }
+        setIsCompressing(false);
+      };
+      img.onerror = () => {
+        setIsCompressing(false);
+        toast.error("Error compressing screen");
+      };
+      img.src = event.target?.result as string;
+    };
+
+    reader.onerror = () => {
+      setIsCompressing(false);
+      toast.error(isHindi ? "फाइल लोड करने में समस्या आई।" : "Error loading file.");
+    };
+    reader.readAsDataURL(file);
+  };
 
   // --- INITIAL MOUNT & SWR BACKGROUND DATABASE SYNCHRONIZER (OPTIMIZED WITH Promise.all) ---
   useEffect(() => {
@@ -1275,7 +1289,7 @@ export default function BbCafeHome() {
               {isHindi ? "बम बम कैफ़े" : "Bum Bum Cafe"}
             </h1>
             <p className="text-[9px] text-gray-300 font-bold">
-              {isHindi ? "पिज्जा, स्पेशल सैंडविच और पनीर डिलाइट्स तुरंत आदेश करें!" : "Order Pizza, Special Sandwich & Pure Paneer Delights instantly!"}
+              {isHindi ? "पिज्जा, स्पेशल सैंडविच और पनीर डिलाइट्स तुरंत आदेश करें!" : "Order Pizza, Special Sandwich & Paneer Delights instantly!"}
             </p>
           </motion.div>
           <button 
