@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../../lib/firebase';
-import { collection, onSnapshot, query, doc, updateDoc, orderBy, getDoc, getDocs, where } from 'firebase/firestore';
+import { collection, onSnapshot, query, doc, updateDoc, orderBy, getDoc, getDocsFromServer, where } from 'firebase/firestore'; // <-- यहाँ 'getDocsFromServer' इम्पोर्ट किया गया है
 import { Phone, MapPin, Check, Loader2, Lock, User, Clock, WifiOff, X, Navigation } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 import { requestNotificationPermission } from '../../lib/messaging';
@@ -204,7 +204,7 @@ export default function DeliveryDashboard() {
     }
   }, [isLocked]);
 
-  // LOGIN: Verifies entered Username & PIN
+  // LOGIN: Verifies entered Username & PIN using getDocsFromServer
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isLoggingIn) return;
@@ -217,7 +217,7 @@ export default function DeliveryDashboard() {
     const toastId = toast.loading("Verifying credentials...");
     
     try {
-      // 100% वर्किंग पुरानी सुरक्षित क्वेरी (केवल PIN और Role)
+      // केवल PIN और Role से पुरानी सुरक्षित क्वेरी
       const q = query(
         collection(db, "staff_members"),
         where("pin", "==", pinInput.trim()),
@@ -227,7 +227,7 @@ export default function DeliveryDashboard() {
       // --- टाइमआउट मैकेनिज्म (8 सेकंड का सेफ्टी गार्ड) ---
       const getDocsWithTimeout = (queryObj: any, timeoutMs = 8000) => {
         return Promise.race([
-          getDocs(queryObj),
+          getDocsFromServer(queryObj), // <-- यहाँ 'getDocsFromServer' का उपयोग किया गया है (अल्ट्रा स्टेबल)
           new Promise((_, reject) =>
             setTimeout(() => reject(new Error("DATABASE_TIMEOUT")), timeoutMs)
           )
@@ -236,7 +236,7 @@ export default function DeliveryDashboard() {
 
       const snap = (await getDocsWithTimeout(q)) as any;
       
-      // फ़ायरबेस से डेटा मिलने के बाद क्लाइंट-साइड ही नाम का मिलान
+      // फ़ायरबेस से डेटा मिलने के बाद क्लाइंट-साइड ही नाम का मिलान (केस-सेंसिटिव से सुरक्षा)
       const matchedRiderDoc = snap.docs.find((doc: any) => {
         const dbName = String(doc.data().name || "").trim().toLowerCase();
         const inputName = usernameInput.trim().toLowerCase();
@@ -309,7 +309,7 @@ export default function DeliveryDashboard() {
     }
   };
 
-  // समय को "कितने मिनट पहले" (Time Ago) के रूप में दिखाने का हेल्पर
+  // समय को "Time Ago" के रूप में दिखाने का हेल्पर
   const getRelativeTime = (timestamp: any) => {
     if (!timestamp) return "";
     const orderDate = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
@@ -359,7 +359,7 @@ export default function DeliveryDashboard() {
             />
             <button 
               type="submit" 
-              disabled={isLoggingIn} // लोडिंग के समय बटन डिसेबल हो जाएगा
+              disabled={isLoggingIn}
               className="w-full bg-orange-500 hover:bg-orange-600 disabled:bg-orange-500/50 disabled:cursor-not-allowed text-white p-4 rounded-2xl font-black text-xs uppercase tracking-wider transition-all"
             >
               {isLoggingIn ? "Verifying..." : "Unlock Terminal"}
