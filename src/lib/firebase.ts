@@ -1,6 +1,6 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
-import { initializeFirestore } from "firebase/firestore"; // <-- 'getFirestore' की जगह 'initializeFirestore' का उपयोग
+import { getFirestore, initializeFirestore } from "firebase/firestore"; // <-- getFirestore भी इम्पोर्ट करें
 import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
@@ -16,11 +16,18 @@ const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 
 export const auth = getAuth(app);
 
-// केवल डेटाबेस कनेक्शन को सुचारू बनाने के लिए Long Polling इनेबल की गई है
-export const db = initializeFirestore(app, {
-  experimentalForceLongPolling: true, // <-- मोबाइल/एंड्रॉइड ऐप पर हैंग होने से बचाने वाली सेटिंग
-});
+// Next.js क्रैश से बचने के लिए सुरक्षित डेटाबेस इनिशियलाइजेशन
+let firestoreDb;
+try {
+  firestoreDb = initializeFirestore(app, {
+    experimentalForceLongPolling: true, // मोबाइल वेबव्यू के लिए लॉन्ग पोलिंग
+  });
+} catch (e) {
+  // यदि पहले से इनिशियलाइज हो चुका है, तो डिफ़ॉल्ट गेट का उपयोग करें
+  firestoreDb = getFirestore(app);
+}
 
+export const db = firestoreDb;
 export const storage = getStorage(app);
 
 export default app;
