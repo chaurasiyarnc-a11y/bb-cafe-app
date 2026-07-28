@@ -1,8 +1,8 @@
 'use client';
 import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../../lib/firebase';
-import { collection, onSnapshot, query, doc, updateDoc, getDoc, where, getDocs } from 'firebase/firestore';
-import { Clock, Check, Loader2, Play, Lock, WifiOff, X } from 'lucide-react';
+import { collection, onSnapshot, query, doc, updateDoc, getDoc, where, getDocsFromServer } from 'firebase/firestore'; 
+import { Clock, Check, Loader2, Play, Lock, WifiOff, X, Navigation } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 import { requestKitchenPermission } from '../../lib/messaging';
 
@@ -10,7 +10,12 @@ export default function KitchenDisplaySystem() {
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isLocked, setIsLocked] = useState(true);
+  
+  // लॉगिन फ़ील्ड्स (यूज़रनेम और पिन दोनों)
+  const [usernameInput, setUsernameInput] = useState("");
   const [pinInput, setPinInput] = useState("");
+  const [cookName, setCookName] = useState(""); // Hydration mismatch से बचने के लिए क्लाइंट स्टेट
+
   const [passcodes, setPasscodes] = useState({ adminPin: "971429", managerPin: "123456" });
   
   // कैफ़े ओपन/क्लोज के लिए स्टोर की स्थिति का स्टेट
@@ -20,17 +25,43 @@ export default function KitchenDisplaySystem() {
   const [printerMethod, setPrinterMethod] = useState<"none" | "browser" | "rawbt">("none");
   const [autoPrintOnAccept, setAutoPrintOnAccept] = useState<boolean>(false);
   const [printTargetOrder, setPrintTargetOrder] = useState<any | null>(null);
+  const [printType, setPrintType] = useState<"kot" | "bill">("kot"); 
+
+  // लॉगिन लोडिंग और बटन लॉक के लिए स्टेट
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
 
   const prevOrdersCountRef = useRef<number | null>(null);
 
   const formatBillNumber = (num: number) => String(num).padStart(4, '0');
 
-  // Play custom MP3 sound alert for kitchen when new order arrives
+  // नया ऑर्डर आने पर तेज़ रिंगटोन बजाने का फंक्शन
   const playAlertSound = () => {
     try {
       const audio = new Audio('/kitchen.mp3');
-      audio.play().catch((err) => console.log("Sound play blocked by browser:", err));
-    } catch (e) {}
+      audio.play().catch(() => {
+        const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        const playBeep = (delay: number, freq: number, dur: number) => {
+          setTimeout(() => {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.type = "sine";
+            osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+            gain.gain.setValueAtTime(0.7, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + dur);
+            osc.start();
+            osc.stop(audioCtx.currentTime + dur);
+          }, delay);
+        };
+        playBeep(0, 950, 0.4);
+        playBeep(450, 950, 0.4);
+        playBeep(900, 1200, 0.6);
+      });
+    } catch (e) {
+      console.warn("Sound play error: ", e);
+    }
   };
 
   // Check login session, Fetch passcodes & Register Service Worker
@@ -38,6 +69,7 @@ export default function KitchenDisplaySystem() {
     const isVerifiedSession = localStorage.getItem('bb_kds_verified') === 'true';
     if (isVerifiedSession) {
       setIsLocked(false);
+      setCookName(localStorage.getItem('bb_kds_cook_name') || "");
     }
 
     const fetchPins = async () => {
@@ -74,7 +106,7 @@ export default function KitchenDisplaySystem() {
     }
   }, []);
 
-  // Real-time simple query with Client-side filtering (Daily Orders Only!)
+  // Real-time listener for orders
   useEffect(() => {
     if (isLocked) return;
 
@@ -103,7 +135,17 @@ export default function KitchenDisplaySystem() {
       
       if (prevOrdersCountRef.current !== null && kitchenOrders.length > prevOrdersCountRef.current) {
         playAlertSound();
+        triggerHaptic(500); 
         toast.success("🚨 रसोई घर: नया आर्डर आया है!");
+        
+        if ('Notification' in window && Notification.permission === 'granted') {
+          new Notification("नया रसोई आर्डर! 👨‍🍳", {
+            body: "कृपया रसोई स्क्रीन चेक करें, नया आर्डर खाना बनाने के लिए आ गया है।",
+            icon: "/icon.png",
+            vibrate: [400, 150, 400],
+            requireInteraction: true
+          } as any);
+        }
       }
       prevOrdersCountRef.current = kitchenOrders.length;
       setOrders(kitchenOrders);
@@ -164,11 +206,10 @@ export default function KitchenDisplaySystem() {
     };
   }, [isLocked]);
 
-  // --- किचन नोटिफिकेशन परमिशन रजिस्टर (FCM - On Mount) ---
+  // --- किचन नोटिफिकेशन परमिशन रजिस्टर ---
   useEffect(() => {
     const MY_VAPID_KEY = "BCKwFGxjNPQdsUFLasSoQonNesm5nVYy9uoikufClZCsCFqhJNUWDP9j1Cqujd8VzqwRKn8I3R3exxo85RtPEn0"; 
 
-    // KDS स्क्रीन पर किसी भी FCM, सर्विस वर्कर, टोकन या परमिशन के अलर्ट को पूरी तरह से म्यूट (Silent) करने के लिए इंटरसेप्टर
     const originalAlert = window.alert;
     window.alert = (msg) => {
       if (
@@ -188,7 +229,7 @@ export default function KitchenDisplaySystem() {
         )
       ) {
         console.log("Muted KDS popup alert silently:", msg);
-        return; // म्यूट कर दिया! कोई ब्राउज़र डायलॉग नहीं दिखेगा।
+        return; 
       }
       originalAlert(msg);
     };
@@ -200,11 +241,11 @@ export default function KitchenDisplaySystem() {
     }
 
     return () => {
-      window.alert = originalAlert; // अनमाउंट होने पर सामान्य स्थिति रीस्टोर करें
+      window.alert = originalAlert; 
     };
   }, []);
 
-  // --- प्रिंटिंग हेल्पर फ़ंक्शंस (Auto-Print & Manual) ---
+  // --- प्रिंटिंग हेल्पर फ़ंक्शंस ---
   const handlePrinterChange = (method: "none" | "browser" | "rawbt") => {
     setPrinterMethod(method);
     localStorage.setItem('bb_kds_printer_method', method);
@@ -218,6 +259,34 @@ export default function KitchenDisplaySystem() {
     toast.success(`Auto-Print: ${next ? "ENABLED" : "DISABLED"}`);
   };
 
+  // KOT (केवल रसोई के लिए) प्लेन-टेक्स्ट रसीद जनरेटर
+  const generatePlainTextKOT = (order: any) => {
+    const line = "--------------------------------\n";
+    const dLine = "================================\n";
+    let text = "";
+    text += dLine;
+    text += "       KITCHEN ORDER TICKET     \n";
+    text += "               KOT              \n";
+    text += dLine;
+    text += `TOKEN: #${order.tokenNumber || "N/A"}\n`;
+    text += `Bill No: #${formatBillNumber(order.billNumber || 0)}\n`;
+    text += `Mode: ${order.fulfillmentType?.toUpperCase() || ""}\n`;
+    if (order.fulfillmentType === "table") {
+      text += `Table: ${order.tableNumber || "N/A"}\n`;
+    }
+    text += line;
+    text += "ITEMS:\n";
+    order.items?.forEach((item: any) => {
+      text += `x${item.quantity} ${item.name}\n`;
+      if (item.note) {
+        text += `   └─ Cooking Note: ${item.note}\n`;
+      }
+    });
+    text += dLine;
+    return text;
+  };
+
+  // ग्राहकों के लिए पूरी बिल रसीद जनरेटर
   const generatePlainTextReceipt = (order: any) => {
     const line = "--------------------------------\n";
     const dLine = "================================\n";
@@ -262,9 +331,11 @@ export default function KitchenDisplaySystem() {
     return text;
   };
 
-  const triggerPrint = (order: any) => {
+  // प्रिंट ट्रिगर करने का मुख्य फंक्शन
+  const triggerPrintCombined = (order: any, type: "kot" | "bill") => {
     if (printerMethod === "none") return;
     triggerHaptic(20);
+    setPrintType(type);
 
     if (printerMethod === "browser") {
       setPrintTargetOrder(order);
@@ -272,57 +343,90 @@ export default function KitchenDisplaySystem() {
         window.print();
       }, 150);
     } else if (printerMethod === "rawbt") {
-      const textStr = generatePlainTextReceipt(order);
+      const textStr = type === "kot" ? generatePlainTextKOT(order) : generatePlainTextReceipt(order);
       window.location.href = "rawbt:" + encodeURIComponent(textStr);
     }
   };
 
-  // LOGIN: Verifies Entered PIN against personal Cook account in Firestore
-  const handlePinSubmit = async (e: React.FormEvent) => {
+  // LOGIN: Verifies Entered Username & PIN
+  const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isLoggingIn) return; // डबल-सबमिशन ब्लॉक करें
+
+    if (!usernameInput.trim() || !pinInput.trim()) {
+      return toast.error("कृपया Username और PIN दोनों दर्ज करें!");
+    }
+
+    setIsLoggingIn(true);
     const toastId = toast.loading("Verifying kitchen credentials...");
     try {
-      if (pinInput === passcodes.adminPin) {
-        toast.dismiss(toastId);
+      // एडमिन लॉगिन बाईपास चेक
+      if (pinInput.trim() === passcodes.adminPin && usernameInput.trim().toLowerCase() === "admin") {
         localStorage.setItem('bb_kds_verified', 'true');
         localStorage.setItem('bb_kds_cook_name', "Admin");
+        setCookName("Admin");
         setIsLocked(false);
         toast.success("KDS Unlocked as Admin! 👑");
         return;
       }
 
+      // केवल PIN और किचन रोल से पुरानी सुरक्षित क्वेरी
       const q = query(
         collection(db, "staff_members"),
-        where("pin", "==", pinInput),
+        where("pin", "==", pinInput.trim()),
         where("role", "==", "kitchen")
       );
-      const snap = await getDocs(q);
-      toast.dismiss(toastId);
 
-      if (!snap.empty) {
-        const cook = snap.docs[0].data();
+      // --- 8 सेकंड का टाइमआउट गार्ड ---
+      const getDocsWithTimeout = (queryObj: any, timeoutMs = 8000) => {
+        return Promise.race([
+          getDocsFromServer(queryObj), 
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error("KDS_DATABASE_TIMEOUT")), timeoutMs)
+          )
+        ]);
+      };
+
+      const snap = (await getDocsWithTimeout(q)) as any;
+
+      // फ़ायरबेस से डेटा मिलने के बाद क्लाइंट-साइड ही नाम का मिलान (केस-सेंसिटिव से सुरक्षा)
+      const matchedCookDoc = snap.docs.find((doc: any) => {
+        const dbName = String(doc.data().name || "").trim().toLowerCase();
+        const inputName = usernameInput.trim().toLowerCase();
+        return dbName === inputName;
+      });
+
+      if (matchedCookDoc) {
+        const cook = matchedCookDoc.data();
         localStorage.setItem('bb_kds_verified', 'true');
         localStorage.setItem('bb_kds_cook_name', cook.name);
+        setCookName(cook.name);
         setIsLocked(false);
         toast.success(`Welcome, Chef ${cook.name}! KDS Unlocked! 👨‍🍳`);
       } else {
-        toast.error("Incorrect PIN! Access Denied.");
+        toast.error("Incorrect Name or PIN! Access Denied. ❌");
         setPinInput("");
       }
-    } catch (err) {
+    } catch (err: any) {
+      if (err.message === "KDS_DATABASE_TIMEOUT") {
+        toast.error("कनेक्शन धीमा है या डेटाबेस लोड नहीं हो सका! ❌");
+      } else {
+        toast.error("लॉगिन वेरिफिकेशन फेल हुआ। डेटाबेस एरर।");
+      }
+      console.error(err);
+    } finally {
       toast.dismiss(toastId);
-      toast.error("Login verification failed. Database error.");
+      setIsLoggingIn(false);
     }
   };
 
-  // --- डिलीवरी बॉय को पुश नोटिफिकेशन भेजने की क्रिया (केवल Delivery ऑर्डर्स के लिए) ---
+  // --- डिलीवरी बॉय को पुश नोटिफिकेशन भेजने की क्रिया ---
   const triggerDeliveryBoyNotification = async (orderId: string) => {
     try {
       const orderSnap = await getDoc(doc(db, "orders", orderId));
       if (orderSnap.exists()) {
         const orderData = orderSnap.data();
         
-        // Self-Pickup या Dine-In (Table) ऑर्डर होने पर डिलीवरी नोटिफिकेशन बाईपास करें
         const fType = orderData.fulfillmentType || "";
         if (fType === "pickup" || fType === "table") {
           console.log(`Order #${orderId} is ${fType}. Skipping delivery boy notification.`);
@@ -369,7 +473,6 @@ export default function KitchenDisplaySystem() {
     if (currentStatus === 'pending') {
       nextStatus = 'preparing';
     } else if (currentStatus === 'preparing') {
-      // Self-Pickup (pickup) और Dine-In (table) ऑर्डर्स सीधे Delivered (पूर्ण) हो जाएंगे
       nextStatus = (fType === "pickup" || fType === "table") ? 'delivered' : 'out_for_delivery';
     } else if (currentStatus === 'out_for_delivery') {
       nextStatus = 'delivered';
@@ -381,12 +484,11 @@ export default function KitchenDisplaySystem() {
       await updateDoc(doc(db, "orders", orderId), { status: nextStatus });
       toast.success(`Status updated to ${nextStatus.replace('_', ' ')}!`);
 
-      // आर्डर एक्सेप्ट (Pending -> Preparing) होते ही ऑटो-प्रिंट ट्रिगर करें
+      // आर्डर एक्सेप्ट होते ही ऑटो-प्रिंट KOT ट्रिगर करें
       if (currentStatus === 'pending' && autoPrintOnAccept) {
-        triggerPrint(order);
+        triggerPrintCombined(order, "kot");
       }
 
-      // केवल Delivery वाले ऑर्डर्स होने पर ही डिलीवरी बॉय को पुश नोटिफिकेशन जाएगा
       if (currentStatus === 'preparing' && fType === 'delivery') {
         triggerDeliveryBoyNotification(orderId);
       }
@@ -425,7 +527,7 @@ export default function KitchenDisplaySystem() {
     }
   };
 
-  // --- SECURITY LOCK SCREEN ---
+  // --- PREMIUM LOCK SCREEN (WITH USERNAME AND PIN) ---
   if (isLocked) {
     return (
       <div className="bg-[#050505] min-h-screen text-white flex items-center justify-center p-4">
@@ -440,21 +542,31 @@ export default function KitchenDisplaySystem() {
             <p className="text-[10px] text-gray-500 font-bold tracking-widest uppercase mt-1">Kitchen Display System</p>
           </div>
 
-          <form onSubmit={handlePinSubmit} className="space-y-4">
+          <form onSubmit={handleLoginSubmit} className="space-y-4">
             <input 
-              type="password" 
+              type="text" 
+              placeholder="Enter Your Name / Username" 
+              value={usernameInput} 
+              onChange={(e) => setUsernameInput(e.target.value)} 
+              className="w-full bg-black/60 border border-white/10 rounded-2xl p-4 text-center outline-none focus:border-orange-500 text-sm font-bold text-white placeholder:normal-case"
+              required 
+            />
+            <input 
+              type="text" // गूगल पासवर्ड वार्निंग बाईपास के लिए 'text'
               maxLength={6} 
-              placeholder="Enter Your Personal PIN" 
+              placeholder="Enter Your PIN" 
               value={pinInput} 
               onChange={(e) => setPinInput(e.target.value)} 
+              style={{ WebkitTextSecurity: 'disc' } as any} // पिन के अक्षरों को डॉट (•) दिखाने के लिए CSS
               className="w-full bg-black/60 border border-white/10 rounded-2xl p-4 text-center outline-none focus:border-orange-500 text-sm font-bold text-white tracking-widest"
               required 
             />
             <button 
               type="submit" 
-              className="w-full bg-orange-500 hover:bg-orange-600 text-white p-4 rounded-2xl font-black text-xs uppercase tracking-wider transition-all"
+              disabled={isLoggingIn} // वेरिफिकेशन के समय डबल-क्लिक लॉक करने के लिए
+              className="w-full bg-orange-500 hover:bg-orange-600 disabled:bg-orange-500/50 disabled:cursor-not-allowed text-white p-4 rounded-2xl font-black text-xs uppercase tracking-wider transition-all"
             >
-              Unlock Terminal
+              {isLoggingIn ? "Verifying..." : "Unlock Terminal"}
             </button>
           </form>
         </div>
@@ -477,7 +589,7 @@ export default function KitchenDisplaySystem() {
       <link rel="manifest" href="/kitchen-manifest.json" />
       <Toaster />
 
-      {/* थर्मल प्रिंटर मीडिया ओवरराइड CSS - पूरे वेबपेज को हाइड करके केवल 58mm का बिल प्रिंट करने के लिए */}
+      {/* थर्मल प्रिंटर मीडिया ओवरराइड CSS */}
       <style dangerouslySetInnerHTML={{__html: `
         @media print {
           body * {
@@ -502,9 +614,12 @@ export default function KitchenDisplaySystem() {
       <header className="border-b border-white/5 pb-4 mb-6 flex flex-wrap gap-4 justify-between items-center">
         <div>
           <h1 className="text-2xl font-black text-orange-500 italic uppercase">
-            Bum Bum Cafe - KDS {typeof window !== 'undefined' && localStorage.getItem('bb_kds_cook_name') ? `- Chef ${localStorage.getItem('bb_kds_cook_name')}` : ''}
+            Bum Bum Cafe - KDS {cookName ? `- Chef ${cookName}` : ''}
           </h1>
-          <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Kitchen Order Screen • Real-time Cooking</p>
+          <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider flex items-center gap-1.5 mt-0.5">
+            <span className="inline-block w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+            Kitchen Order Screen • Real-time Cooking
+          </p>
         </div>
 
         {/* प्रिंटर कॉन्फ़िगरेशन पैनल */}
@@ -527,7 +642,7 @@ export default function KitchenDisplaySystem() {
               onClick={handleAutoPrintToggle}
               className={`px-3 py-1 rounded-lg text-xs font-bold transition-all border ${autoPrintOnAccept ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' : 'bg-white/5 text-gray-400 border-white/10'}`}
             >
-              {autoPrintOnAccept ? "✓ Auto-Print: ON" : "✗ Auto-Print: OFF"}
+              {autoPrintOnAccept ? "✓ Auto-Print KOT: ON" : "✗ Auto-Print KOT: OFF"}
             </button>
           )}
         </div>
@@ -546,6 +661,7 @@ export default function KitchenDisplaySystem() {
             onClick={() => {
               localStorage.removeItem('bb_kds_verified');
               localStorage.removeItem('bb_kds_cook_name');
+              setCookName("");
               setIsLocked(true);
             }} 
             className="p-2.5 bg-white/5 rounded-full text-gray-400 active:scale-90 transition-all"
@@ -575,16 +691,27 @@ export default function KitchenDisplaySystem() {
                   </span>
                 </div>
 
-                <div className="space-y-2 border-y border-white/5 py-3 mb-4">
+                {/* --- अत्यंत स्पष्ट और चमकीला आइटम्स डिस्प्ले जो दूर से दिखेगा --- */}
+                <div className="space-y-3.5 border-y border-white/5 py-4 mb-5">
                   {o.items?.map((item: any, idx: number) => (
-                    <div key={idx} className="text-sm font-bold text-gray-200">
-                      <p className="flex justify-between">
-                        <span><strong className="text-orange-500">×{item.quantity}</strong> {item.name}</span>
-                      </p>
+                    <div key={idx} className="pb-3 border-b border-white/[0.03] last:border-b-0 last:pb-0 space-y-1.5 text-left">
+                      <div className="flex items-center gap-3">
+                        {/* चमकीला बड़ा क्वांटिटी बैज */}
+                        <span className="inline-flex items-center justify-center bg-orange-500/15 border border-orange-500/30 text-orange-400 text-lg font-black px-3 py-1 rounded-xl min-w-[38px]">
+                          {item.quantity}x
+                        </span>
+                        {/* बड़ा और साफ़ आइटम नेम */}
+                        <span className="text-base font-black text-white tracking-wide capitalize">
+                          {item.name}
+                        </span>
+                      </div>
+                      
+                      {/* विशेष कुकिंग निर्देश (Highlighted Yellow Box) */}
                       {item.note && (
-                        <p className="text-[10px] text-orange-400 font-medium italic mt-1 bg-orange-500/5 px-2.5 py-1 rounded border border-orange-500/10">
-                          👩‍🍳 निर्देश: {item.note}
-                        </p>
+                        <div className="text-xs text-yellow-300 font-bold bg-yellow-500/10 px-3 py-2 rounded-xl border border-yellow-500/20 shadow-inner flex items-start gap-1.5 leading-relaxed">
+                          <span className="text-sm">👩‍🍳</span>
+                          <span>निर्देश: {item.note}</span>
+                        </div>
                       )}
                     </div>
                   ))}
@@ -624,16 +751,24 @@ export default function KitchenDisplaySystem() {
                   )}
                 </button>
 
-                {/* मैनुअल पर्ची प्रिंट करने का बटन (अगर सेटिंग्स में प्रिंटर ऑन है) */}
+                {/* केओटी (KOT) और बिल (BILL) प्रिंटिंग के बटन्स */}
                 {printerMethod !== "none" && (
-                  <button
-                    type="button"
-                    onClick={() => triggerPrint(o)}
-                    className="w-full py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider text-orange-400 hover:text-orange-500 hover:bg-orange-500/10 border border-orange-500/20 transition-all flex items-center justify-center gap-1.5 mt-1.5"
-                    title="Print Bill Receipt"
-                  >
-                    <span>🖨️ Print Bill Receipt (पर्ची प्रिंट करें)</span>
-                  </button>
+                  <div className="grid grid-cols-2 gap-2 mt-1.5">
+                    <button
+                      type="button"
+                      onClick={() => triggerPrintCombined(o, "kot")}
+                      className="py-2.5 rounded-xl text-[9px] font-black uppercase tracking-wider text-green-400 hover:text-green-500 hover:bg-green-500/10 border border-green-500/20 transition-all flex items-center justify-center gap-1"
+                    >
+                      <span>🖨️ Print KOT (रसोई पर्ची)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => triggerPrintCombined(o, "bill")}
+                      className="py-2.5 rounded-xl text-[9px] font-black uppercase tracking-wider text-orange-400 hover:text-orange-500 hover:bg-orange-500/10 border border-orange-500/20 transition-all flex items-center justify-center gap-1"
+                    >
+                      <span>🧾 Print Bill (पूरा बिल)</span>
+                    </button>
+                  </div>
                 )}
 
                 {/* Reject/Fake Order Button */}
@@ -651,52 +786,84 @@ export default function KitchenDisplaySystem() {
         </div>
       )}
 
-      {/* --- हिडन प्रिंटिंग रसीद ब्लॉक (केवल Browser Print ट्रिगर होने पर रेंडर होगा) --- */}
+      {/* --- हिडन प्रिंटिंग रसीद ब्लॉक --- */}
       {printTargetOrder && (
         <div id="print-receipt-section" className="hidden print:block text-black bg-white p-4 font-mono text-xs w-[58mm] leading-tight mx-auto text-left">
-          <div className="text-center font-bold text-sm uppercase border-b-2 border-dashed border-black pb-2 mb-2">
-            BUM BUM CAFE
-          </div>
-          <div className="space-y-1 text-[10px]">
-            <p className="font-bold text-xs text-center">TOKEN: #{printTargetOrder.tokenNumber || "N/A"}</p>
-            <p className="text-center">Bill No: #{formatBillNumber(printTargetOrder.billNumber || 0)}</p>
-            <p className="text-center">Date: {printTargetOrder.timestamp?.toDate ? printTargetOrder.timestamp.toDate().toLocaleString('en-IN') : new Date(printTargetOrder.timestamp).toLocaleString()}</p>
-            <div className="border-t border-dashed border-black my-2"></div>
-            <p className="font-bold">Mode: {printTargetOrder.fulfillmentType?.toUpperCase()}</p>
-            {printTargetOrder.fulfillmentType === "table" && <p>Table No: {printTargetOrder.tableNumber}</p>}
-            <p>Customer: {printTargetOrder.customerName}</p>
-            <p>Phone: {printTargetOrder.customerPhone}</p>
-            {printTargetOrder.address && <p className="line-clamp-2">Address: {printTargetOrder.address}</p>}
-            <div className="border-t border-dashed border-black my-2"></div>
-            <p className="font-bold uppercase text-[10px] mb-1">ITEMS:</p>
-            {printTargetOrder.items?.map((item: any, idx: number) => (
-              <div key={idx} className="space-y-0.5 mb-1.5">
-                <div className="flex justify-between font-bold">
-                  <span>{item.name} (x{item.quantity})</span>
-                  <span>₹{item.price * item.quantity}</span>
+          {printType === "kot" ? (
+            // केओटी (KOT) प्रिंट फॉर्मेट
+            <>
+              <div className="text-center font-bold text-sm uppercase border-b-2 border-dashed border-black pb-2 mb-2">
+                KITCHEN TICKET (KOT)
+              </div>
+              <div className="space-y-1 text-[10px]">
+                <p className="font-bold text-xs text-center">TOKEN: #{printTargetOrder.tokenNumber || "N/A"}</p>
+                <p className="text-center">Bill No: #{formatBillNumber(printTargetOrder.billNumber || 0)}</p>
+                <div className="border-t border-dashed border-black my-2"></div>
+                <p className="font-bold">Mode: {printTargetOrder.fulfillmentType?.toUpperCase()}</p>
+                {printTargetOrder.fulfillmentType === "table" && <p>Table No: {printTargetOrder.tableNumber}</p>}
+                <div className="border-t border-dashed border-black my-2"></div>
+                <p className="font-bold uppercase text-[10px] mb-1">KITCHEN ITEMS:</p>
+                {printTargetOrder.items?.map((item: any, idx: number) => (
+                  <div key={idx} className="space-y-0.5 mb-1.5 border-b border-gray-100 pb-1">
+                    <div className="flex justify-between font-bold text-xs">
+                      <span>{item.name} (x{item.quantity})</span>
+                    </div>
+                    {item.note && <p className="text-[9px] font-bold italic pl-2 bg-gray-50 p-1 rounded">└─ निर्देश: {item.note}</p>}
+                  </div>
+                ))}
+              </div>
+              <div className="text-center text-[9px] border-t-2 border-dashed border-black pt-2 mt-4 font-bold">
+                *** COOK FAST • SERVE HOT ***
+              </div>
+            </>
+          ) : (
+            // ग्राहकों के लिए पूरा बिल प्रिंट फॉर्मेट
+            <>
+              <div className="text-center font-bold text-sm uppercase border-b-2 border-dashed border-black pb-2 mb-2">
+                BUM BUM CAFE
+              </div>
+              <div className="space-y-1 text-[10px]">
+                <p className="font-bold text-xs text-center">TOKEN: #{printTargetOrder.tokenNumber || "N/A"}</p>
+                <p className="text-center">Bill No: #{formatBillNumber(printTargetOrder.billNumber || 0)}</p>
+                <p className="text-center">Date: {printTargetOrder.timestamp?.toDate ? printTargetOrder.timestamp.toDate().toLocaleString('en-IN') : new Date(printTargetOrder.timestamp).toLocaleString()}</p>
+                <div className="border-t border-dashed border-black my-2"></div>
+                <p className="font-bold">Mode: {printTargetOrder.fulfillmentType?.toUpperCase()}</p>
+                {printTargetOrder.fulfillmentType === "table" && <p>Table No: {printTargetOrder.tableNumber}</p>}
+                <p>Customer: {printTargetOrder.customerName}</p>
+                <p>Phone: {printTargetOrder.customerPhone}</p>
+                {printTargetOrder.address && <p className="line-clamp-2">Address: {printTargetOrder.address}</p>}
+                <div className="border-t border-dashed border-black my-2"></div>
+                <p className="font-bold uppercase text-[10px] mb-1">ITEMS:</p>
+                {printTargetOrder.items?.map((item: any, idx: number) => (
+                  <div key={idx} className="space-y-0.5 mb-1.5">
+                    <div className="flex justify-between font-bold">
+                      <span>{item.name} (x{item.quantity})</span>
+                      <span>₹{item.price * item.quantity}</span>
+                    </div>
+                    {item.note && <p className="text-[9px] italic pl-2">└─ Note: {item.note}</p>}
+                  </div>
+                ))}
+                <div className="border-t border-dashed border-black my-2"></div>
+                <div className="flex justify-between">
+                  <span>Subtotal:</span>
+                  <span>₹{printTargetOrder.subtotal || 0}</span>
                 </div>
-                {item.note && <p className="text-[9px] italic pl-2">└─ Note: {item.note}</p>}
+                {printTargetOrder.discount > 0 && (
+                  <div className="flex justify-between">
+                    <span>Discount:</span>
+                    <span>-₹{printTargetOrder.discount}</span>
+                  </div>
+                )}
+                <div className="flex justify-between font-bold text-sm border-t border-dashed border-black pt-1 mt-1">
+                  <span>Total Pay:</span>
+                  <span>₹{printTargetOrder.total || 0}</span>
+                </div>
               </div>
-            ))}
-            <div className="border-t border-dashed border-black my-2"></div>
-            <div className="flex justify-between">
-              <span>Subtotal:</span>
-              <span>₹{printTargetOrder.subtotal || 0}</span>
-            </div>
-            {printTargetOrder.discount > 0 && (
-              <div className="flex justify-between">
-                <span>Discount:</span>
-                <span>-₹{printTargetOrder.discount}</span>
+              <div className="text-center text-[9px] border-t-2 border-dashed border-black pt-2 mt-4">
+                *** Thank you! Visit Again ***
               </div>
-            )}
-            <div className="flex justify-between font-bold text-sm border-t border-dashed border-black pt-1 mt-1">
-              <span>Total Pay:</span>
-              <span>₹{printTargetOrder.total || 0}</span>
-            </div>
-          </div>
-          <div className="text-center text-[9px] border-t-2 border-dashed border-black pt-2 mt-4">
-            *** Thank you! Visit Again ***
-          </div>
+            </>
+          )}
         </div>
       )}
     </div>
