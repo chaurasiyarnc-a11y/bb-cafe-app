@@ -16,12 +16,11 @@ const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 
 export const auth = getAuth(app);
 
-// Next.js क्रैश से बचने और WebView/5G पर 100% लॉगिन चलाने के लिए
+// Next.js क्रैश से बचने और WebView/5G पर 100% लॉगिन चलाने के लिए सुरक्षित कॉन्फ़िगरेशन
 let firestoreDb;
 try {
   firestoreDb = initializeFirestore(app, {
-    experimentalForceLongPolling: true, // लॉन्ग पोलिंग को बल दें
-    useFetchStreams: false,             // स्टीम कनेक्शन बंद करें (WebView के लिए बहुत जरूरी)
+    experimentalForceLongPolling: true, // लॉन्ग पोलिंग को बल दें (ऑफिशियल सेटिंग)
   });
 } catch (e) {
   firestoreDb = getFirestore(app);
