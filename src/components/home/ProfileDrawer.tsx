@@ -1,7 +1,7 @@
 'use client';
 import React from 'react';
 import { motion } from 'framer-motion';
-import { X, User, LogOut, Award, Gift, Star, History, Phone } from 'lucide-react';
+import { X, User, LogOut, Award, Gift, Star, History, Phone, Lock } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 interface ProfileDrawerProps {
@@ -36,7 +36,7 @@ interface ProfileDrawerProps {
   triggerHaptic: (ms?: number) => void;
   ecoCutlerySaves: number;
   getReferralCode: () => string;
-  setLiveOrder: (order: any) => void; // प्रॉप्स में सेट लाइव आर्डर जोड़ा गया
+  setLiveOrder: (order: any) => void; 
 }
 
 export default function ProfileDrawer({
@@ -257,29 +257,40 @@ export default function ProfileDrawer({
                           <span className="text-sm text-green-600 dark:text-green-400 font-mono">₹{ord.total}</span>
                         </div>
 
-                        {/* नया सुधारात्मक क्षेत्र: एक्टिव आर्डर्स के नीचे 'Track on Screen' और 'Call' बटन */}
+                        {/* नया सुधारात्मक क्षेत्र: एक्टिव आर्डर्स के नीचे 'Track on Screen' और 'Call' बटन (डिलीवरी पिन के साथ) */}
                         {ord.status !== 'delivered' && ord.status !== 'completed' && ord.status !== 'rejected' ? (
-                          <div className="flex gap-2 mt-2 font-sans">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                triggerHaptic(15);
-                                setLiveOrder(ord); // लाइव ट्रैकर को वापस होम स्क्रीन पर इनेबल करें
-                                setIsProfileOpen(false); // प्रोफाइल ड्रावर बंद करें ताकि ग्राहक ट्रैक देख सके
-                                toast.success(isHindi ? "लाइव ट्रैकर होम स्क्रीन पर चालू हो गया है! 🛵" : "Live tracker activated on home screen! 🛵");
-                              }}
-                              className="flex-1 bg-orange-500 hover:bg-orange-600 text-black text-center text-[10px] font-black py-2.5 rounded-xl transition-all shadow-md"
-                            >
-                              🔍 Track on Screen
-                            </button>
-                            <a
-                              href={`tel:+${whatsappNumber}`}
-                              onClick={() => triggerHaptic(15)}
-                              className="flex-1 bg-green-600 hover:bg-green-700 text-white text-center text-[10px] font-black py-2.5 rounded-xl transition-all flex items-center justify-center gap-1 shadow-md"
-                            >
-                              <Phone size={11} />
-                              <span>Call Cafe</span>
-                            </a>
+                          <div className="space-y-2 mt-2 font-sans">
+                            {/* डिलीवरी पिन यदि उपलब्ध हो */}
+                            {ord.deliveryPin && (
+                              <div className="bg-yellow-500/10 border border-yellow-500/20 p-2 rounded-xl text-center">
+                                <p className="text-[8px] font-bold text-yellow-500 uppercase tracking-wider flex items-center justify-center gap-1 leading-none">
+                                  <Lock size={10} />
+                                  <span>पिन (Rider PIN): {ord.deliveryPin}</span>
+                                </p>
+                              </div>
+                            )}
+                            <div className="flex gap-2">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  triggerHaptic(15);
+                                  setLiveOrder(ord); // लाइव ट्रैकर को वापस होम स्क्रीन पर इनेबल करें
+                                  setIsProfileOpen(false); // प्रोफाइल ड्रावर बंद करें
+                                  toast.success(isHindi ? "लाइव ट्रैकर होम स्क्रीन पर चालू हो गया है! 🛵" : "Live tracker activated on home screen! 🛵");
+                                }}
+                                className="flex-1 bg-orange-500 hover:bg-orange-600 text-black text-center text-[10px] font-black py-2.5 rounded-xl transition-all shadow-md"
+                              >
+                                🔍 Track on Screen
+                              </button>
+                              <a
+                                href={`tel:+${whatsappNumber}`}
+                                onClick={() => triggerHaptic(15)}
+                                className="flex-1 bg-green-600 hover:bg-green-700 text-white text-center text-[10px] font-black py-2.5 rounded-xl transition-all flex items-center justify-center gap-1 shadow-md"
+                              >
+                                <Phone size={11} />
+                                <span>Call Cafe</span>
+                              </a>
+                            </div>
                           </div>
                         ) : (
                           <div className="text-center text-[10px] text-gray-500 font-bold uppercase mt-1">
