@@ -1,7 +1,8 @@
 'use client';
 import React from 'react';
 import { motion } from 'framer-motion';
-import { X, User, LogOut, Award, Gift, Star, History, MessageCircle, Phone, Clock } from 'lucide-react';
+import { X, User, LogOut, Award, Gift, Star, History, Phone } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 interface ProfileDrawerProps {
   isHindi: boolean;
@@ -35,6 +36,7 @@ interface ProfileDrawerProps {
   triggerHaptic: (ms?: number) => void;
   ecoCutlerySaves: number;
   getReferralCode: () => string;
+  setLiveOrder: (order: any) => void; // प्रॉप्स में सेट लाइव आर्डर जोड़ा गया
 }
 
 export default function ProfileDrawer({
@@ -44,7 +46,7 @@ export default function ProfileDrawer({
   loyaltyRules, pointsHistory, shareCount, handleShareApp, setIsGiftModalOpen,
   setIsClaimModalOpen, setClaimingPlatform, SOCIAL_LINKS, handleCustomerRedeem,
   cart, pastOrders, formatBillNumber, whatsappNumber, triggerHaptic,
-  ecoCutlerySaves, getReferralCode
+  ecoCutlerySaves, getReferralCode, setLiveOrder
 }: ProfileDrawerProps) {
   if (!isProfileOpen) return null;
 
@@ -255,21 +257,42 @@ export default function ProfileDrawer({
                           <span className="text-sm text-green-600 dark:text-green-400 font-mono">₹{ord.total}</span>
                         </div>
 
-                        <a 
-                          href={`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(`नमस्ते बम बम कैफ़े! कृपया मेरे आर्डर नंबर #${formatBillNumber(ord.billNumber)} (टोकन नंबर: #${ord.tokenNumber}) का लाइव स्टेटस बताएं।`)}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="w-full bg-orange-500/10 text-orange-600 hover:bg-orange-500 hover:text-white dark:bg-white/5 hover:dark:bg-white/10 text-center text-[10px] font-black py-2.5 rounded-xl block border dark:border-neutral-800 border-orange-500/20 transition-all"
-                        >
-                          Track Live Status on WA 🔍
-                        </a>
+                        {/* नया सुधारात्मक क्षेत्र: एक्टिव आर्डर्स के नीचे 'Track on Screen' और 'Call' बटन */}
+                        {ord.status !== 'delivered' && ord.status !== 'completed' && ord.status !== 'rejected' ? (
+                          <div className="flex gap-2 mt-2 font-sans">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                triggerHaptic(15);
+                                setLiveOrder(ord); // लाइव ट्रैकर को वापस होम स्क्रीन पर इनेबल करें
+                                setIsProfileOpen(false); // प्रोफाइल ड्रावर बंद करें ताकि ग्राहक ट्रैक देख सके
+                                toast.success(isHindi ? "लाइव ट्रैकर होम स्क्रीन पर चालू हो गया है! 🛵" : "Live tracker activated on home screen! 🛵");
+                              }}
+                              className="flex-1 bg-orange-500 hover:bg-orange-600 text-black text-center text-[10px] font-black py-2.5 rounded-xl transition-all shadow-md"
+                            >
+                              🔍 Track on Screen
+                            </button>
+                            <a
+                              href={`tel:+${whatsappNumber}`}
+                              onClick={() => triggerHaptic(15)}
+                              className="flex-1 bg-green-600 hover:bg-green-700 text-white text-center text-[10px] font-black py-2.5 rounded-xl transition-all flex items-center justify-center gap-1 shadow-md"
+                            >
+                              <Phone size={11} />
+                              <span>Call Cafe</span>
+                            </a>
+                          </div>
+                        ) : (
+                          <div className="text-center text-[10px] text-gray-500 font-bold uppercase mt-1">
+                            {ord.status === 'rejected' ? "Order Rejected ❌" : "Order Complete ✓"}
+                          </div>
+                        )}
                       </div>
                     );
                   })}
                 </div>
               ) : (
                 <p className="text-center text-neutral-500 py-6 text-[10px] font-bold uppercase tracking-wider">
-                  {isHindi ? "अभी तक कोई आर्डर नहीं मिला।  स्वादिष्ट आर्डर शुरू करें! 🍕" : "No orders found yet. Grab some food! 🍕"}
+                  {isHindi ? "अभी तक कोई आर्डर नहीं मिला। स्वादिष्ट आर्डर शुरू करें! 🍕" : "No orders found yet. Grab some food! 🍕"}
                 </p>
               )}
             </div>
