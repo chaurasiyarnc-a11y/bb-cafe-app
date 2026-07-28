@@ -41,7 +41,21 @@ jobs:
           npx cap add android || true
           npx cap sync android
 
-      # [NEW AUTO-PATCH] डुप्लीकेट क्लासेस को रोकने के लिए जबरन वर्जन सिंक करने का पैच
+      # [NEW] आपके public/icon-512x512.png से ऑटोमैटिक एंड्रॉइड ऐप आइकॉन और स्प्लैश स्क्रीन बनाना
+      - name: Generate App Icons and Splash Screens
+        run: |
+          mkdir -p assets
+          cp public/icon-512x512.png assets/logo.png
+          npm install @capacitor/assets --save-dev
+          npx @capacitor/assets generate --iconBackgroundColor '#050505' --iconBackgroundColorDark '#050505' --splashBackgroundColor '#050505' --splashBackgroundColorDark '#050505'
+
+      # [NEW] बिना अनइंस्टॉल किए सीधे अपडेट करने के लिए एक स्थाई सिग्नेचर चाबी (Stable Keystore) जनरेट करना
+      - name: Create Stable Debug Keystore
+        run: |
+          mkdir -p ~/.android
+          keytool -genkey -v -keystore ~/.android/debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=BumBum Staff, O=BumBum Cafe, C=IN"
+
+      # डुप्लीकेट क्लासेस को रोकने के लिए जबरन वर्जन सिंक करने का पैच
       - name: Fix Duplicate Kotlin Classes
         run: |
           echo -e "\nsubprojects { configurations.all { resolutionStrategy { force 'org.jetbrains.kotlin:kotlin-stdlib:1.8.22'; force 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.8.22'; force 'org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.8.22' } } }" >> android/build.gradle
