@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../../lib/firebase';
-import { collection, onSnapshot, query, doc, updateDoc, orderBy, getDoc, getDocsFromServer, where } from 'firebase/firestore'; // <-- यहाँ 'getDocsFromServer' इम्पोर्ट किया गया है
+import { collection, onSnapshot, query, doc, updateDoc, orderBy, getDoc, getDocsFromServer, where } from 'firebase/firestore'; 
 import { Phone, MapPin, Check, Loader2, Lock, User, Clock, WifiOff, X, Navigation } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 import { requestNotificationPermission } from '../../lib/messaging';
@@ -16,8 +16,7 @@ export default function DeliveryDashboard() {
   const [pinInput, setPinInput] = useState("");
   const [riderName, setRiderName] = useState(""); 
 
-  // सेटिंग्स बैनर और वेक लॉक
-  const [showBatteryWarning, setShowBatteryWarning] = useState(true);
+  // सेटिंग्स और वेक लॉक
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const wakeLockRef = useRef<any>(null);
 
@@ -29,16 +28,6 @@ export default function DeliveryDashboard() {
     const interval = setInterval(() => setNow(new Date()), 60000);
     return () => clearInterval(interval);
   }, []);
-
-  // लॉगिन होने के 8 सेकंड बाद बैटरी बैनर अपने आप बंद करने का टाइमर
-  useEffect(() => {
-    if (!isLocked) {
-      const timer = setTimeout(() => {
-        setShowBatteryWarning(false);
-      }, 8000);
-      return () => clearTimeout(timer);
-    }
-  }, [isLocked]);
 
   // ब्राउज़र ऑडियो अनलॉक और रिंगटोन बजाने का फंक्शन
   const playNotificationRing = () => {
@@ -227,7 +216,7 @@ export default function DeliveryDashboard() {
       // --- टाइमआउट मैकेनिज्म (8 सेकंड का सेफ्टी गार्ड) ---
       const getDocsWithTimeout = (queryObj: any, timeoutMs = 8000) => {
         return Promise.race([
-          getDocsFromServer(queryObj), // <-- यहाँ 'getDocsFromServer' का उपयोग किया गया है (अल्ट्रा स्टेबल)
+          getDocsFromServer(queryObj), // getDocsFromServer का उपयोग (अल्ट्रा स्टेबल)
           new Promise((_, reject) =>
             setTimeout(() => reject(new Error("DATABASE_TIMEOUT")), timeoutMs)
           )
@@ -349,11 +338,12 @@ export default function DeliveryDashboard() {
               required 
             />
             <input 
-              type="password" 
+              type="text" // गूगल पासवर्ड वार्निंग बाईपास के लिए 'text'
               maxLength={4}
               placeholder="Enter 4-Digit PIN" 
               value={pinInput} 
               onChange={(e) => setPinInput(e.target.value)} 
+              style={{ WebkitTextSecurity: 'disc' } as any} // पिन छिपाने के लिए CSS
               className="w-full bg-black/60 border border-white/10 rounded-2xl p-4 text-center outline-none focus:border-orange-500 text-sm font-bold text-white tracking-widest"
               required 
             />
@@ -415,30 +405,6 @@ export default function DeliveryDashboard() {
           </button>
         </div>
       </header>
-
-      {/* बैटरी चेतावनी बैनर */}
-      {showBatteryWarning && (
-        <div className="bg-orange-500/10 border border-orange-500/30 p-5 rounded-3xl mb-6 relative">
-          <button 
-            onClick={() => setShowBatteryWarning(false)} 
-            className="absolute top-4 right-4 text-orange-400 hover:text-white"
-          >
-            <X size={16} />
-          </button>
-          <h2 className="text-sm font-black text-orange-500 flex items-center gap-2 mb-2">
-            ⚠️ आवश्यक मोबाइल सेटिंग्स (Battery Optimization बंद करें)
-          </h2>
-          <p className="text-xs text-gray-300 leading-relaxed">
-            मोबाइल के 'सोने (Sleep)' या बैटरी बचाने के दौरान आर्डर की घंटी समय पर बजने के लिए यह सेटिंग अवश्य करें:
-          </p>
-          <ul className="text-[11px] text-gray-400 mt-2 space-y-1.5 list-disc pl-4">
-            <li>मोबाइल की <b>होम स्क्रीन</b> पर जाकर इस <b>App आइकन को दबाकर रखें (Long Press)</b>।</li>
-            <li>वहाँ <b>App Info (i)</b> या 'ऐप की जानकारी' पर टैप करें।</li>
-            <li><b>Battery (बैटरी)</b> विकल्प में जाएँ और इसे <b>"Unrestricted" (बिना रोक-टोक)</b> पर सेट करें।</li>
-            <li>सुनिश्चित करें कि <b>Background Activity (पृष्ठभूमि गतिविधि)</b> चालू (Allow) हो।</li>
-          </ul>
-        </div>
-      )}
 
       {orders.length === 0 ? (
         <div className="text-center py-32 space-y-2">
