@@ -1930,16 +1930,16 @@ useEffect(() => {
                           </div>
                           
                           {storeOpen && isItemAvailable && (
-                            <button 
-                              onClick={() => { 
-                                triggerHaptic();
-                                item.variants ? setSelectedProduct(item) : addItem(item); 
-                              }} 
-                              className="px-4 py-2 bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-500/30 hover:bg-orange-500 hover:text-white rounded-lg font-black text-[10px] active:scale-95 transition-all uppercase flex items-center gap-1 shadow"
-                            >
-                              <Plus size={12} /> {isHindi ? "जोड़ें" : "ADD"}
-                            </button>
-                          )}
+  <button 
+    onClick={() => { 
+      triggerHaptic();
+      item.variants ? setSelectedProduct(item) : addItem(item); 
+    }} 
+    className="px-5 py-2.5 bg-orange-500 hover:bg-orange-600 text-white rounded-xl font-black text-xs active:scale-95 transition-all uppercase flex items-center gap-1.5 shadow-md shadow-orange-500/30 border border-orange-600"
+  >
+    <Plus size={14} /> {isHindi ? "जोड़ें" : "ADD"}
+  </button>
+)}
                         </div>
                       </div>
                     </motion.div>
