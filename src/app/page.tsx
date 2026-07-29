@@ -184,6 +184,12 @@ export default function BbCafeHome() {
   // UI States
   const [showGreeting] = useState(true);
 
+  // --- MISSING SOCIAL CLAIM STATES RESOLVED ---
+  const [isClaimModalOpen, setIsClaimModalOpen] = useState(false);
+  const [claimingPlatform, setClaimingPlatform] = useState<any>(SOCIAL_LINKS[0]);
+  const [claimUsername, setClaimUsername] = useState("");
+  const [isClaimingLoading, setIsClaimingLoading] = useState(false);
+
   // --- HELPERS, CALCULATIONS & GENERAL UTILS ---
 
   const triggerHaptic = (ms = 35) => {
@@ -369,7 +375,12 @@ export default function BbCafeHome() {
   }, [menu, dbCategories]);
 
   const filteredMenu = useMemo(() => {
-    const searchWords = debouncedSearchQuery.split(/\s+/).filter(Boolean);
+    // Hinglish Mapping integration
+    const searchWords = debouncedSearchQuery
+      .toLowerCase()
+      .split(/\s+/)
+      .filter(Boolean)
+      .map(word => HINGLISH_DICT[word] || word);
 
     return deduplicatedMenu.filter(item => {
       const itemName = item?.name ? String(item.name).toLowerCase() : "";
@@ -1378,6 +1389,44 @@ export default function BbCafeHome() {
     return () => unsubscribeActiveOrder();
   }, [customerDetails]);
 
+  // --- Search Input Debounce Effect ---
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 300);
+    return () => clearTimeout(handler);
+  }, [searchQuery]);
+
+  // --- Auto-advance Banners Effect ---
+  useEffect(() => {
+    if (banners.length <= 1) return;
+    const interval = setInterval(() => {
+      setBannerIndex(prev => (prev + 1) % banners.length);
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [banners]);
+
+  // --- Network Event Listeners (Online/Offline) ---
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    
+    setIsOnline(navigator.onLine);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  // --- Set Hydrated / Mounted State ---
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   // --- BACKGROUND OFFLINE / CACHE HANDLERS ---
   useEffect(() => {
     try {
@@ -1584,7 +1633,7 @@ export default function BbCafeHome() {
           {/* HINDI / ENGLISH LANGUAGE TOGGLE */}
           <button 
             onClick={() => { triggerHaptic(); setIsHindi(!isHindi); }}
-            className="px-3 py-2.5 bg-orange-500 hover:bg-orange-600 text-white rounded-xl text-[10px] font-black tracking-wider flex-shrink-0 transition-all active:scale-95 shadow flex items-center gap-1 min-w-[65px]"
+            className="px-3 py-2.5 bg-orange-50 hover:bg-orange-600 text-white rounded-xl text-[10px] font-black tracking-wider flex-shrink-0 transition-all active:scale-95 shadow flex items-center gap-1 min-w-[65px]"
           >
             <Globe size={12} />
             <span>{isHindi ? "English" : "हिंदी"}</span>
