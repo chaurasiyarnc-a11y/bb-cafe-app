@@ -1205,70 +1205,7 @@ const handleDetectLocation = () => {
       console.warn("Geocoding failed, falling back to link", e);
     }
 
-    const mapLink = `https://www.google.com/maps?q=${latitude.toFixed(6)},${longitude.toFixed(6)}`;
-    
-    const finalAddressText = textAddress 
-      ? (isHighAcc 
-          ? `📍 Accurate Address: ${textAddress}\n🔗 Maps Link: ${mapLink}`
-          : `📍 Address (approx): ${textAddress}\n🔗 Maps Link: ${mapLink}`)
-      : `My GPS Location: ${mapLink}`;
-
-    setAddress(finalAddressText);
-    toast.dismiss(toastId);
-    toast.success(isHindi ? "लोकेशन सफलतापूर्वक मिल गई!" : "Location successfully found!");
-  }
-
-  // 2. Helper: IP-based Geolocation Backup
-  async function fallbackToIP(toastId: string) {
-    setAddress(isHindi ? "⏳ नेटवर्क लोकेशन खोजी जा रही है (Approx)..." : "⏳ Finding network location...");
-    try {
-      const ipRes = await fetch('https://ipapi.co/json/');
-      if (ipRes.ok) {
-        const ipData = await ipRes.json();
-        const lat = ipData.latitude;
-        const lon = ipData.longitude;
-        const city = ipData.city || "";
-        const region = ipData.region || "";
-
-        setDistanceKm(Number(calculateDistanceInKm(lat, lon, storeCoordinates.lat, storeCoordinates.lng).toFixed(2)));
-        setCustomerCoordinates({ lat, lng: lon });
-
-        const mapLink = `https://www.google.com/maps?q=${lat.toFixed(6)},${lon.toFixed(6)}`;
-        const finalAddressText = city 
-          ? `📍 Approx Area: ${city}, ${region} (IP Location)\n🔗 Maps Link: ${mapLink}`
-          : `My GPS Location: ${mapLink}`;
-
-        setAddress(finalAddressText);
-        toast.dismiss(toastId);
-        toast.success(isHindi ? "लोकेशन डिटेक्ट की गई!" : "Location successfully detected!");
-      } else {
-        throw new Error("IP Geolocation failed");
-      }
-    } catch (e) {
-      setAddress("");
-      toast.dismiss(toastId);
-      toast.error(isHindi ? "लोकेशन खोजने में असमर्थ। कृपया मैन्युअली लिखें।" : "Unable to retrieve location. Please type manually.");
-    }
-  }
-
-  // 3. Helper: Low Accuracy Wi-Fi / Cell Triangulation
-  function fallbackToLowAccuracy(toastId: string) {
-    setAddress(isHindi ? "⏳ वैकल्पिक लोकेशन खोजी जा रही है (Network)..." : "⏳ Finding alternative location...");
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        const { latitude, longitude } = position.coords;
-        await processCoordinates(latitude, longitude, false, toastId);
-      },
-      (error) => {
-        console.warn("Low accuracy failed, switching to IP", error);
-        fallbackToIP(toastId);
-      },
-      { enableHighAccuracy: false, timeout: 6000, maximumAge: 60000 }
-    );
-  }
-
-  // 4. Main Function: Triggers the GPS check
-  function handleDetectLocation() {
+const handleDetectLocation = () => {
     triggerHaptic();
     if (typeof window === "undefined") return;
 
@@ -1276,50 +1213,145 @@ const handleDetectLocation = () => {
     const toastId = toast.loading(isHindi ? "सटीक लोकेशन खोजी जा रही है..." : "Finding accurate location...");
 
     if (!navigator.geolocation) {
-      fallbackToIP(toastId);
+      // Direct IP Fallback inside the block
+      setAddress(isHindi ? "⏳ नेटवर्क लोकेशन खोजी जा रही है (Approx)..." : "⏳ Finding network location...");
+      fetch('https://ipapi.co/json/')
+        .then((res) => {
+          if (res.ok) return res.json();
+          throw new Error("IP Geolocation failed");
+        })
+        .then((ipData) => {
+          const lat = ipData.latitude;
+          const lon = ipData.longitude;
+          const city = ipData.city || "";
+          const region = ipData.region || "";
+
+          setDistanceKm(Number(calculateDistanceInKm(lat, lon, storeCoordinates.lat, storeCoordinates.lng).toFixed(2)));
+          setCustomerCoordinates({ lat, lng: lon });
+
+          const mapLink = `https://www.google.com/maps?q=${lat.toFixed(6)},${lon.toFixed(6)}`;
+          const finalAddressText = city 
+            ? `📍 Approx Area: ${city}, ${region} (IP Location)\n🔗 Maps Link: ${mapLink}`
+            : `My GPS Location: ${mapLink}`;
+
+          setAddress(finalAddressText);
+          toast.dismiss(toastId);
+          toast.success(isHindi ? "लोकेशन डिटेक्ट की गई!" : "Location successfully detected!");
+        })
+        .catch(() => {
+          setAddress("");
+          toast.dismiss(toastId);
+          toast.error(isHindi ? "लोकेशन खोजने में असमर्थ। कृपया मैन्युअली लिखें।" : "Unable to retrieve location. Please type manually.");
+        });
       return;
     }
 
+    // Attempt GPS first
     navigator.geolocation.getCurrentPosition(
-      async (position) => {
+      (position) => {
         const { latitude, longitude } = position.coords;
-        await processCoordinates(latitude, longitude, true, toastId);
+        const distance = calculateDistanceInKm(latitude, longitude, storeCoordinates.lat, storeCoordinates.lng);
+        setDistanceKm(Number(distance.toFixed(2)));
+        setCustomerCoordinates({ lat: latitude, lng: longitude });
+
+        fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&accept-language=en`, {
+          headers: { 'User-Agent': 'BumBumCafeApp/1.0' }
+        })
+          .then((res) => {
+            if (res.ok) return res.json();
+            return null;
+          })
+          .then((data) => {
+            const textAddress = data?.display_name || "";
+            const mapLink = `https://www.google.com/maps?q=${latitude.toFixed(6)},${longitude.toFixed(6)}`;
+            const finalAddressText = textAddress 
+              ? `📍 Accurate Address: ${textAddress}\n🔗 Maps Link: ${mapLink}`
+              : `My GPS Location: ${mapLink}`;
+
+            setAddress(finalAddressText);
+            toast.dismiss(toastId);
+            toast.success(isHindi ? "लोकेशन सफलतापूर्वक मिल गई!" : "Location successfully found!");
+          })
+          .catch(() => {
+            const mapLink = `https://www.google.com/maps?q=${latitude.toFixed(6)},${longitude.toFixed(6)}`;
+            setAddress(`My GPS Location: ${mapLink}`);
+            toast.dismiss(toastId);
+            toast.success(isHindi ? "लोकेशन सफलतापूर्वक मिल गई!" : "Location successfully found!");
+          });
       },
-      (error) => {
-        console.warn("Accurate GPS failed, trying Cell/Wi-Fi...", error);
-        fallbackToLowAccuracy(toastId);
-      },
-      { enableHighAccuracy: true, timeout: 6000, maximumAge: 0 }
-    );
-  }
+      () => {
+        // Fallback to low accuracy on fail (Wi-Fi/Cell Tower)
+        setAddress(isHindi ? "⏳ वैकल्पिक लोकेशन खोजी जा रही है (Network)..." : "⏳ Finding alternative location...");
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            const { latitude, longitude } = position.coords;
+            const distance = calculateDistanceInKm(latitude, longitude, storeCoordinates.lat, storeCoordinates.lng);
+            setDistanceKm(Number(distance.toFixed(2)));
+            setCustomerCoordinates({ lat: latitude, lng: longitude });
 
-  // 4. Main Function: Triggers the GPS check
-  const handleDetectLocation = () => {
-    triggerHaptic();
-    if (typeof window === "undefined") return;
+            fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&accept-language=en`, {
+              headers: { 'User-Agent': 'BumBumCafeApp/1.0' }
+            })
+              .then((res) => {
+                if (res.ok) return res.json();
+                return null;
+              })
+              .then((data) => {
+                const textAddress = data?.display_name || "";
+                const mapLink = `https://www.google.com/maps?q=${latitude.toFixed(6)},${longitude.toFixed(6)}`;
+                const finalAddressText = textAddress 
+                  ? `📍 Address (approx): ${textAddress}\n🔗 Maps Link: ${mapLink}`
+                  : `My GPS Location: ${mapLink}`;
 
-    setAddress(isHindi ? "⏳ सटीक लोकेशन खोजी जा रही है (GPS)..." : "⏳ Finding highly accurate location (GPS)...");
-    const toastId = toast.loading(isHindi ? "सटीक लोकेशन खोजी जा रही है..." : "Finding accurate location...");
+                setAddress(finalAddressText);
+                toast.dismiss(toastId);
+                toast.success(isHindi ? "लोकेशन सफलतापूर्वक मिल गई!" : "Location successfully found!");
+              })
+              .catch(() => {
+                const mapLink = `https://www.google.com/maps?q=${latitude.toFixed(6)},${longitude.toFixed(6)}`;
+                setAddress(`My GPS Location: ${mapLink}`);
+                toast.dismiss(toastId);
+                toast.success(isHindi ? "लोकेशन सफलतापूर्वक मिल गई!" : "Location successfully found!");
+              });
+          },
+          () => {
+            // Fallback to IP if low accuracy fails
+            setAddress(isHindi ? "⏳ नेटवर्क लोकेशन खोजी जा रही है (Approx)..." : "⏳ Finding network location...");
+            fetch('https://ipapi.co/json/')
+              .then((res) => {
+                if (res.ok) return res.json();
+                throw new Error("IP Geolocation failed");
+              })
+              .then((ipData) => {
+                const lat = ipData.latitude;
+                const lon = ipData.longitude;
+                const city = ipData.city || "";
+                const region = ipData.region || "";
 
-    if (!navigator.geolocation) {
-      fallbackToIP(toastId);
-      return;
-    }
+                setDistanceKm(Number(calculateDistanceInKm(lat, lon, storeCoordinates.lat, storeCoordinates.lng).toFixed(2)));
+                setCustomerCoordinates({ lat, lng: lon });
 
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        const { latitude, longitude } = position.coords;
-        await processCoordinates(latitude, longitude, true, toastId);
-      },
-      (error) => {
-        console.warn("Accurate GPS failed, trying Cell/Wi-Fi...", error);
-        fallbackToLowAccuracy(toastId);
+                const mapLink = `https://www.google.com/maps?q=${lat.toFixed(6)},${lon.toFixed(6)}`;
+                const finalAddressText = city 
+                  ? `📍 Approx Area: ${city}, ${region} (IP Location)\n🔗 Maps Link: ${mapLink}`
+                  : `My GPS Location: ${mapLink}`;
+
+                setAddress(finalAddressText);
+                toast.dismiss(toastId);
+                toast.success(isHindi ? "लोकेशन डिटेक्ट की गई!" : "Location successfully detected!");
+              })
+              .catch(() => {
+                setAddress("");
+                toast.dismiss(toastId);
+                toast.error(isHindi ? "लोकेशन खोजने में असमर्थ। कृपया मैन्युअली लिखें।" : "Unable to retrieve location. Please type manually.");
+              });
+          },
+          { enableHighAccuracy: false, timeout: 6000, maximumAge: 60000 }
+        );
       },
       { enableHighAccuracy: true, timeout: 6000, maximumAge: 0 }
     );
   };
-}
-          }
  
   const handleShareApp = async () => {
     triggerHaptic();
