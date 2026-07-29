@@ -215,8 +215,16 @@ export default function BbCafeHome() {
   const [isCompressing, setIsCompressing] = useState(false);
   const [isUpiPopupOpen, setIsUpiPopupOpen] = useState(false);
 
-  // UI States
-  const [showGreeting] = useState(true);
+  // UI States greeting massage
+  const [showGreeting, setShowGreeting] = useState(true);
+  // Greeting ko 8 seconds baad automatic gayab karne ke liye timer
+useEffect(() => {
+  const timer = setTimeout(() => {
+    setShowGreeting(false);
+  }, 8000); // 8000ms = 8 seconds. Aap ise 5000 (5 sec) ya jo chahein set kar sakte hain.
+
+  return () => clearTimeout(timer);
+}, []);
 
   // --- HELPERS, CALCULATIONS & GENERAL UTILS ---
 
@@ -1402,7 +1410,7 @@ export default function BbCafeHome() {
       setSocialAlertIndex(randomIndex);
       setShowSocialAlert(true);
       setTimeout(() => setShowSocialAlert(false), 5000);
-    }, 24000);
+    }, 48000);
 
     return () => clearInterval(interval);
   }, []);
