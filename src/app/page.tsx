@@ -2689,7 +2689,7 @@ export default function BbCafeHome() {
                 </button>
                 <button 
                   type="button" 
-                  onClick={() => { triggerHaptic(); setIsClaimOpen(false); setClaimUsername(""); }} 
+                  onClick={() => { triggerHaptic(); setIsClaimModalOpen(false); setClaimUsername(""); }} 
                   className="bg-neutral-100 text-neutral-800 dark:bg-white/5 dark:text-gray-400 p-3 rounded-xl font-black text-xs uppercase"
                 >
                   Cancel
