@@ -1097,7 +1097,6 @@ useEffect(() => {
     };
     reader.readAsDataURL(file);
   };
-
   const handleDetectLocation = () => {
     triggerHaptic();
     if (typeof window === "undefined") return;
@@ -1350,9 +1349,7 @@ const handleDetectLocation = () => {
       { enableHighAccuracy: false, timeout: 8000, maximumAge: 60000 }
     );
   };
-            
-        
-  const handleShareApp = async () => {
+ const handleShareApp = async () => {
     triggerHaptic();
     const shareText = isHindi 
       ? `बम बम कैफ़े से स्वादिष्ट भोजन आर्डर करें! मेरा इनवाइट कोड इस्तेमाल करें: ${getReferralCode()} 🍕` 
