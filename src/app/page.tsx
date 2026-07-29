@@ -1,4 +1,5 @@
 
+
 'use client';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { db } from '../lib/firebase'; 
@@ -215,16 +216,8 @@ export default function BbCafeHome() {
   const [isCompressing, setIsCompressing] = useState(false);
   const [isUpiPopupOpen, setIsUpiPopupOpen] = useState(false);
 
-  // UI States greeting massage
+  // UI States
   const [showGreeting, setShowGreeting] = useState(true);
-  // Greeting ko 8 seconds baad automatic gayab karne ke liye timer
-useEffect(() => {
-  const timer = setTimeout(() => {
-    setShowGreeting(false);
-  }, 8000); // 8000ms = 8 seconds. Aap ise 5000 (5 sec) ya jo chahein set kar sakte hain.
-
-  return () => clearTimeout(timer);
-}, []);
 
   // --- HELPERS, CALCULATIONS & GENERAL UTILS ---
 
@@ -1097,122 +1090,16 @@ useEffect(() => {
     };
     reader.readAsDataURL(file);
   };
+
+  // --- RE-MODULARIZED AND BRACKET-BALANCED COMPACT HYBRID GEOLOCATION HANDLER ---
   const handleDetectLocation = () => {
     triggerHaptic();
     if (typeof window === "undefined") return;
 
-    // 1. Instantly box mein placeholder text daal dein taaki pata chale connection kaam kar raha hai
-    setAddress(isHindi ? "⏳ लोकेशन खोजी जा रही है, कृपया प्रतीक्षा करें..." : "⏳ Detecting your live location, please wait...");
-
-    const toastId = toast.loading(isHindi ? "लोकेशन खोजी जा रही है..." : "Detecting live location...");
-
-    // IP-BASED FALLBACK (Bina GPS ke instantly location nikalne ke liye backup code)
-    const fallbackToIP = async () => {
-      try {
-        const ipRes = await fetch('https://ipapi.co/json/');
-        if (ipRes.ok) {
-          const ipData = await ipRes.json();
-          const lat = ipData.latitude;
-          const lon = ipData.longitude;
-          const city = ipData.city || "";
-          const region = ipData.region || "";
-
-          setDistanceKm(Number(calculateDistanceInKm(lat, lon, storeCoordinates.lat, storeCoordinates.lng).toFixed(2)));
-          setCustomerCoordinates({ lat, lng: lon });
-
-          const mapLink = `https://www.google.com/maps?q=${lat.toFixed(6)},${lon.toFixed(6)}`;
-          const finalAddressText = city 
-            ? `📍 Approx Area: ${city}, ${region} (IP Location)\n🔗 Maps Link: ${mapLink}`
-            : `My GPS Location: ${mapLink}`;
-
-          setAddress(finalAddressText); // Box ko real address se fill karein
-          toast.dismiss(toastId);
-          toast.success(isHindi ? "लोकेशन (IP द्वारा) डिटेक्ट की गई!" : "Location (via IP) successfully detected!");
-        } else {
-          throw new Error("IP Geolocation failed");
-        }
-      } catch (e) {
-        setAddress(""); // Agar dono fail ho jayein toh box khali karein
-        toast.dismiss(toastId);
-        toast.error(isHindi ? "लोकेशन खोजने में असमर्थ। कृपया मैन्युअली लिखें।" : "Unable to retrieve location. Please type manually.");
-      }
-    };
-
-    if (!navigator.geolocation) {
-      fallbackToIP();
-      return;
-    }
-
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        const { latitude, longitude } = position.coords;
-        const distance = calculateDistanceInKm(latitude, longitude, storeCoordinates.lat, storeCoordinates.lng);
-        setDistanceKm(Number(distance.toFixed(2)));
-
-        setCustomerCoordinates({ lat: latitude, lng: longitude });
-
-        let textAddress = "";
-        try {
-          const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&accept-language=en`, {
-            headers: {
-              'User-Agent': 'BumBumCafeApp/1.0'
-            }
-          });
-          if (response.ok) {
-            
-const handleDetectLocation = () => {
-    triggerHaptic();
-    if (typeof window === "undefined") return;
-
     setAddress(isHindi ? "⏳ सटीक लोकेशन खोजी जा रही है (GPS)..." : "⏳ Finding highly accurate location (GPS)...");
     const toastId = toast.loading(isHindi ? "सटीक लोकेशन खोजी जा रही है..." : "Finding accurate location...");
 
-    // STEP 3: Last Option - IP-based Geolocation (Approximate)
-    const fallbackToIP = async () => {
-      setAddress(isHindi ? "⏳ नेटवर्क लोकेशन खोजी जा रही है (Approx)..." : "⏳ Finding network location...");
-      try {
-        const ipRes = await fetch('https://ipapi.co/json/');
-        if (ipRes.ok) {
-          const ipData = await ipRes.json();
-          const lat = ipData.latitude;
-          const lon = ipData.longitude;
-          const city = ipData.city || "";
-          const region = ipData.region || "";
-
-          setDistanceKm(Number(calculateDistanceInKm(lat, lon, storeCoordinates.lat, storeCoordinates.lng).toFixed(2)));
-          setCustomerCoordinates({ lat, lng: lon });
-
-          const mapLink = `https://www.google.com/maps?q=${lat.toFixed(6)},${lon.toFixed(6)}`;
-// 1. Helper: Coordinates process aur address convert karne ke liye
-  async function processCoordinates(latitude: number, longitude: number, isHighAcc: boolean, toastId: string) {
-    const distance = calculateDistanceInKm(latitude, longitude, storeCoordinates.lat, storeCoordinates.lng);
-    setDistanceKm(Number(distance.toFixed(2)));
-    setCustomerCoordinates({ lat: latitude, lng: longitude });
-
-    let textAddress = "";
-    try {
-      const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&accept-language=en`, {
-        headers: {
-          'User-Agent': 'BumBumCafeApp/1.0'
-        }
-      });
-      if (response.ok) {
-        const data = await response.json();
-        textAddress = data.display_name || "";
-      }
-    } catch (e) {
-      console.warn("Geocoding failed, falling back to link", e);
-    }
-
-const handleDetectLocation = () => {
-    triggerHaptic();
-    if (typeof window === "undefined") return;
-
-    setAddress(isHindi ? "⏳ सटीक लोकेशन खोजी जा रही है (GPS)..." : "⏳ Finding highly accurate location (GPS)...");
-    const toastId = toast.loading(isHindi ? "सटीक लोकेशन खोजी जा रही है..." : "Finding accurate location...");
-
-    if (!navigator.geolocation) {
-      // Direct IP Fallback inside the block
+    const fallbackToIP = () => {
       setAddress(isHindi ? "⏳ नेटवर्क लोकेशन खोजी जा रही है (Approx)..." : "⏳ Finding network location...");
       fetch('https://ipapi.co/json/')
         .then((res) => {
@@ -1240,68 +1127,8 @@ const handleDetectLocation = () => {
         .catch(() => {
           setAddress("");
           toast.dismiss(toastId);
-const handleDetectLocation = () => {
-    triggerHaptic();
-    if (typeof window === "undefined") return;
-
-    // 1. Instantly box mein placeholder text daal dein taaki pata chale connection kaam kar raha hai
-    setAddress(isHindi ? "⏳ लोकेशन खोजी जा रही है, कृपया प्रतीक्षा करें..." : "⏳ Detecting your live location, please wait...");
-
-    const toastId = toast.loading(isHindi ? "लोकेशन खोजी जा रही है..." : "Detecting live location...");
-
-    // IP-BASED FALLBACK (Bina GPS ke instantly location nikalne ke liye backup code)
-    const fallbackToIP = async () => {
-      try {
-        const ipRes = await fetch('https://ipapi.co/json/');
-        if (ipRes.ok) {
-          const ipData = await ipRes.json();
-          const lat = ipData.latitude;
-          const lon = ipData.longitude;
-          const city = ipData.city || "";
-          const region = ipData.region || "";
-
-          setDistanceKm(Number(calculateDistanceInKm(lat, lon, storeCoordinates.lat, storeCoordinates.lng).toFixed(2)));
-          setCustomerCoordinates({ lat, lng: lon });
-
-const handleDetectLocation = () => {
-    triggerHaptic();
-    if (typeof window === "undefined") return;
-
-    // 1. Instantly box mein placeholder text daal dein taaki pata chale connection kaam kar raha hai
-    setAddress(isHindi ? "⏳ लोकेशन खोजी जा रही है, कृपया प्रतीक्षा करें..." : "⏳ Detecting your live location, please wait...");
-
-    const toastId = toast.loading(isHindi ? "लोकेशन खोजी जा रही है..." : "Detecting live location...");
-
-    // IP-BASED FALLBACK (Bina GPS ke instantly location nikalne ke liye backup code)
-    const fallbackToIP = async () => {
-      try {
-        const ipRes = await fetch('https://ipapi.co/json/');
-        if (ipRes.ok) {
-          const ipData = await ipRes.json();
-          const lat = ipData.latitude;
-          const lon = ipData.longitude;
-          const city = ipData.city || "";
-          const region = ipData.region || "";
-
-          setDistanceKm(Number(calculateDistanceInKm(lat, lon, storeCoordinates.lat, storeCoordinates.lng).toFixed(2)));
-          setCustomerCoordinates({ lat, lng: lon });
-
-          const mapLink = `https://www.google.com/maps?q=${lat.toFixed(6)},${lon.toFixed(6)}`;
-          const finalAddressText = city 
-            ? `📍 Approx Area: ${city}, ${region} (IP Location)\n🔗 Maps Link: ${mapLink}`
-            : `My GPS Location: ${mapLink}`;
-
-          setAddress(finalAddressText); // Box ko real address se fill karein
-          toast.dismiss(toastId);
-          toast.success(isHindi ? "लोकेशन (IP द्वारा) डिटेक्ट की गई!" : "Location (via IP) successfully detected!");
-        } else {
-          throw new Error("IP Geolocation failed");
-        }
-      } catch (e) {
-        setAddress(""); // Agar dono fail ho jayein toh box khali karein
-        toast.dismiss(toastId);
-        toast.error(isHindi ? "लोकेशन खोजने में असमर्थ। कृपया मैन्युअली लिखें।" : "Unable to retrieve location. Please type manually.");
-      }
+          toast.error(isHindi ? "लोकेशन खोजने में असमर्थ। कृपया मैन्युअली लिखें।" : "Unable to retrieve location. Please type manually.");
+        });
     };
 
     if (!navigator.geolocation) {
@@ -1310,46 +1137,110 @@ const handleDetectLocation = () => {
     }
 
     navigator.geolocation.getCurrentPosition(
-      async (position) => {
+      (position) => {
         const { latitude, longitude } = position.coords;
         const distance = calculateDistanceInKm(latitude, longitude, storeCoordinates.lat, storeCoordinates.lng);
         setDistanceKm(Number(distance.toFixed(2)));
-
         setCustomerCoordinates({ lat: latitude, lng: longitude });
 
-        let textAddress = "";
-        try {
-          const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&accept-language=en`, {
-            headers: {
-              'User-Agent': 'BumBumCafeApp/1.0'
-            }
+        fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&accept-language=en`, {
+          headers: { 'User-Agent': 'BumBumCafeApp/1.0' }
+        })
+          .then((res) => {
+            if (res.ok) return res.json();
+            return null;
+          })
+          .then((data) => {
+            const textAddress = data?.display_name || "";
+            const mapLink = `https://www.google.com/maps?q=${latitude.toFixed(6)},${longitude.toFixed(6)}`;
+            const finalAddressText = textAddress 
+              ? `📍 Accurate Address: ${textAddress}\n🔗 Maps Link: ${mapLink}`
+              : `My GPS Location: ${mapLink}`;
+
+            setAddress(finalAddressText);
+            toast.dismiss(toastId);
+            toast.success(isHindi ? "लोकेशन सफलतापूर्वक मिल गई!" : "Location successfully found!");
+          })
+          .catch(() => {
+            const mapLink = `https://www.google.com/maps?q=${latitude.toFixed(6)},${longitude.toFixed(6)}`;
+            setAddress(`My GPS Location: ${mapLink}`);
+            toast.dismiss(toastId);
+            toast.success(isHindi ? "लोकेशन सफलतापूर्वक मिल गई!" : "Location successfully found!");
           });
-          if (response.ok) {
-            const data = await response.json();
-            textAddress = data.display_name || "";
-          }
-        } catch (e) {
-          console.warn("Geocoding failed, falling back to link", e);
-        }
-
-        const mapLink = `https://www.google.com/maps?q=${latitude.toFixed(6)},${longitude.toFixed(6)}`;
-        
-        const finalAddressText = textAddress 
-          ? `📍 Address: ${textAddress}\n🔗 Maps Link: ${mapLink}`
-          : `My GPS Location: ${mapLink}`;
-
-        setAddress(finalAddressText); // Box ko real address se fill karein
-        toast.dismiss(toastId);
-        toast.success(isHindi ? "लोकेशन सफलतापूर्वक डिटेक्ट की गई!" : "Location successfully detected!");
       },
-      (error) => {
-        console.warn("GPS Timeout, switching to IP Fallback...", error);
-        fallbackToIP(); // GPS fail hote hi automatic IP se fill karein
+      () => {
+        setAddress(isHindi ? "⏳ वैकल्पिक लोकेशन खोजी जा रही है (Network)..." : "⏳ Finding alternative location...");
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            const { latitude, longitude } = position.coords;
+            const distance = calculateDistanceInKm(latitude, longitude, storeCoordinates.lat, storeCoordinates.lng);
+            setDistanceKm(Number(distance.toFixed(2)));
+            setCustomerCoordinates({ lat: latitude, lng: longitude });
+
+            fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&accept-language=en`, {
+              headers: { 'User-Agent': 'BumBumCafeApp/1.0' }
+            })
+              .then((res) => {
+                if (res.ok) return res.json();
+                return null;
+              })
+              .then((data) => {
+                const textAddress = data?.display_name || "";
+                const mapLink = `https://www.google.com/maps?q=${latitude.toFixed(6)},${longitude.toFixed(6)}`;
+                const finalAddressText = textAddress 
+                  ? `📍 Address (approx): ${textAddress}\n🔗 Maps Link: ${mapLink}`
+                  : `My GPS Location: ${mapLink}`;
+
+                setAddress(finalAddressText);
+                toast.dismiss(toastId);
+                toast.success(isHindi ? "लोकेशन सफलतापूर्वक मिल गई!" : "Location successfully found!");
+              })
+              .catch(() => {
+                const mapLink = `https://www.google.com/maps?q=${latitude.toFixed(6)},${longitude.toFixed(6)}`;
+                setAddress(`My GPS Location: ${mapLink}`);
+                toast.dismiss(toastId);
+                toast.success(isHindi ? "लोकेशन सफलतापूर्वक मिल गई!" : "Location successfully found!");
+              });
+          },
+          () => {
+            setAddress(isHindi ? "⏳ नेटवर्क लोकेशन खोजी जा रही है (Approx)..." : "⏳ Finding network location...");
+            fetch('https://ipapi.co/json/')
+              .then((res) => {
+                if (res.ok) return res.json();
+                throw new Error("IP Geolocation failed");
+              })
+              .then((ipData) => {
+                const lat = ipData.latitude;
+                const lon = ipData.longitude;
+                const city = ipData.city || "";
+                const region = ipData.region || "";
+
+                setDistanceKm(Number(calculateDistanceInKm(lat, lon, storeCoordinates.lat, storeCoordinates.lng).toFixed(2)));
+                setCustomerCoordinates({ lat, lng: lon });
+
+                const mapLink = `https://www.google.com/maps?q=${lat.toFixed(6)},${lon.toFixed(6)}`;
+                const finalAddressText = city 
+                  ? `📍 Approx Area: ${city}, ${region} (IP Location)\n🔗 Maps Link: ${mapLink}`
+                  : `My GPS Location: ${mapLink}`;
+
+                setAddress(finalAddressText);
+                toast.dismiss(toastId);
+                toast.success(isHindi ? "लोकेशन डिटेक्ट की गई!" : "Location successfully detected!");
+              })
+              .catch(() => {
+                setAddress("");
+                toast.dismiss(toastId);
+                toast.error(isHindi ? "लोकेशन खोजने में असमर्थ। कृपया मैन्युअली लिखें।" : "Unable to retrieve location. Please type manually.");
+              });
+          },
+          { enableHighAccuracy: false, timeout: 6000, maximumAge: 60000 }
+        );
       },
-      { enableHighAccuracy: false, timeout: 8000, maximumAge: 60000 }
+      { enableHighAccuracy: true, timeout: 6000, maximumAge: 0 }
     );
   };
- const handleShareApp = async () => {
+
+  const handleShareApp = async () => {
     triggerHaptic();
     const shareText = isHindi 
       ? `बम बम कैफ़े से स्वादिष्ट भोजन आर्डर करें! मेरा इनवाइट कोड इस्तेमाल करें: ${getReferralCode()} 🍕` 
@@ -1580,7 +1471,7 @@ const handleDetectLocation = () => {
     };
   }, [customerDetails?.phone]);
 
-  // --- AUTO DISMISS COMPLETED/REJECTED ORDERS AFTER 15 SECONDS ---
+  // --- AUTO-DISMISS PROCESSED ORDERS AND GREETING TIMER ---
   useEffect(() => {
     if (liveOrder && (liveOrder.status === 'delivered' || liveOrder.status === 'completed' || liveOrder.status === 'rejected')) {
       const timer = setTimeout(() => {
@@ -1592,10 +1483,17 @@ const handleDetectLocation = () => {
           }
         } catch (e) {}
         setLiveOrder(null);
-      }, 15000); // 15 seconds timer
+      }, 15000);
       return () => clearTimeout(timer);
     }
   }, [liveOrder?.id, liveOrder?.status]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setShowGreeting(false);
+    }, 8000);
+    return () => clearTimeout(timer);
+  }, []);
 
   // --- Search Debouncing & Hinglish Optimizer ---
   useEffect(() => {
@@ -1632,7 +1530,7 @@ const handleDetectLocation = () => {
       setSocialAlertIndex(randomIndex);
       setShowSocialAlert(true);
       setTimeout(() => setShowSocialAlert(false), 5000);
-    }, 48000);
+    }, 24000);
 
     return () => clearInterval(interval);
   }, []);
@@ -1803,7 +1701,7 @@ const handleDetectLocation = () => {
         </div>
       )}
 
-      {/* Closing Warning Ribbon */}
+      {/* Closing Warning Timer Ribbon */}
       {closingMinutesLeft !== null && storeOpen && (
         <div className="bg-gradient-to-r from-amber-500 to-orange-600 text-white font-extrabold py-2 px-4 text-center text-[10px] flex items-center justify-center gap-1.5 shadow-md">
           <span>⏰</span>
@@ -2152,16 +2050,16 @@ const handleDetectLocation = () => {
                           </div>
                           
                           {storeOpen && isItemAvailable && (
-  <button 
-    onClick={() => { 
-      triggerHaptic();
-      item.variants ? setSelectedProduct(item) : addItem(item); 
-    }} 
-    className="px-5 py-2.5 bg-orange-500 hover:bg-orange-600 text-white rounded-xl font-black text-xs active:scale-95 transition-all uppercase flex items-center gap-1.5 shadow-md shadow-orange-500/30 border border-orange-600"
-  >
-    <Plus size={14} /> {isHindi ? "जोड़ें" : "ADD"}
-  </button>
-)}
+                            <button 
+                              onClick={() => { 
+                                triggerHaptic();
+                                item.variants ? setSelectedProduct(item) : addItem(item); 
+                              }} 
+                              className="px-5 py-2.5 bg-orange-500 hover:bg-orange-600 text-white rounded-xl font-black text-xs active:scale-95 transition-all uppercase flex items-center gap-1.5 shadow-md shadow-orange-500/30 border border-orange-600"
+                            >
+                              <Plus size={14} /> {isHindi ? "जोड़ें" : "ADD"}
+                            </button>
+                          )}
                         </div>
                       </div>
                     </motion.div>
@@ -2932,4 +2830,6 @@ const handleDetectLocation = () => {
 
     </div>
   );
-   }
+}
+
+
