@@ -1327,6 +1327,7 @@ const handleDetectLocation = () => {
       { enableHighAccuracy: false, timeout: 8000, maximumAge: 60000 }
     );
   };
+        }
   const handleShareApp = async () => {
     triggerHaptic();
     const shareText = isHindi 
