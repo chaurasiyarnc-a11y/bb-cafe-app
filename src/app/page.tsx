@@ -160,12 +160,6 @@ export default function BbCafeHome() {
   const [stories, setStories] = useState<any[]>([]);
   const [activeStory, setActiveStory] = useState<any | null>(null);
 
-  // Social Media Point Claims States
-  const [isClaimModalOpen, setIsClaimModalOpen] = useState(false);
-  const [claimingPlatform, setClaimingPlatform] = useState<any>(null);
-  const [claimUsername, setClaimUsername] = useState("");
-  const [isClaimingLoading, setIsClaimingLoading] = useState(false);
-
   // Cart Specific Add-ons
   const [ketchupAddon, setKetchupAddon] = useState(false);
   const [oreganoAddon, setOreganoAddon] = useState(false);
@@ -582,7 +576,6 @@ export default function BbCafeHome() {
     }
     setIsClaimingLoading(true);
     try {
-      const phoneClean = customerDetails.phone.replace("+91", "");
       await addDoc(collection(db, "point_claims"), {
         customerName: customerDetails.name,
         customerPhone: customerDetails.phone,
@@ -823,7 +816,7 @@ export default function BbCafeHome() {
       return;
     }
     if (amount > customerPoints) {
-      toast.error(isHindi ? "आपके पास पर्याप्त पॉइंट्स नहीं हैं!" : "Insufficient points balance!");
+      toast.error(isHindi ? "आपके पास पर्याप्त雕पॉइंट्स नहीं हैं!" : "Insufficient points balance!");
       return;
     }
     if (giftSenderPin !== customerDetails.pin) {
@@ -922,21 +915,28 @@ export default function BbCafeHome() {
     setIsSubmittingOrder(true);
 
     try {
-      if (!customerDetails) { 
+      if (!customerDetails || !customerDetails.name || !customerDetails.phone || customerDetails.phone.trim().length < 10) { 
         setIsProfileOpen(true); 
-        toast.error("ऑर्डर करने के लिए पहले अपनी प्रोफाइल बनाएं! 👤");
+        toast.error(isHindi 
+          ? "ऑर्डर करने के लिए पहले अपनी प्रोफाइल (नाम और मोबाइल नंबर) बनाएं! 👤" 
+          : "Please complete your profile (Name and Mobile Number) to place your order! 👤"
+        );
+        setIsSubmittingOrder(false);
         return; 
       }
 
       if (fulfillmentType === "delivery" && (!address || address.trim().length < 10)) {
+        setIsSubmittingOrder(false);
         return toast.error("Please enter full address!");
       }
 
       if (fulfillmentType === "table" && !tableNumber) {
+        setIsSubmittingOrder(false);
         return toast.error(isHindi ? "कृपया टेबल चुनें!" : "Please select a table!");
       }
 
       if (paymentMethod === "upi" && !paymentScreenshot) {
+        setIsSubmittingOrder(false);
         return toast.error(isHindi ? "कृपया आगे बढ़ने से पहले यूपीआई भुगतान का स्क्रीनशॉट अपलोड करें!" : "Please upload UPI payment screenshot!");
       }
 
@@ -1066,6 +1066,10 @@ export default function BbCafeHome() {
       }
       msg += `*Payment Method:* ${payModeLabel}\n\n`;
 
+      if (paymentMethod === "upi") {
+        msg += `⚠️ *IMPORTANT STATUS:* UPI Payment Selected. Screenshot uploaded to cafe. Please tap SEND to deliver details to WhatsApp directly for instant verification!\n\n`;
+      }
+
       msg += `*ITEMS:*\n${itemsText}\n`;
       msg += `*Subtotal:* ₹${subtotal + addOnsCost}\n`;
       msg += `*Coupon Discount:* -₹${couponDiscount}\n`;
@@ -1127,9 +1131,12 @@ export default function BbCafeHome() {
 
   const handleCheckoutClick = () => {
     triggerHaptic();
-    if (!customerDetails) {
+    if (!customerDetails || !customerDetails.name || !customerDetails.phone || customerDetails.phone.trim().length < 10) {
       setIsProfileOpen(true);
-      toast.error(isHindi ? "कृपया पहले अपनी प्रोफाइल कस्टमाइज़ करें!" : "Please set up your profile first!");
+      toast.error(isHindi 
+        ? "ऑर्डर करने के लिए पहले अपनी प्रोफाइल (नाम और मोबाइल नंबर) बनाएं! 👤" 
+        : "Please complete your profile (Name and Mobile Number) first to place an order! 👤"
+      );
       return;
     }
     if (paymentMethod === "upi") {
@@ -1249,7 +1256,24 @@ export default function BbCafeHome() {
     }
   }, [isHindi]);
 
-  // --- 2. PWA सर्विस वर्कर रजिस्ट्रेशन ---
+  // --- 2. प्रोफ़ाइल ऑटो-प्रॉम्प्ट (Auto-prompt on Mount for New Users) ---
+  useEffect(() => {
+    if (mounted) {
+      const saved = localStorage.getItem('bb_cafe_customer');
+      if (!saved) {
+        const timer = setTimeout(() => {
+          setIsProfileOpen(true);
+          toast.success(isHindi 
+            ? "ऑर्डर करने और 5 पॉइंट्स वेलकम बोनस पाने के लिए पहले अपना नाम और नंबर भरें! 👤" 
+            : "To order and get 5 points welcome bonus, please enter your Name & Number first! 👤"
+          );
+        }, 1500);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [mounted, isHindi]);
+
+  // --- 3. PWA सर्विस वर्कर रजिस्ट्रेशन ---
   useEffect(() => {
     if ('serviceWorker' in navigator && typeof window !== 'undefined') {
       window.addEventListener('load', () => {
@@ -1262,7 +1286,7 @@ export default function BbCafeHome() {
     }
   }, []);
 
-  // --- 3. रियल-टाइम कस्टमर पॉइंट्स, पॉइंट्स हिस्ट्री और पास्ट आर्डर्स सिंकिंग ---
+  // --- 4. रियल-टाइम कस्टमर पॉइंट्स, पॉइंट्स हिस्ट्री और पास्ट आर्डर्स सिंकिंग ---
   useEffect(() => {
     if (!customerDetails?.phone) {
       setCustomerPoints(0);
@@ -1272,7 +1296,6 @@ export default function BbCafeHome() {
 
     const phoneClean = customerDetails.phone.replace("+91", "").trim();
 
-    // कस्टमर पॉइंट्स रियल-टाइम सिंकिंग
     const pointsDocRef = doc(db, "customer_points", phoneClean);
     const unsubscribePoints = onSnapshot(pointsDocRef, (docSnap) => {
       if (docSnap.exists()) {
@@ -1284,7 +1307,6 @@ export default function BbCafeHome() {
       console.warn("Error subscribing to customer points:", err);
     });
 
-    // कस्टमर पॉइंट्स हिस्ट्री रियल-टाइम सिंकिंग
     const historyCollRef = collection(db, "customer_points", phoneClean, "history");
     const historyQuery = query(historyCollRef, orderBy("timestamp", "desc"));
     const unsubscribeHistory = onSnapshot(historyQuery, (querySnap) => {
@@ -1298,7 +1320,6 @@ export default function BbCafeHome() {
       console.warn("Error subscribing to points history:", err);
     });
 
-    // पुराने सभी ऑर्डर्स रियल-टाइम सिंकिंग
     const ordersRef = collection(db, "orders");
     const ordersQuery = query(
       ordersRef,
@@ -1324,7 +1345,7 @@ export default function BbCafeHome() {
     };
   }, [customerDetails]);
 
-  // --- 4. ग्राहकों के एक्टिव/सक्रिय आर्डर्स की लाइव ट्रैकिंग ---
+  // --- 5. ग्राहकों के एक्टिव/सक्रिय आर्डर्स की लाइव ट्रैकिंग ---
   useEffect(() => {
     if (!customerDetails?.phone) {
       setLiveOrder(null);
@@ -1357,29 +1378,8 @@ export default function BbCafeHome() {
     return () => unsubscribeActiveOrder();
   }, [customerDetails]);
 
-  // --- INITIAL MOUNT & BACKGROUND DATABASE SYNCHRONIZER ---
+  // --- BACKGROUND OFFLINE / CACHE HANDLERS ---
   useEffect(() => {
-    setMounted(true);
-
-    const handleBeforeInstallPrompt = (e: Event) => {
-      e.preventDefault();
-      setDeferredPrompt(e);
-      const dismissed = localStorage.getItem('bb_app_installed_or_dismissed');
-      if (!dismissed) {
-        setShowInstallBanner(true);
-      }
-    };
-
-    const handleOnline = () => setIsOnline(true);
-    const handleOffline = () => setIsOnline(false);
-
-    if (typeof window !== "undefined") {
-      setIsOnline(window.navigator.onLine);
-      window.addEventListener("online", handleOnline);
-      window.addEventListener("offline", handleOffline);
-      window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
-    }
-
     try {
       const cachedMenu = localStorage.getItem('bb_cached_menu');
       if (cachedMenu) setMenu(JSON.parse(cachedMenu));
@@ -1422,7 +1422,6 @@ export default function BbCafeHome() {
     const fetchFreshDbData = async () => {
       setMenuLoading(true);
       try {
-        // 1. Fetch Store Settings
         try {
           const storeSnap = await getDoc(doc(db, "settings", "store"));
           if (storeSnap.exists()) {
@@ -1443,7 +1442,6 @@ export default function BbCafeHome() {
           console.warn("Error fetching store settings:", e);
         }
 
-        // 2. Fetch Products (Menu)
         try {
           const productsSnap = await getDocs(collection(db, "products"));
           const items = productsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter((i: any) => i.isVisible !== false);
@@ -1453,7 +1451,6 @@ export default function BbCafeHome() {
           console.error("Error fetching products:", e);
         }
 
-        // 3. Fetch Categories
         try {
           const catsSnap = await getDocs(collection(db, "categories"));
           const cats = catsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -1463,7 +1460,6 @@ export default function BbCafeHome() {
           console.warn("Error fetching categories:", e);
         }
 
-        // 4. Fetch Banners
         try {
           const bannersSnap = await getDocs(collection(db, "banners"));
           const banData = bannersSnap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -1473,7 +1469,6 @@ export default function BbCafeHome() {
           console.warn("Error fetching banners:", e);
         }
 
-        // 5. Fetch Reels
         try {
           const reelsSnap = await getDocs(collection(db, "reels"));
           const reelData = reelsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -1483,7 +1478,6 @@ export default function BbCafeHome() {
           console.warn("Error fetching reels:", e);
         }
 
-        // 6. Fetch Loyalty Rules
         try {
           const rulesSnap = await getDocs(collection(db, "loyalty_rules"));
           const ruleData = rulesSnap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -1493,7 +1487,6 @@ export default function BbCafeHome() {
           console.warn("Error fetching loyalty rules:", e);
         }
 
-        // 7. Fetch Social Counts
         try {
           const socialSnap = await getDoc(doc(db, "settings", "social_counts"));
           if (socialSnap.exists()) {
@@ -1513,14 +1506,6 @@ export default function BbCafeHome() {
     };
 
     fetchFreshDbData();
-
-    return () => { 
-      if (typeof window !== "undefined") {
-        window.removeEventListener("online", handleOnline);
-        window.removeEventListener("offline", handleOffline);
-        window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
-      }
-    };
   }, []);
 
   return (
