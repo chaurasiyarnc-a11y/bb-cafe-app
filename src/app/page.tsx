@@ -1107,26 +1107,53 @@ useEffect(() => {
 
     const toastId = toast.loading(isHindi ? "लोकेशन खोजी जा रही है..." : "Detecting live location...");
     navigator.geolocation.getCurrentPosition(
-      (position) => {
+      async (position) => {
         const { latitude, longitude } = position.coords;
         const distance = calculateDistanceInKm(latitude, longitude, storeCoordinates.lat, storeCoordinates.lng);
         setDistanceKm(Number(distance.toFixed(2)));
 
-        // --- COORDINATES STATE SET AT REAL-TIME TO ENSURE MAP RETRIEVES CORRECT POINT ---
         setCustomerCoordinates({ lat: latitude, lng: longitude });
 
-        setAddress(isHindi ? `My GPS Location: https://www.google.com/maps?q=${latitude.toFixed(6)},${longitude.toFixed(6)}` : `My GPS Location: https://www.google.com/maps?q=${latitude.toFixed(6)},${longitude.toFixed(6)}`);
+        let textAddress = "";
+        try {
+          // OpenStreetMap Free Reverse Geocoding API (Gets readable text address for free)
+          const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&accept-language=en`, {
+            headers: {
+              'User-Agent': 'BumBumCafeApp/1.0'
+            }
+          });
+          if (response.ok) {
+            const data = await response.json();
+            textAddress = data.display_name || "";
+          }
+        } catch (e) {
+          console.warn("Geocoding failed, falling back to link", e);
+        }
+
+        const mapLink = `https://www.google.com/maps?q=${latitude.toFixed(6)},${longitude.toFixed(6)}`;
+        
+        // Agar readable text address mila toh use maps link ke sath jodenge
+        const finalAddressText = textAddress 
+          ? `📍 Address: ${textAddress}\n🔗 Maps Link: ${mapLink}`
+          : `My GPS Location: ${mapLink}`;
+
+        setAddress(finalAddressText);
         toast.dismiss(toastId);
         toast.success(isHindi ? "लोकेशन सफलतापूर्वक डिटेक्ट की गई!" : "Location successfully detected!");
       },
-      () => {
+      (error) => {
         toast.dismiss(toastId);
-        toast.error(isHindi ? "लोकेशन एक्सेस करने में असमर्थ।" : "Unable to retrieve your location.");
+        if (error.code === error.PERMISSION_DENIED) {
+          toast.error(isHindi ? "लोकेशन परमिशन बंद है। कृपया ब्राउज़र सेटिंग्स से ऑन करें।" : "Location permission denied. Please allow in settings.");
+        } else if (error.code === error.TIMEOUT) {
+          toast.error(isHindi ? "लोकेशन खोजने में समय लग रहा है। कृपया दोबारा प्रयास करें।" : "Location detection timed out. Please try again.");
+        } else {
+          toast.error(isHindi ? "लोकेशन एक्सेस करने में असमर्थ।" : "Unable to retrieve your location.");
+        }
       },
-      { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 60000 }
     );
   };
-
   const handleShareApp = async () => {
     triggerHaptic();
     const shareText = isHindi 
