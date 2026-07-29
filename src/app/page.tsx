@@ -1264,6 +1264,29 @@ const handleDetectLocation = () => {
           setDistanceKm(Number(calculateDistanceInKm(lat, lon, storeCoordinates.lat, storeCoordinates.lng).toFixed(2)));
           setCustomerCoordinates({ lat, lng: lon });
 
+const handleDetectLocation = () => {
+    triggerHaptic();
+    if (typeof window === "undefined") return;
+
+    // 1. Instantly box mein placeholder text daal dein taaki pata chale connection kaam kar raha hai
+    setAddress(isHindi ? "⏳ लोकेशन खोजी जा रही है, कृपया प्रतीक्षा करें..." : "⏳ Detecting your live location, please wait...");
+
+    const toastId = toast.loading(isHindi ? "लोकेशन खोजी जा रही है..." : "Detecting live location...");
+
+    // IP-BASED FALLBACK (Bina GPS ke instantly location nikalne ke liye backup code)
+    const fallbackToIP = async () => {
+      try {
+        const ipRes = await fetch('https://ipapi.co/json/');
+        if (ipRes.ok) {
+          const ipData = await ipRes.json();
+          const lat = ipData.latitude;
+          const lon = ipData.longitude;
+          const city = ipData.city || "";
+          const region = ipData.region || "";
+
+          setDistanceKm(Number(calculateDistanceInKm(lat, lon, storeCoordinates.lat, storeCoordinates.lng).toFixed(2)));
+          setCustomerCoordinates({ lat, lng: lon });
+
           const mapLink = `https://www.google.com/maps?q=${lat.toFixed(6)},${lon.toFixed(6)}`;
           const finalAddressText = city 
             ? `📍 Approx Area: ${city}, ${region} (IP Location)\n🔗 Maps Link: ${mapLink}`
@@ -1326,7 +1349,7 @@ const handleDetectLocation = () => {
       },
       { enableHighAccuracy: false, timeout: 8000, maximumAge: 60000 }
     );
-     };
+  };
             
         
   const handleShareApp = async () => {
