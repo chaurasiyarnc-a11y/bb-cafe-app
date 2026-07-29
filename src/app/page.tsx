@@ -101,12 +101,7 @@ export default function BbCafeHome() {
   
 const router = useRouter();
 
-useEffect(() => {
-  // यदि ऐप असली एंड्रॉइड डिवाइस के अंदर खुला है (APK में)
-  if (Capacitor.isNativePlatform()) {
-    router.replace('/staff'); // तुरंत स्टाफ लॉन्चर पेज पर भेजें
-  }
-}, [router]);
+
   
   // --- STATE VARIABLES ---
   const [menu, setMenu] = useState<any[]>([]);
