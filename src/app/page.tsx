@@ -1,9 +1,4 @@
-यहाँ पूरी फ़ाइल का कोड दिया गया है जिसमें ऊपर बताए गए तीनों सुधारों—Coordinates
-state, handleDetectLocation अपडेट, database order saving में Lat/Lng जोड़ना, और
-live track panel में <LiveOrderTracker> का उपयोग—को जोड़ दिया गया है।
 
-आप इस पूरे कोड को बिना कुछ छोड़े सीधे अपनी फ़ाइल में रिप्लेस (पेस्ट) कर सकते
-हैं:
 
 'use client';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
