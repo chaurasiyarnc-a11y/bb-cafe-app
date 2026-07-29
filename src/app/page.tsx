@@ -1268,7 +1268,7 @@ const handleDetectLocation = () => {
       { enableHighAccuracy: true, timeout: 6000, maximumAge: 0 } // GPS satellite search ke liye 6 seconds wait
     );
   };
-          
+          }
 
  
   const handleShareApp = async () => {
