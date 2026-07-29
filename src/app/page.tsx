@@ -1100,15 +1100,10 @@ useEffect(() => {
 
   const handleDetectLocation = () => {
     triggerHaptic();
-    if (typeof window === "undefined" || !navigator.geolocation) {
-      toast.error(isHindi ? "जियोलोकेशन आपके डिवाइस पर समर्थित नहीं है।" : "Geolocation is not supported by your device.");
-      return;
-    }
-
-    const toastId = toast.loading(isHindi ? "लोकेशन खोजी जा रही है..." : "Detecting live location...");
-    const handleDetectLocation = () => {
-    triggerHaptic();
     if (typeof window === "undefined") return;
+
+    // 1. Instantly box mein placeholder text daal dein taaki pata chale connection kaam kar raha hai
+    setAddress(isHindi ? "⏳ लोकेशन खोजी जा रही है, कृपया प्रतीक्षा करें..." : "⏳ Detecting your live location, please wait...");
 
     const toastId = toast.loading(isHindi ? "लोकेशन खोजी जा रही है..." : "Detecting live location...");
 
@@ -1131,13 +1126,14 @@ useEffect(() => {
             ? `📍 Approx Area: ${city}, ${region} (IP Location)\n🔗 Maps Link: ${mapLink}`
             : `My GPS Location: ${mapLink}`;
 
-          setAddress(finalAddressText);
+          setAddress(finalAddressText); // Box ko real address se fill karein
           toast.dismiss(toastId);
           toast.success(isHindi ? "लोकेशन (IP द्वारा) डिटेक्ट की गई!" : "Location (via IP) successfully detected!");
         } else {
           throw new Error("IP Geolocation failed");
         }
       } catch (e) {
+        setAddress(""); // Agar dono fail ho jayein toh box khali karein
         toast.dismiss(toastId);
         toast.error(isHindi ? "लोकेशन खोजने में असमर्थ। कृपया मैन्युअली लिखें।" : "Unable to retrieve location. Please type manually.");
       }
@@ -1177,20 +1173,20 @@ useEffect(() => {
           ? `📍 Address: ${textAddress}\n🔗 Maps Link: ${mapLink}`
           : `My GPS Location: ${mapLink}`;
 
-        setAddress(finalAddressText);
+        setAddress(finalAddressText); // Box ko real address se fill karein
         toast.dismiss(toastId);
         toast.success(isHindi ? "लोकेशन सफलतापूर्वक डिटेक्ट की गई!" : "Location successfully detected!");
       },
       (error) => {
-        // Agar phone ka GPS timeout ho jaye, toh error dene ke bajaye automatic IP par switch karein!
         console.warn("GPS Timeout, switching to IP Fallback...", error);
-        fallbackToIP();
+        fallbackToIP(); // GPS fail hote hi automatic IP se fill karein
       },
       { enableHighAccuracy: false, timeout: 8000, maximumAge: 60000 }
-    
     );
-    };
-  }
+  };
+
+
+ 
   const handleShareApp = async () => {
     triggerHaptic();
     const shareText = isHindi 
