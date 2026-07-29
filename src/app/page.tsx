@@ -79,20 +79,6 @@ const SOCIAL_LINKS = [
   { id: 'youtube', label: '🔴 YouTube', icon: '/youtube.png', points: 1, url: 'https://www.youtube.com/@bbcafe.i' }
 ];
 
-const SUGGESTED_REVIEWS = [
-  "पिज्जा का स्वाद लाजवाब है! मज़ा आ गया 🍕😋",
-  "मोहांद्रा में सबसे बेस्ट सर्विस और स्वाद! ⭐⭐⭐⭐⭐",
-  "सुपर फास्ट डिलीवरी और शानदार पैकेजिंग! 🛵📦",
-  "साफ़-सफ़ाई और शुद्धता 10/10 है! 🧼👌"
-];
-
-const PERMANENT_REVIEWS = [
-  { id: "rev1", name: "Gaurav Soni", rating: 5, comment: "बम बम कैफे की पनीर पिज्जा सच में पूरे मोहांद्रा में बेस्ट है! एक्स्ट्रा चीज़ लव है। ⭐⭐⭐⭐⭐" },
-  { id: "rev2", name: "Anjali Patel", rating: 5, comment: "फास्ट फ़ूड की पैकिंग बहुत अच्छी थी, डिलीवरी बॉय का व्यवहार भी बहुत विनम्र था। ⭐⭐⭐⭐⭐" },
-  { id: "rev3", name: "Shubham Dwivedi", rating: 5, comment: "स्पेशल थाली का स्वाद एकदम घर जैसा है। सफ़ाई और शुद्धता लाजवाब है। ⭐⭐⭐⭐⭐" },
-  { id: "rev4", name: "Neha Chaurasia", rating: 5, comment: "इस क्षेत्र का सबसे अच्छा कैफे। पिज्जा विभाग ताज़ा है और क्रस्ट बहुत सॉफ्ट है! ⭐⭐⭐⭐⭐" }
-];
-
 export default function BbCafeHome() {
   const store = useCartStore() as any;
   const cart = store?.items || [];
@@ -175,13 +161,6 @@ export default function BbCafeHome() {
   const [banners, setBanners] = useState<any[]>([]);
   const [bannerIndex, setBannerIndex] = useState(0);
   const [bannerError, setBannerError] = useState(false);
-  const [reviews, setReviews] = useState<any[]>([]);
-  
-  const [isReviewsDrawerOpen, setIsReviewsDrawerOpen] = useState(false);
-  const [isReviewFormOpen, setIsReviewFormOpen] = useState(false);
-  const [reviewName, setReviewName] = useState("");
-  const [reviewComment, setReviewComment] = useState("");
-  const [reviewRating, setReviewRating] = useState(5);
   
   const [enteredCoupon, setEnteredCoupon] = useState("");
   const [appliedCoupon, setAppliedCoupon] = useState<any>(null);
@@ -521,14 +500,6 @@ export default function BbCafeHome() {
     return found ? found.address : "";
   }, [pastOrders]);
 
-  const displayReviews = useMemo(() => {
-    return reviews.length > 0 ? reviews : PERMANENT_REVIEWS;
-  }, [reviews]);
-
-  const hasManyReviews = useMemo(() => {
-    return displayReviews.length > 10;
-  }, [displayReviews]);
-
   // --- Dynamic add-ons display verification based on eligible dishes ---
   const showAddonsSection = useMemo(() => {
     const eligibleKeywords = ['pizza', 'sandwich', 'burger', 'momo', 'fries', 'chips', 'finger'];
@@ -589,34 +560,6 @@ export default function BbCafeHome() {
       localStorage.setItem('bb_favorites', JSON.stringify(next));
       return next;
     });
-  };
-
-  const handleReviewSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    triggerHaptic();
-    if (!reviewName || !reviewComment) {
-      toast.error(isHindi ? "सभी फ़ील्ड भरें!" : "Please fill all fields!");
-      return;
-    }
-    const toastId = toast.loading(isHindi ? "समीक्षा सबमिट की जा रही है..." : "Submitting review...");
-    try {
-      await addDoc(collection(db, "reviews"), {
-        name: reviewName,
-        comment: reviewComment,
-        rating: reviewRating,
-        isApproved: false,
-        timestamp: new Date()
-      });
-      toast.dismiss(toastId);
-      toast.success(isHindi ? "समीक्षा सबमिट हो गई! वेरिफिकेशन के बाद दिखेगी।" : "Review submitted successfully! Post approval it will be shown.");
-      setReviewName("");
-      setReviewComment("");
-      setReviewRating(5);
-      setIsReviewFormOpen(false);
-    } catch (err) {
-      toast.dismiss(toastId);
-      toast.error(isHindi ? "त्रुटि! कृपया दोबारा प्रयास करें।" : "Error! Please try again.");
-    }
   };
 
   const handleSaveDetails = async (e: React.FormEvent) => {
@@ -1408,6 +1351,23 @@ export default function BbCafeHome() {
     };
   }, [customerDetails?.phone]);
 
+  // --- AUTO DISMISS COMPLETED/REJECTED ORDERS AFTER 15 SECONDS ---
+  useEffect(() => {
+    if (liveOrder && (liveOrder.status === 'delivered' || liveOrder.status === 'completed' || liveOrder.status === 'rejected')) {
+      const timer = setTimeout(() => {
+        try {
+          const dismissed = JSON.parse(localStorage.getItem('bb_dismissed_rejected_orders') || '[]');
+          if (!dismissed.includes(liveOrder.id)) {
+            dismissed.push(liveOrder.id);
+            localStorage.setItem('bb_dismissed_rejected_orders', JSON.stringify(dismissed));
+          }
+        } catch (e) {}
+        setLiveOrder(null);
+      }, 15000); // 15 seconds timer
+      return () => clearTimeout(timer);
+    }
+  }, [liveOrder?.id, liveOrder?.status]);
+
   // --- Search Debouncing & Hinglish Optimizer ---
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -1490,9 +1450,6 @@ export default function BbCafeHome() {
       const cachedReels = localStorage.getItem('bb_cached_reels');
       if (cachedReels) setStories(JSON.parse(cachedReels));
 
-      const cachedReviews = localStorage.getItem('bb_cached_reviews');
-      if (cachedReviews) setReviews(JSON.parse(cachedReviews));
-
       const savedDetails = localStorage.getItem('bb_cafe_customer');
       if (savedDetails) {
         const parsed = JSON.parse(savedDetails);
@@ -1551,11 +1508,6 @@ export default function BbCafeHome() {
         const reelData = reelsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
         setStories(reelData);
         localStorage.setItem('bb_cached_reels', JSON.stringify(reelData));
-
-        const revsSnap = await getDocs(collection(db, "reviews"));
-        const revData = revsSnap.docs.map(d => ({ id: d.id, ...d.data() as any })).filter((r: any) => r.isApproved === true || r.isApproved === "approved" || r.approved === true);
-        setReviews(revData);
-        localStorage.setItem('bb_cached_reviews', JSON.stringify(revData));
 
         const rulesSnap = await getDocs(collection(db, "loyalty_rules"));
         const ruleData = rulesSnap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -1670,17 +1622,6 @@ export default function BbCafeHome() {
           ))}
         </div>
       )}
-
-      {/* Sticky Right Side Review Tab */}
-      <div className="fixed right-0 top-1/2 -translate-y-1/2 z-50">
-        <button 
-          onClick={() => { triggerHaptic(); setIsReviewFormOpen(true); }}
-          className="bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[10px] py-3 px-1.5 rounded-l-xl shadow-2xl border-l border-y border-white/20 flex flex-col items-center gap-1 transition-all active:translate-x-1"
-          style={{ writingMode: 'vertical-rl' }}
-        >
-          <span className="uppercase tracking-wider font-bold">{isHindi ? "समीक्षा" : "Reviews"}</span>
-        </button>
-      </div>
 
       {/* PREMIUM HERO HEADER */}
       <header className="relative pt-6 pb-4 px-4 overflow-hidden shadow-md flex flex-col justify-end min-h-[120px] bg-neutral-950 border-b dark:border-white/5 border-neutral-200">
@@ -2077,32 +2018,6 @@ export default function BbCafeHome() {
           </div>
         )}
 
-        {/* REVIEWS SECTION */}
-        <div className="pt-6 space-y-4 font-sans font-bold">
-          <div className="flex justify-between items-center">
-            <h3 className="text-sm font-black uppercase tracking-wider text-yellow-500 flex items-center gap-1 font-bold font-sans">⭐ {isHindi ? "हमारे ग्राहकों के प्यारे शब्द" : "Feedback from our loved guests"}</h3>
-            <span className="text-[9px] font-bold text-neutral-600 dark:text-gray-400">{isHindi ? "कुल समीक्षाएं" : "Total Reviews"} ({displayReviews.length})</span>
-          </div>
-          
-          <div className={hasManyReviews ? "max-h-[380px] overflow-y-auto pr-1 space-y-3.5 scrollbar-thin scrollbar-thumb-orange-500 font-sans" : "space-y-3.5 font-sans"}>
-            {displayReviews.map((r: any) => (
-              <div key={r.id} className="dark:bg-white/[0.02] bg-white border dark:border-white/5 border-neutral-200 p-4 rounded-2xl space-y-2 shadow-md shadow-neutral-200/30">
-                <div className="flex justify-between items-center">
-                  <h4 className="font-black text-xs text-orange-600 font-bold">{r.name}</h4>
-                  <div className="flex items-center gap-0.5">
-                    <Star size={10} style={{ color: '#fbbf24', fill: '#fbbf24' }} />
-                    <Star size={10} style={{ color: '#fbbf24', fill: '#fbbf24' }} />
-                    <Star size={10} style={{ color: '#fbbf24', fill: '#fbbf24' }} />
-                    <Star size={10} style={{ color: '#fbbf24', fill: '#fbbf24' }} />
-                    <Star size={10} style={{ color: '#fbbf24', fill: '#fbbf24' }} />
-                  </div>
-                </div>
-                <p className="text-[10.5px] text-neutral-800 dark:text-gray-300 italic leading-relaxed">"{r.comment}"</p>
-              </div>
-            ))}
-          </div>
-        </div>
-
         {/* FOOTER */}
         <footer className="pt-8 border-t border-neutral-200 dark:border-white/5 space-y-6">
           <div className="bg-gradient-to-br dark:from-green-950/20 dark:to-emerald-900/10 from-green-50 to-emerald-50 p-6 rounded-[2rem] border dark:border-green-500/10 border-green-200 relative overflow-hidden transition-colors duration-200 font-sans">
@@ -2247,108 +2162,6 @@ export default function BbCafeHome() {
                 ADD TO CART • ₹{activeStory.price}
               </button>
             </div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* REVIEWS DRAWER MODAL */}
-      <AnimatePresence>
-        {isReviewsDrawerOpen && (
-          <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[120] overflow-y-auto">
-            <div className="p-6 max-w-lg mx-auto pb-32">
-              <div className="flex justify-between items-center mb-8">
-                <div>
-                  <h2 className="text-2xl font-black text-white font-mono">All Reviews</h2>
-                  <p className="text-xs text-yellow-400 font-mono">Rating: 4.8/5.0 ★</p>
-                </div>
-                <button onClick={() => { triggerHaptic(); setIsReviewsDrawerOpen(false); }} className="p-2.5 bg-white/10 text-white rounded-full hover:bg-white/20 transition-colors"><X size={20} /></button>
-              </div>
-              
-              <div className="space-y-4">
-                {displayReviews.map((r: any) => (
-                  <div key={r.id} className="dark:bg-white/[0.03] bg-white border dark:border-white/5 border-neutral-200 p-5 space-y-2 shadow-sm transition-colors duration-200 font-sans">
-                    <div className="flex justify-between items-center">
-                      <h4 className="font-black text-xs text-orange-600">{r.name}</h4>
-                      <div className="flex items-center gap-1 bg-amber-500/10 px-2 py-0.5 rounded text-[9px] font-mono">
-                        <Star size={10} style={{ color: '#fbbf24', fill: '#fbbf24' }} />
-                        <span className="font-extrabold text-amber-600 dark:text-amber-400">{r.rating}</span>
-                      </div>
-                    </div>
-                    <p className="text-[11px] text-neutral-800 dark:text-gray-300 italic">"{r.comment}"</p>
-                  </div>
-                ))}
-              </div>
-              <div className="fixed bottom-6 left-0 w-full px-6 z-50">
-                <button onClick={() => { triggerHaptic(); setIsReviewFormOpen(true); }} className="w-full max-w-md mx-auto bg-orange-500 text-black py-3.5 rounded-2xl font-black text-xs uppercase font-sans">✍️ Write a Review</button>
-              </div>
-            </div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* WRITING REVIEW FORM MODAL */}
-      <AnimatePresence>
-        {isReviewFormOpen && (
-          <div className="fixed inset-0 bg-black/95 z-[200] flex items-center justify-center p-6 font-sans">
-            <form onSubmit={handleReviewSubmit} className="dark:bg-[#111] bg-white w-full max-w-md p-6 rounded-3xl border dark:border-white/10 border-neutral-200 text-center space-y-4 shadow-xl transition-colors duration-200">
-              <div className="flex justify-between items-center pb-2 border-b dark:border-white/10 border-neutral-200">
-                <h3 className="text-xl font-black text-orange-500 uppercase italic">{isHindi ? "आपकी समीक्षा" : "Your Feedback"}</h3>
-                <button 
-                  type="button" 
-                  onClick={() => { triggerHaptic(); setIsReviewFormOpen(false); }} 
-                  className="p-2 bg-red-100 hover:bg-red-500 hover:text-white text-red-600 rounded-full transition-all duration-200 shadow"
-                  title="Close Feedback"
-                >
-                  <X size={18} />
-                </button>
-              </div>
-
-              <div className="space-y-3 text-left">
-                <div>
-                  <label className="text-[9px] font-black uppercase text-neutral-700 dark:text-neutral-400">{isHindi ? "क्या नाम" : "Your Name"}</label>
-                  <input autoComplete="name" type="text" placeholder={isHindi ? "अपना नाम दर्ज करें..." : "Enter your name..."} value={reviewName} onChange={(e) => setReviewName(e.target.value)} required className="w-full dark:bg-white/5 bg-neutral-50 border dark:border-white/10 border-neutral-300 p-3 rounded-lg text-xs text-neutral-900 dark:text-white focus:border-orange-500 outline-none" />
-                </div>
-                <div>
-                  <label className="text-[9px] font-black uppercase text-neutral-700 dark:text-neutral-400">{isHindi ? "रेटिंग" : "Rating"}</label>
-                  <div className="flex gap-1 py-1">
-                    {[1, 2, 3, 4, 5].map((star) => (
-                      <Star 
-                        key={star} 
-                        size={20} 
-                        style={{ color: '#fbbf24', fill: reviewRating >= star ? '#fbbf24' : 'none' }} 
-                        onClick={() => setReviewRating(star)} 
-                        className="cursor-pointer" 
-                      />
-                    ))}
-                  </div>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-[9px] font-black uppercase text-neutral-700 dark:text-neutral-400">{isHindi ? "पसंदीदा समीक्षा टच करें:" : "Quick Suggestions:"}</label>
-                  <div className="flex flex-wrap gap-1.5 py-1">
-                    {SUGGESTED_REVIEWS.map((suggestion: string) => (
-                      <button
-                        type="button"
-                        key={suggestion}
-                        onClick={() => setReviewComment(suggestion)}
-                        className="dark:bg-white/5 bg-neutral-50 border dark:border-white/10 border-neutral-300 hover:border-orange-500/50 px-2 py-1 rounded-full text-[9px] text-neutral-800 dark:text-gray-300 font-bold transition-all text-left"
-                      >
-                        {suggestion}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <label className="text-[9px] font-black uppercase text-neutral-700 dark:text-neutral-400">{isHindi ? "समीक्षा टिप्पणी" : "Comments"}</label>
-                  <textarea placeholder={isHindi ? "खाना कैसा लगा?..." : "How was the food?..."} value={reviewComment} onChange={(e) => setReviewComment(e.target.value)} required rows={3} className="w-full dark:bg-white/5 bg-neutral-50 border dark:border-white/10 border-neutral-300 p-3 rounded-lg text-xs text-neutral-900 dark:text-white focus:border-orange-500 outline-none resize-none" />
-                </div>
-              </div>
-              <div className="flex gap-2 pt-1">
-                <button type="submit" className="flex-1 bg-orange-500 text-black font-black p-3 rounded-lg text-xs uppercase">{isHindi ? "जमा करें" : "SUBMIT"}</button>
-                <button type="button" onClick={() => { triggerHaptic(); setIsReviewFormOpen(false); }} className="dark:bg-white/5 bg-neutral-100 text-neutral-800 dark:text-gray-400 font-bold p-3 rounded-lg text-xs uppercase">{isHindi ? "बंद करें" : "CANCEL"}</button>
-              </div>
-            </form>
           </div>
         )}
       </AnimatePresence>
@@ -2649,7 +2462,7 @@ export default function BbCafeHome() {
                                 <span className="text-sm text-green-600 dark:text-green-400 font-mono">₹{ord.total}</span>
                               </div>
 
-                              {/* --- MODIFIED AREA: REAL-TIME TRACKER MAP INSTEAD OF WHATSAPP LINK --- */}
+                              {/* Real-time Map Tracker Inside Profile History */}
                               {!isHistoryTrackingDismissed ? (
                                 <div className="w-full mt-2 rounded-2xl overflow-hidden shadow">
                                   <LiveOrderTracker 
@@ -2793,7 +2606,7 @@ export default function BbCafeHome() {
                 </p>
                 <p className="flex items-start gap-2">
                   <span className="bg-orange-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px] font-black flex-shrink-0">3</span>
-                  <span>अब **'Install'** बटन दबाएं।  बम बम कैफ़े ऐप आपके फोन की होम स्क्रीन पर असली ऐप की तरह जुड़ जाएगा!</span>
+                  <span>अब **'Install'** बटन दबाएं।  बम बम कैफ़े ऐप आपके phone की होम स्क्रीन पर असली ऐप की तरह जुड़ जाएगा!</span>
                 </p>
               </div>
 
@@ -2877,7 +2690,7 @@ export default function BbCafeHome() {
                 </button>
                 <button 
                   type="button" 
-                  onClick={() => { triggerHaptic(); setIsClaimModalOpen(false); setClaimUsername(""); }} 
+                  onClick={() => { triggerHaptic(); setIsClaimOpen(false); setClaimUsername(""); }} 
                   className="bg-neutral-100 text-neutral-800 dark:bg-white/5 dark:text-gray-400 p-3 rounded-xl font-black text-xs uppercase"
                 >
                   Cancel
