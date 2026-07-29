@@ -1098,7 +1098,7 @@ useEffect(() => {
     reader.readAsDataURL(file);
   };
 
-  const handleDetectLocation = () => {
+  const handleDetectLocation = () => {, 
     triggerHaptic();
     if (typeof window === "undefined") return;
 
@@ -1326,7 +1326,8 @@ const handleDetectLocation = () => {
       },
       { enableHighAccuracy: false, timeout: 8000, maximumAge: 60000 }
     );
-}
+};
+    
         
   const handleShareApp = async () => {
     triggerHaptic();
