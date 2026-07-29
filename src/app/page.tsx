@@ -1106,6 +1106,48 @@ useEffect(() => {
     }
 
     const toastId = toast.loading(isHindi ? "लोकेशन खोजी जा रही है..." : "Detecting live location...");
+    const handleDetectLocation = () => {
+    triggerHaptic();
+    if (typeof window === "undefined") return;
+
+    const toastId = toast.loading(isHindi ? "लोकेशन खोजी जा रही है..." : "Detecting live location...");
+
+    // IP-BASED FALLBACK (Bina GPS ke instantly location nikalne ke liye backup code)
+    const fallbackToIP = async () => {
+      try {
+        const ipRes = await fetch('https://ipapi.co/json/');
+        if (ipRes.ok) {
+          const ipData = await ipRes.json();
+          const lat = ipData.latitude;
+          const lon = ipData.longitude;
+          const city = ipData.city || "";
+          const region = ipData.region || "";
+
+          setDistanceKm(Number(calculateDistanceInKm(lat, lon, storeCoordinates.lat, storeCoordinates.lng).toFixed(2)));
+          setCustomerCoordinates({ lat, lng: lon });
+
+          const mapLink = `https://www.google.com/maps?q=${lat.toFixed(6)},${lon.toFixed(6)}`;
+          const finalAddressText = city 
+            ? `📍 Approx Area: ${city}, ${region} (IP Location)\n🔗 Maps Link: ${mapLink}`
+            : `My GPS Location: ${mapLink}`;
+
+          setAddress(finalAddressText);
+          toast.dismiss(toastId);
+          toast.success(isHindi ? "लोकेशन (IP द्वारा) डिटेक्ट की गई!" : "Location (via IP) successfully detected!");
+        } else {
+          throw new Error("IP Geolocation failed");
+        }
+      } catch (e) {
+        toast.dismiss(toastId);
+        toast.error(isHindi ? "लोकेशन खोजने में असमर्थ। कृपया मैन्युअली लिखें।" : "Unable to retrieve location. Please type manually.");
+      }
+    };
+
+    if (!navigator.geolocation) {
+      fallbackToIP();
+      return;
+    }
+
     navigator.geolocation.getCurrentPosition(
       async (position) => {
         const { latitude, longitude } = position.coords;
@@ -1116,7 +1158,6 @@ useEffect(() => {
 
         let textAddress = "";
         try {
-          // OpenStreetMap Free Reverse Geocoding API (Gets readable text address for free)
           const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&accept-language=en`, {
             headers: {
               'User-Agent': 'BumBumCafeApp/1.0'
@@ -1132,7 +1173,6 @@ useEffect(() => {
 
         const mapLink = `https://www.google.com/maps?q=${latitude.toFixed(6)},${longitude.toFixed(6)}`;
         
-        // Agar readable text address mila toh use maps link ke sath jodenge
         const finalAddressText = textAddress 
           ? `📍 Address: ${textAddress}\n🔗 Maps Link: ${mapLink}`
           : `My GPS Location: ${mapLink}`;
@@ -1142,16 +1182,11 @@ useEffect(() => {
         toast.success(isHindi ? "लोकेशन सफलतापूर्वक डिटेक्ट की गई!" : "Location successfully detected!");
       },
       (error) => {
-        toast.dismiss(toastId);
-        if (error.code === error.PERMISSION_DENIED) {
-          toast.error(isHindi ? "लोकेशन परमिशन बंद है। कृपया ब्राउज़र सेटिंग्स से ऑन करें।" : "Location permission denied. Please allow in settings.");
-        } else if (error.code === error.TIMEOUT) {
-          toast.error(isHindi ? "लोकेशन खोजने में समय लग रहा है। कृपया दोबारा प्रयास करें।" : "Location detection timed out. Please try again.");
-        } else {
-          toast.error(isHindi ? "लोकेशन एक्सेस करने में असमर्थ।" : "Unable to retrieve your location.");
-        }
+        // Agar phone ka GPS timeout ho jaye, toh error dene ke bajaye automatic IP par switch karein!
+        console.warn("GPS Timeout, switching to IP Fallback...", error);
+        fallbackToIP();
       },
-      { enableHighAccuracy: false, timeout: 15000, maximumAge: 60000 }
+      { enableHighAccuracy: false, timeout: 8000, maximumAge: 60000 }
     );
   };
   const handleShareApp = async () => {
