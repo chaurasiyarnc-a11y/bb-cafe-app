@@ -1,3 +1,10 @@
+यहाँ पूरी फ़ाइल का कोड दिया गया है जिसमें ऊपर बताए गए तीनों सुधारों—Coordinates
+state, handleDetectLocation अपडेट, database order saving में Lat/Lng जोड़ना, और
+live track panel में <LiveOrderTracker> का उपयोग—को जोड़ दिया गया है।
+
+आप इस पूरे कोड को बिना कुछ छोड़े सीधे अपनी फ़ाइल में रिप्लेस (पेस्ट) कर सकते
+हैं:
+
 'use client';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { db } from '../lib/firebase'; 
@@ -100,10 +107,8 @@ export default function BbCafeHome() {
 
   const menuRef = useRef<HTMLDivElement | null>(null);
   
-const router = useRouter();
+  const router = useRouter();
 
-
-  
   // --- STATE VARIABLES ---
   const [menu, setMenu] = useState<any[]>([]);
   const [menuLoading, setMenuLoading] = useState(false);
@@ -118,6 +123,9 @@ const router = useRouter();
   const [isInlineBannerEnabled, setIsInlineBannerEnabled] = useState(true);
   const [mounted, setMounted] = useState(false);
   const [isOnline, setIsOnline] = useState(true);
+
+  // लाइव लोकेलिटी कोऑर्डिनेट्स स्टोर करने के लिए स्टेट
+  const [customerCoordinates, setCustomerCoordinates] = useState<{ lat: number, lng: number } | null>(null);
 
   const [whatsappNumber, setWhatsappNumber] = useState("919714293759");
   
@@ -312,7 +320,6 @@ const router = useRouter();
     return baseSub >= selectedArea.minFree ? 0 : selectedArea.fee;
   };
 
-  // --- कूपन डिस्काउंट राशि निकालने के लिए सहायक फ़ंक्शन ---
   const getCouponDiscountAmount = () => {
     if (!appliedCoupon) return 0;
     const subtotal = getCartSubtotal();
@@ -533,14 +540,12 @@ const router = useRouter();
     });
   }, [cart]);
 
-  // --- Optimized UPI Redirection Link Scheme to Prevent Mobile Safari/Chrome popup blocks ---
   const handleLaunchUpiPay = (platform: string) => {
     triggerHaptic();
     const amount = getTotalBillPrice();
     const merchantName = "Bum Bum Cafe";
     const transactionNote = `BumBumCafe Order`;
     
-    // --- UPI ID COPY FALLBACK FOR MERCHANT GUIDELINE BLOCKS ---
     try {
       navigator.clipboard.writeText(upiId);
       toast.success(isHindi 
@@ -866,7 +871,6 @@ const router = useRouter();
     if (isSubmittingOrder) return;
     setIsSubmittingOrder(true);
 
-    // --- ENTIRE LOGIC IN TRY-CATCH-FINALLY TO INSURE SUBMITTING ALWAYS RESETS ---
     try {
       if (!customerDetails) { 
         setIsProfileOpen(true); 
@@ -917,7 +921,6 @@ const router = useRouter();
       const pointsEarned = Math.floor(finalTotal / 100);
       const totalPointsCost = cart.reduce((acc: number, i: any) => acc + (i.pointsCost || 0), 0);
 
-      // --- SCREENSHOT UPLOAD TO FIREBASE STORAGE (WITH 3.5s STRICT TIMEOUT) ---
       let screenshotUrl = "";
       if (paymentMethod === "upi" && paymentScreenshot) {
         const toastId = toast.loading(isHindi ? "स्क्रीनशॉट अपलोड हो रहा है..." : "Uploading screenshot...");
@@ -942,11 +945,31 @@ const router = useRouter();
       }
 
       const orderObj = {
-        billNumber, tokenNumber, deliveryPin, customerName: customerDetails.name, customerPhone: customerDetails.phone,
+        billNumber, 
+        tokenNumber, 
+        deliveryPin, 
+        customerName: customerDetails.name, 
+        customerPhone: customerDetails.phone,
         address: fulfillmentType === "delivery" ? address : `Mode: ${fulfillmentType.toUpperCase()} ${fulfillmentType === 'table' ? `Table: ${tableNumber}` : ''}`, 
-        items: cart, subtotal, discount: couponDiscount, total: finalTotal, timestamp: new Date(), status: 'pending',
-        deliveryArea: fulfillmentType === "delivery" ? selectedArea.name : fulfillmentType.toUpperCase(), noCutlery, ketchupAddon, oreganoAddon, chiliFlakesAddon,
-        fulfillmentType, tableNumber: fulfillmentType === "table" ? tableNumber : "", paymentMethod,
+        
+        // --- LATITUDE AND LONGITUDE GPS FIELDS ADDED TO FIRESTORE OBJECT ---
+        latitude: customerCoordinates?.lat || null,
+        longitude: customerCoordinates?.lng || null,
+
+        items: cart, 
+        subtotal, 
+        discount: couponDiscount, 
+        total: finalTotal, 
+        timestamp: new Date(), 
+        status: 'pending',
+        deliveryArea: fulfillmentType === "delivery" ? selectedArea.name : fulfillmentType.toUpperCase(), 
+        noCutlery, 
+        ketchupAddon, 
+        oreganoAddon, 
+        chiliFlakesAddon,
+        fulfillmentType, 
+        tableNumber: fulfillmentType === "table" ? tableNumber : "", 
+        paymentMethod,
         paymentScreenshot: paymentScreenshot || "",
         screenshotUrl: screenshotUrl || ""
       };
@@ -1001,7 +1024,6 @@ const router = useRouter();
         ? (fulfillmentType === "delivery" ? "Cash on Delivery (COD) 💵" : "Cash at Counter 💵")
         : "UPI Online Payment 📱";
 
-      // --- CONSTRUCT DYNAMIC MESSAGES ---
       let msg = `🔥 *BAM BAM CAFE - NEW ORDER*\n\n`;
       msg += `*Bill No:* #${formattedBillStr}\n`;
       msg += `*Token No:* #${tokenNumber}\n`;
@@ -1070,11 +1092,10 @@ const router = useRouter();
       console.error("Critical submission error caught:", error);
       toast.error(isHindi ? "ऑर्डर जमा करने में समस्या आई! दोबारा कोशिश करें।" : "Error submitting order. Please try again.");
     } finally {
-      setIsSubmittingOrder(false); // ALWAYS RESET SUBMITTING STATE
+      setIsSubmittingOrder(false); 
     }
   };
 
-  // --- HTML5 CANVAS BASED REAL-TIME COMPRESSION (SOLVES 1MB FIRESTORE CRASH) ---
   const handleScreenshotChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     triggerHaptic();
     const file = e.target.files?.[0];
@@ -1142,6 +1163,9 @@ const router = useRouter();
         const { latitude, longitude } = position.coords;
         const distance = calculateDistanceInKm(latitude, longitude, storeCoordinates.lat, storeCoordinates.lng);
         setDistanceKm(Number(distance.toFixed(2)));
+
+        // --- COORDINATES STATE SET AT REAL-TIME TO ENSURE MAP RETRIEVES CORRECT POINT ---
+        setCustomerCoordinates({ lat: latitude, lng: longitude });
 
         setAddress(isHindi ? `My GPS Location: https://www.google.com/maps?q=${latitude.toFixed(6)},${longitude.toFixed(6)}` : `My GPS Location: https://www.google.com/maps?q=${latitude.toFixed(6)},${longitude.toFixed(6)}`);
         toast.dismiss(toastId);
@@ -2226,6 +2250,13 @@ const router = useRouter();
               </div>
             ) : (
               <div className="space-y-1 mt-1 font-mono">
+                {/* --- REAL-TIME MAP RENDERED WHEN KITCHEN ACCEPTS THE ORDER (STATUS !== 'pending') --- */}
+                {liveOrder.status !== 'pending' && (
+                  <div className="w-full h-40 rounded-2xl overflow-hidden mb-3 border border-white/10 shadow-inner">
+                    <LiveOrderTracker order={liveOrder} />
+                  </div>
+                )}
+
                 <div className="flex justify-between text-[8px] text-gray-400 uppercase font-sans">
                   <span className={liveOrder.status === 'pending' ? 'text-orange-400 font-extrabold' : ''}>{isHindi ? "स्वीकृति" : "Confirming"} ⏳</span>
                   <span className={liveOrder.status === 'preparing' ? 'text-yellow-400 font-extrabold' : ''}>{isHindi ? "तैयारी" : "Preparing"} 👨‍🍳</span>
@@ -2780,7 +2811,7 @@ const router = useRouter();
             sendWhatsAppOrder={sendWhatsAppOrder}
             isSubmittingOrder={isSubmittingOrder}
             triggerHaptic={triggerHaptic}
-            upiId={upiId} // Passed down correctly to safely avoid compile error
+            upiId={upiId} 
           />
         )}
       </AnimatePresence>
