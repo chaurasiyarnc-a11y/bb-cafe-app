@@ -1309,7 +1309,7 @@ const handleDetectLocation = () => {
       { enableHighAccuracy: true, timeout: 6000, maximumAge: 0 }
     );
   };
-
+}
  
   const handleShareApp = async () => {
     triggerHaptic();
