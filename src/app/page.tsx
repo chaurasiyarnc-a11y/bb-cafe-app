@@ -1184,26 +1184,8 @@ const handleDetectLocation = () => {
           setCustomerCoordinates({ lat, lng: lon });
 
           const mapLink = `https://www.google.com/maps?q=${lat.toFixed(6)},${lon.toFixed(6)}`;
-          const finalAddressText = city 
-            ? `📍 Approx Area: ${city}, ${region} (IP Location)\n🔗 Maps Link: ${mapLink}`
-            : `My GPS Location: ${mapLink}`;
-
-          setAddress(finalAddressText);
-          toast.dismiss(toastId);
-          toast.success(isHindi ? "लोकेशन डिटेक्ट की गई!" : "Location successfully detected!");
-        } else {
-          throw new Error("IP Geolocation failed");
-        }
-      } catch (e) {
-        setAddress("");
-        toast.dismiss(toastId);
-        toast.error(isHindi ? "लोकेशन खोजने में असमर्थ। कृपया मैन्युअली लिखें।" : "Unable to retrieve location. Please type manually.");
-      }
-    };
-
-    // STEP 2: Alternation Option - Mobile Tower / Wi-Fi Triangulation (Sateek)
 // 1. Helper: Coordinates process aur address convert karne ke liye
-  const processCoordinates = async (latitude: number, longitude: number, isHighAcc: boolean, toastId: string) => {
+  async function processCoordinates(latitude: number, longitude: number, isHighAcc: boolean, toastId: string) {
     const distance = calculateDistanceInKm(latitude, longitude, storeCoordinates.lat, storeCoordinates.lng);
     setDistanceKm(Number(distance.toFixed(2)));
     setCustomerCoordinates({ lat: latitude, lng: longitude });
@@ -1234,10 +1216,10 @@ const handleDetectLocation = () => {
     setAddress(finalAddressText);
     toast.dismiss(toastId);
     toast.success(isHindi ? "लोकेशन सफलतापूर्वक मिल गई!" : "Location successfully found!");
-  };
+  }
 
   // 2. Helper: IP-based Geolocation Backup
-  const fallbackToIP = async (toastId: string) => {
+  async function fallbackToIP(toastId: string) {
     setAddress(isHindi ? "⏳ नेटवर्क लोकेशन खोजी जा रही है (Approx)..." : "⏳ Finding network location...");
     try {
       const ipRes = await fetch('https://ipapi.co/json/');
@@ -1267,10 +1249,10 @@ const handleDetectLocation = () => {
       toast.dismiss(toastId);
       toast.error(isHindi ? "लोकेशन खोजने में असमर्थ। कृपया मैन्युअली लिखें।" : "Unable to retrieve location. Please type manually.");
     }
-  };
+  }
 
   // 3. Helper: Low Accuracy Wi-Fi / Cell Triangulation
-  const fallbackToLowAccuracy = (toastId: string) => {
+  function fallbackToLowAccuracy(toastId: string) {
     setAddress(isHindi ? "⏳ वैकल्पिक लोकेशन खोजी जा रही है (Network)..." : "⏳ Finding alternative location...");
     navigator.geolocation.getCurrentPosition(
       async (position) => {
@@ -1283,7 +1265,33 @@ const handleDetectLocation = () => {
       },
       { enableHighAccuracy: false, timeout: 6000, maximumAge: 60000 }
     );
-  };
+  }
+
+  // 4. Main Function: Triggers the GPS check
+  function handleDetectLocation() {
+    triggerHaptic();
+    if (typeof window === "undefined") return;
+
+    setAddress(isHindi ? "⏳ सटीक लोकेशन खोजी जा रही है (GPS)..." : "⏳ Finding highly accurate location (GPS)...");
+    const toastId = toast.loading(isHindi ? "सटीक लोकेशन खोजी जा रही है..." : "Finding accurate location...");
+
+    if (!navigator.geolocation) {
+      fallbackToIP(toastId);
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const { latitude, longitude } = position.coords;
+        await processCoordinates(latitude, longitude, true, toastId);
+      },
+      (error) => {
+        console.warn("Accurate GPS failed, trying Cell/Wi-Fi...", error);
+        fallbackToLowAccuracy(toastId);
+      },
+      { enableHighAccuracy: true, timeout: 6000, maximumAge: 0 }
+    );
+  }
 
   // 4. Main Function: Triggers the GPS check
   const handleDetectLocation = () => {
