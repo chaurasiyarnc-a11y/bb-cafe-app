@@ -9,7 +9,6 @@ import toast, { Toaster } from 'react-hot-toast';
 import { useCartStore } from '../store/useCartStore';
 
 import { useRouter } from 'next/navigation';
-import { Capacitor } from '@capacitor/core';
 
 // सब-कंपोनेंट्स इम्पोर्ट्स
 import CategorySlider from '../components/home/CategorySlider';
