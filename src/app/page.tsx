@@ -2248,7 +2248,14 @@ export default function BbCafeHome() {
                 {/* --- REAL-TIME MAP RENDERED WHEN KITCHEN ACCEPTS THE ORDER (STATUS !== 'pending') --- */}
                 {liveOrder.status !== 'pending' && (
                   <div className="w-full h-40 rounded-2xl overflow-hidden mb-3 border border-white/10 shadow-inner">
-                    <LiveOrderTracker order={liveOrder} />
+                    <LiveOrderTracker 
+  isHindi={isHindi}
+  liveOrder={liveOrder}
+  setLiveOrder={setLiveOrder}
+  formatBillNumber={formatBillNumber}
+  whatsappNumber={whatsappNumber}
+  triggerHaptic={triggerHaptic}
+/>
                   </div>
                 )}
 
