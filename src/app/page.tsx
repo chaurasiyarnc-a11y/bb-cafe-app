@@ -3,34 +3,19 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { db } from '../lib/firebase'; 
 import { collection, onSnapshot, query, addDoc, doc, setDoc, increment, runTransaction, getDoc, getDocs, where, limit, orderBy } from 'firebase/firestore';
 import { getStorage, ref, uploadString, getDownloadURL } from 'firebase/storage'; 
-import { ShoppingBag, Plus, Search, X, MapPin, Phone, User, Play, Star, Gift, Loader2, Heart, Clock, ChevronRight, WifiOff, Globe } from 'lucide-react';
+import { ShoppingBag, Plus, Search, X, MapPin, Phone, User, Sparkles, Star, Gift, Loader2, Heart, Clock, ChevronRight, WifiOff, History, LogOut, Lock, Award, Play, Globe } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
 import { useCartStore } from '../store/useCartStore';
 
-// --- सभी सब-कॉम्पोनेंट्स इम्पोर्ट्स ---
-import CategorySlider from '@/components/home/CategorySlider';
-import CartDrawer from '@/components/home/CartDrawer';
-import UpiPaymentModal from '@/components/home/UpiPaymentModal';
-import GiftPointsModal from '@/components/home/GiftPointsModal';
-import InstallModal from '@/components/home/InstallModal';
-import LiveOrderTracker from '@/components/home/LiveOrderTracker';
-import PizzaCustomizerModal from '@/components/home/PizzaCustomizerModal';
-import PointsClaimModal from '@/components/home/PointsClaimModal';
-import ProfileDrawer from '@/components/home/ProfileDrawer';
-import ReelsViewer from '@/components/home/ReelsViewer';
+import { useRouter } from 'next/navigation';
+import { Capacitor } from '@capacitor/core';
 
-// TypeScript JSX वैलिडेशन एरर को बायपास करने के लिए cast any किया गया है
-const CategorySliderAny = CategorySlider as any;
-const CartDrawerAny = CartDrawer as any;
-const UpiPaymentModalAny = UpiPaymentModal as any;
-const GiftPointsModalAny = GiftPointsModal as any;
-const InstallModalAny = InstallModal as any;
-const LiveOrderTrackerAny = LiveOrderTracker as any;
-const PizzaCustomizerModalAny = PizzaCustomizerModal as any;
-const PointsClaimModalAny = PointsClaimModal as any;
-const ProfileDrawerAny = ProfileDrawer as any;
-const ReelsViewerAny = ReelsViewer as any;
+// सब-कंपोनेंट्स इम्पोर्ट्स
+import CategorySlider from '../components/home/CategorySlider';
+import DiyPizzaBuilder from '../components/home/DiyPizzaBuilder';
+import CartDrawer from '../components/admin/CartDrawer';
+import UpiPaymentModal from '../components/home/UpiPaymentModal';
 
 const FALLBACK_CATEGORIES = ["All", "Special Pizza", "Special Thali", "Paneer Special", "Special Mix veg", "Fast Food", "Super Cool", "Indian Bread", "Special Rice"];
 
@@ -64,6 +49,24 @@ const PIZZA_ADDONS: { [size: string]: { [addon: string]: number } } = {
   "extra large": { "Veg Add-on": 30, "Paneer": 50, "Black Olives": 50, "Jalapeno": 50, "Extra Cheese": 60, "Mushroom": 50 }
 };
 
+const DIY_PIZZA_PRICES: Record<string, any> = {
+  small: {
+    base: 15, sauce: 10, mozzarella: 40,
+    veggies: { onion: 10, tomato: 10, capsicum: 10, corn: 10 },
+    black_olive: 20, jalapeno: 20, red_peprica: 20, paneer: 30, mushroom: 30
+  },
+  medium: {
+    base: 20, sauce: 15, mozzarella: 60,
+    veggies: { onion: 15, tomato: 15, capsicum: 15, corn: 15 },
+    black_olive: 30, jalapeno: 30, red_peprica: 30, paneer: 40, mushroom: 40
+  },
+  large: {
+    base: 30, sauce: 30, mozzarella: 100,
+    veggies: { onion: 20, tomato: 20, capsicum: 20, corn: 20 },
+    black_olive: 50, jalapeno: 50, red_peprica: 40, paneer: 50, mushroom: 50
+  }
+};
+
 const QUICK_INSTRUCTION_TAGS = ["🌶️ Extra Spicy", "🧅 No Onion-Garlic", "🧀 Extra Cheese", "🔥 Well Baked", "🌱 Make it Mild"];
 
 const SOCIAL_LINKS = [
@@ -74,6 +77,20 @@ const SOCIAL_LINKS = [
   { id: 'youtube', label: '🔴 YouTube', icon: '/youtube.png', points: 1, url: 'https://www.youtube.com/@bbcafe.i' }
 ];
 
+const SUGGESTED_REVIEWS = [
+  "पिज्जा का स्वाद लाजवाब है! मज़ा आ गया 🍕😋",
+  "मोहांद्रा में सबसे बेस्ट सर्विस और स्वाद! ⭐⭐⭐⭐⭐",
+  "सुपर फास्ट डिलीवरी और शानदार पैकेजिंग! 🛵📦",
+  "साफ़-सफ़ाई और शुद्धता 10/10 है! 🧼👌"
+];
+
+const PERMANENT_REVIEWS = [
+  { id: "rev1", name: "Gaurav Soni", rating: 5, comment: "बम बम कैफे की पनीर पिज्जा सच में पूरे मोहांद्रा में बेस्ट है! एक्स्ट्रा चीज़ लव है। ⭐⭐⭐⭐⭐" },
+  { id: "rev2", name: "Anjali Patel", rating: 5, comment: "फास्ट फ़ूड की पैकिंग बहुत अच्छी थी, डिलीवरी बॉय का व्यवहार भी बहुत विनम्र था। ⭐⭐⭐⭐⭐" },
+  { id: "rev3", name: "Shubham Dwivedi", rating: 5, comment: "स्पेशल थाली का स्वाद एकदम घर जैसा है। सफ़ाई और शुद्धता लाजवाब है। ⭐⭐⭐⭐⭐" },
+  { id: "rev4", name: "Neha Chaurasia", rating: 5, comment: "इस क्षेत्र का सबसे अच्छा कैफे। पिज्जा विभाग ताज़ा है और क्रस्ट बहुत सॉफ्ट है! ⭐⭐⭐⭐⭐" }
+];
+
 export default function BbCafeHome() {
   const store = useCartStore() as any;
   const cart = store?.items || [];
@@ -82,7 +99,16 @@ export default function BbCafeHome() {
   const clearCart = store?.clearCart || (() => {});
 
   const menuRef = useRef<HTMLDivElement | null>(null);
+  
+const router = useRouter();
 
+useEffect(() => {
+  // यदि ऐप असली एंड्रॉइड डिवाइस के अंदर खुला है (APK में)
+  if (Capacitor.isNativePlatform()) {
+    router.replace('/staff'); // तुरंत स्टाफ लॉन्चर पेज पर भेजें
+  }
+}, [router]);
+  
   // --- STATE VARIABLES ---
   const [menu, setMenu] = useState<any[]>([]);
   const [menuLoading, setMenuLoading] = useState(false);
@@ -99,7 +125,10 @@ export default function BbCafeHome() {
   const [isOnline, setIsOnline] = useState(true);
 
   const [whatsappNumber, setWhatsappNumber] = useState("919714293759");
+  
+  // कैफ़े की मुख्य UPI ID
   const [upiId, setUpiId] = useState("Q231198993@ybl");
+  
   const [storeCoordinates, setStoreCoordinates] = useState({ lat: 24.2863, lng: 80.1245 });
 
   const [storeTimingHindi, setStoreTimingHindi] = useState("सुबह 10:00 से रात 11:00 बजे");
@@ -145,8 +174,14 @@ export default function BbCafeHome() {
   const [banners, setBanners] = useState<any[]>([]);
   const [bannerIndex, setBannerIndex] = useState(0);
   const [bannerError, setBannerError] = useState(false);
-
-  // कूपन से जुड़े हुए स्टेट्स
+  const [reviews, setReviews] = useState<any[]>([]);
+  
+  const [isReviewsDrawerOpen, setIsReviewsDrawerOpen] = useState(false);
+  const [isReviewFormOpen, setIsReviewFormOpen] = useState(false);
+  const [reviewName, setReviewName] = useState("");
+  const [reviewComment, setReviewComment] = useState("");
+  const [reviewRating, setReviewRating] = useState(5);
+  
   const [enteredCoupon, setEnteredCoupon] = useState("");
   const [appliedCoupon, setAppliedCoupon] = useState<any>(null);
 
@@ -156,15 +191,35 @@ export default function BbCafeHome() {
   const [normalPizzaAddons, setNormalPizzaAddons] = useState<{ [addon: string]: boolean }>({});
   const [chefNote, setChefNote] = useState(""); 
 
+  // DIY PIZZA STATES
+  const [diySize, setDiySize] = useState<string>("small"); 
+  const [diySauce, setDiySauce] = useState<boolean>(true); 
+  const [diyMozzarella, setDiyMozzarella] = useState<boolean>(true); 
+  const [diyVegSelection, setDiyVegSelection] = useState<{ [veg: string]: boolean }>({ onion: false, tomato: false, capsicum: false, corn: false });
+  const [diyPremiumToppings, setDiyPremiumToppings] = useState<{ [top: string]: boolean }>({ black_olive: false, jalapeno: false, red_peprica: false, paneer: false, mushroom: false });
+  const [diyChefNote, setDiyChefNote] = useState<string>("");
+
   // Reels/Stories States
   const [stories, setStories] = useState<any[]>([]);
   const [activeStory, setActiveStory] = useState<any | null>(null);
+
+  // Social Proof Alerts States
+  const [socialProofs, setSocialProofs] = useState<any[]>([]);
+  const [socialAlertIndex, setSocialAlertIndex] = useState(0);
+  const [showSocialAlert, setShowSocialAlert] = useState(false);
+
+  // Social Media Point Claims States
+  const [isClaimModalOpen, setIsClaimModalOpen] = useState(false);
+  const [claimingPlatform, setClaimingPlatform] = useState<any>(null);
+  const [claimUsername, setClaimUsername] = useState("");
+  const [isClaimingLoading, setIsClaimingLoading] = useState(false);
 
   // Cart Specific Add-ons
   const [ketchupAddon, setKetchupAddon] = useState(false);
   const [oreganoAddon, setOreganoAddon] = useState(false);
   const [chiliFlakesAddon, setChiliFlakesAddon] = useState(false);
 
+  const [noCutlery, setNoCutlery] = useState(false);
   const [selectedArea, setSelectedArea] = useState(DELIVERY_AREAS[0]);
   const [favorites, setFavorites] = useState<string[]>([]);
   const [, setLastPlacedOrder] = useState<any>(null);
@@ -183,12 +238,6 @@ export default function BbCafeHome() {
 
   // UI States
   const [showGreeting] = useState(true);
-
-  // --- MISSING SOCIAL CLAIM STATES RESOLVED ---
-  const [isClaimModalOpen, setIsClaimModalOpen] = useState(false);
-  const [claimingPlatform, setClaimingPlatform] = useState<any>(SOCIAL_LINKS[0]);
-  const [claimUsername, setClaimUsername] = useState("");
-  const [isClaimingLoading, setIsClaimingLoading] = useState(false);
 
   // --- HELPERS, CALCULATIONS & GENERAL UTILS ---
 
@@ -268,6 +317,7 @@ export default function BbCafeHome() {
     return baseSub >= selectedArea.minFree ? 0 : selectedArea.fee;
   };
 
+  // --- कूपन डिस्काउंट राशि निकालने के लिए सहायक फ़ंक्शन ---
   const getCouponDiscountAmount = () => {
     if (!appliedCoupon) return 0;
     const subtotal = getCartSubtotal();
@@ -329,13 +379,39 @@ export default function BbCafeHome() {
   };
 
   const getReferralCode = () => {
-    if (!customerDetails || !customerDetails.name || !customerDetails.phone) return "WELCOME";
+    if (!customerDetails) return "WELCOME";
     const namePart = customerDetails.name.trim().split(" ")[0].substring(0, 4).toUpperCase();
     const phonePart = customerDetails.phone.slice(-4);
     return `${namePart}${phonePart}`;
   };
 
   // --- CALCULATION MEMOS ---
+
+  const ecoCutlerySaves = useMemo(() => {
+    return pastOrders.filter(o => o.noCutlery === true).length;
+  }, [pastOrders]);
+
+  const calculatedDiyPizzaPrice = useMemo(() => {
+    const config = DIY_PIZZA_PRICES[diySize];
+    if (!config) return 0;
+    let total = config.base;
+    if (diySauce) total += config.sauce;
+    if (diyMozzarella) total += config.mozzarella;
+
+    Object.entries(diyVegSelection).forEach(([veg, isSelected]) => {
+      if (isSelected) {
+        total += config.veggies[veg] || 0;
+      }
+    });
+
+    Object.entries(diyPremiumToppings).forEach(([top, isSelected]) => {
+      if (isSelected) {
+        total += config[top] || 0;
+      }
+    });
+
+    return total;
+  }, [diySize, diySauce, diyMozzarella, diyVegSelection, diyPremiumToppings]);
 
   const greetingText = useMemo(() => {
     const now = new Date();
@@ -375,12 +451,7 @@ export default function BbCafeHome() {
   }, [menu, dbCategories]);
 
   const filteredMenu = useMemo(() => {
-    // Hinglish Mapping integration
-    const searchWords = debouncedSearchQuery
-      .toLowerCase()
-      .split(/\s+/)
-      .filter(Boolean)
-      .map(word => HINGLISH_DICT[word] || word);
+    const searchWords = debouncedSearchQuery.split(/\s+/).filter(Boolean);
 
     return deduplicatedMenu.filter(item => {
       const itemName = item?.name ? String(item.name).toLowerCase() : "";
@@ -432,7 +503,7 @@ export default function BbCafeHome() {
     });
 
     const listWithoutSpecial = result.filter(c => c !== "All" && c !== "DIY Pizza");
-    const finalized = ["All", ...listWithoutSpecial]; 
+    const finalized = ["All", "DIY Pizza", ...listWithoutSpecial];
 
     return Array.from(new Set(finalized));
   }, [dbCategories]);
@@ -450,6 +521,14 @@ export default function BbCafeHome() {
     return found ? found.address : "";
   }, [pastOrders]);
 
+  const displayReviews = useMemo(() => {
+    return reviews.length > 0 ? reviews : PERMANENT_REVIEWS;
+  }, [reviews]);
+
+  const hasManyReviews = useMemo(() => {
+    return displayReviews.length > 10;
+  }, [displayReviews]);
+
   // --- Dynamic add-ons display verification based on eligible dishes ---
   const showAddonsSection = useMemo(() => {
     const eligibleKeywords = ['pizza', 'sandwich', 'burger', 'momo', 'fries', 'chips', 'finger'];
@@ -459,12 +538,14 @@ export default function BbCafeHome() {
     });
   }, [cart]);
 
+  // --- Optimized UPI Redirection Link Scheme to Prevent Mobile Safari/Chrome popup blocks ---
   const handleLaunchUpiPay = (platform: string) => {
     triggerHaptic();
     const amount = getTotalBillPrice();
     const merchantName = "Bum Bum Cafe";
     const transactionNote = `BumBumCafe Order`;
     
+    // --- UPI ID COPY FALLBACK FOR MERCHANT GUIDELINE BLOCKS ---
     try {
       navigator.clipboard.writeText(upiId);
       toast.success(isHindi 
@@ -496,7 +577,7 @@ export default function BbCafeHome() {
   const quickAppendInstruction = (tag: string, type: "diy" | "normal") => {
     triggerHaptic(20);
     if (type === "diy") {
-      // DIY Pizza Removed
+      setDiyChefNote(prev => prev ? `${prev}, ${tag}` : tag);
     } else {
       setChefNote(prev => prev ? `${prev}, ${tag}` : tag);
     }
@@ -512,49 +593,64 @@ export default function BbCafeHome() {
     });
   };
 
+  const handleReviewSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    triggerHaptic();
+    if (!reviewName || !reviewComment) {
+      toast.error(isHindi ? "सभी फ़ील्ड भरें!" : "Please fill all fields!");
+      return;
+    }
+    const toastId = toast.loading(isHindi ? "समीक्षा सबमिट की जा रही है..." : "Submitting review...");
+    try {
+      await addDoc(collection(db, "reviews"), {
+        name: reviewName,
+        comment: reviewComment,
+        rating: reviewRating,
+        isApproved: false,
+        timestamp: new Date()
+      });
+      toast.dismiss(toastId);
+      toast.success(isHindi ? "समीक्षा सबमिट हो गई! वेरिफिकेशन के बाद दिखेगी।" : "Review submitted successfully! Post approval it will be shown.");
+      setReviewName("");
+      setReviewComment("");
+      setReviewRating(5);
+      setIsReviewFormOpen(false);
+    } catch (err) {
+      toast.dismiss(toastId);
+      toast.error(isHindi ? "त्रुटि! कृपया दोबारा प्रयास करें।" : "Error! Please try again.");
+    }
+  };
+
   const handleSaveDetails = async (e: React.FormEvent) => {
     e.preventDefault();
     triggerHaptic();
-
-    // फ़ोन नंबर और पिन को साफ़ (sanitize) करना
-    const rawPhone = tempPhone.trim().replace(/\s+/g, '').replace(/^\+91/, '').replace(/\D/g, '');
-    const cleanPin = tempPin.trim().replace(/\D/g, '');
-
-    if (!tempName || rawPhone.length !== 10 || cleanPin.length !== 4) {
-      toast.error(isHindi ? "कृपया सभी सही विवरण दर्ज करें! (10 अंकों का फोन और 4 अंकों का पिन)" : "Please enter correct details! (10-digit phone & 4-digit PIN)");
+    if (!tempName || !tempPhone || tempPhone.length !== 10 || !tempPin || tempPin.length !== 4) {
+      toast.error(isHindi ? "कृपया सभी सही विवरण दर्ज करें!" : "Please enter correct details!");
       return;
     }
-    
-    const formattedPhone = `+91${rawPhone}`;
+    const phoneClean = tempPhone.trim();
+    const formattedPhone = `+91${phoneClean}`;
     
     const customerObj = {
       name: tempName.trim(),
       phone: formattedPhone,
-      pin: cleanPin,
+      pin: tempPin,
       refCode: tempRefCode.trim() || undefined
     };
     
     const toastId = toast.loading(isHindi ? "प्रोफाइल सहेज रहा है..." : "Saving profile...");
     try {
-      const userDocRef = doc(db, "customer_points", rawPhone);
+      const userDocRef = doc(db, "customer_points", phoneClean);
       const userSnap = await getDoc(userDocRef);
       
       if (!userSnap.exists()) {
         await setDoc(userDocRef, {
           name: customerObj.name,
-          phone: rawPhone,
+          phone: phoneClean,
           pin: customerObj.pin,
           points: tempRefCode ? 5 : 0, 
           lastActive: new Date()
         });
-        if (tempRefCode) {
-          await addDoc(collection(db, "customer_points", rawPhone, "history"), {
-            type: 'earn',
-            points: 5,
-            description: 'Welcome Referral Bonus 🎁',
-            timestamp: new Date()
-          });
-        }
       } else {
         await setDoc(userDocRef, {
           name: customerObj.name,
@@ -570,7 +666,7 @@ export default function BbCafeHome() {
       toast.success(isHindi ? "प्रोफ़ाइल सफलतापूर्वक सहेजी गई!" : "Profile saved successfully!");
     } catch (err) {
       toast.dismiss(toastId);
-      toast.error(isHindi ? "प्रोफाइल सहेजने में त्रुटि आया!" : "Error saving profile!");
+      toast.error(isHindi ? "प्रोफाइल सहेजने में त्रुटि आई!" : "Error saving profile!");
     }
   };
 
@@ -606,298 +702,6 @@ export default function BbCafeHome() {
     }
   };
 
-  // --- REELS & STORY HANDLERS ---
-
-  const handleReelEnded = () => {
-    if (!activeStory) return;
-    const currentIndex = stories.findIndex((s) => s.id === activeStory.id);
-    if (currentIndex !== -1 && currentIndex < stories.length - 1) {
-      setActiveStory(stories[currentIndex + 1]);
-    } else {
-      setActiveStory(null);
-    }
-  };
-
-  const handleQuickAddFromStory = (story: any) => {
-    triggerHaptic();
-    const matchingItem = menu.find(
-      (item) =>
-        item.name.toLowerCase().includes(story.title.toLowerCase()) ||
-        story.title.toLowerCase().includes(item.name.toLowerCase())
-    );
-    if (matchingItem) {
-      if (matchingItem.variants) {
-        setSelectedProduct(matchingItem);
-        setActiveStory(null); 
-        toast.success(isHindi ? "विकल्प चुनें!" : "Please select options!");
-      } else {
-        addItem(matchingItem);
-        playSoundEffect('add');
-        toast.success(isHindi ? `${matchingItem.name} कर्ट में जोड़ा गया!` : `${matchingItem.name} added to cart!`);
-      }
-    } else {
-      const fallbackItem = {
-        id: `story_${story.id}`,
-        name: story.title,
-        price: story.price || 120, 
-        category: "Special",
-        isAvailable: true
-      };
-      addItem(fallbackItem);
-      playSoundEffect('add');
-      toast.success(isHindi ? `${fallbackItem.name} कर्ट में जोड़ा गया!` : `${fallbackItem.name} added to cart!`);
-    }
-  };
-
-  const handleNormalPizzaAdd = () => {
-    triggerHaptic();
-    if (!selectedProduct) return;
-    
-    const sizeKey = normalPizzaSize.toLowerCase() || "small";
-    const addonsList = Object.entries(normalPizzaAddons)
-      .filter(([_, checked]) => checked)
-      .map(([name]) => name);
-
-    const addonsPrice = addonsList.reduce((acc, addonName) => {
-      const sizeAddons = PIZZA_ADDONS[sizeKey] || {};
-      return acc + (sizeAddons[addonName] || 0);
-    }, 0);
-
-    const basePrice = normalPizzaPrice;
-    const finalItemPrice = basePrice + addonsPrice;
-
-    const customizedItem = {
-      id: `${selectedProduct.id}_${sizeKey}_${addonsList.join('_')}`,
-      name: `${selectedProduct.name} (${normalPizzaSize.toUpperCase()})`,
-      price: finalItemPrice,
-      quantity: 1,
-      category: selectedProduct.category,
-      note: `${chefNote}${addonsList.length > 0 ? ` [Addons: ${addonsList.join(', ')}]` : ''}`.trim()
-    };
-
-    addItem(customizedItem);
-    playSoundEffect('add');
-    toast.success(isHindi ? "पिज्जा कस्टमाइज करके कर्ट में जोड़ा गया!" : "Customized pizza added to cart!");
-    
-    setSelectedProduct(null);
-    setNormalPizzaSize("");
-    setNormalPizzaAddons({});
-    setChefNote("");
-  };
-
-  const handleShareApp = async () => {
-    triggerHaptic();
-    const refCode = getReferralCode();
-    const shareUrl = typeof window !== 'undefined' ? `${window.location.origin}?ref=${refCode}` : 'https://bbcafe.in';
-    const shareText = isHindi 
-      ? `🔥 बम बम कैफ़े से स्वादिष्ट पिज्जा और सैंडविच ऑर्डर करें! मेरा रेफरल कोड "${refCode}" इस्तेमाल करें।  यहाँ क्लिक करें: ${shareUrl}` 
-      : `🔥 Order delicious Pizza & Sandwiches from Bum Bum Cafe! Use my referral code "${refCode}". Tap here: ${shareUrl}`;
-    
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: 'Bum Bum Cafe',
-          text: shareText,
-          url: shareUrl,
-        });
-        setShareCount(prev => prev + 1);
-      } catch (err) {
-        console.log('Error sharing:', err);
-      }
-    } else {
-      try {
-        await navigator.clipboard.writeText(shareText);
-        toast.success(isHindi ? "रेफरल संदेश कॉपी हो गया!" : "Referral message copied to clipboard!");
-        setShareCount(prev => prev + 1);
-      } catch (err) {
-        toast.error(isHindi ? "शेयर करने में विफल!" : "Failed to share!");
-      }
-    }
-  };
-
-  const handleCustomerRedeem = async (rule: any) => {
-    triggerHaptic();
-    if (!customerDetails) {
-      toast.error(isHindi ? "कृपया पहले अपनी प्रोफ़ाइल बनाएँ!" : "Please create your profile first!");
-      return;
-    }
-    if (customerPoints < rule.pointsRequired) {
-      toast.error(isHindi ? "आपके पास पर्याप्त पॉइंट्स नहीं हैं!" : "You do not have enough points!");
-      return;
-    }
-
-    const rewardCartItem = {
-      id: `reward_${rule.id}_${Date.now()}`,
-      name: `🎁 FREE ${rule.rewardName || rule.name || 'Reward Item'}`,
-      price: 0,
-      quantity: 1,
-      category: "Reward",
-      pointsCost: Number(rule.pointsRequired || 0),
-      note: "Loyalty Reward Item"
-    };
-
-    addItem(rewardCartItem);
-    toast.success(isHindi 
-      ? `${rule.rewardName || rule.name || 'उपहार'} कर्ट में जोड़ा गया! (${rule.pointsRequired}  पॉइंट्स उपयोग होंगे)` 
-      : `${rule.rewardName || rule.name || 'Reward'} added to cart! (${rule.pointsRequired} pts will be claimed on checkout)`
-    );
-  };
-
-  const handleDetectLocation = () => {
-    triggerHaptic();
-    if (!navigator.geolocation) {
-      toast.error(isHindi ? "जियोलोकेशन आपके ब्राउज़र द्वारा समर्थित नहीं है!" : "Geolocation is not supported by your browser!");
-      return;
-    }
-
-    const toastId = toast.loading(isHindi ? "आपकी लोकेशन जाँची जा रही है..." : "Detecting your location...");
-
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        toast.dismiss(toastId);
-        const userLat = position.coords.latitude;
-        const userLng = position.coords.longitude;
-        
-        const distance = calculateDistanceInKm(
-          storeCoordinates.lat,
-          storeCoordinates.lng,
-          userLat,
-          userLng
-        );
-        
-        const roundedDistance = Math.round(distance * 10) / 10;
-        setDistanceKm(roundedDistance);
-
-        if (roundedDistance <= 2.0) {
-          setSelectedArea(DELIVERY_AREAS[0]);
-          toast.success(isHindi 
-            ? `आप ${roundedDistance} KM दूर हैं (Mohandra Town चयनित)` 
-            : `You are ${roundedDistance} KM away (Mohandra Town selected)`
-          );
-        } else if (roundedDistance <= 5.0) {
-          setSelectedArea(DELIVERY_AREAS[1]);
-          toast.success(isHindi 
-            ? `आप ${roundedDistance} KM दूर हैं (Within 5 KM चयनित)` 
-            : `You are ${roundedDistance} KM away (Within 5 KM selected)`
-          );
-        } else if (roundedDistance <= 12.0) {
-          setSelectedArea(DELIVERY_AREAS[2]);
-          toast.success(isHindi 
-            ? `आप ${roundedDistance} KM दूर हैं (Within 12 KM चयनित)` 
-            : `You are ${roundedDistance} KM away (Within 12 KM selected)`
-          );
-        } else {
-          toast.error(isHindi 
-            ? `आप काफी दूर हैं (${roundedDistance} KM)। कृपया पिकअप चुनें या कैफ़े से संपर्क करें!` 
-            : `You are too far (${roundedDistance} KM). Please choose self-pickup or contact cafe!`
-          );
-        }
-      },
-      (error) => {
-        toast.dismiss(toastId);
-        toast.error(isHindi ? "लोकेशन एक्सेस करने में विफल! कृपया अनुमति प्रदान करें।" : "Failed to access location! Please grant permission.");
-      },
-      { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
-    );
-  };
-
-  const handleGiftPoints = async (e: React.FormEvent) => {
-    e.preventDefault();
-    triggerHaptic();
-
-    if (!customerDetails?.phone) {
-      toast.error(isHindi ? "कृपया पहले अपनी प्रोफाइल सेट करें!" : "Please setup your profile first!");
-      return;
-    }
-
-    const senderPhoneClean = customerDetails.phone.replace("+91", "");
-    const receiverPhoneClean = giftPhone.trim();
-    const amount = Number(giftPointsAmount);
-
-    if (!receiverPhoneClean || receiverPhoneClean.length !== 10) {
-      toast.error(isHindi ? "प्राप्तकर्ता का सही 10 अंकों का नंबर लिखें!" : "Enter valid 10-digit receiver phone!");
-      return;
-    }
-    if (senderPhoneClean === receiverPhoneClean) {
-      toast.error(isHindi ? "आप स्वयं को पॉइंट्स उपहार में नहीं दे सकते!" : "You cannot gift points to yourself!");
-      return;
-    }
-    if (isNaN(amount) || amount <= 0) {
-      toast.error(isHindi ? "कृपया सही पॉइंट्स संख्या दर्ज करें!" : "Please enter a valid points amount!");
-      return;
-    }
-    if (amount > customerPoints) {
-      toast.error(isHindi ? "आपके पास पर्याप्त雕पॉइंट्स नहीं हैं!" : "Insufficient points balance!");
-      return;
-    }
-    if (giftSenderPin !== customerDetails.pin) {
-      toast.error(isHindi ? "गलत सुरक्षा पिन!" : "Incorrect security PIN!");
-      return;
-    }
-
-    setIsGiftingLoading(true);
-    const toastId = toast.loading(isHindi ? "पॉइंट्स ट्रांसफर किए जा रहे हैं..." : "Transferring points...");
-
-    try {
-      const receiverDocRef = doc(db, "customer_points", receiverPhoneClean);
-      const receiverSnap = await getDoc(receiverDocRef);
-
-      if (!receiverSnap.exists()) {
-        toast.dismiss(toastId);
-        toast.error(isHindi ? "यह नंबर पंजीकृत नहीं है!" : "Receiver phone number is not registered!");
-        setIsGiftingLoading(false);
-        return;
-      }
-
-      const senderDocRef = doc(db, "customer_points", senderPhoneClean);
-
-      await runTransaction(db, async (transaction) => {
-        const senderSnap = await transaction.get(senderDocRef);
-        if (!senderSnap.exists()) throw new Error("Sender not found");
-        
-        const currentSenderPoints = senderSnap.data().points || 0;
-        if (currentSenderPoints < amount) throw new Error("Insufficient points");
-
-        transaction.update(senderDocRef, {
-          points: increment(-amount)
-        });
-        transaction.update(receiverDocRef, {
-          points: increment(amount)
-        });
-
-        const senderHistRef = doc(collection(db, "customer_points", senderPhoneClean, "history"));
-        const receiverHistRef = doc(collection(db, "customer_points", receiverPhoneClean, "history"));
-
-        transaction.set(senderHistRef, {
-          type: 'gift_send',
-          points: amount,
-          description: `Sent gift points to +91${receiverPhoneClean}`,
-          timestamp: new Date()
-        });
-
-        transaction.set(receiverHistRef, {
-          type: 'gift_receive',
-          points: amount,
-          description: `Received gift points from +91${senderPhoneClean}`,
-          timestamp: new Date()
-        });
-      });
-
-      toast.dismiss(toastId);
-      toast.success(isHindi ? "पॉइंट्स सफलतापूर्वक ट्रांसफर किए गए! 🎁" : "Points gifted successfully! 🎁");
-      
-      setGiftPhone("");
-      setGiftPointsAmount("");
-      setGiftSenderPin("");
-      setIsGiftModalOpen(false);
-    } catch (err: any) {
-      toast.dismiss(toastId);
-      toast.error(isHindi ? "ट्रांसफर विफल! पुनः प्रयास करें।" : "Transfer failed. Please try again.");
-    } finally {
-      setIsGiftingLoading(false);
-    }
-  };
-
   const handleDismissInstallBanner = () => {
     triggerHaptic();
     setShowInstallBanner(false);
@@ -919,35 +723,171 @@ export default function BbCafeHome() {
     }
   };
 
+  const handleApplyCoupon = async () => {
+    triggerHaptic();
+    if (!enteredCoupon.trim()) {
+      toast.error(isHindi ? "कृपया कूपन कोड दर्ज करें!" : "Please enter a coupon code!");
+      return;
+    }
+    const codeUpper = enteredCoupon.trim().toUpperCase();
+    const toastId = toast.loading(isHindi ? "कूपन जाँचा जा रहा है..." : "Validating coupon...");
+    try {
+      const couponRef = doc(db, "coupons", codeUpper);
+      const couponSnap = await getDoc(couponRef);
+      if (couponSnap.exists()) {
+        const data = couponSnap.data();
+        const subtotal = getCartSubtotal();
+        if (subtotal < (data.minOrder || 0)) {
+          toast.dismiss(toastId);
+          toast.error(isHindi ? `न्यूनतम ऑर्डर राशि ₹${data.minOrder} होनी चाहिए!` : `Minimum order must be ₹${data.minOrder}!`);
+          return;
+        }
+        
+        setAppliedCoupon({
+          code: codeUpper,
+          discountValue: data.discount !== undefined ? data.discount : (data.discountValue !== undefined ? data.discountValue : 0),
+          type: data.type || data.discountType || 'flat'
+        });
+        toast.dismiss(toastId);
+        toast.success(isHindi ? "कूपन सफलतापूर्वक लागू किया गया!" : "Coupon applied successfully!");
+      } else {
+        toast.dismiss(toastId);
+        toast.error(isHindi ? "अमान्य कूपन कोड! यह कूपन मौजूद नहीं है।" : "Invalid coupon code! This coupon does not exist.");
+      }
+    } catch (e) {
+      toast.dismiss(toastId);
+      toast.error(isHindi ? "कूपन जांचने में समस्या आई!" : "Error applying coupon!");
+    }
+  };
+
+  const handleCheckoutClick = () => {
+    triggerHaptic();
+    if (!customerDetails) {
+      setIsProfileOpen(true);
+      toast.error(isHindi ? "कृपया पहले अपनी प्रोफाइल कस्टमाइज़ करें!" : "Please set up your profile first!");
+      return;
+    }
+    if (paymentMethod === "upi") {
+      setIsUpiPopupOpen(true);
+    } else {
+      sendWhatsAppOrder();
+    }
+  };
+
+  const handleGiftPoints = async (e: React.FormEvent) => {
+    e.preventDefault();
+    triggerHaptic();
+    
+    if (!customerDetails?.phone) {
+      toast.error(isHindi ? "कृपया पहले अपनी प्रोफाइल कस्टमाइज़ करें!" : "Please set up your profile first!");
+      return;
+    }
+    
+    const senderPhoneClean = customerDetails.phone.replace("+91", "").trim();
+    const receiverPhoneClean = giftPhone.trim();
+    const pointsToGift = Number(giftPointsAmount);
+
+    if (!receiverPhoneClean || receiverPhoneClean.length !== 10) {
+      toast.error(isHindi ? "गिफ्ट प्राप्तकर्ता का नंबर 10 अंकों का होना चाहिए!" : "Friend's number must be 10 digits!");
+      return;
+    }
+    if (senderPhoneClean === receiverPhoneClean) {
+      toast.error(isHindi ? "आप स्वयं को पॉइंट्स गिफ्ट नहीं कर सकते!" : "You cannot gift points to yourself!");
+      return;
+    }
+    if (isNaN(pointsToGift) || pointsToGift <= 0) {
+      toast.error(isHindi ? "कृपया सही पॉइंट्स संख्या दर्ज करें!" : "Please enter a valid amount of points!");
+      return;
+    }
+    if (customerPoints < pointsToGift) {
+      toast.error(isHindi ? "आपके पास पर्याप्त पॉइंट्स उपलब्ध नहीं हैं!" : "You do not have enough points!");
+      return;
+    }
+    if (giftSenderPin !== customerDetails.pin) {
+      toast.error(isHindi ? "सुरक्षा पिन गलत है!" : "Invalid security PIN!");
+      return;
+    }
+
+    setIsGiftingLoading(true);
+    const toastId = toast.loading(isHindi ? "पॉइंट्स ट्रांसफर किए जा रहे हैं..." : "Transferring points...");
+
+    try {
+      const receiverDocRef = doc(db, "customer_points", receiverPhoneClean);
+      const receiverSnap = await getDoc(receiverDocRef);
+
+      if (!receiverSnap.exists()) {
+        toast.dismiss(toastId);
+        toast.error(isHindi ? "गिफ्ट पाने वाले का नंबर पंजीकृत नहीं है!" : "The receiver's number is not registered!");
+        setIsGiftingLoading(false);
+        return;
+      }
+
+      const senderDocRef = doc(db, "customer_points", senderPhoneClean);
+
+      await runTransaction(db, async (transaction) => {
+        const senderSnap = await transaction.get(senderDocRef);
+        if (!senderSnap.exists()) throw new Error("Sender records not found.");
+        
+        const currentSenderPoints = senderSnap.data().points || 0;
+        if (currentSenderPoints < pointsToGift) throw new Error("Insufficient points balance.");
+
+        transaction.update(senderDocRef, { points: increment(-pointsToGift) });
+        transaction.update(receiverDocRef, { points: increment(pointsToGift) });
+      });
+
+      await addDoc(collection(db, "customer_points", senderPhoneClean, "history"), {
+        type: 'redeem',
+        points: pointsToGift,
+        description: `Gifted points to ${receiverPhoneClean} 🎁`,
+        timestamp: new Date()
+      });
+
+      await addDoc(collection(db, "customer_points", receiverPhoneClean, "history"), {
+        type: 'earn',
+        points: pointsToGift,
+        description: `Received points from ${senderPhoneClean} 🎁`,
+        timestamp: new Date()
+      });
+
+      setCustomerPoints(prev => prev - pointsToGift);
+      toast.dismiss(toastId);
+      toast.success(isHindi ? "पॉइंट्स गिफ्ट कर दिए गए!" : "Points gifted successfully!");
+      
+      setIsGiftModalOpen(false);
+      setGiftPhone("");
+      setGiftPointsAmount("");
+      setGiftSenderPin("");
+    } catch (err: any) {
+      toast.dismiss(toastId);
+      toast.error(isHindi ? `स्थानांतरण विफल: ${err.message}` : `Transfer failed: ${err.message}`);
+    } finally {
+      setIsGiftingLoading(false);
+    }
+  };
+
   const sendWhatsAppOrder = async () => {
     triggerHaptic();
     
     if (isSubmittingOrder) return;
     setIsSubmittingOrder(true);
 
+    // --- ENTIRE LOGIC IN TRY-CATCH-FINALLY TO INSURE SUBMITTING ALWAYS RESETS ---
     try {
-      if (!customerDetails || !customerDetails.name || !customerDetails.phone || customerDetails.phone.trim().length < 10) { 
+      if (!customerDetails) { 
         setIsProfileOpen(true); 
-        toast.error(isHindi 
-          ? "ऑर्डर करने के लिए पहले अपनी प्रोफाइल (नाम और मोबाइल नंबर) बनाएं! 👤" 
-          : "Please complete your profile (Name and Mobile Number) to place your order! 👤"
-        );
-        setIsSubmittingOrder(false);
+        toast.error("ऑर्डर करने के लिए पहले अपनी प्रोफाइल बनाएं! 👤");
         return; 
       }
 
       if (fulfillmentType === "delivery" && (!address || address.trim().length < 10)) {
-        setIsSubmittingOrder(false);
         return toast.error("Please enter full address!");
       }
 
       if (fulfillmentType === "table" && !tableNumber) {
-        setIsSubmittingOrder(false);
         return toast.error(isHindi ? "कृपया टेबल चुनें!" : "Please select a table!");
       }
 
       if (paymentMethod === "upi" && !paymentScreenshot) {
-        setIsSubmittingOrder(false);
         return toast.error(isHindi ? "कृपया आगे बढ़ने से पहले यूपीआई भुगतान का स्क्रीनशॉट अपलोड करें!" : "Please upload UPI payment screenshot!");
       }
 
@@ -982,7 +922,7 @@ export default function BbCafeHome() {
       const pointsEarned = Math.floor(finalTotal / 100);
       const totalPointsCost = cart.reduce((acc: number, i: any) => acc + (i.pointsCost || 0), 0);
 
-      // --- SCREENSHOT UPLOAD TO FIREBASE STORAGE ---
+      // --- SCREENSHOT UPLOAD TO FIREBASE STORAGE (WITH 3.5s STRICT TIMEOUT) ---
       let screenshotUrl = "";
       if (paymentMethod === "upi" && paymentScreenshot) {
         const toastId = toast.loading(isHindi ? "स्क्रीनशॉट अपलोड हो रहा है..." : "Uploading screenshot...");
@@ -995,7 +935,7 @@ export default function BbCafeHome() {
           });
           
           const timeoutPromise = new Promise<string>((_, reject) => 
-            setTimeout(() => reject(new Error("Timeout")), 10000)
+            setTimeout(() => reject(new Error("Timeout")), 3500)
           );
 
           screenshotUrl = await Promise.race([uploadPromise, timeoutPromise]);
@@ -1010,7 +950,7 @@ export default function BbCafeHome() {
         billNumber, tokenNumber, deliveryPin, customerName: customerDetails.name, customerPhone: customerDetails.phone,
         address: fulfillmentType === "delivery" ? address : `Mode: ${fulfillmentType.toUpperCase()} ${fulfillmentType === 'table' ? `Table: ${tableNumber}` : ''}`, 
         items: cart, subtotal, discount: couponDiscount, total: finalTotal, timestamp: new Date(), status: 'pending',
-        deliveryArea: fulfillmentType === "delivery" ? selectedArea.name : fulfillmentType.toUpperCase(), ketchupAddon, oreganoAddon, chiliFlakesAddon,
+        deliveryArea: fulfillmentType === "delivery" ? selectedArea.name : fulfillmentType.toUpperCase(), noCutlery, ketchupAddon, oreganoAddon, chiliFlakesAddon,
         fulfillmentType, tableNumber: fulfillmentType === "table" ? tableNumber : "", paymentMethod,
         paymentScreenshot: paymentScreenshot || "",
         screenshotUrl: screenshotUrl || ""
@@ -1045,7 +985,6 @@ export default function BbCafeHome() {
       setPastOrders(updatedPastOrders);
       localStorage.setItem('bb_past_orders', JSON.stringify(updatedPastOrders));
       setLastPlacedOrder(orderObj);
-      setLiveOrder(orderObj); // नया ऑर्डर आते ही ग्राहक की स्क्रीन पर तुरंत लाइव ट्रैकर दिखाएं
 
       let itemsText = "";
       cart.forEach((i: any) => {
@@ -1058,13 +997,16 @@ export default function BbCafeHome() {
       if (ketchupAddon) itemsText += `• Extra Tomato Ketchup x1 - ₹10\n`;
       if (oreganoAddon) itemsText += `• Extra Oregano x1 - ₹10\n`;
       if (chiliFlakesAddon) itemsText += `• Extra Chili Flakes x1 - ₹10\n`;
+      if (noCutlery) itemsText += `🌱 (Eco-Friendly: No plastic cutlery requested)\n`;
 
       const refCode = getReferralCode();
+      
       const modeLabel = fulfillmentType === "delivery" ? `Delivery (${selectedArea.name})` : fulfillmentType === "pickup" ? "Self-Pickup 🛍️" : `Dine-In (Table: ${tableNumber}) 🍽️`;
       const payModeLabel = paymentMethod === "cod" 
         ? (fulfillmentType === "delivery" ? "Cash on Delivery (COD) 💵" : "Cash at Counter 💵")
         : "UPI Online Payment 📱";
 
+      // --- CONSTRUCT DYNAMIC MESSAGES ---
       let msg = `🔥 *BAM BAM CAFE - NEW ORDER*\n\n`;
       msg += `*Bill No:* #${formattedBillStr}\n`;
       msg += `*Token No:* #${tokenNumber}\n`;
@@ -1076,10 +1018,6 @@ export default function BbCafeHome() {
         msg += `*Address:* ${address}\n`;
       }
       msg += `*Payment Method:* ${payModeLabel}\n\n`;
-
-      if (paymentMethod === "upi") {
-        msg += `⚠️ *IMPORTANT STATUS:* UPI Payment Selected. Screenshot uploaded to cafe. Please tap SEND to deliver details to WhatsApp directly for instant verification!\n\n`;
-      }
 
       msg += `*ITEMS:*\n${itemsText}\n`;
       msg += `*Subtotal:* ₹${subtotal + addOnsCost}\n`;
@@ -1125,6 +1063,7 @@ export default function BbCafeHome() {
         setKetchupAddon(false);
         setOreganoAddon(false);
         setChiliFlakesAddon(false);
+        setNoCutlery(false);
         setAppliedCoupon(null); 
         setEnteredCoupon(""); 
         setIsCartOpen(false);
@@ -1136,64 +1075,11 @@ export default function BbCafeHome() {
       console.error("Critical submission error caught:", error);
       toast.error(isHindi ? "ऑर्डर जमा करने में समस्या आई! दोबारा कोशिश करें।" : "Error submitting order. Please try again.");
     } finally {
-      setIsSubmittingOrder(false);
+      setIsSubmittingOrder(false); // ALWAYS RESET SUBMITTING STATE
     }
   };
 
-  const handleCheckoutClick = () => {
-    triggerHaptic();
-    if (!customerDetails || !customerDetails.name || !customerDetails.phone || customerDetails.phone.trim().length < 10) {
-      setIsProfileOpen(true);
-      toast.error(isHindi 
-        ? "ऑर्डर करने के लिए पहले अपनी प्रोफाइल (नाम और मोबाइल नंबर) बनाएं! 👤" 
-        : "Please complete your profile (Name and Mobile Number) first to place an order! 👤"
-      );
-      return;
-    }
-    if (paymentMethod === "upi") {
-      setIsUpiPopupOpen(true);
-    } else {
-      sendWhatsAppOrder();
-    }
-  };
-
-  const handleApplyCoupon = async () => {
-    triggerHaptic();
-    if (!enteredCoupon.trim()) {
-      toast.error(isHindi ? "कृपया कूपन कोड दर्ज करें!" : "Please enter a coupon code!");
-      return;
-    }
-    const codeUpper = enteredCoupon.trim().toUpperCase();
-    const toastId = toast.loading(isHindi ? "कूपन जाँचा जा रहा है..." : "Validating coupon...");
-    try {
-      const couponRef = doc(db, "coupons", codeUpper);
-      const couponSnap = await getDoc(couponRef);
-      if (couponSnap.exists()) {
-        const data = couponSnap.data();
-        const subtotal = getCartSubtotal();
-        if (subtotal < (data.minOrder || 0)) {
-          toast.dismiss(toastId);
-          toast.error(isHindi ? `न्यूनतम ऑर्डर राशि ₹${data.minOrder} होनी चाहिए!` : `Minimum order must be ₹${data.minOrder}!`);
-          return;
-        }
-        
-        setAppliedCoupon({
-          code: codeUpper,
-          discountValue: data.discount !== undefined ? data.discount : (data.discountValue !== undefined ? data.discountValue : 0),
-          type: data.type || data.discountType || 'flat'
-        });
-        toast.dismiss(toastId);
-        toast.success(isHindi ? "कूपन सफलतापूर्वक लागू किया गया!" : "Coupon applied successfully!");
-      } else {
-        toast.dismiss(toastId);
-        toast.error(isHindi ? "अमान्य कूपन कोड! यह कूपन मौजूद नहीं है।" : "Invalid coupon code! This coupon does not exist.");
-      }
-    } catch (e) {
-      toast.dismiss(toastId);
-      toast.error(isHindi ? "कूपन जांचने में समस्या आई!" : "Error applying coupon!");
-    }
-  };
-
+  // --- HTML5 CANVAS BASED REAL-TIME COMPRESSION (SOLVES 1MB FIRESTORE CRASH) ---
   const handleScreenshotChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     triggerHaptic();
     const file = e.target.files?.[0];
@@ -1236,7 +1122,7 @@ export default function BbCafeHome() {
       };
       img.onerror = () => {
         setIsCompressing(false);
-        toast.error("Error compressing screen");
+        toast.error("Error compression screen");
       };
       img.src = event.target?.result as string;
     };
@@ -1248,187 +1134,320 @@ export default function BbCafeHome() {
     reader.readAsDataURL(file);
   };
 
-  // --- 1. ऑटोमैटिक रेफरल डिटेक्शन (URL Detect) ---
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      const refParam = params.get('ref');
-      if (refParam) {
-        setTempRefCode(refParam.toUpperCase().trim());
-        const saved = localStorage.getItem('bb_cafe_customer');
-        if (!saved) {
-          setIsProfileOpen(true);
-          toast.success(isHindi 
-            ? `रेफरल कोड "${refParam}" अपने आप लागू हो गया है! बोनस 5 पॉइंट्स पाने के लिए प्रोफाइल सहेजें।` 
-            : `Referral code "${refParam}" applied automatically! Save your profile to claim 5 points.`
-          );
-        }
-      }
+  const handleDetectLocation = () => {
+    triggerHaptic();
+    if (typeof window === "undefined" || !navigator.geolocation) {
+      toast.error(isHindi ? "जियोलोकेशन आपके डिवाइस पर समर्थित नहीं है।" : "Geolocation is not supported by your device.");
+      return;
     }
-  }, [isHindi]);
 
-  // --- 2. प्रोफ़ाइल ऑटो-प्रॉम्प्ट (Auto-prompt on Mount for New Users) ---
-  useEffect(() => {
-    if (mounted) {
-      const saved = localStorage.getItem('bb_cafe_customer');
-      if (!saved) {
-        const timer = setTimeout(() => {
-          setIsProfileOpen(true);
-          toast.success(isHindi 
-            ? "ऑर्डर करने और 5 पॉइंट्स वेलकम बोनस पाने के लिए पहले अपना नाम और नंबर भरें! 👤" 
-            : "To order and get 5 points welcome bonus, please enter your Name & Number first! 👤"
-          );
-        }, 1500);
-        return () => clearTimeout(timer);
-      }
-    }
-  }, [mounted, isHindi]);
+    const toastId = toast.loading(isHindi ? "लोकेशन खोजी जा रही है..." : "Detecting live location...");
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        const distance = calculateDistanceInKm(latitude, longitude, storeCoordinates.lat, storeCoordinates.lng);
+        setDistanceKm(Number(distance.toFixed(2)));
 
-  // --- 3. PWA सर्विस वर्कर रजिस्ट्रेशन ---
-  useEffect(() => {
-    if ('serviceWorker' in navigator && typeof window !== 'undefined') {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js').then((reg) => {
-          console.log('Service worker scope: ', reg.scope);
-        }).catch((err) => {
-          console.warn('Service worker registration failed: ', err);
+        setAddress(isHindi ? `My GPS Location: https://www.google.com/maps?q=${latitude.toFixed(6)},${longitude.toFixed(6)}` : `My GPS Location: https://www.google.com/maps?q=${latitude.toFixed(6)},${longitude.toFixed(6)}`);
+        toast.dismiss(toastId);
+        toast.success(isHindi ? "लोकेशन सफलतापूर्वक डिटेक्ट की गई!" : "Location successfully detected!");
+      },
+      () => {
+        toast.dismiss(toastId);
+        toast.error(isHindi ? "लोकेशन एक्सेस करने में असमर्थ।" : "Unable to retrieve your location.");
+      },
+      { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+    );
+  };
+
+  const handleShareApp = async () => {
+    triggerHaptic();
+    const shareText = isHindi 
+      ? `बम बम कैफ़े से स्वादिष्ट भोजन आर्डर करें! मेरा इनवाइट कोड इस्तेमाल करें: ${getReferralCode()} 🍕` 
+      : `Order delicious food from Bum Bum Cafe! Use my invite code: ${getReferralCode()} 🍕`;
+    
+    const shareUrl = typeof window !== 'undefined' ? window.location.href : 'https://bbcafe.in';
+
+    const performClipboardCopy = () => {
+      navigator.clipboard.writeText(`${shareText} ${shareUrl}`);
+      toast.success(isHindi ? "शेयर लिंक क्लिपबोर्ड पर कॉपी हो गया!" : "Share link copied to clipboard!");
+      updateShareCount();
+    };
+
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'Bum Bum Cafe',
+          text: shareText,
+          url: shareUrl,
         });
+        updateShareCount();
+      } catch (err) {
+        performClipboardCopy();
+      }
+    } else {
+      performClipboardCopy();
+    }
+  };
+
+  const updateShareCount = async () => {
+    const nextCount = shareCount + 1;
+    setShareCount(nextCount);
+    if (nextCount % 5 === 0 && customerDetails?.phone) {
+      const phoneClean = customerDetails.phone.replace("+91", "").trim();
+      const userDocRef = doc(db, "customer_points", phoneClean);
+      try {
+        await setDoc(userDocRef, {
+          points: increment(1)
+        }, { merge: true });
+        
+        await addDoc(collection(db, "customer_points", phoneClean, "history"), {
+          type: 'earn',
+          points: 1,
+          description: `Shared app 5 times! 🎁`,
+          timestamp: new Date()
+        });
+        setCustomerPoints(p => p + 1);
+        toast.success(isHindi ? "मुफ़्त +1 पॉइंट आपके अकाउंट में जोड़ा गया!" : "Free +1 point added to your account!");
+      } catch (err) {
+        console.error(err);
+      }
+    }
+  };
+
+  const handleCustomerRedeem = (ruleId: string, rewardName: string, pointsCost: number) => {
+    triggerHaptic();
+    if (!customerDetails?.phone) {
+      toast.error(isHindi ? "कृपया पहले प्रोफाइल बनाएं!" : "Please create profile first!");
+      return;
+    }
+    
+    addItem({
+      id: ruleId,
+      name: rewardName,
+      price: 0,
+      quantity: 1,
+      isReward: true,
+      pointsCost: pointsCost,
+      category: "Special"
+    });
+    
+    toast.success(isHindi ? `${rewardName} आपके कार्ट में मुफ़्त जोड़ा गया!` : `${rewardName} added to your cart for free!`);
+  };
+
+  const handleAddDiyPizzaToCart = () => {
+    triggerHaptic();
+    if (calculatedDiyPizzaPrice <= 0) {
+      toast.error(isHindi ? "कृपया कोई आकार और सामग्री चुनें!" : "Please choose a size and toppings!");
+      return;
+    }
+
+    const toppingsList: string[] = [];
+    Object.entries(diyVegSelection).forEach(([v, selected]) => { if (selected) toppingsList.push(v); });
+    Object.entries(diyPremiumToppings).forEach(([t, selected]) => { if (selected) toppingsList.push(t); });
+    
+    const description = `${diySize.toUpperCase()} Base, Sauce: ${diySauce ? 'Yes' : 'No'}, Cheese: ${diyMozzarella ? 'Yes' : 'No'}, Toppings: ${toppingsList.join(', ') || 'None'}`;
+
+    addItem({
+      id: `diy-pizza-${Date.now()}`,
+      name: isHindi ? `डीआईवाई पिज्जा (${diySize})` : `DIY Pizza (${diySize})`,
+      price: calculatedDiyPizzaPrice,
+      quantity: 1,
+      note: diyChefNote || description,
+      category: "DIY Pizza"
+    });
+
+    setDiySize("small");
+    setDiySauce(true);
+    setDiyMozzarella(true);
+    setDiyVegSelection({ onion: false, tomato: false, capsicum: false, corn: false });
+    setDiyPremiumToppings({ black_olive: false, jalapeno: false, red_peprica: false, paneer: false, mushroom: false });
+    setDiyChefNote("");
+
+    toast.success(isHindi ? "कास्ट पिज्जा कार्ट में जोड़ा गया!" : "Your custom Pizza has been added to cart!");
+  };
+
+  const handleNormalPizzaAdd = () => {
+    triggerHaptic();
+    if (!normalPizzaSize) {
+      toast.error(isHindi ? "कृपया साइज चुनें!" : "Please select size!");
+      return;
+    }
+
+    let finalPrice = normalPizzaPrice;
+    const selectedAddons: string[] = [];
+    
+    Object.entries(normalPizzaAddons).forEach(([addon, isSelected]) => {
+      if (isSelected) {
+        const cost = PIZZA_ADDONS[normalPizzaSize.toLowerCase()]?.[addon] || 0;
+        finalPrice += cost;
+        selectedAddons.push(addon);
+      }
+    });
+
+    const noteParts = [];
+    if (selectedAddons.length > 0) noteParts.push(`Add-ons: ${selectedAddons.join(', ')}`);
+    if (chefNote) noteParts.push(`Note: ${chefNote}`);
+
+    addItem({
+      id: `${selectedProduct.id}-${normalPizzaSize.toLowerCase()}`,
+      name: `${selectedProduct.name} (${normalPizzaSize.toUpperCase()})`,
+      price: finalPrice,
+      quantity: 1,
+      note: noteParts.join(' | '),
+      category: selectedProduct.category
+    });
+
+    setSelectedProduct(null);
+    setNormalPizzaSize("");
+    setNormalPizzaPrice(0);
+    setNormalPizzaAddons({});
+    setChefNote("");
+
+    toast.success(isHindi ? "कस्टमाइज्ड पिज्जा कार्ट में जोड़ा गया!" : "Customized Pizza added to cart!");
+  };
+
+  const handleReelEnded = () => {
+    triggerHaptic();
+    setActiveStory(null);
+  };
+
+  const handleQuickAddFromStory = (title: string, price: number) => {
+    triggerHaptic();
+    const matchedItem = menu.find(item => item.name?.toLowerCase() === title?.toLowerCase());
+    if (matchedItem) {
+      addItem(matchedItem);
+    } else {
+      addItem({
+        id: `story-${title.replace(/\s+/g, '-').toLowerCase()}`,
+        name: title,
+        price: price,
+        quantity: 1,
+        category: "Fast Food"
       });
     }
-  }, []);
+    setActiveStory(null);
+    toast.success(isHindi ? "आइटम कार्ट में जोड़ा गया!" : "Item added to cart!");
+  };
 
-  // --- 4. रियल-टाइम कस्टमर पॉइंट्स, पॉइंट्स हिस्ट्री और पास्ट आर्डर्स सिंकिंग ---
+  // --- Real-time Watchers ---
   useEffect(() => {
     if (!customerDetails?.phone) {
       setCustomerPoints(0);
       setPointsHistory([]);
-      return;
-    }
-
-    const phoneClean = customerDetails.phone.replace("+91", "").trim();
-
-    const pointsDocRef = doc(db, "customer_points", phoneClean);
-    const unsubscribePoints = onSnapshot(pointsDocRef, (docSnap) => {
-      if (docSnap.exists()) {
-        setCustomerPoints(docSnap.data().points || 0);
-      } else {
-        setCustomerPoints(0);
-      }
-    }, (err) => {
-      console.warn("Error subscribing to customer points:", err);
-    });
-
-    const historyCollRef = collection(db, "customer_points", phoneClean, "history");
-    const historyQuery = query(historyCollRef, orderBy("timestamp", "desc"));
-    const unsubscribeHistory = onSnapshot(historyQuery, (querySnap) => {
-      const list = querySnap.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        timestamp: doc.data().timestamp?.toDate ? doc.data().timestamp.toDate() : doc.data().timestamp
-      }));
-      setPointsHistory(list);
-    }, (err) => {
-      console.warn("Error subscribing to points history:", err);
-    });
-
-    const ordersRef = collection(db, "orders");
-    const ordersQuery = query(
-      ordersRef,
-      where("customerPhone", "==", customerDetails.phone),
-      orderBy("timestamp", "desc")
-    );
-    const unsubscribeOrders = onSnapshot(ordersQuery, (querySnap) => {
-      const list = querySnap.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        timestamp: doc.data().timestamp?.toDate ? doc.data().timestamp.toDate() : doc.data().timestamp
-      }));
-      setPastOrders(list);
-      localStorage.setItem('bb_past_orders', JSON.stringify(list));
-    }, (err) => {
-      console.warn("Error subscribing to past orders:", err);
-    });
-
-    return () => {
-      unsubscribePoints();
-      unsubscribeHistory();
-      unsubscribeOrders();
-    };
-  }, [customerDetails]);
-
-  // --- 5. ग्राहकों के एक्टिव/सक्रिय आर्डर्स की लाइव ट्रैकिंग ---
-  useEffect(() => {
-    if (!customerDetails?.phone) {
       setLiveOrder(null);
       return;
     }
+    
+    const phoneClean = customerDetails.phone.replace("+91", "").trim();
+    
+    const unsubPoints = onSnapshot(doc(db, "customer_points", phoneClean), (snap) => {
+      if (snap.exists()) {
+        setCustomerPoints(snap.data().points || 0);
+      }
+    }, (error) => console.warn("Points live check subscription bypassed:", error));
 
-    const ordersRef = collection(db, "orders");
-    const activeOrdersQuery = query(
-      ordersRef,
-      where("customerPhone", "==", customerDetails.phone),
-      where("status", "in", ["pending", "preparing", "out_for_delivery", "preparing_food", "ready_for_pickup"])
+    const unsubHistory = onSnapshot(
+      query(collection(db, "customer_points", phoneClean, "history"), orderBy("timestamp", "desc")),
+      (snap) => {
+        setPointsHistory(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      },
+      (error) => console.warn("Points history subscription bypassed:", error)
     );
 
-    const unsubscribeActiveOrder = onSnapshot(activeOrdersQuery, (querySnap) => {
-      if (!querySnap.empty) {
-        const sortedActiveDocs = querySnap.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data(),
-          timestamp: doc.data().timestamp?.toDate ? doc.data().timestamp.toDate() : doc.data().timestamp
-        })).sort((a: any, b: any) => b.timestamp - a.timestamp);
-        
-        setLiveOrder(sortedActiveDocs[0]);
-      } else {
-        setLiveOrder(null);
-      }
-    }, (err) => {
-      console.warn("Error listening to active orders:", err);
-    });
+    const unsubLive = onSnapshot(
+      query(
+        collection(db, "orders"),
+        where("customerPhone", "==", customerDetails.phone),
+        orderBy("timestamp", "desc"),
+        limit(1)
+      ),
+      (snap) => {
+        if (!snap.empty) {
+          const latestOrder = { id: snap.docs[0].id, ...snap.docs[0].data() } as any;
+          const dismissedRejected = JSON.parse(localStorage.getItem('bb_dismissed_rejected_orders') || '[]');
+          if (latestOrder.status !== 'completed' && !dismissedRejected.includes(latestOrder.id)) {
+            setLiveOrder(latestOrder);
+          } else {
+            setLiveOrder(null);
+          }
+        } else {
+          setLiveOrder(null);
+        }
+      },
+      (error) => console.warn("Live order subscription bypassed (index may be building):", error)
+    );
 
-    return () => unsubscribeActiveOrder();
-  }, [customerDetails]);
+    return () => {
+      unsubPoints();
+      unsubHistory();
+      unsubLive();
+    };
+  }, [customerDetails?.phone]);
 
-  // --- Search Input Debounce Effect ---
+  // --- Search Debouncing & Hinglish Optimizer ---
   useEffect(() => {
-    const handler = setTimeout(() => {
-      setDebouncedSearchQuery(searchQuery);
+    const timer = setTimeout(() => {
+      const cleanQuery = searchQuery.toLowerCase().trim();
+      const translatedWords = cleanQuery.split(/\s+/).map(word => HINGLISH_DICT[word] || word);
+      setDebouncedSearchQuery(translatedWords.join(" "));
     }, 300);
-    return () => clearTimeout(handler);
+    return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  // --- Auto-advance Banners Effect ---
+  // --- Banner Cycle Auto-Carousel Timer ---
   useEffect(() => {
     if (banners.length <= 1) return;
     const interval = setInterval(() => {
-      setBannerIndex(prev => (prev + 1) % banners.length);
-    }, 5000);
+      setBannerIndex((prev) => (prev + 1) % banners.length);
+    }, 4000);
     return () => clearInterval(interval);
   }, [banners]);
 
-  // --- Network Event Listeners (Online/Offline) ---
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const handleOnline = () => setIsOnline(true);
-    const handleOffline = () => setIsOnline(false);
+    const fakeProofs = [
+      { text: "Ramesh from Mohandra recently ordered Special Thali! 🍛" },
+      { text: "Pooja just added Paneer Special Pizza to her cart! 🍕" },
+      { text: "5 people are looking at DIY Pizza right now! 🔥" },
+      { text: "Amit rated Bum Bum Cafe 5 stars! ⭐⭐⭐⭐⭐" },
+      { text: "Sanjay from Mohandra Town just placed an order! 🛵" },
+      { text: "Anjali is customizing her DIY Pizza! 🍕" }
+    ];
+    setSocialProofs(fakeProofs);
     
-    setIsOnline(navigator.onLine);
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-    
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
+    const interval = setInterval(() => {
+      const randomIndex = Math.floor(Math.random() * fakeProofs.length);
+      setSocialAlertIndex(randomIndex);
+      setShowSocialAlert(true);
+      setTimeout(() => setShowSocialAlert(false), 5000);
+    }, 24000);
+
+    return () => clearInterval(interval);
   }, []);
 
-  // --- Set Hydrated / Mounted State ---
+  // --- INITIAL MOUNT & SWR BACKGROUND DATABASE SYNCHRONIZER ---
   useEffect(() => {
     setMounted(true);
-  }, []);
 
-  // --- BACKGROUND OFFLINE / CACHE HANDLERS ---
-  useEffect(() => {
+    const handleBeforeInstallPrompt = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      const dismissed = localStorage.getItem('bb_app_installed_or_dismissed');
+      if (!dismissed) {
+        setShowInstallBanner(true);
+      }
+    };
+
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    if (typeof window !== "undefined") {
+      setIsOnline(window.navigator.onLine);
+      window.addEventListener("online", handleOnline);
+      window.addEventListener("offline", handleOffline);
+      window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+    }
+
     try {
       const cachedMenu = localStorage.getItem('bb_cached_menu');
       if (cachedMenu) setMenu(JSON.parse(cachedMenu));
@@ -1447,6 +1466,9 @@ export default function BbCafeHome() {
 
       const cachedReels = localStorage.getItem('bb_cached_reels');
       if (cachedReels) setStories(JSON.parse(cachedReels));
+
+      const cachedReviews = localStorage.getItem('bb_cached_reviews');
+      if (cachedReviews) setReviews(JSON.parse(cachedReviews));
 
       const savedDetails = localStorage.getItem('bb_cafe_customer');
       if (savedDetails) {
@@ -1471,80 +1493,57 @@ export default function BbCafeHome() {
     const fetchFreshDbData = async () => {
       setMenuLoading(true);
       try {
-        try {
-          const storeSnap = await getDoc(doc(db, "settings", "store"));
-          if (storeSnap.exists()) {
-            const storeData = storeSnap.data();
-            setStoreOpen(storeData.isOpen);
-            setIsBannerEnabled(storeData.isBannerEnabled ?? storeData.showPromoBanner ?? true);
-            setIsInlineBannerEnabled(storeData.isInlineBannerEnabled ?? storeData.showInlinePromo ?? true);
-            if (storeData.whatsappNumber) setWhatsappNumber(storeData.whatsappNumber);
-            if (storeData.upiId) setUpiId(storeData.upiId);
-            if (storeData.latitude && storeData.longitude) {
-              setStoreCoordinates({ lat: Number(storeData.latitude), lng: Number(storeData.longitude) });
-            }
-            if (storeData.timingHindi) setStoreTimingHindi(storeData.timingHindi);
-            if (storeData.timingEnglish) setStoreTimingEnglish(storeData.timingEnglish);
-            if (storeData.closingMinutesLeft !== undefined) setClosingMinutesLeft(storeData.closingMinutesLeft);
+        const storeSnap = await getDoc(doc(db, "settings", "store"));
+        if (storeSnap.exists()) {
+          const storeData = storeSnap.data();
+          setStoreOpen(storeData.isOpen);
+          setIsBannerEnabled(storeData.isBannerEnabled ?? storeData.showPromoBanner ?? true);
+          setIsInlineBannerEnabled(storeData.isInlineBannerEnabled ?? storeData.showInlinePromo ?? true);
+          if (storeData.whatsappNumber) setWhatsappNumber(storeData.whatsappNumber);
+          if (storeData.upiId) setUpiId(storeData.upiId);
+          if (storeData.latitude && storeData.longitude) {
+            setStoreCoordinates({ lat: Number(storeData.latitude), lng: Number(storeData.longitude) });
           }
-        } catch (e) {
-          console.warn("Error fetching store settings:", e);
+          if (storeData.timingHindi) setStoreTimingHindi(storeData.timingHindi);
+          if (storeData.timingEnglish) setStoreTimingEnglish(storeData.timingEnglish);
+          if (storeData.closingMinutesLeft !== undefined) setClosingMinutesLeft(storeData.closingMinutesLeft);
         }
 
-        try {
-          const productsSnap = await getDocs(collection(db, "products"));
-          const items = productsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter((i: any) => i.isVisible !== false);
-          setMenu(shuffleArray(items));
-          localStorage.setItem('bb_cached_menu', JSON.stringify(items));
-        } catch (e) {
-          console.error("Error fetching products:", e);
-        }
+        const productsSnap = await getDocs(collection(db, "products"));
+        const items = productsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter((i: any) => i.isVisible !== false);
+        setMenu(shuffleArray(items));
+        localStorage.setItem('bb_cached_menu', JSON.stringify(items));
 
-        try {
-          const catsSnap = await getDocs(collection(db, "categories"));
-          const cats = catsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-          setDbCategories(cats);
-          localStorage.setItem('bb_cached_categories', JSON.stringify(cats));
-        } catch (e) {
-          console.warn("Error fetching categories:", e);
-        }
+        const catsSnap = await getDocs(collection(db, "categories"));
+        const cats = catsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+        setDbCategories(cats);
+        localStorage.setItem('bb_cached_categories', JSON.stringify(cats));
 
-        try {
-          const bannersSnap = await getDocs(collection(db, "banners"));
-          const banData = bannersSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-          setBanners(banData);
-          localStorage.setItem('bb_cached_banners', JSON.stringify(banData));
-        } catch (e) {
-          console.warn("Error fetching banners:", e);
-        }
+        const bannersSnap = await getDocs(collection(db, "banners"));
+        const banData = bannersSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+        setBanners(banData);
+        localStorage.setItem('bb_cached_banners', JSON.stringify(banData));
 
-        try {
-          const reelsSnap = await getDocs(collection(db, "reels"));
-          const reelData = reelsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-          setStories(reelData);
-          localStorage.setItem('bb_cached_reels', JSON.stringify(reelData));
-        } catch (e) {
-          console.warn("Error fetching reels:", e);
-        }
+        const reelsSnap = await getDocs(collection(db, "reels"));
+        const reelData = reelsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+        setStories(reelData);
+        localStorage.setItem('bb_cached_reels', JSON.stringify(reelData));
 
-        try {
-          const rulesSnap = await getDocs(collection(db, "loyalty_rules"));
-          const ruleData = rulesSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-          setLoyaltyRules(ruleData);
-          localStorage.setItem('bb_cached_loyalty_rules', JSON.stringify(ruleData));
-        } catch (e) {
-          console.warn("Error fetching loyalty rules:", e);
-        }
+        const revsSnap = await getDocs(collection(db, "reviews"));
+        const revData = revsSnap.docs.map(d => ({ id: d.id, ...d.data() as any })).filter((r: any) => r.isApproved === true || r.isApproved === "approved" || r.approved === true);
+        setReviews(revData);
+        localStorage.setItem('bb_cached_reviews', JSON.stringify(revData));
 
-        try {
-          const socialSnap = await getDoc(doc(db, "settings", "social_counts"));
-          if (socialSnap.exists()) {
-            const data = socialSnap.data();
-            setSocialCounts(data);
-            localStorage.setItem('bb_cached_social_counts', JSON.stringify(data));
-          }
-        } catch (e) {
-          console.warn("Error fetching social counts:", e);
+        const rulesSnap = await getDocs(collection(db, "loyalty_rules"));
+        const ruleData = rulesSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+        setLoyaltyRules(ruleData);
+        localStorage.setItem('bb_cached_loyalty_rules', JSON.stringify(ruleData));
+
+        const socialSnap = await getDoc(doc(db, "settings", "social_counts"));
+        if (socialSnap.exists()) {
+          const data = socialSnap.data();
+          setSocialCounts(data);
+          localStorage.setItem('bb_cached_social_counts', JSON.stringify(data));
         }
 
       } catch (err) {
@@ -1555,7 +1554,24 @@ export default function BbCafeHome() {
     };
 
     fetchFreshDbData();
+
+    return () => { 
+      if (typeof window !== "undefined") {
+        window.removeEventListener("online", handleOnline);
+        window.removeEventListener("offline", handleOffline);
+        window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+      }
+    };
   }, []);
+
+  if (!mounted) {
+    return (
+      <div className="min-h-screen bg-neutral-950 flex flex-col items-center justify-center text-white">
+        <Loader2 className="animate-spin text-orange-500 mb-2" size={32} />
+        <span className="text-xs font-bold uppercase tracking-wider">Bum Bum Cafe Loading...</span>
+      </div>
+    );
+  }
 
   return (
     <div className="dark:bg-[#050505] bg-neutral-50 min-h-screen dark:text-white text-neutral-800 pb-32 font-sans relative overflow-x-clip transition-colors duration-200">
@@ -1590,6 +1606,58 @@ export default function BbCafeHome() {
           <span>आर्डर चेतावनी:  बम बम कैफ़े अगले {closingMinutesLeft} minute में बंद होने वाला है!  आर्डर जल्दी पूरा करें।</span>
         </div>
       )}
+
+      {/* Social Proof Toast Alert */}
+      <AnimatePresence>
+        {showSocialAlert && socialProofs.length > 0 && (
+          <motion.div 
+            initial={{ opacity: 0, y: 50, x: '-50%' }}
+            animate={{ opacity: 1, y: 0, x: '-50%' }}
+            exit={{ opacity: 0, y: 20, x: '-50%' }}
+            className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[100] bg-black/90 backdrop-blur-md border border-orange-500/30 text-white px-4 py-2.5 rounded-full shadow-2xl flex items-center gap-2 max-w-[90%] text-center"
+          >
+            <span className="text-sm">🔥</span>
+            <span className="text-[10px] font-black tracking-wide truncate text-white">{socialProofs[socialAlertIndex]?.text}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      
+      {confettiActive && (
+        <div className="fixed inset-0 pointer-events-none z-[999] overflow-hidden">
+          {Array.from({ length: 105 }).map((_, i) => (
+            <motion.div
+              key={i}
+              className="absolute w-2 h-2 rounded-full"
+              style={{
+                backgroundColor: ["#facc15", "#f97316", "#ef4444", "#3b82f6", "#10b981"][i % 5],
+                left: `${Math.random() * 100}%`,
+                top: `-10px`
+              }}
+              animate={{
+                y: [0, window.innerHeight],
+                x: [0, (Math.random() - 0.5) * 200],
+                rotate: [0, 360]
+              }}
+              transition={{
+                duration: 2 + Math.random() * 3,
+                ease: "easeOut",
+                repeat: Infinity
+              }}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Sticky Right Side Review Tab */}
+      <div className="fixed right-0 top-1/2 -translate-y-1/2 z-50">
+        <button 
+          onClick={() => { triggerHaptic(); setIsReviewFormOpen(true); }}
+          className="bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[10px] py-3 px-1.5 rounded-l-xl shadow-2xl border-l border-y border-white/20 flex flex-col items-center gap-1 transition-all active:translate-x-1"
+          style={{ writingMode: 'vertical-rl' }}
+        >
+          <span className="uppercase tracking-wider font-bold">{isHindi ? "समीक्षा" : "Reviews"}</span>
+        </button>
+      </div>
 
       {/* PREMIUM HERO HEADER */}
       <header className="relative pt-6 pb-4 px-4 overflow-hidden shadow-md flex flex-col justify-end min-h-[120px] bg-neutral-950 border-b dark:border-white/5 border-neutral-200">
@@ -1633,7 +1701,7 @@ export default function BbCafeHome() {
           {/* HINDI / ENGLISH LANGUAGE TOGGLE */}
           <button 
             onClick={() => { triggerHaptic(); setIsHindi(!isHindi); }}
-            className="px-3 py-2.5 bg-orange-50 hover:bg-orange-600 text-white rounded-xl text-[10px] font-black tracking-wider flex-shrink-0 transition-all active:scale-95 shadow flex items-center gap-1 min-w-[65px]"
+            className="px-3 py-2.5 bg-orange-500 hover:bg-orange-600 text-white rounded-xl text-[10px] font-black tracking-wider flex-shrink-0 transition-all active:scale-95 shadow flex items-center gap-1 min-w-[65px]"
           >
             <Globe size={12} />
             <span>{isHindi ? "English" : "हिंदी"}</span>
@@ -1768,7 +1836,7 @@ export default function BbCafeHome() {
         )}
 
         {/* MODULAR CATEGORY SLIDER */}
-        <CategorySliderAny 
+        <CategorySlider 
           isHindi={isHindi}
           selectedCategory={selectedCategory}
           setSelectedCategory={setSelectedCategory}
@@ -1788,188 +1856,228 @@ export default function BbCafeHome() {
           </div>
         )}
 
-        {/* STANDARD PRODUCTS */}
-        <div className="grid grid-cols-1 gap-4 pt-1 font-bold">
-          {menuLoading ? (
-            Array.from({ length: 3 }).map((_, idx) => (
-              <div key={idx} className="dark:bg-white/[0.02] bg-white rounded-2xl border dark:border-white/5 border-neutral-200 p-4 space-y-4 animate-pulse font-sans">
-                <div className="h-44 bg-neutral-300 dark:bg-neutral-800 rounded-xl w-full" />
-                <div className="space-y-2">
-                  <div className="h-4 bg-neutral-300 dark:bg-neutral-800 rounded w-1/2" />
-                  <div className="h-3 bg-neutral-300 dark:bg-neutral-800 rounded w-1/4" />
+        {/* MODULAR DIY PIZZA BUILDER WORKSPACE / STANDARD PRODUCTS */}
+        {selectedCategory === "DIY Pizza" ? (
+          <DiyPizzaBuilder 
+            isHindi={isHindi}
+            diySize={diySize}
+            setDiySize={setDiySize}
+            diySauce={diySauce}
+            setDiySauce={setDiySauce}
+            diyMozzarella={diyMozzarella}
+            setDiyMozzarella={setDiyMozzarella}
+            diyVegSelection={diyVegSelection}
+            setDiyVegSelection={setDiyVegSelection}
+            diyPremiumToppings={diyPremiumToppings}
+            setDiyPremiumToppings={setDiyPremiumToppings}
+            diyChefNote={diyChefNote}
+            setDiyChefNote={setDiyChefNote}
+            calculatedDiyPizzaPrice={calculatedDiyPizzaPrice}
+            DIY_PIZZA_PRICES={DIY_PIZZA_PRICES}
+            QUICK_INSTRUCTION_TAGS={QUICK_INSTRUCTION_TAGS}
+            quickAppendInstruction={quickAppendInstruction}
+            handleAddDiyPizzaToCart={handleAddDiyPizzaToCart}
+            triggerHaptic={triggerHaptic}
+            storeOpen={storeOpen}
+          />
+        ) : (
+          <div className="grid grid-cols-1 gap-4 pt-1 font-bold">
+            {menuLoading ? (
+              Array.from({ length: 3 }).map((_, idx) => (
+                <div key={idx} className="dark:bg-white/[0.02] bg-white rounded-2xl border dark:border-white/5 border-neutral-200 p-4 space-y-4 animate-pulse font-sans">
+                  <div className="h-44 bg-neutral-300 dark:bg-neutral-800 rounded-xl w-full" />
+                  <div className="space-y-2">
+                    <div className="h-4 bg-neutral-300 dark:bg-neutral-800 rounded w-1/2" />
+                    <div className="h-3 bg-neutral-300 dark:bg-neutral-800 rounded w-1/4" />
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <div className="h-6 bg-neutral-300 dark:bg-neutral-800 rounded w-1/6" />
+                    <div className="h-8 bg-neutral-300 dark:bg-neutral-800 rounded w-1/5" />
+                  </div>
                 </div>
-                <div className="flex justify-between items-center">
-                  <div className="h-6 bg-neutral-300 dark:bg-neutral-800 rounded w-1/6" />
-                  <div className="h-8 bg-neutral-300 dark:bg-neutral-800 rounded w-1/5" />
-                </div>
-              </div>
-            ))
-          ) : filteredMenu.length === 0 ? (
-            <p className="text-center text-neutral-600 dark:text-gray-400 py-8 text-xs font-bold uppercase font-sans">No items found...</p>
-          ) : (
-            filteredMenu.map((item: any, index: number) => {
-              const isItemAvailable = item.isAvailable !== false;
+              ))
+            ) : filteredMenu.length === 0 ? (
+              <p className="text-center text-neutral-600 dark:text-gray-400 py-8 text-xs font-bold uppercase font-sans">No items found...</p>
+            ) : (
+              filteredMenu.map((item: any, index: number) => {
+                const isItemAvailable = item.isAvailable !== false;
 
-              return (
-                <React.Fragment key={item.id}>
-                  <motion.div 
-                    layout 
-                    className={`group dark:bg-white/[0.02] bg-white rounded-2xl border dark:border-white/5 border-neutral-200 overflow-hidden flex flex-col relative shadow-md shadow-neutral-100 dark:shadow-none transition-all duration-300 hover:shadow-lg ${!isItemAvailable ? 'opacity-70' : ''}`}
-                    initial={{ opacity: 0, y: 30 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true, margin: "-50px" }}
-                    transition={{ duration: 0.45, ease: "easeOut" }}
-                  >
-                    <div className="relative h-44 w-full overflow-hidden font-sans">
-                      <img 
-                        src={
-                          item.image || 
-                          item.imageUrl || 
-                          item.image_url || 
-                          item.imgUrl || 
-                          item.img || 
-                          item.url || 
-                          "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=500&q=80"
-                        } 
-                        className="w-full h-full object-cover origin-center transition-transform duration-700 ease-out group-hover:scale-110" 
-                        alt={item.name} 
-                        loading="lazy"
-                        onError={(e) => {
-                          e.currentTarget.src = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=500&q=80";
-                        }}
-                      />
-                      
-                      <div className="absolute top-3 left-3 bg-black/50 backdrop-blur-md px-2.5 py-1 rounded-lg border border-white/10 flex items-center gap-1 text-[8px] font-black uppercase text-green-400 font-bold">
-                        <span className="h-1 w-1 rounded-full bg-green-500 animate-pulse" />VEG
-                      </div>
-
-                      <div className="absolute bottom-0 left-0 bg-gradient-to-r from-blue-600 to-blue-500 text-white font-black text-[9px] px-3 py-1 rounded-tr-xl flex items-center gap-1 shadow-md uppercase tracking-wider">
-                        <span>🛵</span> <span>{isHindi ? "फ्री डिलीवरी" : "FREE delivery"}</span>
-                      </div>
-
-                      {!isItemAvailable && (
-                        <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
-                          <span className="bg-red-600 text-white font-black text-[10px] px-3 py-1.5 rounded-lg uppercase tracking-widest shadow-md">
-                            {isHindi ? "आज उपलब्ध नहीं है" : "Out of Stock"}
-                          </span>
-                        </div>
-                      )}
-
-                      <button onClick={(e) => handleToggleFavorite(item.id, e)} className="absolute top-3 right-3 bg-black/60 backdrop-blur-md p-1.5 rounded-full border border-white/10 text-white hover:text-red-500 transition-colors">
-                        <Heart size={14} className={favorites.includes(item.id) ? "fill-red-500 text-red-500" : "text-white"} />
-                      </button>
-                    </div>
-                    <div className="p-4 flex flex-col justify-between flex-1 font-sans font-bold">
-                      <div className="flex justify-between items-start gap-4">
-                        <h4 className="font-black text-sm dark:text-gray-100 text-neutral-900 line-clamp-1">{item.name}</h4>
-                        <div className="bg-green-600 text-white font-extrabold text-[9px] px-2 py-0.5 rounded flex items-center gap-0.5">
-                          <span>4.9</span><Star size={8} style={{ color: '#ffffff', fill: '#ffffff' }} />
-                        </div>
-                      </div>
-                      <div className="flex justify-between items-center text-[9px] text-neutral-500 dark:text-gray-400 font-bold mt-0.5 font-sans">
-                        <p className="uppercase text-[8px] text-neutral-500 dark:text-gray-400">{item.category}</p><p>• 15-25 min</p>
-                      </div>
-                      <div className="h-px dark:bg-white/5 bg-neutral-200 my-2.5" />
-                      <div className="flex justify-between items-end mt-0.5">
-                        <div>
-                          <p className="text-neutral-500 dark:text-neutral-400 text-[8px] font-black uppercase tracking-widest leading-none mb-1">Price</p>
-                          <p className="text-orange-700 dark:text-orange-500 font-black text-base leading-none font-mono">{getDisplayPrice(item)}</p>
-                          {item.variants && <span className="text-[8px] font-bold text-neutral-600 dark:text-gray-400 mt-1 block">{isHindi ? "विकल्प उपलब्ध हैं" : "Options available"}</span>}
-                        </div>
-                        
-                        {storeOpen && isItemAvailable && (
-                          <button 
-                            onClick={() => { 
-                              triggerHaptic();
-                              item.variants ? setSelectedProduct(item) : addItem(item); 
-                            }} 
-                            className="px-4 py-2 bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-500/30 hover:bg-orange-500 hover:text-white rounded-lg font-black text-[10px] active:scale-95 transition-all uppercase flex items-center gap-1 shadow"
-                          >
-                            <Plus size={12} /> {isHindi ? "जोड़ें" : "ADD"}
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  </motion.div>
-
-                  {/* Promo pass card positioned after 4th item */}
-                  {index === 3 && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 20 }}
+                return (
+                  <React.Fragment key={item.id}>
+                    <motion.div 
+                      layout 
+                      className={`group dark:bg-white/[0.02] bg-white rounded-2xl border dark:border-white/5 border-neutral-200 overflow-hidden flex flex-col relative shadow-md shadow-neutral-100 dark:shadow-none transition-all duration-300 hover:shadow-lg ${!isItemAvailable ? 'opacity-70' : ''}`}
+                      initial={{ opacity: 0, y: 30 }}
                       whileInView={{ opacity: 1, y: 0 }}
-                      viewport={{ once: true }}
-                      onClick={() => {
-                        triggerHaptic();
-                        setIsProfileOpen(true);
-                      }}
-                      className="cursor-pointer bg-gradient-to-r from-amber-500 via-orange-500 to-red-600 text-white p-5 rounded-2xl shadow-lg border border-white/10 my-2 relative overflow-hidden group font-sans font-bold"
+                      viewport={{ once: true, margin: "-50px" }}
+                      transition={{ duration: 0.45, ease: "easeOut" }}
                     >
-                      <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full blur-xl group-hover:scale-110 transition-transform duration-500" />
-                      <div className="relative z-10 flex justify-between items-center gap-4 font-sans font-bold">
-                        <div className="space-y-1.5 font-sans font-bold">
-                          <span className="bg-black/30 border border-white/20 text-[8px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full text-yellow-300">
-                            🎁 LOYALTY CLUB PROMO PASS
-                          </span>
-                          <h4 className="text-sm font-black italic tracking-tight font-serif">
-                            {isHindi ? "फ्री पिज्जा, सैंडविच और शेक अनलॉक करें!" : "Unlock Free Pizza, Sandwich & Shakes!"}
-                          </h4>
-                          <p className="text-[10px] text-orange-100 font-bold leading-normal font-sans">
-                            {customerDetails ? (
-                              isHindi ? "आपका प्रोमो पास एक्टिवेटेड है! ✅ हर ₹100 पर 1 पॉइंट कमाएं।  यहाँ क्लिक करके अपने  रिवॉर्ड्स देखें ➔" : "Your promo pass is active! ✅ Earn 1 point per ₹100. Click here to view rewards ➔"
-                            ) : (
-                              isHindi ? "अपना Name और Number दर्ज करके इस पास को एक्टिवेट करें! 🎁 हर ₹100 पर 1 पॉइंट कमाएं।  टच करें ➔" : "Enter your Name & Number to activate this pass! 🎁 Earn 1 point per ₹100. Tap to activate ➔"
-                            )}
-                          </p>
+                      <div className="relative h-44 w-full overflow-hidden font-sans">
+                        <img 
+                          src={item.image || item.imageUrl || item.url || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=500&q=80"} 
+                          className="w-full h-full object-cover origin-center transition-transform duration-700 ease-out group-hover:scale-110" 
+                          alt={item.name} 
+                          loading="lazy"
+                        />
+                        
+                        <div className="absolute top-3 left-3 bg-black/50 backdrop-blur-md px-2.5 py-1 rounded-lg border border-white/10 flex items-center gap-1 text-[8px] font-black uppercase text-green-400 font-bold">
+                          <span className="h-1 w-1 rounded-full bg-green-500 animate-pulse" />VEG
                         </div>
-                        <div className="bg-white/15 backdrop-blur-md p-3 rounded-full border border-white/20 text-yellow-300 group-hover:rotate-12 transition-transform duration-300">
-                          <Gift size={24} />
+
+                        <div className="absolute bottom-0 left-0 bg-gradient-to-r from-blue-600 to-blue-500 text-white font-black text-[9px] px-3 py-1 rounded-tr-xl flex items-center gap-1 shadow-md uppercase tracking-wider">
+                          <span>🛵</span> <span>{isHindi ? "फ्री डिलीवरी" : "FREE delivery"}</span>
+                        </div>
+
+                        {!isItemAvailable && (
+                          <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                            <span className="bg-red-600 text-white font-black text-[10px] px-3 py-1.5 rounded-lg uppercase tracking-widest shadow-md">
+                              {isHindi ? "आज उपलब्ध नहीं है" : "Out of Stock"}
+                            </span>
+                          </div>
+                        )}
+
+                        <button onClick={(e) => handleToggleFavorite(item.id, e)} className="absolute top-3 right-3 bg-black/60 backdrop-blur-md p-1.5 rounded-full border border-white/10 text-white hover:text-red-500 transition-colors">
+                          <Heart size={14} className={favorites.includes(item.id) ? "fill-red-500 text-red-500" : "text-white"} />
+                        </button>
+                      </div>
+                      <div className="p-4 flex flex-col justify-between flex-1 font-sans font-bold">
+                        <div className="flex justify-between items-start gap-4">
+                          <h4 className="font-black text-sm dark:text-gray-100 text-neutral-900 line-clamp-1">{item.name}</h4>
+                          <div className="bg-green-600 text-white font-extrabold text-[9px] px-2 py-0.5 rounded flex items-center gap-0.5">
+                            <span>4.9</span><Star size={8} style={{ color: '#ffffff', fill: '#ffffff' }} />
+                          </div>
+                        </div>
+                        <div className="flex justify-between items-center text-[9px] text-neutral-500 dark:text-gray-400 font-bold mt-0.5 font-sans">
+                          <p className="uppercase text-[8px] text-neutral-500 dark:text-gray-400">{item.category}</p><p>• 15-25 min</p>
+                        </div>
+                        <div className="h-px dark:bg-white/5 bg-neutral-200 my-2.5" />
+                        <div className="flex justify-between items-end mt-0.5">
+                          <div>
+                            <p className="text-neutral-500 dark:text-neutral-400 text-[8px] font-black uppercase tracking-widest leading-none mb-1">Price</p>
+                            <p className="text-orange-700 dark:text-orange-500 font-black text-base leading-none font-mono">{getDisplayPrice(item)}</p>
+                            {item.variants && <span className="text-[8px] font-bold text-neutral-600 dark:text-gray-400 mt-1 block">{isHindi ? "विकल्प उपलब्ध हैं" : "Options available"}</span>}
+                          </div>
+                          
+                          {storeOpen && isItemAvailable && (
+                            <button 
+                              onClick={() => { 
+                                triggerHaptic();
+                                item.variants ? setSelectedProduct(item) : addItem(item); 
+                              }} 
+                              className="px-4 py-2 bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-500/30 hover:bg-orange-500 hover:text-white rounded-lg font-black text-[10px] active:scale-95 transition-all uppercase flex items-center gap-1 shadow"
+                            >
+                              <Plus size={12} /> {isHindi ? "जोड़ें" : "ADD"}
+                            </button>
+                          )}
                         </div>
                       </div>
                     </motion.div>
-                  )}
 
-                  {/* Secondary Promo Banner positioned after the 7th item */}
-                  {index === 6 && isInlineBannerEnabled && (
-                    <div className="w-full h-36 rounded-2xl overflow-hidden relative border border-white/5 bg-white/[0.02] my-2 font-sans font-bold">
-                      {(banners.length === 0 || bannerError) ? (
-                        <div className="w-full h-full bg-gradient-to-r from-yellow-600/35 to-orange-900/30 flex flex-col justify-center p-5 space-y-1 font-sans">
-                          <span className="text-[8px] font-black uppercase text-yellow-400 bg-yellow-500/10 border border-yellow-500/20 px-2 py-0.5 rounded-full w-max">
-                            {isHindi ? "ताज़ा स्वाद" : "Fresh Taste"}
-                          </span>
-                          <h3 className="text-sm font-black text-yellow-300">
-                            {isHindi ? "शुद्ध और हाइजीनिक Fast Food" : "PURE & HYGIENIC FAST FOOD"}
-                          </h3>
-                          <p className="text-[9px] text-neutral-600 dark:text-gray-400 font-bold">
-                            {isHindi ? "मोहांद्रा में हमारा स्पेशल पनीर पिज्जा चखें!" : "Try our special Paneer Pizza in Mohandra Town!"}
-                          </p>
+                    {/* Promo pass card positioned after 4th item */}
+                    {index === 3 && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        whileInView={{ opacity: 1, y: 0 }}
+                        viewport={{ once: true }}
+                        onClick={() => {
+                          triggerHaptic();
+                          setIsProfileOpen(true);
+                        }}
+                        className="cursor-pointer bg-gradient-to-r from-amber-500 via-orange-500 to-red-600 text-white p-5 rounded-2xl shadow-lg border border-white/10 my-2 relative overflow-hidden group font-sans font-bold"
+                      >
+                        <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full blur-xl group-hover:scale-110 transition-transform duration-500" />
+                        <div className="relative z-10 flex justify-between items-center gap-4 font-sans font-bold">
+                          <div className="space-y-1.5 font-sans font-bold">
+                            <span className="bg-black/30 border border-white/20 text-[8px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full text-yellow-300">
+                              🎁 LOYALTY CLUB PROMO PASS
+                            </span>
+                            <h4 className="text-sm font-black italic tracking-tight font-serif">
+                              {isHindi ? "फ्री पिज्जा, सैंडविच और शेक अनलॉक करें!" : "Unlock Free Pizza, Sandwich & Shakes!"}
+                            </h4>
+                            <p className="text-[10px] text-orange-100 font-bold leading-normal font-sans">
+                              {customerDetails ? (
+                                isHindi ? "आपका प्रोमो पास एक्टिवेटेड है! ✅ हर ₹100 पर 1 पॉइंट कमाएं।  यहाँ क्लिक करके अपने  रिवॉर्ड्स देखें ➔" : "Your promo pass is active! ✅ Earn 1 point per ₹100. Click here to view rewards ➔"
+                              ) : (
+                                isHindi ? "अपना Name और Number दर्ज करके इस पास को एक्टिवेट करें! 🎁 हर ₹100 पर 1 पॉइंट कमाएं।  टच करें ➔" : "Enter your Name & Number to activate this pass! 🎁 Earn 1 point per ₹100. Tap to activate ➔"
+                              )}
+                            </p>
+                          </div>
+                          <div className="bg-white/15 backdrop-blur-md p-3 rounded-full border border-white/20 text-yellow-300 group-hover:rotate-12 transition-transform duration-300">
+                            <Gift size={24} />
+                          </div>
                         </div>
-                      ) : (
-                        <div className="w-full h-full relative">
-                          {isVideoUrl(banners[(bannerIndex + 1) % banners.length]?.url) ? (
-                            <video 
-                              src={banners[(bannerIndex + 1) % banners.length]?.url} 
-                              autoPlay 
-                              loop 
-                              muted 
-                              playsInline 
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            <img 
-                              src={banners[(bannerIndex + 1) % banners.length]?.url} 
-                              className="w-full h-full object-cover" 
-                              alt="BAM BAM CAFE Secondary Promo"
-                              loading="lazy"
-                            />
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </React.Fragment>
-              );
-            })
-          )}
+                      </motion.div>
+                    )}
+
+                    {/* Secondary Promo Banner positioned after the 7th item */}
+                    {index === 6 && isInlineBannerEnabled && (
+                      <div className="w-full h-36 rounded-2xl overflow-hidden relative border border-white/5 bg-white/[0.02] my-2 font-sans font-bold">
+                        {(banners.length === 0 || bannerError) ? (
+                          <div className="w-full h-full bg-gradient-to-r from-yellow-600/35 to-orange-900/30 flex flex-col justify-center p-5 space-y-1 font-sans">
+                            <span className="text-[8px] font-black uppercase text-yellow-400 bg-yellow-500/10 border border-yellow-500/20 px-2 py-0.5 rounded-full w-max">
+                              {isHindi ? "ताज़ा स्वाद" : "Fresh Taste"}
+                            </span>
+                            <h3 className="text-sm font-black text-yellow-300">
+                              {isHindi ? "शुद्ध और हाइजीनिक Fast Food" : "PURE & HYGIENIC FAST FOOD"}
+                            </h3>
+                            <p className="text-[9px] text-neutral-600 dark:text-gray-400 font-bold">
+                              {isHindi ? "मोहांद्रा में हमारा स्पेशल पनीर पिज्जा चखें!" : "Try our special Paneer Pizza in Mohandra Town!"}
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="w-full h-full relative">
+                            {isVideoUrl(banners[(bannerIndex + 1) % banners.length]?.url) ? (
+                              <video 
+                                src={banners[(bannerIndex + 1) % banners.length]?.url} 
+                                autoPlay 
+                                loop 
+                                muted 
+                                playsInline 
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <img 
+                                src={banners[(bannerIndex + 1) % banners.length]?.url} 
+                                className="w-full h-full object-cover" 
+                                alt="BAM BAM CAFE Secondary Promo"
+                                loading="lazy"
+                              />
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </React.Fragment>
+                );
+              })
+            )}
+          </div>
+        )}
+
+        {/* REVIEWS SECTION */}
+        <div className="pt-6 space-y-4 font-sans font-bold">
+          <div className="flex justify-between items-center">
+            <h3 className="text-sm font-black uppercase tracking-wider text-yellow-500 flex items-center gap-1 font-bold font-sans">⭐ {isHindi ? "हमारे ग्राहकों के प्यारे शब्द" : "Feedback from our loved guests"}</h3>
+            <span className="text-[9px] font-bold text-neutral-600 dark:text-gray-400">{isHindi ? "कुल समीक्षाएं" : "Total Reviews"} ({displayReviews.length})</span>
+          </div>
+          
+          <div className={hasManyReviews ? "max-h-[380px] overflow-y-auto pr-1 space-y-3.5 scrollbar-thin scrollbar-thumb-orange-500 font-sans" : "space-y-3.5 font-sans"}>
+            {displayReviews.map((r: any) => (
+              <div key={r.id} className="dark:bg-white/[0.02] bg-white border dark:border-white/5 border-neutral-200 p-4 rounded-2xl space-y-2 shadow-md shadow-neutral-200/30">
+                <div className="flex justify-between items-center">
+                  <h4 className="font-black text-xs text-orange-600 font-bold">{r.name}</h4>
+                  <div className="flex items-center gap-0.5">
+                    <Star size={10} style={{ color: '#fbbf24', fill: '#fbbf24' }} />
+                    <Star size={10} style={{ color: '#fbbf24', fill: '#fbbf24' }} />
+                    <Star size={10} style={{ color: '#fbbf24', fill: '#fbbf24' }} />
+                    <Star size={10} style={{ color: '#fbbf24', fill: '#fbbf24' }} />
+                    <Star size={10} style={{ color: '#fbbf24', fill: '#fbbf24' }} />
+                  </div>
+                </div>
+                <p className="text-[10.5px] text-neutral-800 dark:text-gray-300 italic leading-relaxed">"{r.comment}"</p>
+              </div>
+            ))}
+          </div>
         </div>
 
         {/* FOOTER */}
@@ -1986,14 +2094,14 @@ export default function BbCafeHome() {
               
               <p className="text-[11.5px] text-neutral-800 dark:text-gray-300 leading-relaxed max-w-sm mx-auto font-medium">
                 {isHindi ? 
-                  "हमने BAM BAM CAFE की शुरुआत एक छोटे से सपने के साथ की थी—लोगों को घर जैसा स्वाद और कैफे वाला माहौल देने के लिए।  हमारी कोशिश है कि आप जब भी यहाँ आएँ, एक प्यारी मुस्कान के साथ वापस जाएँ।  ❤️" :
+                  "हमने BAM BAM CAFE की शुरुआत एक छोटे से सपने के साथ की थी—लोगों को घर जैसा स्वाद और कैफे वाला माहौल देने के लिए।  यहाँ हर कप कॉफी और हर स्लाइस पिज्जा प्यार और शुद्धता के साथ बनाया जाता है।  हमारी कोशिश है कि आप जब भी यहाँ आएँ, एक प्यारी मुस्कान के साथ वापस जाएँ।  ❤️" :
                   "We started BAM BAM CAFE with a simple dream - to serve hygienic, delicious, home-style fast food in Mohandra town. Every slice of pizza and plate of thali here is crafted with ultimate love, purity and hygiene. Feel free to dine-in or order online! ❤️"
                 }
               </p>
             </div>
           </div>
 
-          {/* Social Icons Container */}
+          {/* Social Icons Container with dynamically fetched Follower Counts */}
           <div className="social-icons flex flex-wrap justify-center gap-6 py-5 dark:bg-white/[0.02] bg-white border dark:border-white/5 border-neutral-200 rounded-2xl shadow-sm">
             {SOCIAL_LINKS.map((link: any) => (
               <a 
@@ -2035,7 +2143,7 @@ export default function BbCafeHome() {
         </footer>
       </main>
 
-      {/* STICKY FLOATING CART BUTTON */}
+      {/* STICKY FLOATING CART BUTTON / BOTTOM NAV */}
       <div className="fixed bottom-6 inset-x-0 z-[80] flex justify-center pointer-events-none font-sans font-bold">
         <div className="flex gap-4 pointer-events-auto">
           {cart.length > 0 && (
@@ -2062,177 +2170,745 @@ export default function BbCafeHome() {
         </div>
       </div>
 
-      {/* (1) LIVE ORDER TRACKING COMPONENT */}
-      <LiveOrderTrackerAny 
-        liveOrder={liveOrder}
-        setLiveOrder={setLiveOrder}
-        whatsappNumber={whatsappNumber}
-        isHindi={isHindi}
-        triggerHaptic={triggerHaptic}
-        formatBillNumber={formatBillNumber}
-      />
+      {/* LIVE ORDER REAL-TIME TRACKING FOOTER PANEL */}
+      <AnimatePresence>
+        {liveOrder && (
+          <motion.div 
+            initial={{ y: 100, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 100, opacity: 0 }}
+            className="fixed bottom-24 inset-x-4 z-50 max-w-sm mx-auto bg-neutral-950/95 backdrop-blur-md border border-orange-500/30 p-4 rounded-3xl shadow-2xl flex flex-col gap-2 text-xs font-bold font-sans"
+          >
+            <div className="flex justify-between items-center">
+              <div className="flex items-center gap-2">
+                <span className={`w-2 h-2 rounded-full ${liveOrder.status === 'rejected' ? 'bg-red-500' : 'bg-orange-500 animate-pulse'}`} />
+                <span className="text-gray-200">
+                  {liveOrder.status === 'rejected' 
+                    ? (isHindi ? "⚠️ आर्डर ALERT" : "⚠️ Order Alert")
+                    : (isHindi ? `आर्डर लाइव ट्रैकिंग (Bill #${formatBillNumber(liveOrder.billNumber)})` : `Order Tracking (Bill #${formatBillNumber(liveOrder.billNumber)})`)
+                  }
+                </span>
+              </div>
+              {liveOrder.status === 'rejected' ? (
+                <button 
+                  type="button"
+                  onClick={() => { 
+                    triggerHaptic(); 
+                    try {
+                      const dismissed = JSON.parse(localStorage.getItem('bb_dismissed_rejected_orders') || '[]');
+                      if (!dismissed.includes(liveOrder.id)) {
+                        dismissed.push(liveOrder.id);
+                        localStorage.setItem('bb_dismissed_rejected_orders', JSON.stringify(dismissed));
+                      }
+                    } catch (e) {}
+                    setLiveOrder(null); 
+                  }}
+                  className="text-gray-400 hover:text-white p-1"
+                >
+                  <X size={14} />
+                </button>
+              ) : (
+                <span className="bg-orange-500/10 text-orange-400 px-2 py-0.5 rounded-md text-[9px] uppercase font-black font-mono">
+                  Token: #{liveOrder.tokenNumber}
+                </span>
+              )}
+            </div>
 
-      {/* (2) REELS VIEWER COMPONENT */}
-      <ReelsViewerAny 
-        activeStory={activeStory}
-        setActiveStory={setActiveStory}
-        handleReelEnded={handleReelEnded}
-        handleQuickAddFromStory={handleQuickAddFromStory}
-        triggerHaptic={triggerHaptic}
-        isHindi={isHindi}
-      />
+            {liveOrder.status === 'rejected' ? (
+              <div className="space-y-3 py-1 font-sans">
+                <p className="text-red-400 text-[10px] leading-relaxed font-black">
+                  {isHindi 
+                    ? "🚨 आपका आर्डर कैफ़े द्वारा रद्द (Reject) कर दिया गया है! कृपया स्पष्टीकरण या दोबारा आर्डर के लिए कैफ़े में तुरंत संपर्क करें।"
+                    : "🚨 Your order has been rejected by the cafe! Please call us immediately for confirmation or details."
+                  }
+                </p>
+                <a 
+                  href="tel:+919714293759"
+                  className="w-full bg-red-600 hover:bg-red-700 text-white text-center text-[10px] py-2 rounded-xl block font-black uppercase"
+                >
+                  Call Cafe 📞
+                </a>
+              </div>
+            ) : (
+              <div className="space-y-1 mt-1 font-mono">
+                <div className="flex justify-between text-[8px] text-gray-400 uppercase font-sans">
+                  <span className={liveOrder.status === 'pending' ? 'text-orange-400 font-extrabold' : ''}>{isHindi ? "स्वीकृति" : "Confirming"} ⏳</span>
+                  <span className={liveOrder.status === 'preparing' ? 'text-yellow-400 font-extrabold' : ''}>{isHindi ? "तैयारी" : "Preparing"} 👨‍🍳</span>
+                  <span className={liveOrder.status === 'out_for_delivery' ? 'text-blue-400 font-extrabold' : ''}>{isHindi ? "मार्ग में" : "On the Way"} 🛵</span>
+                </div>
+                <div className="w-full bg-white/5 h-1.5 rounded-full overflow-hidden relative">
+                  <div 
+                    className="bg-gradient-to-r from-orange-500 to-yellow-400 h-full transition-all duration-500" 
+                    style={{ 
+                      width: liveOrder.status === 'pending' ? '25%' : liveOrder.status === 'preparing' ? '65%' : '90%' 
+                    }} 
+                  />
+                </div>
+                <div className="flex gap-2 pt-1 border-t border-white/5 mt-1.5 font-sans">
+                  <a 
+                    href={`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(`नमस्ते  बम बम कैफ़े! कृपया मेरे आर्डर नंबर #${formatBillNumber(liveOrder.billNumber)} का लाइव स्टेटस बताएं।`)}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex-1 bg-white/5 hover:bg-white/10 text-center text-[10px] text-yellow-400 py-1.5 rounded-xl border border-white/5 transition-all"
+                  >
+                    Track Live Status (WA) 🔍
+                  </a>
+                </div>
+              </div>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      {/* (4) REGULAR PIZZA PORTION CUSTOMIZER MODAL */}
-      <PizzaCustomizerModalAny 
-        selectedProduct={selectedProduct}
-        setSelectedProduct={setSelectedProduct}
-        normalPizzaSize={normalPizzaSize}
-        setNormalPizzaSize={setNormalPizzaSize}
-        normalPizzaPrice={normalPizzaPrice}
-        setNormalPizzaPrice={setNormalPizzaPrice}
-        normalPizzaAddons={normalPizzaAddons}
-        setNormalPizzaAddons={setNormalPizzaAddons}
-        chefNote={chefNote}
-        setChefNote={setChefNote}
-        handleNormalPizzaAdd={handleNormalPizzaAdd}
-        quickAppendInstruction={quickAppendInstruction}
-        PIZZA_ADDONS={PIZZA_ADDONS}
-        QUICK_INSTRUCTION_TAGS={QUICK_INSTRUCTION_TAGS}
-        isHindi={isHindi}
-        triggerHaptic={triggerHaptic}
-      />
+      {/* FULL SCREEN REELS VIEWER */}
+      <AnimatePresence>
+        {activeStory && (
+          <div className="fixed inset-0 bg-black z-[250] flex flex-col justify-between font-sans">
+            <div className="absolute top-4 inset-x-0 px-4 z-[260] flex justify-between items-center bg-gradient-to-b from-black/80 to-transparent pb-10">
+              <span className="text-white text-xs font-black tracking-wider uppercase">{activeStory.title}</span>
+              <button 
+                onClick={() => { triggerHaptic(); setActiveStory(null); }} 
+                className="p-2 bg-white/10 rounded-full text-white"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            
+            <div className="flex-1 flex items-center justify-center">
+              <video 
+                src={activeStory.url} 
+                autoPlay 
+                playsInline 
+                onEnded={handleReelEnded}
+                className="w-full h-auto max-h-[80vh] object-contain"
+              />
+            </div>
 
-      {/* (5) PROFILE & LOYALTY DATABASE DRAWER */}
-      <ProfileDrawerAny 
-        isOpen={isProfileOpen}
-        open={isProfileOpen}
-        onClose={() => setIsProfileOpen(false)}
-        onOpenChange={(val: boolean) => !val && setIsProfileOpen(false)}
-        customerDetails={customerDetails}
-        setCustomerDetails={setCustomerDetails}
-        tempName={tempName}
-        setTempName={setTempName}
-        tempPhone={tempPhone}
-        setTempPhone={setTempPhone}
-        tempPin={tempPin}
-        setTempPin={setTempPin}
-        tempRefCode={tempRefCode}
-        setTempRefCode={setTempRefCode}
-        handleSaveDetails={handleSaveDetails}
-        customerPoints={customerPoints}
-        pointsHistory={pointsHistory}
-        shareCount={shareCount}
-        handleShareApp={handleShareApp}
-        setIsGiftModalOpen={setIsGiftModalOpen}
-        SOCIAL_LINKS={SOCIAL_LINKS}
-        setClaimingPlatform={setClaimingPlatform}
-        setIsClaimModalOpen={setIsClaimModalOpen}
-        loyaltyRules={loyaltyRules}
-        handleCustomerRedeem={handleCustomerRedeem}
-        pastOrders={pastOrders}
-        whatsappNumber={whatsappNumber}
-        isHindi={isHindi}
-        triggerHaptic={triggerHaptic}
-        getReferralCode={getReferralCode}
-      />
+            <div className="p-6 bg-gradient-to-t from-black via-black/80 to-transparent text-center space-y-4 z-[260]">
+              <p className="text-xs text-gray-300 font-semibold">{activeStory.description}</p>
+              <button 
+                onClick={() => handleQuickAddFromStory(activeStory.title, activeStory.price)}
+                className="w-full max-w-sm mx-auto bg-orange-500 hover:bg-orange-600 text-black py-4 rounded-2xl font-black text-xs uppercase shadow"
+              >
+                ADD TO CART • ₹{activeStory.price}
+              </button>
+            </div>
+          </div>
+        )}
+      </AnimatePresence>
 
-      {/* (6) MODULAR CART DRAWER */}
-      <CartDrawerAny 
-        isHindi={isHindi}
-        isCartOpen={isCartOpen}
-        setIsCartOpen={setIsCartOpen}
-        cart={cart}
-        addItem={addItem}
-        removeItem={removeItem}
-        upsellSuggestionItems={upsellSuggestionItems}
-        fulfillmentType={fulfillmentType}
-        setFulfillmentType={setFulfillmentType}
-        ketchupAddon={ketchupAddon}
-        setKetchupAddon={setKetchupAddon}
-        oreganoAddon={oreganoAddon}
-        setOreganoAddon={setOreganoAddon}
-        chiliFlakesAddon={chiliFlakesAddon}
-        setChiliFlakesAddon={setChiliFlakesAddon}
-        selectedArea={selectedArea}
-        setSelectedArea={setSelectedArea}
-        DELIVERY_AREAS={DELIVERY_AREAS}
-        lastDeliveryAddress={lastDeliveryAddress}
-        address={address}
-        setAddress={setAddress}
-        handleDetectLocation={handleDetectLocation}
-        tableNumber={tableNumber}
-        setTableNumber={setTableNumber}
-        enteredCoupon={enteredCoupon}
-        setEnteredCoupon={setEnteredCoupon}
-        appliedCoupon={appliedCoupon}
-        handleApplyCoupon={handleApplyCoupon}
-        paymentMethod={paymentMethod}
-        setPaymentMethod={setPaymentMethod}
-        setIsUpiPopupOpen={setIsUpiPopupOpen}
-        handleCheckoutClick={handleCheckoutClick}
-        isSubmittingOrder={isSubmittingOrder}
-        getCartSubtotal={getCartSubtotal}
-        getCartAddonsPrice={getCartAddonsPrice}
-        getDeliveryCharge={getDeliveryCharge}
-        getFreeDeliveryProgressPercent={getFreeDeliveryProgressPercent}
-        getTotalBillPrice={getTotalBillPrice}
-        getDisplayPrice={getDisplayPrice}
-        triggerHaptic={triggerHaptic}
-        showAddonsSection={showAddonsSection}
-      />
+      {/* REVIEWS DRAWER MODAL */}
+      <AnimatePresence>
+        {isReviewsDrawerOpen && (
+          <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[120] overflow-y-auto">
+            <div className="p-6 max-w-lg mx-auto pb-32">
+              <div className="flex justify-between items-center mb-8">
+                <div>
+                  <h2 className="text-2xl font-black text-white font-mono">All Reviews</h2>
+                  <p className="text-xs text-yellow-400 font-mono">Rating: 4.8/5.0 ★</p>
+                </div>
+                <button onClick={() => { triggerHaptic(); setIsReviewsDrawerOpen(false); }} className="p-2.5 bg-white/10 text-white rounded-full hover:bg-white/20 transition-colors"><X size={20} /></button>
+              </div>
+              
+              <div className="space-y-4">
+                {displayReviews.map((r: any) => (
+                  <div key={r.id} className="dark:bg-white/[0.03] bg-white border dark:border-white/5 border-neutral-200 p-5 space-y-2 shadow-sm transition-colors duration-200 font-sans">
+                    <div className="flex justify-between items-center">
+                      <h4 className="font-black text-xs text-orange-600">{r.name}</h4>
+                      <div className="flex items-center gap-1 bg-amber-500/10 px-2 py-0.5 rounded text-[9px] font-mono">
+                        <Star size={10} style={{ color: '#fbbf24', fill: '#fbbf24' }} />
+                        <span className="font-extrabold text-amber-600 dark:text-amber-400">{r.rating}</span>
+                      </div>
+                    </div>
+                    <p className="text-[11px] text-neutral-800 dark:text-gray-300 italic">"{r.comment}"</p>
+                  </div>
+                ))}
+              </div>
+              <div className="fixed bottom-6 left-0 w-full px-6 z-50">
+                <button onClick={() => { triggerHaptic(); setIsReviewFormOpen(true); }} className="w-full max-w-md mx-auto bg-orange-500 text-black py-3.5 rounded-2xl font-black text-xs uppercase font-sans">✍️ Write a Review</button>
+              </div>
+            </div>
+          </div>
+        )}
+      </AnimatePresence>
 
-      {/* (7) UPI QR/IMAGE PAYMENT SYSTEM MODAL */}
-      <UpiPaymentModalAny 
-        isHindi={isHindi}
-        isUpiPopupOpen={isUpiPopupOpen}
-        setIsUpiPopupOpen={setIsUpiPopupOpen}
-        getTotalBillPrice={getTotalBillPrice}
-        handleLaunchUpiPay={handleLaunchUpiPay}
-        handleScreenshotChange={handleScreenshotChange}
-        isCompressing={isCompressing}
-        paymentScreenshot={paymentScreenshot}
-        setPaymentScreenshot={setPaymentScreenshot}
-        sendWhatsAppOrder={sendWhatsAppOrder}
-        isSubmittingOrder={isSubmittingOrder}
-        triggerHaptic={triggerHaptic}
-        upiId={upiId}
-      />
+      {/* WRITING REVIEW FORM MODAL WITH INTEGRATED EXIT OPTIONS */}
+      <AnimatePresence>
+        {isReviewFormOpen && (
+          <div className="fixed inset-0 bg-black/95 z-[200] flex items-center justify-center p-6 font-sans">
+            <form onSubmit={handleReviewSubmit} className="dark:bg-[#111] bg-white w-full max-w-md p-6 rounded-3xl border dark:border-white/10 border-neutral-200 text-center space-y-4 shadow-xl transition-colors duration-200">
+              <div className="flex justify-between items-center pb-2 border-b dark:border-white/10 border-neutral-200">
+                <h3 className="text-xl font-black text-orange-500 uppercase italic">{isHindi ? "आपकी समीक्षा" : "Your Feedback"}</h3>
+                <button 
+                  type="button" 
+                  onClick={() => { triggerHaptic(); setIsReviewFormOpen(false); }} 
+                  className="p-2 bg-red-100 hover:bg-red-500 hover:text-white text-red-600 rounded-full transition-all duration-200 shadow"
+                  title="Close Feedback"
+                >
+                  <X size={18} />
+                </button>
+              </div>
 
-      {/* (8) APP INSTALL MANUAL GUIDELINES MODAL */}
-      <InstallModalAny 
-        isOpen={isInstallModalOpen}
-        onClose={() => setIsInstallModalOpen(false)}
-        triggerHaptic={triggerHaptic}
-      />
+              <div className="space-y-3 text-left">
+                <div>
+                  <label className="text-[9px] font-black uppercase text-neutral-700 dark:text-neutral-400">{isHindi ? "क्या नाम" : "Your Name"}</label>
+                  <input autoComplete="name" type="text" placeholder={isHindi ? "अपना नाम दर्ज करें..." : "Enter your name..."} value={reviewName} onChange={(e) => setReviewName(e.target.value)} required className="w-full dark:bg-white/5 bg-neutral-50 border dark:border-white/10 border-neutral-300 p-3 rounded-lg text-xs text-neutral-900 dark:text-white focus:border-orange-500 outline-none" />
+                </div>
+                <div>
+                  <label className="text-[9px] font-black uppercase text-neutral-700 dark:text-neutral-400">{isHindi ? "रेटिंग" : "Rating"}</label>
+                  <div className="flex gap-1 py-1">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <Star 
+                        key={star} 
+                        size={20} 
+                        style={{ color: '#fbbf24', fill: reviewRating >= star ? '#fbbf24' : 'none' }} 
+                        onClick={() => setReviewRating(star)} 
+                        className="cursor-pointer" 
+                      />
+                    ))}
+                  </div>
+                </div>
 
-      {/* (9) SECURE PIN POINTS GIFT MODAL */}
-      <GiftPointsModalAny 
-        isOpen={isGiftModalOpen}
-        onClose={() => { setIsGiftModalOpen(false); setGiftPhone(""); setGiftPointsAmount(""); setGiftSenderPin(""); }}
-        customerPoints={customerPoints}
-        giftPhone={giftPhone}
-        setGiftPhone={setGiftPhone}
-        giftPointsAmount={giftPointsAmount}
-        setGiftPointsAmount={setGiftPointsAmount}
-        giftSenderPin={giftSenderPin}
-        setGiftSenderPin={setGiftSenderPin}
-        handleGiftPoints={handleGiftPoints}
-        isGiftingLoading={isGiftingLoading}
-        isHindi={isHindi}
-        triggerHaptic={triggerHaptic}
-      />
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black uppercase text-neutral-700 dark:text-neutral-400">{isHindi ? "पसंदीदा समीक्षा टच करें:" : "Quick Suggestions:"}</label>
+                  <div className="flex flex-wrap gap-1.5 py-1">
+                    {SUGGESTED_REVIEWS.map((suggestion: string) => (
+                      <button
+                        type="button"
+                        key={suggestion}
+                        onClick={() => setReviewComment(suggestion)}
+                        className="dark:bg-white/5 bg-neutral-50 border dark:border-white/10 border-neutral-300 hover:border-orange-500/50 px-2 py-1 rounded-full text-[9px] text-neutral-800 dark:text-gray-300 font-bold transition-all text-left"
+                      >
+                        {suggestion}
+                      </button>
+                    ))}
+                  </div>
+                </div>
 
-      {/* (10) VERIFIED SOCIAL CLAIM TASK SUBMISSIONS MODAL */}
-      <PointsClaimModalAny 
-        isOpen={isClaimModalOpen}
-        onClose={() => { setIsClaimModalOpen(false); setClaimUsername(""); }}
-        claimingPlatform={claimingPlatform}
-        claimUsername={claimUsername}
-        setClaimUsername={setClaimUsername}
-        handleClaimSubmit={handleClaimSubmit}
-        isClaimingLoading={isClaimingLoading}
-        triggerHaptic={triggerHaptic}
-      />
+                <div>
+                  <label className="text-[9px] font-black uppercase text-neutral-700 dark:text-neutral-400">{isHindi ? "समीक्षा टिप्पणी" : "Comments"}</label>
+                  <textarea placeholder={isHindi ? "खाना कैसा लगा?..." : "How was the food?..."} value={reviewComment} onChange={(e) => setReviewComment(e.target.value)} required rows={3} className="w-full dark:bg-white/5 bg-neutral-50 border dark:border-white/10 border-neutral-300 p-3 rounded-lg text-xs text-neutral-900 dark:text-white focus:border-orange-500 outline-none resize-none" />
+                </div>
+              </div>
+              <div className="flex gap-2 pt-1">
+                <button type="submit" className="flex-1 bg-orange-500 text-black font-black p-3 rounded-lg text-xs uppercase">{isHindi ? "जमा करें" : "SUBMIT"}</button>
+                <button type="button" onClick={() => { triggerHaptic(); setIsReviewFormOpen(false); }} className="dark:bg-white/5 bg-neutral-100 text-neutral-800 dark:text-gray-400 font-bold p-3 rounded-lg text-xs uppercase">{isHindi ? "बंद करें" : "CANCEL"}</button>
+              </div>
+            </form>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* STANDARD CUSTOMIZATION MODAL FOR REGULAR PIZZAS */}
+      <AnimatePresence>
+        {selectedProduct && (
+          <div className="fixed inset-0 bg-black/95 z-[100] flex items-end font-sans">
+            <motion.div initial={{ y: 300 }} animate={{ y: 0 }} exit={{ y: 300 }} className="dark:bg-[#111] bg-white w-full p-6 rounded-t-3xl border-t dark:border-white/10 border-neutral-200 max-w-lg mx-auto overflow-y-auto max-h-[95vh] shadow-2xl transition-colors duration-200">
+              <div className="w-12 h-1 bg-neutral-200 dark:bg-white/15 rounded-full mx-auto mb-4" />
+              <h3 className="text-xl font-black text-center text-neutral-900 dark:text-white font-bold">{selectedProduct?.name}</h3>
+              <p className="text-orange-500 font-black mb-4 uppercase text-[8px] text-center">{isHindi ? "ऑर्डर कस्टमाइज़ करें" : "Customize Your Order"}</p>
+              
+              <div className="space-y-3 mb-4 font-sans">
+                <p className="text-[10px] font-bold text-neutral-600 dark:text-gray-400 uppercase">{isHindi ? "1. साइज चुनें:" : "1. Select Portion Size:"}</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {Object.entries(selectedProduct?.variants || {}).map(([size, price]: any) => (
+                    <button 
+                      type="button" 
+                      key={size} 
+                      onClick={() => { setNormalPizzaSize(size); setNormalPizzaPrice(Number(price)); }} 
+                      className={`p-3 rounded-xl flex flex-col items-center border transition-all ${normalPizzaSize.toLowerCase() === size.toLowerCase() ? 'bg-orange-500/10 border-orange-500 text-orange-600 font-black shadow-sm' : 'dark:bg-white/[0.03] bg-neutral-50 dark:border-white/5 border-neutral-300 dark:text-gray-400 text-neutral-800'}`}
+                    >
+                      <span className="capitalize text-xs font-black">{size}</span>
+                      <span className="font-extrabold text-[10px] mt-1 dark:text-white text-neutral-900 font-mono">₹{price}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {normalPizzaSize && (selectedProduct?.category === "Special Pizza" || selectedProduct?.name?.toLowerCase().includes("pizza")) && (
+                <div className="space-y-3 mb-4 border-t border-neutral-200 dark:border-white/5 pt-3">
+                  <p className="text-[10px] font-bold text-neutral-600 dark:text-gray-400 uppercase">{isHindi ? "2. एक्स्ट्रा मसाला/टॉपिंग चुनें:" : "2. Select Add-ons:"}</p>
+                  <div className="grid grid-cols-2 gap-2 font-sans">
+                    {Object.entries(PIZZA_ADDONS[normalPizzaSize.toLowerCase()] || {}).map(([addon, cost]: any) => {
+                      const isSelected = !!normalPizzaAddons[addon];
+                      return (
+                        <button
+                          type="button"
+                          key={addon}
+                          onClick={() => setNormalPizzaAddons(prev => ({ ...prev, [addon]: !prev[addon] }))}
+                          className={`p-2.5 rounded-xl border flex justify-between items-center text-[9px] font-bold ${isSelected ? 'border-orange-500 bg-orange-500/5 text-orange-600' : 'dark:border-white/5 border-neutral-300 dark:bg-white/[0.02] bg-neutral-50 dark:text-gray-300'}`}
+                        >
+                          <span>{addon}</span>
+                          <span className="text-orange-500 dark:text-orange-400 font-black font-mono">+₹{cost}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              <div className="space-y-2 mb-6 border-t border-neutral-200 dark:border-white/5 pt-3">
+                <p className="text-[10px] font-bold text-neutral-600 dark:text-gray-400 uppercase">{isHindi ? "शेफ के लिए विशेष निर्देश:" : "Special Note for Chef / Instructions:"}</p>
+                <div className="flex flex-wrap gap-1.5 pb-2">
+                  {QUICK_INSTRUCTION_TAGS.map((tag: any) => (
+                    <button
+                      type="button"
+                      key={tag}
+                      onClick={() => quickAppendInstruction(tag, "normal")}
+                      className="text-[9px] font-bold py-1 px-2 rounded-full border dark:border-white/5 border-neutral-300 bg-neutral-100 dark:bg-neutral-800 dark:text-gray-300 text-neutral-800 hover:border-orange-500 transition-colors"
+                    >
+                      {tag}
+                    </button>
+                  ))}
+                </div>
+                <textarea 
+                  placeholder="e.g. Make it extra spicy, No onions, soft crust etc..." 
+                  value={chefNote} 
+                  onChange={(e) => setChefNote(e.target.value)} 
+                  className="w-full text-xs p-3 rounded-xl dark:bg-white/[0.03] bg-neutral-50 border dark:border-white/5 border-neutral-300 text-neutral-900 outline-none focus:border-orange-500 h-16 resize-none"
+                />
+              </div>
+
+              <button type="button" onClick={handleNormalPizzaAdd} className="w-full bg-orange-500 text-black p-4 rounded-xl font-black text-xs uppercase">
+                {isHindi ? "कर्ट में जोड़ने की पुष्टि करें" : "Confirm Add To Cart"}
+              </button>
+              <button type="button" onClick={() => { setSelectedProduct(null); setNormalPizzaSize(""); setNormalPizzaPrice(0); setChefNote(""); }} className="w-full mt-3 text-neutral-500 dark:text-gray-400 font-black text-[10px] text-center uppercase">
+                {isHindi ? "बंद करें" : "Close"}
+              </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* COMPACT PROFILE, LOYALTY LEDGER, & ORDER HISTORY DRAWER */}
+      <AnimatePresence>
+        {isProfileOpen && (
+          <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-[115] flex items-end">
+            <motion.div 
+              initial={{ y: "100%" }} 
+              animate={{ y: 0 }} 
+              exit={{ y: "100%" }} 
+              className="dark:bg-[#0b0c10] bg-white w-full h-[90vh] rounded-t-3xl border-t dark:border-white/10 border-neutral-200 overflow-y-auto pb-32 p-5 max-w-lg mx-auto relative shadow-2xl transition-colors duration-200 font-sans"
+            >
+              <div className="w-12 h-1 bg-neutral-200 dark:bg-white/15 rounded-full mx-auto mb-4" />
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-black dark:text-white text-neutral-900 font-mono">{isHindi ? "मेरा खाता और लॉयल्टी" : "My Account & Loyalty"}</h2>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => { triggerHaptic(); setIsProfileOpen(false); }} className="p-2.5 bg-neutral-100 hover:bg-neutral-200 dark:bg-white/5 dark:hover:bg-white/10 dark:text-white text-neutral-800 rounded-full transition-all"><X size={20} /></button>
+                </div>
+              </div>
+
+              {!customerDetails ? (
+                <form onSubmit={handleSaveDetails} className="space-y-4">
+                  <div className="text-center space-y-1.5 pb-2">
+                    <User className="mx-auto text-orange-500" size={32} />
+                    <h3 className="text-sm font-black dark:text-white text-neutral-900">{isHindi ? "प्रोफाइल सेटअप करें" : "Set Up Profile"}</h3>
+                    <p className="text-[10px] text-neutral-600 dark:text-gray-400 font-semibold leading-normal">{isHindi ? "लॉयल्टी पॉइंट्स कमाने, सुरक्षित पिन सेटअप करने और आसान चेकआउट करने के लिए प्रोफाइल बनाएं!" : "Build your profile to unlock free loyalty codes, safety PIN checkout and fast orders!"}</p>
+                  </div>
+                  
+                  <div className="space-y-3 text-left">
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-bold text-neutral-600 uppercase">{isHindi ? "आपका नाम" : "Your Name"}</label>
+                      <input autoComplete="name" type="text" placeholder="Enter your name..." value={tempName} onChange={(e) => setTempName(e.target.value)} className="w-full dark:bg-neutral-800 bg-neutral-50 border dark:border-neutral-700 border-neutral-300 p-3 rounded-xl font-bold dark:text-white text-neutral-900 outline-none focus:border-orange-500 text-xs" required />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-bold text-neutral-600 uppercase">{isHindi ? "मोबाइल नंबर" : "Mobile Number"}</label>
+                      <input autoComplete="tel" type="tel" maxLength={10} placeholder="10-digit Phone Number" value={tempPhone} onChange={(e) => setTempPhone(e.target.value)} className="w-full dark:bg-neutral-800 bg-neutral-50 border dark:border-neutral-700 border-neutral-300 p-3 rounded-xl font-bold dark:text-white text-neutral-900 outline-none focus:border-orange-500 text-xs" required />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-bold text-neutral-600 uppercase flex items-center gap-1"><Lock size={10}/> <span>{isHindi ? "सुरक्षा पिन बनाएँ (4-अंक)" : "Create 4-Digit Security PIN"}</span></label>
+                      <input type="password" maxLength={4} placeholder="e.g. 1234" value={tempPin} onChange={(e) => setTempPin(e.target.value)} className="w-full dark:bg-neutral-800 bg-neutral-50 border dark:border-neutral-700 border-neutral-300 p-3 rounded-xl font-bold dark:text-white text-neutral-900 outline-none focus:border-orange-500 text-xs text-center tracking-widest font-mono" required />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-bold text-neutral-600 uppercase">{isHindi ? "इनवाइट कोड (वैकल्पिक)" : "Referral Code (Optional)"}</label>
+                      <input type="text" placeholder="Enter invite code..." value={tempRefCode} onChange={(e) => setTempRefCode(e.target.value)} className="w-full dark:bg-neutral-800 bg-neutral-50 border dark:border-neutral-700 border-neutral-300 p-3 rounded-xl font-bold dark:text-white text-neutral-900 outline-none focus:border-orange-500 text-xs" />
+                    </div>
+                  </div>
+                  <button type="submit" className="w-full bg-orange-500 text-black p-3.5 rounded-xl font-black text-xs uppercase shadow transition-all active:scale-95 mt-4">{isHindi ? "खाता बनाएं ➔" : "Create Account ➔"}</button>
+                </form>
+              ) : (
+                <div className="space-y-6">
+                  {/* USER ACCOUNT VIEW */}
+                  <div className="dark:bg-white/[0.02] bg-neutral-50 p-4 rounded-2xl border dark:border-white/5 border-neutral-200 flex justify-between items-center transition-colors duration-200">
+                    <div>
+                      <p className="text-[8px] dark:text-gray-400 text-neutral-600 font-black uppercase">Customer Profile</p>
+                      <h4 className="font-black text-base text-orange-500">{customerDetails.name}</h4>
+                      <p className="text-xs dark:text-gray-400 text-neutral-700 font-semibold font-mono">{customerDetails.phone}</p>
+                      <p className="text-[9px] text-yellow-600 dark:text-yellow-400 font-bold mt-1 uppercase font-mono">{isHindi ? "इन्वाइट कोड:" : "Invite Code:"} {getReferralCode()}</p>
+                    </div>
+                    <button 
+                      onClick={() => { 
+                        triggerHaptic();
+                        localStorage.removeItem('bb_cafe_customer'); 
+                        setCustomerDetails(null); 
+                        setTempName(""); 
+                        setTempPhone(""); 
+                        setTempPin(""); 
+                      }} 
+                      className="text-[9px] bg-red-500/10 hover:bg-red-500 hover:text-white text-red-500 px-3 py-2 rounded-lg font-black uppercase flex items-center gap-1 transition-all"
+                    >
+                      <LogOut size={12}/> {isHindi ? "लॉगआउट" : "Logout"}
+                    </button>
+                  </div>
+
+                  {/* Eco-Hero Badge */}
+                  <div className="bg-gradient-to-r from-emerald-500/10 to-teal-500/10 border border-emerald-500/20 p-4 rounded-2xl flex items-center justify-between shadow-sm">
+                    <div className="space-y-1">
+                      <p className="text-[8px] uppercase tracking-wider text-emerald-500 font-black">पर्यावरण संरक्षण ट्रैकर (Eco Impact)</p>
+                      <h4 className="text-xs font-black dark:text-white text-neutral-900">
+                        {isHindi ? `आपने बचाए: ` : "You Saved: "}<span className="text-emerald-500 text-sm font-black">{ecoCutlerySaves} {isHindi ? "प्लास्टिक चम्मच 🌳" : "Plastic Cutlery 🌳"}</span>
+                      </h4>
+                      <p className="text-[9px] text-neutral-500 dark:text-gray-400 font-medium">{isHindi ? "चम्मच/टिश्यू न चुनकर आपने पर्यावरण की मदद की है।" : "By skipping plastic utensils, you actively protected nature!"}</p>
+                    </div>
+                    {ecoCutlerySaves >= 3 && (
+                      <div className="bg-emerald-500 text-black px-3 py-1.5 rounded-full border border-emerald-400/30 font-black text-[9px] flex items-center gap-1 shadow animate-pulse">
+                        <Award size={12}/>
+                        <span>Eco-Hero 🍃</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="dark:bg-yellow-400/5 bg-yellow-100 border border-yellow-300 dark:border-yellow-400/20 rounded-2xl p-4 space-y-3 shadow-md">
+                    <div className="flex justify-between items-center border-b dark:border-white/10 border-yellow-200 pb-2">
+                      <div className="flex items-center gap-1.5 text-yellow-600 dark:text-yellow-400 font-black text-xs uppercase"><Gift size={12}/> <span>{isHindi ? "बम बम लॉयल्टी क्लब" : "Bum Bum Loyalty Club"}</span></div>
+                      <span className="text-[8px] font-black border px-2 py-0.5 rounded-full border-yellow-500/30 bg-yellow-100/30 dark:text-yellow-400 dark:border-yellow-400/30 dark:bg-yellow-400/10">
+                        {getCustomerTier(customerPoints).name}
+                      </span>
+                    </div>
+                    
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <h4 className="text-2xl font-black dark:text-white text-neutral-900 leading-none font-mono">{customerPoints} <span className="text-[9px] dark:text-gray-400 text-neutral-700 font-black uppercase font-mono">Points</span></h4>
+                        <p className="text-[8px] dark:text-gray-400 text-neutral-700 font-bold mt-1">{isHindi ? "₹100 खर्च करें = 1 पॉइंट पाएं!" : "Spend ₹100 = Get 1 Loyalty Point!"}</p>
+                      </div>
+                      <div className="text-right text-[8px] dark:text-yellow-400 text-amber-900 font-black space-y-0.5 uppercase max-h-20 overflow-y-auto no-scrollbar font-mono">
+                        {loyaltyRules.map((rule: any) => (<p key={rule.id}>🎁 {rule.pointsCost} Pts = {rule.rewardName}</p>))}
+                      </div>
+                    </div>
+
+                    {pointsHistory.length > 0 && (
+                      <div className="pt-4 border-t border-neutral-200 dark:border-neutral-800 space-y-3 font-sans">
+                        <p className="text-xs font-black uppercase tracking-wider text-orange-500 flex items-center gap-1.5">
+                          <span>📜</span> {isHindi ? "पॉइंट्स पासबुक (लेन-देन विवरण):" : "Points Passbook & Ledger:"}
+                        </p>
+                        <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                          {pointsHistory.map((h: any) => (
+                            <div key={h.id} className="flex justify-between items-center bg-white dark:bg-neutral-900 p-3 rounded-xl border dark:border-neutral-800 border-neutral-200 shadow-sm transition-colors duration-200">
+                              <div className="space-y-1">
+                                <span className="text-xs font-black text-neutral-800 dark:text-gray-200 block">{h.description}</span>
+                                <span className="text-[9px] text-neutral-500 dark:text-gray-400 font-bold block font-mono">
+                                  {h.timestamp?.toDate ? h.timestamp.toDate().toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' }) : new Date(h.timestamp).toLocaleString()}
+                                </span>
+                              </div>
+                              <span className={`px-2.5 py-1 rounded-lg text-xs font-black flex items-center gap-0.5 font-mono ${h.type === 'earn' ? 'bg-green-500/10 text-green-600 dark:text-green-400 border border-green-500/20' : 'bg-red-500/10 text-red-500 border border-red-500/20'}`}>
+                                {h.type === 'earn' ? '+' : '-'}{h.points} Pts
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="pt-1.5 flex flex-col gap-2 font-sans">
+                      <div className="flex justify-between items-center text-[9px]">
+                        <span className="dark:text-gray-400 text-neutral-700 font-black uppercase">{isHindi ? "शेयर प्रोग्रेस:" : "Share Progress:"}</span>
+                        <span className="text-yellow-600 dark:text-yellow-400 font-black bg-yellow-100 dark:bg-yellow-400/10 px-2 py-0.5 rounded border border-yellow-300 dark:border-yellow-400/20 font-mono">{shareCount}/5 Shared</span>
+                      </div>
+                      <button type="button" onClick={handleShareApp} className="w-full bg-green-600 text-white font-black py-2.5 rounded-xl text-[10px] uppercase flex items-center justify-center gap-1 shadow-md transition-all">{isHindi ? "5 बार शेयर करके मुफ्त +1 पॉइंट कमाएं! 🎁" : "Share 5 times to earn +1 free point! 🎁"}</button>
+                    </div>
+
+                    <div className="pt-2 border-t border-neutral-200 dark:border-neutral-800 flex justify-between items-center font-sans">
+                      <span className="text-[9px] dark:text-gray-400 text-neutral-700 font-bold uppercase">{isHindi ? "दोस्त को गिफ्ट करें:" : "Gift points to a friend:"}</span>
+                      <button type="button" onClick={() => { triggerHaptic(); setIsGiftModalOpen(true); }} className="bg-yellow-500/10 text-yellow-600 border border-yellow-400/20 px-2.5 py-1 rounded text-[8px] font-black uppercase">🎁 Gift Points</button>
+                    </div>
+
+                    <div className="pt-2 border-t border-neutral-200 dark:border-neutral-800">
+                      <p className="text-[9px] dark:text-gray-400 text-neutral-700 font-black uppercase mb-1.5">{isHindi ? "सोशल मीडिया पर फॉलो करके  पॉइंट्स कमाएं:" : "Earn Points by Following Us:"}</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {SOCIAL_LINKS.map((link: any) => (
+                          <button
+                            key={link.id}
+                            type="button"
+                            onClick={() => {
+                              triggerHaptic();
+                              setClaimingPlatform(link);
+                              setIsClaimModalOpen(true);
+                              window.open(link.url, '_blank');
+                            }}
+                            className="flex items-center gap-1 bg-neutral-100 dark:bg-white/5 border dark:border-white/10 border-neutral-200 px-2.5 py-1 rounded-full text-[9px] font-bold dark:text-gray-300 text-neutral-800 hover:border-yellow-400 transition-all"
+                          >
+                            <img src={link.icon} className="w-3.5 h-3.5 object-contain flex-shrink-0" alt="" loading="lazy" />
+                            <span>{link.label.split(' ')[1]} (+{link.points} P)</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5 pt-2 border-t border-neutral-200 dark:border-neutral-800 font-sans">
+                      <p className="text-[9px] dark:text-gray-400 text-neutral-700 font-black uppercase mb-1.5">{isHindi ? "पॉइंट्स रिडीम करें (सीधे कार्ट में):" : "Redeem Points (Instantly adds to cart):"}</p>
+                      <div className="grid grid-cols-2 gap-1.5 max-h-24 overflow-y-auto no-scrollbar font-mono">
+                        {loyaltyRules.map((rule: any) => {
+                          const inCartCost = cart.reduce((acc: number, i: any) => acc + (i.pointsCost || 0), 0);
+                          const isAffordable = (customerPoints - inCartCost) >= rule.pointsCost;
+                          return (
+                            <button key={rule.id} type="button" onClick={() => handleCustomerRedeem(`reward-${rule.id}`, `🎁 FREE ${rule.rewardName}`, rule.pointsCost)} disabled={!isAffordable} className={`py-2 px-2 rounded text-[9px] font-black uppercase border truncate transition-all ${isAffordable ? 'bg-yellow-400 text-black border-yellow-500 hover:bg-yellow-500 font-bold' : 'bg-neutral-100 dark:bg-white/5 text-neutral-500 dark:text-gray-400 border-neutral-200 dark:border-white/5 cursor-not-allowed'}`}>🎁 {rule.rewardName} ({rule.pointsCost} P)</button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4 pt-4 border-t border-neutral-200 dark:border-neutral-800 font-sans">
+                    <h3 className="text-sm font-black dark:text-gray-200 text-neutral-900 uppercase flex items-center gap-1.5">
+                      <History size={16} className="text-orange-500" />
+                      <span>{isHindi ? "मेरा आर्डर इतिहास (विवरण):" : "My Order History Ledger:"}</span>
+                    </h3>
+                    {pastOrders.length > 0 ? (
+                      <div className="space-y-4 pr-1">
+                        {pastOrders.map((ord: any, index: number) => {
+                          const formattedDate = ord.timestamp?.toDate ? ord.timestamp.toDate().toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' }) : new Date(ord.timestamp).toLocaleString();
+                          return (
+                            <div key={index} className="bg-white dark:bg-neutral-900 border dark:border-neutral-800 border-neutral-200 rounded-2xl p-4 space-y-3 shadow-md transition-colors duration-200 font-sans">
+                              <div className="flex justify-between items-center border-b dark:border-neutral-800 border-neutral-200 pb-2 font-mono">
+                                <div className="flex flex-col gap-0.5">
+                                  <span className="text-xs font-black text-orange-500 font-bold">Bill: #{formatBillNumber(ord.billNumber || 0)}</span>
+                                  <span className="text-[9px] text-neutral-500 dark:text-gray-400 font-bold">{formattedDate}</span>
+                                </div>
+                                <span className="bg-green-600/10 text-green-600 dark:text-green-400 border border-green-500/20 px-2.5 py-1 rounded-lg text-[9px] font-black font-mono">
+                                  Token: #{ord.tokenNumber || "N/A"}
+                                </span>
+                              </div>
+                              
+                              <div className="space-y-1.5">
+                                {ord.items.map((it: any, i: number) => (
+                                  <div key={i} className="flex justify-between text-xs text-neutral-800 dark:text-gray-300">
+                                    <span>{it.name} <span className="text-orange-500 text-[10px]">x{it.quantity}</span></span>
+                                    <span>₹{it.price * it.quantity}</span>
+                                  </div>
+                                ))}
+                              </div>
+                              
+                              <div className="border-t border-dashed dark:border-neutral-800 border-neutral-200 pt-2.5 flex justify-between items-center text-xs font-black">
+                                <span className="text-neutral-500">{isHindi ? "कुल भुगतान राशि:" : "To Pay Amount:"}</span>
+                                <span className="text-sm text-green-600 dark:text-green-400 font-mono">₹{ord.total}</span>
+                              </div>
+
+                              <a 
+                                href={`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(`नमस्ते बम बम कैफ़े! कृपया मेरे आर्डर नंबर #${formatBillNumber(ord.billNumber)} (टोकन नंबर: #${ord.tokenNumber}) का लाइव स्टेटस बताएं।`)}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="w-full bg-orange-500/10 text-orange-600 hover:bg-orange-500 hover:text-white dark:bg-white/5 hover:dark:bg-white/10 text-center text-[10px] font-black py-2.5 rounded-xl block border dark:border-neutral-800 border-orange-500/20 transition-all"
+                              >
+                                Track Live Status on WA 🔍
+                              </a>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <p className="text-center text-neutral-500 py-6 text-[10px] font-bold uppercase tracking-wider">
+                        {isHindi ? "अभी तक कोई आर्डर नहीं मिला।  स्वादिष्ट आर्डर शुरू करें! 🍕" : "No orders found yet. Grab some food! 🍕"}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* MODULAR CART DRAWER */}
+      <AnimatePresence>
+        {isCartOpen && (
+          <CartDrawer 
+            isHindi={isHindi}
+            isCartOpen={isCartOpen}
+            setIsCartOpen={setIsCartOpen}
+            cart={cart}
+            addItem={addItem}
+            removeItem={removeItem}
+            upsellSuggestionItems={upsellSuggestionItems}
+            fulfillmentType={fulfillmentType}
+            setFulfillmentType={setFulfillmentType}
+            ketchupAddon={ketchupAddon}
+            setKetchupAddon={setKetchupAddon}
+            oreganoAddon={oreganoAddon}
+            setOreganoAddon={setOreganoAddon}
+            chiliFlakesAddon={chiliFlakesAddon}
+            setChiliFlakesAddon={setChiliFlakesAddon}
+            selectedArea={selectedArea}
+            setSelectedArea={setSelectedArea}
+            DELIVERY_AREAS={DELIVERY_AREAS}
+            lastDeliveryAddress={lastDeliveryAddress}
+            address={address}
+            setAddress={setAddress}
+            handleDetectLocation={handleDetectLocation}
+            tableNumber={tableNumber}
+            setTableNumber={setTableNumber}
+            noCutlery={noCutlery}
+            setNoCutlery={setNoCutlery}
+            enteredCoupon={enteredCoupon}
+            setEnteredCoupon={setEnteredCoupon}
+            appliedCoupon={appliedCoupon}
+            handleApplyCoupon={handleApplyCoupon}
+            paymentMethod={paymentMethod}
+            setPaymentMethod={setPaymentMethod}
+            setIsUpiPopupOpen={setIsUpiPopupOpen}
+            handleCheckoutClick={handleCheckoutClick}
+            isSubmittingOrder={isSubmittingOrder}
+            getCartSubtotal={getCartSubtotal}
+            getCartAddonsPrice={getCartAddonsPrice}
+            getDeliveryCharge={getDeliveryCharge}
+            getFreeDeliveryProgressPercent={getFreeDeliveryProgressPercent}
+            getTotalBillPrice={getTotalBillPrice}
+            getDisplayPrice={getDisplayPrice}
+            triggerHaptic={triggerHaptic}
+            showAddonsSection={showAddonsSection}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* MODULAR UPI POPUP MODAL */}
+      <AnimatePresence>
+        {isUpiPopupOpen && (
+          <UpiPaymentModal 
+            isHindi={isHindi}
+            isUpiPopupOpen={isUpiPopupOpen}
+            setIsUpiPopupOpen={setIsUpiPopupOpen}
+            getTotalBillPrice={getTotalBillPrice}
+            handleLaunchUpiPay={handleLaunchUpiPay}
+            handleScreenshotChange={handleScreenshotChange}
+            isCompressing={isCompressing}
+            paymentScreenshot={paymentScreenshot}
+            setPaymentScreenshot={setPaymentScreenshot}
+            sendWhatsAppOrder={sendWhatsAppOrder}
+            isSubmittingOrder={isSubmittingOrder}
+            triggerHaptic={triggerHaptic}
+            upiId={upiId} // Passed down correctly to safely avoid compile error
+          />
+        )}
+      </AnimatePresence>
+
+      {/* COMPACT INSTALL BANNER GUIDE MODAL */}
+      <AnimatePresence>
+        {isInstallModalOpen && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[270] flex items-center justify-center p-6 font-sans">
+            <div className="dark:bg-[#111] bg-white w-full max-sm p-6 rounded-3xl border dark:border-white/10 border-neutral-200 text-center space-y-4 shadow-2xl transition-colors duration-200">
+              <Sparkles className="mx-auto text-yellow-400 animate-bounce" size={32} />
+              
+              <div className="space-y-1">
+                <h3 className="text-base font-black dark:text-white text-neutral-900">📲 आसान इंस्टॉलेशन गाइड</h3>
+                <p className="text-[10px] text-neutral-600 dark:text-gray-400 font-bold leading-normal">
+                  यदि व्यक्तिगत इंस्टॉल काम नहीं कर रहा है, तो आप नीचे दिए गए आसान चरणों से इसे होम स्क्रीन पर जोड़ सकते हैं:
+                </p>
+              </div>
+
+              <div className="text-left text-xs space-y-3 text-neutral-800 dark:text-gray-300 font-medium border-y dark:border-white/5 border-neutral-200 py-4 font-sans font-bold">
+                <p className="flex items-start gap-2">
+                  <span className="bg-orange-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px] font-black flex-shrink-0">1</span>
+                  <span>गूगल क्रोम (Chrome) में ऊपर दाईं ओर दिख रहे **तीन डॉट्स (⋮)** आइकॉन पर क्लिक करें।</span>
+                </p>
+                <p className="flex items-start gap-2">
+                  <span className="bg-orange-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px] font-black flex-shrink-0">2</span>
+                  <span>मेन्यू लिस्ट में नीचे जाकर **'Install app'** या **'Add to Home screen'** का विकल्प चुनें।</span>
+                </p>
+                <p className="flex items-start gap-2">
+                  <span className="bg-orange-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px] font-black flex-shrink-0">3</span>
+                  <span>अब **'Install'** बटन दबाएं।  बम बम कैफ़े ऐप आपके फोन की होम स्क्रीन पर असली ऐप की तरह जुड़ जाएगा!</span>
+                </p>
+              </div>
+
+              <button 
+                onClick={() => { triggerHaptic(); setIsInstallModalOpen(false); }} 
+                className="w-full bg-orange-500 text-white p-3.5 rounded-xl font-black text-xs uppercase tracking-wider active:scale-95 transition-all shadow"
+              >
+                समझ गया, बंद करें
+              </button>
+            </div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* SECURED GIFT POINTS MODAL */}
+      <AnimatePresence>
+        {isGiftModalOpen && (
+          <div className="fixed inset-0 bg-black/95 z-[260] flex items-center justify-center p-6 font-sans">
+            <motion.form onSubmit={handleGiftPoints} className="dark:bg-[#111] bg-white w-full max-w-md p-6 rounded-3xl border dark:border-white/10 border-neutral-200 text-center space-y-4 shadow-xl transition-colors duration-200">
+              <Gift className="mx-auto text-yellow-400" size={32} />
+              <div>
+                <h3 className="text-lg font-black text-yellow-400 uppercase italic font-mono">Gift Loyalty Points</h3>
+                <p className="text-[9px] text-neutral-600 font-semibold mt-0.5">अपने पॉइंट्स किसी दोस्त को गिफ्ट करें</p>
+              </div>
+              <div className="space-y-3 text-left">
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black uppercase text-neutral-700 dark:text-neutral-400">Friend's Phone Number</label>
+                  <input type="tel" maxLength={10} placeholder="e.g. 9876543210" value={giftPhone} onChange={(e) => setGiftPhone(e.target.value)} required className="w-full dark:bg-white/10 bg-neutral-50 border dark:border-white/10 border-neutral-300 p-3 rounded-xl text-xs font-bold text-neutral-900 dark:text-white outline-none text-center font-mono" />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black uppercase text-neutral-700 dark:text-neutral-400">Points to Gift (Your Pts: {customerPoints})</label>
+                  <input type="number" placeholder="e.g. 10" value={giftPointsAmount} onChange={(e) => setGiftPointsAmount(e.target.value === "" ? "" : Number(e.target.value))} required className="w-full dark:bg-white/10 bg-neutral-50 border dark:border-white/10 border-neutral-300 p-3 rounded-xl text-xs font-bold text-neutral-900 dark:text-white outline-none text-center font-mono" />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black uppercase text-neutral-700 dark:text-neutral-400 flex items-center gap-1"><Lock size={10}/> <span>Your 4-Digit Security PIN (सुरक्षा पिन)</span></label>
+                  <input type="password" maxLength={4} placeholder="🔒 enter your pin" value={giftSenderPin} onChange={(e) => setGiftSenderPin(e.target.value)} required className="w-full dark:bg-white/10 bg-neutral-50 border dark:border-white/10 border-neutral-300 p-3 rounded-xl text-xs font-bold text-neutral-900 dark:text-white outline-none text-center tracking-widest font-mono" />
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <button type="submit" disabled={isGiftingLoading} className="flex-1 bg-yellow-400 text-black font-black p-3 rounded-xl text-xs uppercase flex items-center justify-center gap-1">
+                  {isGiftingLoading ? <Loader2 className="animate-spin" size={14} /> : <span>Gift Points 🎁</span>}
+                </button>
+                <button type="button" onClick={() => { triggerHaptic(); setIsGiftModalOpen(false); setGiftPhone(""); setGiftPointsAmount(""); setGiftSenderPin(""); }} className="bg-neutral-100 text-neutral-800 dark:bg-white/5 dark:text-gray-400 font-bold p-3 rounded-xl text-xs">CANCEL</button>
+              </div>
+            </motion.form>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* VERIFIED SOCIAL POINTS CLAIM MODAL */}
+      <AnimatePresence>
+        {isClaimModalOpen && claimingPlatform && (
+          <div className="fixed inset-0 bg-black/95 z-[260] flex items-center justify-center p-6 font-sans">
+            <motion.form 
+              onSubmit={handleClaimSubmit}
+              className="dark:bg-[#111] bg-white w-full max-sm p-6 rounded-3xl border dark:border-white/10 border-neutral-200 text-center space-y-4 shadow-xl"
+            >
+              <img src={claimingPlatform.icon} className="w-10 h-10 object-contain mx-auto" alt="" loading="lazy" />
+              <div className="space-y-1">
+                <h3 className="text-base font-black text-orange-600 dark:text-orange-500 uppercase">वेरिफिकेशन दावा सबमिट करें</h3>
+                <p className="text-[10px] text-neutral-600 leading-normal font-semibold">
+                  {claimingPlatform.label} पर फॉलो/सब्सक्राइब करने के बाद, नीचे अपना यूज़रनेम दर्ज करें। हमारे एडमिन इसकी जांच करके आपका {claimingPlatform.points} पॉइंट क्रेडिट करेंगे!
+                </p>
+              </div>
+
+              <div className="space-y-1 text-left">
+                <label className="text-[9px] font-black uppercase text-neutral-700 dark:text-neutral-400">Your Profile Handle / Username</label>
+                <input 
+                  type="text" 
+                  placeholder="e.g. @yourname" 
+                  value={claimUsername} 
+                  onChange={(e) => setClaimUsername(e.target.value)} 
+                  required 
+                  className="w-full dark:bg-white/10 bg-neutral-50 border dark:border-white/10 border-neutral-300 p-3 rounded-xl text-xs font-bold text-neutral-900 dark:text-white outline-none text-center font-mono" 
+                />
+              </div>
+
+              <div className="flex gap-2">
+                <button type="submit" disabled={isClaimingLoading} className="flex-1 bg-yellow-400 text-black font-black p-3 rounded-xl text-xs uppercase flex items-center justify-center gap-1">
+                  {isClaimingLoading ? <Loader2 className="animate-spin" size={14} /> : <span>Claim Reward Request ➔</span>}
+                </button>
+                <button 
+                  type="button" 
+                  onClick={() => { triggerHaptic(); setIsClaimModalOpen(false); setClaimUsername(""); }} 
+                  className="bg-neutral-100 text-neutral-800 dark:bg-white/5 dark:text-gray-400 p-3 rounded-xl font-black text-xs uppercase"
+                >
+                  Cancel
+                </button>
+              </div>
+            </motion.form>
+          </div>
+        )}
+      </AnimatePresence>
 
     </div>
   );
