@@ -13,7 +13,7 @@ import { useRouter } from 'next/navigation';
 // सब-कंपोनेंट्स इम्पोर्ट्स
 import CategorySlider from '../components/home/CategorySlider';
 import DiyPizzaBuilder from '../components/home/DiyPizzaBuilder';
-import CartDrawer from '../components/admin/CartDrawer';
+import CartDrawer from '../components/home/CartDrawer';
 import UpiPaymentModal from '../components/home/UpiPaymentModal';
 
 const FALLBACK_CATEGORIES = ["All", "Special Pizza", "Special Thali", "Paneer Special", "Special Mix veg", "Fast Food", "Super Cool", "Indian Bread", "Special Rice"];
