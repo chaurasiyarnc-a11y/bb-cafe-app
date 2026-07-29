@@ -137,6 +137,9 @@ export default function BbCafeHome() {
   const [liveOrder, setLiveOrder] = useState<any | null>(null);
   const [closingMinutesLeft, setClosingMinutesLeft] = useState<number | null>(null);
 
+  // History Ledger Tracker Collapse States
+  const [dismissedHistoryOrders, setDismissedHistoryOrders] = useState<number[]>([]);
+
   const [customerDetails, setCustomerDetails] = useState<{ name: string, phone: string, refCode?: string, pin?: string } | null>(null);
   const [tempName, setTempName] = useState("");
   const [tempPhone, setTempPhone] = useState("");
@@ -1372,13 +1375,19 @@ export default function BbCafeHome() {
     const unsubLive = onSnapshot(
       query(
         collection(db, "orders"),
-        where("customerPhone", "==", customerDetails.phone),
-        orderBy("timestamp", "desc"),
-        limit(1)
+        where("customerPhone", "==", customerDetails.phone)
       ),
       (snap) => {
         if (!snap.empty) {
-          const latestOrder = { id: snap.docs[0].id, ...snap.docs[0].data() } as any;
+          // Client-side sorting latest order to bypass missing index issue
+          const orders = snap.docs.map(d => ({ id: d.id, ...d.data() } as any));
+          orders.sort((a, b) => {
+            const timeA = a.timestamp?.seconds || (a.timestamp?.toDate ? a.timestamp.toDate().getTime() / 1000 : 0);
+            const timeB = b.timestamp?.seconds || (b.timestamp?.toDate ? b.timestamp.toDate().getTime() / 1000 : 0);
+            return timeB - timeA;
+          });
+
+          const latestOrder = orders[0];
           const dismissedRejected = JSON.parse(localStorage.getItem('bb_dismissed_rejected_orders') || '[]');
           if (latestOrder.status !== 'completed' && !dismissedRejected.includes(latestOrder.id)) {
             setLiveOrder(latestOrder);
@@ -1613,7 +1622,7 @@ export default function BbCafeHome() {
         </div>
       )}
 
-      {/* Closing Warning Timer Ribbon */}
+      {/* Closing Warning Ribbon */}
       {closingMinutesLeft !== null && storeOpen && (
         <div className="bg-gradient-to-r from-amber-500 to-orange-600 text-white font-extrabold py-2 px-4 text-center text-[10px] flex items-center justify-center gap-1.5 shadow-md">
           <span>⏰</span>
@@ -2012,7 +2021,7 @@ export default function BbCafeHome() {
                               {customerDetails ? (
                                 isHindi ? "आपका प्रोमो पास एक्टिवेटेड है! ✅ हर ₹100 पर 1 पॉइंट कमाएं।  यहाँ क्लिक करके अपने  रिवॉर्ड्स देखें ➔" : "Your promo pass is active! ✅ Earn 1 point per ₹100. Click here to view rewards ➔"
                               ) : (
-                                isHindi ? "अपना Name और Number दर्ज करके इस पास को एक्टिवेट करें! 🎁 हर ₹100 पर 1 पॉइंट कमाएं।  टच करें ➔" : "Enter your Name & Number to activate this pass! 🎁 Earn 1 point per ₹100. Tap to activate ➔"
+                                isHindi ? "अपना Name & Number दर्ज करके इस पास को एक्टिवेट करें! 🎁 हर ₹100 पर 1 पॉइंट कमाएं।  टच करें ➔" : "Enter your Name & Number to activate this pass! 🎁 Earn 1 point per ₹100. Tap to activate ➔"
                               )}
                             </p>
                           </div>
@@ -2115,7 +2124,7 @@ export default function BbCafeHome() {
             </div>
           </div>
 
-          {/* Social Icons Container with dynamically fetched Follower Counts */}
+          {/* Social Icons */}
           <div className="social-icons flex flex-wrap justify-center gap-6 py-5 dark:bg-white/[0.02] bg-white border dark:border-white/5 border-neutral-200 rounded-2xl shadow-sm">
             {SOCIAL_LINKS.map((link: any) => (
               <a 
@@ -2157,7 +2166,7 @@ export default function BbCafeHome() {
         </footer>
       </main>
 
-      {/* STICKY FLOATING CART BUTTON / BOTTOM NAV */}
+      {/* STICKY FLOATING CART BUTTON */}
       <div className="fixed bottom-6 inset-x-0 z-[80] flex justify-center pointer-events-none font-sans font-bold">
         <div className="flex gap-4 pointer-events-auto">
           {cart.length > 0 && (
@@ -2184,106 +2193,23 @@ export default function BbCafeHome() {
         </div>
       </div>
 
-      {/* LIVE ORDER REAL-TIME TRACKING FOOTER PANEL */}
+      {/* LIVE ORDER REAL-TIME TRACKING FLOATING PANEL */}
       <AnimatePresence>
         {liveOrder && (
           <motion.div 
             initial={{ y: 100, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 100, opacity: 0 }}
-            className="fixed bottom-24 inset-x-4 z-50 max-w-sm mx-auto bg-neutral-950/95 backdrop-blur-md border border-orange-500/30 p-4 rounded-3xl shadow-2xl flex flex-col gap-2 text-xs font-bold font-sans"
+            className="fixed bottom-24 inset-x-4 z-50 max-w-sm mx-auto shadow-2xl"
           >
-            <div className="flex justify-between items-center">
-              <div className="flex items-center gap-2">
-                <span className={`w-2 h-2 rounded-full ${liveOrder.status === 'rejected' ? 'bg-red-500' : 'bg-orange-500 animate-pulse'}`} />
-                <span className="text-gray-200">
-                  {liveOrder.status === 'rejected' 
-                    ? (isHindi ? "⚠️ आर्डर ALERT" : "⚠️ Order Alert")
-                    : (isHindi ? `आर्डर लाइव ट्रैकिंग (Bill #${formatBillNumber(liveOrder.billNumber)})` : `Order Tracking (Bill #${formatBillNumber(liveOrder.billNumber)})`)
-                  }
-                </span>
-              </div>
-              {liveOrder.status === 'rejected' ? (
-                <button 
-                  type="button"
-                  onClick={() => { 
-                    triggerHaptic(); 
-                    try {
-                      const dismissed = JSON.parse(localStorage.getItem('bb_dismissed_rejected_orders') || '[]');
-                      if (!dismissed.includes(liveOrder.id)) {
-                        dismissed.push(liveOrder.id);
-                        localStorage.setItem('bb_dismissed_rejected_orders', JSON.stringify(dismissed));
-                      }
-                    } catch (e) {}
-                    setLiveOrder(null); 
-                  }}
-                  className="text-gray-400 hover:text-white p-1"
-                >
-                  <X size={14} />
-                </button>
-              ) : (
-                <span className="bg-orange-500/10 text-orange-400 px-2 py-0.5 rounded-md text-[9px] uppercase font-black font-mono">
-                  Token: #{liveOrder.tokenNumber}
-                </span>
-              )}
-            </div>
-
-            {liveOrder.status === 'rejected' ? (
-              <div className="space-y-3 py-1 font-sans">
-                <p className="text-red-400 text-[10px] leading-relaxed font-black">
-                  {isHindi 
-                    ? "🚨 आपका आर्डर कैफ़े द्वारा रद्द (Reject) कर दिया गया है! कृपया स्पष्टीकरण या दोबारा आर्डर के लिए कैफ़े में तुरंत संपर्क करें।"
-                    : "🚨 Your order has been rejected by the cafe! Please call us immediately for confirmation or details."
-                  }
-                </p>
-                <a 
-                  href="tel:+919714293759"
-                  className="w-full bg-red-600 hover:bg-red-700 text-white text-center text-[10px] py-2 rounded-xl block font-black uppercase"
-                >
-                  Call Cafe 📞
-                </a>
-              </div>
-            ) : (
-              <div className="space-y-1 mt-1 font-mono">
-                {/* --- REAL-TIME MAP RENDERED WHEN KITCHEN ACCEPTS THE ORDER (STATUS !== 'pending') --- */}
-                {liveOrder.status !== 'pending' && (
-                  <div className="w-full h-40 rounded-2xl overflow-hidden mb-3 border border-white/10 shadow-inner">
-                    <LiveOrderTracker 
-  isHindi={isHindi}
-  liveOrder={liveOrder}
-  setLiveOrder={setLiveOrder}
-  formatBillNumber={formatBillNumber}
-  whatsappNumber={whatsappNumber}
-  triggerHaptic={triggerHaptic}
-/>
-                  </div>
-                )}
-
-                <div className="flex justify-between text-[8px] text-gray-400 uppercase font-sans">
-                  <span className={liveOrder.status === 'pending' ? 'text-orange-400 font-extrabold' : ''}>{isHindi ? "स्वीकृति" : "Confirming"} ⏳</span>
-                  <span className={liveOrder.status === 'preparing' ? 'text-yellow-400 font-extrabold' : ''}>{isHindi ? "तैयारी" : "Preparing"} 👨‍🍳</span>
-                  <span className={liveOrder.status === 'out_for_delivery' ? 'text-blue-400 font-extrabold' : ''}>{isHindi ? "मार्ग में" : "On the Way"} 🛵</span>
-                </div>
-                <div className="w-full bg-white/5 h-1.5 rounded-full overflow-hidden relative">
-                  <div 
-                    className="bg-gradient-to-r from-orange-500 to-yellow-400 h-full transition-all duration-500" 
-                    style={{ 
-                      width: liveOrder.status === 'pending' ? '25%' : liveOrder.status === 'preparing' ? '65%' : '90%' 
-                    }} 
-                  />
-                </div>
-                <div className="flex gap-2 pt-1 border-t border-white/5 mt-1.5 font-sans">
-                  <a 
-                    href={`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(`नमस्ते  बम बम कैफ़े! कृपया मेरे आर्डर नंबर #${formatBillNumber(liveOrder.billNumber)} का लाइव स्टेटस बताएं।`)}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="flex-1 bg-white/5 hover:bg-white/10 text-center text-[10px] text-yellow-400 py-1.5 rounded-xl border border-white/5 transition-all"
-                  >
-                    Track Live Status (WA) 🔍
-                  </a>
-                </div>
-              </div>
-            )}
+            <LiveOrderTracker 
+              isHindi={isHindi}
+              liveOrder={liveOrder}
+              setLiveOrder={setLiveOrder}
+              formatBillNumber={formatBillNumber}
+              whatsappNumber={whatsappNumber}
+              triggerHaptic={triggerHaptic}
+            />
           </motion.div>
         )}
       </AnimatePresence>
@@ -2360,7 +2286,7 @@ export default function BbCafeHome() {
         )}
       </AnimatePresence>
 
-      {/* WRITING REVIEW FORM MODAL WITH INTEGRATED EXIT OPTIONS */}
+      {/* WRITING REVIEW FORM MODAL */}
       <AnimatePresence>
         {isReviewFormOpen && (
           <div className="fixed inset-0 bg-black/95 z-[200] flex items-center justify-center p-6 font-sans">
@@ -2695,6 +2621,8 @@ export default function BbCafeHome() {
                       <div className="space-y-4 pr-1">
                         {pastOrders.map((ord: any, index: number) => {
                           const formattedDate = ord.timestamp?.toDate ? ord.timestamp.toDate().toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' }) : new Date(ord.timestamp).toLocaleString();
+                          const isHistoryTrackingDismissed = dismissedHistoryOrders.includes(ord.billNumber);
+
                           return (
                             <div key={index} className="bg-white dark:bg-neutral-900 border dark:border-neutral-800 border-neutral-200 rounded-2xl p-4 space-y-3 shadow-md transition-colors duration-200 font-sans">
                               <div className="flex justify-between items-center border-b dark:border-neutral-800 border-neutral-200 pb-2 font-mono">
@@ -2721,14 +2649,36 @@ export default function BbCafeHome() {
                                 <span className="text-sm text-green-600 dark:text-green-400 font-mono">₹{ord.total}</span>
                               </div>
 
-                              <a 
-                                href={`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(`नमस्ते बम बम कैफ़े! कृपया मेरे आर्डर नंबर #${formatBillNumber(ord.billNumber)} (टोकन नंबर: #${ord.tokenNumber}) का लाइव स्टेटस बताएं।`)}`}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="w-full bg-orange-500/10 text-orange-600 hover:bg-orange-500 hover:text-white dark:bg-white/5 hover:dark:bg-white/10 text-center text-[10px] font-black py-2.5 rounded-xl block border dark:border-neutral-800 border-orange-500/20 transition-all"
-                              >
-                                Track Live Status on WA 🔍
-                              </a>
+                              {/* --- MODIFIED AREA: REAL-TIME TRACKER MAP INSTEAD OF WHATSAPP LINK --- */}
+                              {!isHistoryTrackingDismissed ? (
+                                <div className="w-full mt-2 rounded-2xl overflow-hidden shadow">
+                                  <LiveOrderTracker 
+                                    isHindi={isHindi}
+                                    liveOrder={ord}
+                                    setLiveOrder={(val) => {
+                                      if (val === null) {
+                                        setDismissedHistoryOrders(prev => [...prev, ord.billNumber]);
+                                      } else {
+                                        setPastOrders(prev => prev.map(o => o.billNumber === ord.billNumber ? val : o));
+                                      }
+                                    }}
+                                    formatBillNumber={formatBillNumber}
+                                    whatsappNumber={whatsappNumber}
+                                    triggerHaptic={triggerHaptic}
+                                  />
+                                </div>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    triggerHaptic();
+                                    setDismissedHistoryOrders(prev => prev.filter(id => id !== ord.billNumber));
+                                  }}
+                                  className="w-full mt-2 bg-orange-500/10 text-orange-600 hover:bg-orange-500 hover:text-white dark:bg-white/5 hover:dark:bg-white/10 text-center text-[10px] font-black py-2.5 rounded-xl block border dark:border-neutral-800 border-orange-500/20 transition-all uppercase tracking-wider"
+                                >
+                                  {isHindi ? "लाइव ट्रैकर दिखाएं 🛵" : "Show Live Tracker 🛵"}
+                                </button>
+                              )}
                             </div>
                           );
                         })}
