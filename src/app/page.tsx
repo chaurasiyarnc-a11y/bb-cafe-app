@@ -2935,4 +2935,4 @@ const handleDetectLocation = () => {
 
     </div>
   );
-  }
+   }
