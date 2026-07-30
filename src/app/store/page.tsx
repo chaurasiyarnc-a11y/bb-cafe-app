@@ -244,7 +244,7 @@ export default function StoreStockPage() {
     setLocalOrderQties(prev => ({ ...prev, ...updatedLocal }));
   }, [savedOrders, focusedOrderField]);
 
-  // --- ऑथेंटिकेशन और डिलीट कन्फर्मेशन फंक्शन्स ---
+  // --- ऑथेंटिकेशन और सुरक्षा सम्बन्धी फंक्शन ---
   const handleLoginSubmit = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     const matched = users.find(u => u.pin === pinInput.trim());
@@ -968,6 +968,31 @@ export default function StoreStockPage() {
       console.error("Migration error:", error);
       toastMessage("स्थानांतरण फेल हो गया। कृपया दोबारा प्रयास करें।", "error");
     }
+  };
+
+  const handleUpdateListName = async (newName: string) => {
+    if (!newName.trim() || !activeListId) return;
+    await setDoc(doc(db, "order_lists", activeListId), { name: newName.toUpperCase() }, { merge: true });
+  };
+
+  const handleRemoveFromSavedList = (compoundId: string, name: string) => {
+    confirmDeleteWithPin(`हटाएं "${name}"?`, async () => {
+      await deleteDoc(doc(db, "saved_orders", compoundId));
+    });
+  };
+
+  const handleDeleteActiveList = () => {
+    confirmDeleteWithPin("क्या आप इस लिस्ट को हटाना चाहते हैं?", async () => {
+      const batch = writeBatch(db);
+      savedOrders.filter(o => o.listId === activeListId).forEach(item => batch.delete(doc(db, "saved_orders", item.id)));
+      batch.delete(doc(db, "order_lists", activeListId));
+      await batch.commit();
+      setActiveListId("");
+    });
+  };
+
+  const handleUpdateOrderQty = async (compoundId: string, qty: string) => {
+    await setDoc(doc(db, "saved_orders", compoundId), { orderQty: qty }, { merge: true });
   };
 
   if (authLoading) {
