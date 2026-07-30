@@ -1083,6 +1083,123 @@ export default function StoreStockPage() {
     }
   };
 
+  // 🖨️ 58mm थर्मल प्रिंटर के लिए नाइट क्लोजिंग चेकलिस्ट प्रिंट फंक्शन
+  const handlePrintKitchenChecklist = () => {
+    const printWindow = window.open('', '_blank', 'width=300,height=600');
+    if (!printWindow) {
+      toastMessage("पॉपअप अवरुद्ध हो गया है! कृपया पॉपअप की अनुमति दें।", "error");
+      return;
+    }
+
+    // केवल सक्रिय कैटगरी की सामग्रियों को प्रिंट करें (ताकि हिडन आइटम न आएं)
+    const activeItems = inventory.filter(item => {
+      const itemCatObj = categories.find(c => c.name === item.category);
+      return !(itemCatObj?.hidden);
+    });
+
+    const rows = activeItems.map(item => `
+      <tr style="border-bottom: 1px dotted #000;">
+        <td style="padding: 4px 0; font-weight: bold; font-size: 10px; max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+          ${item.name}
+        </td>
+        <td style="padding: 4px 0; text-align: center; font-size: 10px;">
+          ${item.kitchenQty || 0}
+        </td>
+        <td style="padding: 4px 0; text-align: right; font-size: 10px; font-weight: bold;">
+          [ &nbsp; &nbsp; &nbsp; &nbsp; ]
+        </td>
+      </tr>
+    `).join('');
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Kitchen_Closing_Checklist</title>
+          <style>
+            @page {
+              size: 58mm auto;
+              margin: 0;
+            }
+            body {
+              width: 52mm;
+              margin: 0 auto;
+              padding: 10px 2px 30px 2px;
+              font-family: 'Courier New', Courier, monospace;
+              font-size: 10px;
+              color: #000;
+              background: #fff;
+            }
+            .center {
+              text-align: center;
+            }
+            .bold {
+              font-weight: bold;
+            }
+            .divider {
+              border-bottom: 1px dashed #000;
+              margin: 6px 0;
+            }
+            table {
+              width: 100%;
+              border-collapse: collapse;
+            }
+            th {
+              font-weight: bold;
+              border-bottom: 1px dashed #000;
+              border-top: 1px dashed #000;
+              font-size: 10px;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="center bold" style="font-size: 12px; margin-bottom: 2px;">BUM BUM CAFE</div>
+          <div class="center bold" style="font-size: 9px; letter-spacing: 0.5px;">KITCHEN NIGHT CHECKLIST</div>
+          <div class="center" style="font-size: 8px; margin-top: 2px; color: #555;">(58mm Thermal Print)</div>
+          
+          <div class="divider"></div>
+          
+          <div style="font-size: 8px; font-weight: bold;">
+            DATE: ____________ TIME: _________<br/>
+            STAFF: ___________________________
+          </div>
+          
+          <div class="divider"></div>
+          
+          <table>
+            <thead>
+              <tr>
+                <th style="text-align: left; padding: 3px 0;">ITEM NAME</th>
+                <th style="text-align: center; padding: 3px 0; width: 45px;">SYS</th>
+                <th style="text-align: right; padding: 3px 0; width: 60px;">PHYSICAL</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rows}
+            </tbody>
+          </table>
+          
+          <div class="divider"></div>
+          
+          <div class="center" style="font-size: 8px; font-style: italic; margin-top: 8px;">
+            किचन में पेन से स्टॉक लिखें,<br/>
+            फिर पोर्टल पर एंट्री दर्ज करें।
+          </div>
+          <div class="center bold" style="font-size: 9px; margin-top: 10px;">
+            *** THANK YOU ***
+          </div>
+          
+          <script>
+            window.onload = function() {
+              window.print();
+              setTimeout(function() { window.close(); }, 500);
+            };
+          </script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
+
   // आज की कुल किचन खपत (Today's Consumption List)
   const todayKitchenConsumption = useMemo(() => {
     const todayStr = getLocalDateString(0);
@@ -1280,19 +1397,29 @@ export default function StoreStockPage() {
             {/* SUB-TAB 1: 🌙 क्लोजिंग (NIGHT CLOSING) */}
             {activeKitchenSubTab === 'closing' && (
               <div className={`p-4 rounded-3xl border ${isDarkMode ? 'bg-neutral-900/60 border-neutral-800' : 'bg-white border-neutral-100'} shadow-sm space-y-3`}>
-                <div className="flex justify-between items-center">
-                  <div>
+                <div className="flex justify-between items-center gap-2">
+                  <div className="flex-1 min-w-0">
                     <h2 className="text-xs font-black text-green-500 uppercase tracking-wider">🌙 रात्रि क्लोजिंग स्टॉक</h2>
-                    <p className="text-[9px] text-neutral-400 font-bold">किचन स्टॉक को सत्यापित कर दैनिक उपयोग की जांच करें</p>
+                    <p className="text-[9px] text-neutral-400 font-bold truncate">चेकलिस्ट प्रिंट करें फिर एंट्री करें</p>
                   </div>
-                  {Object.keys(kitchenClosingInputs).length > 0 && (
+                  
+                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                    {/* 🖨️ 58mm थर्मल प्रिंट बटन */}
                     <button 
-                      onClick={handleSaveAllKitchenClosings}
-                      className="px-3 py-2 bg-green-600 text-white rounded-xl text-[10px] font-black uppercase shadow-lg transition-all"
+                      onClick={handlePrintKitchenChecklist}
+                      className="px-2.5 py-1.5 bg-neutral-800 hover:bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 rounded-xl text-[9px] font-black uppercase shadow-md flex items-center gap-1 transition-all"
                     >
-                      💾 सभी सहेजें
+                      🖨️ प्रिंट (58mm)
                     </button>
-                  )}
+                    {Object.keys(kitchenClosingInputs).length > 0 && (
+                      <button 
+                        onClick={handleSaveAllKitchenClosings}
+                        className="px-2.5 py-1.5 bg-green-600 text-white rounded-xl text-[9px] font-black uppercase shadow-md transition-all"
+                      >
+                        💾 सहेजें
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 {/* खोजें */}
