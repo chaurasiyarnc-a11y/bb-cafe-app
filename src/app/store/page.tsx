@@ -187,7 +187,7 @@ export default function StoreStockPage() {
   const [editingProduct, setEditingProduct] = useState<InventoryItem | null>(null);
   const [editingAsset, setEditingAsset] = useState<FixedAsset | null>(null); 
 
-  // "OTHERS" को बदलकर "OTHER" किया गया है
+  // "OTHERS" को बदलकर "OTHER" किया गया है [240]
   const [formAddProduct, setFormAddProduct] = useState({ name: '', storeQty: '0', kitchenQty: '0', unit: 'Kg', purchasePrice: '', minLimit: '10', category: 'OTHER', lastPurchaseDate: getLocalDateString(0) });
   const [formAddAsset, setFormAddAsset] = useState({ name: '', quantity: '1', purchaseDate: '', cost: '', condition: 'Working' as any, remarks: '', type: 'general', unit: 'Pcs' });
 
@@ -244,7 +244,7 @@ export default function StoreStockPage() {
     setLocalOrderQties(prev => ({ ...prev, ...updatedLocal }));
   }, [savedOrders, focusedOrderField]);
 
-  // --- सुरक्षा और लॉगिन ऑथेंटिकेशन फंक्शन्स ---
+  // --- ऑथेंटिकेशन और डिलीट कन्फर्मेशन फंक्शन्स ---
   const handleLoginSubmit = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     const matched = users.find(u => u.pin === pinInput.trim());
