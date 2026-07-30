@@ -187,7 +187,8 @@ export default function StoreStockPage() {
   const [editingProduct, setEditingProduct] = useState<InventoryItem | null>(null);
   const [editingAsset, setEditingAsset] = useState<FixedAsset | null>(null); 
 
-  const [formAddProduct, setFormAddProduct] = useState({ name: '', storeQty: '0', kitchenQty: '0', unit: 'Kg', purchasePrice: '', minLimit: '10', category: 'OTHERS', lastPurchaseDate: getLocalDateString(0) });
+  // "OTHERS" को बदलकर "OTHER" किया गया है
+  const [formAddProduct, setFormAddProduct] = useState({ name: '', storeQty: '0', kitchenQty: '0', unit: 'Kg', purchasePrice: '', minLimit: '10', category: 'OTHER', lastPurchaseDate: getLocalDateString(0) });
   const [formAddAsset, setFormAddAsset] = useState({ name: '', quantity: '1', purchaseDate: '', cost: '', condition: 'Working' as any, remarks: '', type: 'general', unit: 'Pcs' });
 
   const [showStockOutModal, setShowStockOutModal] = useState<boolean>(false);
@@ -348,10 +349,11 @@ export default function StoreStockPage() {
     return { totalInwardQty, totalKitchenQty, totalWasteLoss, matchedInward, matchedKitchen, matchedWasteLogs };
   }, [dashboardDateRange, startDate, endDate, stockInHistory, stockOutHistory]);
 
+  // "OTHERS" को "OTHER" कर दिया गया है ताकि सभी कार्ड्स की गणना एकदम सही आए
   const categoryStockValues = useMemo(() => {
     const values: Record<string, number> = {};
     inventory.forEach(item => {
-      const cat = item.category || "OTHERS";
+      const cat = (item.category || "OTHER").toUpperCase().trim();
       values[cat] = (values[cat] || 0) + (item.storeQty * item.purchasePrice);
     });
     return values;
@@ -576,23 +578,65 @@ export default function StoreStockPage() {
     });
   };
 
+  // 🚨 डुप्लीकेट नाम चेकिंग प्रोटेक्शन के साथ नया सामान जोड़ने का लॉजिक
   const handleAddProductSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleanName = formAddProduct.name.toUpperCase().trim();
     if (!cleanName) return;
+
+    // गोदाम इन्वेंटरी में डुप्लीकेट नाम की जांच
+    const isDuplicate = inventory.some(
+      item => item.name.toUpperCase().trim() === cleanName
+    );
+
+    if (isDuplicate) {
+      toastMessage(`"${cleanName}" गोदाम में पहले से मौजूद है!`, "error");
+      return;
+    }
+
     const customId = `item_${Date.now()}`;
     await setDoc(doc(db, "godown_inventory", customId), {
-      id: customId, name: cleanName, storeQty: parseFloat(formAddProduct.storeQty) || 0, kitchenQty: parseFloat(formAddProduct.kitchenQty) || 0,
-      unit: formAddProduct.unit, purchasePrice: parseFloat(formAddProduct.purchasePrice) || 0, minLimit: parseFloat(formAddProduct.minLimit) || 10, category: formAddProduct.category.toUpperCase()
+      id: customId, 
+      name: cleanName, 
+      storeQty: parseFloat(formAddProduct.storeQty) || 0, 
+      kitchenQty: parseFloat(formAddProduct.kitchenQty) || 0,
+      unit: formAddProduct.unit, 
+      purchasePrice: parseFloat(formAddProduct.purchasePrice) || 0, 
+      minLimit: parseFloat(formAddProduct.minLimit) || 10, 
+      category: formAddProduct.category.toUpperCase()
     });
+
     setShowAddProductModal(false);
+    // फॉर्म को रिसेट करें
+    setFormAddProduct({ 
+      name: '', 
+      storeQty: '0', 
+      kitchenQty: '0', 
+      unit: 'Kg', 
+      purchasePrice: '', 
+      minLimit: '10', 
+      category: 'OTHER', 
+      lastPurchaseDate: getLocalDateString(0) 
+    });
     toastMessage("नया उत्पाद जोड़ा गया!", "success");
   };
 
+  // 🚨 डुप्लीकेट नाम चेकिंग प्रोटेक्शन के साथ नया एसेट जोड़ने का लॉजिक
   const handleAddAssetSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleanName = formAddAsset.name.toUpperCase().trim();
     if (!cleanName) return;
+
+    // फिक्स्ड एसेट्स में डुप्लीकेट नाम की जांच
+    const isDuplicateAsset = fixedAssets.some(
+      asset => asset.name.toUpperCase().trim() === cleanName
+    );
+
+    if (isDuplicateAsset) {
+      toastMessage(`"${cleanName}" एसेट्स में पहले से मौजूद है!`, "error");
+      return;
+    }
+
     const customId = `asset_${Date.now()}`;
     await setDoc(doc(db, "fixed_assets", customId), {
       id: customId, 
@@ -604,8 +648,19 @@ export default function StoreStockPage() {
       type: formAddAsset.type || 'general',
       unit: formAddAsset.unit || 'Pcs' 
     });
+
     setShowAddAssetModal(false);
-    setFormAddAsset({ name: '', quantity: '1', purchaseDate: '', cost: '', condition: 'Working', remarks: '', type: 'general', unit: 'Pcs' });
+    // फॉर्म को रिसेट करें
+    setFormAddAsset({ 
+      name: '', 
+      quantity: '1', 
+      purchaseDate: '', 
+      cost: '', 
+      condition: 'Working', 
+      remarks: '', 
+      type: 'general', 
+      unit: 'Pcs' 
+    });
     toastMessage("नया एसेट सफलतापूर्वक जोड़ा गया!", "success");
   };
 
@@ -1077,7 +1132,8 @@ export default function StoreStockPage() {
               <div className="grid grid-cols-2 gap-2 text-xs">
                 <div className="space-y-1">
                   <label className="text-[9px] text-neutral-400 font-bold uppercase">कैटेगरी (Category)</label>
-                  <select value={editingProduct.category || "OTHERS"} onChange={e => setEditingProduct({ ...editingProduct, category: e.target.value })} className="w-full p-2.5 rounded-xl border dark:bg-[#181818] font-bold">
+                  {/* फॉलबैक "OTHERS" से बदलकर "OTHER" किया गया है */}
+                  <select value={editingProduct.category || "OTHER"} onChange={e => setEditingProduct({ ...editingProduct, category: e.target.value })} className="w-full p-2.5 rounded-xl border dark:bg-[#181818] font-bold">
                     {categories.map(cat => <option key={cat.id} value={cat.name}>{cat.name}</option>)}
                   </select>
                 </div>
