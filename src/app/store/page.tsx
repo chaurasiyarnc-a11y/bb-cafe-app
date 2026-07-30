@@ -8,7 +8,7 @@ import {
   collection, onSnapshot, query, orderBy, doc, setDoc, increment, addDoc, deleteDoc, writeBatch, limit, getDocs, where 
 } from 'firebase/firestore';
 
-// ककस्टमाइज़्ड सब-कंपोनेंट्स के इम्पोर्ट्स (समर्पित फ़ोल्डर से)
+// कस्टमाइज़्ड सब-कंपोनेंट्स के इम्पोर्ट्स
 import StockDashboard from '../../components/store/StockDashboard';
 import StockGodown from '../../components/store/StockGodown';
 import StockAssets from '../../components/store/StockAssets';
@@ -186,16 +186,16 @@ export default function StoreStockPage() {
   const [editingProduct, setEditingProduct] = useState<InventoryItem | null>(null);
   const [editingAsset, setEditingAsset] = useState<FixedAsset | null>(null); 
 
-  // "OTHERS" को बदलकर "OTHER" किया गया है [240]
   const [formAddProduct, setFormAddProduct] = useState({ name: '', storeQty: '0', kitchenQty: '0', unit: 'Kg', purchasePrice: '', minLimit: '10', category: 'OTHER', lastPurchaseDate: getLocalDateString(0) });
   const [formAddAsset, setFormAddAsset] = useState({ name: '', quantity: '1', purchaseDate: '', cost: '', condition: 'Working' as any, remarks: '', type: 'general', unit: 'Pcs' });
 
   const [showStockOutModal, setShowStockOutModal] = useState<boolean>(false);
   const [formStockOut, setFormStockOut] = useState({ item: '', quantity: '', purpose: 'Waste' as any, remarks: '' });
+  
   const toastMessage = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
-  setToast({ message, type });
-  setTimeout(() => setToast(null), 3000);
-};
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3000);
+  };
   
   // --- रीयल-टाइम डेटा सिंक्रोनाइज़ेशन (Real-time Sync) ---
   useEffect(() => {
@@ -206,7 +206,6 @@ export default function StoreStockPage() {
       if (!snap.empty) setCategories(snap.docs.map(d => ({ id: d.id, ...d.data() } as CategoryItem)));
     });
 
-    // 🚀 परफॉरमेंस सुधार: आवक-जावक इतिहास को केवल अंतिम 100 रिकॉर्ड्स तक सीमित किया [117]
     const unsubStockIns = onSnapshot(query(collection(db, "stock_in_history"), orderBy("date", "desc"), limit(100)), (snap) => {
       setStockInHistory(snap.docs.map(d => ({ id: d.id, ...d.data() } as StockInLog)));
     });
@@ -243,7 +242,7 @@ export default function StoreStockPage() {
     setLocalOrderQties(prev => ({ ...prev, ...updatedLocal }));
   }, [savedOrders, focusedOrderField]);
 
-  // 🔒 डायनामिक पिन वेरिफिकेशन (Dynamic Pin Query Helper) - अत्यंत सुरक्षित [235]
+  // पिन वेरिफिकेशन हेल्पर
   const verifyPinAndGetDoc = async (pin: string) => {
     const q = query(collection(db, "cafe_users"), where("pin", "==", pin), limit(1));
     const querySnapshot = await getDocs(q);
@@ -367,7 +366,6 @@ export default function StoreStockPage() {
     return { totalInwardQty, totalKitchenQty, totalWasteLoss, matchedInward, matchedKitchen, matchedWasteLogs };
   }, [dashboardDateRange, startDate, endDate, stockInHistory, stockOutHistory]);
 
-  // "OTHERS" को "OTHER" कर दिया गया है ताकि सभी कार्ड्स की गणना एकदम सही आए [240]
   const categoryStockValues = useMemo(() => {
     const values: Record<string, number> = {};
     inventory.forEach(item => {
@@ -431,6 +429,63 @@ export default function StoreStockPage() {
   }, [inventory, searchQuery, selectedCategoryFilter, categories]);
 
   const filteredAssets = useMemo(() => fixedAssets.filter(asset => asset.name.toLowerCase().includes(searchQuery.toLowerCase())), [fixedAssets, searchQuery]);
+
+  // 🧹 वन-क्लिक डुप्लीकेट मर्ज क्लीनअप लॉजिक
+  const handleMergeAllExistingDuplicates = async () => {
+    triggerHaptic(50);
+    try {
+      const groups: Record<string, InventoryItem[]> = {};
+      inventory.forEach(item => {
+        const key = item.name.toUpperCase().trim();
+        if (!groups[key]) groups[key] = [];
+        groups[key].push(item);
+      });
+
+      const batch = writeBatch(db);
+      let mergedCount = 0;
+
+      for (const name in groups) {
+        const items = groups[name];
+        if (items.length > 1) {
+          const primary = items[0];
+          let totalStoreQty = primary.storeQty;
+          let totalKitchenQty = primary.kitchenQty || 0;
+          let maxPrice = primary.purchasePrice;
+          const minLimit = primary.minLimit;
+          const category = primary.category || 'OTHER';
+          const unit = primary.unit;
+
+          for (let i = 1; i < items.length; i++) {
+            const duplicate = items[i];
+            totalStoreQty += duplicate.storeQty;
+            totalKitchenQty += (duplicate.kitchenQty || 0);
+            if (duplicate.purchasePrice > maxPrice) maxPrice = duplicate.purchasePrice;
+            
+            batch.delete(doc(db, "godown_inventory", duplicate.id));
+            mergedCount++;
+          }
+
+          batch.set(doc(db, "godown_inventory", primary.id), {
+            storeQty: totalStoreQty,
+            kitchenQty: totalKitchenQty,
+            purchasePrice: maxPrice,
+            minLimit,
+            category,
+            unit
+          }, { merge: true });
+        }
+      }
+
+      if (mergedCount > 0) {
+        await batch.commit();
+        toastMessage(`${mergedCount} डुप्लीकेट सामान सफलतापूर्वक मर्ज किए गए! 🧹`, "success");
+      } else {
+        toastMessage("कोई डुप्लीकेट सामान नहीं मिला। ✨", "info");
+      }
+    } catch {
+      toastMessage("मर्ज करने में त्रुटि आई।", "error");
+    }
+  };
 
   const adjustQty = (id: string, diff: number) => {
     const item = inventory.find(i => i.id === id);
@@ -571,7 +626,6 @@ export default function StoreStockPage() {
     } catch {}
   };
 
-  // 🔄 नया सामान जोड़ते समय यदि डुप्लीकेट हो तो स्टॉक जोड़ने (Merge) का लॉजिक [235]
   const handleAddProductSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleanName = formAddProduct.name.toUpperCase().trim();
@@ -621,7 +675,7 @@ export default function StoreStockPage() {
         lastPurchaseDate: getLocalDateString(0) 
       });
 
-      toastMessage(`"${cleanName}" पहले से मौजूद था, मात्रा सफलतापूर्वक मर्ज कर दी गई है! 🔄`, "success");
+      toastMessage(`"${cleanName}" पहले से मौजूद था, मात्रा मर्ज कर दी गई है! 🔄`, "success");
       return;
     }
 
@@ -634,7 +688,8 @@ export default function StoreStockPage() {
       unit: formAddProduct.unit, 
       purchasePrice: parseFloat(formAddProduct.purchasePrice) || 0, 
       minLimit: parseFloat(formAddProduct.minLimit) || 10, 
-      category: formAddProduct.category.toUpperCase()
+      category: formAddProduct.category.toUpperCase(),
+      lastPurchaseDate: formAddProduct.lastPurchaseDate || getLocalDateString(0)
     });
 
     setShowAddProductModal(false);
@@ -651,7 +706,6 @@ export default function StoreStockPage() {
     toastMessage("नया उत्पाद जोड़ा गया!", "success");
   };
 
-  // 🔄 नया एसेट जोड़ते समय यदि डुप्लीकेट हो तो स्टॉक जोड़ने (Merge) का लॉजिक [235]
   const handleAddAssetSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleanName = formAddAsset.name.toUpperCase().trim();
@@ -672,7 +726,8 @@ export default function StoreStockPage() {
         condition: formAddAsset.condition,
         remarks: formAddAsset.remarks || existingAsset.remarks || "मात्रा अपडेट की गई",
         type: formAddAsset.type || existingAsset.type || 'general',
-        unit: formAddAsset.unit || existingAsset.unit || 'Pcs'
+        unit: formAddAsset.unit || existingAsset.unit || 'Pcs',
+        purchaseDate: formAddAsset.purchaseDate || existingAsset.purchaseDate || getLocalDateString(0)
       }, { merge: true });
 
       setShowAddAssetModal(false);
@@ -687,7 +742,7 @@ export default function StoreStockPage() {
         unit: 'Pcs' 
       });
 
-      toastMessage(`"${cleanName}" एसेट्स में पहले से मौजूद था, मात्रा सफलतापूर्वक मर्ज कर दी गई है! 🔄`, "success");
+      toastMessage(`"${cleanName}" एसेट्स में पहले से मौजूद था, मात्रा मर्ज कर दी गई है! 🔄`, "success");
       return;
     }
 
@@ -700,7 +755,8 @@ export default function StoreStockPage() {
       condition: formAddAsset.condition, 
       remarks: formAddAsset.remarks,
       type: formAddAsset.type || 'general',
-      unit: formAddAsset.unit || 'Pcs' 
+      unit: formAddAsset.unit || 'Pcs',
+      purchaseDate: formAddAsset.purchaseDate || getLocalDateString(0)
     });
 
     setShowAddAssetModal(false);
@@ -855,7 +911,7 @@ export default function StoreStockPage() {
       });
 
       if (itemsToMigrate.length === 0) {
-        toastMessage("गोदाम में ट्रांसफर के लिए कोई क्रॉकरी, कटलरी या डेकोरेशन उत्पाद नहीं मिला! सुनिश्चित करें कि उनका कैटेगरी नाम सही है।", "info");
+        toastMessage("गोदाम में ट्रांसफर के लिए कोई क्रॉकरी, कटलरी या डेकोरेशन उत्पाद नहीं मिला!", "info");
         return;
       }
 
@@ -893,8 +949,7 @@ export default function StoreStockPage() {
 
       await batch.commit();
       toastMessage(`${itemsToMigrate.length} सामान सफलतापूर्वक फिक्स्ड एसेट्स में शिफ्ट कर दिए गए हैं! 🚚`, "success");
-    } catch (error) {
-      console.error("Migration error:", error);
+    } catch {
       toastMessage("स्थानांतरण फेल हो गया। कृपया दोबारा प्रयास करें।", "error");
     }
   };
@@ -1001,7 +1056,7 @@ export default function StoreStockPage() {
         </div>
       </header>
 
-      {/* LAZY TAB LOADER */}
+      {/* MAIN VIEW */}
       <main className="max-w-md mx-auto px-4 pt-4 space-y-4">
         {activeTab === 'home' && (
           <StockDashboard 
@@ -1192,11 +1247,11 @@ export default function StoreStockPage() {
 
               <div className="grid grid-cols-2 gap-2 text-xs">
                 <input type="number" placeholder="कीमत (INR)" value={formAddProduct.purchasePrice} onChange={e => setFormAddProduct({ ...formAddProduct, purchasePrice: e.target.value })} className="p-2 border rounded-xl dark:bg-neutral-800" required />
-                <input type="number" placeholder="गोदाम मात्रा (Godown Qty)" value={formAddProduct.storeQty} onChange={e => setFormAddProduct({ ...formAddProduct, storeQty: e.target.value })} className="p-2 border rounded-xl dark:bg-neutral-800" />
+                <input type="number" placeholder="गोदाम मात्रा" value={formAddProduct.storeQty} onChange={e => setFormAddProduct({ ...formAddProduct, storeQty: e.target.value })} className="p-2 border rounded-xl dark:bg-neutral-800" />
               </div>
 
               <div className="grid grid-cols-2 gap-2 text-xs">
-                <input type="number" placeholder="न्यूनतम सीमा (Min Limit)" value={formAddProduct.minLimit} onChange={e => setFormAddProduct({ ...formAddProduct, minLimit: e.target.value })} className="p-2 border rounded-xl dark:bg-neutral-800" />
+                <input type="number" placeholder="न्यूनतम सीमा" value={formAddProduct.minLimit} onChange={e => setFormAddProduct({ ...formAddProduct, minLimit: e.target.value })} className="p-2 border rounded-xl dark:bg-neutral-800" />
                 <input type="date" value={formAddProduct.lastPurchaseDate} onChange={e => setFormAddProduct({ ...formAddProduct, lastPurchaseDate: e.target.value })} className="p-2 border rounded-xl dark:bg-[#181818]" />
               </div>
 
@@ -1218,7 +1273,6 @@ export default function StoreStockPage() {
               <div className="grid grid-cols-2 gap-2 text-xs">
                 <div className="space-y-1">
                   <label className="text-[9px] text-neutral-400 font-bold uppercase">कैटेगरी (Category)</label>
-                  {/* फॉलबैक "OTHERS" से बदलकर "OTHER" किया गया है */}
                   <select value={editingProduct.category || "OTHER"} onChange={e => setEditingProduct({ ...editingProduct, category: e.target.value })} className="w-full p-2.5 rounded-xl border dark:bg-[#181818] font-bold">
                     {categories.map(cat => <option key={cat.id} value={cat.name}>{cat.name}</option>)}
                   </select>
@@ -1236,7 +1290,7 @@ export default function StoreStockPage() {
 
               <div className="grid grid-cols-2 gap-2 text-xs">
                 <input type="number" placeholder="कीमत (INR)" value={editingProduct.purchasePrice} onChange={e => setEditingProduct({ ...editingProduct, purchasePrice: parseFloat(e.target.value) || 0 })} className="p-2 border rounded-xl dark:bg-neutral-800" required />
-                <input type="number" placeholder="न्यूनतम सीमा (Min Limit)" value={editingProduct.minLimit} onChange={e => setEditingProduct({ ...editingProduct, minLimit: parseFloat(e.target.value) || 0 })} className="p-2 border rounded-xl dark:bg-neutral-800" required />
+                <input type="number" placeholder="न्यूनतम सीमा" value={editingProduct.minLimit} onChange={e => setEditingProduct({ ...editingProduct, minLimit: parseFloat(e.target.value) || 0 })} className="p-2 border rounded-xl dark:bg-neutral-800" required />
               </div>
 
               <div className="grid grid-cols-2 gap-2 text-xs">
@@ -1245,7 +1299,7 @@ export default function StoreStockPage() {
               </div>
 
               <div className="flex gap-2">
-                <button type="button" onClick={() => handleDeleteProduct(editingProduct.id, editingProduct.name)} className="px-4 py-3 bg-red-100 text-red-600 rounded-xl font-bold text-xs uppercase">हटाएं (Delete)</button>
+                <button type="button" onClick={() => handleDeleteProduct(editingProduct.id, editingProduct.name)} className="px-4 py-3 bg-red-100 text-red-600 rounded-xl font-bold text-xs uppercase">हटाएं</button>
                 <button type="submit" className="flex-1 py-3 bg-orange-500 text-white rounded-xl font-bold text-xs uppercase">अपडेट करें ➔</button>
               </div>
             </motion.form>
@@ -1262,7 +1316,7 @@ export default function StoreStockPage() {
               </div>
               
               <div className="space-y-1">
-                <label className="text-[9px] text-neutral-400 font-bold uppercase">एसेट का प्रकार (Type)</label>
+                <label className="text-[9px] text-neutral-400 font-bold uppercase">एसेट का प्रकार</label>
                 <select 
                   value={formAddAsset.type} 
                   onChange={e => setFormAddAsset({ ...formAddAsset, type: e.target.value })} 
@@ -1322,10 +1376,10 @@ export default function StoreStockPage() {
                   onChange={e => setEditingAsset({ ...editingAsset, type: e.target.value })} 
                   className="w-full p-2.5 rounded-xl border dark:bg-neutral-800 text-xs font-bold"
                 >
-                  <option value="general">🏢 सामान्य एसेट (General)</option>
-                  <option value="cutlery">🍴 कटलरी (Cutlery)</option>
-                  <option value="crockery">🍽️ क्रॉकरी (Crockery)</option>
-                  <option value="decoration">✨ डेकोरेशन मटेरियल (Decoration)</option>
+                  <option value="general">🏢 सामान्य एसेट</option>
+                  <option value="cutlery">🍴 कटलरी</option>
+                  <option value="crockery">🍽️ क्रॉकरी</option>
+                  <option value="decoration">✨ डेकोरेशन मटेरियल</option>
                 </select>
               </div>
 
@@ -1352,7 +1406,7 @@ export default function StoreStockPage() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[9px] text-neutral-400 font-bold uppercase">यूनिट (Unit)</label>
+                  <label className="text-[9px] text-neutral-400 font-bold uppercase">यूनिट</label>
                   <select 
                     value={editingAsset.unit || 'Pcs'} 
                     onChange={e => setEditingAsset({ ...editingAsset, unit: e.target.value })} 
