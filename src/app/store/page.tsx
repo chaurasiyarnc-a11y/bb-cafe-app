@@ -244,6 +244,45 @@ export default function StoreStockPage() {
     setLocalOrderQties(prev => ({ ...prev, ...updatedLocal }));
   }, [savedOrders, focusedOrderField]);
 
+  // --- सुरक्षा और लॉगिन ऑथेंटिकेशन फंक्शन्स ---
+  const handleLoginSubmit = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const matched = users.find(u => u.pin === pinInput.trim());
+    if (matched) {
+      setCurrentUser(matched);
+      localStorage.setItem('bum_bum_cafe_user', JSON.stringify(matched));
+      setPinInput("");
+      setAuthError("");
+      toastMessage("सफलतापूर्वक लॉगिन किया गया!", "success");
+    } else {
+      setAuthError("गलत पिन!");
+    }
+  };
+
+  const handleLogout = () => {
+    setCurrentUser(null);
+    localStorage.removeItem('bum_bum_cafe_user');
+    toastMessage("लॉगआउट कर दिया गया है।", "info");
+  };
+
+  const confirmDeleteWithPin = (message: string, actionToExecute: () => void) => {
+    setDeleteConfirmation({ message, action: actionToExecute });
+    setDeletePinInput("");
+    setDeletePinError("");
+  };
+
+  const handleDeleteVerificationSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const matched = users.find(u => u.pin === deletePinInput.trim());
+    if (matched) {
+      if (deleteConfirmation) deleteConfirmation.action();
+      setDeleteConfirmation(null);
+      toastMessage("सफलतापूर्वक हटा दिया गया!", "success");
+    } else {
+      setDeletePinError("गलत पिन!");
+    }
+  };
+
   const getAssetSingleVal = (asset: FixedAsset) => {
     const qty = (asset.quantity === undefined || asset.quantity === null) ? 1 : Number(asset.quantity);
     const cost = Number(asset.cost || 0);
@@ -311,7 +350,7 @@ export default function StoreStockPage() {
     return { totalInwardQty, totalKitchenQty, totalWasteLoss, matchedInward, matchedKitchen, matchedWasteLogs };
   }, [dashboardDateRange, startDate, endDate, stockInHistory, stockOutHistory]);
 
-  // "OTHERS" को "OTHER" कर दिया गया है ताकि सभी कार्ड्स की गणना एकदम सही आए
+  // "OTHERS" को "OTHER" कर दिया गया है ताकि सभी कार्ड्स की गणना एकदम सही आए [240]
   const categoryStockValues = useMemo(() => {
     const values: Record<string, number> = {};
     inventory.forEach(item => {
@@ -515,31 +554,6 @@ export default function StoreStockPage() {
     } catch {}
   };
 
-  const handleUpdateOrderQty = async (compoundId: string, qty: string) => {
-    await setDoc(doc(db, "saved_orders", compoundId), { orderQty: qty }, { merge: true });
-  };
-
-  const handleUpdateListName = async (newName: string) => {
-    if (!newName.trim() || !activeListId) return;
-    await setDoc(doc(db, "order_lists", activeListId), { name: newName.toUpperCase() }, { merge: true });
-  };
-
-  const handleRemoveFromSavedList = (compoundId: string, name: string) => {
-    confirmDeleteWithPin(`हटाएं "${name}"?`, async () => {
-      await deleteDoc(doc(db, "saved_orders", compoundId));
-    });
-  };
-
-  const handleDeleteActiveList = () => {
-    confirmDeleteWithPin("क्या आप इस लिस्ट को हटाना चाहते हैं?", async () => {
-      const batch = writeBatch(db);
-      savedOrders.filter(o => o.listId === activeListId).forEach(item => batch.delete(doc(db, "saved_orders", item.id)));
-      batch.delete(doc(db, "order_lists", activeListId));
-      await batch.commit();
-      setActiveListId("");
-    });
-  };
-
   // 🧹 पूरे डेटाबेस में पहले से जमा सभी पुराने डुप्लीकेट्स को आपस में मर्ज करने का मास्टर फंक्शन
   const handleMergeAllExistingDuplicates = async () => {
     triggerHaptic(60);
@@ -628,7 +642,7 @@ export default function StoreStockPage() {
     }
   };
 
-  // 🔄 नया सामान जोड़ते समय यदि डुप्लीकेट हो तो स्टॉक जोड़ने (Merge) का लॉजिक
+  // 🔄 नया सामान जोड़ते समय यदि डुप्लीकेट हो तो स्टॉक जोड़ने (Merge) का लॉजिक [235]
   const handleAddProductSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleanName = formAddProduct.name.toUpperCase().trim();
@@ -708,7 +722,7 @@ export default function StoreStockPage() {
     toastMessage("नया उत्पाद जोड़ा गया!", "success");
   };
 
-  // 🔄 नया एसेट जोड़ते समय यदि डुप्लीकेट हो तो स्टॉक जोड़ने (Merge) का लॉजिक
+  // 🔄 नया एसेट जोड़ते समय यदि डुप्लीकेट हो तो स्टॉक जोड़ने (Merge) का लॉजिक [235]
   const handleAddAssetSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleanName = formAddAsset.name.toUpperCase().trim();
