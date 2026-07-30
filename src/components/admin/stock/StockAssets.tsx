@@ -6,8 +6,8 @@ import { Search, Plus, Trash2, RefreshCw, Edit, Printer } from 'lucide-react';
 export default function StockAssets({
   isDarkMode, searchQuery, setSearchQuery, filteredAssets, setShowAddAssetModal, handleDeleteAsset, handleMigrate, setEditingAsset, handleAdjustQty
 }: any) {
-  // लोकल स्टेट: एसेट्स को 3 श्रेणियों में फ़िल्टर करने के लिए ('general', 'cutlery', या 'crockery')
-  const [activeSubTab, setActiveSubTab] = useState<'general' | 'cutlery' | 'crockery'>('general');
+  // लोकल स्टेट: एसेट्स को 4 श्रेणियों में फ़िल्टर करने के लिए ('general', 'cutlery', 'crockery', या 'decoration')
+  const [activeSubTab, setActiveSubTab] = useState<'general' | 'cutlery' | 'crockery' | 'decoration'>('general');
 
   // एक्टिव सब-टैब के आधार पर एसेट्स फ़िल्टर करने का लॉजिक
   const displayedAssets = useMemo(() => {
@@ -54,7 +54,13 @@ export default function StockAssets({
       return;
     }
 
-    const tabName = activeSubTab === 'general' ? '🏢 सामान्य एसेट्स (General Assets)' : activeSubTab === 'cutlery' ? '🍴 कटलरी (Cutlery)' : '🍽️ क्रॉकरी (Crockery)';
+    const tabName = activeSubTab === 'general' 
+      ? '🏢 सामान्य एसेट्स (General Assets)' 
+      : activeSubTab === 'cutlery' 
+      ? '🍴 कटलरी (Cutlery)' 
+      : activeSubTab === 'crockery' 
+      ? '🍽️ क्रॉकरी (Crockery)' 
+      : '✨ डेकोरेशन मटेरियल (Decoration)';
 
     const rows = displayedAssets.map((asset: any) => {
       const qty = (asset.quantity === undefined || asset.quantity === null) ? 1 : Number(asset.quantity);
@@ -116,7 +122,7 @@ export default function StockAssets({
         <div className="flex justify-between items-start gap-2 flex-wrap">
           <div>
             <h2 className="text-sm font-black text-orange-600 uppercase">स्थायी संपत्ति (Fixed Assets)</h2>
-            <p className="text-[10px] text-neutral-400">उपकरण, फ्रिज, ओवन, कटलरी और क्रॉकरी</p>
+            <p className="text-[10px] text-neutral-400">उपकरण, फ्रिज, ओवन, कटलरी, क्रॉकरी और डेकोरेशन</p>
           </div>
           
           <div className="flex gap-1.5 flex-wrap">
@@ -124,7 +130,7 @@ export default function StockAssets({
             <button 
               onClick={handleMigrate}
               className="px-2 py-1.5 bg-orange-600 hover:bg-orange-700 text-white rounded-xl text-[9px] font-black uppercase flex items-center gap-1 shadow transition-all active:scale-95"
-              title="गोदाम से सारा क्रॉकरी व कटलरी डेटा यहाँ शिफ्ट करें"
+              title="गोदाम से सारा क्रॉकरी, कटलरी व डेकोरेशन डेटा यहाँ शिफ्ट करें"
             >
               <RefreshCw size={11} /> डेटा शिफ्ट करें
             </button>
@@ -145,11 +151,11 @@ export default function StockAssets({
           </div>
         </div>
 
-        {/* 3 सब-टैब बटन्स (एसेट्स, कटलरी, क्रॉकरी) */}
-        <div className="flex gap-1 bg-neutral-100 dark:bg-neutral-900/60 p-1 rounded-xl">
+        {/* 4 सब-टैब बटन्स (एसेट्स, कटलरी, क्रॉकरी, डेकोरेशन) */}
+        <div className="flex gap-0.5 bg-neutral-100 dark:bg-neutral-900/60 p-1 rounded-xl overflow-x-auto scrollbar-none">
           <button
             onClick={() => setActiveSubTab('general')}
-            className={`flex-1 py-2 text-center rounded-lg text-xs font-black transition-all ${
+            className={`flex-1 py-2 text-center rounded-lg text-[10px] font-black transition-all whitespace-nowrap px-1.5 ${
               activeSubTab === 'general'
                 ? (isDarkMode ? 'bg-neutral-800 text-white shadow' : 'bg-white text-neutral-950 shadow')
                 : 'text-neutral-400'
@@ -159,7 +165,7 @@ export default function StockAssets({
           </button>
           <button
             onClick={() => setActiveSubTab('cutlery')}
-            className={`flex-1 py-2 text-center rounded-lg text-xs font-black transition-all ${
+            className={`flex-1 py-2 text-center rounded-lg text-[10px] font-black transition-all whitespace-nowrap px-1.5 ${
               activeSubTab === 'cutlery'
                 ? (isDarkMode ? 'bg-neutral-800 text-white shadow' : 'bg-white text-neutral-950 shadow')
                 : 'text-neutral-400'
@@ -169,13 +175,23 @@ export default function StockAssets({
           </button>
           <button
             onClick={() => setActiveSubTab('crockery')}
-            className={`flex-1 py-2 text-center rounded-lg text-xs font-black transition-all ${
+            className={`flex-1 py-2 text-center rounded-lg text-[10px] font-black transition-all whitespace-nowrap px-1.5 ${
               activeSubTab === 'crockery'
                 ? (isDarkMode ? 'bg-neutral-800 text-white shadow' : 'bg-white text-neutral-950 shadow')
                 : 'text-neutral-400'
             }`}
           >
             🍽️ क्रॉकरी
+          </button>
+          <button
+            onClick={() => setActiveSubTab('decoration')}
+            className={`flex-1 py-2 text-center rounded-lg text-[10px] font-black transition-all whitespace-nowrap px-1.5 ${
+              activeSubTab === 'decoration'
+                ? (isDarkMode ? 'bg-neutral-800 text-white shadow' : 'bg-white text-neutral-950 shadow')
+                : 'text-neutral-400'
+            }`}
+          >
+            ✨ डेकोरेशन
           </button>
         </div>
 
@@ -243,7 +259,7 @@ export default function StockAssets({
                   </div>
                 </div>
 
-                {/* कम-ज्यादा (मासिक री-काउंटिंग) और एडिट के लिए नीचे का पैनल */}
+                {/* कम-ज्यादा (मात्रा री-काउंटिंग) और एडिट के लिए नीचे का पैनल */}
                 <div className="flex items-center justify-between border-t border-dashed dark:border-neutral-800/80 pt-2.5 mt-1">
                   
                   {/* मात्रा कम / ज्यादा करने का कंट्रोलर */}
