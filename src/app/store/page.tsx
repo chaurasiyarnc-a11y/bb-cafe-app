@@ -244,44 +244,6 @@ export default function StoreStockPage() {
     setLocalOrderQties(prev => ({ ...prev, ...updatedLocal }));
   }, [savedOrders, focusedOrderField]);
 
-  const handleLoginSubmit = (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    const matched = users.find(u => u.pin === pinInput.trim());
-    if (matched) {
-      setCurrentUser(matched);
-      localStorage.setItem('bum_bum_cafe_user', JSON.stringify(matched));
-      setPinInput("");
-      setAuthError("");
-      toastMessage("सफलतापूर्वक लॉगिन किया गया!", "success");
-    } else {
-      setAuthError("गलत पिन!");
-    }
-  };
-
-  const handleLogout = () => {
-    setCurrentUser(null);
-    localStorage.removeItem('bum_bum_cafe_user');
-    toastMessage("लॉगआउट कर दिया गया है।", "info");
-  };
-
-  const confirmDeleteWithPin = (message: string, actionToExecute: () => void) => {
-    setDeleteConfirmation({ message, action: actionToExecute });
-    setDeletePinInput("");
-    setDeletePinError("");
-  };
-
-  const handleDeleteVerificationSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const matched = users.find(u => u.pin === deletePinInput.trim());
-    if (matched) {
-      if (deleteConfirmation) deleteConfirmation.action();
-      setDeleteConfirmation(null);
-      toastMessage("सफलतापूर्वक हटा दिया गया!", "success");
-    } else {
-      setDeletePinError("गलत पिन!");
-    }
-  };
-
   const getAssetSingleVal = (asset: FixedAsset) => {
     const qty = (asset.quantity === undefined || asset.quantity === null) ? 1 : Number(asset.quantity);
     const cost = Number(asset.cost || 0);
@@ -578,19 +540,145 @@ export default function StoreStockPage() {
     });
   };
 
-  // 🚨 डुप्लीकेट नाम चेकिंग प्रोटेक्शन के साथ नया सामान जोड़ने का लॉजिक
+  // 🧹 पूरे डेटाबेस में पहले से जमा सभी पुराने डुप्लीकेट्स को आपस में मर्ज करने का मास्टर फंक्शन
+  const handleMergeAllExistingDuplicates = async () => {
+    triggerHaptic(60);
+    if (!window.confirm("क्या आप वाकई गोदाम (Godown) और स्थायी संपत्ति (Fixed Assets) के सभी पुराने डुप्लीकेट सामानों को आपस में मर्ज करके मात्रा को जोड़ना चाहते हैं? यह क्रिया डेटाबेस को पूरी तरह से डुप्लीकेट-मुक्त कर देगी।")) return;
+
+    try {
+      toastMessage("डुप्लीकेट्स को साफ़ और मर्ज किया जा रहा है...", "info");
+      const batch = writeBatch(db);
+      let godownDeleted = 0;
+      let assetsDeleted = 0;
+
+      // 1. गोदाम स्टॉक डुप्लीकेट मर्ज (Group by Name)
+      const godownGroups: Record<string, InventoryItem[]> = {};
+      inventory.forEach(item => {
+        const key = item.name.toUpperCase().trim();
+        if (!godownGroups[key]) godownGroups[key] = [];
+        godownGroups[key].push(item);
+      });
+
+      for (const key in godownGroups) {
+        const list = godownGroups[key];
+        if (list.length > 1) {
+          const master = list[0];
+          let totalStoreQty = master.storeQty || 0;
+          let totalKitchenQty = master.kitchenQty || 0;
+          let maxPrice = master.purchasePrice || 0;
+
+          for (let i = 1; i < list.length; i++) {
+            const dup = list[i];
+            totalStoreQty += (dup.storeQty || 0);
+            totalKitchenQty += (dup.kitchenQty || 0);
+            if ((dup.purchasePrice || 0) > maxPrice) maxPrice = dup.purchasePrice;
+            
+            batch.delete(doc(db, "godown_inventory", dup.id));
+            godownDeleted++;
+          }
+
+          batch.update(doc(db, "godown_inventory", master.id), {
+            storeQty: totalStoreQty,
+            kitchenQty: totalKitchenQty,
+            purchasePrice: maxPrice
+          });
+        }
+      }
+
+      // 2. फिक्स्ड एसेट्स डुप्लीकेट मर्ज (Group by Name)
+      const assetGroups: Record<string, FixedAsset[]> = {};
+      fixedAssets.forEach(asset => {
+        const key = asset.name.toUpperCase().trim();
+        if (!assetGroups[key]) assetGroups[key] = [];
+        assetGroups[key].push(asset);
+      });
+
+      for (const key in assetGroups) {
+        const list = assetGroups[key];
+        if (list.length > 1) {
+          const master = list[0];
+          let totalQty = master.quantity || 0;
+          let maxCost = master.cost || 0;
+
+          for (let i = 1; i < list.length; i++) {
+            const dup = list[i];
+            totalQty += (dup.quantity || 0);
+            if ((dup.cost || 0) > maxCost) maxCost = dup.cost || 0;
+            
+            batch.delete(doc(db, "fixed_assets", dup.id));
+            assetsDeleted++;
+          }
+
+          batch.update(doc(db, "fixed_assets", master.id), {
+            quantity: totalQty,
+            cost: maxCost
+          });
+        }
+      }
+
+      if (godownDeleted > 0 || assetsDeleted > 0) {
+        await batch.commit();
+        toastMessage(`सफलतापूर्वक मर्ज किया गया! (गोदाम: ${godownDeleted}, एसेट्स: ${assetsDeleted} डुप्लीकेट हटाए गए) 🧼`, "success");
+      } else {
+        toastMessage("डेटाबेस पहले से ही पूरी तरह से साफ़ है! कोई डुप्लीकेट नहीं मिला।", "info");
+      }
+    } catch (error) {
+      console.error("Cleanup error:", error);
+      toastMessage("डुप्लीकेट मर्ज करने में समस्या आई।", "error");
+    }
+  };
+
+  // 🔄 नया सामान जोड़ते समय यदि डुप्लीकेट हो तो स्टॉक जोड़ने (Merge) का लॉजिक
   const handleAddProductSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleanName = formAddProduct.name.toUpperCase().trim();
     if (!cleanName) return;
 
-    // गोदाम इन्वेंटरी में डुप्लीकेट नाम की जांच
-    const isDuplicate = inventory.some(
+    const existingItem = inventory.find(
       item => item.name.toUpperCase().trim() === cleanName
     );
 
-    if (isDuplicate) {
-      toastMessage(`"${cleanName}" गोदाम में पहले से मौजूद है!`, "error");
+    if (existingItem) {
+      const addedStoreQty = parseFloat(formAddProduct.storeQty) || 0;
+      const addedKitchenQty = parseFloat(formAddProduct.kitchenQty) || 0;
+      const newStoreQty = (existingItem.storeQty || 0) + addedStoreQty;
+      const newKitchenQty = (existingItem.kitchenQty || 0) + addedKitchenQty;
+      const updatedPrice = parseFloat(formAddProduct.purchasePrice) || existingItem.purchasePrice || 0;
+
+      await setDoc(doc(db, "godown_inventory", existingItem.id), {
+        storeQty: newStoreQty,
+        kitchenQty: newKitchenQty,
+        purchasePrice: updatedPrice,
+        lastPurchaseDate: formAddProduct.lastPurchaseDate,
+        category: formAddProduct.category.toUpperCase(),
+        unit: formAddProduct.unit
+      }, { merge: true });
+
+      if (addedStoreQty > 0) {
+        const logRef = doc(collection(db, "stock_in_history"));
+        await setDoc(logRef, {
+          id: logRef.id,
+          itemName: cleanName,
+          itemId: existingItem.id,
+          qty: addedStoreQty,
+          date: getLocalDateString(0),
+          remarks: "सामान दोबारा जोड़ने पर मात्रा स्वतः मर्ज की गई"
+        });
+      }
+
+      setShowAddProductModal(false);
+      setFormAddProduct({ 
+        name: '', 
+        storeQty: '0', 
+        kitchenQty: '0', 
+        unit: 'Kg', 
+        purchasePrice: '', 
+        minLimit: '10', 
+        category: 'OTHER', 
+        lastPurchaseDate: getLocalDateString(0) 
+      });
+
+      toastMessage(`"${cleanName}" पहले से मौजूद था, मात्रा सफलतापूर्वक मर्ज कर दी गई है! 🔄`, "success");
       return;
     }
 
@@ -607,7 +695,6 @@ export default function StoreStockPage() {
     });
 
     setShowAddProductModal(false);
-    // फॉर्म को रिसेट करें
     setFormAddProduct({ 
       name: '', 
       storeQty: '0', 
@@ -621,19 +708,43 @@ export default function StoreStockPage() {
     toastMessage("नया उत्पाद जोड़ा गया!", "success");
   };
 
-  // 🚨 डुप्लीकेट नाम चेकिंग प्रोटेक्शन के साथ नया एसेट जोड़ने का लॉजिक
+  // 🔄 नया एसेट जोड़ते समय यदि डुप्लीकेट हो तो स्टॉक जोड़ने (Merge) का लॉजिक
   const handleAddAssetSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleanName = formAddAsset.name.toUpperCase().trim();
     if (!cleanName) return;
 
-    // फिक्स्ड एसेट्स में डुप्लीकेट नाम की जांच
-    const isDuplicateAsset = fixedAssets.some(
+    const existingAsset = fixedAssets.find(
       asset => asset.name.toUpperCase().trim() === cleanName
     );
 
-    if (isDuplicateAsset) {
-      toastMessage(`"${cleanName}" एसेट्स में पहले से मौजूद है!`, "error");
+    if (existingAsset) {
+      const addedQty = parseFloat(formAddAsset.quantity) || 1;
+      const newQty = (existingAsset.quantity || 0) + addedQty;
+      const updatedCost = parseFloat(formAddAsset.cost) || existingAsset.cost || 0;
+
+      await setDoc(doc(db, "fixed_assets", existingAsset.id), {
+        quantity: newQty,
+        cost: updatedCost,
+        condition: formAddAsset.condition,
+        remarks: formAddAsset.remarks || existingAsset.remarks || "मात्रा अपडेट की गई",
+        type: formAddAsset.type || existingAsset.type || 'general',
+        unit: formAddAsset.unit || existingAsset.unit || 'Pcs'
+      }, { merge: true });
+
+      setShowAddAssetModal(false);
+      setFormAddAsset({ 
+        name: '', 
+        quantity: '1', 
+        purchaseDate: '', 
+        cost: '', 
+        condition: 'Working', 
+        remarks: '', 
+        type: 'general', 
+        unit: 'Pcs' 
+      });
+
+      toastMessage(`"${cleanName}" एसेट्स में पहले से मौजूद था, मात्रा सफलतापूर्वक मर्ज कर दी गई है! 🔄`, "success");
       return;
     }
 
@@ -650,7 +761,6 @@ export default function StoreStockPage() {
     });
 
     setShowAddAssetModal(false);
-    // फॉर्म को रिसेट करें
     setFormAddAsset({ 
       name: '', 
       quantity: '1', 
@@ -867,7 +977,7 @@ export default function StoreStockPage() {
           <div className="space-y-2">
             <span className="text-5xl block">☕</span>
             <h1 className="text-xl font-black text-orange-600 tracking-wider uppercase">BUM BUM CAFE</h1>
-            <p className="text-[10px] text-neutral-400 font-bold uppercase">इन्वेंटरी मैनेजमेंट पोर्टल</p>
+            <p className="text-[10px] text-neutral-400 font-bold uppercase">इन्वेंटरी पोर्टल</p>
           </div>
           
           <div className="space-y-3">
@@ -910,6 +1020,14 @@ export default function StoreStockPage() {
           </div>
         </div>
         <div className="flex items-center gap-1.5">
+          {/* 🧹 नया वन-क्लिक डुप्लीकेट मर्ज क्लीनअप बटन */}
+          <button 
+            onClick={handleMergeAllExistingDuplicates} 
+            className="p-2 bg-amber-100 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 rounded-xl text-xs flex items-center gap-1"
+            title="पुराने सभी डुप्लीकेट सामान आपस में मर्ज करें"
+          >
+            🧹 <span className="hidden sm:inline text-[9px] font-bold">मर्ज करें</span>
+          </button>
           <button onClick={handleLogout} className="p-2 bg-red-100 dark:bg-red-950/40 text-red-600 rounded-xl text-xs"><Lock size={13} /></button>
           <button onClick={() => setIsDarkMode(!isDarkMode)} className="p-2 bg-neutral-100 dark:bg-neutral-800 rounded-xl text-xs">{isDarkMode ? '☀️' : '🌙'}</button>
         </div>
