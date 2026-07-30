@@ -120,6 +120,9 @@ export default function StoreStockPage() {
   const [editedQties, setEditedQties] = useState<Record<string, string | number>>({});
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
 
+  // किचन के आंतरिक सब-टैब के लिए स्टेट
+  const [activeKitchenSubTab, setActiveKitchenSubTab] = useState<'closing' | 'today_use' | 'history'>('closing');
+
   // किचन क्लोजिंग स्टॉक इनपुट्स के लिए स्टेट
   const [kitchenClosingInputs, setKitchenClosingInputs] = useState<Record<string, string>>({});
 
@@ -1252,119 +1255,147 @@ export default function StoreStockPage() {
         {activeTab === 'kitchen' && (
           <div className="space-y-4">
             
-            {/* 1. आज की कुल खपत (Today's Consumption Panel) */}
-            <div className={`p-4 rounded-3xl border ${isDarkMode ? 'bg-neutral-900/60 border-neutral-800' : 'bg-white border-neutral-100'} shadow-sm`}>
-              <h2 className="text-xs font-black text-orange-500 uppercase tracking-wider mb-2">🔥 आज की कुल किचन खपत (Today's Usage)</h2>
-              {todayKitchenConsumption.length === 0 ? (
-                <p className="text-xs text-neutral-400 font-medium">आज अभी तक कोई खपत दर्ज नहीं की गई है। रात्रि क्लोजिंग करें!</p>
-              ) : (
-                <div className="grid grid-cols-2 gap-2">
-                  {todayKitchenConsumption.map((c, idx) => (
-                    <div key={idx} className={`p-2.5 rounded-xl border text-xs font-bold flex justify-between ${isDarkMode ? 'bg-neutral-950 border-neutral-800' : 'bg-neutral-50 border-neutral-150'}`}>
-                      <span className="text-neutral-400">{c.name}</span>
-                      <span className="text-orange-500">{c.qty} {c.unit}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
+            {/* 📍 KITCHEN INNER SEGMENTED SUB-TABS */}
+            <div className={`p-1 rounded-2xl flex border ${isDarkMode ? 'bg-neutral-900 border-neutral-800' : 'bg-neutral-100 border-neutral-200'} text-xs font-black uppercase`}>
+              <button 
+                onClick={() => { triggerHaptic(15); setActiveKitchenSubTab('closing'); }} 
+                className={`flex-1 py-2 text-center rounded-xl transition-all duration-200 ${activeKitchenSubTab === 'closing' ? 'bg-orange-500 text-white shadow-sm' : 'text-neutral-400'}`}
+              >
+                🌙 क्लोजिंग
+              </button>
+              <button 
+                onClick={() => { triggerHaptic(15); setActiveKitchenSubTab('today_use'); }} 
+                className={`flex-1 py-2 text-center rounded-xl transition-all duration-200 ${activeKitchenSubTab === 'today_use' ? 'bg-orange-500 text-white shadow-sm' : 'text-neutral-400'}`}
+              >
+                🔥 आज का उपयोग
+              </button>
+              <button 
+                onClick={() => { triggerHaptic(15); setActiveKitchenSubTab('history'); }} 
+                className={`flex-1 py-2 text-center rounded-xl transition-all duration-200 ${activeKitchenSubTab === 'history' ? 'bg-orange-500 text-white shadow-sm' : 'text-neutral-400'}`}
+              >
+                📅 7-दिन इतिहास
+              </button>
             </div>
 
-            {/* 2. क्लोजिंग स्टॉक दर्ज करने का फॉर्म */}
-            <div className={`p-4 rounded-3xl border ${isDarkMode ? 'bg-neutral-900/60 border-neutral-800' : 'bg-white border-neutral-100'} shadow-sm space-y-3`}>
-              <div className="flex justify-between items-center">
-                <div>
-                  <h2 className="text-xs font-black text-green-500 uppercase tracking-wider">🌙 रात्रि क्लोजिंग स्टॉक (Night Closing)</h2>
-                  <p className="text-[9px] text-neutral-400 font-bold">किचन स्टॉक को सत्यापित कर दैनिक उपयोग की जांच करें</p>
+            {/* SUB-TAB 1: 🌙 क्लोजिंग (NIGHT CLOSING) */}
+            {activeKitchenSubTab === 'closing' && (
+              <div className={`p-4 rounded-3xl border ${isDarkMode ? 'bg-neutral-900/60 border-neutral-800' : 'bg-white border-neutral-100'} shadow-sm space-y-3`}>
+                <div className="flex justify-between items-center">
+                  <div>
+                    <h2 className="text-xs font-black text-green-500 uppercase tracking-wider">🌙 रात्रि क्लोजिंग स्टॉक</h2>
+                    <p className="text-[9px] text-neutral-400 font-bold">किचन स्टॉक को सत्यापित कर दैनिक उपयोग की जांच करें</p>
+                  </div>
+                  {Object.keys(kitchenClosingInputs).length > 0 && (
+                    <button 
+                      onClick={handleSaveAllKitchenClosings}
+                      className="px-3 py-2 bg-green-600 text-white rounded-xl text-[10px] font-black uppercase shadow-lg transition-all"
+                    >
+                      💾 सभी सहेजें
+                    </button>
+                  )}
                 </div>
-                {Object.keys(kitchenClosingInputs).length > 0 && (
-                  <button 
-                    onClick={handleSaveAllKitchenClosings}
-                    className="px-3 py-2 bg-green-600 text-white rounded-xl text-[10px] font-black uppercase shadow-lg transition-all"
-                  >
-                    💾 सभी सहेजें
-                  </button>
-                )}
-              </div>
 
-              {/* खोजें */}
-              <input 
-                type="text" 
-                placeholder="सामग्री खोजें... (जैसे: MILK)" 
-                value={kitchenSearchQuery}
-                onChange={e => setKitchenSearchQuery(e.target.value)}
-                className="w-full p-2.5 rounded-xl text-xs font-bold border dark:bg-neutral-950 dark:border-neutral-800 focus:outline-none"
-              />
+                {/* खोजें */}
+                <input 
+                  type="text" 
+                  placeholder="सामग्री खोजें... (जैसे: MILK)" 
+                  value={kitchenSearchQuery}
+                  onChange={e => setKitchenSearchQuery(e.target.value)}
+                  className="w-full p-2.5 rounded-xl text-xs font-bold border dark:bg-neutral-950 dark:border-neutral-800 focus:outline-none"
+                />
 
-              <div className="space-y-2 max-h-[45vh] overflow-y-auto pr-1">
-                {filteredKitchenInventory.length === 0 ? (
-                  <p className="text-xs text-center py-4 text-neutral-400 font-bold">कोई सामग्री नहीं मिली।</p>
-                ) : (
-                  filteredKitchenInventory.map(item => {
-                    const expected = item.kitchenQty || 0;
-                    const typedVal = kitchenClosingInputs[item.id] || "";
-                    const typedNum = parseFloat(typedVal);
-                    const consumed = !isNaN(typedNum) ? (expected - typedNum) : 0;
+                <div className="space-y-2 max-h-[48vh] overflow-y-auto pr-1">
+                  {filteredKitchenInventory.length === 0 ? (
+                    <p className="text-xs text-center py-4 text-neutral-400 font-bold">कोई सामग्री नहीं मिली।</p>
+                  ) : (
+                    filteredKitchenInventory.map(item => {
+                      const expected = item.kitchenQty || 0;
+                      const typedVal = kitchenClosingInputs[item.id] || "";
+                      const typedNum = parseFloat(typedVal);
+                      const consumed = !isNaN(typedNum) ? (expected - typedNum) : 0;
 
-                    return (
-                      <div key={item.id} className={`p-3 rounded-2xl border ${isDarkMode ? 'bg-neutral-950 border-neutral-850' : 'bg-white border-neutral-100'} flex items-center justify-between gap-2`}>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs font-black truncate uppercase">{item.name}</p>
-                          <div className="flex items-center gap-2 mt-0.5 text-[10px] text-neutral-400 font-bold">
-                            <span>सिस्टम स्टॉक: <strong className={isDarkMode ? 'text-white' : 'text-black'}>{expected} {item.unit}</strong></span>
-                            {consumed > 0 && (
-                              <span className="text-orange-500">🔥 उपयोग: {consumed.toFixed(1)} {item.unit}</span>
+                      return (
+                        <div key={item.id} className={`p-3 rounded-2xl border ${isDarkMode ? 'bg-neutral-950 border-neutral-850' : 'bg-white border-neutral-100'} flex items-center justify-between gap-2`}>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-black truncate uppercase">{item.name}</p>
+                            <div className="flex items-center gap-2 mt-0.5 text-[10px] text-neutral-400 font-bold">
+                              <span>सिस्टम स्टॉक: <strong className={isDarkMode ? 'text-white' : 'text-black'}>{expected} {item.unit}</strong></span>
+                              {consumed > 0 && (
+                                <span className="text-orange-500 animate-pulse">🔥 उपयोग: {consumed.toFixed(1)} {item.unit}</span>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-1.5">
+                            <input 
+                              type="number" 
+                              placeholder="क्लोजिंग"
+                              value={typedVal}
+                              onChange={e => setKitchenClosingInputs({ ...kitchenClosingInputs, [item.id]: e.target.value })}
+                              className="w-16 p-1.5 rounded-xl text-center text-xs font-black border dark:bg-neutral-900"
+                            />
+                            {typedVal.trim() !== "" && (
+                              <button 
+                                onClick={() => handleSaveSingleKitchenClosing(item.id, typedVal)}
+                                className="p-1.5 bg-green-100 text-green-600 dark:bg-green-950/40 dark:text-green-400 rounded-xl font-bold text-xs"
+                                title="सहेजें"
+                              >
+                                ✓
+                              </button>
                             )}
                           </div>
                         </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            )}
 
-                        <div className="flex items-center gap-1.5">
-                          <input 
-                            type="number" 
-                            placeholder="क्लोजिंग"
-                            value={typedVal}
-                            onChange={e => setKitchenClosingInputs({ ...kitchenClosingInputs, [item.id]: e.target.value })}
-                            className="w-16 p-1.5 rounded-xl text-center text-xs font-black border dark:bg-neutral-900"
-                          />
-                          {typedVal.trim() !== "" && (
-                            <button 
-                              onClick={() => handleSaveSingleKitchenClosing(item.id, typedVal)}
-                              className="p-1.5 bg-green-100 text-green-600 dark:bg-green-950/40 dark:text-green-400 rounded-xl"
-                              title="सहेजें"
-                            >
-                              ✓
-                            </button>
-                          )}
+            {/* SUB-TAB 2: 🔥 आज का उपयोग (TODAY USE) */}
+            {activeKitchenSubTab === 'today_use' && (
+              <div className={`p-4 rounded-3xl border ${isDarkMode ? 'bg-neutral-900/60 border-neutral-800' : 'bg-white border-neutral-100'} shadow-sm`}>
+                <h2 className="text-xs font-black text-orange-500 uppercase tracking-wider mb-2">🔥 आज की कुल किचन खपत (Today's Usage)</h2>
+                {todayKitchenConsumption.length === 0 ? (
+                  <p className="text-xs text-neutral-400 font-medium py-4 text-center">आज अभी तक कोई खपत दर्ज नहीं की गई है। रात्रि क्लोजिंग करें!</p>
+                ) : (
+                  <div className="grid grid-cols-2 gap-2">
+                    {todayKitchenConsumption.map((c, idx) => (
+                      <div key={idx} className={`p-2.5 rounded-xl border text-xs font-bold flex justify-between ${isDarkMode ? 'bg-neutral-950 border-neutral-800' : 'bg-neutral-50 border-neutral-150'}`}>
+                        <span className="text-neutral-400 truncate max-w-[100px]">{c.name}</span>
+                        <span className="text-orange-500">{c.qty} {c.unit}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* SUB-TAB 3: 📅 7-दिन इतिहास (PAST 7 DAYS HISTORY) */}
+            {activeKitchenSubTab === 'history' && (
+              <div className={`p-4 rounded-3xl border ${isDarkMode ? 'bg-neutral-900/60 border-neutral-800' : 'bg-white border-neutral-100'} shadow-sm`}>
+                <h2 className="text-xs font-black text-neutral-400 uppercase tracking-wider mb-2">📅 दैनिक खपत इतिहास (Past 7 Days History)</h2>
+                <div className="space-y-2 max-h-[50vh] overflow-y-auto">
+                  {pastDaysConsumption.length === 0 ? (
+                    <p className="text-xs text-neutral-400 py-4 text-center">कोई पुराना खपत इतिहास उपलब्ध नहीं है।</p>
+                  ) : (
+                    pastDaysConsumption.map((day, idx) => (
+                      <div key={idx} className="p-3 rounded-2xl border dark:border-neutral-800/80 space-y-1.5">
+                        <p className="text-[10px] font-black uppercase text-orange-500">{new Date(day.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+                        <div className="grid grid-cols-2 gap-1.5 text-[11px] font-bold">
+                          {day.consumptions.map((c, cIdx) => (
+                            <div key={cIdx} className="flex justify-between border-b border-dashed dark:border-neutral-850 pb-0.5">
+                              <span className="text-neutral-400 truncate max-w-[100px]">{c.name}</span>
+                              <span>{c.qty} {c.unit}</span>
+                            </div>
+                          ))}
                         </div>
                       </div>
-                    );
-                  })
-                )}
+                    ))
+                  )}
+                </div>
               </div>
-            </div>
-
-            {/* 3. पिछले 7 दिनों का इतिहास */}
-            <div className={`p-4 rounded-3xl border ${isDarkMode ? 'bg-neutral-900/60 border-neutral-800' : 'bg-white border-neutral-100'} shadow-sm`}>
-              <h2 className="text-xs font-black text-neutral-400 uppercase tracking-wider mb-2">📅 दैनिक खपत इतिहास (Past 7 Days History)</h2>
-              <div className="space-y-2 max-h-[30vh] overflow-y-auto">
-                {pastDaysConsumption.length === 0 ? (
-                  <p className="text-xs text-neutral-400">कोई पुराना खपत इतिहास उपलब्ध नहीं है।</p>
-                ) : (
-                  pastDaysConsumption.map((day, idx) => (
-                    <div key={idx} className="p-3 rounded-2xl border dark:border-neutral-800/80 space-y-1.5">
-                      <p className="text-[10px] font-black uppercase text-orange-500">{new Date(day.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
-                      <div className="grid grid-cols-2 gap-1.5 text-[11px] font-bold">
-                        {day.consumptions.map((c, cIdx) => (
-                          <div key={cIdx} className="flex justify-between border-b border-dashed dark:border-neutral-850 pb-0.5">
-                            <span className="text-neutral-400 truncate max-w-[100px]">{c.name}</span>
-                            <span>{c.qty} {c.unit}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
+            )}
 
           </div>
         )}
@@ -1811,7 +1842,7 @@ export default function StoreStockPage() {
             <Store size={14} /> <span className="mt-0.5">गोदाम</span>
           </button>
           
-          {/* 🍳 NEW KITCHEN TAB BUTTON */}
+          {/* 🍳 KITCHEN TAB BUTTON */}
           <button onClick={() => { setActiveTab('kitchen'); setIsMultiSelectMode(false); }} className={`flex flex-col items-center justify-center py-1 ${activeTab === 'kitchen' ? 'text-[#FF6B00]' : 'text-neutral-400'}`}>
             <Utensils size={14} /> <span className="mt-0.5">किचन</span>
           </button>
