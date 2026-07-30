@@ -1,11 +1,11 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Home, Store, Wrench, Layers, AlertTriangle, Lock, X, Eye, EyeOff, Trash2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { db } from '../../lib/firebase'; 
 import { 
-  collection, onSnapshot, query, orderBy, doc, setDoc, increment, addDoc, deleteDoc, writeBatch 
+  collection, onSnapshot, query, orderBy, doc, setDoc, increment, addDoc, deleteDoc, writeBatch, limit, getDocs, where 
 } from 'firebase/firestore';
 
 // ककस्टमाइज़्ड सब-कंपोनेंट्स के इम्पोर्ट्स (समर्पित फ़ोल्डर से)
@@ -119,7 +119,6 @@ export default function StoreStockPage() {
   const [editedQties, setEditedQties] = useState<Record<string, string | number>>({});
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
 
-  const [users, setUsers] = useState<UserPin[]>([]);
   const [currentUser, setCurrentUser] = useState<UserPin | null>(null);
   const [pinInput, setPinInput] = useState<string>("");
   const [authError, setAuthError] = useState<string>("");
@@ -194,27 +193,23 @@ export default function StoreStockPage() {
   const [showStockOutModal, setShowStockOutModal] = useState<boolean>(false);
   const [formStockOut, setFormStockOut] = useState({ item: '', quantity: '', purpose: 'Waste' as any, remarks: '' });
 
-  const toastMessage = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 3000);
-  };
-
+  // --- रीयल-टाइम डेटा सिंक्रोनाइज़ेशन (Real-time Sync) ---
   useEffect(() => {
-    const unsubUsers = onSnapshot(collection(db, "cafe_users"), (snap) => {
-      if (!snap.empty) setUsers(snap.docs.map(d => ({ id: d.id, ...d.data() } as UserPin)));
-    });
     const unsubInventory = onSnapshot(collection(db, "godown_inventory"), (snap) => {
       setInventory(snap.docs.map(d => ({ id: d.id, kitchenQty: 0, ...d.data() } as InventoryItem)));
     });
     const unsubCategories = onSnapshot(collection(db, "godown_categories"), (snap) => {
       if (!snap.empty) setCategories(snap.docs.map(d => ({ id: d.id, ...d.data() } as CategoryItem)));
     });
-    const unsubStockIns = onSnapshot(query(collection(db, "stock_in_history"), orderBy("date", "desc")), (snap) => {
+
+    // 🚀 परफॉरमेंस सुधार: आवक-जावक इतिहास को केवल अंतिम 100 रिकॉर्ड्स तक सीमित किया [117]
+    const unsubStockIns = onSnapshot(query(collection(db, "stock_in_history"), orderBy("date", "desc"), limit(100)), (snap) => {
       setStockInHistory(snap.docs.map(d => ({ id: d.id, ...d.data() } as StockInLog)));
     });
-    const unsubStockOuts = onSnapshot(query(collection(db, "stock_out_history"), orderBy("date", "desc")), (snap) => {
+    const unsubStockOuts = onSnapshot(query(collection(db, "stock_out_history"), orderBy("date", "desc"), limit(100)), (snap) => {
       setStockOutHistory(snap.docs.map(d => ({ id: d.id, ...d.data() } as StockOutLog)));
     });
+
     const unsubSavedOrders = onSnapshot(collection(db, "saved_orders"), (snap) => {
       setSavedOrders(snap.docs.map(d => ({ id: d.id, ...d.data() } as SavedOrderItem)));
     });
@@ -223,7 +218,7 @@ export default function StoreStockPage() {
     });
 
     return () => {
-      unsubUsers(); unsubInventory(); unsubCategories(); unsubStockIns(); unsubStockOuts(); unsubSavedOrders(); unsubFixedAssets();
+      unsubInventory(); unsubCategories(); unsubStockIns(); unsubStockOuts(); unsubSavedOrders(); unsubFixedAssets();
     };
   }, []);
 
@@ -244,18 +239,32 @@ export default function StoreStockPage() {
     setLocalOrderQties(prev => ({ ...prev, ...updatedLocal }));
   }, [savedOrders, focusedOrderField]);
 
-  // --- ऑथेंटिकेशन और सुरक्षा सम्बन्धी फंक्शन ---
-  const handleLoginSubmit = (e?: React.FormEvent) => {
+  // 🔒 डायनामिक पिन वेरिफिकेशन (Dynamic Pin Query Helper) - अत्यंत सुरक्षित [235]
+  const verifyPinAndGetDoc = async (pin: string) => {
+    const q = query(collection(db, "cafe_users"), where("pin", "==", pin), limit(1));
+    const querySnapshot = await getDocs(q);
+    if (!querySnapshot.empty) {
+      const docSnap = querySnapshot.docs[0];
+      return { id: docSnap.id, ...docSnap.data() } as UserPin;
+    }
+    return null;
+  };
+
+  const handleLoginSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    const matched = users.find(u => u.pin === pinInput.trim());
-    if (matched) {
-      setCurrentUser(matched);
-      localStorage.setItem('bum_bum_cafe_user', JSON.stringify(matched));
-      setPinInput("");
-      setAuthError("");
-      toastMessage("सफलतापूर्वक लॉगिन किया गया!", "success");
-    } else {
-      setAuthError("गलत पिन!");
+    try {
+      const matched = await verifyPinAndGetDoc(pinInput.trim());
+      if (matched) {
+        setCurrentUser(matched);
+        localStorage.setItem('bum_bum_cafe_user', JSON.stringify(matched));
+        setPinInput("");
+        setAuthError("");
+        toastMessage("सफलतापूर्वक लॉगिन किया गया!", "success");
+      } else {
+        setAuthError("गलत पिन!");
+      }
+    } catch {
+      setAuthError("सर्वर त्रुटि! कृपया पुनः प्रयास करें।");
     }
   };
 
@@ -271,15 +280,19 @@ export default function StoreStockPage() {
     setDeletePinError("");
   };
 
-  const handleDeleteVerificationSubmit = (e: React.FormEvent) => {
+  const handleDeleteVerificationSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const matched = users.find(u => u.pin === deletePinInput.trim());
-    if (matched) {
-      if (deleteConfirmation) deleteConfirmation.action();
-      setDeleteConfirmation(null);
-      toastMessage("सफलतापूर्वक हटा दिया गया!", "success");
-    } else {
-      setDeletePinError("गलत पिन!");
+    try {
+      const matched = await verifyPinAndGetDoc(deletePinInput.trim());
+      if (matched) {
+        if (deleteConfirmation) deleteConfirmation.action();
+        setDeleteConfirmation(null);
+        toastMessage("सफलतापूर्वक हटा दिया गया!", "success");
+      } else {
+        setDeletePinError("गलत पिन!");
+      }
+    } catch {
+      setDeletePinError("सर्वर त्रुटि!");
     }
   };
 
@@ -552,94 +565,6 @@ export default function StoreStockPage() {
       setShowConsumeModal(false);
       toastMessage("किचन स्टॉक अपडेट किया गया!", "success");
     } catch {}
-  };
-
-  // 🧹 पूरे डेटाबेस में पहले से जमा सभी पुराने डुप्लीकेट्स को आपस में मर्ज करने का मास्टर फंक्शन
-  const handleMergeAllExistingDuplicates = async () => {
-    triggerHaptic(60);
-    if (!window.confirm("क्या आप वाकई गोदाम (Godown) और स्थायी संपत्ति (Fixed Assets) के सभी पुराने डुप्लीकेट सामानों को आपस में मर्ज करके मात्रा को जोड़ना चाहते हैं? यह क्रिया डेटाबेस को पूरी तरह से डुप्लीकेट-मुक्त कर देगी।")) return;
-
-    try {
-      toastMessage("डुप्लीकेट्स को साफ़ और मर्ज किया जा रहा है...", "info");
-      const batch = writeBatch(db);
-      let godownDeleted = 0;
-      let assetsDeleted = 0;
-
-      // 1. गोदाम स्टॉक डुप्लीकेट मर्ज (Group by Name)
-      const godownGroups: Record<string, InventoryItem[]> = {};
-      inventory.forEach(item => {
-        const key = item.name.toUpperCase().trim();
-        if (!godownGroups[key]) godownGroups[key] = [];
-        godownGroups[key].push(item);
-      });
-
-      for (const key in godownGroups) {
-        const list = godownGroups[key];
-        if (list.length > 1) {
-          const master = list[0];
-          let totalStoreQty = master.storeQty || 0;
-          let totalKitchenQty = master.kitchenQty || 0;
-          let maxPrice = master.purchasePrice || 0;
-
-          for (let i = 1; i < list.length; i++) {
-            const dup = list[i];
-            totalStoreQty += (dup.storeQty || 0);
-            totalKitchenQty += (dup.kitchenQty || 0);
-            if ((dup.purchasePrice || 0) > maxPrice) maxPrice = dup.purchasePrice;
-            
-            batch.delete(doc(db, "godown_inventory", dup.id));
-            godownDeleted++;
-          }
-
-          batch.update(doc(db, "godown_inventory", master.id), {
-            storeQty: totalStoreQty,
-            kitchenQty: totalKitchenQty,
-            purchasePrice: maxPrice
-          });
-        }
-      }
-
-      // 2. फिक्स्ड एसेट्स डुप्लीकेट मर्ज (Group by Name)
-      const assetGroups: Record<string, FixedAsset[]> = {};
-      fixedAssets.forEach(asset => {
-        const key = asset.name.toUpperCase().trim();
-        if (!assetGroups[key]) assetGroups[key] = [];
-        assetGroups[key].push(asset);
-      });
-
-      for (const key in assetGroups) {
-        const list = assetGroups[key];
-        if (list.length > 1) {
-          const master = list[0];
-          let totalQty = master.quantity || 0;
-          let maxCost = master.cost || 0;
-
-          for (let i = 1; i < list.length; i++) {
-            const dup = list[i];
-            totalQty += (dup.quantity || 0);
-            if ((dup.cost || 0) > maxCost) maxCost = dup.cost || 0;
-            
-            batch.delete(doc(db, "fixed_assets", dup.id));
-            assetsDeleted++;
-          }
-
-          batch.update(doc(db, "fixed_assets", master.id), {
-            quantity: totalQty,
-            cost: maxCost
-          });
-        }
-      }
-
-      if (godownDeleted > 0 || assetsDeleted > 0) {
-        await batch.commit();
-        toastMessage(`सफलतापूर्वक मर्ज किया गया! (गोदाम: ${godownDeleted}, एसेट्स: ${assetsDeleted} डुप्लीकेट हटाए गए) 🧼`, "success");
-      } else {
-        toastMessage("डेटाबेस पहले से ही पूरी तरह से साफ़ है! कोई डुप्लीकेट नहीं मिला।", "info");
-      }
-    } catch (error) {
-      console.error("Cleanup error:", error);
-      toastMessage("डुप्लीकेट मर्ज करने में समस्या आई।", "error");
-    }
   };
 
   // 🔄 नया सामान जोड़ते समय यदि डुप्लीकेट हो तो स्टॉक जोड़ने (Merge) का लॉजिक [235]
