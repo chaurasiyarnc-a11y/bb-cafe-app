@@ -205,7 +205,6 @@ export default function StoreStockPage() {
     const unsubInventory = onSnapshot(collection(db, "godown_inventory"), (snap) => {
       setInventory(snap.docs.map(d => ({ id: d.id, kitchenQty: 0, ...d.data() } as InventoryItem)));
     });
-    // [बदलाव] अब यह केवल गोदाम के लिए समर्पित "godown_categories" से डेटा सिंक करेगा
     const unsubCategories = onSnapshot(collection(db, "godown_categories"), (snap) => {
       if (!snap.empty) setCategories(snap.docs.map(d => ({ id: d.id, ...d.data() } as CategoryItem)));
     });
@@ -306,6 +305,10 @@ export default function StoreStockPage() {
       .filter(asset => asset.type === 'crockery')
       .reduce((sum, asset) => sum + getAssetSingleVal(asset), 0);
 
+    const decorationVal = fixedAssets
+      .filter(asset => asset.type === 'decoration')
+      .reduce((sum, asset) => sum + getAssetSingleVal(asset), 0);
+
     return { 
       totalVal, 
       lowCount, 
@@ -313,7 +316,8 @@ export default function StoreStockPage() {
       totalFixedVal,
       generalAssetsVal,
       cutleryVal,
-      crockeryVal
+      crockeryVal,
+      decorationVal
     };
   }, [inventory, fixedAssets]);
 
@@ -481,7 +485,6 @@ export default function StoreStockPage() {
       if (!newCategoryInput.trim()) return;
       targetCategory = newCategoryInput.trim().toUpperCase();
       const catId = targetCategory.toLowerCase().replace(/\s+/g, '_');
-      // [बदलाव] अब यह "godown_categories" में लिखेगा
       await setDoc(doc(db, "godown_categories", catId), { id: catId, name: targetCategory, hidden: false });
     }
     try {
@@ -500,7 +503,6 @@ export default function StoreStockPage() {
     try {
       const formattedName = addCategoryModalInput.trim().toUpperCase();
       const catId = formattedName.toLowerCase().replace(/\s+/g, '_');
-      // [बदलाव] अब यह "godown_categories" में लिखेगा
       await setDoc(doc(db, "godown_categories", catId), { id: catId, name: formattedName, hidden: false });
       setAddCategoryModalInput("");
       toastMessage("नई श्रेणी जोड़ी गई!", "success");
@@ -508,13 +510,11 @@ export default function StoreStockPage() {
   };
 
   const handleToggleCategoryHide = async (cat: CategoryItem) => {
-    // [बदलाव] अब यह "godown_categories" में अपडेट करेगा
     await setDoc(doc(db, "godown_categories", cat.id), { hidden: !cat.hidden }, { merge: true });
   };
 
   const handleRemoveCategory = (cat: CategoryItem) => {
     confirmDeleteWithPin(`क्या आप सच में "${cat.name}" हटाना चाहते हैं?`, async () => {
-      // [बदलाव] अब यह "godown_categories" से डिलीट करेगा
       await deleteDoc(doc(db, "godown_categories", cat.id));
     });
   };
@@ -738,16 +738,16 @@ export default function StoreStockPage() {
 
   const handleMigrateCrockeryCutlery = async () => {
     triggerHaptic(50);
-    if (!window.confirm("क्या आप वाकई गोडाउन (Godown) से क्रॉकरी और कटलरी का सारा डेटा स्थायी संपत्ति (Fixed Assets) में शिफ्ट करना चाहते हैं? यह क्रिया उन्हें गोडाउन से हमेशा के लिए हटा देगी।")) return;
+    if (!window.confirm("क्या आप वाकई गोडाउन (Godown) से क्रॉकरी, कटलरी और डेकोरेशन का सारा डेटा स्थायी संपत्ति (Fixed Assets) में शिफ्ट करना चाहते हैं? यह क्रिया उन्हें गोडाउन से हमेशा के लिए हटा देगी।")) return;
 
     try {
       const itemsToMigrate = inventory.filter(item => {
         const cat = (item.category || "").toUpperCase().trim();
-        return cat.includes('CROCKER') || cat.includes('CUTLER');
+        return cat.includes('CROCKER') || cat.includes('CUTLER') || cat.includes('DECORAT');
       });
 
       if (itemsToMigrate.length === 0) {
-        toastMessage("गोदाम में ट्रांसफर के लिए कोई क्रॉकरी या कटलरी उत्पाद नहीं मिला! सुनिश्चित करें कि उनका कैटेगरी नाम सही है।", "info");
+        toastMessage("गोदाम में ट्रांसफर के लिए कोई क्रॉकरी, कटलरी या डेकोरेशन उत्पाद नहीं मिला! सुनिश्चित करें कि उनका कैटेगरी नाम सही है।", "info");
         return;
       }
 
@@ -759,7 +759,15 @@ export default function StoreStockPage() {
         const godownDocRef = doc(db, "godown_inventory", item.id);
 
         const cat = (item.category || "").toUpperCase().trim();
-        const finalType = cat.includes('CROCKER') ? 'crockery' : 'cutlery';
+        let finalType = 'general';
+        
+        if (cat.includes('CROCKER')) {
+          finalType = 'crockery';
+        } else if (cat.includes('CUTLER')) {
+          finalType = 'cutlery';
+        } else if (cat.includes('DECORAT')) {
+          finalType = 'decoration';
+        }
 
         batch.set(assetDocRef, {
           id: assetId,
@@ -1121,6 +1129,7 @@ export default function StoreStockPage() {
                   <option value="general">🏢 सामान्य एसेट (General)</option>
                   <option value="cutlery">🍴 कटलरी (Cutlery)</option>
                   <option value="crockery">🍽️ क्रॉकरी (Crockery)</option>
+                  <option value="decoration">✨ डेकोरेशन मटेरियल (Decoration)</option>
                 </select>
               </div>
 
@@ -1174,6 +1183,7 @@ export default function StoreStockPage() {
                   <option value="general">🏢 सामान्य एसेट (General)</option>
                   <option value="cutlery">🍴 कटलरी (Cutlery)</option>
                   <option value="crockery">🍽️ क्रॉकरी (Crockery)</option>
+                  <option value="decoration">✨ डेकोरेशन मटेरियल (Decoration)</option>
                 </select>
               </div>
 
