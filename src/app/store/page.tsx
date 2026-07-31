@@ -1,9 +1,8 @@
-
-
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Home, Store, Wrench, Layers, AlertTriangle, Lock, X } from 'lucide-react';
+// सभी आवश्यक आइकन्स को वापस इम्पोर्ट सूची में जोड़ दिया गया है
+import { Home, Store, Wrench, Layers, AlertTriangle, Lock, X, Eye, EyeOff, Trash2, Utensils } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { db } from '../../lib/firebase'; 
 import { 
@@ -16,7 +15,7 @@ import StockGodown from '../../components/store/StockGodown';
 import StockAssets from '../../components/store/StockAssets';
 import StockSupplierOrder from '../../components/store/StockSupplierOrder';
 import StockLedger from '../../components/store/StockLedger';
-import StockKitchen from '../../components/store/StockKitchen'; // 🍳 नया विभाजित किचन सब-कंपोनेंट
+import StockKitchen from '../../components/store/StockKitchen'; // 🍳 विभाजित किचन सब-कंपोनेंट
 
 interface InventoryItem {
   id: string;
@@ -1377,7 +1376,7 @@ export default function StoreStockPage() {
                 <option value="">सामान चुनें...</option>
                 {inventory.map(i => <option key={i.id} value={i.id}>{i.name} ({i.storeQty} उपलब्ध)</option>)}
               </select>
-              <input type="number" placeholder="मात्रा (Qty)" value={formStockOut.quantity} onChange={e => setFormStockOut({ ...formStockOut, quantity: e.target.value })} className="p-2.5 rounded-xl border dark:bg-neutral-800 text-xs" required />
+              <input type="number" placeholder="मात्रा (Qty)" value={formStockOut.quantity} onChange={e => setFormStockOut({ ...formStockOut, quantity: e.target.value })} className="w-full p-2.5 rounded-xl border dark:bg-neutral-800 text-xs" required />
               <select value={formStockOut.purpose} onChange={e => setFormStockOut({ ...formStockOut, purpose: e.target.value as any })} className="w-full p-2.5 rounded-xl border dark:bg-neutral-800 text-xs">
                 <option value="Waste">Waste (कचरा)</option>
                 <option value="Damage">Damage (नुकसान)</option>
@@ -1537,7 +1536,7 @@ export default function StoreStockPage() {
             <motion.form onSubmit={handleEditAssetSubmit} className="w-full max-w-sm rounded-3xl p-6 space-y-4 bg-white dark:bg-neutral-900 border">
               <div className="flex justify-between items-center border-b dark:border-neutral-800 pb-2.5 mb-2">
                 <h3 className="text-xs font-black uppercase text-orange-500">एसेट विवरण संपादित करें</h3>
-                <button type="button" onClick={() => setEditingAsset(null)} className="p-1.5 bg-neutral-100 dark:bg-neutral-800 rounded-xl text-neutral-500"><X size={14} /></button>
+                <button type="button" onClick={() => setEditingAsset(null)} className="p-1.5 bg-neutral-100 dark:bg-neutral-850 rounded-xl text-neutral-500"><X size={14} /></button>
               </div>
               
               <div className="space-y-1">
