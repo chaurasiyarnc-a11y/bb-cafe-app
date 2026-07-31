@@ -14,7 +14,7 @@ import StockGodown from '../../components/store/StockGodown';
 import StockAssets from '../../components/store/StockAssets';
 import StockSupplierOrder from '../../components/store/StockSupplierOrder';
 import StockLedger from '../../components/store/StockLedger';
-import StockKitchen from '../../components/store/StockKitchen'; // 🍳 नया विभाजित किचन सब-कंपोनेंट
+import StockKitchen from '../../components/store/StockKitchen'; // 🍳 विभाजित और प्रबंधित किचन कंपोनेंट
 
 interface InventoryItem {
   id: string;
@@ -917,6 +917,80 @@ export default function StoreStockPage() {
     await setDoc(doc(db, "saved_orders", compoundId), { orderQty: qty }, { merge: true });
   };
 
+  // सप्लायर आर्डर लिस्ट को PDF प्रिंट करने का फंक्शन
+  const handlePrintSavedList = () => {
+    const printWindow = window.open('', '_blank', 'width=600,height=800');
+    if (!printWindow) {
+      toastMessage("पॉपअप अवरुद्ध हो गया है! कृपया पॉपअप की अनुमति दें।", "error");
+      return;
+    }
+
+    const activeList = orderLists.find(l => l.id === activeListId);
+    const listTitle = activeList ? activeList.name : "BUM BUM CAFE ORDER SHEET";
+    const matchedItems = savedOrders.filter(o => o.listId === activeListId);
+
+    const rows = matchedItems.map(item => `
+      <tr>
+        <td style="padding:10px; border-bottom:1px solid #ddd; font-weight:bold;">${item.name}</td>
+        <td style="padding:10px; border-bottom:1px solid #ddd; text-align:center;">${item.storeQty} ${item.unit}</td>
+        <td style="padding:10px; border-bottom:1px solid #ddd; text-align:right; font-weight:bold; color:#FF6B00;">${item.orderQty || "0"}</td>
+      </tr>
+    `).join('');
+
+    printWindow.document.write(`
+      <html>
+        <head><title>Order_Sheet_${listTitle.replace(/\s+/g, '_')}</title></head>
+        <body style="font-family:sans-serif; padding:25px;">
+          <h2 style="color:#FF6B00; text-align:center; text-transform: uppercase;">${listTitle}</h2>
+          <p style="text-align:center; color:#666; font-size:12px;">Generated on: ${new Date().toLocaleString()}</p>
+          <table style="width:100%; border-collapse:collapse; margin-top:20px;">
+            <thead>
+              <tr style="background:#FF6B00; color:white;">
+                <th style="padding:10px; text-align:left;">Item Name</th>
+                <th style="padding:10px; text-align:center;">Current Stock</th>
+                <th style="padding:10px; text-align:right;">Order Qty</th>
+              </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>
+          <script>window.onload = function() { window.print(); }</script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
+
+  // सप्लायर आर्डर लिस्ट को सीधे WhatsApp पर साझा करने का फंक्शन
+  const handleWhatsAppShare = () => {
+    triggerHaptic();
+    if (!activeListId) return;
+
+    const activeList = orderLists.find(l => l.id === activeListId);
+    const listTitle = activeList ? activeList.name : "ORDER SHEET";
+    const matchedItems = savedOrders.filter(o => o.listId === activeListId);
+
+    if (matchedItems.length === 0) {
+      toastMessage("इस लिस्ट में कोई सामान नहीं है!", "error");
+      return;
+    }
+
+    let text = `*BUM BUM CAFE - ${listTitle.toUpperCase()}*\n`;
+    text += `Date: ${new Date().toLocaleDateString('en-GB')}\n\n`;
+    text += `Please deliver the following items:\n`;
+    text += `--------------------------------\n`;
+
+    matchedItems.forEach(item => {
+      const qty = item.orderQty || "0";
+      text += `• *${item.name}*: ${qty} ${item.unit}\n`;
+    });
+
+    text += `--------------------------------\n`;
+    text += `Thank you!`;
+
+    const waUrl = `https://wa.me/?text=${encodeURIComponent(text)}`;
+    window.open(waUrl, '_blank');
+  };
+
   const handleSaveAllKitchenClosings = async () => {
     const enteredItems = Object.entries(kitchenClosingInputs).filter(([_, val]) => val.trim() !== "");
     if (enteredItems.length === 0) {
@@ -1152,13 +1226,13 @@ export default function StoreStockPage() {
       <AnimatePresence>
         {deleteConfirmation && (
           <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[200] flex items-center justify-center p-4">
-            <motion.form onSubmit={handleDeleteVerificationSubmit} className={`w-full max-w-sm rounded-[2.5rem] p-6 space-y-5 border text-center ${isDarkMode ? 'bg-neutral-900 border-neutral-800 text-white' : 'bg-white border-neutral-100'}`}>
+            <motion.form onSubmit={handleDeleteVerificationSubmit} className={`w-full max-w-sm rounded-[2.5rem] p-6 space-y-5 border text-center ${isDarkMode ? 'bg-[#0E0E0E] border-neutral-800 text-white' : 'bg-white border-neutral-100'}`}>
               <div className="flex justify-between items-center border-b dark:border-neutral-800 pb-2 mb-2 w-full">
                 <span className="text-xs font-black text-red-500 uppercase">सुरक्षा प्रमाणीकरण</span>
                 <button type="button" onClick={() => setDeleteConfirmation(null)} className="p-1.5 bg-neutral-100 dark:bg-neutral-850 rounded-xl text-neutral-500"><X size={14} /></button>
               </div>
               <p className="text-xs text-neutral-400">{deleteConfirmation.message}</p>
-              <input type="password" maxLength={6} placeholder="••••" value={deletePinInput} onChange={e => setDeletePinInput(e.target.value)} className="w-full text-center text-xl tracking-[1em] p-2.5 rounded-xl border font-black dark:bg-neutral-800" required />
+              <input type="password" maxLength={6} placeholder="••••" value={deletePinInput} onChange={e => setDeletePinInput(e.target.value)} className="w-full text-center text-xl tracking-[1em] p-2.5 rounded-xl border font-black dark:bg-neutral-850" required />
               {deletePinError && <p className="text-[10px] text-red-500 font-bold">{deletePinError}</p>}
               <div className="flex gap-2">
                 <button type="button" onClick={() => setDeleteConfirmation(null)} className="flex-1 py-3 bg-neutral-100 dark:bg-neutral-800 rounded-xl text-xs font-black">रद्द करें</button>
@@ -1198,7 +1272,7 @@ export default function StoreStockPage() {
         {/* Modal: Transfer to kitchen */}
         {showTransferModal && transferItem && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <motion.form onSubmit={handleTransferToKitchenSubmit} className={`w-full max-w-sm rounded-[2rem] p-6 space-y-4 border ${isDarkMode ? 'bg-neutral-900 text-white' : 'bg-white text-neutral-900'}`}>
+            <motion.form onSubmit={handleTransferToKitchenSubmit} className={`w-full max-w-sm rounded-[2rem] p-6 space-y-4 border ${isDarkMode ? 'bg-[#0E0E0E] text-white' : 'bg-white text-neutral-900'}`}>
               <div className="flex justify-between items-center border-b dark:border-neutral-800 pb-2.5 mb-2">
                 <h3 className="text-xs font-black uppercase text-orange-500">किचन में भेजें - {transferItem.name}</h3>
                 <button type="button" onClick={() => setShowTransferModal(false)} className="p-1.5 bg-neutral-100 dark:bg-neutral-850 rounded-xl text-neutral-500"><X size={14} /></button>
@@ -1212,7 +1286,7 @@ export default function StoreStockPage() {
         {/* Modal: Consume Kitchen stock */}
         {showConsumeModal && consumeItem && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <motion.form onSubmit={handleConsumeKitchenSubmit} className={`w-full max-w-sm rounded-[2rem] p-6 space-y-4 border ${isDarkMode ? 'bg-neutral-900 text-white' : 'bg-white text-neutral-900'}`}>
+            <motion.form onSubmit={handleConsumeKitchenSubmit} className={`w-full max-w-sm rounded-[2rem] p-6 space-y-4 border ${isDarkMode ? 'bg-[#0E0E0E] text-white' : 'bg-white text-neutral-900'}`}>
               <div className="flex justify-between items-center border-b dark:border-neutral-800 pb-2.5 mb-2">
                 <h3 className="text-xs font-black uppercase text-neutral-400">किचन स्टॉक का उपयोग - {consumeItem.name}</h3>
                 <button type="button" onClick={() => setShowConsumeModal(false)} className="p-1.5 bg-neutral-100 dark:bg-neutral-850 rounded-xl text-neutral-500"><X size={14} /></button>
@@ -1514,7 +1588,7 @@ export default function StoreStockPage() {
         {showSaveToListModal && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[110] flex items-center justify-center p-4">
             <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className={`w-full max-w-sm rounded-[2rem] p-6 space-y-4 border ${isDarkMode ? 'bg-[#0F0F0F] border-neutral-800 text-white' : 'bg-white border-neutral-100'}`}>
-              <div className="flex justify-between items-center border-b dark:border-neutral-800 pb-2.5 mb-2">
+              <div className="flex justify-between items-center border-b dark:border-neutral-850 pb-2.5 mb-2">
                 <h3 className="text-xs font-black uppercase text-orange-500">सप्लायर ऑर्डर में सहेजें</h3>
                 <button type="button" onClick={() => setShowSaveToListModal(false)} className="p-1.5 bg-neutral-100 dark:bg-neutral-850 rounded-xl text-neutral-500"><X size={14} /></button>
               </div>
