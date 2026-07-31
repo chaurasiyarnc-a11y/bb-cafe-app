@@ -214,10 +214,61 @@ export default function StoreStockPage() {
   const [showStockOutModal, setShowStockOutModal] = useState<boolean>(false);
   const [formStockOut, setFormStockOut] = useState({ item: '', quantity: '', purpose: 'Waste' as any, remarks: '' });
 
-  const getAssetSingleVal = (asset: FixedAsset) => {
-    const qty = (asset.quantity === undefined || asset.quantity === null) ? 1 : Number(asset.quantity);
-    const cost = Number(asset.cost || 0);
-    return qty * cost;
+  const verifyPinAndGetDoc = async (pin: string) => {
+    const q = query(collection(db, "cafe_users"), where("pin", "==", pin), limit(1));
+    const querySnapshot = await getDocs(q);
+    if (!querySnapshot.empty) {
+      const docSnap = querySnapshot.docs[0];
+      return { id: docSnap.id, ...docSnap.data() } as UserPin;
+    }
+    return null;
+  };
+
+  const handleLoginSubmit = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    try {
+      const matched = await verifyPinAndGetDoc(pinInput.trim());
+      if (matched) {
+        setCurrentUser(matched);
+        localStorage.setItem('bum_bum_cafe_user', JSON.stringify(matched));
+        setPinInput("");
+        setAuthError("");
+        toastMessage("सफलतापूर्वक लॉगिन किया गया!", "success");
+      } else {
+        setAuthError("गलत पिन!");
+      }
+    } catch {
+      setAuthError("सर्वर त्रुटि! कृपया पुनः प्रयास करें।");
+    }
+  };
+
+  const handleLogout = () => {
+    setCurrentUser(null);
+    localStorage.removeItem('bum_bum_cafe_user');
+    toastMessage("लॉगआउट कर दिया गया है।", "info");
+  };
+
+  // 📝 पिन के माध्यम से डिलीट की सुरक्षा जांच करने का फ़ंक्शन (वापस जोड़ा गया)
+  const confirmDeleteWithPin = (message: string, actionToExecute: () => void) => {
+    setDeleteConfirmation({ message, action: actionToExecute });
+    setDeletePinInput("");
+    setDeletePinError("");
+  };
+
+  const handleDeleteVerificationSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const matched = await verifyPinAndGetDoc(deletePinInput.trim());
+      if (matched) {
+        if (deleteConfirmation) deleteConfirmation.action();
+        setDeleteConfirmation(null);
+        toastMessage("सफलतापूर्वक हटा दिया गया!", "success");
+      } else {
+        setDeletePinError("गलत पिन!");
+      }
+    } catch {
+      setDeletePinError("सर्वर त्रुटि!");
+    }
   };
 
   const stats = useMemo(() => {
@@ -344,64 +395,6 @@ export default function StoreStockPage() {
   }, [inventory, searchQuery, selectedCategoryFilter, categories]);
 
   const filteredAssets = useMemo(() => fixedAssets.filter(asset => asset.name.toLowerCase().includes(searchQuery.toLowerCase())), [fixedAssets, searchQuery]);
-
-  // 🧹 वन-क्लिक डुप्लीकेट मर्ज क्लीनअप लॉजिक
-  const handleMergeAllExistingDuplicates = async () => {
-    triggerHaptic(50);
-    try {
-      const groups: Record<string, InventoryItem[]> = {};
-      inventory.forEach(item => {
-        const key = item.name.toUpperCase().trim();
-        if (!groups[key]) groups[key] = [];
-        groups[key].push(item);
-      });
-
-      const batch = writeBatch(db);
-      let mergedCount = 0;
-
-      for (const name in groups) {
-        const items = groups[name];
-        if (items.length > 1) {
-          const primary = items[0];
-          let totalStoreQty = primary.storeQty;
-          let totalKitchenQty = primary.kitchenQty || 0;
-          let maxPrice = primary.purchasePrice;
-          const minLimit = primary.minLimit;
-          const category = primary.category || 'OTHER';
-          const unit = primary.unit;
-
-          for (let i = 1; i < items.length; i++) {
-            const duplicate = items[i];
-            totalStoreQty += duplicate.storeQty;
-            totalKitchenQty += (duplicate.kitchenQty || 0);
-            if (duplicate.purchasePrice > maxPrice) maxPrice = duplicate.purchasePrice;
-            
-            batch.delete(doc(db, "godown_inventory", duplicate.id));
-            mergedCount++;
-          }
-
-          batch.set(doc(db, "godown_inventory", primary.id), {
-            storeQty: totalStoreQty,
-            kitchenQty: totalKitchenQty,
-            purchasePrice: maxPrice,
-            minLimit,
-            category,
-            unit
-          }, { merge: true });
-        }
-      }
-
-      if (mergedCount > 0) {
-        await batch.commit();
-        setKitchenClosingInputs({});
-        toastMessage(`${mergedCount} डुप्लीकेट सामान सफलतापूर्वक मर्ज किए गए! 🧹`, "success");
-      } else {
-        toastMessage("कोई डुप्लीकेट सामान नहीं मिला। ✨", "info");
-      }
-    } catch {
-      toastMessage("मर्ज करने में त्रुटि आई।", "error");
-    }
-  };
 
   const adjustQty = (id: string, diff: number) => {
     const item = inventory.find(i => i.id === id);
@@ -923,7 +916,7 @@ export default function StoreStockPage() {
             🧹 <span className="hidden sm:inline text-[9px] font-bold">मर्ज करें</span>
           </button>
           <button onClick={handleLogout} className="p-2 bg-red-100 dark:bg-red-950/40 text-red-600 rounded-xl text-xs"><Lock size={13} /></button>
-          <button onClick={() => setIsDarkMode(!isDarkMode)} className="p-2 bg-neutral-100 dark:bg-neutral-850 rounded-xl text-xs">{isDarkMode ? '☀️' : '🌙'}</button>
+          <button onClick={() => setIsDarkMode(!isDarkMode)} className="p-2 bg-neutral-100 dark:bg-neutral-800 rounded-xl text-xs">{isDarkMode ? '☀️' : '🌙'}</button>
         </div>
       </header>
 
@@ -1033,7 +1026,7 @@ export default function StoreStockPage() {
             <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className={`w-full max-w-sm rounded-[2rem] p-6 space-y-4 border ${isDarkMode ? 'bg-[#0F0F0F] border-neutral-800 text-white' : 'bg-white border-neutral-100'}`}>
               <div className="flex justify-between items-center border-b pb-2.5">
                 <h3 className="text-xs font-black uppercase text-orange-500">कैटेगरी का प्रबंधन (Manage Categories)</h3>
-                <button type="button" onClick={() => setShowManageCategoriesModal(false)} className="p-1.5 bg-neutral-100 dark:bg-neutral-850 rounded-xl"><X size={14} /></button>
+                <button type="button" onClick={() => setShowManageCategoriesModal(false)} className="p-1.5 bg-neutral-100 dark:bg-neutral-800 rounded-xl"><X size={14} /></button>
               </div>
               <div className="flex gap-1.5 items-center">
                 <input type="text" placeholder="FROZEN" value={addCategoryModalInput} onChange={e => setAddCategoryModalInput(e.target.value)} className="flex-1 p-2 rounded-xl text-xs font-bold border uppercase dark:bg-neutral-900" />
@@ -1072,7 +1065,7 @@ export default function StoreStockPage() {
         {showConsumeModal && consumeItem && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <motion.form onSubmit={handleConsumeKitchenSubmit} className={`w-full max-w-sm rounded-[2rem] p-6 space-y-4 border ${isDarkMode ? 'bg-[#0E0E0E] text-white' : 'bg-white text-neutral-900'}`}>
-              <div className="flex justify-between items-center border-b dark:border-neutral-850 pb-2.5 mb-2">
+              <div className="flex justify-between items-center border-b dark:border-neutral-800 pb-2.5 mb-2">
                 <h3 className="text-xs font-black uppercase text-neutral-400">किचन स्टॉक का उपयोग - {consumeItem.name}</h3>
                 <button type="button" onClick={() => setShowConsumeModal(false)} className="p-1.5 bg-neutral-100 dark:bg-neutral-855 rounded-xl text-neutral-500"><X size={14} /></button>
               </div>
@@ -1087,7 +1080,7 @@ export default function StoreStockPage() {
         {showStockOutModal && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <motion.form onSubmit={handleWasteSubmit} className="w-full max-w-sm rounded-3xl p-6 space-y-4 bg-white dark:bg-neutral-900 border">
-              <div className="flex justify-between items-center border-b dark:border-neutral-850 pb-2.5 mb-2">
+              <div className="flex justify-between items-center border-b dark:border-neutral-800 pb-2.5 mb-2">
                 <h3 className="text-xs font-black text-red-500 uppercase">कचरा / नुकसान दर्ज करें</h3>
                 <button type="button" onClick={() => setShowStockOutModal(false)} className="p-1.5 bg-neutral-100 dark:bg-neutral-855 rounded-xl text-neutral-500"><X size={14} /></button>
               </div>
@@ -1153,7 +1146,7 @@ export default function StoreStockPage() {
         {editingProduct && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <motion.form onSubmit={handleEditProductSubmit} className="w-full max-w-sm rounded-3xl p-6 space-y-4 bg-white dark:bg-neutral-900 border">
-              <div className="flex justify-between items-center border-b dark:border-neutral-800 pb-2.5 mb-2">
+              <div className="flex justify-between items-center border-b dark:border-neutral-850 pb-2.5 mb-2">
                 <h3 className="text-xs font-black uppercase text-orange-500">विवरण संपादित करें</h3>
                 <button type="button" onClick={() => setEditingProduct(null)} className="p-1.5 bg-neutral-100 dark:bg-neutral-855 rounded-xl text-neutral-500"><X size={14} /></button>
               </div>
@@ -1199,7 +1192,7 @@ export default function StoreStockPage() {
         {showAddAssetModal && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <motion.form onSubmit={handleAddAssetSubmit} className="w-full max-w-sm rounded-3xl p-6 space-y-4 bg-white dark:bg-neutral-900 border">
-              <div className="flex justify-between items-center border-b dark:border-neutral-850 pb-2.5 mb-2">
+              <div className="flex justify-between items-center border-b dark:border-neutral-855 pb-2.5 mb-2">
                 <h3 className="text-xs font-black text-green-500 uppercase">अचल संपत्ति (Fixed Asset) जोड़ें</h3>
                 <button type="button" onClick={() => setShowAddAssetModal(false)} className="p-1.5 bg-neutral-100 dark:bg-neutral-855 rounded-xl text-neutral-500"><X size={14} /></button>
               </div>
@@ -1253,7 +1246,7 @@ export default function StoreStockPage() {
         {editingAsset && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <motion.form onSubmit={handleEditAssetSubmit} className="w-full max-w-sm rounded-3xl p-6 space-y-4 bg-white dark:bg-neutral-900 border">
-              <div className="flex justify-between items-center border-b dark:border-neutral-800 pb-2.5 mb-2">
+              <div className="flex justify-between items-center border-b dark:border-neutral-850 pb-2.5 mb-2">
                 <h3 className="text-xs font-black uppercase text-orange-500">एसेट विवरण संपादित करें</h3>
                 <button type="button" onClick={() => setEditingAsset(null)} className="p-1.5 bg-neutral-100 dark:bg-[#181818] rounded-xl text-neutral-500"><X size={14} /></button>
               </div>
