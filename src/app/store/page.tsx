@@ -141,12 +141,6 @@ export default function StoreStockPage() {
   const [authError, setAuthError] = useState<string>("");
   const [authLoading, setAuthLoading] = useState<boolean>(true); 
 
-  // टोस्ट अलर्ट प्रदर्शित करने का फ़ंक्शन
-  const toastMessage = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 3000);
-  };
-
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const savedUser = localStorage.getItem('bum_bum_cafe_user');
@@ -213,6 +207,63 @@ export default function StoreStockPage() {
 
   const [showStockOutModal, setShowStockOutModal] = useState<boolean>(false);
   const [formStockOut, setFormStockOut] = useState({ item: '', quantity: '', purpose: 'Waste' as any, remarks: '' });
+  
+  const toastMessage = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3000);
+  };
+  
+  // --- रीयल-टाइम डेटा सिंक्रोनाइज़ेशन (Real-time Sync) ---
+  useEffect(() => {
+    const unsubInventory = onSnapshot(collection(db, "godown_inventory"), (snap) => {
+      setInventory(snap.docs.map(d => ({ id: d.id, kitchenQty: 0, ...d.data() } as InventoryItem)));
+    });
+    const unsubCategories = onSnapshot(collection(db, "godown_categories"), (snap) => {
+      if (!snap.empty) setCategories(snap.docs.map(d => ({ id: d.id, ...d.data() } as CategoryItem)));
+    });
+
+    const unsubStockIns = onSnapshot(query(collection(db, "stock_in_history"), orderBy("date", "desc"), limit(100)), (snap) => {
+      setStockInHistory(snap.docs.map(d => ({ id: d.id, ...d.data() } as StockInLog)));
+    });
+    const unsubStockOuts = onSnapshot(query(collection(db, "stock_out_history"), orderBy("date", "desc"), limit(100)), (snap) => {
+      setStockOutHistory(snap.docs.map(d => ({ id: d.id, ...d.data() } as StockOutLog)));
+    });
+
+    const unsubSavedOrders = onSnapshot(collection(db, "saved_orders"), (snap) => {
+      setSavedOrders(snap.docs.map(d => ({ id: d.id, ...d.data() } as SavedOrderItem)));
+    });
+    const unsubFixedAssets = onSnapshot(collection(db, "fixed_assets"), (snap) => {
+      setFixedAssets(snap.docs.map(d => ({ id: d.id, ...d.data() } as FixedAsset)));
+    });
+
+    const unsubKitchenClosings = onSnapshot(
+      query(collection(db, "kitchen_closings_log"), orderBy("timestamp", "desc"), limit(150)),
+      (snap) => {
+        setKitchenClosingsHistory(snap.docs.map(d => d.data() as KitchenClosingRecord));
+      }
+    );
+
+    return () => {
+      unsubInventory(); unsubCategories(); unsubStockIns(); unsubStockOuts(); unsubSavedOrders(); unsubFixedAssets(); unsubKitchenClosings();
+    };
+  }, []);
+
+  useEffect(() => {
+    const unsubOrderLists = onSnapshot(collection(db, "order_lists"), (snap) => {
+      const lists = snap.docs.map(d => ({ id: d.id, ...d.data() } as OrderListMeta));
+      setOrderLists(lists);
+      if (lists.length > 0 && (!activeListId || !lists.some(l => l.id === activeListId))) {
+        setActiveListId(lists[0].id);
+      }
+    });
+    return () => unsubOrderLists();
+  }, [activeListId]);
+
+  useEffect(() => {
+    const updatedLocal: Record<string, string> = {};
+    savedOrders.forEach(o => { if (focusedOrderField !== o.id) updatedLocal[o.id] = o.orderQty || ""; });
+    setLocalOrderQties(prev => ({ ...prev, ...updatedLocal }));
+  }, [savedOrders, focusedOrderField]);
 
   const verifyPinAndGetDoc = async (pin: string) => {
     const q = query(collection(db, "cafe_users"), where("pin", "==", pin), limit(1));
@@ -248,7 +299,6 @@ export default function StoreStockPage() {
     toastMessage("लॉगआउट कर दिया गया है।", "info");
   };
 
-  // 📝 पिन के माध्यम से डिलीट की सुरक्षा जांच करने का फ़ंक्शन (वापस जोड़ा गया)
   const confirmDeleteWithPin = (message: string, actionToExecute: () => void) => {
     setDeleteConfirmation({ message, action: actionToExecute });
     setDeletePinInput("");
@@ -269,6 +319,12 @@ export default function StoreStockPage() {
     } catch {
       setDeletePinError("सर्वर त्रुटि!");
     }
+  };
+
+  const getAssetSingleVal = (asset: FixedAsset) => {
+    const qty = (asset.quantity === undefined || asset.quantity === null) ? 1 : Number(asset.quantity);
+    const cost = Number(asset.cost || 0);
+    return qty * cost;
   };
 
   const stats = useMemo(() => {
@@ -395,6 +451,64 @@ export default function StoreStockPage() {
   }, [inventory, searchQuery, selectedCategoryFilter, categories]);
 
   const filteredAssets = useMemo(() => fixedAssets.filter(asset => asset.name.toLowerCase().includes(searchQuery.toLowerCase())), [fixedAssets, searchQuery]);
+
+  // 🧹 वन-क्लिक डुप्लीकेट मर्ज क्लीनअप लॉजिक
+  const handleMergeAllExistingDuplicates = async () => {
+    triggerHaptic(50);
+    try {
+      const groups: Record<string, InventoryItem[]> = {};
+      inventory.forEach(item => {
+        const key = item.name.toUpperCase().trim();
+        if (!groups[key]) groups[key] = [];
+        groups[key].push(item);
+      });
+
+      const batch = writeBatch(db);
+      let mergedCount = 0;
+
+      for (const name in groups) {
+        const items = groups[name];
+        if (items.length > 1) {
+          const primary = items[0];
+          let totalStoreQty = primary.storeQty;
+          let totalKitchenQty = primary.kitchenQty || 0;
+          let maxPrice = primary.purchasePrice;
+          const minLimit = primary.minLimit;
+          const category = primary.category || 'OTHER';
+          const unit = primary.unit;
+
+          for (let i = 1; i < items.length; i++) {
+            const duplicate = items[i];
+            totalStoreQty += duplicate.storeQty;
+            totalKitchenQty += (duplicate.kitchenQty || 0);
+            if (duplicate.purchasePrice > maxPrice) maxPrice = duplicate.purchasePrice;
+            
+            batch.delete(doc(db, "godown_inventory", duplicate.id));
+            mergedCount++;
+          }
+
+          batch.set(doc(db, "godown_inventory", primary.id), {
+            storeQty: totalStoreQty,
+            kitchenQty: totalKitchenQty,
+            purchasePrice: maxPrice,
+            minLimit,
+            category,
+            unit
+          }, { merge: true });
+        }
+      }
+
+      if (mergedCount > 0) {
+        await batch.commit();
+        setKitchenClosingInputs({});
+        toastMessage(`${mergedCount} डुप्लीकेट सामान सफलतापूर्वक मर्ज किए गए! 🧹`, "success");
+      } else {
+        toastMessage("कोई डुप्लीकेट सामान नहीं मिला। ✨", "info");
+      }
+    } catch {
+      toastMessage("मर्ज करने में त्रुटि आई।", "error");
+    }
+  };
 
   const adjustQty = (id: string, diff: number) => {
     const item = inventory.find(i => i.id === id);
@@ -535,98 +649,229 @@ export default function StoreStockPage() {
     } catch {}
   };
 
+  const handleSaveAllKitchenClosings = async () => {
+    const enteredItems = Object.entries(kitchenClosingInputs).filter(([_, val]) => val.trim() !== "");
+    if (enteredItems.length === 0) {
+      toastMessage("कोई क्लोजिंग मात्रा दर्ज नहीं की गई है!", "info");
+      return;
+    }
+
+    triggerHaptic(60);
+    try {
+      const batch = writeBatch(db);
+      let updateCount = 0;
+
+      for (const [itemId, physicalInput] of enteredItems) {
+        const item = inventory.find(i => i.id === itemId);
+        if (!item) continue;
+        const physicalQty = parseFloat(physicalInput);
+        if (isNaN(physicalQty) || physicalQty < 0) continue;
+
+        const expectedQty = item.kitchenQty || 0;
+        const consumedQty = expectedQty - physicalQty;
+
+        batch.set(doc(db, "godown_inventory", itemId), { kitchenQty: physicalQty }, { merge: true });
+
+        if (consumedQty > 0) {
+          const logRef = doc(collection(db, "stock_out_history"));
+          batch.set(logRef, {
+            id: logRef.id,
+            itemName: item.name,
+            itemId: item.id,
+            qty: consumedQty,
+            purpose: "Kitchen Use",
+            date: getLocalDateString(0),
+            remarks: "रात्रि क्लोजिंग स्टॉक द्वारा स्वचालित गणना",
+            financialLoss: 0
+          });
+        }
+
+        const closingLogRef = doc(db, "kitchen_closings_log", `${item.id}_${getLocalDateString(0)}`);
+        batch.set(closingLogRef, {
+          id: `${item.id}_${getLocalDateString(0)}`,
+          date: getLocalDateString(0),
+          itemId: item.id,
+          itemName: item.name,
+          systemQty: expectedQty,
+          physicalQty: physicalQty,
+          consumedQty: consumedQty > 0 ? consumedQty : 0,
+          timestamp: new Date().toISOString(),
+          staffName: currentUser?.name || "Staff"
+        });
+
+        updateCount++;
+      }
+
+      if (updateCount > 0) {
+        await batch.commit();
+        setKitchenClosingInputs({});
+        // सफल सबमिशन पर क्लोजिंग स्टॉक ड्राफ्ट को साफ़ (Clear) करना
+        localStorage.removeItem('kitchen_closing_draft');
+        toastMessage(`${updateCount} आइटम का क्लोजिंग स्टॉक सहेजा गया! 🍳`, "success");
+      }
+    } catch {
+      toastMessage("क्लोजिंग स्टॉक अपडेट करने में त्रुटि!", "error");
+    }
+  };
+
+  const handleSaveSingleKitchenClosing = async (itemId: string, physicalInput: string) => {
+    const item = inventory.find(i => i.id === itemId);
+    if (!item) return;
+    const physicalQty = parseFloat(physicalInput);
+    if (isNaN(physicalQty) || physicalQty < 0) {
+      toastMessage("सही मात्रा दर्ज करें", "error");
+      return;
+    }
+
+    try {
+      const expectedQty = item.kitchenQty || 0;
+      const consumedQty = expectedQty - physicalQty;
+
+      const batch = writeBatch(db);
+      batch.set(doc(db, "godown_inventory", itemId), { kitchenQty: physicalQty }, { merge: true });
+
+      if (consumedQty > 0) {
+        const logRef = doc(collection(db, "stock_out_history"));
+        batch.set(logRef, {
+          id: logRef.id,
+          itemName: item.name,
+          itemId: item.id,
+          qty: consumedQty,
+          purpose: "Kitchen Use",
+          date: getLocalDateString(0),
+          remarks: "रात्रि क्लोजिंग स्टॉक द्वारा स्वचालित गणना",
+          financialLoss: 0
+        });
+      }
+
+      const closingLogRef = doc(db, "kitchen_closings_log", `${item.id}_${getLocalDateString(0)}`);
+      batch.set(closingLogRef, {
+        id: `${item.id}_${getLocalDateString(0)}`,
+        date: getLocalDateString(0),
+        itemId: item.id,
+        itemName: item.name,
+        systemQty: expectedQty,
+        physicalQty: physicalQty,
+        consumedQty: consumedQty > 0 ? consumedQty : 0,
+        timestamp: new Date().toISOString(),
+        staffName: currentUser?.name || "Staff"
+      });
+
+      await batch.commit();
+      setKitchenClosingInputs(prev => {
+        const copy = { ...prev };
+        delete copy[itemId];
+        // सफल व्यक्तिगत सबमिशन पर ड्राफ्ट को लोकल स्टोरेज में भी अपडेट करना
+        localStorage.setItem('kitchen_closing_draft', JSON.stringify(copy));
+        return copy;
+      });
+      toastMessage(`"${item.name}" का स्टॉक अपडेट किया गया!`, "success");
+    } catch {
+      toastMessage("अपडेट फेल हुआ।", "error");
+    }
+  };
+
+  // --- नए आवश्यक एक्शन हैंडलर्स की परिभाषा (New Required Action Handlers) ---
+
+  const handleWasteSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const { item: itemId, quantity, purpose, remarks } = formStockOut;
+    if (!itemId || !quantity) return;
+    const qty = parseFloat(quantity);
+    if (isNaN(qty) || qty <= 0) return;
+
+    const originalItem = inventory.find(i => i.id === itemId);
+    if (!originalItem) return;
+
+    if (originalItem.storeQty < qty) {
+      toastMessage("गोदाम में पर्याप्त स्टॉक नहीं है!", "error");
+      return;
+    }
+
+    try {
+      const batch = writeBatch(db);
+      batch.set(doc(db, "godown_inventory", itemId), { storeQty: increment(-qty) }, { merge: true });
+
+      const logRef = doc(collection(db, "stock_out_history"));
+      const loss = qty * (originalItem.purchasePrice || 0);
+      batch.set(logRef, {
+        id: logRef.id,
+        itemName: originalItem.name,
+        itemId: itemId,
+        qty,
+        purpose,
+        date: getLocalDateString(0),
+        remarks: remarks || "नुकसान दर्ज किया गया",
+        financialLoss: loss
+      });
+
+      await batch.commit();
+      setShowStockOutModal(false);
+      setFormStockOut({ item: '', quantity: '', purpose: 'Waste', remarks: '' });
+      toastMessage("नुकसान सफलतापूर्वक दर्ज किया गया!", "success");
+    } catch {
+      toastMessage("दर्ज करने में त्रुटि!", "error");
+    }
+  };
+
   const handleAddProductSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const cleanName = formAddProduct.name.toUpperCase().trim();
-    if (!cleanName) return;
+    const { name, storeQty, kitchenQty, unit, purchasePrice, minLimit, category, lastPurchaseDate } = formAddProduct;
+    if (!name.trim() || !purchasePrice) return;
 
-    const existingItem = inventory.find(
-      item => item.name.toUpperCase().trim() === cleanName
-    );
+    try {
+      const newDocId = `item_${Date.now()}`;
+      const parsedStoreQty = parseFloat(storeQty) || 0;
+      const parsedKitchenQty = parseFloat(kitchenQty) || 0;
+      const parsedPrice = parseFloat(purchasePrice) || 0;
+      const parsedMinLimit = parseFloat(minLimit) || 0;
 
-    if (existingItem) {
-      const addedStoreQty = parseFloat(formAddProduct.storeQty) || 0;
-      const addedKitchenQty = parseFloat(formAddProduct.kitchenQty) || 0;
-      const newStoreQty = (existingItem.storeQty || 0) + addedStoreQty;
-      const newKitchenQty = (existingItem.kitchenQty || 0) + addedKitchenQty;
-      const updatedPrice = parseFloat(formAddProduct.purchasePrice) || existingItem.purchasePrice || 0;
+      const newItemData = {
+        id: newDocId,
+        name: name.trim().toUpperCase(),
+        storeQty: parsedStoreQty,
+        kitchenQty: parsedKitchenQty,
+        unit,
+        purchasePrice: parsedPrice,
+        minLimit: parsedMinLimit,
+        category: category || "OTHER",
+        lastPurchaseDate: lastPurchaseDate || getLocalDateString(0)
+      };
 
-      await setDoc(doc(db, "godown_inventory", existingItem.id), {
-        storeQty: newStoreQty,
-        kitchenQty: newKitchenQty,
-        purchasePrice: updatedPrice,
-        lastPurchaseDate: formAddProduct.lastPurchaseDate,
-        category: formAddProduct.category.toUpperCase(),
-        unit: formAddProduct.unit
-      }, { merge: true });
-
-      if (addedStoreQty > 0) {
-        const logRef = doc(collection(db, "stock_in_history"));
-        await setDoc(logRef, {
-          id: logRef.id,
-          itemName: cleanName,
-          itemId: existingItem.id,
-          qty: addedStoreQty,
+      await setDoc(doc(db, "godown_inventory", newDocId), newItemData);
+      
+      if (parsedStoreQty > 0) {
+        await addDoc(collection(db, "stock_in_history"), {
+          itemName: newItemData.name,
+          itemId: newDocId,
+          qty: parsedStoreQty,
           date: getLocalDateString(0),
-          remarks: "सामान दोबारा जोड़ने पर मात्रा स्वतः मर्ज की गई"
+          remarks: "प्रारंभिक गोदाम स्टॉक"
         });
       }
 
       setShowAddProductModal(false);
-      setFormAddProduct({ 
-        name: '', 
-        storeQty: '0', 
-        kitchenQty: '0', 
-        unit: 'Kg', 
-        purchasePrice: '', 
-        minLimit: '10', 
-        category: 'OTHER', 
-        lastPurchaseDate: getLocalDateString(0) 
-      });
-
-      toastMessage(`"${cleanName}" पहले से मौजूद था, मात्रा मर्ज कर दी गई है! 🔄`, "success");
-      return;
+      setFormAddProduct({ name: '', storeQty: '0', kitchenQty: '0', unit: 'Kg', purchasePrice: '', minLimit: '10', category: 'OTHER', lastPurchaseDate: getLocalDateString(0) });
+      toastMessage("नया उत्पाद जोड़ा गया!", "success");
+    } catch {
+      toastMessage("उत्पाद जोड़ने में समस्या आई।", "error");
     }
-
-    const customId = `item_${Date.now()}`;
-    await setDoc(doc(db, "godown_inventory", customId), {
-      id: customId, 
-      name: cleanName, 
-      storeQty: parseFloat(formAddProduct.storeQty) || 0, 
-      kitchenQty: parseFloat(formAddProduct.kitchenQty) || 0,
-      unit: formAddProduct.unit, 
-      purchasePrice: parseFloat(formAddProduct.purchasePrice) || 0, 
-      minLimit: parseFloat(formAddProduct.minLimit) || 10, 
-      category: formAddProduct.category.toUpperCase(),
-      lastPurchaseDate: formAddProduct.lastPurchaseDate || getLocalDateString(0)
-    });
-
-    setShowAddProductModal(false);
-    setFormAddProduct({ 
-      name: '', 
-      storeQty: '0', 
-      kitchenQty: '0', 
-      unit: 'Kg', 
-      purchasePrice: '', 
-      minLimit: '10', 
-      category: 'OTHER', 
-      lastPurchaseDate: getLocalDateString(0) 
-    });
-    toastMessage("नया उत्पाद जोड़ा गया!", "success");
   };
 
-  // 📝 उत्पाद संपादन सहेजने का फंक्शन
   const handleEditProductSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingProduct) return;
-    await setDoc(doc(db, "godown_inventory", editingProduct.id), editingProduct, { merge: true });
-    setEditingProduct(null);
-    toastMessage("विवरण अपडेट किया गया!", "success");
+    try {
+      await setDoc(doc(db, "godown_inventory", editingProduct.id), editingProduct, { merge: true });
+      setEditingProduct(null);
+      toastMessage("उत्पाद विवरण सहेजा गया!", "success");
+    } catch {
+      toastMessage("अपडेट करने में समस्या आई।", "error");
+    }
   };
 
-  // 🗑️ उत्पाद डिलीट करने का फंक्शन
   const handleDeleteProduct = (id: string, name: string) => {
-    confirmDeleteWithPin(`क्या आप इस सामान "${name}" को हटाना चाहते हैं?`, async () => {
+    confirmDeleteWithPin(`क्या आप सच में "${name}" को गोदाम सूची से हटाना चाहते हैं?`, async () => {
       await deleteDoc(doc(db, "godown_inventory", id));
       setEditingProduct(null);
     });
@@ -634,264 +879,134 @@ export default function StoreStockPage() {
 
   const handleAddAssetSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const cleanName = formAddAsset.name.toUpperCase().trim();
-    if (!cleanName) return;
+    const { name, quantity, purchaseDate, cost, condition, remarks, type, unit } = formAddAsset;
+    if (!name.trim()) return;
 
-    const existingAsset = fixedAssets.find(
-      asset => asset.name.toUpperCase().trim() === cleanName
-    );
-
-    if (existingAsset) {
-      const addedQty = parseFloat(formAddAsset.quantity) || 1;
-      const newQty = (existingAsset.quantity || 0) + addedQty;
-      const updatedCost = parseFloat(formAddAsset.cost) || existingAsset.cost || 0;
-
-      await setDoc(doc(db, "fixed_assets", existingAsset.id), {
-        quantity: newQty,
-        cost: updatedCost,
-        condition: formAddAsset.condition,
-        remarks: formAddAsset.remarks || existingAsset.remarks || "मात्रा अपडेट की गई",
-        type: formAddAsset.type || existingAsset.type || 'general',
-        unit: formAddAsset.unit || existingAsset.unit || 'Pcs',
-        purchaseDate: formAddAsset.purchaseDate || existingAsset.purchaseDate || getLocalDateString(0)
-      }, { merge: true });
-
-      setShowAddAssetModal(false);
-      setFormAddAsset({ 
-        name: '', 
-        quantity: '1', 
-        purchaseDate: '', 
-        cost: '', 
-        condition: 'Working', 
-        remarks: '', 
-        type: 'general', 
-        unit: 'Pcs' 
+    try {
+      const assetId = `asset_${Date.now()}`;
+      await setDoc(doc(db, "fixed_assets", assetId), {
+        id: assetId,
+        name: name.trim().toUpperCase(),
+        quantity: parseFloat(quantity) || 1,
+        purchaseDate: purchaseDate || getLocalDateString(0),
+        cost: parseFloat(cost) || 0,
+        condition,
+        remarks,
+        type,
+        unit
       });
 
-      toastMessage(`"${cleanName}" एसेट्स में पहले से मौजूद था, मात्रा मर्ज कर दी गई है! 🔄`, "success");
-      return;
+      setShowAddAssetModal(false);
+      setFormAddAsset({ name: '', quantity: '1', purchaseDate: '', cost: '', condition: 'Working', remarks: '', type: 'general', unit: 'Pcs' });
+      toastMessage("अचल संपत्ति जोड़ी गई!", "success");
+    } catch {
+      toastMessage("एसेट जोड़ने में समस्या आई।", "error");
     }
-
-    const customId = `asset_${Date.now()}`;
-    await setDoc(doc(db, "fixed_assets", customId), {
-      id: customId, 
-      name: cleanName, 
-      quantity: parseFloat(formAddAsset.quantity) || 1, 
-      cost: parseFloat(formAddAsset.cost) || 0, 
-      condition: formAddAsset.condition, 
-      remarks: formAddAsset.remarks,
-      type: formAddAsset.type || 'general',
-      unit: formAddAsset.unit || 'Pcs',
-      purchaseDate: formAddAsset.purchaseDate || getLocalDateString(0)
-    });
-
-    setShowAddAssetModal(false);
-    setFormAddAsset({ 
-      name: '', 
-      quantity: '1', 
-      purchaseDate: '', 
-      cost: '', 
-      condition: 'Working', 
-      remarks: '', 
-      type: 'general', 
-      unit: 'Pcs' 
-    });
-    toastMessage("नया एसेट सफलतापूर्वक जोड़ा गया!", "success");
   };
 
   const handleEditAssetSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingAsset) return;
-    await setDoc(doc(db, "fixed_assets", editingAsset.id), editingAsset, { merge: true });
-    setEditingAsset(null);
-    toastMessage("एसेट का विवरण सफलतापूर्वक अपडेट किया गया!", "success");
-  };
-
-  const handleAdjustAssetQty = async (assetId: string, diff: number) => {
-    triggerHaptic(20);
     try {
-      const asset = fixedAssets.find(a => a.id === assetId);
-      if (!asset) return;
-      const nextQty = Math.max(0, (asset.quantity || 0) + diff);
-      await setDoc(doc(db, "fixed_assets", assetId), { quantity: nextQty }, { merge: true });
-      toastMessage("मात्रा सफलतापूर्वक अपडेट की गई!", "success");
+      await setDoc(doc(db, "fixed_assets", editingAsset.id), editingAsset, { merge: true });
+      setEditingAsset(null);
+      toastMessage("अचल संपत्ति अपडेट की गई!", "success");
     } catch {
-      toastMessage("मात्रा अपडेट करने में समस्या आई।", "error");
+      toastMessage("अपडेट करने में समस्या आई।", "error");
     }
   };
 
-  const handleWasteSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const qtyNum = parseFloat(formStockOut.quantity);
-    const item = inventory.find(i => i.id === formStockOut.item);
-    if (!item || isNaN(qtyNum) || item.storeQty < qtyNum) return;
-    await setDoc(doc(db, "godown_inventory", item.id), { storeQty: increment(-qtyNum) }, { merge: true });
-    await addDoc(collection(db, "stock_out_history"), {
-      itemName: item.name, itemId: item.id, qty: qtyNum, purpose: formStockOut.purpose, date: getLocalDateString(0), remarks: formStockOut.remarks, financialLoss: qtyNum * item.purchasePrice
-    });
-    setShowStockOutModal(false);
-    toastMessage("नुकसान/कचरा दर्ज किया गया!", "success");
-  };
-
-  // अचल संपत्ति (Fixed Assets) डिलीट करने का फंक्शन
   const handleDeleteAsset = (id: string, name: string) => {
-    confirmDeleteWithPin(`क्या आप इस एसेट "${name}" को हटाना चाहते हैं?`, async () => {
+    confirmDeleteWithPin(`क्या आप सच में अचल संपत्ति "${name}" को हटाना चाहते हैं?`, async () => {
       await deleteDoc(doc(db, "fixed_assets", id));
     });
   };
 
-  // कबाड़ व टूटे बर्तनों को एसेट में स्थानांतरित (Migrate) करने का फंक्शन
-  const handleMigrateCrockeryCutlery = async () => {
-    triggerHaptic(50);
-    if (!window.confirm("क्या आप वाकई गोडाउन (Godown) से क्रॉकरी, कटलरी और डेकोरेशन का सारा डेटा स्थायी संपत्ति (Fixed Assets) में शिफ्ट करना चाहते हैं? यह क्रिया उन्हें गोडाउन से हमेशा के लिए हटा देगी।")) return;
-
+  const handleAdjustAssetQty = async (id: string, diff: number) => {
+    const asset = fixedAssets.find(a => a.id === id);
+    if (!asset) return;
+    const currentQty = asset.quantity || 0;
+    const newQty = Math.max(0, currentQty + diff);
     try {
-      const itemsToMigrate = inventory.filter(item => {
-        const cat = (item.category || "").toUpperCase().trim();
-        return cat.includes('CROCKER') || cat.includes('CUTLER') || cat.includes('DECORAT');
-      });
-
-      if (itemsToMigrate.length === 0) {
-        toastMessage("गोदाम में ट्रांसफर के लिए कोई क्रॉकरी, कटलरी या डेकोरेशन उत्पाद नहीं मिला!", "info");
-        return;
-      }
-
-      const batch = writeBatch(db);
-
-      itemsToMigrate.forEach(item => {
-        const assetId = `asset_${item.id}`;
-        const assetDocRef = doc(db, "fixed_assets", assetId);
-        const godownDocRef = doc(db, "godown_inventory", item.id);
-
-        const cat = (item.category || "").toUpperCase().trim();
-        let finalType = 'general';
-        
-        if (cat.includes('CROCKER')) {
-          finalType = 'crockery';
-        } else if (cat.includes('CUTLER')) {
-          finalType = 'cutlery';
-        } else if (cat.includes('DECORAT')) {
-          finalType = 'decoration';
-        }
-
-        batch.set(assetDocRef, {
-          id: assetId,
-          name: item.name,
-          quantity: item.storeQty || 1,
-          cost: item.purchasePrice || 0,
-          condition: "Working",
-          remarks: "गोडाउन से स्थानांतरित (Shifted)",
-          type: finalType, 
-          unit: item.unit || 'Pcs' 
-        });
-
-        batch.delete(godownDocRef);
-      });
-
-      await batch.commit();
-      toastMessage(`${itemsToMigrate.length} सामान सफलतापूर्वक फिक्स्ड एसेट्स में शिफ्ट कर दिए गए हैं! 🚚`, "success");
+      await setDoc(doc(db, "fixed_assets", id), { quantity: newQty }, { merge: true });
+      toastMessage("मात्रा अपडेट की गई!", "success");
     } catch {
-      toastMessage("स्थानांतरण फेल हो गया। कृपया दोबारा प्रयास करें।", "error");
+      toastMessage("त्रुटि आई!", "error");
     }
-  };
-
-  const handleUpdateListName = async (newName: string) => {
-    if (!newName.trim() || !activeListId) return;
-    await setDoc(doc(db, "order_lists", activeListId), { name: newName.toUpperCase() }, { merge: true });
-  };
-
-  const handleRemoveFromSavedList = (compoundId: string, name: string) => {
-    confirmDeleteWithPin(`हटाएं "${name}"?`, async () => {
-      await deleteDoc(doc(db, "saved_orders", compoundId));
-    });
   };
 
   const handleDeleteActiveList = () => {
-    confirmDeleteWithPin("क्या आप इस लिस्ट को हटाना चाहते हैं?", async () => {
-      const batch = writeBatch(db);
-      savedOrders.filter(o => o.listId === activeListId).forEach(item => batch.delete(doc(db, "saved_orders", item.id)));
-      batch.delete(doc(db, "order_lists", activeListId));
-      await batch.commit();
-      setActiveListId("");
+    if (!activeListId || activeListId === "general_list") {
+      toastMessage("मुख्य सूची को हटाया नहीं जा सकता!", "error");
+      return;
+    }
+    const list = orderLists.find(l => l.id === activeListId);
+    const listName = list ? list.name : "इस सूची";
+    confirmDeleteWithPin(`क्या आप सच में "${listName}" और इसके सभी आइटम्स को हटाना चाहते हैं?`, async () => {
+      try {
+        const batch = writeBatch(db);
+        batch.delete(doc(db, "order_lists", activeListId));
+
+        const listItems = savedOrders.filter(item => item.listId === activeListId);
+        listItems.forEach(item => {
+          batch.delete(doc(db, "saved_orders", item.id));
+        });
+
+        await batch.commit();
+        setActiveListId("general_list");
+        toastMessage("सूची हटा दी गई!", "success");
+      } catch {
+        toastMessage("हटाने में त्रुटि!", "error");
+      }
     });
   };
 
-  const handleUpdateOrderQty = async (compoundId: string, qty: string) => {
-    await setDoc(doc(db, "saved_orders", compoundId), { orderQty: qty }, { merge: true });
+  const handleUpdateListName = async () => {
+    if (!tempListNameInput.trim() || !activeListId) return;
+    try {
+      await setDoc(doc(db, "order_lists", activeListId), { name: tempListNameInput.trim().toUpperCase() }, { merge: true });
+      setIsEditingListName(false);
+      setTempListNameInput("");
+      toastMessage("सूची का नाम बदला गया!", "success");
+    } catch {
+      toastMessage("त्रुटि!", "error");
+    }
   };
 
-  // सप्लायर आर्डर लिस्ट को PDF प्रिंट करने का फंक्शन
+  const handleUpdateOrderQty = async (id: string, qty: string) => {
+    try {
+      await setDoc(doc(db, "saved_orders", id), { orderQty: qty }, { merge: true });
+    } catch {}
+  };
+
+  const handleRemoveFromSavedList = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, "saved_orders", id));
+      toastMessage("सामग्री हटाई गई", "info");
+    } catch {}
+  };
+
   const handlePrintSavedList = () => {
-    const printWindow = window.open('', '_blank', 'width=600,height=800');
-    if (!printWindow) {
-      toastMessage("पॉपअप अवरुद्ध हो गया है! कृपया पॉपअप की अनुमति दें।", "error");
-      return;
+    if (typeof window !== 'undefined') {
+      window.print();
     }
-
-    const activeList = orderLists.find(l => l.id === activeListId);
-    const listTitle = activeList ? activeList.name : "BUM BUM CAFE ORDER SHEET";
-    const matchedItems = savedOrders.filter(o => o.listId === activeListId);
-
-    const rows = matchedItems.map(item => `
-      <tr>
-        <td style="padding:10px; border-bottom:1px solid #ddd; font-weight:bold;">${item.name}</td>
-        <td style="padding:10px; border-bottom:1px solid #ddd; text-align:center;">${item.storeQty} ${item.unit}</td>
-        <td style="padding:10px; border-bottom:1px solid #ddd; text-align:right; font-weight:bold; color:#FF6B00;">${item.orderQty || "0"}</td>
-      </tr>
-    `).join('');
-
-    printWindow.document.write(`
-      <html>
-        <head><title>Order_Sheet_${listTitle.replace(/\s+/g, '_')}</title></head>
-        <body style="font-family:sans-serif; padding:25px;">
-          <h2 style="color:#FF6B00; text-align:center; text-transform: uppercase;">${listTitle}</h2>
-          <p style="text-align:center; color:#666; font-size:12px;">Generated on: ${new Date().toLocaleString()}</p>
-          <table style="width:100%; border-collapse:collapse; margin-top:20px;">
-            <thead>
-              <tr style="background:#FF6B00; color:white;">
-                <th style="padding:10px; text-align:left;">Item Name</th>
-                <th style="padding:10px; text-align:center;">Current Stock</th>
-                <th style="padding:10px; text-align:right;">Order Qty</th>
-              </tr>
-            </thead>
-            <tbody>${rows}</tbody>
-          </table>
-          <script>window.onload = function() { window.print(); }</script>
-        </body>
-      </html>
-    `);
-    printWindow.document.close();
   };
 
-  // सप्लायर आर्डर लिस्ट को सीधे WhatsApp पर साझा करने का फंक्शन
   const handleWhatsAppShare = () => {
-    triggerHaptic();
-    if (!activeListId) return;
-
-    const activeList = orderLists.find(l => l.id === activeListId);
-    const listTitle = activeList ? activeList.name : "ORDER SHEET";
-    const matchedItems = savedOrders.filter(o => o.listId === activeListId);
-
-    if (matchedItems.length === 0) {
-      toastMessage("इस लिस्ट में कोई सामान नहीं है!", "error");
+    const listItems = savedOrders.filter(item => item.listId === activeListId);
+    if (listItems.length === 0) {
+      toastMessage("साझा करने के लिए कोई आइटम नहीं है!", "info");
       return;
     }
 
-    let text = `*BUM BUM CAFE - ${listTitle.toUpperCase()}*\n`;
-    text += `Date: ${new Date().toLocaleDateString('en-GB')}\n\n`;
-    text += `Please deliver the following items:\n`;
-    text += `--------------------------------\n`;
-
-    matchedItems.forEach(item => {
-      const qty = item.orderQty || "0";
-      text += `• *${item.name}*: ${qty} ${item.unit}\n`;
+    let text = `📋 *${activeListName}*\n📅 *दिनांक:* ${getLocalDateString(0)}\n\n`;
+    listItems.forEach((item, idx) => {
+      const orderStr = item.orderQty ? `-> *${item.orderQty} ${item.unit}*` : "(मात्रा दर्ज नहीं)";
+      text += `${idx + 1}. ${item.name} ${orderStr}\n`;
     });
 
-    text += `--------------------------------\n`;
-    text += `Thank you!`;
-
-    const waUrl = `https://wa.me/?text=${encodeURIComponent(text)}`;
-    window.open(waUrl, '_blank');
+    const encoded = encodeURIComponent(text);
+    window.open(`https://api.whatsapp.com/send?text=${encoded}`, '_blank');
   };
 
   return (
@@ -949,7 +1064,7 @@ export default function StoreStockPage() {
           />
         )}
 
-        {/* 🍳 NEW KITCHEN SEGMENTED TAB (विभाजित और प्रबंधित) */}
+        {/* 🍳 NEW KITCHEN SEGMENTED TAB */}
         {activeTab === 'kitchen' && (
           <StockKitchen 
             isDarkMode={isDarkMode}
@@ -972,7 +1087,6 @@ export default function StoreStockPage() {
             isDarkMode={isDarkMode} searchQuery={searchQuery} setSearchQuery={setSearchQuery}
             filteredAssets={filteredAssets} setShowAddAssetModal={setShowAddAssetModal}
             handleDeleteAsset={handleDeleteAsset}
-            handleMigrate={handleMigrateCrockeryCutlery} 
             setEditingAsset={setEditingAsset} 
             handleAdjustQty={handleAdjustAssetQty} 
           />
@@ -1004,13 +1118,13 @@ export default function StoreStockPage() {
       <AnimatePresence>
         {deleteConfirmation && (
           <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[200] flex items-center justify-center p-4">
-            <motion.form onSubmit={handleDeleteVerificationSubmit} className={`w-full max-w-sm rounded-[2.5rem] p-6 space-y-5 border text-center ${isDarkMode ? 'bg-[#0E0E0E] border-neutral-800 text-white' : 'bg-white border-neutral-100'}`}>
+            <motion.form onSubmit={handleDeleteVerificationSubmit} className={`w-full max-w-sm rounded-[2.5rem] p-6 space-y-5 border text-center ${isDarkMode ? 'bg-neutral-900 border-neutral-800 text-white' : 'bg-white border-neutral-100'}`}>
               <div className="flex justify-between items-center border-b dark:border-neutral-800 pb-2 mb-2 w-full">
                 <span className="text-xs font-black text-red-500 uppercase">सुरक्षा प्रमाणीकरण</span>
                 <button type="button" onClick={() => setDeleteConfirmation(null)} className="p-1.5 bg-neutral-100 dark:bg-neutral-850 rounded-xl text-neutral-500"><X size={14} /></button>
               </div>
               <p className="text-xs text-neutral-400">{deleteConfirmation.message}</p>
-              <input type="password" maxLength={6} placeholder="••••" value={deletePinInput} onChange={e => setDeletePinInput(e.target.value)} className="w-full text-center text-xl tracking-[1em] p-2.5 rounded-xl border font-black dark:bg-neutral-850" required />
+              <input type="password" maxLength={6} placeholder="••••" value={deletePinInput} onChange={e => setDeletePinInput(e.target.value)} className="w-full text-center text-xl tracking-[1em] p-2.5 rounded-xl border font-black dark:bg-neutral-800" required />
               {deletePinError && <p className="text-[10px] text-red-500 font-bold">{deletePinError}</p>}
               <div className="flex gap-2">
                 <button type="button" onClick={() => setDeleteConfirmation(null)} className="flex-1 py-3 bg-neutral-100 dark:bg-neutral-800 rounded-xl text-xs font-black">रद्द करें</button>
@@ -1050,10 +1164,10 @@ export default function StoreStockPage() {
         {/* Modal: Transfer to kitchen */}
         {showTransferModal && transferItem && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <motion.form onSubmit={handleTransferToKitchenSubmit} className={`w-full max-w-sm rounded-[2rem] p-6 space-y-4 border ${isDarkMode ? 'bg-[#0E0E0E] text-white' : 'bg-white text-neutral-900'}`}>
+            <motion.form onSubmit={handleTransferToKitchenSubmit} className={`w-full max-w-sm rounded-[2rem] p-6 space-y-4 border ${isDarkMode ? 'bg-neutral-900 text-white' : 'bg-white text-neutral-900'}`}>
               <div className="flex justify-between items-center border-b dark:border-neutral-800 pb-2.5 mb-2">
                 <h3 className="text-xs font-black uppercase text-orange-500">किचन में भेजें - {transferItem.name}</h3>
-                <button type="button" onClick={() => setShowTransferModal(false)} className="p-1.5 bg-neutral-100 dark:bg-neutral-855 rounded-xl text-neutral-500"><X size={14} /></button>
+                <button type="button" onClick={() => setShowTransferModal(false)} className="p-1.5 bg-neutral-100 dark:bg-neutral-800 rounded-xl text-neutral-500"><X size={14} /></button>
               </div>
               <input type="number" placeholder="मात्रा (Qty)" value={transferQtyInput} onChange={e => setTransferQtyInput(e.target.value)} className="w-full p-2.5 rounded-xl border dark:bg-neutral-800 text-center" required />
               <button type="submit" className="w-full py-3 bg-orange-500 text-white rounded-xl text-xs font-black">पुष्टि करें (Confirm)</button>
@@ -1064,10 +1178,10 @@ export default function StoreStockPage() {
         {/* Modal: Consume Kitchen stock */}
         {showConsumeModal && consumeItem && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <motion.form onSubmit={handleConsumeKitchenSubmit} className={`w-full max-w-sm rounded-[2rem] p-6 space-y-4 border ${isDarkMode ? 'bg-[#0E0E0E] text-white' : 'bg-white text-neutral-900'}`}>
+            <motion.form onSubmit={handleConsumeKitchenSubmit} className={`w-full max-w-sm rounded-[2rem] p-6 space-y-4 border ${isDarkMode ? 'bg-neutral-900 text-white' : 'bg-white text-neutral-900'}`}>
               <div className="flex justify-between items-center border-b dark:border-neutral-800 pb-2.5 mb-2">
                 <h3 className="text-xs font-black uppercase text-neutral-400">किचन स्टॉक का उपयोग - {consumeItem.name}</h3>
-                <button type="button" onClick={() => setShowConsumeModal(false)} className="p-1.5 bg-neutral-100 dark:bg-neutral-855 rounded-xl text-neutral-500"><X size={14} /></button>
+                <button type="button" onClick={() => setShowConsumeModal(false)} className="p-1.5 bg-neutral-100 dark:bg-neutral-800 rounded-xl text-neutral-500"><X size={14} /></button>
               </div>
               <input type="number" placeholder="मात्रा (Qty)" value={consumeQtyInput} onChange={e => setConsumeQtyInput(e.target.value)} className="w-full p-2.5 rounded-xl border dark:bg-neutral-800 text-center" required />
               <input type="text" placeholder="टिप्पणी (Remarks)" value={consumeRemarksInput} onChange={e => setConsumeRemarksInput(e.target.value)} className="w-full p-2.5 rounded-xl border dark:bg-neutral-800" />
@@ -1082,7 +1196,7 @@ export default function StoreStockPage() {
             <motion.form onSubmit={handleWasteSubmit} className="w-full max-w-sm rounded-3xl p-6 space-y-4 bg-white dark:bg-neutral-900 border">
               <div className="flex justify-between items-center border-b dark:border-neutral-800 pb-2.5 mb-2">
                 <h3 className="text-xs font-black text-red-500 uppercase">कचरा / नुकसान दर्ज करें</h3>
-                <button type="button" onClick={() => setShowStockOutModal(false)} className="p-1.5 bg-neutral-100 dark:bg-neutral-855 rounded-xl text-neutral-500"><X size={14} /></button>
+                <button type="button" onClick={() => setShowStockOutModal(false)} className="p-1.5 bg-neutral-100 dark:bg-neutral-800 rounded-xl text-neutral-500"><X size={14} /></button>
               </div>
               <select value={formStockOut.item} onChange={e => setFormStockOut({ ...formStockOut, item: e.target.value })} className="w-full p-2.5 rounded-xl border dark:bg-neutral-800 font-bold text-xs" required>
                 <option value="">सामान चुनें...</option>
@@ -1103,9 +1217,9 @@ export default function StoreStockPage() {
         {showAddProductModal && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <motion.form onSubmit={handleAddProductSubmit} className="w-full max-w-sm rounded-3xl p-6 space-y-4 bg-white dark:bg-neutral-900 border">
-              <div className="flex justify-between items-center border-b dark:border-neutral-855 pb-2.5 mb-2">
+              <div className="flex justify-between items-center border-b dark:border-neutral-800 pb-2.5 mb-2">
                 <h3 className="text-xs font-black text-green-500 uppercase">नया उत्पाद जोड़ें</h3>
-                <button type="button" onClick={() => setShowAddProductModal(false)} className="p-1.5 bg-neutral-100 dark:bg-neutral-855 rounded-xl text-neutral-500"><X size={14} /></button>
+                <button type="button" onClick={() => setShowAddProductModal(false)} className="p-1.5 bg-neutral-100 dark:bg-neutral-800 rounded-xl text-neutral-500"><X size={14} /></button>
               </div>
               <input type="text" placeholder="नाम (जैसे: AMUL BUTTER)" value={formAddProduct.name} onChange={e => setFormAddProduct({ ...formAddProduct, name: e.target.value })} className="w-full p-2.5 rounded-xl border dark:bg-neutral-800 text-xs" required />
               
@@ -1142,13 +1256,13 @@ export default function StoreStockPage() {
           </div>
         )}
 
-        {/* Modal: Edit Product (संशोधित) */}
+        {/* Modal: Edit Product */}
         {editingProduct && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <motion.form onSubmit={handleEditProductSubmit} className="w-full max-w-sm rounded-3xl p-6 space-y-4 bg-white dark:bg-neutral-900 border">
-              <div className="flex justify-between items-center border-b dark:border-neutral-850 pb-2.5 mb-2">
+              <div className="flex justify-between items-center border-b dark:border-neutral-800 pb-2.5 mb-2">
                 <h3 className="text-xs font-black uppercase text-orange-500">विवरण संपादित करें</h3>
-                <button type="button" onClick={() => setEditingProduct(null)} className="p-1.5 bg-neutral-100 dark:bg-neutral-855 rounded-xl text-neutral-500"><X size={14} /></button>
+                <button type="button" onClick={() => setEditingProduct(null)} className="p-1.5 bg-neutral-100 dark:bg-neutral-800 rounded-xl text-neutral-500"><X size={14} /></button>
               </div>
               <input type="text" value={editingProduct.name} onChange={e => setEditingProduct({ ...editingProduct, name: e.target.value.toUpperCase() })} className="w-full p-2.5 rounded-xl border dark:bg-neutral-800 text-xs" required />
               
@@ -1192,9 +1306,9 @@ export default function StoreStockPage() {
         {showAddAssetModal && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <motion.form onSubmit={handleAddAssetSubmit} className="w-full max-w-sm rounded-3xl p-6 space-y-4 bg-white dark:bg-neutral-900 border">
-              <div className="flex justify-between items-center border-b dark:border-neutral-855 pb-2.5 mb-2">
+              <div className="flex justify-between items-center border-b dark:border-neutral-800 pb-2.5 mb-2">
                 <h3 className="text-xs font-black text-green-500 uppercase">अचल संपत्ति (Fixed Asset) जोड़ें</h3>
-                <button type="button" onClick={() => setShowAddAssetModal(false)} className="p-1.5 bg-neutral-100 dark:bg-neutral-855 rounded-xl text-neutral-500"><X size={14} /></button>
+                <button type="button" onClick={() => setShowAddAssetModal(false)} className="p-1.5 bg-neutral-100 dark:bg-neutral-800 rounded-xl text-neutral-500"><X size={14} /></button>
               </div>
               
               <div className="space-y-1">
@@ -1246,9 +1360,9 @@ export default function StoreStockPage() {
         {editingAsset && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <motion.form onSubmit={handleEditAssetSubmit} className="w-full max-w-sm rounded-3xl p-6 space-y-4 bg-white dark:bg-neutral-900 border">
-              <div className="flex justify-between items-center border-b dark:border-neutral-850 pb-2.5 mb-2">
+              <div className="flex justify-between items-center border-b dark:border-neutral-800 pb-2.5 mb-2">
                 <h3 className="text-xs font-black uppercase text-orange-500">एसेट विवरण संपादित करें</h3>
-                <button type="button" onClick={() => setEditingAsset(null)} className="p-1.5 bg-neutral-100 dark:bg-[#181818] rounded-xl text-neutral-500"><X size={14} /></button>
+                <button type="button" onClick={() => setEditingAsset(null)} className="p-1.5 bg-neutral-100 dark:bg-neutral-800 rounded-xl text-neutral-500"><X size={14} /></button>
               </div>
               
               <div className="space-y-1">
@@ -1300,7 +1414,7 @@ export default function StoreStockPage() {
                     <option value="Packets">Packets</option>
                   </select>
                 </div>
-                <div style={{ display: 'none' }} className="space-y-1">
+                <div className="space-y-1">
                   <label className="text-[9px] text-neutral-400 font-bold uppercase">लागत (Cost)</label>
                   <input 
                     type="number" 
@@ -1349,7 +1463,7 @@ export default function StoreStockPage() {
             <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className={`w-full max-w-sm rounded-[2rem] p-6 space-y-4 border ${isDarkMode ? 'bg-[#0F0F0F] border-neutral-800 text-white' : 'bg-white border-neutral-100'}`}>
               <div className="flex justify-between items-center border-b dark:border-neutral-800 pb-2.5 mb-2">
                 <h3 className="text-xs font-black uppercase text-orange-500">कैटेगरी बदलें (Change Category)</h3>
-                <button type="button" onClick={() => setShowBulkCategoryModal(false)} className="p-1.5 bg-neutral-100 dark:bg-neutral-850 rounded-xl text-neutral-500"><X size={14} /></button>
+                <button type="button" onClick={() => setShowBulkCategoryModal(false)} className="p-1.5 bg-neutral-100 dark:bg-neutral-800 rounded-xl text-neutral-500"><X size={14} /></button>
               </div>
               <select value={bulkTargetCategory} onChange={e => setBulkTargetCategory(e.target.value)} className="w-full p-2.5 rounded-xl border dark:bg-neutral-950 font-bold text-xs">
                 <option value="">-- चुनें --</option>
@@ -1366,9 +1480,9 @@ export default function StoreStockPage() {
         {showSaveToListModal && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[110] flex items-center justify-center p-4">
             <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className={`w-full max-w-sm rounded-[2rem] p-6 space-y-4 border ${isDarkMode ? 'bg-[#0F0F0F] border-neutral-800 text-white' : 'bg-white border-neutral-100'}`}>
-              <div className="flex justify-between items-center border-b dark:border-neutral-850 pb-2.5 mb-2">
+              <div className="flex justify-between items-center border-b dark:border-neutral-800 pb-2.5 mb-2">
                 <h3 className="text-xs font-black uppercase text-orange-500">सप्लायर ऑर्डर में सहेजें</h3>
-                <button type="button" onClick={() => setShowSaveToListModal(false)} className="p-1.5 bg-neutral-100 dark:bg-neutral-850 rounded-xl text-neutral-500"><X size={14} /></button>
+                <button type="button" onClick={() => setShowSaveToListModal(false)} className="p-1.5 bg-neutral-100 dark:bg-neutral-800 rounded-xl text-neutral-500"><X size={14} /></button>
               </div>
               <select value={targetListId} onChange={e => setTargetListId(e.target.value)} className="w-full p-2.5 rounded-xl border dark:bg-neutral-900 font-bold text-xs">
                 {orderLists.map(list => <option key={list.id} value={list.id}>{list.name}</option>)}
@@ -1380,6 +1494,23 @@ export default function StoreStockPage() {
           </div>
         )}
 
+      </AnimatePresence>
+
+      {/* TOAST ALERT */}
+      <AnimatePresence>
+        {toast && (
+          <motion.div
+            initial={{ opacity: 0, y: 50 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 50 }}
+            className="fixed bottom-24 left-4 right-4 z-50 max-w-sm mx-auto flex items-center gap-2.5 p-4 rounded-2xl bg-neutral-900 text-white dark:bg-white dark:text-black shadow-2xl border border-neutral-800 dark:border-neutral-200"
+          >
+            <span className="text-base">
+              {toast.type === 'success' ? '✅' : toast.type === 'error' ? '❌' : 'ℹ️'}
+            </span>
+            <p className="text-xs font-bold">{toast.message}</p>
+          </motion.div>
+        )}
       </AnimatePresence>
 
       {/* BOTTOM NAVIGATION BAR */}
