@@ -729,6 +729,23 @@ export default function StoreStockPage() {
     toastMessage("नया उत्पाद जोड़ा गया!", "success");
   };
 
+  // 📝 उत्पाद संपादन सहेजने का छूटा हुआ फंक्शन
+  const handleEditProductSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingProduct) return;
+    await setDoc(doc(db, "godown_inventory", editingProduct.id), editingProduct, { merge: true });
+    setEditingProduct(null);
+    toastMessage("विवरण अपडेट किया गया!", "success");
+  };
+
+  // 🗑️ उत्पाद डिलीट करने का छूटा हुआ फंक्शन
+  const handleDeleteProduct = (id: string, name: string) => {
+    confirmDeleteWithPin(`क्या आप इस सामान "${name}" को हटाना चाहते हैं?`, async () => {
+      await deleteDoc(doc(db, "godown_inventory", id));
+      setEditingProduct(null);
+    });
+  };
+
   const handleAddAssetSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleanName = formAddAsset.name.toUpperCase().trim();
@@ -830,7 +847,7 @@ export default function StoreStockPage() {
     toastMessage("नुकसान/कचरा दर्ज किया गया!", "success");
   };
 
-  // अचल संपत्ति (Fixed Assets) डिलीट करने का छूटा हुआ फंक्शन
+  // अचल संपत्ति (Fixed Assets) डिलीट करने का फंक्शन
   const handleDeleteAsset = (id: string, name: string) => {
     confirmDeleteWithPin(`क्या आप इस एसेट "${name}" को हटाना चाहते हैं?`, async () => {
       await deleteDoc(doc(db, "fixed_assets", id));
@@ -991,131 +1008,6 @@ export default function StoreStockPage() {
     window.open(waUrl, '_blank');
   };
 
-  const handleSaveAllKitchenClosings = async () => {
-    const enteredItems = Object.entries(kitchenClosingInputs).filter(([_, val]) => val.trim() !== "");
-    if (enteredItems.length === 0) {
-      toastMessage("कोई क्लोजिंग मात्रा दर्ज नहीं की गई है!", "info");
-      return;
-    }
-
-    triggerHaptic(60);
-    try {
-      const batch = writeBatch(db);
-      let updateCount = 0;
-
-      for (const [itemId, physicalInput] of enteredItems) {
-        const item = inventory.find(i => i.id === itemId);
-        if (!item) continue;
-        const physicalQty = parseFloat(physicalInput);
-        if (isNaN(physicalQty) || physicalQty < 0) continue;
-
-        const expectedQty = item.kitchenQty || 0;
-        const consumedQty = expectedQty - physicalQty;
-
-        // 1. डेटाबेस में किचन स्टॉक मात्रा को नया क्लोजिंग स्टॉक सेट करें
-        batch.set(doc(db, "godown_inventory", itemId), { kitchenQty: physicalQty }, { merge: true });
-
-        // 2. यदि कुछ उपयोग हुआ है तो उसे 'Kitchen Use' के तौर पर लेज़र में जोड़ें
-        if (consumedQty > 0) {
-          const logRef = doc(collection(db, "stock_out_history"));
-          batch.set(logRef, {
-            id: logRef.id,
-            itemName: item.name,
-            itemId: item.id,
-            qty: consumedQty,
-            purpose: "Kitchen Use",
-            date: getLocalDateString(0),
-            remarks: "रात्रि क्लोजिंग स्टॉक द्वारा स्वचालित गणना",
-            financialLoss: 0
-          });
-        }
-
-        // 3. स्थायी डेली क्लोजिंग रिकॉर्ड सहेजना ( audit के लिए )
-        const closingLogRef = doc(db, "kitchen_closings_log", `${item.id}_${getLocalDateString(0)}`);
-        batch.set(closingLogRef, {
-          id: `${item.id}_${getLocalDateString(0)}`,
-          date: getLocalDateString(0),
-          itemId: item.id,
-          itemName: item.name,
-          systemQty: expectedQty,
-          physicalQty: physicalQty,
-          consumedQty: consumedQty > 0 ? consumedQty : 0,
-          timestamp: new Date().toISOString(),
-          staffName: currentUser?.name || "Staff"
-        });
-
-        updateCount++;
-      }
-
-      if (updateCount > 0) {
-        await batch.commit();
-        setKitchenClosingInputs({});
-        // सफल सबमिशन पर क्लोजिंग स्टॉक ड्राफ्ट को साफ़ (Clear) करना
-        localStorage.removeItem('kitchen_closing_draft');
-        toastMessage(`${updateCount} आइटम का क्लोजिंग स्टॉक सहेजा गया! 🍳`, "success");
-      }
-    } catch {
-      toastMessage("क्लोजिंग स्टॉक अपडेट करने में त्रुटि!", "error");
-    }
-  };
-
-  const handleSaveSingleKitchenClosing = async (itemId: string, physicalInput: string) => {
-    const item = inventory.find(i => i.id === itemId);
-    if (!item) return;
-    const physicalQty = parseFloat(physicalInput);
-    if (isNaN(physicalQty) || physicalQty < 0) {
-      toastMessage("सही मात्रा दर्ज करें", "error");
-      return;
-    }
-
-    try {
-      const expectedQty = item.kitchenQty || 0;
-      const consumedQty = expectedQty - physicalQty;
-
-      const batch = writeBatch(db);
-      batch.set(doc(db, "godown_inventory", itemId), { kitchenQty: physicalQty }, { merge: true });
-
-      if (consumedQty > 0) {
-        const logRef = doc(collection(db, "stock_out_history"));
-        batch.set(logRef, {
-          id: logRef.id,
-          itemName: item.name,
-          itemId: item.id,
-          qty: consumedQty,
-          purpose: "Kitchen Use",
-          date: getLocalDateString(0),
-          remarks: "रात्रि क्लोजिंग स्टॉक द्वारा स्वचालित गणना",
-          financialLoss: 0
-        });
-      }
-
-      const closingLogRef = doc(db, "kitchen_closings_log", `${item.id}_${getLocalDateString(0)}`);
-      batch.set(closingLogRef, {
-        id: `${item.id}_${getLocalDateString(0)}`,
-        date: getLocalDateString(0),
-        itemId: item.id,
-        itemName: item.name,
-        systemQty: expectedQty,
-        physicalQty: physicalQty,
-        consumedQty: consumedQty > 0 ? consumedQty : 0,
-        timestamp: new Date().toISOString(),
-        staffName: currentUser?.name || "Staff"
-      });
-
-      await batch.commit();
-      setKitchenClosingInputs(prev => {
-        const copy = { ...prev };
-        delete copy[itemId];
-        // सफल व्यक्तिगत सबमिशन पर ड्राफ्ट को लोकल स्टोरेज में भी अपडेट करना
-        localStorage.setItem('kitchen_closing_draft', JSON.stringify(copy));
-        return copy;
-      });
-      toastMessage(`"${item.name}" का स्टॉक अपडेट किया गया!`, "success");
-    } catch {
-      toastMessage("अपडेट फेल हुआ।", "error");
-    }
-  };
-
   return (
     <div className={`min-h-screen ${isDarkMode ? 'bg-[#0E0E0E]' : 'bg-[#FAFAFA]'} pb-24 font-sans relative ${isDarkMode ? 'text-white' : 'text-neutral-900'}`}>
       <link rel="manifest" href="/store_manifest.json" />
@@ -1171,7 +1063,7 @@ export default function StoreStockPage() {
           />
         )}
 
-        {/* 🍳 KITCHEN SEGMENTED TAB */}
+        {/* 🍳 NEW KITCHEN SEGMENTED TAB (विभाजित और प्रबंधित) */}
         {activeTab === 'kitchen' && (
           <StockKitchen 
             isDarkMode={isDarkMode}
@@ -1248,7 +1140,7 @@ export default function StoreStockPage() {
             <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className={`w-full max-w-sm rounded-[2rem] p-6 space-y-4 border ${isDarkMode ? 'bg-[#0F0F0F] border-neutral-800 text-white' : 'bg-white border-neutral-100'}`}>
               <div className="flex justify-between items-center border-b pb-2.5">
                 <h3 className="text-xs font-black uppercase text-orange-500">कैटेगरी का प्रबंधन (Manage Categories)</h3>
-                <button type="button" onClick={() => setShowManageCategoriesModal(false)} className="p-1.5 bg-neutral-100 dark:bg-neutral-800 rounded-xl"><X size={14} /></button>
+                <button type="button" onClick={() => setShowManageCategoriesModal(false)} className="p-1.5 bg-neutral-100 dark:bg-neutral-850 rounded-xl"><X size={14} /></button>
               </div>
               <div className="flex gap-1.5 items-center">
                 <input type="text" placeholder="FROZEN" value={addCategoryModalInput} onChange={e => setAddCategoryModalInput(e.target.value)} className="flex-1 p-2 rounded-xl text-xs font-bold border uppercase dark:bg-neutral-900" />
@@ -1325,7 +1217,7 @@ export default function StoreStockPage() {
         {showAddProductModal && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <motion.form onSubmit={handleAddProductSubmit} className="w-full max-w-sm rounded-3xl p-6 space-y-4 bg-white dark:bg-neutral-900 border">
-              <div className="flex justify-between items-center border-b dark:border-neutral-800 pb-2.5 mb-2">
+              <div className="flex justify-between items-center border-b dark:border-neutral-850 pb-2.5 mb-2">
                 <h3 className="text-xs font-black text-green-500 uppercase">नया उत्पाद जोड़ें</h3>
                 <button type="button" onClick={() => setShowAddProductModal(false)} className="p-1.5 bg-neutral-100 dark:bg-neutral-850 rounded-xl text-neutral-500"><X size={14} /></button>
               </div>
@@ -1364,7 +1256,7 @@ export default function StoreStockPage() {
           </div>
         )}
 
-        {/* Modal: Edit Product */}
+        {/* Modal: Edit Product (संशोधित) */}
         {editingProduct && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <motion.form onSubmit={handleEditProductSubmit} className="w-full max-w-sm rounded-3xl p-6 space-y-4 bg-white dark:bg-neutral-900 border">
@@ -1414,7 +1306,7 @@ export default function StoreStockPage() {
         {showAddAssetModal && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <motion.form onSubmit={handleAddAssetSubmit} className="w-full max-w-sm rounded-3xl p-6 space-y-4 bg-white dark:bg-neutral-900 border">
-              <div className="flex justify-between items-center border-b dark:border-neutral-800 pb-2.5 mb-2">
+              <div className="flex justify-between items-center border-b dark:border-neutral-850 pb-2.5 mb-2">
                 <h3 className="text-xs font-black text-green-500 uppercase">अचल संपत्ति (Fixed Asset) जोड़ें</h3>
                 <button type="button" onClick={() => setShowAddAssetModal(false)} className="p-1.5 bg-neutral-100 dark:bg-neutral-850 rounded-xl text-neutral-500"><X size={14} /></button>
               </div>
@@ -1470,7 +1362,7 @@ export default function StoreStockPage() {
             <motion.form onSubmit={handleEditAssetSubmit} className="w-full max-w-sm rounded-3xl p-6 space-y-4 bg-white dark:bg-neutral-900 border">
               <div className="flex justify-between items-center border-b dark:border-neutral-800 pb-2.5 mb-2">
                 <h3 className="text-xs font-black uppercase text-orange-500">एसेट विवरण संपादित करें</h3>
-                <button type="button" onClick={() => setEditingAsset(null)} className="p-1.5 bg-neutral-100 dark:bg-[#181818] rounded-xl text-neutral-500"><X size={14} /></button>
+                <button type="button" onClick={() => setEditingAsset(null)} className="p-1.5 bg-neutral-100 dark:bg-neutral-850 rounded-xl text-neutral-500"><X size={14} /></button>
               </div>
               
               <div className="space-y-1">
@@ -1571,7 +1463,7 @@ export default function StoreStockPage() {
             <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className={`w-full max-w-sm rounded-[2rem] p-6 space-y-4 border ${isDarkMode ? 'bg-[#0F0F0F] border-neutral-800 text-white' : 'bg-white border-neutral-100'}`}>
               <div className="flex justify-between items-center border-b dark:border-neutral-800 pb-2.5 mb-2">
                 <h3 className="text-xs font-black uppercase text-orange-500">कैटेगरी बदलें (Change Category)</h3>
-                <button type="button" onClick={() => setShowBulkCategoryModal(false)} className="p-1.5 bg-neutral-100 dark:bg-neutral-800 rounded-xl text-neutral-500"><X size={14} /></button>
+                <button type="button" onClick={() => setShowBulkCategoryModal(false)} className="p-1.5 bg-neutral-100 dark:bg-neutral-850 rounded-xl text-neutral-500"><X size={14} /></button>
               </div>
               <select value={bulkTargetCategory} onChange={e => setBulkTargetCategory(e.target.value)} className="w-full p-2.5 rounded-xl border dark:bg-neutral-950 font-bold text-xs">
                 <option value="">-- चुनें --</option>
