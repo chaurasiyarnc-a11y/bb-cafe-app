@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 
 interface InventoryItem {
   id: string;
@@ -62,6 +62,7 @@ export default function StockKitchen({
 }: StockKitchenProps) {
   const [activeKitchenSubTab, setActiveKitchenSubTab] = useState<'closing' | 'today_use' | 'history'>('closing');
   const [kitchenSearchQuery, setKitchenSearchQuery] = useState<string>("");
+  const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
 
   const getLocalDateString = (offsetDays = 0) => {
     const d = new Date();
@@ -72,8 +73,64 @@ export default function StockKitchen({
     return `${year}-${month}-${day}`;
   };
 
-  // 🖨️ PDF प्रिंटर फंक्शन (Hidden Iframe विधि जो पॉप-अप ब्लॉक नहीं होने देती)
+  // पेज लोड होने पर यदि कोई पुराना ड्राफ्ट बचा हो तो उसे पुनर्प्राप्त (Restore) करना
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const draft = localStorage.getItem('kitchen_closing_draft');
+      if (draft) {
+        try {
+          setKitchenClosingInputs(JSON.parse(draft));
+        } catch {
+          localStorage.removeItem('kitchen_closing_draft');
+        }
+      }
+    }
+  }, [setKitchenClosingInputs]);
+
+  // इनपुट अपडेट करने और ड्राफ्ट को सहेजने के लिए हेल्पर
+  const updateClosingInput = (itemId: string, value: string) => {
+    const updated = { ...kitchenClosingInputs, [itemId]: value };
+    setKitchenClosingInputs(updated);
+    localStorage.setItem('kitchen_closing_draft', JSON.stringify(updated));
+  };
+
+  // 🪄 त्वरित क्रिया: अपेक्षित सिस्टम स्टॉक को कॉपी करना
+  const handleCopyExpectedStock = () => {
+    triggerHaptic(40);
+    const newInputs: Record<string, string> = {};
+    filteredKitchenInventory.forEach(item => {
+      newInputs[item.id] = String(item.kitchenQty || 0);
+    });
+    setKitchenClosingInputs(newInputs);
+    localStorage.setItem('kitchen_closing_draft', JSON.stringify(newInputs));
+    toastMessage("सिस्टम स्टॉक कॉपी किया गया! कृपया ड्राफ्ट की जांच करें।", "info");
+  };
+
+  // ➕/➖ त्वरित स्टॉक एडजस्टर बटन
+  const handleAdjustInputValue = (itemId: string, expectedVal: number, diff: number) => {
+    triggerHaptic(20);
+    const currentStr = kitchenClosingInputs[itemId] || "";
+    let currentNum = parseFloat(currentStr);
+    if (isNaN(currentNum)) {
+      currentNum = expectedVal; // यदि इनपुट खाली है तो सिस्टम स्टॉक से शुरू करें
+    }
+    const nextVal = Math.max(0, currentNum + diff);
+    updateClosingInput(itemId, String(nextVal));
+  };
+
+  // 📁 फोल्डर को समेटने (Collapse/Expand) का फंक्शन
+  const toggleCategoryFolder = (catName: string) => {
+    triggerHaptic(15);
+    setExpandedCategories(prev => ({ ...prev, [catName]: !prev[catName] }));
+  };
+
+  const isCategoryFolderExpanded = (catName: string) => {
+    return expandedCategories[catName] !== false; // डिफ़ॉल्ट रूप से खुला (Expanded) रहेगा
+  };
+
+  // 🖨️ PDF प्रिंटर फंक्शन (Hidden Iframe तकनीक)
   const handlePrintKitchenChecklist = () => {
+    triggerHaptic(50);
     let iframe = document.getElementById('kitchen-print-iframe') as HTMLIFrameElement;
     if (!iframe) {
       iframe = document.createElement('iframe');
@@ -170,7 +227,7 @@ export default function StockKitchen({
       setTimeout(() => {
         iframe.contentWindow?.focus();
         iframe.contentWindow?.print();
-      }, 400);
+      }, 500);
     }
   };
 
@@ -198,7 +255,7 @@ export default function StockKitchen({
     }));
   }, [stockOutHistory, inventory]);
 
-  // तारीख के हिसाब से ग्रुपिंग
+  // क्लोजिंग स्नैपशॉट को तारीख वार व्यवस्थित करना
   const groupedKitchenClosings = useMemo(() => {
     const map: Record<string, KitchenClosingRecord[]> = {};
     kitchenClosingsHistory.forEach(log => {
@@ -214,6 +271,17 @@ export default function StockKitchen({
       return matchesSearch && (item.kitchenQty > 0 || item.storeQty > 0);
     });
   }, [inventory, kitchenSearchQuery]);
+
+  // सामग्री को कैटेगरी फोल्डर के हिसाब से ग्रुप करना
+  const groupedClosingInventory = useMemo(() => {
+    const map: Record<string, InventoryItem[]> = {};
+    filteredKitchenInventory.forEach(item => {
+      const cat = item.category || "OTHER";
+      if (!map[cat]) map[cat] = [];
+      map[cat].push(item);
+    });
+    return Object.entries(map).sort((a, b) => a[0].localeCompare(b[0]));
+  }, [filteredKitchenInventory]);
 
   return (
     <div className="space-y-4">
@@ -242,27 +310,39 @@ export default function StockKitchen({
       {/* SUB-TAB 1: 🌙 क्लोजिंग (NIGHT CLOSING) */}
       {activeKitchenSubTab === 'closing' && (
         <div className={`p-4 rounded-3xl border ${isDarkMode ? 'bg-neutral-900/60 border-neutral-800' : 'bg-white border-neutral-100'} shadow-sm space-y-3`}>
-          <div className="flex justify-between items-center gap-2">
-            <div className="flex-1 min-w-0">
-              <h2 className="text-xs font-black text-green-500 uppercase tracking-wider">🌙 रात्रि क्लोजिंग स्टॉक</h2>
-              <p className="text-[9px] text-neutral-400 font-bold truncate">चेकलिस्ट प्रिंट करें फिर एंट्री करें</p>
-            </div>
-            
-            <div className="flex items-center gap-1.5 flex-shrink-0">
-              <button 
-                onClick={handlePrintKitchenChecklist}
-                className="px-2.5 py-1.5 bg-neutral-800 hover:bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 rounded-xl text-[9px] font-black uppercase shadow-md flex items-center gap-1 transition-all"
-              >
-                🖨️ प्रिंट चेकलिस्ट (PDF)
-              </button>
-              {Object.keys(kitchenClosingInputs).length > 0 && (
+          <div className="flex flex-col space-y-2 pb-1 border-b dark:border-neutral-800">
+            <div className="flex justify-between items-center gap-2">
+              <div className="min-w-0">
+                <h2 className="text-xs font-black text-green-500 uppercase tracking-wider">🌙 रात्रि क्लोजिंग स्टॉक</h2>
+                <p className="text-[9px] text-neutral-400 font-bold">चेकलिस्ट प्रिंट करें फिर एंट्री करें</p>
+              </div>
+              
+              <div className="flex items-center gap-1 flex-shrink-0">
+                {/* 🖨️ PDF प्रिंटर */}
                 <button 
-                  onClick={handleSaveAllKitchenClosings}
-                  className="px-2.5 py-1.5 bg-green-600 text-white rounded-xl text-[9px] font-black uppercase shadow-md transition-all"
+                  onClick={handlePrintKitchenChecklist}
+                  className="px-2 py-1.5 bg-neutral-800 hover:bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 rounded-xl text-[9px] font-black uppercase shadow-md transition-all"
+                  title="PDF चेकलिस्ट प्रिंट करें"
                 >
-                  💾 सहेजें
+                  🖨️ प्रिंट
                 </button>
-              )}
+                {/* 🪄 अपेक्षित स्टॉक कॉपी बटन */}
+                <button 
+                  onClick={handleCopyExpectedStock}
+                  className="px-2 py-1.5 bg-amber-500 text-white rounded-xl text-[9px] font-black uppercase shadow-md transition-all"
+                  title="सिस्टम स्टॉक को इनपुट में कॉपी करें"
+                >
+                  🪄 कॉपी
+                </button>
+                {Object.keys(kitchenClosingInputs).length > 0 && (
+                  <button 
+                    onClick={handleSaveAllKitchenClosings}
+                    className="px-2 py-1.5 bg-green-600 text-white rounded-xl text-[9px] font-black uppercase shadow-md transition-all"
+                  >
+                    💾 सहेजें
+                  </button>
+                )}
+              </div>
             </div>
           </div>
 
@@ -274,45 +354,87 @@ export default function StockKitchen({
             className="w-full p-2.5 rounded-xl text-xs font-bold border dark:bg-neutral-950 dark:border-neutral-800 focus:outline-none"
           />
 
-          <div className="space-y-2 max-h-[48vh] overflow-y-auto pr-1">
-            {filteredKitchenInventory.length === 0 ? (
+          {/* 📂 फोल्डर आधारित क्लोजिंग लिस्ट */}
+          <div className="space-y-3 max-h-[48vh] overflow-y-auto pr-1">
+            {groupedClosingInventory.length === 0 ? (
               <p className="text-xs text-center py-4 text-neutral-400 font-bold">कोई सामग्री नहीं मिली।</p>
             ) : (
-              filteredKitchenInventory.map(item => {
-                const expected = item.kitchenQty || 0;
-                const typedVal = kitchenClosingInputs[item.id] || "";
-                const typedNum = parseFloat(typedVal);
-                const consumed = !isNaN(typedNum) ? (expected - typedNum) : 0;
-
+              groupedClosingInventory.map(([catName, items]) => {
+                const isExpanded = isCategoryFolderExpanded(catName);
                 return (
-                  <div key={item.id} className={`p-3 rounded-2xl border ${isDarkMode ? 'bg-neutral-950 border-neutral-850' : 'bg-white border-neutral-100'} flex items-center justify-between gap-2`}>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-black truncate uppercase">{item.name}</p>
-                      <div className="flex items-center gap-2 mt-0.5 text-[10px] text-neutral-400 font-bold">
-                        <span>सिस्टम स्टॉक: <strong className={isDarkMode ? 'text-white' : 'text-black'}>{expected} {item.unit}</strong></span>
-                        {consumed > 0 && (
-                          <span className="text-orange-500 animate-pulse">🔥 उपयोग: {consumed.toFixed(1)} {item.unit}</span>
-                        )}
-                      </div>
-                    </div>
+                  <div key={catName} className="space-y-1.5">
+                    {/* फोल्डर हेडर बटन */}
+                    <button
+                      type="button"
+                      onClick={() => toggleCategoryFolder(catName)}
+                      className={`w-full flex justify-between items-center py-2 px-3 rounded-xl font-black text-[10px] uppercase transition-all ${isDarkMode ? 'bg-neutral-900 hover:bg-neutral-850' : 'bg-neutral-100 hover:bg-neutral-150'}`}
+                    >
+                      <span className="flex items-center gap-1.5">
+                        📁 {catName} 
+                        <span className="text-[9px] text-neutral-400">({items.length} आइटम)</span>
+                      </span>
+                      <span className="text-[9px]">{isExpanded ? '▼' : '►'}</span>
+                    </button>
 
-                    <div className="flex items-center gap-1.5">
-                      <input 
-                        type="number" 
-                        placeholder="क्लोजिंग"
-                        value={typedVal}
-                        onChange={e => setKitchenClosingInputs({ ...kitchenClosingInputs, [item.id]: e.target.value })}
-                        className="w-16 p-1.5 rounded-xl text-center text-xs font-black border dark:bg-neutral-900"
-                      />
-                      {typedVal.trim() !== "" && (
-                        <button 
-                          onClick={() => handleSaveSingleKitchenClosing(item.id, typedVal)}
-                          className="p-1.5 bg-green-100 text-green-600 dark:bg-green-950/40 dark:text-green-400 rounded-xl font-bold text-xs"
-                        >
-                          ✓
-                        </button>
-                      )}
-                    </div>
+                    {/* फोल्डर की सामग्रियां */}
+                    {isExpanded && (
+                      <div className="space-y-1.5 pl-1.5">
+                        {items.map(item => {
+                          const expected = item.kitchenQty || 0;
+                          const typedVal = kitchenClosingInputs[item.id] || "";
+                          const typedNum = parseFloat(typedVal);
+                          const consumed = !isNaN(typedNum) ? (expected - typedNum) : 0;
+
+                          return (
+                            <div key={item.id} className={`p-2.5 rounded-2xl border ${isDarkMode ? 'bg-neutral-950 border-neutral-850' : 'bg-white border-neutral-100'} flex items-center justify-between gap-1`}>
+                              <div className="flex-1 min-w-0 pr-1">
+                                <p className="text-xs font-black truncate uppercase">{item.name}</p>
+                                <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-0.5 text-[9px] text-neutral-400 font-bold">
+                                  <span>सिस्टम: <strong className={isDarkMode ? 'text-white' : 'text-black'}>{expected} {item.unit}</strong></span>
+                                  {consumed > 0 && (
+                                    <span className="text-orange-500 animate-pulse">🔥 उपयोग: {consumed.toFixed(1)}</span>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* ➖ इनपुट ➕ त्वरित बटन्स */}
+                              <div className="flex items-center gap-1 flex-shrink-0">
+                                <button
+                                  type="button"
+                                  onClick={() => handleAdjustInputValue(item.id, expected, -1)}
+                                  className={`w-6 h-6 flex items-center justify-center rounded-lg text-xs font-black transition-colors ${isDarkMode ? 'bg-neutral-800 hover:bg-neutral-700' : 'bg-neutral-100 hover:bg-neutral-200'}`}
+                                >
+                                  -
+                                </button>
+                                <input 
+                                  type="number" 
+                                  inputMode="decimal"
+                                  placeholder="0"
+                                  value={typedVal}
+                                  onChange={e => updateClosingInput(item.id, e.target.value)}
+                                  className="w-12 p-1 rounded-lg text-center text-xs font-black border dark:bg-neutral-900 h-6 focus:outline-none"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => handleAdjustInputValue(item.id, expected, 1)}
+                                  className={`w-6 h-6 flex items-center justify-center rounded-lg text-xs font-black transition-colors ${isDarkMode ? 'bg-neutral-800 hover:bg-neutral-700' : 'bg-neutral-100 hover:bg-neutral-200'}`}
+                                >
+                                  +
+                                </button>
+                                {typedVal.trim() !== "" && (
+                                  <button 
+                                    onClick={() => handleSaveSingleKitchenClosing(item.id, typedVal)}
+                                    className="p-1.5 bg-green-100 text-green-600 dark:bg-green-950/40 dark:text-green-400 rounded-lg font-bold text-xs"
+                                  >
+                                    ✓
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 );
               })
