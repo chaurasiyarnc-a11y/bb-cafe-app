@@ -1,3 +1,5 @@
+
+
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -89,6 +91,18 @@ interface UserPin {
   role: 'admin' | 'staff';
 }
 
+interface KitchenClosingRecord {
+  id: string;
+  date: string;
+  itemId: string;
+  itemName: string;
+  systemQty: number;
+  physicalQty: number;
+  consumedQty: number;
+  timestamp: string;
+  staffName: string;
+}
+
 const getLocalDateString = (offsetDays = 0) => {
   const d = new Date();
   d.setDate(d.getDate() - offsetDays);
@@ -125,6 +139,9 @@ export default function StoreStockPage() {
 
   // किचन क्लोजिंग स्टॉक इनपुट्स के लिए स्टेट
   const [kitchenClosingInputs, setKitchenClosingInputs] = useState<Record<string, string>>({});
+
+  // दैनिक क्लोजिंग स्टॉक रिकॉर्ड्स के लिए रियल-टाइम स्टेट
+  const [kitchenClosingsHistory, setKitchenClosingsHistory] = useState<KitchenClosingRecord[]>([]);
 
   const [currentUser, setCurrentUser] = useState<UserPin | null>(null);
   const [pinInput, setPinInput] = useState<string>("");
@@ -227,8 +244,16 @@ export default function StoreStockPage() {
       setFixedAssets(snap.docs.map(d => ({ id: d.id, ...d.data() } as FixedAsset)));
     });
 
+    // डेली नाइट क्लोजिंग रिकॉर्ड हिस्ट्री लोड करना (अधिकतम अंतिम 150 प्रविष्टियां)
+    const unsubKitchenClosings = onSnapshot(
+      query(collection(db, "kitchen_closings_log"), orderBy("timestamp", "desc"), limit(150)),
+      (snap) => {
+        setKitchenClosingsHistory(snap.docs.map(d => d.data() as KitchenClosingRecord));
+      }
+    );
+
     return () => {
-      unsubInventory(); unsubCategories(); unsubStockIns(); unsubStockOuts(); unsubSavedOrders(); unsubFixedAssets();
+      unsubInventory(); unsubCategories(); unsubStockIns(); unsubStockOuts(); unsubSavedOrders(); unsubFixedAssets(); unsubKitchenClosings();
     };
   }, []);
 
@@ -485,6 +510,7 @@ export default function StoreStockPage() {
 
       if (mergedCount > 0) {
         await batch.commit();
+        setKitchenClosingInputs({});
         toastMessage(`${mergedCount} डुप्लीकेट सामान सफलतापूर्वक मर्ज किए गए! 🧹`, "success");
       } else {
         toastMessage("कोई डुप्लीकेट सामान नहीं मिला। ✨", "info");
@@ -1010,10 +1036,10 @@ export default function StoreStockPage() {
         const expectedQty = item.kitchenQty || 0;
         const consumedQty = expectedQty - physicalQty;
 
-        // डेटाबेस में किचन स्टॉक मात्रा को नया क्लोजिंग स्टॉक सेट करें
+        // 1. डेटाबेस में किचन स्टॉक मात्रा को नया क्लोजिंग स्टॉक सेट करें
         batch.set(doc(db, "godown_inventory", itemId), { kitchenQty: physicalQty }, { merge: true });
 
-        // यदि कुछ उपयोग हुआ है तो उसे 'Kitchen Use' के तौर पर लेज़र में जोड़ें
+        // 2. यदि कुछ उपयोग हुआ है तो उसे 'Kitchen Use' के तौर पर लेज़र में जोड़ें
         if (consumedQty > 0) {
           const logRef = doc(collection(db, "stock_out_history"));
           batch.set(logRef, {
@@ -1027,6 +1053,21 @@ export default function StoreStockPage() {
             financialLoss: 0
           });
         }
+
+        // 3. स्थायी डेली क्लोजिंग रिकॉर्ड सहेजना ( audit के लिए )
+        const closingLogRef = doc(db, "kitchen_closings_log", `${item.id}_${getLocalDateString(0)}`);
+        batch.set(closingLogRef, {
+          id: `${item.id}_${getLocalDateString(0)}`,
+          date: getLocalDateString(0),
+          itemId: item.id,
+          itemName: item.name,
+          systemQty: expectedQty,
+          physicalQty: physicalQty,
+          consumedQty: consumedQty > 0 ? consumedQty : 0,
+          timestamp: new Date().toISOString(),
+          staffName: currentUser?.name || "Staff"
+        });
+
         updateCount++;
       }
 
@@ -1055,8 +1096,11 @@ export default function StoreStockPage() {
       const consumedQty = expectedQty - physicalQty;
 
       const batch = writeBatch(db);
+      
+      // 1. किचन स्टॉक मात्रा को नया क्लोजिंग स्टॉक सेट करें
       batch.set(doc(db, "godown_inventory", itemId), { kitchenQty: physicalQty }, { merge: true });
 
+      // 2. यदि उपयोग हुआ है तो लेज़र प्रविष्टि करें
       if (consumedQty > 0) {
         const logRef = doc(collection(db, "stock_out_history"));
         batch.set(logRef, {
@@ -1071,6 +1115,20 @@ export default function StoreStockPage() {
         });
       }
 
+      // 3. स्थायी डेली क्लोजिंग रिकॉर्ड सहेजना
+      const closingLogRef = doc(db, "kitchen_closings_log", `${item.id}_${getLocalDateString(0)}`);
+      batch.set(closingLogRef, {
+        id: `${item.id}_${getLocalDateString(0)}`,
+        date: getLocalDateString(0),
+        itemId: item.id,
+        itemName: item.name,
+        systemQty: expectedQty,
+        physicalQty: physicalQty,
+        consumedQty: consumedQty > 0 ? consumedQty : 0,
+        timestamp: new Date().toISOString(),
+        staffName: currentUser?.name || "Staff"
+      });
+
       await batch.commit();
       setKitchenClosingInputs(prev => {
         const copy = { ...prev };
@@ -1083,9 +1141,9 @@ export default function StoreStockPage() {
     }
   };
 
-  // 🖨️ 58mm थर्मल प्रिंटर के लिए नाइट क्लोजिंग चेकलिस्ट प्रिंट फंक्शन
+  // 🖨️ A4 स्टैंडर्ड साइज़ पीडीएफ चेकलिस्ट प्रिंट फंक्शन
   const handlePrintKitchenChecklist = () => {
-    const printWindow = window.open('', '_blank', 'width=300,height=600');
+    const printWindow = window.open('', '_blank', 'width=800,height=800');
     if (!printWindow) {
       toastMessage("पॉपअप अवरुद्ध हो गया है! कृपया पॉपअप की अनुमति दें।", "error");
       return;
@@ -1097,16 +1155,22 @@ export default function StoreStockPage() {
       return !(itemCatObj?.hidden);
     });
 
-    const rows = activeItems.map(item => `
-      <tr style="border-bottom: 1px dotted #000;">
-        <td style="padding: 4px 0; font-weight: bold; font-size: 10px; max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+    const rows = activeItems.map((item, idx) => `
+      <tr style="border-bottom: 1px solid #ddd;">
+        <td style="padding: 10px; text-align: center; font-size: 12px; font-weight: bold;">
+          ${idx + 1}
+        </td>
+        <td style="padding: 10px; font-weight: bold; font-size: 12px; text-transform: uppercase;">
           ${item.name}
         </td>
-        <td style="padding: 4px 0; text-align: center; font-size: 10px;">
-          ${item.kitchenQty || 0}
+        <td style="padding: 10px; font-size: 11px; text-transform: uppercase; color: #555;">
+          ${item.category || 'OTHER'}
         </td>
-        <td style="padding: 4px 0; text-align: right; font-size: 10px; font-weight: bold;">
-          [ &nbsp; &nbsp; &nbsp; &nbsp; ]
+        <td style="padding: 10px; text-align: center; font-size: 12px; font-weight: bold;">
+          ${item.kitchenQty || 0} ${item.unit}
+        </td>
+        <td style="padding: 10px; text-align: center; font-size: 12px; font-weight: bold; width: 180px;">
+          [ &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; ]
         </td>
       </tr>
     `).join('');
@@ -1114,63 +1178,119 @@ export default function StoreStockPage() {
     printWindow.document.write(`
       <html>
         <head>
-          <title>Kitchen_Closing_Checklist</title>
+          <title>Bum_Bum_Cafe_Kitchen_Closing_Checklist</title>
           <style>
             @page {
-              size: 58mm auto;
-              margin: 0;
+              size: A4 portrait;
+              margin: 15mm;
             }
             body {
-              width: 52mm;
-              margin: 0 auto;
-              padding: 10px 2px 30px 2px;
-              font-family: 'Courier New', Courier, monospace;
-              font-size: 10px;
-              color: #000;
-              background: #fff;
+              font-family: Arial, sans-serif;
+              color: #333;
+              margin: 0;
+              padding: 0;
+              background-color: #fff;
             }
-            .center {
+            .header {
               text-align: center;
+              margin-bottom: 25px;
+              border-bottom: 3px double #333;
+              padding-bottom: 12px;
             }
-            .bold {
+            .title {
+              font-size: 24px;
               font-weight: bold;
+              color: #ff6b00;
+              text-transform: uppercase;
+              letter-spacing: 1px;
+              margin: 0;
             }
-            .divider {
-              border-bottom: 1px dashed #000;
-              margin: 6px 0;
+            .subtitle {
+              font-size: 11px;
+              color: #666;
+              margin-top: 5px;
+              margin-bottom: 0;
+              font-weight: bold;
+              text-transform: uppercase;
+              letter-spacing: 0.5px;
             }
-            table {
+            .meta-info {
               width: 100%;
+              margin-bottom: 20px;
+              font-size: 13px;
               border-collapse: collapse;
             }
-            th {
+            .meta-info td {
+              padding: 4px 0;
+            }
+            table.items-table {
+              width: 100%;
+              border-collapse: collapse;
+              margin-top: 10px;
+            }
+            table.items-table th, table.items-table td {
+              border: 1px solid #ccc;
+              padding: 10px 8px;
+              font-size: 12px;
+              text-align: left;
+            }
+            table.items-table th {
+              background-color: #f7f7f7;
               font-weight: bold;
-              border-bottom: 1px dashed #000;
-              border-top: 1px dashed #000;
-              font-size: 10px;
+              text-transform: uppercase;
+              color: #444;
+            }
+            .center {
+              text-align: center !important;
+            }
+            .footer {
+              margin-top: 40px;
+              font-size: 11px;
+              color: #777;
+              text-align: center;
+              border-top: 1px dashed #ddd;
+              padding-top: 15px;
+            }
+            .signature-area {
+              margin-top: 60px;
+              display: flex;
+              justify-content: space-between;
+            }
+            .sig-box {
+              width: 220px;
+              text-align: center;
+              border-top: 1px solid #333;
+              padding-top: 5px;
+              font-size: 12px;
+              font-weight: bold;
             }
           </style>
         </head>
         <body>
-          <div class="center bold" style="font-size: 12px; margin-bottom: 2px;">BUM BUM CAFE</div>
-          <div class="center bold" style="font-size: 9px; letter-spacing: 0.5px;">KITCHEN NIGHT CHECKLIST</div>
-          <div class="center" style="font-size: 8px; margin-top: 2px; color: #555;">(58mm Thermal Print)</div>
-          
-          <div class="divider"></div>
-          
-          <div style="font-size: 8px; font-weight: bold;">
-            DATE: ____________ TIME: _________<br/>
-            STAFF: ___________________________
+          <div class="header">
+            <h1 class="title">BUM BUM CAFE</h1>
+            <p class="subtitle">Kitchen Night Closing Checklist / किचन क्लोजिंग शीट</p>
           </div>
           
-          <div class="divider"></div>
+          <table class="meta-info">
+            <tr>
+              <td style="width: 50%;"><strong>DATE:</strong> ____________________________</td>
+              <td style="width: 50%; text-align: right;"><strong>TIME:</strong> _________________</td>
+            </tr>
+            <tr>
+              <td style="width: 50%;"><strong>STAFF NAME:</strong> ________________________</td>
+              <td style="width: 50%; text-align: right;"><strong>VERIFIED BY:</strong> ___________</td>
+            </tr>
+          </table>
           
-          <table>
+          <table class="items-table">
             <thead>
               <tr>
-                <th style="text-align: left; padding: 3px 0;">ITEM NAME</th>
-                <th style="text-align: center; padding: 3px 0; width: 45px;">SYS</th>
-                <th style="text-align: right; padding: 3px 0; width: 60px;">PHYSICAL</th>
+                <th class="center" style="width: 50px;">S.No</th>
+                <th>ITEM NAME / सामग्री का नाम</th>
+                <th style="width: 120px;">CATEGORY</th>
+                <th class="center" style="width: 120px;">SYSTEM QTY</th>
+                <th class="center" style="width: 180px;">PHYSICAL STOCK (वास्तविक)</th>
               </tr>
             </thead>
             <tbody>
@@ -1178,14 +1298,13 @@ export default function StoreStockPage() {
             </tbody>
           </table>
           
-          <div class="divider"></div>
-          
-          <div class="center" style="font-size: 8px; font-style: italic; margin-top: 8px;">
-            किचन में पेन से स्टॉक लिखें,<br/>
-            फिर पोर्टल पर एंट्री दर्ज करें।
+          <div class="signature-area">
+            <div class="sig-box">Staff Signature</div>
+            <div class="sig-box">Manager / Admin Signature</div>
           </div>
-          <div class="center bold" style="font-size: 9px; margin-top: 10px;">
-            *** THANK YOU ***
+          
+          <div class="footer">
+            किचन में घूमकर पेन से सही स्टॉक लिखें, फिर इसे इन्वेंटरी पोर्टल पर दर्ज करें। धन्यवाद।
           </div>
           
           <script>
@@ -1224,35 +1343,16 @@ export default function StoreStockPage() {
     }));
   }, [stockOutHistory, inventory]);
 
-  // पिछले 7 दिनों का खपत इतिहास
-  const pastDaysConsumption = useMemo(() => {
-    const dailyMap: Record<string, Record<string, number>> = {};
-    const itemUnits: Record<string, string> = {};
-
-    stockOutHistory.forEach(log => {
-      if (log.purpose === "Kitchen Use") {
-        const date = log.date;
-        const name = log.itemName;
-        const item = inventory.find(i => i.id === log.itemId);
-        itemUnits[name] = item?.unit || "Units";
-
-        if (!dailyMap[date]) dailyMap[date] = {};
-        dailyMap[date][name] = (dailyMap[date][name] || 0) + log.qty;
-      }
+  // वास्तविक सहेजे गए डेली क्लोजिंग स्टॉक रिकॉर्ड्स को तारीख के हिसाब से ग्रुप करना
+  const groupedKitchenClosings = useMemo(() => {
+    const map: Record<string, KitchenClosingRecord[]> = {};
+    kitchenClosingsHistory.forEach(log => {
+      if (!map[log.date]) map[log.date] = [];
+      map[log.date].push(log);
     });
-
-    return Object.entries(dailyMap)
-      .sort((a, b) => b[0].localeCompare(a[0])) 
-      .slice(0, 7) 
-      .map(([date, items]) => ({
-        date,
-        consumptions: Object.entries(items).map(([name, qty]) => ({
-          name,
-          qty,
-          unit: itemUnits[name] || "Units"
-        }))
-      }));
-  }, [stockOutHistory, inventory]);
+    // नवीनतम तारीख पहले
+    return Object.entries(map).sort((a, b) => b[0].localeCompare(a[0]));
+  }, [kitchenClosingsHistory]);
 
   // किचन टैब के लिए सर्च फ़िल्टर
   const filteredKitchenInventory = useMemo(() => {
@@ -1404,12 +1504,12 @@ export default function StoreStockPage() {
                   </div>
                   
                   <div className="flex items-center gap-1.5 flex-shrink-0">
-                    {/* 🖨️ 58mm थर्मल प्रिंट बटन */}
+                    {/* 🖨️ PDF / Standard Print Button */}
                     <button 
                       onClick={handlePrintKitchenChecklist}
                       className="px-2.5 py-1.5 bg-neutral-800 hover:bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 rounded-xl text-[9px] font-black uppercase shadow-md flex items-center gap-1 transition-all"
                     >
-                      🖨️ प्रिंट (58mm)
+                      🖨️ प्रिंट चेकलिस्ट (PDF)
                     </button>
                     {Object.keys(kitchenClosingInputs).length > 0 && (
                       <button 
@@ -1501,21 +1601,37 @@ export default function StoreStockPage() {
             {/* SUB-TAB 3: 📅 7-दिन इतिहास (PAST 7 DAYS HISTORY) */}
             {activeKitchenSubTab === 'history' && (
               <div className={`p-4 rounded-3xl border ${isDarkMode ? 'bg-neutral-900/60 border-neutral-800' : 'bg-white border-neutral-100'} shadow-sm`}>
-                <h2 className="text-xs font-black text-neutral-400 uppercase tracking-wider mb-2">📅 दैनिक खपत इतिहास (Past 7 Days History)</h2>
-                <div className="space-y-2 max-h-[50vh] overflow-y-auto">
-                  {pastDaysConsumption.length === 0 ? (
-                    <p className="text-xs text-neutral-400 py-4 text-center">कोई पुराना खपत इतिहास उपलब्ध नहीं है।</p>
+                <h2 className="text-xs font-black text-neutral-400 uppercase tracking-wider mb-2.5">📅 डेली क्लोजिंग और उपयोग इतिहास (Closing Logs)</h2>
+                <div className="space-y-3 max-h-[50vh] overflow-y-auto">
+                  {groupedKitchenClosings.length === 0 ? (
+                    <p className="text-xs text-neutral-400 py-4 text-center">कोई डेली क्लोजिंग इतिहास रिकॉर्ड नहीं मिला।</p>
                   ) : (
-                    pastDaysConsumption.map((day, idx) => (
-                      <div key={idx} className="p-3 rounded-2xl border dark:border-neutral-800/80 space-y-1.5">
-                        <p className="text-[10px] font-black uppercase text-orange-500">{new Date(day.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
-                        <div className="grid grid-cols-2 gap-1.5 text-[11px] font-bold">
-                          {day.consumptions.map((c, cIdx) => (
-                            <div key={cIdx} className="flex justify-between border-b border-dashed dark:border-neutral-850 pb-0.5">
-                              <span className="text-neutral-400 truncate max-w-[100px]">{c.name}</span>
-                              <span>{c.qty} {c.unit}</span>
-                            </div>
-                          ))}
+                    groupedKitchenClosings.map(([date, logs], idx) => (
+                      <div key={idx} className={`p-3.5 rounded-2xl border ${isDarkMode ? 'bg-neutral-950 border-neutral-850' : 'bg-white border-neutral-100'} space-y-2`}>
+                        <div className="flex justify-between items-center border-b dark:border-neutral-850 pb-1.5">
+                          <p className="text-[10px] font-black uppercase text-orange-500">
+                            {new Date(date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                          </p>
+                          <span className="text-[8px] font-bold text-neutral-400 uppercase">स्टाफ: {logs[0]?.staffName || 'System'}</span>
+                        </div>
+                        
+                        <div className="space-y-1.5">
+                          {logs.map((log) => {
+                            const matchedItem = inventory.find(i => i.id === log.itemId);
+                            const unit = matchedItem?.unit || 'Units';
+                            return (
+                              <div key={log.id} className="flex justify-between items-center text-[10px] font-bold">
+                                <span className="text-neutral-400 truncate max-w-[120px] uppercase">{log.itemName}</span>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-[9px] text-neutral-500">सिस्टम: {log.systemQty}</span>
+                                  <span className="text-[9px] text-green-500 font-extrabold">बचा: {log.physicalQty} {unit}</span>
+                                  {log.consumedQty > 0 && (
+                                    <span className="text-orange-500 text-[9px]">खपत: -{log.consumedQty}</span>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
                     ))
