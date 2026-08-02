@@ -95,7 +95,7 @@ export default function BbCafePos() {
   const [printerPaperSize, setPrinterPaperSize] = useState<'58mm' | '80mm'>('58mm');
   const [themeMode, setThemeMode] = useState<'dark' | 'light'>('dark');
 
-  // Printer Settings states
+  // Printer Settings states (Optimized for Windows USB & Bluetooth)
   const [printerType, setPrinterType] = useState<'thermal_usb' | 'thermal_bluetooth' | 'network_ip' | 'laser'>('thermal_usb');
   const [printerIp, setPrinterIp] = useState('192.168.1.100');
   const [printCopies, setPrintCopies] = useState(1);
@@ -908,7 +908,7 @@ export default function BbCafePos() {
               </div>
             )}
 
-            {/* BILLING WORKSPACE - DESKTOP SPLIT VIEW (LEFT MENU, RIGHT CART) */}
+            {/* BILLING WORKSPACE - WINDOWS/PC SPLIT VIEW (LEFT MENU, RIGHT CART) */}
             {activeTab === 'billing' && (
               <div className="flex-1 flex flex-col md:flex-row gap-4 overflow-hidden relative h-full">
                 
@@ -1095,7 +1095,7 @@ export default function BbCafePos() {
               </div>
             )}
 
-            {/* SETTINGS WORKSPACE */}
+            {/* SETTINGS WORKSPACE (Windows Printer Options) */}
             {activeTab === 'settings' && (
               <div className="max-w-xl mx-auto w-full pb-20 overflow-y-auto flex-1 font-sans">
                 <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 p-6 rounded-3xl shadow-xl space-y-6">
@@ -1131,13 +1131,13 @@ export default function BbCafePos() {
 
                   <div className="space-y-3 pt-2">
                     <div className="flex items-center justify-between">
-                      <p className="text-xs font-bold uppercase">D. Hardware Printer Connection:</p>
+                      <p className="text-xs font-bold uppercase">D. Hardware Printer Connection (USB / Bluetooth):</p>
                       <span className={"text-[8px] font-black uppercase tracking-widest px-2.5 py-0.5 rounded-full border " + (printerConnected ? "bg-green-500/10 text-green-400 border-green-500/20" : "bg-red-500/10 text-red-400 border-red-500/20")}>
                         {printerConnected ? '● Connected' : 'Disconnected'}
                       </span>
                     </div>
                     <div className="grid grid-cols-2 gap-2">
-                      {[{ id: 'thermal_usb', label: 'Thermal USB' }, { id: 'thermal_bluetooth', label: 'Thermal Bluetooth' }, { id: 'network_ip', label: 'Network IP' }, { id: 'laser', label: 'Laser A4' }].map((p) => (
+                      {[{ id: 'thermal_usb', label: 'Thermal USB (Windows)' }, { id: 'thermal_bluetooth', label: 'Thermal Bluetooth' }, { id: 'network_ip', label: 'Network IP' }, { id: 'laser', label: 'Laser A4' }].map((p) => (
                         <button key={p.id} onClick={() => { triggerBeep('tap'); setPrinterType(p.id as any); setPrinterConnected(false); localStorage.setItem("bb_pos_printer_type", p.id); }} className={"p-2 rounded-xl border text-[9px] font-black uppercase transition-all " + (printerType === p.id ? "bg-neutral-950 text-amber-400 border-amber-500" : "bg-neutral-100 dark:bg-neutral-800 border-neutral-200 dark:border-neutral-700")}>
                           {p.label}
                         </button>
