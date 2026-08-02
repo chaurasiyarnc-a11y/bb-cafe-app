@@ -3,7 +3,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { db } from '@/lib/firebase'; 
 import { 
   collection, onSnapshot, query, orderBy, limit, doc, 
-  updateDoc, addDoc, runTransaction, increment, getDoc, getDocs, where, setDoc,
+  updateDoc, addDoc, runTransaction, getDoc, getDocs, where, setDoc,
   waitForPendingWrites
 } from 'firebase/firestore';
 import { 
@@ -112,7 +112,7 @@ export default function BbCafePos() {
   // Swipe gesture tracking states
   const [touchStart, setTouchStart] = useState<number | null>(null);
   const [touchEnd, setTouchEnd] = useState<number | null>(null);
-  const minSwipeDistance = 50; // swipe threshold in pixels
+  const minSwipeDistance = 50;
 
   const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false);
   const [customerSearchQuery, setCustomerSearchQuery] = useState('');
@@ -165,13 +165,6 @@ export default function BbCafePos() {
   const [normalPizzaSize, setNormalPizzaSize] = useState("");
   const [normalPizzaPrice, setNormalPizzaPrice] = useState(0);
   const [customizerChefNote, setCustomizerChefNote] = useState(""); 
-
-  const handleFontSizeChange = (newSize: number) => {
-    if (newSize >= 6 && newSize <= 24) {
-      setFontSize(newSize);
-      localStorage.setItem("bb_pos_font_size", String(newSize));
-    }
-  };
 
   const handleClearAllLiveOrders = async () => {
     triggerBeep('tap');
@@ -232,7 +225,6 @@ export default function BbCafePos() {
     }
   };
 
-  // Service Worker Setup
   useEffect(() => {
     if (typeof window !== 'undefined') {
       let link = document.querySelector('link[rel="manifest"]') as HTMLLinkElement;
@@ -245,43 +237,26 @@ export default function BbCafePos() {
 
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js')
-            .then((reg) => console.log('Service Worker Registered successfully!', reg.scope))
-            .catch((err) => console.warn('Service Worker registration failed:', err));
+          navigator.serviceWorker.register('/sw.js').catch((err) => console.warn(err));
         });
       }
     }
   }, []);
 
-  // Safe manual printer disconnect helper
   const handleDisconnectPrinter = () => {
     triggerBeep('tap');
-    if (serialPort) {
-      serialPort.close().catch(() => {});
-      setSerialPort(null);
-    }
-    if (usbDevice) {
-      usbDevice.close().catch(() => {});
-      setUsbDevice(null);
-    }
-    if (bleCharacteristic && bleCharacteristic.service && bleCharacteristic.service.device) {
-      bleCharacteristic.service.device.gatt.disconnect();
-      setBleCharacteristic(null);
-    }
+    if (serialPort) { serialPort.close().catch(() => {}); setSerialPort(null); }
+    if (usbDevice) { usbDevice.close().catch(() => {}); setUsbDevice(null); }
+    if (bleCharacteristic?.service?.device) { bleCharacteristic.service.device.gatt.disconnect(); setBleCharacteristic(null); }
     setPrinterConnected(false);
     localStorage.removeItem("bb_pos_printer_connected");
     toast.success("Printer disconnected explicitly!");
   };
 
-  // Recovery configuration & LocalStorage Backup load
   useEffect(() => {
     const savedUser = localStorage.getItem("bb_pos_user");
     if (savedUser) {
-      try {
-        const parsed = JSON.parse(savedUser);
-        setIsLoggedIn(true);
-        setCurrentUser(parsed);
-      } catch (e) {}
+      try { setIsLoggedIn(true); setCurrentUser(JSON.parse(savedUser)); } catch (e) {}
     }
     setGstEnabled(localStorage.getItem("bb_pos_gst_enabled") === 'true');
     setGstRate(Number(localStorage.getItem("bb_pos_gst_rate")) || 5);
@@ -303,11 +278,8 @@ export default function BbCafePos() {
     if (localTheme === 'light') document.documentElement.classList.remove('dark');
     else document.documentElement.classList.add('dark');
 
-    // Restore saved inputs and Active Cart state on startup
     const savedCart = localStorage.getItem("bb_pos_saved_cart");
-    if (savedCart) {
-      try { setCart(JSON.parse(savedCart)); } catch (err) {}
-    }
+    if (savedCart) { try { setCart(JSON.parse(savedCart)); } catch (err) {} }
     setCustomerPhone(localStorage.getItem("bb_pos_saved_cust_phone") || '');
     setCustomerName(localStorage.getItem("bb_pos_saved_cust_name") || '');
     setCustomerPoints(Number(localStorage.getItem("bb_pos_saved_cust_points")) || 0);
@@ -317,7 +289,6 @@ export default function BbCafePos() {
     setChefInstructions(localStorage.getItem("bb_pos_saved_chef_instructions") || '');
   }, []);
 
-  // Keep cart & customer states saved to LocalStorage across refreshes
   useEffect(() => {
     localStorage.setItem("bb_pos_saved_cart", JSON.stringify(cart));
   }, [cart]);
@@ -332,96 +303,16 @@ export default function BbCafePos() {
     localStorage.setItem("bb_pos_saved_chef_instructions", chefInstructions);
   }, [customerPhone, customerName, customerPoints, address, fulfillmentType, tableNumber, chefInstructions]);
 
-  // Robust Persistent Auto-reconnect Printer on reload/refresh [UPDATED]
-  useEffect(() => {
-    const autoReconnectPrinters = async () => {
-      const isSavedConnected = localStorage.getItem("bb_pos_printer_connected") === 'true';
-      if (!isSavedConnected) return;
-
-      const savedType = localStorage.getItem("bb_pos_printer_type") || 'thermal_usb';
-      if (typeof window === 'undefined') return;
-
-      try {
-        // 1. Web Serial Auto-connect (USB)
-        if (savedType === 'thermal_usb' && 'serial' in navigator && !serialPort) {
-          const ports = await (navigator as any).serial.getPorts();
-          if (ports.length > 0) {
-            const port = ports[0];
-            await port.open({ baudRate: 9600 });
-            setSerialPort(port);
-            setPrinterConnected(true);
-            toast.success("USB Printer Reconnected!");
-            return;
-          }
-        } 
-        
-        // 2. WebUSB Fallback Auto-connect (USB)
-        if (savedType === 'thermal_usb' && 'usb' in navigator && !serialPort && !usbDevice) {
-          const devices = await (navigator as any).usb.getDevices();
-          if (devices.length > 0) {
-            const device = devices[0];
-            await device.open();
-            await device.selectConfiguration(1);
-            await device.claimInterface(0);
-            setUsbDevice(device);
-            setPrinterConnected(true);
-            toast.success("USB Printer Reconnected via WebUSB!");
-            return;
-          }
-        }
-
-        // 3. Bluetooth Auto-connect using persistent paired devices
-        if (savedType === 'thermal_bluetooth' && 'bluetooth' in navigator && !bleCharacteristic) {
-          const devices = await (navigator as any).bluetooth.getDevices();
-          if (devices.length > 0) {
-            const device = devices[0];
-            const server = await device.gatt.connect();
-            let service;
-            let characteristic;
-
-            try {
-              service = await server.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb');
-              characteristic = await service.getCharacteristic('00002af1-0000-1000-8000-00805f9b34fb');
-            } catch (bleErr) {
-              service = await server.getPrimaryService('0000ff00-0000-1000-8000-00805f9b34fb');
-              characteristic = await service.getCharacteristic('0000ff02-0000-1000-8000-00805f9b34fb');
-            }
-
-            setBleCharacteristic(characteristic);
-            setPrinterConnected(true);
-            toast.success("Bluetooth Printer Reconnected!");
-            return;
-          }
-        }
-
-        // 4. IP/Network and Laser printer reconnection simulation
-        if (savedType === 'network_ip' || savedType === 'laser') {
-          setPrinterConnected(true);
-        }
-      } catch (e) {
-        console.warn("Printer auto-reconnect failed on startup:", e);
-      }
-    };
-
-    if (isLoggedIn) {
-      autoReconnectPrinters();
-    }
-  }, [isLoggedIn]);
-
-  // Sync Live Orders and Align local offline bill sequence
   useEffect(() => {
     const q = query(collection(db, "orders"), orderBy("timestamp", "desc"), limit(40));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const list = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
       setLiveOrders(list);
 
-      // Extract highest sequence number online and lock it in offline counter local sequence
       let maxBill = Number(localStorage.getItem("bb_pos_local_bill_counter")) || 5000;
       list.forEach((ord: any) => {
         const bNum = Number(ord.billNumber);
-        if (!isNaN(bNum) && bNum > maxBill) {
-          maxBill = bNum;
-        }
+        if (!isNaN(bNum) && bNum > maxBill) maxBill = bNum;
       });
       localStorage.setItem("bb_pos_local_bill_counter", String(maxBill));
     });
@@ -453,63 +344,41 @@ export default function BbCafePos() {
     })();
   }, [isLoggedIn]);
 
-  // Past Receipts with pagination limit of 20 and manual "Load More"
   useEffect(() => {
     if (activeTab !== 'receipts') return;
-
     const fetchPastReceipts = async () => {
       setIsSearchingReceipts(true);
       try {
-        let q;
-        if (receiptSearchQuery.trim()) {
-          q = query(collection(db, "orders"), orderBy("timestamp", "desc"), limit(100)); // allow deeper search query
-        } else {
-          q = query(collection(db, "orders"), orderBy("timestamp", "desc"), limit(receiptsLimit));
-        }
+        const q = receiptSearchQuery.trim() ? query(collection(db, "orders"), orderBy("timestamp", "desc"), limit(100)) : query(collection(db, "orders"), orderBy("timestamp", "desc"), limit(receiptsLimit));
         const snap = await getDocs(q);
         setPastReceipts(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       } catch (err) {
-        console.error("Error loading receipts:", err);
+        console.error(err);
       } finally {
         setIsSearchingReceipts(false);
       }
     };
-
-    const delayDebounce = setTimeout(() => {
-      fetchPastReceipts();
-    }, 300);
-
+    const delayDebounce = setTimeout(fetchPastReceipts, 300);
     return () => clearTimeout(delayDebounce);
   }, [activeTab, receiptSearchQuery, receiptsLimit]);
 
-  // Sidebar Manual Sync Handler
   const handleManualSync = async () => {
     triggerBeep('tap');
-    if (!navigator.onLine) {
-      toast.error("You are offline! Connect to the internet first.");
-      return;
-    }
+    if (!navigator.onLine) { toast.error("You are offline!"); return; }
     setIsSyncing(true);
-    const toastId = toast.loading("Force syncing data with server database...");
+    const toastId = toast.loading("Syncing data...");
     try {
-      // Force sync pending writes queue in Firebase
       await waitForPendingWrites(db);
-
-      // Re-download fresh items & loyalty rules to ensure sync
       const prodSnap = await getDocs(collection(db, "products"));
       const items = prodSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
       setProducts(items);
       const uniqueCats = Array.from(new Set(items.map((i: any) => i.category).filter(Boolean))) as string[];
       setCategories(['All', ...uniqueCats]);
-      
-      const rulesSnap = await getDocs(collection(db, "loyalty_rules"));
-      setLoyaltyRules(rulesSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
-      
       toast.dismiss(toastId);
-      toast.success("System fully Synced!");
+      toast.success("Synced successfully!");
     } catch (err) {
       toast.dismiss(toastId);
-      toast.error("Sync incomplete or connection timeout");
+      toast.error("Sync failed");
     } finally {
       setIsSyncing(false);
     }
@@ -533,7 +402,7 @@ export default function BbCafePos() {
       setPinInput('');
     } catch (err) {
       toast.dismiss(toastId);
-      toast.error("Connection timeout");
+      toast.error("Connection error");
       setPinInput('');
     }
   };
@@ -558,22 +427,18 @@ export default function BbCafePos() {
 
   const handleRefundOrder = async (orderId: string) => {
     triggerBeep('tap');
-    const confirmRefund = window.confirm("Are you sure you want to refund/cancel this bill?");
-    if (!confirmRefund) return;
-
+    if (!window.confirm("Are you sure you want to refund this bill?")) return;
     const toastId = toast.loading("Processing Refund...");
     try {
       await updateDoc(doc(db, "orders", orderId), { status: 'refunded' });
-      
       setSelectedReceipt((prev: any) => prev ? { ...prev, status: 'refunded' } : null);
       setPastReceipts(prev => prev.map(o => o.id === orderId ? { ...o, status: 'refunded' } : o));
-      
       toast.dismiss(toastId);
-      toast.success("Bill Refunded/Cancelled Successfully!");
+      toast.success("Refunded Successfully!");
       setIsReceiptModalOpen(false);
     } catch (err) {
       toast.dismiss(toastId);
-      toast.error("Failed to refund order");
+      toast.error("Refund failed");
     }
   };
 
@@ -605,16 +470,7 @@ export default function BbCafePos() {
     const cleanText = text.trim();
     setIsSearchingCustomer(true);
     try {
-      let q;
-      if (cleanText) {
-        if (/^\d+$/.test(cleanText)) {
-          q = query(collection(db, "customer_points"), where("phone", "==", cleanText));
-        } else {
-          q = query(collection(db, "customer_points"), where("name", ">=", cleanText.charAt(0).toUpperCase() + cleanText.slice(1)), limit(15));
-        }
-      } else {
-        q = query(collection(db, "customer_points"), orderBy("lastActive", "desc"), limit(12));
-      }
+      let q = cleanText ? (/^\d+$/.test(cleanText) ? query(collection(db, "customer_points"), where("phone", "==", cleanText)) : query(collection(db, "customer_points"), where("name", ">=", cleanText), limit(15))) : query(collection(db, "customer_points"), orderBy("lastActive", "desc"), limit(12));
       const snap = await getDocs(q);
       setSearchedCustomers(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
     } catch (e) {
@@ -660,7 +516,7 @@ export default function BbCafePos() {
       setEditingCustomer(null); searchDbCustomers(customerSearchQuery);
       toast.success("Profile saved!");
     } catch (err) {
-      toast.error("Failed to edit profile");
+      toast.error("Failed to edit");
     }
   };
 
@@ -679,7 +535,7 @@ export default function BbCafePos() {
       setIsCustomerModalOpen(false);
       toast.success("Registered!");
     } catch (err) {
-      toast.error("Failed to write profile");
+      toast.error("Failed");
     }
   };
 
@@ -694,7 +550,7 @@ export default function BbCafePos() {
       }
       return [...prev, { id: item.id, name: item.name, price: Number(item.price) || 0, quantity: 1 }];
     });
-    toast.success(`${item.name} added!`, { duration: 800 });
+    toast.success(`${item.name} added!`, { duration: 600 });
   };
 
   const handleAddCustomizedItemToCart = () => {
@@ -733,41 +589,21 @@ export default function BbCafePos() {
     setCart((prev) => prev.map((item) => item.id === itemId ? { ...item, note: noteValue } : item));
   };
 
-  // Swipe Navigation Logic [NEW]
-  const handleTouchStart = (e: React.TouchEvent) => {
-    setTouchEnd(null);
-    setTouchStart(e.targetTouches[0].clientX);
-  };
-
-  const handleTouchMove = (e: React.TouchEvent) => {
-    setTouchEnd(e.targetTouches[0].clientX);
-  };
-
+  const handleTouchStart = (e: React.TouchEvent) => { setTouchEnd(null); setTouchStart(e.targetTouches[0].clientX); };
+  const handleTouchMove = (e: React.TouchEvent) => { setTouchEnd(e.targetTouches[0].clientX); };
   const handleTouchEnd = () => {
     if (!touchStart || !touchEnd) return;
     const distance = touchStart - touchEnd;
-    const isLeftSwipe = distance > minSwipeDistance;
-    const isRightSwipe = distance < -minSwipeDistance;
-
-    if (isLeftSwipe || isRightSwipe) {
+    if (Math.abs(distance) > minSwipeDistance) {
       const currentIndex = categories.indexOf(selectedCategory);
       if (currentIndex !== -1) {
-        if (isLeftSwipe) {
-          // Swipe Left -> switch to Next Category
-          const nextIndex = (currentIndex + 1) % categories.length;
-          setSelectedCategory(categories[nextIndex]);
-          triggerBeep('tap');
-        } else if (isRightSwipe) {
-          // Swipe Right -> switch to Previous Category
-          const prevIndex = (currentIndex - 1 + categories.length) % categories.length;
-          setSelectedCategory(categories[prevIndex]);
-          triggerBeep('tap');
-        }
+        if (distance > 0) setSelectedCategory(categories[(currentIndex + 1) % categories.length]);
+        else setSelectedCategory(categories[(currentIndex - 1 + categories.length) % categories.length]);
+        triggerBeep('tap');
       }
     }
   };
 
-  // Billing Math
   const getCartSubtotal = () => cart.reduce((acc, i) => acc + (i.price * i.quantity), 0);
   const getDeliveryCharge = () => (fulfillmentType === "pickup" || fulfillmentType === "table" || getCartSubtotal() === 0) ? 0 : (getCartSubtotal() >= selectedArea.minFree ? 0 : selectedArea.fee);
   const getLoyaltyDiscount = () => Math.min(pointsToRedeem, getCartSubtotal());
@@ -776,154 +612,71 @@ export default function BbCafePos() {
   const getFreeDeliveryProgressPercent = () => Math.min(100, (getCartSubtotal() / selectedArea.minFree) * 100);
   const getTotalPointsRedeemedInCart = () => cart.reduce((acc, i) => acc + (i.pointsCost || 0), 0);
 
-  const getPrintConfig = (): PrintConfig => {
-    const configObj: any = {
-      printerPaperSize,
-      printerType,
-      bleCharacteristic,
-      serialPort,
-      usbDevice,
-      fontSize 
-    };
-    return configObj as PrintConfig;
-  };
+  const getPrintConfig = (): PrintConfig => ({ printerPaperSize, printerType, bleCharacteristic, serialPort, usbDevice, fontSize } as PrintConfig);
 
   const handleConnectPrinter = async () => {
     triggerBeep('tap');
     setIsConnecting(true);
-    const toastId = toast.loading(`Connecting to ${printerType.toUpperCase().replace('_', ' ')}...`);
-
-    if (printerType === 'thermal_bluetooth') {
-      if (!(navigator as any).bluetooth) { 
-        toast.dismiss(toastId);
-        setIsConnecting(false);
-        toast.error("Web Bluetooth is not supported on this browser/device.");
-        return;
-      }
-      try {
-        const device = await (navigator as any).bluetooth.requestDevice({ 
-          acceptAllDevices: true,
-          optionalServices: ['000018f0-0000-1000-8000-00805f9b34fb'] 
-        });
-
+    const toastId = toast.loading(`Connecting to ${printerType.toUpperCase()}...`);
+    try {
+      if (printerType === 'thermal_bluetooth' && 'bluetooth' in navigator) {
+        const device = await (navigator as any).bluetooth.requestDevice({ acceptAllDevices: true, optionalServices: ['000018f0-0000-1000-8000-00805f9b34fb'] });
         const server = await device.gatt!.connect();
-        let service;
-        let characteristic;
-
-        try {
-          service = await server.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb');
-          characteristic = await service.getCharacteristic('00002af1-0000-1000-8000-00805f9b34fb');
-        } catch (bleErr) {
-          service = await server.getPrimaryService('0000ff00-0000-1000-8000-00805f9b34fb');
-          characteristic = await service.getCharacteristic('0000ff02-0000-1000-8000-00805f9b34fb');
-        }
-
+        let service = await server.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb').catch(() => server.getPrimaryService('0000ff00-0000-1000-8000-00805f9b34fb'));
+        let characteristic = await service.getCharacteristic('00002af1-0000-1000-8000-00805f9b34fb').catch(() => service.getCharacteristic('0000ff02-0000-1000-8000-00805f9b34fb'));
         setBleCharacteristic(characteristic);
         setPrinterConnected(true);
         localStorage.setItem("bb_pos_printer_connected", "true");
         toast.dismiss(toastId);
         toast.success("Bluetooth Printer Connected!");
-      } catch (err: any) {
-        console.error(err);
-        toast.dismiss(toastId);
-        toast.error(err.message || "Failed to pair with Bluetooth printer.");
-      } finally {
-        setIsConnecting(false);
-      }
-    } else if (printerType === 'thermal_usb') {
-      if (!(navigator as any).serial && !(navigator as any).usb) {
-        toast.dismiss(toastId);
-        setIsConnecting(false);
-        toast.error("Direct USB printing is not supported on this browser.");
-        return;
-      }
-      try {
-        if ((navigator as any).serial) {
-          const port = await (navigator as any).serial.requestPort();
-          await port.open({ baudRate: 9600 });
-          setSerialPort(port);
-          setPrinterConnected(true);
-          localStorage.setItem("bb_pos_printer_connected", "true");
-          toast.dismiss(toastId);
-          toast.success("Direct USB Printer Connected via Web Serial!");
-        } else {
-          const device = await (navigator as any).usb.requestDevice({ filters: [] });
-          await device.open();
-          await device.selectConfiguration(1);
-          await device.claimInterface(0);
-          setUsbDevice(device);
-          setPrinterConnected(true);
-          localStorage.setItem("bb_pos_printer_connected", "true");
-          toast.dismiss(toastId);
-          toast.success("Direct USB Printer Connected via WebUSB!");
-        }
-      } catch (err) {
-        console.error(err);
-        toast.dismiss(toastId);
-        toast.error("Direct USB connection failed.");
-      } finally {
-        setIsConnecting(false);
-      }
-    } else {
-      setTimeout(() => {
-        toast.dismiss(toastId);
-        setIsConnecting(false);
+      } else if (printerType === 'thermal_usb' && 'serial' in navigator) {
+        const port = await (navigator as any).serial.requestPort();
+        await port.open({ baudRate: 9600 });
+        setSerialPort(port);
         setPrinterConnected(true);
         localStorage.setItem("bb_pos_printer_connected", "true");
-        toast.success(`${printerType.replace('_', ' ').toUpperCase()} Connected Successfully!`);
-      }, 1200);
+        toast.dismiss(toastId);
+        toast.success("USB Printer Connected!");
+      } else {
+        setTimeout(() => {
+          toast.dismiss(toastId);
+          setPrinterConnected(true);
+          localStorage.setItem("bb_pos_printer_connected", "true");
+          toast.success("Connected!");
+        }, 1000);
+      }
+    } catch (err: any) {
+      toast.dismiss(toastId);
+      toast.error(err.message || "Connection failed.");
+    } finally {
+      setIsConnecting(false);
     }
   };
 
   const handleTestPrint = () => {
-    const mockOrder = {
-      billNumber: '0000',
-      tokenNumber: '9999',
-      fulfillmentType: 'test',
-      paymentMethod: 'system',
-      items: [
-        { name: 'Connection Active!', quantity: 1, price: 100 },
-        { name: 'ESC/POS Print Test', quantity: 1, price: 50 }
-      ],
-      subtotal: 150,
-      discount: 0,
-      total: 150,
-      timestamp: new Date()
-    };
-    handlePrintReceipt(mockOrder, getPrintConfig());
+    handlePrintReceipt({ billNumber: '0000', tokenNumber: '9999', fulfillmentType: 'test', paymentMethod: 'system', items: [{ name: 'Print Test', quantity: 1, price: 100 }], subtotal: 100, discount: 0, total: 100, timestamp: new Date() }, getPrintConfig());
   };
 
   const handleDetectLocation = () => {
     triggerBeep('tap');
-    if (typeof window === "undefined" || !navigator.geolocation) {
-      toast.error("Geolocation is not supported by your device.");
-      return;
-    }
+    if (!navigator.geolocation) return toast.error("Geolocation not supported");
     const toastId = toast.loading("Detecting location...");
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const { latitude, longitude } = position.coords;
-        setAddress(`GPS Location: https://www.google.com/maps?q=${latitude.toFixed(6)},${longitude.toFixed(6)}`);
-        toast.dismiss(toastId);
-        toast.success("Location detected!");
-      },
-      () => {
-        toast.dismiss(toastId);
-        toast.error("Unable to retrieve location.");
-      },
-      { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
-    );
+    navigator.geolocation.getCurrentPosition((pos) => {
+      setAddress(`GPS: https://www.google.com/maps?q=${pos.coords.latitude.toFixed(6)},${pos.coords.longitude.toFixed(6)}`);
+      toast.dismiss(toastId);
+      toast.success("Location detected!");
+    }, () => {
+      toast.dismiss(toastId);
+      toast.error("Unable to retrieve location");
+    });
   };
 
-  // Safe offline bill sequence generation
   const getNextLocalBillNumber = () => {
-    const currentLocal = Number(localStorage.getItem("bb_pos_local_bill_counter")) || 5000;
-    const nextLocal = currentLocal + 1;
-    localStorage.setItem("bb_pos_local_bill_counter", String(nextLocal));
-    return nextLocal;
+    const current = Number(localStorage.getItem("bb_pos_local_bill_counter")) || 5000;
+    localStorage.setItem("bb_pos_local_bill_counter", String(current + 1));
+    return current + 1;
   };
 
-  // Place Order flow
   const handlePlaceOrder = async (e: React.FormEvent) => {
     e.preventDefault();
     if (cart.length === 0 || isSubmittingOrder) return;
@@ -933,16 +686,13 @@ export default function BbCafePos() {
     const discountCombined = customDiscount + getLoyaltyDiscount();
     const finalTotal = getTotalBillPrice();
     const token = Math.floor(1000 + Math.random() * 9000);
-
     const earned = Math.floor(finalTotal / 100);
     const netPoints = customerPhone ? (earned - getTotalPointsRedeemedInCart() - pointsToRedeem) : 0;
     const pointsAfterBill = customerPhone ? Math.max(0, customerPoints + netPoints) : 0;
 
-    const isOnline = typeof navigator !== 'undefined' ? navigator.onLine : true;
     let billNumber: number;
-
     try {
-      if (isOnline) {
+      if (navigator.onLine) {
         try {
           billNumber = await runTransaction(db, async (txn) => {
             const snap = await txn.get(doc(db, "settings", "store_bill_counter"));
@@ -951,8 +701,7 @@ export default function BbCafePos() {
             return next;
           });
           localStorage.setItem("bb_pos_local_bill_counter", String(billNumber));
-        } catch (txnError) {
-          console.warn("Transaction failed online, falling back to local counter logic:", txnError);
+        } catch {
           billNumber = getNextLocalBillNumber();
         }
       } else {
@@ -960,81 +709,36 @@ export default function BbCafePos() {
       }
 
       const orderObj = { 
-        billNumber, 
-        tokenNumber: token, 
-        customerName: customerName || "Walk-in Guest", 
-        customerPhone: customerPhone ? `+91${customerPhone}` : "", 
-        customerPointsBefore: customerPhone ? customerPoints : 0,
-        customerPointsEarned: customerPhone ? earned : 0,
-        customerPointsRedeemed: customerPhone ? pointsToRedeem : 0,
-        customerPointsAfter: customerPhone ? pointsAfterBill : 0,
-        items: cart, 
-        subtotal, 
-        discount: discountCombined, 
-        gstRate: gstEnabled ? gstRate : 0, 
-        gstAmount: getGstAmountCalculated(), 
-        total: finalTotal, 
-        timestamp: new Date(), 
-        status: 'completed', 
-        fulfillmentType, 
-        deliveryArea: fulfillmentType === "delivery" ? selectedArea.name : "", 
-        tableNumber: fulfillmentType === 'table' ? tableNumber : '', 
-        paymentMethod, 
-        chefInstructions, 
-        source: 'POS',
-        address: address
+        billNumber, tokenNumber: token, customerName: customerName || "Walk-in Guest", 
+        customerPhone: customerPhone ? `+91${customerPhone}` : "", items: cart, 
+        subtotal, discount: discountCombined, gstRate: gstEnabled ? gstRate : 0, 
+        gstAmount: getGstAmountCalculated(), total: finalTotal, timestamp: new Date(), 
+        status: 'completed', fulfillmentType, deliveryArea: fulfillmentType === "delivery" ? selectedArea.name : "", 
+        tableNumber: fulfillmentType === 'table' ? tableNumber : '', paymentMethod, chefInstructions, source: 'POS', address 
       };
 
       await addDoc(collection(db, "orders"), orderObj);
 
-      if (customerPhone && customerPhone.trim().length === 10) {
-        const phone = customerPhone.trim();
-        const userRef = doc(db, "customer_points", phone);
-
-        if (isOnline) {
-          try {
-            await runTransaction(db, async (txn) => {
-              const snap = await txn.get(userRef);
-              if (!snap.exists()) {
-                txn.set(userRef, { name: customerName || "Walk-in Guest", phone, points: Math.max(0, pointsAfterBill), lastActive: new Date() });
-              } else {
-                txn.update(userRef, { points: pointsAfterBill, lastActive: new Date() });
-              }
-            });
-          } catch (e) {
-            await setDoc(userRef, { name: customerName || "Walk-in Guest", phone, points: Math.max(0, pointsAfterBill), lastActive: new Date() }, { merge: true });
-          }
-        } else {
-          await setDoc(userRef, { name: customerName || "Walk-in Guest", phone, points: Math.max(0, pointsAfterBill), lastActive: new Date() }, { merge: true });
-        }
-
-        if (earned > 0) {
-          await addDoc(collection(db, "customer_points", phone, "history"), { type: 'earn', points: earned, description: `Earned Bill #${billNumber}`, timestamp: new Date() });
-        }
-        if (pointsToRedeem > 0) {
-          await addDoc(collection(db, "customer_points", phone, "history"), { type: 'redeem', points: pointsToRedeem, description: `Redeemed cashback Bill #${billNumber}`, timestamp: new Date() });
-        }
+      if (customerPhone && customerPhone.length === 10) {
+        const userRef = doc(db, "customer_points", customerPhone.trim());
+        await setDoc(userRef, { name: customerName || "Walk-in Guest", phone: customerPhone.trim(), points: Math.max(0, pointsAfterBill), lastActive: new Date() }, { merge: true });
+        if (earned > 0) await addDoc(collection(db, "customer_points", customerPhone.trim(), "history"), { type: 'earn', points: earned, description: `Earned Bill #${billNumber}`, timestamp: new Date() });
       }
 
       triggerBeep('success'); 
-      toast.success(`Bill #${billNumber} saved successfully!`);
+      toast.success(`Bill #${billNumber} saved!`);
       
       const pConfig = getPrintConfig();
-
       if (kotEnabled) {
-        toast.success("Printing KOT first...");
         await handlePrintKot(orderObj, pConfig);
-        await new Promise((resolve) => setTimeout(resolve, 1500));
+        await new Promise((r) => setTimeout(r, 1500));
       }
-
-      toast.success("Printing Customer Receipt...");
       await handlePrintReceipt(orderObj, pConfig);
 
       setCart([]); setCustomerPhone(''); setCustomerName(''); setCustomerPoints(0); setPointsToRedeem(0); setCustomDiscount(0); setIsCartOpen(false); setChefInstructions('');
       localStorage.removeItem("bb_pos_saved_cart");
     } catch (err) {
-      console.error(err);
-      toast.error("Failed to place order offline");
+      toast.error("Failed to place order");
     } finally {
       setIsSubmittingOrder(false);
     }
@@ -1047,7 +751,7 @@ export default function BbCafePos() {
       setProducts(prev => prev.map((p) => p.id === productId ? { ...p, isAvailable: !currentStatus } : p));
       toast.success("Stock toggled!");
     } catch (err) {
-      toast.error("Failed to toggle stock");
+      toast.error("Failed");
     }
   };
 
@@ -1058,19 +762,8 @@ export default function BbCafePos() {
   };
 
   const filteredMenu = useMemo(() => products.filter((p) => (selectedCategory === 'All' || p.category === selectedCategory) && p.name.toLowerCase().includes(searchQuery.toLowerCase())), [products, selectedCategory, searchQuery]);
-  
-  const filteredPastReceipts = useMemo(() => {
-    return pastReceipts.filter((o) => 
-      String(o.billNumber).includes(receiptSearchQuery.trim()) || 
-      String(o.customerPhone || '').includes(receiptSearchQuery.trim()) || 
-      String(o.customerName || '').toLowerCase().includes(receiptSearchQuery.trim().toLowerCase())
-    );
-  }, [pastReceipts, receiptSearchQuery]);
-
-  const activeLiveOrders = useMemo(() => {
-    return liveOrders.filter((o) => o.status !== 'completed' && o.status !== 'rejected');
-  }, [liveOrders]);
-
+  const filteredPastReceipts = useMemo(() => pastReceipts.filter((o) => String(o.billNumber).includes(receiptSearchQuery.trim()) || String(o.customerPhone || '').includes(receiptSearchQuery.trim()) || String(o.customerName || '').toLowerCase().includes(receiptSearchQuery.trim().toLowerCase())), [pastReceipts, receiptSearchQuery]);
+  const activeLiveOrders = useMemo(() => liveOrders.filter((o) => o.status !== 'completed' && o.status !== 'rejected'), [liveOrders]);
   const liveOrdersBadgeCount = activeLiveOrders.length;
 
   const navItems = [
@@ -1080,44 +773,15 @@ export default function BbCafePos() {
     { id: 'settings', label: 'POS Settings', icon: SafeSettings }
   ];
 
-  const sampleOrderForPreview = useMemo(() => {
-    return {
-      billNumber: 45,
-      tokenNumber: 12,
-      timestamp: new Date(),
-      customerName: customerName || "Walk-in Guest",
-      customerPhone: customerPhone ? `+91${customerPhone}` : "",
-      address: address || "Mohandra Bus Stand, Panna, MP",
-      fulfillmentType,
-      tableNumber: tableNumber || "T-1",
-      paymentMethod,
-      items: cart.length > 0 ? cart : [
-        { name: "PANEER TIKKA", quantity: 2, price: 180, note: "EXTRA SPICY" },
-        { name: "VEG BURGER", quantity: 1, price: 90 },
-        { name: "MASALA CHAI", quantity: 3, price: 20 }
-      ],
-      subtotal: cart.length > 0 ? getCartSubtotal() : 510,
-      discount: cart.length > 0 ? (customDiscount + getLoyaltyDiscount()) : 10,
-      customerPointsRedeemed: pointsToRedeem,
-      customerPointsEarned: cart.length > 0 ? Math.floor(getTotalBillPrice() / 100) : 5,
-      customerPointsAfter: customerPhone ? Math.max(0, customerPoints + (Math.floor(getTotalBillPrice() / 100) - getTotalPointsRedeemedInCart() - pointsToRedeem)) : 25,
-      total: cart.length > 0 ? getTotalBillPrice() : 500
-    };
-  }, [cart, customerName, customerPhone, address, fulfillmentType, tableNumber, paymentMethod, customDiscount, pointsToRedeem, customerPoints]);
-
-  const mainClass = "min-h-screen flex flex-col md:flex-row font-sans antialiased overflow-hidden transition-colors duration-200 " + 
-    (themeMode === "dark" ? "dark bg-[#0a0a0a] text-neutral-100" : "bg-neutral-50 text-neutral-800");
-
-  const asideClass = "bg-white dark:bg-neutral-900 border-r border-neutral-200 dark:border-neutral-800 flex flex-col justify-between p-4 shrink-0 shadow-lg transition-all duration-300 fixed inset-y-0 left-0 md:relative md:translate-x-0 md:flex " + 
-    (isSidebarCollapsed ? "md:w-20" : "md:w-64") + " " + 
-    (isSidebarOpen ? "translate-x-0 w-64 z-50 shadow-2xl" : "-translate-x-full md:translate-x-0 z-30 md:z-30");
+  const mainClass = "min-h-screen flex flex-col md:flex-row font-sans antialiased overflow-hidden transition-colors duration-200 " + (themeMode === "dark" ? "dark bg-[#0a0a0a] text-neutral-100" : "bg-neutral-50 text-neutral-800");
+  const asideClass = "bg-white dark:bg-neutral-900 border-r border-neutral-200 dark:border-neutral-800 flex flex-col justify-between p-4 shrink-0 shadow-lg transition-all duration-300 fixed inset-y-0 left-0 md:relative md:translate-x-0 md:flex " + (isSidebarCollapsed ? "md:w-20" : "md:w-64") + " " + (isSidebarOpen ? "translate-x-0 w-64 z-50 shadow-2xl" : "-translate-x-full md:translate-x-0 z-30");
 
   return (
     <div className={mainClass}>
       <Toaster position="top-center" />
 
       {!isLoggedIn ? (
-        <div className="fixed inset-0 bg-neutral-900 text-white flex flex-col items-center justify-center p-4 z-50 animate-fade-in">
+        <div className="fixed inset-0 bg-neutral-900 text-white flex flex-col items-center justify-center p-4 z-50">
           <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-sm bg-neutral-950 border border-neutral-800 rounded-3xl p-8 shadow-2xl space-y-6 text-center">
             <div className="flex flex-col items-center gap-2">
               <div className="p-4 bg-orange-500/10 text-orange-500 rounded-full border border-orange-500/20"><SafeLock size={32} /></div>
@@ -1125,57 +789,40 @@ export default function BbCafePos() {
               <p className="text-xs text-neutral-400">Terminal Locked • Enter PIN</p>
             </div>
             <form onSubmit={handlePinLoginSubmit} className="space-y-4">
-              <input type="password" maxLength={4} value={pinInput} readOnly placeholder="••••" className="w-full bg-neutral-900 border border-neutral-800 text-center text-3xl font-mono py-4 rounded-2xl outline-none focus:border-orange-500 text-orange-400" />
+              <input type="password" maxLength={4} value={pinInput} readOnly placeholder="••••" className="w-full bg-neutral-900 border border-neutral-800 text-center text-3xl font-mono py-4 rounded-2xl outline-none text-orange-400" />
               <div className="grid grid-cols-3 gap-3 max-w-xs mx-auto">
                 {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
                   <button key={num} type="button" onClick={() => { triggerBeep('tap'); if (pinInput.length < 4) setPinInput((p) => p + String(num)); }} className="aspect-square bg-neutral-900 hover:bg-[#151515] font-black text-xl rounded-2xl border border-neutral-800 flex items-center justify-center">{num}</button>
                 ))}
-                <button type="button" onClick={() => { triggerBeep('tap'); setPinInput(''); }} className="aspect-square bg-neutral-900 hover:bg-[#151515] font-bold text-xs uppercase text-red-400 rounded-2xl border border-neutral-800 flex items-center justify-center">Clear</button>
-                <button type="button" onClick={() => { triggerBeep('tap'); if (pinInput.length < 4) setPinInput((p) => p + '0'); }} className="aspect-square bg-neutral-900 hover:bg-[#151515] font-black text-xl rounded-2xl border border-neutral-800 flex items-center justify-center">0</button>
-                <button type="submit" className="aspect-square bg-orange-600 hover:bg-orange-500 font-bold text-xs uppercase rounded-2xl flex items-center justify-center">Login</button>
+                <button type="button" onClick={() => { triggerBeep('tap'); setPinInput(''); }} className="aspect-square bg-neutral-900 font-bold text-xs uppercase text-red-400 rounded-2xl border border-neutral-800 flex items-center justify-center">Clear</button>
+                <button type="button" onClick={() => { triggerBeep('tap'); if (pinInput.length < 4) setPinInput((p) => p + '0'); }} className="aspect-square bg-neutral-900 font-black text-xl rounded-2xl border border-neutral-800 flex items-center justify-center">0</button>
+                <button type="submit" className="aspect-square bg-orange-600 font-bold text-xs uppercase rounded-2xl flex items-center justify-center">Login</button>
               </div>
             </form>
           </motion.div>
         </div>
       ) : (
         <>
-          {isSidebarOpen && (
-            <div onClick={() => setIsSidebarOpen(false)} className="fixed inset-0 bg-neutral-950/80 z-40 md:hidden transition-all duration-300" />
-          )}
+          {isSidebarOpen && <div onClick={() => setIsSidebarOpen(false)} className="fixed inset-0 bg-neutral-950/80 z-40 md:hidden" />}
 
           <aside className={asideClass}>
             <div className="space-y-6">
               <div className="flex items-center justify-between px-1 py-1 border-b border-neutral-200 dark:border-neutral-800 pb-4 gap-2">
                 <div className="flex items-center gap-2">
                   <SafeDatabase className="text-orange-500 animate-pulse" size={18} />
-                  {!isSidebarCollapsed && (
-                    <h1 className="text-xs font-black uppercase text-yellow-500">Bum Bum POS</h1>
-                  )}
+                  {!isSidebarCollapsed && <h1 className="text-xs font-black uppercase text-yellow-500">Bum Bum POS</h1>}
                 </div>
-                <button onClick={() => { triggerBeep('tap'); setIsSidebarCollapsed(!isSidebarCollapsed); }} className="hidden md:flex p-1.5 bg-neutral-200 dark:bg-neutral-800 text-gray-400 rounded-lg">
+                <button onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)} className="hidden md:flex p-1.5 bg-neutral-200 dark:bg-neutral-800 text-gray-400 rounded-lg">
                   {isSidebarCollapsed ? <SafeChevronRight size={14} /> : <SafeChevronLeft size={14} />}
                 </button>
-                <button onClick={() => { triggerBeep('tap'); setIsSidebarOpen(false); }} className="p-1.5 text-gray-400 md:hidden">
-                  <SafeX size={14} />
-                </button>
+                <button onClick={() => setIsSidebarOpen(false)} className="p-1.5 text-gray-400 md:hidden"><SafeX size={14} /></button>
               </div>
               <nav className="space-y-1.5">
                 {navItems.map((item) => {
                   const Icon = item.icon;
                   return (
-                    <button 
-                      key={item.id} 
-                      onClick={() => { 
-                        triggerBeep('tap'); 
-                        setActiveTab(item.id as any); 
-                        setIsSidebarOpen(false); 
-                      }} 
-                      className={"w-full flex items-center justify-between px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-200 " + (activeTab === item.id ? "bg-orange-600 text-white" : "text-neutral-500 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800 hover:text-neutral-900 dark:hover:text-white")}
-                    >
-                      <div className="flex items-center gap-3">
-                        <Icon size={14} />
-                        {!isSidebarCollapsed && <span>{item.label}</span>}
-                      </div>
+                    <button key={item.id} onClick={() => { triggerBeep('tap'); setActiveTab(item.id as any); setIsSidebarOpen(false); }} className={"w-full flex items-center justify-between px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all " + (activeTab === item.id ? "bg-orange-600 text-white" : "text-neutral-500 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800")}>
+                      <div className="flex items-center gap-3"><Icon size={14} />{!isSidebarCollapsed && <span>{item.label}</span>}</div>
                     </button>
                   );
                 })}
@@ -1183,15 +830,10 @@ export default function BbCafePos() {
             </div>
 
             <div className="space-y-2 pt-4 border-t border-neutral-200 dark:border-neutral-800">
-              <button 
-                onClick={handleManualSync} 
-                disabled={isSyncing}
-                className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase text-yellow-500 hover:bg-yellow-500/10 disabled:opacity-50"
-              >
+              <button onClick={handleManualSync} disabled={isSyncing} className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase text-yellow-500 hover:bg-yellow-500/10 disabled:opacity-50">
                 {isSyncing ? <Loader2 className="animate-spin" size={14} /> : <SafeRefreshCw size={14} />}
                 {!isSidebarCollapsed && <span>Sync Now</span>}
               </button>
-              
               <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase text-red-500 hover:bg-red-500/10">
                 <SafeLogOut size={14} />{!isSidebarCollapsed && <span>Lock POS</span>}
               </button>
@@ -1200,26 +842,14 @@ export default function BbCafePos() {
 
           <main className="flex-1 p-3 md:p-5 overflow-y-auto flex flex-col h-screen">
             <div className="flex items-center gap-3 mb-4 border-b border-neutral-200 dark:border-neutral-800 pb-3">
-              <button onClick={() => { triggerBeep('tap'); setIsSidebarOpen(true); }} className="p-2.5 bg-neutral-200 dark:bg-neutral-850 text-orange-500 rounded-xl md:hidden">
-                <SafeMenu size={16} />
-              </button>
+              <button onClick={() => setIsSidebarOpen(true)} className="p-2.5 bg-neutral-200 dark:bg-neutral-800 text-orange-500 rounded-xl md:hidden"><SafeMenu size={16} /></button>
               <div className="flex flex-col">
                 <h2 className="text-[10px] font-black uppercase text-orange-500">{activeTab} Workspace</h2>
                 <span className="text-[9px] text-neutral-500 dark:text-neutral-400 font-bold">Bum Bum Cafe • Mohandra</span>
               </div>
-              
-              <button 
-                onClick={() => { triggerBeep('tap'); setActiveTab('orders'); }} 
-                className={"ml-auto p-2 rounded-xl flex items-center gap-2 text-[10px] font-black uppercase transition-all relative shadow-sm hover:scale-[1.02] active:scale-95 " + 
-                  (activeTab === 'orders' ? "bg-orange-600 text-white" : "bg-neutral-200 dark:bg-neutral-800 text-orange-500")}
-              >
-                <SafeClock size={14} />
-                <span>Live Orders</span>
-                {liveOrdersBadgeCount > 0 && (
-                  <span className="bg-yellow-400 text-black font-black text-[9px] px-2 py-0.5 rounded-full font-mono animate-pulse">
-                    {liveOrdersBadgeCount}
-                  </span>
-                )}
+              <button onClick={() => setActiveTab('orders')} className={"ml-auto p-2 rounded-xl flex items-center gap-2 text-[10px] font-black uppercase transition-all relative " + (activeTab === 'orders' ? "bg-orange-600 text-white" : "bg-neutral-200 dark:bg-neutral-800 text-orange-500")}>
+                <SafeClock size={14} /><span>Live Orders</span>
+                {liveOrdersBadgeCount > 0 && <span className="bg-yellow-400 text-black font-black text-[9px] px-2 py-0.5 rounded-full font-mono animate-pulse">{liveOrdersBadgeCount}</span>}
               </button>
             </div>
 
@@ -1227,163 +857,98 @@ export default function BbCafePos() {
             {activeTab === 'orders' && (
               <div className="flex flex-col flex-1 overflow-hidden font-sans">
                 <div className="flex justify-between items-center mb-3">
-                  <span className="text-[10px] font-black uppercase text-neutral-500">
-                    Active Live Orders ({activeLiveOrders.length})
-                  </span>
-                  {activeLiveOrders.length > 0 && (
-                    <button 
-                      onClick={handleClearAllLiveOrders} 
-                      className="text-[9px] font-black uppercase px-3 py-1.5 bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white border border-red-500/20 rounded-xl transition-all shadow-sm active:scale-95"
-                    >
-                      Clean Workspace 🧹
-                    </button>
-                  )}
+                  <span className="text-[10px] font-black uppercase text-neutral-500">Active Live Orders ({activeLiveOrders.length})</span>
+                  {activeLiveOrders.length > 0 && <button onClick={handleClearAllLiveOrders} className="text-[9px] font-black uppercase px-3 py-1.5 bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white border border-red-500/20 rounded-xl">Clean Workspace 🧹</button>}
                 </div>
-
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pb-20 overflow-y-auto flex-grow">
                   {activeLiveOrders.length === 0 ? (
                     <div className="col-span-full flex flex-col items-center justify-center py-24 text-center">
-                      <SafeClock size={48} className="text-neutral-400 dark:text-neutral-600 mb-4 animate-pulse" />
-                      <p className="text-base font-black text-neutral-500 dark:text-neutral-400">Order Workspace Empty</p>
-                      <span className="text-xs text-neutral-400 dark:text-neutral-500 mt-1">All orders are completed and dispatched!</span>
+                      <SafeClock size={48} className="text-neutral-400 mb-4 animate-pulse" />
+                      <p className="text-base font-black text-neutral-500">Order Workspace Empty</p>
                     </div>
                   ) : (
-                    activeLiveOrders.map((order) => {
-                      const isOnline = order.source && order.source !== 'POS';
-                      const orderCardClass = "border rounded-2xl p-4 flex flex-col justify-between shadow-lg h-fit transition-colors duration-200 " + 
-                        (isOnline ? "bg-blue-50/50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-900/50" : "bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800");
-                      return (
-                        <div key={order.id} className={orderCardClass}>
-                          <div>
-                            <div className="flex justify-between items-start border-b border-neutral-200 dark:border-neutral-800 pb-2 mb-3">
-                              <div>
-                                <p className="text-xs font-black text-yellow-600 dark:text-yellow-300 font-mono">Bill #${String(order.billNumber).padStart(4, '0')}</p>
-                                {isOnline && (
-                                  <span className="text-[8px] font-black text-blue-500 uppercase tracking-widest block mt-1 animate-pulse">🌐 ONLINE ORDER ({order.source})</span>
-                                )}
-                              </div>
-                              <span className="bg-orange-500/10 text-orange-400 text-[8px] font-black uppercase px-2 py-0.5 rounded">{order.fulfillmentType}</span>
+                    activeLiveOrders.map((order) => (
+                      <div key={order.id} className="border bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800 rounded-2xl p-4 flex flex-col justify-between shadow-lg">
+                        <div>
+                          <div className="flex justify-between items-start border-b border-neutral-200 dark:border-neutral-800 pb-2 mb-3">
+                            <div>
+                              <p className="text-xs font-black text-yellow-500 font-mono">Bill #${String(order.billNumber).padStart(4, '0')}</p>
                             </div>
-                            <p className="text-[10px] font-black text-neutral-800 dark:text-neutral-200">👤 {order.customerName}</p>
-                            <div className="space-y-1.5 pt-2 mb-4 border-t border-dashed border-neutral-200 dark:border-neutral-800">
-                              {order.items?.map((it: any, idx: number) => (
-                                <div key={idx} className="flex justify-between text-[11px] font-semibold text-neutral-700 dark:text-neutral-300">
-                                  <span>{it.name} <span className="text-orange-500 font-bold">x{it.quantity}</span></span>
-                                </div>
-                              ))}
-                            </div>
+                            <span className="bg-orange-500/10 text-orange-400 text-[8px] font-black uppercase px-2 py-0.5 rounded">{order.fulfillmentType}</span>
                           </div>
-                          <div>
-                            <div className="flex justify-between text-xs font-black text-green-500 dark:text-green-400 mb-3 border-t border-neutral-200 dark:border-neutral-800 pt-2">
-                              <span>Total:</span><span className="font-mono">₹{order.total}</span>
-                            </div>
-                            <div className="flex gap-2">
-                              {order.status === 'pending' && (
-                                <div className="flex gap-2 w-full">
-                                  <button onClick={() => handleUpdateStatus(order.id, 'preparing')} className="flex-1 bg-green-600 hover:bg-green-700 text-white font-black py-2 rounded-xl text-[10px] uppercase shadow-md active:scale-95 transition-all">Accept</button>
-                                  <button onClick={() => handleUpdateStatus(order.id, 'rejected')} className="flex-1 bg-red-600 hover:bg-red-700 text-white font-black py-2 rounded-xl text-[10px] uppercase shadow-md active:scale-95 transition-all">Reject</button>
-                                </div>
-                              )}
-                              {order.status === 'preparing' && (
-                                <button onClick={() => handleUpdateStatus(order.id, order.fulfillmentType === 'delivery' ? 'out_for_delivery' : 'completed')} className="flex-1 bg-blue-600 text-white font-black py-2 rounded-xl text-[10px] uppercase">Dispatch</button>
-                              )}
-                              {order.status === 'out_for_delivery' && (
-                                <button onClick={() => handleUpdateStatus(order.id, 'completed')} className="flex-1 bg-green-600 text-white font-black py-2 rounded-xl text-[10px] uppercase">Delivered</button>
-                              )}
-                              <button onClick={() => handlePrintReceipt(order, getPrintConfig())} className="p-2 bg-neutral-200 dark:bg-neutral-800 text-neutral-500 dark:text-neutral-400 hover:text-orange-500 dark:hover:text-orange-400 rounded-xl transition-all">
-                                <SafePrinter size={14} />
-                              </button>
-                            </div>
+                          <p className="text-[10px] font-black">👤 {order.customerName}</p>
+                          <div className="space-y-1.5 pt-2 mb-4 border-t border-dashed border-neutral-200 dark:border-neutral-800">
+                            {order.items?.map((it: any, idx: number) => (
+                              <div key={idx} className="flex justify-between text-[11px] font-semibold">
+                                <span>{it.name} <span className="text-orange-500">x{it.quantity}</span></span>
+                              </div>
+                            ))}
                           </div>
                         </div>
-                      );
-                    })
+                        <div>
+                          <div className="flex justify-between text-xs font-black text-green-500 mb-3 border-t border-neutral-200 dark:border-neutral-800 pt-2">
+                            <span>Total:</span><span className="font-mono">₹{order.total}</span>
+                          </div>
+                          <div className="flex gap-2">
+                            {order.status === 'pending' && (
+                              <div className="flex gap-2 w-full">
+                                <button onClick={() => handleUpdateStatus(order.id, 'preparing')} className="flex-1 bg-green-600 text-white font-black py-2 rounded-xl text-[10px] uppercase">Accept</button>
+                                <button onClick={() => handleUpdateStatus(order.id, 'rejected')} className="flex-1 bg-red-600 text-white font-black py-2 rounded-xl text-[10px] uppercase">Reject</button>
+                              </div>
+                            )}
+                            {order.status === 'preparing' && <button onClick={() => handleUpdateStatus(order.id, order.fulfillmentType === 'delivery' ? 'out_for_delivery' : 'completed')} className="flex-1 bg-blue-600 text-white font-black py-2 rounded-xl text-[10px] uppercase">Dispatch</button>}
+                            {order.status === 'out_for_delivery' && <button onClick={() => handleUpdateStatus(order.id, 'completed')} className="flex-1 bg-green-600 text-white font-black py-2 rounded-xl text-[10px] uppercase">Delivered</button>}
+                            <button onClick={() => handlePrintReceipt(order, getPrintConfig())} className="p-2 bg-neutral-200 dark:bg-neutral-800 text-neutral-400 hover:text-orange-500 rounded-xl"><SafePrinter size={14} /></button>
+                          </div>
+                        </div>
+                      </div>
+                    ))
                   )}
                 </div>
               </div>
             )}
 
-            {/* BILLING WORKSPACE WITH SWIPE & DARK MODE FIX [UPDATED] */}
+            {/* BILLING WORKSPACE - DESKTOP SPLIT VIEW (LEFT MENU, RIGHT CART) */}
             {activeTab === 'billing' && (
-              <div className="flex-1 flex flex-col overflow-hidden relative">
+              <div className="flex-1 flex flex-col md:flex-row gap-4 overflow-hidden relative h-full">
+                
+                {/* LEFT SIDE: Menu Items & Categories */}
                 <div className="flex-1 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-3xl p-4 flex flex-col overflow-hidden shadow-xl">
                   <div className="flex gap-3 mb-4 items-center">
                     <div className="relative flex-1">
                       <SafeSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={14} />
-                      <input type="text" placeholder="Search menu..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="w-full bg-neutral-100 dark:bg-neutral-800 rounded-xl py-2 px-9 text-xs outline-none text-neutral-800 dark:text-neutral-100 border border-transparent dark:border-neutral-700 focus:border-orange-500 transition-all" />
+                      <input type="text" placeholder="Search menu..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="w-full bg-neutral-100 dark:bg-neutral-800 rounded-xl py-2 px-9 text-xs outline-none text-neutral-800 dark:text-neutral-100 border border-transparent dark:border-neutral-700 focus:border-orange-500" />
                     </div>
-                    <button onClick={() => { triggerBeep('tap'); setIsCartOpen(true); }} className="bg-orange-500 text-black font-black text-xs py-2 px-4 rounded-xl flex items-center gap-2 shadow-lg active:scale-95 transition-all">
-                      <SafeShoppingBag size={14} /><span>Cart ({cart.reduce((sum, item) => sum + item.quantity, 0)})</span>
-                    </button>
                   </div>
+
                   <div className="flex gap-1.5 overflow-x-auto pb-3 scrollbar-none">
                     {categories.map((cat) => {
                       const isSelected = selectedCategory === cat;
-                      const btnClass = "px-3 py-1.5 rounded-lg text-[9px] font-black uppercase border shrink-0 transition-all " + 
-                        (isSelected ? "bg-orange-500 text-black border-orange-500" : "bg-neutral-100 dark:bg-neutral-800 text-neutral-400 border-neutral-200 dark:border-neutral-700 hover:text-orange-500 dark:hover:text-orange-400");
                       return (
-                        <button 
-                          key={cat} 
-                          onClick={() => { triggerBeep('tap'); setSelectedCategory(cat); }} 
-                          className={btnClass}
-                        >
+                        <button key={cat} onClick={() => { triggerBeep('tap'); setSelectedCategory(cat); }} className={"px-3 py-1.5 rounded-lg text-[9px] font-black uppercase border shrink-0 transition-all " + (isSelected ? "bg-orange-500 text-black border-orange-500" : "bg-neutral-100 dark:bg-neutral-800 text-neutral-400 border-neutral-200 dark:border-neutral-700 hover:text-orange-500")}>
                           {cat}
                         </button>
                       );
                     })}
                   </div>
+
                   {loading ? (
-                    <div className="flex items-center justify-center flex-1">
-                      <Loader2 className="animate-spin text-orange-500" size={24} />
-                    </div>
+                    <div className="flex items-center justify-center flex-1"><Loader2 className="animate-spin text-orange-500" size={24} /></div>
                   ) : (
-                    /* Grid container with Touch Events for category swipe gestures [UPDATED] */
-                    <div 
-                      onTouchStart={handleTouchStart}
-                      onTouchMove={handleTouchMove}
-                      onTouchEnd={handleTouchEnd}
-                      className="grid grid-cols-3 gap-2.5 overflow-y-auto flex-1 pr-1 pb-16 content-start select-none touch-pan-y"
-                    >
+                    <div onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd} className="grid grid-cols-2 md:grid-cols-3 gap-2.5 overflow-y-auto flex-1 pr-1 pb-4 content-start select-none touch-pan-y">
                       <AnimatePresence mode="popLayout">
                         {filteredMenu.map((item) => {
                           const isAvail = item.isAvailable !== false;
                           const hasImage = item.image || item.imageUrl || item.img;
-                          
-                          // Dark Mode solid background fixes [UPDATED]
-                          const cardClass = `border rounded-2xl text-left flex flex-col overflow-hidden h-36 transition-all duration-200 active:scale-95 
-                            ${isAvail 
-                              ? "bg-neutral-50 hover:bg-neutral-100 dark:bg-neutral-800 dark:hover:bg-neutral-750 text-neutral-850 dark:text-neutral-100 border-neutral-200 dark:border-neutral-700 hover:border-orange-500 dark:hover:border-orange-500" 
-                              : "opacity-40 bg-neutral-100 dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800 pointer-events-none"
-                            }`;
-
                           return (
-                            <motion.button 
-                              layout
-                              initial={{ opacity: 0, scale: 0.95 }}
-                              animate={{ opacity: 1, scale: 1 }}
-                              exit={{ opacity: 0, scale: 0.95 }}
-                              transition={{ duration: 0.15 }}
-                              key={item.id} 
-                              disabled={!isAvail} 
-                              onClick={() => { triggerBeep('tap'); item.variants ? setSelectedProduct(item) : handleAddProductToCart(item); }} 
-                              className={cardClass}
-                            >
+                            <motion.button layout initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} key={item.id} disabled={!isAvail} onClick={() => { triggerBeep('tap'); item.variants ? setSelectedProduct(item) : handleAddProductToCart(item); }} className={`border rounded-2xl text-left flex flex-col overflow-hidden h-36 transition-all duration-200 active:scale-95 ${isAvail ? "bg-neutral-50 hover:bg-neutral-100 dark:bg-neutral-800 dark:hover:bg-neutral-750 text-neutral-850 dark:text-neutral-100 border-neutral-200 dark:border-neutral-700 hover:border-orange-500" : "opacity-40 bg-neutral-100 dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800 pointer-events-none"}`}>
                               {hasImage ? (
-                                <img 
-                                  src={item.image || item.imageUrl || item.img} 
-                                  alt={item.name} 
-                                  className="w-full h-24 object-cover shrink-0 bg-neutral-200 dark:bg-neutral-700"
-                                  onError={(e) => { (e.target as any).style.display = 'none'; }}
-                                />
+                                <img src={hasImage} alt={item.name} className="w-full h-24 object-cover shrink-0 bg-neutral-200 dark:bg-neutral-700" />
                               ) : (
-                                <div className="w-full h-24 bg-neutral-200 dark:bg-neutral-700 flex items-center justify-center text-neutral-400 dark:text-neutral-500 text-[10px] font-bold uppercase shrink-0">
-                                  {item.category || "No Image"}
-                                </div>
+                                <div className="w-full h-24 bg-neutral-200 dark:bg-neutral-700 flex items-center justify-center text-neutral-400 text-[10px] font-bold uppercase shrink-0">{item.category || "No Image"}</div>
                               )}
                               <div className="p-2 flex-grow flex flex-col justify-center">
-                                <p className="font-bold text-[11px] line-clamp-2 leading-tight text-neutral-800 dark:text-neutral-200">
-                                  {item.name}
-                                </p>
+                                <p className="font-bold text-[11px] line-clamp-2 leading-tight">{item.name}</p>
                               </div>
                             </motion.button>
                           );
@@ -1392,8 +957,63 @@ export default function BbCafePos() {
                     </div>
                   )}
                 </div>
-                {cart.length > 0 && !isCartOpen && (
-                  <motion.button initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} onClick={() => { triggerBeep('tap'); setIsCartOpen(true); }} className="fixed bottom-6 right-6 left-6 md:left-auto bg-green-600 text-white font-black px-6 py-4 rounded-2xl shadow-2xl flex items-center justify-between gap-4 z-40 active:scale-95 transition-all">
+
+                {/* RIGHT SIDE: Permanent Desktop Cart / Checkout Panel */}
+                <div className="hidden md:flex flex-col w-96 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-3xl p-4 shadow-xl shrink-0 h-full">
+                  <div className="flex items-center justify-between pb-3 border-b border-neutral-200 dark:border-neutral-800 mb-3">
+                    <h3 className="text-xs font-black uppercase text-orange-500 flex items-center gap-2">
+                      <SafeShoppingBag size={14} /> Current Order Cart
+                    </h3>
+                    <span className="text-[10px] font-mono bg-orange-500/10 text-orange-400 px-2 py-0.5 rounded-full font-bold">
+                      {cart.reduce((sum, item) => sum + item.quantity, 0)} Items
+                    </span>
+                  </div>
+
+                  <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+                    {cart.length === 0 ? (
+                      <div className="h-full flex flex-col items-center justify-center text-neutral-400 text-center p-6">
+                        <SafeShoppingBag size={36} className="mb-2 opacity-30 animate-pulse" />
+                        <p className="text-xs font-bold">Cart is empty</p>
+                        <span className="text-[10px] opacity-75">Click menu items on the left to add them here.</span>
+                      </div>
+                    ) : (
+                      cart.map((item) => (
+                        <div key={item.id} className="bg-neutral-50 dark:bg-neutral-800/40 p-2.5 rounded-2xl border border-neutral-200 dark:border-neutral-800 flex flex-col gap-2">
+                          <div className="flex justify-between items-start">
+                            <span className="text-xs font-bold">{item.name}</span>
+                            <span className="text-xs font-mono font-bold text-orange-500">₹{item.price * item.quantity}</span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <div className="flex items-center gap-2 bg-neutral-200 dark:bg-neutral-700 rounded-xl p-1">
+                              <button onClick={() => handleUpdateCartQuantity(item.id, -1)} className="p-1 hover:text-red-500"><SafeMinus size={12} /></button>
+                              <span className="text-xs font-mono font-bold px-1">{item.quantity}</span>
+                              <button onClick={() => handleUpdateCartQuantity(item.id, 1)} className="p-1 hover:text-green-500"><SafePlus size={12} /></button>
+                            </div>
+                            <button onClick={() => handleUpdateCartQuantity(item.id, -item.quantity)} className="text-red-400 hover:text-red-600 p-1"><Trash2 size={14} /></button>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+
+                  {cart.length > 0 && (
+                    <div className="pt-3 border-t border-neutral-200 dark:border-neutral-800 mt-2 space-y-2">
+                      <div className="flex justify-between text-xs font-mono text-neutral-500">
+                        <span>Subtotal:</span><span>₹{getCartSubtotal()}</span>
+                      </div>
+                      <div className="flex justify-between text-sm font-black font-mono text-green-500">
+                        <span>Total Bill:</span><span>₹{getTotalBillPrice()}</span>
+                      </div>
+                      <button onClick={() => setIsCartOpen(true)} className="w-full bg-green-600 hover:bg-green-700 text-white font-black py-3 rounded-2xl text-xs uppercase tracking-wider shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2">
+                        Proceed to Checkout ➔
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Mobile Floating Cart Button */}
+                {cart.length > 0 && (
+                  <motion.button initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} onClick={() => setIsCartOpen(true)} className="fixed bottom-6 right-6 left-6 md:hidden bg-green-600 text-white font-black px-6 py-4 rounded-2xl shadow-2xl flex items-center justify-between gap-4 z-40 active:scale-95 transition-all">
                     <div className="flex items-center gap-2.5">
                       <SafeShoppingBag size={16} />
                       <div className="text-left">
@@ -1406,36 +1026,32 @@ export default function BbCafePos() {
                     </div>
                   </motion.button>
                 )}
+
               </div>
             )}
 
+            {/* INVENTORY WORKSPACE */}
             {activeTab === 'inventory' && (
               <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 p-5 flex-1 overflow-y-auto pb-20 rounded-3xl shadow-xl">
                 <div className="flex justify-between items-center mb-6">
                   <div>
                     <h2 className="text-sm font-black uppercase text-orange-500">Live Item Stock Control</h2>
-                    <p className="text-[10px] text-neutral-500 dark:text-neutral-400">Disable items instantly for customers.</p>
+                    <p className="text-[10px] text-neutral-400">Disable items instantly for customers.</p>
                   </div>
-                  <button onClick={async () => { triggerBeep('tap'); const snap = await getDocs(collection(db, "products")); setProducts(snap.docs.map((doc) => doc.data())); }} className="p-2 bg-neutral-200 dark:bg-neutral-800 text-neutral-400 hover:text-orange-500 dark:hover:text-orange-400 rounded-xl transition-all">
-                    <SafeRefreshCw size={14} />
-                  </button>
+                  <button onClick={async () => { triggerBeep('tap'); const snap = await getDocs(collection(db, "products")); setProducts(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }))); }} className="p-2 bg-neutral-200 dark:bg-neutral-800 text-neutral-400 hover:text-orange-500 rounded-xl"><SafeRefreshCw size={14} /></button>
                 </div>
                 <div className="space-y-2 max-w-xl">
                   {products.map((item) => {
                     const isAvail = item.isAvailable !== false;
                     return (
-                      <div key={item.id} className="bg-neutral-50 dark:bg-neutral-800/40 border border-neutral-200 dark:border-neutral-800 p-3 rounded-2xl flex items-center justify-between">
+                      <div key={item.id} className="bg-neutral-50 dark:bg-neutral-800/45 border border-neutral-200 dark:border-neutral-800 p-3 rounded-2xl flex items-center justify-between">
                         <div>
-                          <span className="font-bold text-xs block text-neutral-800 dark:text-neutral-200">{item.name}</span>
-                          <span className="text-[8px] text-neutral-500 dark:text-neutral-400 block">Category: {item.category} | ₹{item.price}</span>
+                          <span className="font-bold text-xs block">{item.name}</span>
+                          <span className="text-[8px] text-neutral-400 block">Category: {item.category} | ₹{item.price}</span>
                         </div>
                         <div className="flex items-center gap-4">
-                          <span className={"text-[8px] font-black px-2 py-0.5 rounded-full border " + (isAvail ? "bg-green-500/10 text-green-400 border-green-500/20" : "bg-red-500/10 text-red-400 border-red-500/20")}>
-                            {isAvail ? 'In Stock' : 'Out'}
-                          </span>
-                          <button onClick={() => handleToggleStock(item.id, isAvail)} className={"text-[9px] font-black uppercase px-3 py-1.5 rounded-xl border transition-all " + (isAvail ? "text-red-400 border-red-500/20 hover:bg-red-500/10" : "text-green-400 border-green-500/20 hover:bg-green-500/10")}>
-                            {isAvail ? 'Disable' : 'Enable'}
-                          </button>
+                          <span className={"text-[8px] font-black px-2 py-0.5 rounded-full border " + (isAvail ? "bg-green-500/10 text-green-400 border-green-500/20" : "bg-red-500/10 text-red-400 border-red-500/20")}>{isAvail ? 'In Stock' : 'Out'}</span>
+                          <button onClick={() => handleToggleStock(item.id, isAvail)} className={"text-[9px] font-black uppercase px-3 py-1.5 rounded-xl border transition-all " + (isAvail ? "text-red-400 border-red-500/20 hover:bg-red-500/10" : "text-green-400 border-green-500/20 hover:bg-green-500/10")}>{isAvail ? 'Disable' : 'Enable'}</button>
                         </div>
                       </div>
                     );
@@ -1444,45 +1060,28 @@ export default function BbCafePos() {
               </div>
             )}
 
+            {/* PAST RECEIPTS WORKSPACE */}
             {activeTab === 'receipts' && (
               <div className="flex-1 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-3xl p-4 flex flex-col overflow-hidden shadow-xl max-w-5xl w-full mx-auto font-sans">
                 <div className="relative mb-4">
                   <SafeSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={14} />
-                  <input 
-                    type="text" 
-                    placeholder="Search past receipt..." 
-                    value={receiptSearchQuery} 
-                    onChange={e => setReceiptSearchQuery(e.target.value)} 
-                    className="w-full bg-neutral-100 dark:bg-neutral-800 border border-transparent dark:border-neutral-700 rounded-xl py-2 px-9 text-xs outline-none text-neutral-800 dark:text-neutral-100 focus:border-orange-500 transition-all" 
-                  />
+                  <input type="text" placeholder="Search past receipt..." value={receiptSearchQuery} onChange={e => setReceiptSearchQuery(e.target.value)} className="w-full bg-neutral-100 dark:bg-neutral-800 border border-transparent dark:border-neutral-700 rounded-xl py-2 px-9 text-xs outline-none text-neutral-800 dark:text-neutral-100 focus:border-orange-500" />
                 </div>
                 {isSearchingReceipts ? (
-                  <div className="flex items-center justify-center flex-1">
-                    <Loader2 className="animate-spin text-orange-500" size={24} />
-                  </div>
+                  <div className="flex items-center justify-center flex-1"><Loader2 className="animate-spin text-orange-500" size={24} /></div>
                 ) : (
                   <div className="space-y-2 overflow-y-auto flex-1 pr-1 pb-16">
                     {filteredPastReceipts.length === 0 ? (
-                      <p className="text-center text-neutral-400 dark:text-neutral-500 text-xs py-12">No past receipts found</p>
+                      <p className="text-center text-neutral-400 text-xs py-12">No past receipts found</p>
                     ) : (
                       filteredPastReceipts.map((order) => {
                         const isRefunded = order.status === 'refunded';
                         return (
-                          <div 
-                            key={order.id} 
-                            onClick={() => { 
-                              triggerBeep('tap'); 
-                              setSelectedReceipt(order); 
-                              setIsReceiptModalOpen(true); 
-                            }} 
-                            className="bg-neutral-50 dark:bg-neutral-800/30 border border-neutral-200 dark:border-neutral-850 p-4 rounded-2xl flex justify-between items-center cursor-pointer hover:border-orange-500 dark:hover:border-orange-500 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-all"
-                          >
+                          <div key={order.id} onClick={() => { triggerBeep('tap'); setSelectedReceipt(order); setIsReceiptModalOpen(true); }} className="bg-neutral-50 dark:bg-neutral-800/30 border border-neutral-200 dark:border-neutral-850 p-4 rounded-2xl flex justify-between items-center cursor-pointer hover:border-orange-500 transition-all">
                             <div className="space-y-0.5">
-                              <span className="font-bold text-xs block font-mono text-neutral-900 dark:text-neutral-100">Bill #${order.billNumber}</span>
-                              <span className="text-[9px] text-neutral-500 dark:text-neutral-400 block font-mono">Token: #{order.tokenNumber} | {order.customerName}</span>
-                              {isRefunded && (
-                                <span className="text-[7px] font-black uppercase text-red-500 border border-red-500/20 px-1 py-0.2 rounded bg-red-500/5">Refunded</span>
-                              )}
+                              <span className="font-bold text-xs block font-mono">Bill #${order.billNumber}</span>
+                              <span className="text-[9px] text-neutral-400 block font-mono">Token: #{order.tokenNumber} | {order.customerName}</span>
+                              {isRefunded && <span className="text-[7px] font-black uppercase text-red-500 border border-red-500/20 px-1 rounded bg-red-500/5">Refunded</span>}
                             </div>
                             <div className="text-right">
                               <span className={`text-sm font-black font-mono ${isRefunded ? 'text-neutral-400 line-through' : 'text-green-500'}`}>₹{order.total}</span>
@@ -1491,152 +1090,64 @@ export default function BbCafePos() {
                         );
                       })
                     )}
-                    
-                    {/* Load More Pagination Trigger */}
-                    {filteredPastReceipts.length >= receiptsLimit && !receiptSearchQuery.trim() && (
-                      <div className="pt-4 flex justify-center">
-                        <button 
-                          onClick={() => { triggerBeep('tap'); setReceiptsLimit(prev => prev + 20); }} 
-                          className="bg-orange-500 hover:bg-orange-600 text-black font-black text-xs py-2.5 px-6 rounded-xl shadow-md transition-all active:scale-95 uppercase"
-                        >
-                          Load More Bills ➔
-                        </button>
-                      </div>
-                    )}
                   </div>
                 )}
               </div>
             )}
 
-            {/* SETTINGS WORKSPACE WITH AUTO-RECONNECT TOGGLES [UPDATED] */}
+            {/* SETTINGS WORKSPACE */}
             {activeTab === 'settings' && (
-              <div className="max-w-xl mx-auto w-full pb-20 overflow-y-auto flex-1 font-sans animate-fade-in">
-                
+              <div className="max-w-xl mx-auto w-full pb-20 overflow-y-auto flex-1 font-sans">
                 <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 p-6 rounded-3xl shadow-xl space-y-6">
                   <h3 className="text-sm font-black uppercase text-orange-500">POS Settings</h3>
                   
-                  {/* Theme Switcher */}
                   <div className="border-b border-neutral-200 dark:border-neutral-800 pb-4 space-y-3">
-                    <p className="text-xs font-bold uppercase text-neutral-800 dark:text-neutral-200">A. UI Theme:</p>
+                    <p className="text-xs font-bold uppercase">A. UI Theme:</p>
                     <div className="flex bg-neutral-100 dark:bg-neutral-800 p-1 rounded-xl w-60 border border-transparent dark:border-neutral-700">
-                      <button 
-                        onClick={() => handleToggleTheme('dark')} 
-                        className={"flex-grow py-2 rounded-lg text-[10px] font-black uppercase transition-all " + (themeMode === 'dark' ? "bg-neutral-950 text-amber-400 shadow-md" : "text-neutral-400")}
-                      >
-                        Dark
-                      </button>
-                      <button 
-                        onClick={() => handleToggleTheme('light')} 
-                        className={"flex-grow py-2 rounded-lg text-[10px] font-black uppercase transition-all " + (themeMode === 'light' ? "bg-white text-orange-600 shadow-md" : "text-neutral-400")}
-                      >
-                        Light
-                      </button>
+                      <button onClick={() => handleToggleTheme('dark')} className={"flex-grow py-2 rounded-lg text-[10px] font-black uppercase transition-all " + (themeMode === 'dark' ? "bg-neutral-950 text-amber-400 shadow-md" : "text-neutral-400")}>Dark</button>
+                      <button onClick={() => handleToggleTheme('light')} className={"flex-grow py-2 rounded-lg text-[10px] font-black uppercase transition-all " + (themeMode === 'light' ? "bg-white text-orange-600 shadow-md" : "text-neutral-400")}>Light</button>
                     </div>
                   </div>
 
-                  {/* GST Configuration */}
                   <div className="border-b border-neutral-200 dark:border-neutral-800 pb-4 space-y-3">
-                    <p className="text-xs font-bold uppercase text-neutral-800 dark:text-neutral-200">B. GST Config:</p>
+                    <p className="text-xs font-bold uppercase">B. GST Config:</p>
                     <div className="flex items-center justify-between">
-                      <span className="text-xs text-neutral-700 dark:text-neutral-300">Enable GST:</span>
+                      <span className="text-xs">Enable GST:</span>
                       <button onClick={() => { const next = !gstEnabled; setGstEnabled(next); localStorage.setItem("bb_pos_gst_enabled", String(next)); }} className="text-orange-500">
                         {gstEnabled ? <SafeToggleRight size={32} /> : <SafeToggleLeft size={32} />}
                       </button>
                     </div>
-                    {gstEnabled && (
-                      <input type="number" value={gstRate} onChange={e => { const r = Math.max(0, Number(e.target.value)); setGstRate(r); localStorage.setItem("bb_pos_gst_rate", String(r)); }} className="w-full bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 p-3 rounded-xl text-xs outline-none text-neutral-900 dark:text-neutral-100" />
-                    )}
+                    {gstEnabled && <input type="number" value={gstRate} onChange={e => { const r = Number(e.target.value); setGstRate(r); localStorage.setItem("bb_pos_gst_rate", String(r)); }} className="w-full bg-neutral-100 dark:bg-neutral-800 border p-3 rounded-xl text-xs outline-none" />}
                   </div>
 
-                  {/* KOT ON/OFF Switch */}
                   <div className="border-b border-neutral-200 dark:border-neutral-800 pb-4 space-y-3">
                     <div className="flex items-center justify-between">
-                      <p className="text-xs font-bold uppercase text-neutral-800 dark:text-neutral-200">C. Enable KOT Printing:</p>
-                      <button 
-                        onClick={() => { 
-                          const next = !kotEnabled; 
-                          setKotEnabled(next); 
-                          localStorage.setItem("bb_pos_kot_enabled", String(next)); 
-                          toast.success(next ? "KOT Printing ON" : "KOT Printing OFF");
-                        }} 
-                        className="text-orange-500"
-                      >
+                      <p className="text-xs font-bold uppercase">C. Enable KOT Printing:</p>
+                      <button onClick={() => { const next = !kotEnabled; setKotEnabled(next); localStorage.setItem("bb_pos_kot_enabled", String(next)); toast.success(next ? "KOT ON" : "KOT OFF"); }} className="text-orange-500">
                         {kotEnabled ? <SafeToggleRight size={32} /> : <SafeToggleLeft size={32} />}
                       </button>
                     </div>
                   </div>
 
-                  {/* Hardware Printer Configuration */}
-                  <div className="space-y-3 pt-4">
+                  <div className="space-y-3 pt-2">
                     <div className="flex items-center justify-between">
-                      <p className="text-xs font-bold uppercase text-neutral-800 dark:text-neutral-200">D. Hardware Printer Connection:</p>
+                      <p className="text-xs font-bold uppercase">D. Hardware Printer Connection:</p>
                       <span className={"text-[8px] font-black uppercase tracking-widest px-2.5 py-0.5 rounded-full border " + (printerConnected ? "bg-green-500/10 text-green-400 border-green-500/20" : "bg-red-500/10 text-red-400 border-red-500/20")}>
                         {printerConnected ? '● Connected' : 'Disconnected'}
                       </span>
                     </div>
                     <div className="grid grid-cols-2 gap-2">
-                      {[
-                        { id: 'thermal_usb', label: 'Thermal USB' },
-                        { id: 'thermal_bluetooth', label: 'Thermal Bluetooth' },
-                        { id: 'network_ip', label: 'Network IP Printer' },
-                        { id: 'laser', label: 'Laser A4 Printer' }
-                      ].map((p) => {
-                        const isSelected = printerType === p.id;
-                        const btnClass = "p-2 rounded-xl border text-[9px] font-black uppercase tracking-wider transition-all " + 
-                          (isSelected 
-                            ? "bg-neutral-950 text-amber-400 border-amber-500" 
-                            : "bg-neutral-100 dark:bg-neutral-800 border-neutral-200 dark:border-neutral-700 hover:text-orange-500 dark:hover:text-orange-400");
-                        return (
-                          <button 
-                            key={p.id} 
-                            onClick={() => { 
-                              triggerBeep('tap'); 
-                              setPrinterType(p.id as any); 
-                              setPrinterConnected(false); 
-                              setBleCharacteristic(null); 
-                              localStorage.setItem("bb_pos_printer_type", p.id); 
-                            }} 
-                            className={btnClass}
-                          >
-                            {p.label}
-                          </button>
-                        );
-                      })}
+                      {[{ id: 'thermal_usb', label: 'Thermal USB' }, { id: 'thermal_bluetooth', label: 'Thermal Bluetooth' }, { id: 'network_ip', label: 'Network IP' }, { id: 'laser', label: 'Laser A4' }].map((p) => (
+                        <button key={p.id} onClick={() => { triggerBeep('tap'); setPrinterType(p.id as any); setPrinterConnected(false); localStorage.setItem("bb_pos_printer_type", p.id); }} className={"p-2 rounded-xl border text-[9px] font-black uppercase transition-all " + (printerType === p.id ? "bg-neutral-950 text-amber-400 border-amber-500" : "bg-neutral-100 dark:bg-neutral-800 border-neutral-200 dark:border-neutral-700")}>
+                          {p.label}
+                        </button>
+                      ))}
                     </div>
-                    {printerType === 'network_ip' && (
-                      <div className="space-y-1 mt-2">
-                        <label className="text-[9px] font-black uppercase text-gray-500 dark:text-gray-400">Printer IP Address</label>
-                        <input type="text" value={printerIp} onChange={e => { setPrinterIp(e.target.value); localStorage.setItem("bb_pos_printer_ip", e.target.value); }} className="w-full bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 p-3 rounded-xl text-xs outline-none font-mono text-neutral-800 dark:text-neutral-100" />
-                      </div>
-                    )}
-                    <div className="space-y-1">
-                      <label className="text-[9px] font-black uppercase text-gray-500 dark:text-gray-400">Number of Bill Copies</label>
-                      <input type="number" min={1} max={5} value={printCopies} onChange={e => { const v = Math.max(1, Number(e.target.value)); setPrintCopies(v); localStorage.setItem("bb_pos_print_copies", String(v)); }} className="w-full bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 p-3 rounded-xl text-xs outline-none font-mono text-neutral-800 dark:text-neutral-100" />
-                    </div>
-
                     <div className="flex gap-2 pt-2">
-                      <button 
-                        onClick={handleConnectPrinter} 
-                        disabled={isConnecting}
-                        className="flex-1 bg-amber-500 hover:bg-amber-600 disabled:bg-neutral-750 text-black disabled:text-neutral-500 font-black py-2.5 rounded-xl text-[10px] uppercase shadow-md active:scale-95 transition-all flex items-center justify-center gap-1"
-                      >
-                        {isConnecting ? <Loader2 className="animate-spin text-neutral-500" size={10} /> : 'Connect Device'}
-                      </button>
-                      <button 
-                        onClick={handleTestPrint} 
-                        className="flex-grow bg-green-600 hover:bg-green-700 text-white font-black py-2.5 rounded-xl text-[10px] uppercase shadow-md active:scale-95 transition-all"
-                      >
-                        Test Print 🧾
-                      </button>
+                      <button onClick={handleConnectPrinter} disabled={isConnecting} className="flex-1 bg-amber-500 hover:bg-amber-600 text-black font-black py-2.5 rounded-xl text-[10px] uppercase shadow-md active:scale-95 transition-all">Connect Device</button>
+                      <button onClick={handleTestPrint} className="flex-grow bg-green-600 text-white font-black py-2.5 rounded-xl text-[10px] uppercase shadow-md active:scale-95 transition-all">Test Print 🧾</button>
                     </div>
-                    {printerConnected && (
-                      <button 
-                        onClick={handleDisconnectPrinter} 
-                        className="w-full mt-2 bg-red-600/10 text-red-500 hover:bg-red-600 hover:text-white border border-red-500/20 font-black py-2 rounded-xl text-[9px] uppercase tracking-wider transition-all"
-                      >
-                        Disconnect Printer
-                      </button>
-                    )}
+                    {printerConnected && <button onClick={handleDisconnectPrinter} className="w-full mt-2 bg-red-600/10 text-red-500 border border-red-500/20 font-black py-2 rounded-xl text-[9px] uppercase">Disconnect Printer</button>}
                   </div>
                 </div>
               </div>
@@ -1645,171 +1156,61 @@ export default function BbCafePos() {
         </>
       )}
 
-      {/* PAST BILL REPRINT & REFUND POPUP MODAL */}
+      {/* PAST BILL RECEIPT MODAL */}
       <AnimatePresence>
         {isReceiptModalOpen && selectedReceipt && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95, y: 15 }} 
-              animate={{ opacity: 1, scale: 1, y: 0 }} 
-              exit={{ opacity: 0, scale: 0.95, y: 15 }} 
-              className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-neutral-900 dark:text-neutral-100 max-w-lg w-full rounded-3xl p-6 shadow-2xl relative font-sans flex flex-col max-h-[85vh]"
-            >
-              <button 
-                onClick={() => setIsReceiptModalOpen(false)} 
-                className="absolute top-4 right-4 p-2 rounded-full hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-all text-neutral-500"
-              >
-                <SafeX size={18} />
-              </button>
-
+            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-neutral-900 dark:text-neutral-100 max-w-lg w-full rounded-3xl p-6 shadow-2xl relative font-sans flex flex-col max-h-[85vh]">
+              <button onClick={() => setIsReceiptModalOpen(false)} className="absolute top-4 right-4 p-2 rounded-full hover:bg-neutral-100 dark:hover:bg-neutral-800"><SafeX size={18} /></button>
+              
               <div className="border-b border-neutral-200 dark:border-neutral-800 pb-3 pr-8">
                 <div className="flex items-center gap-2">
-                  <h3 className="text-lg font-black text-neutral-950 dark:text-white">Bill Details</h3>
-                  <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded ${
-                    selectedReceipt.status === 'refunded' 
-                      ? 'bg-red-500/10 text-red-500 border border-red-500/20' 
-                      : 'bg-green-500/10 text-green-500 border border-green-500/20'
-                  }`}>
+                  <h3 className="text-lg font-black">Bill Details</h3>
+                  <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded ${selectedReceipt.status === 'refunded' ? 'bg-red-500/10 text-red-500' : 'bg-green-500/10 text-green-500'}`}>
                     {selectedReceipt.status === 'refunded' ? 'Refunded' : 'Completed'}
                   </span>
                 </div>
-                <p className="text-xs font-mono text-neutral-500 dark:text-neutral-400 mt-1">
-                  Bill No: #{selectedReceipt.billNumber} | Token: #{selectedReceipt.tokenNumber}
-                </p>
-                <p className="text-[10px] text-neutral-400 mt-0.5">
-                  Date: {selectedReceipt.timestamp?.toDate ? new Date(selectedReceipt.timestamp.toDate()).toLocaleString() : new Date(selectedReceipt.timestamp).toLocaleString()}
-                </p>
+                <p className="text-xs font-mono text-neutral-400 mt-1">Bill No: #{selectedReceipt.billNumber} | Token: #{selectedReceipt.tokenNumber}</p>
               </div>
 
               <div className="flex-1 overflow-y-auto space-y-4 py-4 pr-1">
-                {/* Guest Details */}
-                <div className="space-y-1.5 text-xs bg-neutral-50 dark:bg-neutral-800/40 border border-neutral-100 dark:border-neutral-800 p-3.5 rounded-2xl">
-                  <p>👤 <b>Guest Name:</b> <span className="font-medium text-neutral-950 dark:text-white">{selectedReceipt.customerName}</span></p>
-                  {selectedReceipt.customerPhone && <p>📞 <b>Phone:</b> <span className="font-medium text-neutral-950 dark:text-white">{selectedReceipt.customerPhone}</span></p>}
-                  <p>💳 <b>Method:</b> <span className="font-medium text-neutral-950 dark:text-white uppercase">{selectedReceipt.paymentMethod}</span></p>
-                  <p>🍽️ <b>Fulfillment:</b> <span className="font-medium text-neutral-950 dark:text-white uppercase">{selectedReceipt.fulfillmentType}</span></p>
-                  {selectedReceipt.tableNumber && <p>🪑 <b>Table No:</b> <span className="font-medium text-neutral-950 dark:text-white font-mono">{selectedReceipt.tableNumber}</span></p>}
-                  {selectedReceipt.address && <p>📍 <b>Address:</b> <span className="font-medium text-neutral-950 dark:text-white">{selectedReceipt.address}</span></p>}
+                <div className="space-y-1.5 text-xs bg-neutral-50 dark:bg-neutral-800/40 p-3.5 rounded-2xl border border-neutral-100 dark:border-neutral-800">
+                  <p>👤 <b>Guest Name:</b> {selectedReceipt.customerName}</p>
+                  {selectedReceipt.customerPhone && <p>📞 <b>Phone:</b> {selectedReceipt.customerPhone}</p>}
+                  <p>💳 <b>Method:</b> <span className="uppercase">{selectedReceipt.paymentMethod}</span></p>
+                  <p>🍽️ <b>Fulfillment:</b> <span className="uppercase">{selectedReceipt.fulfillmentType}</span></p>
                 </div>
 
-                {/* Items Container */}
                 <div className="space-y-1.5">
-                  <p className="text-[10px] font-bold uppercase text-neutral-400 tracking-wider">Ordered Items</p>
+                  <p className="text-[10px] font-bold uppercase text-neutral-400">Ordered Items</p>
                   <div className="space-y-1 bg-neutral-50 dark:bg-neutral-800/40 p-3 rounded-2xl border border-neutral-100 dark:border-neutral-800">
                     {selectedReceipt.items?.map((it: any, idx: number) => (
                       <div key={idx} className="flex justify-between text-xs py-1 border-b border-neutral-100 dark:border-neutral-800/50 last:border-0">
-                        <span className="text-neutral-850 dark:text-neutral-300">
-                          {it.name} <span className="text-orange-500 font-bold">x{it.quantity}</span>
-                        </span>
-                        <span className="font-mono font-medium text-neutral-900 dark:text-white">₹{it.price * it.quantity}</span>
+                        <span>{it.name} <span className="text-orange-500 font-bold">x{it.quantity}</span></span>
+                        <span className="font-mono">₹{it.price * it.quantity}</span>
                       </div>
                     ))}
                   </div>
                 </div>
 
-                {/* Math Summary */}
                 <div className="space-y-1.5 text-xs border-t border-neutral-200 dark:border-neutral-800 pt-3">
-                  <div className="flex justify-between font-mono text-neutral-600 dark:text-neutral-400">
-                    <span>Subtotal:</span>
-                    <span>₹{selectedReceipt.subtotal}</span>
-                  </div>
-                  {selectedReceipt.discount > 0 && (
-                    <div className="flex justify-between text-red-500 font-mono">
-                      <span>Discount:</span>
-                      <span>-₹{selectedReceipt.discount}</span>
-                    </div>
-                  )}
-                  {selectedReceipt.gstAmount > 0 && (
-                    <div className="flex justify-between font-mono text-neutral-600 dark:text-neutral-400">
-                      <span>GST (5%):</span>
-                      <span>+₹{selectedReceipt.gstAmount}</span>
-                    </div>
-                  )}
-                  <div className="flex justify-between text-sm font-black text-green-600 dark:text-green-400 font-mono pt-1.5 border-t border-dashed border-neutral-300 dark:border-neutral-800">
-                    <span>Grand Total:</span>
-                    <span>₹{selectedReceipt.total}</span>
-                  </div>
+                  <div className="flex justify-between font-mono"><span>Subtotal:</span><span>₹{selectedReceipt.subtotal}</span></div>
+                  {selectedReceipt.discount > 0 && <div className="flex justify-between text-red-500 font-mono"><span>Discount:</span><span>-₹{selectedReceipt.discount}</span></div>}
+                  <div className="flex justify-between text-sm font-black text-green-500 font-mono pt-1.5 border-t border-dashed"><span>Grand Total:</span><span>₹{selectedReceipt.total}</span></div>
                 </div>
               </div>
 
-              {/* Popup Action Buttons */}
               <div className="flex gap-2.5 pt-4 border-t border-neutral-200 dark:border-neutral-800">
-                <button 
-                  onClick={() => handlePrintReceipt(selectedReceipt, getPrintConfig())} 
-                  className="flex-1 bg-green-600 hover:bg-green-700 text-white font-black py-3 rounded-2xl text-xs uppercase flex items-center justify-center gap-2 active:scale-95 transition-all shadow-md"
-                >
-                  <SafePrinter size={15} /> Reprint Bill
-                </button>
-                {selectedReceipt.status !== 'refunded' && (
-                  <button 
-                    onClick={() => handleRefundOrder(selectedReceipt.id)} 
-                    className="flex-1 bg-red-600 hover:bg-red-700 text-white font-black py-3 rounded-2xl text-xs uppercase flex items-center justify-center gap-2 active:scale-95 transition-all shadow-md"
-                  >
-                    <Trash2 size={15} /> Refund Bill
-                  </button>
-                )}
+                <button onClick={() => handlePrintReceipt(selectedReceipt, getPrintConfig())} className="flex-1 bg-green-600 hover:bg-green-700 text-white font-black py-3 rounded-2xl text-xs uppercase flex items-center justify-center gap-2"><SafePrinter size={15} /> Reprint Bill</button>
+                {selectedReceipt.status !== 'refunded' && <button onClick={() => handleRefundOrder(selectedReceipt.id)} className="flex-1 bg-red-600 hover:bg-red-700 text-white font-black py-3 rounded-2xl text-xs uppercase flex items-center justify-center gap-2"><Trash2 size={15} /> Refund Bill</button>}
               </div>
             </motion.div>
           </div>
         )}
       </AnimatePresence>
 
-      {/* OVERLAYS */}
       <PosCartDrawer 
-        isHindi={false} 
-        isCartOpen={isCartOpen} 
-        setIsCartOpen={setIsCartOpen} 
-        cart={cart} 
-        setCart={setCart} 
-        customerPhone={customerPhone} 
-        setCustomerPhone={setCustomerPhone} 
-        customerName={customerName} 
-        setCustomerName={setCustomerName} 
-        customerPoints={customerPoints} 
-        setCustomerPoints={setCustomerPoints} 
-        pointsToRedeem={pointsToRedeem} 
-        setPointsToRedeem={setPointsToRedeem} 
-        customDiscount={customDiscount} 
-        setCustomDiscount={setCustomDiscount} 
-        fulfillmentType={fulfillmentType} 
-        setFulfillmentType={setFulfillmentType} 
-        selectedArea={selectedArea} 
-        setSelectedArea={setSelectedArea} 
-        DELIVERY_AREAS={DELIVERY_AREAS} 
-        address={address} 
-        setAddress={setAddress} 
-        tableNumber={tableNumber} 
-        setTableNumber={setTableNumber} 
-        chefInstructions={chefInstructions} 
-        setChefInstructions={setChefInstructions} 
-        isSubmittingOrder={isSubmittingOrder} 
-        paymentMethod={paymentMethod} 
-        setPaymentMethod={handleSetPaymentMethod} 
-        noCutlery={false} 
-        setNoCutlery={() => {}} 
-        getCartSubtotal={getCartSubtotal} 
-        getCartAddonsPrice={() => 0} 
-        getDeliveryCharge={getDeliveryCharge} 
-        getFreeDeliveryProgressPercent={getFreeDeliveryProgressPercent} 
-        getTotalPointsRedeemedInCart={getTotalPointsRedeemedInCart} 
-        getTotalBillPrice={getTotalBillPrice} 
-        loyaltyRules={loyaltyRules} 
-        handlePlaceOrder={handlePlaceOrder} 
-        handleDetectLocation={handleDetectLocation} 
-        setIsCustomerModalOpen={setIsCustomerModalOpen} 
-        searchDbCustomers={searchDbCustomers} 
-        handleUpdateCartQuantity={handleUpdateCartQuantity} 
-        handleUpdateCartItemNote={handleUpdateCartItemNote} 
-        showAddonsSection={false} 
-        triggerBeep={triggerBeep} 
-        handleCheckLoyalty={handleCheckLoyalty}
-        
-        ketchupAddon={false}
-        setKetchupAddon={() => {}}
-        oreganoAddon={false}
-        setOreganoAddon={() => {}}
-        chiliFlakesAddon={false}
-        setChiliFlakesAddon={() => {}}
+        isHindi={false} isCartOpen={isCartOpen} setIsCartOpen={setIsCartOpen} cart={cart} setCart={setCart} customerPhone={customerPhone} setCustomerPhone={setCustomerPhone} customerName={customerName} setCustomerName={setCustomerName} customerPoints={customerPoints} setCustomerPoints={setCustomerPoints} pointsToRedeem={pointsToRedeem} setPointsToRedeem={setPointsToRedeem} customDiscount={customDiscount} setCustomDiscount={setCustomDiscount} fulfillmentType={fulfillmentType} setFulfillmentType={setFulfillmentType} selectedArea={selectedArea} setSelectedArea={setSelectedArea} DELIVERY_AREAS={DELIVERY_AREAS} address={address} setAddress={setAddress} tableNumber={tableNumber} setTableNumber={setTableNumber} chefInstructions={chefInstructions} setChefInstructions={setChefInstructions} isSubmittingOrder={isSubmittingOrder} paymentMethod={paymentMethod} setPaymentMethod={handleSetPaymentMethod} noCutlery={false} setNoCutlery={() => {}} getCartSubtotal={getCartSubtotal} getCartAddonsPrice={() => 0} getDeliveryCharge={getDeliveryCharge} getFreeDeliveryProgressPercent={getFreeDeliveryProgressPercent} getTotalPointsRedeemedInCart={getTotalPointsRedeemedInCart} getTotalBillPrice={getTotalBillPrice} loyaltyRules={loyaltyRules} handlePlaceOrder={handlePlaceOrder} handleDetectLocation={handleDetectLocation} setIsCustomerModalOpen={setIsCustomerModalOpen} searchDbCustomers={searchDbCustomers} handleUpdateCartQuantity={handleUpdateCartQuantity} handleUpdateCartItemNote={handleUpdateCartItemNote} showAddonsSection={false} triggerBeep={triggerBeep} handleCheckLoyalty={handleCheckLoyalty} ketchupAddon={false} setKetchupAddon={() => {}} oreganoAddon={false} setOreganoAddon={() => {}} chiliFlakesAddon={false} setChiliFlakesAddon={() => {}}
       />
 
       <CustomerDirectoryModal 
