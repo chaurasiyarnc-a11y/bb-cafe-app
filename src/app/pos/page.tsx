@@ -76,7 +76,7 @@ interface DeliveryArea {
 
 let globalAudioCtx: AudioContext | null = null;
 
-export default function BbCafePos() {
+export default function BbCafePosMobile() {
   const DELIVERY_AREAS: DeliveryArea[] = useMemo(() => [
     { name: "Mohandra Town", fee: 20, minFree: 99, range: "0-2 KM" },
     { name: "Within 5 KM (Bum Bum Cafe से 5km के दायरे में)", fee: 50, minFree: 499, range: "2-5 KM" },
@@ -90,13 +90,9 @@ export default function BbCafePos() {
   const [pinInput, setPinInput] = useState('');
   const [activeTab, setActiveTab] = useState<'orders' | 'billing' | 'inventory' | 'receipts' | 'settings'>('billing');
   const [previousTab, setPreviousTab] = useState<'billing' | 'inventory' | 'receipts' | 'settings'>('billing');
-  
-  // Layout Mode ('mobile' | 'desktop') saved in localStorage
-  const [layoutMode, setLayoutMode] = useState<'mobile' | 'desktop'>('desktop');
 
   const [isCartOpen, setIsCartOpen] = useState(false); 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false); 
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false); 
 
   const [gstEnabled, setGstEnabled] = useState(false);
   const [gstRate, setGstRate] = useState(5);
@@ -174,7 +170,6 @@ export default function BbCafePos() {
   const [normalPizzaPrice, setNormalPizzaPrice] = useState(0);
   const [customizerChefNote, setCustomizerChefNote] = useState(""); 
 
-  // Continuous alarm reference for pending orders
   const alarmIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const triggerBeep = (type: 'tap' | 'success' | 'alarm') => {
@@ -244,34 +239,6 @@ export default function BbCafePos() {
   };
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      let link = document.querySelector('link[rel="manifest"]') as HTMLLinkElement;
-      if (!link) {
-        link = document.createElement('link');
-        link.rel = 'manifest';
-        document.head.appendChild(link);
-      }
-      link.href = '/pos-menifasto.json';
-
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js').catch((err) => console.warn(err));
-        });
-      }
-    }
-  }, []);
-
-  const handleDisconnectPrinter = () => {
-    triggerBeep('tap');
-    if (serialPort) { serialPort.close().catch(() => {}); setSerialPort(null); }
-    if (usbDevice) { usbDevice.close().catch(() => {}); setUsbDevice(null); }
-    if (bleCharacteristic?.service?.device) { bleCharacteristic.service.device.gatt.disconnect(); setBleCharacteristic(null); }
-    setPrinterConnected(false);
-    localStorage.removeItem("bb_pos_printer_connected");
-    toast.success("Printer disconnected explicitly!");
-  };
-
-  useEffect(() => {
     const savedUser = localStorage.getItem("bb_pos_user");
     if (savedUser) {
       try { setIsLoggedIn(true); setCurrentUser(JSON.parse(savedUser)); } catch (e) {}
@@ -280,19 +247,6 @@ export default function BbCafePos() {
     setGstRate(Number(localStorage.getItem("bb_pos_gst_rate")) || 5);
     setPrinterPaperSize((localStorage.getItem("bb_pos_paper_size") as any) || '58mm');
     setKotEnabled(localStorage.getItem("bb_pos_kot_enabled") !== 'false'); 
-    
-    const savedLayout = localStorage.getItem("bb_pos_layout_mode");
-    if (savedLayout) setLayoutMode(savedLayout as any);
-
-    const localPrinterType = localStorage.getItem("bb_pos_printer_type");
-    if (localPrinterType) setPrinterType(localPrinterType as any);
-    const localPrinterIp = localStorage.getItem("bb_pos_printer_ip");
-    if (localPrinterIp) setPrinterIp(localPrinterIp);
-    const localPrintCopies = localStorage.getItem("bb_pos_print_copies");
-    if (localPrintCopies) setPrintCopies(Number(localPrintCopies) || 1);
-
-    const localFontSize = localStorage.getItem("bb_pos_font_size");
-    if (localFontSize) setFontSize(Number(localFontSize) || 9);
 
     const localTheme = localStorage.getItem("bb_pos_theme") || 'dark';
     setThemeMode(localTheme as any);
@@ -314,17 +268,6 @@ export default function BbCafePos() {
     localStorage.setItem("bb_pos_saved_cart", JSON.stringify(cart));
   }, [cart]);
 
-  useEffect(() => {
-    localStorage.setItem("bb_pos_saved_cust_phone", customerPhone);
-    localStorage.setItem("bb_pos_saved_cust_name", customerName);
-    localStorage.setItem("bb_pos_saved_cust_points", String(customerPoints));
-    localStorage.setItem("bb_pos_saved_cust_address", address);
-    localStorage.setItem("bb_pos_saved_fulfillment_type", fulfillmentType);
-    localStorage.setItem("bb_pos_saved_table_number", tableNumber);
-    localStorage.setItem("bb_pos_saved_chef_instructions", chefInstructions);
-  }, [customerPhone, customerName, customerPoints, address, fulfillmentType, tableNumber, chefInstructions]);
-
-  // Live Orders snapshot & Continuous Alarm logic for pending orders
   useEffect(() => {
     const q = query(collection(db, "orders"), orderBy("timestamp", "desc"), limit(40));
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -349,7 +292,6 @@ export default function BbCafePos() {
   const activeLiveOrders = useMemo(() => liveOrders.filter((o) => o.status !== 'completed' && o.status !== 'rejected'), [liveOrders]);
   const pendingOrdersCount = useMemo(() => liveOrders.filter((o) => o.status === 'pending').length, [liveOrders]);
 
-  // Continuous Ring/Alarm trigger when pending orders exist
   useEffect(() => {
     if (pendingOrdersCount > 0) {
       if (!alarmIntervalRef.current) {
@@ -819,11 +761,8 @@ export default function BbCafePos() {
     { id: 'settings', label: 'POS Settings', icon: SafeSettings }
   ];
 
-  const mainClass = "min-h-screen flex flex-col md:flex-row font-sans antialiased overflow-hidden transition-colors duration-200 " + (themeMode === "dark" ? "dark bg-[#0a0a0a] text-neutral-100" : "bg-neutral-50 text-neutral-800");
-  const isDesktopMode = layoutMode === 'desktop';
-  const asideClass = isDesktopMode 
-    ? "hidden" 
-    : "bg-white dark:bg-neutral-900 border-r border-neutral-200 dark:border-neutral-800 flex flex-col justify-between p-4 shrink-0 shadow-lg transition-all duration-300 fixed inset-y-0 left-0 md:relative md:translate-x-0 md:flex " + (isSidebarCollapsed ? "md:w-20" : "md:w-64") + " " + (isSidebarOpen ? "translate-x-0 w-64 z-50 shadow-2xl" : "-translate-x-full md:translate-x-0 z-30");
+  const mainClass = "min-h-screen flex flex-col font-sans antialiased overflow-hidden transition-colors duration-200 " + (themeMode === "dark" ? "dark bg-[#0a0a0a] text-neutral-100" : "bg-neutral-50 text-neutral-800");
+  const asideClass = "bg-white dark:bg-neutral-900 border-r border-neutral-200 dark:border-neutral-800 flex flex-col justify-between p-4 shrink-0 shadow-2xl transition-all duration-300 fixed inset-y-0 left-0 z-50 w-64 " + (isSidebarOpen ? "translate-x-0" : "-translate-x-full");
 
   return (
     <div className={mainClass}>
@@ -852,58 +791,52 @@ export default function BbCafePos() {
         </div>
       ) : (
         <>
-          {isSidebarOpen && <div onClick={() => setIsSidebarOpen(false)} className="fixed inset-0 bg-neutral-950/80 z-40 md:hidden" />}
+          {isSidebarOpen && <div onClick={() => setIsSidebarOpen(false)} className="fixed inset-0 bg-neutral-950/80 z-40" />}
 
-          {/* Sidebar (Hidden completely in Desktop/Tablet Mode) */}
-          {!isDesktopMode && (
-            <aside className={asideClass}>
-              <div className="space-y-6">
-                <div className="flex items-center justify-between px-1 py-1 border-b border-neutral-200 dark:border-neutral-800 pb-4 gap-2">
-                  <div className="flex items-center gap-2">
-                    <SafeDatabase className="text-orange-500 animate-pulse" size={18} />
-                    {!isSidebarCollapsed && <h1 className="text-xs font-black uppercase text-yellow-500">Bum Bum POS</h1>}
-                  </div>
-                  <button onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)} className="hidden md:flex p-1.5 bg-neutral-200 dark:bg-neutral-800 text-gray-400 rounded-lg">
-                    {isSidebarCollapsed ? <SafeChevronRight size={14} /> : <SafeChevronLeft size={14} />}
-                  </button>
-                  <button onClick={() => setIsSidebarOpen(false)} className="p-1.5 text-gray-400 md:hidden"><SafeX size={14} /></button>
+          {/* Mobile Sidebar */}
+          <aside className={asideClass}>
+            <div className="space-y-6">
+              <div className="flex items-center justify-between px-1 py-1 border-b border-neutral-200 dark:border-neutral-800 pb-4 gap-2">
+                <div className="flex items-center gap-2">
+                  <SafeDatabase className="text-orange-500 animate-pulse" size={18} />
+                  <h1 className="text-xs font-black uppercase text-yellow-500">Bum Bum Mobile POS</h1>
                 </div>
-                <nav className="space-y-1.5">
-                  {navItems.map((item) => {
-                    const Icon = item.icon;
-                    return (
-                      <button key={item.id} onClick={() => { triggerBeep('tap'); setActiveTab(item.id as any); setIsSidebarOpen(false); }} className={"w-full flex items-center justify-between px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all " + (activeTab === item.id ? "bg-orange-600 text-white" : "text-neutral-500 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800")}>
-                        <div className="flex items-center gap-3"><Icon size={14} />{!isSidebarCollapsed && <span>{item.label}</span>}</div>
-                      </button>
-                    );
-                  })}
-                </nav>
+                <button onClick={() => setIsSidebarOpen(false)} className="p-1.5 text-gray-400"><SafeX size={16} /></button>
               </div>
+              <nav className="space-y-1.5">
+                {navItems.map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <button key={item.id} onClick={() => { triggerBeep('tap'); setActiveTab(item.id as any); setIsSidebarOpen(false); }} className={"w-full flex items-center justify-between px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all " + (activeTab === item.id ? "bg-orange-600 text-white" : "text-neutral-500 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800")}>
+                      <div className="flex items-center gap-3"><Icon size={14} /><span>{item.label}</span></div>
+                    </button>
+                  );
+                })}
+              </nav>
+            </div>
 
-              <div className="space-y-2 pt-4 border-t border-neutral-200 dark:border-neutral-800">
-                <button onClick={handleManualSync} disabled={isSyncing} className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase text-yellow-500 hover:bg-yellow-500/10 disabled:opacity-50">
-                  {isSyncing ? <Loader2 className="animate-spin" size={14} /> : <SafeRefreshCw size={14} />}
-                  {!isSidebarCollapsed && <span>Sync Now</span>}
-                </button>
-                <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase text-red-500 hover:bg-red-500/10">
-                  <SafeLogOut size={14} />{!isSidebarCollapsed && <span>Lock POS</span>}
-                </button>
-              </div>
-            </aside>
-          )}
+            <div className="space-y-2 pt-4 border-t border-neutral-200 dark:border-neutral-800">
+              <button onClick={handleManualSync} disabled={isSyncing} className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase text-yellow-500 hover:bg-yellow-500/10 disabled:opacity-50">
+                {isSyncing ? <Loader2 className="animate-spin" size={14} /> : <SafeRefreshCw size={14} />}
+                <span>Sync Now</span>
+              </button>
+              <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase text-red-500 hover:bg-red-500/10">
+                <SafeLogOut size={14} /><span>Lock POS</span>
+              </button>
+            </div>
+          </aside>
 
-          <main className="flex-1 p-3 md:p-5 overflow-y-auto flex flex-col h-screen">
-            <div className="flex items-center gap-3 mb-4 border-b border-neutral-200 dark:border-neutral-800 pb-3">
-              {!isDesktopMode && (
-                <button onClick={() => setIsSidebarOpen(true)} className="p-2.5 bg-neutral-200 dark:bg-neutral-800 text-orange-500 rounded-xl md:hidden"><SafeMenu size={16} /></button>
-              )}
+          <main className="flex-1 p-3 overflow-y-auto flex flex-col h-screen relative">
+            <div className="flex items-center gap-3 mb-3 border-b border-neutral-200 dark:border-neutral-800 pb-3">
+              {/* Menu Button */}
+              <button onClick={() => setIsSidebarOpen(true)} className="p-2.5 bg-neutral-200 dark:bg-neutral-800 text-orange-500 rounded-xl"><SafeMenu size={18} /></button>
 
               <div className="flex flex-col">
                 <h2 className="text-[10px] font-black uppercase text-orange-500">{activeTab} Workspace</h2>
                 <span className="text-[9px] text-neutral-500 dark:text-neutral-400 font-bold">Bum Bum Cafe • Mohandra</span>
               </div>
               
-              {/* Toggle Live Orders Button with flashing badge if pending orders exist */}
+              {/* Toggle Live Orders Button */}
               <button 
                 onClick={() => {
                   triggerBeep('tap');
@@ -917,7 +850,7 @@ export default function BbCafePos() {
                 className={"ml-auto p-2 rounded-xl flex items-center gap-2 text-[10px] font-black uppercase transition-all relative " + (activeTab === 'orders' ? "bg-orange-600 text-white" : "bg-neutral-200 dark:bg-neutral-800 text-orange-500")}
               >
                 <SafeClock size={14} />
-                <span>{activeTab === 'orders' ? 'Back to Menu' : 'Live Orders'}</span>
+                <span>{activeTab === 'orders' ? 'Menu' : 'Live'}</span>
                 {liveOrdersBadgeCount > 0 && (
                   <span className={`font-black text-[9px] px-2 py-0.5 rounded-full font-mono animate-pulse ${pendingOrdersCount > 0 ? 'bg-red-500 text-white' : 'bg-yellow-400 text-black'}`}>
                     {liveOrdersBadgeCount}
@@ -930,23 +863,21 @@ export default function BbCafePos() {
             {activeTab === 'orders' && (
               <div className="flex flex-col flex-1 overflow-hidden font-sans">
                 <div className="flex justify-between items-center mb-3">
-                  <span className="text-[10px] font-black uppercase text-neutral-500">Active Live Orders ({activeLiveOrders.length})</span>
-                  {activeLiveOrders.length > 0 && <button onClick={handleClearAllLiveOrders} className="text-[9px] font-black uppercase px-3 py-1.5 bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white border border-red-500/20 rounded-xl">Clean Workspace 🧹</button>}
+                  <span className="text-[10px] font-black uppercase text-neutral-500">Active Orders ({activeLiveOrders.length})</span>
+                  {activeLiveOrders.length > 0 && <button onClick={handleClearAllLiveOrders} className="text-[9px] font-black uppercase px-3 py-1.5 bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white border border-red-500/20 rounded-xl">Clean 🧹</button>}
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pb-20 overflow-y-auto flex-grow">
+                <div className="grid grid-cols-1 gap-3 pb-24 overflow-y-auto flex-grow">
                   {activeLiveOrders.length === 0 ? (
-                    <div className="col-span-full flex flex-col items-center justify-center py-24 text-center">
+                    <div className="flex flex-col items-center justify-center py-24 text-center">
                       <SafeClock size={48} className="text-neutral-400 mb-4 animate-pulse" />
-                      <p className="text-base font-black text-neutral-500">Order Workspace Empty</p>
+                      <p className="text-base font-black text-neutral-500">No Active Orders</p>
                     </div>
                   ) : (
                     activeLiveOrders.map((order) => (
                       <div key={order.id} className={`border bg-white dark:bg-neutral-950 rounded-2xl p-4 flex flex-col justify-between shadow-lg ${order.status === 'pending' ? 'border-red-500 animate-pulse' : 'border-neutral-200 dark:border-neutral-800'}`}>
                         <div>
                           <div className="flex justify-between items-start border-b border-neutral-200 dark:border-neutral-800 pb-2 mb-3">
-                            <div>
-                              <p className="text-xs font-black text-yellow-500 font-mono">Bill #${String(order.billNumber).padStart(4, '0')}</p>
-                            </div>
+                            <p className="text-xs font-black text-yellow-500 font-mono">Bill #${String(order.billNumber).padStart(4, '0')}</p>
                             <span className="bg-orange-500/10 text-orange-400 text-[8px] font-black uppercase px-2 py-0.5 rounded">{order.fulfillmentType}</span>
                           </div>
                           <p className="text-[10px] font-black">👤 {order.customerName}</p>
@@ -983,113 +914,55 @@ export default function BbCafePos() {
 
             {/* BILLING WORKSPACE */}
             {activeTab === 'billing' && (
-              <div className="flex-1 flex flex-col md:flex-row gap-4 overflow-hidden relative h-full">
+              <div className="flex-1 flex flex-col gap-3 overflow-hidden relative h-full">
                 
-                {/* LEFT SIDE: Menu Items & Categories */}
-                <div className="flex-1 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-3xl p-4 flex flex-col overflow-hidden shadow-xl">
-                  <div className="flex gap-3 mb-4 items-center">
-                    <div className="relative flex-1">
-                      <SafeSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={14} />
-                      <input type="text" placeholder="Search menu..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="w-full bg-neutral-100 dark:bg-neutral-800 rounded-xl py-2 px-9 text-xs outline-none text-neutral-800 dark:text-neutral-100 border border-transparent dark:border-neutral-700 focus:border-orange-500" />
-                    </div>
-                  </div>
-
-                  <div className="flex gap-1.5 overflow-x-auto pb-3 scrollbar-none">
-                    {categories.map((cat) => {
-                      const isSelected = selectedCategory === cat;
-                      return (
-                        <button key={cat} onClick={() => { triggerBeep('tap'); setSelectedCategory(cat); }} className={"px-3 py-1.5 rounded-lg text-[9px] font-black uppercase border shrink-0 transition-all " + (isSelected ? "bg-orange-500 text-black border-orange-500" : "bg-neutral-100 dark:bg-neutral-800 text-neutral-400 border-neutral-200 dark:border-neutral-700 hover:text-orange-500")}>
-                          {cat}
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  {loading ? (
-                    <div className="flex items-center justify-center flex-1"><Loader2 className="animate-spin text-orange-500" size={24} /></div>
-                  ) : (
-                    /* Dynamic Grid: 3 columns on mobile, expands up to 5 columns on large desktop/tablet screens */
-                    <div onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd} className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2.5 overflow-y-auto flex-1 pr-1 pb-4 content-start select-none touch-pan-y">
-                      <AnimatePresence mode="popLayout">
-                        {filteredMenu.map((item) => {
-                          const isAvail = item.isAvailable !== false;
-                          const hasImage = item.image || item.imageUrl || item.img;
-                          return (
-                            <motion.button layout initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} key={item.id} disabled={!isAvail} onClick={() => { triggerBeep('tap'); item.variants ? setSelectedProduct(item) : handleAddProductToCart(item); }} className={`border rounded-2xl text-left flex flex-col overflow-hidden h-36 transition-all duration-200 active:scale-95 ${isAvail ? "bg-neutral-50 hover:bg-neutral-100 dark:bg-neutral-800 dark:hover:bg-neutral-750 text-neutral-850 dark:text-neutral-100 border-neutral-200 dark:border-neutral-700 hover:border-orange-500" : "opacity-40 bg-neutral-100 dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800 pointer-events-none"}`}>
-                              {hasImage ? (
-                                <img src={hasImage} alt={item.name} className="w-full h-20 md:h-24 object-cover shrink-0 bg-neutral-200 dark:bg-neutral-700" />
-                              ) : (
-                                <div className="w-full h-20 md:h-24 bg-neutral-200 dark:bg-neutral-700 flex items-center justify-center text-neutral-400 text-[9px] font-bold uppercase shrink-0">{item.category || "No Image"}</div>
-                              )}
-                              <div className="p-1.5 md:p-2 flex-grow flex flex-col justify-center">
-                                <p className="font-bold text-[10px] md:text-[11px] line-clamp-2 leading-tight">{item.name}</p>
-                              </div>
-                            </motion.button>
-                          );
-                        })}
-                      </AnimatePresence>
-                    </div>
-                  )}
+                {/* Search Bar */}
+                <div className="relative">
+                  <SafeSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={14} />
+                  <input type="text" placeholder="Search menu..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="w-full bg-neutral-100 dark:bg-neutral-800 rounded-xl py-2 px-9 text-xs outline-none text-neutral-800 dark:text-neutral-100 border border-transparent dark:border-neutral-700 focus:border-orange-500" />
                 </div>
 
-                {/* RIGHT SIDE: Direct POS Cart Panel (Desktop/Tablet mode direct open cart list) */}
-                <div className={`flex flex-col w-full md:w-[440px] bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-3xl p-4 shadow-xl shrink-0 h-full ${layoutMode === 'mobile' ? 'hidden md:flex' : ''}`}>
-                  <div className="flex items-center justify-between pb-3 border-b border-neutral-200 dark:border-neutral-800 mb-2">
-                    <h3 className="text-xs font-black uppercase text-orange-500 flex items-center gap-2">
-                      <SafeShoppingBag size={14} /> Direct POS Cart
-                    </h3>
-                    <span className="text-[10px] font-mono bg-orange-500/10 text-orange-400 px-2.5 py-0.5 rounded-full font-bold">
-                      {cart.reduce((sum, item) => sum + item.quantity, 0)} Items
-                    </span>
-                  </div>
-
-                  {/* Scrollable container for up to 10+ items cleanly */}
-                  <div className="flex-1 overflow-y-auto space-y-2 pr-1 max-h-[calc(100vh-280px)]">
-                    {cart.length === 0 ? (
-                      <div className="h-full flex flex-col items-center justify-center text-neutral-400 text-center p-6">
-                        <SafeShoppingBag size={36} className="mb-2 opacity-30 animate-pulse" />
-                        <p className="text-xs font-bold">Cart is empty</p>
-                        <span className="text-[10px] opacity-75">Click menu items to add directly to billing cart.</span>
-                      </div>
-                    ) : (
-                      cart.map((item) => (
-                        <div key={item.id} className="bg-neutral-50 dark:bg-neutral-800/40 p-2.5 rounded-2xl border border-neutral-200 dark:border-neutral-800 flex items-center justify-between gap-2">
-                          <div className="flex-1 min-w-0">
-                            <p className="text-xs font-bold truncate">{item.name}</p>
-                            <p className="text-[10px] font-mono text-orange-500">₹{item.price} x {item.quantity} = ₹{item.price * item.quantity}</p>
-                          </div>
-                          
-                          <div className="flex items-center gap-2 shrink-0">
-                            <div className="flex items-center gap-1.5 bg-neutral-200 dark:bg-neutral-700/80 rounded-xl px-2 py-1">
-                              <button onClick={() => handleUpdateCartQuantity(item.id, -1)} className="hover:text-red-500 p-0.5"><SafeMinus size={11} /></button>
-                              <span className="text-xs font-mono font-bold px-1">{item.quantity}</span>
-                              <button onClick={() => handleUpdateCartQuantity(item.id, 1)} className="hover:text-green-500 p-0.5"><SafePlus size={11} /></button>
-                            </div>
-                            <button onClick={() => handleUpdateCartQuantity(item.id, -item.quantity)} className="text-red-400 hover:text-red-600 p-1"><Trash2 size={13} /></button>
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-
-                  {cart.length > 0 && (
-                    <div className="pt-3 border-t border-neutral-200 dark:border-neutral-800 mt-2 space-y-2 shrink-0">
-                      <div className="flex justify-between text-xs font-mono text-neutral-500">
-                        <span>Subtotal:</span><span>₹{getCartSubtotal()}</span>
-                      </div>
-                      <div className="flex justify-between text-sm font-black font-mono text-green-500">
-                        <span>Total Bill:</span><span>₹{getTotalBillPrice()}</span>
-                      </div>
-                      <button onClick={() => setIsCartOpen(true)} className="w-full bg-green-600 hover:bg-green-700 text-white font-black py-3 rounded-2xl text-xs uppercase tracking-wider shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2">
-                        Proceed to Checkout ➔
+                {/* Categories */}
+                <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-none shrink-0">
+                  {categories.map((cat) => {
+                    const isSelected = selectedCategory === cat;
+                    return (
+                      <button key={cat} onClick={() => { triggerBeep('tap'); setSelectedCategory(cat); }} className={"px-3 py-1.5 rounded-lg text-[9px] font-black uppercase border shrink-0 transition-all " + (isSelected ? "bg-orange-500 text-black border-orange-500" : "bg-neutral-100 dark:bg-neutral-800 text-neutral-400 border-neutral-200 dark:border-neutral-700 hover:text-orange-500")}>
+                        {cat}
                       </button>
-                    </div>
-                  )}
+                    );
+                  })}
                 </div>
 
-                {/* Mobile Floating Cart Button */}
-                {cart.length > 0 && layoutMode === 'mobile' && (
-                  <motion.button initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} onClick={() => setIsCartOpen(true)} className="fixed bottom-6 right-6 left-6 bg-green-600 text-white font-black px-6 py-4 rounded-2xl shadow-2xl flex items-center justify-between gap-4 z-40 active:scale-95 transition-all md:hidden">
+                {loading ? (
+                  <div className="flex items-center justify-center flex-1"><Loader2 className="animate-spin text-orange-500" size={24} /></div>
+                ) : (
+                  /* STRICT 3-Column Grid for Mobile */
+                  <div onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd} className="grid grid-cols-3 gap-2 overflow-y-auto flex-1 pb-24 content-start select-none touch-pan-y">
+                    <AnimatePresence mode="popLayout">
+                      {filteredMenu.map((item) => {
+                        const isAvail = item.isAvailable !== false;
+                        const hasImage = item.image || item.imageUrl || item.img;
+                        return (
+                          <motion.button layout initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} key={item.id} disabled={!isAvail} onClick={() => { triggerBeep('tap'); item.variants ? setSelectedProduct(item) : handleAddProductToCart(item); }} className={`border rounded-2xl text-left flex flex-col overflow-hidden h-32 transition-all duration-200 active:scale-95 ${isAvail ? "bg-neutral-50 hover:bg-neutral-100 dark:bg-neutral-800 text-neutral-850 dark:text-neutral-100 border-neutral-200 dark:border-neutral-700" : "opacity-40 bg-neutral-100 dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800 pointer-events-none"}`}>
+                            {hasImage ? (
+                              <img src={hasImage} alt={item.name} className="w-full h-18 object-cover shrink-0 bg-neutral-200 dark:bg-neutral-700" />
+                            ) : (
+                              <div className="w-full h-18 bg-neutral-200 dark:bg-neutral-700 flex items-center justify-center text-neutral-400 text-[8px] font-bold uppercase shrink-0">{item.category || "No Image"}</div>
+                            )}
+                            <div className="p-1.5 flex-grow flex flex-col justify-center">
+                              <p className="font-bold text-[10px] line-clamp-2 leading-tight">{item.name}</p>
+                            </div>
+                          </motion.button>
+                        );
+                      })}
+                    </AnimatePresence>
+                  </div>
+                )}
+
+                {/* Floating Bottom Cart Button */}
+                {cart.length > 0 && (
+                  <motion.button initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} onClick={() => setIsCartOpen(true)} className="fixed bottom-4 right-4 left-4 bg-green-600 text-white font-black px-5 py-3.5 rounded-2xl shadow-2xl flex items-center justify-between gap-4 z-40 active:scale-95 transition-all">
                     <div className="flex items-center gap-2.5">
                       <SafeShoppingBag size={16} />
                       <div className="text-left">
@@ -1108,26 +981,23 @@ export default function BbCafePos() {
 
             {/* INVENTORY WORKSPACE */}
             {activeTab === 'inventory' && (
-              <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 p-5 flex-1 overflow-y-auto pb-20 rounded-3xl shadow-xl">
-                <div className="flex justify-between items-center mb-6">
-                  <div>
-                    <h2 className="text-sm font-black uppercase text-orange-500">Live Item Stock Control</h2>
-                    <p className="text-[10px] text-neutral-400">Disable items instantly for customers.</p>
-                  </div>
-                  <button onClick={async () => { triggerBeep('tap'); const snap = await getDocs(collection(db, "products")); setProducts(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }))); }} className="p-2 bg-neutral-200 dark:bg-neutral-800 text-neutral-400 hover:text-orange-500 rounded-xl"><SafeRefreshCw size={14} /></button>
+              <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 p-4 flex-1 overflow-y-auto pb-20 rounded-3xl shadow-xl">
+                <div className="flex justify-between items-center mb-4">
+                  <h2 className="text-xs font-black uppercase text-orange-500">Stock Control</h2>
+                  <button onClick={async () => { triggerBeep('tap'); const snap = await getDocs(collection(db, "products")); setProducts(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }))); }} className="p-2 bg-neutral-200 dark:bg-neutral-800 text-neutral-400 rounded-xl"><SafeRefreshCw size={14} /></button>
                 </div>
-                <div className="space-y-2 max-w-xl">
+                <div className="space-y-2">
                   {products.map((item) => {
                     const isAvail = item.isAvailable !== false;
                     return (
                       <div key={item.id} className="bg-neutral-50 dark:bg-neutral-800/45 border border-neutral-200 dark:border-neutral-800 p-3 rounded-2xl flex items-center justify-between">
                         <div>
                           <span className="font-bold text-xs block">{item.name}</span>
-                          <span className="text-[8px] text-neutral-400 block">Category: {item.category} | ₹{item.price}</span>
+                          <span className="text-[8px] text-neutral-400 block">₹{item.price}</span>
                         </div>
-                        <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-3">
                           <span className={"text-[8px] font-black px-2 py-0.5 rounded-full border " + (isAvail ? "bg-green-500/10 text-green-400 border-green-500/20" : "bg-red-500/10 text-red-400 border-red-500/20")}>{isAvail ? 'In Stock' : 'Out'}</span>
-                          <button onClick={() => handleToggleStock(item.id, isAvail)} className={"text-[9px] font-black uppercase px-3 py-1.5 rounded-xl border transition-all " + (isAvail ? "text-red-400 border-red-500/20 hover:bg-red-500/10" : "text-green-400 border-green-500/20 hover:bg-green-500/10")}>{isAvail ? 'Disable' : 'Enable'}</button>
+                          <button onClick={() => handleToggleStock(item.id, isAvail)} className={"text-[9px] font-black uppercase px-3 py-1.5 rounded-xl border transition-all " + (isAvail ? "text-red-400 border-red-500/20" : "text-green-400 border-green-500/20")}>{isAvail ? 'Disable' : 'Enable'}</button>
                         </div>
                       </div>
                     );
@@ -1138,30 +1008,27 @@ export default function BbCafePos() {
 
             {/* PAST RECEIPTS WORKSPACE */}
             {activeTab === 'receipts' && (
-              <div className="flex-1 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-3xl p-4 flex flex-col overflow-hidden shadow-xl max-w-5xl w-full mx-auto font-sans">
-                <div className="relative mb-4">
+              <div className="flex-1 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-3xl p-3 flex flex-col overflow-hidden shadow-xl">
+                <div className="relative mb-3">
                   <SafeSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={14} />
-                  <input type="text" placeholder="Search past receipt..." value={receiptSearchQuery} onChange={e => setReceiptSearchQuery(e.target.value)} className="w-full bg-neutral-100 dark:bg-neutral-800 border border-transparent dark:border-neutral-700 rounded-xl py-2 px-9 text-xs outline-none text-neutral-800 dark:text-neutral-100 focus:border-orange-500" />
+                  <input type="text" placeholder="Search receipt..." value={receiptSearchQuery} onChange={e => setReceiptSearchQuery(e.target.value)} className="w-full bg-neutral-100 dark:bg-neutral-800 rounded-xl py-2 px-9 text-xs outline-none" />
                 </div>
                 {isSearchingReceipts ? (
                   <div className="flex items-center justify-center flex-1"><Loader2 className="animate-spin text-orange-500" size={24} /></div>
                 ) : (
                   <div className="space-y-2 overflow-y-auto flex-1 pr-1 pb-16">
                     {filteredPastReceipts.length === 0 ? (
-                      <p className="text-center text-neutral-400 text-xs py-12">No past receipts found</p>
+                      <p className="text-center text-neutral-400 text-xs py-12">No receipts found</p>
                     ) : (
                       filteredPastReceipts.map((order) => {
                         const isRefunded = order.status === 'refunded';
                         return (
-                          <div key={order.id} onClick={() => { triggerBeep('tap'); setSelectedReceipt(order); setIsReceiptModalOpen(true); }} className="bg-neutral-50 dark:bg-neutral-800/30 border border-neutral-200 dark:border-neutral-850 p-4 rounded-2xl flex justify-between items-center cursor-pointer hover:border-orange-500 transition-all">
-                            <div className="space-y-0.5">
+                          <div key={order.id} onClick={() => { triggerBeep('tap'); setSelectedReceipt(order); setIsReceiptModalOpen(true); }} className="bg-neutral-50 dark:bg-neutral-800/30 border border-neutral-200 dark:border-neutral-850 p-3 rounded-2xl flex justify-between items-center">
+                            <div>
                               <span className="font-bold text-xs block font-mono">Bill #${order.billNumber}</span>
-                              <span className="text-[9px] text-neutral-400 block font-mono">Token: #{order.tokenNumber} | {order.customerName}</span>
-                              {isRefunded && <span className="text-[7px] font-black uppercase text-red-500 border border-red-500/20 px-1 rounded bg-red-500/5">Refunded</span>}
+                              <span className="text-[9px] text-neutral-400 block font-mono">{order.customerName}</span>
                             </div>
-                            <div className="text-right">
-                              <span className={`text-sm font-black font-mono ${isRefunded ? 'text-neutral-400 line-through' : 'text-green-500'}`}>₹{order.total}</span>
-                            </div>
+                            <span className={`text-sm font-black font-mono ${isRefunded ? 'text-neutral-400 line-through' : 'text-green-500'}`}>₹{order.total}</span>
                           </div>
                         );
                       })
@@ -1174,64 +1041,33 @@ export default function BbCafePos() {
             {/* SETTINGS WORKSPACE */}
             {activeTab === 'settings' && (
               <div className="max-w-xl mx-auto w-full pb-20 overflow-y-auto flex-1 font-sans">
-                <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 p-6 rounded-3xl shadow-xl space-y-6">
-                  <h3 className="text-sm font-black uppercase text-orange-500">POS Settings</h3>
+                <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 p-5 rounded-3xl shadow-xl space-y-5">
+                  <h3 className="text-xs font-black uppercase text-orange-500">Mobile POS Settings</h3>
                   
-                  <div className="border-b border-neutral-200 dark:border-neutral-800 pb-4 space-y-3">
-                    <p className="text-xs font-bold uppercase">A. Layout / Device Mode:</p>
-                    <div className="flex bg-neutral-100 dark:bg-neutral-800 p-1 rounded-xl w-64 border border-transparent dark:border-neutral-700">
-                      <button onClick={() => { triggerBeep('tap'); setLayoutMode('desktop'); localStorage.setItem("bb_pos_layout_mode", "desktop"); toast.success("Desktop Mode Active"); }} className={"flex-grow py-2 rounded-lg text-[10px] font-black uppercase transition-all flex items-center justify-center gap-1.5 " + (layoutMode === 'desktop' ? "bg-orange-600 text-white shadow-md" : "text-neutral-400")}><SafeMonitor size={13} /> Desktop</button>
-                      <button onClick={() => { triggerBeep('tap'); setLayoutMode('mobile'); localStorage.setItem("bb_pos_layout_mode", "mobile"); toast.success("Mobile Mode Active"); }} className={"flex-grow py-2 rounded-lg text-[10px] font-black uppercase transition-all flex items-center justify-center gap-1.5 " + (layoutMode === 'mobile' ? "bg-orange-600 text-white shadow-md" : "text-neutral-400")}><SafeSmartphone size={13} /> Mobile</button>
+                  <div className="border-b border-neutral-200 dark:border-neutral-800 pb-3 space-y-2">
+                    <p className="text-xs font-bold uppercase">UI Theme:</p>
+                    <div className="flex bg-neutral-100 dark:bg-neutral-800 p-1 rounded-xl w-48">
+                      <button onClick={() => handleToggleTheme('dark')} className={"flex-grow py-1.5 rounded-lg text-[9px] font-black uppercase " + (themeMode === 'dark' ? "bg-neutral-950 text-amber-400" : "text-neutral-400")}>Dark</button>
+                      <button onClick={() => handleToggleTheme('light')} className={"flex-grow py-1.5 rounded-lg text-[9px] font-black uppercase " + (themeMode === 'light' ? "bg-white text-orange-600" : "text-neutral-400")}>Light</button>
                     </div>
                   </div>
 
-                  <div className="border-b border-neutral-200 dark:border-neutral-800 pb-4 space-y-3">
-                    <p className="text-xs font-bold uppercase">B. UI Theme:</p>
-                    <div className="flex bg-neutral-100 dark:bg-neutral-800 p-1 rounded-xl w-60 border border-transparent dark:border-neutral-700">
-                      <button onClick={() => handleToggleTheme('dark')} className={"flex-grow py-2 rounded-lg text-[10px] font-black uppercase transition-all " + (themeMode === 'dark' ? "bg-neutral-950 text-amber-400 shadow-md" : "text-neutral-400")}>Dark</button>
-                      <button onClick={() => handleToggleTheme('light')} className={"flex-grow py-2 rounded-lg text-[10px] font-black uppercase transition-all " + (themeMode === 'light' ? "bg-white text-orange-600 shadow-md" : "text-neutral-400")}>Light</button>
-                    </div>
-                  </div>
-
-                  <div className="border-b border-neutral-200 dark:border-neutral-800 pb-4 space-y-3">
-                    <p className="text-xs font-bold uppercase">C. GST Config:</p>
+                  <div className="border-b border-neutral-200 dark:border-neutral-800 pb-3 space-y-2">
+                    <p className="text-xs font-bold uppercase">GST Config:</p>
                     <div className="flex items-center justify-between">
                       <span className="text-xs">Enable GST:</span>
                       <button onClick={() => { const next = !gstEnabled; setGstEnabled(next); localStorage.setItem("bb_pos_gst_enabled", String(next)); }} className="text-orange-500">
-                        {gstEnabled ? <SafeToggleRight size={32} /> : <SafeToggleLeft size={32} />}
-                      </button>
-                    </div>
-                    {gstEnabled && <input type="number" value={gstRate} onChange={e => { const r = Number(e.target.value); setGstRate(r); localStorage.setItem("bb_pos_gst_rate", String(r)); }} className="w-full bg-neutral-100 dark:bg-neutral-800 border p-3 rounded-xl text-xs outline-none" />}
-                  </div>
-
-                  <div className="border-b border-neutral-200 dark:border-neutral-800 pb-4 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <p className="text-xs font-bold uppercase">D. Enable KOT Printing:</p>
-                      <button onClick={() => { const next = !kotEnabled; setKotEnabled(next); localStorage.setItem("bb_pos_kot_enabled", String(next)); toast.success(next ? "KOT ON" : "KOT OFF"); }} className="text-orange-500">
-                        {kotEnabled ? <SafeToggleRight size={32} /> : <SafeToggleLeft size={32} />}
+                        {gstEnabled ? <SafeToggleRight size={28} /> : <SafeToggleLeft size={28} />}
                       </button>
                     </div>
                   </div>
 
-                  <div className="space-y-3 pt-2">
-                    <div className="flex items-center justify-between">
-                      <p className="text-xs font-bold uppercase">E. Hardware Printer Connection (USB / Bluetooth):</p>
-                      <span className={"text-[8px] font-black uppercase tracking-widest px-2.5 py-0.5 rounded-full border " + (printerConnected ? "bg-green-500/10 text-green-400 border-green-500/20" : "bg-red-500/10 text-red-400 border-red-500/20")}>
-                        {printerConnected ? '● Connected' : 'Disconnected'}
-                      </span>
+                  <div className="space-y-2">
+                    <p className="text-xs font-bold uppercase">Printer Connection:</p>
+                    <div className="flex gap-2">
+                      <button onClick={handleConnectPrinter} disabled={isConnecting} className="flex-1 bg-amber-500 text-black font-black py-2.5 rounded-xl text-[9px] uppercase">Connect</button>
+                      <button onClick={handleTestPrint} className="flex-1 bg-green-600 text-white font-black py-2.5 rounded-xl text-[9px] uppercase">Test Print 🧾</button>
                     </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      {[{ id: 'thermal_usb', label: 'Thermal USB (Windows)' }, { id: 'thermal_bluetooth', label: 'Thermal Bluetooth' }, { id: 'network_ip', label: 'Network IP' }, { id: 'laser', label: 'Laser A4' }].map((p) => (
-                        <button key={p.id} onClick={() => { triggerBeep('tap'); setPrinterType(p.id as any); setPrinterConnected(false); localStorage.setItem("bb_pos_printer_type", p.id); }} className={"p-2 rounded-xl border text-[9px] font-black uppercase transition-all " + (printerType === p.id ? "bg-neutral-950 text-amber-400 border-amber-500" : "bg-neutral-100 dark:bg-neutral-800 border-neutral-200 dark:border-neutral-700")}>
-                          {p.label}
-                        </button>
-                      ))}
-                    </div>
-                    <div className="flex gap-2 pt-2">
-                      <button onClick={handleConnectPrinter} disabled={isConnecting} className="flex-1 bg-amber-500 hover:bg-amber-600 text-black font-black py-2.5 rounded-xl text-[10px] uppercase shadow-md active:scale-95 transition-all">Connect Device</button>
-                      <button onClick={handleTestPrint} className="flex-grow bg-green-600 text-white font-black py-2.5 rounded-xl text-[10px] uppercase shadow-md active:scale-95 transition-all">Test Print 🧾</button>
-                    </div>
-                    {printerConnected && <button onClick={handleDisconnectPrinter} className="w-full mt-2 bg-red-600/10 text-red-500 border border-red-500/20 font-black py-2 rounded-xl text-[9px] uppercase">Disconnect Printer</button>}
                   </div>
                 </div>
               </div>
@@ -1240,53 +1076,39 @@ export default function BbCafePos() {
         </>
       )}
 
-      {/* PAST BILL RECEIPT MODAL */}
+      {/* MODALS & DRAWERS */}
       <AnimatePresence>
         {isReceiptModalOpen && selectedReceipt && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-neutral-900 dark:text-neutral-100 max-w-lg w-full rounded-3xl p-6 shadow-2xl relative font-sans flex flex-col max-h-[85vh]">
-              <button onClick={() => setIsReceiptModalOpen(false)} className="absolute top-4 right-4 p-2 rounded-full hover:bg-neutral-100 dark:hover:bg-neutral-800"><SafeX size={18} /></button>
+            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-neutral-900 dark:text-neutral-100 max-w-lg w-full rounded-3xl p-5 shadow-2xl relative font-sans flex flex-col max-h-[85vh]">
+              <button onClick={() => setIsReceiptModalOpen(false)} className="absolute top-4 right-4 p-2 rounded-full hover:bg-neutral-100 dark:hover:bg-neutral-800"><SafeX size={16} /></button>
               
               <div className="border-b border-neutral-200 dark:border-neutral-800 pb-3 pr-8">
-                <div className="flex items-center gap-2">
-                  <h3 className="text-lg font-black">Bill Details</h3>
-                  <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded ${selectedReceipt.status === 'refunded' ? 'bg-red-500/10 text-red-500' : 'bg-green-500/10 text-green-500'}`}>
-                    {selectedReceipt.status === 'refunded' ? 'Refunded' : 'Completed'}
-                  </span>
-                </div>
-                <p className="text-xs font-mono text-neutral-400 mt-1">Bill No: #{selectedReceipt.billNumber} | Token: #{selectedReceipt.tokenNumber}</p>
+                <h3 className="text-base font-black">Bill Details</h3>
+                <p className="text-xs font-mono text-neutral-400 mt-0.5">Bill No: #{selectedReceipt.billNumber}</p>
               </div>
 
-              <div className="flex-1 overflow-y-auto space-y-4 py-4 pr-1">
-                <div className="space-y-1.5 text-xs bg-neutral-50 dark:bg-neutral-800/40 p-3.5 rounded-2xl border border-neutral-100 dark:border-neutral-800">
-                  <p>👤 <b>Guest Name:</b> {selectedReceipt.customerName}</p>
-                  {selectedReceipt.customerPhone && <p>📞 <b>Phone:</b> {selectedReceipt.customerPhone}</p>}
+              <div className="flex-1 overflow-y-auto space-y-3 py-3">
+                <div className="space-y-1 text-xs bg-neutral-50 dark:bg-neutral-800/40 p-3 rounded-2xl">
+                  <p>👤 <b>Guest:</b> {selectedReceipt.customerName}</p>
                   <p>💳 <b>Method:</b> <span className="uppercase">{selectedReceipt.paymentMethod}</span></p>
-                  <p>🍽️ <b>Fulfillment:</b> <span className="uppercase">{selectedReceipt.fulfillmentType}</span></p>
                 </div>
-
-                <div className="space-y-1.5">
-                  <p className="text-[10px] font-bold uppercase text-neutral-400">Ordered Items</p>
-                  <div className="space-y-1 bg-neutral-50 dark:bg-neutral-800/40 p-3 rounded-2xl border border-neutral-100 dark:border-neutral-800">
-                    {selectedReceipt.items?.map((it: any, idx: number) => (
-                      <div key={idx} className="flex justify-between text-xs py-1 border-b border-neutral-100 dark:border-neutral-800/50 last:border-0">
-                        <span>{it.name} <span className="text-orange-500 font-bold">x{it.quantity}</span></span>
-                        <span className="font-mono">₹{it.price * it.quantity}</span>
-                      </div>
-                    ))}
-                  </div>
+                <div className="space-y-1 bg-neutral-50 dark:bg-neutral-800/40 p-3 rounded-2xl">
+                  {selectedReceipt.items?.map((it: any, idx: number) => (
+                    <div key={idx} className="flex justify-between text-xs py-1">
+                      <span>{it.name} <span className="text-orange-500 font-bold">x{it.quantity}</span></span>
+                      <span className="font-mono">₹{it.price * it.quantity}</span>
+                    </div>
+                  ))}
                 </div>
-
-                <div className="space-y-1.5 text-xs border-t border-neutral-200 dark:border-neutral-800 pt-3">
-                  <div className="flex justify-between font-mono"><span>Subtotal:</span><span>₹{selectedReceipt.subtotal}</span></div>
-                  {selectedReceipt.discount > 0 && <div className="flex justify-between text-red-500 font-mono"><span>Discount:</span><span>-₹{selectedReceipt.discount}</span></div>}
-                  <div className="flex justify-between text-sm font-black text-green-500 font-mono pt-1.5 border-t border-dashed"><span>Grand Total:</span><span>₹{selectedReceipt.total}</span></div>
+                <div className="flex justify-between text-sm font-black text-green-500 font-mono pt-2 border-t">
+                  <span>Grand Total:</span><span>₹{selectedReceipt.total}</span>
                 </div>
               </div>
 
-              <div className="flex gap-2.5 pt-4 border-t border-neutral-200 dark:border-neutral-800">
-                <button onClick={() => handlePrintReceipt(selectedReceipt, getPrintConfig())} className="flex-1 bg-green-600 hover:bg-green-700 text-white font-black py-3 rounded-2xl text-xs uppercase flex items-center justify-center gap-2"><SafePrinter size={15} /> Reprint Bill</button>
-                {selectedReceipt.status !== 'refunded' && <button onClick={() => handleRefundOrder(selectedReceipt.id)} className="flex-1 bg-red-600 hover:bg-red-700 text-white font-black py-3 rounded-2xl text-xs uppercase flex items-center justify-center gap-2"><Trash2 size={15} /> Refund Bill</button>}
+              <div className="flex gap-2 pt-3 border-t">
+                <button onClick={() => handlePrintReceipt(selectedReceipt, getPrintConfig())} className="flex-1 bg-green-600 text-white font-black py-2.5 rounded-xl text-xs uppercase">Reprint</button>
+                {selectedReceipt.status !== 'refunded' && <button onClick={() => handleRefundOrder(selectedReceipt.id)} className="flex-1 bg-red-600 text-white font-black py-2.5 rounded-xl text-xs uppercase">Refund</button>}
               </div>
             </motion.div>
           </div>
