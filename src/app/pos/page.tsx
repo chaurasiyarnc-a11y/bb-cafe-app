@@ -101,19 +101,15 @@ export default function BbCafePosMobile() {
 
   // Printer Settings states
   const [printerType, setPrinterType] = useState<'thermal_usb' | 'thermal_bluetooth' | 'network_ip' | 'laser'>('thermal_bluetooth');
-  const [printerIp, setPrinterIp] = useState('192.168.1.100');
-  const [printCopies, setPrintCopies] = useState(1);
   const [isConnecting, setIsConnecting] = useState(false);
   const [printerConnected, setPrinterConnected] = useState(false);
   const [bleCharacteristic, setBleCharacteristic] = useState<any>(null);
   const [fontSize, setFontSize] = useState<number>(9); 
   const [kotEnabled, setKotEnabled] = useState<boolean>(true); 
 
-  // USB Web Serial and WebUSB references
   const [serialPort, setSerialPort] = useState<any>(null); 
   const [usbDevice, setUsbDevice] = useState<any>(null); 
 
-  // Swipe gesture tracking states
   const [touchStart, setTouchStart] = useState<number | null>(null);
   const [touchEnd, setTouchEnd] = useState<number | null>(null);
   const minSwipeDistance = 50;
@@ -140,7 +136,6 @@ export default function BbCafePosMobile() {
   const [loyaltyRules, setLoyaltyRules] = useState<any[]>([]); 
   const [storeOpen, setStoreOpen] = useState(true);
   
-  // Receipts states
   const [pastReceipts, setPastReceipts] = useState<any[]>([]);
   const [isSearchingReceipts, setIsSearchingReceipts] = useState(false);
   const [receiptSearchQuery, setReceiptSearchQuery] = useState('');
@@ -256,13 +251,6 @@ export default function BbCafePosMobile() {
 
     const savedCart = localStorage.getItem("bb_pos_saved_cart");
     if (savedCart) { try { setCart(JSON.parse(savedCart)); } catch (err) {} }
-    setCustomerPhone(localStorage.getItem("bb_pos_saved_cust_phone") || '');
-    setCustomerName(localStorage.getItem("bb_pos_saved_cust_name") || '');
-    setCustomerPoints(Number(localStorage.getItem("bb_pos_saved_cust_points")) || 0);
-    setAddress(localStorage.getItem("bb_pos_saved_cust_address") || '');
-    setFulfillmentType((localStorage.getItem("bb_pos_saved_fulfillment_type") as any) || 'table');
-    setTableNumber(localStorage.getItem("bb_pos_saved_table_number") || 'Table 1');
-    setChefInstructions(localStorage.getItem("bb_pos_saved_chef_instructions") || '');
   }, []);
 
   useEffect(() => {
@@ -616,7 +604,6 @@ export default function BbCafePosMobile() {
         });
         const server = await device.gatt!.connect();
         
-        let service;
         let characteristic;
         const services = await server.getPrimaryServices();
         for (const s of services) {
@@ -624,7 +611,6 @@ export default function BbCafePosMobile() {
             const chars = await s.getCharacteristics();
             for (const c of chars) {
               if (c.properties.write || c.properties.writeWithoutResponse) {
-                service = s;
                 characteristic = c;
                 break;
               }
@@ -833,7 +819,6 @@ export default function BbCafePosMobile() {
         <>
           {isSidebarOpen && <div onClick={() => setIsSidebarOpen(false)} className="fixed inset-0 bg-neutral-950/80 z-40" />}
 
-          {/* Mobile Sidebar */}
           <aside className={asideClass}>
             <div className="space-y-6">
               <div className="flex items-center justify-between px-1 py-1 border-b border-neutral-200 dark:border-neutral-800 pb-4 gap-2">
@@ -868,7 +853,6 @@ export default function BbCafePosMobile() {
 
           <main className="flex-1 p-3 overflow-y-auto flex flex-col h-screen relative">
             <div className="flex items-center gap-3 mb-3 border-b border-neutral-200 dark:border-neutral-800 pb-3">
-              {/* Menu Button */}
               <button onClick={() => setIsSidebarOpen(true)} className="p-2.5 bg-neutral-200 dark:bg-neutral-800 text-orange-500 rounded-xl"><SafeMenu size={18} /></button>
 
               <div className="flex flex-col">
@@ -876,7 +860,6 @@ export default function BbCafePosMobile() {
                 <span className="text-[9px] text-neutral-500 dark:text-neutral-400 font-bold">Bum Bum Cafe • Mohandra</span>
               </div>
               
-              {/* Toggle Live Orders Button */}
               <button 
                 onClick={() => {
                   triggerBeep('tap');
@@ -955,14 +938,11 @@ export default function BbCafePosMobile() {
             {/* BILLING WORKSPACE */}
             {activeTab === 'billing' && (
               <div className="flex-1 flex flex-col gap-3 overflow-hidden relative h-full">
-                
-                {/* Search Bar */}
                 <div className="relative">
                   <SafeSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={14} />
                   <input type="text" placeholder="Search menu..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="w-full bg-neutral-100 dark:bg-neutral-800 rounded-xl py-2 px-9 text-xs outline-none text-neutral-800 dark:text-neutral-100 border border-transparent dark:border-neutral-700 focus:border-orange-500" />
                 </div>
 
-                {/* Categories */}
                 <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-none shrink-0">
                   {categories.map((cat) => {
                     const isSelected = selectedCategory === cat;
@@ -977,7 +957,6 @@ export default function BbCafePosMobile() {
                 {loading ? (
                   <div className="flex items-center justify-center flex-1"><Loader2 className="animate-spin text-orange-500" size={24} /></div>
                 ) : (
-                  /* FIXED 3-Column Grid for Mobile with perfect layout balance */
                   <div onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd} className="grid grid-cols-3 gap-2 overflow-y-auto flex-1 pb-24 content-start select-none touch-pan-y">
                     <AnimatePresence mode="popLayout">
                       {filteredMenu.map((item) => {
@@ -994,7 +973,6 @@ export default function BbCafePosMobile() {
                             onClick={() => { triggerBeep('tap'); item.variants ? setSelectedProduct(item) : handleAddProductToCart(item); }} 
                             className={`border rounded-2xl text-left flex flex-col overflow-hidden h-36 transition-all duration-200 active:scale-95 ${isAvail ? "bg-neutral-50 hover:bg-neutral-100 dark:bg-neutral-800 text-neutral-850 dark:text-neutral-100 border-neutral-200 dark:border-neutral-700" : "opacity-40 bg-neutral-100 dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800 pointer-events-none"}`}
                           >
-                            {/* FIXED IMAGE CONTAINER: Strict height and object-cover */}
                             <div className="w-full h-20 bg-neutral-200 dark:bg-neutral-700 relative shrink-0 overflow-hidden">
                               {hasImage ? (
                                 <img src={hasImage} alt={item.name} className="w-full h-full object-cover" />
@@ -1002,7 +980,6 @@ export default function BbCafePosMobile() {
                                 <div className="w-full h-full flex items-center justify-center text-neutral-400 text-[8px] font-bold uppercase">{item.category || "No Image"}</div>
                               )}
                             </div>
-                            {/* FIXED NAME CONTAINER: Prevents text overflowing or clipping */}
                             <div className="p-2 flex-grow flex flex-col justify-between w-full">
                               <p className="font-bold text-[10px] line-clamp-2 leading-tight text-neutral-900 dark:text-neutral-100">{item.name}</p>
                               <p className="text-[10px] font-mono font-bold text-orange-500 mt-1">₹{item.price}</p>
@@ -1014,7 +991,6 @@ export default function BbCafePosMobile() {
                   </div>
                 )}
 
-                {/* Floating Bottom Cart Button */}
                 {cart.length > 0 && (
                   <motion.button initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} onClick={() => setIsCartOpen(true)} className="fixed bottom-4 right-4 left-4 bg-green-600 text-white font-black px-5 py-3.5 rounded-2xl shadow-2xl flex items-center justify-between gap-4 z-40 active:scale-95 transition-all">
                     <div className="flex items-center gap-2.5">
@@ -1029,7 +1005,6 @@ export default function BbCafePosMobile() {
                     </div>
                   </motion.button>
                 )}
-
               </div>
             )}
 
@@ -1182,7 +1157,48 @@ export default function BbCafePosMobile() {
       </AnimatePresence>
 
       <PosCartDrawer 
-        isHindi={false} isCartOpen={isCartOpen} setIsCartOpen={setIsCartOpen} cart={cart} setCart={setCart} customerPhone={customerPhone} setCustomerPhone={setCustomerPhone} customerName={customerName} setCustomerName={setCustomerName} customerPoints={customerPoints} setCustomerPoints={setCustomerPoints} pointsToRedeem={pointsToRedeem} setPointsToRedeem={setPointsToRedeem} customDiscount={customDiscount} setCustomDiscount={setCustomDiscount} fulfillmentType={fulfillmentType} setFulfillmentType={setFulfillmentType} selectedArea={selectedArea} setSelectedArea={setSelectedArea} DELIVERY_AREAS={DELIVERY_AREAS} address={address} setAddress={setAddress} tableNumber={tableNumber} setTableNumber={setTableNumber} chefInstructions={chefInstructions} setChefInstructions={setChefInstructions} isSubmittingOrder={isSubmittingOrder} paymentMethod={paymentMethod} setPaymentMethod={handleSetPaymentMethod} noCutlery={false} setNoCutlery={() => {}} getCartSubtotal={getCartSubtotal} getCartAddonsPrice={() => 0} getDeliveryCharge={getDeliveryCharge} getFreeDeliveryProgressPercent={getFreeDeliveryProgressPercent} getTotalPointsRedeemedInCart={getTotalPointsRedeemedInCart} getTotalBillPrice={getTotalBillPrice} loyaltyRules={loyaltyRules} handlePlaceOrder={handlePlaceOrder} handleDetectLocation={handleDetectLocation} setIsCustomerModalOpen={setIsCustomerModalOpen} searchDbCustomers={searchDbCustomers} handleUpdateCartQuantity={handleUpdateCartQuantity} handleUpdateCartItemNote={handleUpdateCartItemNote} showAddonsSection={false} triggerBeep={triggerBeep} handleCheckLoyalty={handleCheckLoyalty} ketchupAddon={false} setKetchupAddon={() => {}} oreganoAddon={false} setOreganoAddon={() => {}} chiliFlakesAddon={false} setChiliFlakesAddon={() => {}}
+        isCartOpen={isCartOpen} 
+        setIsCartOpen={setIsCartOpen} 
+        cart={cart} 
+        setCart={setCart} 
+        customerPhone={customerPhone} 
+        setCustomerPhone={setCustomerPhone} 
+        customerName={customerName} 
+        setCustomerName={setCustomerName} 
+        customerPoints={customerPoints} 
+        setCustomerPoints={setCustomerPoints} 
+        pointsToRedeem={pointsToRedeem} 
+        setPointsToRedeem={setPointsToRedeem} 
+        customDiscount={customDiscount} 
+        setCustomDiscount={setCustomDiscount} 
+        fulfillmentType={fulfillmentType} 
+        setFulfillmentType={setFulfillmentType} 
+        selectedArea={selectedArea} 
+        setSelectedArea={setSelectedArea} 
+        DELIVERY_AREAS={DELIVERY_AREAS} 
+        address={address} 
+        setAddress={setAddress} 
+        tableNumber={tableNumber} 
+        setTableNumber={setTableNumber} 
+        chefInstructions={chefInstructions} 
+        setChefInstructions={setChefInstructions} 
+        isSubmittingOrder={isSubmittingOrder} 
+        paymentMethod={paymentMethod} 
+        setPaymentMethod={handleSetPaymentMethod} 
+        getCartSubtotal={getCartSubtotal} 
+        getDeliveryCharge={getDeliveryCharge} 
+        getFreeDeliveryProgressPercent={getFreeDeliveryProgressPercent} 
+        getTotalPointsRedeemedInCart={getTotalPointsRedeemedInCart} 
+        getTotalBillPrice={getTotalBillPrice} 
+        loyaltyRules={loyaltyRules} 
+        handlePlaceOrder={handlePlaceOrder} 
+        handleDetectLocation={handleDetectLocation} 
+        setIsCustomerModalOpen={setIsCustomerModalOpen} 
+        searchDbCustomers={searchDbCustomers} 
+        handleUpdateCartQuantity={handleUpdateCartQuantity} 
+        handleUpdateCartItemNote={handleUpdateCartItemNote} 
+        triggerBeep={triggerBeep} 
+        handleCheckLoyalty={handleCheckLoyalty} 
       />
 
       <CustomerDirectoryModal 
