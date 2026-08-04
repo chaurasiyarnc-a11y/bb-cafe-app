@@ -140,7 +140,6 @@ export default function BbCafePosDesktop() {
 
   // Cart States
   const [cart, setCart] = useState<PosCartItem[]>([]);
-  const [isCartOpen, setIsCartOpen] = useState(false);
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerName, setCustomerName] = useState('');
   const [customerPoints, setCustomerPoints] = useState(0);
@@ -797,7 +796,7 @@ export default function BbCafePosDesktop() {
                       )}
                     </div>
 
-                    {/* Cart Items List (KOT Instructions Note inputs completely removed to keep it clean) */}
+                    {/* Cart Items List (Cleaned: No item notes/KOT inputs) */}
                     <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
                       {cart.length === 0 ? (
                         <div className="flex flex-col items-center justify-center py-10 text-neutral-400 space-y-2">
