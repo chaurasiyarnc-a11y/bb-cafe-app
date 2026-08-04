@@ -26,7 +26,7 @@ import {
   PrintConfig 
 } from '@/lib/printerUtils';
 
-// Safe Lucide Icons
+// Safe Lucide Icons casting
 const SafeLock = Lock as any;
 const SafeDatabase = Database as any;
 const SafeMenu = Menu as any;
@@ -655,7 +655,7 @@ export default function BbCafePosDesktop() {
       ) : (
         <div className="flex h-screen w-screen overflow-hidden">
           
-          {/* LEFT SIDEBAR (Navigation Menu - Fixed & Always Visible) */}
+          {/* LEFT SIDEBAR */}
           <aside className="w-20 bg-white dark:bg-neutral-900 border-r border-neutral-200 dark:border-neutral-800 flex flex-col items-center justify-between py-6 shrink-0 shadow-lg select-none z-30">
             <div className="space-y-6 flex flex-col items-center">
               <div className="p-3 bg-orange-500 text-white rounded-2xl shadow-md"><SafeDatabase size={22} /></div>
@@ -796,7 +796,7 @@ export default function BbCafePosDesktop() {
                       )}
                     </div>
 
-                    {/* Cart Items List (Cleaned: No item notes/KOT inputs) */}
+                    {/* Cart Items List */}
                     <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
                       {cart.length === 0 ? (
                         <div className="flex flex-col items-center justify-center py-10 text-neutral-400 space-y-2">
@@ -855,7 +855,7 @@ export default function BbCafePosDesktop() {
                       )}
                     </div>
 
-                    {/* TOGGLE BUTTON FOR DISCOUNT / COUPON SECTION */}
+                    {/* DISCOUNT & COUPON SECTION TOGGLE */}
                     <div className="pt-1">
                       <button 
                         onClick={() => { triggerBeep('tap'); setShowDiscountSection(!showDiscountSection); }}
@@ -865,7 +865,6 @@ export default function BbCafePosDesktop() {
                         {showDiscountSection ? <SafeChevronUp size={14} /> : <SafeChevronDown size={14} />}
                       </button>
 
-                      {/* Collapsible Discount & Chef Note Fields */}
                       {showDiscountSection && (
                         <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="grid grid-cols-2 gap-2 pt-2">
                           <div className="space-y-1">
@@ -1090,11 +1089,50 @@ export default function BbCafePosDesktop() {
       </AnimatePresence>
 
       <CustomerDirectoryModal 
-        isCustomerModalOpen={isCustomerModalOpen} setIsCustomerModalOpen={setIsCustomerModalOpen} customerSearchQuery={customerSearchQuery} setCustomerSearchQuery={setCustomerSearchQuery} searchedCustomers={searchedCustomers} isSearchingCustomer={isSearchingCustomer} newCustName={newCustName} setNewCustName={setNewCustName} newCustPhone={newCustPhone} setNewCustPhone={setNewCustPhone} newCustAddress={newCustAddress} setNewCustAddress={setNewCustAddress} editingCustomer={editingCustomer} viewingHistoryCustomer={viewingHistoryCustomer} customerHistoryList={customerHistoryList} editCustPoints={editCustPoints} setEditCustPoints={setEditCustPoints} handleSelectCustomer={handleSelectCustomer} handleLoadCustomerHistory={() => {}} handleStartEditProfile={() => {}} handleUpdateCustomerProfile={() => {}} handleSaveNewCustomer={() => {}} setViewingHistoryCustomer={() => {}} setCustomerHistoryList={() => {}} setEditingCustomer={() => {}} searchDbCustomers={searchDbCustomers} triggerBeep={triggerBeep}
+        isCustomerModalOpen={isCustomerModalOpen} 
+        setIsCustomerModalOpen={setIsCustomerModalOpen} 
+        customerSearchQuery={customerSearchQuery} 
+        setCustomerSearchQuery={setCustomerSearchQuery} 
+        searchedCustomers={searchedCustomers} 
+        isSearchingCustomer={isSearchingCustomer} 
+        newCustName={newCustName} 
+        setNewCustName={setNewCustName} 
+        newCustPhone={newCustPhone} 
+        setNewCustPhone={setNewCustPhone} 
+        newCustAddress={newCustAddress} 
+        setNewCustAddress={setNewCustAddress} 
+        editingCustomer={editingCustomer} 
+        viewingHistoryCustomer={viewingHistoryCustomer} 
+        customerHistoryList={customerHistoryList} 
+        editCustPoints={editCustPoints} 
+        setEditCustPoints={setEditCustPoints} 
+        handleSelectCustomer={handleSelectCustomer} 
+        handleLoadCustomerHistory={() => {}} 
+        handleStartEditProfile={() => {}} 
+        handleUpdateCustomerProfile={() => {}} 
+        handleSaveNewCustomer={() => {}} 
+        setViewingHistoryCustomer={() => {}} 
+        setCustomerHistoryList={() => {}} 
+        setEditingCustomer={() => {}} 
+        searchDbCustomers={searchDbCustomers} 
+        triggerBeep={triggerBeep}
       />
 
       <CustomizerModal 
-        selectedProduct={selectedProduct} setSelectedProduct={setSelectedProduct} normalPizzaSize={normalPizzaSize} setNormalPizzaSize={setNormalPizzaSize} normalPizzaPrice={normalPizzaPrice} setNormalPizzaPrice={setNormalPizzaPrice} normalPizzaAddons={{}} setNormalPizzaAddons={() => {}} customizerChefNote={customizerChefNote} setCustomizerChefNote={setCustomizerChefNote} PIZZA_ADDONS={{}} QUICK_INSTRUCTION_TAGS={QUICK_INSTRUCTION_TAGS} handleAddCustomizedItemToCart={handleAddCustomizedItemToCart} triggerBeep={triggerBeep}
+        selectedProduct={selectedProduct} 
+        setSelectedProduct={setSelectedProduct} 
+        normalPizzaSize={normalPizzaSize} 
+        setNormalPizzaSize={setNormalPizzaSize} 
+        normalPizzaPrice={normalPizzaPrice} 
+        setNormalPizzaPrice={setNormalPizzaPrice} 
+        normalPizzaAddons={{}} 
+        setNormalPizzaAddons={() => {}} 
+        customizerChefNote={customizerChefNote} 
+        setCustomizerChefNote={setCustomizerChefNote} 
+        PIZZA_ADDONS={{}} 
+        QUICK_INSTRUCTION_TAGS={QUICK_INSTRUCTION_TAGS} 
+        handleAddCustomizedItemToCart={handleAddCustomizedItemToCart} 
+        triggerBeep={triggerBeep}
       />
     </div>
   );
