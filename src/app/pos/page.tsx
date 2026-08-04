@@ -107,7 +107,7 @@ export default function BbCafePosMobile() {
   const [printerConnected, setPrinterConnected] = useState(false);
   const [bleCharacteristic, setBleCharacteristic] = useState<any>(null);
   const [fontSize, setFontSize] = useState<number>(9); 
-  const [kotEnabled, setKotEnabled] = useState<boolean>(true); // KOT Toggle State Restored
+  const [kotEnabled, setKotEnabled] = useState<boolean>(true); 
 
   // USB Web Serial and WebUSB references
   const [serialPort, setSerialPort] = useState<any>(null); 
@@ -977,21 +977,35 @@ export default function BbCafePosMobile() {
                 {loading ? (
                   <div className="flex items-center justify-center flex-1"><Loader2 className="animate-spin text-orange-500" size={24} /></div>
                 ) : (
-                  /* STRICT 3-Column Grid for Mobile */
+                  /* FIXED 3-Column Grid for Mobile with perfect layout balance */
                   <div onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd} className="grid grid-cols-3 gap-2 overflow-y-auto flex-1 pb-24 content-start select-none touch-pan-y">
                     <AnimatePresence mode="popLayout">
                       {filteredMenu.map((item) => {
                         const isAvail = item.isAvailable !== false;
                         const hasImage = item.image || item.imageUrl || item.img;
                         return (
-                          <motion.button layout initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} key={item.id} disabled={!isAvail} onClick={() => { triggerBeep('tap'); item.variants ? setSelectedProduct(item) : handleAddProductToCart(item); }} className={`border rounded-2xl text-left flex flex-col overflow-hidden h-32 transition-all duration-200 active:scale-95 ${isAvail ? "bg-neutral-50 hover:bg-neutral-100 dark:bg-neutral-800 text-neutral-850 dark:text-neutral-100 border-neutral-200 dark:border-neutral-700" : "opacity-40 bg-neutral-100 dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800 pointer-events-none"}`}>
-                            {hasImage ? (
-                              <img src={hasImage} alt={item.name} className="w-full h-18 object-cover shrink-0 bg-neutral-200 dark:bg-neutral-700" />
-                            ) : (
-                              <div className="w-full h-18 bg-neutral-200 dark:bg-neutral-700 flex items-center justify-center text-neutral-400 text-[8px] font-bold uppercase shrink-0">{item.category || "No Image"}</div>
-                            )}
-                            <div className="p-1.5 flex-grow flex flex-col justify-center">
-                              <p className="font-bold text-[10px] line-clamp-2 leading-tight">{item.name}</p>
+                          <motion.button 
+                            layout 
+                            initial={{ opacity: 0, scale: 0.95 }} 
+                            animate={{ opacity: 1, scale: 1 }} 
+                            exit={{ opacity: 0, scale: 0.95 }} 
+                            key={item.id} 
+                            disabled={!isAvail} 
+                            onClick={() => { triggerBeep('tap'); item.variants ? setSelectedProduct(item) : handleAddProductToCart(item); }} 
+                            className={`border rounded-2xl text-left flex flex-col overflow-hidden h-36 transition-all duration-200 active:scale-95 ${isAvail ? "bg-neutral-50 hover:bg-neutral-100 dark:bg-neutral-800 text-neutral-850 dark:text-neutral-100 border-neutral-200 dark:border-neutral-700" : "opacity-40 bg-neutral-100 dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800 pointer-events-none"}`}
+                          >
+                            {/* FIXED IMAGE CONTAINER: Strict height and object-cover */}
+                            <div className="w-full h-20 bg-neutral-200 dark:bg-neutral-700 relative shrink-0 overflow-hidden">
+                              {hasImage ? (
+                                <img src={hasImage} alt={item.name} className="w-full h-full object-cover" />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center text-neutral-400 text-[8px] font-bold uppercase">{item.category || "No Image"}</div>
+                              )}
+                            </div>
+                            {/* FIXED NAME CONTAINER: Prevents text overflowing or clipping */}
+                            <div className="p-2 flex-grow flex flex-col justify-between w-full">
+                              <p className="font-bold text-[10px] line-clamp-2 leading-tight text-neutral-900 dark:text-neutral-100">{item.name}</p>
+                              <p className="text-[10px] font-mono font-bold text-orange-500 mt-1">₹{item.price}</p>
                             </div>
                           </motion.button>
                         );
@@ -1092,7 +1106,6 @@ export default function BbCafePosMobile() {
                     </div>
                   </div>
 
-                  {/* KOT Toggle Setting Restored */}
                   <div className="border-b border-neutral-200 dark:border-neutral-800 pb-3 space-y-2">
                     <p className="text-xs font-bold uppercase">KOT (Kitchen Order Ticket):</p>
                     <div className="flex items-center justify-between">
