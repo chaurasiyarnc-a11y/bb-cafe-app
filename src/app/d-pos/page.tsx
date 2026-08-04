@@ -11,7 +11,7 @@ import {
   Loader2, Clock, Trash2, Printer, Check, Play, Settings, 
   Database, RefreshCw, Layers, Phone, MapPin, LayoutGrid, List,
   Menu, Users, LogOut, Lock, ToggleLeft, ToggleRight, Sun, Moon,
-  ChevronLeft, ChevronRight, Monitor, Bell, CheckCircle2, AlertTriangle, ShieldCheck
+  ChevronLeft, ChevronRight, Monitor, Bell, CheckCircle2, AlertTriangle, ShieldCheck, Tag, Percent
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
@@ -135,7 +135,7 @@ export default function BbCafePosDesktop() {
 
   const [isSyncing, setIsSyncing] = useState(false);
 
-  // Cart States
+  // Cart & Advanced Checkout States
   const [cart, setCart] = useState<PosCartItem[]>([]);
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerName, setCustomerName] = useState('');
@@ -317,7 +317,7 @@ export default function BbCafePosDesktop() {
 
   const handlePinLoginSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    const toastId = toast.loading("Verifying Admin/Cashier PIN...");
+    const toastId = toast.loading("Verifying PIN...");
     try {
       const snap = await getDocs(query(collection(db, "cafe_users"), where("pin", "==", pinInput)));
       toast.dismiss(toastId);
@@ -343,7 +343,7 @@ export default function BbCafePosDesktop() {
     localStorage.removeItem("bb_desktop_pos_user");
     setIsLoggedIn(false);
     setCurrentUser(null);
-    toast.success("Desktop Terminal Locked!");
+    toast.success("Terminal Locked!");
   };
 
   const handleUpdateStatus = async (orderId: string, nextStatus: string) => {
@@ -448,7 +448,7 @@ export default function BbCafePosDesktop() {
     });
 
     setSelectedProduct(null); setNormalPizzaSize(""); setNormalPizzaPrice(0); setCustomizerChefNote("");
-    toast.success("Customized item added to cart!");
+    toast.success("Customized item added!");
   };
 
   const handleUpdateCartQuantity = (id: string, amount: number) => {
@@ -462,11 +462,16 @@ export default function BbCafePosDesktop() {
     }).filter(Boolean) as PosCartItem[]);
   };
 
+  const handleUpdateCartItemNote = (itemId: string, noteValue: string) => {
+    setCart((prev) => prev.map((item) => item.id === itemId ? { ...item, note: noteValue } : item));
+  };
+
   const getCartSubtotal = () => cart.reduce((acc, i) => acc + (i.price * i.quantity), 0);
   const getDeliveryCharge = () => (fulfillmentType === "pickup" || fulfillmentType === "table" || getCartSubtotal() === 0) ? 0 : (getCartSubtotal() >= selectedArea.minFree ? 0 : selectedArea.fee);
   const getLoyaltyDiscount = () => Math.min(pointsToRedeem, getCartSubtotal());
   const getGstAmountCalculated = () => gstEnabled ? Number(((getCartSubtotal() * gstRate) / 100).toFixed(2)) : 0;
   const getTotalBillPrice = () => Math.max(0, getCartSubtotal() + getGstAmountCalculated() - (getLoyaltyDiscount() + customDiscount)) + getDeliveryCharge();
+  const getFreeDeliveryProgressPercent = () => Math.min(100, (getCartSubtotal() / selectedArea.minFree) * 100);
   const getTotalPointsRedeemedInCart = () => cart.reduce((acc, i) => acc + (i.pointsCost || 0), 0);
 
   const getPrintConfig = (): PrintConfig => ({ printerPaperSize, printerType, bleCharacteristic, serialPort, usbDevice, fontSize } as PrintConfig);
@@ -483,17 +488,17 @@ export default function BbCafePosDesktop() {
         setPrinterConnected(true);
         localStorage.setItem("bb_desktop_printer_connected", "true");
         toast.dismiss(toastId);
-        toast.success("USB Thermal Printer Connected Successfully!");
+        toast.success("USB Thermal Printer Connected!");
       } else {
         setTimeout(() => {
           toast.dismiss(toastId);
           setPrinterConnected(true);
-          toast.success("Simulated Printer Connected!");
+          toast.success("Connected!");
         }, 1000);
       }
     } catch (err: any) {
       toast.dismiss(toastId);
-      toast.error(err.message || "Printer connection failed.");
+      toast.error(err.message || "Connection failed.");
     } finally {
       setIsConnecting(false);
     }
@@ -513,10 +518,24 @@ export default function BbCafePosDesktop() {
         total: 150, 
         timestamp: new Date() 
       }, getPrintConfig());
-      toast.success("Test print dispatched!");
+      toast.success("Test print sent!");
     } catch (e: any) {
       toast.error("Print failed: " + (e.message || "Error"));
     }
+  };
+
+  const handleDetectLocation = () => {
+    triggerBeep('tap');
+    if (!navigator.geolocation) return toast.error("Geolocation not supported");
+    const toastId = toast.loading("Detecting GPS location...");
+    navigator.geolocation.getCurrentPosition((pos) => {
+      setAddress(`GPS: https://www.google.com/maps?q=${pos.coords.latitude.toFixed(6)},${pos.coords.longitude.toFixed(6)}`);
+      toast.dismiss(toastId);
+      toast.success("Location detected!");
+    }, () => {
+      toast.dismiss(toastId);
+      toast.error("Unable to retrieve location");
+    });
   };
 
   const getNextLocalBillNumber = () => {
@@ -698,7 +717,7 @@ export default function BbCafePosDesktop() {
                   <div className="flex items-center gap-4 mb-4">
                     <div className="relative flex-1">
                       <SafeSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-400" size={18} />
-                      <input type="text" placeholder="Search menu items (Press '/' to focus)..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="w-full bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-2xl py-3 px-12 text-sm outline-none focus:border-orange-500 shadow-sm" />
+                      <input type="text" placeholder="Search menu items..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="w-full bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-2xl py-3 px-12 text-sm outline-none focus:border-orange-500 shadow-sm" />
                     </div>
                   </div>
 
@@ -744,53 +763,66 @@ export default function BbCafePosDesktop() {
                   )}
                 </div>
 
-                {/* Right Fixed POS Cart & Checkout Panel */}
-                <div className="w-[420px] bg-white dark:bg-neutral-900 border-l border-neutral-200 dark:border-neutral-800 flex flex-col justify-between p-5 shadow-2xl shrink-0">
-                  <div className="space-y-4 flex flex-col flex-1 overflow-hidden">
+                {/* Right Fixed Advanced POS Cart & Checkout Panel */}
+                <div className="w-[460px] bg-white dark:bg-neutral-900 border-l border-neutral-200 dark:border-neutral-800 flex flex-col justify-between p-5 shadow-2xl shrink-0 overflow-y-auto">
+                  <div className="space-y-4">
                     <div className="flex justify-between items-center border-b border-neutral-200 dark:border-neutral-800 pb-3">
-                      <h2 className="text-xs font-black uppercase text-orange-500 tracking-wider">Current Cart ({cart.reduce((s, i) => s + i.quantity, 0)})</h2>
+                      <h2 className="text-xs font-black uppercase text-orange-500 tracking-wider">Active Cart ({cart.reduce((s, i) => s + i.quantity, 0)})</h2>
                       {cart.length > 0 && <button onClick={() => { triggerBeep('tap'); setCart([]); }} className="text-[10px] font-bold text-red-500 hover:underline">Clear All</button>}
                     </div>
 
-                    {/* Customer Info Section */}
-                    <div className="space-y-2 bg-neutral-50 dark:bg-neutral-800/40 p-3 rounded-2xl border border-neutral-200 dark:border-neutral-800 shrink-0">
+                    {/* Customer Info & Loyalty Section */}
+                    <div className="space-y-2.5 bg-neutral-50 dark:bg-neutral-800/40 p-3.5 rounded-2xl border border-neutral-200 dark:border-neutral-800">
                       <div className="flex gap-2">
                         <input type="text" maxLength={10} placeholder="Customer 10-digit Phone" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} className="w-full bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 rounded-xl px-3 py-2 text-xs outline-none font-mono" />
                         <button onClick={handleCheckLoyalty} className="bg-orange-600 hover:bg-orange-500 text-white px-4 rounded-xl text-xs font-black uppercase">Find</button>
+                        <button onClick={() => setIsCustomerModalOpen(true)} className="bg-neutral-200 dark:bg-neutral-700 hover:bg-neutral-300 px-3 rounded-xl text-xs font-bold">Directory</button>
                       </div>
+
                       {customerName && (
-                        <div className="flex justify-between text-[11px] font-bold text-yellow-500 pt-1">
-                          <span>👤 {customerName}</span><span>⭐ Points: {customerPoints}</span>
+                        <div className="space-y-2 pt-1 border-t border-neutral-200 dark:border-neutral-700">
+                          <div className="flex justify-between text-xs font-bold text-yellow-500">
+                            <span>👤 {customerName}</span><span>⭐ Available Points: {customerPoints}</span>
+                          </div>
+                          {customerPoints > 0 && (
+                            <div className="flex items-center justify-between text-xs bg-yellow-500/10 p-2 rounded-xl border border-yellow-500/20">
+                              <span>Redeem Points (₹1 per pt):</span>
+                              <input type="number" min={0} max={Math.min(customerPoints, getCartSubtotal())} value={pointsToRedeem} onChange={e => setPointsToRedeem(Number(e.target.value))} className="w-20 bg-white dark:bg-neutral-900 border border-yellow-500/40 rounded-lg px-2 py-1 text-right text-xs font-mono font-bold" />
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
 
                     {/* Cart Items List */}
-                    <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+                    <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
                       {cart.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center h-full text-neutral-400 space-y-2">
-                          <SafeShoppingBag size={36} className="animate-pulse opacity-50" />
+                        <div className="flex flex-col items-center justify-center py-10 text-neutral-400 space-y-2">
+                          <SafeShoppingBag size={32} className="animate-pulse opacity-50" />
                           <p className="text-xs font-bold uppercase">Cart is empty</p>
                         </div>
                       ) : (
                         cart.map((item) => (
-                          <div key={item.id} className="bg-neutral-50 dark:bg-neutral-800/30 border border-neutral-200 dark:border-neutral-800 p-2.5 rounded-2xl flex items-center justify-between gap-2">
-                            <div className="flex-1 min-w-0">
-                              <p className="font-bold text-xs truncate">{item.name}</p>
-                              <p className="text-[10px] font-mono text-orange-500">₹{item.price * item.quantity}</p>
+                          <div key={item.id} className="bg-neutral-50 dark:bg-neutral-800/30 border border-neutral-200 dark:border-neutral-800 p-2.5 rounded-2xl flex flex-col gap-1.5">
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex-1 min-w-0">
+                                <p className="font-bold text-xs truncate">{item.name}</p>
+                                <p className="text-[10px] font-mono text-orange-500">₹{item.price * item.quantity}</p>
+                              </div>
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <button onClick={() => handleUpdateCartQuantity(item.id, -1)} className="w-6 h-6 bg-neutral-200 dark:bg-neutral-700 rounded-lg flex items-center justify-center font-bold text-xs">-</button>
+                                <span className="w-6 text-center text-xs font-mono font-bold">{item.quantity}</span>
+                                <button onClick={() => handleUpdateCartQuantity(item.id, 1)} className="w-6 h-6 bg-neutral-200 dark:bg-neutral-700 rounded-lg flex items-center justify-center font-bold text-xs">+</button>
+                              </div>
                             </div>
-                            <div className="flex items-center gap-1.5 shrink-0">
-                              <button onClick={() => handleUpdateCartQuantity(item.id, -1)} className="w-6 h-6 bg-neutral-200 dark:bg-neutral-700 rounded-lg flex items-center justify-center font-bold text-xs">-</button>
-                              <span className="w-6 text-center text-xs font-mono font-bold">{item.quantity}</span>
-                              <button onClick={() => handleUpdateCartQuantity(item.id, 1)} className="w-6 h-6 bg-neutral-200 dark:bg-neutral-700 rounded-lg flex items-center justify-center font-bold text-xs">+</button>
-                            </div>
+                            <input type="text" placeholder="Add item note (e.g. less spicy)..." value={item.note || ''} onChange={e => handleUpdateCartItemNote(item.id, e.target.value)} className="w-full bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 rounded-lg px-2 py-1 text-[10px] outline-none text-neutral-400" />
                           </div>
                         ))
                       )}
                     </div>
 
-                    {/* Order Fulfillment Type & Table Selection */}
-                    <div className="space-y-2 shrink-0 pt-2 border-t border-neutral-200 dark:border-neutral-800">
+                    {/* Fulfillment Type & Delivery Options */}
+                    <div className="space-y-3 pt-2 border-t border-neutral-200 dark:border-neutral-800">
                       <div className="grid grid-cols-3 gap-1.5 bg-neutral-100 dark:bg-neutral-800 p-1 rounded-2xl">
                         {(['table', 'pickup', 'delivery'] as const).map((type) => (
                           <button key={type} onClick={() => { triggerBeep('tap'); setFulfillmentType(type); }} className={"py-1.5 rounded-xl text-[10px] font-black uppercase transition-all " + (fulfillmentType === type ? "bg-orange-600 text-white shadow-sm" : "text-neutral-400 hover:text-white")}>{type}</button>
@@ -800,13 +832,50 @@ export default function BbCafePosDesktop() {
                       {fulfillmentType === 'table' && (
                         <input type="text" placeholder="Table Number (e.g., Table 4)" value={tableNumber} onChange={e => setTableNumber(e.target.value)} className="w-full bg-neutral-50 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-xl px-3 py-2 text-xs outline-none" />
                       )}
+
+                      {fulfillmentType === 'delivery' && (
+                        <div className="space-y-2 bg-neutral-50 dark:bg-neutral-800/40 p-3 rounded-2xl border border-neutral-200 dark:border-neutral-800">
+                          <select value={selectedArea.name} onChange={e => { const ar = DELIVERY_AREAS.find(a => a.name === e.target.value); if (ar) setSelectedArea(ar); }} className="w-full bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 rounded-xl p-2 text-xs outline-none">
+                            {DELIVERY_AREAS.map(a => <option key={a.name} value={a.name}>{a.name} (Fee: ₹{a.fee})</option>)}
+                          </select>
+                          <div className="flex gap-2">
+                            <input type="text" placeholder="Delivery Address / GPS Link" value={address} onChange={e => setAddress(e.target.value)} className="w-full bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 rounded-xl px-3 py-2 text-xs outline-none" />
+                            <button onClick={handleDetectLocation} className="bg-neutral-200 dark:bg-neutral-700 px-3 rounded-xl text-xs font-bold whitespace-nowrap">GPS 📍</button>
+                          </div>
+                          {/* Free Delivery Progress Bar */}
+                          <div className="space-y-1 pt-1">
+                            <div className="flex justify-between text-[10px] font-bold text-neutral-400">
+                              <span>Free Delivery Target (₹{selectedArea.minFree})</span>
+                              <span>{getFreeDeliveryProgressPercent().toFixed(0)}%</span>
+                            </div>
+                            <div className="w-full bg-neutral-200 dark:bg-neutral-700 h-1.5 rounded-full overflow-hidden">
+                              <div className="bg-green-500 h-full transition-all duration-300" style={{ width: `${getFreeDeliveryProgressPercent()}%` }} />
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Custom Discount & Chef Instructions */}
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-neutral-400">Extra Discount (₹)</label>
+                        <input type="number" min={0} value={customDiscount} onChange={e => setCustomDiscount(Number(e.target.value))} className="w-full bg-neutral-50 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-xl px-3 py-1.5 text-xs font-mono outline-none" />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-neutral-400">Chef Note</label>
+                        <input type="text" placeholder="Special instructions..." value={chefInstructions} onChange={e => setChefInstructions(e.target.value)} className="w-full bg-neutral-50 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-xl px-3 py-1.5 text-xs outline-none" />
+                      </div>
                     </div>
                   </div>
 
                   {/* Bill Totals & Checkout Button */}
-                  <div className="space-y-3 pt-4 border-t border-neutral-200 dark:border-neutral-800 shrink-0">
+                  <div className="space-y-3 pt-4 border-t border-neutral-200 dark:border-neutral-800 mt-4">
                     <div className="space-y-1 text-xs">
                       <div className="flex justify-between text-neutral-400"><span>Subtotal</span><span className="font-mono">₹{getCartSubtotal()}</span></div>
+                      {getLoyaltyDiscount() > 0 && <div className="flex justify-between text-yellow-500"><span>Loyalty Discount</span><span className="font-mono">-₹{getLoyaltyDiscount()}</span></div>}
+                      {customDiscount > 0 && <div className="flex justify-between text-yellow-500"><span>Manual Discount</span><span className="font-mono">-₹{customDiscount}</span></div>}
+                      {fulfillmentType === 'delivery' && <div className="flex justify-between text-neutral-400"><span>Delivery Charge</span><span className="font-mono">₹{getDeliveryCharge()}</span></div>}
                       {gstEnabled && <div className="flex justify-between text-neutral-400"><span>GST ({gstRate}%)</span><span className="font-mono">₹{getGstAmountCalculated()}</span></div>}
                       <div className="flex justify-between text-sm font-black text-green-500 pt-1 border-t border-dashed border-neutral-700">
                         <span>Grand Total</span><span className="font-mono text-base">₹{getTotalBillPrice()}</span>
