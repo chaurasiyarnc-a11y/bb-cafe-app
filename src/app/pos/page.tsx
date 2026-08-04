@@ -204,7 +204,6 @@ export default function BbCafePos() {
         osc.frequency.setValueAtTime(880, globalAudioCtx.currentTime + 0.24);
         osc.stop(globalAudioCtx.currentTime + 0.4);
       } else if (type === 'alarm') {
-        // High alert continuous alarm tone
         osc.type = 'square';
         osc.frequency.setValueAtTime(880, globalAudioCtx.currentTime);
         osc.frequency.setValueAtTime(1100, globalAudioCtx.currentTime + 0.15);
@@ -356,7 +355,7 @@ export default function BbCafePos() {
       if (!alarmIntervalRef.current) {
         alarmIntervalRef.current = setInterval(() => {
           triggerBeep('alarm');
-        }, 2000); // Beep every 2 seconds continuously until pending orders are cleared/accepted
+        }, 2000);
       }
     } else {
       if (alarmIntervalRef.current) {
@@ -1009,8 +1008,8 @@ export default function BbCafePos() {
                   {loading ? (
                     <div className="flex items-center justify-center flex-1"><Loader2 className="animate-spin text-orange-500" size={24} /></div>
                   ) : (
-                    /* Grid set to 3 columns on mobile */
-                    <div onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd} className="grid grid-cols-3 md:grid-cols-3 gap-2.5 overflow-y-auto flex-1 pr-1 pb-4 content-start select-none touch-pan-y">
+                    /* Dynamic Grid: 3 columns on mobile, expands up to 5 columns on large desktop/tablet screens */
+                    <div onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd} className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2.5 overflow-y-auto flex-1 pr-1 pb-4 content-start select-none touch-pan-y">
                       <AnimatePresence mode="popLayout">
                         {filteredMenu.map((item) => {
                           const isAvail = item.isAvailable !== false;
@@ -1033,7 +1032,7 @@ export default function BbCafePos() {
                   )}
                 </div>
 
-                {/* RIGHT SIDE: Direct POS Cart Panel (Desktop & Tablet mode direct open cart list) */}
+                {/* RIGHT SIDE: Direct POS Cart Panel (Desktop/Tablet mode direct open cart list) */}
                 <div className={`flex flex-col w-full md:w-[440px] bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-3xl p-4 shadow-xl shrink-0 h-full ${layoutMode === 'mobile' ? 'hidden md:flex' : ''}`}>
                   <div className="flex items-center justify-between pb-3 border-b border-neutral-200 dark:border-neutral-800 mb-2">
                     <h3 className="text-xs font-black uppercase text-orange-500 flex items-center gap-2">
@@ -1172,7 +1171,7 @@ export default function BbCafePos() {
               </div>
             )}
 
-            {/* SETTINGS WORKSPACE (Layout Mode Switcher included here as a standard setting) */}
+            {/* SETTINGS WORKSPACE */}
             {activeTab === 'settings' && (
               <div className="max-w-xl mx-auto w-full pb-20 overflow-y-auto flex-1 font-sans">
                 <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 p-6 rounded-3xl shadow-xl space-y-6">
@@ -1299,7 +1298,7 @@ export default function BbCafePos() {
       />
 
       <CustomerDirectoryModal 
-        isCustomerModalOpen={isCustomerModalOpen} setIsCustomerModalOpen={setIsCustomerModalOpen} customerSearchQuery={customerSearchQuery} setCustomerSearchQuery={setCustomerSearchQuery} searchedCustomers={searchedCustomers} isSearchingCustomer={isSearchingCustomer} newCustName={newCustName} setNewCustName={setNewCustName} newCustPhone={newCustPhone} setNewCustPhone={newCustPhone} newCustAddress={newCustAddress} setNewCustAddress={newCustAddress} editingCustomer={editingCustomer} viewingHistoryCustomer={viewingHistoryCustomer} customerHistoryList={customerHistoryList} editCustPoints={editCustPoints} setEditCustPoints={setEditCustPoints} handleSelectCustomer={handleSelectCustomer} handleLoadCustomerHistory={handleLoadCustomerHistory} handleStartEditProfile={handleStartEditProfile} handleUpdateCustomerProfile={handleUpdateCustomerProfile} handleSaveNewCustomer={handleSaveNewCustomer} setViewingHistoryCustomer={setViewingHistoryCustomer} setCustomerHistoryList={setCustomerHistoryList} setEditingCustomer={setEditingCustomer} searchDbCustomers={searchDbCustomers} triggerBeep={triggerBeep}
+        isCustomerModalOpen={isCustomerModalOpen} setIsCustomerModalOpen={setIsCustomerModalOpen} customerSearchQuery={customerSearchQuery} setCustomerSearchQuery={setCustomerSearchQuery} searchedCustomers={searchedCustomers} isSearchingCustomer={isSearchingCustomer} newCustName={newCustName} setNewCustName={setNewCustName} newCustPhone={newCustPhone} setNewCustPhone={setNewCustPhone} newCustAddress={newCustAddress} setNewCustAddress={setNewCustAddress} editingCustomer={editingCustomer} viewingHistoryCustomer={viewingHistoryCustomer} customerHistoryList={customerHistoryList} editCustPoints={editCustPoints} setEditCustPoints={setEditCustPoints} handleSelectCustomer={handleSelectCustomer} handleLoadCustomerHistory={handleLoadCustomerHistory} handleStartEditProfile={handleStartEditProfile} handleUpdateCustomerProfile={handleUpdateCustomerProfile} handleSaveNewCustomer={handleSaveNewCustomer} setViewingHistoryCustomer={setViewingHistoryCustomer} setCustomerHistoryList={setCustomerHistoryList} setEditingCustomer={setEditingCustomer} searchDbCustomers={searchDbCustomers} triggerBeep={triggerBeep}
       />
 
       <CustomizerModal 
