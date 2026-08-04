@@ -11,12 +11,11 @@ import {
   Loader2, Clock, Trash2, Printer, Check, Play, Settings, 
   Database, RefreshCw, Layers, Phone, MapPin, LayoutGrid, List,
   Menu, Users, LogOut, Lock, ToggleLeft, ToggleRight, Sun, Moon,
-  ChevronLeft, ChevronRight, Monitor, Bell
+  ChevronLeft, ChevronRight, Monitor, Bell, CheckCircle2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
 
-import PosCartDrawer from '@/components/pos/PosCartDrawer';
 import CustomerDirectoryModal from '@/components/pos/CustomerDirectoryModal';
 import CustomizerModal from '@/components/pos/CustomizerModal';
 
@@ -136,7 +135,7 @@ export default function BbCafePosDesktop() {
 
   const [isSyncing, setIsSyncing] = useState(false);
 
-  // Cart States for PosCartDrawer integration
+  // Cart States
   const [cart, setCart] = useState<PosCartItem[]>([]);
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerName, setCustomerName] = useState('');
@@ -655,8 +654,8 @@ export default function BbCafePosDesktop() {
       ) : (
         <div className="flex h-screen w-screen overflow-hidden">
           
-          {/* LEFT SIDEBAR (Navigation Menu) */}
-          <aside className="w-20 bg-white dark:bg-neutral-900 border-r border-neutral-200 dark:border-neutral-800 flex flex-col items-center justify-between py-6 shrink-0 shadow-lg select-none">
+          {/* LEFT SIDEBAR (Navigation Menu - Fixed & Always Visible) */}
+          <aside className="w-20 bg-white dark:bg-neutral-900 border-r border-neutral-200 dark:border-neutral-800 flex flex-col items-center justify-between py-6 shrink-0 shadow-lg select-none z-30">
             <div className="space-y-6 flex flex-col items-center">
               <div className="p-3 bg-orange-500 text-white rounded-2xl shadow-md"><SafeDatabase size={22} /></div>
               
@@ -709,7 +708,7 @@ export default function BbCafePosDesktop() {
               </div>
             </header>
 
-            {/* TAB 1: BILLING WORKSPACE (Desktop Split View with EXACT Mobile Cart Integrated) */}
+            {/* TAB 1: BILLING WORKSPACE (Desktop Split View with Integrated Mobile Cart Layout) */}
             {activeTab === 'billing' && (
               <div className="flex-1 flex overflow-hidden">
                 
@@ -764,65 +763,136 @@ export default function BbCafePosDesktop() {
                   )}
                 </div>
 
-                {/* Right Side: Exact Mobile Cart (`PosCartDrawer`) embedded as a permanent static sidebar panel on Desktop */}
+                {/* Right Side: Fixed Desktop Cart Panel (Recreated exactly with all mobile cart capabilities) */}
                 <div className="w-[480px] border-l border-neutral-200 dark:border-neutral-800 flex flex-col h-full bg-white dark:bg-neutral-900 shadow-2xl relative shrink-0">
-                  <div className="h-full flex flex-col overflow-hidden">
-                    <PosCartDrawer 
-                      isHindi={false} 
-                      isCartOpen={true} 
-                      setIsCartOpen={() => {}} 
-                      isPermanentDesktopPanel={true}
-                      cart={cart} 
-                      setCart={setCart} 
-                      customerPhone={customerPhone} 
-                      setCustomerPhone={setCustomerPhone} 
-                      customerName={customerName} 
-                      setCustomerName={setCustomerName} 
-                      customerPoints={customerPoints} 
-                      setCustomerPoints={setCustomerPoints} 
-                      pointsToRedeem={pointsToRedeem} 
-                      setPointsToRedeem={setPointsToRedeem} 
-                      customDiscount={customDiscount} 
-                      setCustomDiscount={setCustomDiscount} 
-                      fulfillmentType={fulfillmentType} 
-                      setFulfillmentType={setFulfillmentType} 
-                      selectedArea={selectedArea} 
-                      setSelectedArea={setSelectedArea} 
-                      DELIVERY_AREAS={DELIVERY_AREAS} 
-                      address={address} 
-                      setAddress={setAddress} 
-                      tableNumber={tableNumber} 
-                      setTableNumber={setTableNumber} 
-                      chefInstructions={chefInstructions} 
-                      setChefInstructions={setChefInstructions} 
-                      isSubmittingOrder={isSubmittingOrder} 
-                      paymentMethod={paymentMethod} 
-                      setPaymentMethod={(val) => setPaymentMethod(val === 'card' ? 'cash' : val)} 
-                      noCutlery={false} 
-                      setNoCutlery={() => {}} 
-                      getCartSubtotal={getCartSubtotal} 
-                      getCartAddonsPrice={() => 0} 
-                      getDeliveryCharge={getDeliveryCharge} 
-                      getFreeDeliveryProgressPercent={getFreeDeliveryProgressPercent} 
-                      getTotalPointsRedeemedInCart={getTotalPointsRedeemedInCart} 
-                      getTotalBillPrice={getTotalBillPrice} 
-                      loyaltyRules={loyaltyRules} 
-                      handlePlaceOrder={handlePlaceOrder} 
-                      handleDetectLocation={handleDetectLocation} 
-                      setIsCustomerModalOpen={setIsCustomerModalOpen} 
-                      searchDbCustomers={searchDbCustomers} 
-                      handleUpdateCartQuantity={handleUpdateCartQuantity} 
-                      handleUpdateCartItemNote={handleUpdateCartItemNote} 
-                      showAddonsSection={false} 
-                      triggerBeep={triggerBeep} 
-                      handleCheckLoyalty={handleCheckLoyalty} 
-                      ketchupAddon={false} 
-                      setKetchupAddon={() => {}} 
-                      oreganoAddon={false} 
-                      setOreganoAddon={() => {}} 
-                      chiliFlakesAddon={false} 
-                      setChiliFlakesAddon={() => {}}
-                    />
+                  <div className="h-full flex flex-col overflow-y-auto p-5 space-y-4">
+                    
+                    <div className="flex justify-between items-center border-b border-neutral-200 dark:border-neutral-800 pb-3">
+                      <h2 className="text-xs font-black uppercase text-orange-500 tracking-wider">Active Cart ({cart.reduce((s, i) => s + i.quantity, 0)})</h2>
+                      {cart.length > 0 && <button onClick={() => { triggerBeep('tap'); setCart([]); }} className="text-[10px] font-bold text-red-500 hover:underline">Clear All</button>}
+                    </div>
+
+                    {/* Customer Info & Loyalty Section */}
+                    <div className="space-y-2.5 bg-neutral-50 dark:bg-neutral-800/40 p-3.5 rounded-2xl border border-neutral-200 dark:border-neutral-800">
+                      <div className="flex gap-2">
+                        <input type="text" maxLength={10} placeholder="Customer 10-digit Phone" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} className="w-full bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 rounded-xl px-3 py-2 text-xs outline-none font-mono" />
+                        <button onClick={handleCheckLoyalty} className="bg-orange-600 hover:bg-orange-500 text-white px-4 rounded-xl text-xs font-black uppercase">Find</button>
+                        <button onClick={() => setIsCustomerModalOpen(true)} className="bg-neutral-200 dark:bg-neutral-700 hover:bg-neutral-300 px-3 rounded-xl text-xs font-bold">Directory</button>
+                      </div>
+
+                      {customerName && (
+                        <div className="space-y-2 pt-1 border-t border-neutral-200 dark:border-neutral-700">
+                          <div className="flex justify-between text-xs font-bold text-yellow-500">
+                            <span>👤 {customerName}</span><span>⭐ Available Points: {customerPoints}</span>
+                          </div>
+                          {customerPoints > 0 && (
+                            <div className="flex items-center justify-between text-xs bg-yellow-500/10 p-2 rounded-xl border border-yellow-500/20">
+                              <span>Redeem Points (₹1 per pt):</span>
+                              <input type="number" min={0} max={Math.min(customerPoints, getCartSubtotal())} value={pointsToRedeem} onChange={e => setPointsToRedeem(Number(e.target.value))} className="w-20 bg-white dark:bg-neutral-900 border border-yellow-500/40 rounded-lg px-2 py-1 text-right text-xs font-mono font-bold" />
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Cart Items List */}
+                    <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                      {cart.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-10 text-neutral-400 space-y-2">
+                          <SafeShoppingBag size={32} className="animate-pulse opacity-50" />
+                          <p className="text-xs font-bold uppercase">Cart is empty</p>
+                        </div>
+                      ) : (
+                        cart.map((item) => (
+                          <div key={item.id} className="bg-neutral-50 dark:bg-neutral-800/30 border border-neutral-200 dark:border-neutral-800 p-2.5 rounded-2xl flex flex-col gap-1.5">
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex-1 min-w-0">
+                                <p className="font-bold text-xs truncate">{item.name}</p>
+                                <p className="text-[10px] font-mono text-orange-500">₹{item.price * item.quantity}</p>
+                              </div>
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <button onClick={() => handleUpdateCartQuantity(item.id, -1)} className="w-6 h-6 bg-neutral-200 dark:bg-neutral-700 rounded-lg flex items-center justify-center font-bold text-xs">-</button>
+                                <span className="w-6 text-center text-xs font-mono font-bold">{item.quantity}</span>
+                                <button onClick={() => handleUpdateCartQuantity(item.id, 1)} className="w-6 h-6 bg-neutral-200 dark:bg-neutral-700 rounded-lg flex items-center justify-center font-bold text-xs">+</button>
+                              </div>
+                            </div>
+                            <input type="text" placeholder="Add item note (e.g. less spicy)..." value={item.note || ''} onChange={e => handleUpdateCartItemNote(item.id, e.target.value)} className="w-full bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 rounded-lg px-2 py-1 text-[10px] outline-none text-neutral-400" />
+                          </div>
+                        ))
+                      )}
+                    </div>
+
+                    {/* Fulfillment Type & Delivery Options */}
+                    <div className="space-y-3 pt-2 border-t border-neutral-200 dark:border-neutral-800">
+                      <div className="grid grid-cols-3 gap-1.5 bg-neutral-100 dark:bg-neutral-800 p-1 rounded-2xl">
+                        {(['table', 'pickup', 'delivery'] as const).map((type) => (
+                          <button key={type} onClick={() => { triggerBeep('tap'); setFulfillmentType(type); }} className={"py-1.5 rounded-xl text-[10px] font-black uppercase transition-all " + (fulfillmentType === type ? "bg-orange-600 text-white shadow-sm" : "text-neutral-400 hover:text-white")}>{type}</button>
+                        ))}
+                      </div>
+
+                      {fulfillmentType === 'table' && (
+                        <input type="text" placeholder="Table Number (e.g., Table 4)" value={tableNumber} onChange={e => setTableNumber(e.target.value)} className="w-full bg-neutral-50 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-xl px-3 py-2 text-xs outline-none" />
+                      )}
+
+                      {fulfillmentType === 'delivery' && (
+                        <div className="space-y-2 bg-neutral-50 dark:bg-neutral-800/40 p-3 rounded-2xl border border-neutral-200 dark:border-neutral-800">
+                          <select value={selectedArea.name} onChange={e => { const ar = DELIVERY_AREAS.find(a => a.name === e.target.value); if (ar) setSelectedArea(ar); }} className="w-full bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 rounded-xl p-2 text-xs outline-none">
+                            {DELIVERY_AREAS.map(a => <option key={a.name} value={a.name}>{a.name} (Fee: ₹{a.fee})</option>)}
+                          </select>
+                          <div className="flex gap-2">
+                            <input type="text" placeholder="Delivery Address / GPS Link" value={address} onChange={e => setAddress(e.target.value)} className="w-full bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 rounded-xl px-3 py-2 text-xs outline-none" />
+                            <button onClick={handleDetectLocation} className="bg-neutral-200 dark:bg-neutral-700 px-3 rounded-xl text-xs font-bold whitespace-nowrap">GPS 📍</button>
+                          </div>
+                          {/* Free Delivery Progress Bar */}
+                          <div className="space-y-1 pt-1">
+                            <div className="flex justify-between text-[10px] font-bold text-neutral-400">
+                              <span>Free Delivery Target (₹{selectedArea.minFree})</span>
+                              <span>{getFreeDeliveryProgressPercent().toFixed(0)}%</span>
+                            </div>
+                            <div className="w-full bg-neutral-200 dark:bg-neutral-700 h-1.5 rounded-full overflow-hidden">
+                              <div className="bg-green-500 h-full transition-all duration-300" style={{ width: `${getFreeDeliveryProgressPercent()}%` }} />
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Custom Discount & Chef Instructions */}
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-neutral-400">Extra Discount (₹)</label>
+                        <input type="number" min={0} value={customDiscount} onChange={e => setCustomDiscount(Number(e.target.value))} className="w-full bg-neutral-50 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-xl px-3 py-1.5 text-xs font-mono outline-none" />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-neutral-400">Chef Note</label>
+                        <input type="text" placeholder="Special instructions..." value={chefInstructions} onChange={e => setChefInstructions(e.target.value)} className="w-full bg-neutral-50 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-xl px-3 py-1.5 text-xs outline-none" />
+                      </div>
+                    </div>
+
+                    {/* Bill Totals & Checkout Button */}
+                    <div className="space-y-3 pt-4 border-t border-neutral-200 dark:border-neutral-800 mt-auto pb-4">
+                      <div className="space-y-1 text-xs">
+                        <div className="flex justify-between text-neutral-400"><span>Subtotal</span><span className="font-mono">₹{getCartSubtotal()}</span></div>
+                        {getLoyaltyDiscount() > 0 && <div className="flex justify-between text-yellow-500"><span>Loyalty Discount</span><span className="font-mono">-₹{getLoyaltyDiscount()}</span></div>}
+                        {customDiscount > 0 && <div className="flex justify-between text-yellow-500"><span>Manual Discount</span><span className="font-mono">-₹{customDiscount}</span></div>}
+                        {fulfillmentType === 'delivery' && <div className="flex justify-between text-neutral-400"><span>Delivery Charge</span><span className="font-mono">₹{getDeliveryCharge()}</span></div>}
+                        {gstEnabled && <div className="flex justify-between text-neutral-400"><span>GST ({gstRate}%)</span><span className="font-mono">₹{getGstAmountCalculated()}</span></div>}
+                        <div className="flex justify-between text-sm font-black text-green-500 pt-1 border-t border-dashed border-neutral-700">
+                          <span>Grand Total</span><span className="font-mono text-base">₹{getTotalBillPrice()}</span>
+                        </div>
+                      </div>
+
+                      <div className="flex gap-2">
+                        <button onClick={() => setPaymentMethod('cash')} className={`flex-1 py-2 rounded-xl text-xs font-black uppercase border ${paymentMethod === 'cash' ? 'bg-green-600 text-white border-green-600' : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-400 border-neutral-700'}`}>Cash</button>
+                        <button onClick={() => setPaymentMethod('upi')} className={`flex-1 py-2 rounded-xl text-xs font-black uppercase border ${paymentMethod === 'upi' ? 'bg-blue-600 text-white border-blue-600' : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-400 border-neutral-700'}`}>UPI / Online</button>
+                      </div>
+
+                      <button onClick={handlePlaceOrder} disabled={cart.length === 0 || isSubmittingOrder} className="w-full bg-green-600 hover:bg-green-500 disabled:opacity-50 text-white font-black py-3.5 rounded-2xl uppercase tracking-wider text-xs flex items-center justify-center gap-2 shadow-lg transition-all active:scale-95">
+                        {isSubmittingOrder ? <Loader2 className="animate-spin" size={16} /> : <SafeCheck size={16} />}
+                        <span>Complete & Print Bill (₹{getTotalBillPrice()})</span>
+                      </button>
+                    </div>
+
                   </div>
                 </div>
 
