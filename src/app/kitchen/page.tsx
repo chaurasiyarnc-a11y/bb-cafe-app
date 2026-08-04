@@ -16,9 +16,9 @@ export default function KitchenDisplaySystem() {
   const [cookName, setCookName] = useState(""); 
 
   const [passcodes, setPasscodes] = useState({ adminPin: "971429", managerPin: "123456" });
-  const [isStoreOpen, setIsStoreOpen] = useState(true);
+  const [isStoreOpen, setIsStoreOpen] = useState<boolean>(true);
 
-  // प्रिंटर सेटिंग्स स्टेट्स ('rawbt' ब्लूटूथ और यूएसबी दोनों को सपोर्ट करता है)
+  // प्रिंटर सेटिंग्स स्टेट्स
   const [printerMethod, setPrinterMethod] = useState<"none" | "browser" | "rawbt">("rawbt");
   const [autoPrintOnAccept, setAutoPrintOnAccept] = useState<boolean>(true);
   const [printTargetOrder, setPrintTargetOrder] = useState<any | null>(null);
@@ -61,7 +61,7 @@ export default function KitchenDisplaySystem() {
     }
   };
 
-  // लगातार अलार्म लॉजिक (जब तक पेंडिंग आर्डर रहेंगे, तब तक हर 7 सेकंड में बजेगा)
+  // लगातार अलार्म लॉजिक
   useEffect(() => {
     const pendingList = orders.filter(o => o.status === 'pending');
     if (pendingList.length > 0) {
@@ -106,39 +106,85 @@ export default function KitchenDisplaySystem() {
     }
   }, []);
 
+  // --- सुपर-फास्ट रियल टाइम आर्डर इंजन (बिना रिफ्रेश के लाइव वर्क करने के लिए) ---
   useEffect(() => {
     if (isLocked) return;
-    const qSimple = query(collection(db, "orders"), where("status", "in", ["pending", "preparing", "out_for_delivery"]));
-    const unsub = onSnapshot(qSimple, (snap) => {
-      const activeOrdersList = snap.docs.map(d => ({ id: d.id, ...d.data() as any }));
-      const todayStart = new Date();
-      todayStart.setHours(0, 0, 0, 0);
 
-      const kitchenOrders = activeOrdersList.filter((o: any) => {
-        if (!o.timestamp) return false;
-        const orderDate = o.timestamp?.toDate ? o.timestamp.toDate() : new Date(o.timestamp);
-        return orderDate >= todayStart;
-      });
+    let unsubscribeOrders: (() => void) | null = void 0;
 
-      kitchenOrders.sort((a, b) => {
-        const tA = a.timestamp?.toDate ? a.timestamp.toDate() : new Date(a.timestamp || 0);
-        const tB = b.timestamp?.toDate ? b.timestamp.toDate() : new Date(b.timestamp || 0);
-        return tA.getTime() - tB.getTime();
+    const setupRealtimeListener = () => {
+      const qSimple = query(
+        collection(db, "orders"),
+        where("status", "in", ["pending", "preparing", "out_for_delivery"])
+      );
+
+      unsubscribeOrders = onSnapshot(qSimple, (snap) => {
+        const activeOrdersList = snap.docs.map(d => ({ id: d.id, ...d.data() as any }));
+        
+        const todayStart = new Date();
+        todayStart.setHours(0, 0, 0, 0);
+
+        const kitchenOrders = activeOrdersList.filter((o: any) => {
+          if (!o.timestamp) return false;
+          const orderDate = o.timestamp?.toDate ? o.timestamp.toDate() : new Date(o.timestamp);
+          return orderDate >= todayStart;
+        });
+
+        kitchenOrders.sort((a, b) => {
+          const tA = a.timestamp?.toDate ? a.timestamp.toDate() : new Date(a.timestamp || 0);
+          const tB = b.timestamp?.toDate ? b.timestamp.toDate() : new Date(b.timestamp || 0);
+          return tA.getTime() - tB.getTime();
+        });
+        
+        if (prevOrdersCountRef.current !== null && kitchenOrders.length > prevOrdersCountRef.current) {
+          playAlertSound();
+          triggerHaptic(500); 
+          toast.success("🚨 रसोई घर: नया आर्डर आ गया है!");
+        }
+        prevOrdersCountRef.current = kitchenOrders.length;
+        setOrders(kitchenOrders);
+        setLoading(false);
+      }, (error) => {
+        console.error("Real-time sync lost, trying to reconnect...", error);
+        // अगर कनेक्शन छूटे तो 3 सेकंड बाद ऑटोमैटिक रीकनेक्ट करेगा
+        setTimeout(() => {
+          if (unsubscribeOrders) unsubscribeOrders();
+          setupRealtimeListener();
+        }, 3000);
       });
-      
-      if (prevOrdersCountRef.current !== null && kitchenOrders.length > prevOrdersCountRef.current) {
-        playAlertSound();
-        triggerHaptic(500); 
-        toast.success("🚨 रसोई घर: नया आर्डर आया है!");
+    };
+
+    setupRealtimeListener();
+
+    // जब भी फोन की स्क्रीन वापस ऑन हो या ऐप बैकग्राउंड से फोगाट में आए, कनेक्शन रीफ्रेश करें
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        console.log("App active again, refreshing connection...");
+        if (unsubscribeOrders) unsubscribeOrders();
+        setupRealtimeListener();
       }
-      prevOrdersCountRef.current = kitchenOrders.length;
-      setOrders(kitchenOrders);
-      setLoading(false);
-    });
-    return () => unsub();
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      if (unsubscribeOrders) unsubscribeOrders();
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
   }, [isLocked]);
 
-  // प्लेन टेक्स्ट KOT जनरेटर (ब्लूटूथ और यूएसबी थर्मल प्रिंटर के लिए)
+  // स्टोर स्टेटस रियल-टाइम लिसनर
+  useEffect(() => {
+    if (isLocked) return;
+    const storeRef = doc(db, "settings", "store");
+    const unsubStore = onSnapshot(storeRef, (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        setIsStoreOpen(data.isOpen ?? true);
+      }
+    }, (err) => console.error(err));
+    return () => unsubStore();
+  }, [isLocked]);
+
   const generatePlainTextKOT = (order: any) => {
     const line = "--------------------------------\n";
     const dLine = "================================\n";
@@ -172,7 +218,6 @@ export default function KitchenDisplaySystem() {
     return text;
   };
 
-  // प्रिंट ट्रिगर (RawBT के जरिए ब्लूटूथ/यूएसबी दोनों पर सीधे प्रिंट भेजेगा)
   const triggerPrintCombined = (order: any, type: "kot" | "bill") => {
     if (printerMethod === "none") return;
     triggerHaptic(20);
@@ -180,7 +225,6 @@ export default function KitchenDisplaySystem() {
 
     if (printerMethod === "rawbt") {
       const textStr = type === "kot" ? generatePlainTextKOT(order) : generatePlainTextReceipt(order);
-      // यह लिंक RawBT ऐप को ट्रिगर करेगा और ब्लूटूथ/यूएसबी प्रिंटर से तुरंत पर्ची निकाल देगा
       window.location.href = "rawbt:" + encodeURIComponent(textStr);
     } else if (printerMethod === "browser") {
       setPrintTargetOrder(order);
@@ -235,7 +279,6 @@ export default function KitchenDisplaySystem() {
       await updateDoc(doc(db, "orders", orderId), { status: nextStatus });
       toast.success(`Status: ${nextStatus.replace('_', ' ')}`);
       
-      // आर्डर स्वीकार करते ही ऑटोमेटिक KOT प्रिंट हो जाएगी (ब्लूटूथ/यूएसबी प्रिंटर पर)
       if (currentStatus === 'pending' && autoPrintOnAccept) {
         triggerPrintCombined(order, "kot");
       }
@@ -256,9 +299,14 @@ export default function KitchenDisplaySystem() {
   const handleToggleStoreStatus = async () => {
     triggerHaptic(50);
     try {
-      await updateDoc(doc(db, "settings", "store"), { isOpen: !isStoreOpen });
-      toast.success(`Store: ${!isStoreOpen ? "Open" : "Closed"}`);
-    } catch (e) {}
+      const storeRef = doc(db, "settings", "store");
+      const newStatus = !isStoreOpen;
+      setIsStoreOpen(newStatus);
+      await updateDoc(storeRef, { isOpen: newStatus });
+      toast.success(`Store is now ${newStatus ? "Online 🟢" : "Offline 🔴"}`);
+    } catch (e) {
+      toast.error("स्टोर स्टेटस बदलने में असफल।");
+    }
   };
 
   const triggerHaptic = (ms = 35) => {
@@ -293,7 +341,7 @@ export default function KitchenDisplaySystem() {
       <div className="bg-[#050505] min-h-screen text-white flex flex-col items-center justify-center">
         <link rel="manifest" href="/kitchen-manifest.json" />
         <Loader2 className="animate-spin text-orange-500 mb-2" size={32} />
-        <p className="text-[10px] font-black uppercase tracking-widest text-gray-500">Syncing...</p>
+        <p className="text-[10px] font-black uppercase tracking-widest text-gray-500">Connecting Live App...</p>
       </div>
     );
   }
@@ -310,13 +358,12 @@ export default function KitchenDisplaySystem() {
               Bum Bum Cafe {cookName ? `- Chef ${cookName}` : ''}
             </h1>
             <p className="text-[9px] text-gray-400 font-bold uppercase tracking-wider flex items-center gap-1">
-              <span className="inline-block w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-              Live KDS (Printer Ready)
+              <span className="inline-block w-1.5 h-1.5 rounded-full bg-green-500 animate-ping" />
+              Live Connected (App Mode)
             </p>
           </div>
         </div>
 
-        {/* सिंगल लाइन हेडर कंट्रोल्स */}
         <div className="flex flex-row flex-nowrap items-center gap-1.5 shrink-0">
           <div className="flex items-center gap-1 bg-white/[0.03] border border-white/5 px-2 py-1 rounded-xl">
             <span className="text-[9px] font-bold text-gray-400">🖨️</span>
@@ -325,7 +372,7 @@ export default function KitchenDisplaySystem() {
               onChange={(e) => {
                 setPrinterMethod(e.target.value as any);
                 localStorage.setItem('bb_kds_printer_method', e.target.value);
-                toast.success(`Printer Mode: ${e.target.value.toUpperCase()}`);
+                toast.success(`Printer: ${e.target.value.toUpperCase()}`);
               }}
               className="bg-black/60 border border-white/10 rounded px-1.5 py-0.5 text-[10px] text-orange-400 font-bold focus:outline-none"
             >
@@ -378,7 +425,7 @@ export default function KitchenDisplaySystem() {
       {orders.length === 0 ? (
         <div className="text-center py-28 space-y-2">
           <span className="text-3xl">😴</span>
-          <h2 className="text-gray-400 font-bold text-xs">अभी कोई आर्डर पेंडिंग नहीं है!</h2>
+          <h2 className="text-gray-400 font-bold text-xs">अभी कोई आर्डर पेंडिंग नहीं है! (लाइव सिंक चालू है)</h2>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
