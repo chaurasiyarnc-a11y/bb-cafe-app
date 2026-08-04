@@ -252,6 +252,20 @@ export default function BbCafePosMobile() {
     });
   };
 
+  const searchDbCustomers = async (text: string) => {
+    const cleanText = text.trim();
+    setIsSearchingCustomer(true);
+    try {
+      let q = cleanText ? (/^\d+$/.test(cleanText) ? query(collection(db, "customer_points"), where("phone", "==", cleanText)) : query(collection(db, "customer_points"), where("name", ">=", cleanText), limit(15))) : query(collection(db, "customer_points"), orderBy("lastActive", "desc"), limit(12));
+      const snap = await getDocs(q);
+      setSearchedCustomers(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsSearchingCustomer(false);
+    }
+  };
+
   useEffect(() => {
     const savedUser = localStorage.getItem("bb_pos_user");
     if (savedUser) {
