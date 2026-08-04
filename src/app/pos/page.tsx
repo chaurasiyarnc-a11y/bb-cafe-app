@@ -431,6 +431,103 @@ export default function BbCafePosMobile() {
     }
   };
 
+  const handleCheckLoyalty = async () => {
+    triggerBeep('tap');
+    if (customerPhone.trim().length !== 10) return toast.error("Enter valid 10-digit number!");
+    const phoneClean = customerPhone.trim();
+    const toastId = toast.loading("Checking profile...");
+    try {
+      const docSnap = await getDoc(doc(db, "customer_points", phoneClean));
+      toast.dismiss(toastId);
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setCustomerName(data.name || '');
+        setCustomerPoints(data.points || 0);
+        setAddress(data.address || ''); 
+        toast.success(`Points: ${data.points || 0}`);
+      } else {
+        setCustomerName(''); setCustomerPoints(0); setAddress('');
+        toast.success("New Guest initialized!");
+      }
+    } catch (e) {
+      toast.dismiss(toastId);
+      toast.error("Database error");
+    }
+  };
+
+  const searchDbCustomers = async (text: string) => {
+    const cleanText = text.trim();
+    setIsSearchingCustomer(true);
+    try {
+      let q = cleanText ? (/^\d+$/.test(cleanText) ? query(collection(db, "customer_points"), where("phone", "==", cleanText)) : query(collection(db, "customer_points"), where("name", ">=", cleanText), limit(15))) : query(collection(db, "customer_points"), orderBy("lastActive", "desc"), limit(12));
+      const snap = await getDocs(q);
+      setSearchedCustomers(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsSearchingCustomer(false);
+    }
+  };
+
+  const handleSelectCustomer = (cust: any) => {
+    triggerBeep('tap');
+    setCustomerPhone(cust.phone); setCustomerName(cust.name); setCustomerPoints(cust.points || 0); setAddress(cust.address || '');
+    setIsCustomerModalOpen(false);
+  };
+
+  const handleLoadCustomerHistory = async (cust: any) => {
+    triggerBeep('tap');
+    setViewingHistoryCustomer(cust);
+    try {
+      const hSnap = await getDocs(query(collection(db, "customer_points", cust.phone, "history"), orderBy("timestamp", "desc"), limit(25)));
+      setCustomerHistoryList(hSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
+    } catch (e) {
+      toast.error("Failed to load history");
+    }
+  };
+
+  const handleStartEditProfile = (cust: any) => {
+    triggerBeep('tap');
+    setEditingCustomer(cust);
+    setNewCustName(cust.name);
+    setNewCustAddress(cust.address || '');
+    setEditCustPoints(cust.points || 0);
+  };
+
+  const handleUpdateCustomerProfile = async () => {
+    triggerBeep('tap');
+    if (!newCustName.trim()) return toast.error("Name mandatory!");
+    try {
+      await updateDoc(doc(db, "customer_points", editingCustomer.phone), { name: newCustName.trim(), address: newCustAddress.trim(), points: editCustPoints });
+      if (customerPhone === editingCustomer.phone) {
+        setCustomerName(newCustName.trim()); setAddress(newCustAddress.trim()); setCustomerPoints(editCustPoints);
+      }
+      setEditingCustomer(null); searchDbCustomers(customerSearchQuery);
+      toast.success("Profile saved!");
+    } catch (err) {
+      toast.error("Failed to edit");
+    }
+  };
+
+  const handleSaveNewCustomer = async (e: React.FormEvent) => {
+    e.preventDefault();
+    triggerBeep('tap');
+    const cleanPhone = newCustPhone.trim();
+    if (cleanPhone.length !== 10) return toast.error("Enter valid 10-digit phone!");
+    try {
+      const userRef = doc(db, "customer_points", cleanPhone);
+      if ((await getDoc(userRef)).exists()) return toast.error("Number already registered!");
+      const newDoc = { name: newCustName.trim(), phone: cleanPhone, points: 0, address: newCustAddress.trim(), lastActive: new Date() };
+      await setDoc(userRef, newDoc);
+      setCustomerPhone(cleanPhone); setCustomerName(newDoc.name); setCustomerPoints(0); setAddress(newDoc.address);
+      setNewCustName(''); setNewCustPhone(''); setNewCustAddress('');
+      setIsCustomerModalOpen(false);
+      toast.success("Registered!");
+    } catch (err) {
+      toast.error("Failed");
+    }
+  };
+
   const handleAddProductToCart = (item: any) => {
     triggerBeep('tap');
     setCart((prev) => {
@@ -561,20 +658,6 @@ export default function BbCafePosMobile() {
       toast.dismiss(toastId);
       toast.error("Unable to retrieve location");
     });
-  };
-
-  const searchDbCustomers = async (text: string) => {
-    const cleanText = text.trim();
-    setIsSearchingCustomer(true);
-    try {
-      let q = cleanText ? (/^\d+$/.test(cleanText) ? query(collection(db, "customer_points"), where("phone", "==", cleanText)) : query(collection(db, "customer_points"), where("name", ">=", cleanText), limit(15))) : query(collection(db, "customer_points"), orderBy("lastActive", "desc"), limit(12));
-      const snap = await getDocs(q);
-      setSearchedCustomers(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setIsSearchingCustomer(false);
-    }
   };
 
   const getNextLocalBillNumber = () => {
@@ -710,6 +793,7 @@ export default function BbCafePosMobile() {
         <>
           {isSidebarOpen && <div onClick={() => setIsSidebarOpen(false)} className="fixed inset-0 bg-neutral-950/80 z-40" />}
 
+          {/* Mobile Sidebar */}
           <aside className={asideClass}>
             <div className="space-y-6">
               <div className="flex items-center justify-between px-1 py-1 border-b border-neutral-200 dark:border-neutral-800 pb-4 gap-2">
@@ -744,6 +828,7 @@ export default function BbCafePosMobile() {
 
           <main className="flex-1 p-3 overflow-y-auto flex flex-col h-screen relative">
             <div className="flex items-center gap-3 mb-3 border-b border-neutral-200 dark:border-neutral-800 pb-3">
+              {/* Menu Button */}
               <button onClick={() => setIsSidebarOpen(true)} className="p-2.5 bg-neutral-200 dark:bg-neutral-800 text-orange-500 rounded-xl"><SafeMenu size={18} /></button>
 
               <div className="flex flex-col">
@@ -751,6 +836,7 @@ export default function BbCafePosMobile() {
                 <span className="text-[9px] text-neutral-500 dark:text-neutral-400 font-bold">Bum Bum Cafe • Mohandra</span>
               </div>
               
+              {/* Toggle Live Orders Button */}
               <button 
                 onClick={() => {
                   triggerBeep('tap');
@@ -830,11 +916,13 @@ export default function BbCafePosMobile() {
             {activeTab === 'billing' && (
               <div className="flex-1 flex flex-col gap-3 overflow-hidden relative h-full">
                 
+                {/* Search Bar */}
                 <div className="relative">
                   <SafeSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={14} />
                   <input type="text" placeholder="Search menu..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="w-full bg-neutral-100 dark:bg-neutral-800 rounded-xl py-2 px-9 text-xs outline-none text-neutral-800 dark:text-neutral-100 border border-transparent dark:border-neutral-700 focus:border-orange-500" />
                 </div>
 
+                {/* Categories */}
                 <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-none shrink-0">
                   {categories.map((cat) => {
                     const isSelected = selectedCategory === cat;
@@ -849,6 +937,7 @@ export default function BbCafePosMobile() {
                 {loading ? (
                   <div className="flex items-center justify-center flex-1"><Loader2 className="animate-spin text-orange-500" size={24} /></div>
                 ) : (
+                  /* STRICT 3-Column Grid for Mobile */
                   <div onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd} className="grid grid-cols-3 gap-2 overflow-y-auto flex-1 pb-24 content-start select-none touch-pan-y">
                     <AnimatePresence mode="popLayout">
                       {filteredMenu.map((item) => {
@@ -871,7 +960,7 @@ export default function BbCafePosMobile() {
                   </div>
                 )}
 
-                {/* Mobile Floating Cart Button */}
+                {/* Floating Bottom Cart Button */}
                 {cart.length > 0 && (
                   <motion.button initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} onClick={() => setIsCartOpen(true)} className="fixed bottom-4 right-4 left-4 bg-green-600 text-white font-black px-5 py-3.5 rounded-2xl shadow-2xl flex items-center justify-between gap-4 z-40 active:scale-95 transition-all">
                     <div className="flex items-center gap-2.5">
@@ -949,7 +1038,7 @@ export default function BbCafePosMobile() {
               </div>
             )}
 
-            {/* SETTINGS WORKSPACE (KOT Print Option Included) */}
+            {/* SETTINGS WORKSPACE */}
             {activeTab === 'settings' && (
               <div className="max-w-xl mx-auto w-full pb-20 overflow-y-auto flex-1 font-sans">
                 <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 p-5 rounded-3xl shadow-xl space-y-5">
@@ -969,16 +1058,6 @@ export default function BbCafePosMobile() {
                       <span className="text-xs">Enable GST:</span>
                       <button onClick={() => { const next = !gstEnabled; setGstEnabled(next); localStorage.setItem("bb_pos_gst_enabled", String(next)); }} className="text-orange-500">
                         {gstEnabled ? <SafeToggleRight size={28} /> : <SafeToggleLeft size={28} />}
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* KOT Printing Toggle Setting */}
-                  <div className="border-b border-neutral-200 dark:border-neutral-800 pb-3 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <p className="text-xs font-bold uppercase">Enable KOT Printing:</p>
-                      <button onClick={() => { const next = !kotEnabled; setKotEnabled(next); localStorage.setItem("bb_pos_kot_enabled", String(next)); toast.success(next ? "KOT ON" : "KOT OFF"); }} className="text-orange-500">
-                        {kotEnabled ? <SafeToggleRight size={28} /> : <SafeToggleLeft size={28} />}
                       </button>
                     </div>
                   </div>
@@ -1041,7 +1120,7 @@ export default function BbCafePosMobile() {
       />
 
       <CustomerDirectoryModal 
-        isCustomerModalOpen={isCustomerModalOpen} setIsCustomerModalOpen={setIsCustomerModalOpen} customerSearchQuery={customerSearchQuery} setCustomerSearchQuery={setCustomerSearchQuery} searchedCustomers={searchedCustomers} isSearchingCustomer={isSearchingCustomer} newCustName={newCustName} setNewCustName={setNewCustName} newCustPhone={newCustPhone} setNewCustPhone={newCustPhone} newCustAddress={newCustAddress} setNewCustAddress={newCustAddress} editingCustomer={editingCustomer} viewingHistoryCustomer={viewingHistoryCustomer} customerHistoryList={customerHistoryList} editCustPoints={editCustPoints} setEditCustPoints={setEditCustPoints} handleSelectCustomer={handleSelectCustomer} handleLoadCustomerHistory={handleLoadCustomerHistory} handleStartEditProfile={handleStartEditProfile} handleUpdateCustomerProfile={handleUpdateCustomerProfile} handleSaveNewCustomer={handleSaveNewCustomer} setViewingHistoryCustomer={setViewingHistoryCustomer} setCustomerHistoryList={setCustomerHistoryList} setEditingCustomer={setEditingCustomer} searchDbCustomers={searchDbCustomers} triggerBeep={triggerBeep}
+        isCustomerModalOpen={isCustomerModalOpen} setIsCustomerModalOpen={setIsCustomerModalOpen} customerSearchQuery={customerSearchQuery} setCustomerSearchQuery={setCustomerSearchQuery} searchedCustomers={searchedCustomers} isSearchingCustomer={isSearchingCustomer} newCustName={newCustName} setNewCustName={setNewCustName} newCustPhone={newCustPhone} setNewCustPhone={setNewCustPhone} newCustAddress={newCustAddress} setNewCustAddress={setNewCustAddress} editingCustomer={editingCustomer} viewingHistoryCustomer={viewingHistoryCustomer} customerHistoryList={customerHistoryList} editCustPoints={editCustPoints} setEditCustPoints={setEditCustPoints} handleSelectCustomer={handleSelectCustomer} handleLoadCustomerHistory={handleLoadCustomerHistory} handleStartEditProfile={handleStartEditProfile} handleUpdateCustomerProfile={handleUpdateCustomerProfile} handleSaveNewCustomer={handleSaveNewCustomer} setViewingHistoryCustomer={setViewingHistoryCustomer} setCustomerHistoryList={setCustomerHistoryList} setEditingCustomer={setEditingCustomer} searchDbCustomers={searchDbCustomers} triggerBeep={triggerBeep}
       />
 
       <CustomizerModal 
