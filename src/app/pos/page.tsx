@@ -266,6 +266,10 @@ export default function BbCafePosMobile() {
     }
   };
 
+  const handleUpdateCartItemNote = (itemId: string, noteValue: string) => {
+    setCart((prev) => prev.map((item) => item.id === itemId ? { ...item, note: noteValue } : item));
+  };
+
   useEffect(() => {
     const savedUser = localStorage.getItem("bb_pos_user");
     if (savedUser) {
