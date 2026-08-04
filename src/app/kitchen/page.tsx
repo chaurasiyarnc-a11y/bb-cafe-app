@@ -106,11 +106,11 @@ export default function KitchenDisplaySystem() {
     }
   }, []);
 
-  // --- सुपर-फास्ट रियल टाइम आर्डर इंजन (बिना रिफ्रेश के लाइव वर्क करने के लिए) ---
+  // --- यहाँ 'null' सेट किया गया है जिससे टाइपस्क्रिप्ट एरर पूरी तरह खत्म हो जाएगा ---
   useEffect(() => {
     if (isLocked) return;
 
-    let unsubscribeOrders: (() => void) | null = void 0;
+    let unsubscribeOrders: (() => void) | null = null;
 
     const setupRealtimeListener = () => {
       const qSimple = query(
@@ -146,7 +146,6 @@ export default function KitchenDisplaySystem() {
         setLoading(false);
       }, (error) => {
         console.error("Real-time sync lost, trying to reconnect...", error);
-        // अगर कनेक्शन छूटे तो 3 सेकंड बाद ऑटोमैटिक रीकनेक्ट करेगा
         setTimeout(() => {
           if (unsubscribeOrders) unsubscribeOrders();
           setupRealtimeListener();
@@ -156,10 +155,8 @@ export default function KitchenDisplaySystem() {
 
     setupRealtimeListener();
 
-    // जब भी फोन की स्क्रीन वापस ऑन हो या ऐप बैकग्राउंड से फोगाट में आए, कनेक्शन रीफ्रेश करें
     const handleVisibility = () => {
       if (document.visibilityState === 'visible') {
-        console.log("App active again, refreshing connection...");
         if (unsubscribeOrders) unsubscribeOrders();
         setupRealtimeListener();
       }
