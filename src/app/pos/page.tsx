@@ -99,7 +99,7 @@ export default function BbCafePosMobile() {
   const [printerPaperSize, setPrinterPaperSize] = useState<'58mm' | '80mm'>('58mm');
   const [themeMode, setThemeMode] = useState<'dark' | 'light'>('dark');
 
-  // Printer & KOT Settings states
+  // Printer Settings states
   const [printerType, setPrinterType] = useState<'thermal_usb' | 'thermal_bluetooth' | 'network_ip' | 'laser'>('thermal_usb');
   const [printerIp, setPrinterIp] = useState('192.168.1.100');
   const [printCopies, setPrintCopies] = useState(1);
@@ -236,38 +236,6 @@ export default function BbCafePosMobile() {
     } else {
       setPaymentMethod(val);
     }
-  };
-
-  const handleDetectLocation = () => {
-    triggerBeep('tap');
-    if (!navigator.geolocation) return toast.error("Geolocation not supported");
-    const toastId = toast.loading("Detecting location...");
-    navigator.geolocation.getCurrentPosition((pos) => {
-      setAddress(`GPS: https://www.google.com/maps?q=${pos.coords.latitude.toFixed(6)},${pos.coords.longitude.toFixed(6)}`);
-      toast.dismiss(toastId);
-      toast.success("Location detected!");
-    }, () => {
-      toast.dismiss(toastId);
-      toast.error("Unable to retrieve location");
-    });
-  };
-
-  const searchDbCustomers = async (text: string) => {
-    const cleanText = text.trim();
-    setIsSearchingCustomer(true);
-    try {
-      let q = cleanText ? (/^\d+$/.test(cleanText) ? query(collection(db, "customer_points"), where("phone", "==", cleanText)) : query(collection(db, "customer_points"), where("name", ">=", cleanText), limit(15))) : query(collection(db, "customer_points"), orderBy("lastActive", "desc"), limit(12));
-      const snap = await getDocs(q);
-      setSearchedCustomers(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setIsSearchingCustomer(false);
-    }
-  };
-
-  const handleUpdateCartItemNote = (itemId: string, noteValue: string) => {
-    setCart((prev) => prev.map((item) => item.id === itemId ? { ...item, note: noteValue } : item));
   };
 
   useEffect(() => {
@@ -509,6 +477,10 @@ export default function BbCafePosMobile() {
     }).filter(Boolean) as PosCartItem[]);
   };
 
+  const handleUpdateCartItemNote = (itemId: string, noteValue: string) => {
+    setCart((prev) => prev.map((item) => item.id === itemId ? { ...item, note: noteValue } : item));
+  };
+
   const handleTouchStart = (e: React.TouchEvent) => { setTouchEnd(null); setTouchStart(e.targetTouches[0].clientX); };
   const handleTouchMove = (e: React.TouchEvent) => { setTouchEnd(e.targetTouches[0].clientX); };
   const handleTouchEnd = () => {
@@ -575,6 +547,34 @@ export default function BbCafePosMobile() {
 
   const handleTestPrint = () => {
     handlePrintReceipt({ billNumber: '0000', tokenNumber: '9999', fulfillmentType: 'test', paymentMethod: 'system', items: [{ name: 'Print Test', quantity: 1, price: 100 }], subtotal: 100, discount: 0, total: 100, timestamp: new Date() }, getPrintConfig());
+  };
+
+  const handleDetectLocation = () => {
+    triggerBeep('tap');
+    if (!navigator.geolocation) return toast.error("Geolocation not supported");
+    const toastId = toast.loading("Detecting location...");
+    navigator.geolocation.getCurrentPosition((pos) => {
+      setAddress(`GPS: https://www.google.com/maps?q=${pos.coords.latitude.toFixed(6)},${pos.coords.longitude.toFixed(6)}`);
+      toast.dismiss(toastId);
+      toast.success("Location detected!");
+    }, () => {
+      toast.dismiss(toastId);
+      toast.error("Unable to retrieve location");
+    });
+  };
+
+  const searchDbCustomers = async (text: string) => {
+    const cleanText = text.trim();
+    setIsSearchingCustomer(true);
+    try {
+      let q = cleanText ? (/^\d+$/.test(cleanText) ? query(collection(db, "customer_points"), where("phone", "==", cleanText)) : query(collection(db, "customer_points"), where("name", ">=", cleanText), limit(15))) : query(collection(db, "customer_points"), orderBy("lastActive", "desc"), limit(12));
+      const snap = await getDocs(q);
+      setSearchedCustomers(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsSearchingCustomer(false);
+    }
   };
 
   const getNextLocalBillNumber = () => {
@@ -949,7 +949,7 @@ export default function BbCafePosMobile() {
               </div>
             )}
 
-            {/* SETTINGS WORKSPACE */}
+            {/* SETTINGS WORKSPACE (KOT Print Option Included) */}
             {activeTab === 'settings' && (
               <div className="max-w-xl mx-auto w-full pb-20 overflow-y-auto flex-1 font-sans">
                 <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 p-5 rounded-3xl shadow-xl space-y-5">
@@ -973,6 +973,7 @@ export default function BbCafePosMobile() {
                     </div>
                   </div>
 
+                  {/* KOT Printing Toggle Setting */}
                   <div className="border-b border-neutral-200 dark:border-neutral-800 pb-3 space-y-2">
                     <div className="flex items-center justify-between">
                       <p className="text-xs font-bold uppercase">Enable KOT Printing:</p>
@@ -995,6 +996,45 @@ export default function BbCafePosMobile() {
           </main>
         </>
       )}
+
+      {/* MODALS & DRAWERS */}
+      <AnimatePresence>
+        {isReceiptModalOpen && selectedReceipt && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-neutral-900 dark:text-neutral-100 max-w-lg w-full rounded-3xl p-5 shadow-2xl relative font-sans flex flex-col max-h-[85vh]">
+              <button onClick={() => setIsReceiptModalOpen(false)} className="absolute top-4 right-4 p-2 rounded-full hover:bg-neutral-100 dark:hover:bg-neutral-800"><SafeX size={16} /></button>
+              
+              <div className="border-b border-neutral-200 dark:border-neutral-800 pb-3 pr-8">
+                <h3 className="text-base font-black">Bill Details</h3>
+                <p className="text-xs font-mono text-neutral-400 mt-0.5">Bill No: #{selectedReceipt.billNumber}</p>
+              </div>
+
+              <div className="flex-1 overflow-y-auto space-y-3 py-3">
+                <div className="space-y-1 text-xs bg-neutral-50 dark:bg-neutral-800/40 p-3 rounded-2xl">
+                  <p>👤 <b>Guest:</b> {selectedReceipt.customerName}</p>
+                  <p>💳 <b>Method:</b> <span className="uppercase">{selectedReceipt.paymentMethod}</span></p>
+                </div>
+                <div className="space-y-1 bg-neutral-50 dark:bg-neutral-800/40 p-3 rounded-2xl">
+                  {selectedReceipt.items?.map((it: any, idx: number) => (
+                    <div key={idx} className="flex justify-between text-xs py-1">
+                      <span>{it.name} <span className="text-orange-500 font-bold">x{it.quantity}</span></span>
+                      <span className="font-mono">₹{it.price * it.quantity}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex justify-between text-sm font-black text-green-500 font-mono pt-2 border-t">
+                  <span>Grand Total:</span><span>₹{selectedReceipt.total}</span>
+                </div>
+              </div>
+
+              <div className="flex gap-2 pt-3 border-t">
+                <button onClick={() => handlePrintReceipt(selectedReceipt, getPrintConfig())} className="flex-1 bg-green-600 text-white font-black py-2.5 rounded-xl text-xs uppercase">Reprint</button>
+                {selectedReceipt.status !== 'refunded' && <button onClick={() => handleRefundOrder(selectedReceipt.id)} className="flex-1 bg-red-600 text-white font-black py-2.5 rounded-xl text-xs uppercase">Refund</button>}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       <PosCartDrawer 
         isHindi={false} isCartOpen={isCartOpen} setIsCartOpen={setIsCartOpen} cart={cart} setCart={setCart} customerPhone={customerPhone} setCustomerPhone={setCustomerPhone} customerName={customerName} setCustomerName={setCustomerName} customerPoints={customerPoints} setCustomerPoints={setCustomerPoints} pointsToRedeem={pointsToRedeem} setPointsToRedeem={setPointsToRedeem} customDiscount={customDiscount} setCustomDiscount={setCustomDiscount} fulfillmentType={fulfillmentType} setFulfillmentType={setFulfillmentType} selectedArea={selectedArea} setSelectedArea={setSelectedArea} DELIVERY_AREAS={DELIVERY_AREAS} address={address} setAddress={setAddress} tableNumber={tableNumber} setTableNumber={setTableNumber} chefInstructions={chefInstructions} setChefInstructions={setChefInstructions} isSubmittingOrder={isSubmittingOrder} paymentMethod={paymentMethod} setPaymentMethod={handleSetPaymentMethod} noCutlery={false} setNoCutlery={() => {}} getCartSubtotal={getCartSubtotal} getCartAddonsPrice={() => 0} getDeliveryCharge={getDeliveryCharge} getFreeDeliveryProgressPercent={getFreeDeliveryProgressPercent} getTotalPointsRedeemedInCart={getTotalPointsRedeemedInCart} getTotalBillPrice={getTotalBillPrice} loyaltyRules={loyaltyRules} handlePlaceOrder={handlePlaceOrder} handleDetectLocation={handleDetectLocation} setIsCustomerModalOpen={setIsCustomerModalOpen} searchDbCustomers={searchDbCustomers} handleUpdateCartQuantity={handleUpdateCartQuantity} handleUpdateCartItemNote={handleUpdateCartItemNote} showAddonsSection={false} triggerBeep={triggerBeep} handleCheckLoyalty={handleCheckLoyalty} ketchupAddon={false} setKetchupAddon={() => {}} oreganoAddon={false} setOreganoAddon={() => {}} chiliFlakesAddon={false} setChiliFlakesAddon={() => {}}
