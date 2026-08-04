@@ -153,6 +153,14 @@ export default function BbCafePosDesktop() {
   const [chefInstructions, setChefInstructions] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'upi'>('cash');
 
+  const handleSetPaymentMethod = (method: 'cash' | 'upi') => {
+    setPaymentMethod(method);
+  };
+
+  const handleUpdateCartItemNote = (id: string, note: string) => {
+    setCart(prev => prev.map(item => item.id === id ? { ...item, note } : item));
+  };
+
   // Toggle for Discount & Coupon section in Cart
   const [showDiscountSection, setShowDiscountSection] = useState(false);
 
