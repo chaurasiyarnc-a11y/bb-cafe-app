@@ -140,6 +140,7 @@ export default function BbCafePosDesktop() {
 
   // Cart States
   const [cart, setCart] = useState<PosCartItem[]>([]);
+  const [isCartOpen, setIsCartOpen] = useState(false);
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerName, setCustomerName] = useState('');
   const [customerPoints, setCustomerPoints] = useState(0);
@@ -855,7 +856,7 @@ export default function BbCafePosDesktop() {
                       )}
                     </div>
 
-                    {/* TOGGLE BUTTON FOR DISCOUNT / COUPON SECTION (Hidden by default for a clean look) */}
+                    {/* TOGGLE BUTTON FOR DISCOUNT / COUPON SECTION */}
                     <div className="pt-1">
                       <button 
                         onClick={() => { triggerBeep('tap'); setShowDiscountSection(!showDiscountSection); }}
