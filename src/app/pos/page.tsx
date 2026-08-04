@@ -100,14 +100,14 @@ export default function BbCafePosMobile() {
   const [themeMode, setThemeMode] = useState<'dark' | 'light'>('dark');
 
   // Printer Settings states
-  const [printerType, setPrinterType] = useState<'thermal_usb' | 'thermal_bluetooth' | 'network_ip' | 'laser'>('thermal_usb');
+  const [printerType, setPrinterType] = useState<'thermal_usb' | 'thermal_bluetooth' | 'network_ip' | 'laser'>('thermal_bluetooth');
   const [printerIp, setPrinterIp] = useState('192.168.1.100');
   const [printCopies, setPrintCopies] = useState(1);
   const [isConnecting, setIsConnecting] = useState(false);
   const [printerConnected, setPrinterConnected] = useState(false);
   const [bleCharacteristic, setBleCharacteristic] = useState<any>(null);
   const [fontSize, setFontSize] = useState<number>(9); 
-  const [kotEnabled, setKotEnabled] = useState<boolean>(true); 
+  const [kotEnabled, setKotEnabled] = useState<boolean>(true); // KOT Toggle State Restored
 
   // USB Web Serial and WebUSB references
   const [serialPort, setSerialPort] = useState<any>(null); 
@@ -247,6 +247,7 @@ export default function BbCafePosMobile() {
     setGstRate(Number(localStorage.getItem("bb_pos_gst_rate")) || 5);
     setPrinterPaperSize((localStorage.getItem("bb_pos_paper_size") as any) || '58mm');
     setKotEnabled(localStorage.getItem("bb_pos_kot_enabled") !== 'false'); 
+    setPrinterType((localStorage.getItem("bb_pos_printer_type") as any) || 'thermal_bluetooth');
 
     const localTheme = localStorage.getItem("bb_pos_theme") || 'dark';
     setThemeMode(localTheme as any);
@@ -606,18 +607,41 @@ export default function BbCafePosMobile() {
   const handleConnectPrinter = async () => {
     triggerBeep('tap');
     setIsConnecting(true);
-    const toastId = toast.loading(`Connecting to ${printerType.toUpperCase()}...`);
+    const toastId = toast.loading(`Connecting to Bluetooth/USB Printer...`);
     try {
       if (printerType === 'thermal_bluetooth' && 'bluetooth' in navigator) {
-        const device = await (navigator as any).bluetooth.requestDevice({ acceptAllDevices: true, optionalServices: ['000018f0-0000-1000-8000-00805f9b34fb'] });
+        const device = await (navigator as any).bluetooth.requestDevice({ 
+          acceptAllDevices: true, 
+          optionalServices: ['000018f0-0000-1000-8000-00805f9b34fb', '0000ff00-0000-1000-8000-00805f9b34fb', '49535343-fe7d-4ae5-8fa9-9fafd205e455'] 
+        });
         const server = await device.gatt!.connect();
-        let service = await server.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb').catch(() => server.getPrimaryService('0000ff00-0000-1000-8000-00805f9b34fb'));
-        let characteristic = await service.getCharacteristic('00002af1-0000-1000-8000-00805f9b34fb').catch(() => service.getCharacteristic('0000ff02-0000-1000-8000-00805f9b34fb'));
+        
+        let service;
+        let characteristic;
+        const services = await server.getPrimaryServices();
+        for (const s of services) {
+          try {
+            const chars = await s.getCharacteristics();
+            for (const c of chars) {
+              if (c.properties.write || c.properties.writeWithoutResponse) {
+                service = s;
+                characteristic = c;
+                break;
+              }
+            }
+          } catch (err) {}
+          if (characteristic) break;
+        }
+
+        if (!characteristic) {
+          throw new Error("Could not find writable characteristic on printer.");
+        }
+
         setBleCharacteristic(characteristic);
         setPrinterConnected(true);
         localStorage.setItem("bb_pos_printer_connected", "true");
         toast.dismiss(toastId);
-        toast.success("Bluetooth Printer Connected!");
+        toast.success("Bluetooth Thermal Printer Connected!");
       } else if (printerType === 'thermal_usb' && 'serial' in navigator) {
         const port = await (navigator as any).serial.requestPort();
         await port.open({ baudRate: 9600 });
@@ -625,7 +649,7 @@ export default function BbCafePosMobile() {
         setPrinterConnected(true);
         localStorage.setItem("bb_pos_printer_connected", "true");
         toast.dismiss(toastId);
-        toast.success("USB Printer Connected!");
+        toast.success("USB Thermal Printer Connected!");
       } else {
         setTimeout(() => {
           toast.dismiss(toastId);
@@ -642,8 +666,24 @@ export default function BbCafePosMobile() {
     }
   };
 
-  const handleTestPrint = () => {
-    handlePrintReceipt({ billNumber: '0000', tokenNumber: '9999', fulfillmentType: 'test', paymentMethod: 'system', items: [{ name: 'Print Test', quantity: 1, price: 100 }], subtotal: 100, discount: 0, total: 100, timestamp: new Date() }, getPrintConfig());
+  const handleTestPrint = async () => {
+    triggerBeep('tap');
+    try {
+      await handlePrintReceipt({ 
+        billNumber: '0000', 
+        tokenNumber: '9999', 
+        fulfillmentType: 'test', 
+        paymentMethod: 'system', 
+        items: [{ name: 'Printer Test Item', quantity: 1, price: 100 }], 
+        subtotal: 100, 
+        discount: 0, 
+        total: 100, 
+        timestamp: new Date() 
+      }, getPrintConfig());
+      toast.success("Test print sent to printer!");
+    } catch (e: any) {
+      toast.error("Print failed: " + (e.message || "Unknown error"));
+    }
   };
 
   const handleDetectLocation = () => {
@@ -1052,6 +1092,17 @@ export default function BbCafePosMobile() {
                     </div>
                   </div>
 
+                  {/* KOT Toggle Setting Restored */}
+                  <div className="border-b border-neutral-200 dark:border-neutral-800 pb-3 space-y-2">
+                    <p className="text-xs font-bold uppercase">KOT (Kitchen Order Ticket):</p>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs">Print KOT on Checkout:</span>
+                      <button onClick={() => { const next = !kotEnabled; setKotEnabled(next); localStorage.setItem("bb_pos_kot_enabled", String(next)); }} className="text-orange-500">
+                        {kotEnabled ? <SafeToggleRight size={28} /> : <SafeToggleLeft size={28} />}
+                      </button>
+                    </div>
+                  </div>
+
                   <div className="border-b border-neutral-200 dark:border-neutral-800 pb-3 space-y-2">
                     <p className="text-xs font-bold uppercase">GST Config:</p>
                     <div className="flex items-center justify-between">
@@ -1063,9 +1114,11 @@ export default function BbCafePosMobile() {
                   </div>
 
                   <div className="space-y-2">
-                    <p className="text-xs font-bold uppercase">Printer Connection:</p>
+                    <p className="text-xs font-bold uppercase">Direct Bluetooth/USB Printer Connection:</p>
                     <div className="flex gap-2">
-                      <button onClick={handleConnectPrinter} disabled={isConnecting} className="flex-1 bg-amber-500 text-black font-black py-2.5 rounded-xl text-[9px] uppercase">Connect</button>
+                      <button onClick={handleConnectPrinter} disabled={isConnecting} className="flex-1 bg-amber-500 text-black font-black py-2.5 rounded-xl text-[9px] uppercase">
+                        {printerConnected ? 'Connected ✅' : 'Connect Printer'}
+                      </button>
                       <button onClick={handleTestPrint} className="flex-1 bg-green-600 text-white font-black py-2.5 rounded-xl text-[9px] uppercase">Test Print 🧾</button>
                     </div>
                   </div>
