@@ -90,7 +90,7 @@ export default function BbCafePos() {
   const [activeTab, setActiveTab] = useState<'orders' | 'billing' | 'inventory' | 'receipts' | 'settings'>('billing');
   const [previousTab, setPreviousTab] = useState<'billing' | 'inventory' | 'receipts' | 'settings'>('billing');
   
-  // Layout Override State ('mobile' | 'desktop') - Default set to desktop for large screens or manual toggle
+  // Layout Override State ('mobile' | 'desktop') - Default set to desktop
   const [layoutMode, setLayoutMode] = useState<'mobile' | 'desktop'>('desktop');
 
   const [isCartOpen, setIsCartOpen] = useState(false); 
@@ -781,8 +781,6 @@ export default function BbCafePos() {
   ];
 
   const mainClass = "min-h-screen flex flex-col md:flex-row font-sans antialiased overflow-hidden transition-colors duration-200 " + (themeMode === "dark" ? "dark bg-[#0a0a0a] text-neutral-100" : "bg-neutral-50 text-neutral-800");
-  
-  // If desktop layout mode is active, completely hide the sidebar wrapper or force it hidden/collapsible seamlessly
   const isDesktopMode = layoutMode === 'desktop';
   const asideClass = isDesktopMode 
     ? "hidden" 
@@ -817,7 +815,7 @@ export default function BbCafePos() {
         <>
           {isSidebarOpen && <div onClick={() => setIsSidebarOpen(false)} className="fixed inset-0 bg-neutral-950/80 z-40 md:hidden" />}
 
-          {/* Sidebar (Hidden completely in Desktop/Tablet Mode as requested) */}
+          {/* Sidebar (Hidden completely in Desktop/Tablet Mode) */}
           {!isDesktopMode && (
             <aside className={asideClass}>
               <div className="space-y-6">
@@ -844,12 +842,11 @@ export default function BbCafePos() {
               </div>
 
               <div className="space-y-2 pt-4 border-t border-neutral-200 dark:border-neutral-800">
-                {/* Mode Switcher Button */}
                 <button 
                   onClick={() => {
                     triggerBeep('tap');
-                    setLayoutMode(isDesktopMode ? 'mobile' : 'desktop');
-                    toast.success(isDesktopMode ? "Switched to Mobile Mode" : "Switched to Desktop Mode");
+                    setLayoutMode('desktop');
+                    toast.success("Switched to Desktop Mode");
                   }} 
                   className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase text-orange-400 hover:bg-orange-500/10"
                 >
@@ -868,25 +865,38 @@ export default function BbCafePos() {
             </aside>
           )}
 
-          <main className="flex-1 p-3 md:p-5 overflow-y-auto flex flex-col h-screen">
-            <div className="flex items-center gap-3 mb-4 border-b border-neutral-200 dark:border-neutral-800 pb-3">
-              {/* Show menu button only if not in full desktop layout mode */}
-              {!isDesktopMode && (
-                <button onClick={() => setIsSidebarOpen(true)} className="p-2.5 bg-neutral-200 dark:bg-neutral-800 text-orange-500 rounded-xl md:hidden"><SafeMenu size={16} /></button>
-              )}
-              
-              {/* Quick toggle mode button for desktop mode header bar */}
-              {isDesktopMode && (
+          <main className="flex-1 p-3 md:p-5 overflow-y-auto flex flex-col h-screen relative">
+            
+            {/* Desktop Mode Floating Switcher (So you can easily switch back to mobile view anytime without sidebar) */}
+            {isDesktopMode && (
+              <div className="absolute top-4 right-4 z-30 flex items-center gap-1.5 bg-neutral-900/90 backdrop-blur-md border border-neutral-800 p-1.5 rounded-2xl shadow-xl">
                 <button 
                   onClick={() => {
                     triggerBeep('tap');
                     setLayoutMode('mobile');
-                    toast.success("Switched to Mobile Layout");
+                    toast.success("Switched to Mobile Mode");
                   }} 
-                  className="p-2 bg-neutral-200 dark:bg-neutral-800 text-orange-500 rounded-xl flex items-center gap-1.5 text-[9px] font-black uppercase"
+                  className="px-3 py-1.5 bg-neutral-800 hover:bg-neutral-700 text-orange-400 rounded-xl text-[9px] font-black uppercase flex items-center gap-1.5 transition-all"
+                  title="Switch to Mobile View"
                 >
-                  <SafeSmartphone size={14} /><span>Mobile View</span>
+                  <SafeSmartphone size={13} /><span>Mobile View</span>
                 </button>
+                <button 
+                  onClick={() => {
+                    triggerBeep('tap');
+                    setActiveTab(activeTab === 'settings' ? 'billing' : 'settings');
+                  }} 
+                  className="p-1.5 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 rounded-xl"
+                  title="Settings"
+                >
+                  <SafeSettings size={14} />
+                </button>
+              </div>
+            )}
+
+            <div className="flex items-center gap-3 mb-4 border-b border-neutral-200 dark:border-neutral-800 pb-3 pr-28 md:pr-0">
+              {!isDesktopMode && (
+                <button onClick={() => setIsSidebarOpen(true)} className="p-2.5 bg-neutral-200 dark:bg-neutral-800 text-orange-500 rounded-xl md:hidden"><SafeMenu size={16} /></button>
               )}
 
               <div className="flex flex-col">
@@ -1019,11 +1029,11 @@ export default function BbCafePos() {
                   )}
                 </div>
 
-                {/* RIGHT SIDE: Direct Permanent Clean Cart Panel (Optimized to show up to 10+ items cleanly with a smooth scroll container) */}
-                <div className="flex flex-col w-full md:w-[420px] bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-3xl p-4 shadow-xl shrink-0 h-full">
+                {/* RIGHT SIDE: Direct POS Cart Panel (Desktop & Tablet mode direct open cart list with clear layout up to 10+ items) */}
+                <div className={`flex flex-col w-full md:w-[440px] bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-3xl p-4 shadow-xl shrink-0 h-full ${layoutMode === 'mobile' ? 'hidden md:flex' : ''}`}>
                   <div className="flex items-center justify-between pb-3 border-b border-neutral-200 dark:border-neutral-800 mb-2">
                     <h3 className="text-xs font-black uppercase text-orange-500 flex items-center gap-2">
-                      <SafeShoppingBag size={14} /> Direct Active Cart
+                      <SafeShoppingBag size={14} /> Direct POS Cart
                     </h3>
                     <span className="text-[10px] font-mono bg-orange-500/10 text-orange-400 px-2.5 py-0.5 rounded-full font-bold">
                       {cart.reduce((sum, item) => sum + item.quantity, 0)} Items
@@ -1036,7 +1046,7 @@ export default function BbCafePos() {
                       <div className="h-full flex flex-col items-center justify-center text-neutral-400 text-center p-6">
                         <SafeShoppingBag size={36} className="mb-2 opacity-30 animate-pulse" />
                         <p className="text-xs font-bold">Cart is empty</p>
-                        <span className="text-[10px] opacity-75">Click items from menu to add directly to billing cart.</span>
+                        <span className="text-[10px] opacity-75">Click menu items to add directly to billing cart.</span>
                       </div>
                     ) : (
                       cart.map((item) => (
@@ -1073,6 +1083,22 @@ export default function BbCafePos() {
                     </div>
                   )}
                 </div>
+
+                {/* Mobile Floating Cart Button (Visible only when forced into mobile view on smaller screens) */}
+                {cart.length > 0 && layoutMode === 'mobile' && (
+                  <motion.button initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} onClick={() => setIsCartOpen(true)} className="fixed bottom-6 right-6 left-6 bg-green-600 text-white font-black px-6 py-4 rounded-2xl shadow-2xl flex items-center justify-between gap-4 z-40 active:scale-95 transition-all md:hidden">
+                    <div className="flex items-center gap-2.5">
+                      <SafeShoppingBag size={16} />
+                      <div className="text-left">
+                        <p className="text-[8px] uppercase text-green-100 font-bold">Active Cart</p>
+                        <p className="text-xs font-mono">{cart.reduce((sum, item) => sum + item.quantity, 0)} Items</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1 text-sm font-mono">
+                      <span>Pay: ₹{getTotalBillPrice()}</span><span>➔</span>
+                    </div>
+                  </motion.button>
+                )}
 
               </div>
             )}
