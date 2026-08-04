@@ -11,7 +11,7 @@ import {
   Loader2, Clock, Trash2, Printer, Check, Play, Settings, 
   Database, RefreshCw, Layers, Phone, MapPin, LayoutGrid, List,
   Menu, Users, LogOut, Lock, ToggleLeft, ToggleRight, Sun, Moon,
-  ChevronLeft, ChevronRight
+  ChevronLeft, ChevronRight, Smartphone, Monitor
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
@@ -53,6 +53,8 @@ const SafeMinus = Minus as any;
 const SafeChevronLeft = ChevronLeft as any;
 const SafeChevronRight = ChevronRight as any;
 const SafeSettings = Settings as any;
+const SafeSmartphone = Smartphone as any;
+const SafeMonitor = Monitor as any;
 
 interface PosCartItem {
   id: string;
@@ -86,6 +88,11 @@ export default function BbCafePos() {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [pinInput, setPinInput] = useState('');
   const [activeTab, setActiveTab] = useState<'orders' | 'billing' | 'inventory' | 'receipts' | 'settings'>('billing');
+  const [previousTab, setPreviousTab] = useState<'billing' | 'inventory' | 'receipts' | 'settings'>('billing');
+  
+  // Layout Override State ('auto' | 'mobile' | 'desktop')
+  const [layoutMode, setLayoutMode] = useState<'auto' | 'mobile' | 'desktop'>('auto');
+
   const [isCartOpen, setIsCartOpen] = useState(false); 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false); 
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false); 
@@ -830,6 +837,21 @@ export default function BbCafePos() {
             </div>
 
             <div className="space-y-2 pt-4 border-t border-neutral-200 dark:border-neutral-800">
+              {/* Device Mode Switcher Button */}
+              <button 
+                onClick={() => {
+                  triggerBeep('tap');
+                  if (layoutMode === 'auto') setLayoutMode('mobile');
+                  else if (layoutMode === 'mobile') setLayoutMode('desktop');
+                  else setLayoutMode('auto');
+                  toast.success(`Layout View: ${layoutMode === 'auto' ? 'Forced Mobile' : layoutMode === 'mobile' ? 'Forced Desktop' : 'Auto Detect'}`);
+                }} 
+                className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase text-orange-400 hover:bg-orange-500/10"
+              >
+                {layoutMode === 'mobile' ? <SafeMonitor size={14} /> : <SafeSmartphone size={14} />}
+                {!isSidebarCollapsed && <span>Mode: {layoutMode.toUpperCase()}</span>}
+              </button>
+
               <button onClick={handleManualSync} disabled={isSyncing} className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase text-yellow-500 hover:bg-yellow-500/10 disabled:opacity-50">
                 {isSyncing ? <Loader2 className="animate-spin" size={14} /> : <SafeRefreshCw size={14} />}
                 {!isSidebarCollapsed && <span>Sync Now</span>}
@@ -847,8 +869,22 @@ export default function BbCafePos() {
                 <h2 className="text-[10px] font-black uppercase text-orange-500">{activeTab} Workspace</h2>
                 <span className="text-[9px] text-neutral-500 dark:text-neutral-400 font-bold">Bum Bum Cafe • Mohandra</span>
               </div>
-              <button onClick={() => setActiveTab('orders')} className={"ml-auto p-2 rounded-xl flex items-center gap-2 text-[10px] font-black uppercase transition-all relative " + (activeTab === 'orders' ? "bg-orange-600 text-white" : "bg-neutral-200 dark:bg-neutral-800 text-orange-500")}>
-                <SafeClock size={14} /><span>Live Orders</span>
+              
+              {/* Toggle Live Orders Button */}
+              <button 
+                onClick={() => {
+                  triggerBeep('tap');
+                  if (activeTab === 'orders') {
+                    setActiveTab(previousTab);
+                  } else {
+                    setPreviousTab(activeTab as any);
+                    setActiveTab('orders');
+                  }
+                }} 
+                className={"ml-auto p-2 rounded-xl flex items-center gap-2 text-[10px] font-black uppercase transition-all relative " + (activeTab === 'orders' ? "bg-orange-600 text-white" : "bg-neutral-200 dark:bg-neutral-800 text-orange-500")}
+              >
+                <SafeClock size={14} />
+                <span>{activeTab === 'orders' ? 'Back to Menu' : 'Live Orders'}</span>
                 {liveOrdersBadgeCount > 0 && <span className="bg-yellow-400 text-black font-black text-[9px] px-2 py-0.5 rounded-full font-mono animate-pulse">{liveOrdersBadgeCount}</span>}
               </button>
             </div>
@@ -908,7 +944,7 @@ export default function BbCafePos() {
               </div>
             )}
 
-            {/* BILLING WORKSPACE - WINDOWS/PC SPLIT VIEW (LEFT MENU, RIGHT CART) */}
+            {/* BILLING WORKSPACE */}
             {activeTab === 'billing' && (
               <div className="flex-1 flex flex-col md:flex-row gap-4 overflow-hidden relative h-full">
                 
@@ -935,7 +971,8 @@ export default function BbCafePos() {
                   {loading ? (
                     <div className="flex items-center justify-center flex-1"><Loader2 className="animate-spin text-orange-500" size={24} /></div>
                   ) : (
-                    <div onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd} className="grid grid-cols-2 md:grid-cols-3 gap-2.5 overflow-y-auto flex-1 pr-1 pb-4 content-start select-none touch-pan-y">
+                    /* Grid set to 3 columns on mobile as requested (grid-cols-3) */
+                    <div onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd} className="grid grid-cols-3 md:grid-cols-3 gap-2.5 overflow-y-auto flex-1 pr-1 pb-4 content-start select-none touch-pan-y">
                       <AnimatePresence mode="popLayout">
                         {filteredMenu.map((item) => {
                           const isAvail = item.isAvailable !== false;
@@ -943,12 +980,12 @@ export default function BbCafePos() {
                           return (
                             <motion.button layout initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} key={item.id} disabled={!isAvail} onClick={() => { triggerBeep('tap'); item.variants ? setSelectedProduct(item) : handleAddProductToCart(item); }} className={`border rounded-2xl text-left flex flex-col overflow-hidden h-36 transition-all duration-200 active:scale-95 ${isAvail ? "bg-neutral-50 hover:bg-neutral-100 dark:bg-neutral-800 dark:hover:bg-neutral-750 text-neutral-850 dark:text-neutral-100 border-neutral-200 dark:border-neutral-700 hover:border-orange-500" : "opacity-40 bg-neutral-100 dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800 pointer-events-none"}`}>
                               {hasImage ? (
-                                <img src={hasImage} alt={item.name} className="w-full h-24 object-cover shrink-0 bg-neutral-200 dark:bg-neutral-700" />
+                                <img src={hasImage} alt={item.name} className="w-full h-20 md:h-24 object-cover shrink-0 bg-neutral-200 dark:bg-neutral-700" />
                               ) : (
-                                <div className="w-full h-24 bg-neutral-200 dark:bg-neutral-700 flex items-center justify-center text-neutral-400 text-[10px] font-bold uppercase shrink-0">{item.category || "No Image"}</div>
+                                <div className="w-full h-20 md:h-24 bg-neutral-200 dark:bg-neutral-700 flex items-center justify-center text-neutral-400 text-[9px] font-bold uppercase shrink-0">{item.category || "No Image"}</div>
                               )}
-                              <div className="p-2 flex-grow flex flex-col justify-center">
-                                <p className="font-bold text-[11px] line-clamp-2 leading-tight">{item.name}</p>
+                              <div className="p-1.5 md:p-2 flex-grow flex flex-col justify-center">
+                                <p className="font-bold text-[10px] md:text-[11px] line-clamp-2 leading-tight">{item.name}</p>
                               </div>
                             </motion.button>
                           );
@@ -958,8 +995,8 @@ export default function BbCafePos() {
                   )}
                 </div>
 
-                {/* RIGHT SIDE: Permanent Desktop Cart / Checkout Panel */}
-                <div className="hidden md:flex flex-col w-96 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-3xl p-4 shadow-xl shrink-0 h-full">
+                {/* RIGHT SIDE: Permanent Desktop Cart / Checkout Panel (Hidden if layoutMode forces mobile view) */}
+                <div className={`hidden md:flex flex-col w-96 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-3xl p-4 shadow-xl shrink-0 h-full ${layoutMode === 'mobile' ? 'hidden' : ''}`}>
                   <div className="flex items-center justify-between pb-3 border-b border-neutral-200 dark:border-neutral-800 mb-3">
                     <h3 className="text-xs font-black uppercase text-orange-500 flex items-center gap-2">
                       <SafeShoppingBag size={14} /> Current Order Cart
@@ -1013,7 +1050,7 @@ export default function BbCafePos() {
 
                 {/* Mobile Floating Cart Button */}
                 {cart.length > 0 && (
-                  <motion.button initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} onClick={() => setIsCartOpen(true)} className="fixed bottom-6 right-6 left-6 md:hidden bg-green-600 text-white font-black px-6 py-4 rounded-2xl shadow-2xl flex items-center justify-between gap-4 z-40 active:scale-95 transition-all">
+                  <motion.button initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} onClick={() => setIsCartOpen(true)} className={`fixed bottom-6 right-6 left-6 bg-green-600 text-white font-black px-6 py-4 rounded-2xl shadow-2xl flex items-center justify-between gap-4 z-40 active:scale-95 transition-all ${layoutMode === 'desktop' ? 'md:hidden' : 'md:hidden'}`}>
                     <div className="flex items-center gap-2.5">
                       <SafeShoppingBag size={16} />
                       <div className="text-left">
@@ -1095,7 +1132,7 @@ export default function BbCafePos() {
               </div>
             )}
 
-            {/* SETTINGS WORKSPACE (Windows Printer Options) */}
+            {/* SETTINGS WORKSPACE */}
             {activeTab === 'settings' && (
               <div className="max-w-xl mx-auto w-full pb-20 overflow-y-auto flex-1 font-sans">
                 <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 p-6 rounded-3xl shadow-xl space-y-6">
