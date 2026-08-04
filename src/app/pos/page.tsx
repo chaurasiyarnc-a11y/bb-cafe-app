@@ -238,6 +238,20 @@ export default function BbCafePosMobile() {
     }
   };
 
+  const handleDetectLocation = () => {
+    triggerBeep('tap');
+    if (!navigator.geolocation) return toast.error("Geolocation not supported");
+    const toastId = toast.loading("Detecting location...");
+    navigator.geolocation.getCurrentPosition((pos) => {
+      setAddress(`GPS: https://www.google.com/maps?q=${pos.coords.latitude.toFixed(6)},${pos.coords.longitude.toFixed(6)}`);
+      toast.dismiss(toastId);
+      toast.success("Location detected!");
+    }, () => {
+      toast.dismiss(toastId);
+      toast.error("Unable to retrieve location");
+    });
+  };
+
   useEffect(() => {
     const savedUser = localStorage.getItem("bb_pos_user");
     if (savedUser) {
@@ -917,7 +931,7 @@ export default function BbCafePosMobile() {
               </div>
             )}
 
-            {/* SETTINGS WORKSPACE (KOT Print Option Added Back) */}
+            {/* SETTINGS WORKSPACE */}
             {activeTab === 'settings' && (
               <div className="max-w-xl mx-auto w-full pb-20 overflow-y-auto flex-1 font-sans">
                 <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 p-5 rounded-3xl shadow-xl space-y-5">
@@ -941,7 +955,6 @@ export default function BbCafePosMobile() {
                     </div>
                   </div>
 
-                  {/* KOT Printing Toggle Option Added */}
                   <div className="border-b border-neutral-200 dark:border-neutral-800 pb-3 space-y-2">
                     <div className="flex items-center justify-between">
                       <p className="text-xs font-bold uppercase">Enable KOT Printing:</p>
@@ -970,7 +983,7 @@ export default function BbCafePosMobile() {
       />
 
       <CustomerDirectoryModal 
-        isCustomerModalOpen={isCustomerModalOpen} setIsCustomerModalOpen={setIsCustomerModalOpen} customerSearchQuery={customerSearchQuery} setCustomerSearchQuery={setCustomerSearchQuery} searchedCustomers={searchedCustomers} isSearchingCustomer={isSearchingCustomer} newCustName={newCustName} setNewCustName={setNewCustName} newCustPhone={newCustPhone} setNewCustPhone={setNewCustPhone} newCustAddress={newCustAddress} setNewCustAddress={newCustAddress} editingCustomer={editingCustomer} viewingHistoryCustomer={viewingHistoryCustomer} customerHistoryList={customerHistoryList} editCustPoints={editCustPoints} setEditCustPoints={setEditCustPoints} handleSelectCustomer={handleSelectCustomer} handleLoadCustomerHistory={handleLoadCustomerHistory} handleStartEditProfile={handleStartEditProfile} handleUpdateCustomerProfile={handleUpdateCustomerProfile} handleSaveNewCustomer={handleSaveNewCustomer} setViewingHistoryCustomer={setViewingHistoryCustomer} setCustomerHistoryList={setCustomerHistoryList} setEditingCustomer={setEditingCustomer} searchDbCustomers={searchDbCustomers} triggerBeep={triggerBeep}
+        isCustomerModalOpen={isCustomerModalOpen} setIsCustomerModalOpen={setIsCustomerModalOpen} customerSearchQuery={customerSearchQuery} setCustomerSearchQuery={setCustomerSearchQuery} searchedCustomers={searchedCustomers} isSearchingCustomer={isSearchingCustomer} newCustName={newCustName} setNewCustName={setNewCustName} newCustPhone={newCustPhone} setNewCustPhone={newCustPhone} newCustAddress={newCustAddress} setNewCustAddress={newCustAddress} editingCustomer={editingCustomer} viewingHistoryCustomer={viewingHistoryCustomer} customerHistoryList={customerHistoryList} editCustPoints={editCustPoints} setEditCustPoints={setEditCustPoints} handleSelectCustomer={handleSelectCustomer} handleLoadCustomerHistory={handleLoadCustomerHistory} handleStartEditProfile={handleStartEditProfile} handleUpdateCustomerProfile={handleUpdateCustomerProfile} handleSaveNewCustomer={handleSaveNewCustomer} setViewingHistoryCustomer={setViewingHistoryCustomer} setCustomerHistoryList={setCustomerHistoryList} setEditingCustomer={setEditingCustomer} searchDbCustomers={searchDbCustomers} triggerBeep={triggerBeep}
       />
 
       <CustomizerModal 
