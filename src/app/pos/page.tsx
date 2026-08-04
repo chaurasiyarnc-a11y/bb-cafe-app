@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { db } from '@/lib/firebase'; 
 import { 
   collection, onSnapshot, query, orderBy, limit, doc, 
@@ -11,7 +11,7 @@ import {
   Loader2, Clock, Trash2, Printer, Check, Play, Settings, 
   Database, RefreshCw, Layers, Phone, MapPin, LayoutGrid, List,
   Menu, Users, LogOut, Lock, ToggleLeft, ToggleRight, Sun, Moon,
-  ChevronLeft, ChevronRight, Smartphone, Monitor
+  ChevronLeft, ChevronRight, Smartphone, Monitor, Bell
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
@@ -55,6 +55,7 @@ const SafeChevronRight = ChevronRight as any;
 const SafeSettings = Settings as any;
 const SafeSmartphone = Smartphone as any;
 const SafeMonitor = Monitor as any;
+const SafeBell = Bell as any;
 
 interface PosCartItem {
   id: string;
@@ -90,7 +91,7 @@ export default function BbCafePos() {
   const [activeTab, setActiveTab] = useState<'orders' | 'billing' | 'inventory' | 'receipts' | 'settings'>('billing');
   const [previousTab, setPreviousTab] = useState<'billing' | 'inventory' | 'receipts' | 'settings'>('billing');
   
-  // Layout Override State ('mobile' | 'desktop') - Default set to desktop
+  // Layout Mode ('mobile' | 'desktop') saved in localStorage
   const [layoutMode, setLayoutMode] = useState<'mobile' | 'desktop'>('desktop');
 
   const [isCartOpen, setIsCartOpen] = useState(false); 
@@ -102,7 +103,7 @@ export default function BbCafePos() {
   const [printerPaperSize, setPrinterPaperSize] = useState<'58mm' | '80mm'>('58mm');
   const [themeMode, setThemeMode] = useState<'dark' | 'light'>('dark');
 
-  // Printer Settings states (Optimized for Windows USB & Bluetooth)
+  // Printer Settings states
   const [printerType, setPrinterType] = useState<'thermal_usb' | 'thermal_bluetooth' | 'network_ip' | 'laser'>('thermal_usb');
   const [printerIp, setPrinterIp] = useState('192.168.1.100');
   const [printCopies, setPrintCopies] = useState(1);
@@ -173,6 +174,49 @@ export default function BbCafePos() {
   const [normalPizzaPrice, setNormalPizzaPrice] = useState(0);
   const [customizerChefNote, setCustomizerChefNote] = useState(""); 
 
+  // Continuous alarm reference for pending orders
+  const alarmIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  const triggerBeep = (type: 'tap' | 'success' | 'alarm') => {
+    try {
+      if (!globalAudioCtx) {
+        globalAudioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      }
+      if (globalAudioCtx.state === 'suspended') {
+        globalAudioCtx.resume();
+      }
+
+      const osc = globalAudioCtx.createOscillator();
+      const gain = globalAudioCtx.createGain();
+      osc.connect(gain);
+      gain.connect(globalAudioCtx.destination);
+
+      if (type === 'tap') {
+        osc.frequency.setValueAtTime(600, globalAudioCtx.currentTime);
+        gain.gain.setValueAtTime(0.05, globalAudioCtx.currentTime);
+        osc.start(); 
+        osc.stop(globalAudioCtx.currentTime + 0.08);
+      } else if (type === 'success') {
+        osc.frequency.setValueAtTime(523, globalAudioCtx.currentTime);
+        gain.gain.setValueAtTime(0.05, globalAudioCtx.currentTime);
+        osc.start();
+        osc.frequency.setValueAtTime(659, globalAudioCtx.currentTime + 0.12);
+        osc.frequency.setValueAtTime(880, globalAudioCtx.currentTime + 0.24);
+        osc.stop(globalAudioCtx.currentTime + 0.4);
+      } else if (type === 'alarm') {
+        // High alert continuous alarm tone
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(880, globalAudioCtx.currentTime);
+        osc.frequency.setValueAtTime(1100, globalAudioCtx.currentTime + 0.15);
+        gain.gain.setValueAtTime(0.1, globalAudioCtx.currentTime);
+        osc.start();
+        osc.stop(globalAudioCtx.currentTime + 0.3);
+      }
+    } catch (e) {
+      console.warn("Audio error:", e);
+    }
+  };
+
   const handleClearAllLiveOrders = async () => {
     triggerBeep('tap');
     const confirmClear = window.confirm("क्या आप वाकई सभी एक्टिव लाइव ऑर्डर्स को साफ़ (Complete) करना चाहते हैं?");
@@ -197,38 +241,6 @@ export default function BbCafePos() {
       setPaymentMethod('cash'); 
     } else {
       setPaymentMethod(val);
-    }
-  };
-
-  const triggerBeep = (type: 'tap' | 'success') => {
-    try {
-      if (!globalAudioCtx) {
-        globalAudioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
-      }
-      if (globalAudioCtx.state === 'suspended') {
-        globalAudioCtx.resume();
-      }
-
-      const osc = globalAudioCtx.createOscillator();
-      const gain = globalAudioCtx.createGain();
-      osc.connect(gain);
-      gain.connect(globalAudioCtx.destination);
-
-      if (type === 'tap') {
-        osc.frequency.setValueAtTime(600, globalAudioCtx.currentTime);
-        gain.gain.setValueAtTime(0.05, globalAudioCtx.currentTime);
-        osc.start(); 
-        osc.stop(globalAudioCtx.currentTime + 0.08);
-      } else {
-        osc.frequency.setValueAtTime(523, globalAudioCtx.currentTime);
-        gain.gain.setValueAtTime(0.05, globalAudioCtx.currentTime);
-        osc.start();
-        osc.frequency.setValueAtTime(659, globalAudioCtx.currentTime + 0.12);
-        osc.frequency.setValueAtTime(880, globalAudioCtx.currentTime + 0.24);
-        osc.stop(globalAudioCtx.currentTime + 0.4);
-      }
-    } catch (e) {
-      console.warn("Audio error:", e);
     }
   };
 
@@ -270,6 +282,9 @@ export default function BbCafePos() {
     setPrinterPaperSize((localStorage.getItem("bb_pos_paper_size") as any) || '58mm');
     setKotEnabled(localStorage.getItem("bb_pos_kot_enabled") !== 'false'); 
     
+    const savedLayout = localStorage.getItem("bb_pos_layout_mode");
+    if (savedLayout) setLayoutMode(savedLayout as any);
+
     const localPrinterType = localStorage.getItem("bb_pos_printer_type");
     if (localPrinterType) setPrinterType(localPrinterType as any);
     const localPrinterIp = localStorage.getItem("bb_pos_printer_ip");
@@ -310,6 +325,7 @@ export default function BbCafePos() {
     localStorage.setItem("bb_pos_saved_chef_instructions", chefInstructions);
   }, [customerPhone, customerName, customerPoints, address, fulfillmentType, tableNumber, chefInstructions]);
 
+  // Live Orders snapshot & Continuous Alarm logic for pending orders
   useEffect(() => {
     const q = query(collection(db, "orders"), orderBy("timestamp", "desc"), limit(40));
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -330,6 +346,31 @@ export default function BbCafePos() {
 
     return () => { unsubscribe(); unsubStore(); };
   }, []);
+
+  const activeLiveOrders = useMemo(() => liveOrders.filter((o) => o.status !== 'completed' && o.status !== 'rejected'), [liveOrders]);
+  const pendingOrdersCount = useMemo(() => liveOrders.filter((o) => o.status === 'pending').length, [liveOrders]);
+
+  // Continuous Ring/Alarm trigger when pending orders exist
+  useEffect(() => {
+    if (pendingOrdersCount > 0) {
+      if (!alarmIntervalRef.current) {
+        alarmIntervalRef.current = setInterval(() => {
+          triggerBeep('alarm');
+        }, 2000); // Beep every 2 seconds continuously until pending orders are cleared/accepted
+      }
+    } else {
+      if (alarmIntervalRef.current) {
+        clearInterval(alarmIntervalRef.current);
+        alarmIntervalRef.current = null;
+      }
+    }
+    return () => {
+      if (alarmIntervalRef.current) {
+        clearInterval(alarmIntervalRef.current);
+        alarmIntervalRef.current = null;
+      }
+    };
+  }, [pendingOrdersCount]);
 
   useEffect(() => {
     if (!isLoggedIn) return;
@@ -770,7 +811,6 @@ export default function BbCafePos() {
 
   const filteredMenu = useMemo(() => products.filter((p) => (selectedCategory === 'All' || p.category === selectedCategory) && p.name.toLowerCase().includes(searchQuery.toLowerCase())), [products, selectedCategory, searchQuery]);
   const filteredPastReceipts = useMemo(() => pastReceipts.filter((o) => String(o.billNumber).includes(receiptSearchQuery.trim()) || String(o.customerPhone || '').includes(receiptSearchQuery.trim()) || String(o.customerName || '').toLowerCase().includes(receiptSearchQuery.trim().toLowerCase())), [pastReceipts, receiptSearchQuery]);
-  const activeLiveOrders = useMemo(() => liveOrders.filter((o) => o.status !== 'completed' && o.status !== 'rejected'), [liveOrders]);
   const liveOrdersBadgeCount = activeLiveOrders.length;
 
   const navItems = [
@@ -842,18 +882,6 @@ export default function BbCafePos() {
               </div>
 
               <div className="space-y-2 pt-4 border-t border-neutral-200 dark:border-neutral-800">
-                <button 
-                  onClick={() => {
-                    triggerBeep('tap');
-                    setLayoutMode('desktop');
-                    toast.success("Switched to Desktop Mode");
-                  }} 
-                  className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase text-orange-400 hover:bg-orange-500/10"
-                >
-                  <SafeMonitor size={14} />
-                  {!isSidebarCollapsed && <span>Mode: Desktop</span>}
-                </button>
-
                 <button onClick={handleManualSync} disabled={isSyncing} className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase text-yellow-500 hover:bg-yellow-500/10 disabled:opacity-50">
                   {isSyncing ? <Loader2 className="animate-spin" size={14} /> : <SafeRefreshCw size={14} />}
                   {!isSidebarCollapsed && <span>Sync Now</span>}
@@ -865,36 +893,8 @@ export default function BbCafePos() {
             </aside>
           )}
 
-          <main className="flex-1 p-3 md:p-5 overflow-y-auto flex flex-col h-screen relative">
-            
-            {/* Desktop Mode Floating Switcher (So you can easily switch back to mobile view anytime without sidebar) */}
-            {isDesktopMode && (
-              <div className="absolute top-4 right-4 z-30 flex items-center gap-1.5 bg-neutral-900/90 backdrop-blur-md border border-neutral-800 p-1.5 rounded-2xl shadow-xl">
-                <button 
-                  onClick={() => {
-                    triggerBeep('tap');
-                    setLayoutMode('mobile');
-                    toast.success("Switched to Mobile Mode");
-                  }} 
-                  className="px-3 py-1.5 bg-neutral-800 hover:bg-neutral-700 text-orange-400 rounded-xl text-[9px] font-black uppercase flex items-center gap-1.5 transition-all"
-                  title="Switch to Mobile View"
-                >
-                  <SafeSmartphone size={13} /><span>Mobile View</span>
-                </button>
-                <button 
-                  onClick={() => {
-                    triggerBeep('tap');
-                    setActiveTab(activeTab === 'settings' ? 'billing' : 'settings');
-                  }} 
-                  className="p-1.5 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 rounded-xl"
-                  title="Settings"
-                >
-                  <SafeSettings size={14} />
-                </button>
-              </div>
-            )}
-
-            <div className="flex items-center gap-3 mb-4 border-b border-neutral-200 dark:border-neutral-800 pb-3 pr-28 md:pr-0">
+          <main className="flex-1 p-3 md:p-5 overflow-y-auto flex flex-col h-screen">
+            <div className="flex items-center gap-3 mb-4 border-b border-neutral-200 dark:border-neutral-800 pb-3">
               {!isDesktopMode && (
                 <button onClick={() => setIsSidebarOpen(true)} className="p-2.5 bg-neutral-200 dark:bg-neutral-800 text-orange-500 rounded-xl md:hidden"><SafeMenu size={16} /></button>
               )}
@@ -904,7 +904,7 @@ export default function BbCafePos() {
                 <span className="text-[9px] text-neutral-500 dark:text-neutral-400 font-bold">Bum Bum Cafe • Mohandra</span>
               </div>
               
-              {/* Toggle Live Orders Button */}
+              {/* Toggle Live Orders Button with flashing badge if pending orders exist */}
               <button 
                 onClick={() => {
                   triggerBeep('tap');
@@ -919,7 +919,11 @@ export default function BbCafePos() {
               >
                 <SafeClock size={14} />
                 <span>{activeTab === 'orders' ? 'Back to Menu' : 'Live Orders'}</span>
-                {liveOrdersBadgeCount > 0 && <span className="bg-yellow-400 text-black font-black text-[9px] px-2 py-0.5 rounded-full font-mono animate-pulse">{liveOrdersBadgeCount}</span>}
+                {liveOrdersBadgeCount > 0 && (
+                  <span className={`font-black text-[9px] px-2 py-0.5 rounded-full font-mono animate-pulse ${pendingOrdersCount > 0 ? 'bg-red-500 text-white' : 'bg-yellow-400 text-black'}`}>
+                    {liveOrdersBadgeCount}
+                  </span>
+                )}
               </button>
             </div>
 
@@ -938,7 +942,7 @@ export default function BbCafePos() {
                     </div>
                   ) : (
                     activeLiveOrders.map((order) => (
-                      <div key={order.id} className="border bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800 rounded-2xl p-4 flex flex-col justify-between shadow-lg">
+                      <div key={order.id} className={`border bg-white dark:bg-neutral-950 rounded-2xl p-4 flex flex-col justify-between shadow-lg ${order.status === 'pending' ? 'border-red-500 animate-pulse' : 'border-neutral-200 dark:border-neutral-800'}`}>
                         <div>
                           <div className="flex justify-between items-start border-b border-neutral-200 dark:border-neutral-800 pb-2 mb-3">
                             <div>
@@ -1029,7 +1033,7 @@ export default function BbCafePos() {
                   )}
                 </div>
 
-                {/* RIGHT SIDE: Direct POS Cart Panel (Desktop & Tablet mode direct open cart list with clear layout up to 10+ items) */}
+                {/* RIGHT SIDE: Direct POS Cart Panel (Desktop & Tablet mode direct open cart list) */}
                 <div className={`flex flex-col w-full md:w-[440px] bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-3xl p-4 shadow-xl shrink-0 h-full ${layoutMode === 'mobile' ? 'hidden md:flex' : ''}`}>
                   <div className="flex items-center justify-between pb-3 border-b border-neutral-200 dark:border-neutral-800 mb-2">
                     <h3 className="text-xs font-black uppercase text-orange-500 flex items-center gap-2">
@@ -1040,7 +1044,7 @@ export default function BbCafePos() {
                     </span>
                   </div>
 
-                  {/* Clean scrollable container tailored to cleanly show 10 items without clutter */}
+                  {/* Scrollable container for up to 10+ items cleanly */}
                   <div className="flex-1 overflow-y-auto space-y-2 pr-1 max-h-[calc(100vh-280px)]">
                     {cart.length === 0 ? (
                       <div className="h-full flex flex-col items-center justify-center text-neutral-400 text-center p-6">
@@ -1084,7 +1088,7 @@ export default function BbCafePos() {
                   )}
                 </div>
 
-                {/* Mobile Floating Cart Button (Visible only when forced into mobile view on smaller screens) */}
+                {/* Mobile Floating Cart Button */}
                 {cart.length > 0 && layoutMode === 'mobile' && (
                   <motion.button initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} onClick={() => setIsCartOpen(true)} className="fixed bottom-6 right-6 left-6 bg-green-600 text-white font-black px-6 py-4 rounded-2xl shadow-2xl flex items-center justify-between gap-4 z-40 active:scale-95 transition-all md:hidden">
                     <div className="flex items-center gap-2.5">
@@ -1168,14 +1172,22 @@ export default function BbCafePos() {
               </div>
             )}
 
-            {/* SETTINGS WORKSPACE */}
+            {/* SETTINGS WORKSPACE (Layout Mode Switcher included here as a standard setting) */}
             {activeTab === 'settings' && (
               <div className="max-w-xl mx-auto w-full pb-20 overflow-y-auto flex-1 font-sans">
                 <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 p-6 rounded-3xl shadow-xl space-y-6">
                   <h3 className="text-sm font-black uppercase text-orange-500">POS Settings</h3>
                   
                   <div className="border-b border-neutral-200 dark:border-neutral-800 pb-4 space-y-3">
-                    <p className="text-xs font-bold uppercase">A. UI Theme:</p>
+                    <p className="text-xs font-bold uppercase">A. Layout / Device Mode:</p>
+                    <div className="flex bg-neutral-100 dark:bg-neutral-800 p-1 rounded-xl w-64 border border-transparent dark:border-neutral-700">
+                      <button onClick={() => { triggerBeep('tap'); setLayoutMode('desktop'); localStorage.setItem("bb_pos_layout_mode", "desktop"); toast.success("Desktop Mode Active"); }} className={"flex-grow py-2 rounded-lg text-[10px] font-black uppercase transition-all flex items-center justify-center gap-1.5 " + (layoutMode === 'desktop' ? "bg-orange-600 text-white shadow-md" : "text-neutral-400")}><SafeMonitor size={13} /> Desktop</button>
+                      <button onClick={() => { triggerBeep('tap'); setLayoutMode('mobile'); localStorage.setItem("bb_pos_layout_mode", "mobile"); toast.success("Mobile Mode Active"); }} className={"flex-grow py-2 rounded-lg text-[10px] font-black uppercase transition-all flex items-center justify-center gap-1.5 " + (layoutMode === 'mobile' ? "bg-orange-600 text-white shadow-md" : "text-neutral-400")}><SafeSmartphone size={13} /> Mobile</button>
+                    </div>
+                  </div>
+
+                  <div className="border-b border-neutral-200 dark:border-neutral-800 pb-4 space-y-3">
+                    <p className="text-xs font-bold uppercase">B. UI Theme:</p>
                     <div className="flex bg-neutral-100 dark:bg-neutral-800 p-1 rounded-xl w-60 border border-transparent dark:border-neutral-700">
                       <button onClick={() => handleToggleTheme('dark')} className={"flex-grow py-2 rounded-lg text-[10px] font-black uppercase transition-all " + (themeMode === 'dark' ? "bg-neutral-950 text-amber-400 shadow-md" : "text-neutral-400")}>Dark</button>
                       <button onClick={() => handleToggleTheme('light')} className={"flex-grow py-2 rounded-lg text-[10px] font-black uppercase transition-all " + (themeMode === 'light' ? "bg-white text-orange-600 shadow-md" : "text-neutral-400")}>Light</button>
@@ -1183,7 +1195,7 @@ export default function BbCafePos() {
                   </div>
 
                   <div className="border-b border-neutral-200 dark:border-neutral-800 pb-4 space-y-3">
-                    <p className="text-xs font-bold uppercase">B. GST Config:</p>
+                    <p className="text-xs font-bold uppercase">C. GST Config:</p>
                     <div className="flex items-center justify-between">
                       <span className="text-xs">Enable GST:</span>
                       <button onClick={() => { const next = !gstEnabled; setGstEnabled(next); localStorage.setItem("bb_pos_gst_enabled", String(next)); }} className="text-orange-500">
@@ -1195,7 +1207,7 @@ export default function BbCafePos() {
 
                   <div className="border-b border-neutral-200 dark:border-neutral-800 pb-4 space-y-3">
                     <div className="flex items-center justify-between">
-                      <p className="text-xs font-bold uppercase">C. Enable KOT Printing:</p>
+                      <p className="text-xs font-bold uppercase">D. Enable KOT Printing:</p>
                       <button onClick={() => { const next = !kotEnabled; setKotEnabled(next); localStorage.setItem("bb_pos_kot_enabled", String(next)); toast.success(next ? "KOT ON" : "KOT OFF"); }} className="text-orange-500">
                         {kotEnabled ? <SafeToggleRight size={32} /> : <SafeToggleLeft size={32} />}
                       </button>
@@ -1204,7 +1216,7 @@ export default function BbCafePos() {
 
                   <div className="space-y-3 pt-2">
                     <div className="flex items-center justify-between">
-                      <p className="text-xs font-bold uppercase">D. Hardware Printer Connection (USB / Bluetooth):</p>
+                      <p className="text-xs font-bold uppercase">E. Hardware Printer Connection (USB / Bluetooth):</p>
                       <span className={"text-[8px] font-black uppercase tracking-widest px-2.5 py-0.5 rounded-full border " + (printerConnected ? "bg-green-500/10 text-green-400 border-green-500/20" : "bg-red-500/10 text-red-400 border-red-500/20")}>
                         {printerConnected ? '● Connected' : 'Disconnected'}
                       </span>
@@ -1287,7 +1299,7 @@ export default function BbCafePos() {
       />
 
       <CustomerDirectoryModal 
-        isCustomerModalOpen={isCustomerModalOpen} setIsCustomerModalOpen={setIsCustomerModalOpen} customerSearchQuery={customerSearchQuery} setCustomerSearchQuery={setCustomerSearchQuery} searchedCustomers={searchedCustomers} isSearchingCustomer={isSearchingCustomer} newCustName={newCustName} setNewCustName={setNewCustName} newCustPhone={newCustPhone} setNewCustPhone={setNewCustPhone} newCustAddress={newCustAddress} setNewCustAddress={setNewCustAddress} editingCustomer={editingCustomer} viewingHistoryCustomer={viewingHistoryCustomer} customerHistoryList={customerHistoryList} editCustPoints={editCustPoints} setEditCustPoints={setEditCustPoints} handleSelectCustomer={handleSelectCustomer} handleLoadCustomerHistory={handleLoadCustomerHistory} handleStartEditProfile={handleStartEditProfile} handleUpdateCustomerProfile={handleUpdateCustomerProfile} handleSaveNewCustomer={handleSaveNewCustomer} setViewingHistoryCustomer={setViewingHistoryCustomer} setCustomerHistoryList={setCustomerHistoryList} setEditingCustomer={setEditingCustomer} searchDbCustomers={searchDbCustomers} triggerBeep={triggerBeep}
+        isCustomerModalOpen={isCustomerModalOpen} setIsCustomerModalOpen={setIsCustomerModalOpen} customerSearchQuery={customerSearchQuery} setCustomerSearchQuery={setCustomerSearchQuery} searchedCustomers={searchedCustomers} isSearchingCustomer={isSearchingCustomer} newCustName={newCustName} setNewCustName={setNewCustName} newCustPhone={newCustPhone} setNewCustPhone={newCustPhone} newCustAddress={newCustAddress} setNewCustAddress={newCustAddress} editingCustomer={editingCustomer} viewingHistoryCustomer={viewingHistoryCustomer} customerHistoryList={customerHistoryList} editCustPoints={editCustPoints} setEditCustPoints={setEditCustPoints} handleSelectCustomer={handleSelectCustomer} handleLoadCustomerHistory={handleLoadCustomerHistory} handleStartEditProfile={handleStartEditProfile} handleUpdateCustomerProfile={handleUpdateCustomerProfile} handleSaveNewCustomer={handleSaveNewCustomer} setViewingHistoryCustomer={setViewingHistoryCustomer} setCustomerHistoryList={setCustomerHistoryList} setEditingCustomer={setEditingCustomer} searchDbCustomers={searchDbCustomers} triggerBeep={triggerBeep}
       />
 
       <CustomizerModal 
