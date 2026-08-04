@@ -99,7 +99,7 @@ export default function BbCafePosMobile() {
   const [printerPaperSize, setPrinterPaperSize] = useState<'58mm' | '80mm'>('58mm');
   const [themeMode, setThemeMode] = useState<'dark' | 'light'>('dark');
 
-  // Printer Settings states
+  // Printer & KOT Settings states
   const [printerType, setPrinterType] = useState<'thermal_usb' | 'thermal_bluetooth' | 'network_ip' | 'laser'>('thermal_usb');
   const [printerIp, setPrinterIp] = useState('192.168.1.100');
   const [printCopies, setPrintCopies] = useState(1);
@@ -431,103 +431,6 @@ export default function BbCafePosMobile() {
     }
   };
 
-  const handleCheckLoyalty = async () => {
-    triggerBeep('tap');
-    if (customerPhone.trim().length !== 10) return toast.error("Enter valid 10-digit number!");
-    const phoneClean = customerPhone.trim();
-    const toastId = toast.loading("Checking profile...");
-    try {
-      const docSnap = await getDoc(doc(db, "customer_points", phoneClean));
-      toast.dismiss(toastId);
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        setCustomerName(data.name || '');
-        setCustomerPoints(data.points || 0);
-        setAddress(data.address || ''); 
-        toast.success(`Points: ${data.points || 0}`);
-      } else {
-        setCustomerName(''); setCustomerPoints(0); setAddress('');
-        toast.success("New Guest initialized!");
-      }
-    } catch (e) {
-      toast.dismiss(toastId);
-      toast.error("Database error");
-    }
-  };
-
-  const searchDbCustomers = async (text: string) => {
-    const cleanText = text.trim();
-    setIsSearchingCustomer(true);
-    try {
-      let q = cleanText ? (/^\d+$/.test(cleanText) ? query(collection(db, "customer_points"), where("phone", "==", cleanText)) : query(collection(db, "customer_points"), where("name", ">=", cleanText), limit(15))) : query(collection(db, "customer_points"), orderBy("lastActive", "desc"), limit(12));
-      const snap = await getDocs(q);
-      setSearchedCustomers(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setIsSearchingCustomer(false);
-    }
-  };
-
-  const handleSelectCustomer = (cust: any) => {
-    triggerBeep('tap');
-    setCustomerPhone(cust.phone); setCustomerName(cust.name); setCustomerPoints(cust.points || 0); setAddress(cust.address || '');
-    setIsCustomerModalOpen(false);
-  };
-
-  const handleLoadCustomerHistory = async (cust: any) => {
-    triggerBeep('tap');
-    setViewingHistoryCustomer(cust);
-    try {
-      const hSnap = await getDocs(query(collection(db, "customer_points", cust.phone, "history"), orderBy("timestamp", "desc"), limit(25)));
-      setCustomerHistoryList(hSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
-    } catch (e) {
-      toast.error("Failed to load history");
-    }
-  };
-
-  const handleStartEditProfile = (cust: any) => {
-    triggerBeep('tap');
-    setEditingCustomer(cust);
-    setNewCustName(cust.name);
-    setNewCustAddress(cust.address || '');
-    setEditCustPoints(cust.points || 0);
-  };
-
-  const handleUpdateCustomerProfile = async () => {
-    triggerBeep('tap');
-    if (!newCustName.trim()) return toast.error("Name mandatory!");
-    try {
-      await updateDoc(doc(db, "customer_points", editingCustomer.phone), { name: newCustName.trim(), address: newCustAddress.trim(), points: editCustPoints });
-      if (customerPhone === editingCustomer.phone) {
-        setCustomerName(newCustName.trim()); setAddress(newCustAddress.trim()); setCustomerPoints(editCustPoints);
-      }
-      setEditingCustomer(null); searchDbCustomers(customerSearchQuery);
-      toast.success("Profile saved!");
-    } catch (err) {
-      toast.error("Failed to edit");
-    }
-  };
-
-  const handleSaveNewCustomer = async (e: React.FormEvent) => {
-    e.preventDefault();
-    triggerBeep('tap');
-    const cleanPhone = newCustPhone.trim();
-    if (cleanPhone.length !== 10) return toast.error("Enter valid 10-digit phone!");
-    try {
-      const userRef = doc(db, "customer_points", cleanPhone);
-      if ((await getDoc(userRef)).exists()) return toast.error("Number already registered!");
-      const newDoc = { name: newCustName.trim(), phone: cleanPhone, points: 0, address: newCustAddress.trim(), lastActive: new Date() };
-      await setDoc(userRef, newDoc);
-      setCustomerPhone(cleanPhone); setCustomerName(newDoc.name); setCustomerPoints(0); setAddress(newDoc.address);
-      setNewCustName(''); setNewCustPhone(''); setNewCustAddress('');
-      setIsCustomerModalOpen(false);
-      toast.success("Registered!");
-    } catch (err) {
-      toast.error("Failed");
-    }
-  };
-
   const handleAddProductToCart = (item: any) => {
     triggerBeep('tap');
     setCart((prev) => {
@@ -572,10 +475,6 @@ export default function BbCafePosMobile() {
       }
       return item;
     }).filter(Boolean) as PosCartItem[]);
-  };
-
-  const handleUpdateCartItemNote = (itemId: string, noteValue: string) => {
-    setCart((prev) => prev.map((item) => item.id === itemId ? { ...item, note: noteValue } : item));
   };
 
   const handleTouchStart = (e: React.TouchEvent) => { setTouchEnd(null); setTouchStart(e.targetTouches[0].clientX); };
@@ -644,20 +543,6 @@ export default function BbCafePosMobile() {
 
   const handleTestPrint = () => {
     handlePrintReceipt({ billNumber: '0000', tokenNumber: '9999', fulfillmentType: 'test', paymentMethod: 'system', items: [{ name: 'Print Test', quantity: 1, price: 100 }], subtotal: 100, discount: 0, total: 100, timestamp: new Date() }, getPrintConfig());
-  };
-
-  const handleDetectLocation = () => {
-    triggerBeep('tap');
-    if (!navigator.geolocation) return toast.error("Geolocation not supported");
-    const toastId = toast.loading("Detecting location...");
-    navigator.geolocation.getCurrentPosition((pos) => {
-      setAddress(`GPS: https://www.google.com/maps?q=${pos.coords.latitude.toFixed(6)},${pos.coords.longitude.toFixed(6)}`);
-      toast.dismiss(toastId);
-      toast.success("Location detected!");
-    }, () => {
-      toast.dismiss(toastId);
-      toast.error("Unable to retrieve location");
-    });
   };
 
   const getNextLocalBillNumber = () => {
@@ -793,7 +678,6 @@ export default function BbCafePosMobile() {
         <>
           {isSidebarOpen && <div onClick={() => setIsSidebarOpen(false)} className="fixed inset-0 bg-neutral-950/80 z-40" />}
 
-          {/* Mobile Sidebar */}
           <aside className={asideClass}>
             <div className="space-y-6">
               <div className="flex items-center justify-between px-1 py-1 border-b border-neutral-200 dark:border-neutral-800 pb-4 gap-2">
@@ -828,7 +712,6 @@ export default function BbCafePosMobile() {
 
           <main className="flex-1 p-3 overflow-y-auto flex flex-col h-screen relative">
             <div className="flex items-center gap-3 mb-3 border-b border-neutral-200 dark:border-neutral-800 pb-3">
-              {/* Menu Button */}
               <button onClick={() => setIsSidebarOpen(true)} className="p-2.5 bg-neutral-200 dark:bg-neutral-800 text-orange-500 rounded-xl"><SafeMenu size={18} /></button>
 
               <div className="flex flex-col">
@@ -836,7 +719,6 @@ export default function BbCafePosMobile() {
                 <span className="text-[9px] text-neutral-500 dark:text-neutral-400 font-bold">Bum Bum Cafe • Mohandra</span>
               </div>
               
-              {/* Toggle Live Orders Button */}
               <button 
                 onClick={() => {
                   triggerBeep('tap');
@@ -916,13 +798,11 @@ export default function BbCafePosMobile() {
             {activeTab === 'billing' && (
               <div className="flex-1 flex flex-col gap-3 overflow-hidden relative h-full">
                 
-                {/* Search Bar */}
                 <div className="relative">
                   <SafeSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={14} />
                   <input type="text" placeholder="Search menu..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="w-full bg-neutral-100 dark:bg-neutral-800 rounded-xl py-2 px-9 text-xs outline-none text-neutral-800 dark:text-neutral-100 border border-transparent dark:border-neutral-700 focus:border-orange-500" />
                 </div>
 
-                {/* Categories */}
                 <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-none shrink-0">
                   {categories.map((cat) => {
                     const isSelected = selectedCategory === cat;
@@ -937,7 +817,6 @@ export default function BbCafePosMobile() {
                 {loading ? (
                   <div className="flex items-center justify-center flex-1"><Loader2 className="animate-spin text-orange-500" size={24} /></div>
                 ) : (
-                  /* STRICT 3-Column Grid for Mobile */
                   <div onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd} className="grid grid-cols-3 gap-2 overflow-y-auto flex-1 pb-24 content-start select-none touch-pan-y">
                     <AnimatePresence mode="popLayout">
                       {filteredMenu.map((item) => {
@@ -960,7 +839,7 @@ export default function BbCafePosMobile() {
                   </div>
                 )}
 
-                {/* Floating Bottom Cart Button */}
+                {/* Mobile Floating Cart Button */}
                 {cart.length > 0 && (
                   <motion.button initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} onClick={() => setIsCartOpen(true)} className="fixed bottom-4 right-4 left-4 bg-green-600 text-white font-black px-5 py-3.5 rounded-2xl shadow-2xl flex items-center justify-between gap-4 z-40 active:scale-95 transition-all">
                     <div className="flex items-center gap-2.5">
@@ -1038,7 +917,7 @@ export default function BbCafePosMobile() {
               </div>
             )}
 
-            {/* SETTINGS WORKSPACE */}
+            {/* SETTINGS WORKSPACE (KOT Print Option Added Back) */}
             {activeTab === 'settings' && (
               <div className="max-w-xl mx-auto w-full pb-20 overflow-y-auto flex-1 font-sans">
                 <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 p-5 rounded-3xl shadow-xl space-y-5">
@@ -1062,6 +941,16 @@ export default function BbCafePosMobile() {
                     </div>
                   </div>
 
+                  {/* KOT Printing Toggle Option Added */}
+                  <div className="border-b border-neutral-200 dark:border-neutral-800 pb-3 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs font-bold uppercase">Enable KOT Printing:</p>
+                      <button onClick={() => { const next = !kotEnabled; setKotEnabled(next); localStorage.setItem("bb_pos_kot_enabled", String(next)); toast.success(next ? "KOT ON" : "KOT OFF"); }} className="text-orange-500">
+                        {kotEnabled ? <SafeToggleRight size={28} /> : <SafeToggleLeft size={28} />}
+                      </button>
+                    </div>
+                  </div>
+
                   <div className="space-y-2">
                     <p className="text-xs font-bold uppercase">Printer Connection:</p>
                     <div className="flex gap-2">
@@ -1076,51 +965,12 @@ export default function BbCafePosMobile() {
         </>
       )}
 
-      {/* MODALS & DRAWERS */}
-      <AnimatePresence>
-        {isReceiptModalOpen && selectedReceipt && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-neutral-900 dark:text-neutral-100 max-w-lg w-full rounded-3xl p-5 shadow-2xl relative font-sans flex flex-col max-h-[85vh]">
-              <button onClick={() => setIsReceiptModalOpen(false)} className="absolute top-4 right-4 p-2 rounded-full hover:bg-neutral-100 dark:hover:bg-neutral-800"><SafeX size={16} /></button>
-              
-              <div className="border-b border-neutral-200 dark:border-neutral-800 pb-3 pr-8">
-                <h3 className="text-base font-black">Bill Details</h3>
-                <p className="text-xs font-mono text-neutral-400 mt-0.5">Bill No: #{selectedReceipt.billNumber}</p>
-              </div>
-
-              <div className="flex-1 overflow-y-auto space-y-3 py-3">
-                <div className="space-y-1 text-xs bg-neutral-50 dark:bg-neutral-800/40 p-3 rounded-2xl">
-                  <p>👤 <b>Guest:</b> {selectedReceipt.customerName}</p>
-                  <p>💳 <b>Method:</b> <span className="uppercase">{selectedReceipt.paymentMethod}</span></p>
-                </div>
-                <div className="space-y-1 bg-neutral-50 dark:bg-neutral-800/40 p-3 rounded-2xl">
-                  {selectedReceipt.items?.map((it: any, idx: number) => (
-                    <div key={idx} className="flex justify-between text-xs py-1">
-                      <span>{it.name} <span className="text-orange-500 font-bold">x{it.quantity}</span></span>
-                      <span className="font-mono">₹{it.price * it.quantity}</span>
-                    </div>
-                  ))}
-                </div>
-                <div className="flex justify-between text-sm font-black text-green-500 font-mono pt-2 border-t">
-                  <span>Grand Total:</span><span>₹{selectedReceipt.total}</span>
-                </div>
-              </div>
-
-              <div className="flex gap-2 pt-3 border-t">
-                <button onClick={() => handlePrintReceipt(selectedReceipt, getPrintConfig())} className="flex-1 bg-green-600 text-white font-black py-2.5 rounded-xl text-xs uppercase">Reprint</button>
-                {selectedReceipt.status !== 'refunded' && <button onClick={() => handleRefundOrder(selectedReceipt.id)} className="flex-1 bg-red-600 text-white font-black py-2.5 rounded-xl text-xs uppercase">Refund</button>}
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
       <PosCartDrawer 
         isHindi={false} isCartOpen={isCartOpen} setIsCartOpen={setIsCartOpen} cart={cart} setCart={setCart} customerPhone={customerPhone} setCustomerPhone={setCustomerPhone} customerName={customerName} setCustomerName={setCustomerName} customerPoints={customerPoints} setCustomerPoints={setCustomerPoints} pointsToRedeem={pointsToRedeem} setPointsToRedeem={setPointsToRedeem} customDiscount={customDiscount} setCustomDiscount={setCustomDiscount} fulfillmentType={fulfillmentType} setFulfillmentType={setFulfillmentType} selectedArea={selectedArea} setSelectedArea={setSelectedArea} DELIVERY_AREAS={DELIVERY_AREAS} address={address} setAddress={setAddress} tableNumber={tableNumber} setTableNumber={setTableNumber} chefInstructions={chefInstructions} setChefInstructions={setChefInstructions} isSubmittingOrder={isSubmittingOrder} paymentMethod={paymentMethod} setPaymentMethod={handleSetPaymentMethod} noCutlery={false} setNoCutlery={() => {}} getCartSubtotal={getCartSubtotal} getCartAddonsPrice={() => 0} getDeliveryCharge={getDeliveryCharge} getFreeDeliveryProgressPercent={getFreeDeliveryProgressPercent} getTotalPointsRedeemedInCart={getTotalPointsRedeemedInCart} getTotalBillPrice={getTotalBillPrice} loyaltyRules={loyaltyRules} handlePlaceOrder={handlePlaceOrder} handleDetectLocation={handleDetectLocation} setIsCustomerModalOpen={setIsCustomerModalOpen} searchDbCustomers={searchDbCustomers} handleUpdateCartQuantity={handleUpdateCartQuantity} handleUpdateCartItemNote={handleUpdateCartItemNote} showAddonsSection={false} triggerBeep={triggerBeep} handleCheckLoyalty={handleCheckLoyalty} ketchupAddon={false} setKetchupAddon={() => {}} oreganoAddon={false} setOreganoAddon={() => {}} chiliFlakesAddon={false} setChiliFlakesAddon={() => {}}
       />
 
       <CustomerDirectoryModal 
-        isCustomerModalOpen={isCustomerModalOpen} setIsCustomerModalOpen={setIsCustomerModalOpen} customerSearchQuery={customerSearchQuery} setCustomerSearchQuery={setCustomerSearchQuery} searchedCustomers={searchedCustomers} isSearchingCustomer={isSearchingCustomer} newCustName={newCustName} setNewCustName={setNewCustName} newCustPhone={newCustPhone} setNewCustPhone={setNewCustPhone} newCustAddress={newCustAddress} setNewCustAddress={setNewCustAddress} editingCustomer={editingCustomer} viewingHistoryCustomer={viewingHistoryCustomer} customerHistoryList={customerHistoryList} editCustPoints={editCustPoints} setEditCustPoints={setEditCustPoints} handleSelectCustomer={handleSelectCustomer} handleLoadCustomerHistory={handleLoadCustomerHistory} handleStartEditProfile={handleStartEditProfile} handleUpdateCustomerProfile={handleUpdateCustomerProfile} handleSaveNewCustomer={handleSaveNewCustomer} setViewingHistoryCustomer={setViewingHistoryCustomer} setCustomerHistoryList={setCustomerHistoryList} setEditingCustomer={setEditingCustomer} searchDbCustomers={searchDbCustomers} triggerBeep={triggerBeep}
+        isCustomerModalOpen={isCustomerModalOpen} setIsCustomerModalOpen={setIsCustomerModalOpen} customerSearchQuery={customerSearchQuery} setCustomerSearchQuery={setCustomerSearchQuery} searchedCustomers={searchedCustomers} isSearchingCustomer={isSearchingCustomer} newCustName={newCustName} setNewCustName={setNewCustName} newCustPhone={newCustPhone} setNewCustPhone={setNewCustPhone} newCustAddress={newCustAddress} setNewCustAddress={newCustAddress} editingCustomer={editingCustomer} viewingHistoryCustomer={viewingHistoryCustomer} customerHistoryList={customerHistoryList} editCustPoints={editCustPoints} setEditCustPoints={setEditCustPoints} handleSelectCustomer={handleSelectCustomer} handleLoadCustomerHistory={handleLoadCustomerHistory} handleStartEditProfile={handleStartEditProfile} handleUpdateCustomerProfile={handleUpdateCustomerProfile} handleSaveNewCustomer={handleSaveNewCustomer} setViewingHistoryCustomer={setViewingHistoryCustomer} setCustomerHistoryList={setCustomerHistoryList} setEditingCustomer={setEditingCustomer} searchDbCustomers={searchDbCustomers} triggerBeep={triggerBeep}
       />
 
       <CustomizerModal 
