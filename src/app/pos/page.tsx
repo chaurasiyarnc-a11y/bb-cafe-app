@@ -398,27 +398,46 @@ export default function BbCafePosMobile() {
     }
   };
 
+  // UPDATED: Check Customer / Auto-save New Customer Logic
   const handleCheckLoyalty = async () => {
     triggerBeep('tap');
-    if (customerPhone.trim().length !== 10) return toast.error("Enter valid 10-digit number!");
-    const phoneClean = customerPhone.trim();
-    const toastId = toast.loading("Checking profile...");
+    const cleanPhone = customerPhone.trim();
+    if (cleanPhone.length !== 10) {
+      return toast.error("कृपया सही 10-डिजिट मोबाइल नंबर दर्ज करें!");
+    }
+    
+    const toastId = toast.loading("कस्टमर प्रोफाइल खोजी जा रही है...");
     try {
-      const docSnap = await getDoc(doc(db, "customer_points", phoneClean));
+      const userRef = doc(db, "customer_points", cleanPhone);
+      const docSnap = await getDoc(userRef);
+      
       toast.dismiss(toastId);
+      
       if (docSnap.exists()) {
         const data = docSnap.data();
         setCustomerName(data.name || '');
         setCustomerPoints(data.points || 0);
         setAddress(data.address || ''); 
-        toast.success(`Points: ${data.points || 0}`);
+        toast.success(`कस्टमर मिल गया: ${data.name || 'Guest'} (पॉइंट्स: ${data.points || 0})`);
       } else {
-        setCustomerName(''); setCustomerPoints(0); setAddress('');
-        toast.success("New Guest initialized!");
+        // नया नंबर होने पर ऑटोमैटिक नया ब्लैंक गेस्ट प्रोफाइल सेट करें और सेव करें
+        const defaultNewName = "Walk-in Guest";
+        await setDoc(userRef, {
+          name: defaultNewName,
+          phone: cleanPhone,
+          points: 0,
+          address: "",
+          lastActive: new Date()
+        }, { merge: true });
+
+        setCustomerName(defaultNewName);
+        setCustomerPoints(0);
+        setAddress('');
+        toast.success("नया नंबर रजिस्टर हो गया! नाम और एड्रेस लिख सकते हैं।");
       }
     } catch (e) {
       toast.dismiss(toastId);
-      toast.error("Database error");
+      toast.error("डेटाबेस कनेक्ट करने में समस्या आई।");
     }
   };
 
@@ -438,7 +457,10 @@ export default function BbCafePosMobile() {
 
   const handleSelectCustomer = (cust: any) => {
     triggerBeep('tap');
-    setCustomerPhone(cust.phone); setCustomerName(cust.name); setCustomerPoints(cust.points || 0); setAddress(cust.address || '');
+    setCustomerPhone(cust.phone); 
+    setCustomerName(cust.name || ''); 
+    setCustomerPoints(cust.points || 0); 
+    setAddress(cust.address || '');
     setIsCustomerModalOpen(false);
   };
 
@@ -642,10 +664,25 @@ export default function BbCafePosMobile() {
 
       await addDoc(collection(db, "orders"), orderObj);
 
+      // Customer data update with name & address on placing order
       if (customerPhone && customerPhone.length === 10) {
         const userRef = doc(db, "customer_points", customerPhone.trim());
-        await setDoc(userRef, { name: customerName || "Walk-in Guest", phone: customerPhone.trim(), points: Math.max(0, pointsAfterBill), lastActive: new Date() }, { merge: true });
-        if (earned > 0) await addDoc(collection(db, "customer_points", customerPhone.trim(), "history"), { type: 'earn', points: earned, description: `Earned Bill #${billNumber}`, timestamp: new Date() });
+        await setDoc(userRef, { 
+          name: customerName || "Walk-in Guest", 
+          phone: customerPhone.trim(), 
+          address: address || "", 
+          points: Math.max(0, pointsAfterBill), 
+          lastActive: new Date() 
+        }, { merge: true });
+
+        if (earned > 0) {
+          await addDoc(collection(db, "customer_points", customerPhone.trim(), "history"), { 
+            type: 'earn', 
+            points: earned, 
+            description: `Earned Bill #${billNumber}`, 
+            timestamp: new Date() 
+          });
+        }
       }
 
       triggerBeep('success'); 
@@ -1036,16 +1073,27 @@ export default function BbCafePosMobile() {
                 <button onClick={() => setIsCartOpen(false)} className="p-1.5 rounded-full bg-neutral-100 dark:bg-neutral-800 text-neutral-400"><SafeX size={16} /></button>
               </div>
 
-              {/* Customer Phone & Loyalty Section */}
+              {/* Customer Phone & Profile Section */}
               <div className="space-y-2 bg-neutral-50 dark:bg-neutral-800/40 p-3 rounded-2xl border border-neutral-200 dark:border-neutral-800 mb-3">
                 <div className="flex gap-2">
                   <input type="text" maxLength={10} placeholder="Customer 10-digit Phone" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} className="w-full bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 rounded-xl px-3 py-2 text-xs outline-none font-mono" />
                   <button onClick={handleCheckLoyalty} className="bg-orange-600 hover:bg-orange-500 text-white px-4 rounded-xl text-xs font-black uppercase">Find</button>
                   <button onClick={() => setIsCustomerModalOpen(true)} className="bg-neutral-200 dark:bg-neutral-700 px-3 rounded-xl text-xs font-bold">List</button>
                 </div>
-                {customerName && (
-                  <div className="flex justify-between text-xs font-bold text-yellow-500 pt-1 border-t border-neutral-200 dark:border-neutral-700">
-                    <span>👤 {customerName}</span><span>⭐ Points: {customerPoints}</span>
+                
+                {/* Editable Customer Name & Address inputs once number is loaded */}
+                {customerPhone.length === 10 && (
+                  <div className="space-y-2 pt-2 border-t border-neutral-200 dark:border-neutral-700">
+                    <input 
+                      type="text" 
+                      placeholder="Customer Name (e.g. Rahul Sharma)" 
+                      value={customerName} 
+                      onChange={e => setCustomerName(e.target.value)} 
+                      className="w-full bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 rounded-xl px-3 py-1.5 text-xs outline-none" 
+                    />
+                    <div className="flex justify-between items-center text-xs font-bold text-yellow-500">
+                      <span>⭐ Points Available: {customerPoints}</span>
+                    </div>
                   </div>
                 )}
               </div>
@@ -1085,7 +1133,7 @@ export default function BbCafePosMobile() {
                       {DELIVERY_AREAS.map(a => <option key={a.name} value={a.name}>{a.name} (Fee: ₹{a.fee})</option>)}
                     </select>
                     <div className="flex gap-2">
-                      <input type="text" placeholder="Delivery Address / GPS Link" value={address} onChange={e => setAddress(e.target.value)} className="w-full bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 rounded-xl px-3 py-2 text-xs outline-none" />
+                      <input type="text" placeholder="Delivery Address (Optional)" value={address} onChange={e => setAddress(e.target.value)} className="w-full bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 rounded-xl px-3 py-2 text-xs outline-none" />
                       <button onClick={handleDetectLocation} className="bg-neutral-200 dark:bg-neutral-700 px-3 rounded-xl text-xs font-bold">GPS 📍</button>
                     </div>
                   </div>
