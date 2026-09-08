@@ -1,246 +1,377 @@
 'use client';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { db } from '@/lib/firebase'; 
 import { 
   collection, onSnapshot, query, orderBy, limit, doc, 
-  updateDoc, addDoc, runTransaction, getDocs 
+  updateDoc, addDoc, runTransaction, getDoc, getDocs, where, setDoc,
+  waitForPendingWrites, Timestamp, startOfDay, endOfDay
 } from 'firebase/firestore';
 import { 
-  ShoppingBag, Search, Loader2, Clock, Printer, Utensils, 
-  Trash2, Plus, Minus, Wifi, Image as ImageIcon, LayoutDashboard, LogOut 
+  ShoppingBag, Search, X, Loader2, Clock, Printer, Check, Settings, 
+  Database, RefreshCw, Layers, Menu, LogOut, Lock, 
+  Sun, Moon, Tag, ChevronRight, User, Calculator, TrendingUp
 } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
 
-// --- ESC/POS Commands for 80mm ---
-const ESC = '\x1B';
-const GS = '\x1D';
-const CMD = {
-  RESET: ESC + '@',
-  CENTER: ESC + 'a' + '\x01',
-  LEFT: ESC + 'a' + '\x00',
-  BOLD_ON: ESC + 'E' + '\x01',
-  BOLD_OFF: ESC + 'E' + '\x00',
-  DB_SIZE: GS + '!' + '\x11', 
-  NORMAL: GS + '!' + '\x00',
-  CUT: GS + 'V' + '\x41' + '\x03',
-};
+// Printer Utils (Assuming these exist in your lib)
+import { handlePrintKot, handlePrintReceipt } from '@/lib/printerUtils';
 
-export default function BumBumCafe_Fixed_POS() {
-  // --- UI States ---
+export default function BbCafePosDesktop() {
+  // --- States ---
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [activeTab, setActiveTab] = useState<'billing' | 'orders'>('billing');
-  const [usbDevice, setUsbDevice] = useState<any>(null);
-  
-  // --- Data States ---
-  const [products, setProducts] = useState<any[]>([]);
-  const [categories, setCategories] = useState<string[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState('All'); // Fixed missing state
+  const [currentUser, setCurrentUser] = useState(null);
+  const [activeTab, setActiveTab] = useState('billing');
+  const [products, setProducts] = useState([]);
+  const [categories, setCategories] = useState(['All']);
+  const [selectedCategory, setSelectedCategory] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
-  
-  const [cart, setCart] = useState<any[]>([]);
-  const [liveOrders, setLiveOrders] = useState<any[]>([]);
+  const [cart, setCart] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  // Billing & Customer
+  const [customerPhone, setCustomerPhone] = useState('');
+  const [customerName, setCustomerName] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState('cash');
+  const [fulfillmentType, setFulfillmentType] = useState('table');
+  const [tableNumber, setTableNumber] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Daily Stats
+  const [todayStats, setTodayStats] = useState({ total: 0, count: 0 });
 
-  // --- 1. WebUSB Connection ---
-  const connectUSBPrinter = async () => {
-    if (!("usb" in navigator)) {
-      toast.error("WebUSB is not supported in this browser. Use Chrome.");
-      return;
-    }
-    try {
-      const device = await (navigator as any).usb.requestDevice({ filters: [] });
-      await device.open();
-      if (device.configuration === null) await device.selectConfiguration(1);
-      await device.claimInterface(device.configuration.interfaces[0].interfaceNumber);
-      
-      setUsbDevice(device);
-      toast.success("USB Printer Ready!");
-    } catch (e) {
-      console.error(e);
-      toast.error("Printer connection failed.");
-    }
+  // --- Load Data ---
+  useEffect(() => {
+    const savedUser = localStorage.getItem("bb_pos_user");
+    if (savedUser) { setIsLoggedIn(true); setCurrentUser(JSON.parse(savedUser)); }
+
+    // Fetch Products
+    const unsubProd = onSnapshot(collection(db, "products"), (snap) => {
+      const items = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      setProducts(items);
+      const cats = ['All', ...new Set(items.map(i => i.category))];
+      setCategories(cats);
+    });
+
+    // Fetch Today's Sales (Daily Change)
+    const today = new Date();
+    const q = query(
+      collection(db, "orders"),
+      where("timestamp", ">=", startOfDay(today)),
+      where("status", "==", "completed")
+    );
+    const unsubStats = onSnapshot(q, (snap) => {
+      let total = 0;
+      snap.docs.forEach(d => total += d.data().total || 0);
+      setTodayStats({ total, count: snap.size });
+    });
+
+    return () => { unsubProd(); unsubStats(); };
+  }, []);
+
+  // --- Logic ---
+  const subtotal = cart.reduce((acc, i) => acc + (i.price * i.quantity), 0);
+  const tokenNumber = useMemo(() => Math.floor(100 + Math.random() * 900), [cart.length === 0]);
+
+  const addToCart = (item) => {
+    setCart(prev => {
+      const exists = prev.find(i => i.id === item.id);
+      if (exists) return prev.map(i => i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i);
+      return [...prev, { ...item, quantity: 1 }];
+    });
   };
 
-  // --- 2. Print Logic ---
-  const executePrint = async (order: any) => {
-    if (!usbDevice) return;
-    const encoder = new TextEncoder();
-    try {
-      let b = CMD.RESET;
-      // KOT Section
-      b += CMD.CENTER + CMD.BOLD_ON + CMD.DB_SIZE + "KITCHEN KOT\n" + CMD.NORMAL;
-      b += `TOKEN: #${order.tokenNumber}\n` + CMD.LEFT + "------------------------------------------\n";
-      order.items.forEach((it: any) => { b += `${it.quantity} x ${it.name}\n`; });
-      b += "------------------------------------------\n\n\n\n";
-
-      // BILL Section
-      b += CMD.CENTER + CMD.BOLD_ON + CMD.DB_SIZE + "BUM BUM CAFE\n" + CMD.NORMAL;
-      b += "------------------------------------------\n" + CMD.LEFT;
-      b += `BILL: #${order.billNumber} | TK: #${order.tokenNumber}\n`;
-      b += `DATE: ${new Date().toLocaleString()}\n------------------------------------------\n`;
-      order.items.forEach((it: any) => {
-        const name = it.name.substring(0, 18).padEnd(20);
-        b += `${name} ${it.quantity} x ${it.price} = ${it.price * it.quantity}\n`;
-      });
-      b += "------------------------------------------\n" + CMD.CENTER + CMD.BOLD_ON;
-      b += `TOTAL: Rs. ${order.total}\n` + CMD.NORMAL + "\nThank You! Visit Again\n\n\n\n" + CMD.CUT;
-
-      const data = encoder.encode(b);
-      await usbDevice.transferOut(1, data); 
-    } catch (e) {
-      toast.error("Printing failed.");
-    }
-  };
-
-  // --- 3. Order Logic ---
   const handlePlaceOrder = async () => {
-    if (cart.length === 0 || isSubmitting) return;
+    if (cart.length === 0) return toast.error("Cart is empty");
     setIsSubmitting(true);
-    try {
-      const today = new Date().toISOString().slice(0, 10);
-      const res = await runTransaction(db, async (txn) => {
-        const bRef = doc(db, "settings", "bill_counter");
-        const tRef = doc(db, "settings", `token_${today}`);
-        const bSnap = await txn.get(bRef);
-        const tSnap = await txn.get(tRef);
-        const nb = bSnap.exists() ? (bSnap.data().value + 1) : 3001;
-        const nt = tSnap.exists() ? (tSnap.data().value + 1) : 1;
-        txn.set(bRef, { value: nb }, { merge: true });
-        txn.set(tRef, { value: nt }, { merge: true });
-        return { nb, nt };
-      });
+    const toastId = toast.loading("Processing Bill...");
 
+    try {
+      const billNumber = Date.now().toString().slice(-6);
       const orderData = {
-        billNumber: res.nb,
-        tokenNumber: String(res.nt).padStart(2, '0'),
+        billNumber,
+        tokenNumber,
         items: cart,
-        total: cart.reduce((a, b) => a + (b.price * b.quantity), 0),
-        status: 'pending',
-        timestamp: new Date()
+        subtotal,
+        total: subtotal,
+        customerName: customerName || "Guest",
+        customerPhone: customerPhone,
+        paymentMethod,
+        fulfillmentType,
+        tableNumber: fulfillmentType === 'table' ? tableNumber : '',
+        timestamp: new Date(),
+        status: 'completed'
       };
 
+      // 1. Save to Firebase
       await addDoc(collection(db, "orders"), orderData);
-      if (usbDevice) await executePrint(orderData);
+
+      // 2. Print KOT
+      await handlePrintKot(orderData, { printerType: 'thermal' });
       
-      setCart([]);
-      toast.success("Order Placed!");
-    } catch (e) {
-      toast.error("Failed to save order");
+      // 3. Print Final Bill
+      await handlePrintReceipt(orderData, { printerType: 'thermal' });
+
+      toast.success(`Order #${billNumber} Success!`, { id: toastId });
+      setCart([]); setCustomerPhone(''); setCustomerName(''); setTableNumber('');
+    } catch (err) {
+      toast.error("Failed to place order", { id: toastId });
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  useEffect(() => {
-    onSnapshot(collection(db, "products"), (snap) => {
-      const items = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      setProducts(items);
-      setCategories(['All', ...Array.from(new Set(items.map((i: any) => i.category).filter(Boolean)))]);
-    });
-    const q = query(collection(db, "orders"), orderBy("timestamp", "desc"), limit(10));
-    return onSnapshot(q, (snap) => setLiveOrders(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
-  }, []);
-
-  if (!isLoggedIn) return (
-    <div className="h-screen bg-black flex items-center justify-center">
-      <div className="bg-neutral-900 p-10 rounded-[2.5rem] border border-neutral-800 w-96 text-center shadow-2xl">
-        <Utensils className="mx-auto text-orange-500 mb-6" size={50} />
-        <input 
-          type="password" placeholder="PIN (1234)" className="w-full bg-black border border-neutral-700 rounded-2xl py-4 text-center text-2xl mb-6 text-white outline-none focus:border-orange-500"
-          onChange={(e) => e.target.value === '1234' && setIsLoggedIn(true)}
-        />
-        <p className="text-neutral-500 text-xs">Bum Bum POS Professional</p>
-      </div>
-    </div>
-  );
+  if (!isLoggedIn) return <LoginScreen onLogin={(u) => { setIsLoggedIn(true); setCurrentUser(u); }} />;
 
   return (
-    <div className="h-screen flex bg-neutral-950 text-white overflow-hidden">
-      <Toaster position="top-right" />
-      
-      {/* Sidebar Nav */}
-      <nav className="w-24 border-r border-neutral-900 flex flex-col items-center py-8 gap-8">
-        <Utensils className="text-orange-600" size={32} />
-        <button onClick={() => setActiveTab('billing')} className={`p-4 rounded-2xl ${activeTab === 'billing' ? 'bg-neutral-800 text-orange-500' : 'text-neutral-500'}`}><LayoutDashboard/></button>
-        <button onClick={() => setActiveTab('orders')} className={`p-4 rounded-2xl ${activeTab === 'orders' ? 'bg-neutral-800 text-orange-500' : 'text-neutral-500'}`}><Clock/></button>
-        <button onClick={connectUSBPrinter} className={`mt-auto p-4 rounded-2xl ${usbDevice ? 'bg-green-600 text-white' : 'bg-neutral-900 text-neutral-500'}`}><Wifi/></button>
-        <button onClick={() => setIsLoggedIn(false)} className="p-4 text-red-500"><LogOut/></button>
-      </nav>
+    <div className="h-screen w-full bg-[#f8f9fa] dark:bg-[#0f0f0f] flex overflow-hidden font-sans text-slate-900 dark:text-slate-100">
+      <Toaster />
 
-      {/* Main Grid */}
-      <main className="flex-1 flex flex-col overflow-hidden p-8">
-        {activeTab === 'billing' ? (
-          <div className="flex-1 flex flex-col overflow-hidden">
-            <div className="flex justify-between items-center mb-8 gap-4">
-              <div className="relative flex-1 max-w-md">
-                <Search className="absolute left-4 top-3 text-neutral-500" size={18} />
-                <input 
-                  type="text" placeholder="Search food..." 
-                  className="w-full bg-neutral-900 border border-neutral-800 rounded-xl py-3 pl-12 text-sm outline-none focus:border-orange-500"
-                  value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
-                />
-              </div>
-              <div className="flex gap-2">
-                {categories.map(c => (
-                  <button key={c} onClick={() => setSelectedCategory(c)} className={`px-5 py-2.5 rounded-xl text-xs font-bold uppercase ${selectedCategory === c ? 'bg-orange-600' : 'bg-neutral-900'}`}>{c}</button>
-                ))}
-              </div>
-            </div>
-            
-            <div className="grid grid-cols-4 xl:grid-cols-5 gap-6 overflow-y-auto pr-2">
-              {products
-                .filter(p => (selectedCategory === 'All' || p.category === selectedCategory) && p.name.toLowerCase().includes(searchQuery.toLowerCase()))
-                .map(p => (
-                <button key={p.id} onClick={() => setCart([...cart, {...p, quantity: 1}])} className="bg-neutral-900 border border-neutral-800 rounded-[2rem] p-4 text-left hover:border-orange-500 transition-all">
-                  <div className="h-32 bg-neutral-800 rounded-2xl mb-4 overflow-hidden">
-                    {(p.imageUrl || p.image) && <img src={p.imageUrl || p.image} alt="" className="w-full h-full object-cover" />}
-                  </div>
-                  <h3 className="font-bold text-sm truncate">{p.name}</h3>
-                  <p className="text-orange-500 font-black">₹{p.price}</p>
-                </button>
-              ))}
-            </div>
-          </div>
-        ) : (
-          <div className="grid grid-cols-3 gap-6 overflow-y-auto">
-            {liveOrders.filter(o => o.status === 'pending').map(order => (
-              <div key={order.id} className="bg-neutral-900 p-6 rounded-[2rem] border border-neutral-800">
-                <div className="flex justify-between mb-4"><span className="bg-orange-600 px-3 py-1 rounded-lg text-[10px] font-black">TK: #{order.tokenNumber}</span></div>
-                <div className="space-y-2 mb-6 h-32 overflow-y-auto">
-                  {order.items.map((it: any, i: number) => <div key={i} className="flex justify-between text-sm"><span>{it.name}</span><span>x{it.quantity}</span></div>)}
-                </div>
-                <button onClick={() => updateDoc(doc(db, "orders", order.id), { status: 'completed' })} className="w-full bg-green-600 py-3 rounded-xl font-bold uppercase text-xs">Mark Ready</button>
-              </div>
-            ))}
-          </div>
-        )}
-      </main>
-
-      {/* Cart Sidebar */}
-      <aside className="w-[420px] bg-neutral-900/40 border-l border-neutral-900 flex flex-col p-8">
-        <h2 className="text-2xl font-black mb-8 flex items-center gap-3"><ShoppingBag className="text-orange-500" /> ORDER</h2>
-        <div className="flex-1 overflow-y-auto space-y-3">
-          {cart.map((item, idx) => (
-            <div key={idx} className="bg-black/40 p-4 rounded-2xl flex justify-between items-center border border-neutral-800">
-              <div className="flex-1 pr-2">
-                <p className="font-bold text-sm truncate">{item.name}</p>
-                <p className="text-orange-500 font-black">₹{item.price}</p>
-              </div>
-              <button onClick={() => setCart(cart.filter((_, i) => i !== idx))} className="text-neutral-500 hover:text-red-500"><Trash2 size={18}/></button>
-            </div>
-          ))}
+      {/* COLUMN 1: SIDEBAR NAVIGATION */}
+      <aside className="w-20 lg:w-64 bg-white dark:bg-[#1a1a1a] border-r border-slate-200 dark:border-slate-800 flex flex-col">
+        <div className="p-6">
+          <h1 className="text-xl font-black text-orange-500 tracking-tighter">BUM BUM CAFE</h1>
+          <p className="text-[10px] text-slate-400 font-bold uppercase">Desktop POS v2.0</p>
         </div>
-        <div className="mt-8 pt-8 border-t border-neutral-800">
-          <div className="flex justify-between text-4xl font-black mb-8"><span>Total</span><span className="text-orange-500">₹{cart.reduce((a, b) => a + b.price, 0)}</span></div>
-          <button 
-            disabled={cart.length === 0 || isSubmitting} 
-            onClick={handlePlaceOrder} 
-            className="w-full bg-orange-600 py-6 rounded-[2rem] font-black text-xl uppercase flex items-center justify-center gap-4 shadow-xl shadow-orange-600/20 disabled:opacity-50"
-          >
-            {isSubmitting ? <Loader2 className="animate-spin" /> : <Printer size={28} />} PRINT & SAVE
+
+        <nav className="flex-1 px-4 space-y-2">
+          <NavItem icon={<Calculator size={20}/>} label="Billing" active={activeTab === 'billing'} onClick={() => setActiveTab('billing')} />
+          <NavItem icon={<Clock size={20}/>} label="Live Orders" active={activeTab === 'orders'} onClick={() => setActiveTab('orders')} />
+          <NavItem icon={<TrendingUp size={20}/>} label="Reports" active={activeTab === 'reports'} onClick={() => setActiveTab('reports')} />
+          <NavItem icon={<Settings size={20}/>} label="Settings" active={activeTab === 'settings'} onClick={() => setActiveTab('settings')} />
+        </nav>
+
+        <div className="p-4 border-t border-slate-200 dark:border-slate-800">
+          <div className="bg-orange-500/10 p-3 rounded-xl mb-4">
+            <p className="text-[10px] font-bold text-orange-500 uppercase">Today's Sale</p>
+            <p className="text-xl font-black">₹{todayStats.total}</p>
+          </div>
+          <button onClick={() => { localStorage.clear(); window.location.reload(); }} className="flex items-center gap-3 text-red-500 font-bold text-sm p-2 w-full">
+            <LogOut size={18} /> Logout
           </button>
         </div>
       </aside>
+
+      {/* COLUMN 2: PRODUCTS GRID */}
+      <main className="flex-1 flex flex-col min-w-0 bg-slate-50 dark:bg-[#0a0a0a]">
+        {/* Search Bar */}
+        <header className="h-20 bg-white dark:bg-[#1a1a1a] border-b border-slate-200 dark:border-slate-800 flex items-center px-8 gap-4">
+          <div className="relative flex-1 max-w-xl">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+            <input 
+              type="text" 
+              placeholder="Search dishes, drinks, pizzas..." 
+              className="w-full bg-slate-100 dark:bg-[#252525] border-none rounded-2xl py-3 pl-12 pr-4 focus:ring-2 ring-orange-500 outline-none transition-all"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+          <div className="flex items-center gap-4">
+            <div className="text-right hidden md:block">
+              <p className="text-xs font-bold">{currentUser?.name}</p>
+              <p className="text-[10px] text-green-500 font-bold">● System Online</p>
+            </div>
+            <div className="h-10 w-10 bg-orange-500 rounded-full flex items-center justify-center font-bold text-white">
+              {currentUser?.name?.charAt(0)}
+            </div>
+          </div>
+        </header>
+
+        {/* Categories */}
+        <div className="p-6 flex gap-3 overflow-x-auto no-scrollbar">
+          {categories.map(cat => (
+            <button 
+              key={cat}
+              onClick={() => setSelectedCategory(cat)}
+              className={`px-6 py-2.5 rounded-xl text-sm font-bold whitespace-nowrap transition-all ${selectedCategory === cat ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/30' : 'bg-white dark:bg-[#1a1a1a] text-slate-500 hover:bg-orange-50'}`}
+            >
+              {cat}
+            </button>
+          ))}
+        </div>
+
+        {/* Product Grid */}
+        <div className="flex-1 overflow-y-auto p-6 grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6">
+          {products
+            .filter(p => (selectedCategory === 'All' || p.category === selectedCategory) && p.name.toLowerCase().includes(searchQuery.toLowerCase()))
+            .map(product => (
+              <ProductCard key={product.id} product={product} onAdd={() => addToCart(product)} />
+            ))}
+        </div>
+      </main>
+
+      {/* COLUMN 3: CART & BILLING */}
+      <section className="w-[400px] bg-white dark:bg-[#1a1a1a] border-l border-slate-200 dark:border-slate-800 flex flex-col shadow-2xl">
+        <div className="p-6 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center">
+          <h2 className="text-lg font-black flex items-center gap-2">
+            <ShoppingBag size={20} className="text-orange-500" /> Current Order
+          </h2>
+          <span className="bg-slate-100 dark:bg-[#252525] px-3 py-1 rounded-lg text-xs font-bold font-mono">
+            Token: #{tokenNumber}
+          </span>
+        </div>
+
+        {/* Cart Items */}
+        <div className="flex-1 overflow-y-auto p-6 space-y-4">
+          {cart.length === 0 ? (
+            <div className="h-full flex flex-col items-center justify-center text-slate-400 opacity-50">
+              <ShoppingBag size={64} strokeWidth={1} />
+              <p className="mt-4 font-bold text-sm text-center">Cart is empty.<br/>Select items to start billing.</p>
+            </div>
+          ) : (
+            cart.map(item => (
+              <div key={item.id} className="flex justify-between items-center group">
+                <div className="flex-1">
+                  <p className="text-sm font-bold leading-tight">{item.name}</p>
+                  <p className="text-xs text-orange-500 font-mono">₹{item.price} x {item.quantity}</p>
+                </div>
+                <div className="flex items-center gap-3 bg-slate-50 dark:bg-[#252525] rounded-xl p-1">
+                  <button onClick={() => updateQty(item.id, -1)} className="w-8 h-8 flex items-center justify-center hover:bg-white dark:hover:bg-[#1a1a1a] rounded-lg shadow-sm transition-all">-</button>
+                  <span className="text-sm font-black w-4 text-center">{item.quantity}</span>
+                  <button onClick={() => updateQty(item.id, 1)} className="w-8 h-8 flex items-center justify-center hover:bg-white dark:hover:bg-[#1a1a1a] rounded-lg shadow-sm transition-all">+</button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* Customer & Payment Info */}
+        <div className="p-6 bg-slate-50 dark:bg-[#151515] space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <input 
+              type="text" placeholder="Customer Phone" 
+              className="bg-white dark:bg-[#1a1a1a] p-3 rounded-xl text-xs border border-slate-200 dark:border-slate-800 outline-none focus:ring-1 ring-orange-500"
+              value={customerPhone} onChange={e => setCustomerPhone(e.target.value)}
+            />
+            <input 
+              type="text" placeholder="Guest Name" 
+              className="bg-white dark:bg-[#1a1a1a] p-3 rounded-xl text-xs border border-slate-200 dark:border-slate-800 outline-none focus:ring-1 ring-orange-500"
+              value={customerName} onChange={e => setCustomerName(e.target.value)}
+            />
+          </div>
+
+          <div className="flex bg-white dark:bg-[#1a1a1a] p-1 rounded-xl border border-slate-200 dark:border-slate-800">
+            {['table', 'pickup', 'delivery'].map(type => (
+              <button 
+                key={type}
+                onClick={() => setFulfillmentType(type)}
+                className={`flex-1 py-2 text-[10px] font-black uppercase rounded-lg transition-all ${fulfillmentType === type ? 'bg-orange-500 text-white' : 'text-slate-400'}`}
+              >
+                {type}
+              </button>
+            ))}
+          </div>
+
+          {fulfillmentType === 'table' && (
+            <input 
+              type="text" placeholder="Table Number (e.g. T1)" 
+              className="w-full bg-white dark:bg-[#1a1a1a] p-3 rounded-xl text-xs border border-slate-200 dark:border-slate-800 outline-none focus:ring-1 ring-orange-500"
+              value={tableNumber} onChange={e => setTableNumber(e.target.value)}
+            />
+          )}
+
+          <div className="space-y-2 border-t border-slate-200 dark:border-slate-800 pt-4">
+            <div className="flex justify-between text-slate-500 text-sm">
+              <span>Subtotal</span>
+              <span className="font-mono font-bold">₹{subtotal}</span>
+            </div>
+            <div className="flex justify-between text-xl font-black">
+              <span>Total Amount</span>
+              <span className="text-orange-500 font-mono">₹{subtotal}</span>
+            </div>
+          </div>
+
+          <div className="flex gap-2">
+            <button onClick={() => setPaymentMethod('cash')} className={`flex-1 py-3 rounded-xl text-xs font-black uppercase border ${paymentMethod === 'cash' ? 'bg-green-600 text-white border-green-600 shadow-lg shadow-green-500/20' : 'bg-white dark:bg-[#1a1a1a] text-slate-400 border-slate-200 dark:border-slate-800'}`}>Cash</button>
+            <button onClick={() => setPaymentMethod('upi')} className={`flex-1 py-3 rounded-xl text-xs font-black uppercase border ${paymentMethod === 'upi' ? 'bg-blue-600 text-white border-blue-600 shadow-lg shadow-blue-500/20' : 'bg-white dark:bg-[#1a1a1a] text-slate-400 border-slate-200 dark:border-slate-800'}`}>UPI</button>
+          </div>
+
+          <button 
+            disabled={isSubmitting || cart.length === 0}
+            onClick={handlePlaceOrder}
+            className="w-full bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white font-black py-4 rounded-2xl flex items-center justify-center gap-3 transition-all transform active:scale-95 shadow-xl shadow-orange-500/20"
+          >
+            {isSubmitting ? <Loader2 className="animate-spin" /> : <Printer size={20} />}
+            PLACE ORDER & PRINT (KOT + BILL)
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+
+  function updateQty(id, delta) {
+    setCart(prev => prev.map(i => i.id === id ? { ...i, quantity: Math.max(0, i.quantity + delta) } : i).filter(i => i.quantity > 0));
+  }
+}
+
+// --- Sub Components ---
+
+function NavItem({ icon, label, active, onClick }) {
+  return (
+    <button 
+      onClick={onClick}
+      className={`w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl transition-all group ${active ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/20' : 'hover:bg-slate-100 dark:hover:bg-[#252525] text-slate-500'}`}
+    >
+      <span className={`${active ? 'text-white' : 'group-hover:text-orange-500'} transition-colors`}>{icon}</span>
+      <span className="text-sm font-bold lg:block hidden">{label}</span>
+    </button>
+  );
+}
+
+function ProductCard({ product, onAdd }) {
+  return (
+    <div 
+      onClick={onAdd}
+      className="bg-white dark:bg-[#1a1a1a] border border-slate-200 dark:border-slate-800 rounded-3xl p-4 cursor-pointer hover:shadow-2xl hover:border-orange-500/50 transition-all group"
+    >
+      <div className="h-32 w-full bg-slate-100 dark:bg-[#252525] rounded-2xl overflow-hidden mb-4">
+        {product.image ? (
+          <img src={product.image} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" alt={product.name} />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-slate-300 uppercase font-black text-[10px]">{product.category}</div>
+        )}
+      </div>
+      <h3 className="font-black text-sm line-clamp-1">{product.name}</h3>
+      <div className="mt-2 flex justify-between items-center">
+        <span className="text-orange-500 font-mono font-black">₹{product.price}</span>
+        <div className="bg-orange-500/10 text-orange-500 p-1.5 rounded-lg group-hover:bg-orange-500 group-hover:text-white transition-all">
+          <Check size={16} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function LoginScreen({ onLogin }) {
+  const [pin, setPin] = useState('');
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    const snap = await getDocs(query(collection(db, "cafe_users"), where("pin", "==", pin)));
+    if(!snap.empty) {
+      const userData = { id: snap.docs[0].id, ...snap.docs[0].data() };
+      localStorage.setItem("bb_pos_user", JSON.stringify(userData));
+      onLogin(userData);
+    } else {
+      toast.error("Invalid PIN");
+      setPin('');
+    }
+  };
+
+  return (
+    <div className="h-screen w-full bg-[#0a0a0a] flex items-center justify-center">
+      <form onSubmit={handleLogin} className="bg-[#151515] p-10 rounded-[40px] border border-white/5 w-96 text-center shadow-2xl">
+        <div className="h-20 w-20 bg-orange-500 rounded-3xl mx-auto flex items-center justify-center mb-6 rotate-12">
+          <Lock size={40} className="text-white -rotate-12" />
+        </div>
+        <h1 className="text-2xl font-black text-white mb-2 tracking-tighter uppercase">Terminal Locked</h1>
+        <p className="text-slate-500 text-sm mb-8 font-bold">Enter Secure 4-Digit PIN</p>
+        <input 
+          type="password" maxLength={4} value={pin} onChange={e => setPin(e.target.value)}
+          className="w-full bg-[#202020] border-none text-center text-4xl font-mono tracking-[20px] py-4 rounded-2xl text-orange-500 focus:ring-2 ring-orange-500 outline-none mb-6"
+          autoFocus
+        />
+        <button type="submit" className="w-full bg-orange-600 hover:bg-orange-500 text-white font-black py-4 rounded-2xl transition-all shadow-xl shadow-orange-600/20">ACCESS TERMINAL</button>
+      </form>
     </div>
   );
 }
