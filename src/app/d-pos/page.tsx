@@ -3,386 +3,331 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { db } from '@/lib/firebase'; 
 import { 
   collection, onSnapshot, query, orderBy, limit, doc, 
-  updateDoc, addDoc, runTransaction, getDoc, getDocs, where, setDoc,
-  waitForPendingWrites
+  updateDoc, addDoc, runTransaction, getDoc, getDocs, where, setDoc
 } from 'firebase/firestore';
 import { 
-  ShoppingBag, Plus, Minus, Search, X, User, Star, Gift, 
-  Loader2, Clock, Trash2, Printer, Check, Play, Settings, 
-  Database, RefreshCw, Layers, Phone, MapPin, LayoutGrid, List,
-  Menu, Users, LogOut, Lock, ToggleLeft, ToggleRight, Sun, Moon,
-  ChevronLeft, ChevronRight, Smartphone, Monitor, Bell
   ShoppingBag, Search, X, Loader2, Clock, Printer, Check, Settings, 
   Database, RefreshCw, Layers, Menu, LogOut, Lock, ToggleLeft, ToggleRight, 
-  Sun, Moon, Tag
+  Sun, Moon, Utensils, Trash2, Plus, Minus, Wifi, Image as ImageIcon, MapPin
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
 
-import PosCartDrawer from '@/components/pos/PosCartDrawer';
-import CustomerDirectoryModal from '@/components/pos/CustomerDirectoryModal';
-import CustomizerModal from '@/components/pos/CustomizerModal';
+// --- Constants ---
+const DELIVERY_AREAS = [
+  { name: "Mohandra Town", fee: 20, minFree: 99 },
+  { name: "Within 5 KM", fee: 50, minFree: 499 },
+  { name: "Within 12 KM", fee: 99, minFree: 999 }
+];
 
-import { 
-  handlePrintKot, 
-  handlePrintReceipt, 
-  generateReceiptHtml, 
-  PrintConfig 
-} from '@/lib/printerUtils';
+const ESC = '\x1B';
+const GS = '\x1D';
+const CMD = {
+  RESET: ESC + '@',
+  CENTER: ESC + 'a' + '\x01',
+  LEFT: ESC + 'a' + '\x00',
+  BOLD_ON: ESC + 'E' + '\x01',
+  BOLD_OFF: ESC + 'E' + '\x00',
+  DOUBLE_SIZE: GS + '!' + '\x11', 
+  NORMAL_SIZE: GS + '!' + '\x00',
+  CUT: GS + 'V' + '\x41' + '\x03',
+};
 
-// Safe Lucide Icons
-// Safe Lucide Icons casting
-const SafeLock = Lock as any;
-const SafeDatabase = Database as any;
-const SafeMenu = Menu as any;
-@@ -40,22 +36,11 @@
-const SafeClock = Clock as any; 
-const SafeLayers = Layers as any;
-const SafePrinter = Printer as any;
-const SafeUsers = Users as any; 
-const SafePlay = Play as any; 
-const SafeCheck = Check as any;
-const SafeSearch = Search as any;
-const SafeX = X as any;
-const SafeRefreshCw = RefreshCw as any;
-const SafeLayoutGrid = LayoutGrid as any;
-const SafeList = List as any;
-const SafePlus = Plus as any;
-const SafeMinus = Minus as any;
-const SafeChevronLeft = ChevronLeft as any;
-const SafeChevronRight = ChevronRight as any;
-const SafeSettings = Settings as any;
-const SafeSmartphone = Smartphone as any;
-const SafeMonitor = Monitor as any;
-const SafeBell = Bell as any;
-
-interface PosCartItem {
-  id: string;
-@@ -136,6 +121,7 @@
-  const [loyaltyRules, setLoyaltyRules] = useState<any[]>([]); 
-  const [storeOpen, setStoreOpen] = useState(true);
-
-  // Receipts states
-  const [pastReceipts, setPastReceipts] = useState<any[]>([]);
-  const [isSearchingReceipts, setIsSearchingReceipts] = useState(false);
-  const [receiptSearchQuery, setReceiptSearchQuery] = useState('');
-@@ -145,6 +131,7 @@
-
-  const [isSyncing, setIsSyncing] = useState(false);
-
-  // Cart & Checkout states
-  const [cart, setCart] = useState<PosCartItem[]>([]);
+export default function BumBumCafePOS() {
+  // --- States ---
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [pinInput, setPinInput] = useState('');
+  const [activeTab, setActiveTab] = useState<'billing' | 'orders' | 'receipts' | 'settings'>('billing');
+  
+  const [products, setProducts] = useState<any[]>([]);
+  const [categories, setCategories] = useState<string[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState('All');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [liveOrders, setLiveOrders] = useState<any[]>([]);
+  
+  const [cart, setCart] = useState<any[]>([]);
+  const [isCartOpen, setIsCartOpen] = useState(false);
+  const [isSubmittingOrder, setIsSubmittingOrder] = useState(false);
+  
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerName, setCustomerName] = useState('');
-@@ -157,7 +144,6 @@
+  const [customerPoints, setCustomerPoints] = useState(0);
+  const [fulfillmentType, setFulfillmentType] = useState<'table' | 'pickup' | 'delivery'>('table');
   const [tableNumber, setTableNumber] = useState('Table 1');
-  const [isSubmittingOrder, setIsSubmittingOrder] = useState(false);
-  const [chefInstructions, setChefInstructions] = useState('');
-  
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'upi'>('cash');
+  const [printerPort, setPrinterPort] = useState<any>(null);
 
-  const [selectedProduct, setSelectedProduct] = useState<any>(null); 
-@@ -208,7 +194,7 @@
+  // --- Functions ---
+  const triggerBeep = (t: string) => {}; // Audio Context can be added here
 
-  const handleClearAllLiveOrders = async () => {
-    triggerBeep('tap');
-    const confirmClear = window.confirm("क्या आप वाकई सभी एक्टिव लाइव ऑर्डर्स को साफ़ (Complete) करना चाहते हैं?");
-    const confirmClear = window.confirm("क्या आप वाकई सभी एक्टिव लाइव ऑर्डर्स को साफ़ करना चाहते हैं?");
-    if (!confirmClear) return;
-
-    const toastId = toast.loading("Clearing active orders...");
-@@ -218,18 +204,10 @@
-      );
-      await Promise.all(promises);
-      toast.dismiss(toastId);
-      toast.success("Active orders cleared successfully!");
-      toast.success("Active orders cleared!");
+  const connectPrinter = async () => {
+    try {
+      const port = await (navigator as any).serial.requestPort();
+      await port.open({ baudRate: 9600 });
+      setPrinterPort(port);
+      toast.success("80mm Printer Ready!");
     } catch (err) {
-      toast.dismiss(toastId);
-      toast.error("Failed to clear active orders");
+      toast.error("Printer Connection Failed");
     }
   };
 
-  const handleSetPaymentMethod = (val: 'cash' | 'upi' | 'card') => {
-    if (val === 'card') {
-      setPaymentMethod('cash'); 
+  const handleCheckLoyalty = async () => {
+    if (customerPhone.length !== 10) return toast.error("Enter 10 digit number");
+    const snap = await getDoc(doc(db, "customer_points", customerPhone));
+    if (snap.exists()) {
+      setCustomerName(snap.data().name);
+      setCustomerPoints(snap.data().points || 0);
+      toast.success("Customer Found!");
     } else {
-      setPaymentMethod(val);
-      toast.error("Failed to clear orders");
+      toast.error("New Customer");
+      setCustomerName("Walk-in Guest");
     }
   };
 
-@@ -464,59 +442,6 @@
-    setIsCustomerModalOpen(false);
+  const printDirect = async (order: any) => {
+    if (!printerPort) return;
+    const writer = printerPort.writable.getWriter();
+    const encoder = new TextEncoder();
+    try {
+      let b = CMD.RESET + CMD.CENTER + CMD.BOLD_ON + CMD.DOUBLE_SIZE + "KITCHEN KOT\n" + CMD.NORMAL_SIZE;
+      b += `TOKEN: #${order.tokenNumber}\n` + CMD.LEFT + "------------------------------------------\n";
+      order.items.forEach((it: any) => { b += `${it.quantity} x ${it.name}\n`; });
+      b += "------------------------------------------\n\n\n";
+
+      b += CMD.CENTER + CMD.BOLD_ON + CMD.DOUBLE_SIZE + "BUM BUM CAFE\n" + CMD.NORMAL_SIZE;
+      b += "------------------------------------------\n" + CMD.LEFT;
+      b += `BILL: #${order.billNumber} | TK: #${order.tokenNumber}\n`;
+      b += `DATE: ${new Date().toLocaleString()}\n------------------------------------------\n`;
+      order.items.forEach((it: any) => {
+        b += `${it.name.substring(0, 20).padEnd(20)} ${it.quantity}  ${it.price * it.quantity}\n`;
+      });
+      b += "------------------------------------------\n" + CMD.CENTER + CMD.BOLD_ON;
+      b += `TOTAL: Rs. ${order.total}\n` + CMD.NORMAL_SIZE + "\nThank You!\n\n\n" + CMD.CUT;
+
+      await writer.write(encoder.encode(b));
+    } finally {
+      writer.releaseLock();
+    }
   };
 
-  const handleLoadCustomerHistory = async (cust: any) => {
-    triggerBeep('tap');
-    setViewingHistoryCustomer(cust);
+  const handlePlaceOrder = async () => {
+    if (cart.length === 0 || isSubmittingOrder) return;
+    setIsSubmittingOrder(true);
     try {
-      const hSnap = await getDocs(query(collection(db, "customer_points", cust.phone, "history"), orderBy("timestamp", "desc"), limit(25)));
-      setCustomerHistoryList(hSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
+      const today = new Date().toISOString().slice(0, 10);
+      const { billNo, tokenNo } = await runTransaction(db, async (txn) => {
+        const bRef = doc(db, "settings", "bill_counter");
+        const tRef = doc(db, "settings", `token_${today}`);
+        const bSnap = await txn.get(bRef);
+        const tSnap = await txn.get(tRef);
+        const nb = bSnap.exists() ? bSnap.data().value + 1 : 1001;
+        const nt = tSnap.exists() ? tSnap.data().value + 1 : 1;
+        txn.set(bRef, { value: nb }, { merge: true });
+        txn.set(tRef, { value: nt }, { merge: true });
+        return { billNo: nb, tokenNo: nt };
+      });
+
+      const orderData = {
+        billNumber: billNo,
+        tokenNumber: String(tokenNo).padStart(2, '0'),
+        items: cart,
+        total: cart.reduce((a, b) => a + (b.price * b.quantity), 0),
+        status: 'pending',
+        timestamp: new Date(),
+        customerName, customerPhone, fulfillmentType, tableNumber, paymentMethod
+      };
+
+      await addDoc(collection(db, "orders"), orderData);
+      if (printerPort) await printDirect(orderData);
+      
+      setCart([]); setIsCartOpen(false);
+      toast.success("Order Successful!");
     } catch (e) {
-      toast.error("Failed to load history");
+      toast.error("Failed to place order");
+    } finally {
+      setIsSubmittingOrder(false);
     }
   };
 
-  const handleStartEditProfile = (cust: any) => {
-    triggerBeep('tap');
-    setEditingCustomer(cust);
-    setNewCustName(cust.name);
-    setNewCustAddress(cust.address || '');
-    setEditCustPoints(cust.points || 0);
-  };
+  // --- Effects ---
+  useEffect(() => {
+    const q = query(collection(db, "products"));
+    getDocs(q).then(snap => {
+      const items = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      setProducts(items);
+      setCategories(['All', ...Array.from(new Set(items.map((i: any) => i.category).filter(Boolean)))]);
+    });
+    
+    const oq = query(collection(db, "orders"), orderBy("timestamp", "desc"), limit(20));
+    return onSnapshot(oq, (snap) => setLiveOrders(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+  }, []);
 
-  const handleUpdateCustomerProfile = async () => {
-    triggerBeep('tap');
-    if (!newCustName.trim()) return toast.error("Name mandatory!");
-    try {
-      await updateDoc(doc(db, "customer_points", editingCustomer.phone), { name: newCustName.trim(), address: newCustAddress.trim(), points: editCustPoints });
-      if (customerPhone === editingCustomer.phone) {
-        setCustomerName(newCustName.trim()); setAddress(newCustAddress.trim()); setCustomerPoints(editCustPoints);
-      }
-      setEditingCustomer(null); searchDbCustomers(customerSearchQuery);
-      toast.success("Profile saved!");
-    } catch (err) {
-      toast.error("Failed to edit");
-    }
-  };
+  if (!isLoggedIn) return (
+    <div className="h-screen bg-black flex items-center justify-center p-6">
+      <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} className="bg-neutral-900 p-8 rounded-3xl border border-neutral-800 w-full max-w-sm text-center">
+        <Utensils className="mx-auto text-orange-500 mb-4" size={48} />
+        <h1 className="text-xl font-black mb-6 uppercase tracking-widest text-white">Bum Bum POS Login</h1>
+        <input 
+          type="password" value={pinInput} onChange={e => setPinInput(e.target.value)}
+          className="w-full bg-black border border-neutral-700 rounded-2xl py-4 text-center text-3xl mb-6 outline-none focus:border-orange-500 text-white" 
+          placeholder="PIN"
+        />
+        <button onClick={() => pinInput === '1234' ? setIsLoggedIn(true) : toast.error("Wrong PIN")} className="w-full bg-orange-600 py-4 rounded-2xl font-bold uppercase text-white">Unlock Terminal</button>
+      </motion.div>
+    </div>
+  );
 
-  const handleSaveNewCustomer = async (e: React.FormEvent) => {
-    e.preventDefault();
-    triggerBeep('tap');
-    const cleanPhone = newCustPhone.trim();
-    if (cleanPhone.length !== 10) return toast.error("Enter valid 10-digit phone!");
-    try {
-      const userRef = doc(db, "customer_points", cleanPhone);
-      if ((await getDoc(userRef)).exists()) return toast.error("Number already registered!");
-      const newDoc = { name: newCustName.trim(), phone: cleanPhone, points: 0, address: newCustAddress.trim(), lastActive: new Date() };
-      await setDoc(userRef, newDoc);
-      setCustomerPhone(cleanPhone); setCustomerName(newDoc.name); setCustomerPoints(0); setAddress(newDoc.address);
-      setNewCustName(''); setNewCustPhone(''); setNewCustAddress('');
-      setIsCustomerModalOpen(false);
-      toast.success("Registered!");
-    } catch (err) {
-      toast.error("Failed");
-    }
-  };
+  return (
+    <div className="h-screen flex bg-neutral-950 text-white overflow-hidden">
+      <Toaster />
+      
+      {/* Sidebar Navigation */}
+      <aside className="w-20 border-r border-neutral-900 flex flex-col items-center py-8 gap-8">
+        <div className="p-3 bg-orange-600 rounded-2xl shadow-lg shadow-orange-600/20"><Utensils size={24} /></div>
+        <button onClick={() => setActiveTab('billing')} className={`p-3 rounded-xl ${activeTab === 'billing' ? 'bg-neutral-800 text-orange-500' : 'text-neutral-500'}`}><ShoppingBag /></button>
+        <button onClick={() => setActiveTab('orders')} className={`p-3 rounded-xl ${activeTab === 'orders' ? 'bg-neutral-800 text-orange-500' : 'text-neutral-500'}`}><Clock /></button>
+        <button onClick={connectPrinter} className={`p-3 rounded-xl ${printerPort ? 'bg-green-600' : 'bg-neutral-800'}`}><Wifi /></button>
+        <button onClick={() => setIsLoggedIn(false)} className="mt-auto text-red-500"><LogOut /></button>
+      </aside>
 
-  const handleAddProductToCart = (item: any) => {
-    triggerBeep('tap');
-    setCart((prev) => {
-@@ -563,10 +488,6 @@
-    }).filter(Boolean) as PosCartItem[]);
-  };
-
-  const handleUpdateCartItemNote = (itemId: string, noteValue: string) => {
-    setCart((prev) => prev.map((item) => item.id === itemId ? { ...item, note: noteValue } : item));
-  };
-
-  const handleTouchStart = (e: React.TouchEvent) => { setTouchEnd(null); setTouchStart(e.targetTouches[0].clientX); };
-  const handleTouchMove = (e: React.TouchEvent) => { setTouchEnd(e.targetTouches[0].clientX); };
-  const handleTouchEnd = () => {
-@@ -619,28 +540,15 @@
-          if (characteristic) break;
-        }
-
-        if (!characteristic) {
-          throw new Error("Could not find writable characteristic on printer.");
-        }
-
-        if (!characteristic) throw new Error("Could not find writable characteristic.");
-        setBleCharacteristic(characteristic);
-        setPrinterConnected(true);
-        localStorage.setItem("bb_pos_printer_connected", "true");
-        toast.dismiss(toastId);
-        toast.success("Bluetooth Thermal Printer Connected!");
-      } else if (printerType === 'thermal_usb' && 'serial' in navigator) {
-        const port = await (navigator as any).serial.requestPort();
-        await port.open({ baudRate: 9600 });
-        setSerialPort(port);
-        setPrinterConnected(true);
-        localStorage.setItem("bb_pos_printer_connected", "true");
-        toast.dismiss(toastId);
-        toast.success("USB Thermal Printer Connected!");
-        toast.success("Bluetooth Printer Connected!");
-      } else {
-        setTimeout(() => {
-          toast.dismiss(toastId);
-          setPrinterConnected(true);
-          localStorage.setItem("bb_pos_printer_connected", "true");
-          toast.success("Connected!");
-        }, 1000);
-      }
-@@ -666,9 +574,9 @@
-        total: 100, 
-        timestamp: new Date() 
-      }, getPrintConfig());
-      toast.success("Test print sent to printer!");
-      toast.success("Test print sent!");
-    } catch (e: any) {
-      toast.error("Print failed: " + (e.message || "Unknown error"));
-      toast.error("Print failed");
-    }
-  };
-
-@@ -1117,7 +1025,98 @@
-        </>
-      )}
-
-      {/* MODALS & DRAWERS */}
-      {/* INLINE CART DRAWER */}
-      <AnimatePresence>
-        {isCartOpen && (
-          <div className="fixed inset-0 z-50 flex flex-col justify-end bg-black/60 backdrop-blur-sm">
-            <motion.div initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} transition={{ type: "spring", damping: 25, stiffness: 200 }} className="bg-white dark:bg-neutral-900 rounded-t-3xl p-5 max-h-[90vh] flex flex-col shadow-2xl overflow-y-auto">
-              
-              <div className="flex items-center justify-between border-b border-neutral-200 dark:border-neutral-800 pb-3 mb-3">
-                <h3 className="text-sm font-black uppercase text-orange-500">Review Active Cart ({cart.reduce((s, i) => s + i.quantity, 0)})</h3>
-                <button onClick={() => setIsCartOpen(false)} className="p-1.5 rounded-full bg-neutral-100 dark:bg-neutral-800 text-neutral-400"><SafeX size={16} /></button>
+      {/* Main Content */}
+      <main className="flex-1 flex flex-col overflow-hidden">
+        {activeTab === 'billing' && (
+          <div className="flex-1 flex flex-col p-6 overflow-hidden">
+            <header className="flex justify-between items-center mb-6">
+              <div className="relative w-96">
+                <Search className="absolute left-4 top-3 text-neutral-500" size={20} />
+                <input 
+                  type="text" placeholder="Search menu..." 
+                  value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
+                  className="w-full bg-neutral-900 rounded-2xl py-3 pl-12 pr-4 border border-neutral-800 outline-none focus:border-orange-500"
+                />
               </div>
-
-              {/* Customer Phone & Loyalty Section */}
-              <div className="space-y-2 bg-neutral-50 dark:bg-neutral-800/40 p-3 rounded-2xl border border-neutral-200 dark:border-neutral-800 mb-3">
-                <div className="flex gap-2">
-                  <input type="text" maxLength={10} placeholder="Customer 10-digit Phone" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} className="w-full bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 rounded-xl px-3 py-2 text-xs outline-none font-mono" />
-                  <button onClick={handleCheckLoyalty} className="bg-orange-600 hover:bg-orange-500 text-white px-4 rounded-xl text-xs font-black uppercase">Find</button>
-                  <button onClick={() => setIsCustomerModalOpen(true)} className="bg-neutral-200 dark:bg-neutral-700 px-3 rounded-xl text-xs font-bold">List</button>
-                </div>
-                {customerName && (
-                  <div className="flex justify-between text-xs font-bold text-yellow-500 pt-1 border-t border-neutral-200 dark:border-neutral-700">
-                    <span>👤 {customerName}</span><span>⭐ Points: {customerPoints}</span>
-                  </div>
-                )}
-              </div>
-
-              {/* Cart Items */}
-              <div className="space-y-2 max-h-48 overflow-y-auto pr-1 mb-3">
-                {cart.map((item) => (
-                  <div key={item.id} className="bg-neutral-50 dark:bg-neutral-800/30 border border-neutral-200 dark:border-neutral-800 p-2.5 rounded-2xl flex items-center justify-between gap-2">
-                    <div className="flex-1 min-w-0">
-                      <p className="font-bold text-xs truncate">{item.name}</p>
-                      <p className="text-[10px] font-mono text-orange-500">₹{item.price * item.quantity}</p>
-                    </div>
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <button onClick={() => handleUpdateCartQuantity(item.id, -1)} className="w-6 h-6 bg-neutral-200 dark:bg-neutral-700 rounded-lg flex items-center justify-center font-bold text-xs">-</button>
-                      <span className="w-6 text-center text-xs font-mono font-bold">{item.quantity}</span>
-                      <button onClick={() => handleUpdateCartQuantity(item.id, 1)} className="w-6 h-6 bg-neutral-200 dark:bg-neutral-700 rounded-lg flex items-center justify-center font-bold text-xs">+</button>
-                    </div>
-                  </div>
+              <div className="flex gap-2">
+                {categories.map(c => (
+                  <button key={c} onClick={() => setSelectedCategory(c)} className={`px-4 py-2 rounded-xl text-xs font-bold uppercase transition-all ${selectedCategory === c ? 'bg-orange-600 text-white' : 'bg-neutral-900 text-neutral-500'}`}>{c}</button>
                 ))}
               </div>
+            </header>
 
-              {/* Fulfillment Options */}
-              <div className="space-y-3 mb-4">
-                <div className="grid grid-cols-3 gap-1 bg-neutral-100 dark:bg-neutral-800 p-1 rounded-2xl">
-                  {(['table', 'pickup', 'delivery'] as const).map((type) => (
-                    <button key={type} onClick={() => { triggerBeep('tap'); setFulfillmentType(type); }} className={"py-1.5 rounded-xl text-[10px] font-black uppercase transition-all " + (fulfillmentType === type ? "bg-orange-600 text-white shadow-sm" : "text-neutral-400")}>{type}</button>
-                  ))}
-                </div>
-
-                {fulfillmentType === 'table' && (
-                  <input type="text" placeholder="Table Number (e.g., Table 4)" value={tableNumber} onChange={e => setTableNumber(e.target.value)} className="w-full bg-neutral-50 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-xl px-3 py-2 text-xs outline-none" />
-                )}
-
-                {fulfillmentType === 'delivery' && (
-                  <div className="space-y-2 bg-neutral-50 dark:bg-neutral-800/40 p-3 rounded-2xl border border-neutral-200 dark:border-neutral-800">
-                    <select value={selectedArea.name} onChange={e => { const ar = DELIVERY_AREAS.find(a => a.name === e.target.value); if (ar) setSelectedArea(ar); }} className="w-full bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 rounded-xl p-2 text-xs outline-none">
-                      {DELIVERY_AREAS.map(a => <option key={a.name} value={a.name}>{a.name} (Fee: ₹{a.fee})</option>)}
-                    </select>
-                    <div className="flex gap-2">
-                      <input type="text" placeholder="Delivery Address / GPS Link" value={address} onChange={e => setAddress(e.target.value)} className="w-full bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 rounded-xl px-3 py-2 text-xs outline-none" />
-                      <button onClick={handleDetectLocation} className="bg-neutral-200 dark:bg-neutral-700 px-3 rounded-xl text-xs font-bold">GPS 📍</button>
-                    </div>
+            <div className="flex-1 overflow-y-auto grid grid-cols-4 xl:grid-cols-6 gap-4 pr-2">
+              {products
+                .filter(p => (selectedCategory === 'All' || p.category === selectedCategory) && p.name.toLowerCase().includes(searchQuery.toLowerCase()))
+                .map(p => (
+                <button 
+                  key={p.id} 
+                  onClick={() => {
+                    const ex = cart.find(i => i.id === p.id);
+                    if (ex) setCart(cart.map(i => i.id === p.id ? {...i, quantity: i.quantity + 1} : i));
+                    else setCart([...cart, { ...p, quantity: 1 }]);
+                    setIsCartOpen(true);
+                  }}
+                  className="bg-neutral-900 border border-neutral-800 rounded-3xl p-3 text-left hover:border-orange-500 transition-all group active:scale-95"
+                >
+                  <div className="h-32 bg-neutral-800 rounded-2xl mb-3 overflow-hidden">
+                    {(p.image || p.imageUrl) ? (
+                      <img src={p.image || p.imageUrl} className="w-full h-full object-cover group-hover:scale-110 transition-all" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center"><ImageIcon className="text-neutral-700" /></div>
+                    )}
                   </div>
-                )}
-              </div>
-
-              {/* Bill Summary */}
-              <div className="space-y-1.5 text-xs border-t border-neutral-200 dark:border-neutral-800 pt-3 mb-4">
-                <div className="flex justify-between text-neutral-400"><span>Subtotal</span><span className="font-mono">₹{getCartSubtotal()}</span></div>
-                {fulfillmentType === 'delivery' && <div className="flex justify-between text-neutral-400"><span>Delivery Charge</span><span className="font-mono">₹{getDeliveryCharge()}</span></div>}
-                <div className="flex justify-between text-sm font-black text-green-500 pt-1 border-t border-dashed border-neutral-700">
-                  <span>Grand Total</span><span className="font-mono text-base">₹{getTotalBillPrice()}</span>
-                </div>
-              </div>
-
-              <div className="flex gap-2 mb-3">
-                <button onClick={() => setPaymentMethod('cash')} className={`flex-1 py-2 rounded-xl text-xs font-black uppercase border ${paymentMethod === 'cash' ? 'bg-green-600 text-white border-green-600' : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-400 border-neutral-700'}`}>Cash</button>
-                <button onClick={() => setPaymentMethod('upi')} className={`flex-1 py-2 rounded-xl text-xs font-black uppercase border ${paymentMethod === 'upi' ? 'bg-blue-600 text-white border-blue-600' : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-400 border-neutral-700'}`}>UPI</button>
-              </div>
-
-              <button onClick={handlePlaceOrder} disabled={cart.length === 0 || isSubmittingOrder} className="w-full bg-green-600 hover:bg-green-500 text-white font-black py-3.5 rounded-2xl uppercase tracking-wider text-xs flex items-center justify-center gap-2 shadow-lg">
-                {isSubmittingOrder ? <Loader2 className="animate-spin" size={16} /> : <SafeCheck size={16} />}
-                <span>Place Order & Print (₹{getTotalBillPrice()})</span>
-              </button>
-
-            </motion.div>
+                  <h3 className="font-bold text-sm truncate">{p.name}</h3>
+                  <p className="text-orange-500 font-black">₹{p.price}</p>
+                </button>
+              ))}
+            </div>
           </div>
         )}
-      </AnimatePresence>
 
-      {/* RECEIPT MODAL */}
+        {activeTab === 'orders' && (
+          <div className="p-6 grid grid-cols-3 gap-4 overflow-y-auto">
+            {liveOrders.map(order => (
+              <div key={order.id} className="bg-neutral-900 border border-neutral-800 rounded-3xl p-5 space-y-4">
+                <div className="flex justify-between items-center">
+                  <span className="bg-orange-600 px-3 py-1 rounded-lg text-xs font-black">TK: #{order.tokenNumber}</span>
+                  <span className="text-neutral-500 text-[10px] uppercase font-bold">{order.fulfillmentType}</span>
+                </div>
+                <div className="space-y-2 border-y border-neutral-800 py-3">
+                  {order.items.map((it: any, idx: number) => (
+                    <div key={idx} className="flex justify-between text-sm">
+                      <span className="text-neutral-300">{it.name}</span>
+                      <span className="font-black">x{it.quantity}</span>
+                    </div>
+                  ))}
+                </div>
+                <button 
+                  onClick={() => updateDoc(doc(db, "orders", order.id), { status: 'completed' })}
+                  className="w-full bg-green-600 py-3 rounded-xl text-xs font-black uppercase hover:bg-green-500"
+                >Mark as Ready</button>
+              </div>
+            ))}
+          </div>
+        )}
+      </main>
+
+      {/* Right Cart Sidebar */}
       <AnimatePresence>
-        {isReceiptModalOpen && selectedReceipt && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-@@ -1156,58 +1155,13 @@
+        {isCartOpen && (
+          <motion.aside 
+            initial={{ x: 400 }} animate={{ x: 0 }} exit={{ x: 400 }}
+            className="w-[420px] bg-neutral-900 border-l border-neutral-800 flex flex-col p-6 shadow-2xl"
+          >
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-black uppercase flex items-center gap-2"><ShoppingBag className="text-orange-500" /> Cart</h2>
+              <button onClick={() => setIsCartOpen(false)} className="p-2 bg-neutral-800 rounded-full"><X size={18}/></button>
+            </div>
+
+            <div className="space-y-3 mb-6">
+              <div className="flex gap-2">
+                <input 
+                  placeholder="Customer Phone" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)}
+                  className="flex-1 bg-black border border-neutral-800 rounded-xl px-4 py-3 text-sm outline-none focus:border-orange-500"
+                />
+                <button onClick={handleCheckLoyalty} className="bg-orange-600 px-4 rounded-xl text-xs font-bold uppercase">Find</button>
+              </div>
+              {customerName && <p className="text-xs text-yellow-500 font-bold px-1">👤 {customerName} | Points: {customerPoints}</p>}
+            </div>
+
+            <div className="flex-1 overflow-y-auto space-y-3 pr-2">
+              {cart.map(item => (
+                <div key={item.id} className="bg-black/40 border border-neutral-800 p-4 rounded-2xl flex items-center justify-between">
+                  <div className="flex-1 min-w-0 mr-4">
+                    <p className="font-bold text-sm truncate">{item.name}</p>
+                    <p className="text-orange-500 font-mono text-xs">₹{item.price * item.quantity}</p>
+                  </div>
+                  <div className="flex items-center gap-3 bg-neutral-900 p-1.5 rounded-xl">
+                    <button onClick={() => setCart(cart.map(i => i.id === item.id ? {...i, quantity: Math.max(1, i.quantity - 1)} : i))} className="p-1 hover:bg-neutral-800 rounded"><Minus size={14}/></button>
+                    <span className="font-mono font-bold w-4 text-center">{item.quantity}</span>
+                    <button onClick={() => setCart(cart.map(i => i.id === item.id ? {...i, quantity: i.quantity + 1} : i))} className="p-1 hover:bg-neutral-800 rounded"><Plus size={14}/></button>
+                  </div>
+                  <button onClick={() => setCart(cart.filter(i => i.id !== item.id))} className="ml-2 text-neutral-600 hover:text-red-500"><Trash2 size={16}/></button>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-6 border-t border-neutral-800 pt-6 space-y-4">
+              <div className="grid grid-cols-3 gap-2 bg-black p-1 rounded-2xl mb-2">
+                {['table', 'pickup', 'delivery'].map(type => (
+                  <button key={type} onClick={() => setFulfillmentType(type as any)} className={`py-2 rounded-xl text-[10px] font-black uppercase ${fulfillmentType === type ? 'bg-neutral-800 text-orange-500' : 'text-neutral-500'}`}>{type}</button>
+                ))}
+              </div>
+              <div className="flex justify-between items-end mb-4">
+                <span className="text-neutral-500 font-bold uppercase text-xs tracking-widest">Total Amount</span>
+                <span className="text-3xl font-black text-orange-500 font-mono">₹{cart.reduce((a, b) => a + (b.price * b.quantity), 0)}</span>
+              </div>
+              <button 
+                disabled={cart.length === 0 || isSubmittingOrder}
+                onClick={handlePlaceOrder}
+                className="w-full bg-orange-600 hover:bg-orange-500 py-5 rounded-3xl font-black text-lg uppercase flex items-center justify-center gap-3 shadow-lg shadow-orange-600/20 disabled:opacity-50"
+              >
+                {isSubmittingOrder ? <Loader2 className="animate-spin"/> : <Printer size={24}/>}
+                Confirm & Print
+              </button>
+            </div>
+          </motion.aside>
         )}
       </AnimatePresence>
-
-      <PosCartDrawer 
-        isCartOpen={isCartOpen} 
-        setIsCartOpen={setIsCartOpen} 
-        cart={cart} 
-        setCart={setCart} 
-        customerPhone={customerPhone} 
-        setCustomerPhone={setCustomerPhone} 
-        customerName={customerName} 
-        setCustomerName={setCustomerName} 
-        customerPoints={customerPoints} 
-        setCustomerPoints={setCustomerPoints} 
-        pointsToRedeem={pointsToRedeem} 
-        setPointsToRedeem={setPointsToRedeem} 
-        customDiscount={customDiscount} 
-        setCustomDiscount={setCustomDiscount} 
-        fulfillmentType={fulfillmentType} 
-        setFulfillmentType={setFulfillmentType} 
-        selectedArea={selectedArea} 
-        setSelectedArea={setSelectedArea} 
-        DELIVERY_AREAS={DELIVERY_AREAS} 
-        address={address} 
-        setAddress={setAddress} 
-        tableNumber={tableNumber} 
-        setTableNumber={setTableNumber} 
-        chefInstructions={chefInstructions} 
-        setChefInstructions={setChefInstructions} 
-        isSubmittingOrder={isSubmittingOrder} 
-        paymentMethod={paymentMethod} 
-        setPaymentMethod={handleSetPaymentMethod} 
-        getCartSubtotal={getCartSubtotal} 
-        getDeliveryCharge={getDeliveryCharge} 
-        getFreeDeliveryProgressPercent={getFreeDeliveryProgressPercent} 
-        getTotalPointsRedeemedInCart={getTotalPointsRedeemedInCart} 
-        getTotalBillPrice={getTotalBillPrice} 
-        loyaltyRules={loyaltyRules} 
-        handlePlaceOrder={handlePlaceOrder} 
-        handleDetectLocation={handleDetectLocation} 
-        setIsCustomerModalOpen={setIsCustomerModalOpen} 
-        searchDbCustomers={searchDbCustomers} 
-        handleUpdateCartQuantity={handleUpdateCartQuantity} 
-        handleUpdateCartItemNote={handleUpdateCartItemNote} 
-        triggerBeep={triggerBeep} 
-        handleCheckLoyalty={handleCheckLoyalty} 
-      />
-
-      <CustomerDirectoryModal 
-        isCustomerModalOpen={isCustomerModalOpen} setIsCustomerModalOpen={setIsCustomerModalOpen} customerSearchQuery={customerSearchQuery} setCustomerSearchQuery={setCustomerSearchQuery} searchedCustomers={searchedCustomers} isSearchingCustomer={isSearchingCustomer} newCustName={newCustName} setNewCustName={setNewCustName} newCustPhone={newCustPhone} setNewCustPhone={setNewCustPhone} newCustAddress={newCustAddress} setNewCustAddress={setNewCustAddress} editingCustomer={editingCustomer} viewingHistoryCustomer={viewingHistoryCustomer} customerHistoryList={customerHistoryList} editCustPoints={editCustPoints} setEditCustPoints={setEditCustPoints} handleSelectCustomer={handleSelectCustomer} handleLoadCustomerHistory={handleLoadCustomerHistory} handleStartEditProfile={handleStartEditProfile} handleUpdateCustomerProfile={handleUpdateCustomerProfile} handleSaveNewCustomer={handleSaveNewCustomer} setViewingHistoryCustomer={setViewingHistoryCustomer} setCustomerHistoryList={setCustomerHistoryList} setEditingCustomer={setEditingCustomer} searchDbCustomers={searchDbCustomers} triggerBeep={triggerBeep}
-        isCustomerModalOpen={isCustomerModalOpen} setIsCustomerModalOpen={setIsCustomerModalOpen} customerSearchQuery={customerSearchQuery} setCustomerSearchQuery={setCustomerSearchQuery} searchedCustomers={searchedCustomers} isSearchingCustomer={isSearchingCustomer} newCustName={newCustName} setNewCustName={setNewCustName} newCustPhone={newCustPhone} setNewCustPhone={setNewCustPhone} newCustAddress={newCustAddress} setNewCustAddress={setNewCustAddress} editingCustomer={editingCustomer} viewingHistoryCustomer={viewingHistoryCustomer} customerHistoryList={customerHistoryList} editCustPoints={editCustPoints} setEditCustPoints={setEditCustPoints} handleSelectCustomer={handleSelectCustomer} handleLoadCustomerHistory={() => {}} handleStartEditProfile={() => {}} handleUpdateCustomerProfile={() => {}} handleSaveNewCustomer={() => {}} setViewingHistoryCustomer={() => {}} setCustomerHistoryList={() => {}} setEditingCustomer={() => {}} searchDbCustomers={searchDbCustomers} triggerBeep={triggerBeep}
-      />
-
-      <CustomizerModal 
-        selectedProduct={selectedProduct} setSelectedProduct={setSelectedProduct} normalPizzaSize={normalPizzaSize} setNormalPizzaSize={setNormalPizzaSize} normalPizzaPrice={normalPizzaPrice} setNormalPizzaPrice={setNormalPizzaPrice} normalPizzaAddons={{}} setNormalPizzaAddons={() => {}} customizerChefNote={customizerChefNote} setCustomizerChefNote={setCustomizerChefNote} PIZZA_ADDONS={{}} QUICK_INSTRUCTION_TAGS={QUICK_INSTRUCTION_TAGS} handleAddCustomizedItemToCart={handleAddCustomizedItemToCart} triggerBeep={triggerBeep}
-      />
     </div>
   );
 }
