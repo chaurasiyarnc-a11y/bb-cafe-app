@@ -3,336 +3,256 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { db } from '@/lib/firebase'; 
 import { 
   collection, onSnapshot, query, orderBy, limit, doc, 
-  updateDoc, addDoc, runTransaction, getDoc, getDocs, where, setDoc,
-  waitForPendingWrites
+  updateDoc, addDoc, getDocs, where, setDoc, Timestamp
 } from 'firebase/firestore';
 import { 
   ShoppingBag, Search, X, Loader2, Clock, Printer, Check, Settings, 
-  Database, RefreshCw, Layers, Menu, LogOut, Lock, ToggleLeft, ToggleRight, 
-  Sun, Moon, Tag, Calculator, TrendingUp, Utensils, User, MapPin, Star
+  LogOut, Lock, Calculator, TrendingUp, Utensils, CreditCard, Banknote
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
 
-import CustomerDirectoryModal from '@/components/pos/CustomerDirectoryModal';
-import CustomizerModal from '@/components/pos/CustomizerModal';
 import { handlePrintKot, handlePrintReceipt, PrintConfig } from '@/lib/printerUtils';
 
-// Safe Lucide Icons casting - FIX APPLIED HERE
-const SafeLock = Lock as any;
-const SafeDatabase = Database as any;
-const SafeMenu = Menu as any;
-const SafeLogOut = LogOut as any;
-const SafeToggleRight = ToggleRight as any;
-const SafeToggleLeft = ToggleLeft as any;
-const SafeMoon = Moon as any;
-const SafeSun = Sun as any;
-const SafeShoppingBag = ShoppingBag as any;
-const SafeClock = Clock as any; 
-const SafeLayers = Layers as any;
-const SafePrinter = Printer as any;
-const SafeCheck = Check as any;
-const SafeSearch = Search as any;
-const SafeX = X as any;
-const SafeRefreshCw = RefreshCw as any;
-const SafeSettings = Settings as any;
-
-interface PosCartItem {
-  id: string;
-  name: string;
-  price: number;
-  quantity: number;
-  isReward?: boolean;
-  pointsCost?: number;
-  note?: string; 
-}
-
-interface DeliveryArea {
-  name: string;
-  fee: number;
-  minFree: number;
-  range: string;
-}
-
-let globalAudioCtx: AudioContext | null = null;
-
 export default function BbCafePosDesktop() {
-  const DELIVERY_AREAS: DeliveryArea[] = useMemo(() => [
-    { name: "Mohandra Town", fee: 20, minFree: 99, range: "0-2 KM" },
-    { name: "Within 5 KM (5km के दायरे में)", fee: 50, minFree: 499, range: "2-5 KM" },
-    { name: "Within 12 KM (12km के दायरे में)", fee: 99, minFree: 999, range: "5-12 KM" }
-  ], []);
-
-  const QUICK_INSTRUCTION_TAGS = ["🌶️ Extra Spicy", "🧅 No Onion-Garlic", "🧀 Extra Cheese", "🔥 Well Baked", "🌱 Make it Mild"];
-
+  // --- States ---
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [currentUser, setCurrentUser] = useState<any>(null);
-  const [pinInput, setPinInput] = useState('');
-  const [activeTab, setActiveTab] = useState<'billing' | 'orders' | 'inventory' | 'receipts' | 'settings'>('billing');
-  
-  const [gstEnabled, setGstEnabled] = useState(false);
-  const [gstRate, setGstRate] = useState(5);
-  const [printerPaperSize, setPrinterPaperSize] = useState<'58mm' | '80mm'>('58mm');
-  const [themeMode, setThemeMode] = useState<'dark' | 'light'>('dark');
-  const [printerType, setPrinterType] = useState<any>('thermal_bluetooth');
-  const [printerConnected, setPrinterConnected] = useState(false);
-  const [bleCharacteristic, setBleCharacteristic] = useState<any>(null);
-  const [fontSize, setFontSize] = useState<number>(9); 
-  const [kotEnabled, setKotEnabled] = useState<boolean>(true); 
-
+  const [activeTab, setActiveTab] = useState<'billing' | 'receipts' | 'reports'>('billing');
   const [products, setProducts] = useState<any[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [liveOrders, setLiveOrders] = useState<any[]>([]);
-  const [pastReceipts, setPastReceipts] = useState<any[]>([]);
-  const [receiptSearchQuery, setReceiptSearchQuery] = useState('');
-  const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
-  const [selectedReceipt, setSelectedReceipt] = useState<any>(null);
+  const [cart, setCart] = useState<any[]>([]);
   
-  const [cart, setCart] = useState<PosCartItem[]>([]);
+  // Billing States
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerName, setCustomerName] = useState('');
-  const [customerPoints, setCustomerPoints] = useState(0);
-  const [pointsToRedeem, setPointsToRedeem] = useState(0);
-  const [customDiscount, setCustomDiscount] = useState(0);
-  const [fulfillmentType, setFulfillmentType] = useState<'delivery' | 'pickup' | 'table'>('table');
-  const [selectedArea, setSelectedArea] = useState<DeliveryArea>(DELIVERY_AREAS[0]);
-  const [address, setAddress] = useState('');
-  const [tableNumber, setTableNumber] = useState('1');
-  const [isSubmittingOrder, setIsSubmittingOrder] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'upi'>('cash');
-  const [selectedProduct, setSelectedProduct] = useState<any>(null);
-  const [normalPizzaSize, setNormalPizzaSize] = useState("");
-  const [normalPizzaPrice, setNormalPizzaPrice] = useState(0);
-  const [customizerChefNote, setCustomizerChefNote] = useState("");
-  const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Reports & History
+  const [pastReceipts, setPastReceipts] = useState<any[]>([]);
+  const [dailySales, setDailySales] = useState({ total: 0, cash: 0, upi: 0, count: 0 });
 
-  const alarmIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  // Printer Config
+  const pConfig: PrintConfig = { 
+    printerPaperSize: '58mm', 
+    printerType: 'thermal_bluetooth' 
+  } as any;
 
-  const triggerBeep = (type: 'tap' | 'success' | 'alarm') => {
-    try {
-      if (!globalAudioCtx) globalAudioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
-      if (globalAudioCtx.state === 'suspended') globalAudioCtx.resume();
-      const osc = globalAudioCtx.createOscillator();
-      const gain = globalAudioCtx.createGain();
-      osc.connect(gain); gain.connect(globalAudioCtx.destination);
-      if (type === 'tap') {
-        osc.frequency.setValueAtTime(600, globalAudioCtx.currentTime);
-        gain.gain.setValueAtTime(0.05, globalAudioCtx.currentTime);
-        osc.start(); osc.stop(globalAudioCtx.currentTime + 0.08);
-      } else if (type === 'success') {
-        osc.frequency.setValueAtTime(523, globalAudioCtx.currentTime);
-        gain.gain.setValueAtTime(0.05, globalAudioCtx.currentTime);
-        osc.start(); osc.stop(globalAudioCtx.currentTime + 0.4);
-      } else if (type === 'alarm') {
-        osc.type = 'square'; osc.frequency.setValueAtTime(880, globalAudioCtx.currentTime);
-        gain.gain.setValueAtTime(0.1, globalAudioCtx.currentTime);
-        osc.start(); osc.stop(globalAudioCtx.currentTime + 0.3);
-      }
-    } catch (e) {}
-  };
-
-  useEffect(() => {
-    const savedUser = localStorage.getItem("bb_pos_user");
-    if (savedUser) { setIsLoggedIn(true); setCurrentUser(JSON.parse(savedUser)); }
-    setGstEnabled(localStorage.getItem("bb_pos_gst_enabled") === 'true');
-    setGstRate(Number(localStorage.getItem("bb_pos_gst_rate")) || 5);
-    setThemeMode((localStorage.getItem("bb_pos_theme") as any) || 'dark');
-    const savedCart = localStorage.getItem("bb_pos_saved_cart");
-    if (savedCart) { try { setCart(JSON.parse(savedCart)); } catch (err) {} }
-  }, []);
-
+  // --- 1. Today's Sales Logic (Daily Change) ---
   useEffect(() => {
     if (!isLoggedIn) return;
-    const unsubProd = onSnapshot(collection(db, "products"), (snap) => {
-      const items = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      setProducts(items);
-      setCategories(['All', ...Array.from(new Set(items.map((i: any) => i.category).filter(Boolean))) as string[]]);
+
+    const start = new Date(); start.setHours(0,0,0,0);
+    const end = new Date(); end.setHours(23,59,59,999);
+
+    const q = query(collection(db, "orders"), where("timestamp", ">=", start), where("timestamp", "<=", end));
+    
+    return onSnapshot(q, (snap) => {
+      let total = 0, cash = 0, upi = 0;
+      const list = snap.docs.map(d => {
+        const data = d.data();
+        if(data.status === 'completed') {
+            total += data.total;
+            if(data.paymentMethod === 'cash') cash += data.total;
+            if(data.paymentMethod === 'upi') upi += data.total;
+        }
+        return { id: d.id, ...data };
+      });
+      setDailySales({ total, cash, upi, count: list.length });
+      setPastReceipts(list.sort((a,b) => b.timestamp - a.timestamp));
     });
-    const unsubOrders = onSnapshot(query(collection(db, "orders"), orderBy("timestamp", "desc"), limit(50)), (snap) => {
-      setLiveOrders(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    });
-    return () => { unsubProd(); unsubOrders(); };
   }, [isLoggedIn]);
 
-  const activeLiveOrders = useMemo(() => liveOrders.filter((o) => o.status !== 'completed' && o.status !== 'rejected'), [liveOrders]);
-  const tokenNumber = useMemo(() => Math.floor(100 + Math.random() * 900), [cart.length === 0]);
-
-  const getCartSubtotal = () => cart.reduce((acc, i) => acc + (i.price * i.quantity), 0);
-  const getGstAmount = () => gstEnabled ? Number(((getCartSubtotal() * gstRate) / 100).toFixed(2)) : 0;
-  const getTotalBill = () => Math.max(0, getCartSubtotal() + getGstAmount() - (pointsToRedeem + customDiscount));
-
-  const handleAddProductToCart = (item: any) => {
-    triggerBeep('tap');
-    setCart((prev) => {
-      const existingIndex = prev.findIndex((c) => c.id === item.id);
-      if (existingIndex > -1) {
-        const next = [...prev];
-        next[existingIndex].quantity += 1;
-        return next;
-      }
-      return [...prev, { id: item.id, name: item.name, price: Number(item.price) || 0, quantity: 1 }];
+  // Load Menu
+  useEffect(() => {
+    return onSnapshot(collection(db, "products"), (snap) => {
+      const items = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      setProducts(items);
+      setCategories(['All', ...Array.from(new Set(items.map((i: any) => i.category))) as string[]]);
     });
-  };
+  }, []);
 
-  const updateQty = (id: string, delta: number) => {
-    triggerBeep('tap');
-    setCart(prev => prev.map(i => i.id === id ? { ...i, quantity: Math.max(0, i.quantity + delta) } : i).filter(i => i.quantity > 0));
-  };
-
+  // --- 2. KOT + BILL Sequential Printing ---
   const handlePlaceOrder = async () => {
-    if (cart.length === 0 || isSubmittingOrder) return;
-    setIsSubmittingOrder(true);
-    const toastId = toast.loading("Processing Order...");
+    if (cart.length === 0 || isSubmitting) return;
+    setIsSubmitting(true);
+    const toastId = toast.loading("Saving & Printing...");
+
     try {
       const billNumber = Date.now().toString().slice(-5);
+      const token = Math.floor(100 + Math.random() * 900);
+      
       const orderObj = { 
-        billNumber, tokenNumber, customerName: customerName || "Walk-in Guest", 
-        customerPhone: customerPhone ? `+91${customerPhone}` : "", items: cart, 
-        subtotal: getCartSubtotal(), total: getTotalBill(), timestamp: new Date(), 
-        status: 'completed', fulfillmentType, tableNumber: fulfillmentType === 'table' ? tableNumber : '', 
-        paymentMethod, source: 'PC-POS', address 
+        billNumber, tokenNumber: token, 
+        customerName: customerName || "Guest", 
+        customerPhone: customerPhone ? `+91${customerPhone}` : "",
+        items: cart, total: cart.reduce((a,b)=>a+(b.price*b.quantity),0),
+        timestamp: new Date(), status: 'completed',
+        paymentMethod, source: 'PC-POS' 
       };
 
       await addDoc(collection(db, "orders"), orderObj);
-      triggerBeep('success');
-      toast.success(`Bill #${billNumber} Success!`, { id: toastId });
+
+      // --- DOUBLE PRINTING LOGIC ---
+      toast.loading("Printing KOT...", { id: toastId });
+      await handlePrintKot(orderObj, pConfig);
       
-      const pConfig: PrintConfig = { printerPaperSize, printerType, bleCharacteristic } as any;
-      if (kotEnabled) await handlePrintKot(orderObj, pConfig);
+      await new Promise(r => setTimeout(r, 1500)); // Delay to prevent printer jam
+      
+      toast.loading("Printing Bill...", { id: toastId });
       await handlePrintReceipt(orderObj, pConfig);
 
-      setCart([]); setCustomerPhone(''); setCustomerName(''); setIsSubmittingOrder(false);
+      toast.success("Order Finished!", { id: toastId });
+      setCart([]); setCustomerName(''); setCustomerPhone('');
     } catch (err) {
-      toast.error("Failed", { id: toastId });
-      setIsSubmittingOrder(false);
+      toast.error("Error saving order", { id: toastId });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  if (!isLoggedIn) {
-    return (
-      <div className="h-screen w-full bg-[#0a0a0a] flex items-center justify-center">
-        <Toaster />
-        <div className="bg-[#151515] p-12 rounded-[40px] border border-white/5 w-[400px] text-center shadow-2xl">
-          <SafeLock size={64} className="text-orange-500 mx-auto mb-8" />
-          <h1 className="text-2xl font-black text-white mb-6 uppercase tracking-tighter">Terminal Locked</h1>
-          <input 
-            type="password" maxLength={4} value={pinInput} 
-            onChange={e => setPinInput(e.target.value)} 
-            className="w-full bg-[#202020] border-none text-center text-4xl font-mono tracking-[15px] py-5 rounded-2xl text-orange-500 outline-none mb-6"
-            autoFocus 
-          />
-          <button className="w-full bg-orange-600 text-white font-black py-4 rounded-xl">ACCESS TERMINAL</button>
-        </div>
-      </div>
-    );
-  }
+  // Reprint Function
+  const handleReprint = async (order: any) => {
+    toast.success(`Reprinting Bill #${order.billNumber}`);
+    await handlePrintReceipt(order, pConfig);
+  };
+
+  if (!isLoggedIn) return <Login onLogin={() => setIsLoggedIn(true)} />;
 
   return (
-    <div className={`h-screen w-full flex overflow-hidden font-sans ${themeMode === 'dark' ? 'bg-[#080808] text-white' : 'bg-slate-50 text-slate-900'}`}>
-      <Toaster position="top-right" />
+    <div className="h-screen w-full bg-[#080808] text-white flex overflow-hidden font-sans">
+      <Toaster />
 
-      {/* SIDEBAR */}
-      <aside className="w-20 lg:w-64 border-r border-white/5 bg-[#111] flex flex-col shrink-0">
-        <div className="p-8">
-          <h1 className="text-xl font-black text-orange-500 tracking-tighter italic">BUM BUM</h1>
-        </div>
-        <nav className="flex-1 px-4 space-y-2 mt-4">
-          <SidebarBtn icon={<Calculator size={20}/>} label="Billing" active={activeTab === 'billing'} onClick={() => setActiveTab('billing')} />
-          <SidebarBtn icon={<SafeClock size={20}/>} label="Live Orders" active={activeTab === 'orders'} onClick={() => setActiveTab('orders')} badge={activeLiveOrders.length} />
-          <SidebarBtn icon={<SafePrinter size={20}/>} label="Receipts" active={activeTab === 'receipts'} onClick={() => setActiveTab('receipts')} />
-          <SidebarBtn icon={<SafeLayers size={20}/>} label="Inventory" active={activeTab === 'inventory'} onClick={() => setActiveTab('inventory')} />
-          <SidebarBtn icon={<SafeSettings size={20}/>} label="Settings" active={activeTab === 'settings'} onClick={() => setActiveTab('settings')} />
+      {/* Side Navigation */}
+      <aside className="w-64 border-r border-white/5 bg-[#111] flex flex-col shrink-0">
+        <div className="p-8 font-black text-2xl text-orange-500 italic">BUM BUM</div>
+        <nav className="flex-1 px-4 space-y-2">
+          <SidebarBtn icon={<Calculator/>} label="Billing" active={activeTab === 'billing'} onClick={()=>setActiveTab('billing')} />
+          <SidebarBtn icon={<Printer/>} label="Reprint Bill" active={activeTab === 'receipts'} onClick={()=>setActiveTab('receipts')} />
+          <SidebarBtn icon={<TrendingUp/>} label="Day Report" active={activeTab === 'reports'} onClick={()=>setActiveTab('reports')} />
         </nav>
+        <div className="p-6 border-t border-white/5">
+           <div className="bg-orange-500/10 p-4 rounded-2xl border border-orange-500/20">
+              <p className="text-[10px] font-black uppercase text-orange-500">Today's Sale</p>
+              <p className="text-2xl font-black font-mono">₹{dailySales.total}</p>
+           </div>
+        </div>
       </aside>
 
-      {/* MAIN CONTENT */}
-      <main className="flex-1 flex flex-col min-w-0">
-        <header className="h-20 bg-[#111]/50 border-b border-white/5 flex items-center px-8 gap-6 shrink-0">
-          <div className="relative flex-1 max-w-xl">
-            <SafeSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
-            <input 
-              type="text" placeholder="Search menu..." 
-              className="w-full bg-[#1a1a1a] border-none rounded-2xl py-3 pl-12 pr-6 focus:ring-2 ring-orange-500 outline-none text-sm"
-              value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
-            />
+      {/* Main Area */}
+      <main className="flex-1 flex overflow-hidden">
+        
+        {/* Billing Tab */}
+        {activeTab === 'billing' && (
+          <>
+            <div className="flex-1 flex flex-col min-w-0 bg-[#000]">
+              <div className="p-6 border-b border-white/5 flex gap-4">
+                <div className="relative flex-1">
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" />
+                  <input type="text" placeholder="Search menu..." className="w-full bg-[#111] border-none rounded-2xl py-3 pl-12" value={searchQuery} onChange={e=>setSearchQuery(e.target.value)} />
+                </div>
+              </div>
+              <div className="p-6 flex gap-2 overflow-x-auto no-scrollbar">
+                {categories.map(c => <button key={c} onClick={()=>setSelectedCategory(c)} className={`px-6 py-2 rounded-xl text-xs font-black uppercase ${selectedCategory === c ? 'bg-orange-500' : 'bg-[#111]'}`}>{c}</button>)}
+              </div>
+              <div className="flex-1 overflow-y-auto p-6 grid grid-cols-2 xl:grid-cols-4 gap-6">
+                {products.filter(p => (selectedCategory==='All'||p.category===selectedCategory)&&p.name.toLowerCase().includes(searchQuery.toLowerCase())).map(item => (
+                  <div key={item.id} onClick={()=>setCart([...cart, {...item, quantity: 1}])} className="bg-[#111] p-4 rounded-[30px] border border-white/5 cursor-pointer hover:border-orange-500/50">
+                    <div className="h-32 bg-[#1a1a1a] rounded-2xl mb-3" />
+                    <h3 className="font-bold text-sm">{item.name}</h3>
+                    <p className="text-orange-500 font-black">₹{item.price}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <aside className="w-[400px] border-l border-white/5 bg-[#111] flex flex-col">
+              <div className="p-6 border-b border-white/5 font-black text-lg">Current Order</div>
+              <div className="flex-1 overflow-y-auto p-6 space-y-4">
+                {cart.map((item, idx) => (
+                  <div key={idx} className="flex justify-between items-center bg-black/20 p-3 rounded-xl border border-white/5">
+                    <div className="text-sm font-bold">{item.name}</div>
+                    <div className="font-mono text-orange-500">₹{item.price}</div>
+                  </div>
+                ))}
+              </div>
+              <div className="p-6 bg-[#151515] space-y-4">
+                <input type="text" placeholder="Mobile" className="w-full bg-[#111] p-3 rounded-xl" value={customerPhone} onChange={e=>setCustomerPhone(e.target.value)} />
+                <div className="flex gap-2">
+                  <button onClick={()=>setPaymentMethod('cash')} className={`flex-1 py-3 rounded-xl font-black ${paymentMethod==='cash'?'bg-green-600':'bg-white/5'}`}>CASH</button>
+                  <button onClick={()=>setPaymentMethod('upi')} className={`flex-1 py-3 rounded-xl font-black ${paymentMethod==='upi'?'bg-blue-600':'bg-white/5'}`}>UPI</button>
+                </div>
+                <div className="flex justify-between text-2xl font-black"><span>Total:</span><span>₹{cart.reduce((a,b)=>a+(b.price*b.quantity),0)}</span></div>
+                <button onClick={handlePlaceOrder} disabled={isSubmitting||cart.length===0} className="w-full bg-orange-600 py-4 rounded-2xl font-black text-xl">PRINT KOT + BILL</button>
+              </div>
+            </aside>
+          </>
+        )}
+
+        {/* Reprint Tab */}
+        {activeTab === 'receipts' && (
+          <div className="flex-1 p-10 space-y-4 overflow-y-auto">
+            <h2 className="text-2xl font-black mb-6">Recent Bills (Reprint)</h2>
+            {pastReceipts.map(order => (
+              <div key={order.id} className="bg-[#111] p-5 rounded-2xl flex justify-between items-center border border-white/5">
+                <div>
+                  <p className="font-mono text-orange-500">#{order.billNumber}</p>
+                  <p className="font-bold">{order.customerName} - ₹{order.total}</p>
+                </div>
+                <button onClick={()=>handleReprint(order)} className="bg-white/5 p-3 rounded-xl hover:bg-orange-500 transition-all">
+                  <Printer size={20} />
+                </button>
+              </div>
+            ))}
           </div>
-          <div className="flex items-center gap-4 border-l border-white/10 pl-6 text-sm font-bold">
-             <div className="text-right">
-                <p>{currentUser?.name}</p>
-                <p className="text-[10px] text-green-500 uppercase tracking-widest italic">● Online</p>
+        )}
+
+        {/* Reports Tab */}
+        {activeTab === 'reports' && (
+          <div className="flex-1 p-10 grid grid-cols-3 gap-6 content-start">
+             <div className="bg-green-600/20 border border-green-600/30 p-8 rounded-[40px]">
+                <Banknote size={40} className="text-green-500 mb-4" />
+                <p className="text-sm font-bold uppercase text-green-500">Cash Collection</p>
+                <p className="text-4xl font-black">₹{dailySales.cash}</p>
+             </div>
+             <div className="bg-blue-600/20 border border-blue-600/30 p-8 rounded-[40px]">
+                <CreditCard size={40} className="text-blue-500 mb-4" />
+                <p className="text-sm font-bold uppercase text-blue-500">UPI Collection</p>
+                <p className="text-4xl font-black">₹{dailySales.upi}</p>
+             </div>
+             <div className="bg-orange-600/20 border border-orange-600/30 p-8 rounded-[40px]">
+                <TrendingUp size={40} className="text-orange-500 mb-4" />
+                <p className="text-sm font-black uppercase text-orange-500">Total Sales</p>
+                <p className="text-4xl font-black">₹{dailySales.total}</p>
              </div>
           </div>
-        </header>
+        )}
 
-        <div className="flex-1 overflow-hidden flex">
-          {activeTab === 'billing' && (
-            <div className="flex-1 flex overflow-hidden">
-               <div className="flex-1 flex flex-col overflow-hidden bg-[#000]">
-                  <div className="p-6 flex gap-2 overflow-x-auto no-scrollbar shrink-0">
-                    {categories.map(cat => (
-                      <button key={cat} onClick={() => setSelectedCategory(cat)} className={`px-6 py-2 rounded-xl text-[11px] font-black uppercase transition-all ${selectedCategory === cat ? 'bg-orange-500 text-white' : 'bg-[#111] text-slate-500'}`}>{cat}</button>
-                    ))}
-                  </div>
-                  <div className="flex-1 overflow-y-auto p-6 grid grid-cols-2 xl:grid-cols-4 2xl:grid-cols-5 gap-6 content-start">
-                    {products
-                      .filter(p => (selectedCategory === 'All' || p.category === selectedCategory) && p.name.toLowerCase().includes(searchQuery.toLowerCase()))
-                      .map(item => (
-                        <div key={item.id} onClick={() => handleAddProductToCart(item)} className="bg-[#111] border border-white/5 rounded-[30px] p-4 cursor-pointer hover:border-orange-500/50 transition-all group">
-                           <div className="h-32 w-full bg-[#1a1a1a] rounded-[24px] mb-4 overflow-hidden">
-                             {item.image ? <img src={item.image} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" /> : <div className="w-full h-full flex items-center justify-center text-slate-600 text-[10px] font-bold">CAFE</div>}
-                           </div>
-                           <h3 className="font-bold text-sm line-clamp-1">{item.name}</h3>
-                           <p className="text-orange-500 font-mono font-black mt-2">₹{item.price}</p>
-                        </div>
-                    ))}
-                  </div>
-               </div>
-
-               <aside className="w-[450px] border-l border-white/5 bg-[#111] flex flex-col shrink-0 shadow-2xl">
-                  <div className="p-6 border-b border-white/5 flex justify-between items-center bg-[#151515]">
-                    <h2 className="font-black text-lg">Billing Cart</h2>
-                    <span className="text-xs font-mono bg-orange-500/10 text-orange-500 px-3 py-1 rounded-lg">Token: #{tokenNumber}</span>
-                  </div>
-                  <div className="flex-1 overflow-y-auto p-6 space-y-4">
-                    {cart.map(item => (
-                      <div key={item.id} className="flex justify-between items-center bg-[#1a1a1a] p-4 rounded-2xl border border-white/5">
-                        <div className="flex-1"><p className="font-bold text-sm truncate">{item.name}</p><p className="text-xs text-orange-500 font-mono">₹{item.price * item.quantity}</p></div>
-                        <div className="flex items-center gap-3 bg-[#000] rounded-xl px-3 py-1.5 font-bold">
-                          <button onClick={() => updateQty(item.id, -1)}>-</button>
-                          <span className="font-mono text-sm">{item.quantity}</span>
-                          <button onClick={() => updateQty(item.id, 1)}>+</button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="p-6 bg-[#151515] border-t border-white/5 space-y-4">
-                    <input type="text" maxLength={10} placeholder="Mobile" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} className="w-full bg-[#111] p-3 rounded-xl text-xs outline-none border border-white/5" />
-                    <div className="space-y-2 pt-2 border-t border-white/5">
-                       <div className="flex justify-between text-slate-500 text-xs"><span>Subtotal</span><span>₹{getCartSubtotal()}</span></div>
-                       <div className="flex justify-between text-xl font-black text-orange-500"><span>Pay</span><span>₹{getTotalBill()}</span></div>
-                    </div>
-                    <button onClick={handlePlaceOrder} className="w-full bg-orange-600 text-white font-black py-4 rounded-2xl flex items-center justify-center gap-3">
-                      <SafePrinter size={20}/> CONFIRM & PRINT
-                    </button>
-                  </div>
-               </aside>
-            </div>
-          )}
-        </div>
       </main>
     </div>
   );
+}
 
-  function SidebarBtn({ icon, label, active, onClick, badge }: any) {
-    return (
-      <button onClick={onClick} className={`w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl transition-all relative group ${active ? 'bg-orange-500 text-white' : 'hover:bg-white/5 text-slate-500'}`}>
-        {icon}
-        <span className="text-sm font-bold hidden lg:block">{label}</span>
-        {badge > 0 && <span className="absolute right-3 top-1/2 -translate-y-1/2 bg-red-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full">{badge}</span>}
-      </button>
-    );
-  }
+// Helper Components
+function SidebarBtn({icon, label, active, onClick, badge}: any) {
+  return (
+    <button onClick={onClick} className={`w-full flex items-center gap-4 px-6 py-4 rounded-2xl transition-all ${active ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/20' : 'text-slate-500 hover:bg-white/5'}`}>
+      {icon} <span className="font-bold">{label}</span>
+      {badge > 0 && <span className="ml-auto bg-red-500 text-white text-[10px] px-2 py-0.5 rounded-full">{badge}</span>}
+    </button>
+  );
+}
+
+function Login({onLogin}: any) {
+  const [p, setP] = useState('');
+  return (
+    <div className="h-screen w-full bg-black flex items-center justify-center">
+      <div className="bg-[#111] p-12 rounded-[40px] border border-white/5 w-96 text-center">
+        <Lock size={48} className="mx-auto text-orange-500 mb-6" />
+        <input type="password" value={p} onChange={e=>setP(e.target.value)} className="w-full bg-black text-center text-4xl font-mono py-4 rounded-2xl mb-6 outline-none" placeholder="****" maxLength={4} />
+        <button onClick={()=>{if(p==='1234') onLogin()}} className="w-full bg-orange-600 py-4 rounded-2xl font-black">ACCESS POS</button>
+      </div>
+    </div>
+  );
 }
