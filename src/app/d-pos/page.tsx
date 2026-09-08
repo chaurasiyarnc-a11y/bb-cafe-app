@@ -1,8 +1,14 @@
 'use client';
 import React, { useState, useEffect } from 'react';
 import { db } from '@/lib/firebase'; 
-import { collection, onSnapshot, query, orderBy, limit, doc, addDoc, runTransaction, getDocs } from 'firebase/firestore';
-import { ShoppingBag, Search, Loader2, Clock, Printer, Utensils, Trash2, Plus, Minus, Wifi, Image as ImageIcon, LayoutDashboard, LogOut } from 'lucide-react';
+import { 
+  collection, onSnapshot, query, orderBy, limit, doc, 
+  updateDoc, addDoc, runTransaction, getDocs 
+} from 'firebase/firestore';
+import { 
+  ShoppingBag, Search, Loader2, Clock, Printer, Utensils, 
+  Trash2, Plus, Minus, Wifi, Image as ImageIcon, LayoutDashboard, LogOut 
+} from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 
 // --- ESC/POS Commands for 80mm ---
@@ -19,38 +25,46 @@ const CMD = {
   CUT: GS + 'V' + '\x41' + '\x03',
 };
 
-export default function BumBumCafe_WebUSB_POS() {
+export default function BumBumCafe_Fixed_POS() {
+  // --- UI States ---
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [activeTab, setActiveTab] = useState<'billing' | 'orders'>('billing');
-  const [usbDevice, setUsbDevice] = useState<any>(null); // WebUSB Device
+  const [usbDevice, setUsbDevice] = useState<any>(null);
+  
+  // --- Data States ---
   const [products, setProducts] = useState<any[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState('All'); // Fixed missing state
+  const [searchQuery, setSearchQuery] = useState('');
+  
   const [cart, setCart] = useState<any[]>([]);
   const [liveOrders, setLiveOrders] = useState<any[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // --- 1. WebUSB Connection (Direct USB) ---
+  // --- 1. WebUSB Connection ---
   const connectUSBPrinter = async () => {
+    if (!("usb" in navigator)) {
+      toast.error("WebUSB is not supported in this browser. Use Chrome.");
+      return;
+    }
     try {
-      // सीधा USB डिवाइस मांगेगा (Serial की ज़रूरत नहीं)
       const device = await (navigator as any).usb.requestDevice({ filters: [] });
       await device.open();
       if (device.configuration === null) await device.selectConfiguration(1);
       await device.claimInterface(device.configuration.interfaces[0].interfaceNumber);
       
       setUsbDevice(device);
-      toast.success("USB Printer Connected Directly!");
+      toast.success("USB Printer Ready!");
     } catch (e) {
       console.error(e);
-      toast.error("Printer not found! Try reconnecting USB cable.");
+      toast.error("Printer connection failed.");
     }
   };
 
-  // --- 2. Professional Print Logic (Direct USB) ---
+  // --- 2. Print Logic ---
   const executePrint = async (order: any) => {
     if (!usbDevice) return;
     const encoder = new TextEncoder();
-
     try {
       let b = CMD.RESET;
       // KOT Section
@@ -65,22 +79,20 @@ export default function BumBumCafe_WebUSB_POS() {
       b += `BILL: #${order.billNumber} | TK: #${order.tokenNumber}\n`;
       b += `DATE: ${new Date().toLocaleString()}\n------------------------------------------\n`;
       order.items.forEach((it: any) => {
-        b += `${it.name.substring(0, 18).padEnd(20)} ${it.quantity}  ${it.price * it.quantity}\n`;
+        const name = it.name.substring(0, 18).padEnd(20);
+        b += `${name} ${it.quantity} x ${it.price} = ${it.price * it.quantity}\n`;
       });
       b += "------------------------------------------\n" + CMD.CENTER + CMD.BOLD_ON;
       b += `TOTAL: Rs. ${order.total}\n` + CMD.NORMAL + "\nThank You! Visit Again\n\n\n\n" + CMD.CUT;
 
       const data = encoder.encode(b);
-      // Endpoint 1 पर डाटा भेजें (ज़्यादातर थर्मल प्रिंटर इसी पर काम करते हैं)
       await usbDevice.transferOut(1, data); 
-      toast.success("Receipt Printed!");
     } catch (e) {
-      console.error(e);
-      toast.error("Printing failed! Reconnect printer.");
+      toast.error("Printing failed.");
     }
   };
 
-  // --- 3. Save Order Logic ---
+  // --- 3. Order Logic ---
   const handlePlaceOrder = async () => {
     if (cart.length === 0 || isSubmitting) return;
     setIsSubmitting(true);
@@ -91,8 +103,8 @@ export default function BumBumCafe_WebUSB_POS() {
         const tRef = doc(db, "settings", `token_${today}`);
         const bSnap = await txn.get(bRef);
         const tSnap = await txn.get(tRef);
-        const nb = bSnap.exists() ? bSnap.data().value + 1 : 2001;
-        const nt = tSnap.exists() ? tSnap.data().value + 1 : 1;
+        const nb = bSnap.exists() ? (bSnap.data().value + 1) : 3001;
+        const nt = tSnap.exists() ? (tSnap.data().value + 1) : 1;
         txn.set(bRef, { value: nb }, { merge: true });
         txn.set(tRef, { value: nt }, { merge: true });
         return { nb, nt };
@@ -131,41 +143,57 @@ export default function BumBumCafe_WebUSB_POS() {
 
   if (!isLoggedIn) return (
     <div className="h-screen bg-black flex items-center justify-center">
-      <div className="bg-neutral-900 p-10 rounded-[2.5rem] border border-neutral-800 w-96 text-center">
+      <div className="bg-neutral-900 p-10 rounded-[2.5rem] border border-neutral-800 w-96 text-center shadow-2xl">
         <Utensils className="mx-auto text-orange-500 mb-6" size={50} />
         <input 
-          type="password" placeholder="PIN" className="w-full bg-black border border-neutral-700 rounded-2xl py-4 text-center text-2xl mb-6 text-white"
+          type="password" placeholder="PIN (1234)" className="w-full bg-black border border-neutral-700 rounded-2xl py-4 text-center text-2xl mb-6 text-white outline-none focus:border-orange-500"
           onChange={(e) => e.target.value === '1234' && setIsLoggedIn(true)}
         />
-        <button className="text-neutral-500 text-xs">Bum Bum Cafe POS</button>
+        <p className="text-neutral-500 text-xs">Bum Bum POS Professional</p>
       </div>
     </div>
   );
 
   return (
-    <div className="h-screen flex bg-neutral-950 text-white overflow-hidden font-sans">
+    <div className="h-screen flex bg-neutral-950 text-white overflow-hidden">
       <Toaster position="top-right" />
+      
+      {/* Sidebar Nav */}
       <nav className="w-24 border-r border-neutral-900 flex flex-col items-center py-8 gap-8">
         <Utensils className="text-orange-600" size={32} />
         <button onClick={() => setActiveTab('billing')} className={`p-4 rounded-2xl ${activeTab === 'billing' ? 'bg-neutral-800 text-orange-500' : 'text-neutral-500'}`}><LayoutDashboard/></button>
         <button onClick={() => setActiveTab('orders')} className={`p-4 rounded-2xl ${activeTab === 'orders' ? 'bg-neutral-800 text-orange-500' : 'text-neutral-500'}`}><Clock/></button>
-        <button onClick={connectUSBPrinter} className={`mt-auto p-4 rounded-2xl ${usbDevice ? 'bg-green-600' : 'bg-neutral-900 text-neutral-500'}`}><Wifi/></button>
+        <button onClick={connectUSBPrinter} className={`mt-auto p-4 rounded-2xl ${usbDevice ? 'bg-green-600 text-white' : 'bg-neutral-900 text-neutral-500'}`}><Wifi/></button>
         <button onClick={() => setIsLoggedIn(false)} className="p-4 text-red-500"><LogOut/></button>
       </nav>
 
+      {/* Main Grid */}
       <main className="flex-1 flex flex-col overflow-hidden p-8">
         {activeTab === 'billing' ? (
           <div className="flex-1 flex flex-col overflow-hidden">
-            <div className="flex gap-4 mb-8">
-              {categories.map(c => (
-                <button key={c} onClick={() => setSelectedCategory(c)} className={`px-6 py-3 rounded-xl text-xs font-bold uppercase ${selectedCategory === c ? 'bg-orange-600' : 'bg-neutral-900'}`}>{c}</button>
-              ))}
+            <div className="flex justify-between items-center mb-8 gap-4">
+              <div className="relative flex-1 max-w-md">
+                <Search className="absolute left-4 top-3 text-neutral-500" size={18} />
+                <input 
+                  type="text" placeholder="Search food..." 
+                  className="w-full bg-neutral-900 border border-neutral-800 rounded-xl py-3 pl-12 text-sm outline-none focus:border-orange-500"
+                  value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
+                />
+              </div>
+              <div className="flex gap-2">
+                {categories.map(c => (
+                  <button key={c} onClick={() => setSelectedCategory(c)} className={`px-5 py-2.5 rounded-xl text-xs font-bold uppercase ${selectedCategory === c ? 'bg-orange-600' : 'bg-neutral-900'}`}>{c}</button>
+                ))}
+              </div>
             </div>
+            
             <div className="grid grid-cols-4 xl:grid-cols-5 gap-6 overflow-y-auto pr-2">
-              {products.filter(p => selectedCategory === 'All' || p.category === selectedCategory).map(p => (
-                <button key={p.id} onClick={() => setCart([...cart, {...p, quantity: 1}])} className="bg-neutral-900 border border-neutral-800 rounded-[2rem] p-4 text-left hover:border-orange-500">
+              {products
+                .filter(p => (selectedCategory === 'All' || p.category === selectedCategory) && p.name.toLowerCase().includes(searchQuery.toLowerCase()))
+                .map(p => (
+                <button key={p.id} onClick={() => setCart([...cart, {...p, quantity: 1}])} className="bg-neutral-900 border border-neutral-800 rounded-[2rem] p-4 text-left hover:border-orange-500 transition-all">
                   <div className="h-32 bg-neutral-800 rounded-2xl mb-4 overflow-hidden">
-                    {p.imageUrl && <img src={p.imageUrl} className="w-full h-full object-cover" />}
+                    {(p.imageUrl || p.image) && <img src={p.imageUrl || p.image} alt="" className="w-full h-full object-cover" />}
                   </div>
                   <h3 className="font-bold text-sm truncate">{p.name}</h3>
                   <p className="text-orange-500 font-black">₹{p.price}</p>
@@ -174,11 +202,11 @@ export default function BumBumCafe_WebUSB_POS() {
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-3 gap-6">
+          <div className="grid grid-cols-3 gap-6 overflow-y-auto">
             {liveOrders.filter(o => o.status === 'pending').map(order => (
               <div key={order.id} className="bg-neutral-900 p-6 rounded-[2rem] border border-neutral-800">
-                <div className="flex justify-between mb-4"><span className="bg-orange-600 px-3 py-1 rounded-lg text-xs font-black">Token: #{order.tokenNumber}</span></div>
-                <div className="space-y-2 mb-6">
+                <div className="flex justify-between mb-4"><span className="bg-orange-600 px-3 py-1 rounded-lg text-[10px] font-black">TK: #{order.tokenNumber}</span></div>
+                <div className="space-y-2 mb-6 h-32 overflow-y-auto">
                   {order.items.map((it: any, i: number) => <div key={i} className="flex justify-between text-sm"><span>{it.name}</span><span>x{it.quantity}</span></div>)}
                 </div>
                 <button onClick={() => updateDoc(doc(db, "orders", order.id), { status: 'completed' })} className="w-full bg-green-600 py-3 rounded-xl font-bold uppercase text-xs">Mark Ready</button>
@@ -188,20 +216,28 @@ export default function BumBumCafe_WebUSB_POS() {
         )}
       </main>
 
-      <aside className="w-[400px] bg-neutral-900/50 border-l border-neutral-800 flex flex-col p-8">
-        <h2 className="text-2xl font-black mb-8 flex items-center gap-3"><ShoppingBag className="text-orange-500" /> CART</h2>
-        <div className="flex-1 overflow-y-auto space-y-4">
+      {/* Cart Sidebar */}
+      <aside className="w-[420px] bg-neutral-900/40 border-l border-neutral-900 flex flex-col p-8">
+        <h2 className="text-2xl font-black mb-8 flex items-center gap-3"><ShoppingBag className="text-orange-500" /> ORDER</h2>
+        <div className="flex-1 overflow-y-auto space-y-3">
           {cart.map((item, idx) => (
             <div key={idx} className="bg-black/40 p-4 rounded-2xl flex justify-between items-center border border-neutral-800">
-              <div className="flex-1 pr-2"><p className="font-bold text-sm truncate">{item.name}</p><p className="text-orange-500 font-black">₹{item.price}</p></div>
-              <button onClick={() => setCart(cart.filter((_, i) => i !== idx))} className="text-neutral-600 hover:text-red-500"><Trash2 size={18}/></button>
+              <div className="flex-1 pr-2">
+                <p className="font-bold text-sm truncate">{item.name}</p>
+                <p className="text-orange-500 font-black">₹{item.price}</p>
+              </div>
+              <button onClick={() => setCart(cart.filter((_, i) => i !== idx))} className="text-neutral-500 hover:text-red-500"><Trash2 size={18}/></button>
             </div>
           ))}
         </div>
         <div className="mt-8 pt-8 border-t border-neutral-800">
-          <div className="flex justify-between text-3xl font-black mb-8"><span>Total</span><span className="text-orange-500">₹{cart.reduce((a, b) => a + b.price, 0)}</span></div>
-          <button disabled={cart.length === 0 || isSubmitting} onClick={handlePlaceOrder} className="w-full bg-orange-600 py-6 rounded-[2rem] font-black text-xl uppercase flex items-center justify-center gap-4 shadow-xl shadow-orange-600/20">
-            {isSubmitting ? <Loader2 className="animate-spin" /> : <Printer size={28} />} Print & Save
+          <div className="flex justify-between text-4xl font-black mb-8"><span>Total</span><span className="text-orange-500">₹{cart.reduce((a, b) => a + b.price, 0)}</span></div>
+          <button 
+            disabled={cart.length === 0 || isSubmitting} 
+            onClick={handlePlaceOrder} 
+            className="w-full bg-orange-600 py-6 rounded-[2rem] font-black text-xl uppercase flex items-center justify-center gap-4 shadow-xl shadow-orange-600/20 disabled:opacity-50"
+          >
+            {isSubmitting ? <Loader2 className="animate-spin" /> : <Printer size={28} />} PRINT & SAVE
           </button>
         </div>
       </aside>
