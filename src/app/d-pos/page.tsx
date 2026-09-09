@@ -66,6 +66,7 @@ export default function BbCafeDesktopPos() {
   const [themeMode, setThemeMode] = useState<'dark' | 'light'>('dark');
 
   // Printer states
+  const [isConnecting, setIsConnecting] = useState(false);
   const [printerConnected, setPrinterConnected] = useState(false);
   const [usbDevice, setUsbDevice] = useState<any>(null);
   const [kotEnabled, setKotEnabled] = useState<boolean>(true); 
@@ -285,7 +286,6 @@ export default function BbCafeDesktopPos() {
         setShowNewCustForm(false);
         toast.success(`कस्टमर मिल गया: ${data.name} (पॉइंट्स: ${data.points || 0})`);
       } else {
-        // Number not found -> Show quick register form
         setCustomerName('');
         setCustomerPoints(0);
         setShowNewCustForm(true);
@@ -661,7 +661,7 @@ export default function BbCafeDesktopPos() {
             {activeTab === 'billing' && (
               <div className="flex-1 flex h-full overflow-hidden">
                 
-                {/* Left: Product Grid with FIXED Image Issue */}
+                {/* Left: Product Grid */}
                 <div className="flex-1 flex flex-col p-5 overflow-hidden">
                   <div className="flex gap-3 mb-4 items-center">
                     <div className="relative flex-1">
@@ -692,7 +692,7 @@ export default function BbCafeDesktopPos() {
                     })}
                   </div>
 
-                  {/* Products Grid with Proper Image Rendering */}
+                  {/* Products Grid */}
                   {loading ? (
                     <div className="flex items-center justify-center flex-1"><Loader2 className="animate-spin text-orange-500" size={32} /></div>
                   ) : (
@@ -725,7 +725,7 @@ export default function BbCafeDesktopPos() {
                   )}
                 </div>
 
-                {/* Right: Permanent Desktop Cart Panel with Instant Loyalty & New Customer Register */}
+                {/* Right: Permanent Desktop Cart Panel */}
                 <div className="w-96 bg-white dark:bg-neutral-900 border-l border-neutral-200 dark:border-neutral-800 flex flex-col p-5 shadow-2xl justify-between">
                   <div className="flex flex-col h-full overflow-hidden">
                     <div className="flex items-center justify-between border-b border-neutral-200 dark:border-neutral-800 pb-3 mb-3">
@@ -748,7 +748,6 @@ export default function BbCafeDesktopPos() {
                         <button onClick={() => setIsCustomerModalOpen(true)} className="bg-neutral-200 dark:bg-neutral-700 px-3 rounded-xl text-xs font-bold">List</button>
                       </div>
 
-                      {/* If Customer Found */}
                       {customerName && !showNewCustForm && (
                         <div className="flex justify-between items-center text-xs font-bold text-yellow-500 pt-1 border-t border-neutral-200 dark:border-neutral-700">
                           <span>👤 {customerName}</span>
@@ -756,7 +755,6 @@ export default function BbCafeDesktopPos() {
                         </div>
                       )}
 
-                      {/* If Number Not Found -> Quick Register Box */}
                       {showNewCustForm && (
                         <div className="space-y-2 pt-2 border-t border-neutral-200 dark:border-neutral-700">
                           <p className="text-[10px] text-red-400 font-bold uppercase">Number not registered! Add details:</p>
@@ -830,7 +828,7 @@ export default function BbCafeDesktopPos() {
                       )}
                     </div>
 
-                    {/* Bill Totals & One-Click Print Checkout */}
+                    {/* Bill Totals & Checkout */}
                     <div className="space-y-2 text-xs border-t border-neutral-200 dark:border-neutral-800 pt-3 shrink-0">
                       <div className="flex justify-between text-neutral-400"><span>Subtotal</span><span className="font-mono">₹{getCartSubtotal()}</span></div>
                       {fulfillmentType === 'delivery' && <div className="flex justify-between text-neutral-400"><span>Delivery Charge</span><span className="font-mono">₹{getDeliveryCharge()}</span></div>}
@@ -969,7 +967,8 @@ export default function BbCafeDesktopPos() {
 
                   <div className="space-y-3">
                     <p className="text-xs font-bold uppercase">80mm USB Thermal Printer Connection (Direct Auto-Cut):</p>
-                    <button onClick={handleConnectPrinter} className="w-full py-3.5 bg-amber-500 hover:bg-amber-400 text-black font-black text-xs uppercase rounded-xl transition-all shadow-md">
+                    <button onClick={handleConnectPrinter} disabled={isConnecting} className="w-full py-3.5 bg-amber-500 hover:bg-amber-400 text-black font-black text-xs uppercase rounded-xl transition-all shadow-md">
+                      {isConnecting ? <Loader2 className="animate-spin inline mr-2" size={16} /> : null}
                       {printerConnected ? 'Printer Connected & Ready ✅' : 'Connect 80mm USB Printer'}
                     </button>
                   </div>
