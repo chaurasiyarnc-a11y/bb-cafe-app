@@ -9,7 +9,7 @@ import {
 import { 
   ShoppingBag, Search, X, Loader2, Clock, Printer, Check, Settings, 
   Database, RefreshCw, Layers, Menu, LogOut, Lock, ToggleLeft, ToggleRight, 
-  Sun, Moon, Tag, Trash2, ArrowRight, CheckCircle2, UserPlus, Download, PlusCircle, Edit3, FileText
+  Sun, Moon, Tag, Trash2, ArrowRight, CheckCircle2, UserPlus, Download, PlusCircle, Edit3, FileText, LayoutGrid, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
@@ -35,6 +35,9 @@ const SafeDownload = Download as any;
 const SafePlusCircle = PlusCircle as any;
 const SafeEdit3 = Edit3 as any;
 const SafeFileText = FileText as any;
+const SafeLayoutGrid = LayoutGrid as any;
+const SafeChevronLeft = ChevronLeft as any;
+const SafeChevronRight = ChevronRight as any;
 
 interface PosCartItem {
   id: string;
@@ -63,11 +66,12 @@ export default function BbCafeDesktopPos() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [pinInput, setPinInput] = useState('');
-  const [activeTab, setActiveTab] = useState<'billing' | 'inventory' | 'receipts' | 'settings' | 'orders'>('billing');
+  const [activeTab, setActiveTab] = useState<'billing' | 'inventory' | 'receipts' | 'settings' | 'orders' | 'tables'>('billing');
 
   const [gstEnabled, setGstEnabled] = useState(false);
   const [gstRate, setGstRate] = useState(5);
   const [themeMode, setThemeMode] = useState<'dark' | 'light'>('dark');
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [isAppInstalled, setIsAppInstalled] = useState(false);
@@ -112,7 +116,6 @@ export default function BbCafeDesktopPos() {
   const [address, setAddress] = useState('');
   const [tableNumber, setTableNumber] = useState('Table 1');
   
-  // Table Re-edit / Running Order Tracking State
   const [activeEditingOrderId, setActiveEditingOrderId] = useState<string | null>(null);
   const [activeEditingBillNumber, setActiveEditingBillNumber] = useState<number | null>(null);
 
@@ -210,8 +213,13 @@ export default function BbCafeDesktopPos() {
     return () => unsubscribe();
   }, []);
 
-  const activeLiveOrders = useMemo(() => liveOrders.filter((o) => o.status !== 'completed' && o.status !== 'rejected'), [liveOrders]);
-  const pendingOrdersCount = useMemo(() => liveOrders.filter((o) => o.status === 'pending').length, [liveOrders]);
+  // Filter separate lists for Active Orders (Delivery/Pickup) and Tables
+  const activeLiveOrders = useMemo(() => liveOrders.filter((o) => (o.fulfillmentType === 'delivery' || o.fulfillmentType === 'pickup') && o.status !== 'completed' && o.status !== 'rejected'), [liveOrders]);
+  
+  const activeTableOrders = useMemo(() => liveOrders.filter((o) => o.fulfillmentType === 'table' && o.status !== 'completed' && o.status !== 'rejected'), [liveOrders]);
+
+  const pendingOrdersCount = useMemo(() => activeLiveOrders.filter((o) => o.status === 'pending').length, [activeLiveOrders]);
+  const activeTablesCount = useMemo(() => activeTableOrders.length, [activeTableOrders]);
 
   useEffect(() => {
     if (pendingOrdersCount > 0) {
@@ -415,7 +423,6 @@ export default function BbCafeDesktopPos() {
   const getGstAmountCalculated = () => gstEnabled ? Number(((getCartSubtotal() * gstRate) / 100).toFixed(2)) : 0;
   const getTotalBillPrice = () => Math.max(0, getCartSubtotal() + getGstAmountCalculated() - customDiscount) + getDeliveryCharge();
 
-  // --- LOAD TABLE ORDER FOR RE-EDITING ---
   const handleLoadTableOrderForEditing = (order: any) => {
     triggerBeep('tap');
     setActiveEditingOrderId(order.id);
@@ -426,7 +433,7 @@ export default function BbCafeDesktopPos() {
     setCustomerPhone(order.customerPhone ? order.customerPhone.replace('+91', '') : '');
     setCart(order.items || []);
     setCustomDiscount(order.discount || 0);
-    toast.success(`Loaded Bill #${order.billNumber} for ${order.tableNumber}. You can add more items & print KOT!`);
+    toast.success(`Loaded ${order.tableNumber} (Bill #${order.billNumber}) for adding items.`);
     setActiveTab('billing');
   };
 
@@ -437,7 +444,7 @@ export default function BbCafeDesktopPos() {
     setCart([]);
     setCustomerName('');
     setCustomerPhone('');
-    toast("Table editing mode closed.", { icon: 'ℹ️' });
+    toast("Table closed from billing.", { icon: 'ℹ️' });
   };
 
   const handleConnectPrinter = async () => {
@@ -469,13 +476,14 @@ export default function BbCafeDesktopPos() {
     }
   };
 
+  // --- OPTIMIZED THERMAL PRINT (NO EXTRA BLANK PAGES) ---
   const handlePrintReceiptDirect = async (orderObj: any, isKot = false) => {
     try {
       if (usbDevice) {
         const encoder = new TextEncoder();
         let commands: number[] = [];
-        commands.push(0x1B, 0x40); 
-        commands.push(0x1B, 0x61, 0x01); 
+        commands.push(0x1B, 0x40); // Init
+        commands.push(0x1B, 0x61, 0x01); // Center
 
         const addText = (txt: string) => {
           const encoded = encoder.encode(txt);
@@ -510,6 +518,7 @@ export default function BbCafeDesktopPos() {
           } catch(e){}
           addText(`Date: ${dateStr}\n`);
           addText(`Customer: ${orderObj.customerName} (${orderObj.customerPhone || 'Walk-in'})\n`);
+          if (orderObj.tableNumber) addText(`Table: ${orderObj.tableNumber}\n`);
           addText("================================================\n");
           addText("ITEM DESCRIPTION           QTY      PRICE\n");
           addText("================================================\n");
@@ -532,11 +541,12 @@ export default function BbCafeDesktopPos() {
           commands.push(0x1D, 0x21, 0x00);
           addText("================================================\n");
           commands.push(0x1B, 0x61, 0x01);
-          addText("Thank You! Visit Again.\n\n\n");
+          addText("Thank You! Visit Again.\n");
         }
 
-        commands.push(0x1B, 0x64, 0x04); 
-        commands.push(0x1D, 0x56, 0x41, 0x03); 
+        // Minimal feed and cut so no extra blank roll is wasted
+        commands.push(0x1B, 0x64, 0x02); 
+        commands.push(0x1D, 0x56, 0x41, 0x00); 
 
         let endpointOut = 1;
         const endpoints = usbDevice.configuration.interfaces[0].alternate.endpoints;
@@ -550,25 +560,27 @@ export default function BbCafeDesktopPos() {
       console.error("USB Print Error, using browser fallback", e);
     }
 
-    const printWindow = window.open('', '_blank', 'width=400,height=600');
+    // Browser Print Fallback with precise @page CSS to prevent blank pages
+    const printWindow = window.open('', '_blank', 'width=350,height=500');
     if (printWindow) {
       printWindow.document.write(`
         <html>
           <head>
             <title>${isKot ? 'KOT' : 'Receipt'} #${orderObj.billNumber}</title>
             <style>
-              body { font-family: 'Courier New', monospace; font-size: 12px; width: 72mm; margin: 0; padding: 5px; color: #000; }
+              @page { size: 80mm auto; margin: 0; }
+              body { font-family: 'Courier New', monospace; font-size: 11px; width: 72mm; margin: 0 auto; padding: 2px; color: #000; }
               .center { text-align: center; }
               .bold { font-weight: bold; }
-              .line { border-bottom: 1px dashed #000; margin: 5px 0; }
+              .line { border-bottom: 1px dashed #000; margin: 3px 0; }
               table { width: 100%; border-collapse: collapse; }
-              th, td { text-align: left; font-size: 11px; padding: 2px 0; }
+              th, td { text-align: left; font-size: 10px; padding: 1px 0; }
               .right { text-align: right; }
             </style>
           </head>
           <body onload="window.print(); window.close();">
             ${isKot ? `
-              <div class="center bold" style="font-size: 15px;">*** KITCHEN KOT ***</div>
+              <div class="center bold" style="font-size: 14px;">*** KITCHEN KOT ***</div>
               <div class="center">Token: #${orderObj.tokenNumber} | Type: ${orderObj.fulfillmentType.toUpperCase()}</div>
               ${orderObj.tableNumber ? `<div class="center bold">Table: ${orderObj.tableNumber}</div>` : ''}
               <div class="line"></div>
@@ -578,12 +590,13 @@ export default function BbCafeDesktopPos() {
               </table>
               <div class="line"></div>
             ` : `
-              <div class="center bold" style="font-size: 16px;">BUM BUM CAFE</div>
+              <div class="center bold" style="font-size: 15px;">BUM BUM CAFE</div>
               <div class="center">Mohandra Town, Main Road</div>
               <div class="line"></div>
               <div>Bill No: #${String(orderObj.billNumber).padStart(4, '0')} &nbsp;&nbsp; Token: #${orderObj.tokenNumber}</div>
               <div>Date: ${new Date().toLocaleString()}</div>
               <div>Customer: ${orderObj.customerName}</div>
+              ${orderObj.tableNumber ? `<div>Table: ${orderObj.tableNumber}</div>` : ''}
               <div class="line"></div>
               <table>
                 <tr><th>Item</th><th class="center">Qty</th><th class="right">Amt</th></tr>
@@ -593,7 +606,7 @@ export default function BbCafeDesktopPos() {
               <div>Subtotal: ₹${orderObj.subtotal}</div>
               ${orderObj.discount > 0 ? `<div>Discount: -₹${orderObj.discount}</div>` : ''}
               ${orderObj.gstAmount > 0 ? `<div>GST: ₹${orderObj.gstAmount}</div>` : ''}
-              <div class="bold" style="font-size: 14px; margin-top: 5px;">GRAND TOTAL: ₹${orderObj.total}</div>
+              <div class="bold" style="font-size: 13px; margin-top: 3px;">GRAND TOTAL: ₹${orderObj.total}</div>
               <div class="line"></div>
               <div class="center bold">Thank You! Visit Again</div>
             `}
@@ -604,7 +617,7 @@ export default function BbCafeDesktopPos() {
     }
   };
 
-  // --- ACTION 1: SAVE TABLE ORDER & PRINT KOT ONLY (Bar bar add kar sakne ke liye) ---
+  // --- SAVE TABLE & PRINT KOT ONLY ---
   const handleSaveTableOrderKotOnly = async () => {
     if (cart.length === 0 || isSubmittingOrder) return;
     setIsSubmittingOrder(true);
@@ -617,7 +630,6 @@ export default function BbCafeDesktopPos() {
       let billNumber: number;
 
       if (activeEditingOrderId) {
-        // Update existing running table order
         billNumber = activeEditingBillNumber || 5001;
         const orderRef = doc(db, "orders", activeEditingOrderId);
         const updatedOrderObj = { 
@@ -637,13 +649,11 @@ export default function BbCafeDesktopPos() {
         triggerBeep('success');
         toast.success(`Table ${tableNumber} updated! KOT printed.`);
 
-        // Print KOT only for kitchen
         await handlePrintReceiptDirect({ ...updatedOrderObj, billNumber, tokenNumber: token, fulfillmentType: 'table' }, true);
 
         setActiveEditingOrderId(null);
         setActiveEditingBillNumber(null);
       } else {
-        // Create new running table order
         if (navigator.onLine) {
           try {
             billNumber = await runTransaction(db, async (txn) => {
@@ -674,7 +684,6 @@ export default function BbCafeDesktopPos() {
         triggerBeep('success');
         toast.success(`Table ${tableNumber} saved! KOT sent to kitchen.`);
 
-        // Print KOT only
         await handlePrintReceiptDirect(orderObj, true);
       }
 
@@ -688,7 +697,7 @@ export default function BbCafeDesktopPos() {
     }
   };
 
-  // --- ACTION 2: FINAL BILL PRINT & SETTLE (Sab ho jane ke baad bill print) ---
+  // --- FINAL BILL PRINT & SETTLED (Removes from Table manager) ---
   const handleFinalCheckoutAndPrintBill = async () => {
     if (cart.length === 0 || isSubmittingOrder) return;
     setIsSubmittingOrder(true);
@@ -711,7 +720,7 @@ export default function BbCafeDesktopPos() {
           gstRate: gstEnabled ? gstRate : 0, 
           gstAmount: getGstAmountCalculated(), 
           total: finalTotal, 
-          status: 'completed', // Settled
+          status: 'completed', // Settled & removed from active tables
           tableNumber: tableNumber,
           customerName: customerName || "Walk-in Guest",
           customerPhone: customerPhone ? `+91${customerPhone}` : "",
@@ -720,15 +729,13 @@ export default function BbCafeDesktopPos() {
 
         await updateDoc(orderRef, finalOrderObj);
         triggerBeep('success');
-        toast.success(`Final Bill #${billNumber} settled and printed!`);
+        toast.success(`Table ${tableNumber} Settled! Bill #${billNumber} printed.`);
 
-        // Print Final Customer Bill
         await handlePrintReceiptDirect({ ...finalOrderObj, billNumber, tokenNumber: token, fulfillmentType: 'table' }, false);
 
         setActiveEditingOrderId(null);
         setActiveEditingBillNumber(null);
       } else {
-        // Direct Checkout for Table / Pickup / Delivery
         if (navigator.onLine) {
           try {
             billNumber = await runTransaction(db, async (txn) => {
@@ -794,7 +801,7 @@ export default function BbCafeDesktopPos() {
     triggerBeep('tap');
     try {
       await updateDoc(doc(db, "orders", orderId), { status: newStatus });
-      toast.success(`Order status updated to ${newStatus}!`);
+      toast.success(`Status updated to ${newStatus}!`);
     } catch (e) {
       toast.error("Failed to update status");
     }
@@ -842,19 +849,33 @@ export default function BbCafeDesktopPos() {
         </div>
       ) : (
         <>
-          <aside className="w-64 bg-white dark:bg-neutral-900 border-r border-neutral-200 dark:border-neutral-800 flex flex-col justify-between p-5 shrink-0 select-none h-full">
-            <div className="space-y-6">
+          {/* SIDEBAR NAVIGATION (COLLAPSIBLE) */}
+          <aside className={`${isSidebarCollapsed ? 'w-20' : 'w-64'} bg-white dark:bg-neutral-900 border-r border-neutral-200 dark:border-neutral-800 flex flex-col justify-between p-4 shrink-0 select-none h-full transition-all duration-300 relative`}>
+            
+            {/* Collapse Toggle Button */}
+            <button 
+              onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)} 
+              className="absolute -right-3 top-7 bg-orange-600 text-white p-1 rounded-full shadow-md hover:bg-orange-500 transition-all z-20"
+              title={isSidebarCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
+            >
+              {isSidebarCollapsed ? <SafeChevronRight size={14} /> : <SafeChevronLeft size={14} />}
+            </button>
+
+            <div className="space-y-6 overflow-hidden">
               <div className="flex items-center gap-3 border-b border-neutral-200 dark:border-neutral-800 pb-4">
-                <SafeDatabase className="text-orange-500" size={22} />
-                <div>
-                  <h1 className="text-xs font-black uppercase text-yellow-500">Bum Bum Cafe</h1>
-                  <span className="text-[10px] text-neutral-400 font-bold">Desktop POS v2.1</span>
-                </div>
+                <SafeDatabase className="text-orange-500 shrink-0" size={22} />
+                {!isSidebarCollapsed && (
+                  <div className="truncate">
+                    <h1 className="text-xs font-black uppercase text-yellow-500 truncate">Bum Bum Cafe</h1>
+                    <span className="text-[10px] text-neutral-400 font-bold">POS v2.1</span>
+                  </div>
+                )}
               </div>
 
               <nav className="space-y-2">
                 {[
                   { id: 'billing', label: 'Counter Billing', icon: ShoppingBag },
+                  { id: 'tables', label: `Tables (${activeTableOrders.length})`, icon: LayoutGrid },
                   { id: 'orders', label: `Live Orders (${activeLiveOrders.length})`, icon: Clock },
                   { id: 'inventory', label: 'Stock Toggle', icon: Layers },
                   { id: 'receipts', label: 'Past Receipts', icon: Printer },
@@ -866,10 +887,17 @@ export default function BbCafeDesktopPos() {
                     <button 
                       key={item.id} 
                       onClick={() => { triggerBeep('tap'); setActiveTab(item.id as any); }} 
-                      className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-black uppercase tracking-wider transition-all ${isActive ? "bg-orange-600 text-white shadow-lg shadow-orange-600/20" : "text-neutral-500 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800"}`}
+                      className={`w-full flex items-center justify-between px-3 py-3 rounded-2xl text-xs font-black uppercase tracking-wider transition-all ${isActive ? "bg-orange-600 text-white shadow-lg shadow-orange-600/20" : "text-neutral-500 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800"}`}
+                      title={item.label}
                     >
-                      <div className="flex items-center gap-3"><Icon size={16} /><span>{item.label}</span></div>
-                      {item.id === 'orders' && pendingOrdersCount > 0 && (
+                      <div className="flex items-center gap-3 truncate">
+                        <Icon size={16} className="shrink-0" />
+                        {!isSidebarCollapsed && <span className="truncate">{item.label}</span>}
+                      </div>
+                      {!isSidebarCollapsed && item.id === 'tables' && activeTablesCount > 0 && (
+                        <span className="bg-amber-500 text-black text-[10px] px-2 py-0.5 rounded-full font-bold">{activeTablesCount}</span>
+                      )}
+                      {!isSidebarCollapsed && item.id === 'orders' && pendingOrdersCount > 0 && (
                         <span className="bg-red-500 text-white text-[10px] px-2 py-0.5 rounded-full animate-pulse">{pendingOrdersCount}</span>
                       )}
                     </button>
@@ -879,21 +907,24 @@ export default function BbCafeDesktopPos() {
             </div>
 
             <div className="space-y-3 pt-4 border-t border-neutral-200 dark:border-neutral-800">
-              <button onClick={handleInstallClick} className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-2xl text-xs font-black uppercase text-blue-400 bg-blue-500/10 hover:bg-blue-500/20 transition-all">
-                <SafeDownload size={16} />
-                <span>Install App on PC</span>
+              <button onClick={handleInstallClick} className="w-full flex items-center justify-center gap-2 px-3 py-3 rounded-2xl text-xs font-black uppercase text-blue-400 bg-blue-500/10 hover:bg-blue-500/20 transition-all" title="Install App">
+                <SafeDownload size={16} className="shrink-0" />
+                {!isSidebarCollapsed && <span className="truncate">Install App</span>}
               </button>
-              <button onClick={handleManualSync} disabled={isSyncing} className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-2xl text-xs font-black uppercase text-yellow-500 bg-yellow-500/10 hover:bg-yellow-500/20 transition-all">
-                {isSyncing ? <Loader2 className="animate-spin" size={16} /> : <SafeRefreshCw size={16} />}
-                <span>Sync Products</span>
+              <button onClick={handleManualSync} disabled={isSyncing} className="w-full flex items-center justify-center gap-2 px-3 py-3 rounded-2xl text-xs font-black uppercase text-yellow-500 bg-yellow-500/10 hover:bg-yellow-500/20 transition-all" title="Sync Products">
+                {isSyncing ? <Loader2 className="animate-spin shrink-0" size={16} /> : <SafeRefreshCw size={16} className="shrink-0" />}
+                {!isSidebarCollapsed && <span className="truncate">Sync Products</span>}
               </button>
-              <button onClick={handleLogout} className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-2xl text-xs font-black uppercase text-red-500 bg-red-500/10 hover:bg-red-500/20 transition-all">
-                <SafeLogOut size={16} /><span>Lock Terminal</span>
+              <button onClick={handleLogout} className="w-full flex items-center justify-center gap-2 px-3 py-3 rounded-2xl text-xs font-black uppercase text-red-500 bg-red-500/10 hover:bg-red-500/20 transition-all" title="Lock Terminal">
+                <SafeLogOut size={16} className="shrink-0" />
+                {!isSidebarCollapsed && <span className="truncate">Lock Terminal</span>}
               </button>
             </div>
           </aside>
 
           <main className="flex-1 flex h-full overflow-hidden">
+            
+            {/* TAB: BILLING */}
             {activeTab === 'billing' && (
               <div className="flex-1 flex h-full overflow-hidden">
                 <div className="flex-1 flex flex-col p-5 h-full overflow-hidden">
@@ -902,7 +933,7 @@ export default function BbCafeDesktopPos() {
                     <div className="mb-3 bg-amber-500/15 border border-amber-500/40 p-3 rounded-2xl flex items-center justify-between shrink-0">
                       <div className="flex items-center gap-2 text-amber-400 text-xs font-black uppercase">
                         <SafeEdit3 size={16} />
-                        <span>Active Table: {tableNumber} (Bill #{activeEditingBillNumber}) - Add more items & Print KOT</span>
+                        <span>Active Table: {tableNumber} (Bill #{activeEditingBillNumber}) - Add items & Print KOT</span>
                       </div>
                       <button onClick={handleCancelTableEditing} className="text-neutral-400 hover:text-white text-xs underline">Cancel</button>
                     </div>
@@ -1073,7 +1104,6 @@ export default function BbCafeDesktopPos() {
                       <button onClick={() => setPaymentMethod('upi')} className={`flex-1 py-2 rounded-xl text-xs font-black uppercase border ${paymentMethod === 'upi' ? 'bg-blue-600 text-white border-blue-600' : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-400 border-neutral-700'}`}>UPI</button>
                     </div>
 
-                    {/* DUAL CHECKOUT BUTTONS: Save Table & Print KOT vs Final Bill Print */}
                     {fulfillmentType === 'table' ? (
                       <div className="space-y-2 shrink-0">
                         <button onClick={handleSaveTableOrderKotOnly} disabled={cart.length === 0 || isSubmittingOrder} className="w-full bg-amber-500 hover:bg-amber-400 text-black font-black py-3 rounded-2xl uppercase tracking-wider text-xs flex items-center justify-center gap-2 shadow-md disabled:opacity-50">
@@ -1082,7 +1112,7 @@ export default function BbCafeDesktopPos() {
                         </button>
                         <button onClick={handleFinalCheckoutAndPrintBill} disabled={cart.length === 0 || isSubmittingOrder} className="w-full bg-green-600 hover:bg-green-500 text-white font-black py-3 rounded-2xl uppercase tracking-wider text-xs flex items-center justify-center gap-2 shadow-lg disabled:opacity-50">
                           {isSubmittingOrder ? <Loader2 className="animate-spin" size={16} /> : <SafeFileText size={16} />}
-                          <span>Final Bill Print & Settled (₹{getTotalBillPrice()})</span>
+                          <span>Settle & Print Final Bill (₹{getTotalBillPrice()})</span>
                         </button>
                       </div>
                     ) : (
@@ -1096,21 +1126,77 @@ export default function BbCafeDesktopPos() {
               </div>
             )}
 
+            {/* TAB: TABLES MANAGER (ALAG TAB FOR TABLES) */}
+            {activeTab === 'tables' && (
+              <div className="flex-1 p-6 h-full overflow-y-auto">
+                <div className="flex justify-between items-center mb-4">
+                  <h2 className="text-sm font-black uppercase text-amber-500">Active Tables Manager ({activeTableOrders.length})</h2>
+                  <span className="text-xs text-neutral-400">Manage running tables, add items, or settle & clear bills</span>
+                </div>
+                <div className="grid grid-cols-3 xl:grid-cols-4 gap-4">
+                  {activeTableOrders.length === 0 ? (
+                    <div className="col-span-4 text-center py-24 text-neutral-500 font-bold">No active tables right now. Select 'Table' in billing to start one.</div>
+                  ) : (
+                    activeTableOrders.map((order) => (
+                      <div key={order.id} className="bg-white dark:bg-neutral-900 border border-amber-500/40 rounded-2xl p-4 flex flex-col justify-between shadow-xl">
+                        <div>
+                          <div className="flex justify-between items-center border-b border-neutral-200 dark:border-neutral-800 pb-2 mb-3">
+                            <span className="font-mono font-black text-amber-400 text-sm">🪑 {order.tableNumber}</span>
+                            <span className="bg-amber-500/10 text-amber-500 text-[10px] font-black uppercase px-2 py-0.5 rounded">Bill #{order.billNumber}</span>
+                          </div>
+                          <p className="text-xs font-bold mb-2">👤 {order.customerName || 'Walk-in'}</p>
+                          <div className="space-y-1.5 py-2 border-t border-dashed border-neutral-200 dark:border-neutral-800 mb-3 max-h-40 overflow-y-auto">
+                            {order.items?.map((it: any, idx: number) => (
+                              <div key={idx} className="flex justify-between text-xs">
+                                <span className="truncate pr-2">{it.name}</span>
+                                <span className="font-bold text-orange-500 shrink-0">x{it.quantity}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="space-y-2 pt-2 border-t border-neutral-200 dark:border-neutral-800">
+                          <div className="flex justify-between text-xs font-black text-green-500">
+                            <span>Total Amount:</span>
+                            <span className="font-mono text-sm">₹{order.total}</span>
+                          </div>
+                          <button 
+                            onClick={() => handleLoadTableOrderForEditing(order)} 
+                            className="w-full bg-amber-500 hover:bg-amber-400 text-black font-black py-2.5 rounded-xl text-xs uppercase flex items-center justify-center gap-1 shadow"
+                          >
+                            <SafeEdit3 size={14} /> Add Items & Print KOT
+                          </button>
+                          <button 
+                            onClick={() => {
+                              handleLoadTableOrderForEditing(order);
+                              toast("Review items and click 'Settle & Print Final Bill'", { icon: 'ℹ️' });
+                            }} 
+                            className="w-full bg-green-600 hover:bg-green-500 text-white font-black py-2.5 rounded-xl text-xs uppercase flex items-center justify-center gap-1 shadow"
+                          >
+                            <SafeFileText size={14} /> Settle & Clear Table
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* TAB: LIVE ORDERS (DELIVERY / PICKUP ONLY) */}
             {activeTab === 'orders' && (
               <div className="flex-1 p-6 h-full overflow-y-auto">
                 <div className="flex justify-between items-center mb-4">
-                  <h2 className="text-sm font-black uppercase text-orange-500">Live Running Tables & Orders ({activeLiveOrders.length})</h2>
-                  <span className="text-[11px] text-neutral-400">Click table to add more items & print KOT</span>
+                  <h2 className="text-sm font-black uppercase text-orange-500">Live Delivery & Pickup Orders ({activeLiveOrders.length})</h2>
                 </div>
                 <div className="grid grid-cols-3 gap-4">
                   {activeLiveOrders.length === 0 ? (
-                    <div className="col-span-3 text-center py-24 text-neutral-500 font-bold">No active table orders right now.</div>
+                    <div className="col-span-3 text-center py-24 text-neutral-500 font-bold">No active delivery or pickup orders right now.</div>
                   ) : (
                     activeLiveOrders.map((order) => (
-                      <div key={order.id} className={`bg-white dark:bg-neutral-900 border rounded-2xl p-4 flex flex-col justify-between shadow-lg ${order.status === 'pending' ? 'border-amber-500' : 'border-neutral-200 dark:border-neutral-800'}`}>
+                      <div key={order.id} className={`bg-white dark:bg-neutral-900 border rounded-2xl p-4 flex flex-col justify-between shadow-lg ${order.status === 'pending' ? 'border-red-500 animate-pulse' : 'border-neutral-200 dark:border-neutral-800'}`}>
                         <div>
                           <div className="flex justify-between items-center border-b border-neutral-200 dark:border-neutral-800 pb-2 mb-3">
-                            <span className="font-mono font-black text-yellow-500">Bill #{order.billNumber} {order.tableNumber ? `(${order.tableNumber})` : ''}</span>
+                            <span className="font-mono font-black text-yellow-500">Bill #{order.billNumber}</span>
                             <span className="bg-orange-500/10 text-orange-400 text-[10px] font-black uppercase px-2 py-0.5 rounded">{order.fulfillmentType}</span>
                           </div>
                           <p className="text-xs font-bold mb-2">👤 {order.customerName} ({order.customerPhone || 'Walk-in'})</p>
@@ -1122,25 +1208,15 @@ export default function BbCafeDesktopPos() {
                             ))}
                           </div>
                         </div>
-                        <div className="space-y-2 pt-2 border-t">
-                          <div className="flex justify-between text-xs font-black text-green-500">
+                        <div>
+                          <div className="flex justify-between text-xs font-black text-green-500 mb-3 pt-2 border-t">
                             <span>Total: ₹{order.total}</span>
                           </div>
-                          
-                          {order.fulfillmentType === 'table' && (
-                            <button 
-                              onClick={() => handleLoadTableOrderForEditing(order)} 
-                              className="w-full bg-amber-500 hover:bg-amber-400 text-black font-black py-2 rounded-xl text-xs uppercase flex items-center justify-center gap-1 shadow"
-                            >
-                              <SafeEdit3 size={14} /> Add Items & Print KOT
-                            </button>
-                          )}
-
                           <div className="flex gap-2">
                             {order.status === 'pending' && (
-                              <button onClick={() => handleUpdateStatus(order.id, 'preparing')} className="flex-1 bg-green-600 text-white font-black py-2 rounded-xl text-xs uppercase">Kitchen Preparing</button>
+                              <button onClick={() => handleUpdateStatus(order.id, 'preparing')} className="flex-1 bg-green-600 text-white font-black py-2 rounded-xl text-xs uppercase">Accept</button>
                             )}
-                            <button onClick={() => handlePrintReceiptDirect(order, false)} className="p-2 bg-neutral-200 dark:bg-neutral-800 text-neutral-400 hover:text-orange-500 rounded-xl" title="Print Final Bill"><SafePrinter size={16} /></button>
+                            <button onClick={() => handlePrintReceiptDirect(order, false)} className="p-2 bg-neutral-200 dark:bg-neutral-800 text-neutral-400 hover:text-orange-500 rounded-xl"><SafePrinter size={16} /></button>
                           </div>
                         </div>
                       </div>
@@ -1150,6 +1226,7 @@ export default function BbCafeDesktopPos() {
               </div>
             )}
 
+            {/* TAB: INVENTORY */}
             {activeTab === 'inventory' && (
               <div className="flex-1 p-6 h-full overflow-y-auto">
                 <h2 className="text-sm font-black uppercase text-orange-500 mb-4">Stock Availability Management</h2>
@@ -1173,6 +1250,7 @@ export default function BbCafeDesktopPos() {
               </div>
             )}
 
+            {/* TAB: PAST RECEIPTS */}
             {activeTab === 'receipts' && (
               <div className="flex-1 p-6 h-full flex flex-col overflow-hidden">
                 <div className="mb-4 shrink-0">
@@ -1192,6 +1270,7 @@ export default function BbCafeDesktopPos() {
               </div>
             )}
 
+            {/* TAB: SETTINGS */}
             {activeTab === 'settings' && (
               <div className="flex-1 p-6 h-full overflow-y-auto flex justify-center">
                 <div className="max-w-xl w-full bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 p-6 rounded-3xl shadow-xl space-y-6">
@@ -1223,7 +1302,7 @@ export default function BbCafeDesktopPos() {
                   </div>
 
                   <div className="space-y-3">
-                    <p className="text-xs font-bold uppercase">80mm USB Thermal Printer Connection (Direct Auto-Cut):</p>
+                    <p className="text-xs font-bold uppercase">80mm USB Thermal Printer Connection (Optimized Height):</p>
                     <button onClick={handleConnectPrinter} disabled={isConnecting} className="w-full py-3.5 bg-amber-500 hover:bg-amber-400 text-black font-black text-xs uppercase rounded-xl transition-all shadow-md">
                       {isConnecting ? <Loader2 className="animate-spin inline mr-2" size={16} /> : null}
                       {printerConnected ? 'Printer Connected & Ready ✅' : 'Connect 80mm USB Printer'}
@@ -1253,7 +1332,7 @@ export default function BbCafeDesktopPos() {
                 <span>Total:</span><span className="text-green-500 font-mono">₹{selectedReceipt.total}</span>
               </div>
               <div className="flex gap-2 pt-2">
-                <button onClick={() => handlePrintReceiptDirect(selectedReceipt, false)} className="flex-1 bg-green-600 text-white font-black py-2.5 rounded-xl text-xs uppercase">Reprint with Cut</button>
+                <button onClick={() => handlePrintReceiptDirect(selectedReceipt, false)} className="flex-1 bg-green-600 text-white font-black py-2.5 rounded-xl text-xs uppercase">Reprint Bill</button>
               </div>
             </motion.div>
           </div>
