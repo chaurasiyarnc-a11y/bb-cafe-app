@@ -13,8 +13,11 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
+import { createRoot } from 'react-dom/client';
 
 import CustomerDirectoryModal from '@/components/pos/CustomerDirectoryModal';
+import PrintCustomerReceipt from '@/components/d-pos/PrintCustomerReceipt';
+import PrintKitchenKot from '@/components/d-pos/PrintKitchenKot';
 
 const SafeLock = Lock as any;
 const SafeDatabase = Database as any;
@@ -108,7 +111,7 @@ export default function BbCafeDesktopPos() {
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(false);
   
-  // Item Editor / Creator States
+  // Item Editor States
   const [editingItemObj, setEditingItemObj] = useState<any>(null);
   const [itemNameInput, setItemNameInput] = useState('');
   const [itemPriceInput, setItemPriceInput] = useState<number>(0);
@@ -116,7 +119,7 @@ export default function BbCafeDesktopPos() {
   const [itemImageInput, setItemImageInput] = useState('');
   const [itemVariantsList, setItemVariantsList] = useState<any>({ small: 100, medium: 200, large: 300 });
 
-  // Item Customization & Variation Popup States
+  // Variation Popup States
   const [isVariationModalOpen, setIsVariationModalOpen] = useState(false);
   const [selectedProductForVariation, setSelectedProductForVariation] = useState<any>(null);
   const [selectedSize, setSelectedSize] = useState('');
@@ -153,7 +156,6 @@ export default function BbCafeDesktopPos() {
   const [activeEditingBillNumber, setActiveEditingBillNumber] = useState<number | null>(null);
 
   const [isSubmittingOrder, setIsSubmittingOrder] = useState(false);
-  const [chefInstructions, setChefInstructions] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'upi'>('cash');
 
   const alarmIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -546,7 +548,6 @@ export default function BbCafeDesktopPos() {
     const sizeSuffix = selectedSize && selectedSize !== 'Standard' ? `(${selectedSize.toUpperCase()})` : '';
     const fullName = `${baseName} ${sizeSuffix}`.trim();
 
-    // 💡 यहाँ noteParts को explicit string[] टाइप दे दिया गया है जिससे TypeScript एरर नहीं आएगी
     const noteParts: string[] = [];
     if (activeAddonsList.length > 0) noteParts.push(`Add-ons: ${activeAddonsList.join(', ')}`);
     if (itemNoteInput) noteParts.push(`Note: ${itemNoteInput}`);
@@ -639,122 +640,37 @@ export default function BbCafeDesktopPos() {
     toast.success("Peri Peri USB 802 Thermal Printer Ready via Browser Print Engine! ✅");
   };
 
+  // ==========================================================
+  // MODULAR PRINT HANDLER (Using PrintCustomerReceipt & PrintKitchenKot)
+  // ==========================================================
   const handlePrintReceiptDirect = async (orderObj: any, isKot = false) => {
     if (!orderObj || !orderObj.items || orderObj.items.length === 0) return;
 
-    const printWindow = window.open('', '_blank', 'width=400,height=600');
+    const printWindow = window.open('', '_blank', 'width=400,height=650');
     if (!printWindow) {
       toast.error("Popup blocked! Please allow popups for printing.");
       return;
     }
 
-    const formattedDate = orderObj.timestamp?.toDate 
-      ? orderObj.timestamp.toDate().toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' })
-      : new Date().toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' });
-
-    const earnedPts = Math.floor((orderObj.total || 0) / 100);
-
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>${isKot ? 'KOT' : 'Receipt'} #${orderObj.billNumber || '5001'}</title>
-          <style>
-            @page { size: 80mm auto; margin: 0mm; }
-            body { font-family: 'Courier New', Courier, monospace; font-size: 13px; line-height: 1.2; width: 72mm; margin: 0 auto; padding: 4px; color: #000; background: #fff; }
-            .center { text-align: center; }
-            .bold { font-weight: bold; }
-            .flex { display: flex; justify-content: space-between; }
-            .line { border-bottom: 1px dashed #000; margin: 6px 0; }
-            .double { font-size: 16px; font-weight: bold; }
-            .item-row { margin-bottom: 4px; }
-            .note { font-size: 11px; font-style: italic; padding-left: 10px; }
-          </style>
-        </head>
-        <body onload="window.print(); window.close();">
-          ${isKot ? `
-            <div class="center double">*** KITCHEN KOT ***</div>
-            <div class="center bold" style="font-size: 14px; margin: 4px 0;">TOKEN: #${orderObj.tokenNumber || '101'}</div>
-            <div class="center">Type: ${orderObj.fulfillmentType ? orderObj.fulfillmentType.toUpperCase() : 'TABLE'}</div>
-            ${orderObj.tableNumber ? `<div class="center bold" style="font-size: 15px; margin-top: 2px;">TABLE: ${orderObj.tableNumber}</div>` : ''}
-            <div class="line"></div>
-            <div>Time: ${formattedDate}</div>
-            <div class="line"></div>
-            ${orderObj.items.map((i: any) => `
-              <div class="item-row">
-                <span class="bold">[ ] ${i.name}</span> — <span class="bold">Qty: ${i.quantity}</span>
-                ${i.note ? `<div class="note">${i.note}</div>` : ''}
-              </div>
-            `).join('')}
-            <div class="line"></div>
-            <div class="center">-- End of KOT --</div>
-          ` : `
-            <div class="center double">BUM BUM CAFE & RESTAURANT</div>
-            <div class="center" style="font-size: 11px;">न्यू बस स्टैंड मोहंद्रा, पुलिस चौकी के सामने,</div>
-            <div class="center" style="font-size: 11px;">जिला पन्ना, मोहंद्रा, मध्य प्रदेश, 488442</div>
-            <div class="center bold" style="font-size: 12px; margin-top: 2px;">Mob: 9714293759</div>
-            <div class="line"></div>
-            
-            <div class="flex"><span>Bill No: #${orderObj.billNumber || '5001'}</span><span>Token: #${orderObj.tokenNumber || '101'}</span></div>
-            <div>Date: ${formattedDate}</div>
-            <div>Cashier: ${currentUser?.name || 'Owner'}</div>
-            <div class="line"></div>
-
-            <div>Customer: ${orderObj.customerName || 'Walk-in Guest'}</div>
-            ${orderObj.customerPhone ? `<div>Phone: ${orderObj.customerPhone}</div>` : ''}
-            ${orderObj.tableNumber ? `<div class="bold">Dine In: ${orderObj.tableNumber}</div>` : `<div>Type: ${orderObj.fulfillmentType ? orderObj.fulfillmentType.toUpperCase() : 'PICKUP'}</div>`}
-            <div class="line"></div>
-
-            <div class="bold flex"><span>ITEM</span><span>TOTAL</span></div>
-            <div class="line"></div>
-
-            ${orderObj.items.map((i: any) => `
-              <div class="item-row">
-                <div class="bold">${i.name}</div>
-                ${i.note ? `<div class="note">${i.note}</div>` : ''}
-                <div class="flex" style="font-size: 12px; padding-left: 5px;">
-                  <span>${i.quantity} x ₹${i.price}</span>
-                  <span class="bold">₹${i.price * i.quantity}</span>
-                </div>
-              </div>
-            `).join('')}
-
-            <div class="line"></div>
-            <div class="flex"><span>Subtotal:</span><span>₹${orderObj.subtotal || orderObj.total}</span></div>
-            
-            ${orderObj.discountAmount > 0 ? `
-              <div class="flex"><span>Discount:</span><span>-₹${orderObj.discountAmount}</span></div>
-            ` : ''}
-
-            ${orderObj.pointsRedeemed > 0 ? `
-              <div class="flex"><span>Points Redeemed:</span><span>-${orderObj.pointsRedeemed} pts</span></div>
-            ` : ''}
-
-            <div class="line"></div>
-            <div class="flex double">
-              <span>GRAND TOTAL:</span>
-              <span>₹${orderObj.total}</span>
-            </div>
-            <div class="flex" style="font-size: 11px; margin-top: 2px;"><span>Payment Mode:</span><span class="bold">${(orderObj.paymentMethod || 'cash').toUpperCase()}</span></div>
-            
-            <div class="line"></div>
-            <div style="font-size: 11px;">
-              <div>Points Earned this bill: +${earnedPts}</div>
-              <div>Remaining Points Balance: ${orderObj.remainingPoints || 0}</div>
-            </div>
-
-            <div class="line"></div>
-            <div class="center" style="font-size: 11px;">Follow us on YouTube & Social Media</div>
-            <div class="center bold" style="font-size: 11px;">www.youtube.com/@bbcafe.i</div>
-            <div class="center bold" style="font-size: 11px;">@bbcafe.in</div>
-            <br/>
-            <div class="center double">🖤 Thank You, Visit Again 🖤</div>
-            <div class="center" style="font-size: 10px; margin-top: 5px;">Powered by BumBumCafe POS v2.1</div>
-          `}
-        </body>
-      </html>
-    `);
+    printWindow.document.write('<!DOCTYPE html><html><head><title>Print</title></head><body><div id="print-root"></div></body></html>');
     printWindow.document.close();
+
+    const container = printWindow.document.getElementById('print-root');
+    if (container) {
+      const root = createRoot(container);
+      
+      if (isKot) {
+        root.render(<PrintKitchenKot orderObj={orderObj} />);
+      } else {
+        root.render(<PrintCustomerReceipt orderObj={orderObj} currentUser={currentUser} />);
+      }
+
+      setTimeout(() => {
+        printWindow.focus();
+        printWindow.print();
+        printWindow.close();
+      }, 600);
+    }
   };
 
   const handleSaveTableOrderKotOnly = async () => {
@@ -820,7 +736,7 @@ export default function BbCafeDesktopPos() {
           gstRate: gstEnabled ? gstRate : 0, gstAmount: getGstAmountCalculated(), 
           deliveryFee: 0, total: finalTotal, timestamp: new Date(), 
           status: 'pending', fulfillmentType: 'table', deliveryArea: "", 
-          tableNumber: tableNumber, paymentMethod, chefInstructions, source: 'PC_POS', address: '' 
+          tableNumber: tableNumber, paymentMethod, source: 'PC_POS', address: '' 
         };
 
         await addDoc(collection(db, "orders"), orderObj);
@@ -924,7 +840,7 @@ export default function BbCafeDesktopPos() {
           gstRate: gstEnabled ? gstRate : 0, gstAmount: getGstAmountCalculated(), 
           deliveryFee: getDeliveryCharge(), total: finalTotal, timestamp: new Date(), 
           status: 'completed', fulfillmentType, deliveryArea: fulfillmentType === "delivery" ? selectedArea.name : "", 
-          tableNumber: fulfillmentType === 'table' ? tableNumber : '', paymentMethod, chefInstructions, source: 'PC_POS', address,
+          tableNumber: fulfillmentType === 'table' ? tableNumber : '', paymentMethod, source: 'PC_POS', address,
           pointsRedeemed: redeemed, remainingPoints: remainingPts 
         };
 
@@ -1616,7 +1532,7 @@ export default function BbCafeDesktopPos() {
         </>
       )}
 
-      {/* --- CUSTOMER APP STYLE ITEM VARIATION & SIZE MODAL --- */}
+      {/* --- ITEM VARIATION & SIZE MODAL --- */}
       <AnimatePresence>
         {isVariationModalOpen && selectedProductForVariation && (
           <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -1627,7 +1543,6 @@ export default function BbCafeDesktopPos() {
               </div>
 
               <div className="space-y-3">
-                {/* 1. Size Variants Selection */}
                 {selectedProductForVariation.variants && Object.keys(selectedProductForVariation.variants).length > 0 && (
                   <div>
                     <label className="text-xs font-bold uppercase text-neutral-400 block mb-1.5">Select Size / Portion:</label>
@@ -1649,7 +1564,6 @@ export default function BbCafeDesktopPos() {
                   </div>
                 )}
 
-                {/* 2. Pizza Add-ons Selection */}
                 {selectedSize && (selectedProductForVariation.category === "Special Pizza" || selectedProductForVariation.name?.toLowerCase().includes("pizza")) && (
                   <div>
                     <label className="text-xs font-bold uppercase text-neutral-400 block mb-1.5">Select Add-ons:</label>
