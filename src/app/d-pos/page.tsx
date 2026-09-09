@@ -510,23 +510,40 @@ export default function BbCafeDesktopPos() {
     setIsCustomerModalOpen(false);
   };
 
-  const handleOpenVariationModal = (item: any) => {
+  // --- SMART ITEM CLICK HANDLER (Direct Add if no variants, Modal if variants exist) ---
+  const handleItemClick = (item: any) => {
     triggerBeep('tap');
-    setSelectedProductForVariation(item);
-    
-    if (item.variants && typeof item.variants === 'object' && Object.keys(item.variants).length > 0) {
+    const hasVariants = item.variants && typeof item.variants === 'object' && Object.keys(item.variants).length > 0;
+
+    if (hasVariants) {
+      // अगर साइज़/वेरिएंट हैं, तो पॉप-अप खोलो
+      setSelectedProductForVariation(item);
       const firstSize = Object.keys(item.variants)[0];
       const firstPrice = Number(item.variants[firstSize]) || Number(item.price) || 100;
       setSelectedSize(firstSize);
       setSelectedSizePrice(firstPrice);
+      setSelectedAddons({});
+      setItemNoteInput('');
+      setIsVariationModalOpen(true);
     } else {
-      setSelectedSize('Standard');
-      setSelectedSizePrice(Number(item.price) || 100);
+      // अगर कोई वेरिएंट नहीं है, तो डायरेक्ट बिना नोट के कार्ट में जोड़ो
+      const itemPrice = Number(item.price) || 100;
+      setCart((prev) => {
+        const existingIndex = prev.findIndex((c) => c.id === item.id && !c.size);
+        if (existingIndex > -1) {
+          const next = [...prev];
+          next[existingIndex].quantity += 1;
+          return next;
+        }
+        return [...prev, { 
+          id: item.id, 
+          name: item.name, 
+          price: itemPrice, 
+          quantity: 1 
+        }];
+      });
+      toast.success(`Added ${item.name} to cart!`);
     }
-
-    setSelectedAddons({});
-    setItemNoteInput('');
-    setIsVariationModalOpen(true);
   };
 
   const handleAddCustomizedItemToCart = () => {
@@ -640,8 +657,24 @@ export default function BbCafeDesktopPos() {
     toast.success("Peri Peri USB 802 Thermal Printer Ready via Browser Print Engine! ✅");
   };
 
+  // --- DAILY RESET TOKEN GENERATOR (01 Se Start) ---
+  const getDailyTokenNumber = () => {
+    const todayStr = new Date().toDateString();
+    let lastResetDate = localStorage.getItem("bb_pos_token_reset_date");
+    let currentTokenSeq = Number(localStorage.getItem("bb_pos_daily_token_seq") || "0");
+
+    if (lastResetDate !== todayStr) {
+      currentTokenSeq = 1;
+      localStorage.setItem("bb_pos_token_reset_date", todayStr);
+    } else {
+      currentTokenSeq += 1;
+    }
+    localStorage.setItem("bb_pos_daily_token_seq", String(currentTokenSeq));
+    return currentTokenSeq;
+  };
+
   // ==========================================================
-  // MODULAR PRINT HANDLER (Using PrintCustomerReceipt & PrintKitchenKot)
+  // MODULAR PRINT HANDLER
   // ==========================================================
   const handlePrintReceiptDirect = async (orderObj: any, isKot = false) => {
     if (!orderObj || !orderObj.items || orderObj.items.length === 0) return;
@@ -680,7 +713,7 @@ export default function BbCafeDesktopPos() {
     const subtotal = getCartSubtotal();
     const finalTotal = getTotalBillPrice();
     const discountAmt = getCalculatedDiscountAmount();
-    const token = Math.floor(1000 + Math.random() * 9000);
+    const token = getDailyTokenNumber();
 
     try {
       let billNumber: number;
@@ -764,7 +797,7 @@ export default function BbCafeDesktopPos() {
     const subtotal = getCartSubtotal();
     const finalTotal = getTotalBillPrice();
     const discountAmt = getCalculatedDiscountAmount();
-    const token = Math.floor(1000 + Math.random() * 9000);
+    const token = getDailyTokenNumber();
     const earned = Math.floor(finalTotal / 100);
     const redeemed = isRedeemingPoints ? pointsToRedeem : 0;
 
@@ -1045,7 +1078,7 @@ export default function BbCafeDesktopPos() {
                           <button 
                             key={item.id} 
                             disabled={!isAvail} 
-                            onClick={() => handleOpenVariationModal(item)} 
+                            onClick={() => handleItemClick(item)} 
                             className={`border rounded-2xl text-left flex flex-col overflow-hidden h-44 transition-all duration-200 hover:scale-[1.02] active:scale-95 shadow-sm ${isAvail ? "bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800 hover:border-orange-500/50" : "opacity-40 bg-neutral-200 dark:bg-neutral-950 border-neutral-800 pointer-events-none"}`}
                           >
                             <div className="w-full h-24 bg-neutral-200 dark:bg-neutral-800 relative shrink-0 overflow-hidden flex items-center justify-center">
