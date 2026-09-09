@@ -2,20 +2,21 @@
   "name": "Bum Bum Cafe - POS Terminal",
   "short_name": "BB POS",
   "description": "Desktop Cloud POS & Billing Terminal for Bum Bum Cafe",
-  "start_url": "/",
+  "start_url": "/d-pos",
+  "scope": "/d-pos",
   "display": "standalone",
-  "orientation": "landscape-primary",
+  "orientation": "landscape",
   "background_color": "#0a0a0a",
-  "theme_color": "#ea580c",
+  "theme_color": "#ff5e00",
   "icons": [
     {
-      "src": "/icons/icon-192x192.png",
+      "src": "/icon-192x192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "/icons/icon-512x512.png",
+      "src": "/icon-512x512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
