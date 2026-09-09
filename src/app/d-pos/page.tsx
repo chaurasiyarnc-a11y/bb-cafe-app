@@ -82,9 +82,7 @@ export default function BbCafeDesktopPos() {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [isAppInstalled, setIsAppInstalled] = useState(false);
 
-  const [isConnecting, setIsConnecting] = useState(false);
   const [printerConnected, setPrinterConnected] = useState(false);
-  const [usbDevice, setUsbDevice] = useState<any>(null);
   const [kotEnabled, setKotEnabled] = useState<boolean>(true); 
 
   const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false);
@@ -137,7 +135,7 @@ export default function BbCafeDesktopPos() {
 
   const [isSyncing, setIsSyncing] = useState(false);
 
-  // Cart & Table Management States (Default fulfillmentType changed to 'pickup')
+  // Cart & Table Management States
   const [cart, setCart] = useState<PosCartItem[]>([]);
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerName, setCustomerName] = useState('');
@@ -242,7 +240,6 @@ export default function BbCafeDesktopPos() {
     localStorage.setItem("bb_pos_saved_cart_pc", JSON.stringify(cart));
   }, [cart]);
 
-  // Load Global Variations from Firestore
   useEffect(() => {
     const unsub = onSnapshot(collection(db, "global_variations"), (snapshot) => {
       const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -671,211 +668,141 @@ export default function BbCafeDesktopPos() {
 
   const handleConnectPrinter = async () => {
     triggerBeep('tap');
-    setIsConnecting(true);
-    const toastId = toast.loading("Connecting to 80mm USB Thermal Printer...");
-    try {
-      if ('usb' in navigator) {
-        const device = await (navigator as any).usb.requestDevice({ filters: [] });
-        await device.open();
-        if (device.configuration === null) await device.selectConfiguration(1);
-        await device.claimInterface(0);
-        setUsbDevice(device);
-        setPrinterConnected(true);
-        toast.dismiss(toastId);
-        toast.success("USB Thermal Printer Connected!");
-      } else {
-        setTimeout(() => {
-          toast.dismiss(toastId);
-          setPrinterConnected(true);
-          toast.success("Printer Simulated/Connected!");
-        }, 1000);
-      }
-    } catch (err: any) {
-      toast.dismiss(toastId);
-      toast.error(err.message || "Printer connection failed.");
-    } finally {
-      setIsConnecting(false);
-    }
+    setPrinterConnected(true);
+    toast.success("Peri Peri USB 802 Thermal Printer Ready via Browser Print Engine! ✅");
   };
 
+  // ==========================================================
+  // PERFECT 80mm USB THERMAL RECEIPT & KOT PRINT ENGINE (Peri Peri 802)
+  // ==========================================================
   const handlePrintReceiptDirect = async (orderObj: any, isKot = false) => {
     if (!orderObj || !orderObj.items || orderObj.items.length === 0) return;
 
-    try {
-      if (usbDevice) {
-        const encoder = new TextEncoder();
-        let commands: number[] = [];
-        commands.push(0x1B, 0x40); // Init
-        commands.push(0x1B, 0x61, 0x01); // Center
-
-        const addText = (txt: string) => {
-          const encoded = encoder.encode(txt);
-          for (let i = 0; i < encoded.length; i++) commands.push(encoded[i]);
-        };
-
-        if (isKot) {
-          commands.push(0x1D, 0x21, 0x11); 
-          addText("*** KITCHEN KOT ***\n");
-          commands.push(0x1D, 0x21, 0x00);
-          addText(`Token: #${orderObj.tokenNumber} | Type: ${orderObj.fulfillmentType.toUpperCase()}\n`);
-          if (orderObj.tableNumber) addText(`Table: ${orderObj.tableNumber}\n`);
-          addText("------------------------------------------------\n");
-          commands.push(0x1B, 0x61, 0x00);
-          orderObj.items.forEach((item: any) => {
-            addText(`[ ] ${item.name} x ${item.quantity}\n`);
-            if (item.note) addText(`    Note: ${item.note}\n`);
-          });
-          addText("------------------------------------------------\n");
-        } else {
-          addText("[ QR CODE ]\n\n");
-
-          commands.push(0x1D, 0x21, 0x11); 
-          addText("BUM BUM CAFE & RESTAURANT\n");
-          commands.push(0x1D, 0x21, 0x00);
-          addText("न्यू बस स्टैंड मोहंद्रा, पुलिस चौकी के सामने,\n");
-          addText("जिला पन्ना, मोहंद्रा, मध्य प्रदेश, 488442\n");
-          addText("9714293759\n\n");
-
-          commands.push(0x1B, 0x61, 0x00);
-          addText(`Employee: ${currentUser?.name || 'Owner'}\n`);
-          addText(`POS: Pos 03\n\n`);
-          addText(`Customer: ${orderObj.customerName || 'Walk-in'}\n`);
-          if (orderObj.customerPhone) addText(`${orderObj.customerPhone}\n`);
-          addText("------------------------------------------------\n");
-          
-          let fulfillmentLabel = "Dine in";
-          if (orderObj.fulfillmentType === 'delivery') fulfillmentLabel = `Delivery (${orderObj.deliveryArea || ''})`;
-          if (orderObj.fulfillmentType === 'pickup') fulfillmentLabel = "Takeaway / Pickup";
-          if (orderObj.tableNumber) fulfillmentLabel = `Dine in (${orderObj.tableNumber})`;
-          
-          addText(`${fulfillmentLabel}\n\n`);
-
-          orderObj.items.forEach((item: any) => {
-            const itemName = item.name || '';
-            const qtyPriceLine = `${item.quantity} x ₹${item.price}`;
-            const itemTotal = `₹${(item.price || 0) * (item.quantity || 1)}`;
-            
-            addText(`${itemName}\n`);
-            if (item.note) addText(`  * Note: ${item.note}\n`);
-            const spaces = ' '.repeat(Math.max(2, 40 - qtyPriceLine.length - itemTotal.length));
-            addText(`${qtyPriceLine}${spaces}${itemTotal}\n\n`);
-          });
-
-          addText("------------------------------------------------\n");
-          if (orderObj.discountAmount > 0) {
-            const discLabel = orderObj.discountType === 'percentage' ? `Discount (${orderObj.discountValue}%)` : `Discount`;
-            addText(`${discLabel}${' '.repeat(Math.max(2, 40 - discLabel.length - String(orderObj.discountAmount).length))} -₹${orderObj.discountAmount}\n`);
-          }
-          if (orderObj.pointsRedeemed > 0) {
-            addText(`Points redeemed${' '.repeat(25)}-${orderObj.pointsRedeemed}\n`);
-          }
-          const earnedPts = Math.floor((orderObj.total || 0) / 100);
-          addText(`Points earned${' '.repeat(28)}${earnedPts}\n`);
-          addText(`Points balance${' '.repeat(26)}${orderObj.remainingPoints || 0}\n`);
-          addText("------------------------------------------------\n");
-
-          commands.push(0x1D, 0x21, 0x01); 
-          addText(`Total${' '.repeat(16)}₹${orderObj.total}\n`);
-          commands.push(0x1D, 0x21, 0x00);
-          
-          addText(`Cash${' '.repeat(25)}₹${orderObj.total}\n`);
-          addText("------------------------------------------------\n");
-          
-          commands.push(0x1B, 0x61, 0x01); 
-          addText("Follow us\n");
-          addText("www.youtube.com/@bbcafe.i\n");
-          addText("All Social Media @bbcafe.in\n");
-          addText("🖤 Thank you, visit again 🖤\n");
-          
-          let dateFormatted = new Date().toLocaleDateString('en-GB') + ' ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-          addText(`${dateFormatted}${' '.repeat(10)}#6-${String(orderObj.billNumber).padStart(4, '0')}\n`);
-        }
-
-        commands.push(0x1B, 0x64, 0x02); 
-        commands.push(0x1D, 0x56, 0x41, 0x00); 
-
-        let endpointOut = 1;
-        const endpoints = usbDevice.configuration.interfaces[0].alternate.endpoints;
-        for (const ep of endpoints) {
-          if (ep.direction === 'out') { endpointOut = ep.endpointNumber; break; }
-        }
-        await usbDevice.transferOut(endpointOut, new Uint8Array(commands));
-        return;
-      }
-    } catch (e) {
-      console.error("USB Print Error, using browser fallback", e);
+    const printWindow = window.open('', '_blank', 'width=400,height=600');
+    if (!printWindow) {
+      toast.error("Popup blocked! Please allow popups for printing.");
+      return;
     }
 
-    const printWindow = window.open('', '_blank', 'width=350,height=550');
-    if (printWindow) {
-      printWindow.document.write(`
-        <html>
-          <head>
-            <title>${isKot ? 'KOT' : 'Receipt'} #${orderObj.billNumber}</title>
-            <style>
-              @page { size: 80mm auto; margin: 0; }
-              body { font-family: 'Courier New', monospace; font-size: 12px; width: 72mm; margin: 0 auto; padding: 2px; color: #000; background: #fff; }
-              .center { text-align: center; }
-              .bold { font-weight: bold; }
-              .line { border-bottom: 1px dashed #000; margin: 4px 0; }
-              .flex { display: flex; justify-content: space-between; }
-            </style>
-          </head>
-          <body onload="window.print(); window.close();">
-            ${isKot ? `
-              <div class="center bold" style="font-size: 14px;">*** KITCHEN KOT ***</div>
-              <div class="center">Token: #${orderObj.tokenNumber} | Type: ${orderObj.fulfillmentType.toUpperCase()}</div>
-              ${orderObj.tableNumber ? `<div class="center bold">Table: ${orderObj.tableNumber}</div>` : ''}
-              <div class="line"></div>
-              ${orderObj.items.map((i: any) => `<div>[ ] ${i.name} x ${i.quantity}${i.note ? ` (${i.note})` : ''}</div>`).join('')}
-              <div class="line"></div>
-            ` : `
-              <div class="center">
-                <svg width="100" height="100" viewBox="0 0 25 25" style="margin: 0 auto; display: block;">
-                  <path d="M0 0h7v7H0zM2 2h3v3H2zM9 0h2v2H9zM14 0h3v3h-3zM19 0h6v6h-6zM21 2h2v2h-2zM0 9h2v2H0zM5 9h3v3H5zM10 9h4v2h-4zM16 9h2v2H2zM21 9h4v2h-4zM0 14h3v3H0zM6 14h2v2H6zM11 14h2v2h-2zM15 14h4v2h-4zM22 14h3v3h-3zM0 19h7v7H0zM2 21h3v3H2zM9 19h2v2H9zM14 19h3v3h-3zM19 19h6v6h-6zM21 21h2v2h-2z" fill="#000"/>
-                </svg>
+    const formattedDate = orderObj.timestamp?.toDate 
+      ? orderObj.timestamp.toDate().toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' })
+      : new Date().toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' });
+
+    const earnedPts = Math.floor((orderObj.total || 0) / 100);
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>${isKot ? 'KOT' : 'Receipt'} #${orderObj.billNumber || '5001'}</title>
+          <style>
+            @page {
+              size: 80mm auto;
+              margin: 0mm;
+            }
+            body {
+              font-family: 'Courier New', Courier, monospace;
+              font-size: 13px;
+              line-height: 1.2;
+              width: 72mm;
+              margin: 0 auto;
+              padding: 4px;
+              color: #000;
+              background: #fff;
+            }
+            .center { text-align: center; }
+            .bold { font-weight: bold; }
+            .flex { display: flex; justify-content: space-between; }
+            .line { border-bottom: 1px dashed #000; margin: 6px 0; }
+            .double { font-size: 16px; font-weight: bold; }
+            .item-row { margin-bottom: 4px; }
+            .note { font-size: 11px; font-style: italic; padding-left: 10px; }
+          </style>
+        </head>
+        <body onload="window.print(); window.close();">
+          ${isKot ? `
+            <div class="center double">*** KITCHEN KOT ***</div>
+            <div class="center bold" style="font-size: 14px; margin: 4px 0;">TOKEN: #${orderObj.tokenNumber || '101'}</div>
+            <div class="center">Type: ${orderObj.fulfillmentType ? orderObj.fulfillmentType.toUpperCase() : 'TABLE'}</div>
+            ${orderObj.tableNumber ? `<div class="center bold" style="font-size: 15px; margin-top: 2px;">TABLE: ${orderObj.tableNumber}</div>` : ''}
+            <div class="line"></div>
+            <div>Time: ${formattedDate}</div>
+            <div class="line"></div>
+            ${orderObj.items.map((i: any) => `
+              <div class="item-row">
+                <span class="bold">[ ] ${i.name}</span> — <span class="bold">Qty: ${i.quantity}</span>
+                ${i.note ? `<div class="note">Note: ${i.note}</div>` : ''}
               </div>
-              <br/>
-              <div class="center bold" style="font-size: 15px;">BUM BUM CAFE & RESTAURANT</div>
-              <div class="center">न्यू बस स्टैंड मोहंद्रा, पुलिस चौकी के सामने,</div>
-              <div class="center">जिला पन्ना, मोहंद्रा, मध्य प्रदेश, 488442</div>
-              <div class="center">9714293759</div>
-              <br/>
-              <div>Employee: ${currentUser?.name || 'Owner'}</div>
-              <div>POS: Pos 03</div>
-              <br/>
-              <div>Customer: ${orderObj.customerName || 'Walk-in'}</div>
-              <div>${orderObj.customerPhone || ''}</div>
-              <div class="line"></div>
-              <div class="bold">${orderObj.tableNumber ? `Dine in (${orderObj.tableNumber})` : 'Dine in'}</div>
-              <br/>
-              ${orderObj.items.map((i: any) => `
-                <div>${i.name}</div>
-                ${i.note ? `<div style="font-size:10px; font-style:italic;">  * Note: ${i.note}</div>` : ''}
-                <div class="flex"><span>${i.quantity} x ₹${i.price}</span><span>₹${i.price * i.quantity}</span></div>
-                <br/>
-              `).join('')}
-              <div class="line"></div>
-              ${orderObj.discountAmount > 0 ? `<div class="flex"><span>${orderObj.discountType === 'percentage' ? `Discount (${orderObj.discountValue}%)` : 'Discount'}</span><span>-₹${orderObj.discountAmount}</span></div>` : ''}
-              ${orderObj.pointsRedeemed ? `<div class="flex"><span>Points redeemed</span><span>-${orderObj.pointsRedeemed}</span></div>` : ''}
-              <div class="flex"><span>Points earned</span><span>${Math.floor(orderObj.total / 100)}</span></div>
-              <div class="flex"><span>Points balance</span><span>${orderObj.remainingPoints || 0}</span></div>
-              <div class="line"></div>
-              <div class="flex bold" style="font-size: 15px;"><span>Total</span><span>₹${orderObj.total}</span></div>
-              <div class="flex"><span>Cash</span><span>₹${orderObj.total}</span></div>
-              <div class="line"></div>
-              <div class="center">Follow us</div>
-              <div class="center">www.youtube.com/@bbcafe.i</div>
-              <div class="center">All Social Media @bbcafe.in</div>
-              <div class="center bold">🖤 Thank you, visit again 🖤</div>
-              <br/>
-              <div class="flex"><span style="font-size: 10px;">${new Date().toLocaleDateString('en-GB')} ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span><span style="font-size: 10px;">#6-${String(orderObj.billNumber).padStart(4, '0')}</span></div>
-            `}
-          </body>
-        </html>
-      `);
-      printWindow.document.close();
-    }
+            `).join('')}
+            <div class="line"></div>
+            <div class="center">-- End of KOT --</div>
+          ` : `
+            <div class="center double">BUM BUM CAFE & RESTAURANT</div>
+            <div class="center" style="font-size: 11px;">न्यू बस स्टैंड मोहंद्रा, पुलिस चौकी के सामने,</div>
+            <div class="center" style="font-size: 11px;">जिला पन्ना, मोहंद्रा, मध्य प्रदेश, 488442</div>
+            <div class="center bold" style="font-size: 12px; margin-top: 2px;">Mob: 9714293759</div>
+            <div class="line"></div>
+            
+            <div class="flex"><span>Bill No: #${orderObj.billNumber || '5001'}</span><span>Token: #${orderObj.tokenNumber || '101'}</span></div>
+            <div>Date: ${formattedDate}</div>
+            <div>Cashier: ${currentUser?.name || 'Owner'}</div>
+            <div class="line"></div>
+
+            <div>Customer: ${orderObj.customerName || 'Walk-in Guest'}</div>
+            ${orderObj.customerPhone ? `<div>Phone: ${orderObj.customerPhone}</div>` : ''}
+            ${orderObj.tableNumber ? `<div class="bold">Dine In: ${orderObj.tableNumber}</div>` : `<div>Type: ${orderObj.fulfillmentType ? orderObj.fulfillmentType.toUpperCase() : 'PICKUP'}</div>`}
+            <div class="line"></div>
+
+            <div class="bold flex"><span>ITEM</span><span>TOTAL</span></div>
+            <div class="line"></div>
+
+            ${orderObj.items.map((i: any) => `
+              <div class="item-row">
+                <div class="bold">${i.name}</div>
+                ${i.note ? `<div class="note">Note: ${i.note}</div>` : ''}
+                <div class="flex" style="font-size: 12px; padding-left: 5px;">
+                  <span>${i.quantity} x ₹${i.price}</span>
+                  <span class="bold">₹${i.price * i.quantity}</span>
+                </div>
+              </div>
+            `).join('')}
+
+            <div class="line"></div>
+            <div class="flex"><span>Subtotal:</span><span>₹${orderObj.subtotal || orderObj.total}</span></div>
+            
+            ${orderObj.discountAmount > 0 ? `
+              <div class="flex"><span>Discount (${orderObj.discountType === 'percentage' ? orderObj.discountValue + '%' : 'Flat'}):</span><span>-₹${orderObj.discountAmount}</span></div>
+            ` : ''}
+
+            ${orderObj.pointsRedeemed > 0 ? `
+              <div class="flex"><span>Points Redeemed:</span><span>-${orderObj.pointsRedeemed} pts</span></div>
+            ` : ''}
+
+            <div class="line"></div>
+            <div class="flex double">
+              <span>GRAND TOTAL:</span>
+              <span>₹${orderObj.total}</span>
+            </div>
+            <div class="flex" style="font-size: 11px; margin-top: 2px;"><span>Payment Mode:</span><span class="bold">${(orderObj.paymentMethod || 'cash').toUpperCase()}</span></div>
+            
+            <div class="line"></div>
+            <div style="font-size: 11px;">
+              <div>Points Earned this bill: +${earnedPts}</div>
+              <div>Remaining Points Balance: ${orderObj.remainingPoints || 0}</div>
+            </div>
+
+            <div class="line"></div>
+            <div class="center" style="font-size: 11px;">Follow us on YouTube & Social Media</div>
+            <div class="center bold" style="font-size: 11px;">www.youtube.com/@bbcafe.i</div>
+            <div class="center bold" style="font-size: 11px;">@bbcafe.in</div>
+            <br/>
+            <div class="center double">🖤 Thank You, Visit Again 🖤</div>
+            <div class="center" style="font-size: 10px; margin-top: 5px;">Powered by BumBumCafe POS v2.1</div>
+          `}
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
   };
 
   const handleSaveTableOrderKotOnly = async () => {
@@ -1528,7 +1455,7 @@ export default function BbCafeDesktopPos() {
               </div>
             )}
 
-            {/* TAB: MANAGE MENU & ITEMS (ADD / EDIT ITEMS & THEIR SPECIFIC VARIATIONS) */}
+            {/* TAB: MANAGE MENU & ITEMS */}
             {activeTab === 'inventory' && (
               <div className="flex-1 p-6 h-full overflow-y-auto">
                 <div className="flex justify-between items-center mb-4">
@@ -1832,11 +1759,11 @@ export default function BbCafeDesktopPos() {
                   </div>
 
                   <div className="space-y-3">
-                    <p className="text-xs font-bold uppercase">80mm USB Thermal Printer Connection (Optimized Height):</p>
-                    <button onClick={handleConnectPrinter} disabled={isConnecting} className="w-full py-3.5 bg-amber-500 hover:bg-amber-400 text-black font-black text-xs uppercase rounded-xl transition-all shadow-md">
-                      {isConnecting ? <Loader2 className="animate-spin inline mr-2" size={16} /> : null}
-                      {printerConnected ? 'Printer Connected & Ready ✅' : 'Connect 80mm USB Printer'}
+                    <p className="text-xs font-bold uppercase">Peri Peri USB 802 Thermal Printer Setup:</p>
+                    <button onClick={handleConnectPrinter} className="w-full py-3.5 bg-amber-500 hover:bg-amber-400 text-black font-black text-xs uppercase rounded-xl transition-all shadow-md">
+                      {printerConnected ? 'Printer Ready & Configured ✅' : 'Initialize Peri Peri 802 Printer'}
                     </button>
+                    <p className="text-[11px] text-neutral-400">Note: Ensure your Peri Peri 802 printer is set as the default printer in Windows Settings with 80mm paper size.</p>
                   </div>
                 </div>
               </div>
