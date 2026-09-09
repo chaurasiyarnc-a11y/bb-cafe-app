@@ -22,28 +22,36 @@ export default function PrintKitchenKot({ orderObj }: PrintKotProps) {
           .bold { font-weight: bold; }
           .line { border-bottom: 1px dashed #000; margin: 6px 0; }
           .double { font-size: 16px; font-weight: bold; }
-          .item-row { margin-bottom: 6px; }
-          .note { font-size: 11px; font-style: italic; padding-left: 12px; font-weight: bold; }
+          .highlight-token { font-size: 24px; font-weight: bold; border: 3px solid #000; padding: 2px 10px; display: inline-block; margin: 4px 0; }
+          .item-row { margin-bottom: 8px; }
+          .note { font-size: 11px; font-style: italic; padding-left: 12px; font-weight: bold; color: #000; }
         `}</style>
       </head>
       <body>
         <div className="center double">*** KITCHEN KOT ***</div>
-        <div className="center bold" style={{ fontSize: '15px', margin: '4px 0' }}>TOKEN: #{orderObj.tokenNumber || '101'}</div>
-        <div className="center">Type: {orderObj.fulfillmentType ? orderObj.fulfillmentType.toUpperCase() : 'TABLE'}</div>
-        {orderObj.tableNumber && <div className="center bold" style={{ fontSize: '16px', marginTop: '2px' }}>TABLE: {orderObj.tableNumber}</div>}
+        
+        <div className="center">
+          <div style={{ fontSize: '11px', textTransform: 'uppercase' }}>TOKEN NO:</div>
+          <div className="highlight-token">#{String(orderObj.tokenNumber || '1').padStart(2, '0')}</div>
+        </div>
+
+        <div className="center" style={{ fontSize: '13px' }}>Type: <b>{orderObj.fulfillmentType ? orderObj.fulfillmentType.toUpperCase() : 'TABLE'}</b></div>
+        {orderObj.tableNumber && <div className="center bold" style={{ fontSize: '18px', marginTop: '3px' }}>TABLE: {orderObj.tableNumber}</div>}
+        
         <div className="line"></div>
-        <div>Time: {formattedDate}</div>
+        <div>Time: {formattedDate} | Bill: #{orderObj.billNumber}</div>
         <div className="line"></div>
         
         {orderObj.items.map((i: any, idx: number) => (
           <div className="item-row" key={idx}>
-            <div className="bold" style={{ fontSize: '14px' }}>[ ] {i.name} — Qty: {i.quantity}</div>
-            {i.note && <div className="note">↳ {i.note}</div>}
+            <div className="bold" style={{ fontSize: '15px' }}>[ ] {i.name}</div>
+            <div style={{ fontSize: '14px', fontWeight: 'bold', paddingLeft: '15px' }}>Quantity: {i.quantity}</div>
+            {i.note && <div className="note">↳ Note: {i.note}</div>}
           </div>
         ))}
 
         <div className="line"></div>
-        <div className="center">-- End of KOT --</div>
+        <div className="center bold" style={{ fontSize: '14px' }}>-- End of KOT --</div>
       </body>
     </html>
   );
