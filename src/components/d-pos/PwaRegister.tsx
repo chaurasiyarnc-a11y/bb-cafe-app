@@ -3,15 +3,15 @@ import { useEffect } from 'react';
 
 export default function PwaRegister() {
   useEffect(() => {
-    if ('serviceWorker' in navigator && window.location.protocol === 'https:' || window.location.hostname === 'localhost') {
+    if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         navigator.serviceWorker
           .register('/sw.js')
           .then((registration) => {
-            console.log('PWA Service Worker registered: ', registration.scope);
+            console.log('SW Registered successfully:', registration.scope);
           })
-          .catch((error) => {
-            console.error('Service Worker registration failed: ', error);
+          .catch((err) => {
+            console.error('SW Registration Failed:', err);
           });
       });
     }
