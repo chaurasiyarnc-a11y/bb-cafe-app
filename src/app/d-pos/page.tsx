@@ -4,12 +4,12 @@ import { db } from '@/lib/firebase';
 import { 
   collection, onSnapshot, query, orderBy, limit, doc, 
   updateDoc, addDoc, runTransaction, getDoc, getDocs, where, setDoc,
-  waitForPendingWrites
+  waitForPendingWrites, increment
 } from 'firebase/firestore';
 import { 
   ShoppingBag, Search, X, Loader2, Clock, Printer, Check, Settings, 
   Database, RefreshCw, Layers, Menu, LogOut, Lock, ToggleLeft, ToggleRight, 
-  Sun, Moon, Tag, Trash2, ArrowRight, CheckCircle2, UserPlus, Download, PlusCircle, Edit3, FileText, LayoutGrid, ChevronLeft, ChevronRight
+  Sun, Moon, Tag, Trash2, ArrowRight, CheckCircle2, UserPlus, Download, PlusCircle, Edit3, FileText, LayoutGrid, ChevronLeft, ChevronRight, Gift, Percent
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
@@ -38,6 +38,8 @@ const SafeFileText = FileText as any;
 const SafeLayoutGrid = LayoutGrid as any;
 const SafeChevronLeft = ChevronLeft as any;
 const SafeChevronRight = ChevronRight as any;
+const SafeGift = Gift as any;
+const SafePercent = Percent as any;
 
 interface PosCartItem {
   id: string;
@@ -105,11 +107,20 @@ export default function BbCafeDesktopPos() {
 
   const [isSyncing, setIsSyncing] = useState(false);
 
+  // Cart & Table Management States
   const [cart, setCart] = useState<PosCartItem[]>([]);
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerName, setCustomerName] = useState('');
   const [customerPoints, setCustomerPoints] = useState(0);
-  const [customDiscount, setCustomDiscount] = useState(0);
+  
+  // Loyalty Redemption States
+  const [isRedeemingPoints, setIsRedeemingPoints] = useState(false);
+  const [pointsToRedeem, setPointsToRedeem] = useState(0);
+
+  // Discount States (Amount & Percentage)
+  const [discountType, setDiscountType] = useState<'amount' | 'percentage'>('amount');
+  const [discountValue, setDiscountValue] = useState<number>(0);
+
   const [fulfillmentType, setFulfillmentType] = useState<'delivery' | 'pickup' | 'table'>('table');
   const [selectedArea, setSelectedArea] = useState<DeliveryArea>(DELIVERY_AREAS[0]);
   const [address, setAddress] = useState('');
@@ -326,10 +337,14 @@ export default function BbCafeDesktopPos() {
         setCustomerPoints(data.points || 0);
         setAddress(data.address || '');
         setShowNewCustForm(false);
-        toast.success(`कस्टमर मिल गया: ${data.name}`);
+        setIsRedeemingPoints(false);
+        setPointsToRedeem(0);
+        toast.success(`कस्टमर मिल गया: ${data.name} (पॉइंट्स: ${data.points || 0})`);
       } else {
         setCustomerName('');
         setCustomerPoints(0);
+        setIsRedeemingPoints(false);
+        setPointsToRedeem(0);
         setShowNewCustForm(true);
         toast("नया नंबर है! कृपया नाम दर्ज करें।", { icon: 'ℹ️' });
       }
@@ -388,6 +403,8 @@ export default function BbCafeDesktopPos() {
     setCustomerPoints(cust.points || 0); 
     setAddress(cust.address || '');
     setShowNewCustForm(false);
+    setIsRedeemingPoints(false);
+    setPointsToRedeem(0);
     setIsCustomerModalOpen(false);
   };
 
@@ -418,7 +435,20 @@ export default function BbCafeDesktopPos() {
   const getCartSubtotal = () => cart.reduce((acc, i) => acc + (i.price * i.quantity), 0);
   const getDeliveryCharge = () => (fulfillmentType === "pickup" || fulfillmentType === "table" || getCartSubtotal() === 0) ? 0 : (getCartSubtotal() >= selectedArea.minFree ? 0 : selectedArea.fee);
   const getGstAmountCalculated = () => gstEnabled ? Number(((getCartSubtotal() * gstRate) / 100).toFixed(2)) : 0;
-  const getTotalBillPrice = () => Math.max(0, getCartSubtotal() + getGstAmountCalculated() - customDiscount) + getDeliveryCharge();
+  
+  const getRedemptionDiscount = () => isRedeemingPoints ? Math.min(pointsToRedeem, getCartSubtotal() + getGstAmountCalculated()) : 0;
+  
+  // Calculate discount amount based on Amount or Percentage
+  const getCalculatedDiscountAmount = () => {
+    const sub = getCartSubtotal();
+    if (discountType === 'amount') {
+      return Math.min(discountValue, sub);
+    } else {
+      return Math.min(Number(((sub * discountValue) / 100).toFixed(2)), sub);
+    }
+  };
+
+  const getTotalBillPrice = () => Math.max(0, getCartSubtotal() + getGstAmountCalculated() - getCalculatedDiscountAmount() - getRedemptionDiscount()) + getDeliveryCharge();
 
   const handleLoadTableOrderForEditing = (order: any) => {
     triggerBeep('tap');
@@ -429,7 +459,10 @@ export default function BbCafeDesktopPos() {
     setCustomerName(order.customerName || '');
     setCustomerPhone(order.customerPhone ? order.customerPhone.replace('+91', '') : '');
     setCart(order.items || []);
-    setCustomDiscount(order.discount || 0);
+    setDiscountValue(order.discountValue || order.discount || 0);
+    setDiscountType(order.discountType || 'amount');
+    setIsRedeemingPoints(false);
+    setPointsToRedeem(0);
     toast.success(`Loaded ${order.tableNumber} (Bill #${order.billNumber}) for adding items.`);
     setActiveTab('billing');
   };
@@ -441,6 +474,9 @@ export default function BbCafeDesktopPos() {
     setCart([]);
     setCustomerName('');
     setCustomerPhone('');
+    setIsRedeemingPoints(false);
+    setPointsToRedeem(0);
+    setDiscountValue(0);
     toast("Table closed from billing.", { icon: 'ℹ️' });
   };
 
@@ -473,7 +509,6 @@ export default function BbCafeDesktopPos() {
     }
   };
 
-  // --- EXACT IMAGE-MATCHED THERMAL PRINT FORMAT (NO BLANK PAGES) ---
   const handlePrintReceiptDirect = async (orderObj: any, isKot = false) => {
     try {
       if (usbDevice) {
@@ -501,7 +536,6 @@ export default function BbCafeDesktopPos() {
           });
           addText("------------------------------------------------\n");
         } else {
-          // Exact Match to User Image Format
           commands.push(0x1D, 0x21, 0x11); 
           addText("BUM BUM CAFE & RESTAURANT\n");
           commands.push(0x1D, 0x21, 0x00);
@@ -509,7 +543,7 @@ export default function BbCafeDesktopPos() {
           addText("जिला पन्ना, मोहंद्रा, मध्य प्रदेश, 488442\n");
           addText("9714293759\n\n");
 
-          commands.push(0x1B, 0x61, 0x00); // Left align
+          commands.push(0x1B, 0x61, 0x00);
           addText(`Employee: ${currentUser?.name || 'Owner'}\n`);
           addText(`POS: Pos 03\n\n`);
           addText(`Customer: ${orderObj.customerName || 'Walk-in'}\n`);
@@ -529,25 +563,31 @@ export default function BbCafeDesktopPos() {
             const itemTotal = `₹${(item.price || 0) * (item.quantity || 1)}`;
             
             addText(`${itemName}\n`);
-            // Pad spaces between qty x price and total amount to match receipt style
             const spaces = ' '.repeat(Math.max(2, 40 - qtyPriceLine.length - itemTotal.length));
             addText(`${qtyPriceLine}${spaces}${itemTotal}\n\n`);
           });
 
           addText("------------------------------------------------\n");
+          if (orderObj.discountAmount > 0) {
+            const discLabel = orderObj.discountType === 'percentage' ? `Discount (${orderObj.discountValue}%)` : `Discount`;
+            addText(`${discLabel}${' '.repeat(Math.max(2, 40 - discLabel.length - String(orderObj.discountAmount).length))} -₹${orderObj.discountAmount}\n`);
+          }
+          if (orderObj.pointsRedeemed > 0) {
+            addText(`Points redeemed${' '.repeat(25)}-${orderObj.pointsRedeemed}\n`);
+          }
           const earnedPts = Math.floor((orderObj.total || 0) / 100);
           addText(`Points earned${' '.repeat(28)}${earnedPts}\n`);
-          addText(`Points balance${' '.repeat(26)}${customerPoints + earnedPts}\n`);
+          addText(`Points balance${' '.repeat(26)}${orderObj.remainingPoints || 0}\n`);
           addText("------------------------------------------------\n");
 
-          commands.push(0x1D, 0x21, 0x01); // Bold large Total
+          commands.push(0x1D, 0x21, 0x01); 
           addText(`Total${' '.repeat(16)}₹${orderObj.total}\n`);
           commands.push(0x1D, 0x21, 0x00);
           
           addText(`Cash${' '.repeat(25)}₹${orderObj.total}\n`);
           addText("------------------------------------------------\n");
           
-          commands.push(0x1B, 0x61, 0x01); // Center
+          commands.push(0x1B, 0x61, 0x01); 
           addText("Follow us\n");
           addText("www.youtube.com/@bbcafe.i\n");
           addText("All Social Media @bbcafe.in\n");
@@ -557,7 +597,6 @@ export default function BbCafeDesktopPos() {
           addText(`${dateFormatted}${' '.repeat(10)}#${String(orderObj.billNumber).padStart(4, '0')}\n`);
         }
 
-        // Minimal feed and cut so no extra blank roll is wasted
         commands.push(0x1B, 0x64, 0x02); 
         commands.push(0x1D, 0x56, 0x41, 0x00); 
 
@@ -573,7 +612,6 @@ export default function BbCafeDesktopPos() {
       console.error("USB Print Error, using browser fallback", e);
     }
 
-    // Browser Print Fallback matching exact style without blank pages
     const printWindow = window.open('', '_blank', 'width=350,height=550');
     if (printWindow) {
       printWindow.document.write(`
@@ -617,8 +655,10 @@ export default function BbCafeDesktopPos() {
                 <br/>
               `).join('')}
               <div class="line"></div>
+              ${orderObj.discountAmount > 0 ? `<div class="flex"><span>${orderObj.discountType === 'percentage' ? `Discount (${orderObj.discountValue}%)` : 'Discount'}</span><span>-₹${orderObj.discountAmount}</span></div>` : ''}
+              ${orderObj.pointsRedeemed ? `<div class="flex"><span>Points redeemed</span><span>-${orderObj.pointsRedeemed}</span></div>` : ''}
               <div class="flex"><span>Points earned</span><span>${Math.floor(orderObj.total / 100)}</span></div>
-              <div class="flex"><span>Points balance</span><span>${customerPoints + Math.floor(orderObj.total / 100)}</span></div>
+              <div class="flex"><span>Points balance</span><span>${orderObj.remainingPoints || 0}</span></div>
               <div class="line"></div>
               <div class="flex bold" style="font-size: 15px;"><span>Total</span><span>₹${orderObj.total}</span></div>
               <div class="flex"><span>Cash</span><span>₹${orderObj.total}</span></div>
@@ -643,6 +683,7 @@ export default function BbCafeDesktopPos() {
 
     const subtotal = getCartSubtotal();
     const finalTotal = getTotalBillPrice();
+    const discountAmt = getCalculatedDiscountAmount();
     const token = Math.floor(1000 + Math.random() * 9000);
 
     try {
@@ -654,7 +695,9 @@ export default function BbCafeDesktopPos() {
         const updatedOrderObj = { 
           items: cart, 
           subtotal, 
-          discount: customDiscount, 
+          discountType,
+          discountValue,
+          discountAmount: discountAmt,
           gstRate: gstEnabled ? gstRate : 0, 
           gstAmount: getGstAmountCalculated(), 
           total: finalTotal, 
@@ -693,8 +736,9 @@ export default function BbCafeDesktopPos() {
         const orderObj = { 
           billNumber, tokenNumber: token, customerName: customerName || "Walk-in Guest", 
           customerPhone: customerPhone ? `+91${customerPhone}` : "", items: cart, 
-          subtotal, discount: customDiscount, gstRate: gstEnabled ? gstRate : 0, 
-          gstAmount: getGstAmountCalculated(), deliveryFee: 0, total: finalTotal, timestamp: new Date(), 
+          subtotal, discountType, discountValue, discountAmount: discountAmt, 
+          gstRate: gstEnabled ? gstRate : 0, gstAmount: getGstAmountCalculated(), 
+          deliveryFee: 0, total: finalTotal, timestamp: new Date(), 
           status: 'pending', fulfillmentType: 'table', deliveryArea: "", 
           tableNumber: tableNumber, paymentMethod, chefInstructions, source: 'PC_POS', address: '' 
         };
@@ -706,7 +750,8 @@ export default function BbCafeDesktopPos() {
         await handlePrintReceiptDirect(orderObj, true);
       }
 
-      setCart([]); setCustomerPhone(''); setCustomerName(''); setCustomDiscount(0);
+      setCart([]); setCustomerPhone(''); setCustomerName(''); setDiscountValue(0);
+      setIsRedeemingPoints(false); setPointsToRedeem(0);
       localStorage.removeItem("bb_pos_saved_cart_pc");
     } catch (err) {
       console.error(err);
@@ -722,11 +767,28 @@ export default function BbCafeDesktopPos() {
 
     const subtotal = getCartSubtotal();
     const finalTotal = getTotalBillPrice();
+    const discountAmt = getCalculatedDiscountAmount();
     const token = Math.floor(1000 + Math.random() * 9000);
     const earned = Math.floor(finalTotal / 100);
+    const redeemed = isRedeemingPoints ? pointsToRedeem : 0;
 
     try {
       let billNumber: number;
+
+      let remainingPts = customerPoints;
+      if (customerPhone && customerPhone.length === 10) {
+        const userRef = doc(db, "customer_points", customerPhone.trim());
+        const userDoc = await getDoc(userRef);
+        const prevPoints = userDoc.exists() ? (userDoc.data().points || 0) : 0;
+        
+        remainingPts = Math.max(0, prevPoints - redeemed) + earned;
+        await setDoc(userRef, { 
+          name: customerName || "Walk-in Guest", 
+          phone: customerPhone.trim(), 
+          points: remainingPts, 
+          lastActive: new Date() 
+        }, { merge: true });
+      }
 
       if (activeEditingOrderId) {
         billNumber = activeEditingBillNumber || 5001;
@@ -734,7 +796,9 @@ export default function BbCafeDesktopPos() {
         const finalOrderObj = { 
           items: cart, 
           subtotal, 
-          discount: customDiscount, 
+          discountType,
+          discountValue,
+          discountAmount: discountAmt, 
           gstRate: gstEnabled ? gstRate : 0, 
           gstAmount: getGstAmountCalculated(), 
           total: finalTotal, 
@@ -742,6 +806,8 @@ export default function BbCafeDesktopPos() {
           tableNumber: tableNumber,
           customerName: customerName || "Walk-in Guest",
           customerPhone: customerPhone ? `+91${customerPhone}` : "",
+          pointsRedeemed: redeemed,
+          remainingPoints: remainingPts,
           settledAt: new Date()
         };
 
@@ -774,26 +840,15 @@ export default function BbCafeDesktopPos() {
         const orderObj = { 
           billNumber, tokenNumber: token, customerName: customerName || "Walk-in Guest", 
           customerPhone: customerPhone ? `+91${customerPhone}` : "", items: cart, 
-          subtotal, discount: customDiscount, gstRate: gstEnabled ? gstRate : 0, 
-          gstAmount: getGstAmountCalculated(), deliveryFee: getDeliveryCharge(), total: finalTotal, timestamp: new Date(), 
+          subtotal, discountType, discountValue, discountAmount: discountAmt, 
+          gstRate: gstEnabled ? gstRate : 0, gstAmount: getGstAmountCalculated(), 
+          deliveryFee: getDeliveryCharge(), total: finalTotal, timestamp: new Date(), 
           status: 'completed', fulfillmentType, deliveryArea: fulfillmentType === "delivery" ? selectedArea.name : "", 
-          tableNumber: fulfillmentType === 'table' ? tableNumber : '', paymentMethod, chefInstructions, source: 'PC_POS', address 
+          tableNumber: fulfillmentType === 'table' ? tableNumber : '', paymentMethod, chefInstructions, source: 'PC_POS', address,
+          pointsRedeemed: redeemed, remainingPoints: remainingPts 
         };
 
         await addDoc(collection(db, "orders"), orderObj);
-
-        if (customerPhone && customerPhone.length === 10) {
-          const userRef = doc(db, "customer_points", customerPhone.trim());
-          const userDoc = await getDoc(userRef);
-          const prevPoints = userDoc.exists() ? (userDoc.data().points || 0) : 0;
-          await setDoc(userRef, { 
-            name: customerName || "Walk-in Guest", 
-            phone: customerPhone.trim(), 
-            address: address || "", 
-            points: prevPoints + earned, 
-            lastActive: new Date() 
-          }, { merge: true });
-        }
 
         triggerBeep('success'); 
         toast.success(`Final Bill #${billNumber} printed successfully!`);
@@ -805,7 +860,8 @@ export default function BbCafeDesktopPos() {
         await handlePrintReceiptDirect(orderObj, false);
       }
 
-      setCart([]); setCustomerPhone(''); setCustomerName(''); setCustomerPoints(0); setCustomDiscount(0); setShowNewCustForm(false);
+      setCart([]); setCustomerPhone(''); setCustomerName(''); setCustomerPoints(0); setDiscountValue(0); setShowNewCustForm(false);
+      setIsRedeemingPoints(false); setPointsToRedeem(0);
       localStorage.removeItem("bb_pos_saved_cart_pc");
     } catch (err) {
       console.error(err);
@@ -1042,6 +1098,43 @@ export default function BbCafeDesktopPos() {
                         </div>
                       )}
 
+                      {customerName && customerPoints > 0 && !showNewCustForm && (
+                        <div className="pt-2 border-t border-neutral-200 dark:border-neutral-700 flex items-center justify-between">
+                          <div className="flex items-center gap-1.5 text-xs">
+                            <SafeGift size={14} className="text-amber-500" />
+                            <span>Redeem Points:</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <input 
+                              type="number" 
+                              min={0} 
+                              max={customerPoints}
+                              value={pointsToRedeem}
+                              onChange={e => {
+                                const val = Number(e.target.value);
+                                setPointsToRedeem(Math.min(val, customerPoints));
+                              }}
+                              className="w-16 bg-white dark:bg-neutral-900 border border-neutral-700 rounded-lg px-2 py-1 text-xs text-center font-mono"
+                            />
+                            <button 
+                              onClick={() => {
+                                if (!isRedeemingPoints && pointsToRedeem > 0) {
+                                  setIsRedeemingPoints(true);
+                                  toast.success(`Redeemed ${pointsToRedeem} points!`);
+                                } else {
+                                  setIsRedeemingPoints(false);
+                                  setPointsToRedeem(0);
+                                  toast("Points redemption cancelled", { icon: 'ℹ️' });
+                                }
+                              }}
+                              className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase ${isRedeemingPoints ? 'bg-red-500 text-white' : 'bg-amber-500 text-black'}`}
+                            >
+                              {isRedeemingPoints ? 'Cancel' : 'Apply'}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
                       {showNewCustForm && (
                         <div className="space-y-2 pt-2 border-t border-neutral-200 dark:border-neutral-700">
                           <p className="text-[10px] text-red-400 font-bold uppercase">Number not registered! Add details:</p>
@@ -1056,7 +1149,7 @@ export default function BbCafeDesktopPos() {
                             onClick={handleSaveNewCustomerQuick} 
                             className="w-full py-2 bg-green-600 hover:bg-green-500 text-white font-black text-xs uppercase rounded-xl flex items-center justify-center gap-1 shadow"
                           >
-                            <SafeUserPlus size={14} /> Save Customer & Link
+                            <SafeUserPlus size5={14} /> Save Customer & Link
                           </button>
                         </div>
                       )}
@@ -1085,6 +1178,31 @@ export default function BbCafeDesktopPos() {
                       )}
                     </div>
 
+                    {/* DISCOUNT INPUT (AMOUNT OR PERCENTAGE) */}
+                    <div className="space-y-2 bg-neutral-50 dark:bg-neutral-800/40 p-2.5 rounded-2xl border border-neutral-200 dark:border-neutral-800 mb-3 shrink-0">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-bold uppercase text-neutral-400">Discount Option</span>
+                        <div className="flex bg-neutral-200 dark:bg-neutral-700 p-0.5 rounded-lg">
+                          <button onClick={() => setDiscountType('amount')} className={`px-2 py-0.5 text-[10px] font-bold rounded ${discountType === 'amount' ? 'bg-orange-600 text-white' : 'text-neutral-400'}`}>₹ Amt</button>
+                          <button onClick={() => setDiscountType('percentage')} className={`px-2 py-0.5 text-[10px] font-bold rounded ${discountType === 'percentage' ? 'bg-orange-600 text-white' : 'text-neutral-400'}`}>% Off</button>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <input 
+                          type="number" 
+                          min={0} 
+                          max={discountType === 'percentage' ? 100 : 100000}
+                          placeholder={discountType === 'amount' ? "Enter Amount (₹)" : "Enter Percentage (%)"}
+                          value={discountValue || ''}
+                          onChange={e => setDiscountValue(Number(e.target.value))}
+                          className="w-full bg-white dark:bg-neutral-900 border border-neutral-700 rounded-xl px-3 py-1.5 text-xs outline-none font-mono"
+                        />
+                        {discountValue > 0 && (
+                          <button onClick={() => setDiscountValue(0)} className="text-red-400 text-xs font-bold px-2">Clear</button>
+                        )}
+                      </div>
+                    </div>
+
                     <div className="space-y-3 mb-4 shrink-0 border-t border-neutral-200 dark:border-neutral-800 pt-3">
                       <div className="grid grid-cols-3 gap-1 bg-neutral-100 dark:bg-neutral-800 p-1 rounded-2xl">
                         {(['table', 'pickup', 'delivery'] as const).map((type) => (
@@ -1108,6 +1226,13 @@ export default function BbCafeDesktopPos() {
 
                     <div className="space-y-2 text-xs border-t border-neutral-200 dark:border-neutral-800 pt-3 shrink-0">
                       <div className="flex justify-between text-neutral-400"><span>Subtotal</span><span className="font-mono">₹{getCartSubtotal()}</span></div>
+                      {getCalculatedDiscountAmount() > 0 && (
+                        <div className="flex justify-between text-orange-400 font-bold">
+                          <span>Discount ({discountType === 'percentage' ? `${discountValue}%` : 'Flat'})</span>
+                          <span className="font-mono">-₹{getCalculatedDiscountAmount()}</span>
+                        </div>
+                      )}
+                      {isRedeemingPoints && <div className="flex justify-between text-amber-400 font-bold"><span>Points Discount</span><span className="font-mono">-₹{getRedemptionDiscount()}</span></div>}
                       {fulfillmentType === 'delivery' && <div className="flex justify-between text-neutral-400"><span>Delivery Charge</span><span className="font-mono">₹{getDeliveryCharge()}</span></div>}
                       <div className="flex justify-between text-base font-black text-green-500 pt-1 border-t border-dashed border-neutral-700">
                         <span>Grand Total</span><span className="font-mono">₹{getTotalBillPrice()}</span>
@@ -1335,7 +1460,7 @@ export default function BbCafeDesktopPos() {
           <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 max-w-md w-full rounded-3xl p-6 shadow-2xl space-y-4">
               <div className="flex justify-between items-center border-b pb-3">
-                <h3 className="print font-black text-sm">Bill Details (# {selectedReceipt.billNumber})</h3>
+                <h3 className="font-black text-sm">Bill Details (# {selectedReceipt.billNumber})</h3>
                 <button onClick={() => setIsReceiptModalOpen(false)}><SafeX size={18} /></button>
               </div>
               <div className="space-y-2 max-h-60 overflow-y-auto text-xs font-mono">
