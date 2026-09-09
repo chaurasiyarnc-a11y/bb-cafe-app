@@ -32,8 +32,13 @@ export default function PrintCustomerReceipt({ orderObj, currentUser }: PrintRec
           .bold { font-weight: bold; }
           .flex { display: flex; justify-content: space-between; }
           .line { border-bottom: 1px dashed #000; margin: 5px 0; }
-          .double { font-size: 16px; font-weight: bold; }
-          .highlight-token { font-size: 20px; font-weight: bold; border: 2px solid #000; padding: 2px 6px; display: inline-block; margin: 4px 0; }
+          
+          /* कैफ़े का नाम बड़ा और हाइलाइटेड */
+          .cafe-title { font-size: 20px; font-weight: bold; text-align: center; letter-spacing: 1px; margin-top: 4px; }
+          
+          /* टोकन नंबर बॉक्स */
+          .highlight-token { font-size: 24px; font-weight: bold; border: 3px solid #000; padding: 2px 10px; display: inline-block; margin: 6px 0; }
+          
           .item-row { margin-bottom: 5px; }
           .note { font-size: 10px; font-style: italic; padding-left: 10px; color: #333; }
           
@@ -51,7 +56,7 @@ export default function PrintCustomerReceipt({ orderObj, currentUser }: PrintRec
           <div className="side-border-left">BUM BUM CAFE • BUM BUM CAFE • BUM BUM CAFE • BUM BUM CAFE • BUM BUM CAFE • BUM BUM CAFE</div>
           <div className="side-border-right">BUM BUM CAFE • BUM BUM CAFE • BUM BUM CAFE • BUM BUM CAFE • BUM BUM CAFE • BUM BUM CAFE</div>
 
-          <div className="center double" style={{ marginTop: '5px' }}>Bum Bum Cafe</div>
+          <div className="cafe-title">Bum Bum Cafe</div>
           <div className="center" style={{ fontSize: '10px' }}>न्यू बस स्टैंड मोहंद्रा, पुलिस चौकी के सामने,</div>
           <div className="center" style={{ fontSize: '10px' }}>जिला पन्ना, मोहंद्रा, मध्य प्रदेश - 488442</div>
           <div className="center bold" style={{ fontSize: '11px', marginTop: '2px' }}>Mob: 9714293759</div>
@@ -61,7 +66,7 @@ export default function PrintCustomerReceipt({ orderObj, currentUser }: PrintRec
           <div>Date & Time: {formattedDate}</div>
           
           <div className="center">
-            <div style={{ fontSize: '10px', textTransform: 'uppercase' }}>Daily Token No:</div>
+            <div style={{ fontSize: '11px', fontWeight: 'bold', textTransform: 'uppercase' }}>TOKEN NUMBER</div>
             <div className="highlight-token">#{String(orderObj.tokenNumber || '1').padStart(2, '0')}</div>
           </div>
 
@@ -98,13 +103,12 @@ export default function PrintCustomerReceipt({ orderObj, currentUser }: PrintRec
           )}
 
           <div className="line"></div>
-          <div className="flex double">
+          <div className="flex" style={{ fontSize: '15px', fontWeight: 'bold' }}>
             <span>GRAND TOTAL:</span>
             <span>₹{totalAmount}</span>
           </div>
           <div className="flex" style={{ fontSize: '11px', marginTop: '2px' }}><span>Payment Mode:</span><span className="bold">{(orderObj.paymentMethod || 'cash').toUpperCase()}</span></div>
           
-          {/* लॉयल्टी पॉइंट्स केवल तभी दिखेंगे जब कस्टमर डिटेल मौजूद हो */}
           {hasCustomer && (
             <>
               <div className="line"></div>
@@ -125,11 +129,11 @@ export default function PrintCustomerReceipt({ orderObj, currentUser }: PrintRec
           </div>
 
           <div className="line"></div>
-          <div className="center" style={{ fontSize: '10px' }}>Follow us on YouTube & Social Media</div>
-          <div className="center bold" style={{ fontSize: '10px' }}>www.youtube.com/@bbcafe.i</div>
-          <div className="center bold" style={{ fontSize: '10px' }}>@bbcafe.in</div>
+          <div className="center" style={{ fontSize: '10px', fontWeight: 'bold' }}>Online Order Website:</div>
+          <div className="center bold" style={{ fontSize: '11px' }}>bb-cafe-app.vercel.app</div>
+          <div className="center" style={{ fontSize: '10px', marginTop: '4px' }}>Follow us: @bb-cafe.in</div>
           <br />
-          <div className="center double">🖤 Thank You, Visit Again 🖤</div>
+          <div className="center" style={{ fontSize: '15px', fontWeight: 'bold' }}>🖤 Thank You, Visit Again 🖤</div>
           <div className="center" style={{ fontSize: '9px', marginTop: '4px' }}>Powered by BumBumCafe POS v2.1</div>
         </div>
       </body>
