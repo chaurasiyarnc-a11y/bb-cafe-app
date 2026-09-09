@@ -1,3 +1,4 @@
+
 'use client';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { db } from '@/lib/firebase'; 
@@ -9,7 +10,7 @@ import {
 import { 
   ShoppingBag, Search, X, Loader2, Clock, Printer, Check, Settings, 
   Database, RefreshCw, Layers, Menu, LogOut, Lock, ToggleLeft, ToggleRight, 
-  Sun, Moon, Tag, Trash2, ArrowRight, CheckCircle2, UserPlus, Download, PlusCircle, Edit3, FileText, LayoutGrid, ChevronLeft, ChevronRight, Gift, Percent, Sliders
+  Sun, Moon, Tag, Trash2, ArrowRight, CheckCircle2, UserPlus, Download, PlusCircle, Edit3, FileText, LayoutGrid, ChevronLeft, ChevronRight, Gift, Percent, Sliders, PackagePlus
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
@@ -41,6 +42,7 @@ const SafeChevronRight = ChevronRight as any;
 const SafeGift = Gift as any;
 const SafePercent = Percent as any;
 const SafeSliders = Sliders as any;
+const SafePackagePlus = PackagePlus as any;
 
 interface PosCartItem {
   id: string;
@@ -70,7 +72,7 @@ export default function BbCafeDesktopPos() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [pinInput, setPinInput] = useState('');
-  const [activeTab, setActiveTab] = useState<'billing' | 'inventory' | 'receipts' | 'settings' | 'orders' | 'tables' | 'variations_manager'>('billing');
+  const [activeTab, setActiveTab] = useState<'billing' | 'inventory' | 'receipts' | 'settings' | 'orders' | 'tables' | 'variations_manager' | 'item_editor'>('billing');
 
   const [gstEnabled, setGstEnabled] = useState(false);
   const [gstRate, setGstRate] = useState(5);
@@ -102,11 +104,24 @@ export default function BbCafeDesktopPos() {
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(false);
   
-  // New Variation Creator States inside Sidebar Tab
+  // Item Editor / Creator States
+  const [editingItemObj, setEditingItemObj] = useState<any>(null);
+  const [itemNameInput, setItemNameInput] = useState('');
+  const [itemPriceInput, setItemPriceInput] = useState<number>(0);
+  const [itemCatInput, setItemCatInput] = useState('');
+  const [itemImageInput, setItemImageInput] = useState('');
+  const [itemVariationsList, setItemVariationsList] = useState<any[]>([
+    { name: 'Half', price: 0 },
+    { name: 'Full', price: 0 },
+    { name: 'Plain', price: 0 },
+    { name: 'Butter', price: 20 }
+  ]);
+
+  // New Global Variation Creator States
   const [newVarName, setNewVarName] = useState('');
   const [newVarPriceAdd, setNewVarPriceAdd] = useState(0);
 
-  // Item Variation Popup States
+  // Item Variation Popup States (Billing Click)
   const [isVariationModalOpen, setIsVariationModalOpen] = useState(false);
   const [selectedProductForVariation, setSelectedProductForVariation] = useState<any>(null);
   const [availableVariations, setAvailableVariations] = useState<any[]>([]);
@@ -122,7 +137,7 @@ export default function BbCafeDesktopPos() {
 
   const [isSyncing, setIsSyncing] = useState(false);
 
-  // Cart & Table Management States
+  // Cart & Table Management States (Default fulfillmentType changed to 'pickup')
   const [cart, setCart] = useState<PosCartItem[]>([]);
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerName, setCustomerName] = useState('');
@@ -134,7 +149,7 @@ export default function BbCafeDesktopPos() {
   const [discountType, setDiscountType] = useState<'amount' | 'percentage'>('amount');
   const [discountValue, setDiscountValue] = useState<number>(0);
 
-  const [fulfillmentType, setFulfillmentType] = useState<'delivery' | 'pickup' | 'table'>('table');
+  const [fulfillmentType, setFulfillmentType] = useState<'delivery' | 'pickup' | 'table'>('pickup');
   const [selectedArea, setSelectedArea] = useState<DeliveryArea>(DELIVERY_AREAS[0]);
   const [address, setAddress] = useState('');
   const [tableNumber, setTableNumber] = useState('Table 1');
@@ -373,6 +388,85 @@ export default function BbCafeDesktopPos() {
     }
   };
 
+  const handleOpenItemEditor = (item: any = null) => {
+    triggerBeep('tap');
+    if (item) {
+      setEditingItemObj(item);
+      setItemNameInput(item.name || '');
+      setItemPriceInput(Number(item.price) || 0);
+      setItemCatInput(item.category || '');
+      setItemImageInput(item.image || item.imageUrl || '');
+      setItemVariationsList(Array.isArray(item.variations) && item.variations.length > 0 ? [...item.variations] : [
+        { name: 'Half', price: 0 },
+        { name: 'Full', price: 0 },
+        { name: 'Plain', price: 0 },
+        { name: 'Butter', price: 20 }
+      ]);
+    } else {
+      setEditingItemObj(null);
+      setItemNameInput('');
+      setItemPriceInput(0);
+      setItemCatInput('Beverages');
+      setItemImageInput('');
+      setItemVariationsList([
+        { name: 'Half', price: 0 },
+        { name: 'Full', price: 0 },
+        { name: 'Plain', price: 0 },
+        { name: 'Butter', price: 20 }
+      ]);
+    }
+    setActiveTab('item_editor');
+  };
+
+  const handleSaveItemToFirestore = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!itemNameInput.trim()) return toast.error("कृपया item का नाम दर्ज करें!");
+    const toastId = toast.loading("Saving item to menu...");
+
+    try {
+      const itemData = {
+        name: itemNameInput.trim(),
+        price: Number(itemPriceInput) || 0,
+        category: itemCatInput.trim() || 'General',
+        image: itemImageInput.trim(),
+        variations: itemVariationsList,
+        isAvailable: true,
+        updatedAt: new Date()
+      };
+
+      if (editingItemObj) {
+        await updateDoc(doc(db, "products", editingItemObj.id), itemData);
+        setProducts(prev => prev.map(p => p.id === editingItemObj.id ? { id: editingItemObj.id, ...itemData } : p));
+        toast.success("Item updated successfully! ✅");
+      } else {
+        const docRef = await addDoc(collection(db, "products"), itemData);
+        setProducts(prev => [...prev, { id: docRef.id, ...itemData }]);
+        toast.success("New item added to menu! ✅");
+      }
+
+      const uniqueCats = Array.from(new Set(products.map((i: any) => i.category).filter(Boolean))) as string[];
+      setCategories(['All', ...uniqueCats]);
+
+      toast.dismiss(toastId);
+      setActiveTab('inventory');
+    } catch (err) {
+      toast.dismiss(toastId);
+      toast.error("Failed to save item");
+    }
+  };
+
+  const handleDeleteProductFromMenu = async (productId: string) => {
+    triggerBeep('tap');
+    if (!window.confirm("Are you sure you want to delete this item from menu?")) return;
+    try {
+      await deleteDoc(doc(db, "products", productId));
+      setProducts(prev => prev.filter(p => p.id !== productId));
+      toast.success("Item deleted from menu");
+    } catch (e) {
+      toast.error("Failed to delete item");
+    }
+  };
+
   const handleCheckLoyalty = async () => {
     triggerBeep('tap');
     const cleanPhone = customerPhone.trim();
@@ -461,22 +555,26 @@ export default function BbCafeDesktopPos() {
     setIsCustomerModalOpen(false);
   };
 
-  // --- OPEN VARIATION POPUP MODAL USING GLOBAL/FIREBASE VARIATIONS ---
   const handleOpenVariationModal = (item: any) => {
     triggerBeep('tap');
     setSelectedProductForVariation(item);
     
-    // Use custom global variations or fallback to defaults
-    const listToUse = globalVariations.length > 0 ? globalVariations : [
-      { name: 'Full', priceAdd: 0 },
-      { name: 'Half', priceAdd: -Math.round((Number(item.price) || 0) * 0.4) },
-      { name: 'Plain', priceAdd: 0 },
-      { name: 'Butter', priceAdd: 20 }
-    ];
+    const itemSpecificVars = item.variations;
+    const listToUse = Array.isArray(itemSpecificVars) && itemSpecificVars.length > 0 
+      ? itemSpecificVars 
+      : (globalVariations.length > 0 ? globalVariations : [
+          { name: 'Full', price: Number(item.price) || 0 },
+          { name: 'Half', price: Math.round((Number(item.price) || 0) * 0.6) },
+          { name: 'Plain', price: Number(item.price) || 0 },
+          { name: 'Butter', price: (Number(item.price) || 0) + 20 }
+        ]);
 
     setAvailableVariations(listToUse);
-    setSelectedVariationType(listToUse[0].name);
-    setCustomVariationPrice((Number(item.price) || 0) + (Number(listToUse[0].priceAdd) || 0));
+    const firstVarName = listToUse[0].name || listToUse[0];
+    const firstVarPrice = typeof listToUse[0] === 'object' && listToUse[0].price !== undefined ? Number(listToUse[0].price) : (Number(item.price) || 0);
+
+    setSelectedVariationType(firstVarName);
+    setCustomVariationPrice(firstVarPrice);
 
     setItemNoteInput('');
     setIsVariationModalOpen(true);
@@ -1052,8 +1150,8 @@ export default function BbCafeDesktopPos() {
                   { id: 'billing', label: 'Counter Billing', icon: ShoppingBag },
                   { id: 'tables', label: `Tables (${activeTableOrders.length})`, icon: LayoutGrid },
                   { id: 'orders', label: `Live Orders (${activeLiveOrders.length})`, icon: Clock },
-                  { id: 'variations_manager', label: 'Variations Manager', icon: Sliders },
-                  { id: 'inventory', label: 'Stock Toggle', icon: Layers },
+                  { id: 'variations_manager', label: 'Global Variations', icon: Sliders },
+                  { id: 'inventory', label: 'Manage Menu & Stock', icon: Layers },
                   { id: 'receipts', label: 'Past Receipts', icon: Printer },
                   { id: 'settings', label: 'Settings & Printer', icon: Settings },
                 ].map((item) => {
@@ -1309,7 +1407,7 @@ export default function BbCafeDesktopPos() {
 
                     <div className="space-y-3 mb-4 shrink-0 border-t border-neutral-200 dark:border-neutral-800 pt-3">
                       <div className="grid grid-cols-3 gap-1 bg-neutral-100 dark:bg-neutral-800 p-1 rounded-2xl">
-                        {(['table', 'pickup', 'delivery'] as const).map((type) => (
+                        {(['pickup', 'table', 'delivery'] as const).map((type) => (
                           <button key={type} onClick={() => { triggerBeep('tap'); setFulfillmentType(type); }} className={`py-2 rounded-xl text-[10px] font-black uppercase transition-all ${fulfillmentType === type ? "bg-orange-600 text-white shadow-md" : "text-neutral-400"}`}>{type}</button>
                         ))}
                       </div>
@@ -1370,30 +1468,30 @@ export default function BbCafeDesktopPos() {
               </div>
             )}
 
-            {/* TAB: VARIATIONS MANAGER (Khud se Half, Full, Plain, Butter, Small, Medium, Large add karne ke liye) */}
+            {/* TAB: GLOBAL VARIATIONS MANAGER */}
             {activeTab === 'variations_manager' && (
               <div className="flex-1 p-6 h-full overflow-y-auto max-w-2xl mx-auto">
                 <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 p-6 rounded-3xl shadow-xl space-y-6">
                   <h2 className="text-sm font-black uppercase text-orange-500 flex items-center gap-2">
-                    <SafeSliders size={18} /> Item Variations Management
+                    <SafeSliders size={18} /> Global Variations Management
                   </h2>
-                  <p className="text-xs text-neutral-400">Yahan aap apne hisaab se naye variations (jaise Half, Full, Plain, Butter, Small, Medium, Large) add kar sakte hain. Yeh sabhi variations item click karne par popup mein dikhengi.</p>
+                  <p className="text-xs text-neutral-400">Yahan aap default variations (jaise Half, Full, Plain, Butter, Small, Medium, Large) add kar sakte hain.</p>
 
                   <form onSubmit={handleAddNewGlobalVariation} className="space-y-4 bg-neutral-50 dark:bg-neutral-800/40 p-4 rounded-2xl border border-neutral-200 dark:border-neutral-700">
-                    <h3 className="text-xs font-black uppercase text-yellow-500">Add New Variation</h3>
+                    <h3 className="text-xs font-black uppercase text-yellow-500">Add New Global Variation</h3>
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <label className="text-[10px] font-bold uppercase text-neutral-400 block mb-1">Variation Name (e.g. Half, Large, Butter):</label>
+                        <label className="text-[10px] font-bold uppercase text-neutral-400 block mb-1">Variation Name:</label>
                         <input 
                           type="text" 
-                          placeholder="Variation Name" 
+                          placeholder="e.g. Medium, Cheese Burst" 
                           value={newVarName}
                           onChange={e => setNewVarName(e.target.value)}
                           className="w-full bg-white dark:bg-neutral-900 border border-neutral-700 rounded-xl px-3 py-2 text-xs outline-none"
                         />
                       </div>
                       <div>
-                        <label className="text-[10px] font-bold uppercase text-neutral-400 block mb-1">Price Addition (₹ e.g. 20 or 0):</label>
+                        <label className="text-[10px] font-bold uppercase text-neutral-400 block mb-1">Price Addition (₹):</label>
                         <input 
                           type="number" 
                           placeholder="Price Add" 
@@ -1409,10 +1507,10 @@ export default function BbCafeDesktopPos() {
                   </form>
 
                   <div className="space-y-3">
-                    <h3 className="text-xs font-black uppercase text-neutral-400">Existing Variations List</h3>
+                    <h3 className="text-xs font-black uppercase text-neutral-400">Existing Global Variations</h3>
                     <div className="space-y-2 max-h-60 overflow-y-auto">
                       {globalVariations.length === 0 ? (
-                        <p className="text-xs text-neutral-500 text-center py-6">No custom variations added yet. Default ones will be used.</p>
+                        <p className="text-xs text-neutral-500 text-center py-6">No global variations added yet.</p>
                       ) : (
                         globalVariations.map((v) => (
                           <div key={v.id} className="flex justify-between items-center bg-neutral-50 dark:bg-neutral-800/60 p-3 rounded-2xl border border-neutral-200 dark:border-neutral-700">
@@ -1426,6 +1524,158 @@ export default function BbCafeDesktopPos() {
                       )}
                     </div>
                   </div>
+                </div>
+              </div>
+            )}
+
+            {/* TAB: MANAGE MENU & ITEMS (ADD / EDIT ITEMS & THEIR SPECIFIC VARIATIONS) */}
+            {activeTab === 'inventory' && (
+              <div className="flex-1 p-6 h-full overflow-y-auto">
+                <div className="flex justify-between items-center mb-4">
+                  <div>
+                    <h2 className="text-sm font-black uppercase text-orange-500">Manage Menu Items & Stock</h2>
+                    <p className="text-xs text-neutral-400">Add new items, toggle stock, or edit individual item variations.</p>
+                  </div>
+                  <button onClick={() => handleOpenItemEditor(null)} className="bg-orange-600 hover:bg-orange-500 text-white px-4 py-2.5 rounded-2xl text-xs font-black uppercase flex items-center gap-1.5 shadow">
+                    <SafePackagePlus size={16} /> Add New Item
+                  </button>
+                </div>
+                <div className="grid grid-cols-3 gap-3">
+                  {products.map((item) => {
+                    const isAvail = item.isAvailable !== false;
+                    return (
+                      <div key={item.id} className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 p-4 rounded-2xl flex flex-col justify-between shadow-sm">
+                        <div>
+                          <div className="flex justify-between items-start mb-2">
+                            <p className="font-bold text-xs">{item.name}</p>
+                            <span className={`text-[9px] font-black px-2 py-0.5 rounded-full ${isAvail ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'}`}>{isAvail ? 'In Stock' : 'Out'}</span>
+                          </div>
+                          <p className="text-xs font-mono text-orange-500 font-bold mb-1">₹{item.price}</p>
+                          <p className="text-[10px] text-neutral-400">Category: {item.category || 'General'}</p>
+                          {Array.isArray(item.variations) && item.variations.length > 0 && (
+                            <p className="text-[10px] text-amber-400 mt-1">Variations: {item.variations.map((v: any) => v.name).join(', ')}</p>
+                          )}
+                        </div>
+                        <div className="flex gap-2 mt-4 pt-3 border-t border-neutral-200 dark:border-neutral-800">
+                          <button onClick={() => handleOpenItemEditor(item)} className="flex-1 bg-neutral-200 dark:bg-neutral-800 hover:bg-orange-500 hover:text-white text-neutral-300 py-1.5 rounded-xl text-[10px] font-black uppercase transition-all">Edit Item & Variations</button>
+                          <button onClick={() => handleToggleStock(item.id, isAvail)} className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase border ${isAvail ? 'text-red-400 border-red-500/30' : 'text-green-400 border-green-500/30'}`}>{isAvail ? 'Disable' : 'Enable'}</button>
+                          <button onClick={() => handleDeleteProductFromMenu(item.id)} className="p-1.5 text-red-400 hover:text-red-300"><SafeTrash2 size={16} /></button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* TAB: ITEM EDITOR FORM */}
+            {activeTab === 'item_editor' && (
+              <div className="flex-1 p-6 h-full overflow-y-auto max-w-2xl mx-auto">
+                <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 p-6 rounded-3xl shadow-xl space-y-6">
+                  <div className="flex justify-between items-center border-b pb-3">
+                    <h2 className="text-sm font-black uppercase text-orange-500">{editingItemObj ? 'Edit Menu Item & Variations' : 'Add New Menu Item'}</h2>
+                    <button onClick={() => setActiveTab('inventory')} className="text-xs text-neutral-400 underline">Back to Inventory</button>
+                  </div>
+
+                  <form onSubmit={handleSaveItemToFirestore} className="space-y-4">
+                    <div>
+                      <label className="text-xs font-bold uppercase text-neutral-400 block mb-1">Item Name *</label>
+                      <input 
+                        type="text" 
+                        required
+                        placeholder="e.g. Veg Burger, Cold Coffee" 
+                        value={itemNameInput}
+                        onChange={e => setItemNameInput(e.target.value)}
+                        className="w-full bg-neutral-100 dark:bg-neutral-800 border border-neutral-700 rounded-xl px-3 py-2 text-xs outline-none"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-xs font-bold uppercase text-neutral-400 block mb-1">Base Price (₹) *</label>
+                        <input 
+                          type="number" 
+                          required
+                          placeholder="100" 
+                          value={itemPriceInput || ''}
+                          onChange={e => setItemPriceInput(Number(e.target.value))}
+                          className="w-full bg-neutral-100 dark:bg-neutral-800 border border-neutral-700 rounded-xl px-3 py-2 text-xs outline-none font-mono"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs font-bold uppercase text-neutral-400 block mb-1">Category</label>
+                        <input 
+                          type="text" 
+                          placeholder="e.g. Fast Food, Beverages" 
+                          value={itemCatInput}
+                          onChange={e => setItemCatInput(e.target.value)}
+                          className="w-full bg-neutral-100 dark:bg-neutral-800 border border-neutral-700 rounded-xl px-3 py-2 text-xs outline-none"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-bold uppercase text-neutral-400 block mb-1">Image URL (Optional)</label>
+                      <input 
+                        type="text" 
+                        placeholder="https://..." 
+                        value={itemImageInput}
+                        onChange={e => setItemImageInput(e.target.value)}
+                        className="w-full bg-neutral-100 dark:bg-neutral-800 border border-neutral-700 rounded-xl px-3 py-2 text-xs outline-none"
+                      />
+                    </div>
+
+                    <div className="space-y-3 pt-3 border-t border-neutral-200 dark:border-neutral-800">
+                      <div className="flex justify-between items-center">
+                        <label className="text-xs font-bold uppercase text-amber-400">Specific Variations for this Item (Half, Full, Plain, Butter, etc.)</label>
+                        <button 
+                          type="button"
+                          onClick={() => setItemVariationsList(prev => [...prev, { name: '', price: 0 }])}
+                          className="bg-neutral-200 dark:bg-neutral-800 text-xs px-3 py-1.5 rounded-xl font-bold hover:bg-orange-500 hover:text-white"
+                        >
+                          + Add Variation Row
+                        </button>
+                      </div>
+
+                      <div className="space-y-2">
+                        {itemVariationsList.map((v, idx) => (
+                          <div key={idx} className="flex gap-2 items-center">
+                            <input 
+                              type="text"
+                              placeholder="Variation Name (e.g. Half / Large)"
+                              value={v.name}
+                              onChange={e => {
+                                const val = e.target.value;
+                                setItemVariationsList(prev => prev.map((item, i) => i === idx ? { ...item, name: val } : item));
+                              }}
+                              className="flex-1 bg-neutral-100 dark:bg-neutral-800 border border-neutral-700 rounded-xl px-3 py-1.5 text-xs outline-none"
+                            />
+                            <input 
+                              type="number"
+                              placeholder="Exact Price (₹)"
+                              value={v.price || ''}
+                              onChange={e => {
+                                const val = Number(e.target.value);
+                                setItemVariationsList(prev => prev.map((item, i) => i === idx ? { ...item, price: val } : item));
+                              }}
+                              className="w-28 bg-neutral-100 dark:bg-neutral-800 border border-neutral-700 rounded-xl px-3 py-1.5 text-xs outline-none font-mono"
+                            />
+                            <button 
+                              type="button"
+                              onClick={() => setItemVariationsList(prev => prev.filter((_, i) => i !== idx))}
+                              className="text-red-400 hover:text-red-300 p-2"
+                            >
+                              <SafeTrash2 size={16} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <button type="submit" className="w-full py-3.5 bg-green-600 hover:bg-green-500 text-white font-black text-xs uppercase rounded-2xl shadow-xl mt-4">
+                      Save Item to Database
+                    </button>
+                  </form>
                 </div>
               </div>
             )}
@@ -1530,30 +1780,6 @@ export default function BbCafeDesktopPos() {
               </div>
             )}
 
-            {/* TAB: INVENTORY */}
-            {activeTab === 'inventory' && (
-              <div className="flex-1 p-6 h-full overflow-y-auto">
-                <h2 className="text-sm font-black uppercase text-orange-500 mb-4">Stock Availability Management</h2>
-                <div className="grid grid-cols-3 gap-3">
-                  {products.map((item) => {
-                    const isAvail = item.isAvailable !== false;
-                    return (
-                      <div key={item.id} className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 p-4 rounded-2xl flex items-center justify-between shadow-sm">
-                        <div>
-                          <p className="font-bold text-xs">{item.name}</p>
-                          <p className="text-xs font-mono text-orange-500">₹{item.price}</p>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <span className={`text-[10px] font-black px-2.5 py-1 rounded-full ${isAvail ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'}`}>{isAvail ? 'In Stock' : 'Out'}</span>
-                          <button onClick={() => handleToggleStock(item.id, isAvail)} className={`px-3 py-1.5 rounded-xl text-xs font-black uppercase border ${isAvail ? 'text-red-400 border-red-500/30' : 'text-green-400 border-green-500/30'}`}>{isAvail ? 'Disable' : 'Enable'}</button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
             {/* TAB: PAST RECEIPTS */}
             {activeTab === 'receipts' && (
               <div className="flex-1 p-6 h-full flex flex-col overflow-hidden">
@@ -1634,10 +1860,10 @@ export default function BbCafeDesktopPos() {
                   <label className="text-xs font-bold uppercase text-neutral-400 block mb-1.5">Select Variation:</label>
                   <div className="grid grid-cols-2 gap-2">
                     {availableVariations.map((v: any, idx: number) => {
-                      const vName = typeof v === 'string' ? v : (v.name || v.size || 'Option');
+                      const vName = v.name || 'Option';
                       const basePrice = Number(selectedProductForVariation.price) || 0;
-                      const priceAdd = Number(v.priceAdd) || 0;
-                      const vPrice = typeof v === 'object' && v.price !== undefined && !v.priceAdd ? Number(v.price) : basePrice + priceAdd;
+                      const specificPrice = Number(v.price) || 0;
+                      const finalVarPrice = specificPrice > 0 ? specificPrice : basePrice + (Number(v.priceAdd) || 0);
 
                       return (
                         <button 
@@ -1645,11 +1871,11 @@ export default function BbCafeDesktopPos() {
                           onClick={() => {
                             triggerBeep('tap');
                             setSelectedVariationType(vName);
-                            setCustomVariationPrice(vPrice);
+                            setCustomVariationPrice(finalVarPrice);
                           }}
                           className={`py-2.5 rounded-xl text-xs font-black uppercase border transition-all ${selectedVariationType === vName ? 'bg-orange-600 text-white border-orange-600' : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-400 border-neutral-700'}`}
                         >
-                          {vName} (₹{vPrice})
+                          {vName} (₹{finalVarPrice})
                         </button>
                       );
                     })}
@@ -1718,3 +1944,4 @@ export default function BbCafeDesktopPos() {
     </div>
   );
 }
+```
