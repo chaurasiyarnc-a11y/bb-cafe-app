@@ -66,11 +66,9 @@ export default function BbCafeDesktopPos() {
   const [gstRate, setGstRate] = useState(5);
   const [themeMode, setThemeMode] = useState<'dark' | 'light'>('dark');
 
-  // PWA Install Prompt State
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [isAppInstalled, setIsAppInstalled] = useState(false);
 
-  // Printer states
   const [isConnecting, setIsConnecting] = useState(false);
   const [printerConnected, setPrinterConnected] = useState(false);
   const [usbDevice, setUsbDevice] = useState<any>(null);
@@ -100,7 +98,6 @@ export default function BbCafeDesktopPos() {
 
   const [isSyncing, setIsSyncing] = useState(false);
 
-  // Cart & Checkout states
   const [cart, setCart] = useState<PosCartItem[]>([]);
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerName, setCustomerName] = useState('');
@@ -148,7 +145,6 @@ export default function BbCafeDesktopPos() {
   };
 
   useEffect(() => {
-    // PWA Install Prompt Listener
     const handleBeforeInstallPrompt = (e: any) => {
       e.preventDefault();
       setDeferredPrompt(e);
@@ -439,93 +435,131 @@ export default function BbCafeDesktopPos() {
     }
   };
 
-  const sendRawDataToPrinter = async (rawBytes: Uint8Array) => {
-    if (usbDevice) {
-      try {
+  // Robust Printing with Reliable Browser Print Fallback & Clean Formatting
+  const handlePrintReceiptDirect = async (orderObj: any, isKot = false) => {
+    try {
+      if (usbDevice) {
+        const encoder = new TextEncoder();
+        let commands: number[] = [];
+        commands.push(0x1B, 0x40); // Init
+        commands.push(0x1B, 0x61, 0x01); // Center alignment
+
+        const addText = (txt: string) => {
+          const encoded = encoder.encode(txt);
+          for (let i = 0; i < encoded.length; i++) commands.push(encoded[i]);
+        };
+
+        if (isKot) {
+          commands.push(0x1D, 0x21, 0x11); 
+          addText("*** KITCHEN KOT ***\n");
+          commands.push(0x1D, 0x21, 0x00);
+          addText(`Token: #${orderObj.tokenNumber} | Type: ${orderObj.fulfillmentType.toUpperCase()}\n`);
+          if (orderObj.tableNumber) addText(`Table: ${orderObj.tableNumber}\n`);
+          addText("------------------------------------------------\n");
+          commands.push(0x1B, 0x61, 0x00);
+          orderObj.items.forEach((item: any) => {
+            addText(`[ ] ${item.name} x ${item.quantity}\n`);
+            if (item.note) addText(`    Note: ${item.note}\n`);
+          });
+          addText("------------------------------------------------\n");
+        } else {
+          commands.push(0x1D, 0x21, 0x11); 
+          addText("BUM BUM CAFE\n");
+          commands.push(0x1D, 0x21, 0x00);
+          addText("Mohandra Town, Main Road\n");
+          addText("GSTIN: 08AABCB1234F1Z5\n\n");
+          
+          commands.push(0x1B, 0x61, 0x00);
+          addText(`Bill No: #${String(orderObj.billNumber).padStart(4, '0')}    Token: #${orderObj.tokenNumber}\n`);
+          let dateStr = new Date().toLocaleString();
+          try {
+            dateStr = new Date(orderObj.timestamp?.toDate ? orderObj.timestamp.toDate() : orderObj.timestamp).toLocaleString();
+          } catch(e){}
+          addText(`Date: ${dateStr}\n`);
+          addText(`Customer: ${orderObj.customerName} (${orderObj.customerPhone || 'Walk-in'})\n`);
+          addText("================================================\n");
+          addText("ITEM DESCRIPTION           QTY      PRICE\n");
+          addText("================================================\n");
+
+          orderObj.items.forEach((item: any) => {
+            const itemName = (item.name || '').padEnd(26, ' ').substring(0, 26);
+            const qty = String(item.quantity || 1).padStart(3, ' ');
+            const totalP = String((item.price || 0) * (item.quantity || 1)).padStart(8, ' ');
+            addText(`${itemName} ${qty}  ₹${totalP}\n`);
+          });
+
+          addText("------------------------------------------------\n");
+          addText(`Subtotal:                           ₹${orderObj.subtotal}\n`);
+          if (orderObj.discount > 0) addText(`Discount:                          -₹${orderObj.discount}\n`);
+          if (orderObj.gstAmount > 0) addText(`GST (${orderObj.gstRate}%):                      ₹${orderObj.gstAmount}\n`);
+          if (orderObj.deliveryFee > 0) addText(`Delivery Charge:                    ₹${orderObj.deliveryFee}\n`);
+          
+          commands.push(0x1D, 0x21, 0x01); 
+          addText(`GRAND TOTAL:                       ₹${orderObj.total}\n`);
+          commands.push(0x1D, 0x21, 0x00);
+          addText("================================================\n");
+          commands.push(0x1B, 0x61, 0x01);
+          addText("Thank You! Visit Again.\n\n\n");
+        }
+
+        commands.push(0x1B, 0x64, 0x04); // Feed lines
+        commands.push(0x1D, 0x56, 0x41, 0x03); // Cut paper
+
         let endpointOut = 1;
         const endpoints = usbDevice.configuration.interfaces[0].alternate.endpoints;
         for (const ep of endpoints) {
           if (ep.direction === 'out') { endpointOut = ep.endpointNumber; break; }
         }
-        await usbDevice.transferOut(endpointOut, rawBytes);
-        return true;
-      } catch (e) {
-        console.error("USB Transfer Error:", e);
+        await usbDevice.transferOut(endpointOut, new Uint8Array(commands));
+        return;
       }
-    }
-    window.print();
-    return false;
-  };
-
-  const handlePrintReceiptDirect = async (orderObj: any, isKot = false) => {
-    const encoder = new TextEncoder();
-    let commands: number[] = [];
-
-    commands.push(0x1B, 0x40); 
-    commands.push(0x1B, 0x61, 0x01); 
-
-    const addText = (txt: string) => {
-      const encoded = encoder.encode(txt);
-      for (let i = 0; i < encoded.length; i++) {
-        commands.push(encoded[i]);
-      }
-    };
-
-    if (isKot) {
-      commands.push(0x1D, 0x21, 0x11); 
-      addText("*** KITCHEN KOT ***\n");
-      commands.push(0x1D, 0x21, 0x00);
-      addText(`Token: #${orderObj.tokenNumber} | Type: ${orderObj.fulfillmentType.toUpperCase()}\n`);
-      if (orderObj.tableNumber) addText(`Table: ${orderObj.tableNumber}\n`);
-      addText("------------------------------------------------\n");
-      
-      commands.push(0x1B, 0x61, 0x00);
-      orderObj.items.forEach((item: any) => {
-        addText(`[ ] ${item.name} x ${item.quantity}\n`);
-        if (item.note) addText(`    Note: ${item.note}\n`);
-      });
-      addText("------------------------------------------------\n");
-    } else {
-      commands.push(0x1D, 0x21, 0x11); 
-      addText("BUM BUM CAFE\n");
-      commands.push(0x1D, 0x21, 0x00);
-      addText("Mohandra Town, Main Road\n");
-      addText("GSTIN: 08AABCB1234F1Z5\n\n");
-      
-      commands.push(0x1B, 0x61, 0x00);
-      addText(`Bill No: #${String(orderObj.billNumber).padStart(4, '0')}    Token: #${orderObj.tokenNumber}\n`);
-      addText(`Date: ${new Date(orderObj.timestamp?.toDate ? orderObj.timestamp.toDate() : orderObj.timestamp).toLocaleString()}\n`);
-      addText(`Customer: ${orderObj.customerName} (${orderObj.customerPhone || 'Walk-in'})\n`);
-      addText("================================================\n");
-      addText("ITEM DESCRIPTION           QTY      PRICE\n");
-      addText("================================================\n");
-
-      orderObj.items.forEach((item: any) => {
-        const itemName = item.name.padEnd(26, ' ').substring(0, 26);
-        const qty = String(item.quantity).padStart(3, ' ');
-        const totalP = String(item.price * item.quantity).padStart(8, ' ');
-        addText(`${itemName} ${qty}  ₹${totalP}\n`);
-      });
-
-      addText("------------------------------------------------\n");
-      addText(`Subtotal:                           ₹${orderObj.subtotal}\n`);
-      if (orderObj.discount > 0) addText(`Discount:                          -₹${orderObj.discount}\n`);
-      if (orderObj.gstAmount > 0) addText(`GST (${orderObj.gstRate}%):                      ₹${orderObj.gstAmount}\n`);
-      if (orderObj.deliveryFee > 0) addText(`Delivery Charge:                    ₹${orderObj.deliveryFee}\n`);
-      
-      commands.push(0x1D, 0x21, 0x01); 
-      addText(`GRAND TOTAL:                       ₹${orderObj.total}\n`);
-      commands.push(0x1D, 0x21, 0x00);
-      addText("================================================\n");
-      commands.push(0x1B, 0x61, 0x01);
-      addText("Thank You! Visit Again.\n");
-      addText("Powered by Bum Bum Cafe POS\n\n");
+    } catch (e) {
+      console.error("USB Raw Print Error, falling back to window.print:", e);
     }
 
-    commands.push(0x1B, 0x64, 0x04); 
-    commands.push(0x1D, 0x56, 0x41, 0x03); 
-
-    await sendRawDataToPrinter(new Uint8Array(commands));
+    // Clean HTML Print Window Fallback (Prevents blank page issues)
+    const printWindow = window.open('', '_blank', 'width=400,height=600');
+    if (printWindow) {
+      printWindow.document.write(`
+        <html>
+          <head>
+            <title>Receipt #${orderObj.billNumber}</title>
+            <style>
+              body { font-family: 'Courier New', monospace; font-size: 12px; width: 72mm; margin: 0; padding: 5px; color: #000; }
+              .center { text-align: center; }
+              .bold { font-weight: bold; }
+              .line { border-bottom: 1px dashed #000; margin: 5px 0; }
+              table { width: 100%; border-collapse: collapse; }
+              th, td { text-align: left; font-size: 11px; padding: 2px 0; }
+              .right { text-align: right; }
+            </style>
+          </head>
+          <body onload="window.print(); window.close();">
+            <div class="center bold" style="font-size: 16px;">BUM BUM CAFE</div>
+            <div class="center">Mohandra Town, Main Road</div>
+            <div class="center">GSTIN: 08AABCB1234F1Z5</div>
+            <div class="line"></div>
+            <div>Bill No: #${String(orderObj.billNumber).padStart(4, '0')} &nbsp;&nbsp; Token: #${orderObj.tokenNumber}</div>
+            <div>Date: ${new Date().toLocaleString()}</div>
+            <div>Customer: ${orderObj.customerName}</div>
+            <div class="line"></div>
+            <table>
+              <tr><th>Item</th><th class="center">Qty</th><th class="right">Amt</th></tr>
+              ${orderObj.items.map((i: any) => `<tr><td>${i.name}</td><td class="center">${i.quantity}</td><td class="right">₹${i.price * i.quantity}</td></tr>`).join('')}
+            </table>
+            <div class="line"></div>
+            <div>Subtotal: ₹${orderObj.subtotal}</div>
+            ${orderObj.discount > 0 ? `<div>Discount: -₹${orderObj.discount}</div>` : ''}
+            ${orderObj.gstAmount > 0 ? `<div>GST: ₹${orderObj.gstAmount}</div>` : ''}
+            ${orderObj.deliveryFee > 0 ? `<div>Delivery: ₹${orderObj.deliveryFee}</div>` : ''}
+            <div class="bold" style="font-size: 14px; margin-top: 5px;">GRAND TOTAL: ₹${orderObj.total}</div>
+            <div class="line"></div>
+            <div class="center bold">Thank You! Visit Again</div>
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
+    }
   };
 
   const handlePlaceOrder = async (e: React.FormEvent) => {
@@ -630,7 +664,8 @@ export default function BbCafeDesktopPos() {
   const filteredMenu = useMemo(() => products.filter((p) => (selectedCategory === 'All' || p.category === selectedCategory) && p.name.toLowerCase().includes(searchQuery.toLowerCase())), [products, selectedCategory, searchQuery]);
   const filteredPastReceipts = useMemo(() => pastReceipts.filter((o) => String(o.billNumber).includes(receiptSearchQuery.trim()) || String(o.customerPhone || '').includes(receiptSearchQuery.trim()) || String(o.customerName || '').toLowerCase().includes(receiptSearchQuery.trim().toLowerCase())), [pastReceipts, receiptSearchQuery]);
 
-  const mainClass = "min-h-screen flex font-sans antialiased overflow-hidden " + (themeMode === "dark" ? "dark bg-[#0a0a0a] text-neutral-100" : "bg-neutral-100 text-neutral-900");
+  // FIXED SCREEN CONTAINER (h-screen w-screen overflow-hidden) prevents body scrolling
+  const mainClass = "h-screen w-screen flex font-sans antialiased overflow-hidden " + (themeMode === "dark" ? "dark bg-[#0a0a0a] text-neutral-100" : "bg-neutral-100 text-neutral-900");
 
   return (
     <div className={mainClass}>
@@ -653,7 +688,7 @@ export default function BbCafeDesktopPos() {
       ) : (
         <>
           {/* DESKTOP SIDEBAR NAVIGATION */}
-          <aside className="w-64 bg-white dark:bg-neutral-900 border-r border-neutral-200 dark:border-neutral-800 flex flex-col justify-between p-5 shrink-0 select-none">
+          <aside className="w-64 bg-white dark:bg-neutral-900 border-r border-neutral-200 dark:border-neutral-800 flex flex-col justify-between p-5 shrink-0 select-none h-full">
             <div className="space-y-6">
               <div className="flex items-center gap-3 border-b border-neutral-200 dark:border-neutral-800 pb-4">
                 <SafeDatabase className="text-orange-500" size={22} />
@@ -704,14 +739,14 @@ export default function BbCafeDesktopPos() {
             </div>
           </aside>
 
-          {/* MAIN CONTENT AREA */}
-          <main className="flex-1 flex overflow-hidden">
+          {/* MAIN CONTENT AREA (FIXED HEIGHT) */}
+          <main className="flex-1 flex h-full overflow-hidden">
 
             {/* TAB: BILLING */}
             {activeTab === 'billing' && (
               <div className="flex-1 flex h-full overflow-hidden">
-                <div className="flex-1 flex flex-col p-5 overflow-hidden">
-                  <div className="flex gap-3 mb-4 items-center">
+                <div className="flex-1 flex flex-col p-5 h-full overflow-hidden">
+                  <div className="flex gap-3 mb-4 items-center shrink-0">
                     <div className="relative flex-1">
                       <SafeSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-400" size={18} />
                       <input 
@@ -772,9 +807,9 @@ export default function BbCafeDesktopPos() {
                 </div>
 
                 {/* Cart Panel */}
-                <div className="w-96 bg-white dark:bg-neutral-900 border-l border-neutral-200 dark:border-neutral-800 flex flex-col p-5 shadow-2xl justify-between">
+                <div className="w-96 bg-white dark:bg-neutral-900 border-l border-neutral-200 dark:border-neutral-800 flex flex-col p-5 h-full shadow-2xl justify-between overflow-hidden">
                   <div className="flex flex-col h-full overflow-hidden">
-                    <div className="flex items-center justify-between border-b border-neutral-200 dark:border-neutral-800 pb-3 mb-3">
+                    <div className="flex items-center justify-between border-b border-neutral-200 dark:border-neutral-800 pb-3 mb-3 shrink-0">
                       <h3 className="text-sm font-black uppercase text-orange-500">Current Order Cart</h3>
                       <button onClick={() => setCart([])} className="text-red-500 text-xs font-bold hover:underline flex items-center gap-1"><SafeTrash2 size={14} /> Clear</button>
                     </div>
@@ -884,7 +919,7 @@ export default function BbCafeDesktopPos() {
                       <button onClick={() => setPaymentMethod('upi')} className={`flex-1 py-2.5 rounded-xl text-xs font-black uppercase border ${paymentMethod === 'upi' ? 'bg-blue-600 text-white border-blue-600' : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-400 border-neutral-700'}`}>UPI</button>
                     </div>
 
-                    <button onClick={handlePlaceOrder} disabled={cart.length === 0 || isSubmittingOrder} className="w-full bg-green-600 hover:bg-green-500 text-white font-black py-4 rounded-2xl uppercase tracking-wider text-xs flex items-center justify-center gap-2 shadow-xl disabled:opacity-50">
+                    <button onClick={handlePlaceOrder} disabled={cart.length === 0 || isSubmittingOrder} className="w-full bg-green-600 hover:bg-green-500 text-white font-black py-4 rounded-2xl uppercase tracking-wider text-xs flex items-center justify-center gap-2 shadow-xl disabled:opacity-50 shrink-0">
                       {isSubmittingOrder ? <Loader2 className="animate-spin" size={16} /> : <CheckCircle2 size={16} />}
                       <span>One-Click Print & Pay (₹{getTotalBillPrice()})</span>
                     </button>
@@ -895,7 +930,7 @@ export default function BbCafeDesktopPos() {
 
             {/* TAB: LIVE ORDERS */}
             {activeTab === 'orders' && (
-              <div className="flex-1 p-6 overflow-y-auto">
+              <div className="flex-1 p-6 h-full overflow-y-auto">
                 <h2 className="text-sm font-black uppercase text-orange-500 mb-4">Live Active Orders ({activeLiveOrders.length})</h2>
                 <div className="grid grid-cols-3 gap-4">
                   {activeLiveOrders.length === 0 ? (
@@ -941,7 +976,7 @@ export default function BbCafeDesktopPos() {
 
             {/* TAB: INVENTORY */}
             {activeTab === 'inventory' && (
-              <div className="flex-1 p-6 overflow-y-auto">
+              <div className="flex-1 p-6 h-full overflow-y-auto">
                 <h2 className="text-sm font-black uppercase text-orange-500 mb-4">Stock Availability Management</h2>
                 <div className="grid grid-cols-3 gap-3">
                   {products.map((item) => {
@@ -965,8 +1000,8 @@ export default function BbCafeDesktopPos() {
 
             {/* TAB: PAST RECEIPTS */}
             {activeTab === 'receipts' && (
-              <div className="flex-1 p-6 flex flex-col overflow-hidden">
-                <div className="mb-4">
+              <div className="flex-1 p-6 h-full flex flex-col overflow-hidden">
+                <div className="mb-4 shrink-0">
                   <input type="text" placeholder="Search past receipts by Bill No / Phone..." value={receiptSearchQuery} onChange={e => setReceiptSearchQuery(e.target.value)} className="w-full bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-2xl py-3 px-4 text-xs outline-none" />
                 </div>
                 <div className="space-y-2 overflow-y-auto flex-1">
@@ -985,7 +1020,7 @@ export default function BbCafeDesktopPos() {
 
             {/* TAB: SETTINGS & THERMAL PRINTER */}
             {activeTab === 'settings' && (
-              <div className="flex-1 p-6 overflow-y-auto flex justify-center">
+              <div className="flex-1 p-6 h-full overflow-y-auto flex justify-center">
                 <div className="max-w-xl w-full bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 p-6 rounded-3xl shadow-xl space-y-6">
                   <h3 className="text-sm font-black uppercase text-orange-500">Desktop Hardware & POS Settings</h3>
                   
