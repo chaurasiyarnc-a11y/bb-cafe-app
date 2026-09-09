@@ -4,12 +4,12 @@ import { db } from '@/lib/firebase';
 import { 
   collection, onSnapshot, query, orderBy, limit, doc, 
   updateDoc, addDoc, runTransaction, getDoc, getDocs, where, setDoc,
-  waitForPendingWrites
+  waitForPendingWrites, deleteDoc
 } from 'firebase/firestore';
 import { 
   ShoppingBag, Search, X, Loader2, Clock, Printer, Check, Settings, 
   Database, RefreshCw, Layers, Menu, LogOut, Lock, ToggleLeft, ToggleRight, 
-  Sun, Moon, Tag, Trash2, ArrowRight, CheckCircle2, UserPlus, Download, PlusCircle, Edit3, FileText, LayoutGrid, ChevronLeft, ChevronRight, Gift, Percent
+  Sun, Moon, Tag, Trash2, ArrowRight, CheckCircle2, UserPlus, Download, PlusCircle, Edit3, FileText, LayoutGrid, ChevronLeft, ChevronRight, Gift, Percent, Sliders
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
@@ -40,6 +40,7 @@ const SafeChevronLeft = ChevronLeft as any;
 const SafeChevronRight = ChevronRight as any;
 const SafeGift = Gift as any;
 const SafePercent = Percent as any;
+const SafeSliders = Sliders as any;
 
 interface PosCartItem {
   id: string;
@@ -69,7 +70,7 @@ export default function BbCafeDesktopPos() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [pinInput, setPinInput] = useState('');
-  const [activeTab, setActiveTab] = useState<'billing' | 'inventory' | 'receipts' | 'settings' | 'orders' | 'tables'>('billing');
+  const [activeTab, setActiveTab] = useState<'billing' | 'inventory' | 'receipts' | 'settings' | 'orders' | 'tables' | 'variations_manager'>('billing');
 
   const [gstEnabled, setGstEnabled] = useState(false);
   const [gstRate, setGstRate] = useState(5);
@@ -95,11 +96,16 @@ export default function BbCafeDesktopPos() {
 
   const [liveOrders, setLiveOrders] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
+  const [globalVariations, setGlobalVariations] = useState<any[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(false);
   
+  // New Variation Creator States inside Sidebar Tab
+  const [newVarName, setNewVarName] = useState('');
+  const [newVarPriceAdd, setNewVarPriceAdd] = useState(0);
+
   // Item Variation Popup States
   const [isVariationModalOpen, setIsVariationModalOpen] = useState(false);
   const [selectedProductForVariation, setSelectedProductForVariation] = useState<any>(null);
@@ -221,6 +227,15 @@ export default function BbCafeDesktopPos() {
     localStorage.setItem("bb_pos_saved_cart_pc", JSON.stringify(cart));
   }, [cart]);
 
+  // Load Global Variations from Firestore
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, "global_variations"), (snapshot) => {
+      const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setGlobalVariations(list);
+    });
+    return () => unsub();
+  }, []);
+
   useEffect(() => {
     const q = query(collection(db, "orders"), orderBy("timestamp", "desc"), limit(50));
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -327,6 +342,37 @@ export default function BbCafeDesktopPos() {
     toast.success("Locked PC Terminal!");
   };
 
+  const handleAddNewGlobalVariation = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newVarName.trim()) return toast.error("कृपया variation का नाम दर्ज करें!");
+    const toastId = toast.loading("Saving variation...");
+    try {
+      await addDoc(collection(db, "global_variations"), {
+        name: newVarName.trim(),
+        priceAdd: Number(newVarPriceAdd) || 0,
+        createdAt: new Date()
+      });
+      setNewVarName('');
+      setNewVarPriceAdd(0);
+      toast.dismiss(toastId);
+      toast.success("Variation successfully added! ✅");
+    } catch (e) {
+      toast.dismiss(toastId);
+      toast.error("Failed to add variation");
+    }
+  };
+
+  const handleDeleteGlobalVariation = async (id: string) => {
+    triggerBeep('tap');
+    if (!window.confirm("Are you sure you want to delete this variation?")) return;
+    try {
+      await deleteDoc(doc(db, "global_variations", id));
+      toast.success("Variation deleted");
+    } catch (e) {
+      toast.error("Failed to delete");
+    }
+  };
+
   const handleCheckLoyalty = async () => {
     triggerBeep('tap');
     const cleanPhone = customerPhone.trim();
@@ -415,26 +461,22 @@ export default function BbCafeDesktopPos() {
     setIsCustomerModalOpen(false);
   };
 
-  // --- OPEN VARIATION POPUP MODAL FETCHED FROM FIREBASE ---
+  // --- OPEN VARIATION POPUP MODAL USING GLOBAL/FIREBASE VARIATIONS ---
   const handleOpenVariationModal = (item: any) => {
     triggerBeep('tap');
     setSelectedProductForVariation(item);
     
-    const dbVariations = item.variations || item.sizes || item.options;
-    if (Array.isArray(dbVariations) && dbVariations.length > 0) {
-      setAvailableVariations(dbVariations);
-      setSelectedVariationType(dbVariations[0].name || dbVariations[0]);
-      setCustomVariationPrice(Number(dbVariations[0].price) || Number(item.price) || 0);
-    } else {
-      setAvailableVariations([
-        { name: 'Full', price: Number(item.price) || 0 },
-        { name: 'Half', price: Math.round((Number(item.price) || 0) * 0.6) },
-        { name: 'Plain', price: Number(item.price) || 0 },
-        { name: 'Butter', price: (Number(item.price) || 0) + 20 }
-      ]);
-      setSelectedVariationType('Full');
-      setCustomVariationPrice(Number(item.price) || 0);
-    }
+    // Use custom global variations or fallback to defaults
+    const listToUse = globalVariations.length > 0 ? globalVariations : [
+      { name: 'Full', priceAdd: 0 },
+      { name: 'Half', priceAdd: -Math.round((Number(item.price) || 0) * 0.4) },
+      { name: 'Plain', priceAdd: 0 },
+      { name: 'Butter', priceAdd: 20 }
+    ];
+
+    setAvailableVariations(listToUse);
+    setSelectedVariationType(listToUse[0].name);
+    setCustomVariationPrice((Number(item.price) || 0) + (Number(listToUse[0].priceAdd) || 0));
 
     setItemNoteInput('');
     setIsVariationModalOpen(true);
@@ -1010,6 +1052,7 @@ export default function BbCafeDesktopPos() {
                   { id: 'billing', label: 'Counter Billing', icon: ShoppingBag },
                   { id: 'tables', label: `Tables (${activeTableOrders.length})`, icon: LayoutGrid },
                   { id: 'orders', label: `Live Orders (${activeLiveOrders.length})`, icon: Clock },
+                  { id: 'variations_manager', label: 'Variations Manager', icon: Sliders },
                   { id: 'inventory', label: 'Stock Toggle', icon: Layers },
                   { id: 'receipts', label: 'Past Receipts', icon: Printer },
                   { id: 'settings', label: 'Settings & Printer', icon: Settings },
@@ -1327,6 +1370,66 @@ export default function BbCafeDesktopPos() {
               </div>
             )}
 
+            {/* TAB: VARIATIONS MANAGER (Khud se Half, Full, Plain, Butter, Small, Medium, Large add karne ke liye) */}
+            {activeTab === 'variations_manager' && (
+              <div className="flex-1 p-6 h-full overflow-y-auto max-w-2xl mx-auto">
+                <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 p-6 rounded-3xl shadow-xl space-y-6">
+                  <h2 className="text-sm font-black uppercase text-orange-500 flex items-center gap-2">
+                    <SafeSliders size={18} /> Item Variations Management
+                  </h2>
+                  <p className="text-xs text-neutral-400">Yahan aap apne hisaab se naye variations (jaise Half, Full, Plain, Butter, Small, Medium, Large) add kar sakte hain. Yeh sabhi variations item click karne par popup mein dikhengi.</p>
+
+                  <form onSubmit={handleAddNewGlobalVariation} className="space-y-4 bg-neutral-50 dark:bg-neutral-800/40 p-4 rounded-2xl border border-neutral-200 dark:border-neutral-700">
+                    <h3 className="text-xs font-black uppercase text-yellow-500">Add New Variation</h3>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-[10px] font-bold uppercase text-neutral-400 block mb-1">Variation Name (e.g. Half, Large, Butter):</label>
+                        <input 
+                          type="text" 
+                          placeholder="Variation Name" 
+                          value={newVarName}
+                          onChange={e => setNewVarName(e.target.value)}
+                          className="w-full bg-white dark:bg-neutral-900 border border-neutral-700 rounded-xl px-3 py-2 text-xs outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold uppercase text-neutral-400 block mb-1">Price Addition (₹ e.g. 20 or 0):</label>
+                        <input 
+                          type="number" 
+                          placeholder="Price Add" 
+                          value={newVarPriceAdd}
+                          onChange={e => setNewVarPriceAdd(Number(e.target.value))}
+                          className="w-full bg-white dark:bg-neutral-900 border border-neutral-700 rounded-xl px-3 py-2 text-xs outline-none font-mono"
+                        />
+                      </div>
+                    </div>
+                    <button type="submit" className="w-full py-2.5 bg-orange-600 hover:bg-orange-500 text-white font-black text-xs uppercase rounded-xl shadow">
+                      Save Variation Option
+                    </button>
+                  </form>
+
+                  <div className="space-y-3">
+                    <h3 className="text-xs font-black uppercase text-neutral-400">Existing Variations List</h3>
+                    <div className="space-y-2 max-h-60 overflow-y-auto">
+                      {globalVariations.length === 0 ? (
+                        <p className="text-xs text-neutral-500 text-center py-6">No custom variations added yet. Default ones will be used.</p>
+                      ) : (
+                        globalVariations.map((v) => (
+                          <div key={v.id} className="flex justify-between items-center bg-neutral-50 dark:bg-neutral-800/60 p-3 rounded-2xl border border-neutral-200 dark:border-neutral-700">
+                            <div>
+                              <span className="font-bold text-xs">{v.name}</span>
+                              <span className="text-[10px] text-orange-400 font-mono block">Price Add: +₹{v.priceAdd || 0}</span>
+                            </div>
+                            <button onClick={() => handleDeleteGlobalVariation(v.id)} className="text-red-400 hover:text-red-300 p-1.5"><SafeTrash2 size={16} /></button>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* TAB: TABLES MANAGER */}
             {activeTab === 'tables' && (
               <div className="flex-1 p-6 h-full overflow-y-auto">
@@ -1532,7 +1635,9 @@ export default function BbCafeDesktopPos() {
                   <div className="grid grid-cols-2 gap-2">
                     {availableVariations.map((v: any, idx: number) => {
                       const vName = typeof v === 'string' ? v : (v.name || v.size || 'Option');
-                      const vPrice = typeof v === 'object' && v.price !== undefined ? Number(v.price) : (vName === 'Half' ? Math.round((Number(selectedProductForVariation.price) || 0) * 0.6) : (vName === 'Butter' ? (Number(selectedProductForVariation.price) || 0) + 20 : Number(selectedProductForVariation.price) || 0));
+                      const basePrice = Number(selectedProductForVariation.price) || 0;
+                      const priceAdd = Number(v.priceAdd) || 0;
+                      const vPrice = typeof v === 'object' && v.price !== undefined && !v.priceAdd ? Number(v.price) : basePrice + priceAdd;
 
                       return (
                         <button 
