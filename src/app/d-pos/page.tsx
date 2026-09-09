@@ -116,7 +116,7 @@ export default function BbCafeDesktopPos() {
   const [itemImageInput, setItemImageInput] = useState('');
   const [itemVariantsList, setItemVariantsList] = useState<any>({ small: 100, medium: 200, large: 300 });
 
-  // Item Customization & Variation Popup States (Billing Click - Customer App Style)
+  // Item Customization & Variation Popup States
   const [isVariationModalOpen, setIsVariationModalOpen] = useState(false);
   const [selectedProductForVariation, setSelectedProductForVariation] = useState<any>(null);
   const [selectedSize, setSelectedSize] = useState('');
@@ -508,7 +508,6 @@ export default function BbCafeDesktopPos() {
     setIsCustomerModalOpen(false);
   };
 
-  // --- OPEN VARIATION & SIZE MODAL (Customer App Style) ---
   const handleOpenVariationModal = (item: any) => {
     triggerBeep('tap');
     setSelectedProductForVariation(item);
@@ -547,12 +546,15 @@ export default function BbCafeDesktopPos() {
     const sizeSuffix = selectedSize && selectedSize !== 'Standard' ? `(${selectedSize.toUpperCase()})` : '';
     const fullName = `${baseName} ${sizeSuffix}`.trim();
 
-    const noteParts = [];
+    // 💡 यहाँ noteParts को explicit string[] टाइप दे दिया गया है जिससे TypeScript एरर नहीं आएगी
+    const noteParts: string[] = [];
     if (activeAddonsList.length > 0) noteParts.push(`Add-ons: ${activeAddonsList.join(', ')}`);
     if (itemNoteInput) noteParts.push(`Note: ${itemNoteInput}`);
 
+    const combinedNote = noteParts.join(' | ');
+
     setCart((prev) => {
-      const existingIndex = prev.findIndex((c) => c.id === selectedProductForVariation.id && c.size === selectedSize && c.note === noteParts.join(' | '));
+      const existingIndex = prev.findIndex((c) => c.id === selectedProductForVariation.id && c.size === selectedSize && c.note === combinedNote);
       if (existingIndex > -1) {
         const next = [...prev];
         next[existingIndex].quantity += 1;
@@ -564,7 +566,7 @@ export default function BbCafeDesktopPos() {
         price: finalItemPrice, 
         quantity: 1, 
         size: selectedSize,
-        note: noteParts.join(' | ') 
+        note: combinedNote 
       }];
     });
 
@@ -637,9 +639,6 @@ export default function BbCafeDesktopPos() {
     toast.success("Peri Peri USB 802 Thermal Printer Ready via Browser Print Engine! ✅");
   };
 
-  // ==========================================================
-  // 80mm THERMAL RECEIPT & KOT PRINT ENGINE (Peri Peri 802)
-  // ==========================================================
   const handlePrintReceiptDirect = async (orderObj: any, isKot = false) => {
     if (!orderObj || !orderObj.items || orderObj.items.length === 0) return;
 
@@ -1637,7 +1636,7 @@ export default function BbCafeDesktopPos() {
                         <button 
                           key={size}
                           onClick={() => {
-                            triggerHaptic('tap');
+                            triggerBeep('tap');
                             setSelectedSize(size);
                             setSelectedSizePrice(Number(price) || 100);
                           }}
