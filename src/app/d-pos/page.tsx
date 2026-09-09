@@ -9,7 +9,7 @@ import {
 import { 
   ShoppingBag, Search, X, Loader2, Clock, Printer, Check, Settings, 
   Database, RefreshCw, Layers, Menu, LogOut, Lock, ToggleLeft, ToggleRight, 
-  Sun, Moon, Tag, Trash2, ArrowRight, CheckCircle2, UserPlus
+  Sun, Moon, Tag, Trash2, ArrowRight, CheckCircle2, UserPlus, Download
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
@@ -31,6 +31,7 @@ const SafeRefreshCw = RefreshCw as any;
 const SafeSettings = Settings as any;
 const SafeTrash2 = Trash2 as any;
 const SafeUserPlus = UserPlus as any;
+const SafeDownload = Download as any;
 
 interface PosCartItem {
   id: string;
@@ -65,6 +66,10 @@ export default function BbCafeDesktopPos() {
   const [gstRate, setGstRate] = useState(5);
   const [themeMode, setThemeMode] = useState<'dark' | 'light'>('dark');
 
+  // PWA Install Prompt State
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [isAppInstalled, setIsAppInstalled] = useState(false);
+
   // Printer states
   const [isConnecting, setIsConnecting] = useState(false);
   const [printerConnected, setPrinterConnected] = useState(false);
@@ -76,7 +81,6 @@ export default function BbCafeDesktopPos() {
   const [searchedCustomers, setSearchedCustomers] = useState<any[]>([]);
   const [isSearchingCustomer, setIsSearchingCustomer] = useState(false);
   
-  // New Customer Quick Save State inside Billing Panel
   const [showNewCustForm, setShowNewCustForm] = useState(false);
   const [newCustNameInput, setNewCustNameInput] = useState('');
   const [newCustAddressInput, setNewCustAddressInput] = useState('');
@@ -144,6 +148,17 @@ export default function BbCafeDesktopPos() {
   };
 
   useEffect(() => {
+    // PWA Install Prompt Listener
+    const handleBeforeInstallPrompt = (e: any) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+    if (window.matchMedia('(display-mode: standalone)').matches) {
+      setIsAppInstalled(true);
+    }
+
     const savedUser = localStorage.getItem("bb_pos_user_pc");
     if (savedUser) { try { setIsLoggedIn(true); setCurrentUser(JSON.parse(savedUser)); } catch (e) {} }
     setGstEnabled(localStorage.getItem("bb_pos_gst_enabled_pc") === 'true');
@@ -157,7 +172,25 @@ export default function BbCafeDesktopPos() {
 
     const savedCart = localStorage.getItem("bb_pos_saved_cart_pc");
     if (savedCart) { try { setCart(JSON.parse(savedCart)); } catch (err) {} }
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
   }, []);
+
+  const handleInstallClick = async () => {
+    if (!deferredPrompt) {
+      toast("App already installed or browser does not support direct installation. Use browser menu -> 'Install App'.", { icon: 'ℹ️' });
+      return;
+    }
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') {
+      setIsAppInstalled(true);
+      toast.success("App installed successfully on your PC! 🎉");
+    }
+    setDeferredPrompt(null);
+  };
 
   useEffect(() => {
     localStorage.setItem("bb_pos_saved_cart_pc", JSON.stringify(cart));
@@ -266,7 +299,6 @@ export default function BbCafeDesktopPos() {
     toast.success("Locked PC Terminal!");
   };
 
-  // --- LOYALTY & CUSTOMER CHECK LOGIC ---
   const handleCheckLoyalty = async () => {
     triggerBeep('tap');
     const cleanPhone = customerPhone.trim();
@@ -378,7 +410,6 @@ export default function BbCafeDesktopPos() {
   const getGstAmountCalculated = () => gstEnabled ? Number(((getCartSubtotal() * gstRate) / 100).toFixed(2)) : 0;
   const getTotalBillPrice = () => Math.max(0, getCartSubtotal() + getGstAmountCalculated() - customDiscount) + getDeliveryCharge();
 
-  // --- THERMAL PRINTER CORE WITH AUTO-CUT (80MM) ---
   const handleConnectPrinter = async () => {
     triggerBeep('tap');
     setIsConnecting(true);
@@ -422,7 +453,7 @@ export default function BbCafeDesktopPos() {
         console.error("USB Transfer Error:", e);
       }
     }
-    window.print(); // Fallback
+    window.print();
     return false;
   };
 
@@ -430,8 +461,8 @@ export default function BbCafeDesktopPos() {
     const encoder = new TextEncoder();
     let commands: number[] = [];
 
-    commands.push(0x1B, 0x40); // Init
-    commands.push(0x1B, 0x61, 0x01); // Center
+    commands.push(0x1B, 0x40); 
+    commands.push(0x1B, 0x61, 0x01); 
 
     const addText = (txt: string) => {
       const encoded = encoder.encode(txt);
@@ -491,7 +522,6 @@ export default function BbCafeDesktopPos() {
       addText("Powered by Bum Bum Cafe POS\n\n");
     }
 
-    // Feed lines & Auto-Cut command for 80mm thermal printer
     commands.push(0x1B, 0x64, 0x04); 
     commands.push(0x1D, 0x56, 0x41, 0x03); 
 
@@ -554,7 +584,6 @@ export default function BbCafeDesktopPos() {
       triggerBeep('success'); 
       toast.success(`Bill #${billNumber} saved & printed successfully!`);
       
-      // One-Click Direct Print with Auto-Cut
       if (kotEnabled) {
         await handlePrintReceiptDirect(orderObj, true);
         await new Promise((r) => setTimeout(r, 800));
@@ -568,6 +597,16 @@ export default function BbCafeDesktopPos() {
       toast.error("Failed to place order");
     } finally {
       setIsSubmittingOrder(false);
+    }
+  };
+
+  const handleUpdateStatus = async (orderId: string, newStatus: string) => {
+    triggerBeep('tap');
+    try {
+      await updateDoc(doc(db, "orders", orderId), { status: newStatus });
+      toast.success(`Order status updated to ${newStatus}!`);
+    } catch (e) {
+      toast.error("Failed to update status");
     }
   };
 
@@ -651,6 +690,10 @@ export default function BbCafeDesktopPos() {
             </div>
 
             <div className="space-y-3 pt-4 border-t border-neutral-200 dark:border-neutral-800">
+              <button onClick={handleInstallClick} className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-2xl text-xs font-black uppercase text-blue-400 bg-blue-500/10 hover:bg-blue-500/20 transition-all">
+                <SafeDownload size={16} />
+                <span>Install App on PC</span>
+              </button>
               <button onClick={handleManualSync} disabled={isSyncing} className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-2xl text-xs font-black uppercase text-yellow-500 bg-yellow-500/10 hover:bg-yellow-500/20 transition-all">
                 {isSyncing ? <Loader2 className="animate-spin" size={16} /> : <SafeRefreshCw size={16} />}
                 <span>Sync Products</span>
@@ -664,11 +707,9 @@ export default function BbCafeDesktopPos() {
           {/* MAIN CONTENT AREA */}
           <main className="flex-1 flex overflow-hidden">
 
-            {/* TAB: BILLING (DESKTOP SPLIT VIEW: MENU + CART) */}
+            {/* TAB: BILLING */}
             {activeTab === 'billing' && (
               <div className="flex-1 flex h-full overflow-hidden">
-                
-                {/* Left: Product Grid */}
                 <div className="flex-1 flex flex-col p-5 overflow-hidden">
                   <div className="flex gap-3 mb-4 items-center">
                     <div className="relative flex-1">
@@ -683,7 +724,6 @@ export default function BbCafeDesktopPos() {
                     </div>
                   </div>
 
-                  {/* Categories Pills */}
                   <div className="flex gap-2 overflow-x-auto pb-3 shrink-0 scrollbar-none">
                     {categories.map((cat) => {
                       const isSelected = selectedCategory === cat;
@@ -699,7 +739,6 @@ export default function BbCafeDesktopPos() {
                     })}
                   </div>
 
-                  {/* Products Grid */}
                   {loading ? (
                     <div className="flex items-center justify-center flex-1"><Loader2 className="animate-spin text-orange-500" size={32} /></div>
                   ) : (
@@ -732,7 +771,7 @@ export default function BbCafeDesktopPos() {
                   )}
                 </div>
 
-                {/* Right: Permanent Desktop Cart Panel */}
+                {/* Cart Panel */}
                 <div className="w-96 bg-white dark:bg-neutral-900 border-l border-neutral-200 dark:border-neutral-800 flex flex-col p-5 shadow-2xl justify-between">
                   <div className="flex flex-col h-full overflow-hidden">
                     <div className="flex items-center justify-between border-b border-neutral-200 dark:border-neutral-800 pb-3 mb-3">
@@ -740,7 +779,6 @@ export default function BbCafeDesktopPos() {
                       <button onClick={() => setCart([])} className="text-red-500 text-xs font-bold hover:underline flex items-center gap-1"><SafeTrash2 size={14} /> Clear</button>
                     </div>
 
-                    {/* Customer Lookup & Quick Registration */}
                     <div className="space-y-2 bg-neutral-50 dark:bg-neutral-800/40 p-3 rounded-2xl border border-neutral-200 dark:border-neutral-800 mb-3 shrink-0">
                       <div className="flex gap-2">
                         <input 
@@ -789,7 +827,6 @@ export default function BbCafeDesktopPos() {
                       )}
                     </div>
 
-                    {/* Cart Items List */}
                     <div className="space-y-2 overflow-y-auto flex-1 pr-1 mb-3">
                       {cart.length === 0 ? (
                         <div className="flex flex-col items-center justify-center h-full text-neutral-400 text-xs text-center">
@@ -813,7 +850,6 @@ export default function BbCafeDesktopPos() {
                       )}
                     </div>
 
-                    {/* Fulfillment Type */}
                     <div className="space-y-3 mb-4 shrink-0 border-t border-neutral-200 dark:border-neutral-800 pt-3">
                       <div className="grid grid-cols-3 gap-1 bg-neutral-100 dark:bg-neutral-800 p-1 rounded-2xl">
                         {(['table', 'pickup', 'delivery'] as const).map((type) => (
@@ -835,7 +871,6 @@ export default function BbCafeDesktopPos() {
                       )}
                     </div>
 
-                    {/* Bill Totals & Checkout */}
                     <div className="space-y-2 text-xs border-t border-neutral-200 dark:border-neutral-800 pt-3 shrink-0">
                       <div className="flex justify-between text-neutral-400"><span>Subtotal</span><span className="font-mono">₹{getCartSubtotal()}</span></div>
                       {fulfillmentType === 'delivery' && <div className="flex justify-between text-neutral-400"><span>Delivery Charge</span><span className="font-mono">₹{getDeliveryCharge()}</span></div>}
@@ -955,6 +990,14 @@ export default function BbCafeDesktopPos() {
                   <h3 className="text-sm font-black uppercase text-orange-500">Desktop Hardware & POS Settings</h3>
                   
                   <div className="space-y-2 border-b border-neutral-200 dark:border-neutral-800 pb-4">
+                    <p className="text-xs font-bold uppercase">Install App on Desktop:</p>
+                    <button onClick={handleInstallClick} className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-black text-xs uppercase rounded-xl transition-all shadow-md flex items-center justify-center gap-2">
+                      <SafeDownload size={16} /> Install POS as PC Application
+                    </button>
+                    <p className="text-[10px] text-neutral-400">Yeh option aapke PC (Windows/Mac) par is web app ko native desktop app ki tarah install kar dega.</p>
+                  </div>
+
+                  <div className="space-y-2 border-b border-neutral-200 dark:border-neutral-800 pb-4">
                     <p className="text-xs font-bold uppercase">UI Theme:</p>
                     <div className="flex bg-neutral-100 dark:bg-neutral-800 p-1 rounded-xl w-48">
                       <button onClick={() => handleToggleTheme('dark')} className={`flex-1 py-2 rounded-lg text-xs font-black uppercase ${themeMode === 'dark' ? 'bg-neutral-950 text-amber-400' : 'text-neutral-400'}`}>Dark</button>
@@ -987,7 +1030,6 @@ export default function BbCafeDesktopPos() {
         </>
       )}
 
-      {/* RECEIPT PREVIEW MODAL */}
       <AnimatePresence>
         {isReceiptModalOpen && selectedReceipt && (
           <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
