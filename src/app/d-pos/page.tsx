@@ -47,6 +47,7 @@ interface PosCartItem {
   price: number;
   quantity: number;
   note?: string; 
+  variation?: string;
 }
 
 interface DeliveryArea {
@@ -99,6 +100,13 @@ export default function BbCafeDesktopPos() {
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(false);
   
+  // Item Variation Popup States
+  const [isVariationModalOpen, setIsVariationModalOpen] = useState(false);
+  const [selectedProductForVariation, setSelectedProductForVariation] = useState<any>(null);
+  const [selectedVariationType, setSelectedVariationType] = useState('Full');
+  const [customVariationPrice, setCustomVariationPrice] = useState<number>(0);
+  const [itemNoteInput, setItemNoteInput] = useState('');
+
   const [pastReceipts, setPastReceipts] = useState<any[]>([]);
   const [receiptSearchQuery, setReceiptSearchQuery] = useState('');
   const [selectedReceipt, setSelectedReceipt] = useState<any>(null);
@@ -113,11 +121,9 @@ export default function BbCafeDesktopPos() {
   const [customerName, setCustomerName] = useState('');
   const [customerPoints, setCustomerPoints] = useState(0);
   
-  // Loyalty Redemption States
   const [isRedeemingPoints, setIsRedeemingPoints] = useState(false);
   const [pointsToRedeem, setPointsToRedeem] = useState(0);
 
-  // Discount States (Amount & Percentage)
   const [discountType, setDiscountType] = useState<'amount' | 'percentage'>('amount');
   const [discountValue, setDiscountValue] = useState<number>(0);
 
@@ -339,7 +345,7 @@ export default function BbCafeDesktopPos() {
         setShowNewCustForm(false);
         setIsRedeemingPoints(false);
         setPointsToRedeem(0);
-        toast.success(`कस्टमर मिल गया: ${data.name} (पॉइंट्स: ${data.points || 0})`);
+        toast.success(`कस्टमर मिल गया: ${data.name}`);
       } else {
         setCustomerName('');
         setCustomerPoints(0);
@@ -408,17 +414,46 @@ export default function BbCafeDesktopPos() {
     setIsCustomerModalOpen(false);
   };
 
-  const handleAddProductToCart = (item: any) => {
+  // --- ITEM VARIATION MODAL TRIGGER ---
+  const handleOpenVariationModal = (item: any) => {
     triggerBeep('tap');
+    setSelectedProductForVariation(item);
+    setSelectedVariationType('Full');
+    setCustomVariationPrice(Number(item.price) || 0);
+    setItemNoteInput('');
+    setIsVariationModalOpen(true);
+  };
+
+  const handleAddVariationItemToCart = () => {
+    if (!selectedProductForVariation) return;
+    triggerBeep('tap');
+
+    const baseName = selectedProductForVariation.name;
+    const variationSuffix = selectedVariationType ? `(${selectedVariationType})` : '';
+    const fullName = `${baseName} ${variationSuffix}`.trim();
+    const finalPrice = Number(customVariationPrice) || 0;
+
     setCart((prev) => {
-      const existingIndex = prev.findIndex((c) => c.id === item.id);
+      // Check if exact same item with same variation exists
+      const existingIndex = prev.findIndex((c) => c.id === selectedProductForVariation.id && c.variation === selectedVariationType && c.note === itemNoteInput);
       if (existingIndex > -1) {
         const next = [...prev];
         next[existingIndex].quantity += 1;
         return next;
       }
-      return [...prev, { id: item.id, name: item.name, price: Number(item.price) || 0, quantity: 1 }];
+      return [...prev, { 
+        id: selectedProductForVariation.id, 
+        name: fullName, 
+        price: finalPrice, 
+        quantity: 1, 
+        variation: selectedVariationType,
+        note: itemNoteInput.trim() 
+      }];
     });
+
+    setIsVariationModalOpen(false);
+    setSelectedProductForVariation(null);
+    toast.success(`Added ${fullName} to cart!`);
   };
 
   const handleUpdateCartQuantity = (id: string, amount: number) => {
@@ -508,10 +543,9 @@ export default function BbCafeDesktopPos() {
     }
   };
 
-  // --- STRICT VALIDATION FOR PRINTING (PREVENTS BLANK PAGES) ---
   const handlePrintReceiptDirect = async (orderObj: any, isKot = false) => {
     if (!orderObj || !orderObj.items || orderObj.items.length === 0) {
-      console.warn("Attempted to print empty order, aborted to prevent blank page.");
+      console.warn("Attempted to print empty order, aborted.");
       return;
     }
 
@@ -541,10 +575,12 @@ export default function BbCafeDesktopPos() {
           });
           addText("------------------------------------------------\n");
         } else {
+          addText("[ QR CODE ]\n\n");
+
           commands.push(0x1D, 0x21, 0x11); 
           addText("BUM BUM CAFE & RESTAURANT\n");
           commands.push(0x1D, 0x21, 0x00);
-          addText("नू बस स्टैंड मोहंद्रा, पुलिस चौकी के सामने,\n");
+          addText("न्यू बस स्टैंड मोहंद्रा, पुलिस चौकी के सामने,\n");
           addText("जिला पन्ना, मोहंद्रा, मध्य प्रदेश, 488442\n");
           addText("9714293759\n\n");
 
@@ -568,6 +604,7 @@ export default function BbCafeDesktopPos() {
             const itemTotal = `₹${(item.price || 0) * (item.quantity || 1)}`;
             
             addText(`${itemName}\n`);
+            if (item.note) addText(`  * Note: ${item.note}\n`);
             const spaces = ' '.repeat(Math.max(2, 40 - qtyPriceLine.length - itemTotal.length));
             addText(`${qtyPriceLine}${spaces}${itemTotal}\n\n`);
           });
@@ -599,7 +636,7 @@ export default function BbCafeDesktopPos() {
           addText("🖤 Thank you, visit again 🖤\n");
           
           let dateFormatted = new Date().toLocaleDateString('en-GB') + ' ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-          addText(`${dateFormatted}${' '.repeat(10)}#${String(orderObj.billNumber).padStart(4, '0')}\n`);
+          addText(`${dateFormatted}${' '.repeat(10)}#6-${String(orderObj.billNumber).padStart(4, '0')}\n`);
         }
 
         commands.push(0x1B, 0x64, 0x02); 
@@ -617,7 +654,6 @@ export default function BbCafeDesktopPos() {
       console.error("USB Print Error, using browser fallback", e);
     }
 
-    // Browser Print Fallback with strict content check
     const printWindow = window.open('', '_blank', 'width=350,height=550');
     if (printWindow) {
       printWindow.document.write(`
@@ -639,9 +675,15 @@ export default function BbCafeDesktopPos() {
               <div class="center">Token: #${orderObj.tokenNumber} | Type: ${orderObj.fulfillmentType.toUpperCase()}</div>
               ${orderObj.tableNumber ? `<div class="center bold">Table: ${orderObj.tableNumber}</div>` : ''}
               <div class="line"></div>
-              ${orderObj.items.map((i: any) => `<div>[ ] ${i.name} x ${i.quantity}</div>`).join('')}
+              ${orderObj.items.map((i: any) => `<div>[ ] ${i.name} x ${i.quantity}${i.note ? ` (${i.note})` : ''}</div>`).join('')}
               <div class="line"></div>
             ` : `
+              <div class="center">
+                <svg width="100" height="100" viewBox="0 0 25 25" style="margin: 0 auto; display: block;">
+                  <path d="M0 0h7v7H0zM2 2h3v3H2zM9 0h2v2H9zM14 0h3v3h-3zM19 0h6v6h-6zM21 2h2v2h-2zM0 9h2v2H0zM5 9h3v3H5zM10 9h4v2h-4zM16 9h2v2h-2zM21 9h4v2h-4zM0 14h3v3H0zM6 14h2v2H6zM11 14h2v2h-2zM15 14h4v2h-4zM22 14h3v3h-3zM0 19h7v7H0zM2 21h3v3H2zM9 19h2v2H9zM14 19h3v3h-3zM19 19h6v6h-6zM21 21h2v2h-2z" fill="#000"/>
+                </svg>
+              </div>
+              <br/>
               <div class="center bold" style="font-size: 15px;">BUM BUM CAFE & RESTAURANT</div>
               <div class="center">न्यू बस स्टैंड मोहंद्रा, पुलिस चौकी के सामने,</div>
               <div class="center">जिला पन्ना, मोहंद्रा, मध्य प्रदेश, 488442</div>
@@ -657,6 +699,7 @@ export default function BbCafeDesktopPos() {
               <br/>
               ${orderObj.items.map((i: any) => `
                 <div>${i.name}</div>
+                ${i.note ? `<div style="font-size:10px; font-style:italic;">  * Note: ${i.note}</div>` : ''}
                 <div class="flex"><span>${i.quantity} x ₹${i.price}</span><span>₹${i.price * i.quantity}</span></div>
                 <br/>
               `).join('')}
@@ -1055,7 +1098,7 @@ export default function BbCafeDesktopPos() {
                           <button 
                             key={item.id} 
                             disabled={!isAvail} 
-                            onClick={() => handleAddProductToCart(item)} 
+                            onClick={() => handleOpenVariationModal(item)} 
                             className={`border rounded-2xl text-left flex flex-col overflow-hidden h-44 transition-all duration-200 hover:scale-[1.02] active:scale-95 shadow-sm ${isAvail ? "bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800 hover:border-orange-500/50" : "opacity-40 bg-neutral-200 dark:bg-neutral-950 border-neutral-800 pointer-events-none"}`}
                           >
                             <div className="w-full h-24 bg-neutral-200 dark:bg-neutral-800 relative shrink-0 overflow-hidden flex items-center justify-center">
@@ -1168,10 +1211,11 @@ export default function BbCafeDesktopPos() {
                           <p>Cart is empty. Click items from menu to add.</p>
                         </div>
                       ) : (
-                        cart.map((item) => (
-                          <div key={item.id} className="bg-neutral-50 dark:bg-neutral-800/40 border border-neutral-200 dark:border-neutral-800 p-2.5 rounded-2xl flex items-center justify-between gap-2">
+                        cart.map((item, idx) => (
+                          <div key={idx} className="bg-neutral-50 dark:bg-neutral-800/40 border border-neutral-200 dark:border-neutral-800 p-2.5 rounded-2xl flex items-center justify-between gap-2">
                             <div className="flex-1 min-w-0">
                               <p className="font-bold text-xs truncate">{item.name}</p>
+                              {item.note && <p className="text-[10px] text-neutral-400 italic truncate">Note: {item.note}</p>}
                               <p className="text-[11px] font-mono text-orange-500 font-bold">₹{item.price * item.quantity}</p>
                             </div>
                             <div className="flex items-center gap-1.5 shrink-0">
@@ -1184,7 +1228,7 @@ export default function BbCafeDesktopPos() {
                       )}
                     </div>
 
-                    {/* DISCOUNT INPUT (AMOUNT OR PERCENTAGE) */}
+                    {/* DISCOUNT INPUT */}
                     <div className="space-y-2 bg-neutral-50 dark:bg-neutral-800/40 p-2.5 rounded-2xl border border-neutral-200 dark:border-neutral-800 mb-3 shrink-0">
                       <div className="flex items-center justify-between">
                         <span className="text-[11px] font-bold uppercase text-neutral-400">Discount Option</span>
@@ -1460,6 +1504,72 @@ export default function BbCafeDesktopPos() {
           </main>
         </>
       )}
+
+      {/* --- ITEM VARIATION MODAL POPUP --- */}
+      <AnimatePresence>
+        {isVariationModalOpen && selectedProductForVariation && (
+          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 max-w-sm w-full rounded-3xl p-6 shadow-2xl space-y-4">
+              <div className="flex justify-between items-center border-b pb-3">
+                <h3 className="font-black text-sm uppercase text-orange-500">{selectedProductForVariation.name}</h3>
+                <button onClick={() => setIsVariationModalOpen(false)}><SafeX size={18} /></button>
+              </div>
+
+              <div className="space-y-3">
+                <div>
+                  <label className="text-xs font-bold uppercase text-neutral-400 block mb-1.5">Select Variation:</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {['Full', 'Half', 'Plain', 'Butter'].map((vType) => (
+                      <button 
+                        key={vType}
+                        onClick={() => {
+                          triggerBeep('tap');
+                          setSelectedVariationType(vType);
+                          // Adjust price dynamically if half or butter
+                          let baseP = Number(selectedProductForVariation.price) || 0;
+                          if (vType === 'Half') baseP = Math.round(baseP * 0.6); // e.g. Half rate
+                          if (vType === 'Butter') baseP += 20; // e.g. Butter extra
+                          setCustomVariationPrice(baseP);
+                        }}
+                        className={`py-2.5 rounded-xl text-xs font-black uppercase border transition-all ${selectedVariationType === vType ? 'bg-orange-600 text-white border-orange-600' : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-400 border-neutral-700'}`}
+                      >
+                        {vType}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold uppercase text-neutral-400 block mb-1">Price (₹):</label>
+                  <input 
+                    type="number" 
+                    value={customVariationPrice}
+                    onChange={e => setCustomVariationPrice(Number(e.target.value))}
+                    className="w-full bg-neutral-100 dark:bg-neutral-800 border border-neutral-700 rounded-xl px-3 py-2 text-sm font-mono font-bold outline-none text-orange-400"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold uppercase text-neutral-400 block mb-1">Special Note / Customization:</label>
+                  <input 
+                    type="text" 
+                    placeholder="e.g. Less spicy, Extra cheese..."
+                    value={itemNoteInput}
+                    onChange={e => setItemNoteInput(e.target.value)}
+                    className="w-full bg-neutral-100 dark:bg-neutral-800 border border-neutral-700 rounded-xl px-3 py-2 text-xs outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button onClick={handleAddVariationItemToCart} className="w-full bg-green-600 hover:bg-green-500 text-white font-black py-3 rounded-xl text-xs uppercase shadow">
+                  Add to Cart
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       <AnimatePresence>
         {isReceiptModalOpen && selectedReceipt && (
