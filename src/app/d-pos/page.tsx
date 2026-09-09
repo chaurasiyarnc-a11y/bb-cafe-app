@@ -345,7 +345,7 @@ export default function BbCafeDesktopPos() {
         setShowNewCustForm(false);
         setIsRedeemingPoints(false);
         setPointsToRedeem(0);
-        toast.success(`कस्टमर मिल गया: ${data.name}`);
+        toast.success(`कस्टमर मिल गया: ${data.name} (पॉइंट्स: ${data.points || 0})`);
       } else {
         setCustomerName('');
         setCustomerPoints(0);
@@ -414,7 +414,7 @@ export default function BbCafeDesktopPos() {
     setIsCustomerModalOpen(false);
   };
 
-  // --- ITEM VARIATION MODAL TRIGGER ---
+  // --- OPEN VARIATION POPUP MODAL ---
   const handleOpenVariationModal = (item: any) => {
     triggerBeep('tap');
     setSelectedProductForVariation(item);
@@ -434,7 +434,6 @@ export default function BbCafeDesktopPos() {
     const finalPrice = Number(customVariationPrice) || 0;
 
     setCart((prev) => {
-      // Check if exact same item with same variation exists
       const existingIndex = prev.findIndex((c) => c.id === selectedProductForVariation.id && c.variation === selectedVariationType && c.note === itemNoteInput);
       if (existingIndex > -1) {
         const next = [...prev];
@@ -680,7 +679,7 @@ export default function BbCafeDesktopPos() {
             ` : `
               <div class="center">
                 <svg width="100" height="100" viewBox="0 0 25 25" style="margin: 0 auto; display: block;">
-                  <path d="M0 0h7v7H0zM2 2h3v3H2zM9 0h2v2H9zM14 0h3v3h-3zM19 0h6v6h-6zM21 2h2v2h-2zM0 9h2v2H0zM5 9h3v3H5zM10 9h4v2h-4zM16 9h2v2h-2zM21 9h4v2h-4zM0 14h3v3H0zM6 14h2v2H6zM11 14h2v2h-2zM15 14h4v2h-4zM22 14h3v3h-3zM0 19h7v7H0zM2 21h3v3H2zM9 19h2v2H9zM14 19h3v3h-3zM19 19h6v6h-6zM21 21h2v2h-2z" fill="#000"/>
+                  <path d="M0 0h7v7H0zM2 2h3v3H2zM9 0h2v2H9zM14 0h3v3h-3zM19 0h6v6h-6zM21 2h2v2h-2zM0 9h2v2H0zM5 9h3v3H5zM10 9h4v2h-4zM16 9h2v2h-2zM21 9h4v2h-4zM0 14h3v3H0zM6 14h2v2H6zM11 14h2v2H2zM15 14h4v2h-4zM22 14h3v3h-3zM0 19h7v7H0zM2 21h3v3H2zM9 19h2v2H9zM14 19h3v3h-3zM19 19h6v6h-6zM21 21h2v2h-2z" fill="#000"/>
                 </svg>
               </div>
               <br/>
@@ -1505,7 +1504,7 @@ export default function BbCafeDesktopPos() {
         </>
       )}
 
-      {/* --- ITEM VARIATION MODAL POPUP --- */}
+      {/* --- ITEM VARIATION POPUP MODAL (Half, Full, Plain, Butter) --- */}
       <AnimatePresence>
         {isVariationModalOpen && selectedProductForVariation && (
           <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -1525,10 +1524,9 @@ export default function BbCafeDesktopPos() {
                         onClick={() => {
                           triggerBeep('tap');
                           setSelectedVariationType(vType);
-                          // Adjust price dynamically if half or butter
                           let baseP = Number(selectedProductForVariation.price) || 0;
-                          if (vType === 'Half') baseP = Math.round(baseP * 0.6); // e.g. Half rate
-                          if (vType === 'Butter') baseP += 20; // e.g. Butter extra
+                          if (vType === 'Half') baseP = Math.round(baseP * 0.6);
+                          if (vType === 'Butter') baseP += 20;
                           setCustomVariationPrice(baseP);
                         }}
                         className={`py-2.5 rounded-xl text-xs font-black uppercase border transition-all ${selectedVariationType === vType ? 'bg-orange-600 text-white border-orange-600' : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-400 border-neutral-700'}`}
