@@ -100,9 +100,10 @@ export default function BbCafeDesktopPos() {
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(false);
   
-  // Item Variation Popup States
+  // Item Variation Popup States from Firebase Data
   const [isVariationModalOpen, setIsVariationModalOpen] = useState(false);
   const [selectedProductForVariation, setSelectedProductForVariation] = useState<any>(null);
+  const [availableVariations, setAvailableVariations] = useState<any[]>([]);
   const [selectedVariationType, setSelectedVariationType] = useState('Full');
   const [customVariationPrice, setCustomVariationPrice] = useState<number>(0);
   const [itemNoteInput, setItemNoteInput] = useState('');
@@ -414,12 +415,29 @@ export default function BbCafeDesktopPos() {
     setIsCustomerModalOpen(false);
   };
 
-  // --- OPEN VARIATION POPUP MODAL ---
+  // --- OPEN VARIATION POPUP MODAL FETCHING FROM FIREBASE PRODUCT DATA ---
   const handleOpenVariationModal = (item: any) => {
     triggerBeep('tap');
     setSelectedProductForVariation(item);
-    setSelectedVariationType('Full');
-    setCustomVariationPrice(Number(item.price) || 0);
+    
+    // Check if item has variations defined in Firebase (e.g. item.variations or item.sizes array)
+    const dbVariations = item.variations || item.sizes || item.options;
+    if (Array.isArray(dbVariations) && dbVariations.length > 0) {
+      setAvailableVariations(dbVariations);
+      setSelectedVariationType(dbVariations[0].name || dbVariations[0]);
+      setCustomVariationPrice(Number(dbVariations[0].price) || Number(item.price) || 0);
+    } else {
+      // Fallback default variations if not explicitly in Firestore
+      setAvailableVariations([
+        { name: 'Full', price: Number(item.price) || 0 },
+        { name: 'Half', price: Math.round((Number(item.price) || 0) * 0.6) },
+        { name: 'Plain', price: Number(item.price) || 0 },
+        { name: 'Butter', price: (Number(item.price) || 0) + 20 }
+      ]);
+      setSelectedVariationType('Full');
+      setCustomVariationPrice(Number(item.price) || 0);
+    }
+
     setItemNoteInput('');
     setIsVariationModalOpen(true);
   };
@@ -679,7 +697,7 @@ export default function BbCafeDesktopPos() {
             ` : `
               <div class="center">
                 <svg width="100" height="100" viewBox="0 0 25 25" style="margin: 0 auto; display: block;">
-                  <path d="M0 0h7v7H0zM2 2h3v3H2zM9 0h2v2H9zM14 0h3v3h-3zM19 0h6v6h-6zM21 2h2v2h-2zM0 9h2v2H0zM5 9h3v3H5zM10 9h4v2h-4zM16 9h2v2h-2zM21 9h4v2h-4zM0 14h3v3H0zM6 14h2v2H6zM11 14h2v2H2zM15 14h4v2h-4zM22 14h3v3h-3zM0 19h7v7H0zM2 21h3v3H2zM9 19h2v2H9zM14 19h3v3h-3zM19 19h6v6h-6zM21 21h2v2h-2z" fill="#000"/>
+                  <path d="M0 0h7v7H0zM2 2h3v3H2zM9 0h2v2H9zM14 0h3v3h-3zM19 0h6v6h-6zM21 2h2v2h-2zM0 9h2v2H0zM5 9h3v3H5zM10 9h4v2h-4zM16 9h2v2H2zM21 9h4v2h-4zM0 14h3v3H0zM6 14h2v2H6zM11 14h2v2h-2zM15 14h4v2h-4zM22 14h3v3h-3zM0 19h7v7H0zM2 21h3v3H2zM9 19h2v2H9zM14 19h3v3h-3zM19 19h6v6h-6zM21 21h2v2h-2z" fill="#000"/>
                 </svg>
               </div>
               <br/>
@@ -1504,7 +1522,7 @@ export default function BbCafeDesktopPos() {
         </>
       )}
 
-      {/* --- ITEM VARIATION POPUP MODAL (Half, Full, Plain, Butter) --- */}
+      {/* --- ITEM VARIATION MODAL POPUP FETCHED FROM FIREBASE PRODUCT DATA --- */}
       <AnimatePresence>
         {isVariationModalOpen && selectedProductForVariation && (
           <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -1518,22 +1536,24 @@ export default function BbCafeDesktopPos() {
                 <div>
                   <label className="text-xs font-bold uppercase text-neutral-400 block mb-1.5">Select Variation:</label>
                   <div className="grid grid-cols-2 gap-2">
-                    {['Full', 'Half', 'Plain', 'Butter'].map((vType) => (
-                      <button 
-                        key={vType}
-                        onClick={() => {
-                          triggerBeep('tap');
-                          setSelectedVariationType(vType);
-                          let baseP = Number(selectedProductForVariation.price) || 0;
-                          if (vType === 'Half') baseP = Math.round(baseP * 0.6);
-                          if (vType === 'Butter') baseP += 20;
-                          setCustomVariationPrice(baseP);
-                        }}
-                        className={`py-2.5 rounded-xl text-xs font-black uppercase border transition-all ${selectedVariationType === vType ? 'bg-orange-600 text-white border-orange-600' : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-400 border-neutral-700'}`}
-                      >
-                        {vType}
-                      </button>
-                    ))}
+                    {availableVariations.map((v: any, idx: number) => {
+                      const vName = typeof v === 'string' ? v : (v.name || v.size || 'Option');
+                      const vPrice = typeof v === 'object' && v.price !== undefined ? Number(v.price) : (vName === 'Half' ? Math.round((Number(selectedProductForVariation.price) || 0) * 0.6) : (vName === 'Butter' ? (Number(selectedProductForVariation.price) || 0) + 20 : Number(selectedProductForVariation.price) || 0));
+
+                      return (
+                        <button 
+                          key={idx}
+                          onClick={() => {
+                            triggerBeep('tap');
+                            setSelectedVariationType(vName);
+                            setCustomVariationPrice(vPrice);
+                          }}
+                          className={`py-2.5 rounded-xl text-xs font-black uppercase border transition-all ${selectedVariationType === vName ? 'bg-orange-600 text-white border-orange-600' : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-400 border-neutral-700'}`}
+                        >
+                          {vName} (₹{vPrice})
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
 
