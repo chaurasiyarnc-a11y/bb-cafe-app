@@ -26,20 +26,29 @@ export default function PrintCustomerReceipt({ orderObj, currentUser }: PrintRec
       <head>
         <title>Receipt #{orderObj.billNumber || '5001'}</title>
         <style>{`
-          @page { size: 80mm auto; margin: 0mm; }
-          body { font-family: 'Courier New', Courier, monospace; font-size: 12px; line-height: 1.25; width: 72mm; margin: 0 auto; padding: 4px; color: #000; background: #fff; }
+          @page { 
+            size: 80mm auto; 
+            margin: 0; 
+          }
+          body { 
+            font-family: 'Courier New', Courier, monospace; 
+            font-size: 12px; 
+            line-height: 1.2; 
+            width: 72mm; 
+            margin: 0 auto; 
+            padding: 0 0 8mm 0; 
+            color: #000; 
+            background: #fff; 
+          }
           .center { text-align: center; }
           .bold { font-weight: bold; }
           .flex { display: flex; justify-content: space-between; }
-          .line { border-bottom: 1px dashed #000; margin: 5px 0; }
+          .line { border-bottom: 1px dashed #000; margin: 4px 0; }
           
-          /* कैफ़े का नाम बड़ा और हाइलाइटेड */
-          .cafe-title { font-size: 20px; font-weight: bold; text-align: center; letter-spacing: 1px; margin-top: 4px; }
+          .cafe-title { font-size: 20px; font-weight: bold; text-align: center; letter-spacing: 1px; margin-top: 2px; }
+          .highlight-token { font-size: 24px; font-weight: bold; border: 3px solid #000; padding: 2px 10px; display: inline-block; margin: 4px 0; }
           
-          /* टोकन नंबर बॉक्स */
-          .highlight-token { font-size: 24px; font-weight: bold; border: 3px solid #000; padding: 2px 10px; display: inline-block; margin: 6px 0; }
-          
-          .item-row { margin-bottom: 5px; }
+          .item-row { margin-bottom: 4px; }
           .note { font-size: 10px; font-style: italic; padding-left: 10px; color: #333; }
           
           .receipt-container { position: relative; padding: 0 4mm; }
@@ -121,20 +130,19 @@ export default function PrintCustomerReceipt({ orderObj, currentUser }: PrintRec
 
           <div className="line"></div>
           
-          {/* QR Code Section */}
           <div className="center">
-            <div style={{ fontSize: '10px', fontWeight: 'bold', marginBottom: '4px' }}>SCAN TO PAY ₹{totalAmount} VIA UPI</div>
-            <img src={qrCodeImageUrl} alt="UPI QR Code" width="120" height="120" style={{ display: 'block', margin: '0 auto', background: '#fff', padding: '2px' }} />
-            <div style={{ fontSize: '9px', marginTop: '3px', fontWeight: 'bold' }}>UPI ID: {cafeUpiId}</div>
+            <div style={{ fontSize: '10px', fontWeight: 'bold', marginBottom: '3px' }}>SCAN TO PAY ₹{totalAmount} VIA UPI</div>
+            <img src={qrCodeImageUrl} alt="UPI QR Code" width="110" height="110" style={{ display: 'block', margin: '0 auto', background: '#fff', padding: '2px' }} />
+            <div style={{ fontSize: '9px', marginTop: '2px', fontWeight: 'bold' }}>UPI ID: {cafeUpiId}</div>
           </div>
 
           <div className="line"></div>
           <div className="center" style={{ fontSize: '10px', fontWeight: 'bold' }}>Online Order Website:</div>
           <div className="center bold" style={{ fontSize: '11px' }}>bb-cafe-app.vercel.app</div>
-          <div className="center" style={{ fontSize: '10px', marginTop: '4px' }}>Follow us: @bb-cafe.in</div>
+          <div className="center" style={{ fontSize: '10px', marginTop: '3px' }}>Follow us: @bb-cafe.in</div>
           <br />
-          <div className="center" style={{ fontSize: '15px', fontWeight: 'bold' }}>🖤 Thank You, Visit Again 🖤</div>
-          <div className="center" style={{ fontSize: '9px', marginTop: '4px' }}>Powered by BumBumCafe POS v2.1</div>
+          <div className="center" style={{ fontSize: '14px', fontWeight: 'bold' }}>🖤 Thank You, Visit Again 🖤</div>
+          <div className="center" style={{ fontSize: '9px', marginTop: '3px' }}>Powered by BumBumCafe POS v2.1</div>
         </div>
       </body>
     </html>
