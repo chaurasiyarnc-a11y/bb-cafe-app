@@ -433,55 +433,62 @@ export default function BbCafeDesktopPos() {
     commands.push(0x1B, 0x40); // Init
     commands.push(0x1B, 0x61, 0x01); // Center
 
+    const addText = (txt: string) => {
+      const encoded = encoder.encode(txt);
+      for (let i = 0; i < encoded.length; i++) {
+        commands.push(encoded[i]);
+      }
+    };
+
     if (isKot) {
       commands.push(0x1D, 0x21, 0x11); 
-      commands.push(...encoder.encode("*** KITCHEN KOT ***\n"));
+      addText("*** KITCHEN KOT ***\n");
       commands.push(0x1D, 0x21, 0x00);
-      commands.push(...encoder.encode(`Token: #${orderObj.tokenNumber} | Type: ${orderObj.fulfillmentType.toUpperCase()}\n`));
-      if (orderObj.tableNumber) commands.push(...encoder.encode(`Table: ${orderObj.tableNumber}\n`));
-      commands.push(...encoder.encode("------------------------------------------------\n"));
+      addText(`Token: #${orderObj.tokenNumber} | Type: ${orderObj.fulfillmentType.toUpperCase()}\n`);
+      if (orderObj.tableNumber) addText(`Table: ${orderObj.tableNumber}\n`);
+      addText("------------------------------------------------\n");
       
       commands.push(0x1B, 0x61, 0x00);
       orderObj.items.forEach((item: any) => {
-        commands.push(...encoder.encode(`[ ] ${item.name} x ${item.quantity}\n`));
-        if (item.note) commands.push(...encoder.encode(`    Note: ${item.note}\n`));
+        addText(`[ ] ${item.name} x ${item.quantity}\n`);
+        if (item.note) addText(`    Note: ${item.note}\n`);
       });
-      commands.push(...encoder.encode("------------------------------------------------\n"));
+      addText("------------------------------------------------\n");
     } else {
       commands.push(0x1D, 0x21, 0x11); 
-      commands.push(...encoder.encode("BUM BUM CAFE\n"));
+      addText("BUM BUM CAFE\n");
       commands.push(0x1D, 0x21, 0x00);
-      commands.push(...encoder.encode("Mohandra Town, Main Road\n"));
-      commands.push(...encoder.encode("GSTIN: 08AABCB1234F1Z5\n\n"));
+      addText("Mohandra Town, Main Road\n");
+      addText("GSTIN: 08AABCB1234F1Z5\n\n");
       
       commands.push(0x1B, 0x61, 0x00);
-      commands.push(...encoder.encode(`Bill No: #${String(orderObj.billNumber).padStart(4, '0')}    Token: #${orderObj.tokenNumber}\n`));
-      commands.push(...encoder.encode(`Date: ${new Date(orderObj.timestamp?.toDate ? orderObj.timestamp.toDate() : orderObj.timestamp).toLocaleString()}\n`));
-      commands.push(...encoder.encode(`Customer: ${orderObj.customerName} (${orderObj.customerPhone || 'Walk-in'})\n`));
-      commands.push(...encoder.encode("================================================\n"));
-      commands.push(...encoder.encode("ITEM DESCRIPTION           QTY      PRICE\n"));
-      commands.push(...encoder.encode("================================================\n"));
+      addText(`Bill No: #${String(orderObj.billNumber).padStart(4, '0')}    Token: #${orderObj.tokenNumber}\n`);
+      addText(`Date: ${new Date(orderObj.timestamp?.toDate ? orderObj.timestamp.toDate() : orderObj.timestamp).toLocaleString()}\n`);
+      addText(`Customer: ${orderObj.customerName} (${orderObj.customerPhone || 'Walk-in'})\n`);
+      addText("================================================\n");
+      addText("ITEM DESCRIPTION           QTY      PRICE\n");
+      addText("================================================\n");
 
       orderObj.items.forEach((item: any) => {
         const itemName = item.name.padEnd(26, ' ').substring(0, 26);
         const qty = String(item.quantity).padStart(3, ' ');
         const totalP = String(item.price * item.quantity).padStart(8, ' ');
-        commands.push(...encoder.encode(`${itemName} ${qty}  ₹${totalP}\n`));
+        addText(`${itemName} ${qty}  ₹${totalP}\n`);
       });
 
-      commands.push(...encoder.encode("------------------------------------------------\n"));
-      commands.push(...encoder.encode(`Subtotal:                           ₹${orderObj.subtotal}\n`));
-      if (orderObj.discount > 0) commands.push(...encoder.encode(`Discount:                          -₹${orderObj.discount}\n`));
-      if (orderObj.gstAmount > 0) commands.push(...encoder.encode(`GST (${orderObj.gstRate}%):                      ₹${orderObj.gstAmount}\n`));
-      if (orderObj.deliveryFee > 0) commands.push(...encoder.encode(`Delivery Charge:                    ₹${orderObj.deliveryFee}\n`));
+      addText("------------------------------------------------\n");
+      addText(`Subtotal:                           ₹${orderObj.subtotal}\n`);
+      if (orderObj.discount > 0) addText(`Discount:                          -₹${orderObj.discount}\n`);
+      if (orderObj.gstAmount > 0) addText(`GST (${orderObj.gstRate}%):                      ₹${orderObj.gstAmount}\n`);
+      if (orderObj.deliveryFee > 0) addText(`Delivery Charge:                    ₹${orderObj.deliveryFee}\n`);
       
       commands.push(0x1D, 0x21, 0x01); 
-      commands.push(...encoder.encode(`GRAND TOTAL:                       ₹${orderObj.total}\n`));
+      addText(`GRAND TOTAL:                       ₹${orderObj.total}\n`);
       commands.push(0x1D, 0x21, 0x00);
-      commands.push(...encoder.encode("================================================\n"));
+      addText("================================================\n");
       commands.push(0x1B, 0x61, 0x01);
-      commands.push(...encoder.encode("Thank You! Visit Again.\n"));
-      commands.push(...encoder.encode("Powered by Bum Bum Cafe POS\n\n"));
+      addText("Thank You! Visit Again.\n");
+      addText("Powered by Bum Bum Cafe POS\n\n");
     }
 
     // Feed lines & Auto-Cut command for 80mm thermal printer
