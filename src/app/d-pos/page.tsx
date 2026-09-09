@@ -9,7 +9,7 @@ import {
 import { 
   ShoppingBag, Search, X, Loader2, Clock, Printer, Check, Settings, 
   Database, RefreshCw, Layers, Menu, LogOut, Lock, ToggleLeft, ToggleRight, 
-  Sun, Moon, Tag, Trash2, ArrowRight, CheckCircle2, UserPlus, Download
+  Sun, Moon, Tag, Trash2, ArrowRight, CheckCircle2, UserPlus, Download, PlusCircle, Edit3
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
@@ -32,6 +32,8 @@ const SafeSettings = Settings as any;
 const SafeTrash2 = Trash2 as any;
 const SafeUserPlus = UserPlus as any;
 const SafeDownload = Download as any;
+const SafePlusCircle = PlusCircle as any;
+const SafeEdit3 = Edit3 as any;
 
 interface PosCartItem {
   id: string;
@@ -98,6 +100,7 @@ export default function BbCafeDesktopPos() {
 
   const [isSyncing, setIsSyncing] = useState(false);
 
+  // Cart & Table Editing States
   const [cart, setCart] = useState<PosCartItem[]>([]);
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerName, setCustomerName] = useState('');
@@ -107,6 +110,11 @@ export default function BbCafeDesktopPos() {
   const [selectedArea, setSelectedArea] = useState<DeliveryArea>(DELIVERY_AREAS[0]);
   const [address, setAddress] = useState('');
   const [tableNumber, setTableNumber] = useState('Table 1');
+  
+  // Table Re-edit / Running Order Tracking State
+  const [activeEditingOrderId, setActiveEditingOrderId] = useState<string | null>(null);
+  const [activeEditingBillNumber, setActiveEditingBillNumber] = useState<number | null>(null);
+
   const [isSubmittingOrder, setIsSubmittingOrder] = useState(false);
   const [chefInstructions, setChefInstructions] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'upi'>('cash');
@@ -176,7 +184,7 @@ export default function BbCafeDesktopPos() {
 
   const handleInstallClick = async () => {
     if (!deferredPrompt) {
-      toast("App already installed or browser does not support direct installation. Use browser menu -> 'Install App'.", { icon: 'ℹ️' });
+      toast("App already installed or browser does not support direct installation.", { icon: 'ℹ️' });
       return;
     }
     deferredPrompt.prompt();
@@ -312,12 +320,12 @@ export default function BbCafeDesktopPos() {
         setCustomerPoints(data.points || 0);
         setAddress(data.address || '');
         setShowNewCustForm(false);
-        toast.success(`कस्टमर मिल गया: ${data.name} (पॉइंट्स: ${data.points || 0})`);
+        toast.success(`कस्टमर मिल गया: ${data.name}`);
       } else {
         setCustomerName('');
         setCustomerPoints(0);
         setShowNewCustForm(true);
-        toast("नया नंबर है! कृपया नाम और पता दर्ज करके सेव करें।", { icon: 'ℹ️' });
+        toast("नया नंबर है! कृपया नाम दर्ज करें।", { icon: 'ℹ️' });
       }
     } catch (e) {
       toast.dismiss(toastId);
@@ -348,7 +356,7 @@ export default function BbCafeDesktopPos() {
       setNewCustNameInput('');
       setNewCustAddressInput('');
       toast.dismiss(toastId);
-      toast.success("नया कस्टमर सफलतापर्वक सेव हो गया! ✅");
+      toast.success("नया कस्टमर सेव हो गया! ✅");
     } catch (err) {
       toast.dismiss(toastId);
       toast.error("कस्टमर सेव करने में विफल।");
@@ -406,6 +414,31 @@ export default function BbCafeDesktopPos() {
   const getGstAmountCalculated = () => gstEnabled ? Number(((getCartSubtotal() * gstRate) / 100).toFixed(2)) : 0;
   const getTotalBillPrice = () => Math.max(0, getCartSubtotal() + getGstAmountCalculated() - customDiscount) + getDeliveryCharge();
 
+  // --- TABLE RUNNING ORDER / RE-EDIT LOAD LOGIC ---
+  const handleLoadTableOrderForEditing = (order: any) => {
+    triggerBeep('tap');
+    setActiveEditingOrderId(order.id);
+    setActiveEditingBillNumber(order.billNumber);
+    setTableNumber(order.tableNumber || 'Table 1');
+    setFulfillmentType('table');
+    setCustomerName(order.customerName || '');
+    setCustomerPhone(order.customerPhone ? order.customerPhone.replace('+91', '') : '');
+    setCart(order.items || []);
+    setCustomDiscount(order.discount || 0);
+    toast.success(`Loaded Bill #${order.billNumber} for Table: ${order.tableNumber}. You can now modify items!`);
+    setActiveTab('billing');
+  };
+
+  const handleCancelTableEditing = () => {
+    triggerBeep('tap');
+    setActiveEditingOrderId(null);
+    setActiveEditingBillNumber(null);
+    setCart([]);
+    setCustomerName('');
+    setCustomerPhone('');
+    toast("Table editing mode closed. Started fresh bill.", { icon: 'ℹ️' });
+  };
+
   const handleConnectPrinter = async () => {
     triggerBeep('tap');
     setIsConnecting(true);
@@ -419,7 +452,7 @@ export default function BbCafeDesktopPos() {
         setUsbDevice(device);
         setPrinterConnected(true);
         toast.dismiss(toastId);
-        toast.success("USB Thermal Printer Connected with Auto-Cut ready!");
+        toast.success("USB Thermal Printer Connected!");
       } else {
         setTimeout(() => {
           toast.dismiss(toastId);
@@ -435,14 +468,13 @@ export default function BbCafeDesktopPos() {
     }
   };
 
-  // Robust Printing with Reliable Browser Print Fallback & Clean Formatting
   const handlePrintReceiptDirect = async (orderObj: any, isKot = false) => {
     try {
       if (usbDevice) {
         const encoder = new TextEncoder();
         let commands: number[] = [];
-        commands.push(0x1B, 0x40); // Init
-        commands.push(0x1B, 0x61, 0x01); // Center alignment
+        commands.push(0x1B, 0x40); 
+        commands.push(0x1B, 0x61, 0x01); 
 
         const addText = (txt: string) => {
           const encoded = encoder.encode(txt);
@@ -451,7 +483,7 @@ export default function BbCafeDesktopPos() {
 
         if (isKot) {
           commands.push(0x1D, 0x21, 0x11); 
-          addText("*** KITCHEN KOT ***\n");
+          addText("*** KITCHEN KOT (UPDATE) ***\n");
           commands.push(0x1D, 0x21, 0x00);
           addText(`Token: #${orderObj.tokenNumber} | Type: ${orderObj.fulfillmentType.toUpperCase()}\n`);
           if (orderObj.tableNumber) addText(`Table: ${orderObj.tableNumber}\n`);
@@ -502,8 +534,8 @@ export default function BbCafeDesktopPos() {
           addText("Thank You! Visit Again.\n\n\n");
         }
 
-        commands.push(0x1B, 0x64, 0x04); // Feed lines
-        commands.push(0x1D, 0x56, 0x41, 0x03); // Cut paper
+        commands.push(0x1B, 0x64, 0x04); 
+        commands.push(0x1D, 0x56, 0x41, 0x03); 
 
         let endpointOut = 1;
         const endpoints = usbDevice.configuration.interfaces[0].alternate.endpoints;
@@ -514,16 +546,15 @@ export default function BbCafeDesktopPos() {
         return;
       }
     } catch (e) {
-      console.error("USB Raw Print Error, falling back to window.print:", e);
+      console.error("USB Print Error, using browser print fallback", e);
     }
 
-    // Clean HTML Print Window Fallback (Prevents blank page issues)
     const printWindow = window.open('', '_blank', 'width=400,height=600');
     if (printWindow) {
       printWindow.document.write(`
         <html>
           <head>
-            <title>Receipt #${orderObj.billNumber}</title>
+            <title>${isKot ? 'KOT' : 'Receipt'} #${orderObj.billNumber}</title>
             <style>
               body { font-family: 'Courier New', monospace; font-size: 12px; width: 72mm; margin: 0; padding: 5px; color: #000; }
               .center { text-align: center; }
@@ -535,26 +566,36 @@ export default function BbCafeDesktopPos() {
             </style>
           </head>
           <body onload="window.print(); window.close();">
-            <div class="center bold" style="font-size: 16px;">BUM BUM CAFE</div>
-            <div class="center">Mohandra Town, Main Road</div>
-            <div class="center">GSTIN: 08AABCB1234F1Z5</div>
-            <div class="line"></div>
-            <div>Bill No: #${String(orderObj.billNumber).padStart(4, '0')} &nbsp;&nbsp; Token: #${orderObj.tokenNumber}</div>
-            <div>Date: ${new Date().toLocaleString()}</div>
-            <div>Customer: ${orderObj.customerName}</div>
-            <div class="line"></div>
-            <table>
-              <tr><th>Item</th><th class="center">Qty</th><th class="right">Amt</th></tr>
-              ${orderObj.items.map((i: any) => `<tr><td>${i.name}</td><td class="center">${i.quantity}</td><td class="right">₹${i.price * i.quantity}</td></tr>`).join('')}
-            </table>
-            <div class="line"></div>
-            <div>Subtotal: ₹${orderObj.subtotal}</div>
-            ${orderObj.discount > 0 ? `<div>Discount: -₹${orderObj.discount}</div>` : ''}
-            ${orderObj.gstAmount > 0 ? `<div>GST: ₹${orderObj.gstAmount}</div>` : ''}
-            ${orderObj.deliveryFee > 0 ? `<div>Delivery: ₹${orderObj.deliveryFee}</div>` : ''}
-            <div class="bold" style="font-size: 14px; margin-top: 5px;">GRAND TOTAL: ₹${orderObj.total}</div>
-            <div class="line"></div>
-            <div class="center bold">Thank You! Visit Again</div>
+            ${isKot ? `
+              <div class="center bold" style="font-size: 15px;">*** KITCHEN KOT (UPDATE) ***</div>
+              <div class="center">Token: #${orderObj.tokenNumber} | Type: ${orderObj.fulfillmentType.toUpperCase()}</div>
+              ${orderObj.tableNumber ? `<div class="center bold">Table: ${orderObj.tableNumber}</div>` : ''}
+              <div class="line"></div>
+              <table>
+                <tr><th>Item</th><th class="right">Qty</th></tr>
+                ${orderObj.items.map((i: any) => `<tr><td>[ ] ${i.name}</td><td class="right">${i.quantity}</td></tr>`).join('')}
+              </table>
+              <div class="line"></div>
+            ` : `
+              <div class="center bold" style="font-size: 16px;">BUM BUM CAFE</div>
+              <div class="center">Mohandra Town, Main Road</div>
+              <div class="line"></div>
+              <div>Bill No: #${String(orderObj.billNumber).padStart(4, '0')} &nbsp;&nbsp; Token: #${orderObj.tokenNumber}</div>
+              <div>Date: ${new Date().toLocaleString()}</div>
+              <div>Customer: ${orderObj.customerName}</div>
+              <div class="line"></div>
+              <table>
+                <tr><th>Item</th><th class="center">Qty</th><th class="right">Amt</th></tr>
+                ${orderObj.items.map((i: any) => `<tr><td>${i.name}</td><td class="center">${i.quantity}</td><td class="right">₹${i.price * i.quantity}</td></tr>`).join('')}
+              </table>
+              <div class="line"></div>
+              <div>Subtotal: ₹${orderObj.subtotal}</div>
+              ${orderObj.discount > 0 ? `<div>Discount: -₹${orderObj.discount}</div>` : ''}
+              ${orderObj.gstAmount > 0 ? `<div>GST: ₹${orderObj.gstAmount}</div>` : ''}
+              <div class="bold" style="font-size: 14px; margin-top: 5px;">GRAND TOTAL: ₹${orderObj.total}</div>
+              <div class="line"></div>
+              <div class="center bold">Thank You! Visit Again</div>
+            `}
           </body>
         </html>
       `);
@@ -572,63 +613,102 @@ export default function BbCafeDesktopPos() {
     const token = Math.floor(1000 + Math.random() * 9000);
     const earned = Math.floor(finalTotal / 100);
 
-    let billNumber: number;
     try {
-      if (navigator.onLine) {
-        try {
-          billNumber = await runTransaction(db, async (txn) => {
-            const snap = await txn.get(doc(db, "settings", "store_bill_counter"));
-            const next = snap.exists() ? (snap.data().nextBillNumber || 1) : 1;
-            txn.set(doc(db, "settings", "store_bill_counter"), { nextBillNumber: next + 1 });
-            return next;
-          });
-        } catch {
+      let billNumber: number;
+
+      if (activeEditingOrderId) {
+        // --- UPDATE EXISTING RUNNING TABLE ORDER ---
+        billNumber = activeEditingBillNumber || 5001;
+        const orderRef = doc(db, "orders", activeEditingOrderId);
+        
+        const updatedOrderObj = { 
+          items: cart, 
+          subtotal, 
+          discount: customDiscount, 
+          gstRate: gstEnabled ? gstRate : 0, 
+          gstAmount: getGstAmountCalculated(), 
+          deliveryFee: getDeliveryCharge(), 
+          total: finalTotal, 
+          tableNumber: fulfillmentType === 'table' ? tableNumber : '',
+          customerName: customerName || "Walk-in Guest",
+          customerPhone: customerPhone ? `+91${customerPhone}` : "",
+          lastUpdated: new Date()
+        };
+
+        await updateDoc(orderRef, updatedOrderObj);
+
+        triggerBeep('success');
+        toast.success(`Bill #${billNumber} (Table: ${tableNumber}) updated successfully!`);
+
+        // Print KOT / Receipt for modified items
+        if (kotEnabled) {
+          await handlePrintReceiptDirect({ ...updatedOrderObj, billNumber, tokenNumber: token, fulfillmentType }, true);
+          await new Promise((r) => setTimeout(r, 600));
+        }
+        await handlePrintReceiptDirect({ ...updatedOrderObj, billNumber, tokenNumber: token, fulfillmentType }, false);
+
+        // Reset editing mode
+        setActiveEditingOrderId(null);
+        setActiveEditingBillNumber(null);
+
+      } else {
+        // --- CREATE NEW ORDER ---
+        if (navigator.onLine) {
+          try {
+            billNumber = await runTransaction(db, async (txn) => {
+              const snap = await txn.get(doc(db, "settings", "store_bill_counter"));
+              const next = snap.exists() ? (snap.data().nextBillNumber || 1) : 1;
+              txn.set(doc(db, "settings", "store_bill_counter"), { nextBillNumber: next + 1 });
+              return next;
+            });
+          } catch {
+            billNumber = Number(localStorage.getItem("bb_pos_local_bill_counter_pc") || 5000) + 1;
+            localStorage.setItem("bb_pos_local_bill_counter_pc", String(billNumber));
+          }
+        } else {
           billNumber = Number(localStorage.getItem("bb_pos_local_bill_counter_pc") || 5000) + 1;
           localStorage.setItem("bb_pos_local_bill_counter_pc", String(billNumber));
         }
-      } else {
-        billNumber = Number(localStorage.getItem("bb_pos_local_bill_counter_pc") || 5000) + 1;
-        localStorage.setItem("bb_pos_local_bill_counter_pc", String(billNumber));
+
+        const orderObj = { 
+          billNumber, tokenNumber: token, customerName: customerName || "Walk-in Guest", 
+          customerPhone: customerPhone ? `+91${customerPhone}` : "", items: cart, 
+          subtotal, discount: customDiscount, gstRate: gstEnabled ? gstRate : 0, 
+          gstAmount: getGstAmountCalculated(), deliveryFee: getDeliveryCharge(), total: finalTotal, timestamp: new Date(), 
+          status: 'completed', fulfillmentType, deliveryArea: fulfillmentType === "delivery" ? selectedArea.name : "", 
+          tableNumber: fulfillmentType === 'table' ? tableNumber : '', paymentMethod, chefInstructions, source: 'PC_POS', address 
+        };
+
+        await addDoc(collection(db, "orders"), orderObj);
+
+        if (customerPhone && customerPhone.length === 10) {
+          const userRef = doc(db, "customer_points", customerPhone.trim());
+          const userDoc = await getDoc(userRef);
+          const prevPoints = userDoc.exists() ? (userDoc.data().points || 0) : 0;
+          await setDoc(userRef, { 
+            name: customerName || "Walk-in Guest", 
+            phone: customerPhone.trim(), 
+            address: address || "", 
+            points: prevPoints + earned, 
+            lastActive: new Date() 
+          }, { merge: true });
+        }
+
+        triggerBeep('success'); 
+        toast.success(`Bill #${billNumber} saved & printed successfully!`);
+        
+        if (kotEnabled) {
+          await handlePrintReceiptDirect(orderObj, true);
+          await new Promise((r) => setTimeout(r, 800));
+        }
+        await handlePrintReceiptDirect(orderObj, false);
       }
-
-      const orderObj = { 
-        billNumber, tokenNumber: token, customerName: customerName || "Walk-in Guest", 
-        customerPhone: customerPhone ? `+91${customerPhone}` : "", items: cart, 
-        subtotal, discount: customDiscount, gstRate: gstEnabled ? gstRate : 0, 
-        gstAmount: getGstAmountCalculated(), deliveryFee: getDeliveryCharge(), total: finalTotal, timestamp: new Date(), 
-        status: 'completed', fulfillmentType, deliveryArea: fulfillmentType === "delivery" ? selectedArea.name : "", 
-        tableNumber: fulfillmentType === 'table' ? tableNumber : '', paymentMethod, chefInstructions, source: 'PC_POS', address 
-      };
-
-      await addDoc(collection(db, "orders"), orderObj);
-
-      if (customerPhone && customerPhone.length === 10) {
-        const userRef = doc(db, "customer_points", customerPhone.trim());
-        const userDoc = await getDoc(userRef);
-        const prevPoints = userDoc.exists() ? (userDoc.data().points || 0) : 0;
-        await setDoc(userRef, { 
-          name: customerName || "Walk-in Guest", 
-          phone: customerPhone.trim(), 
-          address: address || "", 
-          points: prevPoints + earned, 
-          lastActive: new Date() 
-        }, { merge: true });
-      }
-
-      triggerBeep('success'); 
-      toast.success(`Bill #${billNumber} saved & printed successfully!`);
-      
-      if (kotEnabled) {
-        await handlePrintReceiptDirect(orderObj, true);
-        await new Promise((r) => setTimeout(r, 800));
-      }
-      await handlePrintReceiptDirect(orderObj, false);
 
       setCart([]); setCustomerPhone(''); setCustomerName(''); setCustomerPoints(0); setCustomDiscount(0); setChefInstructions(''); setShowNewCustForm(false);
       localStorage.removeItem("bb_pos_saved_cart_pc");
     } catch (err) {
       console.error(err);
-      toast.error("Failed to place order");
+      toast.error("Failed to process order");
     } finally {
       setIsSubmittingOrder(false);
     }
@@ -664,7 +744,6 @@ export default function BbCafeDesktopPos() {
   const filteredMenu = useMemo(() => products.filter((p) => (selectedCategory === 'All' || p.category === selectedCategory) && p.name.toLowerCase().includes(searchQuery.toLowerCase())), [products, selectedCategory, searchQuery]);
   const filteredPastReceipts = useMemo(() => pastReceipts.filter((o) => String(o.billNumber).includes(receiptSearchQuery.trim()) || String(o.customerPhone || '').includes(receiptSearchQuery.trim()) || String(o.customerName || '').toLowerCase().includes(receiptSearchQuery.trim().toLowerCase())), [pastReceipts, receiptSearchQuery]);
 
-  // FIXED SCREEN CONTAINER (h-screen w-screen overflow-hidden) prevents body scrolling
   const mainClass = "h-screen w-screen flex font-sans antialiased overflow-hidden " + (themeMode === "dark" ? "dark bg-[#0a0a0a] text-neutral-100" : "bg-neutral-100 text-neutral-900");
 
   return (
@@ -687,7 +766,6 @@ export default function BbCafeDesktopPos() {
         </div>
       ) : (
         <>
-          {/* DESKTOP SIDEBAR NAVIGATION */}
           <aside className="w-64 bg-white dark:bg-neutral-900 border-r border-neutral-200 dark:border-neutral-800 flex flex-col justify-between p-5 shrink-0 select-none h-full">
             <div className="space-y-6">
               <div className="flex items-center gap-3 border-b border-neutral-200 dark:border-neutral-800 pb-4">
@@ -739,13 +817,22 @@ export default function BbCafeDesktopPos() {
             </div>
           </aside>
 
-          {/* MAIN CONTENT AREA (FIXED HEIGHT) */}
           <main className="flex-1 flex h-full overflow-hidden">
-
-            {/* TAB: BILLING */}
             {activeTab === 'billing' && (
               <div className="flex-1 flex h-full overflow-hidden">
                 <div className="flex-1 flex flex-col p-5 h-full overflow-hidden">
+                  
+                  {/* Table Editing Mode Alert Banner */}
+                  {activeEditingOrderId && (
+                    <div className="mb-3 bg-amber-500/15 border border-amber-500/40 p-3 rounded-2xl flex items-center justify-between shrink-0">
+                      <div className="flex items-center gap-2 text-amber-400 text-xs font-black uppercase">
+                        <SafeEdit3 size={16} />
+                        <span>Re-editing Bill #{activeEditingBillNumber} (Table: {tableNumber}) - Add items & update</span>
+                      </div>
+                      <button onClick={handleCancelTableEditing} className="text-neutral-400 hover:text-white text-xs underline">Cancel</button>
+                    </div>
+                  )}
+
                   <div className="flex gap-3 mb-4 items-center shrink-0">
                     <div className="relative flex-1">
                       <SafeSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-400" size={18} />
@@ -806,7 +893,6 @@ export default function BbCafeDesktopPos() {
                   )}
                 </div>
 
-                {/* Cart Panel */}
                 <div className="w-96 bg-white dark:bg-neutral-900 border-l border-neutral-200 dark:border-neutral-800 flex flex-col p-5 h-full shadow-2xl justify-between overflow-hidden">
                   <div className="flex flex-col h-full overflow-hidden">
                     <div className="flex items-center justify-between border-b border-neutral-200 dark:border-neutral-800 pb-3 mb-3 shrink-0">
@@ -843,13 +929,6 @@ export default function BbCafeDesktopPos() {
                             placeholder="Customer Name *" 
                             value={newCustNameInput} 
                             onChange={e => setNewCustNameInput(e.target.value)} 
-                            className="w-full bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 rounded-xl px-3 py-1.5 text-xs outline-none" 
-                          />
-                          <input 
-                            type="text" 
-                            placeholder="Address (Optional)" 
-                            value={newCustAddressInput} 
-                            onChange={e => setNewCustAddressInput(e.target.value)} 
                             className="w-full bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 rounded-xl px-3 py-1.5 text-xs outline-none" 
                           />
                           <button 
@@ -921,17 +1000,19 @@ export default function BbCafeDesktopPos() {
 
                     <button onClick={handlePlaceOrder} disabled={cart.length === 0 || isSubmittingOrder} className="w-full bg-green-600 hover:bg-green-500 text-white font-black py-4 rounded-2xl uppercase tracking-wider text-xs flex items-center justify-center gap-2 shadow-xl disabled:opacity-50 shrink-0">
                       {isSubmittingOrder ? <Loader2 className="animate-spin" size={16} /> : <CheckCircle2 size={16} />}
-                      <span>One-Click Print & Pay (₹{getTotalBillPrice()})</span>
+                      <span>{activeEditingOrderId ? `Update & Re-Print Bill (₹${getTotalBillPrice()})` : `One-Click Print & Pay (₹${getTotalBillPrice()})`}</span>
                     </button>
                   </div>
                 </div>
               </div>
             )}
 
-            {/* TAB: LIVE ORDERS */}
             {activeTab === 'orders' && (
               <div className="flex-1 p-6 h-full overflow-y-auto">
-                <h2 className="text-sm font-black uppercase text-orange-500 mb-4">Live Active Orders ({activeLiveOrders.length})</h2>
+                <div className="flex justify-between items-center mb-4">
+                  <h2 className="text-sm font-black uppercase text-orange-500">Live Active Orders & Tables ({activeLiveOrders.length})</h2>
+                  <span className="text-[11px] text-neutral-400">Click "Re-edit / Add Items" to modify running table orders</span>
+                </div>
                 <div className="grid grid-cols-3 gap-4">
                   {activeLiveOrders.length === 0 ? (
                     <div className="col-span-3 text-center py-24 text-neutral-500 font-bold">No active orders right now.</div>
@@ -940,11 +1021,11 @@ export default function BbCafeDesktopPos() {
                       <div key={order.id} className={`bg-white dark:bg-neutral-900 border rounded-2xl p-4 flex flex-col justify-between shadow-lg ${order.status === 'pending' ? 'border-red-500 animate-pulse' : 'border-neutral-200 dark:border-neutral-800'}`}>
                         <div>
                           <div className="flex justify-between items-center border-b border-neutral-200 dark:border-neutral-800 pb-2 mb-3">
-                            <span className="font-mono font-black text-yellow-500">Bill #{order.billNumber}</span>
+                            <span className="font-mono font-black text-yellow-500">Bill #{order.billNumber} {order.tableNumber ? `(${order.tableNumber})` : ''}</span>
                             <span className="bg-orange-500/10 text-orange-400 text-[10px] font-black uppercase px-2 py-0.5 rounded">{order.fulfillmentType}</span>
                           </div>
                           <p className="text-xs font-bold mb-2">👤 {order.customerName} ({order.customerPhone || 'Walk-in'})</p>
-                          <div className="space-y-1 py-2 border-t border-dashed border-neutral-200 dark:border-neutral-800 mb-3">
+                          <div className="space-y-1 py-2 border-t border-dashed border-neutral-200 dark:border-neutral-800 mb-3 max-h-36 overflow-y-auto">
                             {order.items?.map((it: any, idx: number) => (
                               <div key={idx} className="flex justify-between text-xs">
                                 <span>{it.name}</span><span className="font-bold text-orange-500">x{it.quantity}</span>
@@ -952,10 +1033,21 @@ export default function BbCafeDesktopPos() {
                             ))}
                           </div>
                         </div>
-                        <div>
-                          <div className="flex justify-between text-xs font-black text-green-500 mb-3 pt-2 border-t">
+                        <div className="space-y-2 pt-2 border-t">
+                          <div className="flex justify-between text-xs font-black text-green-500">
                             <span>Total: ₹{order.total}</span>
                           </div>
+                          
+                          {/* Re-edit Table Order Button */}
+                          {order.fulfillmentType === 'table' && (
+                            <button 
+                              onClick={() => handleLoadTableOrderForEditing(order)} 
+                              className="w-full bg-amber-500 hover:bg-amber-400 text-black font-black py-2 rounded-xl text-xs uppercase flex items-center justify-center gap-1 shadow"
+                            >
+                              <SafeEdit3 size={14} /> Re-edit / Add Items to Table
+                            </button>
+                          )}
+
                           <div className="flex gap-2">
                             {order.status === 'pending' && (
                               <>
@@ -963,8 +1055,8 @@ export default function BbCafeDesktopPos() {
                                 <button onClick={() => handleUpdateStatus(order.id, 'rejected')} className="flex-1 bg-red-600 text-white font-black py-2 rounded-xl text-xs uppercase">Reject</button>
                               </>
                             )}
-                            {order.status === 'preparing' && <button onClick={() => handleUpdateStatus(order.id, 'completed')} className="w-full bg-blue-600 text-white font-black py-2 rounded-xl text-xs uppercase">Mark Ready</button>}
-                            <button onClick={() => handlePrintReceiptDirect(order, false)} className="p-2 bg-neutral-200 dark:bg-neutral-800 text-neutral-400 hover:text-orange-500 rounded-xl"><SafePrinter size={16} /></button>
+                            {order.status === 'preparing' && <button onClick={() => handleUpdateStatus(order.id, 'completed')} className="w-full bg-blue-600 text-white font-black py-2 rounded-xl text-xs uppercase">Mark Settled / Ready</button>}
+                            <button onClick={() => handlePrintReceiptDirect(order, false)} className="p-2 bg-neutral-200 dark:bg-neutral-800 text-neutral-400 hover:text-orange-500 rounded-xl" title="Print Bill"><SafePrinter size={16} /></button>
                           </div>
                         </div>
                       </div>
@@ -974,7 +1066,6 @@ export default function BbCafeDesktopPos() {
               </div>
             )}
 
-            {/* TAB: INVENTORY */}
             {activeTab === 'inventory' && (
               <div className="flex-1 p-6 h-full overflow-y-auto">
                 <h2 className="text-sm font-black uppercase text-orange-500 mb-4">Stock Availability Management</h2>
@@ -998,7 +1089,6 @@ export default function BbCafeDesktopPos() {
               </div>
             )}
 
-            {/* TAB: PAST RECEIPTS */}
             {activeTab === 'receipts' && (
               <div className="flex-1 p-6 h-full flex flex-col overflow-hidden">
                 <div className="mb-4 shrink-0">
@@ -1018,7 +1108,6 @@ export default function BbCafeDesktopPos() {
               </div>
             )}
 
-            {/* TAB: SETTINGS & THERMAL PRINTER */}
             {activeTab === 'settings' && (
               <div className="flex-1 p-6 h-full overflow-y-auto flex justify-center">
                 <div className="max-w-xl w-full bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 p-6 rounded-3xl shadow-xl space-y-6">
@@ -1029,7 +1118,6 @@ export default function BbCafeDesktopPos() {
                     <button onClick={handleInstallClick} className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-black text-xs uppercase rounded-xl transition-all shadow-md flex items-center justify-center gap-2">
                       <SafeDownload size={16} /> Install POS as PC Application
                     </button>
-                    <p className="text-[10px] text-neutral-400">Yeh option aapke PC (Windows/Mac) par is web app ko native desktop app ki tarah install kar dega.</p>
                   </div>
 
                   <div className="space-y-2 border-b border-neutral-200 dark:border-neutral-800 pb-4">
@@ -1060,7 +1148,6 @@ export default function BbCafeDesktopPos() {
                 </div>
               </div>
             )}
-
           </main>
         </>
       )}
