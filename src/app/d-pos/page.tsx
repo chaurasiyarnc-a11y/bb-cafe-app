@@ -1,15 +1,16 @@
+
 'use client';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { db } from '@/lib/firebase'; 
 import { 
   collection, onSnapshot, query, orderBy, limit, doc, 
   updateDoc, addDoc, runTransaction, getDoc, getDocs, where, setDoc,
-  waitForPendingWrites, deleteDoc
+  waitForPendingWrites, deleteDoc, Timestamp
 } from 'firebase/firestore';
 import { 
   ShoppingBag, Search, X, Loader2, Clock, Printer, Check, Settings, 
   Database, RefreshCw, Layers, Menu, LogOut, Lock, ToggleLeft, ToggleRight, 
-  Sun, Moon, Tag, Trash2, ArrowRight, CheckCircle2, UserPlus, Download, PlusCircle, Edit3, FileText, LayoutGrid, ChevronLeft, ChevronRight, Gift, Percent, Sliders, PackagePlus, Plus
+  Sun, Moon, Tag, Trash2, ArrowRight, CheckCircle2, UserPlus, Download, PlusCircle, Edit3, FileText, LayoutGrid, ChevronLeft, ChevronRight, Gift, Percent, Sliders, PackagePlus, Plus, BarChart3, DollarSign, Calendar
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
@@ -45,6 +46,7 @@ const SafeGift = Gift as any;
 const SafePercent = Percent as any;
 const SafeSliders = Sliders as any;
 const SafePackagePlus = PackagePlus as any;
+const SafeBarChart3 = BarChart3 as any;
 
 interface PosCartItem {
   id: string;
@@ -82,7 +84,7 @@ export default function BbCafeDesktopPos() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [pinInput, setPinInput] = useState('');
-  const [activeTab, setActiveTab] = useState<'billing' | 'inventory' | 'receipts' | 'settings' | 'orders' | 'tables' | 'variations_manager' | 'item_editor'>('billing');
+  const [activeTab, setActiveTab] = useState<'billing' | 'inventory' | 'receipts' | 'settings' | 'orders' | 'tables' | 'variations_manager' | 'item_editor' | 'reports'>('billing');
 
   const [gstEnabled, setGstEnabled] = useState(false);
   const [gstRate, setGstRate] = useState(5);
@@ -111,6 +113,13 @@ export default function BbCafeDesktopPos() {
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(false);
   
+  // Sales Reports States
+  const [reportFilter, setReportFilter] = useState<'today' | 'yesterday' | 'custom'>('today');
+  const [customReportDate, setCustomReportDate] = useState(new Date().toISOString().split('T')[0]);
+  const [reportOrders, setReportOrders] = useState<any[]>([]);
+  const [isReportLoading, setIsReportLoading] = useState(false);
+  const [physicalCashInput, setPhysicalCashInput] = useState<number | ''>('');
+
   // Item Editor States
   const [editingItemObj, setEditingItemObj] = useState<any>(null);
   const [itemNameInput, setItemNameInput] = useState('');
@@ -158,6 +167,7 @@ export default function BbCafeDesktopPos() {
   const [isSubmittingOrder, setIsSubmittingOrder] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'upi'>('cash');
 
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
   const alarmIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const triggerBeep = (type: 'tap' | 'success' | 'alarm') => {
@@ -190,6 +200,133 @@ export default function BbCafeDesktopPos() {
       }
     } catch (e) {}
   };
+
+  // --- FILTERED MENU FOR SEARCH (Item Code / Name support) ---
+  const filteredMenu = useMemo(() => {
+    const queryStr = searchQuery.toLowerCase().trim();
+    return products.filter((p) => {
+      const matchesCategory = selectedCategory === 'All' || p.category === selectedCategory;
+      const matchesName = p.name.toLowerCase().includes(queryStr);
+      // Support matching itemCode or product id if entered
+      const matchesCode = p.itemCode && String(p.itemCode).toLowerCase().includes(queryStr);
+      return matchesCategory && (matchesName || matchesCode);
+    });
+  }, [products, selectedCategory, searchQuery]);
+
+  // --- KEYBOARD SHORTCUTS & SEARCH ENTER SELECT (PC POS Speedup) ---
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!isLoggedIn) return;
+
+      // F2 -> Focus Search Bar
+      if (e.key === 'F2') {
+        e.preventDefault();
+        setActiveTab('billing');
+        setTimeout(() => searchInputRef.current?.focus(), 100);
+        toast("Shortcut: Item Search Focused (F2)", { icon: '⌨️' });
+      }
+
+      // F4 -> Toggle Cash / UPI Payment Method
+      if (e.key === 'F4') {
+        e.preventDefault();
+        setPaymentMethod(prev => (prev === 'cash' ? 'upi' : 'cash'));
+        toast(`Payment Mode switched to: ${paymentMethod === 'cash' ? 'UPI' : 'Cash'}`, { icon: '💳' });
+      }
+
+      // F9 -> One-Click Print & Pay Checkout
+      if (e.key === 'F9') {
+        e.preventDefault();
+        if (cart.length > 0 && !isSubmittingOrder) {
+          handleFinalCheckoutAndPrintBill();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isLoggedIn, cart, isSubmittingOrder, paymentMethod]);
+
+  // --- HANDLE SEARCH INPUT ENTER KEY (Quick Add First Matched Item) ---
+  const handleSearchInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (filteredMenu.length > 0) {
+        // Automatically click/select the first matched item from search results
+        handleItemClick(filteredMenu[0]);
+        setSearchQuery(''); // Reset search query to clear box for next scan/type
+      } else {
+        toast.error("कोई आइटम नहीं मिला!");
+      }
+    }
+  };
+
+  // --- FETCH SALES REPORTS FOR TODAY / YESTERDAY / CUSTOM ---
+  useEffect(() => {
+    if (activeTab !== 'reports') return;
+    (async () => {
+      setIsReportLoading(true);
+      try {
+        let startTarget = new Date();
+        let endTarget = new Date();
+
+        if (reportFilter === 'today') {
+          startTarget.setHours(0, 0, 0, 0);
+          endTarget.setHours(23, 59, 59, 999);
+        } else if (reportFilter === 'yesterday') {
+          startTarget.setDate(startTarget.getDate() - 1);
+          startTarget.setHours(0, 0, 0, 0);
+          endTarget.setDate(endTarget.getDate() - 1);
+          endTarget.setHours(23, 59, 59, 999);
+        } else if (reportFilter === 'custom' && customReportDate) {
+          startTarget = new Date(customReportDate);
+          startTarget.setHours(0, 0, 0, 0);
+          endTarget = new Date(customReportDate);
+          endTarget.setHours(23, 59, 59, 999);
+        }
+
+        const q = query(
+          collection(db, "orders"),
+          where("timestamp", ">=", Timestamp.fromDate(startTarget)),
+          where("timestamp", "<=", Timestamp.fromDate(endTarget)),
+          orderBy("timestamp", "desc")
+        );
+
+        const snap = await getDocs(q);
+        const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        setReportOrders(list);
+      } catch (err) {
+        console.error("Report fetch error:", err);
+        try {
+          const snapFallback = await getDocs(collection(db, "orders"));
+          const all = snapFallback.docs.map(d => ({ id: d.id, ...d.data() }));
+          setReportOrders(all);
+        } catch (e) {}
+      } finally {
+        setIsReportLoading(false);
+      }
+    })();
+  }, [activeTab, reportFilter, customReportDate]);
+
+  const reportSummary = useMemo(() => {
+    let totalSale = 0;
+    let cashSale = 0;
+    let upiSale = 0;
+    let totalOrdersCount = reportOrders.filter(o => o.status !== 'rejected').length;
+
+    reportOrders.forEach(o => {
+      if (o.status !== 'rejected') {
+        const amt = Number(o.total) || 0;
+        totalSale += amt;
+        if (o.paymentMethod === 'upi') {
+          upiSale += amt;
+        } else {
+          cashSale += amt;
+        }
+      }
+    });
+
+    return { totalSale, cashSale, upiSale, totalOrdersCount };
+  }, [reportOrders]);
 
   useEffect(() => {
     const handleBeforeInstallPrompt = (e: any) => {
@@ -510,13 +647,11 @@ export default function BbCafeDesktopPos() {
     setIsCustomerModalOpen(false);
   };
 
-  // --- SMART ITEM CLICK HANDLER (Direct Add if no variants, Modal if variants exist) ---
   const handleItemClick = (item: any) => {
     triggerBeep('tap');
     const hasVariants = item.variants && typeof item.variants === 'object' && Object.keys(item.variants).length > 0;
 
     if (hasVariants) {
-      // अगर साइज़/वेरिएंट हैं, तो पॉप-अप खोलो
       setSelectedProductForVariation(item);
       const firstSize = Object.keys(item.variants)[0];
       const firstPrice = Number(item.variants[firstSize]) || Number(item.price) || 100;
@@ -526,7 +661,6 @@ export default function BbCafeDesktopPos() {
       setItemNoteInput('');
       setIsVariationModalOpen(true);
     } else {
-      // अगर कोई वेरिएंट नहीं है, तो डायरेक्ट बिना नोट के कार्ट में जोड़ो
       const itemPrice = Number(item.price) || 100;
       setCart((prev) => {
         const existingIndex = prev.findIndex((c) => c.id === item.id && !c.size);
@@ -657,7 +791,6 @@ export default function BbCafeDesktopPos() {
     toast.success("Peri Peri USB 802 Thermal Printer Ready via Browser Print Engine! ✅");
   };
 
-  // --- DAILY RESET TOKEN GENERATOR (01 Se Start) ---
   const getDailyTokenNumber = () => {
     const todayStr = new Date().toDateString();
     let lastResetDate = localStorage.getItem("bb_pos_token_reset_date");
@@ -673,9 +806,6 @@ export default function BbCafeDesktopPos() {
     return currentTokenSeq;
   };
 
-  // ==========================================================
-  // MODULAR PRINT HANDLER
-  // ==========================================================
   const handlePrintReceiptDirect = async (orderObj: any, isKot = false) => {
     if (!orderObj || !orderObj.items || orderObj.items.length === 0) return;
 
@@ -882,7 +1012,7 @@ export default function BbCafeDesktopPos() {
         triggerBeep('success'); 
         toast.success(`Final Bill #${billNumber} printed successfully!`);
         
-        if (kotEnabled && fulfillmentType === 'table') {
+        if (kotEnabled) {
           await handlePrintReceiptDirect(orderObj, true);
           await new Promise((r) => setTimeout(r, 600));
         }
@@ -927,7 +1057,6 @@ export default function BbCafeDesktopPos() {
     else document.documentElement.classList.add('dark');
   };
 
-  const filteredMenu = useMemo(() => products.filter((p) => (selectedCategory === 'All' || p.category === selectedCategory) && p.name.toLowerCase().includes(searchQuery.toLowerCase())), [products, selectedCategory, searchQuery]);
   const filteredPastReceipts = useMemo(() => pastReceipts.filter((o) => String(o.billNumber).includes(receiptSearchQuery.trim()) || String(o.customerPhone || '').includes(receiptSearchQuery.trim()) || String(o.customerName || '').toLowerCase().includes(receiptSearchQuery.trim().toLowerCase())), [pastReceipts, receiptSearchQuery]);
 
   const mainClass = "h-screen w-screen flex font-sans antialiased overflow-hidden " + (themeMode === "dark" ? "dark bg-[#0a0a0a] text-neutral-100" : "bg-neutral-100 text-neutral-900");
@@ -975,9 +1104,10 @@ export default function BbCafeDesktopPos() {
 
               <nav className="space-y-2">
                 {[
-                  { id: 'billing', label: 'Counter Billing', icon: ShoppingBag },
+                  { id: 'billing', label: 'Counter Billing [F2]', icon: ShoppingBag },
                   { id: 'tables', label: `Tables (${activeTableOrders.length})`, icon: LayoutGrid },
                   { id: 'orders', label: `Live Orders (${activeLiveOrders.length})`, icon: Clock },
+                  { id: 'reports', label: 'Sales Reports & Cash', icon: SafeBarChart3 },
                   { id: 'inventory', label: 'Manage Menu & Stock', icon: Layers },
                   { id: 'receipts', label: 'Past Receipts', icon: Printer },
                   { id: 'settings', label: 'Settings & Printer', icon: Settings },
@@ -1039,14 +1169,17 @@ export default function BbCafeDesktopPos() {
                     </div>
                   )}
 
+                  {/* SEARCH BAR WITH ENTER KEY QUICK ADD */}
                   <div className="flex gap-3 mb-4 items-center shrink-0">
                     <div className="relative flex-1">
                       <SafeSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-400" size={18} />
                       <input 
+                        ref={searchInputRef}
                         type="text" 
-                        placeholder="Search items by name..." 
+                        placeholder="Search item / Type Code & Press [Enter] to add... [F2]" 
                         value={searchQuery} 
-                        onChange={e => setSearchQuery(e.target.value)} 
+                        onChange={e => setSearchQuery(e.target.value)}
+                        onKeyDown={handleSearchInputKeyDown} 
                         className="w-full bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-2xl py-3 pl-11 pr-4 text-sm outline-none focus:border-orange-500 shadow-sm" 
                       />
                     </div>
@@ -1269,8 +1402,8 @@ export default function BbCafeDesktopPos() {
                     </div>
 
                     <div className="flex gap-2 my-2 shrink-0">
-                      <button onClick={() => setPaymentMethod('cash')} className={`flex-1 py-2 rounded-xl text-xs font-black uppercase border ${paymentMethod === 'cash' ? 'bg-green-600 text-white border-green-600' : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-400 border-neutral-700'}`}>Cash</button>
-                      <button onClick={() => setPaymentMethod('upi')} className={`flex-1 py-2 rounded-xl text-xs font-black uppercase border ${paymentMethod === 'upi' ? 'bg-blue-600 text-white border-blue-600' : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-400 border-neutral-700'}`}>UPI</button>
+                      <button onClick={() => setPaymentMethod('cash')} className={`flex-1 py-2 rounded-xl text-xs font-black uppercase border ${paymentMethod === 'cash' ? 'bg-green-600 text-white border-green-600' : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-400 border-neutral-700'}`}>Cash [F4]</button>
+                      <button onClick={() => setPaymentMethod('upi')} className={`flex-1 py-2 rounded-xl text-xs font-black uppercase border ${paymentMethod === 'upi' ? 'bg-blue-600 text-white border-blue-600' : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-400 border-neutral-700'}`}>UPI [F4]</button>
                     </div>
 
                     {fulfillmentType === 'table' ? (
@@ -1281,17 +1414,106 @@ export default function BbCafeDesktopPos() {
                         </button>
                         <button onClick={handleFinalCheckoutAndPrintBill} disabled={cart.length === 0 || isSubmittingOrder} className="w-full bg-green-600 hover:bg-green-500 text-white font-black py-3 rounded-2xl uppercase tracking-wider text-xs flex items-center justify-center gap-2 shadow-lg disabled:opacity-50">
                           {isSubmittingOrder ? <Loader2 className="animate-spin" size={16} /> : <SafeFileText size={16} />}
-                          <span>Settle & Print Final Bill (₹{getTotalBillPrice()})</span>
+                          <span>Settle & Print Final Bill (₹{getTotalBillPrice()}) [F9]</span>
                         </button>
                       </div>
                     ) : (
                       <button onClick={handleFinalCheckoutAndPrintBill} disabled={cart.length === 0 || isSubmittingOrder} className="w-full bg-green-600 hover:bg-green-500 text-white font-black py-4 rounded-2xl uppercase tracking-wider text-xs flex items-center justify-center gap-2 shadow-xl disabled:opacity-50 shrink-0">
                         {isSubmittingOrder ? <Loader2 className="animate-spin" size={16} /> : <CheckCircle2 size={16} />}
-                        <span>One-Click Print & Pay (₹{getTotalBillPrice()})</span>
+                        <span>One-Click Print & Pay (₹{getTotalBillPrice()}) [F9]</span>
                       </button>
                     )}
                   </div>
                 </div>
+              </div>
+            )}
+
+            {/* TAB: SALES REPORTS & CASH DRAWER COUNT */}
+            {activeTab === 'reports' && (
+              <div className="flex-1 p-6 h-full overflow-y-auto max-w-4xl mx-auto space-y-6">
+                <div className="flex justify-between items-center border-b pb-4">
+                  <div>
+                    <h2 className="text-lg font-black uppercase text-orange-500 flex items-center gap-2">
+                      <SafeBarChart3 size={20} /> Sales Reports & Cash Drawer Audit
+                    </h2>
+                    <p className="text-xs text-neutral-400">आज और कल की बिक्री देखें तथा गल्ले (Cash Drawer) का मिलान करें।</p>
+                  </div>
+                  <div className="flex bg-neutral-800 p-1 rounded-2xl border border-neutral-700">
+                    <button onClick={() => setReportFilter('today')} className={`px-4 py-2 text-xs font-black uppercase rounded-xl transition-all ${reportFilter === 'today' ? 'bg-orange-600 text-white' : 'text-neutral-400'}`}>Today</button>
+                    <button onClick={() => setReportFilter('yesterday')} className={`px-4 py-2 text-xs font-black uppercase rounded-xl transition-all ${reportFilter === 'yesterday' ? 'bg-orange-600 text-white' : 'text-neutral-400'}`}>Yesterday</button>
+                    <button onClick={() => setReportFilter('custom')} className={`px-4 py-2 text-xs font-black uppercase rounded-xl transition-all ${reportFilter === 'custom' ? 'bg-orange-600 text-white' : 'text-neutral-400'}`}>Custom</button>
+                  </div>
+                </div>
+
+                {reportFilter === 'custom' && (
+                  <div className="flex items-center gap-3 bg-neutral-900 p-4 rounded-2xl border border-neutral-800">
+                    <label className="text-xs font-bold uppercase text-neutral-400">Select Date:</label>
+                    <input type="date" value={customReportDate} onChange={e => setCustomReportDate(e.target.value)} className="bg-neutral-950 border border-neutral-700 rounded-xl px-3 py-2 text-xs text-orange-400 font-mono outline-none" />
+                  </div>
+                )}
+
+                {isReportLoading ? (
+                  <div className="flex justify-center py-24"><Loader2 className="animate-spin text-orange-500" size={32} /></div>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-4 gap-4">
+                      <div className="bg-neutral-900 border border-neutral-800 p-5 rounded-3xl space-y-1 shadow-lg">
+                        <p className="text-[10px] font-black uppercase text-neutral-400">Total Sale</p>
+                        <p className="text-2xl font-black font-mono text-green-400">₹{reportSummary.totalSale}</p>
+                        <p className="text-[10px] text-neutral-500">{reportSummary.totalOrdersCount} Orders Completed</p>
+                      </div>
+                      <div className="bg-neutral-900 border border-neutral-800 p-5 rounded-3xl space-y-1 shadow-lg">
+                        <p className="text-[10px] font-black uppercase text-neutral-400">Cash Collection</p>
+                        <p className="text-2xl font-black font-mono text-amber-400">₹{reportSummary.cashSale}</p>
+                        <p className="text-[10px] text-neutral-500">Physical Cash Expected in Drawer</p>
+                      </div>
+                      <div className="bg-neutral-900 border border-neutral-800 p-5 rounded-3xl space-y-1 shadow-lg">
+                        <p className="text-[10px] font-black uppercase text-neutral-400">UPI / Online</p>
+                        <p className="text-2xl font-black font-mono text-blue-400">₹{reportSummary.upiSale}</p>
+                        <p className="text-[10px] text-neutral-500">Direct Bank Settlements</p>
+                      </div>
+                      <div className="bg-neutral-900 border border-neutral-800 p-5 rounded-3xl space-y-3 shadow-lg flex flex-col justify-between">
+                        <div>
+                          <p className="text-[10px] font-black uppercase text-yellow-400">Cash Counter Audit</p>
+                          <input 
+                            type="number" 
+                            placeholder="Counted Cash in Drawer (₹)" 
+                            value={physicalCashInput}
+                            onChange={e => setPhysicalCashInput(e.target.value === '' ? '' : Number(e.target.value))}
+                            className="w-full mt-2 bg-neutral-950 border border-neutral-700 rounded-xl px-3 py-1.5 text-xs font-mono text-white outline-none"
+                          />
+                        </div>
+                        {physicalCashInput !== '' && (
+                          <div className={`text-[11px] font-bold ${Number(physicalCashInput) === reportSummary.cashSale ? 'text-green-400' : Number(physicalCashInput) > reportSummary.cashSale ? 'text-blue-400' : 'text-red-400'}`}>
+                            {Number(physicalCashInput) === reportSummary.cashSale ? '✅ Cash Matched Perfectly!' : Number(physicalCashInput) > reportSummary.cashSale ? `⚠️ Excess: +₹{Number(physicalCashInput) - reportSummary.cashSale}` : `❌ Shortage: -₹{reportSummary.cashSale - Number(physicalCashInput)}`}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="bg-neutral-900 border border-neutral-800 rounded-3xl p-5 space-y-4 shadow-xl">
+                      <h3 className="text-xs font-black uppercase text-neutral-400">Transactions List ({reportOrders.length})</h3>
+                      <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
+                        {reportOrders.length === 0 ? (
+                          <p className="text-xs text-neutral-500 text-center py-12">No transactions recorded for this period.</p>
+                        ) : (
+                          reportOrders.map(ord => (
+                            <div key={ord.id} className="flex justify-between items-center bg-neutral-950 p-3.5 rounded-2xl border border-neutral-800 text-xs">
+                              <div>
+                                <span className="font-mono font-bold text-yellow-500">Bill #{ord.billNumber}</span> • <span className="font-bold">{ord.customerName || 'Walk-in'}</span>
+                                <span className="text-[10px] text-neutral-500 block font-mono">{ord.timestamp?.toDate ? ord.timestamp.toDate().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'Recent'}</span>
+                              </div>
+                              <div className="flex items-center gap-3">
+                                <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded ${ord.paymentMethod === 'upi' ? 'bg-blue-500/10 text-blue-400' : 'bg-green-500/10 text-green-400'}`}>{ord.paymentMethod || 'cash'}</span>
+                                <span className="font-mono font-black text-sm text-white">₹{ord.total}</span>
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
             )}
 
