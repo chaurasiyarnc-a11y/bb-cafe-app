@@ -8,9 +8,11 @@ import {
   waitForPendingWrites, deleteDoc, Timestamp
 } from 'firebase/firestore';
 import { 
-  ShoppingBag, Search, X, Loader2, Clock, Printer, Check, Settings, 
-  Database, RefreshCw, Layers, Menu, LogOut, Lock, ToggleLeft, ToggleRight, 
-  Sun, Moon, Tag, Trash2, ArrowRight, CheckCircle2, UserPlus, Download, PlusCircle, Edit3, FileText, LayoutGrid, ChevronLeft, ChevronRight, Gift, Percent, Sliders, PackagePlus, Plus, BarChart3, DollarSign, Calendar
+  ShoppingBag, Search, X, Loader2, Clock, Printer, Settings, 
+  Database, RefreshCw, Layers, LogOut, Lock, ToggleLeft, ToggleRight, 
+  Trash2, UserPlus, Download, Edit3, FileText, LayoutGrid, ChevronLeft, ChevronRight, 
+  Gift, PackagePlus, BarChart3, HelpCircle, PauseCircle, PlayCircle, QrCode, 
+  Share2, Calculator, Receipt, IndianRupee, ArrowRight
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
@@ -36,19 +38,23 @@ const SafeSettings = Settings as any;
 const SafeTrash2 = Trash2 as any;
 const SafeUserPlus = UserPlus as any;
 const SafeDownload = Download as any;
-const SafePlusCircle = PlusCircle as any;
 const SafeEdit3 = Edit3 as any;
 const SafeFileText = FileText as any;
 const SafeLayoutGrid = LayoutGrid as any;
 const SafeChevronLeft = ChevronLeft as any;
 const SafeChevronRight = ChevronRight as any;
 const SafeGift = Gift as any;
-const SafePercent = Percent as any;
-const SafeSliders = Sliders as any;
 const SafePackagePlus = PackagePlus as any;
 const SafeBarChart3 = BarChart3 as any;
+const SafeHelpCircle = HelpCircle as any;
+const SafePauseCircle = PauseCircle as any;
+const SafePlayCircle = PlayCircle as any;
+const SafeQrCode = QrCode as any;
+const SafeShare2 = Share2 as any;
+const SafeCalculator = Calculator as any;
 
 interface PosCartItem {
+  cartItemId: string;
   id: string;
   name: string;
   price: number;
@@ -63,6 +69,18 @@ interface DeliveryArea {
   fee: number;
   minFree: number;
   range: string;
+}
+
+interface HeldCart {
+  id: string;
+  cart: PosCartItem[];
+  customerName: string;
+  customerPhone: string;
+  tableNumber: string;
+  fulfillmentType: 'delivery' | 'pickup' | 'table';
+  heldAt: string;
+  total: number;
+  note?: string;
 }
 
 const PIZZA_ADDONS: { [size: string]: { [addon: string]: number } } = {
@@ -84,7 +102,7 @@ export default function BbCafeDesktopPos() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [pinInput, setPinInput] = useState('');
-  const [activeTab, setActiveTab] = useState<'billing' | 'inventory' | 'receipts' | 'settings' | 'orders' | 'tables' | 'variations_manager' | 'item_editor' | 'reports'>('billing');
+  const [activeTab, setActiveTab] = useState<'billing' | 'inventory' | 'receipts' | 'settings' | 'orders' | 'tables' | 'item_editor' | 'reports'>('billing');
 
   const [gstEnabled, setGstEnabled] = useState(false);
   const [gstRate, setGstRate] = useState(5);
@@ -95,7 +113,9 @@ export default function BbCafeDesktopPos() {
   const [isAppInstalled, setIsAppInstalled] = useState(false);
   const [printerConnected, setPrinterConnected] = useState(false);
   const [kotEnabled, setKotEnabled] = useState<boolean>(true); 
+  const [upiIdConfig, setUpiIdConfig] = useState<string>('bumbumcafe@upi');
 
+  // Customer Directory States
   const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false);
   const [customerSearchQuery, setCustomerSearchQuery] = useState('');
   const [searchedCustomers, setSearchedCustomers] = useState<any[]>([]);
@@ -107,22 +127,41 @@ export default function BbCafeDesktopPos() {
 
   const [liveOrders, setLiveOrders] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
-  const [globalVariations, setGlobalVariations] = useState<any[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(false);
   
-  // Sales Reports States
+  // Reports & Expenses States
   const [reportFilter, setReportFilter] = useState<'today' | 'yesterday' | 'custom'>('today');
   const [customReportDate, setCustomReportDate] = useState(new Date().toISOString().split('T')[0]);
   const [reportOrders, setReportOrders] = useState<any[]>([]);
+  const [dailyExpenses, setDailyExpenses] = useState<any[]>([]);
   const [isReportLoading, setIsReportLoading] = useState(false);
   const [physicalCashInput, setPhysicalCashInput] = useState<number | ''>('');
+
+  // Modals & New Features States
+  const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
+  const [isHeldCartsModalOpen, setIsHeldCartsModalOpen] = useState(false);
+  const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
+  const [isQrModalOpen, setIsQrModalOpen] = useState(false);
+  const [isChangeModalOpen, setIsChangeModalOpen] = useState(false);
+  
+  // Expense Form State
+  const [expenseTitle, setExpenseTitle] = useState('');
+  const [expenseAmount, setExpenseAmount] = useState<number | ''>('');
+  const [expenseCategory, setExpenseCategory] = useState('Milk / Dairy');
+
+  // Change Calculator State
+  const [tenderCashAmount, setTenderCashAmount] = useState<number | ''>('');
+
+  // Held Carts Storage
+  const [heldCarts, setHeldCarts] = useState<HeldCart[]>([]);
 
   // Item Editor States
   const [editingItemObj, setEditingItemObj] = useState<any>(null);
   const [itemNameInput, setItemNameInput] = useState('');
+  const [itemCodeInput, setItemCodeInput] = useState('');
   const [itemPriceInput, setItemPriceInput] = useState<number>(0);
   const [itemCatInput, setItemCatInput] = useState('');
   const [itemImageInput, setItemImageInput] = useState('');
@@ -140,11 +179,11 @@ export default function BbCafeDesktopPos() {
   const [receiptSearchQuery, setReceiptSearchQuery] = useState('');
   const [selectedReceipt, setSelectedReceipt] = useState<any>(null);
   const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false); 
-  const [receiptsLimit, setReceiptsLimit] = useState(30);
+  const [receiptsLimit] = useState(50);
 
   const [isSyncing, setIsSyncing] = useState(false);
 
-  // Cart & Table Management States
+  // Cart & Order States
   const [cart, setCart] = useState<PosCartItem[]>([]);
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerName, setCustomerName] = useState('');
@@ -165,10 +204,14 @@ export default function BbCafeDesktopPos() {
   const [activeEditingBillNumber, setActiveEditingBillNumber] = useState<number | null>(null);
 
   const [isSubmittingOrder, setIsSubmittingOrder] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'upi'>('cash');
+  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'upi' | 'split'>('cash');
+  const [splitCashAmount, setSplitCashAmount] = useState<number>(0);
+  const [splitUpiAmount, setSplitUpiAmount] = useState<number>(0);
 
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const alarmIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  const getSanitizedPhone = (p: string) => p.replace(/\D/g, '').slice(-10);
 
   const triggerBeep = (type: 'tap' | 'success' | 'alarm') => {
     try {
@@ -201,112 +244,333 @@ export default function BbCafeDesktopPos() {
     } catch (e) {}
   };
 
-  // --- FILTERED MENU FOR SEARCH (Item Code / Name support) ---
+  // Calculations
+  const getCartSubtotal = () => cart.reduce((acc, i) => acc + (i.price * i.quantity), 0);
+  const getDeliveryCharge = () => (fulfillmentType === "pickup" || fulfillmentType === "table" || getCartSubtotal() === 0) ? 0 : (getCartSubtotal() >= selectedArea.minFree ? 0 : selectedArea.fee);
+  const getGstAmountCalculated = () => gstEnabled ? Number(((getCartSubtotal() * gstRate) / 100).toFixed(2)) : 0;
+  const getRedemptionDiscount = () => isRedeemingPoints ? Math.min(pointsToRedeem, getCartSubtotal() + getGstAmountCalculated()) : 0;
+  
+  const getCalculatedDiscountAmount = () => {
+    const sub = getCartSubtotal();
+    if (discountType === 'amount') {
+      return Math.min(discountValue, sub);
+    } else {
+      return Math.min(Number(((sub * discountValue) / 100).toFixed(2)), sub);
+    }
+  };
+
+  const getTotalBillPrice = () => Math.max(0, getCartSubtotal() + getGstAmountCalculated() - getCalculatedDiscountAmount() - getRedemptionDiscount()) + getDeliveryCharge();
+
+  // Sync split totals when total bill price changes
+  useEffect(() => {
+    const total = getTotalBillPrice();
+    if (paymentMethod === 'split') {
+      const half = Math.floor(total / 2);
+      setSplitCashAmount(half);
+      setSplitUpiAmount(total - half);
+    }
+  }, [cart, discountValue, discountType, isRedeemingPoints, pointsToRedeem, paymentMethod]);
+
+  // Load Saved Held Carts from LocalStorage
+  useEffect(() => {
+    const savedHeld = localStorage.getItem("bb_pos_held_carts");
+    if (savedHeld) {
+      try { setHeldCarts(JSON.parse(savedHeld)); } catch (e) {}
+    }
+    const savedUpi = localStorage.getItem("bb_pos_upi_id");
+    if (savedUpi) setUpiIdConfig(savedUpi);
+  }, []);
+
+  const saveHeldCartsToStorage = (newList: HeldCart[]) => {
+    setHeldCarts(newList);
+    localStorage.setItem("bb_pos_held_carts", JSON.stringify(newList));
+  };
+
+  // --- HOLD / PARK CART HANDLER [F3] ---
+  const handleHoldCurrentCart = () => {
+    if (cart.length === 0) {
+      toast.error("Cart is empty! Nothing to hold.");
+      return;
+    }
+    triggerBeep('tap');
+
+    const newHold: HeldCart = {
+      id: `hold_${Date.now()}`,
+      cart: [...cart],
+      customerName: customerName || 'Walk-in Guest',
+      customerPhone,
+      tableNumber,
+      fulfillmentType,
+      heldAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      total: getTotalBillPrice()
+    };
+
+    const updated = [newHold, ...heldCarts];
+    saveHeldCartsToStorage(updated);
+    toast.success(`Cart parked on Hold! [${newHold.customerName}]`, { icon: '⏸️' });
+
+    // Clear active cart for next walk-in guest
+    setCart([]);
+    setCustomerName('');
+    setCustomerPhone('');
+    setDiscountValue(0);
+    setIsRedeemingPoints(false);
+    setPointsToRedeem(0);
+    localStorage.removeItem("bb_pos_saved_cart_pc");
+  };
+
+  // --- RECALL HELD CART HANDLER [F5] ---
+  const handleRestoreHeldCart = (heldItem: HeldCart) => {
+    triggerBeep('tap');
+    if (cart.length > 0) {
+      if (!window.confirm("Current active cart has items. Replace it with this held order?")) return;
+    }
+    setCart(heldItem.cart);
+    setCustomerName(heldItem.customerName === 'Walk-in Guest' ? '' : heldItem.customerName);
+    setCustomerPhone(heldItem.customerPhone || '');
+    setTableNumber(heldItem.tableNumber || 'Table 1');
+    setFulfillmentType(heldItem.fulfillmentType || 'pickup');
+    
+    const updated = heldCarts.filter(h => h.id !== heldItem.id);
+    saveHeldCartsToStorage(updated);
+    setIsHeldCartsModalOpen(false);
+    setActiveTab('billing');
+    toast.success(`Restored order of ${heldItem.customerName}!`, { icon: '▶️' });
+  };
+
+  // --- DELETE HELD CART ---
+  const handleDeleteHeldCart = (holdId: string) => {
+    triggerBeep('tap');
+    const updated = heldCarts.filter(h => h.id !== holdId);
+    saveHeldCartsToStorage(updated);
+    toast.success("Held cart removed.");
+  };
+
+  // --- WHATSAPP DIGITAL RECEIPT SENDER [F7] ---
+  const handleSendWhatsAppBill = () => {
+    const clean = getSanitizedPhone(customerPhone);
+    if (clean.length !== 10) {
+      toast.error("Please enter a valid 10-digit phone number first!");
+      return;
+    }
+    if (cart.length === 0) {
+      toast.error("Cart is empty!");
+      return;
+    }
+
+    const itemsText = cart.map(i => `• ${i.name} x${i.quantity} = ₹${i.price * i.quantity}`).join('%0A');
+    const sub = getCartSubtotal();
+    const tot = getTotalBillPrice();
+
+    const message = `*☕ BUM BUM CAFE - DIGITAL RECEIPT*%0A------------------------------%0A*Customer:* ${customerName || 'Valued Guest'}%0A*Phone:* ${clean}%0A*Mode:* ${fulfillmentType.toUpperCase()}%0A------------------------------%0A${itemsText}%0A------------------------------%0A*Subtotal:* ₹${sub}%0A*Grand Total:* ₹${tot}%0A------------------------------%0A_Thank you for visiting Bum Bum Cafe, Mohandra! Visit Again!_ 💛`;
+
+    const url = `https://wa.me/91${clean}?text=${message}`;
+    window.open(url, '_blank');
+    toast.success("WhatsApp bill opened in new tab! 📱");
+  };
+
+  // --- SAVE PETTY CASH EXPENSE [F6] ---
+  const handleSaveExpense = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const amt = Number(expenseAmount);
+    if (!expenseTitle.trim() || isNaN(amt) || amt <= 0) {
+      toast.error("Enter valid expense title and amount!");
+      return;
+    }
+    const toastId = toast.loading("Saving daily expense...");
+    try {
+      await addDoc(collection(db, "daily_expenses"), {
+        title: expenseTitle.trim(),
+        amount: amt,
+        category: expenseCategory,
+        timestamp: new Date(),
+        enteredBy: currentUser?.name || 'Staff'
+      });
+      toast.dismiss(toastId);
+      toast.success(`Expense ₹${amt} logged from drawer! ✅`);
+      setExpenseTitle('');
+      setExpenseAmount('');
+      setIsExpenseModalOpen(false);
+      // Trigger fetch for reports if active
+      fetchReportData();
+    } catch (err) {
+      toast.dismiss(toastId);
+      toast.error("Failed to record expense");
+    }
+  };
+
+  // --- FILTERED MENU FOR FAST POS SCAN ---
   const filteredMenu = useMemo(() => {
     const queryStr = searchQuery.toLowerCase().trim();
     return products.filter((p) => {
       const matchesCategory = selectedCategory === 'All' || p.category === selectedCategory;
-      const matchesName = p.name.toLowerCase().includes(queryStr);
-      // Support matching itemCode or product id if entered
+      const matchesName = (p.name || '').toLowerCase().includes(queryStr);
       const matchesCode = p.itemCode && String(p.itemCode).toLowerCase().includes(queryStr);
       return matchesCategory && (matchesName || matchesCode);
     });
   }, [products, selectedCategory, searchQuery]);
 
-  // --- KEYBOARD SHORTCUTS & SEARCH ENTER SELECT (PC POS Speedup) ---
+  // --- MASTER KEYBOARD SHORTCUTS CONTROLLER (F1 - F10, ESC) ---
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!isLoggedIn) return;
 
-      // F2 -> Focus Search Bar
+      // [F1] Shortcuts Help Modal
+      if (e.key === 'F1') {
+        e.preventDefault();
+        setIsHelpModalOpen(prev => !prev);
+      }
+
+      // [F2] Focus Item Search Bar
       if (e.key === 'F2') {
         e.preventDefault();
         setActiveTab('billing');
-        setTimeout(() => searchInputRef.current?.focus(), 100);
-        toast("Shortcut: Item Search Focused (F2)", { icon: '⌨️' });
+        setTimeout(() => searchInputRef.current?.focus(), 80);
+        toast("Search Bar Focused [F2]", { icon: '⌨️' });
       }
 
-      // F4 -> Toggle Cash / UPI Payment Method
+      // [F3] Park / Hold Order
+      if (e.key === 'F3') {
+        e.preventDefault();
+        handleHoldCurrentCart();
+      }
+
+      // [F4] Toggle Payment Mode (Cash -> UPI -> Split)
       if (e.key === 'F4') {
         e.preventDefault();
-        setPaymentMethod(prev => (prev === 'cash' ? 'upi' : 'cash'));
-        toast(`Payment Mode switched to: ${paymentMethod === 'cash' ? 'UPI' : 'Cash'}`, { icon: '💳' });
+        setPaymentMethod(prev => {
+          const next = prev === 'cash' ? 'upi' : prev === 'upi' ? 'split' : 'cash';
+          toast(`Payment Mode: ${next.toUpperCase()} [F4]`, { icon: '💳' });
+          return next;
+        });
       }
 
-      // F9 -> One-Click Print & Pay Checkout
+      // [F5] View & Recall Held Carts
+      if (e.key === 'F5') {
+        e.preventDefault();
+        setIsHeldCartsModalOpen(prev => !prev);
+      }
+
+      // [F6] Daily Expense Entry
+      if (e.key === 'F6') {
+        e.preventDefault();
+        setIsExpenseModalOpen(prev => !prev);
+      }
+
+      // [F7] Send WhatsApp Bill
+      if (e.key === 'F7') {
+        e.preventDefault();
+        handleSendWhatsAppBill();
+      }
+
+      // [F8] Dynamic UPI QR Display
+      if (e.key === 'F8') {
+        e.preventDefault();
+        if (getTotalBillPrice() <= 0) {
+          toast.error("Cart total must be greater than ₹0 for UPI QR!");
+        } else {
+          setIsQrModalOpen(prev => !prev);
+        }
+      }
+
+      // [F9] Quick Pay, Print Receipt & KOT
       if (e.key === 'F9') {
         e.preventDefault();
         if (cart.length > 0 && !isSubmittingOrder) {
           handleFinalCheckoutAndPrintBill();
+        } else if (cart.length === 0) {
+          toast.error("Cart is empty! Add items first.");
         }
+      }
+
+      // [F10] Cash Tender Change Calculator
+      if (e.key === 'F10') {
+        e.preventDefault();
+        setTenderCashAmount(getTotalBillPrice());
+        setIsChangeModalOpen(prev => !prev);
+      }
+
+      // [Escape] Close Any Modal
+      if (e.key === 'Escape') {
+        setIsHelpModalOpen(false);
+        setIsHeldCartsModalOpen(false);
+        setIsExpenseModalOpen(false);
+        setIsQrModalOpen(false);
+        setIsChangeModalOpen(false);
+        setIsVariationModalOpen(false);
+        setIsReceiptModalOpen(false);
+        setIsCustomerModalOpen(false);
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isLoggedIn, cart, isSubmittingOrder, paymentMethod]);
+  }, [isLoggedIn, cart, isSubmittingOrder, paymentMethod, customerName, customerPhone, tableNumber, fulfillmentType, heldCarts]);
 
-  // --- HANDLE SEARCH INPUT ENTER KEY (Quick Add First Matched Item) ---
+  // Handle Search Input [Enter] to quickly select first item
   const handleSearchInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       e.preventDefault();
       if (filteredMenu.length > 0) {
-        // Automatically click/select the first matched item from search results
         handleItemClick(filteredMenu[0]);
-        setSearchQuery(''); // Reset search query to clear box for next scan/type
+        setSearchQuery('');
       } else {
-        toast.error("कोई आइटम नहीं मिला!");
+        toast.error("No matching item found!");
       }
     }
   };
 
-  // --- FETCH SALES REPORTS FOR TODAY / YESTERDAY / CUSTOM ---
-  useEffect(() => {
-    if (activeTab !== 'reports') return;
-    (async () => {
-      setIsReportLoading(true);
-      try {
-        let startTarget = new Date();
-        let endTarget = new Date();
+  // Fetch Sales & Daily Expenses for Reports
+  const fetchReportData = async () => {
+    setIsReportLoading(true);
+    try {
+      let startTarget = new Date();
+      let endTarget = new Date();
 
-        if (reportFilter === 'today') {
-          startTarget.setHours(0, 0, 0, 0);
-          endTarget.setHours(23, 59, 59, 999);
-        } else if (reportFilter === 'yesterday') {
-          startTarget.setDate(startTarget.getDate() - 1);
-          startTarget.setHours(0, 0, 0, 0);
-          endTarget.setDate(endTarget.getDate() - 1);
-          endTarget.setHours(23, 59, 59, 999);
-        } else if (reportFilter === 'custom' && customReportDate) {
-          startTarget = new Date(customReportDate);
-          startTarget.setHours(0, 0, 0, 0);
-          endTarget = new Date(customReportDate);
-          endTarget.setHours(23, 59, 59, 999);
-        }
-
-        const q = query(
-          collection(db, "orders"),
-          where("timestamp", ">=", Timestamp.fromDate(startTarget)),
-          where("timestamp", "<=", Timestamp.fromDate(endTarget)),
-          orderBy("timestamp", "desc")
-        );
-
-        const snap = await getDocs(q);
-        const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        setReportOrders(list);
-      } catch (err) {
-        console.error("Report fetch error:", err);
-        try {
-          const snapFallback = await getDocs(collection(db, "orders"));
-          const all = snapFallback.docs.map(d => ({ id: d.id, ...d.data() }));
-          setReportOrders(all);
-        } catch (e) {}
-      } finally {
-        setIsReportLoading(false);
+      if (reportFilter === 'today') {
+        startTarget.setHours(0, 0, 0, 0);
+        endTarget.setHours(23, 59, 59, 999);
+      } else if (reportFilter === 'yesterday') {
+        startTarget.setDate(startTarget.getDate() - 1);
+        startTarget.setHours(0, 0, 0, 0);
+        endTarget.setDate(endTarget.getDate() - 1);
+        endTarget.setHours(23, 59, 59, 999);
+      } else if (reportFilter === 'custom' && customReportDate) {
+        startTarget = new Date(customReportDate);
+        startTarget.setHours(0, 0, 0, 0);
+        endTarget = new Date(customReportDate);
+        endTarget.setHours(23, 59, 59, 999);
       }
-    })();
+
+      const qOrders = query(
+        collection(db, "orders"),
+        where("timestamp", ">=", Timestamp.fromDate(startTarget)),
+        where("timestamp", "<=", Timestamp.fromDate(endTarget)),
+        orderBy("timestamp", "desc")
+      );
+      const snapOrders = await getDocs(qOrders);
+      setReportOrders(snapOrders.docs.map(d => ({ id: d.id, ...d.data() })));
+
+      const qExpenses = query(
+        collection(db, "daily_expenses"),
+        where("timestamp", ">=", Timestamp.fromDate(startTarget)),
+        where("timestamp", "<=", Timestamp.fromDate(endTarget)),
+        orderBy("timestamp", "desc")
+      );
+      const snapExpenses = await getDocs(qExpenses);
+      setDailyExpenses(snapExpenses.docs.map(d => ({ id: d.id, ...d.data() })));
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsReportLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'reports') fetchReportData();
   }, [activeTab, reportFilter, customReportDate]);
 
+  // Report Summary Breakdown with Expenses Deducted
   const reportSummary = useMemo(() => {
     let totalSale = 0;
     let cashSale = 0;
@@ -319,15 +583,22 @@ export default function BbCafeDesktopPos() {
         totalSale += amt;
         if (o.paymentMethod === 'upi') {
           upiSale += amt;
+        } else if (o.paymentMethod === 'split') {
+          cashSale += Number(o.splitCashAmount || 0);
+          upiSale += Number(o.splitUpiAmount || 0);
         } else {
           cashSale += amt;
         }
       }
     });
 
-    return { totalSale, cashSale, upiSale, totalOrdersCount };
-  }, [reportOrders]);
+    const totalExpenseAmount = dailyExpenses.reduce((acc, exp) => acc + (Number(exp.amount) || 0), 0);
+    const netCashInDrawer = Math.max(0, cashSale - totalExpenseAmount);
 
+    return { totalSale, cashSale, upiSale, totalOrdersCount, totalExpenseAmount, netCashInDrawer };
+  }, [reportOrders, dailyExpenses]);
+
+  // App initialization
   useEffect(() => {
     const handleBeforeInstallPrompt = (e: any) => {
       e.preventDefault();
@@ -340,7 +611,12 @@ export default function BbCafeDesktopPos() {
     }
 
     const savedUser = localStorage.getItem("bb_pos_user_pc");
-    if (savedUser) { try { setIsLoggedIn(true); setCurrentUser(JSON.parse(savedUser)); } catch (e) {} }
+    if (savedUser) { 
+      try { 
+        setIsLoggedIn(true); 
+        setCurrentUser(JSON.parse(savedUser)); 
+      } catch (e) {} 
+    }
     setGstEnabled(localStorage.getItem("bb_pos_gst_enabled_pc") === 'true');
     setGstRate(Number(localStorage.getItem("bb_pos_gst_rate_pc")) || 5);
     setKotEnabled(localStorage.getItem("bb_pos_kot_enabled_pc") !== 'false'); 
@@ -351,7 +627,9 @@ export default function BbCafeDesktopPos() {
     else document.documentElement.classList.add('dark');
 
     const savedCart = localStorage.getItem("bb_pos_saved_cart_pc");
-    if (savedCart) { try { setCart(JSON.parse(savedCart)); } catch (err) {} }
+    if (savedCart) { 
+      try { setCart(JSON.parse(savedCart)); } catch (err) {} 
+    }
 
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
@@ -360,14 +638,14 @@ export default function BbCafeDesktopPos() {
 
   const handleInstallClick = async () => {
     if (!deferredPrompt) {
-      toast("App already installed or browser does not support direct installation.", { icon: 'ℹ️' });
+      toast("App already installed or browser unsupported.", { icon: 'ℹ️' });
       return;
     }
     deferredPrompt.prompt();
     const { outcome } = await deferredPrompt.userChoice;
     if (outcome === 'accepted') {
       setIsAppInstalled(true);
-      toast.success("App installed successfully on your PC! 🎉");
+      toast.success("Desktop POS Installed Successfully! 🎉");
     }
     setDeferredPrompt(null);
   };
@@ -376,14 +654,7 @@ export default function BbCafeDesktopPos() {
     localStorage.setItem("bb_pos_saved_cart_pc", JSON.stringify(cart));
   }, [cart]);
 
-  useEffect(() => {
-    const unsub = onSnapshot(collection(db, "global_variations"), (snapshot) => {
-      const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setGlobalVariations(list);
-    });
-    return () => unsub();
-  }, []);
-
+  // Live Orders Listener
   useEffect(() => {
     const q = query(collection(db, "orders"), orderBy("timestamp", "desc"), limit(50));
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -402,7 +673,7 @@ export default function BbCafeDesktopPos() {
   useEffect(() => {
     if (pendingOrdersCount > 0) {
       if (!alarmIntervalRef.current) {
-        alarmIntervalRef.current = setInterval(() => { triggerBeep('alarm'); }, 2000);
+        alarmIntervalRef.current = setInterval(() => { triggerBeep('alarm'); }, 2500);
       }
     } else {
       if (alarmIntervalRef.current) { clearInterval(alarmIntervalRef.current); alarmIntervalRef.current = null; }
@@ -410,6 +681,7 @@ export default function BbCafeDesktopPos() {
     return () => { if (alarmIntervalRef.current) clearInterval(alarmIntervalRef.current); };
   }, [pendingOrdersCount]);
 
+  // Load Products
   useEffect(() => {
     if (!isLoggedIn) return;
     (async () => {
@@ -428,6 +700,7 @@ export default function BbCafeDesktopPos() {
     })();
   }, [isLoggedIn]);
 
+  // Load Past Receipts
   useEffect(() => {
     if (activeTab !== 'receipts') return;
     (async () => {
@@ -449,6 +722,8 @@ export default function BbCafeDesktopPos() {
       const prodSnap = await getDocs(collection(db, "products"));
       const items = prodSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
       setProducts(items);
+      const uniqueCats = Array.from(new Set(items.map((i: any) => i.category).filter(Boolean))) as string[];
+      setCategories(['All', ...uniqueCats]);
       toast.dismiss(toastId);
       toast.success("Synced successfully!");
     } catch (err) {
@@ -463,7 +738,7 @@ export default function BbCafeDesktopPos() {
     e.preventDefault();
     const toastId = toast.loading("Verifying PIN...");
     try {
-      const snap = await getDocs(query(collection(db, "cafe_users"), where("pin", "==", pinInput)));
+      const snap = await getDocs(query(collection(db, "cafe_users"), where("pin", "==", pinInput.trim())));
       toast.dismiss(toastId);
       if (!snap.empty) {
         const uDoc = snap.docs[0].data();
@@ -472,7 +747,7 @@ export default function BbCafeDesktopPos() {
         localStorage.setItem("bb_pos_user_pc", JSON.stringify({ id: snap.docs[0].id, ...uDoc })); 
         toast.success(`Welcome, ${uDoc.name}!`);
       } else {
-        toast.error("Incorrect PIN!");
+        toast.error("Incorrect Staff PIN!");
       }
       setPinInput('');
     } catch (err) {
@@ -487,166 +762,10 @@ export default function BbCafeDesktopPos() {
     localStorage.removeItem("bb_pos_user_pc");
     setIsLoggedIn(false);
     setCurrentUser(null);
-    toast.success("Locked PC Terminal!");
+    toast.success("Terminal Locked!");
   };
 
-  const handleOpenItemEditor = (item: any = null) => {
-    triggerBeep('tap');
-    if (item) {
-      setEditingItemObj(item);
-      setItemNameInput(item.name || '');
-      setItemPriceInput(Number(item.price) || 0);
-      setItemCatInput(item.category || '');
-      setItemImageInput(item.image || item.imageUrl || '');
-      setItemVariantsList(item.variants || { small: Number(item.price) || 100 });
-    } else {
-      setEditingItemObj(null);
-      setItemNameInput('');
-      setItemPriceInput(100);
-      setItemCatInput('Fast Food');
-      setItemImageInput('');
-      setItemVariantsList({ small: 100, medium: 200, large: 300 });
-    }
-    setActiveTab('item_editor');
-  };
-
-  const handleSaveItemToFirestore = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!itemNameInput.trim()) return toast.error("कृपया item का नाम दर्ज करें!");
-    const toastId = toast.loading("Saving item to menu...");
-
-    try {
-      const itemData = {
-        name: itemNameInput.trim(),
-        price: Number(itemPriceInput) || 0,
-        category: itemCatInput.trim() || 'General',
-        image: itemImageInput.trim(),
-        variants: itemVariantsList,
-        isAvailable: true,
-        updatedAt: new Date()
-      };
-
-      if (editingItemObj) {
-        await updateDoc(doc(db, "products", editingItemObj.id), itemData);
-        setProducts(prev => prev.map(p => p.id === editingItemObj.id ? { id: editingItemObj.id, ...itemData } : p));
-        toast.success("Item updated successfully! ✅");
-      } else {
-        const docRef = await addDoc(collection(db, "products"), itemData);
-        setProducts(prev => [...prev, { id: docRef.id, ...itemData }]);
-        toast.success("New item added to menu! ✅");
-      }
-
-      const uniqueCats = Array.from(new Set(products.map((i: any) => i.category).filter(Boolean))) as string[];
-      setCategories(['All', ...uniqueCats]);
-
-      toast.dismiss(toastId);
-      setActiveTab('inventory');
-    } catch (err) {
-      toast.dismiss(toastId);
-      toast.error("Failed to save item");
-    }
-  };
-
-  const handleDeleteProductFromMenu = async (productId: string) => {
-    triggerBeep('tap');
-    if (!window.confirm("Are you sure you want to delete this item from menu?")) return;
-    try {
-      await deleteDoc(doc(db, "products", productId));
-      setProducts(prev => prev.filter(p => p.id !== productId));
-      toast.success("Item deleted from menu");
-    } catch (e) {
-      toast.error("Failed to delete item");
-    }
-  };
-
-  const handleCheckLoyalty = async () => {
-    triggerBeep('tap');
-    const cleanPhone = customerPhone.trim();
-    if (cleanPhone.length !== 10) return toast.error("कृपया सही 10-डिजिट मोबाइल नंबर दर्ज करें!");
-    
-    const toastId = toast.loading("कस्टमर खोजा जा रहा है...");
-    try {
-      const userRef = doc(db, "customer_points", cleanPhone);
-      const docSnap = await getDoc(userRef);
-      toast.dismiss(toastId);
-      
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        setCustomerName(data.name || '');
-        setCustomerPoints(data.points || 0);
-        setAddress(data.address || '');
-        setShowNewCustForm(false);
-        setIsRedeemingPoints(false);
-        setPointsToRedeem(0);
-        toast.success(`कस्टमर मिल गया: ${data.name} (पॉइंट्स: ${data.points || 0})`);
-      } else {
-        setCustomerName('');
-        setCustomerPoints(0);
-        setIsRedeemingPoints(false);
-        setPointsToRedeem(0);
-        setShowNewCustForm(true);
-        toast("नया नंबर है! कृपया नाम दर्ज करें।", { icon: 'ℹ️' });
-      }
-    } catch (e) {
-      toast.dismiss(toastId);
-      toast.error("डेटाबेस कनेक्ट करने में समस्या आई।");
-    }
-  };
-
-  const handleSaveNewCustomerQuick = async () => {
-    const cleanPhone = customerPhone.trim();
-    const nameTrim = newCustNameInput.trim();
-    if (!nameTrim) return toast.error("कृपया कस्टमर का नाम दर्ज करें!");
-
-    const toastId = toast.loading("कस्टमर सेव हो रहा है...");
-    try {
-      const userRef = doc(db, "customer_points", cleanPhone);
-      await setDoc(userRef, {
-        name: nameTrim,
-        phone: cleanPhone,
-        address: newCustAddressInput.trim(),
-        points: 0,
-        lastActive: new Date()
-      }, { merge: true });
-
-      setCustomerName(nameTrim);
-      setAddress(newCustAddressInput.trim());
-      setCustomerPoints(0);
-      setShowNewCustForm(false);
-      setNewCustNameInput('');
-      setNewCustAddressInput('');
-      toast.dismiss(toastId);
-      toast.success("नया कस्टमर सेव हो गया! ✅");
-    } catch (err) {
-      toast.dismiss(toastId);
-      toast.error("कस्टमर सेव करने में विफल।");
-    }
-  };
-
-  const searchDbCustomers = async (text: string) => {
-    const cleanText = text.trim();
-    setIsSearchingCustomer(true);
-    try {
-      let q = cleanText ? (/^\d+$/.test(cleanText) ? query(collection(db, "customer_points"), where("phone", "==", cleanText)) : query(collection(db, "customer_points"), where("name", ">=", cleanText), limit(15))) : query(collection(db, "customer_points"), orderBy("lastActive", "desc"), limit(12));
-      const snap = await getDocs(q);
-      setSearchedCustomers(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
-    } catch (e) {} finally {
-      setIsSearchingCustomer(false);
-    }
-  };
-
-  const handleSelectCustomer = (cust: any) => {
-    triggerBeep('tap');
-    setCustomerPhone(cust.phone); 
-    setCustomerName(cust.name || ''); 
-    setCustomerPoints(cust.points || 0); 
-    setAddress(cust.address || '');
-    setShowNewCustForm(false);
-    setIsRedeemingPoints(false);
-    setPointsToRedeem(0);
-    setIsCustomerModalOpen(false);
-  };
-
+  // Cart Management with Unique cartItemId to prevent collision
   const handleItemClick = (item: any) => {
     triggerBeep('tap');
     const hasVariants = item.variants && typeof item.variants === 'object' && Object.keys(item.variants).length > 0;
@@ -662,21 +781,23 @@ export default function BbCafeDesktopPos() {
       setIsVariationModalOpen(true);
     } else {
       const itemPrice = Number(item.price) || 100;
+      const cartItemId = `std-${item.id}`;
       setCart((prev) => {
-        const existingIndex = prev.findIndex((c) => c.id === item.id && !c.size);
+        const existingIndex = prev.findIndex((c) => c.cartItemId === cartItemId);
         if (existingIndex > -1) {
           const next = [...prev];
-          next[existingIndex].quantity += 1;
+          next[existingIndex] = { ...next[existingIndex], quantity: next[existingIndex].quantity + 1 };
           return next;
         }
         return [...prev, { 
+          cartItemId,
           id: item.id, 
           name: item.name, 
           price: itemPrice, 
           quantity: 1 
         }];
       });
-      toast.success(`Added ${item.name} to cart!`);
+      toast.success(`Added ${item.name}!`);
     }
   };
 
@@ -704,15 +825,17 @@ export default function BbCafeDesktopPos() {
     if (itemNoteInput) noteParts.push(`Note: ${itemNoteInput}`);
 
     const combinedNote = noteParts.join(' | ');
+    const cartItemId = `${selectedProductForVariation.id}-${selectedSize}-${combinedNote}`;
 
     setCart((prev) => {
-      const existingIndex = prev.findIndex((c) => c.id === selectedProductForVariation.id && c.size === selectedSize && c.note === combinedNote);
+      const existingIndex = prev.findIndex((c) => c.cartItemId === cartItemId);
       if (existingIndex > -1) {
         const next = [...prev];
-        next[existingIndex].quantity += 1;
+        next[existingIndex] = { ...next[existingIndex], quantity: next[existingIndex].quantity + 1 };
         return next;
       }
       return [...prev, { 
+        cartItemId,
         id: selectedProductForVariation.id, 
         name: fullName, 
         price: finalItemPrice, 
@@ -724,13 +847,13 @@ export default function BbCafeDesktopPos() {
 
     setIsVariationModalOpen(false);
     setSelectedProductForVariation(null);
-    toast.success(`Added ${fullName} to cart!`);
+    toast.success(`Added ${fullName}!`);
   };
 
-  const handleUpdateCartQuantity = (id: string, amount: number) => {
+  const handleUpdateCartQuantity = (cartItemId: string, amount: number) => {
     triggerBeep('tap');
     setCart((prev) => prev.map((item) => {
-      if (item.id === id) {
+      if (item.cartItemId === cartItemId) {
         const updatedQty = item.quantity + amount;
         return updatedQty > 0 ? { ...item, quantity: updatedQty } : null;
       }
@@ -738,57 +861,68 @@ export default function BbCafeDesktopPos() {
     }).filter(Boolean) as PosCartItem[]);
   };
 
-  const getCartSubtotal = () => cart.reduce((acc, i) => acc + (i.price * i.quantity), 0);
-  const getDeliveryCharge = () => (fulfillmentType === "pickup" || fulfillmentType === "table" || getCartSubtotal() === 0) ? 0 : (getCartSubtotal() >= selectedArea.minFree ? 0 : selectedArea.fee);
-  const getGstAmountCalculated = () => gstEnabled ? Number(((getCartSubtotal() * gstRate) / 100).toFixed(2)) : 0;
-  
-  const getRedemptionDiscount = () => isRedeemingPoints ? Math.min(pointsToRedeem, getCartSubtotal() + getGstAmountCalculated()) : 0;
-  
-  const getCalculatedDiscountAmount = () => {
-    const sub = getCartSubtotal();
-    if (discountType === 'amount') {
-      return Math.min(discountValue, sub);
-    } else {
-      return Math.min(Number(((sub * discountValue) / 100).toFixed(2)), sub);
+  const handleCheckLoyalty = async () => {
+    triggerBeep('tap');
+    const cleanPhone = getSanitizedPhone(customerPhone);
+    if (cleanPhone.length !== 10) return toast.error("Enter a valid 10-digit phone!");
+    
+    const toastId = toast.loading("Finding customer...");
+    try {
+      const userRef = doc(db, "customer_points", cleanPhone);
+      const docSnap = await getDoc(userRef);
+      toast.dismiss(toastId);
+      
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setCustomerName(data.name || '');
+        setCustomerPoints(data.points || 0);
+        setAddress(data.address || '');
+        setShowNewCustForm(false);
+        setIsRedeemingPoints(false);
+        setPointsToRedeem(0);
+        toast.success(`Found: ${data.name} (${data.points || 0} Pts)`);
+      } else {
+        setCustomerName('');
+        setCustomerPoints(0);
+        setIsRedeemingPoints(false);
+        setPointsToRedeem(0);
+        setShowNewCustForm(true);
+        toast("New customer! Enter details to register.", { icon: 'ℹ️' });
+      }
+    } catch (e) {
+      toast.dismiss(toastId);
+      toast.error("Failed to connect to database");
     }
   };
 
-  const getTotalBillPrice = () => Math.max(0, getCartSubtotal() + getGstAmountCalculated() - getCalculatedDiscountAmount() - getRedemptionDiscount()) + getDeliveryCharge();
+  const handleSaveNewCustomerQuick = async () => {
+    const cleanPhone = getSanitizedPhone(customerPhone);
+    const nameTrim = newCustNameInput.trim();
+    if (!nameTrim) return toast.error("Enter customer name!");
 
-  const handleLoadTableOrderForEditing = (order: any) => {
-    triggerBeep('tap');
-    setActiveEditingOrderId(order.id);
-    setActiveEditingBillNumber(order.billNumber);
-    setTableNumber(order.tableNumber || 'Table 1');
-    setFulfillmentType('table');
-    setCustomerName(order.customerName || '');
-    setCustomerPhone(order.customerPhone ? order.customerPhone.replace('+91', '') : '');
-    setCart(order.items || []);
-    setDiscountValue(order.discountValue || order.discount || 0);
-    setDiscountType(order.discountType || 'amount');
-    setIsRedeemingPoints(false);
-    setPointsToRedeem(0);
-    toast.success(`Loaded ${order.tableNumber} (Bill #${order.billNumber}) for adding items.`);
-    setActiveTab('billing');
-  };
+    const toastId = toast.loading("Saving customer...");
+    try {
+      const userRef = doc(db, "customer_points", cleanPhone);
+      await setDoc(userRef, {
+        name: nameTrim,
+        phone: cleanPhone,
+        address: newCustAddressInput.trim(),
+        points: 0,
+        lastActive: new Date()
+      }, { merge: true });
 
-  const handleCancelTableEditing = () => {
-    triggerBeep('tap');
-    setActiveEditingOrderId(null);
-    setActiveEditingBillNumber(null);
-    setCart([]);
-    setCustomerName('');
-    setCustomerPhone('');
-    setIsRedeemingPoints(false);
-    setPointsToRedeem(0);
-    setDiscountValue(0);
-    toast("Table closed from billing.", { icon: 'ℹ️' });
-  };
-
-  const handleConnectPrinter = async () => {
-    triggerBeep('tap');
-    setPrinterConnected(true);
-    toast.success("Peri Peri USB 802 Thermal Printer Ready via Browser Print Engine! ✅");
+      setCustomerName(nameTrim);
+      setAddress(newCustAddressInput.trim());
+      setCustomerPoints(0);
+      setShowNewCustForm(false);
+      setNewCustNameInput('');
+      setNewCustAddressInput('');
+      toast.dismiss(toastId);
+      toast.success("Customer saved & linked! ✅");
+    } catch (err) {
+      toast.dismiss(toastId);
+      toast.error("Failed to save customer");
+    }
   };
 
   const getDailyTokenNumber = () => {
@@ -806,36 +940,46 @@ export default function BbCafeDesktopPos() {
     return currentTokenSeq;
   };
 
-  const handlePrintReceiptDirect = async (orderObj: any, isKot = false) => {
-    if (!orderObj || !orderObj.items || orderObj.items.length === 0) return;
+  // Thermal Printing Engine
+  const handlePrintReceiptDirect = async (orderObj: any, isKot = false): Promise<void> => {
+    return new Promise((resolve) => {
+      if (!orderObj || !orderObj.items || orderObj.items.length === 0) return resolve();
 
-    const printWindow = window.open('', '_blank', 'width=400,height=650');
-    if (!printWindow) {
-      toast.error("Popup blocked! Please allow popups for printing.");
-      return;
-    }
-
-    printWindow.document.write('<!DOCTYPE html><html><head><title>Print</title></head><body><div id="print-root"></div></body></html>');
-    printWindow.document.close();
-
-    const container = printWindow.document.getElementById('print-root');
-    if (container) {
-      const root = createRoot(container);
-      
-      if (isKot) {
-        root.render(<PrintKitchenKot orderObj={orderObj} />);
-      } else {
-        root.render(<PrintCustomerReceipt orderObj={orderObj} currentUser={currentUser} />);
+      const printWindow = window.open('', '_blank', 'width=420,height=700');
+      if (!printWindow) {
+        toast.error("Popup blocked! Allow popups for thermal printing.");
+        return resolve();
       }
 
-      setTimeout(() => {
-        printWindow.focus();
-        printWindow.print();
-        printWindow.close();
-      }, 600);
-    }
+      printWindow.document.write('<!DOCTYPE html><html><head><title>Print Receipt</title>');
+      Array.from(document.querySelectorAll('link[rel="stylesheet"], style')).forEach((styleTag) => {
+        printWindow.document.write(styleTag.outerHTML);
+      });
+      printWindow.document.write('</head><body class="bg-white text-black"><div id="print-root"></div></body></html>');
+      printWindow.document.close();
+
+      const container = printWindow.document.getElementById('print-root');
+      if (container) {
+        const root = createRoot(container);
+        if (isKot) {
+          root.render(<PrintKitchenKot orderObj={orderObj} />);
+        } else {
+          root.render(<PrintCustomerReceipt orderObj={orderObj} currentUser={currentUser} />);
+        }
+
+        setTimeout(() => {
+          printWindow.focus();
+          printWindow.print();
+          printWindow.close();
+          resolve();
+        }, 500);
+      } else {
+        resolve();
+      }
+    });
   };
 
+  // Table KOT Save Handler
   const handleSaveTableOrderKotOnly = async () => {
     if (cart.length === 0 || isSubmittingOrder) return;
     setIsSubmittingOrder(true);
@@ -856,13 +1000,13 @@ export default function BbCafeDesktopPos() {
           subtotal, 
           discountType,
           discountValue,
-          discountAmount: discountAmt,
+          discountAmount: discountAmt, 
           gstRate: gstEnabled ? gstRate : 0, 
           gstAmount: getGstAmountCalculated(), 
           total: finalTotal, 
           tableNumber: tableNumber,
           customerName: customerName || "Walk-in Guest",
-          customerPhone: customerPhone ? `+91${customerPhone}` : "",
+          customerPhone: customerPhone ? `+91${getSanitizedPhone(customerPhone)}` : "",
           lastUpdated: new Date()
         };
 
@@ -875,26 +1019,12 @@ export default function BbCafeDesktopPos() {
         setActiveEditingOrderId(null);
         setActiveEditingBillNumber(null);
       } else {
-        if (navigator.onLine) {
-          try {
-            billNumber = await runTransaction(db, async (txn) => {
-              const snap = await txn.get(doc(db, "settings", "store_bill_counter"));
-              const next = snap.exists() ? (snap.data().nextBillNumber || 1) : 1;
-              txn.set(doc(db, "settings", "store_bill_counter"), { nextBillNumber: next + 1 });
-              return next;
-            });
-          } catch {
-            billNumber = Number(localStorage.getItem("bb_pos_local_bill_counter_pc") || 5000) + 1;
-            localStorage.setItem("bb_pos_local_bill_counter_pc", String(billNumber));
-          }
-        } else {
-          billNumber = Number(localStorage.getItem("bb_pos_local_bill_counter_pc") || 5000) + 1;
-          localStorage.setItem("bb_pos_local_bill_counter_pc", String(billNumber));
-        }
+        billNumber = Number(localStorage.getItem("bb_pos_local_bill_counter_pc") || 5000) + 1;
+        localStorage.setItem("bb_pos_local_bill_counter_pc", String(billNumber));
 
         const orderObj = { 
           billNumber, tokenNumber: token, customerName: customerName || "Walk-in Guest", 
-          customerPhone: customerPhone ? `+91${customerPhone}` : "", items: cart, 
+          customerPhone: customerPhone ? `+91${getSanitizedPhone(customerPhone)}` : "", items: cart, 
           subtotal, discountType, discountValue, discountAmount: discountAmt, 
           gstRate: gstEnabled ? gstRate : 0, gstAmount: getGstAmountCalculated(), 
           deliveryFee: 0, total: finalTotal, timestamp: new Date(), 
@@ -904,7 +1034,7 @@ export default function BbCafeDesktopPos() {
 
         await addDoc(collection(db, "orders"), orderObj);
         triggerBeep('success');
-        toast.success(`Table ${tableNumber} saved! KOT sent to kitchen.`);
+        toast.success(`Table ${tableNumber} saved! KOT sent.`);
 
         await handlePrintReceiptDirect(orderObj, true);
       }
@@ -920,6 +1050,7 @@ export default function BbCafeDesktopPos() {
     }
   };
 
+  // FINAL CHECKOUT & PAY [F9]
   const handleFinalCheckoutAndPrintBill = async () => {
     if (cart.length === 0 || isSubmittingOrder) return;
     setIsSubmittingOrder(true);
@@ -930,20 +1061,21 @@ export default function BbCafeDesktopPos() {
     const token = getDailyTokenNumber();
     const earned = Math.floor(finalTotal / 100);
     const redeemed = isRedeemingPoints ? pointsToRedeem : 0;
+    const cleanPhone = getSanitizedPhone(customerPhone);
 
     try {
       let billNumber: number;
 
       let remainingPts = customerPoints;
-      if (customerPhone && customerPhone.length === 10) {
-        const userRef = doc(db, "customer_points", customerPhone.trim());
+      if (cleanPhone.length === 10) {
+        const userRef = doc(db, "customer_points", cleanPhone);
         const userDoc = await getDoc(userRef);
         const prevPoints = userDoc.exists() ? (userDoc.data().points || 0) : 0;
         
         remainingPts = Math.max(0, prevPoints - redeemed) + earned;
         await setDoc(userRef, { 
           name: customerName || "Walk-in Guest", 
-          phone: customerPhone.trim(), 
+          phone: cleanPhone, 
           points: remainingPts, 
           lastActive: new Date() 
         }, { merge: true });
@@ -964,7 +1096,10 @@ export default function BbCafeDesktopPos() {
           status: 'completed', 
           tableNumber: tableNumber,
           customerName: customerName || "Walk-in Guest",
-          customerPhone: customerPhone ? `+91${customerPhone}` : "",
+          customerPhone: cleanPhone ? `+91${cleanPhone}` : "",
+          paymentMethod,
+          splitCashAmount: paymentMethod === 'split' ? splitCashAmount : 0,
+          splitUpiAmount: paymentMethod === 'split' ? splitUpiAmount : 0,
           pointsRedeemed: redeemed,
           remainingPoints: remainingPts,
           settledAt: new Date()
@@ -979,42 +1114,29 @@ export default function BbCafeDesktopPos() {
         setActiveEditingOrderId(null);
         setActiveEditingBillNumber(null);
       } else {
-        if (navigator.onLine) {
-          try {
-            billNumber = await runTransaction(db, async (txn) => {
-              const snap = await txn.get(doc(db, "settings", "store_bill_counter"));
-              const next = snap.exists() ? (snap.data().nextBillNumber || 1) : 1;
-              txn.set(doc(db, "settings", "store_bill_counter"), { nextBillNumber: next + 1 });
-              return next;
-            });
-          } catch {
-            billNumber = Number(localStorage.getItem("bb_pos_local_bill_counter_pc") || 5000) + 1;
-            localStorage.setItem("bb_pos_local_bill_counter_pc", String(billNumber));
-          }
-        } else {
-          billNumber = Number(localStorage.getItem("bb_pos_local_bill_counter_pc") || 5000) + 1;
-          localStorage.setItem("bb_pos_local_bill_counter_pc", String(billNumber));
-        }
+        billNumber = Number(localStorage.getItem("bb_pos_local_bill_counter_pc") || 5000) + 1;
+        localStorage.setItem("bb_pos_local_bill_counter_pc", String(billNumber));
 
         const orderObj = { 
           billNumber, tokenNumber: token, customerName: customerName || "Walk-in Guest", 
-          customerPhone: customerPhone ? `+91${customerPhone}` : "", items: cart, 
+          customerPhone: cleanPhone ? `+91${cleanPhone}` : "", items: cart, 
           subtotal, discountType, discountValue, discountAmount: discountAmt, 
           gstRate: gstEnabled ? gstRate : 0, gstAmount: getGstAmountCalculated(), 
           deliveryFee: getDeliveryCharge(), total: finalTotal, timestamp: new Date(), 
           status: 'completed', fulfillmentType, deliveryArea: fulfillmentType === "delivery" ? selectedArea.name : "", 
-          tableNumber: fulfillmentType === 'table' ? tableNumber : '', paymentMethod, source: 'PC_POS', address,
+          tableNumber: fulfillmentType === 'table' ? tableNumber : '', 
+          paymentMethod, 
+          splitCashAmount: paymentMethod === 'split' ? splitCashAmount : 0,
+          splitUpiAmount: paymentMethod === 'split' ? splitUpiAmount : 0,
+          source: 'PC_POS', address,
           pointsRedeemed: redeemed, remainingPoints: remainingPts 
         };
 
         await addDoc(collection(db, "orders"), orderObj);
-
         triggerBeep('success'); 
-        toast.success(`Final Bill #${billNumber} printed successfully!`);
-        
+
         if (kotEnabled) {
           await handlePrintReceiptDirect(orderObj, true);
-          await new Promise((r) => setTimeout(r, 600));
         }
         await handlePrintReceiptDirect(orderObj, false);
       }
@@ -1061,6 +1183,12 @@ export default function BbCafeDesktopPos() {
 
   const mainClass = "h-screen w-screen flex font-sans antialiased overflow-hidden " + (themeMode === "dark" ? "dark bg-[#0a0a0a] text-neutral-100" : "bg-neutral-100 text-neutral-900");
 
+  // Dynamic UPI URL for QR
+  const dynamicUpiUrl = useMemo(() => {
+    const total = getTotalBillPrice();
+    return `upi://pay?pa=${upiIdConfig}&pn=Bum%20Bum%20Cafe&am=${total}&cu=INR&tn=BumBumCafeOrder`;
+  }, [upiIdConfig, cart, discountValue, isRedeemingPoints]);
+
   return (
     <div className={mainClass}>
       <Toaster position="top-right" />
@@ -1070,23 +1198,23 @@ export default function BbCafeDesktopPos() {
           <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="w-full max-w-md bg-neutral-900 border border-neutral-800 rounded-3xl p-10 shadow-2xl space-y-6 text-center">
             <div className="flex flex-col items-center gap-3">
               <div className="p-4 bg-orange-500/10 text-orange-500 rounded-full border border-orange-500/20"><SafeLock size={36} /></div>
-              <h1 className="text-2xl font-black uppercase text-yellow-500">BUM BUM CAFE - PC POS</h1>
+              <h1 className="text-2xl font-black uppercase text-yellow-500 tracking-wider">BUM BUM CAFE - PC POS</h1>
               <p className="text-xs text-neutral-400">Desktop Terminal Locked • Enter Staff PIN</p>
             </div>
             <form onSubmit={handlePinLoginSubmit} className="space-y-4">
-              <input type="password" maxLength={6} value={pinInput} onChange={e => setPinInput(e.target.value)} placeholder="Enter 4-digit PIN" className="w-full bg-neutral-950 border border-neutral-800 text-center text-3xl font-mono py-4 rounded-2xl outline-none text-orange-400 tracking-widest" autoFocus />
-              <button type="submit" className="w-full py-4 bg-orange-600 hover:bg-orange-500 text-white font-black text-sm uppercase rounded-2xl tracking-wider transition-all">Unlock Terminal</button>
+              <input type="password" maxLength={6} value={pinInput} onChange={e => setPinInput(e.target.value)} placeholder="Enter PIN" className="w-full bg-neutral-950 border border-neutral-800 text-center text-3xl font-mono py-4 rounded-2xl outline-none text-orange-400 tracking-widest" autoFocus />
+              <button type="submit" className="w-full py-4 bg-orange-600 hover:bg-orange-500 text-white font-black text-sm uppercase rounded-2xl tracking-wider transition-all shadow-lg">Unlock Terminal</button>
             </form>
           </motion.div>
         </div>
       ) : (
         <>
+          {/* SIDEBAR NAVIGATION */}
           <aside className={`${isSidebarCollapsed ? 'w-20' : 'w-64'} bg-white dark:bg-neutral-900 border-r border-neutral-200 dark:border-neutral-800 flex flex-col justify-between p-4 shrink-0 select-none h-full transition-all duration-300 relative`}>
             
             <button 
               onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)} 
               className="absolute -right-3 top-7 bg-orange-600 text-white p-1 rounded-full shadow-md hover:bg-orange-500 transition-all z-20"
-              title={isSidebarCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
             >
               {isSidebarCollapsed ? <SafeChevronRight size={14} /> : <SafeChevronLeft size={14} />}
             </button>
@@ -1097,20 +1225,20 @@ export default function BbCafeDesktopPos() {
                 {!isSidebarCollapsed && (
                   <div className="truncate">
                     <h1 className="text-xs font-black uppercase text-yellow-500 truncate">Bum Bum Cafe</h1>
-                    <span className="text-[10px] text-neutral-400 font-bold">POS v2.1</span>
+                    <span className="text-[10px] text-neutral-400 font-bold">POS v3.0 Ultra</span>
                   </div>
                 )}
               </div>
 
-              <nav className="space-y-2">
+              <nav className="space-y-1.5">
                 {[
-                  { id: 'billing', label: 'Counter Billing [F2]', icon: ShoppingBag },
+                  { id: 'billing', label: 'Counter [F2]', icon: ShoppingBag },
                   { id: 'tables', label: `Tables (${activeTableOrders.length})`, icon: LayoutGrid },
                   { id: 'orders', label: `Live Orders (${activeLiveOrders.length})`, icon: Clock },
-                  { id: 'reports', label: 'Sales Reports & Cash', icon: SafeBarChart3 },
-                  { id: 'inventory', label: 'Manage Menu & Stock', icon: Layers },
-                  { id: 'receipts', label: 'Past Receipts', icon: Printer },
-                  { id: 'settings', label: 'Settings & Printer', icon: Settings },
+                  { id: 'reports', label: 'Reports & Cash', icon: SafeBarChart3 },
+                  { id: 'inventory', label: 'Menu & Stock', icon: Layers },
+                  { id: 'receipts', label: 'Receipts', icon: Printer },
+                  { id: 'settings', label: 'Settings', icon: Settings },
                 ].map((item) => {
                   const Icon = item.icon;
                   const isActive = activeTab === item.id;
@@ -1119,7 +1247,6 @@ export default function BbCafeDesktopPos() {
                       key={item.id} 
                       onClick={() => { triggerBeep('tap'); setActiveTab(item.id as any); }} 
                       className={`w-full flex items-center justify-between px-3 py-3 rounded-2xl text-xs font-black uppercase tracking-wider transition-all ${isActive ? "bg-orange-600 text-white shadow-lg shadow-orange-600/20" : "text-neutral-500 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800"}`}
-                      title={item.label}
                     >
                       <div className="flex items-center gap-3 truncate">
                         <Icon size={16} className="shrink-0" />
@@ -1135,24 +1262,44 @@ export default function BbCafeDesktopPos() {
                   );
                 })}
               </nav>
+
+              {/* QUICK SHORTCUT TRIGGER BUTTONS IN SIDEBAR */}
+              {!isSidebarCollapsed && (
+                <div className="pt-2 border-t border-neutral-200 dark:border-neutral-800 space-y-1.5">
+                  <div className="flex justify-between items-center px-1">
+                    <span className="text-[10px] font-black uppercase text-neutral-400">Quick Tools</span>
+                    <button onClick={() => setIsHelpModalOpen(true)} className="text-[10px] text-orange-500 font-bold hover:underline flex items-center gap-1">
+                      <SafeHelpCircle size={12} /> Help [F1]
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-1.5">
+                    <button onClick={() => setIsHeldCartsModalOpen(true)} className="bg-neutral-100 dark:bg-neutral-800 hover:border-orange-500 border border-transparent p-2 rounded-xl text-[10px] font-bold flex items-center gap-1 text-left">
+                      <SafePauseCircle size={13} className="text-amber-400 shrink-0" />
+                      <span className="truncate">Parked ({heldCarts.length}) [F5]</span>
+                    </button>
+                    <button onClick={() => setIsExpenseModalOpen(true)} className="bg-neutral-100 dark:bg-neutral-800 hover:border-orange-500 border border-transparent p-2 rounded-xl text-[10px] font-bold flex items-center gap-1 text-left">
+                      <Receipt size={13} className="text-red-400 shrink-0" />
+                      <span className="truncate">Expense [F6]</span>
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
 
-            <div className="space-y-3 pt-4 border-t border-neutral-200 dark:border-neutral-800">
-              <button onClick={handleInstallClick} className="w-full flex items-center justify-center gap-2 px-3 py-3 rounded-2xl text-xs font-black uppercase text-blue-400 bg-blue-500/10 hover:bg-blue-500/20 transition-all" title="Install App">
-                <SafeDownload size={16} className="shrink-0" />
-                {!isSidebarCollapsed && <span className="truncate">Install App</span>}
-              </button>
-              <button onClick={handleManualSync} disabled={isSyncing} className="w-full flex items-center justify-center gap-2 px-3 py-3 rounded-2xl text-xs font-black uppercase text-yellow-500 bg-yellow-500/10 hover:bg-yellow-500/20 transition-all" title="Sync Products">
+            <div className="space-y-2 pt-4 border-t border-neutral-200 dark:border-neutral-800">
+              <button onClick={handleManualSync} disabled={isSyncing} className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-2xl text-xs font-black uppercase text-yellow-500 bg-yellow-500/10 hover:bg-yellow-500/20 transition-all">
                 {isSyncing ? <Loader2 className="animate-spin shrink-0" size={16} /> : <SafeRefreshCw size={16} className="shrink-0" />}
-                {!isSidebarCollapsed && <span className="truncate">Sync Products</span>}
+                {!isSidebarCollapsed && <span className="truncate">Sync Menu</span>}
               </button>
-              <button onClick={handleLogout} className="w-full flex items-center justify-center gap-2 px-3 py-3 rounded-2xl text-xs font-black uppercase text-red-500 bg-red-500/10 hover:bg-red-500/20 transition-all" title="Lock Terminal">
+              <button onClick={handleLogout} className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-2xl text-xs font-black uppercase text-red-500 bg-red-500/10 hover:bg-red-500/20 transition-all">
                 <SafeLogOut size={16} className="shrink-0" />
-                {!isSidebarCollapsed && <span className="truncate">Lock Terminal</span>}
+                {!isSidebarCollapsed && <span className="truncate">Lock POS</span>}
               </button>
             </div>
           </aside>
 
+          {/* MAIN APPLICATION VIEWPORT */}
           <main className="flex-1 flex h-full overflow-hidden">
             
             {activeTab === 'billing' && (
@@ -1163,20 +1310,20 @@ export default function BbCafeDesktopPos() {
                     <div className="mb-3 bg-amber-500/15 border border-amber-500/40 p-3 rounded-2xl flex items-center justify-between shrink-0">
                       <div className="flex items-center gap-2 text-amber-400 text-xs font-black uppercase">
                         <SafeEdit3 size={16} />
-                        <span>Active Table: {tableNumber} (Bill #{activeEditingBillNumber}) - Add items & Print KOT</span>
+                        <span>Active Table: {tableNumber} (Bill #{activeEditingBillNumber})</span>
                       </div>
-                      <button onClick={handleCancelTableEditing} className="text-neutral-400 hover:text-white text-xs underline">Cancel</button>
+                      <button onClick={() => { setActiveEditingOrderId(null); setCart([]); }} className="text-neutral-400 hover:text-white text-xs underline">Clear Table</button>
                     </div>
                   )}
 
-                  {/* SEARCH BAR WITH ENTER KEY QUICK ADD */}
+                  {/* QUICK SEARCH WITH [ENTER] AUTO-ADD */}
                   <div className="flex gap-3 mb-4 items-center shrink-0">
                     <div className="relative flex-1">
                       <SafeSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-400" size={18} />
                       <input 
                         ref={searchInputRef}
                         type="text" 
-                        placeholder="Search item / Type Code & Press [Enter] to add... [F2]" 
+                        placeholder="Search item / Type Code & hit [Enter] to add... [F2]" 
                         value={searchQuery} 
                         onChange={e => setSearchQuery(e.target.value)}
                         onKeyDown={handleSearchInputKeyDown} 
@@ -1185,6 +1332,7 @@ export default function BbCafeDesktopPos() {
                     </div>
                   </div>
 
+                  {/* CATEGORIES BAR */}
                   <div className="flex gap-2 overflow-x-auto pb-3 shrink-0 scrollbar-none">
                     {categories.map((cat) => {
                       const isSelected = selectedCategory === cat;
@@ -1200,6 +1348,7 @@ export default function BbCafeDesktopPos() {
                     })}
                   </div>
 
+                  {/* PRODUCT CARDS GRID */}
                   {loading ? (
                     <div className="flex items-center justify-center flex-1"><Loader2 className="animate-spin text-orange-500" size={32} /></div>
                   ) : (
@@ -1223,7 +1372,10 @@ export default function BbCafeDesktopPos() {
                             </div>
                             <div className="p-3 flex-grow flex flex-col justify-between w-full">
                               <p className="font-bold text-xs line-clamp-2 leading-tight">{item.name}</p>
-                              <p className="text-xs font-mono font-black text-orange-500">₹{item.price}</p>
+                              <div className="flex justify-between items-center">
+                                <span className="text-xs font-mono font-black text-orange-500">₹{item.price}</span>
+                                {item.itemCode && <span className="text-[9px] bg-neutral-100 dark:bg-neutral-800 px-1.5 py-0.5 rounded text-neutral-400 font-mono">#{item.itemCode}</span>}
+                              </div>
                             </div>
                           </button>
                         );
@@ -1232,25 +1384,34 @@ export default function BbCafeDesktopPos() {
                   )}
                 </div>
 
+                {/* RIGHT SIDE CART PANEL */}
                 <div className="w-96 bg-white dark:bg-neutral-900 border-l border-neutral-200 dark:border-neutral-800 flex flex-col p-5 h-full shadow-2xl justify-between overflow-hidden">
                   <div className="flex flex-col h-full overflow-hidden">
                     <div className="flex items-center justify-between border-b border-neutral-200 dark:border-neutral-800 pb-3 mb-3 shrink-0">
-                      <h3 className="text-sm font-black uppercase text-orange-500">Current Order Cart</h3>
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-sm font-black uppercase text-orange-500">Cart ({cart.length})</h3>
+                        <button onClick={handleHoldCurrentCart} title="Park Cart [F3]" className="text-[10px] font-black uppercase px-2 py-0.5 bg-amber-500/10 text-amber-500 hover:bg-amber-500/20 rounded-md border border-amber-500/30 flex items-center gap-1">
+                          <SafePauseCircle size={11} /> Hold [F3]
+                        </button>
+                      </div>
                       <button onClick={() => setCart([])} className="text-red-500 text-xs font-bold hover:underline flex items-center gap-1"><SafeTrash2 size={14} /> Clear</button>
                     </div>
 
+                    {/* CUSTOMER PHONE & LOYALTY */}
                     <div className="space-y-2 bg-neutral-50 dark:bg-neutral-800/40 p-3 rounded-2xl border border-neutral-200 dark:border-neutral-800 mb-3 shrink-0">
                       <div className="flex gap-2">
                         <input 
                           type="text" 
                           maxLength={10} 
-                          placeholder="10-digit Phone" 
+                          placeholder="Phone (10-digits)" 
                           value={customerPhone} 
                           onChange={e => setCustomerPhone(e.target.value)} 
                           className="w-full bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 rounded-xl px-3 py-2 text-xs outline-none font-mono" 
                         />
                         <button onClick={handleCheckLoyalty} className="bg-orange-600 hover:bg-orange-500 text-white px-3 rounded-xl text-xs font-black uppercase">Find</button>
-                        <button onClick={() => setIsCustomerModalOpen(true)} className="bg-neutral-200 dark:bg-neutral-700 px-3 rounded-xl text-xs font-bold">List</button>
+                        <button onClick={handleSendWhatsAppBill} title="Send WhatsApp Receipt [F7]" className="bg-green-600/10 hover:bg-green-600/20 text-green-500 px-2.5 rounded-xl text-xs font-bold flex items-center">
+                          <SafeShare2 size={14} />
+                        </button>
                       </div>
 
                       {customerName && !showNewCustForm && (
@@ -1260,46 +1421,9 @@ export default function BbCafeDesktopPos() {
                         </div>
                       )}
 
-                      {customerName && customerPoints > 0 && !showNewCustForm && (
-                        <div className="pt-2 border-t border-neutral-200 dark:border-neutral-700 flex items-center justify-between">
-                          <div className="flex items-center gap-1.5 text-xs">
-                            <SafeGift size={14} className="text-amber-500" />
-                            <span>Redeem Points:</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <input 
-                              type="number" 
-                              min={0} 
-                              max={customerPoints}
-                              value={pointsToRedeem}
-                              onChange={e => {
-                                const val = Number(e.target.value);
-                                setPointsToRedeem(Math.min(val, customerPoints));
-                              }}
-                              className="w-16 bg-white dark:bg-neutral-900 border border-neutral-700 rounded-lg px-2 py-1 text-xs text-center font-mono"
-                            />
-                            <button 
-                              onClick={() => {
-                                if (!isRedeemingPoints && pointsToRedeem > 0) {
-                                  setIsRedeemingPoints(true);
-                                  toast.success(`Redeemed ${pointsToRedeem} points!`);
-                                } else {
-                                  setIsRedeemingPoints(false);
-                                  setPointsToRedeem(0);
-                                  toast("Points redemption cancelled", { icon: 'ℹ️' });
-                                }
-                              }}
-                              className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase ${isRedeemingPoints ? 'bg-red-500 text-white' : 'bg-amber-500 text-black'}`}
-                            >
-                              {isRedeemingPoints ? 'Cancel' : 'Apply'}
-                            </button>
-                          </div>
-                        </div>
-                      )}
-
                       {showNewCustForm && (
                         <div className="space-y-2 pt-2 border-t border-neutral-200 dark:border-neutral-700">
-                          <p className="text-[10px] text-red-400 font-bold uppercase">Number not registered! Add details:</p>
+                          <p className="text-[10px] text-red-400 font-bold uppercase">Unregistered number! Add details:</p>
                           <input 
                             type="text" 
                             placeholder="Customer Name *" 
@@ -1311,49 +1435,49 @@ export default function BbCafeDesktopPos() {
                             onClick={handleSaveNewCustomerQuick} 
                             className="w-full py-2 bg-green-600 hover:bg-green-500 text-white font-black text-xs uppercase rounded-xl flex items-center justify-center gap-1 shadow"
                           >
-                            <SafeUserPlus size={14} /> Save Customer & Link
+                            <SafeUserPlus size={14} /> Save Customer
                           </button>
                         </div>
                       )}
                     </div>
 
+                    {/* CART ITEMS LIST */}
                     <div className="space-y-2 overflow-y-auto flex-1 pr-1 mb-3">
                       {cart.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center h-full text-neutral-400 text-xs text-center">
+                        <div className="flex flex-col items-center justify-center h-full text-neutral-400 text-xs text-center py-10">
                           <ShoppingBag size={32} className="mb-2 opacity-40" />
                           <p>Cart is empty. Click items from menu to add.</p>
                         </div>
                       ) : (
-                        cart.map((item, idx) => (
-                          <div key={idx} className="bg-neutral-50 dark:bg-neutral-800/40 border border-neutral-200 dark:border-neutral-800 p-2.5 rounded-2xl flex items-center justify-between gap-2">
+                        cart.map((item) => (
+                          <div key={item.cartItemId} className="bg-neutral-50 dark:bg-neutral-800/40 border border-neutral-200 dark:border-neutral-800 p-2.5 rounded-2xl flex items-center justify-between gap-2">
                             <div className="flex-1 min-w-0">
                               <p className="font-bold text-xs truncate">{item.name}</p>
                               {item.note && <p className="text-[10px] text-neutral-400 italic truncate">{item.note}</p>}
                               <p className="text-[11px] font-mono text-orange-500 font-bold">₹{item.price * item.quantity}</p>
                             </div>
                             <div className="flex items-center gap-1.5 shrink-0">
-                              <button onClick={() => handleUpdateCartQuantity(item.id, -1)} className="w-7 h-7 bg-neutral-200 dark:bg-neutral-700 rounded-lg flex items-center justify-center font-bold text-xs">-</button>
+                              <button onClick={() => handleUpdateCartQuantity(item.cartItemId, -1)} className="w-7 h-7 bg-neutral-200 dark:bg-neutral-700 rounded-lg flex items-center justify-center font-bold text-xs">-</button>
                               <span className="w-6 text-center text-xs font-mono font-bold">{item.quantity}</span>
-                              <button onClick={() => handleUpdateCartQuantity(item.id, 1)} className="w-7 h-7 bg-neutral-200 dark:bg-neutral-700 rounded-lg flex items-center justify-center font-bold text-xs">+</button>
+                              <button onClick={() => handleUpdateCartQuantity(item.cartItemId, 1)} className="w-7 h-7 bg-neutral-200 dark:bg-neutral-700 rounded-lg flex items-center justify-center font-bold text-xs">+</button>
                             </div>
                           </div>
                         ))
                       )}
                     </div>
 
+                    {/* DISCOUNT SELECTOR */}
                     <div className="space-y-2 bg-neutral-50 dark:bg-neutral-800/40 p-2.5 rounded-2xl border border-neutral-200 dark:border-neutral-800 mb-3 shrink-0">
                       <div className="flex items-center justify-between">
                         <span className="text-[11px] font-bold uppercase text-neutral-400">Discount Option</span>
                         <div className="flex bg-neutral-200 dark:bg-neutral-700 p-0.5 rounded-lg">
-                          <button onClick={() => setDiscountType('amount')} className={`px-2 py-0.5 text-[10px] font-bold rounded ${discountType === 'amount' ? 'bg-orange-600 text-white' : 'text-neutral-400'}`}>₹ Amt</button>
+                          <button onClick={() => setDiscountType('amount')} className={`px-2 py-0.5 text-[10px] font-bold rounded ${discountType === 'amount' ? 'bg-orange-600 text-white' : 'text-neutral-400'}`}>₹ Flat</button>
                           <button onClick={() => setDiscountType('percentage')} className={`px-2 py-0.5 text-[10px] font-bold rounded ${discountType === 'percentage' ? 'bg-orange-600 text-white' : 'text-neutral-400'}`}>% Off</button>
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
                         <input 
                           type="number" 
-                          min={0} 
-                          max={discountType === 'percentage' ? 100 : 100000}
                           placeholder={discountType === 'amount' ? "Enter Amount (₹)" : "Enter Percentage (%)"}
                           value={discountValue || ''}
                           onChange={e => setDiscountValue(Number(e.target.value))}
@@ -1365,62 +1489,97 @@ export default function BbCafeDesktopPos() {
                       </div>
                     </div>
 
-                    <div className="space-y-3 mb-4 shrink-0 border-t border-neutral-200 dark:border-neutral-800 pt-3">
+                    {/* FULFILLMENT MODE */}
+                    <div className="space-y-2 mb-3 shrink-0 border-t border-neutral-200 dark:border-neutral-800 pt-2">
                       <div className="grid grid-cols-3 gap-1 bg-neutral-100 dark:bg-neutral-800 p-1 rounded-2xl">
                         {(['pickup', 'table', 'delivery'] as const).map((type) => (
-                          <button key={type} onClick={() => { triggerBeep('tap'); setFulfillmentType(type); }} className={`py-2 rounded-xl text-[10px] font-black uppercase transition-all ${fulfillmentType === type ? "bg-orange-600 text-white shadow-md" : "text-neutral-400"}`}>{type}</button>
+                          <button key={type} onClick={() => { triggerBeep('tap'); setFulfillmentType(type); }} className={`py-1.5 rounded-xl text-[10px] font-black uppercase transition-all ${fulfillmentType === type ? "bg-orange-600 text-white shadow-md" : "text-neutral-400"}`}>{type}</button>
                         ))}
                       </div>
 
                       {fulfillmentType === 'table' && (
-                        <input type="text" placeholder="Table Number (e.g., Table 4)" value={tableNumber} onChange={e => setTableNumber(e.target.value)} className="w-full bg-neutral-50 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-xl px-3 py-2 text-xs outline-none" />
-                      )}
-
-                      {fulfillmentType === 'delivery' && (
-                        <div className="space-y-2">
-                          <select value={selectedArea.name} onChange={e => { const ar = DELIVERY_AREAS.find(a => a.name === e.target.value); if (ar) setSelectedArea(ar); }} className="w-full bg-neutral-50 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-xl p-2 text-xs outline-none">
-                            {DELIVERY_AREAS.map(a => <option key={a.name} value={a.name}>{a.name} (Fee: ₹{a.fee})</option>)}
-                          </select>
-                          <input type="text" placeholder="Delivery Address" value={address} onChange={e => setAddress(e.target.value)} className="w-full bg-neutral-50 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-xl px-3 py-2 text-xs outline-none" />
-                        </div>
+                        <input type="text" placeholder="Table No (e.g. Table 4)" value={tableNumber} onChange={e => setTableNumber(e.target.value)} className="w-full bg-neutral-50 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-xl px-3 py-1.5 text-xs outline-none" />
                       )}
                     </div>
 
-                    <div className="space-y-2 text-xs border-t border-neutral-200 dark:border-neutral-800 pt-3 shrink-0">
+                    {/* BILL BREAKDOWN TOTALS */}
+                    <div className="space-y-1.5 text-xs border-t border-neutral-200 dark:border-neutral-800 pt-2 shrink-0">
                       <div className="flex justify-between text-neutral-400"><span>Subtotal</span><span className="font-mono">₹{getCartSubtotal()}</span></div>
                       {getCalculatedDiscountAmount() > 0 && (
-                        <div className="flex justify-between text-orange-400 font-bold">
-                          <span>Discount</span>
-                          <span className="font-mono">-₹{getCalculatedDiscountAmount()}</span>
-                        </div>
+                        <div className="flex justify-between text-orange-400 font-bold"><span>Discount</span><span className="font-mono">-₹{getCalculatedDiscountAmount()}</span></div>
                       )}
-                      {isRedeemingPoints && <div className="flex justify-between text-amber-400 font-bold"><span>Points Discount</span><span className="font-mono">-₹{getRedemptionDiscount()}</span></div>}
-                      {fulfillmentType === 'delivery' && <div className="flex justify-between text-neutral-400"><span>Delivery Charge</span><span className="font-mono">₹{getDeliveryCharge()}</span></div>}
                       <div className="flex justify-between text-base font-black text-green-500 pt-1 border-t border-dashed border-neutral-700">
                         <span>Grand Total</span><span className="font-mono">₹{getTotalBillPrice()}</span>
                       </div>
                     </div>
 
-                    <div className="flex gap-2 my-2 shrink-0">
-                      <button onClick={() => setPaymentMethod('cash')} className={`flex-1 py-2 rounded-xl text-xs font-black uppercase border ${paymentMethod === 'cash' ? 'bg-green-600 text-white border-green-600' : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-400 border-neutral-700'}`}>Cash [F4]</button>
-                      <button onClick={() => setPaymentMethod('upi')} className={`flex-1 py-2 rounded-xl text-xs font-black uppercase border ${paymentMethod === 'upi' ? 'bg-blue-600 text-white border-blue-600' : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-400 border-neutral-700'}`}>UPI [F4]</button>
+                    {/* PAYMENT METHOD SELECTOR WITH SPLIT MODE [F4] */}
+                    <div className="space-y-2 my-2 shrink-0">
+                      <div className="grid grid-cols-3 gap-1.5">
+                        <button onClick={() => setPaymentMethod('cash')} className={`py-2 rounded-xl text-xs font-black uppercase border transition-all ${paymentMethod === 'cash' ? 'bg-green-600 text-white border-green-600 shadow' : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-400 border-neutral-700'}`}>Cash [F4]</button>
+                        <button onClick={() => setPaymentMethod('upi')} className={`py-2 rounded-xl text-xs font-black uppercase border transition-all ${paymentMethod === 'upi' ? 'bg-blue-600 text-white border-blue-600 shadow' : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-400 border-neutral-700'}`}>UPI [F4]</button>
+                        <button onClick={() => setPaymentMethod('split')} className={`py-2 rounded-xl text-xs font-black uppercase border transition-all ${paymentMethod === 'split' ? 'bg-amber-600 text-white border-amber-600 shadow' : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-400 border-neutral-700'}`}>Split [F4]</button>
+                      </div>
+
+                      {/* SPLIT PAYMENT INPUTS */}
+                      {paymentMethod === 'split' && (
+                        <div className="grid grid-cols-2 gap-2 bg-amber-500/10 border border-amber-500/30 p-2.5 rounded-xl">
+                          <div>
+                            <label className="text-[9px] font-black uppercase text-neutral-400 block mb-1">Cash Part (₹)</label>
+                            <input 
+                              type="number" 
+                              value={splitCashAmount} 
+                              onChange={e => {
+                                const val = Number(e.target.value);
+                                setSplitCashAmount(val);
+                                setSplitUpiAmount(Math.max(0, getTotalBillPrice() - val));
+                              }}
+                              className="w-full bg-neutral-900 border border-neutral-700 rounded-lg p-1.5 text-xs text-center font-mono" 
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[9px] font-black uppercase text-neutral-400 block mb-1">UPI Part (₹)</label>
+                            <input 
+                              type="number" 
+                              value={splitUpiAmount} 
+                              onChange={e => {
+                                const val = Number(e.target.value);
+                                setSplitUpiAmount(val);
+                                setSplitCashAmount(Math.max(0, getTotalBillPrice() - val));
+                              }}
+                              className="w-full bg-neutral-900 border border-neutral-700 rounded-lg p-1.5 text-xs text-center font-mono" 
+                            />
+                          </div>
+                        </div>
+                      )}
                     </div>
 
+                    {/* EXTRA TOOLS ROW (QR & CHANGE CALCULATOR) */}
+                    <div className="grid grid-cols-2 gap-2 mb-2 shrink-0">
+                      <button onClick={() => setIsQrModalOpen(true)} className="py-2 px-3 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/30 rounded-xl text-[11px] font-black uppercase flex items-center justify-center gap-1.5">
+                        <SafeQrCode size={14} /> Show QR [F8]
+                      </button>
+                      <button onClick={() => setIsChangeModalOpen(true)} className="py-2 px-3 bg-purple-500/10 hover:bg-purple-500/20 text-purple-400 border border-purple-500/30 rounded-xl text-[11px] font-black uppercase flex items-center justify-center gap-1.5">
+                        <SafeCalculator size={14} /> Change [F10]
+                      </button>
+                    </div>
+
+                    {/* CHECKOUT ACTION BUTTONS [F9] */}
                     {fulfillmentType === 'table' ? (
                       <div className="space-y-2 shrink-0">
                         <button onClick={handleSaveTableOrderKotOnly} disabled={cart.length === 0 || isSubmittingOrder} className="w-full bg-amber-500 hover:bg-amber-400 text-black font-black py-3 rounded-2xl uppercase tracking-wider text-xs flex items-center justify-center gap-2 shadow-md disabled:opacity-50">
                           {isSubmittingOrder ? <Loader2 className="animate-spin" size={16} /> : <SafePrinter size={16} />}
-                          <span>Save Table & Print KOT Only</span>
+                          <span>Save Table & Print KOT</span>
                         </button>
                         <button onClick={handleFinalCheckoutAndPrintBill} disabled={cart.length === 0 || isSubmittingOrder} className="w-full bg-green-600 hover:bg-green-500 text-white font-black py-3 rounded-2xl uppercase tracking-wider text-xs flex items-center justify-center gap-2 shadow-lg disabled:opacity-50">
                           {isSubmittingOrder ? <Loader2 className="animate-spin" size={16} /> : <SafeFileText size={16} />}
-                          <span>Settle & Print Final Bill (₹{getTotalBillPrice()}) [F9]</span>
+                          <span>Settle & Print Final (₹{getTotalBillPrice()}) [F9]</span>
                         </button>
                       </div>
                     ) : (
-                      <button onClick={handleFinalCheckoutAndPrintBill} disabled={cart.length === 0 || isSubmittingOrder} className="w-full bg-green-600 hover:bg-green-500 text-white font-black py-4 rounded-2xl uppercase tracking-wider text-xs flex items-center justify-center gap-2 shadow-xl disabled:opacity-50 shrink-0">
-                        {isSubmittingOrder ? <Loader2 className="animate-spin" size={16} /> : <CheckCircle2 size={16} />}
-                        <span>One-Click Print & Pay (₹{getTotalBillPrice()}) [F9]</span>
+                      <button onClick={handleFinalCheckoutAndPrintBill} disabled={cart.length === 0 || isSubmittingOrder} className="w-full bg-green-600 hover:bg-green-500 text-white font-black py-3.5 rounded-2xl uppercase tracking-wider text-xs flex items-center justify-center gap-2 shadow-xl disabled:opacity-50 shrink-0">
+                        {isSubmittingOrder ? <Loader2 className="animate-spin" size={16} /> : <Receipt size={16} />}
+                        <span>Pay & Print Bill (₹{getTotalBillPrice()}) [F9]</span>
                       </button>
                     )}
                   </div>
@@ -1428,7 +1587,7 @@ export default function BbCafeDesktopPos() {
               </div>
             )}
 
-            {/* TAB: SALES REPORTS & CASH DRAWER COUNT */}
+            {/* TAB: SALES REPORTS & CASH AUDIT */}
             {activeTab === 'reports' && (
               <div className="flex-1 p-6 h-full overflow-y-auto max-w-4xl mx-auto space-y-6">
                 <div className="flex justify-between items-center border-b pb-4">
@@ -1436,7 +1595,7 @@ export default function BbCafeDesktopPos() {
                     <h2 className="text-lg font-black uppercase text-orange-500 flex items-center gap-2">
                       <SafeBarChart3 size={20} /> Sales Reports & Cash Drawer Audit
                     </h2>
-                    <p className="text-xs text-neutral-400">आज और कल की बिक्री देखें तथा गल्ले (Cash Drawer) का मिलान करें।</p>
+                    <p className="text-xs text-neutral-400">Total sale, payment modes, daily petty cash expenses and drawer match.</p>
                   </div>
                   <div className="flex bg-neutral-800 p-1 rounded-2xl border border-neutral-700">
                     <button onClick={() => setReportFilter('today')} className={`px-4 py-2 text-xs font-black uppercase rounded-xl transition-all ${reportFilter === 'today' ? 'bg-orange-600 text-white' : 'text-neutral-400'}`}>Today</button>
@@ -1445,70 +1604,57 @@ export default function BbCafeDesktopPos() {
                   </div>
                 </div>
 
-                {reportFilter === 'custom' && (
-                  <div className="flex items-center gap-3 bg-neutral-900 p-4 rounded-2xl border border-neutral-800">
-                    <label className="text-xs font-bold uppercase text-neutral-400">Select Date:</label>
-                    <input type="date" value={customReportDate} onChange={e => setCustomReportDate(e.target.value)} className="bg-neutral-950 border border-neutral-700 rounded-xl px-3 py-2 text-xs text-orange-400 font-mono outline-none" />
-                  </div>
-                )}
-
                 {isReportLoading ? (
                   <div className="flex justify-center py-24"><Loader2 className="animate-spin text-orange-500" size={32} /></div>
                 ) : (
                   <>
                     <div className="grid grid-cols-4 gap-4">
                       <div className="bg-neutral-900 border border-neutral-800 p-5 rounded-3xl space-y-1 shadow-lg">
-                        <p className="text-[10px] font-black uppercase text-neutral-400">Total Sale</p>
+                        <p className="text-[10px] font-black uppercase text-neutral-400">Total Sales</p>
                         <p className="text-2xl font-black font-mono text-green-400">₹{reportSummary.totalSale}</p>
-                        <p className="text-[10px] text-neutral-500">{reportSummary.totalOrdersCount} Orders Completed</p>
+                        <p className="text-[10px] text-neutral-500">{reportSummary.totalOrdersCount} Completed Orders</p>
                       </div>
                       <div className="bg-neutral-900 border border-neutral-800 p-5 rounded-3xl space-y-1 shadow-lg">
-                        <p className="text-[10px] font-black uppercase text-neutral-400">Cash Collection</p>
+                        <p className="text-[10px] font-black uppercase text-neutral-400">Cash Received</p>
                         <p className="text-2xl font-black font-mono text-amber-400">₹{reportSummary.cashSale}</p>
-                        <p className="text-[10px] text-neutral-500">Physical Cash Expected in Drawer</p>
+                        <p className="text-[10px] text-neutral-500">Gross Cash collected</p>
                       </div>
                       <div className="bg-neutral-900 border border-neutral-800 p-5 rounded-3xl space-y-1 shadow-lg">
                         <p className="text-[10px] font-black uppercase text-neutral-400">UPI / Online</p>
                         <p className="text-2xl font-black font-mono text-blue-400">₹{reportSummary.upiSale}</p>
-                        <p className="text-[10px] text-neutral-500">Direct Bank Settlements</p>
+                        <p className="text-[10px] text-neutral-500">Bank Settlements</p>
                       </div>
-                      <div className="bg-neutral-900 border border-neutral-800 p-5 rounded-3xl space-y-3 shadow-lg flex flex-col justify-between">
-                        <div>
-                          <p className="text-[10px] font-black uppercase text-yellow-400">Cash Counter Audit</p>
-                          <input 
-                            type="number" 
-                            placeholder="Counted Cash in Drawer (₹)" 
-                            value={physicalCashInput}
-                            onChange={e => setPhysicalCashInput(e.target.value === '' ? '' : Number(e.target.value))}
-                            className="w-full mt-2 bg-neutral-950 border border-neutral-700 rounded-xl px-3 py-1.5 text-xs font-mono text-white outline-none"
-                          />
-                        </div>
-                        {physicalCashInput !== '' && (
-                          <div className={`text-[11px] font-bold ${Number(physicalCashInput) === reportSummary.cashSale ? 'text-green-400' : Number(physicalCashInput) > reportSummary.cashSale ? 'text-blue-400' : 'text-red-400'}`}>
-                            {Number(physicalCashInput) === reportSummary.cashSale ? '✅ Cash Matched Perfectly!' : Number(physicalCashInput) > reportSummary.cashSale ? `⚠️ Excess: +₹{Number(physicalCashInput) - reportSummary.cashSale}` : `❌ Shortage: -₹{reportSummary.cashSale - Number(physicalCashInput)}`}
-                          </div>
-                        )}
+                      <div className="bg-neutral-900 border border-neutral-800 p-5 rounded-3xl space-y-1 shadow-lg">
+                        <p className="text-[10px] font-black uppercase text-red-400">Expenses Deducted</p>
+                        <p className="text-2xl font-black font-mono text-red-400">-₹{reportSummary.totalExpenseAmount}</p>
+                        <p className="text-[10px] text-neutral-500">{dailyExpenses.length} Drawer Vouchers</p>
                       </div>
                     </div>
 
-                    <div className="bg-neutral-900 border border-neutral-800 rounded-3xl p-5 space-y-4 shadow-xl">
-                      <h3 className="text-xs font-black uppercase text-neutral-400">Transactions List ({reportOrders.length})</h3>
-                      <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
-                        {reportOrders.length === 0 ? (
-                          <p className="text-xs text-neutral-500 text-center py-12">No transactions recorded for this period.</p>
-                        ) : (
-                          reportOrders.map(ord => (
-                            <div key={ord.id} className="flex justify-between items-center bg-neutral-950 p-3.5 rounded-2xl border border-neutral-800 text-xs">
-                              <div>
-                                <span className="font-mono font-bold text-yellow-500">Bill #{ord.billNumber}</span> • <span className="font-bold">{ord.customerName || 'Walk-in'}</span>
-                                <span className="text-[10px] text-neutral-500 block font-mono">{ord.timestamp?.toDate ? ord.timestamp.toDate().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'Recent'}</span>
-                              </div>
-                              <div className="flex items-center gap-3">
-                                <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded ${ord.paymentMethod === 'upi' ? 'bg-blue-500/10 text-blue-400' : 'bg-green-500/10 text-green-400'}`}>{ord.paymentMethod || 'cash'}</span>
-                                <span className="font-mono font-black text-sm text-white">₹{ord.total}</span>
-                              </div>
-                            </div>
-                          ))
+                    {/* CASH DRAWER AUDIT BOX */}
+                    <div className="bg-neutral-900 border border-neutral-800 p-5 rounded-3xl space-y-4 shadow-xl">
+                      <div className="flex justify-between items-center border-b border-neutral-800 pb-3">
+                        <div>
+                          <h3 className="text-xs font-black uppercase text-yellow-400">Cash Drawer Audit (गल्ला मिलान)</h3>
+                          <p className="text-[11px] text-neutral-400">Net Expected Cash in Drawer = Cash Sales (₹{reportSummary.cashSale}) - Expenses (₹{reportSummary.totalExpenseAmount}) = <span className="font-mono text-green-400 font-bold">₹{reportSummary.netCashInDrawer}</span></p>
+                        </div>
+                        <button onClick={() => setIsExpenseModalOpen(true)} className="px-3 py-1.5 bg-red-600/10 text-red-400 hover:bg-red-600/20 border border-red-500/30 rounded-xl text-xs font-black uppercase">
+                          + Add Expense [F6]
+                        </button>
+                      </div>
+
+                      <div className="flex items-center gap-4">
+                        <input 
+                          type="number" 
+                          placeholder="Counted Physical Cash in Drawer (₹)" 
+                          value={physicalCashInput}
+                          onChange={e => setPhysicalCashInput(e.target.value === '' ? '' : Number(e.target.value))}
+                          className="flex-1 bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-2.5 text-sm font-mono text-white outline-none"
+                        />
+                        {physicalCashInput !== '' && (
+                          <div className={`text-xs font-black px-4 py-2.5 rounded-xl border ${Number(physicalCashInput) === reportSummary.netCashInDrawer ? 'bg-green-500/10 text-green-400 border-green-500/30' : Number(physicalCashInput) > reportSummary.netCashInDrawer ? 'bg-blue-500/10 text-blue-400 border-blue-500/30' : 'bg-red-500/10 text-red-400 border-red-500/30'}`}>
+                            {Number(physicalCashInput) === reportSummary.netCashInDrawer ? '✅ Cash Matched Perfectly!' : Number(physicalCashInput) > reportSummary.netCashInDrawer ? `⚠️ Excess: +₹${Number(physicalCashInput) - reportSummary.netCashInDrawer}` : `❌ Shortage: -₹${reportSummary.netCashInDrawer - Number(physicalCashInput)}`}
+                          </div>
                         )}
                       </div>
                     </div>
@@ -1517,121 +1663,15 @@ export default function BbCafeDesktopPos() {
               </div>
             )}
 
-            {/* TAB: MANAGE MENU & ITEMS */}
-            {activeTab === 'inventory' && (
-              <div className="flex-1 p-6 h-full overflow-y-auto">
-                <div className="flex justify-between items-center mb-4">
-                  <div>
-                    <h2 className="text-sm font-black uppercase text-orange-500">Manage Menu Items & Stock</h2>
-                    <p className="text-xs text-neutral-400">Add new items, toggle stock, or edit individual item variants.</p>
-                  </div>
-                  <button onClick={() => handleOpenItemEditor(null)} className="bg-orange-600 hover:bg-orange-500 text-white px-4 py-2.5 rounded-2xl text-xs font-black uppercase flex items-center gap-1.5 shadow">
-                    <SafePackagePlus size={16} /> Add New Item
-                  </button>
-                </div>
-                <div className="grid grid-cols-3 gap-3">
-                  {products.map((item) => {
-                    const isAvail = item.isAvailable !== false;
-                    return (
-                      <div key={item.id} className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 p-4 rounded-2xl flex flex-col justify-between shadow-sm">
-                        <div>
-                          <div className="flex justify-between items-start mb-2">
-                            <p className="font-bold text-xs">{item.name}</p>
-                            <span className={`text-[9px] font-black px-2 py-0.5 rounded-full ${isAvail ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'}`}>{isAvail ? 'In Stock' : 'Out'}</span>
-                          </div>
-                          <p className="text-xs font-mono text-orange-500 font-bold mb-1">₹{item.price}</p>
-                          <p className="text-[10px] text-neutral-400">Category: {item.category || 'General'}</p>
-                          {item.variants && (
-                            <p className="text-[10px] text-amber-400 mt-1">Sizes: {Object.keys(item.variants).join(', ')}</p>
-                          )}
-                        </div>
-                        <div className="flex gap-2 mt-4 pt-3 border-t border-neutral-200 dark:border-neutral-800">
-                          <button onClick={() => handleOpenItemEditor(item)} className="flex-1 bg-neutral-200 dark:bg-neutral-800 hover:bg-orange-500 hover:text-white text-neutral-300 py-1.5 rounded-xl text-[10px] font-black uppercase transition-all">Edit Item</button>
-                          <button onClick={() => handleToggleStock(item.id, isAvail)} className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase border ${isAvail ? 'text-red-400 border-red-500/30' : 'text-green-400 border-green-500/30'}`}>{isAvail ? 'Disable' : 'Enable'}</button>
-                          <button onClick={() => handleDeleteProductFromMenu(item.id)} className="p-1.5 text-red-400 hover:text-red-300"><SafeTrash2 size={16} /></button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {/* TAB: ITEM EDITOR FORM */}
-            {activeTab === 'item_editor' && (
-              <div className="flex-1 p-6 h-full overflow-y-auto max-w-2xl mx-auto">
-                <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 p-6 rounded-3xl shadow-xl space-y-6">
-                  <div className="flex justify-between items-center border-b pb-3">
-                    <h2 className="text-sm font-black uppercase text-orange-500">{editingItemObj ? 'Edit Menu Item' : 'Add New Menu Item'}</h2>
-                    <button onClick={() => setActiveTab('inventory')} className="text-xs text-neutral-400 underline">Back to Inventory</button>
-                  </div>
-
-                  <form onSubmit={handleSaveItemToFirestore} className="space-y-4">
-                    <div>
-                      <label className="text-xs font-bold uppercase text-neutral-400 block mb-1">Item Name *</label>
-                      <input 
-                        type="text" 
-                        required
-                        placeholder="e.g. Veg Pizza, Cold Coffee" 
-                        value={itemNameInput}
-                        onChange={e => setItemNameInput(e.target.value)}
-                        className="w-full bg-neutral-100 dark:bg-neutral-800 border border-neutral-700 rounded-xl px-3 py-2 text-xs outline-none"
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="text-xs font-bold uppercase text-neutral-400 block mb-1">Base Price (₹) *</label>
-                        <input 
-                          type="number" 
-                          required
-                          placeholder="100" 
-                          value={itemPriceInput || ''}
-                          onChange={e => setItemPriceInput(Number(e.target.value))}
-                          className="w-full bg-neutral-100 dark:bg-neutral-800 border border-neutral-700 rounded-xl px-3 py-2 text-xs outline-none font-mono"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-xs font-bold uppercase text-neutral-400 block mb-1">Category</label>
-                        <input 
-                          type="text" 
-                          placeholder="e.g. Special Pizza, Fast Food" 
-                          value={itemCatInput}
-                          onChange={e => setItemCatInput(e.target.value)}
-                          className="w-full bg-neutral-100 dark:bg-neutral-800 border border-neutral-700 rounded-xl px-3 py-2 text-xs outline-none"
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="text-xs font-bold uppercase text-neutral-400 block mb-1">Image URL (Optional)</label>
-                      <input 
-                        type="text" 
-                        placeholder="https://..." 
-                        value={itemImageInput}
-                        onChange={e => setItemImageInput(e.target.value)}
-                        className="w-full bg-neutral-100 dark:bg-neutral-800 border border-neutral-700 rounded-xl px-3 py-2 text-xs outline-none"
-                      />
-                    </div>
-
-                    <button type="submit" className="w-full py-3.5 bg-green-600 hover:bg-green-500 text-white font-black text-xs uppercase rounded-2xl shadow-xl mt-4">
-                      Save Item to Database
-                    </button>
-                  </form>
-                </div>
-              </div>
-            )}
-
             {/* TAB: TABLES MANAGER */}
             {activeTab === 'tables' && (
               <div className="flex-1 p-6 h-full overflow-y-auto">
                 <div className="flex justify-between items-center mb-4">
-                  <h2 className="text-sm font-black uppercase text-amber-500">Active Tables Manager ({activeTableOrders.length})</h2>
-                  <span className="text-xs text-neutral-400">Manage running tables, add items, or settle & clear bills</span>
+                  <h2 className="text-sm font-black uppercase text-amber-500">Active Tables ({activeTableOrders.length})</h2>
                 </div>
                 <div className="grid grid-cols-3 xl:grid-cols-4 gap-4">
                   {activeTableOrders.length === 0 ? (
-                    <div className="col-span-4 text-center py-24 text-neutral-500 font-bold">No active tables right now. Select 'Table' in billing to start one.</div>
+                    <div className="col-span-4 text-center py-24 text-neutral-500 font-bold">No active tables right now.</div>
                   ) : (
                     activeTableOrders.map((order) => (
                       <div key={order.id} className="bg-white dark:bg-neutral-900 border border-amber-500/40 rounded-2xl p-4 flex flex-col justify-between shadow-xl">
@@ -1656,19 +1696,17 @@ export default function BbCafeDesktopPos() {
                             <span className="font-mono text-sm">₹{order.total}</span>
                           </div>
                           <button 
-                            onClick={() => handleLoadTableOrderForEditing(order)} 
+                            onClick={() => {
+                              setActiveEditingOrderId(order.id);
+                              setActiveEditingBillNumber(order.billNumber);
+                              setTableNumber(order.tableNumber || 'Table 1');
+                              setFulfillmentType('table');
+                              setCart(order.items || []);
+                              setActiveTab('billing');
+                            }} 
                             className="w-full bg-amber-500 hover:bg-amber-400 text-black font-black py-2.5 rounded-xl text-xs uppercase flex items-center justify-center gap-1 shadow"
                           >
-                            <SafeEdit3 size={14} /> Add Items & Print KOT
-                          </button>
-                          <button 
-                            onClick={() => {
-                              handleLoadTableOrderForEditing(order);
-                              toast("Review items and click 'Settle & Print Final Bill'", { icon: 'ℹ️' });
-                            }} 
-                            className="w-full bg-green-600 hover:bg-green-500 text-white font-black py-2.5 rounded-xl text-xs uppercase flex items-center justify-center gap-1 shadow"
-                          >
-                            <SafeFileText size={14} /> Settle & Clear Table
+                            <SafeEdit3 size={14} /> Add Items & Settle
                           </button>
                         </div>
                       </div>
@@ -1678,66 +1716,34 @@ export default function BbCafeDesktopPos() {
               </div>
             )}
 
-            {/* TAB: LIVE ORDERS */}
-            {activeTab === 'orders' && (
+            {/* TAB: INVENTORY */}
+            {activeTab === 'inventory' && (
               <div className="flex-1 p-6 h-full overflow-y-auto">
                 <div className="flex justify-between items-center mb-4">
-                  <h2 className="text-sm font-black uppercase text-orange-500">Live Delivery & Pickup Orders ({activeLiveOrders.length})</h2>
+                  <h2 className="text-sm font-black uppercase text-orange-500">Menu & Stock Manager</h2>
+                  <button onClick={() => setActiveTab('item_editor')} className="bg-orange-600 hover:bg-orange-500 text-white px-4 py-2.5 rounded-2xl text-xs font-black uppercase flex items-center gap-1.5 shadow">
+                    <SafePackagePlus size={16} /> Add New Item
+                  </button>
                 </div>
-                <div className="grid grid-cols-3 gap-4">
-                  {activeLiveOrders.length === 0 ? (
-                    <div className="col-span-3 text-center py-24 text-neutral-500 font-bold">No active delivery or pickup orders right now.</div>
-                  ) : (
-                    activeLiveOrders.map((order) => (
-                      <div key={order.id} className={`bg-white dark:bg-neutral-900 border rounded-2xl p-4 flex flex-col justify-between shadow-lg ${order.status === 'pending' ? 'border-red-500 animate-pulse' : 'border-neutral-200 dark:border-neutral-800'}`}>
+                <div className="grid grid-cols-3 gap-3">
+                  {products.map((item) => {
+                    const isAvail = item.isAvailable !== false;
+                    return (
+                      <div key={item.id} className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 p-4 rounded-2xl flex flex-col justify-between shadow-sm">
                         <div>
-                          <div className="flex justify-between items-center border-b border-neutral-200 dark:border-neutral-800 pb-2 mb-3">
-                            <span className="font-mono font-black text-yellow-500">Bill #{order.billNumber}</span>
-                            <span className="bg-orange-500/10 text-orange-400 text-[10px] font-black uppercase px-2 py-0.5 rounded">{order.fulfillmentType}</span>
+                          <div className="flex justify-between items-start mb-2">
+                            <p className="font-bold text-xs">{item.name}</p>
+                            <span className={`text-[9px] font-black px-2 py-0.5 rounded-full ${isAvail ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'}`}>{isAvail ? 'In Stock' : 'Out'}</span>
                           </div>
-                          <p className="text-xs font-bold mb-2">👤 {order.customerName} ({order.customerPhone || 'Walk-in'})</p>
-                          <div className="space-y-1 py-2 border-t border-dashed border-neutral-200 dark:border-neutral-800 mb-3 max-h-36 overflow-y-auto">
-                            {order.items?.map((it: any, idx: number) => (
-                              <div key={idx} className="flex justify-between text-xs">
-                                <span>{it.name}</span><span className="font-bold text-orange-500">x{it.quantity}</span>
-                              </div>
-                            ))}
-                          </div>
+                          <p className="text-xs font-mono text-orange-500 font-bold mb-1">₹{item.price}</p>
+                          <p className="text-[10px] text-neutral-400">Category: {item.category || 'General'}</p>
                         </div>
-                        <div>
-                          <div className="flex justify-between text-xs font-black text-green-500 mb-3 pt-2 border-t">
-                            <span>Total: ₹{order.total}</span>
-                          </div>
-                          <div className="flex gap-2">
-                            {order.status === 'pending' && (
-                              <button onClick={() => handleUpdateStatus(order.id, 'preparing')} className="flex-1 bg-green-600 text-white font-black py-2 rounded-xl text-xs uppercase">Accept</button>
-                            )}
-                            <button onClick={() => handlePrintReceiptDirect(order, false)} className="p-2 bg-neutral-200 dark:bg-neutral-800 text-neutral-400 hover:text-orange-500 rounded-xl"><SafePrinter size={16} /></button>
-                          </div>
+                        <div className="flex gap-2 mt-4 pt-3 border-t border-neutral-200 dark:border-neutral-800">
+                          <button onClick={() => handleToggleStock(item.id, isAvail)} className={`flex-1 py-1.5 rounded-xl text-[10px] font-black uppercase border ${isAvail ? 'text-red-400 border-red-500/30' : 'text-green-400 border-green-500/30'}`}>{isAvail ? 'Disable' : 'Enable'}</button>
                         </div>
                       </div>
-                    ))
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* TAB: PAST RECEIPTS */}
-            {activeTab === 'receipts' && (
-              <div className="flex-1 p-6 h-full flex flex-col overflow-hidden">
-                <div className="mb-4 shrink-0">
-                  <input type="text" placeholder="Search past receipts by Bill No / Phone..." value={receiptSearchQuery} onChange={e => setReceiptSearchQuery(e.target.value)} className="w-full bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-2xl py-3 px-4 text-xs outline-none" />
-                </div>
-                <div className="space-y-2 overflow-y-auto flex-1">
-                  {filteredPastReceipts.map((order) => (
-                    <div key={order.id} onClick={() => { setSelectedReceipt(order); setIsReceiptModalOpen(true); }} className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 p-4 rounded-2xl flex justify-between items-center cursor-pointer hover:border-orange-500">
-                      <div>
-                        <span className="font-mono font-bold text-xs block">Bill #${order.billNumber} • {order.customerName} ({order.customerPhone || 'Walk-in'})</span>
-                        <span className="text-[10px] text-neutral-400 font-mono">{new Date(order.timestamp?.toDate ? order.timestamp.toDate() : order.timestamp).toLocaleString()}</span>
-                      </div>
-                      <span className={`font-mono font-black text-sm ${order.status === 'refunded' ? 'line-through text-neutral-500' : 'text-green-500'}`}>₹{order.total}</span>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -1746,13 +1752,20 @@ export default function BbCafeDesktopPos() {
             {activeTab === 'settings' && (
               <div className="flex-1 p-6 h-full overflow-y-auto flex justify-center">
                 <div className="max-w-xl w-full bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 p-6 rounded-3xl shadow-xl space-y-6">
-                  <h3 className="text-sm font-black uppercase text-orange-500">Desktop Hardware & POS Settings</h3>
+                  <h3 className="text-sm font-black uppercase text-orange-500">POS & Hardware Settings</h3>
                   
                   <div className="space-y-2 border-b border-neutral-200 dark:border-neutral-800 pb-4">
-                    <p className="text-xs font-bold uppercase">Install App on Desktop:</p>
-                    <button onClick={handleInstallClick} className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-black text-xs uppercase rounded-xl transition-all shadow-md flex items-center justify-center gap-2">
-                      <SafeDownload size={16} /> Install POS as PC Application
-                    </button>
+                    <p className="text-xs font-bold uppercase">Dynamic UPI ID (VPA for QR Code):</p>
+                    <div className="flex gap-2">
+                      <input 
+                        type="text" 
+                        value={upiIdConfig} 
+                        onChange={e => setUpiIdConfig(e.target.value)}
+                        placeholder="e.g. bumbumcafe@upi"
+                        className="flex-1 bg-neutral-100 dark:bg-neutral-800 border border-neutral-700 rounded-xl px-3 py-2 text-xs font-mono outline-none" 
+                      />
+                      <button onClick={() => { localStorage.setItem("bb_pos_upi_id", upiIdConfig); toast.success("UPI ID Saved!"); }} className="bg-blue-600 text-white px-4 rounded-xl text-xs font-black uppercase">Save</button>
+                    </div>
                   </div>
 
                   <div className="space-y-2 border-b border-neutral-200 dark:border-neutral-800 pb-4">
@@ -1766,19 +1779,11 @@ export default function BbCafeDesktopPos() {
                   <div className="space-y-2 border-b border-neutral-200 dark:border-neutral-800 pb-4">
                     <p className="text-xs font-bold uppercase">KOT Printing:</p>
                     <div className="flex items-center justify-between">
-                      <span className="text-xs">Print Kitchen Order Ticket automatically on checkout:</span>
+                      <span className="text-xs">Print Kitchen Order Ticket on checkout:</span>
                       <button onClick={() => { const next = !kotEnabled; setKotEnabled(next); localStorage.setItem("bb_pos_kot_enabled_pc", String(next)); }} className="text-orange-500">
                         {kotEnabled ? <SafeToggleRight size={28} /> : <SafeToggleLeft size={28} />}
                       </button>
                     </div>
-                  </div>
-
-                  <div className="space-y-3">
-                    <p className="text-xs font-bold uppercase">Peri Peri USB 802 Thermal Printer Setup:</p>
-                    <button onClick={handleConnectPrinter} className="w-full py-3.5 bg-amber-500 hover:bg-amber-400 text-black font-black text-xs uppercase rounded-xl transition-all shadow-md">
-                      {printerConnected ? 'Printer Ready & Configured ✅' : 'Initialize Peri Peri 802 Printer'}
-                    </button>
-                    <p className="text-[11px] text-neutral-400">Note: Ensure your Peri Peri 802 printer is set as the default printer in Windows Settings with 80mm paper size.</p>
                   </div>
                 </div>
               </div>
@@ -1787,30 +1792,259 @@ export default function BbCafeDesktopPos() {
         </>
       )}
 
-      {/* --- ITEM VARIATION & SIZE MODAL --- */}
+      {/* ======================================================== */}
+      {/*                   NEW POPUP MODALS                       */}
+      {/* ======================================================== */}
+
+      {/* [F1] SHORTCUTS HELP CHEAT SHEET */}
+      <AnimatePresence>
+        {isHelpModalOpen && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="bg-neutral-900 border border-neutral-800 max-w-lg w-full rounded-3xl p-6 shadow-2xl space-y-4 text-neutral-100">
+              <div className="flex justify-between items-center border-b border-neutral-800 pb-3">
+                <div className="flex items-center gap-2 text-yellow-500 font-black text-sm uppercase">
+                  <SafeHelpCircle size={18} />
+                  <span>POS Keyboard Shortcuts (F1 - F10)</span>
+                </div>
+                <button onClick={() => setIsHelpModalOpen(false)}><SafeX size={18} /></button>
+              </div>
+
+              <div className="space-y-2 text-xs">
+                {[
+                  { key: 'F1', desc: 'Open this Shortcut Help Sheet' },
+                  { key: 'F2', desc: 'Focus Item Search & hit [Enter] to quick-add' },
+                  { key: 'F3', desc: 'Park / Hold active cart' },
+                  { key: 'F4', desc: 'Toggle Payment Mode (Cash / UPI / Split)' },
+                  { key: 'F5', desc: 'View & Recall Held / Parked Carts' },
+                  { key: 'F6', desc: 'Add Daily Drawer Expense (दूध, बर्फ, सब्ज़ी)' },
+                  { key: 'F7', desc: 'Send WhatsApp Receipt to customer phone' },
+                  { key: 'F8', desc: 'Display Dynamic UPI QR Code on screen' },
+                  { key: 'F9', desc: 'Quick Pay & Print Final Bill (+KOT)' },
+                  { key: 'F10', desc: 'Cash Tender / Change Calculator (वापसी पैसे)' },
+                  { key: 'Esc', desc: 'Close any active popup modal' },
+                ].map((s) => (
+                  <div key={s.key} className="flex justify-between items-center p-2 rounded-xl bg-neutral-950 border border-neutral-800">
+                    <span className="font-mono font-black text-orange-400 bg-orange-500/10 px-2.5 py-1 rounded-lg border border-orange-500/20">{s.key}</span>
+                    <span className="text-neutral-300">{s.desc}</span>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* [F5] HELD / PARKED CARTS MODAL */}
+      <AnimatePresence>
+        {isHeldCartsModalOpen && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="bg-neutral-900 border border-neutral-800 max-w-lg w-full rounded-3xl p-6 shadow-2xl space-y-4">
+              <div className="flex justify-between items-center border-b border-neutral-800 pb-3">
+                <div className="flex items-center gap-2 text-amber-400 font-black text-sm uppercase">
+                  <SafePauseCircle size={18} />
+                  <span>Held / Parked Orders ({heldCarts.length}) [F5]</span>
+                </div>
+                <button onClick={() => setIsHeldCartsModalOpen(false)}><SafeX size={18} /></button>
+              </div>
+
+              <div className="space-y-2.5 max-h-96 overflow-y-auto pr-1">
+                {heldCarts.length === 0 ? (
+                  <p className="text-xs text-neutral-400 text-center py-10">No orders on hold right now.</p>
+                ) : (
+                  heldCarts.map((h) => (
+                    <div key={h.id} className="bg-neutral-950 border border-neutral-800 p-3.5 rounded-2xl flex justify-between items-center">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-xs text-white">{h.customerName}</span>
+                          <span className="text-[10px] text-neutral-500 font-mono">({h.heldAt})</span>
+                        </div>
+                        <p className="text-[10px] text-neutral-400 font-mono mt-0.5">{h.cart.length} items • ₹{h.total}</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button onClick={() => handleRestoreHeldCart(h)} className="bg-green-600 hover:bg-green-500 text-white px-3 py-1.5 rounded-xl text-xs font-black uppercase flex items-center gap-1 shadow">
+                          <SafePlayCircle size={14} /> Resume
+                        </button>
+                        <button onClick={() => handleDeleteHeldCart(h.id)} className="p-1.5 text-red-400 hover:text-red-300">
+                          <SafeTrash2 size={16} />
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* [F6] QUICK EXPENSE MODAL */}
+      <AnimatePresence>
+        {isExpenseModalOpen && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="bg-neutral-900 border border-neutral-800 max-w-sm w-full rounded-3xl p-6 shadow-2xl space-y-4">
+              <div className="flex justify-between items-center border-b border-neutral-800 pb-3">
+                <h3 className="font-black text-sm uppercase text-red-400 flex items-center gap-2">
+                  <Receipt size={16} /> Daily Expense Entry [F6]
+                </h3>
+                <button onClick={() => setIsExpenseModalOpen(false)}><SafeX size={18} /></button>
+              </div>
+
+              <form onSubmit={handleSaveExpense} className="space-y-3 text-xs">
+                <div>
+                  <label className="text-neutral-400 uppercase font-black text-[10px] block mb-1">Expense Title / Item *</label>
+                  <input 
+                    type="text" 
+                    required 
+                    placeholder="e.g. Milk 5L, Ice cubes, Veggies" 
+                    value={expenseTitle} 
+                    onChange={e => setExpenseTitle(e.target.value)} 
+                    className="w-full bg-neutral-950 border border-neutral-700 rounded-xl p-2.5 text-white outline-none" 
+                    autoFocus 
+                  />
+                </div>
+                <div>
+                  <label className="text-neutral-400 uppercase font-black text-[10px] block mb-1">Amount Deducted from Drawer (₹) *</label>
+                  <input 
+                    type="number" 
+                    required 
+                    min={1} 
+                    placeholder="e.g. 150" 
+                    value={expenseAmount} 
+                    onChange={e => setExpenseAmount(e.target.value === '' ? '' : Number(e.target.value))} 
+                    className="w-full bg-neutral-950 border border-neutral-700 rounded-xl p-2.5 text-white font-mono text-sm outline-none" 
+                  />
+                </div>
+                <div>
+                  <label className="text-neutral-400 uppercase font-black text-[10px] block mb-1">Category</label>
+                  <select value={expenseCategory} onChange={e => setExpenseCategory(e.target.value)} className="w-full bg-neutral-950 border border-neutral-700 rounded-xl p-2.5 text-white outline-none">
+                    <option value="Milk / Dairy">Milk / Dairy</option>
+                    <option value="Vegetables">Vegetables / Raw Food</option>
+                    <option value="Staff Tea / Snacks">Staff Tea / Snacks</option>
+                    <option value="Maintenance / Gas">Maintenance / Gas</option>
+                    <option value="General">Other / General</option>
+                  </select>
+                </div>
+                <button type="submit" className="w-full py-3 bg-red-600 hover:bg-red-500 text-white font-black uppercase text-xs rounded-xl shadow-lg mt-2">
+                  Deduct & Save Voucher
+                </button>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* [F8] DYNAMIC UPI QR MODAL */}
+      <AnimatePresence>
+        {isQrModalOpen && (
+          <div className="fixed inset-0 bg-black/85 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="bg-neutral-900 border border-neutral-800 max-w-sm w-full rounded-3xl p-6 shadow-2xl space-y-4 text-center">
+              <div className="flex justify-between items-center border-b border-neutral-800 pb-3">
+                <h3 className="font-black text-sm uppercase text-blue-400 flex items-center gap-2">
+                  <SafeQrCode size={16} /> Dynamic UPI Payment QR [F8]
+                </h3>
+                <button onClick={() => setIsQrModalOpen(false)}><SafeX size={18} /></button>
+              </div>
+
+              <div className="bg-white p-4 rounded-2xl inline-block shadow-xl">
+                <img 
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(dynamicUpiUrl)}`} 
+                  alt="UPI QR Code" 
+                  className="w-52 h-52 object-contain" 
+                />
+              </div>
+
+              <div className="space-y-1">
+                <p className="text-xl font-black font-mono text-green-400">₹{getTotalBillPrice()}</p>
+                <p className="text-xs text-neutral-400">Scan via PhonePe, GPay, Paytm to pay directly</p>
+                <p className="text-[10px] text-neutral-500 font-mono">UPI ID: {upiIdConfig}</p>
+              </div>
+
+              <button onClick={() => { setPaymentMethod('upi'); setIsQrModalOpen(false); toast.success("Switched to UPI mode!"); }} className="w-full py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-black uppercase text-xs rounded-xl shadow">
+                Received UPI Payment (Confirm)
+              </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* [F10] CASH TENDER / CHANGE CALCULATOR */}
+      <AnimatePresence>
+        {isChangeModalOpen && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="bg-neutral-900 border border-neutral-800 max-w-sm w-full rounded-3xl p-6 shadow-2xl space-y-4">
+              <div className="flex justify-between items-center border-b border-neutral-800 pb-3">
+                <h3 className="font-black text-sm uppercase text-purple-400 flex items-center gap-2">
+                  <SafeCalculator size={16} /> Change Return Calculator [F10]
+                </h3>
+                <button onClick={() => setIsChangeModalOpen(false)}><SafeX size={18} /></button>
+              </div>
+
+              <div className="space-y-3 text-xs">
+                <div className="flex justify-between items-center p-3 bg-neutral-950 rounded-xl border border-neutral-800">
+                  <span className="text-neutral-400">Bill Total:</span>
+                  <span className="font-mono text-lg font-black text-white">₹{getTotalBillPrice()}</span>
+                </div>
+
+                <div>
+                  <label className="text-neutral-400 uppercase font-black text-[10px] block mb-1">Customer Paid Note (₹):</label>
+                  <input 
+                    type="number" 
+                    placeholder="e.g. 500" 
+                    value={tenderCashAmount} 
+                    onChange={e => setTenderCashAmount(e.target.value === '' ? '' : Number(e.target.value))} 
+                    className="w-full bg-neutral-950 border border-neutral-700 rounded-xl p-3 text-white font-mono text-lg font-bold outline-none text-center" 
+                    autoFocus 
+                  />
+                </div>
+
+                {/* QUICK CASH PRESET BUTTONS */}
+                <div className="flex gap-2">
+                  {[100, 200, 500, 2000].map(amt => (
+                    <button key={amt} onClick={() => setTenderCashAmount(amt)} className="flex-1 py-1.5 bg-neutral-800 hover:bg-neutral-700 rounded-lg font-mono font-bold text-xs text-neutral-300">
+                      ₹{amt}
+                    </button>
+                  ))}
+                </div>
+
+                {tenderCashAmount !== '' && (
+                  <div className={`p-4 rounded-xl border text-center space-y-1 ${Number(tenderCashAmount) >= getTotalBillPrice() ? 'bg-green-500/10 border-green-500/30' : 'bg-red-500/10 border-red-500/30'}`}>
+                    <p className="text-[10px] font-black uppercase text-neutral-400">
+                      {Number(tenderCashAmount) >= getTotalBillPrice() ? 'Return to Customer (वापस करें):' : 'Pending Remaining Cash:'}
+                    </p>
+                    <p className={`text-2xl font-mono font-black ${Number(tenderCashAmount) >= getTotalBillPrice() ? 'text-green-400' : 'text-red-400'}`}>
+                      ₹{Math.abs(Number(tenderCashAmount) - getTotalBillPrice())}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* VARIATION MODAL */}
       <AnimatePresence>
         {isVariationModalOpen && selectedProductForVariation && (
           <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 max-w-sm w-full rounded-3xl p-6 shadow-2xl space-y-4 font-sans">
+            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 max-w-sm w-full rounded-3xl p-6 shadow-2xl space-y-4">
               <div className="flex justify-between items-center border-b pb-3">
                 <h3 className="font-black text-sm uppercase text-orange-500">{selectedProductForVariation.name}</h3>
                 <button onClick={() => setIsVariationModalOpen(false)}><SafeX size={18} /></button>
               </div>
 
               <div className="space-y-3">
-                {selectedProductForVariation.variants && Object.keys(selectedProductForVariation.variants).length > 0 && (
+                {selectedProductForVariation.variants && (
                   <div>
-                    <label className="text-xs font-bold uppercase text-neutral-400 block mb-1.5">Select Size / Portion:</label>
+                    <label className="text-xs font-bold uppercase text-neutral-400 block mb-1.5">Size / Portion:</label>
                     <div className="grid grid-cols-2 gap-2">
                       {Object.entries(selectedProductForVariation.variants).map(([size, price]: any) => (
                         <button 
                           key={size}
                           onClick={() => {
-                            triggerBeep('tap');
                             setSelectedSize(size);
                             setSelectedSizePrice(Number(price) || 100);
                           }}
-                          className={`py-2.5 rounded-xl text-xs font-black uppercase border transition-all ${selectedSize.toLowerCase() === size.toLowerCase() ? 'bg-orange-600 text-white border-orange-600' : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-400 border-neutral-700'}`}
+                          className={`py-2 rounded-xl text-xs font-black uppercase border transition-all ${selectedSize.toLowerCase() === size.toLowerCase() ? 'bg-orange-600 text-white border-orange-600' : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-400 border-neutral-700'}`}
                         >
                           {size} (₹{price})
                         </button>
@@ -1818,76 +2052,45 @@ export default function BbCafeDesktopPos() {
                     </div>
                   </div>
                 )}
-
-                {selectedSize && (selectedProductForVariation.category === "Special Pizza" || selectedProductForVariation.name?.toLowerCase().includes("pizza")) && (
-                  <div>
-                    <label className="text-xs font-bold uppercase text-neutral-400 block mb-1.5">Select Add-ons:</label>
-                    <div className="grid grid-cols-2 gap-2">
-                      {Object.entries(PIZZA_ADDONS[selectedSize.toLowerCase()] || {}).map(([addon, cost]: any) => {
-                        const isSelected = !!selectedAddons[addon];
-                        return (
-                          <button
-                            key={addon}
-                            onClick={() => setSelectedAddons(prev => ({ ...prev, [addon]: !prev[addon] }))}
-                            className={`p-2 rounded-xl border flex justify-between items-center text-[10px] font-bold ${isSelected ? 'border-orange-500 bg-orange-500/10 text-orange-500' : 'border-neutral-700 bg-neutral-800 text-neutral-400'}`}
-                          >
-                            <span>{addon}</span>
-                            <span className="font-mono font-bold">+₹{cost}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                <div>
-                  <label className="text-xs font-bold uppercase text-neutral-400 block mb-1">Special Note / Customization:</label>
-                  <input 
-                    type="text" 
-                    placeholder="e.g. Less spicy, Extra cheese..."
-                    value={itemNoteInput}
-                    onChange={e => setItemNoteInput(e.target.value)}
-                    className="w-full bg-neutral-100 dark:bg-neutral-800 border border-neutral-700 rounded-xl px-3 py-2 text-xs outline-none"
-                  />
-                </div>
               </div>
 
-              <div className="flex gap-2 pt-2">
-                <button onClick={handleAddCustomizedItemToCart} className="w-full bg-green-600 hover:bg-green-500 text-white font-black py-3 rounded-xl text-xs uppercase shadow">
-                  Add to Cart
-                </button>
-              </div>
+              <button onClick={handleAddCustomizedItemToCart} className="w-full bg-green-600 hover:bg-green-500 text-white font-black py-3 rounded-xl text-xs uppercase shadow mt-2">
+                Add to Cart
+              </button>
             </motion.div>
           </div>
         )}
       </AnimatePresence>
 
-      <AnimatePresence>
-        {isReceiptModalOpen && selectedReceipt && (
-          <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 max-w-md w-full rounded-3xl p-6 shadow-2xl space-y-4">
-              <div className="flex justify-between items-center border-b pb-3">
-                <h3 className="font-black text-sm">Bill Details (# {selectedReceipt.billNumber})</h3>
-                <button onClick={() => setIsReceiptModalOpen(false)}><SafeX size={18} /></button>
-              </div>
-              <div className="space-y-2 max-h-60 overflow-y-auto text-xs font-mono">
-                {selectedReceipt.items?.map((it: any, i: number) => (
-                  <div key={i} className="flex justify-between"><span>{it.name} x{it.quantity}</span><span>₹{it.price * it.quantity}</span></div>
-                ))}
-              </div>
-              <div className="flex justify-between font-bold text-sm border-t pt-2">
-                <span>Total:</span><span className="text-green-500 font-mono">₹{selectedReceipt.total}</span>
-              </div>
-              <div className="flex gap-2 pt-2">
-                <button onClick={() => handlePrintReceiptDirect(selectedReceipt, false)} className="flex-1 bg-green-600 text-white font-black py-2.5 rounded-xl text-xs uppercase">Reprint Bill</button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
+      {/* CUSTOMER DIRECTORY MODAL */}
       <CustomerDirectoryModal 
-        isCustomerModalOpen={isCustomerModalOpen} setIsCustomerModalOpen={setIsCustomerModalOpen} customerSearchQuery={customerSearchQuery} setCustomerSearchQuery={setCustomerSearchQuery} searchedCustomers={searchedCustomers} isSearchingCustomer={isSearchingCustomer} newCustName="" setNewCustName={() => {}} newCustPhone="" setNewCustPhone={() => {}} newCustAddress="" setNewCustAddress={() => {}} editingCustomer={null} viewingHistoryCustomer={null} customerHistoryList={[]} editCustPoints={0} setEditCustPoints={() => {}} handleSelectCustomer={handleSelectCustomer} handleLoadCustomerHistory={() => {}} handleStartEditProfile={() => {}} handleUpdateCustomerProfile={() => {}} handleSaveNewCustomer={() => {}} setViewingHistoryCustomer={() => {}} setCustomerHistoryList={() => {}} setEditingCustomer={() => {}} searchDbCustomers={searchDbCustomers} triggerBeep={triggerBeep}
+        isCustomerModalOpen={isCustomerModalOpen} 
+        setIsCustomerModalOpen={setIsCustomerModalOpen} 
+        customerSearchQuery={customerSearchQuery} 
+        setCustomerSearchQuery={setCustomerSearchQuery} 
+        searchedCustomers={searchedCustomers} 
+        isSearchingCustomer={isSearchingCustomer} 
+        newCustName="" setNewCustName={() => {}} 
+        newCustPhone="" setNewCustPhone={() => {}} 
+        newCustAddress="" setNewCustAddress={() => {}} 
+        editingCustomer={null} viewingHistoryCustomer={null} 
+        customerHistoryList={[]} editCustPoints={0} 
+        setEditCustPoints={() => {}} 
+        handleSelectCustomer={(cust: any) => {
+          setCustomerPhone(cust.phone); 
+          setCustomerName(cust.name || ''); 
+          setCustomerPoints(cust.points || 0); 
+          setIsCustomerModalOpen(false);
+        }} 
+        handleLoadCustomerHistory={() => {}} 
+        handleStartEditProfile={() => {}} 
+        handleUpdateCustomerProfile={() => {}} 
+        handleSaveNewCustomer={() => {}} 
+        setViewingHistoryCustomer={() => {}} 
+        setCustomerHistoryList={() => {}} 
+        setEditingCustomer={() => {}} 
+        searchDbCustomers={() => {}} 
+        triggerBeep={triggerBeep}
       />
     </div>
   );
