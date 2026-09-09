@@ -105,7 +105,6 @@ export default function BbCafeDesktopPos() {
 
   const [isSyncing, setIsSyncing] = useState(false);
 
-  // Cart & Table Management States
   const [cart, setCart] = useState<PosCartItem[]>([]);
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerName, setCustomerName] = useState('');
@@ -213,9 +212,7 @@ export default function BbCafeDesktopPos() {
     return () => unsubscribe();
   }, []);
 
-  // Filter separate lists for Active Orders (Delivery/Pickup) and Tables
   const activeLiveOrders = useMemo(() => liveOrders.filter((o) => (o.fulfillmentType === 'delivery' || o.fulfillmentType === 'pickup') && o.status !== 'completed' && o.status !== 'rejected'), [liveOrders]);
-  
   const activeTableOrders = useMemo(() => liveOrders.filter((o) => o.fulfillmentType === 'table' && o.status !== 'completed' && o.status !== 'rejected'), [liveOrders]);
 
   const pendingOrdersCount = useMemo(() => activeLiveOrders.filter((o) => o.status === 'pending').length, [activeLiveOrders]);
@@ -476,7 +473,7 @@ export default function BbCafeDesktopPos() {
     }
   };
 
-  // --- OPTIMIZED THERMAL PRINT (NO EXTRA BLANK PAGES) ---
+  // --- EXACT IMAGE-MATCHED THERMAL PRINT FORMAT (NO BLANK PAGES) ---
   const handlePrintReceiptDirect = async (orderObj: any, isKot = false) => {
     try {
       if (usbDevice) {
@@ -504,44 +501,60 @@ export default function BbCafeDesktopPos() {
           });
           addText("------------------------------------------------\n");
         } else {
+          // Exact Match to User Image Format
           commands.push(0x1D, 0x21, 0x11); 
-          addText("BUM BUM CAFE\n");
+          addText("BUM BUM CAFE & RESTAURANT\n");
           commands.push(0x1D, 0x21, 0x00);
-          addText("Mohandra Town, Main Road\n");
-          addText("GSTIN: 08AABCB1234F1Z5\n\n");
+          addText("नू बस स्टैंड मोहंद्रा, पुलिस चौकी के सामने,\n");
+          addText("जिला पन्ना, मोहंद्रा, मध्य प्रदेश, 488442\n");
+          addText("9714293759\n\n");
+
+          commands.push(0x1B, 0x61, 0x00); // Left align
+          addText(`Employee: ${currentUser?.name || 'Owner'}\n`);
+          addText(`POS: Pos 03\n\n`);
+          addText(`Customer: ${orderObj.customerName || 'Walk-in'}\n`);
+          if (orderObj.customerPhone) addText(`${orderObj.customerPhone}\n`);
+          addText("------------------------------------------------\n");
           
-          commands.push(0x1B, 0x61, 0x00);
-          addText(`Bill No: #${String(orderObj.billNumber).padStart(4, '0')}    Token: #${orderObj.tokenNumber}\n`);
-          let dateStr = new Date().toLocaleString();
-          try {
-            dateStr = new Date(orderObj.timestamp?.toDate ? orderObj.timestamp.toDate() : orderObj.timestamp).toLocaleString();
-          } catch(e){}
-          addText(`Date: ${dateStr}\n`);
-          addText(`Customer: ${orderObj.customerName} (${orderObj.customerPhone || 'Walk-in'})\n`);
-          if (orderObj.tableNumber) addText(`Table: ${orderObj.tableNumber}\n`);
-          addText("================================================\n");
-          addText("ITEM DESCRIPTION           QTY      PRICE\n");
-          addText("================================================\n");
+          let fulfillmentLabel = "Dine in";
+          if (orderObj.fulfillmentType === 'delivery') fulfillmentLabel = `Delivery (${orderObj.deliveryArea || ''})`;
+          if (orderObj.fulfillmentType === 'pickup') fulfillmentLabel = "Takeaway / Pickup";
+          if (orderObj.tableNumber) fulfillmentLabel = `Dine in (${orderObj.tableNumber})`;
+          
+          addText(`${fulfillmentLabel}\n\n`);
 
           orderObj.items.forEach((item: any) => {
-            const itemName = (item.name || '').padEnd(26, ' ').substring(0, 26);
-            const qty = String(item.quantity || 1).padStart(3, ' ');
-            const totalP = String((item.price || 0) * (item.quantity || 1)).padStart(8, ' ');
-            addText(`${itemName} ${qty}  ₹${totalP}\n`);
+            const itemName = item.name || '';
+            const qtyPriceLine = `${item.quantity} x ₹${item.price}`;
+            const itemTotal = `₹${(item.price || 0) * (item.quantity || 1)}`;
+            
+            addText(`${itemName}\n`);
+            // Pad spaces between qty x price and total amount to match receipt style
+            const spaces = ' '.repeat(Math.max(2, 40 - qtyPriceLine.length - itemTotal.length));
+            addText(`${qtyPriceLine}${spaces}${itemTotal}\n\n`);
           });
 
           addText("------------------------------------------------\n");
-          addText(`Subtotal:                           ₹${orderObj.subtotal}\n`);
-          if (orderObj.discount > 0) addText(`Discount:                          -₹${orderObj.discount}\n`);
-          if (orderObj.gstAmount > 0) addText(`GST (${orderObj.gstRate}%):                      ₹${orderObj.gstAmount}\n`);
-          if (orderObj.deliveryFee > 0) addText(`Delivery Charge:                    ₹${orderObj.deliveryFee}\n`);
-          
-          commands.push(0x1D, 0x21, 0x01); 
-          addText(`GRAND TOTAL:                       ₹${orderObj.total}\n`);
+          const earnedPts = Math.floor((orderObj.total || 0) / 100);
+          addText(`Points earned${' '.repeat(28)}${earnedPts}\n`);
+          addText(`Points balance${' '.repeat(26)}${customerPoints + earnedPts}\n`);
+          addText("------------------------------------------------\n");
+
+          commands.push(0x1D, 0x21, 0x01); // Bold large Total
+          addText(`Total${' '.repeat(16)}₹${orderObj.total}\n`);
           commands.push(0x1D, 0x21, 0x00);
-          addText("================================================\n");
-          commands.push(0x1B, 0x61, 0x01);
-          addText("Thank You! Visit Again.\n");
+          
+          addText(`Cash${' '.repeat(25)}₹${orderObj.total}\n`);
+          addText("------------------------------------------------\n");
+          
+          commands.push(0x1B, 0x61, 0x01); // Center
+          addText("Follow us\n");
+          addText("www.youtube.com/@bbcafe.i\n");
+          addText("All Social Media @bbcafe.in\n");
+          addText("🖤 Thank you, visit again 🖤\n");
+          
+          let dateFormatted = new Date().toLocaleDateString('en-GB') + ' ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          addText(`${dateFormatted}${' '.repeat(10)}#${String(orderObj.billNumber).padStart(4, '0')}\n`);
         }
 
         // Minimal feed and cut so no extra blank roll is wasted
@@ -560,8 +573,8 @@ export default function BbCafeDesktopPos() {
       console.error("USB Print Error, using browser fallback", e);
     }
 
-    // Browser Print Fallback with precise @page CSS to prevent blank pages
-    const printWindow = window.open('', '_blank', 'width=350,height=500');
+    // Browser Print Fallback matching exact style without blank pages
+    const printWindow = window.open('', '_blank', 'width=350,height=550');
     if (printWindow) {
       printWindow.document.write(`
         <html>
@@ -569,13 +582,11 @@ export default function BbCafeDesktopPos() {
             <title>${isKot ? 'KOT' : 'Receipt'} #${orderObj.billNumber}</title>
             <style>
               @page { size: 80mm auto; margin: 0; }
-              body { font-family: 'Courier New', monospace; font-size: 11px; width: 72mm; margin: 0 auto; padding: 2px; color: #000; }
+              body { font-family: 'Courier New', monospace; font-size: 12px; width: 72mm; margin: 0 auto; padding: 2px; color: #000; }
               .center { text-align: center; }
               .bold { font-weight: bold; }
-              .line { border-bottom: 1px dashed #000; margin: 3px 0; }
-              table { width: 100%; border-collapse: collapse; }
-              th, td { text-align: left; font-size: 10px; padding: 1px 0; }
-              .right { text-align: right; }
+              .line { border-bottom: 1px dashed #000; margin: 4px 0; }
+              .flex { display: flex; justify-content: space-between; }
             </style>
           </head>
           <body onload="window.print(); window.close();">
@@ -584,31 +595,40 @@ export default function BbCafeDesktopPos() {
               <div class="center">Token: #${orderObj.tokenNumber} | Type: ${orderObj.fulfillmentType.toUpperCase()}</div>
               ${orderObj.tableNumber ? `<div class="center bold">Table: ${orderObj.tableNumber}</div>` : ''}
               <div class="line"></div>
-              <table>
-                <tr><th>Item</th><th class="right">Qty</th></tr>
-                ${orderObj.items.map((i: any) => `<tr><td>[ ] ${i.name}</td><td class="right">${i.quantity}</td></tr>`).join('')}
-              </table>
+              ${orderObj.items.map((i: any) => `<div>[ ] ${i.name} x ${i.quantity}</div>`).join('')}
               <div class="line"></div>
             ` : `
-              <div class="center bold" style="font-size: 15px;">BUM BUM CAFE</div>
-              <div class="center">Mohandra Town, Main Road</div>
+              <div class="center bold" style="font-size: 15px;">BUM BUM CAFE & RESTAURANT</div>
+              <div class="center">न्यू बस स्टैंड मोहंद्रा, पुलिस चौकी के सामने,</div>
+              <div class="center">जिला पन्ना, मोहंद्रा, मध्य प्रदेश, 488442</div>
+              <div class="center">9714293759</div>
+              <br/>
+              <div>Employee: ${currentUser?.name || 'Owner'}</div>
+              <div>POS: Pos 03</div>
+              <br/>
+              <div>Customer: ${orderObj.customerName || 'Walk-in'}</div>
+              <div>${orderObj.customerPhone || ''}</div>
               <div class="line"></div>
-              <div>Bill No: #${String(orderObj.billNumber).padStart(4, '0')} &nbsp;&nbsp; Token: #${orderObj.tokenNumber}</div>
-              <div>Date: ${new Date().toLocaleString()}</div>
-              <div>Customer: ${orderObj.customerName}</div>
-              ${orderObj.tableNumber ? `<div>Table: ${orderObj.tableNumber}</div>` : ''}
+              <div class="bold">${orderObj.tableNumber ? `Dine in (${orderObj.tableNumber})` : 'Dine in'}</div>
+              <br/>
+              ${orderObj.items.map((i: any) => `
+                <div>${i.name}</div>
+                <div class="flex"><span>${i.quantity} x ₹${i.price}</span><span>₹${i.price * i.quantity}</span></div>
+                <br/>
+              `).join('')}
               <div class="line"></div>
-              <table>
-                <tr><th>Item</th><th class="center">Qty</th><th class="right">Amt</th></tr>
-                ${orderObj.items.map((i: any) => `<tr><td>${i.name}</td><td class="center">${i.quantity}</td><td class="right">₹${i.price * i.quantity}</td></tr>`).join('')}
-              </table>
+              <div class="flex"><span>Points earned</span><span>${Math.floor(orderObj.total / 100)}</span></div>
+              <div class="flex"><span>Points balance</span><span>${customerPoints + Math.floor(orderObj.total / 100)}</span></div>
               <div class="line"></div>
-              <div>Subtotal: ₹${orderObj.subtotal}</div>
-              ${orderObj.discount > 0 ? `<div>Discount: -₹${orderObj.discount}</div>` : ''}
-              ${orderObj.gstAmount > 0 ? `<div>GST: ₹${orderObj.gstAmount}</div>` : ''}
-              <div class="bold" style="font-size: 13px; margin-top: 3px;">GRAND TOTAL: ₹${orderObj.total}</div>
+              <div class="flex bold" style="font-size: 15px;"><span>Total</span><span>₹${orderObj.total}</span></div>
+              <div class="flex"><span>Cash</span><span>₹${orderObj.total}</span></div>
               <div class="line"></div>
-              <div class="center bold">Thank You! Visit Again</div>
+              <div class="center">Follow us</div>
+              <div class="center">www.youtube.com/@bbcafe.i</div>
+              <div class="center">All Social Media @bbcafe.in</div>
+              <div class="center bold">🖤 Thank you, visit again 🖤</div>
+              <br/>
+              <div class="flex"><span style="font-size: 10px;">${new Date().toLocaleDateString('en-GB')} ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span><span style="font-size: 10px;">#6-${String(orderObj.billNumber).padStart(4, '0')}</span></div>
             `}
           </body>
         </html>
@@ -617,7 +637,6 @@ export default function BbCafeDesktopPos() {
     }
   };
 
-  // --- SAVE TABLE & PRINT KOT ONLY ---
   const handleSaveTableOrderKotOnly = async () => {
     if (cart.length === 0 || isSubmittingOrder) return;
     setIsSubmittingOrder(true);
@@ -697,7 +716,6 @@ export default function BbCafeDesktopPos() {
     }
   };
 
-  // --- FINAL BILL PRINT & SETTLED (Removes from Table manager) ---
   const handleFinalCheckoutAndPrintBill = async () => {
     if (cart.length === 0 || isSubmittingOrder) return;
     setIsSubmittingOrder(true);
@@ -720,7 +738,7 @@ export default function BbCafeDesktopPos() {
           gstRate: gstEnabled ? gstRate : 0, 
           gstAmount: getGstAmountCalculated(), 
           total: finalTotal, 
-          status: 'completed', // Settled & removed from active tables
+          status: 'completed', 
           tableNumber: tableNumber,
           customerName: customerName || "Walk-in Guest",
           customerPhone: customerPhone ? `+91${customerPhone}` : "",
@@ -849,10 +867,8 @@ export default function BbCafeDesktopPos() {
         </div>
       ) : (
         <>
-          {/* SIDEBAR NAVIGATION (COLLAPSIBLE) */}
           <aside className={`${isSidebarCollapsed ? 'w-20' : 'w-64'} bg-white dark:bg-neutral-900 border-r border-neutral-200 dark:border-neutral-800 flex flex-col justify-between p-4 shrink-0 select-none h-full transition-all duration-300 relative`}>
             
-            {/* Collapse Toggle Button */}
             <button 
               onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)} 
               className="absolute -right-3 top-7 bg-orange-600 text-white p-1 rounded-full shadow-md hover:bg-orange-500 transition-all z-20"
@@ -924,7 +940,6 @@ export default function BbCafeDesktopPos() {
 
           <main className="flex-1 flex h-full overflow-hidden">
             
-            {/* TAB: BILLING */}
             {activeTab === 'billing' && (
               <div className="flex-1 flex h-full overflow-hidden">
                 <div className="flex-1 flex flex-col p-5 h-full overflow-hidden">
@@ -1126,7 +1141,7 @@ export default function BbCafeDesktopPos() {
               </div>
             )}
 
-            {/* TAB: TABLES MANAGER (ALAG TAB FOR TABLES) */}
+            {/* TAB: TABLES MANAGER */}
             {activeTab === 'tables' && (
               <div className="flex-1 p-6 h-full overflow-y-auto">
                 <div className="flex justify-between items-center mb-4">
@@ -1182,7 +1197,7 @@ export default function BbCafeDesktopPos() {
               </div>
             )}
 
-            {/* TAB: LIVE ORDERS (DELIVERY / PICKUP ONLY) */}
+            {/* TAB: LIVE ORDERS */}
             {activeTab === 'orders' && (
               <div className="flex-1 p-6 h-full overflow-y-auto">
                 <div className="flex justify-between items-center mb-4">
@@ -1320,7 +1335,7 @@ export default function BbCafeDesktopPos() {
           <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 max-w-md w-full rounded-3xl p-6 shadow-2xl space-y-4">
               <div className="flex justify-between items-center border-b pb-3">
-                <h3 className="font-black text-sm">Bill Details (# {selectedReceipt.billNumber})</h3>
+                <h3 className="print font-black text-sm">Bill Details (# {selectedReceipt.billNumber})</h3>
                 <button onClick={() => setIsReceiptModalOpen(false)}><SafeX size={18} /></button>
               </div>
               <div className="space-y-2 max-h-60 overflow-y-auto text-xs font-mono">
