@@ -35,7 +35,6 @@ export default function PrintCustomerReceipt({ orderObj, currentUser }: PrintRec
           .item-row { margin-bottom: 5px; }
           .note { font-size: 10px; font-style: italic; padding-left: 10px; color: #333; }
           
-          /* डोमिनोज़ स्टाइल वर्टिकल साइड बॉर्डर टेक्स्ट */
           .receipt-container { position: relative; padding: 0 4mm; }
           .side-border-left, .side-border-right {
             position: absolute; top: 0; bottom: 0; font-size: 8px; letter-spacing: 2px; color: #555;
@@ -108,7 +107,6 @@ export default function PrintCustomerReceipt({ orderObj, currentUser }: PrintRec
 
           <div className="line"></div>
           
-          {/* डायनेमिक UPI QR Code */}
           <div className="center">
             <div style={{ fontSize: '10px', fontWeight: 'bold', marginBottom: '3px' }}>SCAN TO PAY ₹{totalAmount} VIA UPI</div>
             <img src={qrCodeImageUrl} alt="UPI QR Code" width="110" height="110" style={{ display: 'block', margin: '0 auto' }} />
