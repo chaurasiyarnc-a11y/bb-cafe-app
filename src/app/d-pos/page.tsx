@@ -438,7 +438,6 @@ export default function BbCafeDesktopPos() {
   
   const getRedemptionDiscount = () => isRedeemingPoints ? Math.min(pointsToRedeem, getCartSubtotal() + getGstAmountCalculated()) : 0;
   
-  // Calculate discount amount based on Amount or Percentage
   const getCalculatedDiscountAmount = () => {
     const sub = getCartSubtotal();
     if (discountType === 'amount') {
@@ -509,7 +508,13 @@ export default function BbCafeDesktopPos() {
     }
   };
 
+  // --- STRICT VALIDATION FOR PRINTING (PREVENTS BLANK PAGES) ---
   const handlePrintReceiptDirect = async (orderObj: any, isKot = false) => {
+    if (!orderObj || !orderObj.items || orderObj.items.length === 0) {
+      console.warn("Attempted to print empty order, aborted to prevent blank page.");
+      return;
+    }
+
     try {
       if (usbDevice) {
         const encoder = new TextEncoder();
@@ -612,6 +617,7 @@ export default function BbCafeDesktopPos() {
       console.error("USB Print Error, using browser fallback", e);
     }
 
+    // Browser Print Fallback with strict content check
     const printWindow = window.open('', '_blank', 'width=350,height=550');
     if (printWindow) {
       printWindow.document.write(`
@@ -620,7 +626,7 @@ export default function BbCafeDesktopPos() {
             <title>${isKot ? 'KOT' : 'Receipt'} #${orderObj.billNumber}</title>
             <style>
               @page { size: 80mm auto; margin: 0; }
-              body { font-family: 'Courier New', monospace; font-size: 12px; width: 72mm; margin: 0 auto; padding: 2px; color: #000; }
+              body { font-family: 'Courier New', monospace; font-size: 12px; width: 72mm; margin: 0 auto; padding: 2px; color: #000; background: #fff; }
               .center { text-align: center; }
               .bold { font-weight: bold; }
               .line { border-bottom: 1px dashed #000; margin: 4px 0; }
@@ -1149,7 +1155,7 @@ export default function BbCafeDesktopPos() {
                             onClick={handleSaveNewCustomerQuick} 
                             className="w-full py-2 bg-green-600 hover:bg-green-500 text-white font-black text-xs uppercase rounded-xl flex items-center justify-center gap-1 shadow"
                           >
-                            <SafeUserPlus size5={14} /> Save Customer & Link
+                            <SafeUserPlus size={14} /> Save Customer & Link
                           </button>
                         </div>
                       )}
