@@ -1,18 +1,15 @@
-const CACHE_NAME = 'bb-cafe-cache-v4'; // कैशे का नाम v4 किया गया है ताकि पुराना कैशे क्लियर हो सके
+// Version ko v5 kar diya gaya hai taaki purana kharab cache turant clear ho jaye
+const CACHE_NAME = 'bb-cafe-cache-v5';
 
 const ASSETS_TO_CACHE = [
   '/',
-  '/pos-menifasto.json', 
-  '/pos', // सुधरा हुआ: POS पाथ को यहाँ ऑफ़लाइन कैशिंग के लिए जोड़ा गया है
+  '/pos',
+  '/manifest.json',
   '/delivery',
-  '/delivery-manifest.json',
   '/kitchen',
-  '/kitchen-manifest.json',
   '/admin',
-  '/admin-manifest.json',
   '/icon-192x192.png',
   '/icon-512x512.png',
-  // आपके public फोल्डर की सभी महत्वपूर्ण इमेजेस और साउंड्स
   '/facebook.png',
   '/instagram.png',
   '/snapchat.png',
@@ -27,17 +24,27 @@ const ASSETS_TO_CACHE = [
   '/kitchen.mp3'
 ];
 
-// Install Event
+// 1. Install Event (Safe Cache Loading)
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(ASSETS_TO_CACHE);
+    caches.open(CACHE_NAME).then(async (cache) => {
+      // Promise.allSettled use kiya hai taaki agar koi ek photo ya mp3 missing ho,
+      // tab bhi installation FAIL na ho aur POS app chalta rahe
+      await Promise.allSettled(
+        ASSETS_TO_CACHE.map((url) =>
+          fetch(url)
+            .then((res) => {
+              if (res.ok) return cache.put(url, res);
+            })
+            .catch(() => {})
+        )
+      );
     })
   );
   self.skipWaiting();
 });
 
-// Activate Event
+// 2. Activate Event (Purge old v1, v2, v3, v4 caches)
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) => {
@@ -50,35 +57,44 @@ self.addEventListener('activate', (event) => {
       );
     })
   );
-  // सुधरा हुआ: सिंटैक्स एरर और कंपाइल क्रैश को ठीक करने के लिए 'self.clients.claim()' किया गया
-  self.clients.claim(); 
+  self.clients.claim();
 });
 
-// Fetch Event (Hybrid Smooth Strategy)
+// 3. Fetch Event
 self.addEventListener('fetch', (event) => {
-  // बाहरी लिंक्स या API (जैसे Firebase/Firestore) को कैशे न करें
-  if (!event.request.url.startsWith(self.location.origin)) return;
+  // Sirf GET requests handle karein
   if (event.request.method !== 'GET') return;
 
   const url = new URL(event.request.url);
 
-  // 1. CACHE-FIRST strategy for Static Assets (Images, Audio, Web Fonts)
-  const isStaticAsset = 
-    url.pathname.endsWith('.png') || 
-    url.pathname.endsWith('.jpg') || 
-    url.pathname.endsWith('.jpeg') || 
-    url.pathname.endsWith('.svg') || 
-    url.pathname.endsWith('.mp3') || 
+  // Firebase, Google APIs ya external links ko cache na karein
+  if (
+    !event.request.url.startsWith(self.location.origin) ||
+    url.hostname.includes('firebase') ||
+    url.hostname.includes('firestore') ||
+    url.hostname.includes('googleapis.com')
+  ) {
+    return;
+  }
+
+  // 1. Static Assets (Images, Audio, Fonts) -> CACHE FIRST Strategy
+  const isStaticAsset =
+    url.pathname.endsWith('.png') ||
+    url.pathname.endsWith('.jpg') ||
+    url.pathname.endsWith('.jpeg') ||
+    url.pathname.endsWith('.svg') ||
+    url.pathname.endsWith('.ico') ||
+    url.pathname.endsWith('.mp3') ||
     url.pathname.endsWith('.woff2');
 
   if (isStaticAsset) {
     event.respondWith(
       caches.match(event.request).then((cachedResponse) => {
         if (cachedResponse) {
-          return cachedResponse; // कैशे से तुरंत लोड करें
+          return cachedResponse;
         }
         return fetch(event.request).then((networkResponse) => {
-          if (networkResponse.status === 200) {
+          if (networkResponse && networkResponse.status === 200) {
             const responseClone = networkResponse.clone();
             caches.open(CACHE_NAME).then((cache) => {
               cache.put(event.request, responseClone);
@@ -91,23 +107,26 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 2. STALE-WHILE-REVALIDATE for HTML, JS and CSS Files
-  // (यह कैशे से पेज तुरंत दिखाएगा और बैकग्राउंड में नया डेटा अपडेट करेगा)
+  // 2. HTML Pages & POS Navigation -> NETWORK FIRST with Cache Fallback
+  // (POS terminal ke liye zaroori hai taaki live order aur bill count hamesha naya mile)
   event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
-      const fetchPromise = fetch(event.request).then((networkResponse) => {
-        if (networkResponse.status === 200) {
+    fetch(event.request)
+      .then((networkResponse) => {
+        if (networkResponse && networkResponse.status === 200) {
           const responseClone = networkResponse.clone();
           caches.open(CACHE_NAME).then((cache) => {
             cache.put(event.request, responseClone);
           });
         }
         return networkResponse;
-      }).catch(() => {
-        // नेटवर्क न होने पर एरर को ब्लॉक करें
-      });
-
-      return cachedResponse || fetchPromise;
-    })
+      })
+      .catch(async () => {
+        // Agar internet band ho jaye, tab offline cache se load karein
+        const cachedResponse = await caches.match(event.request);
+        if (cachedResponse) return cachedResponse;
+        
+        // Agar page cache mein nahi mila, toh home/pos page dikhayein
+        return caches.match('/pos') || caches.match('/');
+      })
   );
 });
