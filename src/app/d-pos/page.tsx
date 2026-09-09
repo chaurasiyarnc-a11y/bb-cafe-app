@@ -1,4 +1,3 @@
-
 'use client';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { db } from '@/lib/firebase'; 
@@ -10,7 +9,7 @@ import {
 import { 
   ShoppingBag, Search, X, Loader2, Clock, Printer, Check, Settings, 
   Database, RefreshCw, Layers, Menu, LogOut, Lock, ToggleLeft, ToggleRight, 
-  Sun, Moon, Tag, Trash2, ArrowRight, CheckCircle2, UserPlus, Download, PlusCircle, Edit3, FileText, LayoutGrid, ChevronLeft, ChevronRight, Gift, Percent, Sliders, PackagePlus
+  Sun, Moon, Tag, Trash2, ArrowRight, CheckCircle2, UserPlus, Download, PlusCircle, Edit3, FileText, LayoutGrid, ChevronLeft, ChevronRight, Gift, Percent, Sliders, PackagePlus, Plus
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
@@ -51,6 +50,7 @@ interface PosCartItem {
   quantity: number;
   note?: string; 
   variation?: string;
+  size?: string;
 }
 
 interface DeliveryArea {
@@ -59,6 +59,13 @@ interface DeliveryArea {
   minFree: number;
   range: string;
 }
+
+const PIZZA_ADDONS: { [size: string]: { [addon: string]: number } } = {
+  "small": { "Veg Add-on": 10, "Paneer": 20, "Black Olives": 20, "Jalapeno": 20, "Extra Cheese": 20, "Mushroom": 20 },
+  "medium": { "Veg Add-on": 10, "Paneer": 30, "Black Olives": 30, "Jalapeno": 30, "Extra Cheese": 30, "Mushroom": 30 },
+  "large": { "Veg Add-on": 20, "Paneer": 40, "Black Olives": 40, "Jalapeno": 40, "Extra Cheese": 40, "Mushroom": 40 },
+  "extra large": { "Veg Add-on": 30, "Paneer": 50, "Black Olives": 50, "Jalapeno": 50, "Extra Cheese": 60, "Mushroom": 50 }
+};
 
 let globalAudioCtx: AudioContext | null = null;
 
@@ -81,7 +88,6 @@ export default function BbCafeDesktopPos() {
 
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [isAppInstalled, setIsAppInstalled] = useState(false);
-
   const [printerConnected, setPrinterConnected] = useState(false);
   const [kotEnabled, setKotEnabled] = useState<boolean>(true); 
 
@@ -108,23 +114,14 @@ export default function BbCafeDesktopPos() {
   const [itemPriceInput, setItemPriceInput] = useState<number>(0);
   const [itemCatInput, setItemCatInput] = useState('');
   const [itemImageInput, setItemImageInput] = useState('');
-  const [itemVariationsList, setItemVariationsList] = useState<any[]>([
-    { name: 'Half', price: 0 },
-    { name: 'Full', price: 0 },
-    { name: 'Plain', price: 0 },
-    { name: 'Butter', price: 20 }
-  ]);
+  const [itemVariantsList, setItemVariantsList] = useState<any>({ small: 100, medium: 200, large: 300 });
 
-  // New Global Variation Creator States
-  const [newVarName, setNewVarName] = useState('');
-  const [newVarPriceAdd, setNewVarPriceAdd] = useState(0);
-
-  // Item Variation Popup States (Billing Click)
+  // Item Customization & Variation Popup States (Billing Click - Customer App Style)
   const [isVariationModalOpen, setIsVariationModalOpen] = useState(false);
   const [selectedProductForVariation, setSelectedProductForVariation] = useState<any>(null);
-  const [availableVariations, setAvailableVariations] = useState<any[]>([]);
-  const [selectedVariationType, setSelectedVariationType] = useState('Full');
-  const [customVariationPrice, setCustomVariationPrice] = useState<number>(0);
+  const [selectedSize, setSelectedSize] = useState('');
+  const [selectedSizePrice, setSelectedSizePrice] = useState(0);
+  const [selectedAddons, setSelectedAddons] = useState<{ [addon: string]: boolean }>({});
   const [itemNoteInput, setItemNoteInput] = useState('');
 
   const [pastReceipts, setPastReceipts] = useState<any[]>([]);
@@ -354,37 +351,6 @@ export default function BbCafeDesktopPos() {
     toast.success("Locked PC Terminal!");
   };
 
-  const handleAddNewGlobalVariation = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newVarName.trim()) return toast.error("कृपया variation का नाम दर्ज करें!");
-    const toastId = toast.loading("Saving variation...");
-    try {
-      await addDoc(collection(db, "global_variations"), {
-        name: newVarName.trim(),
-        priceAdd: Number(newVarPriceAdd) || 0,
-        createdAt: new Date()
-      });
-      setNewVarName('');
-      setNewVarPriceAdd(0);
-      toast.dismiss(toastId);
-      toast.success("Variation successfully added! ✅");
-    } catch (e) {
-      toast.dismiss(toastId);
-      toast.error("Failed to add variation");
-    }
-  };
-
-  const handleDeleteGlobalVariation = async (id: string) => {
-    triggerBeep('tap');
-    if (!window.confirm("Are you sure you want to delete this variation?")) return;
-    try {
-      await deleteDoc(doc(db, "global_variations", id));
-      toast.success("Variation deleted");
-    } catch (e) {
-      toast.error("Failed to delete");
-    }
-  };
-
   const handleOpenItemEditor = (item: any = null) => {
     triggerBeep('tap');
     if (item) {
@@ -393,24 +359,14 @@ export default function BbCafeDesktopPos() {
       setItemPriceInput(Number(item.price) || 0);
       setItemCatInput(item.category || '');
       setItemImageInput(item.image || item.imageUrl || '');
-      setItemVariationsList(Array.isArray(item.variations) && item.variations.length > 0 ? [...item.variations] : [
-        { name: 'Half', price: 0 },
-        { name: 'Full', price: 0 },
-        { name: 'Plain', price: 0 },
-        { name: 'Butter', price: 20 }
-      ]);
+      setItemVariantsList(item.variants || { small: Number(item.price) || 100 });
     } else {
       setEditingItemObj(null);
       setItemNameInput('');
-      setItemPriceInput(0);
-      setItemCatInput('Beverages');
+      setItemPriceInput(100);
+      setItemCatInput('Fast Food');
       setItemImageInput('');
-      setItemVariationsList([
-        { name: 'Half', price: 0 },
-        { name: 'Full', price: 0 },
-        { name: 'Plain', price: 0 },
-        { name: 'Butter', price: 20 }
-      ]);
+      setItemVariantsList({ small: 100, medium: 200, large: 300 });
     }
     setActiveTab('item_editor');
   };
@@ -426,7 +382,7 @@ export default function BbCafeDesktopPos() {
         price: Number(itemPriceInput) || 0,
         category: itemCatInput.trim() || 'General',
         image: itemImageInput.trim(),
-        variations: itemVariationsList,
+        variants: itemVariantsList,
         isAvailable: true,
         updatedAt: new Date()
       };
@@ -552,42 +508,51 @@ export default function BbCafeDesktopPos() {
     setIsCustomerModalOpen(false);
   };
 
+  // --- OPEN VARIATION & SIZE MODAL (Customer App Style) ---
   const handleOpenVariationModal = (item: any) => {
     triggerBeep('tap');
     setSelectedProductForVariation(item);
     
-    const itemSpecificVars = item.variations;
-    const listToUse = Array.isArray(itemSpecificVars) && itemSpecificVars.length > 0 
-      ? itemSpecificVars 
-      : (globalVariations.length > 0 ? globalVariations : [
-          { name: 'Full', price: Number(item.price) || 0 },
-          { name: 'Half', price: Math.round((Number(item.price) || 0) * 0.6) },
-          { name: 'Plain', price: Number(item.price) || 0 },
-          { name: 'Butter', price: (Number(item.price) || 0) + 20 }
-        ]);
+    if (item.variants && typeof item.variants === 'object' && Object.keys(item.variants).length > 0) {
+      const firstSize = Object.keys(item.variants)[0];
+      const firstPrice = Number(item.variants[firstSize]) || Number(item.price) || 100;
+      setSelectedSize(firstSize);
+      setSelectedSizePrice(firstPrice);
+    } else {
+      setSelectedSize('Standard');
+      setSelectedSizePrice(Number(item.price) || 100);
+    }
 
-    setAvailableVariations(listToUse);
-    const firstVarName = listToUse[0].name || listToUse[0];
-    const firstVarPrice = typeof listToUse[0] === 'object' && listToUse[0].price !== undefined ? Number(listToUse[0].price) : (Number(item.price) || 0);
-
-    setSelectedVariationType(firstVarName);
-    setCustomVariationPrice(firstVarPrice);
-
+    setSelectedAddons({});
     setItemNoteInput('');
     setIsVariationModalOpen(true);
   };
 
-  const handleAddVariationItemToCart = () => {
+  const handleAddCustomizedItemToCart = () => {
     if (!selectedProductForVariation) return;
     triggerBeep('tap');
 
+    let finalItemPrice = selectedSizePrice;
+    const activeAddonsList: string[] = [];
+
+    Object.entries(selectedAddons).forEach(([addon, isSelected]) => {
+      if (isSelected) {
+        const cost = PIZZA_ADDONS[selectedSize.toLowerCase()]?.[addon] || 20;
+        finalItemPrice += cost;
+        activeAddonsList.push(addon);
+      }
+    });
+
     const baseName = selectedProductForVariation.name;
-    const variationSuffix = selectedVariationType ? `(${selectedVariationType})` : '';
-    const fullName = `${baseName} ${variationSuffix}`.trim();
-    const finalPrice = Number(customVariationPrice) || 0;
+    const sizeSuffix = selectedSize && selectedSize !== 'Standard' ? `(${selectedSize.toUpperCase()})` : '';
+    const fullName = `${baseName} ${sizeSuffix}`.trim();
+
+    const noteParts = [];
+    if (activeAddonsList.length > 0) noteParts.push(`Add-ons: ${activeAddonsList.join(', ')}`);
+    if (itemNoteInput) noteParts.push(`Note: ${itemNoteInput}`);
 
     setCart((prev) => {
-      const existingIndex = prev.findIndex((c) => c.id === selectedProductForVariation.id && c.variation === selectedVariationType && c.note === itemNoteInput);
+      const existingIndex = prev.findIndex((c) => c.id === selectedProductForVariation.id && c.size === selectedSize && c.note === noteParts.join(' | '));
       if (existingIndex > -1) {
         const next = [...prev];
         next[existingIndex].quantity += 1;
@@ -596,10 +561,10 @@ export default function BbCafeDesktopPos() {
       return [...prev, { 
         id: selectedProductForVariation.id, 
         name: fullName, 
-        price: finalPrice, 
+        price: finalItemPrice, 
         quantity: 1, 
-        variation: selectedVariationType,
-        note: itemNoteInput.trim() 
+        size: selectedSize,
+        note: noteParts.join(' | ') 
       }];
     });
 
@@ -673,7 +638,7 @@ export default function BbCafeDesktopPos() {
   };
 
   // ==========================================================
-  // PERFECT 80mm USB THERMAL RECEIPT & KOT PRINT ENGINE (Peri Peri 802)
+  // 80mm THERMAL RECEIPT & KOT PRINT ENGINE (Peri Peri 802)
   // ==========================================================
   const handlePrintReceiptDirect = async (orderObj: any, isKot = false) => {
     if (!orderObj || !orderObj.items || orderObj.items.length === 0) return;
@@ -696,20 +661,8 @@ export default function BbCafeDesktopPos() {
         <head>
           <title>${isKot ? 'KOT' : 'Receipt'} #${orderObj.billNumber || '5001'}</title>
           <style>
-            @page {
-              size: 80mm auto;
-              margin: 0mm;
-            }
-            body {
-              font-family: 'Courier New', Courier, monospace;
-              font-size: 13px;
-              line-height: 1.2;
-              width: 72mm;
-              margin: 0 auto;
-              padding: 4px;
-              color: #000;
-              background: #fff;
-            }
+            @page { size: 80mm auto; margin: 0mm; }
+            body { font-family: 'Courier New', Courier, monospace; font-size: 13px; line-height: 1.2; width: 72mm; margin: 0 auto; padding: 4px; color: #000; background: #fff; }
             .center { text-align: center; }
             .bold { font-weight: bold; }
             .flex { display: flex; justify-content: space-between; }
@@ -731,7 +684,7 @@ export default function BbCafeDesktopPos() {
             ${orderObj.items.map((i: any) => `
               <div class="item-row">
                 <span class="bold">[ ] ${i.name}</span> — <span class="bold">Qty: ${i.quantity}</span>
-                ${i.note ? `<div class="note">Note: ${i.note}</div>` : ''}
+                ${i.note ? `<div class="note">${i.note}</div>` : ''}
               </div>
             `).join('')}
             <div class="line"></div>
@@ -759,7 +712,7 @@ export default function BbCafeDesktopPos() {
             ${orderObj.items.map((i: any) => `
               <div class="item-row">
                 <div class="bold">${i.name}</div>
-                ${i.note ? `<div class="note">Note: ${i.note}</div>` : ''}
+                ${i.note ? `<div class="note">${i.note}</div>` : ''}
                 <div class="flex" style="font-size: 12px; padding-left: 5px;">
                   <span>${i.quantity} x ₹${i.price}</span>
                   <span class="bold">₹${i.price * i.quantity}</span>
@@ -771,7 +724,7 @@ export default function BbCafeDesktopPos() {
             <div class="flex"><span>Subtotal:</span><span>₹${orderObj.subtotal || orderObj.total}</span></div>
             
             ${orderObj.discountAmount > 0 ? `
-              <div class="flex"><span>Discount (${orderObj.discountType === 'percentage' ? orderObj.discountValue + '%' : 'Flat'}):</span><span>-₹${orderObj.discountAmount}</span></div>
+              <div class="flex"><span>Discount:</span><span>-₹${orderObj.discountAmount}</span></div>
             ` : ''}
 
             ${orderObj.pointsRedeemed > 0 ? `
@@ -1077,7 +1030,6 @@ export default function BbCafeDesktopPos() {
                   { id: 'billing', label: 'Counter Billing', icon: ShoppingBag },
                   { id: 'tables', label: `Tables (${activeTableOrders.length})`, icon: LayoutGrid },
                   { id: 'orders', label: `Live Orders (${activeLiveOrders.length})`, icon: Clock },
-                  { id: 'variations_manager', label: 'Global Variations', icon: Sliders },
                   { id: 'inventory', label: 'Manage Menu & Stock', icon: Layers },
                   { id: 'receipts', label: 'Past Receipts', icon: Printer },
                   { id: 'settings', label: 'Settings & Printer', icon: Settings },
@@ -1295,7 +1247,7 @@ export default function BbCafeDesktopPos() {
                           <div key={idx} className="bg-neutral-50 dark:bg-neutral-800/40 border border-neutral-200 dark:border-neutral-800 p-2.5 rounded-2xl flex items-center justify-between gap-2">
                             <div className="flex-1 min-w-0">
                               <p className="font-bold text-xs truncate">{item.name}</p>
-                              {item.note && <p className="text-[10px] text-neutral-400 italic truncate">Note: {item.note}</p>}
+                              {item.note && <p className="text-[10px] text-neutral-400 italic truncate">{item.note}</p>}
                               <p className="text-[11px] font-mono text-orange-500 font-bold">₹{item.price * item.quantity}</p>
                             </div>
                             <div className="flex items-center gap-1.5 shrink-0">
@@ -1357,7 +1309,7 @@ export default function BbCafeDesktopPos() {
                       <div className="flex justify-between text-neutral-400"><span>Subtotal</span><span className="font-mono">₹{getCartSubtotal()}</span></div>
                       {getCalculatedDiscountAmount() > 0 && (
                         <div className="flex justify-between text-orange-400 font-bold">
-                          <span>Discount ({discountType === 'percentage' ? `${discountValue}%` : 'Flat'})</span>
+                          <span>Discount</span>
                           <span className="font-mono">-₹{getCalculatedDiscountAmount()}</span>
                         </div>
                       )}
@@ -1395,73 +1347,13 @@ export default function BbCafeDesktopPos() {
               </div>
             )}
 
-            {/* TAB: GLOBAL VARIATIONS MANAGER */}
-            {activeTab === 'variations_manager' && (
-              <div className="flex-1 p-6 h-full overflow-y-auto max-w-2xl mx-auto">
-                <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 p-6 rounded-3xl shadow-xl space-y-6">
-                  <h2 className="text-sm font-black uppercase text-orange-500 flex items-center gap-2">
-                    <SafeSliders size={18} /> Global Variations Management
-                  </h2>
-                  <p className="text-xs text-neutral-400">Yahan aap default variations (jaise Half, Full, Plain, Butter, Small, Medium, Large) add kar sakte hain.</p>
-
-                  <form onSubmit={handleAddNewGlobalVariation} className="space-y-4 bg-neutral-50 dark:bg-neutral-800/40 p-4 rounded-2xl border border-neutral-200 dark:border-neutral-700">
-                    <h3 className="text-xs font-black uppercase text-yellow-500">Add New Global Variation</h3>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="text-[10px] font-bold uppercase text-neutral-400 block mb-1">Variation Name:</label>
-                        <input 
-                          type="text" 
-                          placeholder="e.g. Medium, Cheese Burst" 
-                          value={newVarName}
-                          onChange={e => setNewVarName(e.target.value)}
-                          className="w-full bg-white dark:bg-neutral-900 border border-neutral-700 rounded-xl px-3 py-2 text-xs outline-none"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-[10px] font-bold uppercase text-neutral-400 block mb-1">Price Addition (₹):</label>
-                        <input 
-                          type="number" 
-                          placeholder="Price Add" 
-                          value={newVarPriceAdd}
-                          onChange={e => setNewVarPriceAdd(Number(e.target.value))}
-                          className="w-full bg-white dark:bg-neutral-900 border border-neutral-700 rounded-xl px-3 py-2 text-xs outline-none font-mono"
-                        />
-                      </div>
-                    </div>
-                    <button type="submit" className="w-full py-2.5 bg-orange-600 hover:bg-orange-500 text-white font-black text-xs uppercase rounded-xl shadow">
-                      Save Variation Option
-                    </button>
-                  </form>
-
-                  <div className="space-y-3">
-                    <h3 className="text-xs font-black uppercase text-neutral-400">Existing Global Variations</h3>
-                    <div className="space-y-2 max-h-60 overflow-y-auto">
-                      {globalVariations.length === 0 ? (
-                        <p className="text-xs text-neutral-500 text-center py-6">No global variations added yet.</p>
-                      ) : (
-                        globalVariations.map((v) => (
-                          <div key={v.id} className="flex justify-between items-center bg-neutral-50 dark:bg-neutral-800/60 p-3 rounded-2xl border border-neutral-200 dark:border-neutral-700">
-                            <div>
-                              <span className="font-bold text-xs">{v.name}</span>
-                              <span className="text-[10px] text-orange-400 font-mono block">Price Add: +₹{v.priceAdd || 0}</span>
-                            </div>
-                            <button onClick={() => handleDeleteGlobalVariation(v.id)} className="text-red-400 hover:text-red-300 p-1.5"><SafeTrash2 size={16} /></button>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
             {/* TAB: MANAGE MENU & ITEMS */}
             {activeTab === 'inventory' && (
               <div className="flex-1 p-6 h-full overflow-y-auto">
                 <div className="flex justify-between items-center mb-4">
                   <div>
                     <h2 className="text-sm font-black uppercase text-orange-500">Manage Menu Items & Stock</h2>
-                    <p className="text-xs text-neutral-400">Add new items, toggle stock, or edit individual item variations.</p>
+                    <p className="text-xs text-neutral-400">Add new items, toggle stock, or edit individual item variants.</p>
                   </div>
                   <button onClick={() => handleOpenItemEditor(null)} className="bg-orange-600 hover:bg-orange-500 text-white px-4 py-2.5 rounded-2xl text-xs font-black uppercase flex items-center gap-1.5 shadow">
                     <SafePackagePlus size={16} /> Add New Item
@@ -1479,12 +1371,12 @@ export default function BbCafeDesktopPos() {
                           </div>
                           <p className="text-xs font-mono text-orange-500 font-bold mb-1">₹{item.price}</p>
                           <p className="text-[10px] text-neutral-400">Category: {item.category || 'General'}</p>
-                          {Array.isArray(item.variations) && item.variations.length > 0 && (
-                            <p className="text-[10px] text-amber-400 mt-1">Variations: {item.variations.map((v: any) => v.name).join(', ')}</p>
+                          {item.variants && (
+                            <p className="text-[10px] text-amber-400 mt-1">Sizes: {Object.keys(item.variants).join(', ')}</p>
                           )}
                         </div>
                         <div className="flex gap-2 mt-4 pt-3 border-t border-neutral-200 dark:border-neutral-800">
-                          <button onClick={() => handleOpenItemEditor(item)} className="flex-1 bg-neutral-200 dark:bg-neutral-800 hover:bg-orange-500 hover:text-white text-neutral-300 py-1.5 rounded-xl text-[10px] font-black uppercase transition-all">Edit Item & Variations</button>
+                          <button onClick={() => handleOpenItemEditor(item)} className="flex-1 bg-neutral-200 dark:bg-neutral-800 hover:bg-orange-500 hover:text-white text-neutral-300 py-1.5 rounded-xl text-[10px] font-black uppercase transition-all">Edit Item</button>
                           <button onClick={() => handleToggleStock(item.id, isAvail)} className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase border ${isAvail ? 'text-red-400 border-red-500/30' : 'text-green-400 border-green-500/30'}`}>{isAvail ? 'Disable' : 'Enable'}</button>
                           <button onClick={() => handleDeleteProductFromMenu(item.id)} className="p-1.5 text-red-400 hover:text-red-300"><SafeTrash2 size={16} /></button>
                         </div>
@@ -1500,7 +1392,7 @@ export default function BbCafeDesktopPos() {
               <div className="flex-1 p-6 h-full overflow-y-auto max-w-2xl mx-auto">
                 <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 p-6 rounded-3xl shadow-xl space-y-6">
                   <div className="flex justify-between items-center border-b pb-3">
-                    <h2 className="text-sm font-black uppercase text-orange-500">{editingItemObj ? 'Edit Menu Item & Variations' : 'Add New Menu Item'}</h2>
+                    <h2 className="text-sm font-black uppercase text-orange-500">{editingItemObj ? 'Edit Menu Item' : 'Add New Menu Item'}</h2>
                     <button onClick={() => setActiveTab('inventory')} className="text-xs text-neutral-400 underline">Back to Inventory</button>
                   </div>
 
@@ -1510,7 +1402,7 @@ export default function BbCafeDesktopPos() {
                       <input 
                         type="text" 
                         required
-                        placeholder="e.g. Veg Burger, Cold Coffee" 
+                        placeholder="e.g. Veg Pizza, Cold Coffee" 
                         value={itemNameInput}
                         onChange={e => setItemNameInput(e.target.value)}
                         className="w-full bg-neutral-100 dark:bg-neutral-800 border border-neutral-700 rounded-xl px-3 py-2 text-xs outline-none"
@@ -1533,7 +1425,7 @@ export default function BbCafeDesktopPos() {
                         <label className="text-xs font-bold uppercase text-neutral-400 block mb-1">Category</label>
                         <input 
                           type="text" 
-                          placeholder="e.g. Fast Food, Beverages" 
+                          placeholder="e.g. Special Pizza, Fast Food" 
                           value={itemCatInput}
                           onChange={e => setItemCatInput(e.target.value)}
                           className="w-full bg-neutral-100 dark:bg-neutral-800 border border-neutral-700 rounded-xl px-3 py-2 text-xs outline-none"
@@ -1550,53 +1442,6 @@ export default function BbCafeDesktopPos() {
                         onChange={e => setItemImageInput(e.target.value)}
                         className="w-full bg-neutral-100 dark:bg-neutral-800 border border-neutral-700 rounded-xl px-3 py-2 text-xs outline-none"
                       />
-                    </div>
-
-                    <div className="space-y-3 pt-3 border-t border-neutral-200 dark:border-neutral-800">
-                      <div className="flex justify-between items-center">
-                        <label className="text-xs font-bold uppercase text-amber-400">Specific Variations for this Item (Half, Full, Plain, Butter, etc.)</label>
-                        <button 
-                          type="button"
-                          onClick={() => setItemVariationsList(prev => [...prev, { name: '', price: 0 }])}
-                          className="bg-neutral-200 dark:bg-neutral-800 text-xs px-3 py-1.5 rounded-xl font-bold hover:bg-orange-500 hover:text-white"
-                        >
-                          + Add Variation Row
-                        </button>
-                      </div>
-
-                      <div className="space-y-2">
-                        {itemVariationsList.map((v, idx) => (
-                          <div key={idx} className="flex gap-2 items-center">
-                            <input 
-                              type="text"
-                              placeholder="Variation Name (e.g. Half / Large)"
-                              value={v.name}
-                              onChange={e => {
-                                const val = e.target.value;
-                                setItemVariationsList(prev => prev.map((item, i) => i === idx ? { ...item, name: val } : item));
-                              }}
-                              className="flex-1 bg-neutral-100 dark:bg-neutral-800 border border-neutral-700 rounded-xl px-3 py-1.5 text-xs outline-none"
-                            />
-                            <input 
-                              type="number"
-                              placeholder="Exact Price (₹)"
-                              value={v.price || ''}
-                              onChange={e => {
-                                const val = Number(e.target.value);
-                                setItemVariationsList(prev => prev.map((item, i) => i === idx ? { ...item, price: val } : item));
-                              }}
-                              className="w-28 bg-neutral-100 dark:bg-neutral-800 border border-neutral-700 rounded-xl px-3 py-1.5 text-xs outline-none font-mono"
-                            />
-                            <button 
-                              type="button"
-                              onClick={() => setItemVariationsList(prev => prev.filter((_, i) => i !== idx))}
-                              className="text-red-400 hover:text-red-300 p-2"
-                            >
-                              <SafeTrash2 size={16} />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
                     </div>
 
                     <button type="submit" className="w-full py-3.5 bg-green-600 hover:bg-green-500 text-white font-black text-xs uppercase rounded-2xl shadow-xl mt-4">
@@ -1772,10 +1617,10 @@ export default function BbCafeDesktopPos() {
         </>
       )}
 
-      {/* --- ITEM VARIATION MODAL POPUP --- */}
+      {/* --- CUSTOMER APP STYLE ITEM VARIATION & SIZE MODAL --- */}
       <AnimatePresence>
         {isVariationModalOpen && selectedProductForVariation && (
-          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 max-w-sm w-full rounded-3xl p-6 shadow-2xl space-y-4 font-sans">
               <div className="flex justify-between items-center border-b pb-3">
                 <h3 className="font-black text-sm uppercase text-orange-500">{selectedProductForVariation.name}</h3>
@@ -1783,41 +1628,49 @@ export default function BbCafeDesktopPos() {
               </div>
 
               <div className="space-y-3">
-                <div>
-                  <label className="text-xs font-bold uppercase text-neutral-400 block mb-1.5">Select Variation:</label>
-                  <div className="grid grid-cols-2 gap-2">
-                    {availableVariations.map((v: any, idx: number) => {
-                      const vName = v.name || 'Option';
-                      const basePrice = Number(selectedProductForVariation.price) || 0;
-                      const specificPrice = Number(v.price) || 0;
-                      const finalVarPrice = specificPrice > 0 ? specificPrice : basePrice + (Number(v.priceAdd) || 0);
-
-                      return (
+                {/* 1. Size Variants Selection */}
+                {selectedProductForVariation.variants && Object.keys(selectedProductForVariation.variants).length > 0 && (
+                  <div>
+                    <label className="text-xs font-bold uppercase text-neutral-400 block mb-1.5">Select Size / Portion:</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {Object.entries(selectedProductForVariation.variants).map(([size, price]: any) => (
                         <button 
-                          key={idx}
+                          key={size}
                           onClick={() => {
-                            triggerBeep('tap');
-                            setSelectedVariationType(vName);
-                            setCustomVariationPrice(finalVarPrice);
+                            triggerHaptic('tap');
+                            setSelectedSize(size);
+                            setSelectedSizePrice(Number(price) || 100);
                           }}
-                          className={`py-2.5 rounded-xl text-xs font-black uppercase border transition-all ${selectedVariationType === vName ? 'bg-orange-600 text-white border-orange-600' : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-400 border-neutral-700'}`}
+                          className={`py-2.5 rounded-xl text-xs font-black uppercase border transition-all ${selectedSize.toLowerCase() === size.toLowerCase() ? 'bg-orange-600 text-white border-orange-600' : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-400 border-neutral-700'}`}
                         >
-                          {vName} (₹{finalVarPrice})
+                          {size} (₹{price})
                         </button>
-                      );
-                    })}
+                      ))}
+                    </div>
                   </div>
-                </div>
+                )}
 
-                <div>
-                  <label className="text-xs font-bold uppercase text-neutral-400 block mb-1">Price (₹):</label>
-                  <input 
-                    type="number" 
-                    value={customVariationPrice}
-                    onChange={e => setCustomVariationPrice(Number(e.target.value))}
-                    className="w-full bg-neutral-100 dark:bg-neutral-800 border border-neutral-700 rounded-xl px-3 py-2 text-sm font-mono font-bold outline-none text-orange-400"
-                  />
-                </div>
+                {/* 2. Pizza Add-ons Selection */}
+                {selectedSize && (selectedProductForVariation.category === "Special Pizza" || selectedProductForVariation.name?.toLowerCase().includes("pizza")) && (
+                  <div>
+                    <label className="text-xs font-bold uppercase text-neutral-400 block mb-1.5">Select Add-ons:</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {Object.entries(PIZZA_ADDONS[selectedSize.toLowerCase()] || {}).map(([addon, cost]: any) => {
+                        const isSelected = !!selectedAddons[addon];
+                        return (
+                          <button
+                            key={addon}
+                            onClick={() => setSelectedAddons(prev => ({ ...prev, [addon]: !prev[addon] }))}
+                            className={`p-2 rounded-xl border flex justify-between items-center text-[10px] font-bold ${isSelected ? 'border-orange-500 bg-orange-500/10 text-orange-500' : 'border-neutral-700 bg-neutral-800 text-neutral-400'}`}
+                          >
+                            <span>{addon}</span>
+                            <span className="font-mono font-bold">+₹{cost}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
 
                 <div>
                   <label className="text-xs font-bold uppercase text-neutral-400 block mb-1">Special Note / Customization:</label>
@@ -1832,7 +1685,7 @@ export default function BbCafeDesktopPos() {
               </div>
 
               <div className="flex gap-2 pt-2">
-                <button onClick={handleAddVariationItemToCart} className="w-full bg-green-600 hover:bg-green-500 text-white font-black py-3 rounded-xl text-xs uppercase shadow">
+                <button onClick={handleAddCustomizedItemToCart} className="w-full bg-green-600 hover:bg-green-500 text-white font-black py-3 rounded-xl text-xs uppercase shadow">
                   Add to Cart
                 </button>
               </div>
@@ -1843,7 +1696,7 @@ export default function BbCafeDesktopPos() {
 
       <AnimatePresence>
         {isReceiptModalOpen && selectedReceipt && (
-          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 max-w-md w-full rounded-3xl p-6 shadow-2xl space-y-4">
               <div className="flex justify-between items-center border-b pb-3">
                 <h3 className="font-black text-sm">Bill Details (# {selectedReceipt.billNumber})</h3>
