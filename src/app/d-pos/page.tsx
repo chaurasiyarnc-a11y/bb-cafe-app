@@ -9,7 +9,7 @@ import {
 import { 
   ShoppingBag, Search, X, Loader2, Clock, Printer, Check, Settings, 
   Database, RefreshCw, Layers, Menu, LogOut, Lock, ToggleLeft, ToggleRight, 
-  Sun, Moon, Tag, Trash2, ArrowRight, CheckCircle2, UserPlus, Download, PlusCircle, Edit3
+  Sun, Moon, Tag, Trash2, ArrowRight, CheckCircle2, UserPlus, Download, PlusCircle, Edit3, FileText
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
@@ -34,6 +34,7 @@ const SafeUserPlus = UserPlus as any;
 const SafeDownload = Download as any;
 const SafePlusCircle = PlusCircle as any;
 const SafeEdit3 = Edit3 as any;
+const SafeFileText = FileText as any;
 
 interface PosCartItem {
   id: string;
@@ -100,7 +101,7 @@ export default function BbCafeDesktopPos() {
 
   const [isSyncing, setIsSyncing] = useState(false);
 
-  // Cart & Table Editing States
+  // Cart & Table Management States
   const [cart, setCart] = useState<PosCartItem[]>([]);
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerName, setCustomerName] = useState('');
@@ -414,7 +415,7 @@ export default function BbCafeDesktopPos() {
   const getGstAmountCalculated = () => gstEnabled ? Number(((getCartSubtotal() * gstRate) / 100).toFixed(2)) : 0;
   const getTotalBillPrice = () => Math.max(0, getCartSubtotal() + getGstAmountCalculated() - customDiscount) + getDeliveryCharge();
 
-  // --- TABLE RUNNING ORDER / RE-EDIT LOAD LOGIC ---
+  // --- LOAD TABLE ORDER FOR RE-EDITING ---
   const handleLoadTableOrderForEditing = (order: any) => {
     triggerBeep('tap');
     setActiveEditingOrderId(order.id);
@@ -425,7 +426,7 @@ export default function BbCafeDesktopPos() {
     setCustomerPhone(order.customerPhone ? order.customerPhone.replace('+91', '') : '');
     setCart(order.items || []);
     setCustomDiscount(order.discount || 0);
-    toast.success(`Loaded Bill #${order.billNumber} for Table: ${order.tableNumber}. You can now modify items!`);
+    toast.success(`Loaded Bill #${order.billNumber} for ${order.tableNumber}. You can add more items & print KOT!`);
     setActiveTab('billing');
   };
 
@@ -436,7 +437,7 @@ export default function BbCafeDesktopPos() {
     setCart([]);
     setCustomerName('');
     setCustomerPhone('');
-    toast("Table editing mode closed. Started fresh bill.", { icon: 'ℹ️' });
+    toast("Table editing mode closed.", { icon: 'ℹ️' });
   };
 
   const handleConnectPrinter = async () => {
@@ -483,7 +484,7 @@ export default function BbCafeDesktopPos() {
 
         if (isKot) {
           commands.push(0x1D, 0x21, 0x11); 
-          addText("*** KITCHEN KOT (UPDATE) ***\n");
+          addText("*** KITCHEN KOT ***\n");
           commands.push(0x1D, 0x21, 0x00);
           addText(`Token: #${orderObj.tokenNumber} | Type: ${orderObj.fulfillmentType.toUpperCase()}\n`);
           if (orderObj.tableNumber) addText(`Table: ${orderObj.tableNumber}\n`);
@@ -546,7 +547,7 @@ export default function BbCafeDesktopPos() {
         return;
       }
     } catch (e) {
-      console.error("USB Print Error, using browser print fallback", e);
+      console.error("USB Print Error, using browser fallback", e);
     }
 
     const printWindow = window.open('', '_blank', 'width=400,height=600');
@@ -567,7 +568,7 @@ export default function BbCafeDesktopPos() {
           </head>
           <body onload="window.print(); window.close();">
             ${isKot ? `
-              <div class="center bold" style="font-size: 15px;">*** KITCHEN KOT (UPDATE) ***</div>
+              <div class="center bold" style="font-size: 15px;">*** KITCHEN KOT ***</div>
               <div class="center">Token: #${orderObj.tokenNumber} | Type: ${orderObj.fulfillmentType.toUpperCase()}</div>
               ${orderObj.tableNumber ? `<div class="center bold">Table: ${orderObj.tableNumber}</div>` : ''}
               <div class="line"></div>
@@ -603,11 +604,95 @@ export default function BbCafeDesktopPos() {
     }
   };
 
-  const handlePlaceOrder = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // --- ACTION 1: SAVE TABLE ORDER & PRINT KOT ONLY (Bar bar add kar sakne ke liye) ---
+  const handleSaveTableOrderKotOnly = async () => {
     if (cart.length === 0 || isSubmittingOrder) return;
     setIsSubmittingOrder(true);
-    
+
+    const subtotal = getCartSubtotal();
+    const finalTotal = getTotalBillPrice();
+    const token = Math.floor(1000 + Math.random() * 9000);
+
+    try {
+      let billNumber: number;
+
+      if (activeEditingOrderId) {
+        // Update existing running table order
+        billNumber = activeEditingBillNumber || 5001;
+        const orderRef = doc(db, "orders", activeEditingOrderId);
+        const updatedOrderObj = { 
+          items: cart, 
+          subtotal, 
+          discount: customDiscount, 
+          gstRate: gstEnabled ? gstRate : 0, 
+          gstAmount: getGstAmountCalculated(), 
+          total: finalTotal, 
+          tableNumber: tableNumber,
+          customerName: customerName || "Walk-in Guest",
+          customerPhone: customerPhone ? `+91${customerPhone}` : "",
+          lastUpdated: new Date()
+        };
+
+        await updateDoc(orderRef, updatedOrderObj);
+        triggerBeep('success');
+        toast.success(`Table ${tableNumber} updated! KOT printed.`);
+
+        // Print KOT only for kitchen
+        await handlePrintReceiptDirect({ ...updatedOrderObj, billNumber, tokenNumber: token, fulfillmentType: 'table' }, true);
+
+        setActiveEditingOrderId(null);
+        setActiveEditingBillNumber(null);
+      } else {
+        // Create new running table order
+        if (navigator.onLine) {
+          try {
+            billNumber = await runTransaction(db, async (txn) => {
+              const snap = await txn.get(doc(db, "settings", "store_bill_counter"));
+              const next = snap.exists() ? (snap.data().nextBillNumber || 1) : 1;
+              txn.set(doc(db, "settings", "store_bill_counter"), { nextBillNumber: next + 1 });
+              return next;
+            });
+          } catch {
+            billNumber = Number(localStorage.getItem("bb_pos_local_bill_counter_pc") || 5000) + 1;
+            localStorage.setItem("bb_pos_local_bill_counter_pc", String(billNumber));
+          }
+        } else {
+          billNumber = Number(localStorage.getItem("bb_pos_local_bill_counter_pc") || 5000) + 1;
+          localStorage.setItem("bb_pos_local_bill_counter_pc", String(billNumber));
+        }
+
+        const orderObj = { 
+          billNumber, tokenNumber: token, customerName: customerName || "Walk-in Guest", 
+          customerPhone: customerPhone ? `+91${customerPhone}` : "", items: cart, 
+          subtotal, discount: customDiscount, gstRate: gstEnabled ? gstRate : 0, 
+          gstAmount: getGstAmountCalculated(), deliveryFee: 0, total: finalTotal, timestamp: new Date(), 
+          status: 'pending', fulfillmentType: 'table', deliveryArea: "", 
+          tableNumber: tableNumber, paymentMethod, chefInstructions, source: 'PC_POS', address: '' 
+        };
+
+        await addDoc(collection(db, "orders"), orderObj);
+        triggerBeep('success');
+        toast.success(`Table ${tableNumber} saved! KOT sent to kitchen.`);
+
+        // Print KOT only
+        await handlePrintReceiptDirect(orderObj, true);
+      }
+
+      setCart([]); setCustomerPhone(''); setCustomerName(''); setCustomDiscount(0);
+      localStorage.removeItem("bb_pos_saved_cart_pc");
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to save table order");
+    } finally {
+      setIsSubmittingOrder(false);
+    }
+  };
+
+  // --- ACTION 2: FINAL BILL PRINT & SETTLE (Sab ho jane ke baad bill print) ---
+  const handleFinalCheckoutAndPrintBill = async () => {
+    if (cart.length === 0 || isSubmittingOrder) return;
+    setIsSubmittingOrder(true);
+
     const subtotal = getCartSubtotal();
     const finalTotal = getTotalBillPrice();
     const token = Math.floor(1000 + Math.random() * 9000);
@@ -617,42 +702,33 @@ export default function BbCafeDesktopPos() {
       let billNumber: number;
 
       if (activeEditingOrderId) {
-        // --- UPDATE EXISTING RUNNING TABLE ORDER ---
         billNumber = activeEditingBillNumber || 5001;
         const orderRef = doc(db, "orders", activeEditingOrderId);
-        
-        const updatedOrderObj = { 
+        const finalOrderObj = { 
           items: cart, 
           subtotal, 
           discount: customDiscount, 
           gstRate: gstEnabled ? gstRate : 0, 
           gstAmount: getGstAmountCalculated(), 
-          deliveryFee: getDeliveryCharge(), 
           total: finalTotal, 
-          tableNumber: fulfillmentType === 'table' ? tableNumber : '',
+          status: 'completed', // Settled
+          tableNumber: tableNumber,
           customerName: customerName || "Walk-in Guest",
           customerPhone: customerPhone ? `+91${customerPhone}` : "",
-          lastUpdated: new Date()
+          settledAt: new Date()
         };
 
-        await updateDoc(orderRef, updatedOrderObj);
-
+        await updateDoc(orderRef, finalOrderObj);
         triggerBeep('success');
-        toast.success(`Bill #${billNumber} (Table: ${tableNumber}) updated successfully!`);
+        toast.success(`Final Bill #${billNumber} settled and printed!`);
 
-        // Print KOT / Receipt for modified items
-        if (kotEnabled) {
-          await handlePrintReceiptDirect({ ...updatedOrderObj, billNumber, tokenNumber: token, fulfillmentType }, true);
-          await new Promise((r) => setTimeout(r, 600));
-        }
-        await handlePrintReceiptDirect({ ...updatedOrderObj, billNumber, tokenNumber: token, fulfillmentType }, false);
+        // Print Final Customer Bill
+        await handlePrintReceiptDirect({ ...finalOrderObj, billNumber, tokenNumber: token, fulfillmentType: 'table' }, false);
 
-        // Reset editing mode
         setActiveEditingOrderId(null);
         setActiveEditingBillNumber(null);
-
       } else {
-        // --- CREATE NEW ORDER ---
+        // Direct Checkout for Table / Pickup / Delivery
         if (navigator.onLine) {
           try {
             billNumber = await runTransaction(db, async (txn) => {
@@ -695,20 +771,20 @@ export default function BbCafeDesktopPos() {
         }
 
         triggerBeep('success'); 
-        toast.success(`Bill #${billNumber} saved & printed successfully!`);
+        toast.success(`Final Bill #${billNumber} printed successfully!`);
         
-        if (kotEnabled) {
+        if (kotEnabled && fulfillmentType === 'table') {
           await handlePrintReceiptDirect(orderObj, true);
-          await new Promise((r) => setTimeout(r, 800));
+          await new Promise((r) => setTimeout(r, 600));
         }
         await handlePrintReceiptDirect(orderObj, false);
       }
 
-      setCart([]); setCustomerPhone(''); setCustomerName(''); setCustomerPoints(0); setCustomDiscount(0); setChefInstructions(''); setShowNewCustForm(false);
+      setCart([]); setCustomerPhone(''); setCustomerName(''); setCustomerPoints(0); setCustomDiscount(0); setShowNewCustForm(false);
       localStorage.removeItem("bb_pos_saved_cart_pc");
     } catch (err) {
       console.error(err);
-      toast.error("Failed to process order");
+      toast.error("Failed to complete checkout");
     } finally {
       setIsSubmittingOrder(false);
     }
@@ -822,12 +898,11 @@ export default function BbCafeDesktopPos() {
               <div className="flex-1 flex h-full overflow-hidden">
                 <div className="flex-1 flex flex-col p-5 h-full overflow-hidden">
                   
-                  {/* Table Editing Mode Alert Banner */}
                   {activeEditingOrderId && (
                     <div className="mb-3 bg-amber-500/15 border border-amber-500/40 p-3 rounded-2xl flex items-center justify-between shrink-0">
                       <div className="flex items-center gap-2 text-amber-400 text-xs font-black uppercase">
                         <SafeEdit3 size={16} />
-                        <span>Re-editing Bill #{activeEditingBillNumber} (Table: {tableNumber}) - Add items & update</span>
+                        <span>Active Table: {tableNumber} (Bill #{activeEditingBillNumber}) - Add more items & Print KOT</span>
                       </div>
                       <button onClick={handleCancelTableEditing} className="text-neutral-400 hover:text-white text-xs underline">Cancel</button>
                     </div>
@@ -993,15 +1068,29 @@ export default function BbCafeDesktopPos() {
                       </div>
                     </div>
 
-                    <div className="flex gap-2 my-3 shrink-0">
-                      <button onClick={() => setPaymentMethod('cash')} className={`flex-1 py-2.5 rounded-xl text-xs font-black uppercase border ${paymentMethod === 'cash' ? 'bg-green-600 text-white border-green-600' : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-400 border-neutral-700'}`}>Cash</button>
-                      <button onClick={() => setPaymentMethod('upi')} className={`flex-1 py-2.5 rounded-xl text-xs font-black uppercase border ${paymentMethod === 'upi' ? 'bg-blue-600 text-white border-blue-600' : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-400 border-neutral-700'}`}>UPI</button>
+                    <div className="flex gap-2 my-2 shrink-0">
+                      <button onClick={() => setPaymentMethod('cash')} className={`flex-1 py-2 rounded-xl text-xs font-black uppercase border ${paymentMethod === 'cash' ? 'bg-green-600 text-white border-green-600' : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-400 border-neutral-700'}`}>Cash</button>
+                      <button onClick={() => setPaymentMethod('upi')} className={`flex-1 py-2 rounded-xl text-xs font-black uppercase border ${paymentMethod === 'upi' ? 'bg-blue-600 text-white border-blue-600' : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-400 border-neutral-700'}`}>UPI</button>
                     </div>
 
-                    <button onClick={handlePlaceOrder} disabled={cart.length === 0 || isSubmittingOrder} className="w-full bg-green-600 hover:bg-green-500 text-white font-black py-4 rounded-2xl uppercase tracking-wider text-xs flex items-center justify-center gap-2 shadow-xl disabled:opacity-50 shrink-0">
-                      {isSubmittingOrder ? <Loader2 className="animate-spin" size={16} /> : <CheckCircle2 size={16} />}
-                      <span>{activeEditingOrderId ? `Update & Re-Print Bill (₹${getTotalBillPrice()})` : `One-Click Print & Pay (₹${getTotalBillPrice()})`}</span>
-                    </button>
+                    {/* DUAL CHECKOUT BUTTONS: Save Table & Print KOT vs Final Bill Print */}
+                    {fulfillmentType === 'table' ? (
+                      <div className="space-y-2 shrink-0">
+                        <button onClick={handleSaveTableOrderKotOnly} disabled={cart.length === 0 || isSubmittingOrder} className="w-full bg-amber-500 hover:bg-amber-400 text-black font-black py-3 rounded-2xl uppercase tracking-wider text-xs flex items-center justify-center gap-2 shadow-md disabled:opacity-50">
+                          {isSubmittingOrder ? <Loader2 className="animate-spin" size={16} /> : <SafePrinter size={16} />}
+                          <span>Save Table & Print KOT Only</span>
+                        </button>
+                        <button onClick={handleFinalCheckoutAndPrintBill} disabled={cart.length === 0 || isSubmittingOrder} className="w-full bg-green-600 hover:bg-green-500 text-white font-black py-3 rounded-2xl uppercase tracking-wider text-xs flex items-center justify-center gap-2 shadow-lg disabled:opacity-50">
+                          {isSubmittingOrder ? <Loader2 className="animate-spin" size={16} /> : <SafeFileText size={16} />}
+                          <span>Final Bill Print & Settled (₹{getTotalBillPrice()})</span>
+                        </button>
+                      </div>
+                    ) : (
+                      <button onClick={handleFinalCheckoutAndPrintBill} disabled={cart.length === 0 || isSubmittingOrder} className="w-full bg-green-600 hover:bg-green-500 text-white font-black py-4 rounded-2xl uppercase tracking-wider text-xs flex items-center justify-center gap-2 shadow-xl disabled:opacity-50 shrink-0">
+                        {isSubmittingOrder ? <Loader2 className="animate-spin" size={16} /> : <CheckCircle2 size={16} />}
+                        <span>One-Click Print & Pay (₹{getTotalBillPrice()})</span>
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1010,15 +1099,15 @@ export default function BbCafeDesktopPos() {
             {activeTab === 'orders' && (
               <div className="flex-1 p-6 h-full overflow-y-auto">
                 <div className="flex justify-between items-center mb-4">
-                  <h2 className="text-sm font-black uppercase text-orange-500">Live Active Orders & Tables ({activeLiveOrders.length})</h2>
-                  <span className="text-[11px] text-neutral-400">Click "Re-edit / Add Items" to modify running table orders</span>
+                  <h2 className="text-sm font-black uppercase text-orange-500">Live Running Tables & Orders ({activeLiveOrders.length})</h2>
+                  <span className="text-[11px] text-neutral-400">Click table to add more items & print KOT</span>
                 </div>
                 <div className="grid grid-cols-3 gap-4">
                   {activeLiveOrders.length === 0 ? (
-                    <div className="col-span-3 text-center py-24 text-neutral-500 font-bold">No active orders right now.</div>
+                    <div className="col-span-3 text-center py-24 text-neutral-500 font-bold">No active table orders right now.</div>
                   ) : (
                     activeLiveOrders.map((order) => (
-                      <div key={order.id} className={`bg-white dark:bg-neutral-900 border rounded-2xl p-4 flex flex-col justify-between shadow-lg ${order.status === 'pending' ? 'border-red-500 animate-pulse' : 'border-neutral-200 dark:border-neutral-800'}`}>
+                      <div key={order.id} className={`bg-white dark:bg-neutral-900 border rounded-2xl p-4 flex flex-col justify-between shadow-lg ${order.status === 'pending' ? 'border-amber-500' : 'border-neutral-200 dark:border-neutral-800'}`}>
                         <div>
                           <div className="flex justify-between items-center border-b border-neutral-200 dark:border-neutral-800 pb-2 mb-3">
                             <span className="font-mono font-black text-yellow-500">Bill #{order.billNumber} {order.tableNumber ? `(${order.tableNumber})` : ''}</span>
@@ -1038,25 +1127,20 @@ export default function BbCafeDesktopPos() {
                             <span>Total: ₹{order.total}</span>
                           </div>
                           
-                          {/* Re-edit Table Order Button */}
                           {order.fulfillmentType === 'table' && (
                             <button 
                               onClick={() => handleLoadTableOrderForEditing(order)} 
                               className="w-full bg-amber-500 hover:bg-amber-400 text-black font-black py-2 rounded-xl text-xs uppercase flex items-center justify-center gap-1 shadow"
                             >
-                              <SafeEdit3 size={14} /> Re-edit / Add Items to Table
+                              <SafeEdit3 size={14} /> Add Items & Print KOT
                             </button>
                           )}
 
                           <div className="flex gap-2">
                             {order.status === 'pending' && (
-                              <>
-                                <button onClick={() => handleUpdateStatus(order.id, 'preparing')} className="flex-1 bg-green-600 text-white font-black py-2 rounded-xl text-xs uppercase">Accept</button>
-                                <button onClick={() => handleUpdateStatus(order.id, 'rejected')} className="flex-1 bg-red-600 text-white font-black py-2 rounded-xl text-xs uppercase">Reject</button>
-                              </>
+                              <button onClick={() => handleUpdateStatus(order.id, 'preparing')} className="flex-1 bg-green-600 text-white font-black py-2 rounded-xl text-xs uppercase">Kitchen Preparing</button>
                             )}
-                            {order.status === 'preparing' && <button onClick={() => handleUpdateStatus(order.id, 'completed')} className="w-full bg-blue-600 text-white font-black py-2 rounded-xl text-xs uppercase">Mark Settled / Ready</button>}
-                            <button onClick={() => handlePrintReceiptDirect(order, false)} className="p-2 bg-neutral-200 dark:bg-neutral-800 text-neutral-400 hover:text-orange-500 rounded-xl" title="Print Bill"><SafePrinter size={16} /></button>
+                            <button onClick={() => handlePrintReceiptDirect(order, false)} className="p-2 bg-neutral-200 dark:bg-neutral-800 text-neutral-400 hover:text-orange-500 rounded-xl" title="Print Final Bill"><SafePrinter size={16} /></button>
                           </div>
                         </div>
                       </div>
