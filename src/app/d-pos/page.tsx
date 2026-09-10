@@ -119,7 +119,7 @@ export default function BbCafeDesktopPos() {
   const [isAppInstalled, setIsAppInstalled] = useState(false);
   const [printerConnected, setPrinterConnected] = useState(false);
   const [kotEnabled, setKotEnabled] = useState<boolean>(true); 
-  const [upiIdConfig, setUpiIdConfig] = useState<string>('Q231190930@ybl');
+  const [upiIdConfig, setUpiIdConfig] = useState<string>('Q991347275@ybl');
   const [ownerPhoneConfig, setOwnerPhoneConfig] = useState<string>('919714293759');
 
   // Customer Directory States
@@ -301,7 +301,7 @@ export default function BbCafeDesktopPos() {
       setSplitCashAmount(half);
       setSplitUpiAmount(total - half);
     }
-  }, [cart, discountValue, discountType, isRedeemingPoints, pointsToRedeem, paymentMethod]);
+  }, [cart, discountValue, discountType, isRedeemingPoints, pointsToRedeem, paymentMethod, fulfillmentType, selectedArea]);
 
   // Load Saved Settings
   useEffect(() => {
@@ -310,7 +310,11 @@ export default function BbCafeDesktopPos() {
       try { setHeldCarts(JSON.parse(savedHeld)); } catch (e) {}
     }
     const savedUpi = localStorage.getItem("bb_pos_upi_id");
-    if (savedUpi) setUpiIdConfig(savedUpi);
+    if (savedUpi) {
+      setUpiIdConfig(savedUpi);
+    } else {
+      setUpiIdConfig('Q991347275@ybl');
+    }
 
     const savedOwnerPhone = localStorage.getItem("bb_pos_owner_phone");
     if (savedOwnerPhone) setOwnerPhoneConfig(savedOwnerPhone);
@@ -811,17 +815,6 @@ export default function BbCafeDesktopPos() {
     };
   }, []);
 
-  const handleInstallClick = async () => {
-    if (!deferredPrompt) return toast("App already installed or browser unsupported.", { icon: 'ℹ️' });
-    deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    if (outcome === 'accepted') {
-      setIsAppInstalled(true);
-      toast.success("Desktop POS Installed Successfully! 🎉");
-    }
-    setDeferredPrompt(null);
-  };
-
   useEffect(() => {
     localStorage.setItem("bb_pos_saved_cart_pc", JSON.stringify(cart));
   }, [cart]);
@@ -1223,6 +1216,7 @@ export default function BbCafeDesktopPos() {
           tableNumber: tableNumber,
           customerName: customerName || "Walk-in Guest",
           customerPhone: customerPhone ? `+91${getSanitizedPhone(customerPhone)}` : "",
+          upiId: upiIdConfig,
           lastUpdated: new Date()
         };
 
@@ -1245,7 +1239,8 @@ export default function BbCafeDesktopPos() {
           gstRate: gstEnabled ? gstRate : 0, gstAmount: getGstAmountCalculated(), 
           deliveryFee: 0, total: finalTotal, timestamp: new Date(), 
           status: 'pending', fulfillmentType: 'table', deliveryArea: "", 
-          tableNumber: tableNumber, paymentMethod, source: 'PC_POS', address: '' 
+          tableNumber: tableNumber, paymentMethod, source: 'PC_POS', address: '',
+          upiId: upiIdConfig
         };
 
         await addDoc(collection(db, "orders"), orderObj);
@@ -1319,6 +1314,7 @@ export default function BbCafeDesktopPos() {
           pointsEarned: earned,
           pointsRedeemed: redeemed,
           remainingPoints: remainingPts,
+          upiId: upiIdConfig,
           settledAt: new Date()
         };
 
@@ -1348,7 +1344,8 @@ export default function BbCafeDesktopPos() {
           source: 'PC_POS', address,
           pointsEarned: earned,
           pointsRedeemed: redeemed, 
-          remainingPoints: remainingPts 
+          remainingPoints: remainingPts,
+          upiId: upiIdConfig
         };
 
         await addDoc(collection(db, "orders"), orderObj);
@@ -1398,8 +1395,8 @@ export default function BbCafeDesktopPos() {
 
   const dynamicUpiUrl = useMemo(() => {
     const total = getTotalBillPrice();
-    return `upi://pay?pa=${upiIdConfig}&pn=Bum%20Bum%20Cafe&am=${total}&cu=INR`;
-  }, [upiIdConfig, cart, discountValue, isRedeemingPoints]);
+    return `upi://pay?pa=${encodeURIComponent(upiIdConfig.trim())}&pn=Bum%20Bum%20Cafe&am=${total}&cu=INR`;
+  }, [upiIdConfig, cart, discountValue, discountType, isRedeemingPoints, pointsToRedeem, fulfillmentType, selectedArea, gstEnabled, gstRate]);
 
   return (
     <div className={mainClass}>
@@ -1639,7 +1636,7 @@ export default function BbCafeDesktopPos() {
                         </div>
                       )}
 
-                      {/* ⭐ LOYALTY POINTS REDEEM BOX ⭐ */}
+                      {/* LOYALTY POINTS REDEEM BOX */}
                       {customerName && customerPoints > 0 && !showNewCustForm && (
                         <div className="pt-2 border-t border-neutral-200 dark:border-neutral-700 flex items-center justify-between text-xs">
                           <div className="flex items-center gap-1 text-amber-400 font-bold">
@@ -2217,7 +2214,7 @@ export default function BbCafeDesktopPos() {
                         type="text" 
                         value={upiIdConfig} 
                         onChange={e => setUpiIdConfig(e.target.value)}
-                        placeholder="e.g. Q231190930@ybl"
+                        placeholder="e.g. Q991347275@ybl"
                         className="flex-1 bg-neutral-100 dark:bg-neutral-800 border border-neutral-700 rounded-xl px-3 py-2 text-xs font-mono outline-none" 
                       />
                       <button onClick={() => { localStorage.setItem("bb_pos_upi_id", upiIdConfig); toast.success("UPI ID Saved!"); }} className="bg-blue-600 text-white px-4 rounded-xl text-xs font-black uppercase">Save</button>
@@ -2262,11 +2259,8 @@ export default function BbCafeDesktopPos() {
         </>
       )}
 
-      {/* ======================================================== */}
-      {/*     ALL POPUP MODALS WITH CLICK-OUTSIDE & CANCEL BUTTON  */}
-      {/* ======================================================== */}
-
-      {/* MODAL 1: ADD / EDIT PRODUCT WITH DYNAMIC VARIATIONS */}
+      {/* ALL POPUP MODALS */}
+      {/* MODAL 1: ADD / EDIT PRODUCT */}
       <AnimatePresence>
         {isItemEditorModalOpen && (
           <div 
@@ -2956,175 +2950,3 @@ export default function BbCafeDesktopPos() {
     </div>
   );
 }
-
-Step 2: src/components/d-pos/PrintCustomerReceipt.tsx को चेक करें
-
-अब दूसरी फ़ाइल src/components/d-pos/PrintCustomerReceipt.tsx खोलें और पक्का करें
-कि उसमें यह कोड है (इसमें कोई भी ग़लत टेक्स्ट नहीं होना चाहिए):
-
-'use client';
-import React from 'react';
-
-interface PrintReceiptProps {
-  orderObj: any;
-  currentUser?: any;
-}
-
-export default function PrintCustomerReceipt({ orderObj, currentUser }: PrintReceiptProps) {
-  if (!orderObj) return null;
-
-  const orderDate = orderObj.timestamp?.toDate 
-    ? orderObj.timestamp.toDate() 
-    : new Date(orderObj.timestamp || Date.now());
-
-  let upiId = orderObj.upiId || 'Q231190930@ybl';
-  if (!upiId.includes('@') && upiId.includes('ybl')) {
-    upiId = upiId.replace('ybl', '@ybl');
-  }
-
-  const totalAmount = Number(orderObj.total || 0).toFixed(2);
-  const payeeName = 'Bum Bum Cafe';
-  
-  const upiString = `upi://pay?pa=${upiId}&pn=${encodeURIComponent(payeeName)}&am=${totalAmount}&cu=INR`;
-  const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(upiString)}&margin=1`;
-
-  const earnedPts = orderObj.pointsEarned ?? Math.floor((orderObj.total || 0) / 100);
-  const redeemedPts = orderObj.pointsRedeemed || 0;
-  const balancePts = orderObj.remainingPoints ?? orderObj.customerPoints ?? 0;
-
-  return (
-    <div 
-      style={{ fontFamily: 'Verdana, Geneva, Tahoma, sans-serif' }}
-      className="w-[68mm] max-w-[68mm] mx-auto text-black bg-white p-0 pr-1 text-left select-none"
-    >
-      <div className="text-center pb-2 border-b border-black">
-        <h1 className="text-lg font-black uppercase tracking-wider leading-tight">BUM BUM CAFE</h1>
-        <p className="text-[10px] font-bold mt-1 leading-snug">
-          न्यू बस स्टैंड मोहंद्रा, पुलिस चौकी के सामने,<br />
-          जिला पन्ना, मोहंद्रा, मध्य प्रदेश - 488442
-        </p>
-        <p className="text-[11px] font-black mt-1">Mob: 9714293759</p>
-      </div>
-
-      <div className="text-[10px] font-bold py-1 border-b border-black flex justify-between pr-1">
-        <span>Invoice: #{orderObj.billNumber || 5001}</span>
-        <span>Server: {(currentUser?.name || 'YOGESH').toUpperCase()}</span>
-      </div>
-      <div className="text-[10px] font-bold pb-1 flex justify-between pr-1">
-        <span>Date: {orderDate.toLocaleDateString()}</span>
-        <span>Time: {orderDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-      </div>
-
-      <div className="my-1.5 border-2 border-black py-1 text-center bg-white">
-        <p className="text-[9px] font-black uppercase tracking-widest">TOKEN NUMBER</p>
-        <p className="text-2xl font-black">#{orderObj.tokenNumber || '01'}</p>
-      </div>
-
-      <div className="text-[10px] font-bold pb-1.5 border-b border-black">
-        <p>Customer: {orderObj.customerName || 'Walk-in Guest'}</p>
-        {orderObj.customerPhone && <p>Phone: {orderObj.customerPhone}</p>}
-        <p className="uppercase">Type: {orderObj.fulfillmentType || 'Counter'}</p>
-        {orderObj.tableNumber && <p className="font-black">Table: {orderObj.tableNumber}</p>}
-      </div>
-
-      <div className="py-1.5 border-b border-black">
-        <div className="flex justify-between text-[10px] font-black uppercase pb-1 border-b border-dashed border-black pr-1">
-          <span>ITEM DESCRIPTION</span>
-          <span>TOTAL</span>
-        </div>
-
-        <div className="space-y-1.5 pt-1.5 pr-1">
-          {orderObj.items?.map((item: any, idx: number) => (
-            <div key={idx} className="text-[11px] leading-tight">
-              <div className="flex justify-between font-black items-start">
-                <span className="pr-1 break-words flex-1">
-                  {item.quantity} x {item.name}
-                </span>
-                <span className="shrink-0 font-bold ml-1">₹{item.price * item.quantity}</span>
-              </div>
-              <div className="flex justify-between text-[9px] font-bold text-black pl-3">
-                <span>Price: ₹{item.price}</span>
-              </div>
-              {item.note && (
-                <p className="text-[9px] italic pl-3 font-bold text-black">
-                  Note: {item.note}
-                </p>
-              )}
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="py-1.5 border-b border-black text-[11px] space-y-1 pr-1">
-        <div className="flex justify-between font-bold">
-          <span>Subtotal:</span>
-          <span>₹{orderObj.subtotal || orderObj.total}</span>
-        </div>
-
-        {orderObj.discountAmount > 0 && (
-          <div className="flex justify-between font-bold">
-            <span>Discount:</span>
-            <span>-₹{orderObj.discountAmount}</span>
-          </div>
-        )}
-
-        <div className="flex justify-between text-sm font-black pt-1 border-t border-black">
-          <span>GRAND TOTAL:</span>
-          <span>₹{orderObj.total}</span>
-        </div>
-
-        <div className="flex justify-between text-[10px] font-black uppercase pt-0.5">
-          <span>Payment Mode:</span>
-          <span>{orderObj.paymentMethod || 'CASH'}</span>
-        </div>
-      </div>
-
-      {orderObj.customerPhone && (
-        <div className="py-1.5 border-b border-dashed border-black text-[10px] space-y-0.5">
-          <p className="font-black uppercase text-center tracking-wider">⭐ LOYALTY REWARDS ⭐</p>
-          <div className="flex justify-between font-bold">
-            <span>Points Earned this Bill:</span>
-            <span>+{earnedPts} Pts</span>
-          </div>
-          {redeemedPts > 0 && (
-            <div className="flex justify-between font-bold text-black">
-              <span>Points Redeemed:</span>
-              <span>-{redeemedPts} Pts</span>
-            </div>
-          )}
-          <div className="flex justify-between font-black border-t border-dotted border-black pt-0.5">
-            <span>Total Balance Points:</span>
-            <span>{balancePts} Pts</span>
-          </div>
-        </div>
-      )}
-
-      <div className="py-2 text-center border-b border-black flex flex-col items-center justify-center">
-        <p className="text-[10px] font-black uppercase tracking-wider mb-1">
-          SCAN TO PAY ₹{orderObj.total} VIA UPI
-        </p>
-        
-        <div className="p-1 bg-white border border-black inline-block rounded">
-          <img 
-            src={qrCodeUrl} 
-            alt="UPI QR Code" 
-            className="w-36 h-36 object-contain block mx-auto"
-            crossOrigin="anonymous"
-          />
-        </div>
-
-        <p className="text-[10px] font-bold mt-1 font-mono text-black">
-          UPI ID: {upiId}
-        </p>
-      </div>
-
-      <div className="pt-2 text-center text-[9px] font-bold space-y-0.5">
-        <p>Online Order Website:</p>
-        <p className="font-black">bb-cafe-app.vercel.app</p>
-        <p className="text-[10px] font-black mt-1">❤ Thank You, Visit Again ❤</p>
-        <p className="text-[8px] text-black mt-0.5">Powered by BumBumCafe POS v3.3</p>
-      </div>
-    </div>
-  );
-}
-
