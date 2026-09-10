@@ -12,7 +12,7 @@ import {
   Database, RefreshCw, Layers, LogOut, Lock, ToggleLeft, ToggleRight, 
   Trash2, UserPlus, Download, Edit3, FileText, LayoutGrid, ChevronLeft, ChevronRight, 
   Gift, PackagePlus, BarChart3, HelpCircle, PauseCircle, PlayCircle, QrCode, 
-  Share2, Calculator, Receipt, IndianRupee, ArrowRight
+  Share2, Calculator, Receipt, IndianRupee, Send, ShieldAlert, Check
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
@@ -52,6 +52,7 @@ const SafePlayCircle = PlayCircle as any;
 const SafeQrCode = QrCode as any;
 const SafeShare2 = Share2 as any;
 const SafeCalculator = Calculator as any;
+const SafeSend = Send as any;
 
 interface PosCartItem {
   cartItemId: string;
@@ -90,6 +91,8 @@ const PIZZA_ADDONS: { [size: string]: { [addon: string]: number } } = {
   "extra large": { "Veg Add-on": 30, "Paneer": 50, "Black Olives": 50, "Jalapeno": 50, "Extra Cheese": 60, "Mushroom": 50 }
 };
 
+const COOKING_TAGS = ['🌶️ Less Spicy', '🧅 No Onion/Garlic', '📦 Parcel/To-Go', '🧊 Less Ice', '🧀 Extra Dip', '☕ Kadak'];
+
 let globalAudioCtx: AudioContext | null = null;
 
 export default function BbCafeDesktopPos() {
@@ -114,6 +117,7 @@ export default function BbCafeDesktopPos() {
   const [printerConnected, setPrinterConnected] = useState(false);
   const [kotEnabled, setKotEnabled] = useState<boolean>(true); 
   const [upiIdConfig, setUpiIdConfig] = useState<string>('bumbumcafe@upi');
+  const [ownerPhoneConfig, setOwnerPhoneConfig] = useState<string>('919876543210');
 
   // Customer Directory States
   const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false);
@@ -140,7 +144,7 @@ export default function BbCafeDesktopPos() {
   const [isReportLoading, setIsReportLoading] = useState(false);
   const [physicalCashInput, setPhysicalCashInput] = useState<number | ''>('');
 
-  // Modals & New Features States
+  // Modals States
   const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
   const [isHeldCartsModalOpen, setIsHeldCartsModalOpen] = useState(false);
   const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
@@ -210,6 +214,8 @@ export default function BbCafeDesktopPos() {
 
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const alarmIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const barcodeBufferRef = useRef<string>('');
+  const barcodeTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const getSanitizedPhone = (p: string) => p.replace(/\D/g, '').slice(-10);
 
@@ -261,7 +267,25 @@ export default function BbCafeDesktopPos() {
 
   const getTotalBillPrice = () => Math.max(0, getCartSubtotal() + getGstAmountCalculated() - getCalculatedDiscountAmount() - getRedemptionDiscount()) + getDeliveryCharge();
 
-  // Sync split totals when total bill price changes
+  // Active Live Orders & Tables
+  const activeLiveOrders = useMemo(() => liveOrders.filter((o) => (o.fulfillmentType === 'delivery' || o.fulfillmentType === 'pickup') && o.status !== 'completed' && o.status !== 'rejected'), [liveOrders]);
+  const activeTableOrders = useMemo(() => liveOrders.filter((o) => o.fulfillmentType === 'table' && o.status !== 'completed' && o.status !== 'rejected'), [liveOrders]);
+  const pendingOrdersCount = useMemo(() => activeLiveOrders.filter((o) => o.status === 'pending').length, [activeLiveOrders]);
+  const activeTablesCount = useMemo(() => activeTableOrders.length, [activeTableOrders]);
+
+  // CRASH & ACCIDENTAL CLOSE PROTECTION
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (cart.length > 0 || activeTableOrders.length > 0) {
+        e.preventDefault();
+        e.returnValue = 'You have active orders or unsaved cart items! Are you sure you want to close?';
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [cart.length, activeTableOrders.length]);
+
+  // Auto split update
   useEffect(() => {
     const total = getTotalBillPrice();
     if (paymentMethod === 'split') {
@@ -271,7 +295,7 @@ export default function BbCafeDesktopPos() {
     }
   }, [cart, discountValue, discountType, isRedeemingPoints, pointsToRedeem, paymentMethod]);
 
-  // Load Saved Held Carts from LocalStorage
+  // Load Saved Settings
   useEffect(() => {
     const savedHeld = localStorage.getItem("bb_pos_held_carts");
     if (savedHeld) {
@@ -279,6 +303,9 @@ export default function BbCafeDesktopPos() {
     }
     const savedUpi = localStorage.getItem("bb_pos_upi_id");
     if (savedUpi) setUpiIdConfig(savedUpi);
+
+    const savedOwnerPhone = localStorage.getItem("bb_pos_owner_phone");
+    if (savedOwnerPhone) setOwnerPhoneConfig(savedOwnerPhone);
   }, []);
 
   const saveHeldCartsToStorage = (newList: HeldCart[]) => {
@@ -286,7 +313,7 @@ export default function BbCafeDesktopPos() {
     localStorage.setItem("bb_pos_held_carts", JSON.stringify(newList));
   };
 
-  // --- HOLD / PARK CART HANDLER [F3] ---
+  // HOLD CURRENT CART [F3]
   const handleHoldCurrentCart = () => {
     if (cart.length === 0) {
       toast.error("Cart is empty! Nothing to hold.");
@@ -309,7 +336,6 @@ export default function BbCafeDesktopPos() {
     saveHeldCartsToStorage(updated);
     toast.success(`Cart parked on Hold! [${newHold.customerName}]`, { icon: '⏸️' });
 
-    // Clear active cart for next walk-in guest
     setCart([]);
     setCustomerName('');
     setCustomerPhone('');
@@ -319,7 +345,7 @@ export default function BbCafeDesktopPos() {
     localStorage.removeItem("bb_pos_saved_cart_pc");
   };
 
-  // --- RECALL HELD CART HANDLER [F5] ---
+  // RESTORE HELD CART [F5]
   const handleRestoreHeldCart = (heldItem: HeldCart) => {
     triggerBeep('tap');
     if (cart.length > 0) {
@@ -338,7 +364,6 @@ export default function BbCafeDesktopPos() {
     toast.success(`Restored order of ${heldItem.customerName}!`, { icon: '▶️' });
   };
 
-  // --- DELETE HELD CART ---
   const handleDeleteHeldCart = (holdId: string) => {
     triggerBeep('tap');
     const updated = heldCarts.filter(h => h.id !== holdId);
@@ -346,7 +371,7 @@ export default function BbCafeDesktopPos() {
     toast.success("Held cart removed.");
   };
 
-  // --- WHATSAPP DIGITAL RECEIPT SENDER [F7] ---
+  // WHATSAPP DIGITAL BILL [F7]
   const handleSendWhatsAppBill = () => {
     const clean = getSanitizedPhone(customerPhone);
     if (clean.length !== 10) {
@@ -369,7 +394,16 @@ export default function BbCafeDesktopPos() {
     toast.success("WhatsApp bill opened in new tab! 📱");
   };
 
-  // --- SAVE PETTY CASH EXPENSE [F6] ---
+  // OWNER DAILY SUMMARY WHATSAPP
+  const handleSendOwnerSummary = () => {
+    const cleanOwner = getSanitizedPhone(ownerPhoneConfig);
+    const msg = `*☕ BUM BUM CAFE - DAY END SUMMARY*%0A------------------------------%0A*Date:* ${new Date().toLocaleDateString()}%0A*Total Sales:* ₹${reportSummary.totalSale}%0A*Orders Completed:* ${reportSummary.totalOrdersCount}%0A------------------------------%0A*💵 Gross Cash:* ₹${reportSummary.cashSale}%0A*📱 UPI / Bank:* ₹${reportSummary.upiSale}%0A*🧾 Total Expenses:* -₹${reportSummary.totalExpenseAmount}%0A------------------------------%0A*💰 Net Cash in Drawer:* ₹${reportSummary.netCashInDrawer}%0A------------------------------%0A_Generated via Bum Bum Cafe Desktop POS_`;
+    
+    window.open(`https://wa.me/${cleanOwner}?text=${msg}`, '_blank');
+    toast.success("Closing summary sent to owner via WhatsApp! 📊");
+  };
+
+  // SAVE PETTY CASH EXPENSE [F6]
   const handleSaveExpense = async (e: React.FormEvent) => {
     e.preventDefault();
     const amt = Number(expenseAmount);
@@ -391,7 +425,6 @@ export default function BbCafeDesktopPos() {
       setExpenseTitle('');
       setExpenseAmount('');
       setIsExpenseModalOpen(false);
-      // Trigger fetch for reports if active
       fetchReportData();
     } catch (err) {
       toast.dismiss(toastId);
@@ -399,7 +432,7 @@ export default function BbCafeDesktopPos() {
     }
   };
 
-  // --- FILTERED MENU FOR FAST POS SCAN ---
+  // FILTERED MENU
   const filteredMenu = useMemo(() => {
     const queryStr = searchQuery.toLowerCase().trim();
     return products.filter((p) => {
@@ -410,18 +443,18 @@ export default function BbCafeDesktopPos() {
     });
   }, [products, selectedCategory, searchQuery]);
 
-  // --- MASTER KEYBOARD SHORTCUTS CONTROLLER (F1 - F10, ESC) ---
+  // GLOBAL BARCODE & HARDWARE KEYBOARD CONTROLLER (F1 - F10, ESC)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!isLoggedIn) return;
 
-      // [F1] Shortcuts Help Modal
+      // [F1] Shortcuts Help
       if (e.key === 'F1') {
         e.preventDefault();
         setIsHelpModalOpen(prev => !prev);
       }
 
-      // [F2] Focus Item Search Bar
+      // [F2] Focus Search
       if (e.key === 'F2') {
         e.preventDefault();
         setActiveTab('billing');
@@ -435,7 +468,7 @@ export default function BbCafeDesktopPos() {
         handleHoldCurrentCart();
       }
 
-      // [F4] Toggle Payment Mode (Cash -> UPI -> Split)
+      // [F4] Toggle Payment Mode
       if (e.key === 'F4') {
         e.preventDefault();
         setPaymentMethod(prev => {
@@ -445,25 +478,25 @@ export default function BbCafeDesktopPos() {
         });
       }
 
-      // [F5] View & Recall Held Carts
+      // [F5] Parked Carts
       if (e.key === 'F5') {
         e.preventDefault();
         setIsHeldCartsModalOpen(prev => !prev);
       }
 
-      // [F6] Daily Expense Entry
+      // [F6] Daily Expense
       if (e.key === 'F6') {
         e.preventDefault();
         setIsExpenseModalOpen(prev => !prev);
       }
 
-      // [F7] Send WhatsApp Bill
+      // [F7] WhatsApp Bill
       if (e.key === 'F7') {
         e.preventDefault();
         handleSendWhatsAppBill();
       }
 
-      // [F8] Dynamic UPI QR Display
+      // [F8] Dynamic UPI QR
       if (e.key === 'F8') {
         e.preventDefault();
         if (getTotalBillPrice() <= 0) {
@@ -473,7 +506,7 @@ export default function BbCafeDesktopPos() {
         }
       }
 
-      // [F9] Quick Pay, Print Receipt & KOT
+      // [F9] Settle & Print
       if (e.key === 'F9') {
         e.preventDefault();
         if (cart.length > 0 && !isSubmittingOrder) {
@@ -483,14 +516,14 @@ export default function BbCafeDesktopPos() {
         }
       }
 
-      // [F10] Cash Tender Change Calculator
+      // [F10] Change Calculator
       if (e.key === 'F10') {
         e.preventDefault();
         setTenderCashAmount(getTotalBillPrice());
         setIsChangeModalOpen(prev => !prev);
       }
 
-      // [Escape] Close Any Modal
+      // [Escape] MASTER POPUP CLOSE HANDLER
       if (e.key === 'Escape') {
         setIsHelpModalOpen(false);
         setIsHeldCartsModalOpen(false);
@@ -507,7 +540,7 @@ export default function BbCafeDesktopPos() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isLoggedIn, cart, isSubmittingOrder, paymentMethod, customerName, customerPhone, tableNumber, fulfillmentType, heldCarts]);
 
-  // Handle Search Input [Enter] to quickly select first item
+  // ENTER KEY ON SEARCH (AUTO-ADD FIRST MATCH)
   const handleSearchInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       e.preventDefault();
@@ -520,7 +553,7 @@ export default function BbCafeDesktopPos() {
     }
   };
 
-  // Fetch Sales & Daily Expenses for Reports
+  // FETCH REPORT & EXPENSES
   const fetchReportData = async () => {
     setIsReportLoading(true);
     try {
@@ -570,7 +603,7 @@ export default function BbCafeDesktopPos() {
     if (activeTab === 'reports') fetchReportData();
   }, [activeTab, reportFilter, customReportDate]);
 
-  // Report Summary Breakdown with Expenses Deducted
+  // REPORT SUMMARY CALCULATION
   const reportSummary = useMemo(() => {
     let totalSale = 0;
     let cashSale = 0;
@@ -598,7 +631,7 @@ export default function BbCafeDesktopPos() {
     return { totalSale, cashSale, upiSale, totalOrdersCount, totalExpenseAmount, netCashInDrawer };
   }, [reportOrders, dailyExpenses]);
 
-  // App initialization
+  // APP INITIALIZATION
   useEffect(() => {
     const handleBeforeInstallPrompt = (e: any) => {
       e.preventDefault();
@@ -654,7 +687,7 @@ export default function BbCafeDesktopPos() {
     localStorage.setItem("bb_pos_saved_cart_pc", JSON.stringify(cart));
   }, [cart]);
 
-  // Live Orders Listener
+  // LIVE ORDERS SNAPSHOT
   useEffect(() => {
     const q = query(collection(db, "orders"), orderBy("timestamp", "desc"), limit(50));
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -664,12 +697,7 @@ export default function BbCafeDesktopPos() {
     return () => unsubscribe();
   }, []);
 
-  const activeLiveOrders = useMemo(() => liveOrders.filter((o) => (o.fulfillmentType === 'delivery' || o.fulfillmentType === 'pickup') && o.status !== 'completed' && o.status !== 'rejected'), [liveOrders]);
-  const activeTableOrders = useMemo(() => liveOrders.filter((o) => o.fulfillmentType === 'table' && o.status !== 'completed' && o.status !== 'rejected'), [liveOrders]);
-
-  const pendingOrdersCount = useMemo(() => activeLiveOrders.filter((o) => o.status === 'pending').length, [activeLiveOrders]);
-  const activeTablesCount = useMemo(() => activeTableOrders.length, [activeTableOrders]);
-
+  // ALARM TRIGGER FOR PENDING ORDERS
   useEffect(() => {
     if (pendingOrdersCount > 0) {
       if (!alarmIntervalRef.current) {
@@ -681,7 +709,7 @@ export default function BbCafeDesktopPos() {
     return () => { if (alarmIntervalRef.current) clearInterval(alarmIntervalRef.current); };
   }, [pendingOrdersCount]);
 
-  // Load Products
+  // LOAD PRODUCTS
   useEffect(() => {
     if (!isLoggedIn) return;
     (async () => {
@@ -700,7 +728,7 @@ export default function BbCafeDesktopPos() {
     })();
   }, [isLoggedIn]);
 
-  // Load Past Receipts
+  // LOAD PAST RECEIPTS
   useEffect(() => {
     if (activeTab !== 'receipts') return;
     (async () => {
@@ -765,7 +793,7 @@ export default function BbCafeDesktopPos() {
     toast.success("Terminal Locked!");
   };
 
-  // Cart Management with Unique cartItemId to prevent collision
+  // CART ADD LOGIC WITH UNIQUE CART ITEM ID
   const handleItemClick = (item: any) => {
     triggerBeep('tap');
     const hasVariants = item.variants && typeof item.variants === 'object' && Object.keys(item.variants).length > 0;
@@ -940,7 +968,7 @@ export default function BbCafeDesktopPos() {
     return currentTokenSeq;
   };
 
-  // Thermal Printing Engine
+  // THERMAL PRINTING
   const handlePrintReceiptDirect = async (orderObj: any, isKot = false): Promise<void> => {
     return new Promise((resolve) => {
       if (!orderObj || !orderObj.items || orderObj.items.length === 0) return resolve();
@@ -979,7 +1007,7 @@ export default function BbCafeDesktopPos() {
     });
   };
 
-  // Table KOT Save Handler
+  // SAVE TABLE ORDER KOT ONLY
   const handleSaveTableOrderKotOnly = async () => {
     if (cart.length === 0 || isSubmittingOrder) return;
     setIsSubmittingOrder(true);
@@ -1152,16 +1180,6 @@ export default function BbCafeDesktopPos() {
     }
   };
 
-  const handleUpdateStatus = async (orderId: string, newStatus: string) => {
-    triggerBeep('tap');
-    try {
-      await updateDoc(doc(db, "orders", orderId), { status: newStatus });
-      toast.success(`Status updated to ${newStatus}!`);
-    } catch (e) {
-      toast.error("Failed to update status");
-    }
-  };
-
   const handleToggleStock = async (productId: string, currentStatus: boolean) => {
     triggerBeep('tap');
     try {
@@ -1183,7 +1201,6 @@ export default function BbCafeDesktopPos() {
 
   const mainClass = "h-screen w-screen flex font-sans antialiased overflow-hidden " + (themeMode === "dark" ? "dark bg-[#0a0a0a] text-neutral-100" : "bg-neutral-100 text-neutral-900");
 
-  // Dynamic UPI URL for QR
   const dynamicUpiUrl = useMemo(() => {
     const total = getTotalBillPrice();
     return `upi://pay?pa=${upiIdConfig}&pn=Bum%20Bum%20Cafe&am=${total}&cu=INR&tn=BumBumCafeOrder`;
@@ -1225,7 +1242,7 @@ export default function BbCafeDesktopPos() {
                 {!isSidebarCollapsed && (
                   <div className="truncate">
                     <h1 className="text-xs font-black uppercase text-yellow-500 truncate">Bum Bum Cafe</h1>
-                    <span className="text-[10px] text-neutral-400 font-bold">POS v3.0 Ultra</span>
+                    <span className="text-[10px] text-neutral-400 font-bold">Desktop Engine v3.2</span>
                   </div>
                 )}
               </div>
@@ -1263,11 +1280,10 @@ export default function BbCafeDesktopPos() {
                 })}
               </nav>
 
-              {/* QUICK SHORTCUT TRIGGER BUTTONS IN SIDEBAR */}
               {!isSidebarCollapsed && (
                 <div className="pt-2 border-t border-neutral-200 dark:border-neutral-800 space-y-1.5">
                   <div className="flex justify-between items-center px-1">
-                    <span className="text-[10px] font-black uppercase text-neutral-400">Quick Tools</span>
+                    <span className="text-[10px] font-black uppercase text-neutral-400">POS Tools</span>
                     <button onClick={() => setIsHelpModalOpen(true)} className="text-[10px] text-orange-500 font-bold hover:underline flex items-center gap-1">
                       <SafeHelpCircle size={12} /> Help [F1]
                     </button>
@@ -1299,7 +1315,7 @@ export default function BbCafeDesktopPos() {
             </div>
           </aside>
 
-          {/* MAIN APPLICATION VIEWPORT */}
+          {/* MAIN VIEW */}
           <main className="flex-1 flex h-full overflow-hidden">
             
             {activeTab === 'billing' && (
@@ -1316,14 +1332,14 @@ export default function BbCafeDesktopPos() {
                     </div>
                   )}
 
-                  {/* QUICK SEARCH WITH [ENTER] AUTO-ADD */}
+                  {/* QUICK SEARCH */}
                   <div className="flex gap-3 mb-4 items-center shrink-0">
                     <div className="relative flex-1">
                       <SafeSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-400" size={18} />
                       <input 
                         ref={searchInputRef}
                         type="text" 
-                        placeholder="Search item / Type Code & hit [Enter] to add... [F2]" 
+                        placeholder="Search item / Type Code & press [Enter]... [F2]" 
                         value={searchQuery} 
                         onChange={e => setSearchQuery(e.target.value)}
                         onKeyDown={handleSearchInputKeyDown} 
@@ -1332,7 +1348,7 @@ export default function BbCafeDesktopPos() {
                     </div>
                   </div>
 
-                  {/* CATEGORIES BAR */}
+                  {/* CATEGORIES */}
                   <div className="flex gap-2 overflow-x-auto pb-3 shrink-0 scrollbar-none">
                     {categories.map((cat) => {
                       const isSelected = selectedCategory === cat;
@@ -1348,7 +1364,7 @@ export default function BbCafeDesktopPos() {
                     })}
                   </div>
 
-                  {/* PRODUCT CARDS GRID */}
+                  {/* PRODUCTS GRID */}
                   {loading ? (
                     <div className="flex items-center justify-center flex-1"><Loader2 className="animate-spin text-orange-500" size={32} /></div>
                   ) : (
@@ -1384,7 +1400,7 @@ export default function BbCafeDesktopPos() {
                   )}
                 </div>
 
-                {/* RIGHT SIDE CART PANEL */}
+                {/* RIGHT CART PANEL */}
                 <div className="w-96 bg-white dark:bg-neutral-900 border-l border-neutral-200 dark:border-neutral-800 flex flex-col p-5 h-full shadow-2xl justify-between overflow-hidden">
                   <div className="flex flex-col h-full overflow-hidden">
                     <div className="flex items-center justify-between border-b border-neutral-200 dark:border-neutral-800 pb-3 mb-3 shrink-0">
@@ -1441,7 +1457,7 @@ export default function BbCafeDesktopPos() {
                       )}
                     </div>
 
-                    {/* CART ITEMS LIST */}
+                    {/* CART ITEMS */}
                     <div className="space-y-2 overflow-y-auto flex-1 pr-1 mb-3">
                       {cart.length === 0 ? (
                         <div className="flex flex-col items-center justify-center h-full text-neutral-400 text-xs text-center py-10">
@@ -1466,7 +1482,7 @@ export default function BbCafeDesktopPos() {
                       )}
                     </div>
 
-                    {/* DISCOUNT SELECTOR */}
+                    {/* DISCOUNT OPTION */}
                     <div className="space-y-2 bg-neutral-50 dark:bg-neutral-800/40 p-2.5 rounded-2xl border border-neutral-200 dark:border-neutral-800 mb-3 shrink-0">
                       <div className="flex items-center justify-between">
                         <span className="text-[11px] font-bold uppercase text-neutral-400">Discount Option</span>
@@ -1502,7 +1518,7 @@ export default function BbCafeDesktopPos() {
                       )}
                     </div>
 
-                    {/* BILL BREAKDOWN TOTALS */}
+                    {/* BREAKDOWN TOTALS */}
                     <div className="space-y-1.5 text-xs border-t border-neutral-200 dark:border-neutral-800 pt-2 shrink-0">
                       <div className="flex justify-between text-neutral-400"><span>Subtotal</span><span className="font-mono">₹{getCartSubtotal()}</span></div>
                       {getCalculatedDiscountAmount() > 0 && (
@@ -1513,7 +1529,7 @@ export default function BbCafeDesktopPos() {
                       </div>
                     </div>
 
-                    {/* PAYMENT METHOD SELECTOR WITH SPLIT MODE [F4] */}
+                    {/* PAYMENT METHOD [F4] */}
                     <div className="space-y-2 my-2 shrink-0">
                       <div className="grid grid-cols-3 gap-1.5">
                         <button onClick={() => setPaymentMethod('cash')} className={`py-2 rounded-xl text-xs font-black uppercase border transition-all ${paymentMethod === 'cash' ? 'bg-green-600 text-white border-green-600 shadow' : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-400 border-neutral-700'}`}>Cash [F4]</button>
@@ -1521,7 +1537,6 @@ export default function BbCafeDesktopPos() {
                         <button onClick={() => setPaymentMethod('split')} className={`py-2 rounded-xl text-xs font-black uppercase border transition-all ${paymentMethod === 'split' ? 'bg-amber-600 text-white border-amber-600 shadow' : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-400 border-neutral-700'}`}>Split [F4]</button>
                       </div>
 
-                      {/* SPLIT PAYMENT INPUTS */}
                       {paymentMethod === 'split' && (
                         <div className="grid grid-cols-2 gap-2 bg-amber-500/10 border border-amber-500/30 p-2.5 rounded-xl">
                           <div>
@@ -1554,7 +1569,7 @@ export default function BbCafeDesktopPos() {
                       )}
                     </div>
 
-                    {/* EXTRA TOOLS ROW (QR & CHANGE CALCULATOR) */}
+                    {/* EXTRA TOOLS */}
                     <div className="grid grid-cols-2 gap-2 mb-2 shrink-0">
                       <button onClick={() => setIsQrModalOpen(true)} className="py-2 px-3 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/30 rounded-xl text-[11px] font-black uppercase flex items-center justify-center gap-1.5">
                         <SafeQrCode size={14} /> Show QR [F8]
@@ -1587,7 +1602,7 @@ export default function BbCafeDesktopPos() {
               </div>
             )}
 
-            {/* TAB: SALES REPORTS & CASH AUDIT */}
+            {/* TAB: REPORTS & CASH DRAWER AUDIT */}
             {activeTab === 'reports' && (
               <div className="flex-1 p-6 h-full overflow-y-auto max-w-4xl mx-auto space-y-6">
                 <div className="flex justify-between items-center border-b pb-4">
@@ -1595,12 +1610,17 @@ export default function BbCafeDesktopPos() {
                     <h2 className="text-lg font-black uppercase text-orange-500 flex items-center gap-2">
                       <SafeBarChart3 size={20} /> Sales Reports & Cash Drawer Audit
                     </h2>
-                    <p className="text-xs text-neutral-400">Total sale, payment modes, daily petty cash expenses and drawer match.</p>
+                    <p className="text-xs text-neutral-400">Total sale, payment modes, daily petty cash expenses and drawer balance.</p>
                   </div>
-                  <div className="flex bg-neutral-800 p-1 rounded-2xl border border-neutral-700">
-                    <button onClick={() => setReportFilter('today')} className={`px-4 py-2 text-xs font-black uppercase rounded-xl transition-all ${reportFilter === 'today' ? 'bg-orange-600 text-white' : 'text-neutral-400'}`}>Today</button>
-                    <button onClick={() => setReportFilter('yesterday')} className={`px-4 py-2 text-xs font-black uppercase rounded-xl transition-all ${reportFilter === 'yesterday' ? 'bg-orange-600 text-white' : 'text-neutral-400'}`}>Yesterday</button>
-                    <button onClick={() => setReportFilter('custom')} className={`px-4 py-2 text-xs font-black uppercase rounded-xl transition-all ${reportFilter === 'custom' ? 'bg-orange-600 text-white' : 'text-neutral-400'}`}>Custom</button>
+                  <div className="flex gap-2">
+                    <button onClick={handleSendOwnerSummary} className="px-3 py-2 bg-green-600 hover:bg-green-500 text-white rounded-xl text-xs font-black uppercase flex items-center gap-1.5 shadow">
+                      <SafeSend size={14} /> Send WhatsApp to Owner
+                    </button>
+                    <div className="flex bg-neutral-800 p-1 rounded-2xl border border-neutral-700">
+                      <button onClick={() => setReportFilter('today')} className={`px-4 py-2 text-xs font-black uppercase rounded-xl transition-all ${reportFilter === 'today' ? 'bg-orange-600 text-white' : 'text-neutral-400'}`}>Today</button>
+                      <button onClick={() => setReportFilter('yesterday')} className={`px-4 py-2 text-xs font-black uppercase rounded-xl transition-all ${reportFilter === 'yesterday' ? 'bg-orange-600 text-white' : 'text-neutral-400'}`}>Yesterday</button>
+                      <button onClick={() => setReportFilter('custom')} className={`px-4 py-2 text-xs font-black uppercase rounded-xl transition-all ${reportFilter === 'custom' ? 'bg-orange-600 text-white' : 'text-neutral-400'}`}>Custom</button>
+                    </div>
                   </div>
                 </div>
 
@@ -1615,9 +1635,9 @@ export default function BbCafeDesktopPos() {
                         <p className="text-[10px] text-neutral-500">{reportSummary.totalOrdersCount} Completed Orders</p>
                       </div>
                       <div className="bg-neutral-900 border border-neutral-800 p-5 rounded-3xl space-y-1 shadow-lg">
-                        <p className="text-[10px] font-black uppercase text-neutral-400">Cash Received</p>
+                        <p className="text-[10px] font-black uppercase text-neutral-400">Gross Cash Sale</p>
                         <p className="text-2xl font-black font-mono text-amber-400">₹{reportSummary.cashSale}</p>
-                        <p className="text-[10px] text-neutral-500">Gross Cash collected</p>
+                        <p className="text-[10px] text-neutral-500">Collected at counter</p>
                       </div>
                       <div className="bg-neutral-900 border border-neutral-800 p-5 rounded-3xl space-y-1 shadow-lg">
                         <p className="text-[10px] font-black uppercase text-neutral-400">UPI / Online</p>
@@ -1631,12 +1651,11 @@ export default function BbCafeDesktopPos() {
                       </div>
                     </div>
 
-                    {/* CASH DRAWER AUDIT BOX */}
                     <div className="bg-neutral-900 border border-neutral-800 p-5 rounded-3xl space-y-4 shadow-xl">
                       <div className="flex justify-between items-center border-b border-neutral-800 pb-3">
                         <div>
                           <h3 className="text-xs font-black uppercase text-yellow-400">Cash Drawer Audit (गल्ला मिलान)</h3>
-                          <p className="text-[11px] text-neutral-400">Net Expected Cash in Drawer = Cash Sales (₹{reportSummary.cashSale}) - Expenses (₹{reportSummary.totalExpenseAmount}) = <span className="font-mono text-green-400 font-bold">₹{reportSummary.netCashInDrawer}</span></p>
+                          <p className="text-[11px] text-neutral-400">Net Expected Cash = Cash Sales (₹{reportSummary.cashSale}) - Expenses (₹{reportSummary.totalExpenseAmount}) = <span className="font-mono text-green-400 font-bold">₹{reportSummary.netCashInDrawer}</span></p>
                         </div>
                         <button onClick={() => setIsExpenseModalOpen(true)} className="px-3 py-1.5 bg-red-600/10 text-red-400 hover:bg-red-600/20 border border-red-500/30 rounded-xl text-xs font-black uppercase">
                           + Add Expense [F6]
@@ -1646,10 +1665,10 @@ export default function BbCafeDesktopPos() {
                       <div className="flex items-center gap-4">
                         <input 
                           type="number" 
-                          placeholder="Counted Physical Cash in Drawer (₹)" 
+                          placeholder="Counted Cash in Drawer (₹)" 
                           value={physicalCashInput}
                           onChange={e => setPhysicalCashInput(e.target.value === '' ? '' : Number(e.target.value))}
-                          className="flex-1 bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-2.5 text-sm font-mono text-white outline-none"
+                          className="flex-1 bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-2.5 text-sm font-mono text-white outline-none" 
                         />
                         {physicalCashInput !== '' && (
                           <div className={`text-xs font-black px-4 py-2.5 rounded-xl border ${Number(physicalCashInput) === reportSummary.netCashInDrawer ? 'bg-green-500/10 text-green-400 border-green-500/30' : Number(physicalCashInput) > reportSummary.netCashInDrawer ? 'bg-blue-500/10 text-blue-400 border-blue-500/30' : 'bg-red-500/10 text-red-400 border-red-500/30'}`}>
@@ -1769,6 +1788,20 @@ export default function BbCafeDesktopPos() {
                   </div>
 
                   <div className="space-y-2 border-b border-neutral-200 dark:border-neutral-800 pb-4">
+                    <p className="text-xs font-bold uppercase">Owner WhatsApp Number (for EOD Report):</p>
+                    <div className="flex gap-2">
+                      <input 
+                        type="text" 
+                        value={ownerPhoneConfig} 
+                        onChange={e => setOwnerPhoneConfig(e.target.value)}
+                        placeholder="e.g. 919876543210"
+                        className="flex-1 bg-neutral-100 dark:bg-neutral-800 border border-neutral-700 rounded-xl px-3 py-2 text-xs font-mono outline-none" 
+                      />
+                      <button onClick={() => { localStorage.setItem("bb_pos_owner_phone", ownerPhoneConfig); toast.success("Owner Phone Saved!"); }} className="bg-green-600 text-white px-4 rounded-xl text-xs font-black uppercase">Save</button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 border-b border-neutral-200 dark:border-neutral-800 pb-4">
                     <p className="text-xs font-bold uppercase">UI Theme:</p>
                     <div className="flex bg-neutral-100 dark:bg-neutral-800 p-1 rounded-xl w-48">
                       <button onClick={() => handleToggleTheme('dark')} className={`flex-1 py-2 rounded-lg text-xs font-black uppercase ${themeMode === 'dark' ? 'bg-neutral-950 text-amber-400' : 'text-neutral-400'}`}>Dark</button>
@@ -1793,23 +1826,32 @@ export default function BbCafeDesktopPos() {
       )}
 
       {/* ======================================================== */}
-      {/*                   NEW POPUP MODALS                       */}
+      {/*     ALL POPUP MODALS WITH CLICK-OUTSIDE & CANCEL BUTTON  */}
       {/* ======================================================== */}
 
-      {/* [F1] SHORTCUTS HELP CHEAT SHEET */}
+      {/* [F1] SHORTCUTS HELP MODAL */}
       <AnimatePresence>
         {isHelpModalOpen && (
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="bg-neutral-900 border border-neutral-800 max-w-lg w-full rounded-3xl p-6 shadow-2xl space-y-4 text-neutral-100">
+          <div 
+            className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 cursor-pointer" 
+            onClick={() => setIsHelpModalOpen(false)}
+          >
+            <motion.div 
+              initial={{ scale: 0.95 }} 
+              animate={{ scale: 1 }} 
+              exit={{ scale: 0.95 }} 
+              onClick={(e) => e.stopPropagation()} 
+              className="bg-neutral-900 border border-neutral-800 max-w-lg w-full rounded-3xl p-6 shadow-2xl space-y-4 text-neutral-100 cursor-default"
+            >
               <div className="flex justify-between items-center border-b border-neutral-800 pb-3">
                 <div className="flex items-center gap-2 text-yellow-500 font-black text-sm uppercase">
                   <SafeHelpCircle size={18} />
                   <span>POS Keyboard Shortcuts (F1 - F10)</span>
                 </div>
-                <button onClick={() => setIsHelpModalOpen(false)}><SafeX size={18} /></button>
+                <button onClick={() => setIsHelpModalOpen(false)} className="text-neutral-400 hover:text-white p-1"><SafeX size={18} /></button>
               </div>
 
-              <div className="space-y-2 text-xs">
+              <div className="space-y-2 text-xs max-h-80 overflow-y-auto pr-1">
                 {[
                   { key: 'F1', desc: 'Open this Shortcut Help Sheet' },
                   { key: 'F2', desc: 'Focus Item Search & hit [Enter] to quick-add' },
@@ -1829,6 +1871,13 @@ export default function BbCafeDesktopPos() {
                   </div>
                 ))}
               </div>
+
+              <button 
+                onClick={() => setIsHelpModalOpen(false)} 
+                className="w-full py-2.5 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 font-black uppercase text-xs rounded-xl transition-all"
+              >
+                Close [Esc]
+              </button>
             </motion.div>
           </div>
         )}
@@ -1837,17 +1886,26 @@ export default function BbCafeDesktopPos() {
       {/* [F5] HELD / PARKED CARTS MODAL */}
       <AnimatePresence>
         {isHeldCartsModalOpen && (
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="bg-neutral-900 border border-neutral-800 max-w-lg w-full rounded-3xl p-6 shadow-2xl space-y-4">
+          <div 
+            className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 cursor-pointer" 
+            onClick={() => setIsHeldCartsModalOpen(false)}
+          >
+            <motion.div 
+              initial={{ scale: 0.95 }} 
+              animate={{ scale: 1 }} 
+              exit={{ scale: 0.95 }} 
+              onClick={(e) => e.stopPropagation()} 
+              className="bg-neutral-900 border border-neutral-800 max-w-lg w-full rounded-3xl p-6 shadow-2xl space-y-4 cursor-default"
+            >
               <div className="flex justify-between items-center border-b border-neutral-800 pb-3">
                 <div className="flex items-center gap-2 text-amber-400 font-black text-sm uppercase">
                   <SafePauseCircle size={18} />
                   <span>Held / Parked Orders ({heldCarts.length}) [F5]</span>
                 </div>
-                <button onClick={() => setIsHeldCartsModalOpen(false)}><SafeX size={18} /></button>
+                <button onClick={() => setIsHeldCartsModalOpen(false)} className="text-neutral-400 hover:text-white p-1"><SafeX size={18} /></button>
               </div>
 
-              <div className="space-y-2.5 max-h-96 overflow-y-auto pr-1">
+              <div className="space-y-2.5 max-h-80 overflow-y-auto pr-1">
                 {heldCarts.length === 0 ? (
                   <p className="text-xs text-neutral-400 text-center py-10">No orders on hold right now.</p>
                 ) : (
@@ -1872,21 +1930,37 @@ export default function BbCafeDesktopPos() {
                   ))
                 )}
               </div>
+
+              <button 
+                onClick={() => setIsHeldCartsModalOpen(false)} 
+                className="w-full py-2.5 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 font-black uppercase text-xs rounded-xl transition-all"
+              >
+                Close [Esc]
+              </button>
             </motion.div>
           </div>
         )}
       </AnimatePresence>
 
-      {/* [F6] QUICK EXPENSE MODAL */}
+      {/* [F6] QUICK DAILY EXPENSE MODAL */}
       <AnimatePresence>
         {isExpenseModalOpen && (
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="bg-neutral-900 border border-neutral-800 max-w-sm w-full rounded-3xl p-6 shadow-2xl space-y-4">
+          <div 
+            className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 cursor-pointer" 
+            onClick={() => setIsExpenseModalOpen(false)}
+          >
+            <motion.div 
+              initial={{ scale: 0.95 }} 
+              animate={{ scale: 1 }} 
+              exit={{ scale: 0.95 }} 
+              onClick={(e) => e.stopPropagation()} 
+              className="bg-neutral-900 border border-neutral-800 max-w-sm w-full rounded-3xl p-6 shadow-2xl space-y-4 cursor-default"
+            >
               <div className="flex justify-between items-center border-b border-neutral-800 pb-3">
                 <h3 className="font-black text-sm uppercase text-red-400 flex items-center gap-2">
                   <Receipt size={16} /> Daily Expense Entry [F6]
                 </h3>
-                <button onClick={() => setIsExpenseModalOpen(false)}><SafeX size={18} /></button>
+                <button onClick={() => setIsExpenseModalOpen(false)} className="text-neutral-400 hover:text-white p-1"><SafeX size={18} /></button>
               </div>
 
               <form onSubmit={handleSaveExpense} className="space-y-3 text-xs">
@@ -1924,9 +1998,10 @@ export default function BbCafeDesktopPos() {
                     <option value="General">Other / General</option>
                   </select>
                 </div>
-                <button type="submit" className="w-full py-3 bg-red-600 hover:bg-red-500 text-white font-black uppercase text-xs rounded-xl shadow-lg mt-2">
-                  Deduct & Save Voucher
-                </button>
+                <div className="flex gap-2 pt-2">
+                  <button type="button" onClick={() => setIsExpenseModalOpen(false)} className="flex-1 py-2.5 bg-neutral-800 text-neutral-300 font-black uppercase text-xs rounded-xl">Cancel [Esc]</button>
+                  <button type="submit" className="flex-1 py-2.5 bg-red-600 hover:bg-red-500 text-white font-black uppercase text-xs rounded-xl shadow-lg">Save Voucher</button>
+                </div>
               </form>
             </motion.div>
           </div>
@@ -1936,13 +2011,22 @@ export default function BbCafeDesktopPos() {
       {/* [F8] DYNAMIC UPI QR MODAL */}
       <AnimatePresence>
         {isQrModalOpen && (
-          <div className="fixed inset-0 bg-black/85 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="bg-neutral-900 border border-neutral-800 max-w-sm w-full rounded-3xl p-6 shadow-2xl space-y-4 text-center">
+          <div 
+            className="fixed inset-0 bg-black/85 backdrop-blur-sm z-50 flex items-center justify-center p-4 cursor-pointer" 
+            onClick={() => setIsQrModalOpen(false)}
+          >
+            <motion.div 
+              initial={{ scale: 0.95 }} 
+              animate={{ scale: 1 }} 
+              exit={{ scale: 0.95 }} 
+              onClick={(e) => e.stopPropagation()} 
+              className="bg-neutral-900 border border-neutral-800 max-w-sm w-full rounded-3xl p-6 shadow-2xl space-y-4 text-center cursor-default"
+            >
               <div className="flex justify-between items-center border-b border-neutral-800 pb-3">
                 <h3 className="font-black text-sm uppercase text-blue-400 flex items-center gap-2">
                   <SafeQrCode size={16} /> Dynamic UPI Payment QR [F8]
                 </h3>
-                <button onClick={() => setIsQrModalOpen(false)}><SafeX size={18} /></button>
+                <button onClick={() => setIsQrModalOpen(false)} className="text-neutral-400 hover:text-white p-1"><SafeX size={18} /></button>
               </div>
 
               <div className="bg-white p-4 rounded-2xl inline-block shadow-xl">
@@ -1955,28 +2039,48 @@ export default function BbCafeDesktopPos() {
 
               <div className="space-y-1">
                 <p className="text-xl font-black font-mono text-green-400">₹{getTotalBillPrice()}</p>
-                <p className="text-xs text-neutral-400">Scan via PhonePe, GPay, Paytm to pay directly</p>
-                <p className="text-[10px] text-neutral-500 font-mono">UPI ID: {upiIdConfig}</p>
+                <p className="text-xs text-neutral-400">Scan via PhonePe, GPay, Paytm</p>
+                <p className="text-[10px] text-neutral-500 font-mono">UPI: {upiIdConfig}</p>
               </div>
 
-              <button onClick={() => { setPaymentMethod('upi'); setIsQrModalOpen(false); toast.success("Switched to UPI mode!"); }} className="w-full py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-black uppercase text-xs rounded-xl shadow">
-                Received UPI Payment (Confirm)
-              </button>
+              <div className="flex gap-2">
+                <button 
+                  onClick={() => setIsQrModalOpen(false)} 
+                  className="flex-1 py-2.5 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 font-black uppercase text-xs rounded-xl"
+                >
+                  Close [Esc]
+                </button>
+                <button 
+                  onClick={() => { setPaymentMethod('upi'); setIsQrModalOpen(false); toast.success("Switched to UPI mode!"); }} 
+                  className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-black uppercase text-xs rounded-xl shadow"
+                >
+                  Confirm Paid
+                </button>
+              </div>
             </motion.div>
           </div>
         )}
       </AnimatePresence>
 
-      {/* [F10] CASH TENDER / CHANGE CALCULATOR */}
+      {/* [F10] CHANGE CALCULATOR MODAL */}
       <AnimatePresence>
         {isChangeModalOpen && (
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="bg-neutral-900 border border-neutral-800 max-w-sm w-full rounded-3xl p-6 shadow-2xl space-y-4">
+          <div 
+            className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 cursor-pointer" 
+            onClick={() => setIsChangeModalOpen(false)}
+          >
+            <motion.div 
+              initial={{ scale: 0.95 }} 
+              animate={{ scale: 1 }} 
+              exit={{ scale: 0.95 }} 
+              onClick={(e) => e.stopPropagation()} 
+              className="bg-neutral-900 border border-neutral-800 max-w-sm w-full rounded-3xl p-6 shadow-2xl space-y-4 cursor-default"
+            >
               <div className="flex justify-between items-center border-b border-neutral-800 pb-3">
                 <h3 className="font-black text-sm uppercase text-purple-400 flex items-center gap-2">
-                  <SafeCalculator size={16} /> Change Return Calculator [F10]
+                  <SafeCalculator size={16} /> Return Change Calculator [F10]
                 </h3>
-                <button onClick={() => setIsChangeModalOpen(false)}><SafeX size={18} /></button>
+                <button onClick={() => setIsChangeModalOpen(false)} className="text-neutral-400 hover:text-white p-1"><SafeX size={18} /></button>
               </div>
 
               <div className="space-y-3 text-xs">
@@ -1986,7 +2090,7 @@ export default function BbCafeDesktopPos() {
                 </div>
 
                 <div>
-                  <label className="text-neutral-400 uppercase font-black text-[10px] block mb-1">Customer Paid Note (₹):</label>
+                  <label className="text-neutral-400 uppercase font-black text-[10px] block mb-1">Customer Tendered Note (₹):</label>
                   <input 
                     type="number" 
                     placeholder="e.g. 500" 
@@ -1997,7 +2101,6 @@ export default function BbCafeDesktopPos() {
                   />
                 </div>
 
-                {/* QUICK CASH PRESET BUTTONS */}
                 <div className="flex gap-2">
                   {[100, 200, 500, 2000].map(amt => (
                     <button key={amt} onClick={() => setTenderCashAmount(amt)} className="flex-1 py-1.5 bg-neutral-800 hover:bg-neutral-700 rounded-lg font-mono font-bold text-xs text-neutral-300">
@@ -2016,20 +2119,36 @@ export default function BbCafeDesktopPos() {
                     </p>
                   </div>
                 )}
+
+                <button 
+                  onClick={() => setIsChangeModalOpen(false)} 
+                  className="w-full py-2.5 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 font-black uppercase text-xs rounded-xl transition-all mt-2"
+                >
+                  Done / Close [Esc]
+                </button>
               </div>
             </motion.div>
           </div>
         )}
       </AnimatePresence>
 
-      {/* VARIATION MODAL */}
+      {/* VARIATION & COOKING TAGS MODAL */}
       <AnimatePresence>
         {isVariationModalOpen && selectedProductForVariation && (
-          <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 max-w-sm w-full rounded-3xl p-6 shadow-2xl space-y-4">
+          <div 
+            className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4 cursor-pointer" 
+            onClick={() => setIsVariationModalOpen(false)}
+          >
+            <motion.div 
+              initial={{ scale: 0.95 }} 
+              animate={{ scale: 1 }} 
+              exit={{ scale: 0.95 }} 
+              onClick={(e) => e.stopPropagation()} 
+              className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 max-w-sm w-full rounded-3xl p-6 shadow-2xl space-y-4 cursor-default"
+            >
               <div className="flex justify-between items-center border-b pb-3">
                 <h3 className="font-black text-sm uppercase text-orange-500">{selectedProductForVariation.name}</h3>
-                <button onClick={() => setIsVariationModalOpen(false)}><SafeX size={18} /></button>
+                <button onClick={() => setIsVariationModalOpen(false)} className="text-neutral-400 hover:text-white p-1"><SafeX size={18} /></button>
               </div>
 
               <div className="space-y-3">
@@ -2052,11 +2171,51 @@ export default function BbCafeDesktopPos() {
                     </div>
                   </div>
                 )}
+
+                {/* QUICK KITCHEN TAG BADGES */}
+                <div>
+                  <label className="text-xs font-bold uppercase text-neutral-400 block mb-1">Quick Cooking Instructions:</label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {COOKING_TAGS.map((tag) => (
+                      <button
+                        key={tag}
+                        type="button"
+                        onClick={() => setItemNoteInput(prev => prev ? `${prev}, ${tag}` : tag)}
+                        className="px-2 py-1 bg-neutral-100 dark:bg-neutral-800 hover:border-orange-500 border border-neutral-700 rounded-lg text-[10px] font-bold text-neutral-300 transition-all"
+                      >
+                        {tag}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold uppercase text-neutral-400 block mb-1">Custom Note / Request:</label>
+                  <input 
+                    type="text" 
+                    placeholder="e.g. Extra hot, Less sugar..." 
+                    value={itemNoteInput}
+                    onChange={e => setItemNoteInput(e.target.value)}
+                    className="w-full bg-neutral-100 dark:bg-neutral-800 border border-neutral-700 rounded-xl px-3 py-2 text-xs outline-none"
+                  />
+                </div>
               </div>
 
-              <button onClick={handleAddCustomizedItemToCart} className="w-full bg-green-600 hover:bg-green-500 text-white font-black py-3 rounded-xl text-xs uppercase shadow mt-2">
-                Add to Cart
-              </button>
+              <div className="flex gap-2 pt-2">
+                <button 
+                  type="button" 
+                  onClick={() => setIsVariationModalOpen(false)} 
+                  className="flex-1 py-3 bg-neutral-200 dark:bg-neutral-800 text-neutral-400 font-black uppercase text-xs rounded-xl"
+                >
+                  Cancel [Esc]
+                </button>
+                <button 
+                  onClick={handleAddCustomizedItemToCart} 
+                  className="flex-1 bg-green-600 hover:bg-green-500 text-white font-black py-3 rounded-xl text-xs uppercase shadow"
+                >
+                  Add to Cart
+                </button>
+              </div>
             </motion.div>
           </div>
         )}
