@@ -1147,9 +1147,10 @@ export default function BbCafeDesktopPos() {
             min-height: 0 !important;
           }
           #print-root { 
-            width: 80mm !important; 
-            margin: 0 auto !important; 
-            padding: 0 !important; 
+            width: 68mm !important; 
+            max-width: 68mm !important; 
+            margin-left: 2mm !important; 
+            padding-right: 2mm !important; 
           }
         </style>
       `);
