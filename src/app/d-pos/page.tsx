@@ -13,7 +13,8 @@ import {
   Database, RefreshCw, Layers, LogOut, Lock, ToggleLeft, ToggleRight, 
   Trash2, UserPlus, Download, Edit3, FileText, LayoutGrid, ChevronLeft, ChevronRight, 
   Gift, PackagePlus, BarChart3, HelpCircle, PauseCircle, PlayCircle, QrCode, 
-  Share2, Calculator, Receipt, IndianRupee, Send, ShieldAlert, Check, Plus, Eye
+  Share2, Calculator, Receipt, IndianRupee, Send, ShieldAlert, Check, Plus, Eye,
+  Users, Truck
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
@@ -56,6 +57,8 @@ const SafeCalculator = Calculator as any;
 const SafeSend = Send as any;
 const SafePlus = Plus as any;
 const SafeEye = Eye as any;
+const SafeUsers = Users as any;
+const SafeTruck = Truck as any;
 
 interface PosCartItem {
   cartItemId: string;
@@ -223,8 +226,11 @@ export default function BbCafeDesktopPos() {
   const [splitCashAmount, setSplitCashAmount] = useState<number>(0);
   const [splitUpiAmount, setSplitUpiAmount] = useState<number>(0);
 
+  // Refs for Keyboard Accessibility
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const alarmIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const firstVariantButtonRef = useRef<HTMLButtonElement | null>(null);
+  const addToCartButtonRef = useRef<HTMLButtonElement | null>(null);
 
   const getSanitizedPhone = (p: string) => p.replace(/\D/g, '').slice(-10);
 
@@ -324,6 +330,20 @@ export default function BbCafeDesktopPos() {
     setHeldCarts(newList);
     localStorage.setItem("bb_pos_held_carts", JSON.stringify(newList));
   };
+
+  // Auto-focus on first variant button when Variation Modal opens
+  useEffect(() => {
+    if (isVariationModalOpen) {
+      const timer = setTimeout(() => {
+        if (firstVariantButtonRef.current) {
+          firstVariantButtonRef.current.focus();
+        } else if (addToCartButtonRef.current) {
+          addToCartButtonRef.current.focus();
+        }
+      }, 60);
+      return () => clearTimeout(timer);
+    }
+  }, [isVariationModalOpen]);
 
   // --- ITEM EDITOR HANDLERS ---
   const handleOpenItemEditor = (item: any = null) => {
@@ -501,6 +521,7 @@ export default function BbCafeDesktopPos() {
     setIsRedeemingPoints(false);
     setPointsToRedeem(0);
     localStorage.removeItem("bb_pos_saved_cart_pc");
+    setTimeout(() => searchInputRef.current?.focus(), 60);
   };
 
   // --- RESTORE HELD CART [F5] ---
@@ -520,6 +541,7 @@ export default function BbCafeDesktopPos() {
     setIsHeldCartsModalOpen(false);
     setActiveTab('billing');
     toast.success(`Restored order of ${heldItem.customerName}!`, { icon: '▶️' });
+    setTimeout(() => searchInputRef.current?.focus(), 60);
   };
 
   const handleDeleteHeldCart = (holdId: string) => {
@@ -611,7 +633,7 @@ export default function BbCafeDesktopPos() {
     });
   }, [products, inventorySearchQuery]);
 
-  // --- KEYBOARD SHORTCUTS (F1 - F10, ESC) ---
+  // --- FULL KEYBOARD SHORTCUTS ENGINE (F1 - F12, Escape, Delete) ---
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!isLoggedIn) return;
@@ -671,6 +693,26 @@ export default function BbCafeDesktopPos() {
         setTenderCashAmount(getTotalBillPrice());
         setIsChangeModalOpen(prev => !prev);
       }
+      if (e.key === 'F11') {
+        e.preventDefault();
+        setIsCustomerModalOpen(prev => !prev);
+        toast("Customer Directory [F11]", { icon: '👤' });
+      }
+      if (e.key === 'F12') {
+        e.preventDefault();
+        setFulfillmentType(prev => {
+          const next = prev === 'pickup' ? 'table' : prev === 'table' ? 'delivery' : 'pickup';
+          toast(`Mode: ${next.toUpperCase()} [F12]`, { icon: '🚚' });
+          return next;
+        });
+      }
+      // Quick Cart Clear with Delete or Shift+Backspace (when not typing in an input)
+      if ((e.key === 'Delete' || (e.shiftKey && e.key === 'Backspace')) && document.activeElement?.tagName !== 'INPUT') {
+        if (cart.length > 0) {
+          setCart([]);
+          toast("Cart Cleared! [Delete]", { icon: '🗑️' });
+        }
+      }
       if (e.key === 'Escape') {
         setIsHelpModalOpen(false);
         setIsHeldCartsModalOpen(false);
@@ -681,6 +723,7 @@ export default function BbCafeDesktopPos() {
         setIsReceiptModalOpen(false);
         setIsCustomerModalOpen(false);
         setIsItemEditorModalOpen(false);
+        setTimeout(() => searchInputRef.current?.focus(), 60);
       }
     };
 
@@ -688,12 +731,20 @@ export default function BbCafeDesktopPos() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isLoggedIn, cart, isSubmittingOrder, paymentMethod, customerName, customerPhone, tableNumber, fulfillmentType, heldCarts]);
 
+  // Search Bar Key Handler with Fast Add
   const handleSearchInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       e.preventDefault();
       if (filteredMenu.length > 0) {
-        handleItemClick(filteredMenu[0]);
+        const item = filteredMenu[0];
+        handleItemClick(item);
         setSearchQuery('');
+        
+        // Agar item me variant nahi hai to direct add ho jayega aur search bar focus rahega
+        const hasItemVariants = item.variants && typeof item.variants === 'object' && Object.keys(item.variants).length > 0;
+        if (!hasItemVariants) {
+          setTimeout(() => searchInputRef.current?.focus(), 50);
+        }
       } else {
         toast.error("No matching item found!");
       }
@@ -891,6 +942,7 @@ export default function BbCafeDesktopPos() {
         setCurrentUser({ id: snap.docs[0].id, ...uDoc });
         localStorage.setItem("bb_pos_user_pc", JSON.stringify({ id: snap.docs[0].id, ...uDoc })); 
         toast.success(`Welcome, ${uDoc.name}!`);
+        setTimeout(() => searchInputRef.current?.focus(), 150);
       } else {
         toast.error("Incorrect Staff PIN!");
       }
@@ -992,7 +1044,13 @@ export default function BbCafeDesktopPos() {
 
     setIsVariationModalOpen(false);
     setSelectedProductForVariation(null);
+    setSearchQuery('');
     toast.success(`Added ${fullName}!`);
+
+    // Focus immediately returns to search input for seamless next-item entry
+    setTimeout(() => {
+      searchInputRef.current?.focus();
+    }, 60);
   };
 
   const handleUpdateCartQuantity = (cartItemId: string, amount: number) => {
@@ -1098,7 +1156,6 @@ export default function BbCafeDesktopPos() {
 
       printWindow.document.write('<!DOCTYPE html><html><head><title>Print Receipt</title>');
       
-      // Strict 68mm Safe Width to prevent right-edge clipping
       printWindow.document.write(`
         <style>
           @page { 
@@ -1253,6 +1310,7 @@ export default function BbCafeDesktopPos() {
       setCart([]); setCustomerPhone(''); setCustomerName(''); setDiscountValue(0);
       setIsRedeemingPoints(false); setPointsToRedeem(0);
       localStorage.removeItem("bb_pos_saved_cart_pc");
+      setTimeout(() => searchInputRef.current?.focus(), 60);
     } catch (err) {
       console.error(err);
       toast.error("Failed to save table order");
@@ -1261,7 +1319,6 @@ export default function BbCafeDesktopPos() {
     }
   };
 
-  // FINAL CHECKOUT & PAY [F9] (WITH LOYALTY SAVED)
   // FINAL CHECKOUT & PAY [F9] (WITH LOYALTY SAVED)
   const handleFinalCheckoutAndPrintBill = async () => {
     if (cart.length === 0 || isSubmittingOrder) return;
@@ -1279,7 +1336,6 @@ export default function BbCafeDesktopPos() {
       let billNumber: number;
       let remainingPts = customerPoints;
 
-      // यदि 10 अंकों का मोबाइल नंबर है, तो डेटाबेस में लॉयल्टी अपडेट करें
       if (cleanPhone.length === 10) {
         const userRef = doc(db, "customer_points", cleanPhone);
         const userDoc = await getDoc(userRef);
@@ -1384,6 +1440,7 @@ export default function BbCafeDesktopPos() {
       setIsRedeemingPoints(false); 
       setPointsToRedeem(0);
       localStorage.removeItem("bb_pos_saved_cart_pc");
+      setTimeout(() => searchInputRef.current?.focus(), 60);
     } catch (err) {
       console.error(err);
       toast.error("Failed to complete checkout");
@@ -1391,6 +1448,7 @@ export default function BbCafeDesktopPos() {
       setIsSubmittingOrder(false);
     }
   };
+
   const handleToggleStock = async (productId: string, currentStatus: boolean) => {
     triggerBeep('tap');
     try {
@@ -1514,6 +1572,22 @@ export default function BbCafeDesktopPos() {
                       <span className="truncate">Expense [F6]</span>
                     </button>
                   </div>
+
+                  <div className="grid grid-cols-2 gap-1.5">
+                    <button onClick={() => setIsCustomerModalOpen(true)} className="bg-neutral-100 dark:bg-neutral-800 hover:border-orange-500 border border-transparent p-2 rounded-xl text-[10px] font-bold flex items-center gap-1 text-left">
+                      <SafeUsers size={13} className="text-blue-400 shrink-0" />
+                      <span className="truncate">Customer [F11]</span>
+                    </button>
+                    <button 
+                      onClick={() => {
+                        setFulfillmentType(prev => prev === 'pickup' ? 'table' : prev === 'table' ? 'delivery' : 'pickup');
+                      }} 
+                      className="bg-neutral-100 dark:bg-neutral-800 hover:border-orange-500 border border-transparent p-2 rounded-xl text-[10px] font-bold flex items-center gap-1 text-left"
+                    >
+                      <SafeTruck size={13} className="text-green-400 shrink-0" />
+                      <span className="truncate">Mode [F12]</span>
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
@@ -1548,8 +1622,8 @@ export default function BbCafeDesktopPos() {
                     </div>
                   )}
 
-                  {/* SEARCH BAR */}
-                  <div className="flex gap-3 mb-4 items-center shrink-0">
+                  {/* SEARCH BAR (F2) */}
+                  <div className="flex gap-3 mb-3 items-center shrink-0">
                     <div className="relative flex-1">
                       <SafeSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-400" size={18} />
                       <input 
@@ -1560,6 +1634,7 @@ export default function BbCafeDesktopPos() {
                         onChange={e => setSearchQuery(e.target.value)}
                         onKeyDown={handleSearchInputKeyDown} 
                         className="w-full bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-2xl py-3 pl-11 pr-4 text-sm outline-none focus:border-orange-500 shadow-sm" 
+                        autoFocus
                       />
                     </div>
                     <button 
@@ -1570,17 +1645,30 @@ export default function BbCafeDesktopPos() {
                     </button>
                   </div>
 
-                  {/* CATEGORIES */}
-                  <div className="flex gap-2 overflow-x-auto pb-3 shrink-0 scrollbar-none">
+                  {/* CATEGORIES - FULLY VISIBLE & WRAPPED */}
+                  <div className="flex flex-wrap gap-2 pb-3 shrink-0 max-h-36 overflow-y-auto pr-1">
                     {categories.map((cat) => {
                       const isSelected = selectedCategory === cat;
+                      const count = cat === 'All' 
+                        ? products.length 
+                        : products.filter(p => p.category === cat).length;
+
                       return (
                         <button 
                           key={cat} 
                           onClick={() => { triggerBeep('tap'); setSelectedCategory(cat); }} 
-                          className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider border shrink-0 transition-all ${isSelected ? "bg-orange-500 text-black border-orange-500 shadow-md shadow-orange-500/20" : "bg-white dark:bg-neutral-900 text-neutral-400 border-neutral-200 dark:border-neutral-800 hover:text-orange-500"}`}
+                          className={`px-3.5 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider border transition-all flex items-center gap-1.5 shadow-sm ${
+                            isSelected 
+                              ? "bg-orange-500 text-black border-orange-500 shadow-md shadow-orange-500/20 scale-105" 
+                              : "bg-white dark:bg-neutral-900 text-neutral-300 border-neutral-200 dark:border-neutral-800 hover:border-orange-500 hover:text-orange-400"
+                          }`}
                         >
-                          {cat}
+                          <span>{cat}</span>
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-mono font-bold ${
+                            isSelected ? 'bg-black/25 text-black' : 'bg-neutral-800 text-neutral-400'
+                          }`}>
+                            {count}
+                          </span>
                         </button>
                       );
                     })}
@@ -1632,7 +1720,7 @@ export default function BbCafeDesktopPos() {
                           <SafePauseCircle size={11} /> Hold [F3]
                         </button>
                       </div>
-                      <button onClick={() => setCart([])} className="text-red-500 text-xs font-bold hover:underline flex items-center gap-1"><SafeTrash2 size={14} /> Clear</button>
+                      <button onClick={() => setCart([])} className="text-red-500 text-xs font-bold hover:underline flex items-center gap-1"><SafeTrash2 size={14} /> Clear [Del]</button>
                     </div>
 
                     {/* CUSTOMER PHONE & LOYALTY */}
@@ -1674,7 +1762,7 @@ export default function BbCafeDesktopPos() {
                               value={pointsToRedeem || ''}
                               onChange={e => setPointsToRedeem(Math.min(Number(e.target.value), customerPoints))}
                               placeholder="Pts"
-                              className="w-16 bg-neutral-900 border border-neutral-700 rounded-lg p-1 text-center font-mono text-xs text-white outline-none"
+                              className="w-16 bg-neutral-900 border border-neutral-700 rounded-lg p-1 text-center font-mono text-xs text-white outline-none" 
                             />
                             <button 
                               type="button"
@@ -1721,7 +1809,7 @@ export default function BbCafeDesktopPos() {
                       {cart.length === 0 ? (
                         <div className="flex flex-col items-center justify-center h-full text-neutral-400 text-xs text-center py-10">
                           <ShoppingBag size={32} className="mb-2 opacity-40" />
-                          <p>Cart is empty. Click items from menu to add.</p>
+                          <p>Cart is empty. Click items or type code.</p>
                         </div>
                       ) : (
                         cart.map((item) => (
@@ -1764,7 +1852,7 @@ export default function BbCafeDesktopPos() {
                       </div>
                     </div>
 
-                    {/* FULFILLMENT MODE */}
+                    {/* FULFILLMENT MODE [F12] */}
                     <div className="space-y-2 mb-3 shrink-0 border-t border-neutral-200 dark:border-neutral-800 pt-2">
                       <div className="grid grid-cols-3 gap-1 bg-neutral-100 dark:bg-neutral-800 p-1 rounded-2xl">
                         {(['pickup', 'table', 'delivery'] as const).map((type) => (
@@ -2168,6 +2256,7 @@ export default function BbCafeDesktopPos() {
                               setFulfillmentType('table');
                               setCart(order.items || []);
                               setActiveTab('billing');
+                              setTimeout(() => searchInputRef.current?.focus(), 80);
                             }} 
                             className="w-full bg-amber-500 hover:bg-amber-400 text-black font-black py-2.5 rounded-xl text-xs uppercase flex items-center justify-center gap-1 shadow"
                           >
@@ -2283,12 +2372,16 @@ export default function BbCafeDesktopPos() {
       )}
 
       {/* ALL POPUP MODALS */}
+
       {/* MODAL 1: ADD / EDIT PRODUCT */}
       <AnimatePresence>
         {isItemEditorModalOpen && (
           <div 
             className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 cursor-pointer" 
-            onClick={() => setIsItemEditorModalOpen(false)}
+            onClick={() => {
+              setIsItemEditorModalOpen(false);
+              setTimeout(() => searchInputRef.current?.focus(), 60);
+            }}
           >
             <motion.div 
               initial={{ scale: 0.95 }} 
@@ -2302,7 +2395,7 @@ export default function BbCafeDesktopPos() {
                   <SafePackagePlus size={18} />
                   <span>{editingItemObj ? 'Edit Menu Item' : 'Add New Item to Menu'}</span>
                 </h3>
-                <button onClick={() => setIsItemEditorModalOpen(false)} className="text-neutral-400 hover:text-white p-1"><SafeX size={18} /></button>
+                <button onClick={() => { setIsItemEditorModalOpen(false); setTimeout(() => searchInputRef.current?.focus(), 60); }} className="text-neutral-400 hover:text-white p-1"><SafeX size={18} /></button>
               </div>
 
               <form onSubmit={handleSaveItemToFirestore} className="space-y-4 text-xs">
@@ -2445,7 +2538,7 @@ export default function BbCafeDesktopPos() {
                 <div className="flex gap-2 pt-2 border-t border-neutral-800">
                   <button 
                     type="button" 
-                    onClick={() => setIsItemEditorModalOpen(false)} 
+                    onClick={() => { setIsItemEditorModalOpen(false); setTimeout(() => searchInputRef.current?.focus(), 60); }} 
                     className="flex-1 py-3 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 font-black uppercase text-xs rounded-xl"
                   >
                     Cancel [Esc]
@@ -2468,7 +2561,7 @@ export default function BbCafeDesktopPos() {
         {isReceiptModalOpen && selectedReceipt && (
           <div 
             className="fixed inset-0 bg-black/85 backdrop-blur-sm z-50 flex items-center justify-center p-4 cursor-pointer" 
-            onClick={() => setIsReceiptModalOpen(false)}
+            onClick={() => { setIsReceiptModalOpen(false); setTimeout(() => searchInputRef.current?.focus(), 60); }}
           >
             <motion.div 
               initial={{ scale: 0.95 }} 
@@ -2484,7 +2577,7 @@ export default function BbCafeDesktopPos() {
                     {selectedReceipt.timestamp?.toDate ? selectedReceipt.timestamp.toDate().toLocaleString() : new Date(selectedReceipt.timestamp).toLocaleString()}
                   </p>
                 </div>
-                <button onClick={() => setIsReceiptModalOpen(false)} className="text-neutral-400 hover:text-white p-1"><SafeX size={18} /></button>
+                <button onClick={() => { setIsReceiptModalOpen(false); setTimeout(() => searchInputRef.current?.focus(), 60); }} className="text-neutral-400 hover:text-white p-1"><SafeX size={18} /></button>
               </div>
 
               <div className="space-y-1 bg-neutral-950 p-3 rounded-2xl border border-neutral-800">
@@ -2510,6 +2603,7 @@ export default function BbCafeDesktopPos() {
               <div className="space-y-1.5 border-t border-neutral-800 pt-2 font-mono">
                 <div className="flex justify-between text-neutral-400"><span>Subtotal:</span><span>₹{selectedReceipt.subtotal || selectedReceipt.total}</span></div>
                 {selectedReceipt.discountAmount > 0 && <div className="flex justify-between text-orange-400"><span>Discount:</span><span>-₹{selectedReceipt.discountAmount}</span></div>}
+                {selectedReceipt.pointsDiscount > 0 && <div className="flex justify-between text-amber-400 font-bold"><span>Points Redeemed:</span><span>-₹{selectedReceipt.pointsDiscount}</span></div>}
                 <div className="flex justify-between font-black text-sm text-green-400 pt-1 border-t border-dashed border-neutral-800">
                   <span>Grand Total:</span><span>₹{selectedReceipt.total}</span>
                 </div>
@@ -2538,7 +2632,7 @@ export default function BbCafeDesktopPos() {
                   <SafeShare2 size={14} /> Send WhatsApp Bill
                 </button>
                 <button 
-                  onClick={() => setIsReceiptModalOpen(false)} 
+                  onClick={() => { setIsReceiptModalOpen(false); setTimeout(() => searchInputRef.current?.focus(), 60); }} 
                   className="flex-1 py-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 font-black uppercase text-xs rounded-xl"
                 >
                   Close [Esc]
@@ -2554,7 +2648,7 @@ export default function BbCafeDesktopPos() {
         {isHelpModalOpen && (
           <div 
             className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 cursor-pointer" 
-            onClick={() => setIsHelpModalOpen(false)}
+            onClick={() => { setIsHelpModalOpen(false); setTimeout(() => searchInputRef.current?.focus(), 60); }}
           >
             <motion.div 
               initial={{ scale: 0.95 }} 
@@ -2566,24 +2660,27 @@ export default function BbCafeDesktopPos() {
               <div className="flex justify-between items-center border-b border-neutral-800 pb-3">
                 <div className="flex items-center gap-2 text-yellow-500 font-black text-sm uppercase">
                   <SafeHelpCircle size={18} />
-                  <span>POS Keyboard Shortcuts (F1 - F10)</span>
+                  <span>POS Keyboard Shortcuts (F1 - F12)</span>
                 </div>
-                <button onClick={() => setIsHelpModalOpen(false)} className="text-neutral-400 hover:text-white p-1"><SafeX size={18} /></button>
+                <button onClick={() => { setIsHelpModalOpen(false); setTimeout(() => searchInputRef.current?.focus(), 60); }} className="text-neutral-400 hover:text-white p-1"><SafeX size={18} /></button>
               </div>
 
               <div className="space-y-2 text-xs max-h-80 overflow-y-auto pr-1">
                 {[
-                  { key: 'F1', desc: 'Open this Shortcut Help Sheet' },
-                  { key: 'F2', desc: 'Focus Item Search & hit [Enter] to quick-add' },
-                  { key: 'F3', desc: 'Park / Hold active cart' },
+                  { key: 'F1', desc: 'Open this Keyboard Shortcuts Guide' },
+                  { key: 'F2', desc: 'Focus Search Bar & hit [Enter] to auto-add item' },
+                  { key: 'F3', desc: 'Park / Hold active cart order' },
                   { key: 'F4', desc: 'Toggle Payment Mode (Cash / UPI / Split)' },
-                  { key: 'F5', desc: 'View & Recall Held / Parked Carts' },
-                  { key: 'F6', desc: 'Add Daily Drawer Expense (दूध, बर्फ, सब्ज़ी)' },
-                  { key: 'F7', desc: 'Send WhatsApp Receipt to customer phone' },
-                  { key: 'F8', desc: 'Display Dynamic UPI QR Code on screen' },
-                  { key: 'F9', desc: 'Quick Pay & Print Final Bill (+KOT)' },
-                  { key: 'F10', desc: 'Cash Tender / Change Calculator (वापसी पैसे)' },
-                  { key: 'Esc', desc: 'Close any active popup modal' },
+                  { key: 'F5', desc: 'Recall / Open Held / Parked Carts' },
+                  { key: 'F6', desc: 'Record Daily Drawer Expense (दूध, बर्फ, सब्ज़ी)' },
+                  { key: 'F7', desc: 'Send WhatsApp Receipt to customer mobile' },
+                  { key: 'F8', desc: 'Display Dynamic UPI QR Code on Terminal' },
+                  { key: 'F9', desc: 'Fast Pay & Print Bill (or Settle Table)' },
+                  { key: 'F10', desc: 'Cash Tender / Return Change Calculator' },
+                  { key: 'F11', desc: 'Open Customer Directory / Loyalty Points' },
+                  { key: 'F12', desc: 'Toggle Mode (Pickup ➔ Table ➔ Delivery)' },
+                  { key: 'Del', desc: 'Clear Current Cart Items quickly' },
+                  { key: 'Esc', desc: 'Close any active popup modal & refocus Search' },
                 ].map((s) => (
                   <div key={s.key} className="flex justify-between items-center p-2 rounded-xl bg-neutral-950 border border-neutral-800">
                     <span className="font-mono font-black text-orange-400 bg-orange-500/10 px-2.5 py-1 rounded-lg border border-orange-500/20">{s.key}</span>
@@ -2593,7 +2690,7 @@ export default function BbCafeDesktopPos() {
               </div>
 
               <button 
-                onClick={() => setIsHelpModalOpen(false)} 
+                onClick={() => { setIsHelpModalOpen(false); setTimeout(() => searchInputRef.current?.focus(), 60); }} 
                 className="w-full py-2.5 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 font-black uppercase text-xs rounded-xl transition-all"
               >
                 Close [Esc]
@@ -2608,7 +2705,7 @@ export default function BbCafeDesktopPos() {
         {isHeldCartsModalOpen && (
           <div 
             className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 cursor-pointer" 
-            onClick={() => setIsHeldCartsModalOpen(false)}
+            onClick={() => { setIsHeldCartsModalOpen(false); setTimeout(() => searchInputRef.current?.focus(), 60); }}
           >
             <motion.div 
               initial={{ scale: 0.95 }} 
@@ -2622,7 +2719,7 @@ export default function BbCafeDesktopPos() {
                   <SafePauseCircle size={18} />
                   <span>Held / Parked Orders ({heldCarts.length}) [F5]</span>
                 </div>
-                <button onClick={() => setIsHeldCartsModalOpen(false)} className="text-neutral-400 hover:text-white p-1"><SafeX size={18} /></button>
+                <button onClick={() => { setIsHeldCartsModalOpen(false); setTimeout(() => searchInputRef.current?.focus(), 60); }} className="text-neutral-400 hover:text-white p-1"><SafeX size={18} /></button>
               </div>
 
               <div className="space-y-2.5 max-h-80 overflow-y-auto pr-1">
@@ -2652,7 +2749,7 @@ export default function BbCafeDesktopPos() {
               </div>
 
               <button 
-                onClick={() => setIsHeldCartsModalOpen(false)} 
+                onClick={() => { setIsHeldCartsModalOpen(false); setTimeout(() => searchInputRef.current?.focus(), 60); }} 
                 className="w-full py-2.5 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 font-black uppercase text-xs rounded-xl transition-all"
               >
                 Close [Esc]
@@ -2667,7 +2764,7 @@ export default function BbCafeDesktopPos() {
         {isExpenseModalOpen && (
           <div 
             className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 cursor-pointer" 
-            onClick={() => setIsExpenseModalOpen(false)}
+            onClick={() => { setIsExpenseModalOpen(false); setTimeout(() => searchInputRef.current?.focus(), 60); }}
           >
             <motion.div 
               initial={{ scale: 0.95 }} 
@@ -2680,7 +2777,7 @@ export default function BbCafeDesktopPos() {
                 <h3 className="font-black text-sm uppercase text-red-400 flex items-center gap-2">
                   <Receipt size={16} /> Daily Expense Entry [F6]
                 </h3>
-                <button onClick={() => setIsExpenseModalOpen(false)} className="text-neutral-400 hover:text-white p-1"><SafeX size={18} /></button>
+                <button onClick={() => { setIsExpenseModalOpen(false); setTimeout(() => searchInputRef.current?.focus(), 60); }} className="text-neutral-400 hover:text-white p-1"><SafeX size={18} /></button>
               </div>
 
               <form onSubmit={handleSaveExpense} className="space-y-3 text-xs">
@@ -2719,7 +2816,7 @@ export default function BbCafeDesktopPos() {
                   </select>
                 </div>
                 <div className="flex gap-2 pt-2">
-                  <button type="button" onClick={() => setIsExpenseModalOpen(false)} className="flex-1 py-2.5 bg-neutral-800 text-neutral-300 font-black uppercase text-xs rounded-xl">Cancel [Esc]</button>
+                  <button type="button" onClick={() => { setIsExpenseModalOpen(false); setTimeout(() => searchInputRef.current?.focus(), 60); }} className="flex-1 py-2.5 bg-neutral-800 text-neutral-300 font-black uppercase text-xs rounded-xl">Cancel [Esc]</button>
                   <button type="submit" className="flex-1 py-2.5 bg-red-600 hover:bg-red-500 text-white font-black uppercase text-xs rounded-xl shadow-lg">Save Voucher</button>
                 </div>
               </form>
@@ -2733,7 +2830,7 @@ export default function BbCafeDesktopPos() {
         {isQrModalOpen && (
           <div 
             className="fixed inset-0 bg-black/85 backdrop-blur-sm z-50 flex items-center justify-center p-4 cursor-pointer" 
-            onClick={() => setIsQrModalOpen(false)}
+            onClick={() => { setIsQrModalOpen(false); setTimeout(() => searchInputRef.current?.focus(), 60); }}
           >
             <motion.div 
               initial={{ scale: 0.95 }} 
@@ -2746,7 +2843,7 @@ export default function BbCafeDesktopPos() {
                 <h3 className="font-black text-sm uppercase text-blue-400 flex items-center gap-2">
                   <SafeQrCode size={16} /> Dynamic UPI Payment QR [F8]
                 </h3>
-                <button onClick={() => setIsQrModalOpen(false)} className="text-neutral-400 hover:text-white p-1"><SafeX size={18} /></button>
+                <button onClick={() => { setIsQrModalOpen(false); setTimeout(() => searchInputRef.current?.focus(), 60); }} className="text-neutral-400 hover:text-white p-1"><SafeX size={18} /></button>
               </div>
 
               <div className="bg-white p-4 rounded-2xl inline-block shadow-xl">
@@ -2765,13 +2862,18 @@ export default function BbCafeDesktopPos() {
 
               <div className="flex gap-2">
                 <button 
-                  onClick={() => setIsQrModalOpen(false)} 
+                  onClick={() => { setIsQrModalOpen(false); setTimeout(() => searchInputRef.current?.focus(), 60); }} 
                   className="flex-1 py-2.5 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 font-black uppercase text-xs rounded-xl"
                 >
                   Close [Esc]
                 </button>
                 <button 
-                  onClick={() => { setPaymentMethod('upi'); setIsQrModalOpen(false); toast.success("Switched to UPI mode!"); }} 
+                  onClick={() => { 
+                    setPaymentMethod('upi'); 
+                    setIsQrModalOpen(false); 
+                    toast.success("Switched to UPI mode!"); 
+                    setTimeout(() => searchInputRef.current?.focus(), 60);
+                  }} 
                   className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-black uppercase text-xs rounded-xl shadow"
                 >
                   Confirm Paid
@@ -2787,7 +2889,7 @@ export default function BbCafeDesktopPos() {
         {isChangeModalOpen && (
           <div 
             className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 cursor-pointer" 
-            onClick={() => setIsChangeModalOpen(false)}
+            onClick={() => { setIsChangeModalOpen(false); setTimeout(() => searchInputRef.current?.focus(), 60); }}
           >
             <motion.div 
               initial={{ scale: 0.95 }} 
@@ -2800,7 +2902,7 @@ export default function BbCafeDesktopPos() {
                 <h3 className="font-black text-sm uppercase text-purple-400 flex items-center gap-2">
                   <SafeCalculator size={16} /> Return Change Calculator [F10]
                 </h3>
-                <button onClick={() => setIsChangeModalOpen(false)} className="text-neutral-400 hover:text-white p-1"><SafeX size={18} /></button>
+                <button onClick={() => { setIsChangeModalOpen(false); setTimeout(() => searchInputRef.current?.focus(), 60); }} className="text-neutral-400 hover:text-white p-1"><SafeX size={18} /></button>
               </div>
 
               <div className="space-y-3 text-xs">
@@ -2841,7 +2943,7 @@ export default function BbCafeDesktopPos() {
                 )}
 
                 <button 
-                  onClick={() => setIsChangeModalOpen(false)} 
+                  onClick={() => { setIsChangeModalOpen(false); setTimeout(() => searchInputRef.current?.focus(), 60); }} 
                   className="w-full py-2.5 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 font-black uppercase text-xs rounded-xl transition-all mt-2"
                 >
                   Done / Close [Esc]
@@ -2852,12 +2954,15 @@ export default function BbCafeDesktopPos() {
         )}
       </AnimatePresence>
 
-      {/* MODAL 8: BILLING VARIATION & COOKING TAGS */}
+      {/* MODAL 8: BILLING VARIATION & COOKING TAGS (KEYBOARD AUTO-FOCUS & TAB BYPASS) */}
       <AnimatePresence>
         {isVariationModalOpen && selectedProductForVariation && (
           <div 
             className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4 cursor-pointer" 
-            onClick={() => setIsVariationModalOpen(false)}
+            onClick={() => {
+              setIsVariationModalOpen(false);
+              setTimeout(() => searchInputRef.current?.focus(), 60);
+            }}
           >
             <motion.div 
               initial={{ scale: 0.95 }} 
@@ -2867,40 +2972,80 @@ export default function BbCafeDesktopPos() {
               className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 max-w-sm w-full rounded-3xl p-6 shadow-2xl space-y-4 cursor-default"
             >
               <div className="flex justify-between items-center border-b pb-3">
-                <h3 className="font-black text-sm uppercase text-orange-500">{selectedProductForVariation.name}</h3>
-                <button onClick={() => setIsVariationModalOpen(false)} className="text-neutral-400 hover:text-white p-1"><SafeX size={18} /></button>
+                <h3 className="font-black text-sm uppercase text-orange-500">
+                  {selectedProductForVariation.name}
+                </h3>
+                <button 
+                  tabIndex={-1}
+                  onClick={() => {
+                    setIsVariationModalOpen(false);
+                    setTimeout(() => searchInputRef.current?.focus(), 60);
+                  }} 
+                  className="text-neutral-400 hover:text-white p-1"
+                >
+                  <SafeX size={18} />
+                </button>
               </div>
 
               <div className="space-y-3">
+                {/* SIZE / PORTION SELECTION WITH KEYBOARD SUPPORT */}
                 {selectedProductForVariation.variants && (
                   <div>
-                    <label className="text-xs font-bold uppercase text-neutral-400 block mb-1.5">Size / Portion:</label>
+                    <label className="text-xs font-bold uppercase text-neutral-400 block mb-1.5">
+                      Size / Portion: <span className="text-[10px] text-orange-400 font-normal">([Tab] to change, [Enter] to Add)</span>
+                    </label>
                     <div className="grid grid-cols-2 gap-2">
-                      {Object.entries(selectedProductForVariation.variants).map(([size, price]: any) => (
-                        <button 
-                          key={size}
-                          onClick={() => {
-                            setSelectedSize(size);
-                            setSelectedSizePrice(Number(price) || 100);
-                          }}
-                          className={`py-2 rounded-xl text-xs font-black uppercase border transition-all ${selectedSize.toLowerCase() === size.toLowerCase() ? 'bg-orange-600 text-white border-orange-600' : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-400 border-neutral-700'}`}
-                        >
-                          {size} (₹{price})
-                        </button>
-                      ))}
+                      {Object.entries(selectedProductForVariation.variants).map(([size, price]: any, idx: number) => {
+                        const isSelected = selectedSize.toLowerCase() === size.toLowerCase();
+                        return (
+                          <button 
+                            key={size}
+                            ref={idx === 0 ? firstVariantButtonRef : null}
+                            type="button"
+                            tabIndex={0}
+                            // Tab से फ़ोकस होते ही साइज़ अपने-आप सेलेक्ट हो जाएगा
+                            onFocus={() => {
+                              setSelectedSize(size);
+                              setSelectedSizePrice(Number(price) || 100);
+                            }}
+                            onClick={() => {
+                              setSelectedSize(size);
+                              setSelectedSizePrice(Number(price) || 100);
+                            }}
+                            onKeyDown={(e) => {
+                              // यदि साइज़ बटन पर Enter दबाएं, तो सीधे तुरंत कार्ट में ऐड हो जाए
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                handleAddCustomizedItemToCart();
+                              }
+                            }}
+                            className={`py-2 px-3 rounded-xl text-xs font-black uppercase border transition-all outline-none focus:ring-2 focus:ring-orange-500 ${
+                              isSelected 
+                                ? 'bg-orange-600 text-white border-orange-600 shadow-md ring-2 ring-orange-400' 
+                                : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-400 border-neutral-700 hover:border-orange-500'
+                            }`}
+                          >
+                            {size} (₹{price})
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
                 )}
 
+                {/* COOKING INSTRUCTIONS - BYPASSED BY TAB KEY */}
                 <div>
-                  <label className="text-xs font-bold uppercase text-neutral-400 block mb-1">Quick Cooking Instructions:</label>
+                  <label className="text-xs font-bold uppercase text-neutral-400 block mb-1">
+                    Quick Cooking Instructions (Optional):
+                  </label>
                   <div className="flex flex-wrap gap-1.5">
                     {COOKING_TAGS.map((tag) => (
                       <button
                         key={tag}
                         type="button"
+                        tabIndex={-1}
                         onClick={() => setItemNoteInput(prev => prev ? `${prev}, ${tag}` : tag)}
-                        className="px-2 py-1 bg-neutral-100 dark:bg-neutral-800 hover:border-orange-500 border border-neutral-700 rounded-lg text-[10px] font-bold text-neutral-300 transition-all"
+                        className="px-2 py-1 bg-neutral-100 dark:bg-neutral-800 hover:border-orange-500 border border-neutral-700 rounded-lg text-[10px] font-bold text-neutral-300 transition-all cursor-pointer"
                       >
                         {tag}
                       </button>
@@ -2908,31 +3053,43 @@ export default function BbCafeDesktopPos() {
                   </div>
                 </div>
 
+                {/* CUSTOM NOTE - BYPASSED BY TAB KEY */}
                 <div>
-                  <label className="text-xs font-bold uppercase text-neutral-400 block mb-1">Custom Note / Request:</label>
+                  <label className="text-xs font-bold uppercase text-neutral-400 block mb-1">
+                    Custom Note / Request:
+                  </label>
                   <input 
                     type="text" 
+                    tabIndex={-1}
                     placeholder="e.g. Extra hot, Less sugar..." 
                     value={itemNoteInput}
                     onChange={e => setItemNoteInput(e.target.value)}
-                    className="w-full bg-neutral-100 dark:bg-neutral-800 border border-neutral-700 rounded-xl px-3 py-2 text-xs outline-none" 
+                    className="w-full bg-neutral-100 dark:bg-neutral-800 border border-neutral-700 rounded-xl px-3 py-2 text-xs outline-none focus:border-orange-500" 
                   />
                 </div>
               </div>
 
+              {/* ACTION BUTTONS */}
               <div className="flex gap-2 pt-2">
                 <button 
                   type="button" 
-                  onClick={() => setIsVariationModalOpen(false)} 
+                  tabIndex={-1}
+                  onClick={() => {
+                    setIsVariationModalOpen(false);
+                    setTimeout(() => searchInputRef.current?.focus(), 60);
+                  }} 
                   className="flex-1 py-3 bg-neutral-200 dark:bg-neutral-800 text-neutral-400 font-black uppercase text-xs rounded-xl"
                 >
                   Cancel [Esc]
                 </button>
                 <button 
+                  ref={addToCartButtonRef}
+                  type="button"
+                  tabIndex={0}
                   onClick={handleAddCustomizedItemToCart} 
-                  className="flex-1 bg-green-600 hover:bg-green-500 text-white font-black py-3 rounded-xl text-xs uppercase shadow"
+                  className="flex-1 bg-green-600 hover:bg-green-500 text-white font-black py-3 rounded-xl text-xs uppercase shadow outline-none focus:ring-2 focus:ring-green-400 focus:bg-green-500"
                 >
-                  Add to Cart
+                  Add to Cart [Enter]
                 </button>
               </div>
             </motion.div>
@@ -2940,7 +3097,7 @@ export default function BbCafeDesktopPos() {
         )}
       </AnimatePresence>
 
-      {/* CUSTOMER DIRECTORY MODAL */}
+      {/* CUSTOMER DIRECTORY MODAL [F11] */}
       <CustomerDirectoryModal 
         isCustomerModalOpen={isCustomerModalOpen} 
         setIsCustomerModalOpen={setIsCustomerModalOpen} 
@@ -2959,6 +3116,7 @@ export default function BbCafeDesktopPos() {
           setCustomerName(cust.name || ''); 
           setCustomerPoints(cust.points || 0); 
           setIsCustomerModalOpen(false);
+          setTimeout(() => searchInputRef.current?.focus(), 60);
         }} 
         handleLoadCustomerHistory={() => {}} 
         handleStartEditProfile={() => {}} 
