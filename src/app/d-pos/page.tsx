@@ -1113,6 +1113,7 @@ export default function BbCafeDesktopPos() {
   };
 
   // THERMAL PRINTING
+  // UPDATED THERMAL PRINTING WITH VERDANA FONT & QR CODE LOAD WAITER
   const handlePrintReceiptDirect = async (orderObj: any, isKot = false): Promise<void> => {
     return new Promise((resolve) => {
       if (!orderObj || !orderObj.items || orderObj.items.length === 0) return resolve();
@@ -1124,10 +1125,40 @@ export default function BbCafeDesktopPos() {
       }
 
       printWindow.document.write('<!DOCTYPE html><html><head><title>Print Receipt</title>');
+      
+      // Inject Strict Verdana Font and 80mm Roll CSS
+      printWindow.document.write(`
+        <style>
+          @page { 
+            size: 80mm auto; 
+            margin: 0mm !important; 
+          }
+          * { 
+            font-family: Verdana, Geneva, Tahoma, sans-serif !important;
+            box-sizing: border-box;
+          }
+          html, body { 
+            margin: 0 !important; 
+            padding: 0 !important; 
+            width: 80mm !important; 
+            background: #ffffff !important;
+            color: #000000 !important;
+            height: auto !important;
+            min-height: 0 !important;
+          }
+          #print-root { 
+            width: 80mm !important; 
+            margin: 0 auto !important; 
+            padding: 0 !important; 
+          }
+        </style>
+      `);
+
       Array.from(document.querySelectorAll('link[rel="stylesheet"], style')).forEach((styleTag) => {
         printWindow.document.write(styleTag.outerHTML);
       });
-      printWindow.document.write('</head><body class="bg-white text-black"><div id="print-root"></div></body></html>');
+
+      printWindow.document.write('</head><body><div id="print-root"></div></body></html>');
       printWindow.document.close();
 
       const container = printWindow.document.getElementById('print-root');
@@ -1139,18 +1170,53 @@ export default function BbCafeDesktopPos() {
           root.render(<PrintCustomerReceipt orderObj={orderObj} currentUser={currentUser} />);
         }
 
-        setTimeout(() => {
-          printWindow.focus();
-          printWindow.print();
-          printWindow.close();
-          resolve();
-        }, 500);
+        // WAIT FOR QR CODE IMAGE TO FULLY LOAD BEFORE PRINTING
+        const triggerPrintWhenImagesReady = () => {
+          const images = Array.from(printWindow.document.images);
+          if (images.length === 0) {
+            printWindow.focus();
+            printWindow.print();
+            printWindow.close();
+            resolve();
+            return;
+          }
+
+          let loadedCount = 0;
+          const checkDone = () => {
+            loadedCount++;
+            if (loadedCount >= images.length) {
+              printWindow.focus();
+              printWindow.print();
+              printWindow.close();
+              resolve();
+            }
+          };
+
+          images.forEach((img) => {
+            if (img.complete) {
+              checkDone();
+            } else {
+              img.onload = checkDone;
+              img.onerror = checkDone; // Don't hang if offline
+            }
+          });
+
+          // Maximum safety timeout (1 second max wait)
+          setTimeout(() => {
+            printWindow.focus();
+            printWindow.print();
+            printWindow.close();
+            resolve();
+          }, 1000);
+        };
+
+        // Give React 150ms to mount DOM elements, then wait for images
+        setTimeout(triggerPrintWhenImagesReady, 150);
       } else {
         resolve();
       }
     });
   };
-
   // SAVE TABLE ORDER KOT ONLY
   const handleSaveTableOrderKotOnly = async () => {
     if (cart.length === 0 || isSubmittingOrder) return;
