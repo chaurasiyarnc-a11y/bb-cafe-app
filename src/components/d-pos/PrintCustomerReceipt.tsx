@@ -14,7 +14,7 @@ export default function PrintCustomerReceipt({ orderObj, currentUser }: PrintRec
     : new Date(orderObj.timestamp || Date.now());
 
   // FIXED VALID UPI ID WITH '@' SIGN
-  let upiId = orderObj.upiId || 'Q231190930@ybl';
+  let upiId = orderObj.upiId || 'Q991347275@ybl';
   if (!upiId.includes('@') && upiId.includes('ybl')) {
     upiId = upiId.replace('ybl', '@ybl');
   }
