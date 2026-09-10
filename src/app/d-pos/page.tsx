@@ -1262,6 +1262,7 @@ export default function BbCafeDesktopPos() {
   };
 
   // FINAL CHECKOUT & PAY [F9] (WITH LOYALTY SAVED)
+  // FINAL CHECKOUT & PAY [F9] (WITH LOYALTY SAVED)
   const handleFinalCheckoutAndPrintBill = async () => {
     if (cart.length === 0 || isSubmittingOrder) return;
     setIsSubmittingOrder(true);
@@ -1276,12 +1277,13 @@ export default function BbCafeDesktopPos() {
 
     try {
       let billNumber: number;
-
       let remainingPts = customerPoints;
+
+      // यदि 10 अंकों का मोबाइल नंबर है, तो डेटाबेस में लॉयल्टी अपडेट करें
       if (cleanPhone.length === 10) {
         const userRef = doc(db, "customer_points", cleanPhone);
         const userDoc = await getDoc(userRef);
-        const prevPoints = userDoc.exists() ? (userDoc.data().points || 0) : 0;
+        const prevPoints = userDoc.exists() ? (Number(userDoc.data().points) || 0) : 0;
         
         remainingPts = Math.max(0, prevPoints - redeemed) + earned;
         await setDoc(userRef, { 
@@ -1313,7 +1315,9 @@ export default function BbCafeDesktopPos() {
           splitUpiAmount: paymentMethod === 'split' ? splitUpiAmount : 0,
           pointsEarned: earned,
           pointsRedeemed: redeemed,
+          pointsDiscount: redeemed,
           remainingPoints: remainingPts,
+          customerPoints: remainingPts,
           upiId: upiIdConfig,
           settledAt: new Date()
         };
@@ -1331,20 +1335,34 @@ export default function BbCafeDesktopPos() {
         localStorage.setItem("bb_pos_local_bill_counter_pc", String(billNumber));
 
         const orderObj = { 
-          billNumber, tokenNumber: token, customerName: customerName || "Walk-in Guest", 
-          customerPhone: cleanPhone ? `+91${cleanPhone}` : "", items: cart, 
-          subtotal, discountType, discountValue, discountAmount: discountAmt, 
-          gstRate: gstEnabled ? gstRate : 0, gstAmount: getGstAmountCalculated(), 
-          deliveryFee: getDeliveryCharge(), total: finalTotal, timestamp: new Date(), 
-          status: 'completed', fulfillmentType, deliveryArea: fulfillmentType === "delivery" ? selectedArea.name : "", 
+          billNumber, 
+          tokenNumber: token, 
+          customerName: customerName || "Walk-in Guest", 
+          customerPhone: cleanPhone ? `+91${cleanPhone}` : "", 
+          items: cart, 
+          subtotal, 
+          discountType, 
+          discountValue, 
+          discountAmount: discountAmt, 
+          gstRate: gstEnabled ? gstRate : 0, 
+          gstAmount: getGstAmountCalculated(), 
+          deliveryFee: getDeliveryCharge(), 
+          total: finalTotal, 
+          timestamp: new Date(), 
+          status: 'completed', 
+          fulfillmentType, 
+          deliveryArea: fulfillmentType === "delivery" ? selectedArea.name : "", 
           tableNumber: fulfillmentType === 'table' ? tableNumber : '', 
           paymentMethod, 
           splitCashAmount: paymentMethod === 'split' ? splitCashAmount : 0,
           splitUpiAmount: paymentMethod === 'split' ? splitUpiAmount : 0,
-          source: 'PC_POS', address,
+          source: 'PC_POS', 
+          address,
           pointsEarned: earned,
           pointsRedeemed: redeemed, 
+          pointsDiscount: redeemed,
           remainingPoints: remainingPts,
+          customerPoints: remainingPts,
           upiId: upiIdConfig
         };
 
@@ -1357,8 +1375,14 @@ export default function BbCafeDesktopPos() {
         await handlePrintReceiptDirect(orderObj, false);
       }
 
-      setCart([]); setCustomerPhone(''); setCustomerName(''); setCustomerPoints(0); setDiscountValue(0); setShowNewCustForm(false);
-      setIsRedeemingPoints(false); setPointsToRedeem(0);
+      setCart([]); 
+      setCustomerPhone(''); 
+      setCustomerName(''); 
+      setCustomerPoints(0); 
+      setDiscountValue(0); 
+      setShowNewCustForm(false);
+      setIsRedeemingPoints(false); 
+      setPointsToRedeem(0);
       localStorage.removeItem("bb_pos_saved_cart_pc");
     } catch (err) {
       console.error(err);
@@ -1367,7 +1391,6 @@ export default function BbCafeDesktopPos() {
       setIsSubmittingOrder(false);
     }
   };
-
   const handleToggleStock = async (productId: string, currentStatus: boolean) => {
     triggerBeep('tap');
     try {
