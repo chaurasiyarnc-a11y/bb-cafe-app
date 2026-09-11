@@ -100,7 +100,7 @@ const COOKING_TAGS = ['🌶️ Less Spicy', '🧅 No Onion/Garlic', '📦 Parcel
 
 let globalAudioCtx: AudioContext | null = null;
 
-// ⭐ CATEGORY-WISE NUMERIC CODE SERIES (बर्गर: 1 से, चायनीज: 101 से, रोटी/पराठा: 201 से...) ⭐
+// ⭐ CATEGORY-WISE NUMERIC CODE SERIES (1 से Burger, 100 से Chinese, 200 से Bread/Paratha...) ⭐
 const getCategoryBaseCode = (catName: string): number => {
   const c = (catName || '').trim().toLowerCase();
   if (c.includes('burger')) return 1;
@@ -138,6 +138,7 @@ export default function BbCafeDesktopPos() {
   const [kotEnabled, setKotEnabled] = useState<boolean>(true); 
   const [upiIdConfig, setUpiIdConfig] = useState<string>('Q991347275@ybl');
   const [ownerPhoneConfig, setOwnerPhoneConfig] = useState<string>('919714293759');
+  const [manualInvoiceCounterInput, setManualInvoiceCounterInput] = useState<string>('200');
 
   // Customer Directory States
   const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false);
@@ -255,6 +256,19 @@ export default function BbCafeDesktopPos() {
   const addToCartButtonRef = useRef<HTMLButtonElement | null>(null);
 
   const getSanitizedPhone = (p: string) => p.replace(/\D/g, '').slice(-10);
+
+  // ⭐ INVOICE NUMBER GENERATOR (STARTS AT 200) ⭐
+  const getNextBillNumber = (): number => {
+    const saved = localStorage.getItem("bb_pos_local_bill_counter_pc");
+    let current = saved ? parseInt(saved, 10) : 199;
+    if (isNaN(current) || current < 199 || current >= 5000) {
+      current = 199;
+    }
+    const next = current + 1;
+    localStorage.setItem("bb_pos_local_bill_counter_pc", String(next));
+    setManualInvoiceCounterInput(String(next + 1));
+    return next;
+  };
 
   const triggerBeep = (type: 'tap' | 'success' | 'alarm') => {
     try {
@@ -420,7 +434,7 @@ export default function BbCafeDesktopPos() {
     toast.success("Held cart removed.");
   };
 
-  // Load Saved Settings
+  // Load Saved Settings & Initialize Bill Counter at 199 (Next will be 200)
   useEffect(() => {
     const savedHeld = localStorage.getItem("bb_pos_held_carts");
     if (savedHeld) {
@@ -435,6 +449,14 @@ export default function BbCafeDesktopPos() {
 
     const savedOwnerPhone = localStorage.getItem("bb_pos_owner_phone");
     if (savedOwnerPhone) setOwnerPhoneConfig(savedOwnerPhone);
+
+    const savedCounter = localStorage.getItem("bb_pos_local_bill_counter_pc");
+    if (!savedCounter || Number(savedCounter) < 199 || Number(savedCounter) >= 5000) {
+      localStorage.setItem("bb_pos_local_bill_counter_pc", "199");
+      setManualInvoiceCounterInput("200");
+    } else {
+      setManualInvoiceCounterInput(String(Number(savedCounter) + 1));
+    }
 
     const savedUser = localStorage.getItem("bb_pos_user_pc");
     if (savedUser) { 
@@ -465,7 +487,7 @@ export default function BbCafeDesktopPos() {
   // Clean Categories Deduplication
   const normalizeCategoryList = (rawItems: any[]) => {
     const cleaned = rawItems.map((i: any) => {
-      const c = (i.category || 'Fast Food').trim();
+      const c = (i.category || 'Burgers').trim();
       return c.charAt(0).toUpperCase() + c.slice(1);
     });
     const unique = Array.from(new Set(cleaned.filter(Boolean))) as string[];
@@ -549,6 +571,15 @@ export default function BbCafeDesktopPos() {
     }
   }, [isVariationModalOpen]);
 
+  // Real-time listener for orders to sync active tables immediately
+  useEffect(() => {
+    const q = query(collection(db, "orders"), orderBy("timestamp", "desc"), limit(50));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      setLiveOrders(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
+    });
+    return () => unsubscribe();
+  }, []);
+
   // Search by exact numeric code or fast-add
   const handleSearchInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
@@ -556,7 +587,6 @@ export default function BbCafeDesktopPos() {
       const cleanQ = searchQuery.trim().toLowerCase();
       if (!cleanQ) return;
 
-      // 1. Exact numeric item code match (e.g. 1, 2, 101, 201)
       const exactCodeMatch = products.find(p => String(p.itemCode || '').trim().toLowerCase() === cleanQ);
       if (exactCodeMatch) {
         handleItemClick(exactCodeMatch);
@@ -566,7 +596,6 @@ export default function BbCafeDesktopPos() {
         return;
       }
 
-      // 2. Name or partial match
       if (filteredMenu.length > 0) {
         const item = filteredMenu[0];
         handleItemClick(item);
@@ -747,7 +776,7 @@ export default function BbCafeDesktopPos() {
 
     const finalCategory = isAddingNewCatInput && newCustomCategoryName.trim() 
       ? newCustomCategoryName.trim() 
-      : itemCatInput.trim() || 'Fast Food';
+      : itemCatInput.trim() || 'Burgers';
 
     try {
       const cleanVariants = (hasVariants && Object.keys(itemVariantsList).length > 0) ? itemVariantsList : null;
@@ -979,7 +1008,7 @@ export default function BbCafeDesktopPos() {
     });
   };
 
-  // ⭐ SAVE RUNNING TABLE ORDER & PRINT KOT (TABLE BILL REMAINS OPEN IN SIDEBAR & CART) ⭐
+  // ⭐ SAVE & UPDATE RUNNING TABLE ORDER (BILL REMAINS SAVED IN SIDEBAR & FREES UP CART) ⭐
   const handleSaveTableOrderKotOnly = async () => {
     if (cart.length === 0 || isSubmittingOrder) return;
     setIsSubmittingOrder(true);
@@ -993,7 +1022,7 @@ export default function BbCafeDesktopPos() {
       let billNumber: number;
 
       if (activeEditingOrderId) {
-        billNumber = activeEditingBillNumber || 5001;
+        billNumber = activeEditingBillNumber || getNextBillNumber();
         const orderRef = doc(db, "orders", activeEditingOrderId);
         const updatedOrderObj = { 
           items: cart, 
@@ -1014,44 +1043,78 @@ export default function BbCafeDesktopPos() {
         };
 
         await updateDoc(orderRef, updatedOrderObj);
+
+        // Immediately reflect in local state for instant sidebar update
+        setLiveOrders(prev => prev.map(o => o.id === activeEditingOrderId ? { ...o, ...updatedOrderObj } : o));
+
         triggerBeep('success');
         toast.success(`Table ${tableNumber} updated! Running KOT printed. 🪑`);
 
-        await handlePrintReceiptDirect({ ...updatedOrderObj, billNumber, tokenNumber: token, fulfillmentType: 'table' }, true);
+        if (kotEnabled) {
+          await handlePrintReceiptDirect({ ...updatedOrderObj, billNumber, tokenNumber: token, fulfillmentType: 'table' }, true);
+        }
       } else {
-        billNumber = Number(localStorage.getItem("bb_pos_local_bill_counter_pc") || 5000) + 1;
-        localStorage.setItem("bb_pos_local_bill_counter_pc", String(billNumber));
+        billNumber = getNextBillNumber();
 
         const orderObj = { 
-          billNumber, tokenNumber: token, customerName: customerName || "Walk-in Guest", 
-          customerPhone: customerPhone ? `+91${getSanitizedPhone(customerPhone)}` : "", items: cart, 
-          subtotal, discountType, discountValue, discountAmount: discountAmt, 
-          gstRate: gstEnabled ? gstRate : 0, gstAmount: getGstAmountCalculated(), 
-          deliveryFee: 0, total: finalTotal, timestamp: new Date(), 
-          status: 'pending', fulfillmentType: 'table', deliveryArea: "", 
-          tableNumber: tableNumber, paymentMethod, source: 'PC_POS', address: '',
+          billNumber, 
+          tokenNumber: token, 
+          customerName: customerName || "Walk-in Guest", 
+          customerPhone: customerPhone ? `+91${getSanitizedPhone(customerPhone)}` : "", 
+          items: cart, 
+          subtotal, 
+          discountType, 
+          discountValue, 
+          discountAmount: discountAmt, 
+          gstRate: gstEnabled ? gstRate : 0, 
+          gstAmount: getGstAmountCalculated(), 
+          deliveryFee: 0, 
+          total: finalTotal, 
+          timestamp: new Date(), 
+          status: 'pending', 
+          fulfillmentType: 'table', 
+          deliveryArea: "", 
+          tableNumber: tableNumber, 
+          paymentMethod, 
+          source: 'PC_POS', 
+          address: '',
           upiId: upiIdConfig
         };
 
         const docRef = await addDoc(collection(db, "orders"), orderObj);
-        setActiveEditingOrderId(docRef.id);
-        setActiveEditingBillNumber(billNumber);
+        
+        // Immediately reflect in local state for instant sidebar update
+        setLiveOrders(prev => [{ id: docRef.id, ...orderObj }, ...prev]);
 
         triggerBeep('success');
-        toast.success(`Table ${tableNumber} Saved! KOT printed. 🪑`);
+        toast.success(`Table ${tableNumber} Saved on Table! KOT printed. 🪑`);
 
-        await handlePrintReceiptDirect(orderObj, true);
+        if (kotEnabled) {
+          await handlePrintReceiptDirect(orderObj, true);
+        }
       }
 
+      // ⭐ CLEAR CART SO CASHIER CAN ATTEND OTHER TABLES ⭐
+      setCart([]); 
+      setCustomerPhone(''); 
+      setCustomerName(''); 
+      setDiscountValue(0); 
+      setIsRedeemingPoints(false); 
+      setPointsToRedeem(0);
+      setActiveEditingOrderId(null);
+      setActiveEditingBillNumber(null);
+      localStorage.removeItem("bb_pos_saved_cart_pc");
       setTimeout(() => searchInputRef.current?.focus(), 60);
+
     } catch (err) {
+      console.error(err);
       toast.error("Failed to save table order");
     } finally {
       setIsSubmittingOrder(false);
     }
   };
 
-  // Final Checkout & Pay [F9]
+  // Final Checkout & Settle [F9] (Invoice Starts from 200)
   const handleFinalCheckoutAndPrintBill = async () => {
     if (cart.length === 0 || isSubmittingOrder) return;
     setIsSubmittingOrder(true);
@@ -1077,7 +1140,7 @@ export default function BbCafeDesktopPos() {
       }
 
       if (activeEditingOrderId) {
-        billNumber = activeEditingBillNumber || 5001;
+        billNumber = activeEditingBillNumber || getNextBillNumber();
         const orderRef = doc(db, "orders", activeEditingOrderId);
         const finalOrderObj = { 
           items: cart, 
@@ -1105,6 +1168,10 @@ export default function BbCafeDesktopPos() {
         };
 
         await updateDoc(orderRef, finalOrderObj);
+        
+        // Remove from active tables
+        setLiveOrders(prev => prev.filter(o => o.id !== activeEditingOrderId));
+
         triggerBeep('success');
         toast.success(`Table ${tableNumber} Settled & Bill #${billNumber} Printed! ✅`);
 
@@ -1113,8 +1180,7 @@ export default function BbCafeDesktopPos() {
         setActiveEditingOrderId(null);
         setActiveEditingBillNumber(null);
       } else {
-        billNumber = Number(localStorage.getItem("bb_pos_local_bill_counter_pc") || 5000) + 1;
-        localStorage.setItem("bb_pos_local_bill_counter_pc", String(billNumber));
+        billNumber = getNextBillNumber();
 
         const orderObj = { 
           billNumber, 
@@ -1455,7 +1521,7 @@ export default function BbCafeDesktopPos() {
                   {!isSidebarCollapsed && (
                     <div className="truncate">
                       <h1 className="text-xs font-black uppercase text-orange-600 dark:text-yellow-500 truncate">Bum Bum Cafe</h1>
-                      <span className="text-[10px] text-neutral-600 dark:text-neutral-400 font-bold">POS Pro v3.6</span>
+                      <span className="text-[10px] text-neutral-600 dark:text-neutral-400 font-bold">POS Pro v3.7</span>
                     </div>
                   )}
                 </div>
@@ -1553,7 +1619,7 @@ export default function BbCafeDesktopPos() {
                     <div className="mb-2 bg-amber-500/20 border border-amber-500 p-2.5 rounded-xl flex items-center justify-between shrink-0 shadow-sm">
                       <div className="flex items-center gap-2 text-amber-800 dark:text-amber-300 text-xs font-black uppercase">
                         <SafeEdit3 size={16} />
-                        <span>🪑 Running Table: {tableNumber} (Bill #{activeEditingBillNumber}) - Add items or Settle</span>
+                        <span>🪑 Table {tableNumber} (Active Bill #{activeEditingBillNumber}) - Add more items or Settle</span>
                       </div>
                       <button onClick={() => { setActiveEditingOrderId(null); setActiveEditingBillNumber(null); setCart([]); }} className="text-neutral-600 dark:text-neutral-300 hover:text-black dark:hover:text-white text-xs font-bold underline">
                         Exit Table (Clear)
@@ -1817,6 +1883,7 @@ export default function BbCafeDesktopPos() {
                                   } else {
                                     setActiveEditingOrderId(null);
                                     setActiveEditingBillNumber(null);
+                                    setCart([]);
                                   }
                                 }}
                                 className={`py-1.5 px-1 rounded-lg text-xs font-black uppercase border transition-all text-center ${
@@ -1826,9 +1893,13 @@ export default function BbCafeDesktopPos() {
                                 }`}
                               >
                                 <span>{tName}</span>
-                                {occupiedOrder && (
+                                {occupiedOrder ? (
                                   <span className="block text-[8px] text-red-600 dark:text-red-400 font-black uppercase">
-                                    ₹{occupiedOrder.total}
+                                    ● Running (₹{occupiedOrder.total})
+                                  </span>
+                                ) : (
+                                  <span className="block text-[8px] text-green-600 dark:text-green-400 font-bold uppercase">
+                                    Free
                                   </span>
                                 )}
                               </button>
@@ -1918,7 +1989,7 @@ export default function BbCafeDesktopPos() {
                       <div className="space-y-1.5 shrink-0">
                         <button onClick={handleSaveTableOrderKotOnly} disabled={cart.length === 0 || isSubmittingOrder} className="w-full bg-amber-500 hover:bg-amber-400 text-black font-black py-2.5 rounded-xl uppercase tracking-wider text-xs flex items-center justify-center gap-2 shadow disabled:opacity-50">
                           {isSubmittingOrder ? <Loader2 className="animate-spin" size={15} /> : <SafePrinter size={15} />}
-                          <span>{activeEditingOrderId ? "Update Table & Print Running KOT" : "Save Table & Print KOT"}</span>
+                          <span>{activeEditingOrderId ? "Update Table & Print Running KOT" : "Save Table Order & KOT"}</span>
                         </button>
                         <button onClick={handleFinalCheckoutAndPrintBill} disabled={cart.length === 0 || isSubmittingOrder} className="w-full bg-green-600 hover:bg-green-500 text-white font-black py-2.5 rounded-xl uppercase tracking-wider text-xs flex items-center justify-center gap-2 shadow-lg disabled:opacity-50">
                           {isSubmittingOrder ? <Loader2 className="animate-spin" size={15} /> : <SafeFileText size={15} />}
@@ -2043,7 +2114,7 @@ export default function BbCafeDesktopPos() {
                   <select 
                     value={receiptsLimit} 
                     onChange={e => setReceiptsLimit(Number(e.target.value))} 
-                    className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 rounded-xl px-3 py-2 text-xs font-bold outline-none"
+                    className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 rounded-xl px-3 py-2 text-xs font-bold outline-none" 
                   >
                     <option value={30}>Last 30 Bills</option>
                     <option value={50}>Last 50 Bills</option>
@@ -2063,7 +2134,7 @@ export default function BbCafeDesktopPos() {
                         <div 
                           key={order.id} 
                           onClick={() => { setSelectedReceipt(order); setIsReceiptModalOpen(true); }} 
-                          className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 hover:border-orange-500 p-4 rounded-2xl flex justify-between items-center cursor-pointer transition-all shadow-sm"
+                          className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 hover:border-orange-500 p-4 rounded-2xl flex justify-between items-center cursor-pointer transition-all shadow-sm" 
                         >
                           <div>
                             <div className="flex items-center gap-2">
@@ -2217,17 +2288,18 @@ export default function BbCafeDesktopPos() {
               </div>
             )}
 
-            {/* TAB 5: TABLES MANAGER */}
+            {/* TAB 5: TABLES MANAGER (DINE-IN ACTIVE TABLES) */}
             {activeTab === 'tables' && (
               <div className="flex-1 p-6 h-full overflow-y-auto">
                 <div className="flex justify-between items-center mb-4">
                   <h2 className="text-sm font-black uppercase text-amber-600 dark:text-amber-500">Active Tables ({activeTableOrders.length})</h2>
+                  <p className="text-xs text-neutral-500">Click any table to add more items/KOT or settle the final bill.</p>
                 </div>
                 <div className="grid grid-cols-3 xl:grid-cols-4 gap-4">
                   {['Table 1', 'Table 2', 'Table 3', 'Table 4', 'Table 5', 'Table 6'].map((tName) => {
                     const order = activeTableOrders.find(o => o.tableNumber === tName);
                     return (
-                      <div key={tName} className={`border rounded-2xl p-4 flex flex-col justify-between shadow-sm transition-all ${order ? 'bg-white dark:bg-neutral-900 border-amber-500 ring-1 ring-amber-400' : 'bg-neutral-100 dark:bg-neutral-900 border-neutral-300 dark:border-neutral-800 opacity-60'}`}>
+                      <div key={tName} className={`border rounded-2xl p-4 flex flex-col justify-between shadow-sm transition-all ${order ? 'bg-white dark:bg-neutral-900 border-amber-500 ring-2 ring-amber-400/50' : 'bg-neutral-100 dark:bg-neutral-900 border-neutral-300 dark:border-neutral-800 opacity-60'}`}>
                         <div>
                           <div className="flex justify-between items-center border-b border-neutral-300 dark:border-neutral-800 pb-2 mb-3">
                             <span className="font-mono font-black text-amber-600 dark:text-amber-400 text-sm">🪑 {tName}</span>
@@ -2239,7 +2311,7 @@ export default function BbCafeDesktopPos() {
                           </div>
                           {order ? (
                             <>
-                              <p className="text-xs font-bold mb-2">👤 {order.customerName || 'Walk-in'}</p>
+                              <p className="text-xs font-bold mb-2">👤 {order.customerName || 'Walk-in Guest'} {order.customerPhone && `(${order.customerPhone})`}</p>
                               <div className="space-y-1.5 py-2 border-t border-dashed border-neutral-300 dark:border-neutral-800 mb-3 max-h-40 overflow-y-auto">
                                 {order.items?.map((it: any, idx: number) => (
                                   <div key={idx} className="flex justify-between text-xs font-medium">
@@ -2267,7 +2339,10 @@ export default function BbCafeDesktopPos() {
                                   setTableNumber(order.tableNumber || tName);
                                   setFulfillmentType('table');
                                   setCart(order.items || []);
+                                  setCustomerName(order.customerName || '');
+                                  setCustomerPhone(order.customerPhone || '');
                                   setActiveTab('billing');
+                                  toast.success(`Loaded ${tName} Bill #${order.billNumber}`);
                                   setTimeout(() => searchInputRef.current?.focus(), 80);
                                 }} 
                                 className="w-full bg-amber-500 hover:bg-amber-400 text-black font-black py-2.5 rounded-xl text-xs uppercase flex items-center justify-center gap-1 shadow"
@@ -2302,7 +2377,7 @@ export default function BbCafeDesktopPos() {
             {/* TAB 6: LIVE ORDERS */}
             {activeTab === 'orders' && (
               <div className="flex-1 p-6 h-full overflow-y-auto">
-                <h2 className="text-sm font-black uppercase text-orange-600 dark:text-orange-500 mb-4">Live Orders ({activeLiveOrders.length})</h2>
+                <h2 className="text-sm font-black uppercase text-orange-600 dark:text-orange-500 mb-4">Live Delivery & Pickup Orders ({activeLiveOrders.length})</h2>
                 <div className="grid grid-cols-3 gap-4">
                   {activeLiveOrders.length === 0 ? (
                     <div className="col-span-3 text-center py-24 text-neutral-500 font-bold">No active live orders.</div>
@@ -2355,6 +2430,27 @@ export default function BbCafeDesktopPos() {
                 <div className="max-w-xl w-full bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 p-6 rounded-3xl shadow-xl space-y-6">
                   <h3 className="text-sm font-black uppercase text-orange-600 dark:text-orange-500">POS & Hardware Settings</h3>
                   
+                  {/* INVOICE STARTING NUMBER CONFIG */}
+                  <div className="space-y-2 border-b border-neutral-300 dark:border-neutral-800 pb-4">
+                    <p className="text-xs font-bold uppercase">Next Bill / Invoice Number:</p>
+                    <div className="flex gap-2">
+                      <input 
+                        type="number" 
+                        value={manualInvoiceCounterInput} 
+                        onChange={e => setManualInvoiceCounterInput(e.target.value)}
+                        placeholder="e.g. 200"
+                        className="flex-1 bg-neutral-100 dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 rounded-xl px-3 py-2 text-xs font-mono font-bold outline-none" 
+                      />
+                      <button onClick={() => { 
+                        const num = parseInt(manualInvoiceCounterInput, 10);
+                        if (!isNaN(num) && num >= 1) {
+                          localStorage.setItem("bb_pos_local_bill_counter_pc", String(num - 1));
+                          toast.success(`Next Invoice will be #${num}! ✅`);
+                        }
+                      }} className="bg-orange-600 text-white px-4 rounded-xl text-xs font-black uppercase">Set Counter</button>
+                    </div>
+                  </div>
+
                   <div className="space-y-2 border-b border-neutral-300 dark:border-neutral-800 pb-4">
                     <p className="text-xs font-bold uppercase">Dynamic UPI ID (VPA for QR Code):</p>
                     <div className="flex gap-2">
@@ -2409,7 +2505,7 @@ export default function BbCafeDesktopPos() {
 
       {/* ALL POPUP MODALS */}
 
-      {/* MODAL 1: ADD / EDIT PRODUCT (WITH IMAGE URL & FULL VARIATION BUILDER) */}
+      {/* MODAL 1: ADD / EDIT PRODUCT */}
       <AnimatePresence>
         {isItemEditorModalOpen && (
           <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 cursor-pointer" onClick={() => setIsItemEditorModalOpen(false)}>
@@ -2472,7 +2568,7 @@ export default function BbCafeDesktopPos() {
                   )}
                 </div>
 
-                {/* ⭐ IMAGE URL BOX (RESTORED) ⭐ */}
+                {/* IMAGE URL BOX */}
                 <div>
                   <label className="text-neutral-700 dark:text-neutral-300 uppercase font-bold text-[10px] block mb-1">
                     Image URL (फोटो का लिंक / Web URL):
@@ -2486,7 +2582,7 @@ export default function BbCafeDesktopPos() {
                   />
                 </div>
 
-                {/* FULL VARIATION / SIZES BUILDER */}
+                {/* FULL VARIATION BUILDER */}
                 <div className="pt-3 border-t border-neutral-300 dark:border-neutral-800 space-y-3">
                   <div className="flex justify-between items-center">
                     <div>
@@ -2500,7 +2596,6 @@ export default function BbCafeDesktopPos() {
 
                   {hasVariants && (
                     <div className="bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 p-3 rounded-2xl space-y-3">
-                      {/* QUICK PRESETS */}
                       <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
                         <span className="text-[9px] font-bold text-neutral-600 uppercase mr-1">Presets:</span>
                         <button type="button" onClick={() => handleApplyVariantPreset('half_full')} className="px-2 py-1 bg-white dark:bg-neutral-800 hover:bg-neutral-200 rounded text-[10px] font-bold border border-neutral-300 dark:border-neutral-700">🍲 Half / Full</button>
@@ -2509,7 +2604,6 @@ export default function BbCafeDesktopPos() {
                         <button type="button" onClick={() => handleApplyVariantPreset('reg_large')} className="px-2 py-1 bg-white dark:bg-neutral-800 hover:bg-neutral-200 rounded text-[10px] font-bold border border-neutral-300 dark:border-neutral-700">🥤 Reg / Large</button>
                       </div>
 
-                      {/* ACTIVE VARIANT LIST */}
                       <div className="space-y-1.5">
                         {Object.entries(itemVariantsList).map(([vName, vPrice]: any) => (
                           <div key={vName} className="flex justify-between items-center bg-white dark:bg-neutral-900 px-3 py-2 rounded-xl border border-neutral-300 dark:border-neutral-800 font-bold">
@@ -2522,7 +2616,6 @@ export default function BbCafeDesktopPos() {
                         ))}
                       </div>
 
-                      {/* ADD CUSTOM VARIANT ROW */}
                       <div className="flex gap-2 pt-1">
                         <input 
                           type="text" 
@@ -2781,7 +2874,7 @@ export default function BbCafeDesktopPos() {
       <AnimatePresence>
         {isVariationModalOpen && selectedProductForVariation && (
           <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4 cursor-pointer" onClick={() => { setIsVariationModalOpen(false); setTimeout(() => searchInputRef.current?.focus(), 60); }}>
-            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} onClick={e => e.stopPropagation()} className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 max-w-sm w-full rounded-3xl p-6 shadow-2xl space-y-4 cursor-default">
+            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} onClick={e => e.stopPropagation()} className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 max-w-sm w-full rounded-3xl p-6 shadow-2xl space-y-4 cursor-default">
               <div className="flex justify-between items-center border-b pb-3">
                 <h3 className="font-black text-sm uppercase text-orange-600 dark:text-orange-500">{selectedProductForVariation.name}</h3>
                 <button tabIndex={-1} onClick={() => { setIsVariationModalOpen(false); setTimeout(() => searchInputRef.current?.focus(), 60); }} className="text-neutral-500"><SafeX size={18} /></button>
@@ -2876,5 +2969,4 @@ export default function BbCafeDesktopPos() {
     </div>
   );
 }
-
 
