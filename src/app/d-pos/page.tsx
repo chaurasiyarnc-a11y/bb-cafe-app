@@ -273,7 +273,6 @@ export default function BbCafeDesktopPos() {
   // Calculations
   const getCartSubtotal = () => cart.reduce((acc, i) => acc + (i.price * i.quantity), 0);
   
-  // Delivery Charge Calculation (Optional & Editable)
   const getDeliveryCharge = () => {
     if (fulfillmentType !== "delivery" || getCartSubtotal() === 0 || !applyDeliveryFee) {
       return 0;
@@ -346,6 +345,65 @@ export default function BbCafeDesktopPos() {
     }
   }, [cart, discountValue, discountType, isRedeemingPoints, pointsToRedeem, paymentMethod, fulfillmentType, applyDeliveryFee, customDeliveryFee]);
 
+  const saveHeldCartsToStorage = (newList: HeldCart[]) => {
+    setHeldCarts(newList);
+    localStorage.setItem("bb_pos_held_carts", JSON.stringify(newList));
+  };
+
+  // ⭐ DEFINING HOLD & RESTORE FUNCTIONS HERE (BEFORE KEYBOARD HANDLERS) ⭐
+  const handleHoldCurrentCart = () => {
+    if (cart.length === 0) return toast.error("Cart is empty!");
+    triggerBeep('tap');
+
+    const newHold: HeldCart = {
+      id: `hold_${Date.now()}`,
+      cart: [...cart],
+      customerName: customerName || 'Walk-in Guest',
+      customerPhone,
+      tableNumber,
+      fulfillmentType,
+      heldAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      total: getTotalBillPrice()
+    };
+
+    saveHeldCartsToStorage([newHold, ...heldCarts]);
+    toast.success(`Cart parked on Hold! [${newHold.customerName}]`, { icon: '⏸️' });
+
+    setCart([]);
+    setCustomerName('');
+    setCustomerPhone('');
+    setDiscountValue(0);
+    setIsRedeemingPoints(false);
+    setPointsToRedeem(0);
+    localStorage.removeItem("bb_pos_saved_cart_pc");
+    setTimeout(() => searchInputRef.current?.focus(), 60);
+  };
+
+  const handleRestoreHeldCart = (heldItem: HeldCart) => {
+    triggerBeep('tap');
+    if (cart.length > 0) {
+      if (!window.confirm("Replace active cart with this held order?")) return;
+    }
+    setCart(heldItem.cart);
+    setCustomerName(heldItem.customerName === 'Walk-in Guest' ? '' : heldItem.customerName);
+    setCustomerPhone(heldItem.customerPhone || '');
+    setTableNumber(heldItem.tableNumber || 'Table 1');
+    setFulfillmentType(heldItem.fulfillmentType || 'pickup');
+    
+    saveHeldCartsToStorage(heldCarts.filter(h => h.id !== heldItem.id));
+    setIsHeldCartsModalOpen(false);
+    setActiveTab('billing');
+    toast.success(`Restored order of ${heldItem.customerName}!`, { icon: '▶️' });
+    setTimeout(() => searchInputRef.current?.focus(), 60);
+  };
+
+  const handleDeleteHeldCart = (holdId: string) => {
+    triggerBeep('tap');
+    const updated = heldCarts.filter(h => h.id !== holdId);
+    saveHeldCartsToStorage(updated);
+    toast.success("Held cart removed.");
+  };
+
   // Load Saved Settings
   useEffect(() => {
     const savedHeld = localStorage.getItem("bb_pos_held_carts");
@@ -384,16 +442,11 @@ export default function BbCafeDesktopPos() {
     }
   }, []);
 
-  const saveHeldCartsToStorage = (newList: HeldCart[]) => {
-    setHeldCarts(newList);
-    localStorage.setItem("bb_pos_held_carts", JSON.stringify(newList));
-  };
-
   useEffect(() => {
     localStorage.setItem("bb_pos_saved_cart_pc", JSON.stringify(cart));
   }, [cart]);
 
-  // Smart Category Prefix Generator for Category-based Item Codes
+  // Smart Category Prefix Generator
   const getCategoryPrefix = (catName: string) => {
     const c = (catName || 'Fast Food').trim().toUpperCase();
     if (c.includes('PIZZA')) return 'PZ';
@@ -405,7 +458,6 @@ export default function BbCafeDesktopPos() {
     if (c.includes('SOUTH')) return 'SI';
     if (c.includes('CHINESE') || c.includes('NOODLE') || c.includes('MOMOS')) return 'CN';
     if (c.includes('DESSERT') || c.includes('ICE')) return 'DS';
-    // Fallback: take first 2 letters
     const clean = c.replace(/[^A-Z]/g, '');
     return clean.slice(0, 2) || 'IT';
   };
@@ -436,7 +488,7 @@ export default function BbCafeDesktopPos() {
     return ['All', ...unique.sort()];
   };
 
-  // Fetch Products & Ensure Category-based Item Codes
+  // Products Loading
   useEffect(() => {
     if (!isLoggedIn) return;
     (async () => {
@@ -456,8 +508,7 @@ export default function BbCafeDesktopPos() {
             };
           });
 
-          // Fill any missing item codes based on category prefix
-          items = items.map((item, idx, arr) => {
+          items = items.map((item, idx) => {
             if (!item.itemCode) {
               const prefix = getCategoryPrefix(item.category);
               return { ...item, itemCode: `${prefix}${idx + 1}` };
@@ -1247,7 +1298,7 @@ export default function BbCafeDesktopPos() {
     String(o.customerName || '').toLowerCase().includes(receiptSearchQuery.trim().toLowerCase())
   ), [pastReceipts, receiptSearchQuery]);
 
-  // Keyboard Shortcuts Handler
+  // ⭐ KEYBOARD SHORTCUTS HANDLER (PLACED SAFELY AFTER ALL FUNCTION DECLARATIONS) ⭐
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!isLoggedIn) return;
@@ -2037,6 +2088,34 @@ export default function BbCafeDesktopPos() {
                   </div>
                 </div>
 
+                {/* CASH DRAWER AUDIT */}
+                <div className="bg-neutral-900 border border-neutral-800 p-5 rounded-3xl space-y-4 shadow-xl">
+                  <div className="flex justify-between items-center border-b border-neutral-800 pb-3">
+                    <div>
+                      <h3 className="text-xs font-black uppercase text-yellow-400">Cash Drawer Audit (गल्ला मिलान)</h3>
+                      <p className="text-[11px] text-neutral-400">Expected Net Cash: <span className="font-mono text-green-400 font-bold">₹{reportSummary.netCashInDrawer}</span></p>
+                    </div>
+                    <button onClick={() => setIsExpenseModalOpen(true)} className="px-3 py-1.5 bg-red-600/10 text-red-400 hover:bg-red-600/20 border border-red-500/30 rounded-xl text-xs font-black uppercase">
+                      + Add Expense [F6]
+                    </button>
+                  </div>
+
+                  <div className="flex items-center gap-4">
+                    <input 
+                      type="number" 
+                      placeholder="Counted Cash in Drawer (₹)" 
+                      value={physicalCashInput}
+                      onChange={e => setPhysicalCashInput(e.target.value === '' ? '' : Number(e.target.value))}
+                      className="flex-1 bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-2.5 text-sm font-mono text-white outline-none" 
+                    />
+                    {physicalCashInput !== '' && (
+                      <div className={`text-xs font-black px-4 py-2.5 rounded-xl border ${Number(physicalCashInput) === reportSummary.netCashInDrawer ? 'bg-green-500/10 text-green-400 border-green-500/30' : Number(physicalCashInput) > reportSummary.netCashInDrawer ? 'bg-blue-500/10 text-blue-400 border-blue-500/30' : 'bg-red-500/10 text-red-400 border-red-500/30'}`}>
+                        {Number(physicalCashInput) === reportSummary.netCashInDrawer ? '✅ Matched!' : Number(physicalCashInput) > reportSummary.netCashInDrawer ? `⚠️ Excess: +₹${Number(physicalCashInput) - reportSummary.netCashInDrawer}` : `❌ Short: -₹${reportSummary.netCashInDrawer - Number(physicalCashInput)}`}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
                 {/* ITEM-WISE SALES TABLE */}
                 <div className="bg-neutral-900 border border-neutral-800 p-5 rounded-3xl space-y-3">
                   <h3 className="text-xs font-black uppercase text-yellow-400 flex items-center justify-between">
@@ -2233,11 +2312,9 @@ export default function BbCafeDesktopPos() {
         </>
       )}
 
-      {/* ======================================================== */}
-      {/*                    ALL POPUP MODALS                      */}
-      {/* ======================================================== */}
+      {/* ALL POPUP MODALS */}
 
-      {/* MODAL 1: ADD / EDIT PRODUCT WITH CATEGORY DROPDOWN & VARIATION BUILDER */}
+      {/* MODAL 1: ADD / EDIT PRODUCT */}
       <AnimatePresence>
         {isItemEditorModalOpen && (
           <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 cursor-pointer" onClick={() => setIsItemEditorModalOpen(false)}>
@@ -2264,7 +2341,6 @@ export default function BbCafeDesktopPos() {
                   </div>
                 </div>
 
-                {/* CATEGORY SELECTION WITH DROPDOWN + NEW CATEGORY OPTION */}
                 <div>
                   <div className="flex justify-between items-center mb-1">
                     <label className="text-neutral-400 uppercase font-bold text-[10px]">Category Selection *</label>
@@ -2300,7 +2376,7 @@ export default function BbCafeDesktopPos() {
                   )}
                 </div>
 
-                {/* ⭐ FULL VARIATION / SIZES BUILDER (HALF, FULL, PLAIN, BUTTER, ETC.) ⭐ */}
+                {/* FULL VARIATION / SIZES BUILDER */}
                 <div className="pt-3 border-t border-neutral-800 space-y-3">
                   <div className="flex justify-between items-center">
                     <div>
@@ -2314,7 +2390,6 @@ export default function BbCafeDesktopPos() {
 
                   {hasVariants && (
                     <div className="bg-neutral-950 border border-neutral-800 p-3 rounded-2xl space-y-3">
-                      {/* QUICK PRESETS */}
                       <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
                         <span className="text-[9px] font-bold text-neutral-400 uppercase mr-1">Presets:</span>
                         <button type="button" onClick={() => handleApplyVariantPreset('half_full')} className="px-2 py-1 bg-neutral-800 hover:bg-neutral-700 rounded text-[10px] font-bold border border-neutral-700">🍲 Half / Full</button>
@@ -2323,7 +2398,6 @@ export default function BbCafeDesktopPos() {
                         <button type="button" onClick={() => handleApplyVariantPreset('reg_large')} className="px-2 py-1 bg-neutral-800 hover:bg-neutral-700 rounded text-[10px] font-bold border border-neutral-700">🥤 Reg / Large</button>
                       </div>
 
-                      {/* ACTIVE VARIANT LIST */}
                       <div className="space-y-1.5">
                         {Object.entries(itemVariantsList).map(([vName, vPrice]: any) => (
                           <div key={vName} className="flex justify-between items-center bg-neutral-900 px-3 py-2 rounded-xl border border-neutral-800">
@@ -2336,7 +2410,6 @@ export default function BbCafeDesktopPos() {
                         ))}
                       </div>
 
-                      {/* ADD CUSTOM VARIANT ROW */}
                       <div className="flex gap-2 pt-1">
                         <input 
                           type="text" 
@@ -2487,7 +2560,7 @@ export default function BbCafeDesktopPos() {
                         <button onClick={() => handleRestoreHeldCart(h)} className="bg-green-600 text-white px-3 py-1.5 rounded-xl text-xs font-black uppercase flex items-center gap-1 shadow">
                           <SafePlayCircle size={14} /> Resume
                         </button>
-                        <button onClick={() => saveHeldCartsToStorage(heldCarts.filter(it => it.id !== h.id))} className="p-1.5 text-red-400"><SafeTrash2 size={16} /></button>
+                        <button onClick={() => handleDeleteHeldCart(h.id)} className="p-1.5 text-red-400"><SafeTrash2 size={16} /></button>
                       </div>
                     </div>
                   ))
