@@ -1851,7 +1851,6 @@ export default function BbCafeDesktopPos() {
                       )}
                     </div>
 
-
 {/* ⭐ DISCOUNT OPTION (₹ FLAT / % OFF) ⭐ */}
 <div className="space-y-1.5 bg-neutral-100 dark:bg-neutral-800/50 p-2.5 rounded-xl border border-neutral-300 dark:border-neutral-700 mb-2 shrink-0">
   <div className="flex items-center justify-between">
