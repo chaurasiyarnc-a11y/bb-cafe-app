@@ -1,11 +1,10 @@
 
-
 'use client';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { db } from '@/lib/firebase'; 
 import { 
   collection, onSnapshot, query, orderBy, limit, doc, 
-  updateDoc, addDoc, runTransaction, getDoc, getDocs, where, setDoc,
+  updateDoc, addDoc, getDoc, getDocs, where, setDoc,
   waitForPendingWrites, deleteDoc, Timestamp
 } from 'firebase/firestore';
 import { 
@@ -14,7 +13,7 @@ import {
   Trash2, UserPlus, Download, Edit3, FileText, LayoutGrid, ChevronLeft, ChevronRight, 
   Gift, PackagePlus, BarChart3, HelpCircle, PauseCircle, PlayCircle, QrCode, 
   Share2, Calculator, Receipt, IndianRupee, Send, ShieldAlert, Check, Plus, Eye,
-  Users, Truck
+  Users, Truck, Wifi, WifiOff, CheckCircle2, XCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
@@ -108,6 +107,8 @@ export default function BbCafeDesktopPos() {
     { name: "Within 12 KM (12km के दायरे में)", fee: 99, minFree: 999, range: "5-12 KM" }
   ], []);
 
+  // System & Connection States
+  const [isOnline, setIsOnline] = useState<boolean>(true);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [pinInput, setPinInput] = useState('');
@@ -120,7 +121,6 @@ export default function BbCafeDesktopPos() {
 
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [isAppInstalled, setIsAppInstalled] = useState(false);
-  const [printerConnected, setPrinterConnected] = useState(false);
   const [kotEnabled, setKotEnabled] = useState<boolean>(true); 
   const [upiIdConfig, setUpiIdConfig] = useState<string>('Q991347275@ybl');
   const [ownerPhoneConfig, setOwnerPhoneConfig] = useState<string>('919714293759');
@@ -135,6 +135,7 @@ export default function BbCafeDesktopPos() {
   const [newCustNameInput, setNewCustNameInput] = useState('');
   const [newCustAddressInput, setNewCustAddressInput] = useState('');
 
+  // Menu & Data States
   const [liveOrders, setLiveOrders] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
@@ -165,6 +166,8 @@ export default function BbCafeDesktopPos() {
   const [itemCodeInput, setItemCodeInput] = useState('');
   const [itemPriceInput, setItemPriceInput] = useState<number | ''>(100);
   const [itemCatInput, setItemCatInput] = useState('Fast Food');
+  const [isAddingNewCatInput, setIsAddingNewCatInput] = useState(false);
+  const [newCustomCategoryName, setNewCustomCategoryName] = useState('');
   const [itemImageInput, setItemImageInput] = useState('');
   const [itemIsAvailable, setItemIsAvailable] = useState(true);
   const [hasVariants, setHasVariants] = useState(false);
@@ -226,8 +229,11 @@ export default function BbCafeDesktopPos() {
   const [splitCashAmount, setSplitCashAmount] = useState<number>(0);
   const [splitUpiAmount, setSplitUpiAmount] = useState<number>(0);
 
-  // Refs for Keyboard Accessibility
+  // Accessibility Refs for Keyboard-Only Fast Bill
   const searchInputRef = useRef<HTMLInputElement | null>(null);
+  const phoneInputRef = useRef<HTMLInputElement | null>(null);
+  const newCustNameRef = useRef<HTMLInputElement | null>(null);
+  const newCustAddressRef = useRef<HTMLInputElement | null>(null);
   const alarmIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const firstVariantButtonRef = useRef<HTMLButtonElement | null>(null);
   const addToCartButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -282,24 +288,60 @@ export default function BbCafeDesktopPos() {
 
   const getTotalBillPrice = () => Math.max(0, getCartSubtotal() + getGstAmountCalculated() - getCalculatedDiscountAmount() - getRedemptionDiscount()) + getDeliveryCharge();
 
+  // Active Orders
   const activeLiveOrders = useMemo(() => liveOrders.filter((o) => (o.fulfillmentType === 'delivery' || o.fulfillmentType === 'pickup') && o.status !== 'completed' && o.status !== 'rejected'), [liveOrders]);
   const activeTableOrders = useMemo(() => liveOrders.filter((o) => o.fulfillmentType === 'table' && o.status !== 'completed' && o.status !== 'rejected'), [liveOrders]);
   const pendingOrdersCount = useMemo(() => activeLiveOrders.filter((o) => o.status === 'pending').length, [activeLiveOrders]);
   const activeTablesCount = useMemo(() => activeTableOrders.length, [activeTableOrders]);
 
-  // CRASH PROTECTION
+  // Online / Offline Status Engine
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOnline(true);
+      toast.success("Internet connected! Synced cloud. 🟢");
+      syncOfflineOrders();
+    };
+    const handleOffline = () => {
+      setIsOnline(false);
+      toast("Working Offline! Bills will save locally. 🟠", { icon: '⚠️' });
+    };
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    setIsOnline(navigator.onLine);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  const syncOfflineOrders = async () => {
+    const offlineStr = localStorage.getItem("bb_pos_offline_orders_queue");
+    if (!offlineStr) return;
+    try {
+      const queue: any[] = JSON.parse(offlineStr);
+      if (queue.length > 0) {
+        for (const ord of queue) {
+          await addDoc(collection(db, "orders"), ord);
+        }
+        localStorage.removeItem("bb_pos_offline_orders_queue");
+        toast.success(`Synced ${queue.length} offline orders! ✅`);
+      }
+    } catch (e) {}
+  };
+
+  // Crash Protection
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       if (cart.length > 0 || activeTableOrders.length > 0) {
         e.preventDefault();
-        e.returnValue = 'You have active orders or unsaved cart items! Are you sure you want to close?';
+        e.returnValue = 'Active order in progress! Sure to close?';
       }
     };
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [cart.length, activeTableOrders.length]);
 
-  // Split payment auto-sync
+  // Split Payment Sync
   useEffect(() => {
     const total = getTotalBillPrice();
     if (paymentMethod === 'split') {
@@ -309,7 +351,7 @@ export default function BbCafeDesktopPos() {
     }
   }, [cart, discountValue, discountType, isRedeemingPoints, pointsToRedeem, paymentMethod, fulfillmentType, selectedArea]);
 
-  // Load Saved Settings
+  // Load Saved Configs
   useEffect(() => {
     const savedHeld = localStorage.getItem("bb_pos_held_carts");
     if (savedHeld) {
@@ -324,6 +366,27 @@ export default function BbCafeDesktopPos() {
 
     const savedOwnerPhone = localStorage.getItem("bb_pos_owner_phone");
     if (savedOwnerPhone) setOwnerPhoneConfig(savedOwnerPhone);
+
+    const savedUser = localStorage.getItem("bb_pos_user_pc");
+    if (savedUser) { 
+      try { 
+        setIsLoggedIn(true); 
+        setCurrentUser(JSON.parse(savedUser)); 
+      } catch (e) {} 
+    }
+    setGstEnabled(localStorage.getItem("bb_pos_gst_enabled_pc") === 'true');
+    setGstRate(Number(localStorage.getItem("bb_pos_gst_rate_pc")) || 5);
+    setKotEnabled(localStorage.getItem("bb_pos_kot_enabled_pc") !== 'false'); 
+
+    const localTheme = localStorage.getItem("bb_pos_theme_pc") || 'dark';
+    setThemeMode(localTheme as any);
+    if (localTheme === 'light') document.documentElement.classList.remove('dark');
+    else document.documentElement.classList.add('dark');
+
+    const savedCart = localStorage.getItem("bb_pos_saved_cart_pc");
+    if (savedCart) { 
+      try { setCart(JSON.parse(savedCart)); } catch (err) {} 
+    }
   }, []);
 
   const saveHeldCartsToStorage = (newList: HeldCart[]) => {
@@ -331,7 +394,53 @@ export default function BbCafeDesktopPos() {
     localStorage.setItem("bb_pos_held_carts", JSON.stringify(newList));
   };
 
-  // Auto-focus on first variant button when Variation Modal opens
+  useEffect(() => {
+    localStorage.setItem("bb_pos_saved_cart_pc", JSON.stringify(cart));
+  }, [cart]);
+
+  // Deduplicate & Normalize Category Names
+  const normalizeCategoryList = (rawItems: any[]) => {
+    const cleaned = rawItems.map((i: any) => {
+      const c = (i.category || 'Fast Food').trim();
+      return c.charAt(0).toUpperCase() + c.slice(1);
+    });
+    const unique = Array.from(new Set(cleaned.filter(Boolean))) as string[];
+    return ['All', ...unique.sort()];
+  };
+
+  // Products Loading with Sequential Auto-Codes
+  useEffect(() => {
+    if (!isLoggedIn) return;
+    (async () => {
+      setLoading(true);
+      try {
+        let items: any[] = [];
+        if (navigator.onLine) {
+          const prodSnap = await getDocs(collection(db, "products"));
+          items = prodSnap.docs.map((d, index) => {
+            const data = d.data();
+            return {
+              id: d.id,
+              ...data,
+              itemCode: data.itemCode ? String(data.itemCode).trim() : String(101 + index)
+            };
+          });
+          localStorage.setItem("bb_pos_cached_products", JSON.stringify(items));
+        } else {
+          const cached = localStorage.getItem("bb_pos_cached_products");
+          if (cached) items = JSON.parse(cached);
+        }
+        setProducts(items);
+        setCategories(normalizeCategoryList(items));
+      } catch (err) {
+        toast.error("Error loading products");
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [isLoggedIn]);
+
+  // Variation Modal Auto-Focus First Variant Button
   useEffect(() => {
     if (isVariationModalOpen) {
       const timer = setTimeout(() => {
@@ -345,156 +454,221 @@ export default function BbCafeDesktopPos() {
     }
   }, [isVariationModalOpen]);
 
-  // --- ITEM EDITOR HANDLERS ---
-  const handleOpenItemEditor = (item: any = null) => {
-    triggerBeep('tap');
-    if (item) {
-      setEditingItemObj(item);
-      setItemNameInput(item.name || '');
-      setItemCodeInput(item.itemCode || '');
-      setItemPriceInput(item.price !== undefined ? Number(item.price) : 100);
-      setItemCatInput(item.category || 'Fast Food');
-      setItemImageInput(item.image || item.imageUrl || '');
-      setItemIsAvailable(item.isAvailable !== false);
-      
-      if (item.variants && typeof item.variants === 'object' && Object.keys(item.variants).length > 0) {
-        setHasVariants(true);
-        setItemVariantsList({ ...item.variants });
-      } else {
-        setHasVariants(false);
-        setItemVariantsList({});
-      }
-    } else {
-      setEditingItemObj(null);
-      setItemNameInput('');
-      setItemCodeInput('');
-      setItemPriceInput(100);
-      setItemCatInput(categories.find(c => c !== 'All') || 'Fast Food');
-      setItemImageInput('');
-      setItemIsAvailable(true);
-      setHasVariants(false);
-      setItemVariantsList({});
-    }
-    setNewVariantName('');
-    setNewVariantPrice('');
-    setIsItemEditorModalOpen(true);
-  };
-
-  const handleAddVariantRow = () => {
-    const name = newVariantName.trim();
-    const price = Number(newVariantPrice);
-    if (!name) return toast.error("Enter size name (e.g. Medium, Half)!");
-    if (isNaN(price) || price < 0) return toast.error("Enter a valid price!");
-    setItemVariantsList(prev => ({ ...prev, [name]: price }));
-    setNewVariantName('');
-    setNewVariantPrice('');
-    toast.success(`Size "${name} (₹${price})" added!`);
-  };
-
-  const handleRemoveVariantRow = (key: string) => {
-    setItemVariantsList(prev => {
-      const next = { ...prev };
-      delete next[key];
-      return next;
-    });
-  };
-
-  const handleApplyVariantPreset = (presetType: 'pizza' | 'half_full' | 'reg_large') => {
-    const base = Number(itemPriceInput) || 100;
-    setHasVariants(true);
-    if (presetType === 'pizza') {
-      setItemVariantsList({
-        'Small': base,
-        'Medium': Math.round(base * 1.6),
-        'Large': Math.round(base * 2.2)
-      });
-    } else if (presetType === 'half_full') {
-      setItemVariantsList({
-        'Half': Math.round(base * 0.6),
-        'Full': base
-      });
-    } else if (presetType === 'reg_large') {
-      setItemVariantsList({
-        'Regular': base,
-        'Large': Math.round(base * 1.4)
-      });
-    }
-    toast.success("Applied size presets!");
-  };
-
-  const handleSaveItemToFirestore = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!itemNameInput.trim()) return toast.error("कृपया item का नाम दर्ज करें!");
-    const toastId = toast.loading("Saving item to menu...");
-
-    try {
-      const cleanVariants = (hasVariants && Object.keys(itemVariantsList).length > 0) ? itemVariantsList : null;
-
-      const itemData: any = {
-        name: itemNameInput.trim(),
-        itemCode: itemCodeInput.trim(),
-        price: Number(itemPriceInput) || 0,
-        category: itemCatInput.trim() || 'General',
-        image: itemImageInput.trim(),
-        variants: cleanVariants,
-        isAvailable: itemIsAvailable,
-        updatedAt: new Date()
-      };
-
-      if (editingItemObj) {
-        await updateDoc(doc(db, "products", editingItemObj.id), itemData);
-        setProducts(prev => prev.map(p => p.id === editingItemObj.id ? { id: editingItemObj.id, ...itemData } : p));
-        toast.success("Item updated successfully! ✅");
-      } else {
-        const docRef = await addDoc(collection(db, "products"), itemData);
-        setProducts(prev => [...prev, { id: docRef.id, ...itemData }]);
-        toast.success("New item added to menu! ✅");
-      }
-
-      const uniqueCats = Array.from(new Set([...products.map((i: any) => i.category), itemData.category].filter(Boolean))) as string[];
-      setCategories(['All', ...uniqueCats]);
-
-      toast.dismiss(toastId);
-      setIsItemEditorModalOpen(false);
-      setEditingItemObj(null);
-    } catch (err) {
-      toast.dismiss(toastId);
-      toast.error("Failed to save item");
-    }
-  };
-
-  const handleDeleteProductFromMenu = async (productId: string) => {
-    triggerBeep('tap');
-    if (!window.confirm("Permanently delete this item from menu?")) return;
-    try {
-      await deleteDoc(doc(db, "products", productId));
-      setProducts(prev => prev.filter(p => p.id !== productId));
-      toast.success("Item deleted from menu");
-      if (isItemEditorModalOpen) setIsItemEditorModalOpen(false);
-    } catch (e) {
-      toast.error("Failed to delete item");
-    }
-  };
-
-  // --- PAST RECEIPTS ---
-  const fetchPastReceipts = async () => {
-    setIsReceiptsLoading(true);
-    try {
-      const q = query(collection(db, "orders"), orderBy("timestamp", "desc"), limit(receiptsLimit));
-      const snap = await getDocs(q);
-      setPastReceipts(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    } catch (err) {
-      toast.error("Failed to load past receipts");
-    } finally {
-      setIsReceiptsLoading(false);
-    }
-  };
-
+  // Real-time orders listener
   useEffect(() => {
-    if (activeTab === 'receipts') fetchPastReceipts();
-  }, [activeTab, receiptsLimit]);
+    const q = query(collection(db, "orders"), orderBy("timestamp", "desc"), limit(50));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      setLiveOrders(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
+    });
+    return () => unsubscribe();
+  }, []);
 
-  // --- HOLD CURRENT CART [F3] ---
+  // Alarm for live pending orders
+  useEffect(() => {
+    if (pendingOrdersCount > 0) {
+      if (!alarmIntervalRef.current) alarmIntervalRef.current = setInterval(() => triggerBeep('alarm'), 2500);
+    } else {
+      if (alarmIntervalRef.current) { clearInterval(alarmIntervalRef.current); alarmIntervalRef.current = null; }
+    }
+    return () => { if (alarmIntervalRef.current) clearInterval(alarmIntervalRef.current); };
+  }, [pendingOrdersCount]);
+
+  // Search by exact code or fast-add
+  const handleSearchInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const cleanQ = searchQuery.trim().toLowerCase();
+      if (!cleanQ) return;
+
+      const exactCodeMatch = products.find(p => String(p.itemCode || '').trim().toLowerCase() === cleanQ);
+      if (exactCodeMatch) {
+        handleItemClick(exactCodeMatch);
+        setSearchQuery('');
+        const hasVariants = exactCodeMatch.variants && typeof exactCodeMatch.variants === 'object' && Object.keys(exactCodeMatch.variants).length > 0;
+        if (!hasVariants) setTimeout(() => searchInputRef.current?.focus(), 60);
+        return;
+      }
+
+      if (filteredMenu.length > 0) {
+        const item = filteredMenu[0];
+        handleItemClick(item);
+        setSearchQuery('');
+        const hasVariants = item.variants && typeof item.variants === 'object' && Object.keys(item.variants).length > 0;
+        if (!hasVariants) setTimeout(() => searchInputRef.current?.focus(), 60);
+      } else {
+        toast.error("No matching item found!");
+      }
+    }
+  };
+
+  // Customer Phone Enter Key -> Auto Find or Auto Jump to Name
+  const handlePhoneInputKeyDown = async (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const cleanPhone = getSanitizedPhone(customerPhone);
+      if (cleanPhone.length !== 10) {
+        return toast.error("Enter a valid 10-digit phone number!");
+      }
+      await handleCheckLoyaltyWithAutoJump();
+    }
+  };
+
+  const handleCheckLoyaltyWithAutoJump = async () => {
+    triggerBeep('tap');
+    const cleanPhone = getSanitizedPhone(customerPhone);
+    if (cleanPhone.length !== 10) return toast.error("Enter 10-digit phone!");
+
+    const toastId = toast.loading("Searching customer...");
+    try {
+      const userRef = doc(db, "customer_points", cleanPhone);
+      const docSnap = await getDoc(userRef);
+      toast.dismiss(toastId);
+
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setCustomerName(data.name || '');
+        setCustomerPoints(data.points || 0);
+        setAddress(data.address || '');
+        setShowNewCustForm(false);
+        toast.success(`Found: ${data.name} (${data.points || 0} Pts)`);
+        setTimeout(() => searchInputRef.current?.focus(), 80);
+      } else {
+        setCustomerName('');
+        setCustomerPoints(0);
+        setShowNewCustForm(true);
+        toast("New Customer! Enter Name & press [Enter]", { icon: '👤' });
+        setTimeout(() => newCustNameRef.current?.focus(), 80);
+      }
+    } catch (err) {
+      toast.dismiss(toastId);
+      toast.error("Could not fetch customer");
+    }
+  };
+
+  const handleSaveNewCustomerQuick = async () => {
+    const cleanPhone = getSanitizedPhone(customerPhone);
+    const nameTrim = newCustNameInput.trim();
+    if (!nameTrim) return toast.error("Enter customer name!");
+
+    const toastId = toast.loading("Saving customer...");
+    try {
+      const userRef = doc(db, "customer_points", cleanPhone);
+      await setDoc(userRef, {
+        name: nameTrim,
+        phone: cleanPhone,
+        address: newCustAddressInput.trim(),
+        points: 0,
+        lastActive: new Date()
+      }, { merge: true });
+
+      setCustomerName(nameTrim);
+      setAddress(newCustAddressInput.trim());
+      setCustomerPoints(0);
+      setShowNewCustForm(false);
+      setNewCustNameInput('');
+      setNewCustAddressInput('');
+      toast.dismiss(toastId);
+      toast.success("Customer saved & linked! ✅");
+      setTimeout(() => searchInputRef.current?.focus(), 60);
+    } catch (err) {
+      toast.dismiss(toastId);
+      toast.error("Failed to save customer");
+    }
+  };
+
+  // Add Item to Cart
+  const handleItemClick = (item: any) => {
+    triggerBeep('tap');
+    const hasItemVariants = item.variants && typeof item.variants === 'object' && Object.keys(item.variants).length > 0;
+
+    if (hasItemVariants) {
+      setSelectedProductForVariation(item);
+      const firstSize = Object.keys(item.variants)[0];
+      const firstPrice = Number(item.variants[firstSize]) || Number(item.price) || 100;
+      setSelectedSize(firstSize);
+      setSelectedSizePrice(firstPrice);
+      setSelectedAddons({});
+      setItemNoteInput('');
+      setIsVariationModalOpen(true);
+    } else {
+      const itemPrice = Number(item.price) || 100;
+      const cartItemId = `std-${item.id}`;
+      setCart((prev) => {
+        const existingIndex = prev.findIndex((c) => c.cartItemId === cartItemId);
+        if (existingIndex > -1) {
+          const next = [...prev];
+          next[existingIndex] = { ...next[existingIndex], quantity: next[existingIndex].quantity + 1 };
+          return next;
+        }
+        return [...prev, { cartItemId, id: item.id, name: item.name, price: itemPrice, quantity: 1 }];
+      });
+      toast.success(`Added ${item.name}!`);
+    }
+  };
+
+  const handleAddCustomizedItemToCart = () => {
+    if (!selectedProductForVariation) return;
+    triggerBeep('tap');
+
+    let finalItemPrice = selectedSizePrice;
+    const activeAddonsList: string[] = [];
+
+    Object.entries(selectedAddons).forEach(([addon, isSelected]) => {
+      if (isSelected) {
+        const cost = PIZZA_ADDONS[selectedSize.toLowerCase()]?.[addon] || 20;
+        finalItemPrice += cost;
+        activeAddonsList.push(addon);
+      }
+    });
+
+    const baseName = selectedProductForVariation.name;
+    const sizeSuffix = selectedSize && selectedSize !== 'Standard' ? `(${selectedSize.toUpperCase()})` : '';
+    const fullName = `${baseName} ${sizeSuffix}`.trim();
+
+    const noteParts: string[] = [];
+    if (activeAddonsList.length > 0) noteParts.push(`Add-ons: ${activeAddonsList.join(', ')}`);
+    if (itemNoteInput) noteParts.push(`Note: ${itemNoteInput}`);
+
+    const combinedNote = noteParts.join(' | ');
+    const cartItemId = `${selectedProductForVariation.id}-${selectedSize}-${combinedNote}`;
+
+    setCart((prev) => {
+      const existingIndex = prev.findIndex((c) => c.cartItemId === cartItemId);
+      if (existingIndex > -1) {
+        const next = [...prev];
+        next[existingIndex] = { ...next[existingIndex], quantity: next[existingIndex].quantity + 1 };
+        return next;
+      }
+      return [...prev, { 
+        cartItemId,
+        id: selectedProductForVariation.id, 
+        name: fullName, 
+        price: finalItemPrice, 
+        quantity: 1, 
+        size: selectedSize,
+        note: combinedNote 
+      }];
+    });
+
+    setIsVariationModalOpen(false);
+    setSelectedProductForVariation(null);
+    setSearchQuery('');
+    toast.success(`Added ${fullName}!`);
+    setTimeout(() => searchInputRef.current?.focus(), 60);
+  };
+
+  const handleUpdateCartQuantity = (cartItemId: string, amount: number) => {
+    triggerBeep('tap');
+    setCart((prev) => prev.map((item) => {
+      if (item.cartItemId === cartItemId) {
+        const updatedQty = item.quantity + amount;
+        return updatedQty > 0 ? { ...item, quantity: updatedQty } : null;
+      }
+      return item;
+    }).filter(Boolean) as PosCartItem[]);
+  };
+
+  // Hold & Restore
   const handleHoldCurrentCart = () => {
     if (cart.length === 0) return toast.error("Cart is empty!");
     triggerBeep('tap');
@@ -510,8 +684,7 @@ export default function BbCafeDesktopPos() {
       total: getTotalBillPrice()
     };
 
-    const updated = [newHold, ...heldCarts];
-    saveHeldCartsToStorage(updated);
+    saveHeldCartsToStorage([newHold, ...heldCarts]);
     toast.success(`Cart parked on Hold! [${newHold.customerName}]`, { icon: '⏸️' });
 
     setCart([]);
@@ -524,7 +697,6 @@ export default function BbCafeDesktopPos() {
     setTimeout(() => searchInputRef.current?.focus(), 60);
   };
 
-  // --- RESTORE HELD CART [F5] ---
   const handleRestoreHeldCart = (heldItem: HeldCart) => {
     triggerBeep('tap');
     if (cart.length > 0) {
@@ -536,56 +708,299 @@ export default function BbCafeDesktopPos() {
     setTableNumber(heldItem.tableNumber || 'Table 1');
     setFulfillmentType(heldItem.fulfillmentType || 'pickup');
     
-    const updated = heldCarts.filter(h => h.id !== heldItem.id);
-    saveHeldCartsToStorage(updated);
+    saveHeldCartsToStorage(heldCarts.filter(h => h.id !== heldItem.id));
     setIsHeldCartsModalOpen(false);
     setActiveTab('billing');
     toast.success(`Restored order of ${heldItem.customerName}!`, { icon: '▶️' });
     setTimeout(() => searchInputRef.current?.focus(), 60);
   };
 
-  const handleDeleteHeldCart = (holdId: string) => {
-    triggerBeep('tap');
-    const updated = heldCarts.filter(h => h.id !== holdId);
-    saveHeldCartsToStorage(updated);
-    toast.success("Held cart removed.");
+  // Thermal Printing Direct (68mm Safe Margin)
+  const handlePrintReceiptDirect = async (orderObj: any, isKot = false): Promise<void> => {
+    return new Promise((resolve) => {
+      if (!orderObj || !orderObj.items || orderObj.items.length === 0) return resolve();
+
+      const printWindow = window.open('', '_blank', 'width=420,height=700');
+      if (!printWindow) {
+        toast.error("Popup blocked! Allow popups for thermal printing.");
+        return resolve();
+      }
+
+      printWindow.document.write('<!DOCTYPE html><html><head><title>Print Receipt</title>');
+      printWindow.document.write(`
+        <style>
+          @page { size: 80mm auto; margin: 0mm !important; }
+          * { font-family: Verdana, Geneva, Tahoma, sans-serif !important; box-sizing: border-box; }
+          html, body { margin: 0 !important; padding: 0 !important; width: 80mm !important; background: #ffffff !important; color: #000000 !important; }
+          #print-root { width: 68mm !important; max-width: 68mm !important; margin-left: 2mm !important; padding-right: 2mm !important; }
+        </style>
+      `);
+
+      Array.from(document.querySelectorAll('link[rel="stylesheet"], style')).forEach((styleTag) => {
+        printWindow.document.write(styleTag.outerHTML);
+      });
+
+      printWindow.document.write('</head><body><div id="print-root"></div></body></html>');
+      printWindow.document.close();
+
+      const container = printWindow.document.getElementById('print-root');
+      if (container) {
+        const root = createRoot(container);
+        if (isKot) {
+          root.render(<PrintKitchenKot orderObj={orderObj} />);
+        } else {
+          root.render(<PrintCustomerReceipt orderObj={orderObj} currentUser={currentUser} />);
+        }
+
+        setTimeout(() => {
+          printWindow.focus();
+          printWindow.print();
+          printWindow.close();
+          resolve();
+        }, 350);
+      } else {
+        resolve();
+      }
+    });
   };
 
-  // --- WHATSAPP RECEIPT SENDER ---
-  const handleSendWhatsAppBill = (targetOrder: any = null) => {
-    const ord = targetOrder || {
-      customerPhone,
-      customerName,
-      fulfillmentType,
-      items: cart,
-      subtotal: getCartSubtotal(),
-      total: getTotalBillPrice()
-    };
+  const getDailyTokenNumber = () => {
+    const todayStr = new Date().toDateString();
+    let lastResetDate = localStorage.getItem("bb_pos_token_reset_date");
+    let currentTokenSeq = Number(localStorage.getItem("bb_pos_daily_token_seq") || "0");
 
+    if (lastResetDate !== todayStr) {
+      currentTokenSeq = 1;
+      localStorage.setItem("bb_pos_token_reset_date", todayStr);
+    } else {
+      currentTokenSeq += 1;
+    }
+    localStorage.setItem("bb_pos_daily_token_seq", String(currentTokenSeq));
+    return currentTokenSeq;
+  };
+
+  // Table Order KOT Only
+  const handleSaveTableOrderKotOnly = async () => {
+    if (cart.length === 0 || isSubmittingOrder) return;
+    setIsSubmittingOrder(true);
+
+    const subtotal = getCartSubtotal();
+    const finalTotal = getTotalBillPrice();
+    const discountAmt = getCalculatedDiscountAmount();
+    const token = getDailyTokenNumber();
+
+    try {
+      let billNumber: number;
+
+      if (activeEditingOrderId) {
+        billNumber = activeEditingBillNumber || 5001;
+        const orderRef = doc(db, "orders", activeEditingOrderId);
+        const updatedOrderObj = { 
+          items: cart, 
+          subtotal, 
+          discountType,
+          discountValue,
+          discountAmount: discountAmt, 
+          gstRate: gstEnabled ? gstRate : 0, 
+          gstAmount: getGstAmountCalculated(), 
+          total: finalTotal, 
+          tableNumber: tableNumber,
+          customerName: customerName || "Walk-in Guest",
+          customerPhone: customerPhone ? `+91${getSanitizedPhone(customerPhone)}` : "",
+          upiId: upiIdConfig,
+          lastUpdated: new Date()
+        };
+
+        await updateDoc(orderRef, updatedOrderObj);
+        triggerBeep('success');
+        toast.success(`Table ${tableNumber} updated! KOT printed.`);
+
+        await handlePrintReceiptDirect({ ...updatedOrderObj, billNumber, tokenNumber: token, fulfillmentType: 'table' }, true);
+
+        setActiveEditingOrderId(null);
+        setActiveEditingBillNumber(null);
+      } else {
+        billNumber = Number(localStorage.getItem("bb_pos_local_bill_counter_pc") || 5000) + 1;
+        localStorage.setItem("bb_pos_local_bill_counter_pc", String(billNumber));
+
+        const orderObj = { 
+          billNumber, tokenNumber: token, customerName: customerName || "Walk-in Guest", 
+          customerPhone: customerPhone ? `+91${getSanitizedPhone(customerPhone)}` : "", items: cart, 
+          subtotal, discountType, discountValue, discountAmount: discountAmt, 
+          gstRate: gstEnabled ? gstRate : 0, gstAmount: getGstAmountCalculated(), 
+          deliveryFee: 0, total: finalTotal, timestamp: new Date(), 
+          status: 'pending', fulfillmentType: 'table', deliveryArea: "", 
+          tableNumber: tableNumber, paymentMethod, source: 'PC_POS', address: '',
+          upiId: upiIdConfig
+        };
+
+        await addDoc(collection(db, "orders"), orderObj);
+        triggerBeep('success');
+        toast.success(`Table ${tableNumber} saved! KOT sent.`);
+
+        await handlePrintReceiptDirect(orderObj, true);
+      }
+
+      setCart([]); setCustomerPhone(''); setCustomerName(''); setDiscountValue(0);
+      setIsRedeemingPoints(false); setPointsToRedeem(0);
+      localStorage.removeItem("bb_pos_saved_cart_pc");
+      setTimeout(() => searchInputRef.current?.focus(), 60);
+    } catch (err) {
+      toast.error("Failed to save table order");
+    } finally {
+      setIsSubmittingOrder(false);
+    }
+  };
+
+  // Final Checkout & Pay [F9]
+  const handleFinalCheckoutAndPrintBill = async () => {
+    if (cart.length === 0 || isSubmittingOrder) return;
+    setIsSubmittingOrder(true);
+
+    const subtotal = getCartSubtotal();
+    const finalTotal = getTotalBillPrice();
+    const discountAmt = getCalculatedDiscountAmount();
+    const token = getDailyTokenNumber();
+    const earned = Math.floor(finalTotal / 100);
+    const redeemed = isRedeemingPoints ? pointsToRedeem : 0;
+    const cleanPhone = getSanitizedPhone(customerPhone);
+
+    try {
+      let billNumber: number;
+      let remainingPts = customerPoints;
+
+      if (cleanPhone.length === 10 && navigator.onLine) {
+        const userRef = doc(db, "customer_points", cleanPhone);
+        const userDoc = await getDoc(userRef);
+        const prevPoints = userDoc.exists() ? (Number(userDoc.data().points) || 0) : 0;
+        remainingPts = Math.max(0, prevPoints - redeemed) + earned;
+        await setDoc(userRef, { name: customerName || "Walk-in Guest", phone: cleanPhone, points: remainingPts, lastActive: new Date() }, { merge: true });
+      }
+
+      if (activeEditingOrderId) {
+        billNumber = activeEditingBillNumber || 5001;
+        const orderRef = doc(db, "orders", activeEditingOrderId);
+        const finalOrderObj = { 
+          items: cart, 
+          subtotal, 
+          discountType,
+          discountValue,
+          discountAmount: discountAmt, 
+          gstRate: gstEnabled ? gstRate : 0, 
+          gstAmount: getGstAmountCalculated(), 
+          total: finalTotal, 
+          status: 'completed', 
+          tableNumber: tableNumber,
+          customerName: customerName || "Walk-in Guest",
+          customerPhone: cleanPhone ? `+91${cleanPhone}` : "",
+          paymentMethod,
+          splitCashAmount: paymentMethod === 'split' ? splitCashAmount : 0,
+          splitUpiAmount: paymentMethod === 'split' ? splitUpiAmount : 0,
+          pointsEarned: earned,
+          pointsRedeemed: redeemed,
+          pointsDiscount: redeemed,
+          remainingPoints: remainingPts,
+          customerPoints: remainingPts,
+          upiId: upiIdConfig,
+          settledAt: new Date()
+        };
+
+        await updateDoc(orderRef, finalOrderObj);
+        triggerBeep('success');
+        toast.success(`Table ${tableNumber} Settled! Bill #${billNumber} printed.`);
+
+        await handlePrintReceiptDirect({ ...finalOrderObj, billNumber, tokenNumber: token, fulfillmentType: 'table' }, false);
+
+        setActiveEditingOrderId(null);
+        setActiveEditingBillNumber(null);
+      } else {
+        billNumber = Number(localStorage.getItem("bb_pos_local_bill_counter_pc") || 5000) + 1;
+        localStorage.setItem("bb_pos_local_bill_counter_pc", String(billNumber));
+
+        const orderObj = { 
+          billNumber, 
+          tokenNumber: token, 
+          customerName: customerName || "Walk-in Guest", 
+          customerPhone: cleanPhone ? `+91${cleanPhone}` : "", 
+          items: cart, 
+          subtotal, 
+          discountType, 
+          discountValue, 
+          discountAmount: discountAmt, 
+          gstRate: gstEnabled ? gstRate : 0, 
+          gstAmount: getGstAmountCalculated(), 
+          deliveryFee: getDeliveryCharge(), 
+          total: finalTotal, 
+          timestamp: new Date(), 
+          status: 'completed', 
+          fulfillmentType, 
+          deliveryArea: fulfillmentType === "delivery" ? selectedArea.name : "", 
+          tableNumber: fulfillmentType === 'table' ? tableNumber : '', 
+          paymentMethod, 
+          splitCashAmount: paymentMethod === 'split' ? splitCashAmount : 0,
+          splitUpiAmount: paymentMethod === 'split' ? splitUpiAmount : 0,
+          source: 'PC_POS', 
+          address,
+          pointsEarned: earned,
+          pointsRedeemed: redeemed, 
+          pointsDiscount: redeemed,
+          remainingPoints: remainingPts,
+          customerPoints: remainingPts,
+          upiId: upiIdConfig
+        };
+
+        if (navigator.onLine) {
+          await addDoc(collection(db, "orders"), orderObj);
+        } else {
+          const cachedQueue = JSON.parse(localStorage.getItem("bb_pos_offline_orders_queue") || "[]");
+          cachedQueue.push(orderObj);
+          localStorage.setItem("bb_pos_offline_orders_queue", JSON.stringify(cachedQueue));
+          toast("Saved offline! Will sync once internet returns.", { icon: '💾' });
+        }
+
+        triggerBeep('success'); 
+
+        if (kotEnabled) await handlePrintReceiptDirect(orderObj, true);
+        await handlePrintReceiptDirect(orderObj, false);
+      }
+
+      setCart([]); 
+      setCustomerPhone(''); 
+      setCustomerName(''); 
+      setCustomerPoints(0); 
+      setDiscountValue(0); 
+      setShowNewCustForm(false);
+      setIsRedeemingPoints(false); 
+      setPointsToRedeem(0);
+      localStorage.removeItem("bb_pos_saved_cart_pc");
+      setTimeout(() => searchInputRef.current?.focus(), 60);
+    } catch (err) {
+      toast.error("Checkout failed");
+    } finally {
+      setIsSubmittingOrder(false);
+    }
+  };
+
+  // WhatsApp Bill Sender
+  const handleSendWhatsAppBill = (targetOrder: any = null) => {
+    const ord = targetOrder || { customerPhone, customerName, fulfillmentType, items: cart, total: getTotalBillPrice() };
     const clean = getSanitizedPhone(ord.customerPhone || '');
-    if (clean.length !== 10) return toast.error("Enter a valid 10-digit phone number!");
-    if (!ord.items || ord.items.length === 0) return toast.error("No items to send!");
+    if (clean.length !== 10) return toast.error("Enter 10-digit phone number!");
+    if (!ord.items || ord.items.length === 0) return toast.error("No items in cart!");
 
     const itemsText = ord.items.map((i: any) => `• ${i.name} x${i.quantity} = ₹${i.price * i.quantity}`).join('%0A');
-    const billNumStr = ord.billNumber ? ` (Bill #${ord.billNumber})` : '';
-
-    const message = `*☕ BUM BUM CAFE - DIGITAL RECEIPT*${billNumStr}%0A------------------------------%0A*Customer:* ${ord.customerName || 'Valued Guest'}%0A*Phone:* ${clean}%0A*Mode:* ${(ord.fulfillmentType || 'Counter').toUpperCase()}%0A------------------------------%0A${itemsText}%0A------------------------------%0A*Grand Total:* ₹${ord.total}%0A------------------------------%0A_Thank you for visiting Bum Bum Cafe, Mohandra! Visit Again!_ 💛`;
-
-    const url = `https://wa.me/91${clean}?text=${message}`;
-    window.open(url, '_blank');
-    toast.success("WhatsApp bill opened! 📱");
+    const msg = `*☕ BUM BUM CAFE - DIGITAL RECEIPT*%0A------------------------------%0A*Customer:* ${ord.customerName || 'Valued Guest'}%0A*Total Amount:* ₹${ord.total}%0A------------------------------%0A${itemsText}%0A------------------------------%0A_Thank you for visiting Bum Bum Cafe! Visit Again!_ 💛`;
+    window.open(`https://wa.me/91${clean}?text=${msg}`, '_blank');
   };
 
-  // --- OWNER DAILY SUMMARY WHATSAPP ---
+  // Owner EOD Summary WhatsApp
   const handleSendOwnerSummary = () => {
     const cleanOwner = getSanitizedPhone(ownerPhoneConfig);
-    const msg = `*☕ BUM BUM CAFE - DAY END SUMMARY*%0A------------------------------%0A*Date:* ${new Date().toLocaleDateString()}%0A*Total Sales:* ₹${reportSummary.totalSale}%0A*Orders Completed:* ${reportSummary.totalOrdersCount}%0A------------------------------%0A*💵 Gross Cash:* ₹${reportSummary.cashSale}%0A*📱 UPI / Bank:* ₹${reportSummary.upiSale}%0A*🧾 Total Expenses:* -₹${reportSummary.totalExpenseAmount}%0A------------------------------%0A*💰 Net Cash in Drawer:* ₹${reportSummary.netCashInDrawer}%0A------------------------------%0A_Generated via Bum Bum Cafe Desktop POS_`;
-    
+    const msg = `*☕ BUM BUM CAFE - DAY END SUMMARY*%0A------------------------------%0A*Date:* ${new Date().toLocaleDateString()}%0A*Total Sales:* ₹${reportSummary.totalSale}%0A*Orders Completed:* ${reportSummary.totalOrdersCount}%0A------------------------------%0A*💵 Gross Cash:* ₹${reportSummary.cashSale}%0A*📱 UPI / Bank:* ₹${reportSummary.upiSale}%0A*🧾 Expenses:* -₹${reportSummary.totalExpenseAmount}%0A------------------------------%0A*💰 Net Cash in Drawer:* ₹${reportSummary.netCashInDrawer}%0A------------------------------%0A_Generated via Bum Bum Cafe Desktop POS_`;
     window.open(`https://wa.me/${cleanOwner}?text=${msg}`, '_blank');
-    toast.success("Closing summary sent to owner! 📊");
   };
 
-  // --- SAVE PETTY CASH EXPENSE [F6] ---
+  // Daily Drawer Expense Save [F6]
   const handleSaveExpense = async (e: React.FormEvent) => {
     e.preventDefault();
     const amt = Number(expenseAmount);
@@ -600,7 +1015,7 @@ export default function BbCafeDesktopPos() {
         enteredBy: currentUser?.name || 'Staff'
       });
       toast.dismiss(toastId);
-      toast.success(`Expense ₹${amt} logged from drawer! ✅`);
+      toast.success(`Expense ₹${amt} saved! ✅`);
       setExpenseTitle('');
       setExpenseAmount('');
       setIsExpenseModalOpen(false);
@@ -611,147 +1026,7 @@ export default function BbCafeDesktopPos() {
     }
   };
 
-  // --- FILTERED MENU FOR FAST SEARCH ---
-  const filteredMenu = useMemo(() => {
-    const queryStr = searchQuery.toLowerCase().trim();
-    return products.filter((p) => {
-      const matchesCategory = selectedCategory === 'All' || p.category === selectedCategory;
-      const matchesName = (p.name || '').toLowerCase().includes(queryStr);
-      const matchesCode = p.itemCode && String(p.itemCode).toLowerCase().includes(queryStr);
-      return matchesCategory && (matchesName || matchesCode);
-    });
-  }, [products, selectedCategory, searchQuery]);
-
-  // --- FILTERED INVENTORY PRODUCTS ---
-  const filteredInventoryProducts = useMemo(() => {
-    const queryStr = inventorySearchQuery.toLowerCase().trim();
-    return products.filter((p) => {
-      const matchesName = (p.name || '').toLowerCase().includes(queryStr);
-      const matchesCat = (p.category || '').toLowerCase().includes(queryStr);
-      const matchesCode = p.itemCode && String(p.itemCode).toLowerCase().includes(queryStr);
-      return matchesName || matchesCat || matchesCode;
-    });
-  }, [products, inventorySearchQuery]);
-
-  // --- FULL KEYBOARD SHORTCUTS ENGINE (F1 - F12, Escape, Delete) ---
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (!isLoggedIn) return;
-
-      if (e.key === 'F1') {
-        e.preventDefault();
-        setIsHelpModalOpen(prev => !prev);
-      }
-      if (e.key === 'F2') {
-        e.preventDefault();
-        setActiveTab('billing');
-        setTimeout(() => searchInputRef.current?.focus(), 80);
-        toast("Search Bar Focused [F2]", { icon: '⌨️' });
-      }
-      if (e.key === 'F3') {
-        e.preventDefault();
-        handleHoldCurrentCart();
-      }
-      if (e.key === 'F4') {
-        e.preventDefault();
-        setPaymentMethod(prev => {
-          const next = prev === 'cash' ? 'upi' : prev === 'upi' ? 'split' : 'cash';
-          toast(`Payment Mode: ${next.toUpperCase()} [F4]`, { icon: '💳' });
-          return next;
-        });
-      }
-      if (e.key === 'F5') {
-        e.preventDefault();
-        setIsHeldCartsModalOpen(prev => !prev);
-      }
-      if (e.key === 'F6') {
-        e.preventDefault();
-        setIsExpenseModalOpen(prev => !prev);
-      }
-      if (e.key === 'F7') {
-        e.preventDefault();
-        handleSendWhatsAppBill();
-      }
-      if (e.key === 'F8') {
-        e.preventDefault();
-        if (getTotalBillPrice() <= 0) {
-          toast.error("Cart total must be greater than ₹0 for UPI QR!");
-        } else {
-          setIsQrModalOpen(prev => !prev);
-        }
-      }
-      if (e.key === 'F9') {
-        e.preventDefault();
-        if (cart.length > 0 && !isSubmittingOrder) {
-          handleFinalCheckoutAndPrintBill();
-        } else if (cart.length === 0) {
-          toast.error("Cart is empty! Add items first.");
-        }
-      }
-      if (e.key === 'F10') {
-        e.preventDefault();
-        setTenderCashAmount(getTotalBillPrice());
-        setIsChangeModalOpen(prev => !prev);
-      }
-      if (e.key === 'F11') {
-        e.preventDefault();
-        setIsCustomerModalOpen(prev => !prev);
-        toast("Customer Directory [F11]", { icon: '👤' });
-      }
-      if (e.key === 'F12') {
-        e.preventDefault();
-        setFulfillmentType(prev => {
-          const next = prev === 'pickup' ? 'table' : prev === 'table' ? 'delivery' : 'pickup';
-          toast(`Mode: ${next.toUpperCase()} [F12]`, { icon: '🚚' });
-          return next;
-        });
-      }
-      // Quick Cart Clear with Delete or Shift+Backspace (when not typing in an input)
-      if ((e.key === 'Delete' || (e.shiftKey && e.key === 'Backspace')) && document.activeElement?.tagName !== 'INPUT') {
-        if (cart.length > 0) {
-          setCart([]);
-          toast("Cart Cleared! [Delete]", { icon: '🗑️' });
-        }
-      }
-      if (e.key === 'Escape') {
-        setIsHelpModalOpen(false);
-        setIsHeldCartsModalOpen(false);
-        setIsExpenseModalOpen(false);
-        setIsQrModalOpen(false);
-        setIsChangeModalOpen(false);
-        setIsVariationModalOpen(false);
-        setIsReceiptModalOpen(false);
-        setIsCustomerModalOpen(false);
-        setIsItemEditorModalOpen(false);
-        setTimeout(() => searchInputRef.current?.focus(), 60);
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isLoggedIn, cart, isSubmittingOrder, paymentMethod, customerName, customerPhone, tableNumber, fulfillmentType, heldCarts]);
-
-  // Search Bar Key Handler with Fast Add
-  const handleSearchInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      if (filteredMenu.length > 0) {
-        const item = filteredMenu[0];
-        handleItemClick(item);
-        setSearchQuery('');
-        
-        // Agar item me variant nahi hai to direct add ho jayega aur search bar focus rahega
-        const hasItemVariants = item.variants && typeof item.variants === 'object' && Object.keys(item.variants).length > 0;
-        if (!hasItemVariants) {
-          setTimeout(() => searchInputRef.current?.focus(), 50);
-        }
-      } else {
-        toast.error("No matching item found!");
-      }
-    }
-  };
-
-  // --- REPORT CALCULATIONS ---
+  // Reports Data Fetching (Today, Yesterday, Custom)
   const fetchReportData = async () => {
     setIsReportLoading(true);
     try {
@@ -828,649 +1103,205 @@ export default function BbCafeDesktopPos() {
     return { totalSale, cashSale, upiSale, totalOrdersCount, totalExpenseAmount, netCashInDrawer };
   }, [reportOrders, dailyExpenses]);
 
-  // App initialization
-  useEffect(() => {
-    const handleBeforeInstallPrompt = (e: any) => {
-      e.preventDefault();
-      setDeferredPrompt(e);
-    };
-    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-
-    if (window.matchMedia('(display-mode: standalone)').matches) {
-      setIsAppInstalled(true);
-    }
-
-    const savedUser = localStorage.getItem("bb_pos_user_pc");
-    if (savedUser) { 
-      try { 
-        setIsLoggedIn(true); 
-        setCurrentUser(JSON.parse(savedUser)); 
-      } catch (e) {} 
-    }
-    setGstEnabled(localStorage.getItem("bb_pos_gst_enabled_pc") === 'true');
-    setGstRate(Number(localStorage.getItem("bb_pos_gst_rate_pc")) || 5);
-    setKotEnabled(localStorage.getItem("bb_pos_kot_enabled_pc") !== 'false'); 
-
-    const localTheme = localStorage.getItem("bb_pos_theme_pc") || 'dark';
-    setThemeMode(localTheme as any);
-    if (localTheme === 'light') document.documentElement.classList.remove('dark');
-    else document.documentElement.classList.add('dark');
-
-    const savedCart = localStorage.getItem("bb_pos_saved_cart_pc");
-    if (savedCart) { 
-      try { setCart(JSON.parse(savedCart)); } catch (err) {} 
-    }
-
-    return () => {
-      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-    };
-  }, []);
-
-  useEffect(() => {
-    localStorage.setItem("bb_pos_saved_cart_pc", JSON.stringify(cart));
-  }, [cart]);
-
-  useEffect(() => {
-    const q = query(collection(db, "orders"), orderBy("timestamp", "desc"), limit(50));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const list = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-      setLiveOrders(list);
-    });
-    return () => unsubscribe();
-  }, []);
-
-  useEffect(() => {
-    if (pendingOrdersCount > 0) {
-      if (!alarmIntervalRef.current) {
-        alarmIntervalRef.current = setInterval(() => { triggerBeep('alarm'); }, 2500);
-      }
-    } else {
-      if (alarmIntervalRef.current) { clearInterval(alarmIntervalRef.current); alarmIntervalRef.current = null; }
-    }
-    return () => { if (alarmIntervalRef.current) clearInterval(alarmIntervalRef.current); };
-  }, [pendingOrdersCount]);
-
-  useEffect(() => {
-    if (!isLoggedIn) return;
-    (async () => {
-      setLoading(true);
-      try {
-        const prodSnap = await getDocs(collection(db, "products"));
-        const items = prodSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-        setProducts(items);
-        const uniqueCats = Array.from(new Set(items.map((i: any) => i.category).filter(Boolean))) as string[];
-        setCategories(['All', ...uniqueCats]);
-      } catch (err) {
-        toast.error("Error loading products");
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, [isLoggedIn]);
-
-  const handleManualSync = async () => {
-    triggerBeep('tap');
-    if (!navigator.onLine) return toast.error("You are offline!");
-    setIsSyncing(true);
-    const toastId = toast.loading("Syncing products...");
-    try {
-      await waitForPendingWrites(db);
-      const prodSnap = await getDocs(collection(db, "products"));
-      const items = prodSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-      setProducts(items);
-      const uniqueCats = Array.from(new Set(items.map((i: any) => i.category).filter(Boolean))) as string[];
-      setCategories(['All', ...uniqueCats]);
-      toast.dismiss(toastId);
-      toast.success("Synced successfully!");
-    } catch (err) {
-      toast.dismiss(toastId);
-      toast.error("Sync failed");
-    } finally {
-      setIsSyncing(false);
-    }
-  };
-
-  const handlePinLoginSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const toastId = toast.loading("Verifying PIN...");
-    try {
-      const snap = await getDocs(query(collection(db, "cafe_users"), where("pin", "==", pinInput.trim())));
-      toast.dismiss(toastId);
-      if (!snap.empty) {
-        const uDoc = snap.docs[0].data();
-        setIsLoggedIn(true);
-        setCurrentUser({ id: snap.docs[0].id, ...uDoc });
-        localStorage.setItem("bb_pos_user_pc", JSON.stringify({ id: snap.docs[0].id, ...uDoc })); 
-        toast.success(`Welcome, ${uDoc.name}!`);
-        setTimeout(() => searchInputRef.current?.focus(), 150);
-      } else {
-        toast.error("Incorrect Staff PIN!");
-      }
-      setPinInput('');
-    } catch (err) {
-      toast.dismiss(toastId);
-      toast.error("Connection error");
-      setPinInput('');
-    }
-  };
-
-  const handleLogout = () => {
-    triggerBeep('tap');
-    localStorage.removeItem("bb_pos_user_pc");
-    setIsLoggedIn(false);
-    setCurrentUser(null);
-    toast.success("Terminal Locked!");
-  };
-
-  // CART ADD LOGIC
-  const handleItemClick = (item: any) => {
-    triggerBeep('tap');
-    const hasItemVariants = item.variants && typeof item.variants === 'object' && Object.keys(item.variants).length > 0;
-
-    if (hasItemVariants) {
-      setSelectedProductForVariation(item);
-      const firstSize = Object.keys(item.variants)[0];
-      const firstPrice = Number(item.variants[firstSize]) || Number(item.price) || 100;
-      setSelectedSize(firstSize);
-      setSelectedSizePrice(firstPrice);
-      setSelectedAddons({});
-      setItemNoteInput('');
-      setIsVariationModalOpen(true);
-    } else {
-      const itemPrice = Number(item.price) || 100;
-      const cartItemId = `std-${item.id}`;
-      setCart((prev) => {
-        const existingIndex = prev.findIndex((c) => c.cartItemId === cartItemId);
-        if (existingIndex > -1) {
-          const next = [...prev];
-          next[existingIndex] = { ...next[existingIndex], quantity: next[existingIndex].quantity + 1 };
-          return next;
-        }
-        return [...prev, { 
-          cartItemId,
-          id: item.id, 
-          name: item.name, 
-          price: itemPrice, 
-          quantity: 1 
-        }];
-      });
-      toast.success(`Added ${item.name}!`);
-    }
-  };
-
-  const handleAddCustomizedItemToCart = () => {
-    if (!selectedProductForVariation) return;
-    triggerBeep('tap');
-
-    let finalItemPrice = selectedSizePrice;
-    const activeAddonsList: string[] = [];
-
-    Object.entries(selectedAddons).forEach(([addon, isSelected]) => {
-      if (isSelected) {
-        const cost = PIZZA_ADDONS[selectedSize.toLowerCase()]?.[addon] || 20;
-        finalItemPrice += cost;
-        activeAddonsList.push(addon);
+  // Item-wise sales calculation
+  const itemWiseSales = useMemo(() => {
+    const map: { [name: string]: { qty: number; revenue: number } } = {};
+    reportOrders.forEach(o => {
+      if (o.status !== 'rejected' && o.items) {
+        o.items.forEach((it: any) => {
+          const name = it.name || 'Unknown Item';
+          if (!map[name]) map[name] = { qty: 0, revenue: 0 };
+          map[name].qty += (Number(it.quantity) || 1);
+          map[name].revenue += ((Number(it.price) || 0) * (Number(it.quantity) || 1));
+        });
       }
     });
+    return Object.entries(map).map(([name, data]) => ({ name, ...data })).sort((a, b) => b.qty - a.qty);
+  }, [reportOrders]);
 
-    const baseName = selectedProductForVariation.name;
-    const sizeSuffix = selectedSize && selectedSize !== 'Standard' ? `(${selectedSize.toUpperCase()})` : '';
-    const fullName = `${baseName} ${sizeSuffix}`.trim();
-
-    const noteParts: string[] = [];
-    if (activeAddonsList.length > 0) noteParts.push(`Add-ons: ${activeAddonsList.join(', ')}`);
-    if (itemNoteInput) noteParts.push(`Note: ${itemNoteInput}`);
-
-    const combinedNote = noteParts.join(' | ');
-    const cartItemId = `${selectedProductForVariation.id}-${selectedSize}-${combinedNote}`;
-
-    setCart((prev) => {
-      const existingIndex = prev.findIndex((c) => c.cartItemId === cartItemId);
-      if (existingIndex > -1) {
-        const next = [...prev];
-        next[existingIndex] = { ...next[existingIndex], quantity: next[existingIndex].quantity + 1 };
-        return next;
-      }
-      return [...prev, { 
-        cartItemId,
-        id: selectedProductForVariation.id, 
-        name: fullName, 
-        price: finalItemPrice, 
-        quantity: 1, 
-        size: selectedSize,
-        note: combinedNote 
-      }];
-    });
-
-    setIsVariationModalOpen(false);
-    setSelectedProductForVariation(null);
-    setSearchQuery('');
-    toast.success(`Added ${fullName}!`);
-
-    // Focus immediately returns to search input for seamless next-item entry
-    setTimeout(() => {
-      searchInputRef.current?.focus();
-    }, 60);
-  };
-
-  const handleUpdateCartQuantity = (cartItemId: string, amount: number) => {
-    triggerBeep('tap');
-    setCart((prev) => prev.map((item) => {
-      if (item.cartItemId === cartItemId) {
-        const updatedQty = item.quantity + amount;
-        return updatedQty > 0 ? { ...item, quantity: updatedQty } : null;
-      }
-      return item;
-    }).filter(Boolean) as PosCartItem[]);
-  };
-
-  const handleCheckLoyalty = async () => {
-    triggerBeep('tap');
-    const cleanPhone = getSanitizedPhone(customerPhone);
-    if (cleanPhone.length !== 10) return toast.error("Enter a valid 10-digit phone!");
-    
-    const toastId = toast.loading("Finding customer...");
+  // Live Order Actions
+  const handleCompleteLiveOrder = async (orderId: string) => {
+    triggerBeep('success');
     try {
-      const userRef = doc(db, "customer_points", cleanPhone);
-      const docSnap = await getDoc(userRef);
-      toast.dismiss(toastId);
-      
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        setCustomerName(data.name || '');
-        setCustomerPoints(data.points || 0);
-        setAddress(data.address || '');
-        setShowNewCustForm(false);
-        setIsRedeemingPoints(false);
-        setPointsToRedeem(0);
-        toast.success(`Found: ${data.name} (${data.points || 0} Pts)`);
-      } else {
-        setCustomerName('');
-        setCustomerPoints(0);
-        setIsRedeemingPoints(false);
-        setPointsToRedeem(0);
-        setShowNewCustForm(true);
-        toast("New customer! Enter details to register.", { icon: 'ℹ️' });
-      }
-    } catch (e) {
-      toast.dismiss(toastId);
-      toast.error("Failed to connect to database");
-    }
-  };
-
-  const handleSaveNewCustomerQuick = async () => {
-    const cleanPhone = getSanitizedPhone(customerPhone);
-    const nameTrim = newCustNameInput.trim();
-    if (!nameTrim) return toast.error("Enter customer name!");
-
-    const toastId = toast.loading("Saving customer...");
-    try {
-      const userRef = doc(db, "customer_points", cleanPhone);
-      await setDoc(userRef, {
-        name: nameTrim,
-        phone: cleanPhone,
-        address: newCustAddressInput.trim(),
-        points: 0,
-        lastActive: new Date()
-      }, { merge: true });
-
-      setCustomerName(nameTrim);
-      setAddress(newCustAddressInput.trim());
-      setCustomerPoints(0);
-      setShowNewCustForm(false);
-      setNewCustNameInput('');
-      setNewCustAddressInput('');
-      toast.dismiss(toastId);
-      toast.success("Customer saved & linked! ✅");
-    } catch (err) {
-      toast.dismiss(toastId);
-      toast.error("Failed to save customer");
-    }
-  };
-
-  const getDailyTokenNumber = () => {
-    const todayStr = new Date().toDateString();
-    let lastResetDate = localStorage.getItem("bb_pos_token_reset_date");
-    let currentTokenSeq = Number(localStorage.getItem("bb_pos_daily_token_seq") || "0");
-
-    if (lastResetDate !== todayStr) {
-      currentTokenSeq = 1;
-      localStorage.setItem("bb_pos_token_reset_date", todayStr);
-    } else {
-      currentTokenSeq += 1;
-    }
-    localStorage.setItem("bb_pos_daily_token_seq", String(currentTokenSeq));
-    return currentTokenSeq;
-  };
-
-  // THERMAL PRINTING WITH 68MM SAFE MARGIN
-  const handlePrintReceiptDirect = async (orderObj: any, isKot = false): Promise<void> => {
-    return new Promise((resolve) => {
-      if (!orderObj || !orderObj.items || orderObj.items.length === 0) return resolve();
-
-      const printWindow = window.open('', '_blank', 'width=420,height=700');
-      if (!printWindow) {
-        toast.error("Popup blocked! Allow popups for thermal printing.");
-        return resolve();
-      }
-
-      printWindow.document.write('<!DOCTYPE html><html><head><title>Print Receipt</title>');
-      
-      printWindow.document.write(`
-        <style>
-          @page { 
-            size: 80mm auto; 
-            margin: 0mm !important; 
-          }
-          * { 
-            font-family: Verdana, Geneva, Tahoma, sans-serif !important;
-            box-sizing: border-box;
-          }
-          html, body { 
-            margin: 0 !important; 
-            padding: 0 !important; 
-            width: 80mm !important; 
-            background: #ffffff !important;
-            color: #000000 !important;
-            height: auto !important;
-            min-height: 0 !important;
-          }
-          #print-root { 
-            width: 68mm !important; 
-            max-width: 68mm !important; 
-            margin-left: 2mm !important; 
-            padding-right: 2mm !important; 
-          }
-        </style>
-      `);
-
-      Array.from(document.querySelectorAll('link[rel="stylesheet"], style')).forEach((styleTag) => {
-        printWindow.document.write(styleTag.outerHTML);
-      });
-
-      printWindow.document.write('</head><body><div id="print-root"></div></body></html>');
-      printWindow.document.close();
-
-      const container = printWindow.document.getElementById('print-root');
-      if (container) {
-        const root = createRoot(container);
-        if (isKot) {
-          root.render(<PrintKitchenKot orderObj={orderObj} />);
-        } else {
-          root.render(<PrintCustomerReceipt orderObj={orderObj} currentUser={currentUser} />);
-        }
-
-        const triggerPrintWhenImagesReady = () => {
-          const images = Array.from(printWindow.document.images);
-          if (images.length === 0) {
-            printWindow.focus();
-            printWindow.print();
-            printWindow.close();
-            resolve();
-            return;
-          }
-
-          let loadedCount = 0;
-          const checkDone = () => {
-            loadedCount++;
-            if (loadedCount >= images.length) {
-              printWindow.focus();
-              printWindow.print();
-              printWindow.close();
-              resolve();
-            }
-          };
-
-          images.forEach((img) => {
-            if (img.complete) {
-              checkDone();
-            } else {
-              img.onload = checkDone;
-              img.onerror = checkDone;
-            }
-          });
-
-          setTimeout(() => {
-            printWindow.focus();
-            printWindow.print();
-            printWindow.close();
-            resolve();
-          }, 1000);
-        };
-
-        setTimeout(triggerPrintWhenImagesReady, 150);
-      } else {
-        resolve();
-      }
-    });
-  };
-
-  // SAVE TABLE ORDER KOT ONLY
-  const handleSaveTableOrderKotOnly = async () => {
-    if (cart.length === 0 || isSubmittingOrder) return;
-    setIsSubmittingOrder(true);
-
-    const subtotal = getCartSubtotal();
-    const finalTotal = getTotalBillPrice();
-    const discountAmt = getCalculatedDiscountAmount();
-    const token = getDailyTokenNumber();
-
-    try {
-      let billNumber: number;
-
-      if (activeEditingOrderId) {
-        billNumber = activeEditingBillNumber || 5001;
-        const orderRef = doc(db, "orders", activeEditingOrderId);
-        const updatedOrderObj = { 
-          items: cart, 
-          subtotal, 
-          discountType,
-          discountValue,
-          discountAmount: discountAmt, 
-          gstRate: gstEnabled ? gstRate : 0, 
-          gstAmount: getGstAmountCalculated(), 
-          total: finalTotal, 
-          tableNumber: tableNumber,
-          customerName: customerName || "Walk-in Guest",
-          customerPhone: customerPhone ? `+91${getSanitizedPhone(customerPhone)}` : "",
-          upiId: upiIdConfig,
-          lastUpdated: new Date()
-        };
-
-        await updateDoc(orderRef, updatedOrderObj);
-        triggerBeep('success');
-        toast.success(`Table ${tableNumber} updated! KOT printed.`);
-
-        await handlePrintReceiptDirect({ ...updatedOrderObj, billNumber, tokenNumber: token, fulfillmentType: 'table' }, true);
-
-        setActiveEditingOrderId(null);
-        setActiveEditingBillNumber(null);
-      } else {
-        billNumber = Number(localStorage.getItem("bb_pos_local_bill_counter_pc") || 5000) + 1;
-        localStorage.setItem("bb_pos_local_bill_counter_pc", String(billNumber));
-
-        const orderObj = { 
-          billNumber, tokenNumber: token, customerName: customerName || "Walk-in Guest", 
-          customerPhone: customerPhone ? `+91${getSanitizedPhone(customerPhone)}` : "", items: cart, 
-          subtotal, discountType, discountValue, discountAmount: discountAmt, 
-          gstRate: gstEnabled ? gstRate : 0, gstAmount: getGstAmountCalculated(), 
-          deliveryFee: 0, total: finalTotal, timestamp: new Date(), 
-          status: 'pending', fulfillmentType: 'table', deliveryArea: "", 
-          tableNumber: tableNumber, paymentMethod, source: 'PC_POS', address: '',
-          upiId: upiIdConfig
-        };
-
-        await addDoc(collection(db, "orders"), orderObj);
-        triggerBeep('success');
-        toast.success(`Table ${tableNumber} saved! KOT sent.`);
-
-        await handlePrintReceiptDirect(orderObj, true);
-      }
-
-      setCart([]); setCustomerPhone(''); setCustomerName(''); setDiscountValue(0);
-      setIsRedeemingPoints(false); setPointsToRedeem(0);
-      localStorage.removeItem("bb_pos_saved_cart_pc");
-      setTimeout(() => searchInputRef.current?.focus(), 60);
-    } catch (err) {
-      console.error(err);
-      toast.error("Failed to save table order");
-    } finally {
-      setIsSubmittingOrder(false);
-    }
-  };
-
-  // FINAL CHECKOUT & PAY [F9] (WITH LOYALTY SAVED)
-  const handleFinalCheckoutAndPrintBill = async () => {
-    if (cart.length === 0 || isSubmittingOrder) return;
-    setIsSubmittingOrder(true);
-
-    const subtotal = getCartSubtotal();
-    const finalTotal = getTotalBillPrice();
-    const discountAmt = getCalculatedDiscountAmount();
-    const token = getDailyTokenNumber();
-    const earned = Math.floor(finalTotal / 100);
-    const redeemed = isRedeemingPoints ? pointsToRedeem : 0;
-    const cleanPhone = getSanitizedPhone(customerPhone);
-
-    try {
-      let billNumber: number;
-      let remainingPts = customerPoints;
-
-      if (cleanPhone.length === 10) {
-        const userRef = doc(db, "customer_points", cleanPhone);
-        const userDoc = await getDoc(userRef);
-        const prevPoints = userDoc.exists() ? (Number(userDoc.data().points) || 0) : 0;
-        
-        remainingPts = Math.max(0, prevPoints - redeemed) + earned;
-        await setDoc(userRef, { 
-          name: customerName || "Walk-in Guest", 
-          phone: cleanPhone, 
-          points: remainingPts, 
-          lastActive: new Date() 
-        }, { merge: true });
-      }
-
-      if (activeEditingOrderId) {
-        billNumber = activeEditingBillNumber || 5001;
-        const orderRef = doc(db, "orders", activeEditingOrderId);
-        const finalOrderObj = { 
-          items: cart, 
-          subtotal, 
-          discountType,
-          discountValue,
-          discountAmount: discountAmt, 
-          gstRate: gstEnabled ? gstRate : 0, 
-          gstAmount: getGstAmountCalculated(), 
-          total: finalTotal, 
-          status: 'completed', 
-          tableNumber: tableNumber,
-          customerName: customerName || "Walk-in Guest",
-          customerPhone: cleanPhone ? `+91${cleanPhone}` : "",
-          paymentMethod,
-          splitCashAmount: paymentMethod === 'split' ? splitCashAmount : 0,
-          splitUpiAmount: paymentMethod === 'split' ? splitUpiAmount : 0,
-          pointsEarned: earned,
-          pointsRedeemed: redeemed,
-          pointsDiscount: redeemed,
-          remainingPoints: remainingPts,
-          customerPoints: remainingPts,
-          upiId: upiIdConfig,
-          settledAt: new Date()
-        };
-
-        await updateDoc(orderRef, finalOrderObj);
-        triggerBeep('success');
-        toast.success(`Table ${tableNumber} Settled! Bill #${billNumber} printed.`);
-
-        await handlePrintReceiptDirect({ ...finalOrderObj, billNumber, tokenNumber: token, fulfillmentType: 'table' }, false);
-
-        setActiveEditingOrderId(null);
-        setActiveEditingBillNumber(null);
-      } else {
-        billNumber = Number(localStorage.getItem("bb_pos_local_bill_counter_pc") || 5000) + 1;
-        localStorage.setItem("bb_pos_local_bill_counter_pc", String(billNumber));
-
-        const orderObj = { 
-          billNumber, 
-          tokenNumber: token, 
-          customerName: customerName || "Walk-in Guest", 
-          customerPhone: cleanPhone ? `+91${cleanPhone}` : "", 
-          items: cart, 
-          subtotal, 
-          discountType, 
-          discountValue, 
-          discountAmount: discountAmt, 
-          gstRate: gstEnabled ? gstRate : 0, 
-          gstAmount: getGstAmountCalculated(), 
-          deliveryFee: getDeliveryCharge(), 
-          total: finalTotal, 
-          timestamp: new Date(), 
-          status: 'completed', 
-          fulfillmentType, 
-          deliveryArea: fulfillmentType === "delivery" ? selectedArea.name : "", 
-          tableNumber: fulfillmentType === 'table' ? tableNumber : '', 
-          paymentMethod, 
-          splitCashAmount: paymentMethod === 'split' ? splitCashAmount : 0,
-          splitUpiAmount: paymentMethod === 'split' ? splitUpiAmount : 0,
-          source: 'PC_POS', 
-          address,
-          pointsEarned: earned,
-          pointsRedeemed: redeemed, 
-          pointsDiscount: redeemed,
-          remainingPoints: remainingPts,
-          customerPoints: remainingPts,
-          upiId: upiIdConfig
-        };
-
-        await addDoc(collection(db, "orders"), orderObj);
-        triggerBeep('success'); 
-
-        if (kotEnabled) {
-          await handlePrintReceiptDirect(orderObj, true);
-        }
-        await handlePrintReceiptDirect(orderObj, false);
-      }
-
-      setCart([]); 
-      setCustomerPhone(''); 
-      setCustomerName(''); 
-      setCustomerPoints(0); 
-      setDiscountValue(0); 
-      setShowNewCustForm(false);
-      setIsRedeemingPoints(false); 
-      setPointsToRedeem(0);
-      localStorage.removeItem("bb_pos_saved_cart_pc");
-      setTimeout(() => searchInputRef.current?.focus(), 60);
-    } catch (err) {
-      console.error(err);
-      toast.error("Failed to complete checkout");
-    } finally {
-      setIsSubmittingOrder(false);
-    }
-  };
-
-  const handleToggleStock = async (productId: string, currentStatus: boolean) => {
-    triggerBeep('tap');
-    try {
-      await updateDoc(doc(db, "products", productId), { isAvailable: !currentStatus });
-      setProducts(prev => prev.map((p) => p.id === productId ? { ...p, isAvailable: !currentStatus } : p));
-      toast.success("Stock status updated!");
+      await updateDoc(doc(db, "orders", orderId), { status: 'completed', settledAt: new Date() });
+      toast.success("Order Completed! ✅");
     } catch (err) {
       toast.error("Failed");
     }
   };
 
-  const handleToggleTheme = (mode: 'dark' | 'light') => {
-    triggerBeep('tap'); setThemeMode(mode); localStorage.setItem("bb_pos_theme_pc", mode);
-    if (mode === 'light') document.documentElement.classList.remove('dark');
-    else document.documentElement.classList.add('dark');
+  const handleRejectLiveOrder = async (orderId: string) => {
+    triggerBeep('tap');
+    if (!window.confirm("Reject this order?")) return;
+    try {
+      await updateDoc(doc(db, "orders", orderId), { status: 'rejected', rejectedAt: new Date() });
+      toast.success("Order Rejected.");
+    } catch (err) {
+      toast.error("Failed");
+    }
   };
+
+  // Past Receipts Fetching
+  const fetchPastReceipts = async () => {
+    setIsReceiptsLoading(true);
+    try {
+      const q = query(collection(db, "orders"), orderBy("timestamp", "desc"), limit(receiptsLimit));
+      const snap = await getDocs(q);
+      setPastReceipts(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    } catch (err) {
+      toast.error("Failed to load receipts");
+    } finally {
+      setIsReceiptsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'receipts') fetchPastReceipts();
+  }, [activeTab, receiptsLimit]);
 
   const filteredPastReceipts = useMemo(() => pastReceipts.filter((o) => 
     String(o.billNumber || '').includes(receiptSearchQuery.trim()) || 
     String(o.customerPhone || '').includes(receiptSearchQuery.trim()) || 
     String(o.customerName || '').toLowerCase().includes(receiptSearchQuery.trim().toLowerCase())
   ), [pastReceipts, receiptSearchQuery]);
+
+  // Dynamic Item Editor Save
+  const handleOpenItemEditor = (item: any = null) => {
+    triggerBeep('tap');
+    setIsAddingNewCatInput(false);
+    setNewCustomCategoryName('');
+    if (item) {
+      setEditingItemObj(item);
+      setItemNameInput(item.name || '');
+      setItemCodeInput(item.itemCode || '');
+      setItemPriceInput(item.price !== undefined ? Number(item.price) : 100);
+      setItemCatInput(item.category || 'Fast Food');
+      setItemImageInput(item.image || item.imageUrl || '');
+      setItemIsAvailable(item.isAvailable !== false);
+      if (item.variants && typeof item.variants === 'object' && Object.keys(item.variants).length > 0) {
+        setHasVariants(true);
+        setItemVariantsList({ ...item.variants });
+      } else {
+        setHasVariants(false);
+        setItemVariantsList({});
+      }
+    } else {
+      setEditingItemObj(null);
+      setItemNameInput('');
+      const nextCode = products.length > 0 ? String(Math.max(...products.map(p => Number(p.itemCode) || 100)) + 1) : '101';
+      setItemCodeInput(nextCode);
+      setItemPriceInput(100);
+      setItemCatInput(categories.find(c => c !== 'All') || 'Fast Food');
+      setItemImageInput('');
+      setItemIsAvailable(true);
+      setHasVariants(false);
+      setItemVariantsList({});
+    }
+    setNewVariantName('');
+    setNewVariantPrice('');
+    setIsItemEditorModalOpen(true);
+  };
+
+  const handleSaveItemToFirestore = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!itemNameInput.trim()) return toast.error("Item name required!");
+    const toastId = toast.loading("Saving item...");
+
+    const finalCategory = isAddingNewCatInput && newCustomCategoryName.trim() 
+      ? newCustomCategoryName.trim() 
+      : itemCatInput.trim() || 'Fast Food';
+
+    try {
+      const cleanVariants = (hasVariants && Object.keys(itemVariantsList).length > 0) ? itemVariantsList : null;
+
+      const itemData: any = {
+        name: itemNameInput.trim(),
+        itemCode: itemCodeInput.trim(),
+        price: Number(itemPriceInput) || 0,
+        category: finalCategory,
+        image: itemImageInput.trim(),
+        variants: cleanVariants,
+        isAvailable: itemIsAvailable,
+        updatedAt: new Date()
+      };
+
+      if (editingItemObj) {
+        await updateDoc(doc(db, "products", editingItemObj.id), itemData);
+        setProducts(prev => prev.map(p => p.id === editingItemObj.id ? { id: editingItemObj.id, ...itemData } : p));
+        toast.success("Item updated! ✅");
+      } else {
+        const docRef = await addDoc(collection(db, "products"), itemData);
+        setProducts(prev => [...prev, { id: docRef.id, ...itemData }]);
+        toast.success("New item added! ✅");
+      }
+
+      setCategories(normalizeCategoryList([...products, itemData]));
+      toast.dismiss(toastId);
+      setIsItemEditorModalOpen(false);
+      setEditingItemObj(null);
+      setTimeout(() => searchInputRef.current?.focus(), 60);
+    } catch (err) {
+      toast.dismiss(toastId);
+      toast.error("Failed to save item");
+    }
+  };
+
+  // Keyboard Shortcuts Handler
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!isLoggedIn) return;
+
+      if (e.key === 'F1') { e.preventDefault(); setIsHelpModalOpen(prev => !prev); }
+      if (e.key === 'F2') { e.preventDefault(); setActiveTab('billing'); setTimeout(() => searchInputRef.current?.focus(), 80); }
+      if (e.key === 'F3') { e.preventDefault(); handleHoldCurrentCart(); }
+      if (e.key === 'F4') { e.preventDefault(); setPaymentMethod(p => p === 'cash' ? 'upi' : p === 'upi' ? 'split' : 'cash'); }
+      if (e.key === 'F5') { e.preventDefault(); setIsHeldCartsModalOpen(prev => !prev); }
+      if (e.key === 'F6') { e.preventDefault(); setIsExpenseModalOpen(prev => !prev); }
+      if (e.key === 'F7') { e.preventDefault(); handleSendWhatsAppBill(); }
+      if (e.key === 'F8') { e.preventDefault(); if (getTotalBillPrice() > 0) setIsQrModalOpen(prev => !prev); }
+      if (e.key === 'F9') { e.preventDefault(); if (cart.length > 0 && !isSubmittingOrder) handleFinalCheckoutAndPrintBill(); }
+      if (e.key === 'F10') { e.preventDefault(); setTenderCashAmount(getTotalBillPrice()); setIsChangeModalOpen(prev => !prev); }
+      if (e.key === 'F11') { e.preventDefault(); setIsCustomerModalOpen(prev => !prev); }
+      if (e.key === 'F12') { e.preventDefault(); setFulfillmentType(prev => prev === 'pickup' ? 'table' : prev === 'table' ? 'delivery' : 'pickup'); }
+      if ((e.key === 'Delete' || (e.shiftKey && e.key === 'Backspace')) && document.activeElement?.tagName !== 'INPUT') {
+        if (cart.length > 0) setCart([]);
+      }
+      if (e.key === 'Escape') {
+        setIsHelpModalOpen(false);
+        setIsHeldCartsModalOpen(false);
+        setIsExpenseModalOpen(false);
+        setIsQrModalOpen(false);
+        setIsChangeModalOpen(false);
+        setIsVariationModalOpen(false);
+        setIsReceiptModalOpen(false);
+        setIsCustomerModalOpen(false);
+        setIsItemEditorModalOpen(false);
+        setTimeout(() => searchInputRef.current?.focus(), 60);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isLoggedIn, cart, isSubmittingOrder, paymentMethod, customerName, customerPhone, tableNumber, fulfillmentType, heldCarts]);
+
+  const filteredMenu = useMemo(() => {
+    const queryStr = searchQuery.toLowerCase().trim();
+    return products.filter((p) => {
+      const matchesCategory = selectedCategory === 'All' || p.category?.toLowerCase() === selectedCategory.toLowerCase();
+      const matchesName = (p.name || '').toLowerCase().includes(queryStr);
+      const matchesCode = p.itemCode && String(p.itemCode).toLowerCase().includes(queryStr);
+      return matchesCategory && (matchesName || matchesCode);
+    });
+  }, [products, selectedCategory, searchQuery]);
+
+  const filteredInventoryProducts = useMemo(() => {
+    const queryStr = inventorySearchQuery.toLowerCase().trim();
+    return products.filter((p) => {
+      const matchesName = (p.name || '').toLowerCase().includes(queryStr);
+      const matchesCat = (p.category || '').toLowerCase().includes(queryStr);
+      const matchesCode = p.itemCode && String(p.itemCode).toLowerCase().includes(queryStr);
+      return matchesName || matchesCat || matchesCode;
+    });
+  }, [products, inventorySearchQuery]);
 
   const mainClass = "h-screen w-screen flex font-sans antialiased overflow-hidden " + (themeMode === "dark" ? "dark bg-[#0a0a0a] text-neutral-100" : "bg-neutral-100 text-neutral-900");
 
@@ -1483,6 +1314,7 @@ export default function BbCafeDesktopPos() {
     <div className={mainClass}>
       <Toaster position="top-right" />
 
+      {/* TERMINAL LOCK / LOGIN */}
       {!isLoggedIn ? (
         <div className="fixed inset-0 bg-neutral-950 text-white flex flex-col items-center justify-center p-4 z-50">
           <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="w-full max-w-md bg-neutral-900 border border-neutral-800 rounded-3xl p-10 shadow-2xl space-y-6 text-center">
@@ -1491,7 +1323,21 @@ export default function BbCafeDesktopPos() {
               <h1 className="text-2xl font-black uppercase text-yellow-500 tracking-wider">BUM BUM CAFE - PC POS</h1>
               <p className="text-xs text-neutral-400">Desktop Terminal Locked • Enter Staff PIN</p>
             </div>
-            <form onSubmit={handlePinLoginSubmit} className="space-y-4">
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              const snap = await getDocs(query(collection(db, "cafe_users"), where("pin", "==", pinInput.trim())));
+              if (!snap.empty) {
+                const uDoc = snap.docs[0].data();
+                setIsLoggedIn(true);
+                setCurrentUser({ id: snap.docs[0].id, ...uDoc });
+                localStorage.setItem("bb_pos_user_pc", JSON.stringify({ id: snap.docs[0].id, ...uDoc }));
+                toast.success(`Welcome, ${uDoc.name}!`);
+                setTimeout(() => searchInputRef.current?.focus(), 150);
+              } else {
+                toast.error("Incorrect PIN!");
+              }
+              setPinInput('');
+            }} className="space-y-4">
               <input type="password" maxLength={6} value={pinInput} onChange={e => setPinInput(e.target.value)} placeholder="Enter PIN" className="w-full bg-neutral-950 border border-neutral-800 text-center text-3xl font-mono py-4 rounded-2xl outline-none text-orange-400 tracking-widest" autoFocus />
               <button type="submit" className="w-full py-4 bg-orange-600 hover:bg-orange-500 text-white font-black text-sm uppercase rounded-2xl tracking-wider transition-all shadow-lg">Unlock Terminal</button>
             </form>
@@ -1501,22 +1347,26 @@ export default function BbCafeDesktopPos() {
         <>
           {/* SIDEBAR NAVIGATION */}
           <aside className={`${isSidebarCollapsed ? 'w-20' : 'w-64'} bg-white dark:bg-neutral-900 border-r border-neutral-200 dark:border-neutral-800 flex flex-col justify-between p-4 shrink-0 select-none h-full transition-all duration-300 relative`}>
-            
-            <button 
-              onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)} 
-              className="absolute -right-3 top-7 bg-orange-600 text-white p-1 rounded-full shadow-md hover:bg-orange-500 transition-all z-20"
-            >
+            <button onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)} className="absolute -right-3 top-7 bg-orange-600 text-white p-1 rounded-full shadow-md hover:bg-orange-500 transition-all z-20">
               {isSidebarCollapsed ? <SafeChevronRight size={14} /> : <SafeChevronLeft size={14} />}
             </button>
 
             <div className="space-y-6 overflow-hidden">
-              <div className="flex items-center gap-3 border-b border-neutral-200 dark:border-neutral-800 pb-4">
-                <SafeDatabase className="text-orange-500 shrink-0" size={22} />
+              <div className="flex items-center justify-between border-b border-neutral-200 dark:border-neutral-800 pb-4">
+                <div className="flex items-center gap-3 truncate">
+                  <SafeDatabase className="text-orange-500 shrink-0" size={22} />
+                  {!isSidebarCollapsed && (
+                    <div className="truncate">
+                      <h1 className="text-xs font-black uppercase text-yellow-500 truncate">Bum Bum Cafe</h1>
+                      <span className="text-[10px] text-neutral-400 font-bold">POS Pro v3.5</span>
+                    </div>
+                  )}
+                </div>
                 {!isSidebarCollapsed && (
-                  <div className="truncate">
-                    <h1 className="text-xs font-black uppercase text-yellow-500 truncate">Bum Bum Cafe</h1>
-                    <span className="text-[10px] text-neutral-400 font-bold">POS Pro v3.3</span>
-                  </div>
+                  <span className={`text-[9px] font-black px-2 py-0.5 rounded-full flex items-center gap-1 ${isOnline ? 'bg-green-500/15 text-green-400' : 'bg-orange-500/15 text-orange-400'}`}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${isOnline ? 'bg-green-400' : 'bg-orange-400'}`}></span>
+                    {isOnline ? 'Online' : 'Offline'}
+                  </span>
                 )}
               </div>
 
@@ -1527,7 +1377,7 @@ export default function BbCafeDesktopPos() {
                   { id: 'receipts', label: 'Past Receipts', icon: Printer },
                   { id: 'tables', label: `Tables (${activeTableOrders.length})`, icon: LayoutGrid },
                   { id: 'orders', label: `Live Orders (${activeLiveOrders.length})`, icon: Clock },
-                  { id: 'reports', label: 'Reports & Cash', icon: SafeBarChart3 },
+                  { id: 'reports', label: 'Reports & Sales', icon: SafeBarChart3 },
                   { id: 'settings', label: 'Settings', icon: Settings },
                 ].map((item) => {
                   const Icon = item.icon;
@@ -1561,31 +1411,14 @@ export default function BbCafeDesktopPos() {
                       <SafeHelpCircle size={12} /> Help [F1]
                     </button>
                   </div>
-
                   <div className="grid grid-cols-2 gap-1.5">
-                    <button onClick={() => setIsHeldCartsModalOpen(true)} className="bg-neutral-100 dark:bg-neutral-800 hover:border-orange-500 border border-transparent p-2 rounded-xl text-[10px] font-bold flex items-center gap-1 text-left">
+                    <button onClick={() => setIsHeldCartsModalOpen(true)} className="bg-neutral-100 dark:bg-neutral-800 p-2 rounded-xl text-[10px] font-bold flex items-center gap-1">
                       <SafePauseCircle size={13} className="text-amber-400 shrink-0" />
                       <span className="truncate">Parked ({heldCarts.length}) [F5]</span>
                     </button>
-                    <button onClick={() => setIsExpenseModalOpen(true)} className="bg-neutral-100 dark:bg-neutral-800 hover:border-orange-500 border border-transparent p-2 rounded-xl text-[10px] font-bold flex items-center gap-1 text-left">
+                    <button onClick={() => setIsExpenseModalOpen(true)} className="bg-neutral-100 dark:bg-neutral-800 p-2 rounded-xl text-[10px] font-bold flex items-center gap-1">
                       <Receipt size={13} className="text-red-400 shrink-0" />
                       <span className="truncate">Expense [F6]</span>
-                    </button>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-1.5">
-                    <button onClick={() => setIsCustomerModalOpen(true)} className="bg-neutral-100 dark:bg-neutral-800 hover:border-orange-500 border border-transparent p-2 rounded-xl text-[10px] font-bold flex items-center gap-1 text-left">
-                      <SafeUsers size={13} className="text-blue-400 shrink-0" />
-                      <span className="truncate">Customer [F11]</span>
-                    </button>
-                    <button 
-                      onClick={() => {
-                        setFulfillmentType(prev => prev === 'pickup' ? 'table' : prev === 'table' ? 'delivery' : 'pickup');
-                      }} 
-                      className="bg-neutral-100 dark:bg-neutral-800 hover:border-orange-500 border border-transparent p-2 rounded-xl text-[10px] font-bold flex items-center gap-1 text-left"
-                    >
-                      <SafeTruck size={13} className="text-green-400 shrink-0" />
-                      <span className="truncate">Mode [F12]</span>
                     </button>
                   </div>
                 </div>
@@ -1593,13 +1426,19 @@ export default function BbCafeDesktopPos() {
             </div>
 
             <div className="space-y-2 pt-4 border-t border-neutral-200 dark:border-neutral-800">
-              <button onClick={handleManualSync} disabled={isSyncing} className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-2xl text-xs font-black uppercase text-yellow-500 bg-yellow-500/10 hover:bg-yellow-500/20 transition-all">
+              <button onClick={async () => {
+                setIsSyncing(true);
+                await waitForPendingWrites(db);
+                await syncOfflineOrders();
+                setIsSyncing(false);
+                toast.success("Synced Cloud Data!");
+              }} disabled={isSyncing} className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-2xl text-xs font-black uppercase text-yellow-500 bg-yellow-500/10 hover:bg-yellow-500/20">
                 {isSyncing ? <Loader2 className="animate-spin shrink-0" size={16} /> : <SafeRefreshCw size={16} />}
-                {!isSidebarCollapsed && <span className="truncate">Sync Menu</span>}
+                {!isSidebarCollapsed && <span className="truncate">Sync Data</span>}
               </button>
-              <button onClick={handleLogout} className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-2xl text-xs font-black uppercase text-red-500 bg-red-500/10 hover:bg-red-500/20 transition-all">
+              <button onClick={() => { setIsLoggedIn(false); setCurrentUser(null); localStorage.removeItem("bb_pos_user_pc"); }} className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-2xl text-xs font-black uppercase text-red-500 bg-red-500/10 hover:bg-red-500/20">
                 <SafeLogOut size={16} className="shrink-0" />
-                {!isSidebarCollapsed && <span className="truncate">Lock POS</span>}
+                {!isSidebarCollapsed && <span className="truncate">Lock Terminal</span>}
               </button>
             </div>
           </aside>
@@ -1607,7 +1446,7 @@ export default function BbCafeDesktopPos() {
           {/* MAIN WORKSPACE */}
           <main className="flex-1 flex h-full overflow-hidden">
             
-            {/* TAB 1: BILLING COUNTER */}
+            {/* TAB 1: BILLING */}
             {activeTab === 'billing' && (
               <div className="flex-1 flex h-full overflow-hidden">
                 <div className="flex-1 flex flex-col p-5 h-full overflow-hidden">
@@ -1629,11 +1468,11 @@ export default function BbCafeDesktopPos() {
                       <input 
                         ref={searchInputRef}
                         type="text" 
-                        placeholder="Search item / Type Code & hit [Enter]... [F2]" 
+                        placeholder="Search item / Type Short Code (e.g. 101, PZ1) & hit [Enter]... [F2]" 
                         value={searchQuery} 
                         onChange={e => setSearchQuery(e.target.value)}
                         onKeyDown={handleSearchInputKeyDown} 
-                        className="w-full bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-2xl py-3 pl-11 pr-4 text-sm outline-none focus:border-orange-500 shadow-sm" 
+                        className="w-full bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-2xl py-3 pl-11 pr-4 text-sm outline-none focus:border-orange-500 shadow-sm font-medium" 
                         autoFocus
                       />
                     </div>
@@ -1645,14 +1484,11 @@ export default function BbCafeDesktopPos() {
                     </button>
                   </div>
 
-                  {/* CATEGORIES - FULLY VISIBLE & WRAPPED */}
+                  {/* CATEGORIES - DEDUPLICATED & ALL VISIBLE */}
                   <div className="flex flex-wrap gap-2 pb-3 shrink-0 max-h-36 overflow-y-auto pr-1">
                     {categories.map((cat) => {
                       const isSelected = selectedCategory === cat;
-                      const count = cat === 'All' 
-                        ? products.length 
-                        : products.filter(p => p.category === cat).length;
-
+                      const count = cat === 'All' ? products.length : products.filter(p => p.category?.toLowerCase() === cat.toLowerCase()).length;
                       return (
                         <button 
                           key={cat} 
@@ -1664,9 +1500,7 @@ export default function BbCafeDesktopPos() {
                           }`}
                         >
                           <span>{cat}</span>
-                          <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-mono font-bold ${
-                            isSelected ? 'bg-black/25 text-black' : 'bg-neutral-800 text-neutral-400'
-                          }`}>
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-mono font-bold ${isSelected ? 'bg-black/25 text-black' : 'bg-neutral-800 text-neutral-400'}`}>
                             {count}
                           </span>
                         </button>
@@ -1695,12 +1529,17 @@ export default function BbCafeDesktopPos() {
                               ) : (
                                 <span className="text-neutral-400 text-xs font-black uppercase tracking-wider px-2 text-center">{item.category || "Cafe Item"}</span>
                               )}
+                              {item.itemCode && (
+                                <span className="absolute top-2 right-2 bg-black/80 backdrop-blur-md text-yellow-400 font-mono text-[10px] font-black px-2 py-0.5 rounded-lg border border-yellow-500/40 shadow">
+                                  #{item.itemCode}
+                                </span>
+                              )}
                             </div>
                             <div className="p-3 flex-grow flex flex-col justify-between w-full">
                               <p className="font-bold text-xs line-clamp-2 leading-tight">{item.name}</p>
                               <div className="flex justify-between items-center">
                                 <span className="text-xs font-mono font-black text-orange-500">₹{item.price}</span>
-                                {item.itemCode && <span className="text-[9px] bg-neutral-100 dark:bg-neutral-800 px-1.5 py-0.5 rounded text-neutral-400 font-mono">#{item.itemCode}</span>}
+                                <span className="text-[10px] text-neutral-400">{item.category}</span>
                               </div>
                             </div>
                           </button>
@@ -1723,18 +1562,20 @@ export default function BbCafeDesktopPos() {
                       <button onClick={() => setCart([])} className="text-red-500 text-xs font-bold hover:underline flex items-center gap-1"><SafeTrash2 size={14} /> Clear [Del]</button>
                     </div>
 
-                    {/* CUSTOMER PHONE & LOYALTY */}
+                    {/* CUSTOMER PHONE & AUTO JUMP ON ENTER */}
                     <div className="space-y-2 bg-neutral-50 dark:bg-neutral-800/40 p-3 rounded-2xl border border-neutral-200 dark:border-neutral-800 mb-3 shrink-0">
                       <div className="flex gap-2">
                         <input 
+                          ref={phoneInputRef}
                           type="text" 
                           maxLength={10} 
-                          placeholder="Phone (10-digits)" 
+                          placeholder="Phone No & press [Enter]" 
                           value={customerPhone} 
                           onChange={e => setCustomerPhone(e.target.value)} 
+                          onKeyDown={handlePhoneInputKeyDown}
                           className="w-full bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 rounded-xl px-3 py-2 text-xs outline-none font-mono" 
                         />
-                        <button onClick={handleCheckLoyalty} className="bg-orange-600 hover:bg-orange-500 text-white px-3 rounded-xl text-xs font-black uppercase">Find</button>
+                        <button onClick={handleCheckLoyaltyWithAutoJump} className="bg-orange-600 hover:bg-orange-500 text-white px-3 rounded-xl text-xs font-black uppercase">Find</button>
                         <button onClick={() => handleSendWhatsAppBill()} title="Send WhatsApp Receipt [F7]" className="bg-green-600/10 hover:bg-green-600/20 text-green-500 px-2.5 rounded-xl text-xs font-bold flex items-center">
                           <SafeShare2 size={14} />
                         </button>
@@ -1747,13 +1588,10 @@ export default function BbCafeDesktopPos() {
                         </div>
                       )}
 
-                      {/* LOYALTY POINTS REDEEM BOX */}
+                      {/* LOYALTY REDEMPTION */}
                       {customerName && customerPoints > 0 && !showNewCustForm && (
                         <div className="pt-2 border-t border-neutral-200 dark:border-neutral-700 flex items-center justify-between text-xs">
-                          <div className="flex items-center gap-1 text-amber-400 font-bold">
-                            <SafeGift size={14} />
-                            <span>Redeem ({customerPoints} Pts):</span>
-                          </div>
+                          <span className="text-amber-400 font-bold flex items-center gap-1">⭐ Redeem ({customerPoints} Pts):</span>
                           <div className="flex items-center gap-2">
                             <input 
                               type="number" 
@@ -1769,11 +1607,10 @@ export default function BbCafeDesktopPos() {
                               onClick={() => {
                                 if (!isRedeemingPoints && pointsToRedeem > 0) {
                                   setIsRedeemingPoints(true);
-                                  toast.success(`${pointsToRedeem} Pts Redeemed (₹${pointsToRedeem} Off)!`);
+                                  toast.success(`Redeemed ₹${pointsToRedeem} off!`);
                                 } else {
                                   setIsRedeemingPoints(false);
                                   setPointsToRedeem(0);
-                                  toast("Points redemption cancelled");
                                 }
                               }}
                               className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase ${isRedeemingPoints ? 'bg-red-500 text-white' : 'bg-amber-500 text-black'}`}
@@ -1784,32 +1621,51 @@ export default function BbCafeDesktopPos() {
                         </div>
                       )}
 
+                      {/* NEW CUSTOMER REGISTRATION (AUTO-FOCUS JUMP) */}
                       {showNewCustForm && (
                         <div className="space-y-2 pt-2 border-t border-neutral-200 dark:border-neutral-700">
-                          <p className="text-[10px] text-red-400 font-bold uppercase">Unregistered number! Add details:</p>
+                          <p className="text-[10px] text-yellow-400 font-bold uppercase">New Customer! Type Name & Press [Enter]:</p>
                           <input 
+                            ref={newCustNameRef}
                             type="text" 
                             placeholder="Customer Name *" 
                             value={newCustNameInput} 
                             onChange={e => setNewCustNameInput(e.target.value)} 
+                            onKeyDown={e => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                newCustAddressRef.current?.focus();
+                              }
+                            }}
                             className="w-full bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 rounded-xl px-3 py-1.5 text-xs outline-none" 
                           />
-                          <button 
-                            onClick={handleSaveNewCustomerQuick} 
-                            className="w-full py-2 bg-green-600 hover:bg-green-500 text-white font-black text-xs uppercase rounded-xl flex items-center justify-center gap-1 shadow"
-                          >
-                            <SafeUserPlus size={14} /> Save Customer
+                          <input 
+                            ref={newCustAddressRef}
+                            type="text" 
+                            placeholder="Address / Area (Optional) & hit [Enter]" 
+                            value={newCustAddressInput} 
+                            onChange={e => setNewCustAddressInput(e.target.value)} 
+                            onKeyDown={e => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                handleSaveNewCustomerQuick();
+                              }
+                            }}
+                            className="w-full bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 rounded-xl px-3 py-1.5 text-xs outline-none" 
+                          />
+                          <button onClick={handleSaveNewCustomerQuick} className="w-full py-2 bg-green-600 hover:bg-green-500 text-white font-black text-xs uppercase rounded-xl flex items-center justify-center gap-1 shadow">
+                            <SafeUserPlus size={14} /> Save Customer [Enter]
                           </button>
                         </div>
                       )}
                     </div>
 
-                    {/* CART ITEMS */}
+                    {/* CART ITEMS LIST */}
                     <div className="space-y-2 overflow-y-auto flex-1 pr-1 mb-3">
                       {cart.length === 0 ? (
                         <div className="flex flex-col items-center justify-center h-full text-neutral-400 text-xs text-center py-10">
                           <ShoppingBag size={32} className="mb-2 opacity-40" />
-                          <p>Cart is empty. Click items or type code.</p>
+                          <p>Cart is empty. Type code or click item.</p>
                         </div>
                       ) : (
                         cart.map((item) => (
@@ -1820,39 +1676,20 @@ export default function BbCafeDesktopPos() {
                               <p className="text-[11px] font-mono text-orange-500 font-bold">₹{item.price * item.quantity}</p>
                             </div>
                             <div className="flex items-center gap-1.5 shrink-0">
-                              <button onClick={() => handleUpdateCartQuantity(item.cartItemId, -1)} className="w-7 h-7 bg-neutral-200 dark:bg-neutral-700 rounded-lg flex items-center justify-center font-bold text-xs">-</button>
+                              <button onClick={() => {
+                                handleUpdateCartQuantity(item.cartItemId, -1);
+                              }} className="w-7 h-7 bg-neutral-200 dark:bg-neutral-700 rounded-lg flex items-center justify-center font-bold text-xs">-</button>
                               <span className="w-6 text-center text-xs font-mono font-bold">{item.quantity}</span>
-                              <button onClick={() => handleUpdateCartQuantity(item.cartItemId, 1)} className="w-7 h-7 bg-neutral-200 dark:bg-neutral-700 rounded-lg flex items-center justify-center font-bold text-xs">+</button>
+                              <button onClick={() => {
+                                handleUpdateCartQuantity(item.cartItemId, 1);
+                              }} className="w-7 h-7 bg-neutral-200 dark:bg-neutral-700 rounded-lg flex items-center justify-center font-bold text-xs">+</button>
                             </div>
                           </div>
                         ))
                       )}
                     </div>
 
-                    {/* DISCOUNT OPTION */}
-                    <div className="space-y-2 bg-neutral-50 dark:bg-neutral-800/40 p-2.5 rounded-2xl border border-neutral-200 dark:border-neutral-800 mb-3 shrink-0">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[11px] font-bold uppercase text-neutral-400">Discount Option</span>
-                        <div className="flex bg-neutral-200 dark:bg-neutral-700 p-0.5 rounded-lg">
-                          <button onClick={() => setDiscountType('amount')} className={`px-2 py-0.5 text-[10px] font-bold rounded ${discountType === 'amount' ? 'bg-orange-600 text-white' : 'text-neutral-400'}`}>₹ Flat</button>
-                          <button onClick={() => setDiscountType('percentage')} className={`px-2 py-0.5 text-[10px] font-bold rounded ${discountType === 'percentage' ? 'bg-orange-600 text-white' : 'text-neutral-400'}`}>% Off</button>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <input 
-                          type="number" 
-                          placeholder={discountType === 'amount' ? "Enter Amount (₹)" : "Enter Percentage (%)"}
-                          value={discountValue || ''}
-                          onChange={e => setDiscountValue(Number(e.target.value))}
-                          className="w-full bg-white dark:bg-neutral-900 border border-neutral-700 rounded-xl px-3 py-1.5 text-xs outline-none font-mono" 
-                        />
-                        {discountValue > 0 && (
-                          <button onClick={() => setDiscountValue(0)} className="text-red-400 text-xs font-bold px-2">Clear</button>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* FULFILLMENT MODE [F12] */}
+                    {/* FULFILLMENT MODE & 6 FIXED TABLE BUTTONS */}
                     <div className="space-y-2 mb-3 shrink-0 border-t border-neutral-200 dark:border-neutral-800 pt-2">
                       <div className="grid grid-cols-3 gap-1 bg-neutral-100 dark:bg-neutral-800 p-1 rounded-2xl">
                         {(['pickup', 'table', 'delivery'] as const).map((type) => (
@@ -1860,20 +1697,37 @@ export default function BbCafeDesktopPos() {
                         ))}
                       </div>
 
+                      {/* 6 TABLE SELECTION TABS */}
                       {fulfillmentType === 'table' && (
-                        <input type="text" placeholder="Table No (e.g. Table 4)" value={tableNumber} onChange={e => setTableNumber(e.target.value)} className="w-full bg-neutral-50 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-xl px-3 py-1.5 text-xs outline-none" />
+                        <div className="grid grid-cols-3 gap-1.5 pt-1">
+                          {['Table 1', 'Table 2', 'Table 3', 'Table 4', 'Table 5', 'Table 6'].map((tName) => {
+                            const isOccupied = activeTableOrders.some(o => o.tableNumber === tName);
+                            const isSelected = tableNumber === tName;
+                            return (
+                              <button 
+                                key={tName}
+                                type="button"
+                                onClick={() => { triggerBeep('tap'); setTableNumber(tName); }}
+                                className={`py-2 px-1 rounded-xl text-xs font-black uppercase border transition-all text-center ${
+                                  isSelected 
+                                    ? 'bg-amber-500 text-black border-amber-500 shadow-md font-black' 
+                                    : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-300 border-neutral-700 hover:border-amber-400'
+                                }`}
+                              >
+                                <span>{tName}</span>
+                                {isOccupied && <span className="block text-[8px] text-red-500 font-bold uppercase mt-0.5">● Active</span>}
+                              </button>
+                            );
+                          })}
+                        </div>
                       )}
                     </div>
 
-                    {/* BREAKDOWN TOTALS */}
+                    {/* BREAKDOWN & GRAND TOTAL */}
                     <div className="space-y-1.5 text-xs border-t border-neutral-200 dark:border-neutral-800 pt-2 shrink-0">
                       <div className="flex justify-between text-neutral-400"><span>Subtotal</span><span className="font-mono">₹{getCartSubtotal()}</span></div>
-                      {getCalculatedDiscountAmount() > 0 && (
-                        <div className="flex justify-between text-orange-400 font-bold"><span>Discount</span><span className="font-mono">-₹{getCalculatedDiscountAmount()}</span></div>
-                      )}
-                      {isRedeemingPoints && (
-                        <div className="flex justify-between text-amber-400 font-bold"><span>Points Redeemed</span><span className="font-mono">-₹{getRedemptionDiscount()}</span></div>
-                      )}
+                      {getCalculatedDiscountAmount() > 0 && <div className="flex justify-between text-orange-400 font-bold"><span>Discount</span><span className="font-mono">-₹{getCalculatedDiscountAmount()}</span></div>}
+                      {isRedeemingPoints && <div className="flex justify-between text-amber-400 font-bold"><span>Points Redeemed</span><span className="font-mono">-₹{getRedemptionDiscount()}</span></div>}
                       <div className="flex justify-between text-base font-black text-green-500 pt-1 border-t border-dashed border-neutral-700">
                         <span>Grand Total</span><span className="font-mono">₹{getTotalBillPrice()}</span>
                       </div>
@@ -1882,41 +1736,10 @@ export default function BbCafeDesktopPos() {
                     {/* PAYMENT METHOD [F4] */}
                     <div className="space-y-2 my-2 shrink-0">
                       <div className="grid grid-cols-3 gap-1.5">
-                        <button onClick={() => setPaymentMethod('cash')} className={`py-2 rounded-xl text-xs font-black uppercase border transition-all ${paymentMethod === 'cash' ? 'bg-green-600 text-white border-green-600 shadow' : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-400 border-neutral-700'}`}>Cash [F4]</button>
-                        <button onClick={() => setPaymentMethod('upi')} className={`py-2 rounded-xl text-xs font-black uppercase border transition-all ${paymentMethod === 'upi' ? 'bg-blue-600 text-white border-blue-600 shadow' : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-400 border-neutral-700'}`}>UPI [F4]</button>
-                        <button onClick={() => setPaymentMethod('split')} className={`py-2 rounded-xl text-xs font-black uppercase border transition-all ${paymentMethod === 'split' ? 'bg-amber-600 text-white border-amber-600 shadow' : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-400 border-neutral-700'}`}>Split [F4]</button>
+                        <button onClick={() => setPaymentMethod('cash')} className={`py-2 rounded-xl text-xs font-black uppercase border ${paymentMethod === 'cash' ? 'bg-green-600 text-white border-green-600 shadow' : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-400 border-neutral-700'}`}>Cash [F4]</button>
+                        <button onClick={() => setPaymentMethod('upi')} className={`py-2 rounded-xl text-xs font-black uppercase border ${paymentMethod === 'upi' ? 'bg-blue-600 text-white border-blue-600 shadow' : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-400 border-neutral-700'}`}>UPI [F4]</button>
+                        <button onClick={() => setPaymentMethod('split')} className={`py-2 rounded-xl text-xs font-black uppercase border ${paymentMethod === 'split' ? 'bg-amber-600 text-white border-amber-600 shadow' : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-400 border-neutral-700'}`}>Split [F4]</button>
                       </div>
-
-                      {paymentMethod === 'split' && (
-                        <div className="grid grid-cols-2 gap-2 bg-amber-500/10 border border-amber-500/30 p-2.5 rounded-xl">
-                          <div>
-                            <label className="text-[9px] font-black uppercase text-neutral-400 block mb-1">Cash Part (₹)</label>
-                            <input 
-                              type="number" 
-                              value={splitCashAmount} 
-                              onChange={e => {
-                                const val = Number(e.target.value);
-                                setSplitCashAmount(val);
-                                setSplitUpiAmount(Math.max(0, getTotalBillPrice() - val));
-                              }}
-                              className="w-full bg-neutral-900 border border-neutral-700 rounded-lg p-1.5 text-xs text-center font-mono" 
-                            />
-                          </div>
-                          <div>
-                            <label className="text-[9px] font-black uppercase text-neutral-400 block mb-1">UPI Part (₹)</label>
-                            <input 
-                              type="number" 
-                              value={splitUpiAmount} 
-                              onChange={e => {
-                                const val = Number(e.target.value);
-                                setSplitUpiAmount(val);
-                                setSplitCashAmount(Math.max(0, getTotalBillPrice() - val));
-                              }}
-                              className="w-full bg-neutral-900 border border-neutral-700 rounded-lg p-1.5 text-xs text-center font-mono" 
-                            />
-                          </div>
-                        </div>
-                      )}
                     </div>
 
                     {/* EXTRA TOOLS */}
@@ -1952,7 +1775,7 @@ export default function BbCafeDesktopPos() {
               </div>
             )}
 
-            {/* TAB 2: MANAGE MENU & PRODUCTS */}
+            {/* TAB 2: INVENTORY & MENU MANAGER */}
             {activeTab === 'inventory' && (
               <div className="flex-1 p-6 h-full overflow-y-auto space-y-4">
                 <div className="flex justify-between items-center border-b pb-3">
@@ -1960,11 +1783,8 @@ export default function BbCafeDesktopPos() {
                     <h2 className="text-sm font-black uppercase text-orange-500">Menu Items & Stock Manager</h2>
                     <p className="text-xs text-neutral-400">Add new food items with variations/sizes, toggle stock status, or edit prices.</p>
                   </div>
-                  <button 
-                    onClick={() => handleOpenItemEditor(null)} 
-                    className="bg-orange-600 hover:bg-orange-500 text-white px-4 py-2.5 rounded-2xl text-xs font-black uppercase flex items-center gap-1.5 shadow"
-                  >
-                    <SafePackagePlus size={16} /> + Add New Item
+                  <button onClick={() => handleOpenItemEditor(null)} className="bg-orange-600 hover:bg-orange-500 text-white px-4 py-2.5 rounded-2xl text-xs font-black uppercase flex items-center gap-1.5 shadow">
+                    <SafePackagePlus size={16} /> + Add New Food Item
                   </button>
                 </div>
 
@@ -1995,7 +1815,6 @@ export default function BbCafeDesktopPos() {
                               {isAvail ? 'In Stock' : 'Out'}
                             </span>
                           </div>
-                          
                           <p className="text-xs font-mono text-orange-500 font-black mb-1">₹{item.price}</p>
                           <p className="text-[10px] text-neutral-400">Category: {item.category || 'General'}</p>
 
@@ -2014,23 +1833,17 @@ export default function BbCafeDesktopPos() {
                         </div>
 
                         <div className="flex gap-2 mt-4 pt-3 border-t border-neutral-200 dark:border-neutral-800">
-                          <button 
-                            onClick={() => handleOpenItemEditor(item)} 
-                            className="flex-1 bg-neutral-200 dark:bg-neutral-800 hover:bg-orange-600 hover:text-white py-1.5 rounded-xl text-[10px] font-black uppercase transition-all flex items-center justify-center gap-1"
-                          >
+                          <button onClick={() => handleOpenItemEditor(item)} className="flex-1 bg-neutral-200 dark:bg-neutral-800 hover:bg-orange-600 hover:text-white py-1.5 rounded-xl text-[10px] font-black uppercase transition-all flex items-center justify-center gap-1">
                             <SafeEdit3 size={12} /> Edit
                           </button>
                           <button 
-                            onClick={() => handleToggleStock(item.id, isAvail)} 
+                            onClick={async () => {
+                              await updateDoc(doc(db, "products", item.id), { isAvailable: !isAvail });
+                              setProducts(prev => prev.map(p => p.id === item.id ? { ...p, isAvailable: !isAvail } : p));
+                            }} 
                             className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase border ${isAvail ? 'text-red-400 border-red-500/30' : 'text-green-400 border-green-500/30'}`}
                           >
                             {isAvail ? 'Disable' : 'Enable'}
-                          </button>
-                          <button 
-                            onClick={() => handleDeleteProductFromMenu(item.id)} 
-                            className="p-1.5 text-red-400 hover:text-red-300"
-                          >
-                            <SafeTrash2 size={16} />
                           </button>
                         </div>
                       </div>
@@ -2040,7 +1853,7 @@ export default function BbCafeDesktopPos() {
               </div>
             )}
 
-            {/* TAB 3: PAST RECEIPTS & REPRINT */}
+            {/* TAB 3: PAST RECEIPTS & OLD BILL REPRINTS */}
             {activeTab === 'receipts' && (
               <div className="flex-1 p-6 h-full flex flex-col overflow-hidden space-y-4">
                 <div className="flex justify-between items-center border-b pb-3 shrink-0">
@@ -2048,13 +1861,9 @@ export default function BbCafeDesktopPos() {
                     <h2 className="text-sm font-black uppercase text-orange-500 flex items-center gap-2">
                       <Printer size={18} /> Past Receipts & Old Bill Reprints
                     </h2>
-                    <p className="text-xs text-neutral-400">Search past bills, inspect ordered items, reprint thermal receipts or KOT, and resend WhatsApp bills.</p>
+                    <p className="text-xs text-neutral-400">Search past bills, reprint thermal receipts or KOT, and resend WhatsApp bills.</p>
                   </div>
-                  <button 
-                    onClick={fetchPastReceipts} 
-                    disabled={isReceiptsLoading} 
-                    className="bg-neutral-800 hover:bg-neutral-700 text-neutral-300 px-3 py-2 rounded-xl text-xs font-black uppercase flex items-center gap-1.5 border border-neutral-700"
-                  >
+                  <button onClick={fetchPastReceipts} disabled={isReceiptsLoading} className="bg-neutral-800 hover:bg-neutral-700 text-neutral-300 px-3 py-2 rounded-xl text-xs font-black uppercase flex items-center gap-1.5 border border-neutral-700">
                     {isReceiptsLoading ? <Loader2 className="animate-spin" size={14} /> : <SafeRefreshCw size={14} />} Refresh
                   </button>
                 </div>
@@ -2085,9 +1894,7 @@ export default function BbCafeDesktopPos() {
                   {isReceiptsLoading ? (
                     <div className="flex justify-center py-20"><Loader2 className="animate-spin text-orange-500" size={32} /></div>
                   ) : filteredPastReceipts.length === 0 ? (
-                    <div className="text-center py-24 text-neutral-500 font-bold text-xs">
-                      No matching receipts found.
-                    </div>
+                    <div className="text-center py-24 text-neutral-500 font-bold text-xs">No receipts found.</div>
                   ) : (
                     filteredPastReceipts.map((order) => {
                       const orderDate = order.timestamp?.toDate ? order.timestamp.toDate() : new Date(order.timestamp || Date.now());
@@ -2136,83 +1943,116 @@ export default function BbCafeDesktopPos() {
               </div>
             )}
 
-            {/* TAB 4: REPORTS & CASH DRAWER */}
+            {/* TAB 4: REPORTS WITH ITEM-WISE BREAKDOWN & CUSTOM DATE */}
             {activeTab === 'reports' && (
               <div className="flex-1 p-6 h-full overflow-y-auto max-w-4xl mx-auto space-y-6">
                 <div className="flex justify-between items-center border-b pb-4">
                   <div>
                     <h2 className="text-lg font-black uppercase text-orange-500 flex items-center gap-2">
-                      <SafeBarChart3 size={20} /> Sales Reports & Cash Drawer Audit
+                      <SafeBarChart3 size={20} /> Sales & Item-wise Analytics
                     </h2>
-                    <p className="text-xs text-neutral-400">Total sale, payment modes, daily petty cash expenses and drawer balance.</p>
+                    <p className="text-xs text-neutral-400">Check total sales and see which food item sold how much.</p>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex items-center gap-2">
                     <button onClick={handleSendOwnerSummary} className="px-3 py-2 bg-green-600 hover:bg-green-500 text-white rounded-xl text-xs font-black uppercase flex items-center gap-1.5 shadow">
                       <SafeSend size={14} /> Send WhatsApp to Owner
                     </button>
                     <div className="flex bg-neutral-800 p-1 rounded-2xl border border-neutral-700">
-                      <button onClick={() => setReportFilter('today')} className={`px-4 py-2 text-xs font-black uppercase rounded-xl transition-all ${reportFilter === 'today' ? 'bg-orange-600 text-white' : 'text-neutral-400'}`}>Today</button>
-                      <button onClick={() => setReportFilter('yesterday')} className={`px-4 py-2 text-xs font-black uppercase rounded-xl transition-all ${reportFilter === 'yesterday' ? 'bg-orange-600 text-white' : 'text-neutral-400'}`}>Yesterday</button>
-                      <button onClick={() => setReportFilter('custom')} className={`px-4 py-2 text-xs font-black uppercase rounded-xl transition-all ${reportFilter === 'custom' ? 'bg-orange-600 text-white' : 'text-neutral-400'}`}>Custom</button>
+                      <button onClick={() => setReportFilter('today')} className={`px-3 py-1.5 text-xs font-black uppercase rounded-xl ${reportFilter === 'today' ? 'bg-orange-600 text-white' : 'text-neutral-400'}`}>Today</button>
+                      <button onClick={() => setReportFilter('yesterday')} className={`px-3 py-1.5 text-xs font-black uppercase rounded-xl ${reportFilter === 'yesterday' ? 'bg-orange-600 text-white' : 'text-neutral-400'}`}>Yesterday</button>
+                      <button onClick={() => setReportFilter('custom')} className={`px-3 py-1.5 text-xs font-black uppercase rounded-xl ${reportFilter === 'custom' ? 'bg-orange-600 text-white' : 'text-neutral-400'}`}>Date Picker</button>
                     </div>
+                    {reportFilter === 'custom' && (
+                      <input 
+                        type="date" 
+                        value={customReportDate} 
+                        onChange={e => setCustomReportDate(e.target.value)}
+                        className="bg-neutral-900 border border-neutral-700 text-white text-xs px-3 py-1.5 rounded-xl outline-none font-mono" 
+                      />
+                    )}
                   </div>
                 </div>
 
-                {isReportLoading ? (
-                  <div className="flex justify-center py-24"><Loader2 className="animate-spin text-orange-500" size={32} /></div>
-                ) : (
-                  <>
-                    <div className="grid grid-cols-4 gap-4">
-                      <div className="bg-neutral-900 border border-neutral-800 p-5 rounded-3xl space-y-1 shadow-lg">
-                        <p className="text-[10px] font-black uppercase text-neutral-400">Total Sales</p>
-                        <p className="text-2xl font-black font-mono text-green-400">₹{reportSummary.totalSale}</p>
-                        <p className="text-[10px] text-neutral-500">{reportSummary.totalOrdersCount} Completed Orders</p>
-                      </div>
-                      <div className="bg-neutral-900 border border-neutral-800 p-5 rounded-3xl space-y-1 shadow-lg">
-                        <p className="text-[10px] font-black uppercase text-neutral-400">Gross Cash Sale</p>
-                        <p className="text-2xl font-black font-mono text-amber-400">₹{reportSummary.cashSale}</p>
-                        <p className="text-[10px] text-neutral-500">Collected at counter</p>
-                      </div>
-                      <div className="bg-neutral-900 border border-neutral-800 p-5 rounded-3xl space-y-1 shadow-lg">
-                        <p className="text-[10px] font-black uppercase text-neutral-400">UPI / Online</p>
-                        <p className="text-2xl font-black font-mono text-blue-400">₹{reportSummary.upiSale}</p>
-                        <p className="text-[10px] text-neutral-500">Bank Settlements</p>
-                      </div>
-                      <div className="bg-neutral-900 border border-neutral-800 p-5 rounded-3xl space-y-1 shadow-lg">
-                        <p className="text-[10px] font-black uppercase text-red-400">Expenses Deducted</p>
-                        <p className="text-2xl font-black font-mono text-red-400">-₹{reportSummary.totalExpenseAmount}</p>
-                        <p className="text-[10px] text-neutral-500">{dailyExpenses.length} Drawer Vouchers</p>
-                      </div>
+                {/* SUMMARY STATS */}
+                <div className="grid grid-cols-4 gap-4">
+                  <div className="bg-neutral-900 border border-neutral-800 p-4 rounded-3xl space-y-1">
+                    <p className="text-[10px] font-black uppercase text-neutral-400">Total Sales</p>
+                    <p className="text-2xl font-black font-mono text-green-400">₹{reportSummary.totalSale}</p>
+                    <p className="text-[10px] text-neutral-500">{reportSummary.totalOrdersCount} Completed Orders</p>
+                  </div>
+                  <div className="bg-neutral-900 border border-neutral-800 p-4 rounded-3xl space-y-1">
+                    <p className="text-[10px] font-black uppercase text-neutral-400">Gross Cash</p>
+                    <p className="text-2xl font-black font-mono text-amber-400">₹{reportSummary.cashSale}</p>
+                  </div>
+                  <div className="bg-neutral-900 border border-neutral-800 p-4 rounded-3xl space-y-1">
+                    <p className="text-[10px] font-black uppercase text-neutral-400">UPI Payments</p>
+                    <p className="text-2xl font-black font-mono text-blue-400">₹{reportSummary.upiSale}</p>
+                  </div>
+                  <div className="bg-neutral-900 border border-neutral-800 p-4 rounded-3xl space-y-1">
+                    <p className="text-[10px] font-black uppercase text-neutral-400">Net in Drawer</p>
+                    <p className="text-2xl font-black font-mono text-emerald-400">₹{reportSummary.netCashInDrawer}</p>
+                  </div>
+                </div>
+
+                {/* CASH DRAWER AUDIT */}
+                <div className="bg-neutral-900 border border-neutral-800 p-5 rounded-3xl space-y-4 shadow-xl">
+                  <div className="flex justify-between items-center border-b border-neutral-800 pb-3">
+                    <div>
+                      <h3 className="text-xs font-black uppercase text-yellow-400">Cash Drawer Audit (गल्ला मिलान)</h3>
+                      <p className="text-[11px] text-neutral-400">Expected Net Cash: <span className="font-mono text-green-400 font-bold">₹{reportSummary.netCashInDrawer}</span></p>
                     </div>
+                    <button onClick={() => setIsExpenseModalOpen(true)} className="px-3 py-1.5 bg-red-600/10 text-red-400 hover:bg-red-600/20 border border-red-500/30 rounded-xl text-xs font-black uppercase">
+                      + Add Expense [F6]
+                    </button>
+                  </div>
 
-                    <div className="bg-neutral-900 border border-neutral-800 p-5 rounded-3xl space-y-4 shadow-xl">
-                      <div className="flex justify-between items-center border-b border-neutral-800 pb-3">
-                        <div>
-                          <h3 className="text-xs font-black uppercase text-yellow-400">Cash Drawer Audit (गल्ला मिलान)</h3>
-                          <p className="text-[11px] text-neutral-400">Net Expected Cash = Cash Sales (₹{reportSummary.cashSale}) - Expenses (₹{reportSummary.totalExpenseAmount}) = <span className="font-mono text-green-400 font-bold">₹{reportSummary.netCashInDrawer}</span></p>
-                        </div>
-                        <button onClick={() => setIsExpenseModalOpen(true)} className="px-3 py-1.5 bg-red-600/10 text-red-400 hover:bg-red-600/20 border border-red-500/30 rounded-xl text-xs font-black uppercase">
-                          + Add Expense [F6]
-                        </button>
+                  <div className="flex items-center gap-4">
+                    <input 
+                      type="number" 
+                      placeholder="Counted Cash in Drawer (₹)" 
+                      value={physicalCashInput}
+                      onChange={e => setPhysicalCashInput(e.target.value === '' ? '' : Number(e.target.value))}
+                      className="flex-1 bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-2.5 text-sm font-mono text-white outline-none" 
+                    />
+                    {physicalCashInput !== '' && (
+                      <div className={`text-xs font-black px-4 py-2.5 rounded-xl border ${Number(physicalCashInput) === reportSummary.netCashInDrawer ? 'bg-green-500/10 text-green-400 border-green-500/30' : Number(physicalCashInput) > reportSummary.netCashInDrawer ? 'bg-blue-500/10 text-blue-400 border-blue-500/30' : 'bg-red-500/10 text-red-400 border-red-500/30'}`}>
+                        {Number(physicalCashInput) === reportSummary.netCashInDrawer ? '✅ Matched!' : Number(physicalCashInput) > reportSummary.netCashInDrawer ? `⚠️ Excess: +₹${Number(physicalCashInput) - reportSummary.netCashInDrawer}` : `❌ Short: -₹${reportSummary.netCashInDrawer - Number(physicalCashInput)}`}
                       </div>
+                    )}
+                  </div>
+                </div>
 
-                      <div className="flex items-center gap-4">
-                        <input 
-                          type="number" 
-                          placeholder="Counted Cash in Drawer (₹)" 
-                          value={physicalCashInput}
-                          onChange={e => setPhysicalCashInput(e.target.value === '' ? '' : Number(e.target.value))}
-                          className="flex-1 bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-2.5 text-sm font-mono text-white outline-none" 
-                        />
-                        {physicalCashInput !== '' && (
-                          <div className={`text-xs font-black px-4 py-2.5 rounded-xl border ${Number(physicalCashInput) === reportSummary.netCashInDrawer ? 'bg-green-500/10 text-green-400 border-green-500/30' : Number(physicalCashInput) > reportSummary.netCashInDrawer ? 'bg-blue-500/10 text-blue-400 border-blue-500/30' : 'bg-red-500/10 text-red-400 border-red-500/30'}`}>
-                            {Number(physicalCashInput) === reportSummary.netCashInDrawer ? '✅ Cash Matched Perfectly!' : Number(physicalCashInput) > reportSummary.netCashInDrawer ? `⚠️ Excess: +₹${Number(physicalCashInput) - reportSummary.netCashInDrawer}` : `❌ Shortage: -₹${reportSummary.netCashInDrawer - Number(physicalCashInput)}`}
-                          </div>
+                {/* ITEM-WISE SALES TABLE */}
+                <div className="bg-neutral-900 border border-neutral-800 p-5 rounded-3xl space-y-3">
+                  <h3 className="text-xs font-black uppercase text-yellow-400 flex items-center justify-between">
+                    <span>📊 Item-wise Sales Breakdown</span>
+                    <span className="text-neutral-400 font-normal">Sorted by Most Sold</span>
+                  </h3>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead>
+                        <tr className="border-b border-neutral-800 text-neutral-400 text-[10px] uppercase">
+                          <th className="py-2">Item Name</th>
+                          <th className="py-2 text-center">Qty Sold</th>
+                          <th className="py-2 text-right">Revenue (₹)</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-neutral-800/60 font-mono">
+                        {itemWiseSales.length === 0 ? (
+                          <tr><td colSpan={3} className="py-6 text-center text-neutral-500 font-sans">No items sold on this date.</td></tr>
+                        ) : (
+                          itemWiseSales.map((item, idx) => (
+                            <tr key={idx} className="hover:bg-neutral-800/30">
+                              <td className="py-2.5 font-sans font-bold text-white">{item.name}</td>
+                              <td className="py-2.5 text-center font-bold text-orange-400">x{item.qty}</td>
+                              <td className="py-2.5 text-right font-black text-green-400">₹{item.revenue}</td>
+                            </tr>
+                          ))
                         )}
-                      </div>
-                    </div>
-                  </>
-                )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
               </div>
             )}
 
@@ -2270,41 +2110,41 @@ export default function BbCafeDesktopPos() {
               </div>
             )}
 
-            {/* TAB 6: LIVE ORDERS */}
+            {/* TAB 6: LIVE ORDERS (PRINT, COMPLETE, REJECT) */}
             {activeTab === 'orders' && (
               <div className="flex-1 p-6 h-full overflow-y-auto">
-                <div className="flex justify-between items-center mb-4">
-                  <h2 className="text-sm font-black uppercase text-orange-500">Live Delivery & Pickup Orders ({activeLiveOrders.length})</h2>
-                </div>
+                <h2 className="text-sm font-black uppercase text-orange-500 mb-4">Live Orders ({activeLiveOrders.length})</h2>
                 <div className="grid grid-cols-3 gap-4">
                   {activeLiveOrders.length === 0 ? (
-                    <div className="col-span-3 text-center py-24 text-neutral-500 font-bold">No active delivery or pickup orders right now.</div>
+                    <div className="col-span-3 text-center py-24 text-neutral-500 font-bold">No active live orders.</div>
                   ) : (
                     activeLiveOrders.map((order) => (
-                      <div key={order.id} className={`bg-white dark:bg-neutral-900 border rounded-2xl p-4 flex flex-col justify-between shadow-lg ${order.status === 'pending' ? 'border-red-500 animate-pulse' : 'border-neutral-200 dark:border-neutral-800'}`}>
+                      <div key={order.id} className="bg-neutral-900 border border-neutral-800 rounded-2xl p-4 flex flex-col justify-between shadow-lg space-y-3">
                         <div>
-                          <div className="flex justify-between items-center border-b border-neutral-200 dark:border-neutral-800 pb-2 mb-3">
+                          <div className="flex justify-between items-center border-b border-neutral-800 pb-2 mb-2">
                             <span className="font-mono font-black text-yellow-500">Bill #{order.billNumber}</span>
                             <span className="bg-orange-500/10 text-orange-400 text-[10px] font-black uppercase px-2 py-0.5 rounded">{order.fulfillmentType}</span>
                           </div>
-                          <p className="text-xs font-bold mb-2">👤 {order.customerName} ({order.customerPhone || 'Walk-in'})</p>
-                          <div className="space-y-1 py-2 border-t border-dashed border-neutral-200 dark:border-neutral-800 mb-3 max-h-36 overflow-y-auto">
+                          <p className="text-xs font-bold">👤 {order.customerName} ({order.customerPhone || 'Walk-in'})</p>
+                          <div className="space-y-1 py-2 border-t border-dashed border-neutral-800 my-2 max-h-36 overflow-y-auto">
                             {order.items?.map((it: any, idx: number) => (
                               <div key={idx} className="flex justify-between text-xs">
                                 <span>{it.name}</span><span className="font-bold text-orange-500">x{it.quantity}</span>
                               </div>
                             ))}
                           </div>
+                          <p className="text-sm font-black text-green-400 font-mono">Total: ₹{order.total}</p>
                         </div>
-                        <div>
-                          <div className="flex justify-between text-xs font-black text-green-500 mb-3 pt-2 border-t">
-                            <span>Total: ₹{order.total}</span>
-                          </div>
-                          <div className="flex gap-2">
-                            <button onClick={() => handlePrintReceiptDirect(order, false)} className="flex-1 py-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 rounded-xl text-xs font-black uppercase flex items-center justify-center gap-1">
-                              <SafePrinter size={14} /> Print
-                            </button>
-                          </div>
+                        <div className="grid grid-cols-3 gap-1.5 pt-2 border-t border-neutral-800">
+                          <button onClick={() => handlePrintReceiptDirect(order, false)} className="py-2 bg-neutral-800 hover:bg-neutral-700 text-white rounded-xl text-[10px] font-black uppercase flex items-center justify-center gap-1">
+                            <SafePrinter size={13} /> Print
+                          </button>
+                          <button onClick={() => handleCompleteLiveOrder(order.id)} className="py-2 bg-green-600 hover:bg-green-500 text-white rounded-xl text-[10px] font-black uppercase flex items-center justify-center gap-1">
+                            <Check size={13} /> Done
+                          </button>
+                          <button onClick={() => handleRejectLiveOrder(order.id)} className="py-2 bg-red-600/20 text-red-400 hover:bg-red-600 hover:text-white rounded-xl text-[10px] font-black uppercase flex items-center justify-center gap-1">
+                            <SafeX size={13} /> Reject
+                          </button>
                         </div>
                       </div>
                     ))
@@ -2313,7 +2153,7 @@ export default function BbCafeDesktopPos() {
               </div>
             )}
 
-            {/* TAB 7: SETTINGS */}
+            {/* TAB 7: HARDWARE & SETTINGS */}
             {activeTab === 'settings' && (
               <div className="flex-1 p-6 h-full overflow-y-auto flex justify-center">
                 <div className="max-w-xl w-full bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 p-6 rounded-3xl shadow-xl space-y-6">
@@ -2350,8 +2190,8 @@ export default function BbCafeDesktopPos() {
                   <div className="space-y-2 border-b border-neutral-200 dark:border-neutral-800 pb-4">
                     <p className="text-xs font-bold uppercase">UI Theme:</p>
                     <div className="flex bg-neutral-100 dark:bg-neutral-800 p-1 rounded-xl w-48">
-                      <button onClick={() => handleToggleTheme('dark')} className={`flex-1 py-2 rounded-lg text-xs font-black uppercase ${themeMode === 'dark' ? 'bg-neutral-950 text-amber-400' : 'text-neutral-400'}`}>Dark</button>
-                      <button onClick={() => handleToggleTheme('light')} className={`flex-1 py-2 rounded-lg text-xs font-black uppercase ${themeMode === 'light' ? 'bg-white text-orange-600' : 'text-neutral-400'}`}>Light</button>
+                      <button onClick={() => { setThemeMode('dark'); localStorage.setItem("bb_pos_theme_pc", 'dark'); document.documentElement.classList.add('dark'); }} className={`flex-1 py-2 rounded-lg text-xs font-black uppercase ${themeMode === 'dark' ? 'bg-neutral-950 text-amber-400' : 'text-neutral-400'}`}>Dark</button>
+                      <button onClick={() => { setThemeMode('light'); localStorage.setItem("bb_pos_theme_pc", 'light'); document.documentElement.classList.remove('dark'); }} className={`flex-1 py-2 rounded-lg text-xs font-black uppercase ${themeMode === 'light' ? 'bg-white text-orange-600' : 'text-neutral-400'}`}>Light</button>
                     </div>
                   </div>
 
@@ -2376,179 +2216,51 @@ export default function BbCafeDesktopPos() {
       {/* MODAL 1: ADD / EDIT PRODUCT */}
       <AnimatePresence>
         {isItemEditorModalOpen && (
-          <div 
-            className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 cursor-pointer" 
-            onClick={() => {
-              setIsItemEditorModalOpen(false);
-              setTimeout(() => searchInputRef.current?.focus(), 60);
-            }}
-          >
-            <motion.div 
-              initial={{ scale: 0.95 }} 
-              animate={{ scale: 1 }} 
-              exit={{ scale: 0.95 }} 
-              onClick={(e) => e.stopPropagation()} 
-              className="bg-neutral-900 border border-neutral-800 max-w-lg w-full rounded-3xl p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto cursor-default"
-            >
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setIsItemEditorModalOpen(false)}>
+            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} onClick={e => e.stopPropagation()} className="bg-neutral-900 border border-neutral-800 max-w-lg w-full rounded-3xl p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
               <div className="flex justify-between items-center border-b border-neutral-800 pb-3">
-                <h3 className="font-black text-sm uppercase text-orange-500 flex items-center gap-2">
-                  <SafePackagePlus size={18} />
-                  <span>{editingItemObj ? 'Edit Menu Item' : 'Add New Item to Menu'}</span>
-                </h3>
-                <button onClick={() => { setIsItemEditorModalOpen(false); setTimeout(() => searchInputRef.current?.focus(), 60); }} className="text-neutral-400 hover:text-white p-1"><SafeX size={18} /></button>
+                <h3 className="font-black text-sm uppercase text-orange-500">{editingItemObj ? 'Edit Food Item' : 'Add New Food Item'}</h3>
+                <button onClick={() => setIsItemEditorModalOpen(false)} className="text-neutral-400"><SafeX size={18} /></button>
               </div>
 
-              <form onSubmit={handleSaveItemToFirestore} className="space-y-4 text-xs">
+              <form onSubmit={handleSaveItemToFirestore} className="space-y-3 text-xs">
                 <div>
-                  <label className="text-neutral-400 uppercase font-black text-[10px] block mb-1">Item Name *</label>
-                  <input 
-                    type="text" 
-                    required 
-                    placeholder="e.g. Veg Cheese Pizza, Cold Coffee, Paneer Burger" 
-                    value={itemNameInput} 
-                    onChange={e => setItemNameInput(e.target.value)} 
-                    className="w-full bg-neutral-950 border border-neutral-700 rounded-xl p-2.5 text-white outline-none" 
-                    autoFocus 
-                  />
+                  <label className="text-neutral-400 uppercase font-bold text-[10px] block mb-1">Item Name *</label>
+                  <input type="text" required placeholder="e.g. Cheese Pizza, Masala Dosa" value={itemNameInput} onChange={e => setItemNameInput(e.target.value)} className="w-full bg-neutral-950 border border-neutral-700 rounded-xl p-2.5 text-white outline-none" autoFocus />
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="text-neutral-400 uppercase font-black text-[10px] block mb-1">Base Price (₹) *</label>
-                    <input 
-                      type="number" 
-                      required 
-                      min={0}
-                      placeholder="100" 
-                      value={itemPriceInput} 
-                      onChange={e => setItemPriceInput(e.target.value === '' ? '' : Number(e.target.value))} 
-                      className="w-full bg-neutral-950 border border-neutral-700 rounded-xl p-2.5 text-white font-mono text-sm outline-none" 
-                    />
+                    <label className="text-neutral-400 uppercase font-bold text-[10px] block mb-1">Base Price (₹) *</label>
+                    <input type="number" required min={0} value={itemPriceInput} onChange={e => setItemPriceInput(e.target.value === '' ? '' : Number(e.target.value))} className="w-full bg-neutral-950 border border-neutral-700 rounded-xl p-2.5 text-white font-mono" />
                   </div>
                   <div>
-                    <label className="text-neutral-400 uppercase font-black text-[10px] block mb-1">Short Code / Barcode</label>
-                    <input 
-                      type="text" 
-                      placeholder="e.g. 101, PZ01" 
-                      value={itemCodeInput} 
-                      onChange={e => setItemCodeInput(e.target.value)} 
-                      className="w-full bg-neutral-950 border border-neutral-700 rounded-xl p-2.5 text-white font-mono text-sm outline-none" 
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-neutral-400 uppercase font-black text-[10px] block mb-1">Category</label>
-                    <input 
-                      type="text" 
-                      placeholder="e.g. Fast Food, Pizza, Beverages" 
-                      value={itemCatInput} 
-                      onChange={e => setItemCatInput(e.target.value)} 
-                      className="w-full bg-neutral-950 border border-neutral-700 rounded-xl p-2.5 text-white outline-none" 
-                    />
-                  </div>
-                  <div>
-                    <label className="text-neutral-400 uppercase font-black text-[10px] block mb-1">Stock Status</label>
-                    <button 
-                      type="button" 
-                      onClick={() => setItemIsAvailable(prev => !prev)} 
-                      className={`w-full py-2.5 rounded-xl font-bold uppercase text-xs border ${itemIsAvailable ? 'bg-green-500/10 text-green-400 border-green-500/30' : 'bg-red-500/10 text-red-400 border-red-500/30'}`}
-                    >
-                      {itemIsAvailable ? 'In Stock (उपलब्ध)' : 'Out of Stock (खत्म)'}
-                    </button>
+                    <label className="text-neutral-400 uppercase font-bold text-[10px] block mb-1">Short Code *</label>
+                    <input type="text" required placeholder="e.g. 101, 102, PZ1" value={itemCodeInput} onChange={e => setItemCodeInput(e.target.value)} className="w-full bg-neutral-950 border border-neutral-700 rounded-xl p-2.5 text-white font-mono" />
                   </div>
                 </div>
 
                 <div>
-                  <label className="text-neutral-400 uppercase font-black text-[10px] block mb-1">Image URL (Optional)</label>
-                  <input 
-                    type="text" 
-                    placeholder="https://images.unsplash.com/..." 
-                    value={itemImageInput} 
-                    onChange={e => setItemImageInput(e.target.value)} 
-                    className="w-full bg-neutral-950 border border-neutral-700 rounded-xl p-2.5 text-white outline-none" 
-                  />
-                </div>
-
-                {/* DYNAMIC VARIATIONS / SIZES BLOCK */}
-                <div className="pt-3 border-t border-neutral-800 space-y-3">
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <span className="font-black uppercase text-[11px] text-yellow-400">Multiple Sizes / Variations?</span>
-                      <p className="text-[10px] text-neutral-400">Small, Medium, Large या Half/Full अलग-अलग कीमत पर</p>
-                    </div>
-                    <button 
-                      type="button" 
-                      onClick={() => setHasVariants(!hasVariants)} 
-                      className="text-orange-500"
-                    >
-                      {hasVariants ? <SafeToggleRight size={30} /> : <SafeToggleLeft size={30} />}
+                  <div className="flex justify-between items-center mb-1">
+                    <label className="text-neutral-400 uppercase font-bold text-[10px]">Category Selection *</label>
+                    <button type="button" onClick={() => setIsAddingNewCatInput(!isAddingNewCatInput)} className="text-orange-400 text-[10px] font-bold underline">
+                      {isAddingNewCatInput ? 'Select Existing' : '+ Add New Category'}
                     </button>
                   </div>
-
-                  {hasVariants && (
-                    <div className="bg-neutral-950 border border-neutral-800 p-3 rounded-2xl space-y-3">
-                      <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
-                        <span className="text-[9px] font-bold text-neutral-400 uppercase mr-1">Presets:</span>
-                        <button type="button" onClick={() => handleApplyVariantPreset('pizza')} className="px-2 py-1 bg-neutral-800 hover:bg-neutral-700 rounded text-[10px] font-bold border border-neutral-700">🍕 Pizza Sizes</button>
-                        <button type="button" onClick={() => handleApplyVariantPreset('half_full')} className="px-2 py-1 bg-neutral-800 hover:bg-neutral-700 rounded text-[10px] font-bold border border-neutral-700">🍲 Half / Full</button>
-                        <button type="button" onClick={() => handleApplyVariantPreset('reg_large')} className="px-2 py-1 bg-neutral-800 hover:bg-neutral-700 rounded text-[10px] font-bold border border-neutral-700">🥤 Regular / Large</button>
-                      </div>
-
-                      <div className="space-y-2">
-                        {Object.entries(itemVariantsList).map(([size, price]: any) => (
-                          <div key={size} className="flex justify-between items-center bg-neutral-900 px-3 py-2 rounded-xl border border-neutral-800">
-                            <span className="font-bold text-neutral-200">{size}</span>
-                            <div className="flex items-center gap-3">
-                              <span className="font-mono text-orange-400 font-bold">₹{price}</span>
-                              <button type="button" onClick={() => handleRemoveVariantRow(size)} className="text-red-400 hover:text-red-300"><SafeTrash2 size={14} /></button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-
-                      <div className="flex gap-2 pt-1">
-                        <input 
-                          type="text" 
-                          placeholder="Size (e.g. Medium, 250ml)" 
-                          value={newVariantName} 
-                          onChange={e => setNewVariantName(e.target.value)} 
-                          className="flex-1 bg-neutral-900 border border-neutral-700 rounded-xl px-2.5 py-1.5 text-xs text-white outline-none" 
-                        />
-                        <input 
-                          type="number" 
-                          placeholder="Price (₹)" 
-                          value={newVariantPrice} 
-                          onChange={e => setNewVariantPrice(e.target.value === '' ? '' : Number(e.target.value))} 
-                          className="w-24 bg-neutral-900 border border-neutral-700 rounded-xl px-2.5 py-1.5 text-xs text-white font-mono outline-none" 
-                        />
-                        <button 
-                          type="button" 
-                          onClick={handleAddVariantRow} 
-                          className="bg-orange-600 hover:bg-orange-500 text-white px-3 py-1.5 rounded-xl font-bold uppercase text-[10px]"
-                        >
-                          + Add
-                        </button>
-                      </div>
-                    </div>
+                  {isAddingNewCatInput ? (
+                    <input type="text" placeholder="Type New Category Name" value={newCustomCategoryName} onChange={e => setNewCustomCategoryName(e.target.value)} className="w-full bg-neutral-950 border border-orange-500 rounded-xl p-2.5 text-white" />
+                  ) : (
+                    <select value={itemCatInput} onChange={e => setItemCatInput(e.target.value)} className="w-full bg-neutral-950 border border-neutral-700 rounded-xl p-2.5 text-white">
+                      {categories.filter(c => c !== 'All').map(c => (
+                        <option key={c} value={c}>{c}</option>
+                      ))}
+                    </select>
                   )}
                 </div>
 
                 <div className="flex gap-2 pt-2 border-t border-neutral-800">
-                  <button 
-                    type="button" 
-                    onClick={() => { setIsItemEditorModalOpen(false); setTimeout(() => searchInputRef.current?.focus(), 60); }} 
-                    className="flex-1 py-3 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 font-black uppercase text-xs rounded-xl"
-                  >
-                    Cancel [Esc]
-                  </button>
-                  <button 
-                    type="submit" 
-                    className="flex-1 py-3 bg-green-600 hover:bg-green-500 text-white font-black uppercase text-xs rounded-xl shadow-lg"
-                  >
-                    Save to Menu
-                  </button>
+                  <button type="button" onClick={() => setIsItemEditorModalOpen(false)} className="flex-1 py-3 bg-neutral-800 text-neutral-300 font-bold uppercase rounded-xl">Cancel</button>
+                  <button type="submit" className="flex-1 py-3 bg-green-600 text-white font-black uppercase rounded-xl">Save Item</button>
                 </div>
               </form>
             </motion.div>
@@ -2559,128 +2271,77 @@ export default function BbCafeDesktopPos() {
       {/* MODAL 2: PAST RECEIPT DETAILS & REPRINT */}
       <AnimatePresence>
         {isReceiptModalOpen && selectedReceipt && (
-          <div 
-            className="fixed inset-0 bg-black/85 backdrop-blur-sm z-50 flex items-center justify-center p-4 cursor-pointer" 
-            onClick={() => { setIsReceiptModalOpen(false); setTimeout(() => searchInputRef.current?.focus(), 60); }}
-          >
-            <motion.div 
-              initial={{ scale: 0.95 }} 
-              animate={{ scale: 1 }} 
-              exit={{ scale: 0.95 }} 
-              onClick={(e) => e.stopPropagation()} 
-              className="bg-neutral-900 border border-neutral-800 max-w-md w-full rounded-3xl p-6 shadow-2xl space-y-4 cursor-default text-xs"
-            >
+          <div className="fixed inset-0 bg-black/85 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setIsReceiptModalOpen(false)}>
+            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} onClick={e => e.stopPropagation()} className="bg-neutral-900 border border-neutral-800 max-w-md w-full rounded-3xl p-6 shadow-2xl space-y-4 text-xs">
               <div className="flex justify-between items-center border-b border-neutral-800 pb-3">
                 <div>
-                  <h3 className="font-black text-sm uppercase text-orange-400">Bill Details (# {selectedReceipt.billNumber || 'N/A'})</h3>
-                  <p className="text-[10px] text-neutral-400 font-mono">
-                    {selectedReceipt.timestamp?.toDate ? selectedReceipt.timestamp.toDate().toLocaleString() : new Date(selectedReceipt.timestamp).toLocaleString()}
-                  </p>
+                  <h3 className="font-black text-sm uppercase text-orange-400">Bill Details (#{selectedReceipt.billNumber})</h3>
+                  <p className="text-[10px] text-neutral-400 font-mono">{new Date(selectedReceipt.timestamp?.toDate ? selectedReceipt.timestamp.toDate() : selectedReceipt.timestamp).toLocaleString()}</p>
                 </div>
-                <button onClick={() => { setIsReceiptModalOpen(false); setTimeout(() => searchInputRef.current?.focus(), 60); }} className="text-neutral-400 hover:text-white p-1"><SafeX size={18} /></button>
+                <button onClick={() => setIsReceiptModalOpen(false)} className="text-neutral-400"><SafeX size={18} /></button>
               </div>
-
               <div className="space-y-1 bg-neutral-950 p-3 rounded-2xl border border-neutral-800">
-                <p className="font-bold text-white">👤 {selectedReceipt.customerName || 'Walk-in Guest'} {selectedReceipt.customerPhone && `(${selectedReceipt.customerPhone})`}</p>
-                <p className="text-[10px] text-neutral-400 uppercase font-mono">Mode: {selectedReceipt.fulfillmentType || 'pickup'} • Pay: {selectedReceipt.paymentMethod || 'cash'}</p>
+                <p className="font-bold text-white">👤 {selectedReceipt.customerName} {selectedReceipt.customerPhone && `(${selectedReceipt.customerPhone})`}</p>
+                <p className="text-[10px] text-neutral-400 uppercase font-mono">Mode: {selectedReceipt.fulfillmentType} • Payment: {selectedReceipt.paymentMethod}</p>
               </div>
-
               <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
                 {selectedReceipt.items?.map((it: any, i: number) => (
                   <div key={i} className="flex justify-between items-center bg-neutral-950 p-2.5 rounded-xl border border-neutral-800">
-                    <div>
-                      <p className="font-bold text-white">{it.name}</p>
-                      {it.note && <p className="text-[9px] text-neutral-400 italic">{it.note}</p>}
-                    </div>
-                    <div className="text-right font-mono">
-                      <span className="text-neutral-400">x{it.quantity}</span>
-                      <p className="font-bold text-orange-400">₹{it.price * it.quantity}</p>
-                    </div>
+                    <p className="font-bold text-white">{it.name}</p>
+                    <p className="font-mono text-orange-400 font-bold">{it.quantity} x ₹{it.price}</p>
                   </div>
                 ))}
               </div>
-
-              <div className="space-y-1.5 border-t border-neutral-800 pt-2 font-mono">
-                <div className="flex justify-between text-neutral-400"><span>Subtotal:</span><span>₹{selectedReceipt.subtotal || selectedReceipt.total}</span></div>
-                {selectedReceipt.discountAmount > 0 && <div className="flex justify-between text-orange-400"><span>Discount:</span><span>-₹{selectedReceipt.discountAmount}</span></div>}
-                {selectedReceipt.pointsDiscount > 0 && <div className="flex justify-between text-amber-400 font-bold"><span>Points Redeemed:</span><span>-₹{selectedReceipt.pointsDiscount}</span></div>}
+              <div className="border-t border-neutral-800 pt-2 font-mono space-y-1">
+                <div className="flex justify-between text-neutral-400"><span>Subtotal:</span><span>₹{selectedReceipt.subtotal}</span></div>
                 <div className="flex justify-between font-black text-sm text-green-400 pt-1 border-t border-dashed border-neutral-800">
                   <span>Grand Total:</span><span>₹{selectedReceipt.total}</span>
                 </div>
               </div>
-
               <div className="grid grid-cols-2 gap-2 pt-2 border-t border-neutral-800">
-                <button 
-                  onClick={() => handlePrintReceiptDirect(selectedReceipt, false)} 
-                  className="py-2.5 bg-green-600 hover:bg-green-500 text-white font-black uppercase text-xs rounded-xl flex items-center justify-center gap-1.5 shadow"
-                >
+                <button onClick={() => handlePrintReceiptDirect(selectedReceipt, false)} className="py-2.5 bg-green-600 hover:bg-green-500 text-white font-black uppercase text-xs rounded-xl flex items-center justify-center gap-1.5 shadow">
                   <SafePrinter size={14} /> Print Bill
                 </button>
-                <button 
-                  onClick={() => handlePrintReceiptDirect(selectedReceipt, true)} 
-                  className="py-2.5 bg-amber-500 hover:bg-amber-400 text-black font-black uppercase text-xs rounded-xl flex items-center justify-center gap-1.5 shadow"
-                >
+                <button onClick={() => handlePrintReceiptDirect(selectedReceipt, true)} className="py-2.5 bg-amber-500 hover:bg-amber-400 text-black font-black uppercase text-xs rounded-xl flex items-center justify-center gap-1.5 shadow">
                   <SafeFileText size={14} /> Print KOT
                 </button>
               </div>
-
-              <div className="flex gap-2">
-                <button 
-                  onClick={() => handleSendWhatsAppBill(selectedReceipt)} 
-                  className="flex-1 py-2 bg-green-600/15 hover:bg-green-600/25 text-green-400 border border-green-500/30 font-black uppercase text-xs rounded-xl flex items-center justify-center gap-1.5"
-                >
-                  <SafeShare2 size={14} /> Send WhatsApp Bill
-                </button>
-                <button 
-                  onClick={() => { setIsReceiptModalOpen(false); setTimeout(() => searchInputRef.current?.focus(), 60); }} 
-                  className="flex-1 py-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 font-black uppercase text-xs rounded-xl"
-                >
-                  Close [Esc]
-                </button>
-              </div>
+              <button onClick={() => handleSendWhatsAppBill(selectedReceipt)} className="w-full py-2 bg-green-600/15 text-green-400 border border-green-500/30 font-black uppercase text-xs rounded-xl flex items-center justify-center gap-1.5">
+                <SafeShare2 size={14} /> Send WhatsApp Bill
+              </button>
             </motion.div>
           </div>
         )}
       </AnimatePresence>
 
-      {/* MODAL 3: SHORTCUTS HELP SHEET [F1] */}
+      {/* MODAL 3: KEYBOARD SHORTCUTS SHEET [F1] */}
       <AnimatePresence>
         {isHelpModalOpen && (
-          <div 
-            className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 cursor-pointer" 
-            onClick={() => { setIsHelpModalOpen(false); setTimeout(() => searchInputRef.current?.focus(), 60); }}
-          >
-            <motion.div 
-              initial={{ scale: 0.95 }} 
-              animate={{ scale: 1 }} 
-              exit={{ scale: 0.95 }} 
-              onClick={(e) => e.stopPropagation()} 
-              className="bg-neutral-900 border border-neutral-800 max-w-lg w-full rounded-3xl p-6 shadow-2xl space-y-4 text-neutral-100 cursor-default"
-            >
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setIsHelpModalOpen(false)}>
+            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} onClick={e => e.stopPropagation()} className="bg-neutral-900 border border-neutral-800 max-w-lg w-full rounded-3xl p-6 shadow-2xl space-y-4 text-neutral-100">
               <div className="flex justify-between items-center border-b border-neutral-800 pb-3">
                 <div className="flex items-center gap-2 text-yellow-500 font-black text-sm uppercase">
                   <SafeHelpCircle size={18} />
                   <span>POS Keyboard Shortcuts (F1 - F12)</span>
                 </div>
-                <button onClick={() => { setIsHelpModalOpen(false); setTimeout(() => searchInputRef.current?.focus(), 60); }} className="text-neutral-400 hover:text-white p-1"><SafeX size={18} /></button>
+                <button onClick={() => setIsHelpModalOpen(false)} className="text-neutral-400"><SafeX size={18} /></button>
               </div>
-
               <div className="space-y-2 text-xs max-h-80 overflow-y-auto pr-1">
                 {[
-                  { key: 'F1', desc: 'Open this Keyboard Shortcuts Guide' },
+                  { key: 'F1', desc: 'Open Shortcuts Guide' },
                   { key: 'F2', desc: 'Focus Search Bar & hit [Enter] to auto-add item' },
                   { key: 'F3', desc: 'Park / Hold active cart order' },
                   { key: 'F4', desc: 'Toggle Payment Mode (Cash / UPI / Split)' },
                   { key: 'F5', desc: 'Recall / Open Held / Parked Carts' },
-                  { key: 'F6', desc: 'Record Daily Drawer Expense (दूध, बर्फ, सब्ज़ी)' },
-                  { key: 'F7', desc: 'Send WhatsApp Receipt to customer mobile' },
-                  { key: 'F8', desc: 'Display Dynamic UPI QR Code on Terminal' },
-                  { key: 'F9', desc: 'Fast Pay & Print Bill (or Settle Table)' },
+                  { key: 'F6', desc: 'Record Daily Drawer Expense (दूध, बर्फ)' },
+                  { key: 'F7', desc: 'Send WhatsApp Receipt to mobile' },
+                  { key: 'F8', desc: 'Display Dynamic UPI QR Code on Screen' },
+                  { key: 'F9', desc: 'Pay & Print Bill (or Settle Table)' },
                   { key: 'F10', desc: 'Cash Tender / Return Change Calculator' },
-                  { key: 'F11', desc: 'Open Customer Directory / Loyalty Points' },
+                  { key: 'F11', desc: 'Open Customer Directory / Loyalty' },
                   { key: 'F12', desc: 'Toggle Mode (Pickup ➔ Table ➔ Delivery)' },
-                  { key: 'Del', desc: 'Clear Current Cart Items quickly' },
-                  { key: 'Esc', desc: 'Close any active popup modal & refocus Search' },
+                  { key: 'Del', desc: 'Clear Current Cart Items' },
+                  { key: 'Esc', desc: 'Close any active popup modal' },
                 ].map((s) => (
                   <div key={s.key} className="flex justify-between items-center p-2 rounded-xl bg-neutral-950 border border-neutral-800">
                     <span className="font-mono font-black text-orange-400 bg-orange-500/10 px-2.5 py-1 rounded-lg border border-orange-500/20">{s.key}</span>
@@ -2688,13 +2349,6 @@ export default function BbCafeDesktopPos() {
                   </div>
                 ))}
               </div>
-
-              <button 
-                onClick={() => { setIsHelpModalOpen(false); setTimeout(() => searchInputRef.current?.focus(), 60); }} 
-                className="w-full py-2.5 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 font-black uppercase text-xs rounded-xl transition-all"
-              >
-                Close [Esc]
-              </button>
             </motion.div>
           </div>
         )}
@@ -2703,57 +2357,35 @@ export default function BbCafeDesktopPos() {
       {/* MODAL 4: HELD / PARKED CARTS [F5] */}
       <AnimatePresence>
         {isHeldCartsModalOpen && (
-          <div 
-            className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 cursor-pointer" 
-            onClick={() => { setIsHeldCartsModalOpen(false); setTimeout(() => searchInputRef.current?.focus(), 60); }}
-          >
-            <motion.div 
-              initial={{ scale: 0.95 }} 
-              animate={{ scale: 1 }} 
-              exit={{ scale: 0.95 }} 
-              onClick={(e) => e.stopPropagation()} 
-              className="bg-neutral-900 border border-neutral-800 max-w-lg w-full rounded-3xl p-6 shadow-2xl space-y-4 cursor-default"
-            >
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setIsHeldCartsModalOpen(false)}>
+            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} onClick={e => e.stopPropagation()} className="bg-neutral-900 border border-neutral-800 max-w-lg w-full rounded-3xl p-6 shadow-2xl space-y-4">
               <div className="flex justify-between items-center border-b border-neutral-800 pb-3">
                 <div className="flex items-center gap-2 text-amber-400 font-black text-sm uppercase">
                   <SafePauseCircle size={18} />
-                  <span>Held / Parked Orders ({heldCarts.length}) [F5]</span>
+                  <span>Held Orders ({heldCarts.length}) [F5]</span>
                 </div>
-                <button onClick={() => { setIsHeldCartsModalOpen(false); setTimeout(() => searchInputRef.current?.focus(), 60); }} className="text-neutral-400 hover:text-white p-1"><SafeX size={18} /></button>
+                <button onClick={() => setIsHeldCartsModalOpen(false)} className="text-neutral-400"><SafeX size={18} /></button>
               </div>
-
               <div className="space-y-2.5 max-h-80 overflow-y-auto pr-1">
                 {heldCarts.length === 0 ? (
-                  <p className="text-xs text-neutral-400 text-center py-10">No orders on hold right now.</p>
+                  <p className="text-xs text-neutral-400 text-center py-10">No parked orders.</p>
                 ) : (
                   heldCarts.map((h) => (
                     <div key={h.id} className="bg-neutral-950 border border-neutral-800 p-3.5 rounded-2xl flex justify-between items-center">
                       <div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-xs text-white">{h.customerName}</span>
-                          <span className="text-[10px] text-neutral-500 font-mono">({h.heldAt})</span>
-                        </div>
-                        <p className="text-[10px] text-neutral-400 font-mono mt-0.5">{h.cart.length} items • ₹{h.total}</p>
+                        <p className="font-bold text-xs text-white">{h.customerName} ({h.heldAt})</p>
+                        <p className="text-[10px] text-neutral-400 font-mono">{h.cart.length} items • ₹{h.total}</p>
                       </div>
                       <div className="flex items-center gap-2">
-                        <button onClick={() => handleRestoreHeldCart(h)} className="bg-green-600 hover:bg-green-500 text-white px-3 py-1.5 rounded-xl text-xs font-black uppercase flex items-center gap-1 shadow">
+                        <button onClick={() => handleRestoreHeldCart(h)} className="bg-green-600 text-white px-3 py-1.5 rounded-xl text-xs font-black uppercase flex items-center gap-1 shadow">
                           <SafePlayCircle size={14} /> Resume
                         </button>
-                        <button onClick={() => handleDeleteHeldCart(h.id)} className="p-1.5 text-red-400 hover:text-red-300">
-                          <SafeTrash2 size={16} />
-                        </button>
+                        <button onClick={() => saveHeldCartsToStorage(heldCarts.filter(it => it.id !== h.id))} className="p-1.5 text-red-400"><SafeTrash2 size={16} /></button>
                       </div>
                     </div>
                   ))
                 )}
               </div>
-
-              <button 
-                onClick={() => { setIsHeldCartsModalOpen(false); setTimeout(() => searchInputRef.current?.focus(), 60); }} 
-                className="w-full py-2.5 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 font-black uppercase text-xs rounded-xl transition-all"
-              >
-                Close [Esc]
-              </button>
             </motion.div>
           </div>
         )}
@@ -2762,63 +2394,32 @@ export default function BbCafeDesktopPos() {
       {/* MODAL 5: QUICK DAILY EXPENSE ENTRY [F6] */}
       <AnimatePresence>
         {isExpenseModalOpen && (
-          <div 
-            className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 cursor-pointer" 
-            onClick={() => { setIsExpenseModalOpen(false); setTimeout(() => searchInputRef.current?.focus(), 60); }}
-          >
-            <motion.div 
-              initial={{ scale: 0.95 }} 
-              animate={{ scale: 1 }} 
-              exit={{ scale: 0.95 }} 
-              onClick={(e) => e.stopPropagation()} 
-              className="bg-neutral-900 border border-neutral-800 max-w-sm w-full rounded-3xl p-6 shadow-2xl space-y-4 cursor-default"
-            >
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setIsExpenseModalOpen(false)}>
+            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} onClick={e => e.stopPropagation()} className="bg-neutral-900 border border-neutral-800 max-w-sm w-full rounded-3xl p-6 shadow-2xl space-y-4">
               <div className="flex justify-between items-center border-b border-neutral-800 pb-3">
-                <h3 className="font-black text-sm uppercase text-red-400 flex items-center gap-2">
-                  <Receipt size={16} /> Daily Expense Entry [F6]
-                </h3>
-                <button onClick={() => { setIsExpenseModalOpen(false); setTimeout(() => searchInputRef.current?.focus(), 60); }} className="text-neutral-400 hover:text-white p-1"><SafeX size={18} /></button>
+                <h3 className="font-black text-sm uppercase text-red-400 flex items-center gap-2"><Receipt size={16} /> Drawer Expense Entry [F6]</h3>
+                <button onClick={() => setIsExpenseModalOpen(false)} className="text-neutral-400"><SafeX size={18} /></button>
               </div>
-
               <form onSubmit={handleSaveExpense} className="space-y-3 text-xs">
                 <div>
-                  <label className="text-neutral-400 uppercase font-black text-[10px] block mb-1">Expense Title / Item *</label>
-                  <input 
-                    type="text" 
-                    required 
-                    placeholder="e.g. Milk 5L, Ice cubes, Veggies" 
-                    value={expenseTitle} 
-                    onChange={e => setExpenseTitle(e.target.value)} 
-                    className="w-full bg-neutral-950 border border-neutral-700 rounded-xl p-2.5 text-white outline-none" 
-                    autoFocus 
-                  />
+                  <label className="text-neutral-400 uppercase font-black text-[10px] block mb-1">Expense Title *</label>
+                  <input type="text" required placeholder="e.g. Milk 5L, Ice cubes" value={expenseTitle} onChange={e => setExpenseTitle(e.target.value)} className="w-full bg-neutral-950 border border-neutral-700 rounded-xl p-2.5 text-white outline-none" autoFocus />
                 </div>
                 <div>
-                  <label className="text-neutral-400 uppercase font-black text-[10px] block mb-1">Amount Deducted from Drawer (₹) *</label>
-                  <input 
-                    type="number" 
-                    required 
-                    min={1} 
-                    placeholder="e.g. 150" 
-                    value={expenseAmount} 
-                    onChange={e => setExpenseAmount(e.target.value === '' ? '' : Number(e.target.value))} 
-                    className="w-full bg-neutral-950 border border-neutral-700 rounded-xl p-2.5 text-white font-mono text-sm outline-none" 
-                  />
+                  <label className="text-neutral-400 uppercase font-black text-[10px] block mb-1">Amount Deducted (₹) *</label>
+                  <input type="number" required min={1} placeholder="e.g. 150" value={expenseAmount} onChange={e => setExpenseAmount(e.target.value === '' ? '' : Number(e.target.value))} className="w-full bg-neutral-950 border border-neutral-700 rounded-xl p-2.5 text-white font-mono text-sm outline-none" />
                 </div>
                 <div>
                   <label className="text-neutral-400 uppercase font-black text-[10px] block mb-1">Category</label>
-                  <select value={expenseCategory} onChange={e => setExpenseCategory(e.target.value)} className="w-full bg-neutral-950 border border-neutral-700 rounded-xl p-2.5 text-white outline-none">
+                  <select value={expenseCategory} onChange={e => setExpenseCategory(e.target.value)} className="w-full bg-neutral-950 border border-neutral-700 rounded-xl p-2.5 text-white">
                     <option value="Milk / Dairy">Milk / Dairy</option>
                     <option value="Vegetables">Vegetables / Raw Food</option>
-                    <option value="Staff Tea / Snacks">Staff Tea / Snacks</option>
-                    <option value="Maintenance / Gas">Maintenance / Gas</option>
+                    <option value="Staff Snacks">Staff Tea / Snacks</option>
+                    <option value="Gas / Maintenance">Maintenance / Gas</option>
                     <option value="General">Other / General</option>
                   </select>
                 </div>
-                <div className="flex gap-2 pt-2">
-                  <button type="button" onClick={() => { setIsExpenseModalOpen(false); setTimeout(() => searchInputRef.current?.focus(), 60); }} className="flex-1 py-2.5 bg-neutral-800 text-neutral-300 font-black uppercase text-xs rounded-xl">Cancel [Esc]</button>
-                  <button type="submit" className="flex-1 py-2.5 bg-red-600 hover:bg-red-500 text-white font-black uppercase text-xs rounded-xl shadow-lg">Save Voucher</button>
-                </div>
+                <button type="submit" className="w-full py-2.5 bg-red-600 hover:bg-red-500 text-white font-black uppercase text-xs rounded-xl shadow-lg">Save Expense</button>
               </form>
             </motion.div>
           </div>
@@ -2828,57 +2429,21 @@ export default function BbCafeDesktopPos() {
       {/* MODAL 6: DYNAMIC UPI QR CODE [F8] */}
       <AnimatePresence>
         {isQrModalOpen && (
-          <div 
-            className="fixed inset-0 bg-black/85 backdrop-blur-sm z-50 flex items-center justify-center p-4 cursor-pointer" 
-            onClick={() => { setIsQrModalOpen(false); setTimeout(() => searchInputRef.current?.focus(), 60); }}
-          >
-            <motion.div 
-              initial={{ scale: 0.95 }} 
-              animate={{ scale: 1 }} 
-              exit={{ scale: 0.95 }} 
-              onClick={(e) => e.stopPropagation()} 
-              className="bg-neutral-900 border border-neutral-800 max-w-sm w-full rounded-3xl p-6 shadow-2xl space-y-4 text-center cursor-default"
-            >
+          <div className="fixed inset-0 bg-black/85 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setIsQrModalOpen(false)}>
+            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} onClick={e => e.stopPropagation()} className="bg-neutral-900 border border-neutral-800 max-w-sm w-full rounded-3xl p-6 shadow-2xl space-y-4 text-center">
               <div className="flex justify-between items-center border-b border-neutral-800 pb-3">
-                <h3 className="font-black text-sm uppercase text-blue-400 flex items-center gap-2">
-                  <SafeQrCode size={16} /> Dynamic UPI Payment QR [F8]
-                </h3>
-                <button onClick={() => { setIsQrModalOpen(false); setTimeout(() => searchInputRef.current?.focus(), 60); }} className="text-neutral-400 hover:text-white p-1"><SafeX size={18} /></button>
+                <h3 className="font-black text-sm uppercase text-blue-400 flex items-center gap-2"><SafeQrCode size={16} /> Dynamic UPI QR [F8]</h3>
+                <button onClick={() => setIsQrModalOpen(false)} className="text-neutral-400"><SafeX size={18} /></button>
               </div>
-
               <div className="bg-white p-4 rounded-2xl inline-block shadow-xl">
-                <img 
-                  src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(dynamicUpiUrl)}`} 
-                  alt="UPI QR Code" 
-                  className="w-52 h-52 object-contain" 
-                />
+                <img src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(dynamicUpiUrl)}`} alt="UPI QR Code" className="w-52 h-52 object-contain" />
               </div>
-
               <div className="space-y-1">
                 <p className="text-xl font-black font-mono text-green-400">₹{getTotalBillPrice()}</p>
                 <p className="text-xs text-neutral-400">Scan via PhonePe, GPay, Paytm</p>
                 <p className="text-[10px] text-neutral-500 font-mono">UPI: {upiIdConfig}</p>
               </div>
-
-              <div className="flex gap-2">
-                <button 
-                  onClick={() => { setIsQrModalOpen(false); setTimeout(() => searchInputRef.current?.focus(), 60); }} 
-                  className="flex-1 py-2.5 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 font-black uppercase text-xs rounded-xl"
-                >
-                  Close [Esc]
-                </button>
-                <button 
-                  onClick={() => { 
-                    setPaymentMethod('upi'); 
-                    setIsQrModalOpen(false); 
-                    toast.success("Switched to UPI mode!"); 
-                    setTimeout(() => searchInputRef.current?.focus(), 60);
-                  }} 
-                  className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-black uppercase text-xs rounded-xl shadow"
-                >
-                  Confirm Paid
-                </button>
-              </div>
+              <button onClick={() => { setPaymentMethod('upi'); setIsQrModalOpen(false); toast.success("Switched to UPI mode!"); }} className="w-full py-2.5 bg-blue-600 text-white font-black uppercase text-xs rounded-xl shadow">Confirm Paid</button>
             </motion.div>
           </div>
         )}
@@ -2887,113 +2452,52 @@ export default function BbCafeDesktopPos() {
       {/* MODAL 7: RETURN CHANGE CALCULATOR [F10] */}
       <AnimatePresence>
         {isChangeModalOpen && (
-          <div 
-            className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 cursor-pointer" 
-            onClick={() => { setIsChangeModalOpen(false); setTimeout(() => searchInputRef.current?.focus(), 60); }}
-          >
-            <motion.div 
-              initial={{ scale: 0.95 }} 
-              animate={{ scale: 1 }} 
-              exit={{ scale: 0.95 }} 
-              onClick={(e) => e.stopPropagation()} 
-              className="bg-neutral-900 border border-neutral-800 max-w-sm w-full rounded-3xl p-6 shadow-2xl space-y-4 cursor-default"
-            >
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setIsChangeModalOpen(false)}>
+            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} onClick={e => e.stopPropagation()} className="bg-neutral-900 border border-neutral-800 max-w-sm w-full rounded-3xl p-6 shadow-2xl space-y-4">
               <div className="flex justify-between items-center border-b border-neutral-800 pb-3">
-                <h3 className="font-black text-sm uppercase text-purple-400 flex items-center gap-2">
-                  <SafeCalculator size={16} /> Return Change Calculator [F10]
-                </h3>
-                <button onClick={() => { setIsChangeModalOpen(false); setTimeout(() => searchInputRef.current?.focus(), 60); }} className="text-neutral-400 hover:text-white p-1"><SafeX size={18} /></button>
+                <h3 className="font-black text-sm uppercase text-purple-400 flex items-center gap-2"><SafeCalculator size={16} /> Return Change Calculator [F10]</h3>
+                <button onClick={() => setIsChangeModalOpen(false)} className="text-neutral-400"><SafeX size={18} /></button>
               </div>
-
               <div className="space-y-3 text-xs">
                 <div className="flex justify-between items-center p-3 bg-neutral-950 rounded-xl border border-neutral-800">
                   <span className="text-neutral-400">Bill Total:</span>
                   <span className="font-mono text-lg font-black text-white">₹{getTotalBillPrice()}</span>
                 </div>
-
                 <div>
-                  <label className="text-neutral-400 uppercase font-black text-[10px] block mb-1">Customer Tendered Note (₹):</label>
-                  <input 
-                    type="number" 
-                    placeholder="e.g. 500" 
-                    value={tenderCashAmount} 
-                    onChange={e => setTenderCashAmount(e.target.value === '' ? '' : Number(e.target.value))} 
-                    className="w-full bg-neutral-950 border border-neutral-700 rounded-xl p-3 text-white font-mono text-lg font-bold outline-none text-center" 
-                    autoFocus 
-                  />
+                  <label className="text-neutral-400 uppercase font-black text-[10px] block mb-1">Customer Tendered (₹):</label>
+                  <input type="number" placeholder="e.g. 500" value={tenderCashAmount} onChange={e => setTenderCashAmount(e.target.value === '' ? '' : Number(e.target.value))} className="w-full bg-neutral-950 border border-neutral-700 rounded-xl p-3 text-white font-mono text-lg font-bold outline-none text-center" autoFocus />
                 </div>
-
                 <div className="flex gap-2">
                   {[100, 200, 500, 2000].map(amt => (
-                    <button key={amt} onClick={() => setTenderCashAmount(amt)} className="flex-1 py-1.5 bg-neutral-800 hover:bg-neutral-700 rounded-lg font-mono font-bold text-xs text-neutral-300">
-                      ₹{amt}
-                    </button>
+                    <button key={amt} onClick={() => setTenderCashAmount(amt)} className="flex-1 py-1.5 bg-neutral-800 rounded-lg font-mono font-bold text-xs text-neutral-300">₹{amt}</button>
                   ))}
                 </div>
-
                 {tenderCashAmount !== '' && (
                   <div className={`p-4 rounded-xl border text-center space-y-1 ${Number(tenderCashAmount) >= getTotalBillPrice() ? 'bg-green-500/10 border-green-500/30' : 'bg-red-500/10 border-red-500/30'}`}>
-                    <p className="text-[10px] font-black uppercase text-neutral-400">
-                      {Number(tenderCashAmount) >= getTotalBillPrice() ? 'Return to Customer (वापस करें):' : 'Pending Remaining Cash:'}
-                    </p>
-                    <p className={`text-2xl font-mono font-black ${Number(tenderCashAmount) >= getTotalBillPrice() ? 'text-green-400' : 'text-red-400'}`}>
-                      ₹{Math.abs(Number(tenderCashAmount) - getTotalBillPrice())}
-                    </p>
+                    <p className="text-[10px] font-black uppercase text-neutral-400">{Number(tenderCashAmount) >= getTotalBillPrice() ? 'Return to Customer:' : 'Pending Remaining:'}</p>
+                    <p className={`text-2xl font-mono font-black ${Number(tenderCashAmount) >= getTotalBillPrice() ? 'text-green-400' : 'text-red-400'}`}>₹{Math.abs(Number(tenderCashAmount) - getTotalBillPrice())}</p>
                   </div>
                 )}
-
-                <button 
-                  onClick={() => { setIsChangeModalOpen(false); setTimeout(() => searchInputRef.current?.focus(), 60); }} 
-                  className="w-full py-2.5 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 font-black uppercase text-xs rounded-xl transition-all mt-2"
-                >
-                  Done / Close [Esc]
-                </button>
               </div>
             </motion.div>
           </div>
         )}
       </AnimatePresence>
 
-      {/* MODAL 8: BILLING VARIATION & COOKING TAGS (KEYBOARD AUTO-FOCUS & TAB BYPASS) */}
+      {/* MODAL 8: BILLING VARIATION MODAL (KEYBOARD AUTO-FOCUS & TAB BYPASS) */}
       <AnimatePresence>
         {isVariationModalOpen && selectedProductForVariation && (
-          <div 
-            className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4 cursor-pointer" 
-            onClick={() => {
-              setIsVariationModalOpen(false);
-              setTimeout(() => searchInputRef.current?.focus(), 60);
-            }}
-          >
-            <motion.div 
-              initial={{ scale: 0.95 }} 
-              animate={{ scale: 1 }} 
-              exit={{ scale: 0.95 }} 
-              onClick={(e) => e.stopPropagation()} 
-              className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 max-w-sm w-full rounded-3xl p-6 shadow-2xl space-y-4 cursor-default"
-            >
+          <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => { setIsVariationModalOpen(false); setTimeout(() => searchInputRef.current?.focus(), 60); }}>
+            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} onClick={e => e.stopPropagation()} className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 max-w-sm w-full rounded-3xl p-6 shadow-2xl space-y-4">
               <div className="flex justify-between items-center border-b pb-3">
-                <h3 className="font-black text-sm uppercase text-orange-500">
-                  {selectedProductForVariation.name}
-                </h3>
-                <button 
-                  tabIndex={-1}
-                  onClick={() => {
-                    setIsVariationModalOpen(false);
-                    setTimeout(() => searchInputRef.current?.focus(), 60);
-                  }} 
-                  className="text-neutral-400 hover:text-white p-1"
-                >
-                  <SafeX size={18} />
-                </button>
+                <h3 className="font-black text-sm uppercase text-orange-500">{selectedProductForVariation.name}</h3>
+                <button tabIndex={-1} onClick={() => { setIsVariationModalOpen(false); setTimeout(() => searchInputRef.current?.focus(), 60); }} className="text-neutral-400"><SafeX size={18} /></button>
               </div>
 
               <div className="space-y-3">
-                {/* SIZE / PORTION SELECTION WITH KEYBOARD SUPPORT */}
                 {selectedProductForVariation.variants && (
                   <div>
-                    <label className="text-xs font-bold uppercase text-neutral-400 block mb-1.5">
-                      Size / Portion: <span className="text-[10px] text-orange-400 font-normal">([Tab] to change, [Enter] to Add)</span>
-                    </label>
+                    <label className="text-xs font-bold uppercase text-neutral-400 block mb-1.5">Size / Portion ([Tab] to switch, [Enter] to select):</label>
                     <div className="grid grid-cols-2 gap-2">
                       {Object.entries(selectedProductForVariation.variants).map(([size, price]: any, idx: number) => {
                         const isSelected = selectedSize.toLowerCase() === size.toLowerCase();
@@ -3003,26 +2507,11 @@ export default function BbCafeDesktopPos() {
                             ref={idx === 0 ? firstVariantButtonRef : null}
                             type="button"
                             tabIndex={0}
-                            // Tab से फ़ोकस होते ही साइज़ अपने-आप सेलेक्ट हो जाएगा
-                            onFocus={() => {
-                              setSelectedSize(size);
-                              setSelectedSizePrice(Number(price) || 100);
-                            }}
-                            onClick={() => {
-                              setSelectedSize(size);
-                              setSelectedSizePrice(Number(price) || 100);
-                            }}
-                            onKeyDown={(e) => {
-                              // यदि साइज़ बटन पर Enter दबाएं, तो सीधे तुरंत कार्ट में ऐड हो जाए
-                              if (e.key === 'Enter') {
-                                e.preventDefault();
-                                handleAddCustomizedItemToCart();
-                              }
-                            }}
+                            onFocus={() => { setSelectedSize(size); setSelectedSizePrice(Number(price) || 100); }}
+                            onClick={() => { setSelectedSize(size); setSelectedSizePrice(Number(price) || 100); }}
+                            onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddCustomizedItemToCart(); } }}
                             className={`py-2 px-3 rounded-xl text-xs font-black uppercase border transition-all outline-none focus:ring-2 focus:ring-orange-500 ${
-                              isSelected 
-                                ? 'bg-orange-600 text-white border-orange-600 shadow-md ring-2 ring-orange-400' 
-                                : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-400 border-neutral-700 hover:border-orange-500'
+                              isSelected ? 'bg-orange-600 text-white border-orange-600 shadow-md ring-2 ring-orange-400' : 'bg-neutral-800 text-neutral-400 border-neutral-700'
                             }`}
                           >
                             {size} (₹{price})
@@ -3033,62 +2522,25 @@ export default function BbCafeDesktopPos() {
                   </div>
                 )}
 
-                {/* COOKING INSTRUCTIONS - BYPASSED BY TAB KEY */}
                 <div>
-                  <label className="text-xs font-bold uppercase text-neutral-400 block mb-1">
-                    Quick Cooking Instructions (Optional):
-                  </label>
+                  <label className="text-xs font-bold uppercase text-neutral-400 block mb-1">Instructions (Optional):</label>
                   <div className="flex flex-wrap gap-1.5">
                     {COOKING_TAGS.map((tag) => (
-                      <button
-                        key={tag}
-                        type="button"
-                        tabIndex={-1}
-                        onClick={() => setItemNoteInput(prev => prev ? `${prev}, ${tag}` : tag)}
-                        className="px-2 py-1 bg-neutral-100 dark:bg-neutral-800 hover:border-orange-500 border border-neutral-700 rounded-lg text-[10px] font-bold text-neutral-300 transition-all cursor-pointer"
-                      >
+                      <button key={tag} type="button" tabIndex={-1} onClick={() => setItemNoteInput(prev => prev ? `${prev}, ${tag}` : tag)} className="px-2 py-1 bg-neutral-800 border border-neutral-700 rounded-lg text-[10px] font-bold text-neutral-300">
                         {tag}
                       </button>
                     ))}
                   </div>
                 </div>
 
-                {/* CUSTOM NOTE - BYPASSED BY TAB KEY */}
                 <div>
-                  <label className="text-xs font-bold uppercase text-neutral-400 block mb-1">
-                    Custom Note / Request:
-                  </label>
-                  <input 
-                    type="text" 
-                    tabIndex={-1}
-                    placeholder="e.g. Extra hot, Less sugar..." 
-                    value={itemNoteInput}
-                    onChange={e => setItemNoteInput(e.target.value)}
-                    className="w-full bg-neutral-100 dark:bg-neutral-800 border border-neutral-700 rounded-xl px-3 py-2 text-xs outline-none focus:border-orange-500" 
-                  />
+                  <input type="text" tabIndex={-1} placeholder="Custom Note (Optional)" value={itemNoteInput} onChange={e => setItemNoteInput(e.target.value)} className="w-full bg-neutral-800 border border-neutral-700 rounded-xl px-3 py-2 text-xs outline-none" />
                 </div>
               </div>
 
-              {/* ACTION BUTTONS */}
               <div className="flex gap-2 pt-2">
-                <button 
-                  type="button" 
-                  tabIndex={-1}
-                  onClick={() => {
-                    setIsVariationModalOpen(false);
-                    setTimeout(() => searchInputRef.current?.focus(), 60);
-                  }} 
-                  className="flex-1 py-3 bg-neutral-200 dark:bg-neutral-800 text-neutral-400 font-black uppercase text-xs rounded-xl"
-                >
-                  Cancel [Esc]
-                </button>
-                <button 
-                  ref={addToCartButtonRef}
-                  type="button"
-                  tabIndex={0}
-                  onClick={handleAddCustomizedItemToCart} 
-                  className="flex-1 bg-green-600 hover:bg-green-500 text-white font-black py-3 rounded-xl text-xs uppercase shadow outline-none focus:ring-2 focus:ring-green-400 focus:bg-green-500"
-                >
+                <button type="button" tabIndex={-1} onClick={() => { setIsVariationModalOpen(false); setTimeout(() => searchInputRef.current?.focus(), 60); }} className="flex-1 py-3 bg-neutral-800 text-neutral-400 font-bold uppercase text-xs rounded-xl">Cancel [Esc]</button>
+                <button ref={addToCartButtonRef} type="button" tabIndex={0} onClick={handleAddCustomizedItemToCart} className="flex-1 bg-green-600 hover:bg-green-500 text-white font-black py-3 rounded-xl text-xs uppercase shadow">
                   Add to Cart [Enter]
                 </button>
               </div>
