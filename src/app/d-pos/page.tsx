@@ -12,8 +12,8 @@ import {
   Database, RefreshCw, Layers, LogOut, Lock, ToggleLeft, ToggleRight, 
   Trash2, UserPlus, Download, Edit3, FileText, LayoutGrid, ChevronLeft, ChevronRight, 
   Gift, PackagePlus, BarChart3, HelpCircle, PauseCircle, PlayCircle, QrCode, 
-  Share2, Calculator, Receipt, IndianRupee, Send, ShieldAlert, Check, Plus, Eye,
-  Users, Truck, Wifi, WifiOff, CheckCircle2, XCircle
+  Share2, Calculator, Receipt, IndianRupee, Send, Check, Plus, Eye,
+  Users, Truck
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
@@ -38,7 +38,6 @@ const SafeRefreshCw = RefreshCw as any;
 const SafeSettings = Settings as any;
 const SafeTrash2 = Trash2 as any;
 const SafeUserPlus = UserPlus as any;
-const SafeDownload = Download as any;
 const SafeEdit3 = Edit3 as any;
 const SafeFileText = FileText as any;
 const SafeLayoutGrid = LayoutGrid as any;
@@ -107,7 +106,7 @@ export default function BbCafeDesktopPos() {
     { name: "Within 12 KM (12km के दायरे में)", fee: 99, minFree: 999, range: "5-12 KM" }
   ], []);
 
-  // System & Connection States
+  // System States
   const [isOnline, setIsOnline] = useState<boolean>(true);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
@@ -119,8 +118,6 @@ export default function BbCafeDesktopPos() {
   const [themeMode, setThemeMode] = useState<'dark' | 'light'>('dark');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
-  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
-  const [isAppInstalled, setIsAppInstalled] = useState(false);
   const [kotEnabled, setKotEnabled] = useState<boolean>(true); 
   const [upiIdConfig, setUpiIdConfig] = useState<string>('Q991347275@ybl');
   const [ownerPhoneConfig, setOwnerPhoneConfig] = useState<string>('919714293759');
@@ -135,7 +132,7 @@ export default function BbCafeDesktopPos() {
   const [newCustNameInput, setNewCustNameInput] = useState('');
   const [newCustAddressInput, setNewCustAddressInput] = useState('');
 
-  // Menu & Data States
+  // Menu States
   const [liveOrders, setLiveOrders] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
@@ -144,7 +141,7 @@ export default function BbCafeDesktopPos() {
   const [inventorySearchQuery, setInventorySearchQuery] = useState('');
   const [loading, setLoading] = useState(false);
   
-  // Reports & Expenses States
+  // Reports States
   const [reportFilter, setReportFilter] = useState<'today' | 'yesterday' | 'custom'>('today');
   const [customReportDate, setCustomReportDate] = useState(new Date().toISOString().split('T')[0]);
   const [reportOrders, setReportOrders] = useState<any[]>([]);
@@ -186,7 +183,7 @@ export default function BbCafeDesktopPos() {
   // Held Carts Storage
   const [heldCarts, setHeldCarts] = useState<HeldCart[]>([]);
 
-  // Variation Popup States (During Billing)
+  // Variation Popup States (Billing)
   const [isVariationModalOpen, setIsVariationModalOpen] = useState(false);
   const [selectedProductForVariation, setSelectedProductForVariation] = useState<any>(null);
   const [selectedSize, setSelectedSize] = useState('');
@@ -218,6 +215,8 @@ export default function BbCafeDesktopPos() {
 
   const [fulfillmentType, setFulfillmentType] = useState<'delivery' | 'pickup' | 'table'>('pickup');
   const [selectedArea, setSelectedArea] = useState<DeliveryArea>(DELIVERY_AREAS[0]);
+  const [applyDeliveryFee, setApplyDeliveryFee] = useState<boolean>(true);
+  const [customDeliveryFee, setCustomDeliveryFee] = useState<number | ''>(20);
   const [address, setAddress] = useState('');
   const [tableNumber, setTableNumber] = useState('Table 1');
   
@@ -229,7 +228,7 @@ export default function BbCafeDesktopPos() {
   const [splitCashAmount, setSplitCashAmount] = useState<number>(0);
   const [splitUpiAmount, setSplitUpiAmount] = useState<number>(0);
 
-  // Accessibility Refs for Keyboard-Only Fast Bill
+  // Focus Refs
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const phoneInputRef = useRef<HTMLInputElement | null>(null);
   const newCustNameRef = useRef<HTMLInputElement | null>(null);
@@ -273,7 +272,15 @@ export default function BbCafeDesktopPos() {
 
   // Calculations
   const getCartSubtotal = () => cart.reduce((acc, i) => acc + (i.price * i.quantity), 0);
-  const getDeliveryCharge = () => (fulfillmentType === "pickup" || fulfillmentType === "table" || getCartSubtotal() === 0) ? 0 : (getCartSubtotal() >= selectedArea.minFree ? 0 : selectedArea.fee);
+  
+  // Delivery Charge Calculation (Optional & Editable)
+  const getDeliveryCharge = () => {
+    if (fulfillmentType !== "delivery" || getCartSubtotal() === 0 || !applyDeliveryFee) {
+      return 0;
+    }
+    return Number(customDeliveryFee) || 0;
+  };
+
   const getGstAmountCalculated = () => gstEnabled ? Number(((getCartSubtotal() * gstRate) / 100).toFixed(2)) : 0;
   const getRedemptionDiscount = () => isRedeemingPoints ? Math.min(pointsToRedeem, getCartSubtotal() + getGstAmountCalculated()) : 0;
   
@@ -294,11 +301,11 @@ export default function BbCafeDesktopPos() {
   const pendingOrdersCount = useMemo(() => activeLiveOrders.filter((o) => o.status === 'pending').length, [activeLiveOrders]);
   const activeTablesCount = useMemo(() => activeTableOrders.length, [activeTableOrders]);
 
-  // Online / Offline Status Engine
+  // Online / Offline Detection
   useEffect(() => {
     const handleOnline = () => {
       setIsOnline(true);
-      toast.success("Internet connected! Synced cloud. 🟢");
+      toast.success("Internet connected! Synced. 🟢");
       syncOfflineOrders();
     };
     const handleOffline = () => {
@@ -329,19 +336,7 @@ export default function BbCafeDesktopPos() {
     } catch (e) {}
   };
 
-  // Crash Protection
-  useEffect(() => {
-    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (cart.length > 0 || activeTableOrders.length > 0) {
-        e.preventDefault();
-        e.returnValue = 'Active order in progress! Sure to close?';
-      }
-    };
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [cart.length, activeTableOrders.length]);
-
-  // Split Payment Sync
+  // Split payment auto-sync
   useEffect(() => {
     const total = getTotalBillPrice();
     if (paymentMethod === 'split') {
@@ -349,9 +344,9 @@ export default function BbCafeDesktopPos() {
       setSplitCashAmount(half);
       setSplitUpiAmount(total - half);
     }
-  }, [cart, discountValue, discountType, isRedeemingPoints, pointsToRedeem, paymentMethod, fulfillmentType, selectedArea]);
+  }, [cart, discountValue, discountType, isRedeemingPoints, pointsToRedeem, paymentMethod, fulfillmentType, applyDeliveryFee, customDeliveryFee]);
 
-  // Load Saved Configs
+  // Load Saved Settings
   useEffect(() => {
     const savedHeld = localStorage.getItem("bb_pos_held_carts");
     if (savedHeld) {
@@ -398,7 +393,40 @@ export default function BbCafeDesktopPos() {
     localStorage.setItem("bb_pos_saved_cart_pc", JSON.stringify(cart));
   }, [cart]);
 
-  // Deduplicate & Normalize Category Names
+  // Smart Category Prefix Generator for Category-based Item Codes
+  const getCategoryPrefix = (catName: string) => {
+    const c = (catName || 'Fast Food').trim().toUpperCase();
+    if (c.includes('PIZZA')) return 'PZ';
+    if (c.includes('BURGER')) return 'BG';
+    if (c.includes('FAST')) return 'FF';
+    if (c.includes('CHAI') || c.includes('TEA') || c.includes('COFFEE')) return 'CH';
+    if (c.includes('SHAKE') || c.includes('BEVERAGE') || c.includes('DRINK')) return 'BV';
+    if (c.includes('SANDWICH')) return 'SW';
+    if (c.includes('SOUTH')) return 'SI';
+    if (c.includes('CHINESE') || c.includes('NOODLE') || c.includes('MOMOS')) return 'CN';
+    if (c.includes('DESSERT') || c.includes('ICE')) return 'DS';
+    // Fallback: take first 2 letters
+    const clean = c.replace(/[^A-Z]/g, '');
+    return clean.slice(0, 2) || 'IT';
+  };
+
+  const generateNextCategoryCode = (catName: string, currentList = products) => {
+    const prefix = getCategoryPrefix(catName);
+    const existingNums = currentList
+      .filter(p => (p.category || '').trim().toLowerCase() === catName.trim().toLowerCase())
+      .map(p => {
+        const code = String(p.itemCode || '').toUpperCase();
+        if (code.startsWith(prefix)) {
+          const num = parseInt(code.replace(prefix, ''), 10);
+          return isNaN(num) ? 0 : num;
+        }
+        return 0;
+      });
+    const maxNum = existingNums.length > 0 ? Math.max(...existingNums) : 0;
+    return `${prefix}${maxNum + 1}`;
+  };
+
+  // Clean Categories Deduplication
   const normalizeCategoryList = (rawItems: any[]) => {
     const cleaned = rawItems.map((i: any) => {
       const c = (i.category || 'Fast Food').trim();
@@ -408,7 +436,7 @@ export default function BbCafeDesktopPos() {
     return ['All', ...unique.sort()];
   };
 
-  // Products Loading with Sequential Auto-Codes
+  // Fetch Products & Ensure Category-based Item Codes
   useEffect(() => {
     if (!isLoggedIn) return;
     (async () => {
@@ -417,14 +445,26 @@ export default function BbCafeDesktopPos() {
         let items: any[] = [];
         if (navigator.onLine) {
           const prodSnap = await getDocs(collection(db, "products"));
-          items = prodSnap.docs.map((d, index) => {
+          items = prodSnap.docs.map((d) => {
             const data = d.data();
+            const cat = data.category || 'Fast Food';
             return {
               id: d.id,
               ...data,
-              itemCode: data.itemCode ? String(data.itemCode).trim() : String(101 + index)
+              category: cat,
+              itemCode: data.itemCode ? String(data.itemCode).trim() : ''
             };
           });
+
+          // Fill any missing item codes based on category prefix
+          items = items.map((item, idx, arr) => {
+            if (!item.itemCode) {
+              const prefix = getCategoryPrefix(item.category);
+              return { ...item, itemCode: `${prefix}${idx + 1}` };
+            }
+            return item;
+          });
+
           localStorage.setItem("bb_pos_cached_products", JSON.stringify(items));
         } else {
           const cached = localStorage.getItem("bb_pos_cached_products");
@@ -440,7 +480,7 @@ export default function BbCafeDesktopPos() {
     })();
   }, [isLoggedIn]);
 
-  // Variation Modal Auto-Focus First Variant Button
+  // Auto-focus on first variant button when Variation Modal opens
   useEffect(() => {
     if (isVariationModalOpen) {
       const timer = setTimeout(() => {
@@ -453,25 +493,6 @@ export default function BbCafeDesktopPos() {
       return () => clearTimeout(timer);
     }
   }, [isVariationModalOpen]);
-
-  // Real-time orders listener
-  useEffect(() => {
-    const q = query(collection(db, "orders"), orderBy("timestamp", "desc"), limit(50));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      setLiveOrders(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
-    });
-    return () => unsubscribe();
-  }, []);
-
-  // Alarm for live pending orders
-  useEffect(() => {
-    if (pendingOrdersCount > 0) {
-      if (!alarmIntervalRef.current) alarmIntervalRef.current = setInterval(() => triggerBeep('alarm'), 2500);
-    } else {
-      if (alarmIntervalRef.current) { clearInterval(alarmIntervalRef.current); alarmIntervalRef.current = null; }
-    }
-    return () => { if (alarmIntervalRef.current) clearInterval(alarmIntervalRef.current); };
-  }, [pendingOrdersCount]);
 
   // Search by exact code or fast-add
   const handleSearchInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -576,7 +597,137 @@ export default function BbCafeDesktopPos() {
     }
   };
 
-  // Add Item to Cart
+  // Variation Handlers in Item Editor Modal
+  const handleAddVariantRow = () => {
+    const name = newVariantName.trim();
+    const price = Number(newVariantPrice);
+    if (!name) return toast.error("Enter variation name (e.g. Half, Large, Butter)!");
+    if (isNaN(price) || price < 0) return toast.error("Enter a valid price!");
+    setItemVariantsList(prev => ({ ...prev, [name]: price }));
+    setNewVariantName('');
+    setNewVariantPrice('');
+    toast.success(`Variant "${name} (₹${price})" added!`);
+  };
+
+  const handleRemoveVariantRow = (key: string) => {
+    setItemVariantsList(prev => {
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+  };
+
+  const handleApplyVariantPreset = (presetType: 'half_full' | 'plain_butter' | 'pizza' | 'reg_large') => {
+    const base = Number(itemPriceInput) || 100;
+    setHasVariants(true);
+    if (presetType === 'half_full') {
+      setItemVariantsList({
+        'Half': Math.round(base * 0.6),
+        'Full': base
+      });
+    } else if (presetType === 'plain_butter') {
+      setItemVariantsList({
+        'Plain': base,
+        'Butter': base + 10,
+        'Cheese': base + 30
+      });
+    } else if (presetType === 'pizza') {
+      setItemVariantsList({
+        'Small': base,
+        'Medium': Math.round(base * 1.6),
+        'Large': Math.round(base * 2.2)
+      });
+    } else if (presetType === 'reg_large') {
+      setItemVariantsList({
+        'Regular': base,
+        'Large': Math.round(base * 1.4)
+      });
+    }
+    toast.success("Applied presets!");
+  };
+
+  // Item Editor: Save or Add Category
+  const handleOpenItemEditor = (item: any = null) => {
+    triggerBeep('tap');
+    setIsAddingNewCatInput(false);
+    setNewCustomCategoryName('');
+    if (item) {
+      setEditingItemObj(item);
+      setItemNameInput(item.name || '');
+      setItemCodeInput(item.itemCode || '');
+      setItemPriceInput(item.price !== undefined ? Number(item.price) : 100);
+      setItemCatInput(item.category || 'Fast Food');
+      setItemImageInput(item.image || item.imageUrl || '');
+      setItemIsAvailable(item.isAvailable !== false);
+      if (item.variants && typeof item.variants === 'object' && Object.keys(item.variants).length > 0) {
+        setHasVariants(true);
+        setItemVariantsList({ ...item.variants });
+      } else {
+        setHasVariants(false);
+        setItemVariantsList({});
+      }
+    } else {
+      setEditingItemObj(null);
+      setItemNameInput('');
+      const defaultCat = categories.find(c => c !== 'All') || 'Fast Food';
+      setItemCatInput(defaultCat);
+      setItemCodeInput(generateNextCategoryCode(defaultCat));
+      setItemPriceInput(100);
+      setItemImageInput('');
+      setItemIsAvailable(true);
+      setHasVariants(false);
+      setItemVariantsList({});
+    }
+    setNewVariantName('');
+    setNewVariantPrice('');
+    setIsItemEditorModalOpen(true);
+  };
+
+  const handleSaveItemToFirestore = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!itemNameInput.trim()) return toast.error("Item name required!");
+    const toastId = toast.loading("Saving menu item...");
+
+    const finalCategory = isAddingNewCatInput && newCustomCategoryName.trim() 
+      ? newCustomCategoryName.trim() 
+      : itemCatInput.trim() || 'Fast Food';
+
+    try {
+      const cleanVariants = (hasVariants && Object.keys(itemVariantsList).length > 0) ? itemVariantsList : null;
+
+      const itemData: any = {
+        name: itemNameInput.trim(),
+        itemCode: itemCodeInput.trim(),
+        price: Number(itemPriceInput) || 0,
+        category: finalCategory,
+        image: itemImageInput.trim(),
+        variants: cleanVariants,
+        isAvailable: itemIsAvailable,
+        updatedAt: new Date()
+      };
+
+      if (editingItemObj) {
+        await updateDoc(doc(db, "products", editingItemObj.id), itemData);
+        setProducts(prev => prev.map(p => p.id === editingItemObj.id ? { id: editingItemObj.id, ...itemData } : p));
+        toast.success("Item updated! ✅");
+      } else {
+        const docRef = await addDoc(collection(db, "products"), itemData);
+        setProducts(prev => [...prev, { id: docRef.id, ...itemData }]);
+        toast.success("New item added! ✅");
+      }
+
+      setCategories(normalizeCategoryList([...products, itemData]));
+      toast.dismiss(toastId);
+      setIsItemEditorModalOpen(false);
+      setEditingItemObj(null);
+      setTimeout(() => searchInputRef.current?.focus(), 60);
+    } catch (err) {
+      toast.dismiss(toastId);
+      toast.error("Failed to save item");
+    }
+  };
+
+  // Add Item to Cart (Standard or Variation Modal)
   const handleItemClick = (item: any) => {
     triggerBeep('tap');
     const hasItemVariants = item.variants && typeof item.variants === 'object' && Object.keys(item.variants).length > 0;
@@ -668,51 +819,19 @@ export default function BbCafeDesktopPos() {
     }).filter(Boolean) as PosCartItem[]);
   };
 
-  // Hold & Restore
-  const handleHoldCurrentCart = () => {
-    if (cart.length === 0) return toast.error("Cart is empty!");
-    triggerBeep('tap');
+  const getDailyTokenNumber = () => {
+    const todayStr = new Date().toDateString();
+    let lastResetDate = localStorage.getItem("bb_pos_token_reset_date");
+    let currentTokenSeq = Number(localStorage.getItem("bb_pos_daily_token_seq") || "0");
 
-    const newHold: HeldCart = {
-      id: `hold_${Date.now()}`,
-      cart: [...cart],
-      customerName: customerName || 'Walk-in Guest',
-      customerPhone,
-      tableNumber,
-      fulfillmentType,
-      heldAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      total: getTotalBillPrice()
-    };
-
-    saveHeldCartsToStorage([newHold, ...heldCarts]);
-    toast.success(`Cart parked on Hold! [${newHold.customerName}]`, { icon: '⏸️' });
-
-    setCart([]);
-    setCustomerName('');
-    setCustomerPhone('');
-    setDiscountValue(0);
-    setIsRedeemingPoints(false);
-    setPointsToRedeem(0);
-    localStorage.removeItem("bb_pos_saved_cart_pc");
-    setTimeout(() => searchInputRef.current?.focus(), 60);
-  };
-
-  const handleRestoreHeldCart = (heldItem: HeldCart) => {
-    triggerBeep('tap');
-    if (cart.length > 0) {
-      if (!window.confirm("Replace active cart with this held order?")) return;
+    if (lastResetDate !== todayStr) {
+      currentTokenSeq = 1;
+      localStorage.setItem("bb_pos_token_reset_date", todayStr);
+    } else {
+      currentTokenSeq += 1;
     }
-    setCart(heldItem.cart);
-    setCustomerName(heldItem.customerName === 'Walk-in Guest' ? '' : heldItem.customerName);
-    setCustomerPhone(heldItem.customerPhone || '');
-    setTableNumber(heldItem.tableNumber || 'Table 1');
-    setFulfillmentType(heldItem.fulfillmentType || 'pickup');
-    
-    saveHeldCartsToStorage(heldCarts.filter(h => h.id !== heldItem.id));
-    setIsHeldCartsModalOpen(false);
-    setActiveTab('billing');
-    toast.success(`Restored order of ${heldItem.customerName}!`, { icon: '▶️' });
-    setTimeout(() => searchInputRef.current?.focus(), 60);
+    localStorage.setItem("bb_pos_daily_token_seq", String(currentTokenSeq));
+    return currentTokenSeq;
   };
 
   // Thermal Printing Direct (68mm Safe Margin)
@@ -764,22 +883,7 @@ export default function BbCafeDesktopPos() {
     });
   };
 
-  const getDailyTokenNumber = () => {
-    const todayStr = new Date().toDateString();
-    let lastResetDate = localStorage.getItem("bb_pos_token_reset_date");
-    let currentTokenSeq = Number(localStorage.getItem("bb_pos_daily_token_seq") || "0");
-
-    if (lastResetDate !== todayStr) {
-      currentTokenSeq = 1;
-      localStorage.setItem("bb_pos_token_reset_date", todayStr);
-    } else {
-      currentTokenSeq += 1;
-    }
-    localStorage.setItem("bb_pos_daily_token_seq", String(currentTokenSeq));
-    return currentTokenSeq;
-  };
-
-  // Table Order KOT Only
+  // Save Table KOT Only
   const handleSaveTableOrderKotOnly = async () => {
     if (cart.length === 0 || isSubmittingOrder) return;
     setIsSubmittingOrder(true);
@@ -1026,7 +1130,7 @@ export default function BbCafeDesktopPos() {
     }
   };
 
-  // Reports Data Fetching (Today, Yesterday, Custom)
+  // Reports Data Fetching
   const fetchReportData = async () => {
     setIsReportLoading(true);
     try {
@@ -1119,28 +1223,6 @@ export default function BbCafeDesktopPos() {
     return Object.entries(map).map(([name, data]) => ({ name, ...data })).sort((a, b) => b.qty - a.qty);
   }, [reportOrders]);
 
-  // Live Order Actions
-  const handleCompleteLiveOrder = async (orderId: string) => {
-    triggerBeep('success');
-    try {
-      await updateDoc(doc(db, "orders", orderId), { status: 'completed', settledAt: new Date() });
-      toast.success("Order Completed! ✅");
-    } catch (err) {
-      toast.error("Failed");
-    }
-  };
-
-  const handleRejectLiveOrder = async (orderId: string) => {
-    triggerBeep('tap');
-    if (!window.confirm("Reject this order?")) return;
-    try {
-      await updateDoc(doc(db, "orders", orderId), { status: 'rejected', rejectedAt: new Date() });
-      toast.success("Order Rejected.");
-    } catch (err) {
-      toast.error("Failed");
-    }
-  };
-
   // Past Receipts Fetching
   const fetchPastReceipts = async () => {
     setIsReceiptsLoading(true);
@@ -1164,87 +1246,6 @@ export default function BbCafeDesktopPos() {
     String(o.customerPhone || '').includes(receiptSearchQuery.trim()) || 
     String(o.customerName || '').toLowerCase().includes(receiptSearchQuery.trim().toLowerCase())
   ), [pastReceipts, receiptSearchQuery]);
-
-  // Dynamic Item Editor Save
-  const handleOpenItemEditor = (item: any = null) => {
-    triggerBeep('tap');
-    setIsAddingNewCatInput(false);
-    setNewCustomCategoryName('');
-    if (item) {
-      setEditingItemObj(item);
-      setItemNameInput(item.name || '');
-      setItemCodeInput(item.itemCode || '');
-      setItemPriceInput(item.price !== undefined ? Number(item.price) : 100);
-      setItemCatInput(item.category || 'Fast Food');
-      setItemImageInput(item.image || item.imageUrl || '');
-      setItemIsAvailable(item.isAvailable !== false);
-      if (item.variants && typeof item.variants === 'object' && Object.keys(item.variants).length > 0) {
-        setHasVariants(true);
-        setItemVariantsList({ ...item.variants });
-      } else {
-        setHasVariants(false);
-        setItemVariantsList({});
-      }
-    } else {
-      setEditingItemObj(null);
-      setItemNameInput('');
-      const nextCode = products.length > 0 ? String(Math.max(...products.map(p => Number(p.itemCode) || 100)) + 1) : '101';
-      setItemCodeInput(nextCode);
-      setItemPriceInput(100);
-      setItemCatInput(categories.find(c => c !== 'All') || 'Fast Food');
-      setItemImageInput('');
-      setItemIsAvailable(true);
-      setHasVariants(false);
-      setItemVariantsList({});
-    }
-    setNewVariantName('');
-    setNewVariantPrice('');
-    setIsItemEditorModalOpen(true);
-  };
-
-  const handleSaveItemToFirestore = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!itemNameInput.trim()) return toast.error("Item name required!");
-    const toastId = toast.loading("Saving item...");
-
-    const finalCategory = isAddingNewCatInput && newCustomCategoryName.trim() 
-      ? newCustomCategoryName.trim() 
-      : itemCatInput.trim() || 'Fast Food';
-
-    try {
-      const cleanVariants = (hasVariants && Object.keys(itemVariantsList).length > 0) ? itemVariantsList : null;
-
-      const itemData: any = {
-        name: itemNameInput.trim(),
-        itemCode: itemCodeInput.trim(),
-        price: Number(itemPriceInput) || 0,
-        category: finalCategory,
-        image: itemImageInput.trim(),
-        variants: cleanVariants,
-        isAvailable: itemIsAvailable,
-        updatedAt: new Date()
-      };
-
-      if (editingItemObj) {
-        await updateDoc(doc(db, "products", editingItemObj.id), itemData);
-        setProducts(prev => prev.map(p => p.id === editingItemObj.id ? { id: editingItemObj.id, ...itemData } : p));
-        toast.success("Item updated! ✅");
-      } else {
-        const docRef = await addDoc(collection(db, "products"), itemData);
-        setProducts(prev => [...prev, { id: docRef.id, ...itemData }]);
-        toast.success("New item added! ✅");
-      }
-
-      setCategories(normalizeCategoryList([...products, itemData]));
-      toast.dismiss(toastId);
-      setIsItemEditorModalOpen(false);
-      setEditingItemObj(null);
-      setTimeout(() => searchInputRef.current?.focus(), 60);
-    } catch (err) {
-      toast.dismiss(toastId);
-      toast.error("Failed to save item");
-    }
-  };
 
   // Keyboard Shortcuts Handler
   useEffect(() => {
@@ -1308,7 +1309,7 @@ export default function BbCafeDesktopPos() {
   const dynamicUpiUrl = useMemo(() => {
     const total = getTotalBillPrice();
     return `upi://pay?pa=${encodeURIComponent(upiIdConfig.trim())}&pn=Bum%20Bum%20Cafe&am=${total}&cu=INR`;
-  }, [upiIdConfig, cart, discountValue, discountType, isRedeemingPoints, pointsToRedeem, fulfillmentType, selectedArea, gstEnabled, gstRate]);
+  }, [upiIdConfig, cart, discountValue, discountType, isRedeemingPoints, pointsToRedeem, fulfillmentType, applyDeliveryFee, customDeliveryFee, gstEnabled, gstRate]);
 
   return (
     <div className={mainClass}>
@@ -1449,12 +1450,12 @@ export default function BbCafeDesktopPos() {
             {/* TAB 1: BILLING */}
             {activeTab === 'billing' && (
               <div className="flex-1 flex h-full overflow-hidden">
-                <div className="flex-1 flex flex-col p-5 h-full overflow-hidden">
+                <div className="flex-1 flex flex-col p-4 h-full overflow-hidden">
                   
                   {activeEditingOrderId && (
-                    <div className="mb-3 bg-amber-500/15 border border-amber-500/40 p-3 rounded-2xl flex items-center justify-between shrink-0">
+                    <div className="mb-2 bg-amber-500/15 border border-amber-500/40 p-2.5 rounded-xl flex items-center justify-between shrink-0">
                       <div className="flex items-center gap-2 text-amber-400 text-xs font-black uppercase">
-                        <SafeEdit3 size={16} />
+                        <SafeEdit3 size={15} />
                         <span>Active Table: {tableNumber} (Bill #{activeEditingBillNumber})</span>
                       </div>
                       <button onClick={() => { setActiveEditingOrderId(null); setCart([]); }} className="text-neutral-400 hover:text-white text-xs underline">Clear Table</button>
@@ -1462,30 +1463,30 @@ export default function BbCafeDesktopPos() {
                   )}
 
                   {/* SEARCH BAR (F2) */}
-                  <div className="flex gap-3 mb-3 items-center shrink-0">
+                  <div className="flex gap-2.5 mb-2.5 items-center shrink-0">
                     <div className="relative flex-1">
-                      <SafeSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-400" size={18} />
+                      <SafeSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-400" size={17} />
                       <input 
                         ref={searchInputRef}
                         type="text" 
-                        placeholder="Search item / Type Short Code (e.g. 101, PZ1) & hit [Enter]... [F2]" 
+                        placeholder="Search item / Type Category Code (e.g. PZ1, BG1, 101) & hit [Enter]... [F2]" 
                         value={searchQuery} 
                         onChange={e => setSearchQuery(e.target.value)}
                         onKeyDown={handleSearchInputKeyDown} 
-                        className="w-full bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-2xl py-3 pl-11 pr-4 text-sm outline-none focus:border-orange-500 shadow-sm font-medium" 
+                        className="w-full bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl py-2.5 pl-10 pr-4 text-xs outline-none focus:border-orange-500 shadow-sm font-medium" 
                         autoFocus
                       />
                     </div>
                     <button 
                       onClick={() => handleOpenItemEditor(null)} 
-                      className="bg-orange-600 hover:bg-orange-500 text-white px-4 py-3 rounded-2xl text-xs font-black uppercase flex items-center gap-1.5 shadow transition-all shrink-0"
+                      className="bg-orange-600 hover:bg-orange-500 text-white px-3.5 py-2.5 rounded-xl text-xs font-black uppercase flex items-center gap-1.5 shadow transition-all shrink-0"
                     >
-                      <SafePlus size={16} /> Add Item
+                      <SafePlus size={15} /> Add Item
                     </button>
                   </div>
 
-                  {/* CATEGORIES - DEDUPLICATED & ALL VISIBLE */}
-                  <div className="flex flex-wrap gap-2 pb-3 shrink-0 max-h-36 overflow-y-auto pr-1">
+                  {/* CATEGORIES - COMPACT 2-LINE WRAP */}
+                  <div className="flex flex-wrap gap-1.5 pb-2.5 shrink-0 max-h-20 overflow-y-auto pr-1">
                     {categories.map((cat) => {
                       const isSelected = selectedCategory === cat;
                       const count = cat === 'All' ? products.length : products.filter(p => p.category?.toLowerCase() === cat.toLowerCase()).length;
@@ -1493,14 +1494,14 @@ export default function BbCafeDesktopPos() {
                         <button 
                           key={cat} 
                           onClick={() => { triggerBeep('tap'); setSelectedCategory(cat); }} 
-                          className={`px-3.5 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider border transition-all flex items-center gap-1.5 shadow-sm ${
+                          className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider border transition-all flex items-center gap-1.5 shadow-sm ${
                             isSelected 
-                              ? "bg-orange-500 text-black border-orange-500 shadow-md shadow-orange-500/20 scale-105" 
+                              ? "bg-orange-500 text-black border-orange-500 shadow-md scale-[1.02]" 
                               : "bg-white dark:bg-neutral-900 text-neutral-300 border-neutral-200 dark:border-neutral-800 hover:border-orange-500 hover:text-orange-400"
                           }`}
                         >
                           <span>{cat}</span>
-                          <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-mono font-bold ${isSelected ? 'bg-black/25 text-black' : 'bg-neutral-800 text-neutral-400'}`}>
+                          <span className={`text-[9px] px-1.5 py-0.2 rounded font-mono font-bold ${isSelected ? 'bg-black/25 text-black' : 'bg-neutral-800 text-neutral-400'}`}>
                             {count}
                           </span>
                         </button>
@@ -1512,7 +1513,7 @@ export default function BbCafeDesktopPos() {
                   {loading ? (
                     <div className="flex items-center justify-center flex-1"><Loader2 className="animate-spin text-orange-500" size={32} /></div>
                   ) : (
-                    <div className="grid grid-cols-3 xl:grid-cols-4 gap-4 overflow-y-auto flex-1 pr-2 content-start">
+                    <div className="grid grid-cols-3 xl:grid-cols-4 gap-3 overflow-y-auto flex-1 pr-1.5 content-start">
                       {filteredMenu.map((item) => {
                         const isAvail = item.isAvailable !== false;
                         const imgUrl = item.image || item.imageUrl || item.img;
@@ -1521,25 +1522,25 @@ export default function BbCafeDesktopPos() {
                             key={item.id} 
                             disabled={!isAvail} 
                             onClick={() => handleItemClick(item)} 
-                            className={`border rounded-2xl text-left flex flex-col overflow-hidden h-44 transition-all duration-200 hover:scale-[1.02] active:scale-95 shadow-sm ${isAvail ? "bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800 hover:border-orange-500/50" : "opacity-40 bg-neutral-200 dark:bg-neutral-950 border-neutral-800 pointer-events-none"}`}
+                            className={`border rounded-xl text-left flex flex-col overflow-hidden h-40 transition-all duration-150 hover:scale-[1.01] active:scale-95 shadow-sm ${isAvail ? "bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800 hover:border-orange-500/50" : "opacity-40 bg-neutral-200 dark:bg-neutral-950 border-neutral-800 pointer-events-none"}`}
                           >
-                            <div className="w-full h-24 bg-neutral-200 dark:bg-neutral-800 relative shrink-0 overflow-hidden flex items-center justify-center">
+                            <div className="w-full h-20 bg-neutral-200 dark:bg-neutral-800 relative shrink-0 overflow-hidden flex items-center justify-center">
                               {imgUrl ? (
                                 <img src={imgUrl} alt={item.name} className="w-full h-full object-cover" />
                               ) : (
-                                <span className="text-neutral-400 text-xs font-black uppercase tracking-wider px-2 text-center">{item.category || "Cafe Item"}</span>
+                                <span className="text-neutral-400 text-[11px] font-black uppercase tracking-wider px-2 text-center">{item.category || "Cafe Item"}</span>
                               )}
                               {item.itemCode && (
-                                <span className="absolute top-2 right-2 bg-black/80 backdrop-blur-md text-yellow-400 font-mono text-[10px] font-black px-2 py-0.5 rounded-lg border border-yellow-500/40 shadow">
+                                <span className="absolute top-1.5 right-1.5 bg-black/85 backdrop-blur-md text-yellow-400 font-mono text-[9px] font-black px-1.5 py-0.5 rounded border border-yellow-500/40 shadow">
                                   #{item.itemCode}
                                 </span>
                               )}
                             </div>
-                            <div className="p-3 flex-grow flex flex-col justify-between w-full">
+                            <div className="p-2.5 flex-grow flex flex-col justify-between w-full">
                               <p className="font-bold text-xs line-clamp-2 leading-tight">{item.name}</p>
                               <div className="flex justify-between items-center">
                                 <span className="text-xs font-mono font-black text-orange-500">₹{item.price}</span>
-                                <span className="text-[10px] text-neutral-400">{item.category}</span>
+                                <span className="text-[9px] text-neutral-400 truncate max-w-[90px]">{item.category}</span>
                               </div>
                             </div>
                           </button>
@@ -1550,21 +1551,21 @@ export default function BbCafeDesktopPos() {
                 </div>
 
                 {/* RIGHT CART PANEL */}
-                <div className="w-96 bg-white dark:bg-neutral-900 border-l border-neutral-200 dark:border-neutral-800 flex flex-col p-5 h-full shadow-2xl justify-between overflow-hidden">
+                <div className="w-96 bg-white dark:bg-neutral-900 border-l border-neutral-200 dark:border-neutral-800 flex flex-col p-4 h-full shadow-2xl justify-between overflow-hidden">
                   <div className="flex flex-col h-full overflow-hidden">
-                    <div className="flex items-center justify-between border-b border-neutral-200 dark:border-neutral-800 pb-3 mb-3 shrink-0">
+                    <div className="flex items-center justify-between border-b border-neutral-200 dark:border-neutral-800 pb-2.5 mb-2.5 shrink-0">
                       <div className="flex items-center gap-2">
-                        <h3 className="text-sm font-black uppercase text-orange-500">Cart ({cart.length})</h3>
+                        <h3 className="text-xs font-black uppercase text-orange-500">Cart ({cart.length})</h3>
                         <button onClick={handleHoldCurrentCart} title="Park Cart [F3]" className="text-[10px] font-black uppercase px-2 py-0.5 bg-amber-500/10 text-amber-500 hover:bg-amber-500/20 rounded-md border border-amber-500/30 flex items-center gap-1">
                           <SafePauseCircle size={11} /> Hold [F3]
                         </button>
                       </div>
-                      <button onClick={() => setCart([])} className="text-red-500 text-xs font-bold hover:underline flex items-center gap-1"><SafeTrash2 size={14} /> Clear [Del]</button>
+                      <button onClick={() => setCart([])} className="text-red-500 text-xs font-bold hover:underline flex items-center gap-1"><SafeTrash2 size={13} /> Clear [Del]</button>
                     </div>
 
                     {/* CUSTOMER PHONE & AUTO JUMP ON ENTER */}
-                    <div className="space-y-2 bg-neutral-50 dark:bg-neutral-800/40 p-3 rounded-2xl border border-neutral-200 dark:border-neutral-800 mb-3 shrink-0">
-                      <div className="flex gap-2">
+                    <div className="space-y-1.5 bg-neutral-50 dark:bg-neutral-800/40 p-2.5 rounded-xl border border-neutral-200 dark:border-neutral-800 mb-2 shrink-0">
+                      <div className="flex gap-1.5">
                         <input 
                           ref={phoneInputRef}
                           type="text" 
@@ -1573,11 +1574,11 @@ export default function BbCafeDesktopPos() {
                           value={customerPhone} 
                           onChange={e => setCustomerPhone(e.target.value)} 
                           onKeyDown={handlePhoneInputKeyDown}
-                          className="w-full bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 rounded-xl px-3 py-2 text-xs outline-none font-mono" 
+                          className="w-full bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 rounded-lg px-2.5 py-1.5 text-xs outline-none font-mono" 
                         />
-                        <button onClick={handleCheckLoyaltyWithAutoJump} className="bg-orange-600 hover:bg-orange-500 text-white px-3 rounded-xl text-xs font-black uppercase">Find</button>
-                        <button onClick={() => handleSendWhatsAppBill()} title="Send WhatsApp Receipt [F7]" className="bg-green-600/10 hover:bg-green-600/20 text-green-500 px-2.5 rounded-xl text-xs font-bold flex items-center">
-                          <SafeShare2 size={14} />
+                        <button onClick={handleCheckLoyaltyWithAutoJump} className="bg-orange-600 hover:bg-orange-500 text-white px-2.5 rounded-lg text-xs font-black uppercase">Find</button>
+                        <button onClick={() => handleSendWhatsAppBill()} title="Send WhatsApp Receipt [F7]" className="bg-green-600/10 hover:bg-green-600/20 text-green-500 px-2 rounded-lg text-xs font-bold flex items-center">
+                          <SafeShare2 size={13} />
                         </button>
                       </div>
 
@@ -1590,9 +1591,9 @@ export default function BbCafeDesktopPos() {
 
                       {/* LOYALTY REDEMPTION */}
                       {customerName && customerPoints > 0 && !showNewCustForm && (
-                        <div className="pt-2 border-t border-neutral-200 dark:border-neutral-700 flex items-center justify-between text-xs">
+                        <div className="pt-1.5 border-t border-neutral-200 dark:border-neutral-700 flex items-center justify-between text-xs">
                           <span className="text-amber-400 font-bold flex items-center gap-1">⭐ Redeem ({customerPoints} Pts):</span>
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1.5">
                             <input 
                               type="number" 
                               min={1} 
@@ -1600,7 +1601,7 @@ export default function BbCafeDesktopPos() {
                               value={pointsToRedeem || ''}
                               onChange={e => setPointsToRedeem(Math.min(Number(e.target.value), customerPoints))}
                               placeholder="Pts"
-                              className="w-16 bg-neutral-900 border border-neutral-700 rounded-lg p-1 text-center font-mono text-xs text-white outline-none" 
+                              className="w-14 bg-neutral-900 border border-neutral-700 rounded-lg p-1 text-center font-mono text-xs text-white outline-none" 
                             />
                             <button 
                               type="button"
@@ -1613,7 +1614,7 @@ export default function BbCafeDesktopPos() {
                                   setPointsToRedeem(0);
                                 }
                               }}
-                              className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase ${isRedeemingPoints ? 'bg-red-500 text-white' : 'bg-amber-500 text-black'}`}
+                              className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${isRedeemingPoints ? 'bg-red-500 text-white' : 'bg-amber-500 text-black'}`}
                             >
                               {isRedeemingPoints ? 'Cancel' : 'Apply'}
                             </button>
@@ -1621,10 +1622,10 @@ export default function BbCafeDesktopPos() {
                         </div>
                       )}
 
-                      {/* NEW CUSTOMER REGISTRATION (AUTO-FOCUS JUMP) */}
+                      {/* NEW CUSTOMER REGISTRATION */}
                       {showNewCustForm && (
-                        <div className="space-y-2 pt-2 border-t border-neutral-200 dark:border-neutral-700">
-                          <p className="text-[10px] text-yellow-400 font-bold uppercase">New Customer! Type Name & Press [Enter]:</p>
+                        <div className="space-y-1.5 pt-1.5 border-t border-neutral-200 dark:border-neutral-700">
+                          <p className="text-[9px] text-yellow-400 font-bold uppercase">New Customer! Type Name & Press [Enter]:</p>
                           <input 
                             ref={newCustNameRef}
                             type="text" 
@@ -1637,12 +1638,12 @@ export default function BbCafeDesktopPos() {
                                 newCustAddressRef.current?.focus();
                               }
                             }}
-                            className="w-full bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 rounded-xl px-3 py-1.5 text-xs outline-none" 
+                            className="w-full bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 rounded-lg px-2.5 py-1 text-xs outline-none" 
                           />
                           <input 
                             ref={newCustAddressRef}
                             type="text" 
-                            placeholder="Address / Area (Optional) & hit [Enter]" 
+                            placeholder="Address (Optional) & hit [Enter]" 
                             value={newCustAddressInput} 
                             onChange={e => setNewCustAddressInput(e.target.value)} 
                             onKeyDown={e => {
@@ -1651,55 +1652,51 @@ export default function BbCafeDesktopPos() {
                                 handleSaveNewCustomerQuick();
                               }
                             }}
-                            className="w-full bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 rounded-xl px-3 py-1.5 text-xs outline-none" 
+                            className="w-full bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 rounded-lg px-2.5 py-1 text-xs outline-none" 
                           />
-                          <button onClick={handleSaveNewCustomerQuick} className="w-full py-2 bg-green-600 hover:bg-green-500 text-white font-black text-xs uppercase rounded-xl flex items-center justify-center gap-1 shadow">
-                            <SafeUserPlus size={14} /> Save Customer [Enter]
+                          <button onClick={handleSaveNewCustomerQuick} className="w-full py-1.5 bg-green-600 hover:bg-green-500 text-white font-black text-xs uppercase rounded-lg flex items-center justify-center gap-1 shadow">
+                            <SafeUserPlus size={13} /> Save Customer [Enter]
                           </button>
                         </div>
                       )}
                     </div>
 
                     {/* CART ITEMS LIST */}
-                    <div className="space-y-2 overflow-y-auto flex-1 pr-1 mb-3">
+                    <div className="space-y-1.5 overflow-y-auto flex-1 pr-1 mb-2">
                       {cart.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center h-full text-neutral-400 text-xs text-center py-10">
-                          <ShoppingBag size={32} className="mb-2 opacity-40" />
+                        <div className="flex flex-col items-center justify-center h-full text-neutral-400 text-xs text-center py-8">
+                          <ShoppingBag size={28} className="mb-2 opacity-35" />
                           <p>Cart is empty. Type code or click item.</p>
                         </div>
                       ) : (
                         cart.map((item) => (
-                          <div key={item.cartItemId} className="bg-neutral-50 dark:bg-neutral-800/40 border border-neutral-200 dark:border-neutral-800 p-2.5 rounded-2xl flex items-center justify-between gap-2">
+                          <div key={item.cartItemId} className="bg-neutral-50 dark:bg-neutral-800/40 border border-neutral-200 dark:border-neutral-800 p-2 rounded-xl flex items-center justify-between gap-2">
                             <div className="flex-1 min-w-0">
                               <p className="font-bold text-xs truncate">{item.name}</p>
-                              {item.note && <p className="text-[10px] text-neutral-400 italic truncate">{item.note}</p>}
+                              {item.note && <p className="text-[9px] text-neutral-400 italic truncate">{item.note}</p>}
                               <p className="text-[11px] font-mono text-orange-500 font-bold">₹{item.price * item.quantity}</p>
                             </div>
-                            <div className="flex items-center gap-1.5 shrink-0">
-                              <button onClick={() => {
-                                handleUpdateCartQuantity(item.cartItemId, -1);
-                              }} className="w-7 h-7 bg-neutral-200 dark:bg-neutral-700 rounded-lg flex items-center justify-center font-bold text-xs">-</button>
-                              <span className="w-6 text-center text-xs font-mono font-bold">{item.quantity}</span>
-                              <button onClick={() => {
-                                handleUpdateCartQuantity(item.cartItemId, 1);
-                              }} className="w-7 h-7 bg-neutral-200 dark:bg-neutral-700 rounded-lg flex items-center justify-center font-bold text-xs">+</button>
+                            <div className="flex items-center gap-1 shrink-0">
+                              <button onClick={() => handleUpdateCartQuantity(item.cartItemId, -1)} className="w-6 h-6 bg-neutral-200 dark:bg-neutral-700 rounded flex items-center justify-center font-bold text-xs">-</button>
+                              <span className="w-5 text-center text-xs font-mono font-bold">{item.quantity}</span>
+                              <button onClick={() => handleUpdateCartQuantity(item.cartItemId, 1)} className="w-6 h-6 bg-neutral-200 dark:bg-neutral-700 rounded flex items-center justify-center font-bold text-xs">+</button>
                             </div>
                           </div>
                         ))
                       )}
                     </div>
 
-                    {/* FULFILLMENT MODE & 6 FIXED TABLE BUTTONS */}
-                    <div className="space-y-2 mb-3 shrink-0 border-t border-neutral-200 dark:border-neutral-800 pt-2">
-                      <div className="grid grid-cols-3 gap-1 bg-neutral-100 dark:bg-neutral-800 p-1 rounded-2xl">
+                    {/* FULFILLMENT MODE & 6 TABLE SELECTION / OPTIONAL DELIVERY FEE */}
+                    <div className="space-y-2 mb-2 shrink-0 border-t border-neutral-200 dark:border-neutral-800 pt-2">
+                      <div className="grid grid-cols-3 gap-1 bg-neutral-100 dark:bg-neutral-800 p-1 rounded-xl">
                         {(['pickup', 'table', 'delivery'] as const).map((type) => (
-                          <button key={type} onClick={() => { triggerBeep('tap'); setFulfillmentType(type); }} className={`py-1.5 rounded-xl text-[10px] font-black uppercase transition-all ${fulfillmentType === type ? "bg-orange-600 text-white shadow-md" : "text-neutral-400"}`}>{type}</button>
+                          <button key={type} onClick={() => { triggerBeep('tap'); setFulfillmentType(type); }} className={`py-1 rounded-lg text-[10px] font-black uppercase transition-all ${fulfillmentType === type ? "bg-orange-600 text-white shadow" : "text-neutral-400"}`}>{type}</button>
                         ))}
                       </div>
 
-                      {/* 6 TABLE SELECTION TABS */}
+                      {/* 6 FIXED TABLE BUTTONS */}
                       {fulfillmentType === 'table' && (
-                        <div className="grid grid-cols-3 gap-1.5 pt-1">
+                        <div className="grid grid-cols-3 gap-1 pt-1">
                           {['Table 1', 'Table 2', 'Table 3', 'Table 4', 'Table 5', 'Table 6'].map((tName) => {
                             const isOccupied = activeTableOrders.some(o => o.tableNumber === tName);
                             const isSelected = tableNumber === tName;
@@ -1708,65 +1705,111 @@ export default function BbCafeDesktopPos() {
                                 key={tName}
                                 type="button"
                                 onClick={() => { triggerBeep('tap'); setTableNumber(tName); }}
-                                className={`py-2 px-1 rounded-xl text-xs font-black uppercase border transition-all text-center ${
+                                className={`py-1.5 px-1 rounded-lg text-xs font-black uppercase border transition-all text-center ${
                                   isSelected 
                                     ? 'bg-amber-500 text-black border-amber-500 shadow-md font-black' 
                                     : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-300 border-neutral-700 hover:border-amber-400'
                                 }`}
                               >
                                 <span>{tName}</span>
-                                {isOccupied && <span className="block text-[8px] text-red-500 font-bold uppercase mt-0.5">● Active</span>}
+                                {isOccupied && <span className="block text-[8px] text-red-500 font-bold uppercase">● Active</span>}
                               </button>
                             );
                           })}
                         </div>
                       )}
+
+                      {/* OPTIONAL DELIVERY CHARGE BOX */}
+                      {fulfillmentType === 'delivery' && (
+                        <div className="bg-neutral-100 dark:bg-neutral-800/80 p-2 rounded-xl border border-neutral-700 space-y-1.5">
+                          <div className="flex justify-between items-center text-xs">
+                            <label className="flex items-center gap-1.5 cursor-pointer font-bold text-neutral-200">
+                              <input 
+                                type="checkbox" 
+                                checked={applyDeliveryFee} 
+                                onChange={e => setApplyDeliveryFee(e.target.checked)}
+                                className="accent-orange-600 w-3.5 h-3.5 cursor-pointer" 
+                              />
+                              <span>Delivery Charge (वैकल्पिक):</span>
+                            </label>
+                            <span className="text-[10px] font-bold text-orange-400 font-mono">
+                              {applyDeliveryFee ? `+₹${customDeliveryFee || 0}` : 'FREE (₹0)'}
+                            </span>
+                          </div>
+
+                          {applyDeliveryFee && (
+                            <div className="flex items-center gap-1.5 pt-1">
+                              <input 
+                                type="number" 
+                                min={0}
+                                placeholder="Fee ₹" 
+                                value={customDeliveryFee} 
+                                onChange={e => setCustomDeliveryFee(e.target.value === '' ? '' : Number(e.target.value))}
+                                className="w-20 bg-neutral-900 border border-neutral-700 rounded-lg p-1 text-xs text-center font-mono text-white outline-none" 
+                              />
+                              <div className="flex gap-1 flex-1">
+                                {[0, 20, 30, 50].map((amt) => (
+                                  <button 
+                                    key={amt}
+                                    type="button"
+                                    onClick={() => setCustomDeliveryFee(amt)}
+                                    className={`flex-1 py-1 rounded text-[10px] font-bold border font-mono ${customDeliveryFee === amt ? 'bg-orange-600 text-white border-orange-600' : 'bg-neutral-900 border-neutral-700 text-neutral-400'}`}
+                                  >
+                                    {amt === 0 ? 'Free' : `₹${amt}`}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
 
                     {/* BREAKDOWN & GRAND TOTAL */}
-                    <div className="space-y-1.5 text-xs border-t border-neutral-200 dark:border-neutral-800 pt-2 shrink-0">
+                    <div className="space-y-1 text-xs border-t border-neutral-200 dark:border-neutral-800 pt-1.5 shrink-0">
                       <div className="flex justify-between text-neutral-400"><span>Subtotal</span><span className="font-mono">₹{getCartSubtotal()}</span></div>
+                      {getDeliveryCharge() > 0 && <div className="flex justify-between text-neutral-300"><span>Delivery Charge</span><span className="font-mono">+₹{getDeliveryCharge()}</span></div>}
                       {getCalculatedDiscountAmount() > 0 && <div className="flex justify-between text-orange-400 font-bold"><span>Discount</span><span className="font-mono">-₹{getCalculatedDiscountAmount()}</span></div>}
                       {isRedeemingPoints && <div className="flex justify-between text-amber-400 font-bold"><span>Points Redeemed</span><span className="font-mono">-₹{getRedemptionDiscount()}</span></div>}
-                      <div className="flex justify-between text-base font-black text-green-500 pt-1 border-t border-dashed border-neutral-700">
-                        <span>Grand Total</span><span className="font-mono">₹{getTotalBillPrice()}</span>
+                      <div className="flex justify-between text-sm font-black text-green-500 pt-1 border-t border-dashed border-neutral-700">
+                        <span>Grand Total</span><span className="font-mono text-base">₹{getTotalBillPrice()}</span>
                       </div>
                     </div>
 
                     {/* PAYMENT METHOD [F4] */}
-                    <div className="space-y-2 my-2 shrink-0">
-                      <div className="grid grid-cols-3 gap-1.5">
-                        <button onClick={() => setPaymentMethod('cash')} className={`py-2 rounded-xl text-xs font-black uppercase border ${paymentMethod === 'cash' ? 'bg-green-600 text-white border-green-600 shadow' : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-400 border-neutral-700'}`}>Cash [F4]</button>
-                        <button onClick={() => setPaymentMethod('upi')} className={`py-2 rounded-xl text-xs font-black uppercase border ${paymentMethod === 'upi' ? 'bg-blue-600 text-white border-blue-600 shadow' : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-400 border-neutral-700'}`}>UPI [F4]</button>
-                        <button onClick={() => setPaymentMethod('split')} className={`py-2 rounded-xl text-xs font-black uppercase border ${paymentMethod === 'split' ? 'bg-amber-600 text-white border-amber-600 shadow' : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-400 border-neutral-700'}`}>Split [F4]</button>
+                    <div className="space-y-1.5 my-1.5 shrink-0">
+                      <div className="grid grid-cols-3 gap-1">
+                        <button onClick={() => setPaymentMethod('cash')} className={`py-1.5 rounded-lg text-xs font-black uppercase border ${paymentMethod === 'cash' ? 'bg-green-600 text-white border-green-600 shadow' : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-400 border-neutral-700'}`}>Cash [F4]</button>
+                        <button onClick={() => setPaymentMethod('upi')} className={`py-1.5 rounded-lg text-xs font-black uppercase border ${paymentMethod === 'upi' ? 'bg-blue-600 text-white border-blue-600 shadow' : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-400 border-neutral-700'}`}>UPI [F4]</button>
+                        <button onClick={() => setPaymentMethod('split')} className={`py-1.5 rounded-lg text-xs font-black uppercase border ${paymentMethod === 'split' ? 'bg-amber-600 text-white border-amber-600 shadow' : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-400 border-neutral-700'}`}>Split [F4]</button>
                       </div>
                     </div>
 
                     {/* EXTRA TOOLS */}
-                    <div className="grid grid-cols-2 gap-2 mb-2 shrink-0">
-                      <button onClick={() => setIsQrModalOpen(true)} className="py-2 px-3 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/30 rounded-xl text-[11px] font-black uppercase flex items-center justify-center gap-1.5">
-                        <SafeQrCode size={14} /> Show QR [F8]
+                    <div className="grid grid-cols-2 gap-1.5 mb-1.5 shrink-0">
+                      <button onClick={() => setIsQrModalOpen(true)} className="py-1.5 px-2 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/30 rounded-lg text-[10px] font-black uppercase flex items-center justify-center gap-1">
+                        <SafeQrCode size={13} /> QR [F8]
                       </button>
-                      <button onClick={() => setIsChangeModalOpen(true)} className="py-2 px-3 bg-purple-500/10 hover:bg-purple-500/20 text-purple-400 border border-purple-500/30 rounded-xl text-[11px] font-black uppercase flex items-center justify-center gap-1.5">
-                        <SafeCalculator size={14} /> Change [F10]
+                      <button onClick={() => setIsChangeModalOpen(true)} className="py-1.5 px-2 bg-purple-500/10 hover:bg-purple-500/20 text-purple-400 border border-purple-500/30 rounded-lg text-[10px] font-black uppercase flex items-center justify-center gap-1">
+                        <SafeCalculator size={13} /> Change [F10]
                       </button>
                     </div>
 
                     {/* CHECKOUT ACTION BUTTONS [F9] */}
                     {fulfillmentType === 'table' ? (
-                      <div className="space-y-2 shrink-0">
-                        <button onClick={handleSaveTableOrderKotOnly} disabled={cart.length === 0 || isSubmittingOrder} className="w-full bg-amber-500 hover:bg-amber-400 text-black font-black py-3 rounded-2xl uppercase tracking-wider text-xs flex items-center justify-center gap-2 shadow-md disabled:opacity-50">
-                          {isSubmittingOrder ? <Loader2 className="animate-spin" size={16} /> : <SafePrinter size={16} />}
+                      <div className="space-y-1.5 shrink-0">
+                        <button onClick={handleSaveTableOrderKotOnly} disabled={cart.length === 0 || isSubmittingOrder} className="w-full bg-amber-500 hover:bg-amber-400 text-black font-black py-2.5 rounded-xl uppercase tracking-wider text-xs flex items-center justify-center gap-2 shadow disabled:opacity-50">
+                          {isSubmittingOrder ? <Loader2 className="animate-spin" size={15} /> : <SafePrinter size={15} />}
                           <span>Save Table & Print KOT</span>
                         </button>
-                        <button onClick={handleFinalCheckoutAndPrintBill} disabled={cart.length === 0 || isSubmittingOrder} className="w-full bg-green-600 hover:bg-green-500 text-white font-black py-3 rounded-2xl uppercase tracking-wider text-xs flex items-center justify-center gap-2 shadow-lg disabled:opacity-50">
-                          {isSubmittingOrder ? <Loader2 className="animate-spin" size={16} /> : <SafeFileText size={16} />}
-                          <span>Settle & Print Final (₹{getTotalBillPrice()}) [F9]</span>
+                        <button onClick={handleFinalCheckoutAndPrintBill} disabled={cart.length === 0 || isSubmittingOrder} className="w-full bg-green-600 hover:bg-green-500 text-white font-black py-2.5 rounded-xl uppercase tracking-wider text-xs flex items-center justify-center gap-2 shadow-lg disabled:opacity-50">
+                          {isSubmittingOrder ? <Loader2 className="animate-spin" size={15} /> : <SafeFileText size={15} />}
+                          <span>Settle & Print (₹{getTotalBillPrice()}) [F9]</span>
                         </button>
                       </div>
                     ) : (
-                      <button onClick={handleFinalCheckoutAndPrintBill} disabled={cart.length === 0 || isSubmittingOrder} className="w-full bg-green-600 hover:bg-green-500 text-white font-black py-3.5 rounded-2xl uppercase tracking-wider text-xs flex items-center justify-center gap-2 shadow-xl disabled:opacity-50 shrink-0">
-                        {isSubmittingOrder ? <Loader2 className="animate-spin" size={16} /> : <Receipt size={16} />}
+                      <button onClick={handleFinalCheckoutAndPrintBill} disabled={cart.length === 0 || isSubmittingOrder} className="w-full bg-green-600 hover:bg-green-500 text-white font-black py-3 rounded-xl uppercase tracking-wider text-xs flex items-center justify-center gap-2 shadow-xl disabled:opacity-50 shrink-0">
+                        {isSubmittingOrder ? <Loader2 className="animate-spin" size={15} /> : <Receipt size={15} />}
                         <span>Pay & Print Bill (₹{getTotalBillPrice()}) [F9]</span>
                       </button>
                     )}
@@ -1775,13 +1818,13 @@ export default function BbCafeDesktopPos() {
               </div>
             )}
 
-            {/* TAB 2: INVENTORY & MENU MANAGER */}
+            {/* TAB 2: INVENTORY & MENU */}
             {activeTab === 'inventory' && (
               <div className="flex-1 p-6 h-full overflow-y-auto space-y-4">
                 <div className="flex justify-between items-center border-b pb-3">
                   <div>
                     <h2 className="text-sm font-black uppercase text-orange-500">Menu Items & Stock Manager</h2>
-                    <p className="text-xs text-neutral-400">Add new food items with variations/sizes, toggle stock status, or edit prices.</p>
+                    <p className="text-xs text-neutral-400">Add new food items with variations/sizes, category codes, and prices.</p>
                   </div>
                   <button onClick={() => handleOpenItemEditor(null)} className="bg-orange-600 hover:bg-orange-500 text-white px-4 py-2.5 rounded-2xl text-xs font-black uppercase flex items-center gap-1.5 shadow">
                     <SafePackagePlus size={16} /> + Add New Food Item
@@ -1853,7 +1896,7 @@ export default function BbCafeDesktopPos() {
               </div>
             )}
 
-            {/* TAB 3: PAST RECEIPTS & OLD BILL REPRINTS */}
+            {/* TAB 3: PAST RECEIPTS */}
             {activeTab === 'receipts' && (
               <div className="flex-1 p-6 h-full flex flex-col overflow-hidden space-y-4">
                 <div className="flex justify-between items-center border-b pb-3 shrink-0">
@@ -1994,34 +2037,6 @@ export default function BbCafeDesktopPos() {
                   </div>
                 </div>
 
-                {/* CASH DRAWER AUDIT */}
-                <div className="bg-neutral-900 border border-neutral-800 p-5 rounded-3xl space-y-4 shadow-xl">
-                  <div className="flex justify-between items-center border-b border-neutral-800 pb-3">
-                    <div>
-                      <h3 className="text-xs font-black uppercase text-yellow-400">Cash Drawer Audit (गल्ला मिलान)</h3>
-                      <p className="text-[11px] text-neutral-400">Expected Net Cash: <span className="font-mono text-green-400 font-bold">₹{reportSummary.netCashInDrawer}</span></p>
-                    </div>
-                    <button onClick={() => setIsExpenseModalOpen(true)} className="px-3 py-1.5 bg-red-600/10 text-red-400 hover:bg-red-600/20 border border-red-500/30 rounded-xl text-xs font-black uppercase">
-                      + Add Expense [F6]
-                    </button>
-                  </div>
-
-                  <div className="flex items-center gap-4">
-                    <input 
-                      type="number" 
-                      placeholder="Counted Cash in Drawer (₹)" 
-                      value={physicalCashInput}
-                      onChange={e => setPhysicalCashInput(e.target.value === '' ? '' : Number(e.target.value))}
-                      className="flex-1 bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-2.5 text-sm font-mono text-white outline-none" 
-                    />
-                    {physicalCashInput !== '' && (
-                      <div className={`text-xs font-black px-4 py-2.5 rounded-xl border ${Number(physicalCashInput) === reportSummary.netCashInDrawer ? 'bg-green-500/10 text-green-400 border-green-500/30' : Number(physicalCashInput) > reportSummary.netCashInDrawer ? 'bg-blue-500/10 text-blue-400 border-blue-500/30' : 'bg-red-500/10 text-red-400 border-red-500/30'}`}>
-                        {Number(physicalCashInput) === reportSummary.netCashInDrawer ? '✅ Matched!' : Number(physicalCashInput) > reportSummary.netCashInDrawer ? `⚠️ Excess: +₹${Number(physicalCashInput) - reportSummary.netCashInDrawer}` : `❌ Short: -₹${reportSummary.netCashInDrawer - Number(physicalCashInput)}`}
-                      </div>
-                    )}
-                  </div>
-                </div>
-
                 {/* ITEM-WISE SALES TABLE */}
                 <div className="bg-neutral-900 border border-neutral-800 p-5 rounded-3xl space-y-3">
                   <h3 className="text-xs font-black uppercase text-yellow-400 flex items-center justify-between">
@@ -2110,7 +2125,7 @@ export default function BbCafeDesktopPos() {
               </div>
             )}
 
-            {/* TAB 6: LIVE ORDERS (PRINT, COMPLETE, REJECT) */}
+            {/* TAB 6: LIVE ORDERS */}
             {activeTab === 'orders' && (
               <div className="flex-1 p-6 h-full overflow-y-auto">
                 <h2 className="text-sm font-black uppercase text-orange-500 mb-4">Live Orders ({activeLiveOrders.length})</h2>
@@ -2139,10 +2154,17 @@ export default function BbCafeDesktopPos() {
                           <button onClick={() => handlePrintReceiptDirect(order, false)} className="py-2 bg-neutral-800 hover:bg-neutral-700 text-white rounded-xl text-[10px] font-black uppercase flex items-center justify-center gap-1">
                             <SafePrinter size={13} /> Print
                           </button>
-                          <button onClick={() => handleCompleteLiveOrder(order.id)} className="py-2 bg-green-600 hover:bg-green-500 text-white rounded-xl text-[10px] font-black uppercase flex items-center justify-center gap-1">
+                          <button onClick={async () => {
+                            await updateDoc(doc(db, "orders", order.id), { status: 'completed', settledAt: new Date() });
+                            toast.success("Order Completed! ✅");
+                          }} className="py-2 bg-green-600 hover:bg-green-500 text-white rounded-xl text-[10px] font-black uppercase flex items-center justify-center gap-1">
                             <Check size={13} /> Done
                           </button>
-                          <button onClick={() => handleRejectLiveOrder(order.id)} className="py-2 bg-red-600/20 text-red-400 hover:bg-red-600 hover:text-white rounded-xl text-[10px] font-black uppercase flex items-center justify-center gap-1">
+                          <button onClick={async () => {
+                            if (!window.confirm("Reject order?")) return;
+                            await updateDoc(doc(db, "orders", order.id), { status: 'rejected', rejectedAt: new Date() });
+                            toast.success("Rejected.");
+                          }} className="py-2 bg-red-600/20 text-red-400 hover:bg-red-600 hover:text-white rounded-xl text-[10px] font-black uppercase flex items-center justify-center gap-1">
                             <SafeX size={13} /> Reject
                           </button>
                         </div>
@@ -2211,22 +2233,24 @@ export default function BbCafeDesktopPos() {
         </>
       )}
 
-      {/* ALL POPUP MODALS */}
+      {/* ======================================================== */}
+      {/*                    ALL POPUP MODALS                      */}
+      {/* ======================================================== */}
 
-      {/* MODAL 1: ADD / EDIT PRODUCT */}
+      {/* MODAL 1: ADD / EDIT PRODUCT WITH CATEGORY DROPDOWN & VARIATION BUILDER */}
       <AnimatePresence>
         {isItemEditorModalOpen && (
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setIsItemEditorModalOpen(false)}>
-            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} onClick={e => e.stopPropagation()} className="bg-neutral-900 border border-neutral-800 max-w-lg w-full rounded-3xl p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 cursor-pointer" onClick={() => setIsItemEditorModalOpen(false)}>
+            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} onClick={e => e.stopPropagation()} className="bg-neutral-900 border border-neutral-800 max-w-lg w-full rounded-3xl p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto cursor-default">
               <div className="flex justify-between items-center border-b border-neutral-800 pb-3">
                 <h3 className="font-black text-sm uppercase text-orange-500">{editingItemObj ? 'Edit Food Item' : 'Add New Food Item'}</h3>
-                <button onClick={() => setIsItemEditorModalOpen(false)} className="text-neutral-400"><SafeX size={18} /></button>
+                <button onClick={() => setIsItemEditorModalOpen(false)} className="text-neutral-400 hover:text-white p-1"><SafeX size={18} /></button>
               </div>
 
               <form onSubmit={handleSaveItemToFirestore} className="space-y-3 text-xs">
                 <div>
                   <label className="text-neutral-400 uppercase font-bold text-[10px] block mb-1">Item Name *</label>
-                  <input type="text" required placeholder="e.g. Cheese Pizza, Masala Dosa" value={itemNameInput} onChange={e => setItemNameInput(e.target.value)} className="w-full bg-neutral-950 border border-neutral-700 rounded-xl p-2.5 text-white outline-none" autoFocus />
+                  <input type="text" required placeholder="e.g. Cheese Pizza, Masala Dosa, Paneer Paratha" value={itemNameInput} onChange={e => setItemNameInput(e.target.value)} className="w-full bg-neutral-950 border border-neutral-700 rounded-xl p-2.5 text-white outline-none" autoFocus />
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
@@ -2235,26 +2259,108 @@ export default function BbCafeDesktopPos() {
                     <input type="number" required min={0} value={itemPriceInput} onChange={e => setItemPriceInput(e.target.value === '' ? '' : Number(e.target.value))} className="w-full bg-neutral-950 border border-neutral-700 rounded-xl p-2.5 text-white font-mono" />
                   </div>
                   <div>
-                    <label className="text-neutral-400 uppercase font-bold text-[10px] block mb-1">Short Code *</label>
-                    <input type="text" required placeholder="e.g. 101, 102, PZ1" value={itemCodeInput} onChange={e => setItemCodeInput(e.target.value)} className="w-full bg-neutral-950 border border-neutral-700 rounded-xl p-2.5 text-white font-mono" />
+                    <label className="text-neutral-400 uppercase font-bold text-[10px] block mb-1">Short Code (Category-based) *</label>
+                    <input type="text" required placeholder="e.g. PZ1, FF2, BG1" value={itemCodeInput} onChange={e => setItemCodeInput(e.target.value)} className="w-full bg-neutral-950 border border-neutral-700 rounded-xl p-2.5 text-white font-mono" />
                   </div>
                 </div>
 
+                {/* CATEGORY SELECTION WITH DROPDOWN + NEW CATEGORY OPTION */}
                 <div>
                   <div className="flex justify-between items-center mb-1">
                     <label className="text-neutral-400 uppercase font-bold text-[10px]">Category Selection *</label>
                     <button type="button" onClick={() => setIsAddingNewCatInput(!isAddingNewCatInput)} className="text-orange-400 text-[10px] font-bold underline">
-                      {isAddingNewCatInput ? 'Select Existing' : '+ Add New Category'}
+                      {isAddingNewCatInput ? 'Select Existing Category' : '+ Add New Category'}
                     </button>
                   </div>
                   {isAddingNewCatInput ? (
-                    <input type="text" placeholder="Type New Category Name" value={newCustomCategoryName} onChange={e => setNewCustomCategoryName(e.target.value)} className="w-full bg-neutral-950 border border-orange-500 rounded-xl p-2.5 text-white" />
+                    <input 
+                      type="text" 
+                      placeholder="Type New Category (e.g. Shakes, Paratha, Momos)" 
+                      value={newCustomCategoryName} 
+                      onChange={e => {
+                        setNewCustomCategoryName(e.target.value);
+                        if (!editingItemObj) setItemCodeInput(generateNextCategoryCode(e.target.value));
+                      }} 
+                      className="w-full bg-neutral-950 border border-orange-500 rounded-xl p-2.5 text-white outline-none" 
+                    />
                   ) : (
-                    <select value={itemCatInput} onChange={e => setItemCatInput(e.target.value)} className="w-full bg-neutral-950 border border-neutral-700 rounded-xl p-2.5 text-white">
+                    <select 
+                      value={itemCatInput} 
+                      onChange={e => {
+                        const newCat = e.target.value;
+                        setItemCatInput(newCat);
+                        if (!editingItemObj) setItemCodeInput(generateNextCategoryCode(newCat));
+                      }} 
+                      className="w-full bg-neutral-950 border border-neutral-700 rounded-xl p-2.5 text-white outline-none"
+                    >
                       {categories.filter(c => c !== 'All').map(c => (
                         <option key={c} value={c}>{c}</option>
                       ))}
                     </select>
+                  )}
+                </div>
+
+                {/* ⭐ FULL VARIATION / SIZES BUILDER (HALF, FULL, PLAIN, BUTTER, ETC.) ⭐ */}
+                <div className="pt-3 border-t border-neutral-800 space-y-3">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <span className="font-black uppercase text-[11px] text-yellow-400">Multiple Sizes / Variations?</span>
+                      <p className="text-[10px] text-neutral-400">Half/Full, Plain/Butter, Small/Medium/Large</p>
+                    </div>
+                    <button type="button" onClick={() => setHasVariants(!hasVariants)} className="text-orange-500">
+                      {hasVariants ? <SafeToggleRight size={30} /> : <SafeToggleLeft size={30} />}
+                    </button>
+                  </div>
+
+                  {hasVariants && (
+                    <div className="bg-neutral-950 border border-neutral-800 p-3 rounded-2xl space-y-3">
+                      {/* QUICK PRESETS */}
+                      <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+                        <span className="text-[9px] font-bold text-neutral-400 uppercase mr-1">Presets:</span>
+                        <button type="button" onClick={() => handleApplyVariantPreset('half_full')} className="px-2 py-1 bg-neutral-800 hover:bg-neutral-700 rounded text-[10px] font-bold border border-neutral-700">🍲 Half / Full</button>
+                        <button type="button" onClick={() => handleApplyVariantPreset('plain_butter')} className="px-2 py-1 bg-neutral-800 hover:bg-neutral-700 rounded text-[10px] font-bold border border-neutral-700">🧈 Plain / Butter</button>
+                        <button type="button" onClick={() => handleApplyVariantPreset('pizza')} className="px-2 py-1 bg-neutral-800 hover:bg-neutral-700 rounded text-[10px] font-bold border border-neutral-700">🍕 Pizza Sizes</button>
+                        <button type="button" onClick={() => handleApplyVariantPreset('reg_large')} className="px-2 py-1 bg-neutral-800 hover:bg-neutral-700 rounded text-[10px] font-bold border border-neutral-700">🥤 Reg / Large</button>
+                      </div>
+
+                      {/* ACTIVE VARIANT LIST */}
+                      <div className="space-y-1.5">
+                        {Object.entries(itemVariantsList).map(([vName, vPrice]: any) => (
+                          <div key={vName} className="flex justify-between items-center bg-neutral-900 px-3 py-2 rounded-xl border border-neutral-800">
+                            <span className="font-bold text-neutral-200">{vName}</span>
+                            <div className="flex items-center gap-3">
+                              <span className="font-mono text-orange-400 font-bold">₹{vPrice}</span>
+                              <button type="button" onClick={() => handleRemoveVariantRow(vName)} className="text-red-400 hover:text-red-300"><SafeTrash2 size={14} /></button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* ADD CUSTOM VARIANT ROW */}
+                      <div className="flex gap-2 pt-1">
+                        <input 
+                          type="text" 
+                          placeholder="Size (e.g. Half, Butter, Large, 500ml)" 
+                          value={newVariantName} 
+                          onChange={e => setNewVariantName(e.target.value)} 
+                          className="flex-1 bg-neutral-900 border border-neutral-700 rounded-xl px-2.5 py-1.5 text-xs text-white outline-none" 
+                        />
+                        <input 
+                          type="number" 
+                          placeholder="Price (₹)" 
+                          value={newVariantPrice} 
+                          onChange={e => setNewVariantPrice(e.target.value === '' ? '' : Number(e.target.value))} 
+                          className="w-24 bg-neutral-900 border border-neutral-700 rounded-xl px-2.5 py-1.5 text-xs text-white font-mono outline-none" 
+                        />
+                        <button 
+                          type="button" 
+                          onClick={handleAddVariantRow} 
+                          className="bg-orange-600 hover:bg-orange-500 text-white px-3 py-1.5 rounded-xl font-bold uppercase text-[10px]"
+                        >
+                          + Add
+                        </button>
+                      </div>
+                    </div>
                   )}
                 </div>
 
@@ -2268,11 +2374,11 @@ export default function BbCafeDesktopPos() {
         )}
       </AnimatePresence>
 
-      {/* MODAL 2: PAST RECEIPT DETAILS & REPRINT */}
+      {/* MODAL 2: PAST RECEIPT DETAILS */}
       <AnimatePresence>
         {isReceiptModalOpen && selectedReceipt && (
-          <div className="fixed inset-0 bg-black/85 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setIsReceiptModalOpen(false)}>
-            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} onClick={e => e.stopPropagation()} className="bg-neutral-900 border border-neutral-800 max-w-md w-full rounded-3xl p-6 shadow-2xl space-y-4 text-xs">
+          <div className="fixed inset-0 bg-black/85 backdrop-blur-sm z-50 flex items-center justify-center p-4 cursor-pointer" onClick={() => setIsReceiptModalOpen(false)}>
+            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} onClick={e => e.stopPropagation()} className="bg-neutral-900 border border-neutral-800 max-w-md w-full rounded-3xl p-6 shadow-2xl space-y-4 text-xs cursor-default">
               <div className="flex justify-between items-center border-b border-neutral-800 pb-3">
                 <div>
                   <h3 className="font-black text-sm uppercase text-orange-400">Bill Details (#{selectedReceipt.billNumber})</h3>
@@ -2294,6 +2400,7 @@ export default function BbCafeDesktopPos() {
               </div>
               <div className="border-t border-neutral-800 pt-2 font-mono space-y-1">
                 <div className="flex justify-between text-neutral-400"><span>Subtotal:</span><span>₹{selectedReceipt.subtotal}</span></div>
+                {selectedReceipt.deliveryFee > 0 && <div className="flex justify-between text-neutral-300"><span>Delivery Fee:</span><span>+₹{selectedReceipt.deliveryFee}</span></div>}
                 <div className="flex justify-between font-black text-sm text-green-400 pt-1 border-t border-dashed border-neutral-800">
                   <span>Grand Total:</span><span>₹{selectedReceipt.total}</span>
                 </div>
@@ -2314,11 +2421,11 @@ export default function BbCafeDesktopPos() {
         )}
       </AnimatePresence>
 
-      {/* MODAL 3: KEYBOARD SHORTCUTS SHEET [F1] */}
+      {/* MODAL 3: SHORTCUTS SHEET [F1] */}
       <AnimatePresence>
         {isHelpModalOpen && (
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setIsHelpModalOpen(false)}>
-            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} onClick={e => e.stopPropagation()} className="bg-neutral-900 border border-neutral-800 max-w-lg w-full rounded-3xl p-6 shadow-2xl space-y-4 text-neutral-100">
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 cursor-pointer" onClick={() => setIsHelpModalOpen(false)}>
+            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} onClick={e => e.stopPropagation()} className="bg-neutral-900 border border-neutral-800 max-w-lg w-full rounded-3xl p-6 shadow-2xl space-y-4 text-neutral-100 cursor-default">
               <div className="flex justify-between items-center border-b border-neutral-800 pb-3">
                 <div className="flex items-center gap-2 text-yellow-500 font-black text-sm uppercase">
                   <SafeHelpCircle size={18} />
@@ -2354,11 +2461,11 @@ export default function BbCafeDesktopPos() {
         )}
       </AnimatePresence>
 
-      {/* MODAL 4: HELD / PARKED CARTS [F5] */}
+      {/* MODAL 4: HELD CARTS [F5] */}
       <AnimatePresence>
         {isHeldCartsModalOpen && (
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setIsHeldCartsModalOpen(false)}>
-            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} onClick={e => e.stopPropagation()} className="bg-neutral-900 border border-neutral-800 max-w-lg w-full rounded-3xl p-6 shadow-2xl space-y-4">
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 cursor-pointer" onClick={() => setIsHeldCartsModalOpen(false)}>
+            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} onClick={e => e.stopPropagation()} className="bg-neutral-900 border border-neutral-800 max-w-lg w-full rounded-3xl p-6 shadow-2xl space-y-4 cursor-default">
               <div className="flex justify-between items-center border-b border-neutral-800 pb-3">
                 <div className="flex items-center gap-2 text-amber-400 font-black text-sm uppercase">
                   <SafePauseCircle size={18} />
@@ -2391,11 +2498,11 @@ export default function BbCafeDesktopPos() {
         )}
       </AnimatePresence>
 
-      {/* MODAL 5: QUICK DAILY EXPENSE ENTRY [F6] */}
+      {/* MODAL 5: EXPENSE [F6] */}
       <AnimatePresence>
         {isExpenseModalOpen && (
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setIsExpenseModalOpen(false)}>
-            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} onClick={e => e.stopPropagation()} className="bg-neutral-900 border border-neutral-800 max-w-sm w-full rounded-3xl p-6 shadow-2xl space-y-4">
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 cursor-pointer" onClick={() => setIsExpenseModalOpen(false)}>
+            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} onClick={e => e.stopPropagation()} className="bg-neutral-900 border border-neutral-800 max-w-sm w-full rounded-3xl p-6 shadow-2xl space-y-4 cursor-default">
               <div className="flex justify-between items-center border-b border-neutral-800 pb-3">
                 <h3 className="font-black text-sm uppercase text-red-400 flex items-center gap-2"><Receipt size={16} /> Drawer Expense Entry [F6]</h3>
                 <button onClick={() => setIsExpenseModalOpen(false)} className="text-neutral-400"><SafeX size={18} /></button>
@@ -2426,11 +2533,11 @@ export default function BbCafeDesktopPos() {
         )}
       </AnimatePresence>
 
-      {/* MODAL 6: DYNAMIC UPI QR CODE [F8] */}
+      {/* MODAL 6: QR CODE [F8] */}
       <AnimatePresence>
         {isQrModalOpen && (
-          <div className="fixed inset-0 bg-black/85 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setIsQrModalOpen(false)}>
-            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} onClick={e => e.stopPropagation()} className="bg-neutral-900 border border-neutral-800 max-w-sm w-full rounded-3xl p-6 shadow-2xl space-y-4 text-center">
+          <div className="fixed inset-0 bg-black/85 backdrop-blur-sm z-50 flex items-center justify-center p-4 cursor-pointer" onClick={() => setIsQrModalOpen(false)}>
+            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} onClick={e => e.stopPropagation()} className="bg-neutral-900 border border-neutral-800 max-w-sm w-full rounded-3xl p-6 shadow-2xl space-y-4 text-center cursor-default">
               <div className="flex justify-between items-center border-b border-neutral-800 pb-3">
                 <h3 className="font-black text-sm uppercase text-blue-400 flex items-center gap-2"><SafeQrCode size={16} /> Dynamic UPI QR [F8]</h3>
                 <button onClick={() => setIsQrModalOpen(false)} className="text-neutral-400"><SafeX size={18} /></button>
@@ -2449,11 +2556,11 @@ export default function BbCafeDesktopPos() {
         )}
       </AnimatePresence>
 
-      {/* MODAL 7: RETURN CHANGE CALCULATOR [F10] */}
+      {/* MODAL 7: CHANGE CALCULATOR [F10] */}
       <AnimatePresence>
         {isChangeModalOpen && (
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setIsChangeModalOpen(false)}>
-            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} onClick={e => e.stopPropagation()} className="bg-neutral-900 border border-neutral-800 max-w-sm w-full rounded-3xl p-6 shadow-2xl space-y-4">
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 cursor-pointer" onClick={() => setIsChangeModalOpen(false)}>
+            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} onClick={e => e.stopPropagation()} className="bg-neutral-900 border border-neutral-800 max-w-sm w-full rounded-3xl p-6 shadow-2xl space-y-4 cursor-default">
               <div className="flex justify-between items-center border-b border-neutral-800 pb-3">
                 <h3 className="font-black text-sm uppercase text-purple-400 flex items-center gap-2"><SafeCalculator size={16} /> Return Change Calculator [F10]</h3>
                 <button onClick={() => setIsChangeModalOpen(false)} className="text-neutral-400"><SafeX size={18} /></button>
@@ -2484,11 +2591,11 @@ export default function BbCafeDesktopPos() {
         )}
       </AnimatePresence>
 
-      {/* MODAL 8: BILLING VARIATION MODAL (KEYBOARD AUTO-FOCUS & TAB BYPASS) */}
+      {/* MODAL 8: BILLING VARIATION MODAL */}
       <AnimatePresence>
         {isVariationModalOpen && selectedProductForVariation && (
-          <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => { setIsVariationModalOpen(false); setTimeout(() => searchInputRef.current?.focus(), 60); }}>
-            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} onClick={e => e.stopPropagation()} className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 max-w-sm w-full rounded-3xl p-6 shadow-2xl space-y-4">
+          <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4 cursor-pointer" onClick={() => { setIsVariationModalOpen(false); setTimeout(() => searchInputRef.current?.focus(), 60); }}>
+            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} onClick={e => e.stopPropagation()} className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 max-w-sm w-full rounded-3xl p-6 shadow-2xl space-y-4 cursor-default">
               <div className="flex justify-between items-center border-b pb-3">
                 <h3 className="font-black text-sm uppercase text-orange-500">{selectedProductForVariation.name}</h3>
                 <button tabIndex={-1} onClick={() => { setIsVariationModalOpen(false); setTimeout(() => searchInputRef.current?.focus(), 60); }} className="text-neutral-400"><SafeX size={18} /></button>
