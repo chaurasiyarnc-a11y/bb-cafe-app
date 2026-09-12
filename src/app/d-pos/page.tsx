@@ -2029,31 +2029,7 @@ export default function BbCafeDesktopPos() {
                       )}
                     </div>
 
-                    {/* DISCOUNT OPTION (₹ FLAT / % OFF) */}
-                    <div className="space-y-1.5 bg-neutral-100 dark:bg-neutral-800/50 p-2.5 rounded-xl border border-neutral-300 dark:border-neutral-700 mb-2 shrink-0">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[10px] font-black uppercase text-neutral-700 dark:text-neutral-300">Discount (छूट)</span>
-                        <div className="flex bg-neutral-200 dark:bg-neutral-700 p-0.5 rounded-lg border border-neutral-300 dark:border-neutral-600">
-                          <button type="button" onClick={() => setDiscountType('amount')} className={`px-2 py-0.5 text-[9px] font-black uppercase rounded transition-all ${discountType === 'amount' ? 'bg-orange-600 text-white shadow' : 'text-neutral-700 dark:text-neutral-300'}`}>₹ Flat</button>
-                          <button type="button" onClick={() => setDiscountType('percentage')} className={`px-2 py-0.5 text-[9px] font-black uppercase rounded transition-all ${discountType === 'percentage' ? 'bg-orange-600 text-white shadow' : 'text-neutral-700 dark:text-neutral-300'}`}>% Off</button>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-1.5">
-                        <input 
-                          type="number" 
-                          min={0}
-                          placeholder={discountType === 'amount' ? "Enter Discount (₹)" : "Enter Discount (%)"}
-                          value={discountValue || ''}
-                          onChange={e => setDiscountValue(Number(e.target.value))}
-                          className="w-full bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 rounded-lg px-2.5 py-1 text-xs text-neutral-900 dark:text-white outline-none font-mono font-bold" 
-                        />
-                        {discountValue > 0 && (
-                          <button type="button" onClick={() => setDiscountValue(0)} className="text-red-500 hover:text-red-700 text-xs font-black px-2 py-1 bg-red-500/10 rounded-lg shrink-0">Clear</button>
-                        )}
-                      </div>
-                    </div>
-
+                    
                     {/* FULFILLMENT MODE & DIRECT CART TABLE SELECTOR */}
                     <div className="space-y-2 mb-2 shrink-0 border-t border-neutral-300 dark:border-neutral-800 pt-2">
                       <div className="grid grid-cols-3 gap-1 bg-neutral-200 dark:bg-neutral-800 p-1 rounded-xl">
@@ -2159,6 +2135,30 @@ export default function BbCafeDesktopPos() {
                           )}
                         </div>
                       )}
+                    </div>
+{/* DISCOUNT OPTION (₹ FLAT / % OFF) */}
+                    <div className="space-y-1.5 bg-neutral-100 dark:bg-neutral-800/50 p-2.5 rounded-xl border border-neutral-300 dark:border-neutral-700 mb-2 shrink-0">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-black uppercase text-neutral-700 dark:text-neutral-300">Discount (छूट)</span>
+                        <div className="flex bg-neutral-200 dark:bg-neutral-700 p-0.5 rounded-lg border border-neutral-300 dark:border-neutral-600">
+                          <button type="button" onClick={() => setDiscountType('amount')} className={`px-2 py-0.5 text-[9px] font-black uppercase rounded transition-all ${discountType === 'amount' ? 'bg-orange-600 text-white shadow' : 'text-neutral-700 dark:text-neutral-300'}`}>₹ Flat</button>
+                          <button type="button" onClick={() => setDiscountType('percentage')} className={`px-2 py-0.5 text-[9px] font-black uppercase rounded transition-all ${discountType === 'percentage' ? 'bg-orange-600 text-white shadow' : 'text-neutral-700 dark:text-neutral-300'}`}>% Off</button>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1.5">
+                        <input 
+                          type="number" 
+                          min={0}
+                          placeholder={discountType === 'amount' ? "Enter Discount (₹)" : "Enter Discount (%)"}
+                          value={discountValue || ''}
+                          onChange={e => setDiscountValue(Number(e.target.value))}
+                          className="w-full bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 rounded-lg px-2.5 py-1 text-xs text-neutral-900 dark:text-white outline-none font-mono font-bold" 
+                        />
+                        {discountValue > 0 && (
+                          <button type="button" onClick={() => setDiscountValue(0)} className="text-red-500 hover:text-red-700 text-xs font-black px-2 py-1 bg-red-500/10 rounded-lg shrink-0">Clear</button>
+                        )}
+                      </div>
                     </div>
 
                     {/* BREAKDOWN & GRAND TOTAL */}
