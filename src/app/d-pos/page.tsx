@@ -101,7 +101,6 @@ const PIZZA_ADDONS: { [size: string]: { [addon: string]: number } } = {
 
 const COOKING_TAGS = ['🌶️ Less Spicy', '🧅 No Onion/Garlic', '📦 Parcel/To-Go', '🧊 Less Ice', '🧀 Extra Dip', '☕ Kadak'];
 
-// Predefined Promo Codes (Admin Codes)
 const PROMO_COUPONS: { [code: string]: { type: 'percent' | 'flat', value: number } } = {
   'CAFE10': { type: 'percent', value: 10 },
   'BUM50': { type: 'flat', value: 50 },
@@ -111,7 +110,6 @@ const PROMO_COUPONS: { [code: string]: { type: 'percent' | 'flat', value: number
 
 let globalAudioCtx: AudioContext | null = null;
 
-// Category-wise Numeric Code Series (1: Burger, 100: Chinese, 200: Bread/Paratha...)
 const getCategoryBaseCode = (catName: string): number => {
   const c = (catName || '').trim().toLowerCase();
   if (c.includes('burger')) return 1;
@@ -139,7 +137,7 @@ export default function BbCafeDesktopPos() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [pinInput, setPinInput] = useState('');
-  const [activeTab, setActiveTab] = useState<'billing' | 'inventory' | 'receipts' | 'settings' | 'orders' | 'tables' | 'reports'>('billing');
+  const [activeTab, setActiveTab] = useState<'billing' | 'settlement' | 'inventory' | 'receipts' | 'settings' | 'orders' | 'tables' | 'reports'>('billing');
 
   const [gstEnabled, setGstEnabled] = useState(false);
   const [gstRate, setGstRate] = useState(5);
@@ -266,10 +264,12 @@ export default function BbCafeDesktopPos() {
   const [activeEditingOriginalItems, setActiveEditingOriginalItems] = useState<PosCartItem[]>([]);
 
   const [isSubmittingOrder, setIsSubmittingOrder] = useState(false);
-  // Payment methods: cash, upi, split, due (उधार / Credit)
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'upi' | 'split' | 'due'>('cash');
   const [splitCashAmount, setSplitCashAmount] = useState<number>(0);
   const [splitUpiAmount, setSplitUpiAmount] = useState<number>(0);
+
+  // Settlement Filter inside Daily Bills tab
+  const [settlementFilter, setSettlementFilter] = useState<'all' | 'unsettled' | 'settled'>('all');
 
   // Focus & Audio Refs
   const searchInputRef = useRef<HTMLInputElement | null>(null);
@@ -357,6 +357,30 @@ export default function BbCafeDesktopPos() {
   const pendingOrdersCount = useMemo(() => activeLiveOrders.filter((o) => o.status === 'pending').length, [activeLiveOrders]);
   const activeTablesCount = useMemo(() => activeTableOrders.length, [activeTableOrders]);
 
+  // Today's orders for Daily Bills & Settlement Tab
+  const todaySettlementOrders = useMemo(() => {
+    const today = new Date();
+    const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0).getTime();
+    return liveOrders.filter((o) => {
+      const orderTime = o.timestamp?.toDate ? o.timestamp.toDate().getTime() : new Date(o.timestamp || Date.now()).getTime();
+      return orderTime >= todayStart;
+    });
+  }, [liveOrders]);
+
+  const unsettledOrdersCount = useMemo(() => {
+    return todaySettlementOrders.filter(o => o.status === 'unsettled' || (o.status === 'pending' && !o.paymentSettled)).length;
+  }, [todaySettlementOrders]);
+
+  const filteredSettlementOrders = useMemo(() => {
+    if (settlementFilter === 'unsettled') {
+      return todaySettlementOrders.filter(o => o.status === 'unsettled' || (o.status === 'pending' && !o.paymentSettled));
+    }
+    if (settlementFilter === 'settled') {
+      return todaySettlementOrders.filter(o => o.status === 'completed');
+    }
+    return todaySettlementOrders;
+  }, [todaySettlementOrders, settlementFilter]);
+
   // Load Recent Customers to Local Storage
   const saveRecentCustomerLocal = (cust: QuickCustomer) => {
     try {
@@ -370,7 +394,6 @@ export default function BbCafeDesktopPos() {
     } catch (e) {}
   };
 
-  // Close Customer dropdown on click outside
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (customerDropdownRef.current && !customerDropdownRef.current.contains(e.target as Node)) {
@@ -524,12 +547,7 @@ export default function BbCafeDesktopPos() {
       try { setHeldCarts(JSON.parse(savedHeld)); } catch (e) {}
     }
     const savedUpi = localStorage.getItem("bb_pos_upi_id");
-    if (savedUpi) {
-      setUpiIdConfig(savedUpi);
-    } else {
-      setUpiIdConfig('Q991347275@ybl');
-    }
-
+    if (savedUpi) setUpiIdConfig(savedUpi);
     const savedOwnerPhone = localStorage.getItem("bb_pos_owner_phone");
     if (savedOwnerPhone) setOwnerPhoneConfig(savedOwnerPhone);
 
@@ -572,7 +590,7 @@ export default function BbCafeDesktopPos() {
     localStorage.setItem("bb_pos_saved_cart_pc", JSON.stringify(cart));
   }, [cart]);
 
-  // Clean Categories Deduplication with Custom Order Support
+  // Clean Categories Deduplication
   const normalizeCategoryList = (rawItems: any[]) => {
     const cleaned = rawItems.map((i: any) => {
       const c = (i.category || 'Burgers').trim();
@@ -664,7 +682,6 @@ export default function BbCafeDesktopPos() {
             const data = d.data();
             const cat = data.category || 'Burgers';
 
-            // Ensure valid price is resolved even if stored only as variants
             let resolvedPrice = Number(data.price);
             if (isNaN(resolvedPrice) || resolvedPrice <= 0) {
               if (data.variants && typeof data.variants === 'object') {
@@ -677,7 +694,7 @@ export default function BbCafeDesktopPos() {
             return {
               id: d.id,
               ...data,
-              name: data.name || data.title || 'Cafe Item',
+              name: data.name || data.title || data.itemName || 'Cafe Item',
               price: resolvedPrice,
               category: cat,
               itemCode: data.itemCode ? String(data.itemCode).trim() : ''
@@ -717,9 +734,9 @@ export default function BbCafeDesktopPos() {
     })();
   }, [isLoggedIn]);
 
-  // Real-time listener for live orders + Sound Alarm on New Incoming Website Orders
+  // Real-time listener for live orders
   useEffect(() => {
-    const q = query(collection(db, "orders"), orderBy("timestamp", "desc"), limit(80));
+    const q = query(collection(db, "orders"), orderBy("timestamp", "desc"), limit(100));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const ordersList = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
       setLiveOrders(ordersList);
@@ -824,7 +841,6 @@ export default function BbCafeDesktopPos() {
         }
       }
 
-      // Name search fallback if phone doesn't match
       if (!foundData) {
         const qName = query(collection(db, "customer_points"), where("name", ">=", inputVal), limit(5));
         const snap = await getDocs(qName);
@@ -861,7 +877,6 @@ export default function BbCafeDesktopPos() {
     }
   };
 
-  // Save / Update Customer Profile directly from Cart
   const handleSaveCustomerProfileInline = async () => {
     const clean = getSanitizedPhone(customerPhone);
     if (clean.length !== 10) return toast.error("Valid 10-digit phone required!");
@@ -927,7 +942,6 @@ export default function BbCafeDesktopPos() {
     }
   };
 
-  // Promo / Coupon Handler
   const handleApplyPromoCoupon = () => {
     const code = promoCouponInput.trim().toUpperCase();
     if (!code) return toast.error("Enter a promo code!");
@@ -1079,7 +1093,7 @@ export default function BbCafeDesktopPos() {
     }
   };
 
-  // Add Item to Cart & Keyboard-Ready Variation Handler
+  // Add Item to Cart
   const handleItemClick = (item: any) => {
     triggerBeep('tap');
     const hasItemVariants = item.variants && typeof item.variants === 'object' && Object.keys(item.variants).length > 0;
@@ -1108,7 +1122,7 @@ export default function BbCafeDesktopPos() {
         }
         return [...prev, { cartItemId, id: item.id, name: itemName, price: itemPrice, quantity: 1 }];
       });
-      toast.success(`Added ${itemName}!`);
+      toast.success(`जोड़ा गया: ${itemName}!`);
       setTimeout(() => searchInputRef.current?.focus(), 60);
     }
   };
@@ -1160,54 +1174,72 @@ export default function BbCafeDesktopPos() {
     setIsVariationModalOpen(false);
     setSelectedProductForVariation(null);
     setSearchQuery('');
-    toast.success(`Added ${fullName}!`);
-    setTimeout(() => searchInputRef.current?.focus(), 60);
+    toast.success(`जोड़ा गया: ${fullName}!`);
+    setTimeout(() => searchInputRef.current?.focus(), 50);
   };
 
-  // Keyboard navigation inside Variation Modal: TAB / ARROWS cycle, ENTER confirms
-  const handleVariationModalKeyDown = (e: React.KeyboardEvent) => {
-    if (!selectedProductForVariation || !selectedProductForVariation.variants) return;
-    const entries = Object.entries(selectedProductForVariation.variants);
-    const totalVariants = entries.length;
+  // ROBUST WINDOW-LEVEL LISTENER FOR VARIATION MODAL (TAB TO SWITCH SIZE, ENTER TO CONFIRM)
+  useEffect(() => {
+    if (!isVariationModalOpen || !selectedProductForVariation?.variants) return;
 
-    if (e.key === 'Tab') {
-      e.preventDefault();
-      const nextIdx = e.shiftKey ? (selectedVariantIndex - 1 + totalVariants) % totalVariants : (selectedVariantIndex + 1) % totalVariants;
-      setSelectedVariantIndex(nextIdx);
-      setSelectedSize(entries[nextIdx][0]);
-      setSelectedSizePrice(Number(entries[nextIdx][1]) || 0);
-      return;
-    }
+    const handleModalKeys = (e: KeyboardEvent) => {
+      const entries = Object.entries(selectedProductForVariation.variants);
+      const totalVariants = entries.length;
+      if (totalVariants === 0) return;
 
-    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
-      e.preventDefault();
-      const nextIdx = (selectedVariantIndex + 1) % totalVariants;
-      setSelectedVariantIndex(nextIdx);
-      setSelectedSize(entries[nextIdx][0]);
-      setSelectedSizePrice(Number(entries[nextIdx][1]) || 0);
-    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
-      e.preventDefault();
-      const prevIdx = (selectedVariantIndex - 1 + totalVariants) % totalVariants;
-      setSelectedVariantIndex(prevIdx);
-      setSelectedSize(entries[prevIdx][0]);
-      setSelectedSizePrice(Number(entries[prevIdx][1]) || 0);
-    } else if (e.key === 'Enter') {
-      e.preventDefault();
-      handleAddCustomizedItemToCart();
-    } else if (['1', '2', '3', '4', '5'].includes(e.key)) {
-      const numIdx = parseInt(e.key, 10) - 1;
-      if (entries[numIdx]) {
+      if (e.key === 'Tab') {
         e.preventDefault();
-        setSelectedVariantIndex(numIdx);
-        setSelectedSize(entries[numIdx][0]);
-        setSelectedSizePrice(Number(entries[numIdx][1]) || 0);
+        e.stopPropagation();
+        setSelectedVariantIndex((prev) => {
+          const next = e.shiftKey
+            ? (prev - 1 + totalVariants) % totalVariants
+            : (prev + 1) % totalVariants;
+          setSelectedSize(entries[next][0]);
+          setSelectedSizePrice(Number(entries[next][1]) || 0);
+          return next;
+        });
+      } else if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+        e.preventDefault();
+        e.stopPropagation();
+        setSelectedVariantIndex((prev) => {
+          const next = (prev + 1) % totalVariants;
+          setSelectedSize(entries[next][0]);
+          setSelectedSizePrice(Number(entries[next][1]) || 0);
+          return next;
+        });
+      } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        e.stopPropagation();
+        setSelectedVariantIndex((prev) => {
+          const prevIdx = (prev - 1 + totalVariants) % totalVariants;
+          setSelectedSize(entries[prevIdx][0]);
+          setSelectedSizePrice(Number(entries[prevIdx][1]) || 0);
+          return prevIdx;
+        });
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        e.stopPropagation();
+        handleAddCustomizedItemToCart();
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsVariationModalOpen(false);
+        setTimeout(() => searchInputRef.current?.focus(), 60);
+      } else if (['1', '2', '3', '4', '5'].includes(e.key)) {
+        const numIdx = parseInt(e.key, 10) - 1;
+        if (entries[numIdx]) {
+          e.preventDefault();
+          e.stopPropagation();
+          setSelectedVariantIndex(numIdx);
+          setSelectedSize(entries[numIdx][0]);
+          setSelectedSizePrice(Number(entries[numIdx][1]) || 0);
+        }
       }
-    } else if (e.key === 'Escape') {
-      e.preventDefault();
-      setIsVariationModalOpen(false);
-      setTimeout(() => searchInputRef.current?.focus(), 60);
-    }
-  };
+    };
+
+    window.addEventListener('keydown', handleModalKeys, true);
+    return () => window.removeEventListener('keydown', handleModalKeys, true);
+  }, [isVariationModalOpen, selectedProductForVariation, selectedSizePrice, selectedSize, itemNoteInput, selectedAddons]);
 
   const handleUpdateCartQuantity = (cartItemId: string, amount: number) => {
     triggerBeep('tap');
@@ -1284,39 +1316,6 @@ export default function BbCafeDesktopPos() {
     });
   };
 
-  // Step 1: Pre-print Estimate Bill (कच्चा बिल) before Customer Pays
-  const handlePrintEstimateBill = async () => {
-    if (cart.length === 0) return toast.error("Cart is empty!");
-    triggerBeep('tap');
-
-    const subtotal = getCartSubtotal();
-    const finalTotal = getTotalBillPrice();
-    const discountAmt = getCalculatedDiscountAmount();
-    const token = getDailyTokenNumber();
-
-    const estOrderObj = {
-      billNumber: activeEditingBillNumber || 'EST-' + Math.floor(Math.random() * 900 + 100),
-      tokenNumber: token,
-      customerName: customerName || "Walk-in Guest",
-      customerPhone: customerPhone ? `+91${getSanitizedPhone(customerPhone)}` : "",
-      items: cart,
-      subtotal,
-      discountAmount: discountAmt,
-      gstAmount: getGstAmountCalculated(),
-      deliveryFee: getDeliveryCharge(),
-      total: finalTotal,
-      fulfillmentType,
-      tableNumber: fulfillmentType === 'table' ? tableNumber : '',
-      paymentMethod,
-      timestamp: new Date(),
-      isEstimate: true,
-      upiId: upiIdConfig
-    };
-
-    toast.success("Printing Estimate Bill (कच्चा बिल)...");
-    await handlePrintReceiptDirect(estOrderObj, false);
-  };
-
   // Running Table Order: Save & Print ONLY Newly Added Items in KOT (Incremental KOT)
   const handleSaveTableOrderKotOnly = async () => {
     if (cart.length === 0 || isSubmittingOrder) return;
@@ -1360,7 +1359,8 @@ export default function BbCafeDesktopPos() {
           customerName: customerName || "Walk-in Guest",
           customerPhone: customerPhone ? `+91${getSanitizedPhone(customerPhone)}` : "",
           upiId: upiIdConfig,
-          status: 'pending',
+          status: 'unsettled',
+          paymentSettled: false,
           fulfillmentType: 'table',
           lastUpdated: new Date()
         };
@@ -1400,7 +1400,8 @@ export default function BbCafeDesktopPos() {
           deliveryFee: 0, 
           total: finalTotal, 
           timestamp: new Date(), 
-          status: 'pending', 
+          status: 'unsettled', 
+          paymentSettled: false,
           fulfillmentType: 'table', 
           deliveryArea: "", 
           tableNumber: tableNumber, 
@@ -1454,7 +1455,7 @@ export default function BbCafeDesktopPos() {
     }
   };
 
-  // Final Checkout, Settle & Automatic Reset to 'pickup'
+  // Final Checkout & Bill Print: Saved as 'unsettled' until cashier settles it in Daily Bills tab!
   const handleFinalCheckoutAndPrintBill = async () => {
     if (cart.length === 0 || isSubmittingOrder) return;
     setIsSubmittingOrder(true);
@@ -1480,102 +1481,65 @@ export default function BbCafeDesktopPos() {
         saveRecentCustomerLocal({ phone: cleanPhone, name: customerName || "Walk-in Guest", points: remainingPts, address });
       }
 
+      billNumber = activeEditingBillNumber || getNextBillNumber();
+
+      const orderObj = { 
+        billNumber, 
+        tokenNumber: token, 
+        customerName: customerName || "Walk-in Guest", 
+        customerPhone: cleanPhone ? `+91${cleanPhone}` : "", 
+        items: cart, 
+        subtotal, 
+        discountType, 
+        discountValue, 
+        discountAmount: discountAmt, 
+        gstRate: gstEnabled ? gstRate : 0, 
+        gstAmount: getGstAmountCalculated(), 
+        deliveryFee: getDeliveryCharge(), 
+        total: finalTotal, 
+        timestamp: new Date(), 
+        status: 'unsettled', // UNSETTLED BY DEFAULT: Requires settlement to count in daily sales!
+        paymentSettled: false,
+        fulfillmentType, 
+        deliveryArea: fulfillmentType === "delivery" ? selectedArea.name : "", 
+        tableNumber: fulfillmentType === 'table' ? tableNumber : '', 
+        paymentMethod, 
+        splitCashAmount: paymentMethod === 'split' ? splitCashAmount : 0,
+        splitUpiAmount: paymentMethod === 'split' ? splitUpiAmount : 0,
+        source: 'PC_POS', 
+        address,
+        pointsEarned: earned,
+        pointsRedeemed: redeemed, 
+        pointsDiscount: redeemed,
+        remainingPoints: remainingPts,
+        customerPoints: remainingPts,
+        upiId: upiIdConfig
+      };
+
       if (activeEditingOrderId) {
-        billNumber = activeEditingBillNumber || getNextBillNumber();
-        const orderRef = doc(db, "orders", activeEditingOrderId);
-        const finalOrderObj = { 
-          items: cart, 
-          subtotal, 
-          discountType,
-          discountValue,
-          discountAmount: discountAmt, 
-          gstRate: gstEnabled ? gstRate : 0, 
-          gstAmount: getGstAmountCalculated(), 
-          total: finalTotal, 
-          status: 'completed', 
-          tableNumber: tableNumber,
-          customerName: customerName || "Walk-in Guest",
-          customerPhone: cleanPhone ? `+91${cleanPhone}` : "",
-          paymentMethod,
-          splitCashAmount: paymentMethod === 'split' ? splitCashAmount : 0,
-          splitUpiAmount: paymentMethod === 'split' ? splitUpiAmount : 0,
-          pointsEarned: earned,
-          pointsRedeemed: redeemed,
-          pointsDiscount: redeemed,
-          remainingPoints: remainingPts,
-          customerPoints: remainingPts,
-          upiId: upiIdConfig,
-          settledAt: new Date()
-        };
-
         if (navigator.onLine) {
-          await updateDoc(orderRef, finalOrderObj);
-        } else {
-          const offlineQueue = JSON.parse(localStorage.getItem("bb_pos_offline_orders_queue") || "[]");
-          offlineQueue.push({ ...finalOrderObj, billNumber });
-          localStorage.setItem("bb_pos_offline_orders_queue", JSON.stringify(offlineQueue));
+          await updateDoc(doc(db, "orders", activeEditingOrderId), orderObj);
         }
-
-        setLiveOrders(prev => prev.filter(o => o.id !== activeEditingOrderId));
-
-        triggerBeep('success');
-        toast.success(`Table ${tableNumber} Settled & Bill #${billNumber} Printed! ✅`);
-        await handlePrintReceiptDirect({ ...finalOrderObj, billNumber, tokenNumber: token, fulfillmentType: 'table' }, false);
-
-        setActiveEditingOrderId(null);
-        setActiveEditingBillNumber(null);
-        setActiveEditingOriginalItems([]);
+        setLiveOrders(prev => prev.map(o => o.id === activeEditingOrderId ? { id: o.id, ...orderObj } : o));
       } else {
-        billNumber = getNextBillNumber();
-
-        const orderObj = { 
-          billNumber, 
-          tokenNumber: token, 
-          customerName: customerName || "Walk-in Guest", 
-          customerPhone: cleanPhone ? `+91${cleanPhone}` : "", 
-          items: cart, 
-          subtotal, 
-          discountType, 
-          discountValue, 
-          discountAmount: discountAmt, 
-          gstRate: gstEnabled ? gstRate : 0, 
-          gstAmount: getGstAmountCalculated(), 
-          deliveryFee: getDeliveryCharge(), 
-          total: finalTotal, 
-          timestamp: new Date(), 
-          status: 'completed', 
-          fulfillmentType, 
-          deliveryArea: fulfillmentType === "delivery" ? selectedArea.name : "", 
-          tableNumber: fulfillmentType === 'table' ? tableNumber : '', 
-          paymentMethod, 
-          splitCashAmount: paymentMethod === 'split' ? splitCashAmount : 0,
-          splitUpiAmount: paymentMethod === 'split' ? splitUpiAmount : 0,
-          source: 'PC_POS', 
-          address,
-          pointsEarned: earned,
-          pointsRedeemed: redeemed, 
-          pointsDiscount: redeemed,
-          remainingPoints: remainingPts,
-          customerPoints: remainingPts,
-          upiId: upiIdConfig
-        };
-
         if (navigator.onLine) {
-          await addDoc(collection(db, "orders"), orderObj);
+          const docRef = await addDoc(collection(db, "orders"), orderObj);
+          setLiveOrders(prev => [{ id: docRef.id, ...orderObj }, ...prev]);
         } else {
           const cachedQueue = JSON.parse(localStorage.getItem("bb_pos_offline_orders_queue") || "[]");
           cachedQueue.push(orderObj);
           localStorage.setItem("bb_pos_offline_orders_queue", JSON.stringify(cachedQueue));
-          toast("Saved locally (Offline mode)! 💾", { icon: '💾' });
         }
-
-        triggerBeep('success'); 
-
-        if (kotEnabled) await handlePrintReceiptDirect(orderObj, true);
-        await handlePrintReceiptDirect(orderObj, false);
       }
 
-      // RESET STATE: ALWAYS REVERTS DEFAULT FULFILLMENT TO 'PICKUP'
+      triggerBeep('success'); 
+
+      if (kotEnabled) await handlePrintReceiptDirect(orderObj, true);
+      await handlePrintReceiptDirect(orderObj, false);
+
+      toast.success(`बिल #${billNumber} प्रिंट हुआ! (Daily Bills से भुगतान सेटल करें)`);
+
+      // AUTOMATIC RESET: ALWAYS REVERTS FULFILLMENT TO 'PICKUP' & CLEARS CART
       setCart([]); 
       setCustomerPhone(''); 
       setCustomerName(''); 
@@ -1588,15 +1552,40 @@ export default function BbCafeDesktopPos() {
       setPointsToRedeem(0);
       setAppliedPromoName(null);
       setPromoCouponInput('');
-      setFulfillmentType('pickup'); // Always set to pickup!
+      setFulfillmentType('pickup'); // Always reset to pickup!
       setTableNumber('Table 1');
       setApplyDeliveryFee(false);
+      setActiveEditingOrderId(null);
+      setActiveEditingBillNumber(null);
+      setActiveEditingOriginalItems([]);
       localStorage.removeItem("bb_pos_saved_cart_pc");
-      setTimeout(() => searchInputRef.current?.focus(), 60);
+      setTimeout(() => searchInputRef.current?.focus(), 80);
     } catch (err) {
       toast.error("Checkout failed");
     } finally {
       setIsSubmittingOrder(false);
+    }
+  };
+
+  // Settle Bill Action (From Daily Bills Settlement Tab)
+  const handleQuickSettleOrder = async (orderId: string, pMethod: 'cash' | 'upi' | 'due' | 'split') => {
+    triggerBeep('tap');
+    const toastId = toast.loading(`Settling bill via ${pMethod.toUpperCase()}...`);
+    try {
+      const updatePayload: any = {
+        status: 'completed',
+        paymentSettled: true,
+        paymentMethod: pMethod,
+        settledAt: new Date()
+      };
+      await updateDoc(doc(db, "orders", orderId), updatePayload);
+      setLiveOrders(prev => prev.map(o => o.id === orderId ? { ...o, ...updatePayload } : o));
+      toast.dismiss(toastId);
+      toast.success(`बिल सेटल हुआ [${pMethod.toUpperCase()}] और आज की बिक्री में जुड़ गया! ✅`);
+      triggerBeep('success');
+    } catch (e) {
+      toast.dismiss(toastId);
+      toast.error("सेटलमेंट विफल रहा");
     }
   };
 
@@ -1615,7 +1604,7 @@ export default function BbCafeDesktopPos() {
   // Owner EOD Summary WhatsApp
   const handleSendOwnerSummary = () => {
     const cleanOwner = getSanitizedPhone(ownerPhoneConfig);
-    const msg = `*☕ BUM BUM CAFE - DAY END SUMMARY*%0A------------------------------%0A*Date:* ${new Date().toLocaleDateString()}%0A*Total Sales:* ₹${reportSummary.totalSale}%0A*Orders Completed:* ${reportSummary.totalOrdersCount}%0A------------------------------%0A*💵 Gross Cash:* ₹${reportSummary.cashSale}%0A*📱 UPI / Bank:* ₹${reportSummary.upiSale}%0A*📕 Udhar / Due:* ₹${reportSummary.dueSale}%0A*🧾 Expenses:* -₹${reportSummary.totalExpenseAmount}%0A------------------------------%0A*💰 Net Cash in Drawer:* ₹${reportSummary.netCashInDrawer}%0A------------------------------%0A_Generated via Bum Bum Cafe Desktop POS_`;
+    const msg = `*☕ BUM BUM CAFE - DAY END SUMMARY*%0A------------------------------%0A*Date:* ${new Date().toLocaleDateString()}%0A*Total Sales:* ₹${reportSummary.totalSale}%0A*Orders Settled:* ${reportSummary.totalOrdersCount}%0A------------------------------%0A*💵 Gross Cash:* ₹${reportSummary.cashSale}%0A*📱 UPI / Bank:* ₹${reportSummary.upiSale}%0A*📕 Udhar / Due:* ₹${reportSummary.dueSale}%0A*🧾 Expenses:* -₹${reportSummary.totalExpenseAmount}%0A------------------------------%0A*💰 Net Cash in Drawer:* ₹${reportSummary.netCashInDrawer}%0A------------------------------%0A_Generated via Bum Bum Cafe Desktop POS_`;
     window.open(`https://wa.me/${cleanOwner}?text=${msg}`, '_blank');
   };
 
@@ -1654,7 +1643,7 @@ export default function BbCafeDesktopPos() {
     }
   };
 
-  // Reports Data Fetching (Exact Day 00:00:00 to 23:59:59.999 - No bills missed)
+  // Reports Data Fetching: ONLY COUNT SETTLED BILLS!
   const fetchReportData = async () => {
     setIsReportLoading(true);
     try {
@@ -1676,11 +1665,7 @@ export default function BbCafeDesktopPos() {
       }
 
       if (navigator.onLine) {
-        const qOrders = query(
-          collection(db, "orders"),
-          orderBy("timestamp", "desc"),
-          limit(500)
-        );
+        const qOrders = query(collection(db, "orders"), orderBy("timestamp", "desc"), limit(600));
         const snapOrders = await getDocs(qOrders);
         const filteredOrders = snapOrders.docs.map(d => ({ id: d.id, ...d.data() })).filter((o: any) => {
           const raw = o.timestamp?.toDate ? o.timestamp.toDate() : new Date(o.timestamp || Date.now());
@@ -1689,11 +1674,7 @@ export default function BbCafeDesktopPos() {
         });
         setReportOrders(filteredOrders);
 
-        const qExpenses = query(
-          collection(db, "daily_expenses"),
-          orderBy("timestamp", "desc"),
-          limit(200)
-        );
+        const qExpenses = query(collection(db, "daily_expenses"), orderBy("timestamp", "desc"), limit(200));
         const snapExpenses = await getDocs(qExpenses);
         const filteredExp = snapExpenses.docs.map(d => ({ id: d.id, ...d.data() })).filter((exp: any) => {
           const raw = exp.timestamp?.toDate ? exp.timestamp.toDate() : new Date(exp.timestamp || Date.now());
@@ -1713,16 +1694,20 @@ export default function BbCafeDesktopPos() {
     if (activeTab === 'reports') fetchReportData();
   }, [activeTab, reportFilter, customReportDate]);
 
+  // Financial Summary: ONLY SETTLED BILLS (status === 'completed') ARE ADDED TO DAILY SALE!
   const reportSummary = useMemo(() => {
     let totalSale = 0;
     let cashSale = 0;
     let upiSale = 0;
     let dueSale = 0;
-    let totalOrdersCount = reportOrders.filter(o => o.status !== 'rejected').length;
+    let totalOrdersCount = 0;
+    let unsettledTotal = 0;
+    let unsettledCount = 0;
 
     reportOrders.forEach(o => {
-      if (o.status !== 'rejected') {
-        const amt = Number(o.total) || 0;
+      const amt = Number(o.total) || 0;
+      if (o.status === 'completed') {
+        totalOrdersCount++;
         totalSale += amt;
         if (o.paymentMethod === 'upi') {
           upiSale += amt;
@@ -1734,21 +1719,24 @@ export default function BbCafeDesktopPos() {
         } else {
           cashSale += amt;
         }
+      } else if (o.status === 'unsettled' || (o.status === 'pending' && !o.paymentSettled)) {
+        unsettledTotal += amt;
+        unsettledCount++;
       }
     });
 
     const totalExpenseAmount = dailyExpenses.reduce((acc, exp) => acc + (Number(exp.amount) || 0), 0);
     const netCashInDrawer = Math.max(0, cashSale - totalExpenseAmount);
 
-    return { totalSale, cashSale, upiSale, dueSale, totalOrdersCount, totalExpenseAmount, netCashInDrawer };
+    return { totalSale, cashSale, upiSale, dueSale, totalOrdersCount, totalExpenseAmount, netCashInDrawer, unsettledTotal, unsettledCount };
   }, [reportOrders, dailyExpenses]);
 
-  // Item-wise Sales Report Calculation
+  // Item-wise Sales Report Calculation (Only from Settled/Completed Orders)
   const itemWiseSales = useMemo(() => {
     const map: { [key: string]: { name: string, quantity: number, revenue: number } } = {};
 
     reportOrders.forEach((order) => {
-      if (order.status !== 'rejected' && Array.isArray(order.items)) {
+      if (order.status === 'completed' && Array.isArray(order.items)) {
         order.items.forEach((item: PosCartItem) => {
           const key = item.name;
           if (!map[key]) {
@@ -1942,21 +1930,16 @@ export default function BbCafeDesktopPos() {
                   {!isSidebarCollapsed && (
                     <div className="truncate">
                       <h1 className="text-xs font-black uppercase text-orange-600 dark:text-yellow-500 truncate">Bum Bum Cafe</h1>
-                      <span className="text-[10px] text-neutral-600 dark:text-neutral-400 font-bold">POS Pro v4.1</span>
+                      <span className="text-[10px] text-neutral-600 dark:text-neutral-400 font-bold">POS Pro v4.3</span>
                     </div>
                   )}
                 </div>
-                {!isSidebarCollapsed && (
-                  <span className={`text-[9px] font-black px-2 py-0.5 rounded-full flex items-center gap-1 ${isOnline ? 'bg-green-500/15 text-green-700 dark:text-green-400' : 'bg-orange-500/15 text-orange-700 dark:text-orange-400'}`}>
-                    <span className={`w-1.5 h-1.5 rounded-full ${isOnline ? 'bg-green-500' : 'bg-orange-500'}`}></span>
-                    {isOnline ? 'Online' : 'Offline'}
-                  </span>
-                )}
               </div>
 
               <nav className="space-y-1.5">
                 {[
                   { id: 'billing', label: 'Counter [F2]', icon: ShoppingBag },
+                  { id: 'settlement', label: `Daily Bills (${unsettledOrdersCount})`, icon: Receipt },
                   { id: 'inventory', label: 'Menu & Stock', icon: Layers },
                   { id: 'receipts', label: 'Past Receipts', icon: Printer },
                   { id: 'tables', label: `Tables (${activeTableOrders.length})`, icon: LayoutGrid },
@@ -1976,11 +1959,11 @@ export default function BbCafeDesktopPos() {
                         <Icon size={16} className="shrink-0" />
                         {!isSidebarCollapsed && <span className="truncate">{item.label}</span>}
                       </div>
-                      {!isSidebarCollapsed && item.id === 'tables' && activeTablesCount > 0 && (
-                        <span className="bg-amber-500 text-black text-[10px] px-2 py-0.5 rounded-full font-black animate-pulse">{activeTablesCount}</span>
+                      {!isSidebarCollapsed && item.id === 'settlement' && unsettledOrdersCount > 0 && (
+                        <span className="bg-red-500 text-white text-[10px] px-2 py-0.5 rounded-full font-black animate-pulse">{unsettledOrdersCount}</span>
                       )}
-                      {!isSidebarCollapsed && item.id === 'orders' && pendingOrdersCount > 0 && (
-                        <span className="bg-red-500 text-white text-[10px] px-2 py-0.5 rounded-full animate-pulse">{pendingOrdersCount}</span>
+                      {!isSidebarCollapsed && item.id === 'tables' && activeTableOrders.length > 0 && (
+                        <span className="bg-amber-500 text-black text-[10px] px-2 py-0.5 rounded-full font-black">{activeTableOrders.length}</span>
                       )}
                     </button>
                   );
@@ -1990,7 +1973,7 @@ export default function BbCafeDesktopPos() {
               {!isSidebarCollapsed && (
                 <div className="pt-2 border-t border-neutral-300 dark:border-neutral-800 space-y-1.5">
                   <div className="flex justify-between items-center px-1">
-                    <span className="text-[10px] font-black uppercase text-neutral-500 dark:text-neutral-400">POS Tools</span>
+                    <span className="text-[10px] font-black uppercase text-neutral-500">POS Tools</span>
                     <button onClick={() => setIsHelpModalOpen(true)} className="text-[10px] text-orange-600 font-bold hover:underline flex items-center gap-1">
                       <SafeHelpCircle size={12} /> Help [F1]
                     </button>
@@ -1998,7 +1981,7 @@ export default function BbCafeDesktopPos() {
                   <div className="grid grid-cols-2 gap-1.5">
                     <button onClick={() => setIsHeldCartsModalOpen(true)} className="bg-neutral-200 dark:bg-neutral-800 p-2 rounded-xl text-[10px] font-bold flex items-center gap-1 text-neutral-800 dark:text-white">
                       <SafePauseCircle size={13} className="text-amber-500 shrink-0" />
-                      <span className="truncate">Parked ({heldCarts.length}) [F5]</span>
+                      <span className="truncate">Parked ({heldCarts.length})</span>
                     </button>
                     <button onClick={() => setIsExpenseModalOpen(true)} className="bg-neutral-200 dark:bg-neutral-800 p-2 rounded-xl text-[10px] font-bold flex items-center gap-1 text-neutral-800 dark:text-white">
                       <Receipt size={13} className="text-red-500 shrink-0" />
@@ -2010,13 +1993,11 @@ export default function BbCafeDesktopPos() {
             </div>
 
             <div className="space-y-2 pt-4 border-t border-neutral-300 dark:border-neutral-800">
-              <button onClick={async () => {
-                await syncOfflineAll();
-              }} disabled={isSyncing} className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-2xl text-xs font-black uppercase text-amber-700 dark:text-yellow-500 bg-amber-500/15 hover:bg-amber-500/25">
+              <button onClick={async () => { await syncOfflineAll(); }} disabled={isSyncing} className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-2xl text-xs font-black uppercase text-amber-700 dark:text-yellow-500 bg-amber-500/15">
                 {isSyncing ? <Loader2 className="animate-spin shrink-0" size={16} /> : <SafeRefreshCw size={16} />}
                 {!isSidebarCollapsed && <span className="truncate">Sync Cloud Data</span>}
               </button>
-              <button onClick={() => { setIsLoggedIn(false); setCurrentUser(null); localStorage.removeItem("bb_pos_user_pc"); }} className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-2xl text-xs font-black uppercase text-red-600 bg-red-500/15 hover:bg-red-500/25">
+              <button onClick={() => { setIsLoggedIn(false); setCurrentUser(null); localStorage.removeItem("bb_pos_user_pc"); }} className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-2xl text-xs font-black uppercase text-red-600 bg-red-500/15">
                 <SafeLogOut size={16} className="shrink-0" />
                 {!isSidebarCollapsed && <span className="truncate">Lock Terminal</span>}
               </button>
@@ -2061,45 +2042,43 @@ export default function BbCafeDesktopPos() {
                     </div>
                     <button 
                       onClick={() => setIsCatManagerModalOpen(true)} 
-                      title="Reorder & Merge Categories"
-                      className="bg-neutral-200 dark:bg-neutral-800 hover:bg-neutral-300 text-neutral-800 dark:text-neutral-200 px-3 py-2.5 rounded-xl text-xs font-black uppercase flex items-center gap-1.5 border border-neutral-300 dark:border-neutral-700 transition-all shrink-0"
+                      className="bg-neutral-200 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 px-3 py-2.5 rounded-xl text-xs font-black uppercase flex items-center gap-1.5 border border-neutral-300 dark:border-neutral-700 shrink-0"
                     >
                       <ArrowLeftRight size={14} className="text-orange-500" /> Reorder Cats
                     </button>
                     <button 
                       onClick={() => handleOpenItemEditor(null)} 
-                      className="bg-orange-600 hover:bg-orange-500 text-white px-3.5 py-2.5 rounded-xl text-xs font-black uppercase flex items-center gap-1.5 shadow transition-all shrink-0"
+                      className="bg-orange-600 hover:bg-orange-500 text-white px-3.5 py-2.5 rounded-xl text-xs font-black uppercase flex items-center gap-1.5 shadow shrink-0"
                     >
                       <SafePlus size={15} /> Add Item
                     </button>
                   </div>
 
-                  {/* CATEGORIES WRAPPER */}
+                  {/* CATEGORIES BAR */}
                   <div className="flex flex-wrap gap-1.5 pb-2 shrink-0 max-h-24 overflow-y-auto pr-1">
                     {categories.map((cat) => {
                       const isSelected = selectedCategory === cat;
                       const count = cat === 'All' ? products.length : products.filter(p => p.category?.toLowerCase() === cat.toLowerCase()).length;
                       return (
-                        <div key={cat} className="inline-flex items-center group">
-                          <button 
-                            onClick={() => { triggerBeep('tap'); setSelectedCategory(cat); }} 
-                            className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider border transition-all flex items-center gap-1.5 shadow-sm ${
-                              isSelected 
-                                ? "bg-orange-600 text-white border-orange-600 shadow-md scale-[1.02]" 
-                                : "bg-neutral-200 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 border-neutral-300 dark:border-neutral-700 hover:border-orange-500 hover:text-orange-600"
-                            }`}
-                          >
-                            <span>{cat}</span>
-                            <span className={`text-[9px] px-1.5 py-0.2 rounded font-mono font-bold ${isSelected ? 'bg-black/30 text-white' : 'bg-neutral-300 dark:bg-neutral-700 text-neutral-800 dark:text-neutral-300'}`}>
-                              {count}
-                            </span>
-                          </button>
-                        </div>
+                        <button 
+                          key={cat}
+                          onClick={() => { triggerBeep('tap'); setSelectedCategory(cat); }} 
+                          className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider border transition-all flex items-center gap-1.5 shadow-sm ${
+                            isSelected 
+                              ? "bg-orange-600 text-white border-orange-600 shadow-md scale-[1.02]" 
+                              : "bg-neutral-200 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 border-neutral-300 dark:border-neutral-700"
+                          }`}
+                        >
+                          <span>{cat}</span>
+                          <span className={`text-[9px] px-1.5 py-0.2 rounded font-mono font-bold ${isSelected ? 'bg-black/30 text-white' : 'bg-neutral-300 dark:bg-neutral-700'}`}>
+                            {count}
+                          </span>
+                        </button>
                       );
                     })}
                   </div>
 
-                  {/* PRODUCTS GRID (100% Guaranteed Price & Name Display for Every Single Item) */}
+                  {/* PRODUCTS GRID (100% Guaranteed Name & Price Display with Fixed 82px Image Height) */}
                   {loading ? (
                     <div className="flex items-center justify-center flex-1"><Loader2 className="animate-spin text-orange-500" size={32} /></div>
                   ) : (
@@ -2107,7 +2086,7 @@ export default function BbCafeDesktopPos() {
                       {filteredMenu.map((item) => {
                         const isAvail = item.isAvailable !== false;
                         const imgUrl = item.image || item.imageUrl || item.img;
-                        const displayName = item.name || item.title || "Cafe Item";
+                        const displayName = item.name || item.title || item.itemName || "Cafe Item";
                         const displayPrice = Number(item.price) || (item.variants && Object.values(item.variants)[0]) || 0;
 
                         return (
@@ -2115,25 +2094,38 @@ export default function BbCafeDesktopPos() {
                             key={item.id} 
                             disabled={!isAvail} 
                             onClick={() => handleItemClick(item)} 
-                            className={`border rounded-xl text-left flex flex-col overflow-hidden h-36 transition-all duration-150 hover:scale-[1.01] active:scale-95 shadow-sm ${isAvail ? "bg-white dark:bg-neutral-900 border-neutral-300 dark:border-neutral-800 hover:border-orange-500" : "opacity-40 bg-neutral-200 dark:bg-neutral-950 border-neutral-300 dark:border-neutral-800 pointer-events-none"}`}
+                            className={`border rounded-2xl text-left flex flex-col overflow-hidden h-[155px] min-h-[155px] transition-all duration-150 hover:scale-[1.02] active:scale-95 shadow-sm relative ${
+                              isAvail 
+                                ? "bg-white dark:bg-neutral-900 border-neutral-300 dark:border-neutral-800 hover:border-orange-500" 
+                                : "opacity-40 bg-neutral-200 dark:bg-neutral-950 pointer-events-none"
+                            }`}
                           >
-                            <div className="w-full h-18 bg-neutral-200 dark:bg-neutral-800 relative shrink-0 overflow-hidden flex items-center justify-center">
+                            {/* FIXED IMAGE CONTAINER 82PX - NEVER OVERFLOWS OR HIDES DETAILS */}
+                            <div className="w-full h-[82px] max-h-[82px] min-h-[82px] bg-neutral-200 dark:bg-neutral-800 relative shrink-0 overflow-hidden flex items-center justify-center">
                               {imgUrl ? (
-                                <img src={imgUrl} alt={displayName} className="w-full h-full object-cover" />
+                                <img src={imgUrl} alt={displayName} className="w-full h-full object-cover" loading="lazy" />
                               ) : (
                                 <span className="text-neutral-500 text-[10px] font-black uppercase tracking-wider px-2 text-center">{item.category || "Cafe Item"}</span>
                               )}
                               {item.itemCode && (
-                                <span className="absolute top-1 right-1 bg-black/90 text-yellow-400 font-mono text-[9px] font-black px-1.5 py-0.5 rounded border border-yellow-500/50 shadow">
+                                <span className="absolute top-1 right-1 bg-black/90 text-yellow-400 font-mono text-[9px] font-black px-1.5 py-0.5 rounded border border-yellow-500/50 shadow z-10">
                                   #{item.itemCode}
                                 </span>
                               )}
                             </div>
-                            <div className="p-2 flex-grow flex flex-col justify-between w-full">
-                              <p className="font-bold text-[11px] line-clamp-2 text-neutral-900 dark:text-white leading-tight">{displayName}</p>
-                              <div className="flex justify-between items-center">
-                                <span className="text-xs font-mono font-black text-orange-600 dark:text-orange-400">₹{displayPrice}</span>
-                                <span className="text-[8px] font-bold text-neutral-500 truncate max-w-[70px]">{item.category}</span>
+
+                            {/* ITEM NAME & PRICE CONTAINER - GUARANTEED VISIBILITY */}
+                            <div className="p-2 flex-1 flex flex-col justify-between w-full bg-white dark:bg-neutral-900 min-h-[65px]">
+                              <p className="font-bold text-[11px] line-clamp-2 text-neutral-900 dark:text-white leading-tight">
+                                {displayName}
+                              </p>
+                              <div className="flex justify-between items-center pt-1 border-t border-neutral-100 dark:border-neutral-800">
+                                <span className="text-xs font-mono font-black text-orange-600 dark:text-orange-400">
+                                  ₹{displayPrice}
+                                </span>
+                                <span className="text-[8px] font-bold text-neutral-500 truncate max-w-[70px]">
+                                  {item.category || 'General'}
+                                </span>
                               </div>
                             </div>
                           </button>
@@ -2163,7 +2155,7 @@ export default function BbCafeDesktopPos() {
                           <input 
                             ref={phoneInputRef}
                             type="text" 
-                            placeholder="Type Phone or Name & hit [Enter]" 
+                            placeholder="Customer Name or Mobile No..." 
                             value={customerInputSearch} 
                             onFocus={() => setShowCustomerDropdown(true)}
                             onChange={e => handleCustomerInputChange(e.target.value)} 
@@ -2185,14 +2177,14 @@ export default function BbCafeDesktopPos() {
                       {/* LAST 10 RECENT CUSTOMERS AUTO-DROPDOWN */}
                       {showCustomerDropdown && filteredCustomerSuggestions.length > 0 && (
                         <div className="absolute left-0 right-0 top-12 z-50 bg-white dark:bg-neutral-900 border border-orange-500/50 rounded-xl shadow-2xl overflow-hidden max-h-48 overflow-y-auto">
-                          <div className="p-1.5 bg-neutral-100 dark:bg-neutral-800 text-[10px] font-black uppercase text-neutral-500 flex items-center gap-1 border-b border-neutral-200 dark:border-neutral-700">
+                          <div className="p-1.5 bg-neutral-100 dark:bg-neutral-800 text-[10px] font-black uppercase text-neutral-500 flex items-center gap-1 border-b">
                             <History size={11} /> Last 10 Recent Customers (हाल के ग्राहक)
                           </div>
                           {filteredCustomerSuggestions.map((cust, i) => (
                             <div 
                               key={i} 
                               onClick={() => handleSelectQuickCustomer(cust)}
-                              className="px-3 py-1.5 hover:bg-orange-50 dark:hover:bg-neutral-800 cursor-pointer flex justify-between items-center text-xs border-b border-neutral-100 dark:border-neutral-800/50"
+                              className="px-3 py-1.5 hover:bg-orange-50 dark:hover:bg-neutral-800 cursor-pointer flex justify-between items-center text-xs border-b"
                             >
                               <div>
                                 <span className="font-bold text-neutral-900 dark:text-white">{cust.name || 'Customer'}</span>
@@ -2206,9 +2198,9 @@ export default function BbCafeDesktopPos() {
                         </div>
                       )}
 
-                      {/* CUSTOMER FOUND DETAILS + EDIT PROFILE TOGGLE */}
+                      {/* CUSTOMER FOUND DETAILS + EDIT PROFILE */}
                       {customerName && !showNewCustForm && !isEditingCustomerProfile && (
-                        <div className="flex justify-between items-center text-xs font-black text-amber-600 dark:text-yellow-400 pt-1 border-t border-neutral-300 dark:border-neutral-700">
+                        <div className="flex justify-between items-center text-xs font-black text-amber-600 dark:text-yellow-400 pt-1 border-t">
                           <span>👤 {customerName} (⭐ {customerPoints} Pts)</span>
                           <button 
                             type="button" 
@@ -2220,9 +2212,9 @@ export default function BbCafeDesktopPos() {
                         </div>
                       )}
 
-                      {/* INLINE EDIT CUSTOMER PROFILE FORM */}
+                      {/* INLINE EDIT CUSTOMER PROFILE */}
                       {isEditingCustomerProfile && (
-                        <div className="space-y-1.5 pt-1 border-t border-neutral-300 dark:border-neutral-700">
+                        <div className="space-y-1.5 pt-1 border-t">
                           <p className="text-[9px] font-black uppercase text-blue-600 dark:text-blue-400">Edit Customer Profile:</p>
                           <input 
                             type="text" 
@@ -2245,43 +2237,11 @@ export default function BbCafeDesktopPos() {
                         </div>
                       )}
 
-                      {customerName && customerPoints > 0 && !showNewCustForm && !isEditingCustomerProfile && (
-                        <div className="pt-1 border-t border-neutral-300 dark:border-neutral-700 flex items-center justify-between text-xs">
-                          <span className="text-amber-700 dark:text-amber-400 font-bold flex items-center gap-1">⭐ Redeem ({customerPoints} Pts):</span>
-                          <div className="flex items-center gap-1.5">
-                            <input 
-                              type="number" 
-                              min={1} 
-                              max={customerPoints}
-                              value={pointsToRedeem || ''}
-                              onChange={e => setPointsToRedeem(Math.min(Number(e.target.value), customerPoints))}
-                              placeholder="Pts"
-                              className="w-14 bg-white dark:bg-neutral-900 border border-neutral-400 dark:border-neutral-700 rounded-lg p-1 text-center font-mono text-xs text-neutral-900 dark:text-white outline-none font-bold" 
-                            />
-                            <button 
-                              type="button"
-                              onClick={() => {
-                                if (!isRedeemingPoints && pointsToRedeem > 0) {
-                                  setIsRedeemingPoints(true);
-                                  toast.success(`Redeemed ₹${pointsToRedeem} off!`);
-                                } else {
-                                  setIsRedeemingPoints(false);
-                                  setPointsToRedeem(0);
-                                }
-                              }}
-                              className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${isRedeemingPoints ? 'bg-red-500 text-white' : 'bg-amber-500 text-black'}`}
-                            >
-                              {isRedeemingPoints ? 'Cancel' : 'Apply'}
-                            </button>
-                          </div>
-                        </div>
-                      )}
-
                       {showNewCustForm && (
-                        <div className="space-y-1.5 pt-1.5 border-t border-neutral-300 dark:border-neutral-700">
+                        <div className="space-y-1.5 pt-1.5 border-t">
                           <p className="text-[9px] text-amber-700 dark:text-yellow-400 font-black uppercase">New Customer! Type Name & Press [Enter]:</p>
                           <input 
-                            ref={newCustNameRef}
+                            ref={newCustNameRef} 
                             type="text" 
                             placeholder="Customer Name *" 
                             value={newCustNameInput} 
@@ -2292,10 +2252,10 @@ export default function BbCafeDesktopPos() {
                                 newCustAddressRef.current?.focus();
                               }
                             }}
-                            className="w-full bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 rounded-lg px-2 py-1 text-xs text-neutral-900 dark:text-white outline-none" 
+                            className="w-full bg-white dark:bg-neutral-900 border rounded-lg px-2 py-1 text-xs outline-none" 
                           />
                           <input 
-                            ref={newCustAddressRef}
+                            ref={newCustAddressRef} 
                             type="text" 
                             placeholder="Address (Optional) & hit [Enter]" 
                             value={newCustAddressInput} 
@@ -2306,7 +2266,7 @@ export default function BbCafeDesktopPos() {
                                 handleSaveNewCustomerQuick();
                               }
                             }}
-                            className="w-full bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 rounded-lg px-2 py-1 text-xs text-neutral-900 dark:text-white outline-none" 
+                            className="w-full bg-white dark:bg-neutral-900 border rounded-lg px-2 py-1 text-xs outline-none" 
                           />
                           <button onClick={handleSaveNewCustomerQuick} className="w-full py-1 bg-green-600 hover:bg-green-500 text-white font-black text-xs uppercase rounded-lg flex items-center justify-center gap-1 shadow">
                             <SafeUserPlus size={13} /> Save Customer [Enter]
@@ -2340,7 +2300,7 @@ export default function BbCafeDesktopPos() {
                       )}
                     </div>
 
-                    {/* FULFILLMENT MODE & ULTRA-COMPACT 6 TABLES SELECTOR */}
+                    {/* FULFILLMENT MODE */}
                     <div className="space-y-1.5 mb-2 shrink-0 border-t border-neutral-300 dark:border-neutral-800 pt-1.5">
                       <div className="grid grid-cols-3 gap-1 bg-neutral-200 dark:bg-neutral-800 p-1 rounded-xl">
                         {(['pickup', 'table', 'delivery'] as const).map((type) => (
@@ -2352,93 +2312,19 @@ export default function BbCafeDesktopPos() {
                         <div className="bg-amber-500/10 border border-amber-500/30 p-1.5 rounded-xl space-y-1">
                           <div className="flex justify-between items-center text-[9px] font-black uppercase text-amber-800 dark:text-amber-300">
                             <span>Table: {tableNumber}</span>
-                            <span className="text-[8px] text-neutral-500">Click to Switch</span>
                           </div>
                           <div className="grid grid-cols-6 gap-1">
-                            {['Table 1', 'Table 2', 'Table 3', 'Table 4', 'Table 5', 'Table 6'].map((tName, idx) => {
-                              const occupiedOrder = activeTableOrders.find(o => o.tableNumber === tName);
-                              const isSelected = tableNumber === tName;
-                              return (
-                                <button 
-                                  key={tName}
-                                  type="button"
-                                  onClick={() => { 
-                                    triggerBeep('tap'); 
-                                    setTableNumber(tName);
-                                    if (occupiedOrder) {
-                                      setActiveEditingOrderId(occupiedOrder.id);
-                                      setActiveEditingBillNumber(occupiedOrder.billNumber);
-                                      setActiveEditingOriginalItems(occupiedOrder.items ? JSON.parse(JSON.stringify(occupiedOrder.items)) : []);
-                                      setCart(occupiedOrder.items || []);
-                                      setCustomerName(occupiedOrder.customerName || '');
-                                      setCustomerPhone(occupiedOrder.customerPhone || '');
-                                      toast.success(`${tName} Bill #${occupiedOrder.billNumber} Loaded!`);
-                                    } else {
-                                      setActiveEditingOrderId(null);
-                                      setActiveEditingBillNumber(null);
-                                      setActiveEditingOriginalItems([]);
-                                    }
-                                  }}
-                                  className={`py-1 px-0.5 rounded-md text-[9px] font-black uppercase border transition-all text-center ${
-                                    isSelected 
-                                      ? 'bg-amber-500 text-black border-amber-600 shadow ring-1 ring-amber-400' 
-                                      : 'bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white border-neutral-300 dark:border-neutral-700'
-                                  }`}
-                                >
-                                  <span>T{idx + 1}</span>
-                                  {occupiedOrder ? (
-                                    <span className="block text-[7px] text-red-600 dark:text-red-400 font-mono font-black">● ₹{occupiedOrder.total}</span>
-                                  ) : (
-                                    <span className="block text-[7px] text-green-600 dark:text-green-400">Free</span>
-                                  )}
-                                </button>
-                              );
-                            })}
+                            {['Table 1', 'Table 2', 'Table 3', 'Table 4', 'Table 5', 'Table 6'].map((tName, idx) => (
+                              <button 
+                                key={tName}
+                                type="button"
+                                onClick={() => { triggerBeep('tap'); setTableNumber(tName); }}
+                                className={`py-1 rounded text-[9px] font-black uppercase border ${tableNumber === tName ? 'bg-amber-500 text-black border-amber-600 shadow' : 'bg-white dark:bg-neutral-800'}`}
+                              >
+                                T{idx + 1}
+                              </button>
+                            ))}
                           </div>
-                        </div>
-                      )}
-
-                      {fulfillmentType === 'delivery' && (
-                        <div className="bg-neutral-100 dark:bg-neutral-800/80 p-2 rounded-xl border border-neutral-300 dark:border-neutral-700 space-y-1.5">
-                          <div className="flex justify-between items-center text-xs">
-                            <label className="flex items-center gap-1.5 cursor-pointer font-bold text-neutral-900 dark:text-neutral-200">
-                              <input 
-                                type="checkbox" 
-                                checked={applyDeliveryFee} 
-                                onChange={e => setApplyDeliveryFee(e.target.checked)}
-                                className="accent-orange-600 w-3.5 h-3.5 cursor-pointer" 
-                              />
-                              <span>Delivery Charge:</span>
-                            </label>
-                            <span className="text-[10px] font-bold text-orange-600 dark:text-orange-400 font-mono">
-                              {applyDeliveryFee ? `+₹${customDeliveryFee || 0}` : 'FREE (₹0)'}
-                            </span>
-                          </div>
-
-                          {applyDeliveryFee && (
-                            <div className="flex items-center gap-1.5 pt-1">
-                              <input 
-                                type="number" 
-                                min={0}
-                                placeholder="Fee ₹" 
-                                value={customDeliveryFee} 
-                                onChange={e => setCustomDeliveryFee(e.target.value === '' ? '' : Number(e.target.value))}
-                                className="w-16 bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 rounded-lg p-1 text-xs text-center font-mono text-neutral-900 dark:text-white outline-none font-bold" 
-                              />
-                              <div className="flex gap-1 flex-1">
-                                {[0, 20, 30, 50].map((amt) => (
-                                  <button 
-                                    key={amt}
-                                    type="button"
-                                    onClick={() => setCustomDeliveryFee(amt)}
-                                    className={`flex-1 py-1 rounded text-[10px] font-bold border font-mono ${customDeliveryFee === amt ? 'bg-orange-600 text-white border-orange-600' : 'bg-white dark:bg-neutral-900 border-neutral-300 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300'}`}
-                                  >
-                                    {amt === 0 ? 'Free' : `₹${amt}`}
-                                  </button>
-                                ))}
-                              </div>
-                            </div>
-                          )}
                         </div>
                       )}
                     </div>
@@ -2469,19 +2355,18 @@ export default function BbCafeDesktopPos() {
                             <span className="text-[10px] font-black uppercase text-neutral-700 dark:text-neutral-300 flex items-center gap-1">
                               <Ticket size={11} className="text-orange-500" /> Coupon / Discount (छूट)
                             </span>
-                            <button type="button" onClick={() => setIsDiscountOpen(false)} className="text-neutral-400 hover:text-black dark:hover:text-white p-0.5">
+                            <button type="button" onClick={() => setIsDiscountOpen(false)} className="text-neutral-400 p-0.5">
                               <ChevronUp size={14} />
                             </button>
                           </div>
 
-                          {/* PROMO / COUPON CODE BOX */}
                           <div className="flex gap-1.5">
                             <input 
                               type="text" 
                               placeholder="Coupon Code (e.g. CAFE10, BUM50)" 
                               value={promoCouponInput}
                               onChange={e => setPromoCouponInput(e.target.value)}
-                              className="flex-1 bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 rounded-lg px-2.5 py-1 text-xs font-mono font-bold uppercase text-neutral-900 dark:text-white outline-none" 
+                              className="flex-1 bg-white dark:bg-neutral-900 border rounded-lg px-2.5 py-1 text-xs font-mono font-bold uppercase text-neutral-900 dark:text-white outline-none" 
                             />
                             <button 
                               type="button" 
@@ -2492,11 +2377,10 @@ export default function BbCafeDesktopPos() {
                             </button>
                           </div>
 
-                          {/* MANUAL DISCOUNT ENTRY */}
                           <div className="flex items-center gap-1.5 pt-1 border-t border-neutral-300 dark:border-neutral-700">
-                            <div className="flex bg-neutral-200 dark:bg-neutral-700 p-0.5 rounded-lg border border-neutral-300 dark:border-neutral-600">
-                              <button type="button" onClick={() => setDiscountType('amount')} className={`px-2 py-0.5 text-[9px] font-black uppercase rounded transition-all ${discountType === 'amount' ? 'bg-orange-600 text-white shadow' : 'text-neutral-700 dark:text-neutral-300'}`}>₹ Flat</button>
-                              <button type="button" onClick={() => setDiscountType('percentage')} className={`px-2 py-0.5 text-[9px] font-black uppercase rounded transition-all ${discountType === 'percentage' ? 'bg-orange-600 text-white shadow' : 'text-neutral-700 dark:text-neutral-300'}`}>% Off</button>
+                            <div className="flex bg-neutral-200 dark:bg-neutral-700 p-0.5 rounded-lg border">
+                              <button type="button" onClick={() => setDiscountType('amount')} className={`px-2 py-0.5 text-[9px] font-black uppercase rounded ${discountType === 'amount' ? 'bg-orange-600 text-white' : 'text-neutral-700 dark:text-neutral-300'}`}>₹ Flat</button>
+                              <button type="button" onClick={() => setDiscountType('percentage')} className={`px-2 py-0.5 text-[9px] font-black uppercase rounded ${discountType === 'percentage' ? 'bg-orange-600 text-white' : 'text-neutral-700 dark:text-neutral-300'}`}>% Off</button>
                             </div>
                             <input 
                               type="number" 
@@ -2504,7 +2388,7 @@ export default function BbCafeDesktopPos() {
                               placeholder="Value"
                               value={discountValue || ''}
                               onChange={e => { setDiscountValue(Number(e.target.value)); setAppliedPromoName(null); }}
-                              className="w-full bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 rounded-lg px-2 py-1 text-xs text-neutral-900 dark:text-white outline-none font-mono font-bold" 
+                              className="w-full bg-white dark:bg-neutral-900 border rounded-lg px-2 py-1 text-xs text-neutral-900 dark:text-white outline-none font-mono font-bold" 
                             />
                             {discountValue > 0 && (
                               <button type="button" onClick={() => { setDiscountValue(0); setAppliedPromoName(null); }} className="text-red-500 text-xs font-black px-1.5 py-1 bg-red-500/10 rounded-lg shrink-0">Clear</button>
@@ -2514,62 +2398,133 @@ export default function BbCafeDesktopPos() {
                       )}
                     </div>
 
-                    {/* BREAKDOWN & GRAND TOTAL */}
+                    {/* BILL TOTALS */}
                     <div className="space-y-1 text-xs border-t border-neutral-300 dark:border-neutral-800 pt-1.5 shrink-0 font-bold">
                       <div className="flex justify-between text-neutral-600 dark:text-neutral-400"><span>Subtotal</span><span className="font-mono">₹{getCartSubtotal()}</span></div>
                       {getDeliveryCharge() > 0 && <div className="flex justify-between text-neutral-800 dark:text-neutral-200"><span>Delivery Charge</span><span className="font-mono">+₹{getDeliveryCharge()}</span></div>}
                       {getCalculatedDiscountAmount() > 0 && <div className="flex justify-between text-orange-600 font-bold"><span>Discount {appliedPromoName && `(${appliedPromoName})`}</span><span className="font-mono">-₹{getCalculatedDiscountAmount()}</span></div>}
-                      {isRedeemingPoints && <div className="flex justify-between text-amber-600 font-bold"><span>Points Redeemed</span><span className="font-mono">-₹{getRedemptionDiscount()}</span></div>}
                       <div className="flex justify-between text-sm font-black text-green-600 dark:text-green-500 pt-1 border-t border-dashed border-neutral-400">
                         <span>Grand Total</span><span className="font-mono text-base font-black">₹{getTotalBillPrice()}</span>
                       </div>
                     </div>
 
-                    {/* PAYMENT METHOD [F4] INCLUDING 'UDHAR' (उधार / DUE) */}
-                    <div className="space-y-1.5 my-1.5 shrink-0">
-                      <div className="grid grid-cols-4 gap-1">
-                        <button onClick={() => setPaymentMethod('cash')} className={`py-1.5 rounded-lg text-[10px] font-black uppercase border ${paymentMethod === 'cash' ? 'bg-green-600 text-white border-green-600 shadow' : 'bg-neutral-200 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-300 border-neutral-300 dark:border-neutral-700'}`}>Cash</button>
-                        <button onClick={() => setPaymentMethod('upi')} className={`py-1.5 rounded-lg text-[10px] font-black uppercase border ${paymentMethod === 'upi' ? 'bg-blue-600 text-white border-blue-600 shadow' : 'bg-neutral-200 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-300 border-neutral-300 dark:border-neutral-700'}`}>UPI</button>
-                        <button onClick={() => setPaymentMethod('split')} className={`py-1.5 rounded-lg text-[10px] font-black uppercase border ${paymentMethod === 'split' ? 'bg-amber-600 text-white border-amber-600 shadow' : 'bg-neutral-200 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-300 border-neutral-300 dark:border-neutral-700'}`}>Split</button>
-                        <button onClick={() => setPaymentMethod('due')} className={`py-1.5 rounded-lg text-[10px] font-black uppercase border ${paymentMethod === 'due' ? 'bg-red-600 text-white border-red-600 shadow' : 'bg-neutral-200 dark:bg-neutral-800 text-red-600 dark:text-red-400 border-neutral-300 dark:border-neutral-700'}`}>उधार (Due)</button>
-                      </div>
-                    </div>
-
-                    {/* ESTIMATE BILL (कच्चा बिल) + FINAL SETTLEMENT BUTTONS */}
-                    <div className="space-y-1.5 shrink-0">
-                      {fulfillmentType === 'table' ? (
-                        <>
-                          <button onClick={handleSaveTableOrderKotOnly} disabled={cart.length === 0 || isSubmittingOrder} className="w-full bg-amber-500 hover:bg-amber-400 text-black font-black py-2 rounded-xl uppercase tracking-wider text-xs flex items-center justify-center gap-1.5 shadow disabled:opacity-50">
-                            {isSubmittingOrder ? <Loader2 className="animate-spin" size={14} /> : <SafePrinter size={14} />}
-                            <span>{activeEditingOrderId ? `Update ${tableNumber} (New Items KOT)` : `Save on ${tableNumber} & Print KOT`}</span>
-                          </button>
-                          <div className="grid grid-cols-2 gap-1.5">
-                            <button onClick={handlePrintEstimateBill} disabled={cart.length === 0} className="py-2 bg-neutral-200 dark:bg-neutral-800 hover:bg-neutral-300 text-neutral-800 dark:text-neutral-200 font-black rounded-xl uppercase text-xs flex items-center justify-center gap-1 border border-neutral-300 dark:border-neutral-700">
-                              <SafeFileText size={13} /> Print Est. Bill
-                            </button>
-                            <button onClick={handleFinalCheckoutAndPrintBill} disabled={cart.length === 0 || isSubmittingOrder} className="py-2 bg-green-600 hover:bg-green-500 text-white font-black rounded-xl uppercase text-xs flex items-center justify-center gap-1 shadow-lg disabled:opacity-50">
-                              <Receipt size={13} /> Settle Bill [F9]
-                            </button>
-                          </div>
-                        </>
-                      ) : (
-                        <div className="grid grid-cols-2 gap-1.5">
-                          <button onClick={handlePrintEstimateBill} disabled={cart.length === 0} className="py-2.5 bg-neutral-200 dark:bg-neutral-800 hover:bg-neutral-300 text-neutral-800 dark:text-neutral-200 font-black rounded-xl uppercase text-xs flex items-center justify-center gap-1 border border-neutral-300 dark:border-neutral-700">
-                            <SafeFileText size={14} /> Est. Bill (कच्चा)
-                          </button>
-                          <button onClick={handleFinalCheckoutAndPrintBill} disabled={cart.length === 0 || isSubmittingOrder} className="py-2.5 bg-green-600 hover:bg-green-500 text-white font-black rounded-xl uppercase text-xs flex items-center justify-center gap-1.5 shadow-xl disabled:opacity-50">
-                            {isSubmittingOrder ? <Loader2 className="animate-spin" size={14} /> : <Receipt size={14} />}
-                            <span>Pay & Settle [F9]</span>
-                          </button>
-                        </div>
-                      )}
+                    {/* SINGLE CLEAN ACTION BUTTON: PRINT BILL (SAVED TO SETTLEMENT LIST) */}
+                    <div className="space-y-1.5 pt-2 shrink-0">
+                      <button 
+                        onClick={handleFinalCheckoutAndPrintBill} 
+                        disabled={cart.length === 0 || isSubmittingOrder} 
+                        className="w-full bg-green-600 hover:bg-green-500 text-white font-black py-3 rounded-xl uppercase tracking-wider text-xs flex items-center justify-center gap-2 shadow-xl disabled:opacity-50"
+                      >
+                        {isSubmittingOrder ? <Loader2 className="animate-spin" size={15} /> : <Receipt size={15} />}
+                        <span>Print Bill (₹{getTotalBillPrice()}) [F9]</span>
+                      </button>
                     </div>
                   </div>
                 </div>
               </div>
             )}
 
-            {/* TAB 2: INVENTORY & MENU */}
+            {/* TAB: DAILY BILLS & SETTLEMENT */}
+            {activeTab === 'settlement' && (
+              <div className="flex-1 p-6 h-full flex flex-col overflow-hidden space-y-4">
+                <div className="flex justify-between items-center border-b pb-3 shrink-0">
+                  <div>
+                    <h2 className="text-base font-black uppercase text-orange-600 dark:text-orange-500 flex items-center gap-2">
+                      <Receipt size={20} /> Daily Bills & Settlement (दैनिक बिल व भुगतान सेटलमेंट)
+                    </h2>
+                    <p className="text-xs text-neutral-600 dark:text-neutral-400">
+                      यहाँ से ग्राहक के भुगतान (Cash/UPI/उधार) को सेलेक्ट करके सेटल करें। सेटल होने के बाद ही यह दैनिक बिक्री रिपोर्ट में जुड़ेगा।
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="flex bg-neutral-200 dark:bg-neutral-800 p-1 rounded-xl">
+                      <button onClick={() => setSettlementFilter('all')} className={`px-3 py-1.5 text-xs font-black uppercase rounded-lg ${settlementFilter === 'all' ? 'bg-orange-600 text-white' : 'text-neutral-700 dark:text-neutral-300'}`}>All ({todaySettlementOrders.length})</button>
+                      <button onClick={() => setSettlementFilter('unsettled')} className={`px-3 py-1.5 text-xs font-black uppercase rounded-lg ${settlementFilter === 'unsettled' ? 'bg-red-600 text-white' : 'text-neutral-700 dark:text-neutral-300'}`}>Unsettled ({unsettledOrdersCount})</button>
+                      <button onClick={() => setSettlementFilter('settled')} className={`px-3 py-1.5 text-xs font-black uppercase rounded-lg ${settlementFilter === 'settled' ? 'bg-green-600 text-white' : 'text-neutral-700 dark:text-neutral-300'}`}>Settled</button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-3 overflow-y-auto flex-1 pr-1">
+                  {filteredSettlementOrders.length === 0 ? (
+                    <div className="text-center py-24 text-neutral-500 font-bold text-xs">
+                      कोई बिल उपलब्ध नहीं है।
+                    </div>
+                  ) : (
+                    filteredSettlementOrders.map((order) => {
+                      const isSettled = order.status === 'completed';
+                      return (
+                        <div 
+                          key={order.id} 
+                          className={`border rounded-2xl p-4 flex flex-col lg:flex-row justify-between lg:items-center gap-4 transition-all shadow-sm ${
+                            isSettled 
+                              ? 'bg-white dark:bg-neutral-900 border-neutral-300 dark:border-neutral-800' 
+                              : 'bg-amber-500/5 dark:bg-amber-500/10 border-amber-500 ring-1 ring-amber-500/50'
+                          }`}
+                        >
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono font-black text-amber-600 text-sm">Bill #{order.billNumber}</span>
+                              <span className="text-neutral-400">•</span>
+                              <span className="font-bold text-xs text-neutral-900 dark:text-white">{order.customerName || 'Walk-in Guest'}</span>
+                              {order.customerPhone && <span className="text-[10px] text-neutral-500 font-mono">({order.customerPhone})</span>}
+                              <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded ${
+                                isSettled ? 'bg-green-500/15 text-green-700 dark:text-green-400' : 'bg-red-500/15 text-red-600 dark:text-red-400 animate-pulse'
+                              }`}>
+                                {isSettled ? `✅ चुकता (${order.paymentMethod?.toUpperCase()})` : '🟡 भुगतान बाकी (Unsettled)'}
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-neutral-500 font-mono mt-1">
+                              {order.items?.map((it: any) => `${it.name} x${it.quantity}`).join(', ')}
+                            </p>
+                          </div>
+
+                          <div className="flex items-center gap-4 shrink-0">
+                            <div className="text-right">
+                              <span className="text-[10px] text-neutral-500 block uppercase font-bold">Total Amount</span>
+                              <span className="font-mono font-black text-base text-green-600 dark:text-green-400">₹{order.total}</span>
+                            </div>
+
+                            {/* SETTLEMENT BUTTONS (ONE-CLICK SETTLE) */}
+                            {!isSettled ? (
+                              <div className="flex gap-1.5">
+                                <button 
+                                  onClick={() => handleQuickSettleOrder(order.id, 'cash')} 
+                                  className="px-3 py-2 bg-green-600 hover:bg-green-500 text-white rounded-xl text-xs font-black uppercase shadow"
+                                >
+                                  💵 Cash
+                                </button>
+                                <button 
+                                  onClick={() => handleQuickSettleOrder(order.id, 'upi')} 
+                                  className="px-3 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-black uppercase shadow"
+                                >
+                                  📱 UPI
+                                </button>
+                                <button 
+                                  onClick={() => handleQuickSettleOrder(order.id, 'due')} 
+                                  className="px-3 py-2 bg-red-600 hover:bg-red-500 text-white rounded-xl text-xs font-black uppercase shadow"
+                                >
+                                  📕 उधार (Due)
+                                </button>
+                              </div>
+                            ) : (
+                              <button 
+                                onClick={() => handlePrintReceiptDirect(order, false)} 
+                                className="px-3 py-2 bg-neutral-200 dark:bg-neutral-800 text-neutral-800 dark:text-white rounded-xl text-xs font-bold flex items-center gap-1 border"
+                              >
+                                <SafePrinter size={14} /> Reprint
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* TAB 2: INVENTORY & STOCK */}
             {activeTab === 'inventory' && (
               <div className="flex-1 p-6 h-full overflow-y-auto space-y-4">
                 <div className="flex justify-between items-center border-b pb-3">
@@ -2762,13 +2717,13 @@ export default function BbCafeDesktopPos() {
                     <h2 className="text-lg font-black uppercase text-orange-600 dark:text-orange-500 flex items-center gap-2">
                       <SafeBarChart3 size={20} /> Sales & Item-wise Analytics
                     </h2>
-                    <p className="text-xs text-neutral-600 dark:text-neutral-400">Total sales, cash drawer reconciliation and item-wise sales report.</p>
+                    <p className="text-xs text-neutral-600 dark:text-neutral-400">Total settled sales, cash drawer reconciliation and item-wise sales report.</p>
                   </div>
                   <div className="flex items-center gap-2">
                     <button onClick={handleSendOwnerSummary} className="px-3 py-2 bg-green-600 hover:bg-green-500 text-white rounded-xl text-xs font-black uppercase flex items-center gap-1.5 shadow">
                       <SafeSend size={14} /> WhatsApp to Owner
                     </button>
-                    <div className="flex bg-neutral-200 dark:bg-neutral-800 p-1 rounded-2xl border border-neutral-300 dark:border-neutral-700">
+                    <div className="flex bg-neutral-200 dark:bg-neutral-800 p-1 rounded-2xl border">
                       <button onClick={() => setReportFilter('today')} className={`px-3 py-1.5 text-xs font-black uppercase rounded-xl ${reportFilter === 'today' ? 'bg-orange-600 text-white' : 'text-neutral-700 dark:text-neutral-400'}`}>Today</button>
                       <button onClick={() => setReportFilter('yesterday')} className={`px-3 py-1.5 text-xs font-black uppercase rounded-xl ${reportFilter === 'yesterday' ? 'bg-orange-600 text-white' : 'text-neutral-700 dark:text-neutral-400'}`}>Yesterday</button>
                       <button onClick={() => setReportFilter('custom')} className={`px-3 py-1.5 text-xs font-black uppercase rounded-xl ${reportFilter === 'custom' ? 'bg-orange-600 text-white' : 'text-neutral-700 dark:text-neutral-400'}`}>Date Picker</button>
@@ -2784,18 +2739,19 @@ export default function BbCafeDesktopPos() {
                   </div>
                 </div>
 
+                {/* SUMMARY TILES */}
                 <div className="grid grid-cols-5 gap-3">
                   <div className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 p-3.5 rounded-2xl space-y-1 shadow-sm">
-                    <p className="text-[10px] font-black uppercase text-neutral-500">Total Sales</p>
+                    <p className="text-[10px] font-black uppercase text-neutral-500">Settled Sales</p>
                     <p className="text-xl font-black font-mono text-green-600 dark:text-green-400">₹{reportSummary.totalSale}</p>
-                    <p className="text-[9px] text-neutral-500">{reportSummary.totalOrdersCount} Completed Orders</p>
+                    <p className="text-[9px] text-neutral-500">{reportSummary.totalOrdersCount} Settled Orders</p>
                   </div>
                   <div className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 p-3.5 rounded-2xl space-y-1 shadow-sm">
-                    <p className="text-[10px] font-black uppercase text-neutral-500">Gross Cash</p>
+                    <p className="text-[10px] font-black uppercase text-neutral-500">Cash Received</p>
                     <p className="text-xl font-black font-mono text-amber-600 dark:text-amber-400">₹{reportSummary.cashSale}</p>
                   </div>
                   <div className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 p-3.5 rounded-2xl space-y-1 shadow-sm">
-                    <p className="text-[10px] font-black uppercase text-neutral-500">UPI Payments</p>
+                    <p className="text-[10px] font-black uppercase text-neutral-500">UPI Received</p>
                     <p className="text-xl font-black font-mono text-blue-600 dark:text-blue-400">₹{reportSummary.upiSale}</p>
                   </div>
                   <div className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 p-3.5 rounded-2xl space-y-1 shadow-sm">
@@ -2846,7 +2802,7 @@ export default function BbCafeDesktopPos() {
                   </div>
 
                   {itemWiseSales.length === 0 ? (
-                    <p className="text-xs text-neutral-400 py-6 text-center">No items sold in this selected date range.</p>
+                    <p className="text-xs text-neutral-400 py-6 text-center">No settled items in this date range.</p>
                   ) : (
                     <div className="max-h-72 overflow-y-auto pr-1">
                       <table className="w-full text-left text-xs">
@@ -2992,7 +2948,7 @@ export default function BbCafeDesktopPos() {
                             <SafePrinter size={13} /> Print
                           </button>
                           <button onClick={async () => {
-                            await updateDoc(doc(db, "orders", order.id), { status: 'completed', settledAt: new Date() });
+                            await updateDoc(doc(db, "orders", order.id), { status: 'completed', paymentSettled: true, settledAt: new Date() });
                             toast.success("Order Completed! ✅");
                           }} className="py-2 bg-green-600 hover:bg-green-500 text-white rounded-xl text-[10px] font-black uppercase flex items-center justify-center gap-1">
                             <Check size={13} /> Done
@@ -3341,7 +3297,7 @@ export default function BbCafeDesktopPos() {
                   { key: 'F6', desc: 'Record Daily Drawer Expense' },
                   { key: 'F7', desc: 'Send WhatsApp Receipt to customer' },
                   { key: 'F8', desc: 'Toggle Discount & Coupon Box (Hide / Unhide छूट)' },
-                  { key: 'F9', desc: 'Pay & Settle Bill (or Settle Table)' },
+                  { key: 'F9', desc: 'Print Bill & Send to Daily Bills Settlement' },
                   { key: 'F11', desc: 'Open Customer Directory / Loyalty' },
                   { key: 'F12', desc: 'Toggle Mode (Pickup ➔ Table ➔ Delivery)' },
                   { key: 'Tab', desc: 'Cycle through Sizes/Portions in Variation Popup' },
@@ -3436,7 +3392,6 @@ export default function BbCafeDesktopPos() {
         {isVariationModalOpen && selectedProductForVariation && (
           <div 
             className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4 cursor-pointer outline-none" 
-            onKeyDown={handleVariationModalKeyDown}
             tabIndex={0}
             autoFocus
             onClick={() => { setIsVariationModalOpen(false); setTimeout(() => searchInputRef.current?.focus(), 60); }}
