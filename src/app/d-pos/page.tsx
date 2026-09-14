@@ -5,7 +5,7 @@ import { db } from '@/lib/firebase';
 import { 
   collection, onSnapshot, query, orderBy, limit, doc, 
   updateDoc, addDoc, getDoc, getDocs, where, setDoc,
-  waitForPendingWrites, deleteDoc, Timestamp
+  deleteDoc, Timestamp
 } from 'firebase/firestore';
 import { 
   ShoppingBag, Search, X, Loader2, Clock, Printer, Settings, 
@@ -14,7 +14,7 @@ import {
   Gift, PackagePlus, BarChart3, HelpCircle, PauseCircle, PlayCircle, QrCode, 
   Share2, Calculator, Receipt, IndianRupee, Send, Check, Plus, Eye,
   Users, Truck, ArrowLeft, ArrowRight, ArrowLeftRight, CheckCircle2, History,
-  ChevronDown, ChevronUp, BellRing, Tag
+  ChevronDown, ChevronUp, BellRing, Tag, Ticket
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
@@ -44,7 +44,6 @@ const SafeFileText = FileText as any;
 const SafeLayoutGrid = LayoutGrid as any;
 const SafeChevronLeft = ChevronLeft as any;
 const SafeChevronRight = ChevronRight as any;
-const SafeGift = Gift as any;
 const SafePackagePlus = PackagePlus as any;
 const SafeBarChart3 = BarChart3 as any;
 const SafeHelpCircle = HelpCircle as any;
@@ -52,12 +51,9 @@ const SafePauseCircle = PauseCircle as any;
 const SafePlayCircle = PlayCircle as any;
 const SafeQrCode = QrCode as any;
 const SafeShare2 = Share2 as any;
-const SafeCalculator = Calculator as any;
 const SafeSend = Send as any;
 const SafePlus = Plus as any;
 const SafeEye = Eye as any;
-const SafeUsers = Users as any;
-const SafeTruck = Truck as any;
 
 interface PosCartItem {
   cartItemId: string;
@@ -104,6 +100,14 @@ const PIZZA_ADDONS: { [size: string]: { [addon: string]: number } } = {
 };
 
 const COOKING_TAGS = ['🌶️ Less Spicy', '🧅 No Onion/Garlic', '📦 Parcel/To-Go', '🧊 Less Ice', '🧀 Extra Dip', '☕ Kadak'];
+
+// Predefined Promo Codes (Admin Codes)
+const PROMO_COUPONS: { [code: string]: { type: 'percent' | 'flat', value: number } } = {
+  'CAFE10': { type: 'percent', value: 10 },
+  'BUM50': { type: 'flat', value: 50 },
+  'WELCOME': { type: 'percent', value: 15 },
+  'FLAT100': { type: 'flat', value: 100 }
+};
 
 let globalAudioCtx: AudioContext | null = null;
 
@@ -160,6 +164,7 @@ export default function BbCafeDesktopPos() {
   const [showNewCustForm, setShowNewCustForm] = useState(false);
   const [newCustNameInput, setNewCustNameInput] = useState('');
   const [newCustAddressInput, setNewCustAddressInput] = useState('');
+  const [isEditingCustomerProfile, setIsEditingCustomerProfile] = useState(false);
 
   // Menu States & Category Management
   const [liveOrders, setLiveOrders] = useState<any[]>([]);
@@ -221,13 +226,13 @@ export default function BbCafeDesktopPos() {
   const [selectedAddons, setSelectedAddons] = useState<{ [addon: string]: boolean }>({});
   const [itemNoteInput, setItemNoteInput] = useState('');
 
-  // Past Receipts States with Quick Filter (All / Today / Yesterday)
+  // Past Receipts States with Quick Filter
   const [pastReceipts, setPastReceipts] = useState<any[]>([]);
   const [receiptSearchQuery, setReceiptSearchQuery] = useState('');
   const [receiptFilterDay, setReceiptFilterDay] = useState<'all' | 'today' | 'yesterday'>('today');
   const [selectedReceipt, setSelectedReceipt] = useState<any>(null);
   const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false); 
-  const [receiptsLimit, setReceiptsLimit] = useState(100);
+  const [receiptsLimit, setReceiptsLimit] = useState(200);
   const [isReceiptsLoading, setIsReceiptsLoading] = useState(false);
 
   const [isSyncing, setIsSyncing] = useState(false);
@@ -241,10 +246,12 @@ export default function BbCafeDesktopPos() {
   const [isRedeemingPoints, setIsRedeemingPoints] = useState(false);
   const [pointsToRedeem, setPointsToRedeem] = useState(0);
 
-  // Collapsible Discount State
+  // Collapsible Discount & Admin Promo Code State
   const [isDiscountOpen, setIsDiscountOpen] = useState(false);
   const [discountType, setDiscountType] = useState<'amount' | 'percentage'>('amount');
   const [discountValue, setDiscountValue] = useState<number>(0);
+  const [promoCouponInput, setPromoCouponInput] = useState('');
+  const [appliedPromoName, setAppliedPromoName] = useState<string | null>(null);
 
   const [fulfillmentType, setFulfillmentType] = useState<'delivery' | 'pickup' | 'table'>('pickup');
   const [selectedArea, setSelectedArea] = useState<DeliveryArea>(DELIVERY_AREAS[0]);
@@ -259,7 +266,8 @@ export default function BbCafeDesktopPos() {
   const [activeEditingOriginalItems, setActiveEditingOriginalItems] = useState<PosCartItem[]>([]);
 
   const [isSubmittingOrder, setIsSubmittingOrder] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'upi' | 'split'>('cash');
+  // Payment methods: cash, upi, split, due (उधार / Credit)
+  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'upi' | 'split' | 'due'>('cash');
   const [splitCashAmount, setSplitCashAmount] = useState<number>(0);
   const [splitUpiAmount, setSplitUpiAmount] = useState<number>(0);
 
@@ -273,11 +281,11 @@ export default function BbCafeDesktopPos() {
 
   const getSanitizedPhone = (p: string) => (p || '').replace(/\D/g, '').slice(-10);
 
-  // Invoice Number Generator (Starts at 200)
+  // Invoice Number Generator
   const getNextBillNumber = (): number => {
     const saved = localStorage.getItem("bb_pos_local_bill_counter_pc");
     let current = saved ? parseInt(saved, 10) : 199;
-    if (isNaN(current) || current < 199 || current >= 5000) {
+    if (isNaN(current) || current < 199 || current >= 10000) {
       current = 199;
     }
     const next = current + 1;
@@ -308,7 +316,6 @@ export default function BbCafeDesktopPos() {
         osc.frequency.setValueAtTime(880, globalAudioCtx.currentTime + 0.24);
         osc.stop(globalAudioCtx.currentTime + 0.4);
       } else if (type === 'alarm') {
-        // High attention alert chime for online orders
         osc.type = 'sine';
         osc.frequency.setValueAtTime(880, globalAudioCtx.currentTime);
         osc.frequency.setValueAtTime(1200, globalAudioCtx.currentTime + 0.15);
@@ -357,7 +364,7 @@ export default function BbCafeDesktopPos() {
       let list: QuickCustomer[] = existingStr ? JSON.parse(existingStr) : [];
       list = list.filter(c => c.phone !== cust.phone);
       list.unshift(cust);
-      list = list.slice(0, 15);
+      list = list.slice(0, 10);
       localStorage.setItem("bb_pos_recent_customers", JSON.stringify(list));
       setRecentCustomersList(list);
     } catch (e) {}
@@ -382,26 +389,30 @@ export default function BbCafeDesktopPos() {
     let expenseCount = 0;
 
     try {
-      // 1. Sync Offline Orders
       const offlineOrdersStr = localStorage.getItem("bb_pos_offline_orders_queue");
       if (offlineOrdersStr) {
         const queue: any[] = JSON.parse(offlineOrdersStr);
         if (queue.length > 0) {
           for (const ord of queue) {
-            await addDoc(collection(db, "orders"), ord);
+            await addDoc(collection(db, "orders"), {
+              ...ord,
+              timestamp: ord.timestamp ? new Date(ord.timestamp) : new Date()
+            });
             orderCount++;
           }
           localStorage.removeItem("bb_pos_offline_orders_queue");
         }
       }
 
-      // 2. Sync Offline Expenses
       const offlineExpensesStr = localStorage.getItem("bb_pos_offline_expenses_queue");
       if (offlineExpensesStr) {
         const expQueue: any[] = JSON.parse(offlineExpensesStr);
         if (expQueue.length > 0) {
           for (const exp of expQueue) {
-            await addDoc(collection(db, "daily_expenses"), exp);
+            await addDoc(collection(db, "daily_expenses"), {
+              ...exp,
+              timestamp: exp.timestamp ? new Date(exp.timestamp) : new Date()
+            });
             expenseCount++;
           }
           localStorage.removeItem("bb_pos_offline_expenses_queue");
@@ -528,7 +539,7 @@ export default function BbCafeDesktopPos() {
     }
 
     const savedCounter = localStorage.getItem("bb_pos_local_bill_counter_pc");
-    if (!savedCounter || Number(savedCounter) < 199 || Number(savedCounter) >= 5000) {
+    if (!savedCounter || Number(savedCounter) < 199 || Number(savedCounter) >= 10000) {
       localStorage.setItem("bb_pos_local_bill_counter_pc", "199");
       setManualInvoiceCounterInput("200");
     } else {
@@ -640,7 +651,7 @@ export default function BbCafeDesktopPos() {
     return String(Math.max(...existingNums) + 1);
   };
 
-  // Products Loading with Local Cache Fallback
+  // Products Loading with guaranteed Name & Price fallback
   useEffect(() => {
     if (!isLoggedIn) return;
     (async () => {
@@ -652,9 +663,22 @@ export default function BbCafeDesktopPos() {
           items = prodSnap.docs.map((d) => {
             const data = d.data();
             const cat = data.category || 'Burgers';
+
+            // Ensure valid price is resolved even if stored only as variants
+            let resolvedPrice = Number(data.price);
+            if (isNaN(resolvedPrice) || resolvedPrice <= 0) {
+              if (data.variants && typeof data.variants === 'object') {
+                const vals = Object.values(data.variants);
+                if (vals.length > 0) resolvedPrice = Number(vals[0]) || 0;
+              }
+            }
+            if (isNaN(resolvedPrice)) resolvedPrice = 0;
+
             return {
               id: d.id,
               ...data,
+              name: data.name || data.title || 'Cafe Item',
+              price: resolvedPrice,
               category: cat,
               itemCode: data.itemCode ? String(data.itemCode).trim() : ''
             };
@@ -695,12 +719,11 @@ export default function BbCafeDesktopPos() {
 
   // Real-time listener for live orders + Sound Alarm on New Incoming Website Orders
   useEffect(() => {
-    const q = query(collection(db, "orders"), orderBy("timestamp", "desc"), limit(60));
+    const q = query(collection(db, "orders"), orderBy("timestamp", "desc"), limit(80));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const ordersList = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
       setLiveOrders(ordersList);
 
-      // Check for newly added online orders (Ignore initial load)
       if (isInitialOrdersLoad.current) {
         isInitialOrdersLoad.current = false;
         return;
@@ -709,7 +732,6 @@ export default function BbCafeDesktopPos() {
       snapshot.docChanges().forEach((change) => {
         if (change.type === 'added') {
           const newOrd: any = change.doc.data();
-          // Detect online order or any newly arrived pending order
           if (newOrd.status === 'pending' && newOrd.source !== 'PC_POS') {
             triggerBeep('alarm');
             toast((t) => (
@@ -743,7 +765,7 @@ export default function BbCafeDesktopPos() {
     setShowCustomerDropdown(false);
     setShowNewCustForm(false);
     saveRecentCustomerLocal(cust);
-    toast.success(`Selected ${cust.name || cust.phone}!`);
+    toast.success(`चुना गया: ${cust.name || cust.phone}!`);
     setTimeout(() => searchInputRef.current?.focus(), 60);
   };
 
@@ -780,28 +802,50 @@ export default function BbCafeDesktopPos() {
     }
   };
 
+  // Customer Loyalty Search by Name or Phone
   const handleCheckLoyaltyWithAutoJump = async () => {
     triggerBeep('tap');
-    const cleanPhone = getSanitizedPhone(customerPhone || customerInputSearch);
-    if (cleanPhone.length !== 10) return toast.error("Enter valid 10-digit phone!");
+    const inputVal = customerInputSearch.trim();
+    if (!inputVal) return toast.error("Enter customer phone or name!");
+
+    const cleanPhone = getSanitizedPhone(customerPhone || inputVal);
 
     const toastId = toast.loading("Searching customer...");
     try {
-      const userRef = doc(db, "customer_points", cleanPhone);
-      const docSnap = await getDoc(userRef);
+      let foundData: any = null;
+      let foundPhone = cleanPhone;
+
+      if (cleanPhone.length === 10) {
+        const userRef = doc(db, "customer_points", cleanPhone);
+        const docSnap = await getDoc(userRef);
+        if (docSnap.exists()) {
+          foundData = docSnap.data();
+          foundPhone = cleanPhone;
+        }
+      }
+
+      // Name search fallback if phone doesn't match
+      if (!foundData) {
+        const qName = query(collection(db, "customer_points"), where("name", ">=", inputVal), limit(5));
+        const snap = await getDocs(qName);
+        if (!snap.empty) {
+          foundData = snap.docs[0].data();
+          foundPhone = snap.docs[0].id;
+        }
+      }
+
       toast.dismiss(toastId);
 
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        setCustomerName(data.name || '');
-        setCustomerPoints(data.points || 0);
-        setAddress(data.address || '');
-        setCustomerPhone(cleanPhone);
-        setCustomerInputSearch(`${data.name} (${cleanPhone})`);
+      if (foundData) {
+        setCustomerName(foundData.name || '');
+        setCustomerPoints(foundData.points || 0);
+        setAddress(foundData.address || '');
+        setCustomerPhone(foundPhone);
+        setCustomerInputSearch(`${foundData.name} (${foundPhone})`);
         setShowNewCustForm(false);
         setShowCustomerDropdown(false);
-        saveRecentCustomerLocal({ phone: cleanPhone, name: data.name, address: data.address, points: data.points });
-        toast.success(`Found: ${data.name} (${data.points || 0} Pts)`);
+        saveRecentCustomerLocal({ phone: foundPhone, name: foundData.name, address: foundData.address, points: foundData.points });
+        toast.success(`Found: ${foundData.name} (${foundData.points || 0} Pts)`);
         setTimeout(() => searchInputRef.current?.focus(), 80);
       } else {
         setCustomerName('');
@@ -814,6 +858,34 @@ export default function BbCafeDesktopPos() {
     } catch (err) {
       toast.dismiss(toastId);
       toast.error("Could not fetch customer");
+    }
+  };
+
+  // Save / Update Customer Profile directly from Cart
+  const handleSaveCustomerProfileInline = async () => {
+    const clean = getSanitizedPhone(customerPhone);
+    if (clean.length !== 10) return toast.error("Valid 10-digit phone required!");
+    const nameTrim = customerName.trim();
+    if (!nameTrim) return toast.error("Customer name cannot be empty!");
+
+    const toastId = toast.loading("Updating customer profile...");
+    try {
+      const userRef = doc(db, "customer_points", clean);
+      const updateData = {
+        name: nameTrim,
+        phone: clean,
+        address: address.trim(),
+        points: Number(customerPoints) || 0,
+        lastUpdated: new Date()
+      };
+      await setDoc(userRef, updateData, { merge: true });
+      saveRecentCustomerLocal(updateData);
+      setIsEditingCustomerProfile(false);
+      toast.dismiss(toastId);
+      toast.success("Profile updated successfully! ✅");
+    } catch (e) {
+      toast.dismiss(toastId);
+      toast.error("Failed to update customer");
     }
   };
 
@@ -852,6 +924,26 @@ export default function BbCafeDesktopPos() {
     } catch (err) {
       toast.dismiss(toastId);
       toast.error("Failed to save customer");
+    }
+  };
+
+  // Promo / Coupon Handler
+  const handleApplyPromoCoupon = () => {
+    const code = promoCouponInput.trim().toUpperCase();
+    if (!code) return toast.error("Enter a promo code!");
+    if (PROMO_COUPONS[code]) {
+      const c = PROMO_COUPONS[code];
+      if (c.type === 'percent') {
+        setDiscountType('percentage');
+        setDiscountValue(c.value);
+      } else {
+        setDiscountType('amount');
+        setDiscountValue(c.value);
+      }
+      setAppliedPromoName(code);
+      toast.success(`Coupon "${code}" applied successfully!`);
+    } else {
+      toast.error("Invalid coupon code!");
     }
   };
 
@@ -913,7 +1005,7 @@ export default function BbCafeDesktopPos() {
     setNewCustomCategoryName('');
     if (item) {
       setEditingItemObj(item);
-      setItemNameInput(item.name || '');
+      setItemNameInput(item.name || item.title || '');
       setItemCodeInput(item.itemCode || '');
       setItemPriceInput(item.price !== undefined ? Number(item.price) : 100);
       setItemCatInput(item.category || 'Burgers');
@@ -1005,6 +1097,7 @@ export default function BbCafeDesktopPos() {
       setIsVariationModalOpen(true);
     } else {
       const itemPrice = Number(item.price) || 100;
+      const itemName = item.name || item.title || "Cafe Item";
       const cartItemId = `std-${item.id}`;
       setCart((prev) => {
         const existingIndex = prev.findIndex((c) => c.cartItemId === cartItemId);
@@ -1013,9 +1106,9 @@ export default function BbCafeDesktopPos() {
           next[existingIndex] = { ...next[existingIndex], quantity: next[existingIndex].quantity + 1 };
           return next;
         }
-        return [...prev, { cartItemId, id: item.id, name: item.name, price: itemPrice, quantity: 1 }];
+        return [...prev, { cartItemId, id: item.id, name: itemName, price: itemPrice, quantity: 1 }];
       });
-      toast.success(`Added ${item.name}!`);
+      toast.success(`Added ${itemName}!`);
       setTimeout(() => searchInputRef.current?.focus(), 60);
     }
   };
@@ -1035,7 +1128,7 @@ export default function BbCafeDesktopPos() {
       }
     });
 
-    const baseName = selectedProductForVariation.name;
+    const baseName = selectedProductForVariation.name || selectedProductForVariation.title || "Item";
     const sizeSuffix = selectedSize && selectedSize !== 'Standard' ? `(${selectedSize.toUpperCase()})` : '';
     const fullName = `${baseName} ${sizeSuffix}`.trim();
 
@@ -1068,24 +1161,33 @@ export default function BbCafeDesktopPos() {
     setSelectedProductForVariation(null);
     setSearchQuery('');
     toast.success(`Added ${fullName}!`);
-    // Immediately refocus Search Input for lightning fast keyboard entry!
     setTimeout(() => searchInputRef.current?.focus(), 60);
   };
 
-  // Keyboard navigation inside Variation Modal (Left/Right/Enter/Esc)
+  // Keyboard navigation inside Variation Modal: TAB / ARROWS cycle, ENTER confirms
   const handleVariationModalKeyDown = (e: React.KeyboardEvent) => {
     if (!selectedProductForVariation || !selectedProductForVariation.variants) return;
     const entries = Object.entries(selectedProductForVariation.variants);
+    const totalVariants = entries.length;
+
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      const nextIdx = e.shiftKey ? (selectedVariantIndex - 1 + totalVariants) % totalVariants : (selectedVariantIndex + 1) % totalVariants;
+      setSelectedVariantIndex(nextIdx);
+      setSelectedSize(entries[nextIdx][0]);
+      setSelectedSizePrice(Number(entries[nextIdx][1]) || 0);
+      return;
+    }
 
     if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
       e.preventDefault();
-      const nextIdx = (selectedVariantIndex + 1) % entries.length;
+      const nextIdx = (selectedVariantIndex + 1) % totalVariants;
       setSelectedVariantIndex(nextIdx);
       setSelectedSize(entries[nextIdx][0]);
       setSelectedSizePrice(Number(entries[nextIdx][1]) || 0);
     } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
       e.preventDefault();
-      const prevIdx = (selectedVariantIndex - 1 + entries.length) % entries.length;
+      const prevIdx = (selectedVariantIndex - 1 + totalVariants) % totalVariants;
       setSelectedVariantIndex(prevIdx);
       setSelectedSize(entries[prevIdx][0]);
       setSelectedSizePrice(Number(entries[prevIdx][1]) || 0);
@@ -1170,54 +1272,49 @@ export default function BbCafeDesktopPos() {
           root.render(<PrintCustomerReceipt orderObj={orderObj} currentUser={currentUser} />);
         }
 
-        const executePrint = () => {
-          if (isKot) {
-            setTimeout(() => {
-              printWindow.focus();
-              printWindow.print();
-              printWindow.close();
-              resolve();
-            }, 250);
-            return;
-          }
-
-          const qrImg = printWindow.document.querySelector('img[alt="UPI QR Code"]') as HTMLImageElement | null;
-          if (qrImg) {
-            if (qrImg.complete && qrImg.naturalWidth > 0) {
-              printWindow.focus();
-              printWindow.print();
-              printWindow.close();
-              resolve();
-            } else {
-              let printed = false;
-              const trigger = () => {
-                if (!printed) {
-                  printed = true;
-                  printWindow.focus();
-                  printWindow.print();
-                  printWindow.close();
-                  resolve();
-                }
-              };
-              qrImg.onload = trigger;
-              qrImg.onerror = trigger;
-              setTimeout(trigger, 2500);
-            }
-          } else {
-            setTimeout(() => {
-              printWindow.focus();
-              printWindow.print();
-              printWindow.close();
-              resolve();
-            }, 400);
-          }
-        };
-
-        setTimeout(executePrint, 200);
+        setTimeout(() => {
+          printWindow.focus();
+          printWindow.print();
+          printWindow.close();
+          resolve();
+        }, 350);
       } else {
         resolve();
       }
     });
+  };
+
+  // Step 1: Pre-print Estimate Bill (कच्चा बिल) before Customer Pays
+  const handlePrintEstimateBill = async () => {
+    if (cart.length === 0) return toast.error("Cart is empty!");
+    triggerBeep('tap');
+
+    const subtotal = getCartSubtotal();
+    const finalTotal = getTotalBillPrice();
+    const discountAmt = getCalculatedDiscountAmount();
+    const token = getDailyTokenNumber();
+
+    const estOrderObj = {
+      billNumber: activeEditingBillNumber || 'EST-' + Math.floor(Math.random() * 900 + 100),
+      tokenNumber: token,
+      customerName: customerName || "Walk-in Guest",
+      customerPhone: customerPhone ? `+91${getSanitizedPhone(customerPhone)}` : "",
+      items: cart,
+      subtotal,
+      discountAmount: discountAmt,
+      gstAmount: getGstAmountCalculated(),
+      deliveryFee: getDeliveryCharge(),
+      total: finalTotal,
+      fulfillmentType,
+      tableNumber: fulfillmentType === 'table' ? tableNumber : '',
+      paymentMethod,
+      timestamp: new Date(),
+      isEstimate: true,
+      upiId: upiIdConfig
+    };
+
+    toast.success("Printing Estimate Bill (कच्चा बिल)...");
+    await handlePrintReceiptDirect(estOrderObj, false);
   };
 
   // Running Table Order: Save & Print ONLY Newly Added Items in KOT (Incremental KOT)
@@ -1236,7 +1333,6 @@ export default function BbCafeDesktopPos() {
       if (activeEditingOrderId) {
         billNumber = activeEditingBillNumber || getNextBillNumber();
         
-        // Calculate incremental new items for Kitchen KOT
         const newlyAddedKotItems: PosCartItem[] = [];
         cart.forEach((currItem) => {
           const prevItem = activeEditingOriginalItems.find(p => p.cartItemId === currItem.cartItemId || (p.name === currItem.name && p.size === currItem.size && p.note === currItem.note));
@@ -1341,6 +1437,9 @@ export default function BbCafeDesktopPos() {
       setIsDiscountOpen(false);
       setIsRedeemingPoints(false); 
       setPointsToRedeem(0);
+      setFulfillmentType('pickup'); // Always reset to pickup!
+      setTableNumber('Table 1');
+      setApplyDeliveryFee(false);
       setActiveEditingOrderId(null);
       setActiveEditingBillNumber(null);
       setActiveEditingOriginalItems([]);
@@ -1355,7 +1454,7 @@ export default function BbCafeDesktopPos() {
     }
   };
 
-  // Final Checkout & Settle [F9]
+  // Final Checkout, Settle & Automatic Reset to 'pickup'
   const handleFinalCheckoutAndPrintBill = async () => {
     if (cart.length === 0 || isSubmittingOrder) return;
     setIsSubmittingOrder(true);
@@ -1476,6 +1575,7 @@ export default function BbCafeDesktopPos() {
         await handlePrintReceiptDirect(orderObj, false);
       }
 
+      // RESET STATE: ALWAYS REVERTS DEFAULT FULFILLMENT TO 'PICKUP'
       setCart([]); 
       setCustomerPhone(''); 
       setCustomerName(''); 
@@ -1486,6 +1586,11 @@ export default function BbCafeDesktopPos() {
       setShowNewCustForm(false);
       setIsRedeemingPoints(false); 
       setPointsToRedeem(0);
+      setAppliedPromoName(null);
+      setPromoCouponInput('');
+      setFulfillmentType('pickup'); // Always set to pickup!
+      setTableNumber('Table 1');
+      setApplyDeliveryFee(false);
       localStorage.removeItem("bb_pos_saved_cart_pc");
       setTimeout(() => searchInputRef.current?.focus(), 60);
     } catch (err) {
@@ -1503,18 +1608,18 @@ export default function BbCafeDesktopPos() {
     if (!ord.items || ord.items.length === 0) return toast.error("No items in cart!");
 
     const itemsText = ord.items.map((i: any) => `• ${i.name} x${i.quantity} = ₹${i.price * i.quantity}`).join('%0A');
-    const msg = `*☕ BUM BUM CAFE - DIGITAL RECEIPT*%0A------------------------------%0A*Customer:* ${ord.customerName || 'Valued Guest'}%0A*Total Amount:* ₹${ord.total}%0A------------------------------%0A${itemsText}%0A------------------------------%0A_Thank you for visiting Bum Bum Cafe! Visit Again!_ 💛`;
+    const msg = `*☕ BUM BUM CAFE - DIGITAL RECEIPT*%0A------------------------------%0A*Customer:* ${ord.customerName || 'Valued Guest'}%0A*Total Amount:* ₹${ord.total}%0A*Payment:* ${ord.paymentMethod || 'Paid'}%0A------------------------------%0A${itemsText}%0A------------------------------%0A_Thank you for visiting Bum Bum Cafe! Visit Again!_ 💛`;
     window.open(`https://wa.me/91${clean}?text=${msg}`, '_blank');
   };
 
   // Owner EOD Summary WhatsApp
   const handleSendOwnerSummary = () => {
     const cleanOwner = getSanitizedPhone(ownerPhoneConfig);
-    const msg = `*☕ BUM BUM CAFE - DAY END SUMMARY*%0A------------------------------%0A*Date:* ${new Date().toLocaleDateString()}%0A*Total Sales:* ₹${reportSummary.totalSale}%0A*Orders Completed:* ${reportSummary.totalOrdersCount}%0A------------------------------%0A*💵 Gross Cash:* ₹${reportSummary.cashSale}%0A*📱 UPI / Bank:* ₹${reportSummary.upiSale}%0A*🧾 Expenses:* -₹${reportSummary.totalExpenseAmount}%0A------------------------------%0A*💰 Net Cash in Drawer:* ₹${reportSummary.netCashInDrawer}%0A------------------------------%0A_Generated via Bum Bum Cafe Desktop POS_`;
+    const msg = `*☕ BUM BUM CAFE - DAY END SUMMARY*%0A------------------------------%0A*Date:* ${new Date().toLocaleDateString()}%0A*Total Sales:* ₹${reportSummary.totalSale}%0A*Orders Completed:* ${reportSummary.totalOrdersCount}%0A------------------------------%0A*💵 Gross Cash:* ₹${reportSummary.cashSale}%0A*📱 UPI / Bank:* ₹${reportSummary.upiSale}%0A*📕 Udhar / Due:* ₹${reportSummary.dueSale}%0A*🧾 Expenses:* -₹${reportSummary.totalExpenseAmount}%0A------------------------------%0A*💰 Net Cash in Drawer:* ₹${reportSummary.netCashInDrawer}%0A------------------------------%0A_Generated via Bum Bum Cafe Desktop POS_`;
     window.open(`https://wa.me/${cleanOwner}?text=${msg}`, '_blank');
   };
 
-  // Daily Drawer Expense Save with Offline Fallback [F6]
+  // Daily Drawer Expense Save
   const handleSaveExpense = async (e: React.FormEvent) => {
     e.preventDefault();
     const amt = Number(expenseAmount);
@@ -1549,7 +1654,7 @@ export default function BbCafeDesktopPos() {
     }
   };
 
-  // Reports Data Fetching
+  // Reports Data Fetching (Exact Day 00:00:00 to 23:59:59.999 - No bills missed)
   const fetchReportData = async () => {
     setIsReportLoading(true);
     try {
@@ -1565,30 +1670,37 @@ export default function BbCafeDesktopPos() {
         endTarget.setDate(endTarget.getDate() - 1);
         endTarget.setHours(23, 59, 59, 999);
       } else if (reportFilter === 'custom' && customReportDate) {
-        startTarget = new Date(customReportDate);
-        startTarget.setHours(0, 0, 0, 0);
-        endTarget = new Date(customReportDate);
-        endTarget.setHours(23, 59, 59, 999);
+        const parts = customReportDate.split('-');
+        startTarget = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]), 0, 0, 0, 0);
+        endTarget = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]), 23, 59, 59, 999);
       }
 
       if (navigator.onLine) {
         const qOrders = query(
           collection(db, "orders"),
-          where("timestamp", ">=", Timestamp.fromDate(startTarget)),
-          where("timestamp", "<=", Timestamp.fromDate(endTarget)),
-          orderBy("timestamp", "desc")
+          orderBy("timestamp", "desc"),
+          limit(500)
         );
         const snapOrders = await getDocs(qOrders);
-        setReportOrders(snapOrders.docs.map(d => ({ id: d.id, ...d.data() })));
+        const filteredOrders = snapOrders.docs.map(d => ({ id: d.id, ...d.data() })).filter((o: any) => {
+          const raw = o.timestamp?.toDate ? o.timestamp.toDate() : new Date(o.timestamp || Date.now());
+          const timeMs = raw.getTime();
+          return timeMs >= startTarget.getTime() && timeMs <= endTarget.getTime();
+        });
+        setReportOrders(filteredOrders);
 
         const qExpenses = query(
           collection(db, "daily_expenses"),
-          where("timestamp", ">=", Timestamp.fromDate(startTarget)),
-          where("timestamp", "<=", Timestamp.fromDate(endTarget)),
-          orderBy("timestamp", "desc")
+          orderBy("timestamp", "desc"),
+          limit(200)
         );
         const snapExpenses = await getDocs(qExpenses);
-        setDailyExpenses(snapExpenses.docs.map(d => ({ id: d.id, ...d.data() })));
+        const filteredExp = snapExpenses.docs.map(d => ({ id: d.id, ...d.data() })).filter((exp: any) => {
+          const raw = exp.timestamp?.toDate ? exp.timestamp.toDate() : new Date(exp.timestamp || Date.now());
+          const timeMs = raw.getTime();
+          return timeMs >= startTarget.getTime() && timeMs <= endTarget.getTime();
+        });
+        setDailyExpenses(filteredExp);
       }
     } catch (err) {
       console.error(err);
@@ -1605,6 +1717,7 @@ export default function BbCafeDesktopPos() {
     let totalSale = 0;
     let cashSale = 0;
     let upiSale = 0;
+    let dueSale = 0;
     let totalOrdersCount = reportOrders.filter(o => o.status !== 'rejected').length;
 
     reportOrders.forEach(o => {
@@ -1613,6 +1726,8 @@ export default function BbCafeDesktopPos() {
         totalSale += amt;
         if (o.paymentMethod === 'upi') {
           upiSale += amt;
+        } else if (o.paymentMethod === 'due') {
+          dueSale += amt;
         } else if (o.paymentMethod === 'split') {
           cashSale += Number(o.splitCashAmount || 0);
           upiSale += Number(o.splitUpiAmount || 0);
@@ -1625,8 +1740,28 @@ export default function BbCafeDesktopPos() {
     const totalExpenseAmount = dailyExpenses.reduce((acc, exp) => acc + (Number(exp.amount) || 0), 0);
     const netCashInDrawer = Math.max(0, cashSale - totalExpenseAmount);
 
-    return { totalSale, cashSale, upiSale, totalOrdersCount, totalExpenseAmount, netCashInDrawer };
+    return { totalSale, cashSale, upiSale, dueSale, totalOrdersCount, totalExpenseAmount, netCashInDrawer };
   }, [reportOrders, dailyExpenses]);
+
+  // Item-wise Sales Report Calculation
+  const itemWiseSales = useMemo(() => {
+    const map: { [key: string]: { name: string, quantity: number, revenue: number } } = {};
+
+    reportOrders.forEach((order) => {
+      if (order.status !== 'rejected' && Array.isArray(order.items)) {
+        order.items.forEach((item: PosCartItem) => {
+          const key = item.name;
+          if (!map[key]) {
+            map[key] = { name: key, quantity: 0, revenue: 0 };
+          }
+          map[key].quantity += (Number(item.quantity) || 1);
+          map[key].revenue += (Number(item.price) || 0) * (Number(item.quantity) || 1);
+        });
+      }
+    });
+
+    return Object.values(map).sort((a, b) => b.quantity - a.quantity);
+  }, [reportOrders]);
 
   // Past Receipts Fetching
   const fetchPastReceipts = async () => {
@@ -1678,7 +1813,7 @@ export default function BbCafeDesktopPos() {
     });
   }, [pastReceipts, receiptSearchQuery, receiptFilterDay]);
 
-  // Keyboard Shortcuts Handler (F8: Toggle Discount, F9: Final Pay)
+  // Keyboard Shortcuts Handler
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!isLoggedIn) return;
@@ -1686,11 +1821,11 @@ export default function BbCafeDesktopPos() {
       if (e.key === 'F1') { e.preventDefault(); setIsHelpModalOpen(prev => !prev); }
       if (e.key === 'F2') { e.preventDefault(); setActiveTab('billing'); setTimeout(() => searchInputRef.current?.focus(), 80); }
       if (e.key === 'F3') { e.preventDefault(); handleHoldCurrentCart(); }
-      if (e.key === 'F4') { e.preventDefault(); setPaymentMethod(p => p === 'cash' ? 'upi' : p === 'upi' ? 'split' : 'cash'); }
+      if (e.key === 'F4') { e.preventDefault(); setPaymentMethod(p => p === 'cash' ? 'upi' : p === 'upi' ? 'split' : p === 'split' ? 'due' : 'cash'); }
       if (e.key === 'F5') { e.preventDefault(); setIsHeldCartsModalOpen(prev => !prev); }
       if (e.key === 'F6') { e.preventDefault(); setIsExpenseModalOpen(prev => !prev); }
       if (e.key === 'F7') { e.preventDefault(); handleSendWhatsAppBill(); }
-      if (e.key === 'F8') { e.preventDefault(); setIsDiscountOpen(prev => !prev); } // F8 to instantly toggle Discount!
+      if (e.key === 'F8') { e.preventDefault(); setIsDiscountOpen(prev => !prev); }
       if (e.key === 'F9') { e.preventDefault(); if (cart.length > 0 && !isSubmittingOrder) handleFinalCheckoutAndPrintBill(); }
       if (e.key === 'F11') { e.preventDefault(); setIsCustomerModalOpen(prev => !prev); }
       if (e.key === 'F12') { e.preventDefault(); setFulfillmentType(prev => prev === 'pickup' ? 'table' : prev === 'table' ? 'delivery' : 'pickup'); }
@@ -1707,6 +1842,7 @@ export default function BbCafeDesktopPos() {
         setIsItemEditorModalOpen(false);
         setIsCatManagerModalOpen(false);
         setShowCustomerDropdown(false);
+        setIsEditingCustomerProfile(false);
         setTimeout(() => searchInputRef.current?.focus(), 60);
       }
     };
@@ -1773,7 +1909,6 @@ export default function BbCafeDesktopPos() {
                     return;
                   }
                 }
-                // Fallback offline login for manager/staff pin
                 if (pinInput.trim() === '1234' || pinInput.trim() === '0000') {
                   setIsLoggedIn(true);
                   setCurrentUser({ name: 'Staff Offline', role: 'cashier' });
@@ -1807,7 +1942,7 @@ export default function BbCafeDesktopPos() {
                   {!isSidebarCollapsed && (
                     <div className="truncate">
                       <h1 className="text-xs font-black uppercase text-orange-600 dark:text-yellow-500 truncate">Bum Bum Cafe</h1>
-                      <span className="text-[10px] text-neutral-600 dark:text-neutral-400 font-bold">POS Pro v3.9</span>
+                      <span className="text-[10px] text-neutral-600 dark:text-neutral-400 font-bold">POS Pro v4.1</span>
                     </div>
                   )}
                 </div>
@@ -1964,7 +2099,7 @@ export default function BbCafeDesktopPos() {
                     })}
                   </div>
 
-                  {/* PRODUCTS GRID (NOW 5 ITEMS PER ROW FOR MAXIMUM VISIBILITY) */}
+                  {/* PRODUCTS GRID (100% Guaranteed Price & Name Display for Every Single Item) */}
                   {loading ? (
                     <div className="flex items-center justify-center flex-1"><Loader2 className="animate-spin text-orange-500" size={32} /></div>
                   ) : (
@@ -1972,6 +2107,9 @@ export default function BbCafeDesktopPos() {
                       {filteredMenu.map((item) => {
                         const isAvail = item.isAvailable !== false;
                         const imgUrl = item.image || item.imageUrl || item.img;
+                        const displayName = item.name || item.title || "Cafe Item";
+                        const displayPrice = Number(item.price) || (item.variants && Object.values(item.variants)[0]) || 0;
+
                         return (
                           <button 
                             key={item.id} 
@@ -1981,7 +2119,7 @@ export default function BbCafeDesktopPos() {
                           >
                             <div className="w-full h-18 bg-neutral-200 dark:bg-neutral-800 relative shrink-0 overflow-hidden flex items-center justify-center">
                               {imgUrl ? (
-                                <img src={imgUrl} alt={item.name} className="w-full h-full object-cover" />
+                                <img src={imgUrl} alt={displayName} className="w-full h-full object-cover" />
                               ) : (
                                 <span className="text-neutral-500 text-[10px] font-black uppercase tracking-wider px-2 text-center">{item.category || "Cafe Item"}</span>
                               )}
@@ -1992,9 +2130,9 @@ export default function BbCafeDesktopPos() {
                               )}
                             </div>
                             <div className="p-2 flex-grow flex flex-col justify-between w-full">
-                              <p className="font-bold text-[11px] line-clamp-2 text-neutral-900 dark:text-white leading-tight">{item.name}</p>
+                              <p className="font-bold text-[11px] line-clamp-2 text-neutral-900 dark:text-white leading-tight">{displayName}</p>
                               <div className="flex justify-between items-center">
-                                <span className="text-xs font-mono font-black text-orange-600 dark:text-orange-400">₹{item.price}</span>
+                                <span className="text-xs font-mono font-black text-orange-600 dark:text-orange-400">₹{displayPrice}</span>
                                 <span className="text-[8px] font-bold text-neutral-500 truncate max-w-[70px]">{item.category}</span>
                               </div>
                             </div>
@@ -2018,7 +2156,7 @@ export default function BbCafeDesktopPos() {
                       <button onClick={() => setCart([])} className="text-red-500 text-xs font-bold hover:underline flex items-center gap-1"><SafeTrash2 size={13} /> Clear [Del]</button>
                     </div>
 
-                    {/* CUSTOMER SEARCH BY PHONE OR NAME */}
+                    {/* CUSTOMER SEARCH BY PHONE OR NAME + EDIT PROFILE */}
                     <div ref={customerDropdownRef} className="relative space-y-1.5 bg-neutral-100 dark:bg-neutral-800/40 p-2 rounded-xl border border-neutral-300 dark:border-neutral-700 mb-2 shrink-0">
                       <div className="flex gap-1.5">
                         <div className="relative flex-1">
@@ -2048,7 +2186,7 @@ export default function BbCafeDesktopPos() {
                       {showCustomerDropdown && filteredCustomerSuggestions.length > 0 && (
                         <div className="absolute left-0 right-0 top-12 z-50 bg-white dark:bg-neutral-900 border border-orange-500/50 rounded-xl shadow-2xl overflow-hidden max-h-48 overflow-y-auto">
                           <div className="p-1.5 bg-neutral-100 dark:bg-neutral-800 text-[10px] font-black uppercase text-neutral-500 flex items-center gap-1 border-b border-neutral-200 dark:border-neutral-700">
-                            <History size={11} /> Recent Customers (हाल के ग्राहक)
+                            <History size={11} /> Last 10 Recent Customers (हाल के ग्राहक)
                           </div>
                           {filteredCustomerSuggestions.map((cust, i) => (
                             <div 
@@ -2068,14 +2206,46 @@ export default function BbCafeDesktopPos() {
                         </div>
                       )}
 
-                      {customerName && !showNewCustForm && (
+                      {/* CUSTOMER FOUND DETAILS + EDIT PROFILE TOGGLE */}
+                      {customerName && !showNewCustForm && !isEditingCustomerProfile && (
                         <div className="flex justify-between items-center text-xs font-black text-amber-600 dark:text-yellow-400 pt-1 border-t border-neutral-300 dark:border-neutral-700">
-                          <span>👤 {customerName}</span>
-                          <span>⭐ Pts: {customerPoints}</span>
+                          <span>👤 {customerName} (⭐ {customerPoints} Pts)</span>
+                          <button 
+                            type="button" 
+                            onClick={() => setIsEditingCustomerProfile(true)}
+                            className="text-[10px] text-blue-600 dark:text-blue-400 flex items-center gap-1 hover:underline"
+                          >
+                            <SafeEdit3 size={11} /> Edit Profile
+                          </button>
                         </div>
                       )}
 
-                      {customerName && customerPoints > 0 && !showNewCustForm && (
+                      {/* INLINE EDIT CUSTOMER PROFILE FORM */}
+                      {isEditingCustomerProfile && (
+                        <div className="space-y-1.5 pt-1 border-t border-neutral-300 dark:border-neutral-700">
+                          <p className="text-[9px] font-black uppercase text-blue-600 dark:text-blue-400">Edit Customer Profile:</p>
+                          <input 
+                            type="text" 
+                            value={customerName} 
+                            onChange={e => setCustomerName(e.target.value)} 
+                            placeholder="Customer Name" 
+                            className="w-full bg-white dark:bg-neutral-900 border rounded px-2 py-1 text-xs font-bold"
+                          />
+                          <input 
+                            type="text" 
+                            value={address} 
+                            onChange={e => setAddress(e.target.value)} 
+                            placeholder="Address" 
+                            className="w-full bg-white dark:bg-neutral-900 border rounded px-2 py-1 text-xs"
+                          />
+                          <div className="flex gap-1.5">
+                            <button onClick={handleSaveCustomerProfileInline} className="flex-1 py-1 bg-blue-600 text-white font-black text-[10px] rounded uppercase">Save</button>
+                            <button onClick={() => setIsEditingCustomerProfile(false)} className="px-2 py-1 bg-neutral-300 dark:bg-neutral-700 text-[10px] rounded uppercase">Cancel</button>
+                          </div>
+                        </div>
+                      )}
+
+                      {customerName && customerPoints > 0 && !showNewCustForm && !isEditingCustomerProfile && (
                         <div className="pt-1 border-t border-neutral-300 dark:border-neutral-700 flex items-center justify-between text-xs">
                           <span className="text-amber-700 dark:text-amber-400 font-bold flex items-center gap-1">⭐ Redeem ({customerPoints} Pts):</span>
                           <div className="flex items-center gap-1.5">
@@ -2145,7 +2315,7 @@ export default function BbCafeDesktopPos() {
                       )}
                     </div>
 
-                    {/* CART ITEMS LIST (EXPANDED TO MAXIMUM HEIGHT) */}
+                    {/* CART ITEMS LIST */}
                     <div className="space-y-1.5 overflow-y-auto flex-1 pr-1 mb-2">
                       {cart.length === 0 ? (
                         <div className="flex flex-col items-center justify-center h-full text-neutral-500 text-xs text-center py-8">
@@ -2178,7 +2348,6 @@ export default function BbCafeDesktopPos() {
                         ))}
                       </div>
 
-                      {/* ULTRA-COMPACT SLIM 6 TABLES SELECTOR (Takes negligible height!) */}
                       {fulfillmentType === 'table' && (
                         <div className="bg-amber-500/10 border border-amber-500/30 p-1.5 rounded-xl space-y-1">
                           <div className="flex justify-between items-center text-[9px] font-black uppercase text-amber-800 dark:text-amber-300">
@@ -2229,7 +2398,6 @@ export default function BbCafeDesktopPos() {
                         </div>
                       )}
 
-                      {/* OPTIONAL DELIVERY CHARGE BOX */}
                       {fulfillmentType === 'delivery' && (
                         <div className="bg-neutral-100 dark:bg-neutral-800/80 p-2 rounded-xl border border-neutral-300 dark:border-neutral-700 space-y-1.5">
                           <div className="flex justify-between items-center text-xs">
@@ -2275,7 +2443,7 @@ export default function BbCafeDesktopPos() {
                       )}
                     </div>
 
-                    {/* COLLAPSIBLE DISCOUNT OPTION (छूट - HIDE/UNHIDE ON DEMAND [F8]) */}
+                    {/* COLLAPSIBLE DISCOUNT & ADMIN PROMO CODE SECTION [F8] */}
                     <div className="mb-2 shrink-0">
                       {!isDiscountOpen ? (
                         <button 
@@ -2285,45 +2453,61 @@ export default function BbCafeDesktopPos() {
                         >
                           <span className="flex items-center gap-1.5">
                             <Tag size={12} className="text-orange-500" />
-                            <span>Add Discount (छूट) [F8]</span>
+                            <span>Add Coupon / Discount (छूट) [F8]</span>
                           </span>
                           {discountValue > 0 ? (
                             <span className="font-mono text-orange-600 dark:text-orange-400 font-black">
-                              -₹{getCalculatedDiscountAmount()} Applied
+                              -₹{getCalculatedDiscountAmount()} {appliedPromoName && `(${appliedPromoName})`}
                             </span>
                           ) : (
                             <ChevronDown size={14} className="text-neutral-400" />
                           )}
                         </button>
                       ) : (
-                        <div className="space-y-1.5 bg-neutral-100 dark:bg-neutral-800/50 p-2 rounded-xl border border-orange-500/50">
+                        <div className="space-y-2 bg-neutral-100 dark:bg-neutral-800/60 p-2.5 rounded-xl border border-orange-500/50">
                           <div className="flex items-center justify-between">
                             <span className="text-[10px] font-black uppercase text-neutral-700 dark:text-neutral-300 flex items-center gap-1">
-                              <Tag size={11} className="text-orange-500" /> Discount (छूट)
+                              <Ticket size={11} className="text-orange-500" /> Coupon / Discount (छूट)
                             </span>
-                            <div className="flex items-center gap-1.5">
-                              <div className="flex bg-neutral-200 dark:bg-neutral-700 p-0.5 rounded-lg border border-neutral-300 dark:border-neutral-600">
-                                <button type="button" onClick={() => setDiscountType('amount')} className={`px-2 py-0.5 text-[9px] font-black uppercase rounded transition-all ${discountType === 'amount' ? 'bg-orange-600 text-white shadow' : 'text-neutral-700 dark:text-neutral-300'}`}>₹ Flat</button>
-                                <button type="button" onClick={() => setDiscountType('percentage')} className={`px-2 py-0.5 text-[9px] font-black uppercase rounded transition-all ${discountType === 'percentage' ? 'bg-orange-600 text-white shadow' : 'text-neutral-700 dark:text-neutral-300'}`}>% Off</button>
-                              </div>
-                              <button type="button" onClick={() => setIsDiscountOpen(false)} className="text-neutral-400 hover:text-black dark:hover:text-white p-0.5">
-                                <ChevronUp size={14} />
-                              </button>
-                            </div>
+                            <button type="button" onClick={() => setIsDiscountOpen(false)} className="text-neutral-400 hover:text-black dark:hover:text-white p-0.5">
+                              <ChevronUp size={14} />
+                            </button>
                           </div>
 
-                          <div className="flex items-center gap-1.5">
+                          {/* PROMO / COUPON CODE BOX */}
+                          <div className="flex gap-1.5">
+                            <input 
+                              type="text" 
+                              placeholder="Coupon Code (e.g. CAFE10, BUM50)" 
+                              value={promoCouponInput}
+                              onChange={e => setPromoCouponInput(e.target.value)}
+                              className="flex-1 bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 rounded-lg px-2.5 py-1 text-xs font-mono font-bold uppercase text-neutral-900 dark:text-white outline-none" 
+                            />
+                            <button 
+                              type="button" 
+                              onClick={handleApplyPromoCoupon} 
+                              className="bg-orange-600 hover:bg-orange-500 text-white px-3 py-1 rounded-lg text-xs font-black uppercase"
+                            >
+                              Apply
+                            </button>
+                          </div>
+
+                          {/* MANUAL DISCOUNT ENTRY */}
+                          <div className="flex items-center gap-1.5 pt-1 border-t border-neutral-300 dark:border-neutral-700">
+                            <div className="flex bg-neutral-200 dark:bg-neutral-700 p-0.5 rounded-lg border border-neutral-300 dark:border-neutral-600">
+                              <button type="button" onClick={() => setDiscountType('amount')} className={`px-2 py-0.5 text-[9px] font-black uppercase rounded transition-all ${discountType === 'amount' ? 'bg-orange-600 text-white shadow' : 'text-neutral-700 dark:text-neutral-300'}`}>₹ Flat</button>
+                              <button type="button" onClick={() => setDiscountType('percentage')} className={`px-2 py-0.5 text-[9px] font-black uppercase rounded transition-all ${discountType === 'percentage' ? 'bg-orange-600 text-white shadow' : 'text-neutral-700 dark:text-neutral-300'}`}>% Off</button>
+                            </div>
                             <input 
                               type="number" 
                               min={0}
-                              placeholder={discountType === 'amount' ? "Enter Discount (₹)" : "Enter Discount (%)"}
+                              placeholder="Value"
                               value={discountValue || ''}
-                              onChange={e => setDiscountValue(Number(e.target.value))}
-                              className="w-full bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 rounded-lg px-2.5 py-1 text-xs text-neutral-900 dark:text-white outline-none font-mono font-bold" 
-                              autoFocus
+                              onChange={e => { setDiscountValue(Number(e.target.value)); setAppliedPromoName(null); }}
+                              className="w-full bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 rounded-lg px-2 py-1 text-xs text-neutral-900 dark:text-white outline-none font-mono font-bold" 
                             />
                             {discountValue > 0 && (
-                              <button type="button" onClick={() => setDiscountValue(0)} className="text-red-500 hover:text-red-700 text-xs font-black px-2 py-1 bg-red-500/10 rounded-lg shrink-0">Clear</button>
+                              <button type="button" onClick={() => { setDiscountValue(0); setAppliedPromoName(null); }} className="text-red-500 text-xs font-black px-1.5 py-1 bg-red-500/10 rounded-lg shrink-0">Clear</button>
                             )}
                           </div>
                         </div>
@@ -2334,40 +2518,52 @@ export default function BbCafeDesktopPos() {
                     <div className="space-y-1 text-xs border-t border-neutral-300 dark:border-neutral-800 pt-1.5 shrink-0 font-bold">
                       <div className="flex justify-between text-neutral-600 dark:text-neutral-400"><span>Subtotal</span><span className="font-mono">₹{getCartSubtotal()}</span></div>
                       {getDeliveryCharge() > 0 && <div className="flex justify-between text-neutral-800 dark:text-neutral-200"><span>Delivery Charge</span><span className="font-mono">+₹{getDeliveryCharge()}</span></div>}
-                      {getCalculatedDiscountAmount() > 0 && <div className="flex justify-between text-orange-600 font-bold"><span>Discount</span><span className="font-mono">-₹{getCalculatedDiscountAmount()}</span></div>}
+                      {getCalculatedDiscountAmount() > 0 && <div className="flex justify-between text-orange-600 font-bold"><span>Discount {appliedPromoName && `(${appliedPromoName})`}</span><span className="font-mono">-₹{getCalculatedDiscountAmount()}</span></div>}
                       {isRedeemingPoints && <div className="flex justify-between text-amber-600 font-bold"><span>Points Redeemed</span><span className="font-mono">-₹{getRedemptionDiscount()}</span></div>}
                       <div className="flex justify-between text-sm font-black text-green-600 dark:text-green-500 pt-1 border-t border-dashed border-neutral-400">
                         <span>Grand Total</span><span className="font-mono text-base font-black">₹{getTotalBillPrice()}</span>
                       </div>
                     </div>
 
-                    {/* PAYMENT METHOD [F4] */}
+                    {/* PAYMENT METHOD [F4] INCLUDING 'UDHAR' (उधार / DUE) */}
                     <div className="space-y-1.5 my-1.5 shrink-0">
-                      <div className="grid grid-cols-3 gap-1">
-                        <button onClick={() => setPaymentMethod('cash')} className={`py-1.5 rounded-lg text-xs font-black uppercase border ${paymentMethod === 'cash' ? 'bg-green-600 text-white border-green-600 shadow' : 'bg-neutral-200 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-300 border-neutral-300 dark:border-neutral-700'}`}>Cash [F4]</button>
-                        <button onClick={() => setPaymentMethod('upi')} className={`py-1.5 rounded-lg text-xs font-black uppercase border ${paymentMethod === 'upi' ? 'bg-blue-600 text-white border-blue-600 shadow' : 'bg-neutral-200 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-300 border-neutral-300 dark:border-neutral-700'}`}>UPI [F4]</button>
-                        <button onClick={() => setPaymentMethod('split')} className={`py-1.5 rounded-lg text-xs font-black uppercase border ${paymentMethod === 'split' ? 'bg-amber-600 text-white border-amber-600 shadow' : 'bg-neutral-200 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-300 border-neutral-300 dark:border-neutral-700'}`}>Split [F4]</button>
+                      <div className="grid grid-cols-4 gap-1">
+                        <button onClick={() => setPaymentMethod('cash')} className={`py-1.5 rounded-lg text-[10px] font-black uppercase border ${paymentMethod === 'cash' ? 'bg-green-600 text-white border-green-600 shadow' : 'bg-neutral-200 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-300 border-neutral-300 dark:border-neutral-700'}`}>Cash</button>
+                        <button onClick={() => setPaymentMethod('upi')} className={`py-1.5 rounded-lg text-[10px] font-black uppercase border ${paymentMethod === 'upi' ? 'bg-blue-600 text-white border-blue-600 shadow' : 'bg-neutral-200 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-300 border-neutral-300 dark:border-neutral-700'}`}>UPI</button>
+                        <button onClick={() => setPaymentMethod('split')} className={`py-1.5 rounded-lg text-[10px] font-black uppercase border ${paymentMethod === 'split' ? 'bg-amber-600 text-white border-amber-600 shadow' : 'bg-neutral-200 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-300 border-neutral-300 dark:border-neutral-700'}`}>Split</button>
+                        <button onClick={() => setPaymentMethod('due')} className={`py-1.5 rounded-lg text-[10px] font-black uppercase border ${paymentMethod === 'due' ? 'bg-red-600 text-white border-red-600 shadow' : 'bg-neutral-200 dark:bg-neutral-800 text-red-600 dark:text-red-400 border-neutral-300 dark:border-neutral-700'}`}>उधार (Due)</button>
                       </div>
                     </div>
 
-                    {/* CHECKOUT ACTION BUTTONS [F9] */}
-                    {fulfillmentType === 'table' ? (
-                      <div className="space-y-1.5 shrink-0">
-                        <button onClick={handleSaveTableOrderKotOnly} disabled={cart.length === 0 || isSubmittingOrder} className="w-full bg-amber-500 hover:bg-amber-400 text-black font-black py-2.5 rounded-xl uppercase tracking-wider text-xs flex items-center justify-center gap-2 shadow disabled:opacity-50">
-                          {isSubmittingOrder ? <Loader2 className="animate-spin" size={15} /> : <SafePrinter size={15} />}
-                          <span>{activeEditingOrderId ? `Update ${tableNumber} (Only New Items KOT)` : `Save on ${tableNumber} & Print KOT`}</span>
-                        </button>
-                        <button onClick={handleFinalCheckoutAndPrintBill} disabled={cart.length === 0 || isSubmittingOrder} className="w-full bg-green-600 hover:bg-green-500 text-white font-black py-2.5 rounded-xl uppercase tracking-wider text-xs flex items-center justify-center gap-2 shadow-lg disabled:opacity-50">
-                          {isSubmittingOrder ? <Loader2 className="animate-spin" size={15} /> : <SafeFileText size={15} />}
-                          <span>Settle & Final Bill (₹{getTotalBillPrice()}) [F9]</span>
-                        </button>
-                      </div>
-                    ) : (
-                      <button onClick={handleFinalCheckoutAndPrintBill} disabled={cart.length === 0 || isSubmittingOrder} className="w-full bg-green-600 hover:bg-green-500 text-white font-black py-3 rounded-xl uppercase tracking-wider text-xs flex items-center justify-center gap-2 shadow-xl disabled:opacity-50 shrink-0">
-                        {isSubmittingOrder ? <Loader2 className="animate-spin" size={15} /> : <Receipt size={15} />}
-                        <span>Pay & Print Bill (₹{getTotalBillPrice()}) [F9]</span>
-                      </button>
-                    )}
+                    {/* ESTIMATE BILL (कच्चा बिल) + FINAL SETTLEMENT BUTTONS */}
+                    <div className="space-y-1.5 shrink-0">
+                      {fulfillmentType === 'table' ? (
+                        <>
+                          <button onClick={handleSaveTableOrderKotOnly} disabled={cart.length === 0 || isSubmittingOrder} className="w-full bg-amber-500 hover:bg-amber-400 text-black font-black py-2 rounded-xl uppercase tracking-wider text-xs flex items-center justify-center gap-1.5 shadow disabled:opacity-50">
+                            {isSubmittingOrder ? <Loader2 className="animate-spin" size={14} /> : <SafePrinter size={14} />}
+                            <span>{activeEditingOrderId ? `Update ${tableNumber} (New Items KOT)` : `Save on ${tableNumber} & Print KOT`}</span>
+                          </button>
+                          <div className="grid grid-cols-2 gap-1.5">
+                            <button onClick={handlePrintEstimateBill} disabled={cart.length === 0} className="py-2 bg-neutral-200 dark:bg-neutral-800 hover:bg-neutral-300 text-neutral-800 dark:text-neutral-200 font-black rounded-xl uppercase text-xs flex items-center justify-center gap-1 border border-neutral-300 dark:border-neutral-700">
+                              <SafeFileText size={13} /> Print Est. Bill
+                            </button>
+                            <button onClick={handleFinalCheckoutAndPrintBill} disabled={cart.length === 0 || isSubmittingOrder} className="py-2 bg-green-600 hover:bg-green-500 text-white font-black rounded-xl uppercase text-xs flex items-center justify-center gap-1 shadow-lg disabled:opacity-50">
+                              <Receipt size={13} /> Settle Bill [F9]
+                            </button>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="grid grid-cols-2 gap-1.5">
+                          <button onClick={handlePrintEstimateBill} disabled={cart.length === 0} className="py-2.5 bg-neutral-200 dark:bg-neutral-800 hover:bg-neutral-300 text-neutral-800 dark:text-neutral-200 font-black rounded-xl uppercase text-xs flex items-center justify-center gap-1 border border-neutral-300 dark:border-neutral-700">
+                            <SafeFileText size={14} /> Est. Bill (कच्चा)
+                          </button>
+                          <button onClick={handleFinalCheckoutAndPrintBill} disabled={cart.length === 0 || isSubmittingOrder} className="py-2.5 bg-green-600 hover:bg-green-500 text-white font-black rounded-xl uppercase text-xs flex items-center justify-center gap-1.5 shadow-xl disabled:opacity-50">
+                            {isSubmittingOrder ? <Loader2 className="animate-spin" size={14} /> : <Receipt size={14} />}
+                            <span>Pay & Settle [F9]</span>
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -2535,7 +2731,7 @@ export default function BbCafeDesktopPos() {
                           </div>
 
                           <div className="flex items-center gap-4">
-                            <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded ${order.paymentMethod === 'upi' ? 'bg-blue-500/15 text-blue-600 dark:text-blue-400' : order.paymentMethod === 'split' ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400' : 'bg-green-500/15 text-green-600 dark:text-green-400'}`}>
+                            <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded ${order.paymentMethod === 'upi' ? 'bg-blue-500/15 text-blue-600 dark:text-blue-400' : order.paymentMethod === 'due' ? 'bg-red-500/15 text-red-600 dark:text-red-400' : order.paymentMethod === 'split' ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400' : 'bg-green-500/15 text-green-600 dark:text-green-400'}`}>
                               {order.paymentMethod || 'cash'}
                             </span>
                             <span className="font-mono font-black text-sm text-green-600 dark:text-green-400">₹{order.total}</span>
@@ -2558,15 +2754,15 @@ export default function BbCafeDesktopPos() {
               </div>
             )}
 
-            {/* TAB 4: REPORTS */}
+            {/* TAB 4: REPORTS WITH ITEM-WISE SALES */}
             {activeTab === 'reports' && (
-              <div className="flex-1 p-6 h-full overflow-y-auto max-w-4xl mx-auto space-y-6">
+              <div className="flex-1 p-6 h-full overflow-y-auto max-w-5xl mx-auto space-y-6">
                 <div className="flex justify-between items-center border-b pb-4">
                   <div>
                     <h2 className="text-lg font-black uppercase text-orange-600 dark:text-orange-500 flex items-center gap-2">
                       <SafeBarChart3 size={20} /> Sales & Item-wise Analytics
                     </h2>
-                    <p className="text-xs text-neutral-600 dark:text-neutral-400">Check total sales, cash in drawer and item-wise sales report.</p>
+                    <p className="text-xs text-neutral-600 dark:text-neutral-400">Total sales, cash drawer reconciliation and item-wise sales report.</p>
                   </div>
                   <div className="flex items-center gap-2">
                     <button onClick={handleSendOwnerSummary} className="px-3 py-2 bg-green-600 hover:bg-green-500 text-white rounded-xl text-xs font-black uppercase flex items-center gap-1.5 shadow">
@@ -2577,29 +2773,42 @@ export default function BbCafeDesktopPos() {
                       <button onClick={() => setReportFilter('yesterday')} className={`px-3 py-1.5 text-xs font-black uppercase rounded-xl ${reportFilter === 'yesterday' ? 'bg-orange-600 text-white' : 'text-neutral-700 dark:text-neutral-400'}`}>Yesterday</button>
                       <button onClick={() => setReportFilter('custom')} className={`px-3 py-1.5 text-xs font-black uppercase rounded-xl ${reportFilter === 'custom' ? 'bg-orange-600 text-white' : 'text-neutral-700 dark:text-neutral-400'}`}>Date Picker</button>
                     </div>
+                    {reportFilter === 'custom' && (
+                      <input 
+                        type="date" 
+                        value={customReportDate} 
+                        onChange={e => setCustomReportDate(e.target.value)}
+                        className="bg-white dark:bg-neutral-900 border rounded-xl px-2.5 py-1.5 text-xs font-bold"
+                      />
+                    )}
                   </div>
                 </div>
 
-                <div className="grid grid-cols-4 gap-4">
-                  <div className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 p-4 rounded-3xl space-y-1 shadow-sm">
+                <div className="grid grid-cols-5 gap-3">
+                  <div className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 p-3.5 rounded-2xl space-y-1 shadow-sm">
                     <p className="text-[10px] font-black uppercase text-neutral-500">Total Sales</p>
-                    <p className="text-2xl font-black font-mono text-green-600 dark:text-green-400">₹{reportSummary.totalSale}</p>
-                    <p className="text-[10px] text-neutral-500">{reportSummary.totalOrdersCount} Completed Orders</p>
+                    <p className="text-xl font-black font-mono text-green-600 dark:text-green-400">₹{reportSummary.totalSale}</p>
+                    <p className="text-[9px] text-neutral-500">{reportSummary.totalOrdersCount} Completed Orders</p>
                   </div>
-                  <div className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 p-4 rounded-3xl space-y-1 shadow-sm">
+                  <div className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 p-3.5 rounded-2xl space-y-1 shadow-sm">
                     <p className="text-[10px] font-black uppercase text-neutral-500">Gross Cash</p>
-                    <p className="text-2xl font-black font-mono text-amber-600 dark:text-amber-400">₹{reportSummary.cashSale}</p>
+                    <p className="text-xl font-black font-mono text-amber-600 dark:text-amber-400">₹{reportSummary.cashSale}</p>
                   </div>
-                  <div className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 p-4 rounded-3xl space-y-1 shadow-sm">
+                  <div className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 p-3.5 rounded-2xl space-y-1 shadow-sm">
                     <p className="text-[10px] font-black uppercase text-neutral-500">UPI Payments</p>
-                    <p className="text-2xl font-black font-mono text-blue-600 dark:text-blue-400">₹{reportSummary.upiSale}</p>
+                    <p className="text-xl font-black font-mono text-blue-600 dark:text-blue-400">₹{reportSummary.upiSale}</p>
                   </div>
-                  <div className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 p-4 rounded-3xl space-y-1 shadow-sm">
+                  <div className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 p-3.5 rounded-2xl space-y-1 shadow-sm">
+                    <p className="text-[10px] font-black uppercase text-neutral-500">उधार (Due)</p>
+                    <p className="text-xl font-black font-mono text-red-600 dark:text-red-400">₹{reportSummary.dueSale}</p>
+                  </div>
+                  <div className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 p-3.5 rounded-2xl space-y-1 shadow-sm">
                     <p className="text-[10px] font-black uppercase text-neutral-500">Net in Drawer</p>
-                    <p className="text-2xl font-black font-mono text-emerald-600 dark:text-emerald-400">₹{reportSummary.netCashInDrawer}</p>
+                    <p className="text-xl font-black font-mono text-emerald-600 dark:text-emerald-400">₹{reportSummary.netCashInDrawer}</p>
                   </div>
                 </div>
 
+                {/* CASH DRAWER AUDIT */}
                 <div className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 p-5 rounded-3xl space-y-4 shadow-sm">
                   <div className="flex justify-between items-center border-b border-neutral-300 dark:border-neutral-800 pb-3">
                     <div>
@@ -2625,6 +2834,41 @@ export default function BbCafeDesktopPos() {
                       </div>
                     )}
                   </div>
+                </div>
+
+                {/* ITEM-WISE SALES TABLE */}
+                <div className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 p-5 rounded-3xl space-y-3 shadow-sm">
+                  <div className="flex justify-between items-center border-b border-neutral-300 dark:border-neutral-800 pb-2">
+                    <h3 className="text-xs font-black uppercase text-orange-600 dark:text-orange-500 flex items-center gap-1.5">
+                      <Layers size={14} /> आइटम-वाइज़ बिक्री रिपोर्ट (Item-wise Sales Report)
+                    </h3>
+                    <span className="text-[10px] text-neutral-500 font-bold">{itemWiseSales.length} items sold</span>
+                  </div>
+
+                  {itemWiseSales.length === 0 ? (
+                    <p className="text-xs text-neutral-400 py-6 text-center">No items sold in this selected date range.</p>
+                  ) : (
+                    <div className="max-h-72 overflow-y-auto pr-1">
+                      <table className="w-full text-left text-xs">
+                        <thead>
+                          <tr className="border-b border-neutral-200 dark:border-neutral-800 text-neutral-500 uppercase text-[10px]">
+                            <th className="py-2">Item Name</th>
+                            <th className="py-2 text-center">Qty Sold</th>
+                            <th className="py-2 text-right">Total Revenue (₹)</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800">
+                          {itemWiseSales.map((row, idx) => (
+                            <tr key={idx} className="hover:bg-neutral-50 dark:hover:bg-neutral-800/50">
+                              <td className="py-2 font-bold text-neutral-900 dark:text-neutral-100">{row.name}</td>
+                              <td className="py-2 text-center font-mono font-black text-orange-600">{row.quantity}</td>
+                              <td className="py-2 text-right font-mono font-bold">₹{row.revenue}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -3092,15 +3336,16 @@ export default function BbCafeDesktopPos() {
                   { key: 'F1', desc: 'Open Shortcuts Guide' },
                   { key: 'F2', desc: 'Focus Search Bar & hit [Enter] to auto-add item' },
                   { key: 'F3', desc: 'Park / Hold active cart order' },
-                  { key: 'F4', desc: 'Toggle Payment Mode (Cash / UPI / Split)' },
+                  { key: 'F4', desc: 'Toggle Payment Mode (Cash / UPI / Split / Udhar)' },
                   { key: 'F5', desc: 'Recall / Open Held / Parked Carts' },
                   { key: 'F6', desc: 'Record Daily Drawer Expense' },
                   { key: 'F7', desc: 'Send WhatsApp Receipt to customer' },
-                  { key: 'F8', desc: 'Toggle Discount Box (Hide / Unhide छूट)' },
-                  { key: 'F9', desc: 'Pay & Print Bill (or Settle Table)' },
+                  { key: 'F8', desc: 'Toggle Discount & Coupon Box (Hide / Unhide छूट)' },
+                  { key: 'F9', desc: 'Pay & Settle Bill (or Settle Table)' },
                   { key: 'F11', desc: 'Open Customer Directory / Loyalty' },
                   { key: 'F12', desc: 'Toggle Mode (Pickup ➔ Table ➔ Delivery)' },
-                  { key: 'Enter', desc: 'Auto add item / Select portion and confirm' },
+                  { key: 'Tab', desc: 'Cycle through Sizes/Portions in Variation Popup' },
+                  { key: 'Enter', desc: 'Confirm size / Add to cart immediately' },
                   { key: 'Arrows (←/→)', desc: 'Switch portion/variation without mouse' },
                 ].map((s) => (
                   <div key={s.key} className="flex justify-between items-center p-2 rounded-xl bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 font-bold">
@@ -3186,7 +3431,7 @@ export default function BbCafeDesktopPos() {
         )}
       </AnimatePresence>
 
-      {/* POPUP MODAL 6: KEYBOARD-CONTROLLED VARIATION MODAL (NO MOUSE NEEDED) */}
+      {/* POPUP MODAL 6: KEYBOARD-CONTROLLED VARIATION MODAL (TAB TO SELECT, ENTER TO ADD) */}
       <AnimatePresence>
         {isVariationModalOpen && selectedProductForVariation && (
           <div 
@@ -3200,7 +3445,7 @@ export default function BbCafeDesktopPos() {
               <div className="flex justify-between items-center border-b pb-3">
                 <div>
                   <h3 className="font-black text-sm uppercase text-orange-600 dark:text-orange-500">{selectedProductForVariation.name}</h3>
-                  <p className="text-[10px] text-neutral-500">तीर कीज़ (←/→) से साइज़ चुनें व [Enter] दबाएँ</p>
+                  <p className="text-[10px] text-neutral-500">तीर कीज़ (←/→) या [Tab] से साइज़ चुनें व [Enter] दबाएँ</p>
                 </div>
                 <button tabIndex={-1} onClick={() => { setIsVariationModalOpen(false); setTimeout(() => searchInputRef.current?.focus(), 60); }} className="text-neutral-500"><SafeX size={18} /></button>
               </div>
@@ -3208,7 +3453,7 @@ export default function BbCafeDesktopPos() {
               <div className="space-y-3">
                 {selectedProductForVariation.variants && (
                   <div>
-                    <label className="text-xs font-bold uppercase text-neutral-600 dark:text-neutral-400 block mb-1.5">Size / Portion (1, 2, 3 या Arrow Keys):</label>
+                    <label className="text-xs font-bold uppercase text-neutral-600 dark:text-neutral-400 block mb-1.5">Size / Portion ([Tab] / 1, 2, 3):</label>
                     <div className="grid grid-cols-2 gap-2">
                       {Object.entries(selectedProductForVariation.variants).map(([size, price]: any, idx: number) => {
                         const isSelected = selectedSize.toLowerCase() === size.toLowerCase();
