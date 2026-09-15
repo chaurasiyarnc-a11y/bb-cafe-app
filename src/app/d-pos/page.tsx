@@ -3372,7 +3372,63 @@ export default function BbCafeDesktopPos() {
           </div>
         )}
       </AnimatePresence>
-
+{/* POPUP: PARKED / HELD CARTS */}
+      <AnimatePresence>
+        {isHeldCartsModalOpen && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 max-w-lg w-full rounded-3xl p-6 shadow-2xl space-y-4 max-h-[85vh] flex flex-col">
+              <div className="flex justify-between items-center border-b border-neutral-200 dark:border-neutral-800 pb-3 shrink-0">
+                <div>
+                  <h3 className="font-black text-sm uppercase text-amber-600 flex items-center gap-2">
+                    <SafePauseCircle size={18} /> Parked Carts ({heldCarts.length})
+                  </h3>
+                  <p className="text-[10px] text-neutral-500">होल्ड किये गए कस्टमर के आर्डर रिस्टोर करें</p>
+                </div>
+                <button onClick={() => setIsHeldCartsModalOpen(false)} className="text-neutral-500 hover:text-black dark:hover:text-white transition-colors">
+                  <X size={20} />
+                </button>
+              </div>
+              
+              <div className="space-y-3 overflow-y-auto pr-1 flex-1">
+                {heldCarts.length === 0 ? (
+                  <div className="text-center py-10">
+                     <p className="text-xs text-neutral-500 font-bold">कोई भी कार्ट होल्ड (Park) पर नहीं है।</p>
+                  </div>
+                ) : (
+                  heldCarts.map(cartObj => (
+                    <div key={cartObj.id} className="bg-neutral-50 dark:bg-neutral-800/50 border border-neutral-200 dark:border-neutral-700 p-4 rounded-2xl flex justify-between items-center shadow-sm hover:border-amber-500 transition-colors">
+                      <div>
+                        <p className="font-bold text-sm text-neutral-900 dark:text-white">👤 {cartObj.customerName}</p>
+                        <p className="text-[10px] text-neutral-500 font-mono mt-1">
+                          ⏰ {cartObj.heldAt} • 🛒 {cartObj.cart.length} Items • 🪑 {cartObj.tableNumber}
+                        </p>
+                        <p className="text-xs font-black text-green-600 dark:text-green-400 mt-1">
+                          Total: ₹{cartObj.total}
+                        </p>
+                      </div>
+                      <div className="flex gap-2">
+                        <button 
+                          onClick={() => handleRestoreHeldCart(cartObj)} 
+                          className="bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded-xl text-xs font-black uppercase shadow-md flex items-center gap-1"
+                        >
+                          <SafePlayCircle size={14} /> Restore
+                        </button>
+                        <button 
+                          onClick={() => handleDeleteHeldCart(cartObj.id)} 
+                          className="bg-red-500/10 hover:bg-red-500 hover:text-white text-red-600 px-3 py-2 rounded-xl text-xs font-black uppercase transition-colors"
+                        >
+                          <SafeTrash2 size={15} />
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+      
       {/* CUSTOMER DIRECTORY MODAL [F11] */}
       <CustomerDirectoryModal 
         isCustomerModalOpen={isCustomerModalOpen} 
