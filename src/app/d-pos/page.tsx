@@ -3119,25 +3119,100 @@ export default function BbCafeDesktopPos() {
         )}
       </AnimatePresence>
 
-      {/* POPUP: ITEM EDITOR MODAL */}
+   {/* POPUP: ITEM EDITOR MODAL */}
       <AnimatePresence>
         {isItemEditorModalOpen && (
           <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="bg-white dark:bg-neutral-900 border max-w-lg w-full rounded-3xl p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
               <div className="flex justify-between items-center border-b pb-3">
                 <h3 className="font-black text-sm uppercase text-orange-600">{editingItemObj ? 'Edit Food Item' : 'Add Food Item'}</h3>
-                <button onClick={() => setIsItemEditorModalOpen(false)}><X size={18} /></button>
+                <button onClick={() => setIsItemEditorModalOpen(false)} className="text-neutral-500 hover:text-black dark:hover:text-white"><X size={18} /></button>
               </div>
               <form onSubmit={handleSaveItemToFirestore} className="space-y-3 text-xs">
-                <input type="text" required placeholder="Item Name *" value={itemNameInput} onChange={e => setItemNameInput(e.target.value)} className="w-full bg-neutral-100 dark:bg-neutral-950 border rounded-xl p-2.5 font-bold" autoFocus />
+                
+                {/* Item Name */}
+                <input type="text" required placeholder="Item Name *" value={itemNameInput} onChange={e => setItemNameInput(e.target.value)} className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-xl p-2.5 font-bold outline-none focus:border-orange-500" autoFocus />
+                
+                {/* Price & Code */}
                 <div className="grid grid-cols-2 gap-3">
-                  <input type="number" required min={0} placeholder="Price (₹) *" value={itemPriceInput} onChange={e => setItemPriceInput(e.target.value === '' ? '' : Number(e.target.value))} className="w-full bg-neutral-100 dark:bg-neutral-950 border rounded-xl p-2.5 font-mono font-bold" />
-                  <input type="text" required placeholder="Short Code *" value={itemCodeInput} onChange={e => setItemCodeInput(e.target.value)} className="w-full bg-neutral-100 dark:bg-neutral-950 border rounded-xl p-2.5 font-mono font-bold" />
+                  <input type="number" required min={0} placeholder="Default Price (₹) *" value={itemPriceInput} onChange={e => setItemPriceInput(e.target.value === '' ? '' : Number(e.target.value))} className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-xl p-2.5 font-mono font-bold outline-none focus:border-orange-500" />
+                  <input type="text" required placeholder="Short Code *" value={itemCodeInput} onChange={e => setItemCodeInput(e.target.value)} className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-xl p-2.5 font-mono font-bold outline-none focus:border-orange-500" />
                 </div>
-                <input type="text" placeholder="Image URL (Optional)" value={itemImageInput} onChange={e => setItemImageInput(e.target.value)} className="w-full bg-neutral-100 dark:bg-neutral-950 border rounded-xl p-2.5" />
+
+                {/* Category Dropdown */}
+                <div className="flex gap-2 items-center">
+                  {!isAddingNewCatInput ? (
+                    <select value={itemCatInput} onChange={e => {
+                      if (e.target.value === 'ADD_NEW') setIsAddingNewCatInput(true);
+                      else setItemCatInput(e.target.value);
+                    }} className="flex-1 bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-xl p-2.5 font-bold outline-none focus:border-orange-500">
+                      {categories.filter(c => c !== 'All').map(c => <option key={c} value={c}>{c}</option>)}
+                      <option value="ADD_NEW" className="font-black text-orange-600">+ Add New Category</option>
+                    </select>
+                  ) : (
+                    <div className="flex-1 flex gap-2">
+                      <input type="text" placeholder="New Category Name..." value={newCustomCategoryName} onChange={e => setNewCustomCategoryName(e.target.value)} className="flex-1 bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-xl p-2.5 font-bold outline-none focus:border-orange-500" autoFocus />
+                      <button type="button" onClick={() => { setIsAddingNewCatInput(false); setNewCustomCategoryName(''); }} className="px-3 bg-red-500/10 text-red-600 rounded-xl font-bold hover:bg-red-500/20">Cancel</button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Image URL & Availability */}
+                <input type="text" placeholder="Image URL (Optional)" value={itemImageInput} onChange={e => setItemImageInput(e.target.value)} className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-xl p-2.5 outline-none focus:border-orange-500" />
+                
+                <div className="flex items-center gap-2 px-1">
+                  <input type="checkbox" id="availCheckbox" checked={itemIsAvailable} onChange={e => setItemIsAvailable(e.target.checked)} className="w-4 h-4 accent-orange-600 cursor-pointer" />
+                  <label htmlFor="availCheckbox" className="font-bold cursor-pointer select-none">Item is Available (In Stock)</label>
+                </div>
+
+                {/* Variants / Portions (Forsan) Section */}
+                <div className="pt-3 pb-1 border-t border-neutral-300 dark:border-neutral-800">
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="font-black uppercase text-orange-600">Variants / Portions (साइज़)</label>
+                    <button type="button" onClick={() => setHasVariants(!hasVariants)} className={`px-2 py-1 rounded text-[10px] font-black uppercase transition-all shadow-sm ${hasVariants ? 'bg-orange-600 text-white' : 'bg-neutral-200 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300'}`}>
+                      {hasVariants ? 'Enabled ✓' : '+ Enable Variants'}
+                    </button>
+                  </div>
+
+                  {hasVariants && (
+                    <div className="space-y-3 bg-neutral-50 dark:bg-neutral-900/40 p-3 rounded-xl border border-neutral-200 dark:border-neutral-800">
+                      
+                      {/* Presets */}
+                      <div className="flex flex-wrap gap-1.5">
+                        <button type="button" onClick={() => handleApplyVariantPreset('half_full')} className="px-2 py-1 bg-white dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 rounded text-[9px] font-bold hover:border-orange-500">Half/Full</button>
+                        <button type="button" onClick={() => handleApplyVariantPreset('reg_large')} className="px-2 py-1 bg-white dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 rounded text-[9px] font-bold hover:border-orange-500">Reg/Large</button>
+                        <button type="button" onClick={() => handleApplyVariantPreset('pizza')} className="px-2 py-1 bg-white dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 rounded text-[9px] font-bold hover:border-orange-500">Pizza Sizes</button>
+                      </div>
+
+                      {/* Current Variants List */}
+                      {Object.keys(itemVariantsList).length > 0 && (
+                        <div className="space-y-1.5">
+                          {Object.entries(itemVariantsList).map(([vName, vPrice]) => (
+                            <div key={vName} className="flex justify-between items-center bg-white dark:bg-neutral-800 p-2 rounded-lg border border-neutral-200 dark:border-neutral-700 shadow-sm">
+                              <span className="font-bold">{vName}</span>
+                              <div className="flex items-center gap-3">
+                                <span className="font-mono text-orange-600 dark:text-orange-400 font-black">₹{String(vPrice)}</span>
+                                <button type="button" onClick={() => handleRemoveVariantRow(vName)} className="text-red-500 hover:text-red-600 bg-red-500/10 p-1 rounded"><SafeTrash2 size={14} /></button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Add New Custom Variant */}
+                      <div className="flex gap-2 items-center pt-2">
+                        <input type="text" placeholder="Name (e.g. Plate)" value={newVariantName} onChange={e => setNewVariantName(e.target.value)} className="flex-1 bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-lg p-2 outline-none focus:border-orange-500" />
+                        <input type="number" min={0} placeholder="Price (₹)" value={newVariantPrice} onChange={e => setNewVariantPrice(e.target.value === '' ? '' : Number(e.target.value))} className="w-20 bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-lg p-2 font-mono outline-none focus:border-orange-500" />
+                        <button type="button" onClick={handleAddVariantRow} className="bg-neutral-800 dark:bg-neutral-700 text-white px-3 py-2 rounded-lg font-black text-[10px] uppercase hover:bg-neutral-900">Add</button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Action Buttons */}
                 <div className="flex gap-2 pt-2">
-                  <button type="button" onClick={() => setIsItemEditorModalOpen(false)} className="flex-1 py-3 bg-neutral-200 dark:bg-neutral-800 font-bold uppercase rounded-xl">Cancel</button>
-                  <button type="submit" className="flex-1 py-3 bg-green-600 text-white font-black uppercase rounded-xl shadow">Save Item</button>
+                  <button type="button" onClick={() => setIsItemEditorModalOpen(false)} className="flex-1 py-3 bg-neutral-200 dark:bg-neutral-800 text-neutral-800 dark:text-white font-black uppercase rounded-xl hover:bg-neutral-300 dark:hover:bg-neutral-700">Cancel</button>
+                  <button type="submit" className="flex-1 py-3 bg-green-600 hover:bg-green-500 text-white font-black uppercase rounded-xl shadow-lg">Save Item</button>
                 </div>
               </form>
             </motion.div>
