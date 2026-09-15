@@ -295,7 +295,39 @@ export default function BbCafeDesktopPos() {
   const [custFormPhone, setCustFormPhone] = useState('');
   const [custFormAddress, setCustFormAddress] = useState('');
   const [custFormPoints, setCustFormPoints] = useState<number | ''>(0);
+// NEW: CUSTOMER HISTORY STATES & FUNCTION
+  const [isCustHistoryModalOpen, setIsCustHistoryModalOpen] = useState(false);
+  const [selectedHistoryCust, setSelectedHistoryCust] = useState<any>(null);
+  const [custHistoryList, setCustHistoryList] = useState<any[]>([]);
+  const [isCustHistoryLoading, setIsCustHistoryLoading] = useState(false);
 
+  const handleViewCustomerHistory = async (cust: any) => {
+    triggerBeep('tap');
+    setSelectedHistoryCust(cust);
+    setIsCustHistoryModalOpen(true);
+    setIsCustHistoryLoading(true);
+    setCustHistoryList([]);
+    
+    try {
+      if (navigator.onLine) {
+        const cleanPhone = cust.phone || cust.id;
+        // Fetch recent 50 orders
+        const q = query(collection(db, "orders"), orderBy("timestamp", "desc"), limit(50));
+        const snap = await getDocs(q);
+        
+        // Filter those orders that match the customer's phone
+        const matchedOrders = snap.docs
+          .map(d => ({ id: d.id, ...d.data() }))
+          .filter((o: any) => String(o.customerPhone || '').includes(cleanPhone));
+        
+        setCustHistoryList(matchedOrders);
+      }
+    } catch (e) {
+      toast.error("हिस्ट्री लोड करने में त्रुटि आई!");
+    } finally {
+      setIsCustHistoryLoading(false);
+    }
+  };
   const fetchAllCustomers = async () => {
     setIsCustomersLoading(true);
     try {
@@ -3264,7 +3296,14 @@ export default function BbCafeDesktopPos() {
                         </div>
                         <button onClick={() => openEditCustomerModal(cust)} className="w-full py-2 bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 text-neutral-800 dark:text-white border border-neutral-300 dark:border-neutral-700 rounded-xl text-xs font-black uppercase flex items-center justify-center gap-1.5 transition-colors">
                            <SafeEdit3 size={14} /> Edit Profile & Points
-                        </button>
+                       <div className="flex gap-2">
+                          <button onClick={() => openEditCustomerModal(cust)} className="flex-1 py-2 bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 text-neutral-800 dark:text-white border border-neutral-300 dark:border-neutral-700 rounded-xl text-xs font-black uppercase flex items-center justify-center gap-1.5 transition-colors">
+                             <SafeEdit3 size={14} /> Edit
+                          </button>
+                          <button onClick={() => handleViewCustomerHistory(cust)} className="flex-1 py-2 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/40 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-800/30 rounded-xl text-xs font-black uppercase flex items-center justify-center gap-1.5 transition-colors">
+                             <History size={14} /> History
+                          </button>
+                        </div>
                       </div>
                     ))
                   )}
@@ -3616,7 +3655,65 @@ export default function BbCafeDesktopPos() {
           </div>
         )}
       </AnimatePresence>
-      
+      {/* POPUP: CUSTOMER ORDER HISTORY */}
+      <AnimatePresence>
+        {isCustHistoryModalOpen && selectedHistoryCust && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 max-w-2xl w-full rounded-3xl p-6 shadow-2xl space-y-4 max-h-[85vh] flex flex-col">
+              <div className="flex justify-between items-center border-b border-neutral-200 dark:border-neutral-800 pb-3 shrink-0">
+                <div>
+                  <h3 className="font-black text-sm uppercase text-blue-600 flex items-center gap-2">
+                    <History size={18} /> Order History: {selectedHistoryCust.name}
+                  </h3>
+                  <p className="text-[10px] text-neutral-500 font-mono mt-1">📞 {selectedHistoryCust.phone || selectedHistoryCust.id} | ⭐ {selectedHistoryCust.points || 0} Points</p>
+                </div>
+                <button onClick={() => setIsCustHistoryModalOpen(false)} className="text-neutral-500 hover:text-black dark:hover:text-white transition-colors">
+                  <X size={20} />
+                </button>
+              </div>
+              
+              <div className="space-y-3 overflow-y-auto pr-1 flex-1">
+                {isCustHistoryLoading ? (
+                  <div className="flex justify-center py-10"><Loader2 className="animate-spin text-blue-500" size={32} /></div>
+                ) : custHistoryList.length === 0 ? (
+                  <div className="text-center py-10">
+                     <p className="text-xs text-neutral-500 font-bold">इस ग्राहक का कोई पुराना बिल नहीं मिला।</p>
+                  </div>
+                ) : (
+                  custHistoryList.map(order => {
+                    const orderDate = order.timestamp?.toDate ? order.timestamp.toDate() : new Date(order.timestamp || Date.now());
+                    return (
+                      <div key={order.id} className="bg-neutral-50 dark:bg-neutral-800/50 border border-neutral-200 dark:border-neutral-700 p-3 rounded-2xl flex flex-col gap-2 shadow-sm hover:border-blue-500 transition-colors">
+                        <div className="flex justify-between items-center border-b border-neutral-200 dark:border-neutral-700 pb-2">
+                          <div className="flex gap-2 items-center">
+                            <span className="font-mono font-black text-blue-600 dark:text-blue-400 text-sm">Bill #{order.billNumber}</span>
+                            <span className="text-[10px] font-bold text-neutral-500 bg-neutral-200 dark:bg-neutral-700 px-2 py-0.5 rounded uppercase">{order.fulfillmentType || 'pickup'}</span>
+                          </div>
+                          <span className="text-[10px] font-bold text-neutral-500">{orderDate.toLocaleString()}</span>
+                        </div>
+                        
+                        <div className="flex justify-between items-end">
+                          <div className="text-[11px] text-neutral-600 dark:text-neutral-300 font-medium space-y-0.5">
+                            {order.items?.map((it: any, i: number) => (
+                              <p key={i}>• {it.name} <span className="font-bold text-orange-600 dark:text-orange-400">x{it.quantity}</span></p>
+                            ))}
+                          </div>
+                          <div className="text-right">
+                            <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded block mb-1 ${order.paymentMethod === 'upi' ? 'bg-blue-500/15 text-blue-600' : order.paymentMethod === 'due' ? 'bg-red-500/15 text-red-600' : 'bg-green-500/15 text-green-600'}`}>
+                              {order.paymentMethod || 'cash'}
+                            </span>
+                            <span className="font-mono font-black text-green-600 dark:text-green-400 text-base">₹{order.total}</span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
       {/* CUSTOMER DIRECTORY MODAL [F11] */}
       <CustomerDirectoryModal 
         isCustomerModalOpen={isCustomerModalOpen} 
