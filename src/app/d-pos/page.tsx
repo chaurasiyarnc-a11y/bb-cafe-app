@@ -3270,7 +3270,7 @@ export default function BbCafeDesktopPos() {
                   />
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 overflow-y-auto flex-1 pr-1 content-start">
+                <div <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 overflow-y-auto flex-1 pr-1 content-start">
                   {isCustomersLoading ? (
                      <div className="col-span-full flex justify-center py-20"><Loader2 className="animate-spin text-orange-500" size={32} /></div>
                   ) : allCustomers.filter(c => !customerTabSearch || String(c.name).toLowerCase().includes(customerTabSearch.toLowerCase()) || String(c.phone).includes(customerTabSearch) || String(c.address).toLowerCase().includes(customerTabSearch.toLowerCase())).length === 0 ? (
@@ -3294,9 +3294,9 @@ export default function BbCafeDesktopPos() {
                             <p className="text-[11px] text-neutral-400 italic">No address provided</p>
                           )}
                         </div>
-                        <button onClick={() => openEditCustomerModal(cust)} className="w-full py-2 bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 text-neutral-800 dark:text-white border border-neutral-300 dark:border-neutral-700 rounded-xl text-xs font-black uppercase flex items-center justify-center gap-1.5 transition-colors">
-                           <SafeEdit3 size={14} /> Edit Profile & Points
-                       <div className="flex gap-2">
+                        
+                        {/* CORRECTED BUTTONS BLOCK */}
+                        <div className="flex gap-2">
                           <button onClick={() => openEditCustomerModal(cust)} className="flex-1 py-2 bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 text-neutral-800 dark:text-white border border-neutral-300 dark:border-neutral-700 rounded-xl text-xs font-black uppercase flex items-center justify-center gap-1.5 transition-colors">
                              <SafeEdit3 size={14} /> Edit
                           </button>
@@ -3304,6 +3304,7 @@ export default function BbCafeDesktopPos() {
                              <History size={14} /> History
                           </button>
                         </div>
+
                       </div>
                     ))
                   )}
