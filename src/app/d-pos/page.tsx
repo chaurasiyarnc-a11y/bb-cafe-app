@@ -1,4 +1,5 @@
 
+
 'use client';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { db } from '@/lib/firebase'; 
@@ -10,11 +11,10 @@ import {
 import { 
   ShoppingBag, Search, X, Loader2, Clock, Printer, Settings, 
   Database, RefreshCw, Layers, LogOut, Lock, ToggleLeft, ToggleRight, 
-  Trash2, UserPlus, Download, Edit3, FileText, LayoutGrid, ChevronLeft, ChevronRight, 
-  Gift, PackagePlus, BarChart3, HelpCircle, PauseCircle, PlayCircle, QrCode, 
-  Share2, Calculator, Receipt, IndianRupee, Send, Check, Plus, Eye,
-  Users, Truck, ArrowLeft, ArrowRight, ArrowLeftRight, CheckCircle2, History,
-  ChevronDown, ChevronUp, BellRing, Tag, Ticket
+  Trash2, UserPlus, Edit3, FileText, LayoutGrid, ChevronLeft, ChevronRight, 
+  PackagePlus, BarChart3, HelpCircle, PauseCircle, PlayCircle, 
+  Share2, Receipt, Send, Check, Plus, Eye,
+  ArrowLeftRight, History, ChevronDown, ChevronUp, BellRing, Tag, Ticket, IndianRupee
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
@@ -30,18 +30,15 @@ const SafeLogOut = LogOut as any;
 const SafeToggleRight = ToggleRight as any;
 const SafeToggleLeft = ToggleLeft as any;
 const SafeShoppingBag = ShoppingBag as any;
-const SafeClock = Clock as any; 
 const SafeLayers = Layers as any;
 const SafePrinter = Printer as any;
 const SafeSearch = Search as any;
 const SafeX = X as any;
 const SafeRefreshCw = RefreshCw as any;
-const SafeSettings = Settings as any;
 const SafeTrash2 = Trash2 as any;
 const SafeUserPlus = UserPlus as any;
 const SafeEdit3 = Edit3 as any;
 const SafeFileText = FileText as any;
-const SafeLayoutGrid = LayoutGrid as any;
 const SafeChevronLeft = ChevronLeft as any;
 const SafeChevronRight = ChevronRight as any;
 const SafePackagePlus = PackagePlus as any;
@@ -49,7 +46,6 @@ const SafeBarChart3 = BarChart3 as any;
 const SafeHelpCircle = HelpCircle as any;
 const SafePauseCircle = PauseCircle as any;
 const SafePlayCircle = PlayCircle as any;
-const SafeQrCode = QrCode as any;
 const SafeShare2 = Share2 as any;
 const SafeSend = Send as any;
 const SafePlus = Plus as any;
@@ -149,22 +145,27 @@ export default function BbCafeDesktopPos() {
   const [ownerPhoneConfig, setOwnerPhoneConfig] = useState<string>('919714293759');
   const [manualInvoiceCounterInput, setManualInvoiceCounterInput] = useState<string>('200');
 
-  // Customer Directory & Quick Recent Customers
+  // Customer Directory & Numeric Search
   const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false);
   const [customerSearchQuery, setCustomerSearchQuery] = useState('');
   const [searchedCustomers, setSearchedCustomers] = useState<any[]>([]);
   const [isSearchingCustomer, setIsSearchingCustomer] = useState(false);
   
-  const [recentCustomersList, setRecentCustomersList] = useState<QuickCustomer[]>([]);
-  const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
-  const [customerInputSearch, setCustomerInputSearch] = useState('');
+  const [customerPhone, setCustomerPhone] = useState('');
+  const [customerName, setCustomerName] = useState('');
+  const [customerPoints, setCustomerPoints] = useState(0);
+  const [address, setAddress] = useState('');
+  const [isRedeemingPoints, setIsRedeemingPoints] = useState(false);
+  const [pointsToRedeem, setPointsToRedeem] = useState(0);
 
   const [showNewCustForm, setShowNewCustForm] = useState(false);
   const [newCustNameInput, setNewCustNameInput] = useState('');
   const [newCustAddressInput, setNewCustAddressInput] = useState('');
-  const [isEditingCustomerProfile, setIsEditingCustomerProfile] = useState(false);
 
-  // Menu States & Category Management
+  // Cash Change Calculator
+  const [cashTendered, setCashTendered] = useState<number | ''>('');
+
+  // Menu States
   const [liveOrders, setLiveOrders] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
@@ -173,12 +174,12 @@ export default function BbCafeDesktopPos() {
   const [inventorySearchQuery, setInventorySearchQuery] = useState('');
   const [loading, setLoading] = useState(false);
   
-  // Category Move & Merge Modal States
+  // Category Manager
   const [isCatManagerModalOpen, setIsCatManagerModalOpen] = useState(false);
   const [mergeSourceCat, setMergeSourceCat] = useState('');
   const [mergeTargetCat, setMergeTargetCat] = useState('');
 
-  // Reports States
+  // Reports
   const [reportFilter, setReportFilter] = useState<'today' | 'yesterday' | 'custom'>('today');
   const [customReportDate, setCustomReportDate] = useState(new Date().toISOString().split('T')[0]);
   const [reportOrders, setReportOrders] = useState<any[]>([]);
@@ -186,13 +187,13 @@ export default function BbCafeDesktopPos() {
   const [isReportLoading, setIsReportLoading] = useState(false);
   const [physicalCashInput, setPhysicalCashInput] = useState<number | ''>('');
 
-  // Modals States
+  // Modals
   const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
   const [isHeldCartsModalOpen, setIsHeldCartsModalOpen] = useState(false);
   const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
   const [isItemEditorModalOpen, setIsItemEditorModalOpen] = useState(false);
 
-  // Dynamic Item Editor States
+  // Dynamic Item Editor
   const [editingItemObj, setEditingItemObj] = useState<any>(null);
   const [itemNameInput, setItemNameInput] = useState('');
   const [itemCodeInput, setItemCodeInput] = useState('');
@@ -207,7 +208,7 @@ export default function BbCafeDesktopPos() {
   const [newVariantName, setNewVariantName] = useState('');
   const [newVariantPrice, setNewVariantPrice] = useState<number | ''>('');
 
-  // Expense Form State
+  // Expense Form
   const [expenseTitle, setExpenseTitle] = useState('');
   const [expenseAmount, setExpenseAmount] = useState<number | ''>('');
   const [expenseCategory, setExpenseCategory] = useState('Milk / Dairy');
@@ -215,7 +216,7 @@ export default function BbCafeDesktopPos() {
   // Held Carts Storage
   const [heldCarts, setHeldCarts] = useState<HeldCart[]>([]);
 
-  // Variation Popup States (Billing)
+  // Variation Modal (Keyboard First!)
   const [isVariationModalOpen, setIsVariationModalOpen] = useState(false);
   const [selectedProductForVariation, setSelectedProductForVariation] = useState<any>(null);
   const [selectedVariantIndex, setSelectedVariantIndex] = useState<number>(0);
@@ -224,7 +225,7 @@ export default function BbCafeDesktopPos() {
   const [selectedAddons, setSelectedAddons] = useState<{ [addon: string]: boolean }>({});
   const [itemNoteInput, setItemNoteInput] = useState('');
 
-  // Past Receipts States with Quick Filter
+  // Past Receipts
   const [pastReceipts, setPastReceipts] = useState<any[]>([]);
   const [receiptSearchQuery, setReceiptSearchQuery] = useState('');
   const [receiptFilterDay, setReceiptFilterDay] = useState<'all' | 'today' | 'yesterday'>('today');
@@ -237,12 +238,6 @@ export default function BbCafeDesktopPos() {
 
   // Cart & Order States
   const [cart, setCart] = useState<PosCartItem[]>([]);
-  const [customerPhone, setCustomerPhone] = useState('');
-  const [customerName, setCustomerName] = useState('');
-  const [customerPoints, setCustomerPoints] = useState(0);
-  
-  const [isRedeemingPoints, setIsRedeemingPoints] = useState(false);
-  const [pointsToRedeem, setPointsToRedeem] = useState(0);
 
   // Collapsible Discount & Admin Promo Code State
   const [isDiscountOpen, setIsDiscountOpen] = useState(false);
@@ -255,7 +250,6 @@ export default function BbCafeDesktopPos() {
   const [selectedArea, setSelectedArea] = useState<DeliveryArea>(DELIVERY_AREAS[0]);
   const [applyDeliveryFee, setApplyDeliveryFee] = useState<boolean>(false);
   const [customDeliveryFee, setCustomDeliveryFee] = useState<number | ''>(20);
-  const [address, setAddress] = useState('');
   const [tableNumber, setTableNumber] = useState('Table 1');
   
   // Track Active Editing Table Order & Previous Items for KOT Delta
@@ -268,7 +262,7 @@ export default function BbCafeDesktopPos() {
   const [splitCashAmount, setSplitCashAmount] = useState<number>(0);
   const [splitUpiAmount, setSplitUpiAmount] = useState<number>(0);
 
-  // Settlement Filter inside Daily Bills tab
+  // Settlement Filter
   const [settlementFilter, setSettlementFilter] = useState<'all' | 'unsettled' | 'settled'>('all');
 
   // Focus & Audio Refs
@@ -276,7 +270,6 @@ export default function BbCafeDesktopPos() {
   const phoneInputRef = useRef<HTMLInputElement | null>(null);
   const newCustNameRef = useRef<HTMLInputElement | null>(null);
   const newCustAddressRef = useRef<HTMLInputElement | null>(null);
-  const customerDropdownRef = useRef<HTMLDivElement | null>(null);
   const isInitialOrdersLoad = useRef<boolean>(true);
 
   const getSanitizedPhone = (p: string) => (p || '').replace(/\D/g, '').slice(-10);
@@ -351,13 +344,18 @@ export default function BbCafeDesktopPos() {
 
   const getTotalBillPrice = () => Math.max(0, getCartSubtotal() + getGstAmountCalculated() - getCalculatedDiscountAmount() - getRedemptionDiscount()) + getDeliveryCharge();
 
-  // Active Orders Filters
+  // Change Return Calculation
+  const changeReturnAmount = useMemo(() => {
+    if (cashTendered === '' || isNaN(Number(cashTendered))) return 0;
+    const diff = Number(cashTendered) - getTotalBillPrice();
+    return diff > 0 ? diff : 0;
+  }, [cashTendered, cart, discountValue, isRedeemingPoints, pointsToRedeem, applyDeliveryFee, customDeliveryFee]);
+
+  // Active Orders
   const activeLiveOrders = useMemo(() => liveOrders.filter((o) => (o.fulfillmentType === 'delivery' || o.fulfillmentType === 'pickup') && o.status !== 'completed' && o.status !== 'rejected'), [liveOrders]);
   const activeTableOrders = useMemo(() => liveOrders.filter((o) => o.fulfillmentType === 'table' && o.status !== 'completed' && o.status !== 'rejected'), [liveOrders]);
-  const pendingOrdersCount = useMemo(() => activeLiveOrders.filter((o) => o.status === 'pending').length, [activeLiveOrders]);
-  const activeTablesCount = useMemo(() => activeTableOrders.length, [activeTableOrders]);
 
-  // Today's orders for Daily Bills & Settlement Tab
+  // Today's orders for Daily Bills
   const todaySettlementOrders = useMemo(() => {
     const today = new Date();
     const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0).getTime();
@@ -380,29 +378,6 @@ export default function BbCafeDesktopPos() {
     }
     return todaySettlementOrders;
   }, [todaySettlementOrders, settlementFilter]);
-
-  // Load Recent Customers to Local Storage
-  const saveRecentCustomerLocal = (cust: QuickCustomer) => {
-    try {
-      const existingStr = localStorage.getItem("bb_pos_recent_customers");
-      let list: QuickCustomer[] = existingStr ? JSON.parse(existingStr) : [];
-      list = list.filter(c => c.phone !== cust.phone);
-      list.unshift(cust);
-      list = list.slice(0, 10);
-      localStorage.setItem("bb_pos_recent_customers", JSON.stringify(list));
-      setRecentCustomersList(list);
-    } catch (e) {}
-  };
-
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (customerDropdownRef.current && !customerDropdownRef.current.contains(e.target as Node)) {
-        setShowCustomerDropdown(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
 
   // Offline / Online Detection & Sync
   const syncOfflineAll = async () => {
@@ -507,10 +482,11 @@ export default function BbCafeDesktopPos() {
     setCart([]);
     setCustomerName('');
     setCustomerPhone('');
-    setCustomerInputSearch('');
+    setAddress('');
     setDiscountValue(0);
     setIsRedeemingPoints(false);
     setPointsToRedeem(0);
+    setCashTendered('');
     localStorage.removeItem("bb_pos_saved_cart_pc");
     setTimeout(() => searchInputRef.current?.focus(), 60);
   };
@@ -523,7 +499,6 @@ export default function BbCafeDesktopPos() {
     setCart(heldItem.cart);
     setCustomerName(heldItem.customerName === 'Walk-in Guest' ? '' : heldItem.customerName);
     setCustomerPhone(heldItem.customerPhone || '');
-    setCustomerInputSearch(heldItem.customerPhone || heldItem.customerName || '');
     setTableNumber(heldItem.tableNumber || 'Table 1');
     setFulfillmentType(heldItem.fulfillmentType || 'pickup');
     
@@ -550,11 +525,6 @@ export default function BbCafeDesktopPos() {
     if (savedUpi) setUpiIdConfig(savedUpi);
     const savedOwnerPhone = localStorage.getItem("bb_pos_owner_phone");
     if (savedOwnerPhone) setOwnerPhoneConfig(savedOwnerPhone);
-
-    const savedRecentCust = localStorage.getItem("bb_pos_recent_customers");
-    if (savedRecentCust) {
-      try { setRecentCustomersList(JSON.parse(savedRecentCust)); } catch (e) {}
-    }
 
     const savedCounter = localStorage.getItem("bb_pos_local_bill_counter_pc");
     if (!savedCounter || Number(savedCounter) < 199 || Number(savedCounter) >= 10000) {
@@ -590,7 +560,7 @@ export default function BbCafeDesktopPos() {
     localStorage.setItem("bb_pos_saved_cart_pc", JSON.stringify(cart));
   }, [cart]);
 
-  // Clean Categories Deduplication
+  // Clean Categories
   const normalizeCategoryList = (rawItems: any[]) => {
     const cleaned = rawItems.map((i: any) => {
       const c = (i.category || 'Burgers').trim();
@@ -643,7 +613,6 @@ export default function BbCafeDesktopPos() {
       }
 
       setProducts(prev => prev.map(p => (p.category || '').toLowerCase() === mergeSourceCat.toLowerCase() ? { ...p, category: mergeTargetCat } : p));
-      
       const newItems = products.map(p => (p.category || '').toLowerCase() === mergeSourceCat.toLowerCase() ? { ...p, category: mergeTargetCat } : p);
       setCategories(normalizeCategoryList(newItems));
       
@@ -771,141 +740,54 @@ export default function BbCafeDesktopPos() {
     return () => unsubscribe();
   }, []);
 
-  // Quick Customer Select from Dropdown
-  const handleSelectQuickCustomer = (cust: QuickCustomer) => {
-    triggerBeep('tap');
-    setCustomerPhone(cust.phone);
-    setCustomerName(cust.name || '');
-    setAddress(cust.address || '');
-    setCustomerPoints(cust.points || 0);
-    setCustomerInputSearch(`${cust.name} (${cust.phone})`);
-    setShowCustomerDropdown(false);
-    setShowNewCustForm(false);
-    saveRecentCustomerLocal(cust);
-    toast.success(`चुना गया: ${cust.name || cust.phone}!`);
-    setTimeout(() => searchInputRef.current?.focus(), 60);
-  };
+  // Strict Numeric Phone Search for Customer
+  const handleCustomerNumberChange = (val: string) => {
+    const digits = val.replace(/\D/g, '').slice(0, 10);
+    setCustomerPhone(digits);
 
-  // Fast-Add by Exact Numeric Code or Enter
-  const handleSearchInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      const cleanQ = searchQuery.trim().toLowerCase();
-      if (!cleanQ) return;
-
-      const exactCodeMatch = products.find(p => String(p.itemCode || '').trim().toLowerCase() === cleanQ);
-      if (exactCodeMatch) {
-        handleItemClick(exactCodeMatch);
-        setSearchQuery('');
-        return;
-      }
-
-      if (filteredMenu.length > 0) {
-        const item = filteredMenu[0];
-        handleItemClick(item);
-        setSearchQuery('');
-      } else {
-        toast.error("No matching item found!");
-      }
+    if (digits.length === 10) {
+      searchCustomerByExactPhone(digits);
+    } else {
+      setCustomerName('');
+      setCustomerPoints(0);
+      setAddress('');
+      setIsRedeemingPoints(false);
+      setPointsToRedeem(0);
+      setShowNewCustForm(false);
     }
   };
 
-  const handleCustomerInputChange = async (val: string) => {
-    setCustomerInputSearch(val);
-    setShowCustomerDropdown(true);
-    const digitsOnly = val.replace(/\D/g, '');
-    if (digitsOnly.length > 0) {
-      setCustomerPhone(digitsOnly.slice(-10));
-    }
-  };
-
-  // Customer Loyalty Search by Name or Phone
-  const handleCheckLoyaltyWithAutoJump = async () => {
-    triggerBeep('tap');
-    const inputVal = customerInputSearch.trim();
-    if (!inputVal) return toast.error("Enter customer phone or name!");
-
-    const cleanPhone = getSanitizedPhone(customerPhone || inputVal);
-
-    const toastId = toast.loading("Searching customer...");
+  const searchCustomerByExactPhone = async (phoneStr: string) => {
+    const toastId = toast.loading("ग्राहक खोज रहे हैं...");
     try {
-      let foundData: any = null;
-      let foundPhone = cleanPhone;
-
-      if (cleanPhone.length === 10) {
-        const userRef = doc(db, "customer_points", cleanPhone);
-        const docSnap = await getDoc(userRef);
-        if (docSnap.exists()) {
-          foundData = docSnap.data();
-          foundPhone = cleanPhone;
-        }
-      }
-
-      if (!foundData) {
-        const qName = query(collection(db, "customer_points"), where("name", ">=", inputVal), limit(5));
-        const snap = await getDocs(qName);
-        if (!snap.empty) {
-          foundData = snap.docs[0].data();
-          foundPhone = snap.docs[0].id;
-        }
-      }
-
+      const userRef = doc(db, "customer_points", phoneStr);
+      const snap = await getDoc(userRef);
       toast.dismiss(toastId);
 
-      if (foundData) {
-        setCustomerName(foundData.name || '');
-        setCustomerPoints(foundData.points || 0);
-        setAddress(foundData.address || '');
-        setCustomerPhone(foundPhone);
-        setCustomerInputSearch(`${foundData.name} (${foundPhone})`);
+      if (snap.exists()) {
+        const data = snap.data();
+        setCustomerName(data.name || 'Valued Guest');
+        setCustomerPoints(Number(data.points) || 0);
+        setAddress(data.address || '');
         setShowNewCustForm(false);
-        setShowCustomerDropdown(false);
-        saveRecentCustomerLocal({ phone: foundPhone, name: foundData.name, address: foundData.address, points: foundData.points });
-        toast.success(`Found: ${foundData.name} (${foundData.points || 0} Pts)`);
+        toast.success(`ग्राहक मिला: ${data.name} (${data.points || 0} Pts)`);
         setTimeout(() => searchInputRef.current?.focus(), 80);
       } else {
         setCustomerName('');
         setCustomerPoints(0);
+        setAddress('');
         setShowNewCustForm(true);
-        setShowCustomerDropdown(false);
-        toast("New Customer! Enter Name & press [Enter]", { icon: '👤' });
+        toast("नया ग्राहक! नाम दर्ज करें", { icon: '👤' });
         setTimeout(() => newCustNameRef.current?.focus(), 80);
       }
-    } catch (err) {
-      toast.dismiss(toastId);
-      toast.error("Could not fetch customer");
-    }
-  };
-
-  const handleSaveCustomerProfileInline = async () => {
-    const clean = getSanitizedPhone(customerPhone);
-    if (clean.length !== 10) return toast.error("Valid 10-digit phone required!");
-    const nameTrim = customerName.trim();
-    if (!nameTrim) return toast.error("Customer name cannot be empty!");
-
-    const toastId = toast.loading("Updating customer profile...");
-    try {
-      const userRef = doc(db, "customer_points", clean);
-      const updateData = {
-        name: nameTrim,
-        phone: clean,
-        address: address.trim(),
-        points: Number(customerPoints) || 0,
-        lastUpdated: new Date()
-      };
-      await setDoc(userRef, updateData, { merge: true });
-      saveRecentCustomerLocal(updateData);
-      setIsEditingCustomerProfile(false);
-      toast.dismiss(toastId);
-      toast.success("Profile updated successfully! ✅");
     } catch (e) {
       toast.dismiss(toastId);
-      toast.error("Failed to update customer");
+      toast.error("ग्राहक डेटा लोड नहीं हो सका");
     }
   };
 
   const handleSaveNewCustomerQuick = async () => {
-    const cleanPhone = getSanitizedPhone(customerPhone || customerInputSearch);
+    const cleanPhone = getSanitizedPhone(customerPhone);
     const nameTrim = newCustNameInput.trim();
     if (!nameTrim) return toast.error("Enter customer name!");
     if (cleanPhone.length !== 10) return toast.error("Enter valid 10-digit phone!");
@@ -926,19 +808,49 @@ export default function BbCafeDesktopPos() {
 
       setCustomerName(nameTrim);
       setAddress(newCustAddressInput.trim());
-      setCustomerPhone(cleanPhone);
       setCustomerPoints(0);
-      setCustomerInputSearch(`${nameTrim} (${cleanPhone})`);
       setShowNewCustForm(false);
       setNewCustNameInput('');
       setNewCustAddressInput('');
-      saveRecentCustomerLocal(newCustObj);
       toast.dismiss(toastId);
       toast.success("Customer saved & linked! ✅");
       setTimeout(() => searchInputRef.current?.focus(), 60);
     } catch (err) {
       toast.dismiss(toastId);
       toast.error("Failed to save customer");
+    }
+  };
+
+  // Search input keydown with support for QTY*CODE (e.g. 3*101)
+  const handleSearchInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const val = searchQuery.trim().toLowerCase();
+      if (!val) return;
+
+      let qty = 1;
+      let cleanQ = val;
+
+      if (val.includes('*')) {
+        const parts = val.split('*');
+        qty = parseInt(parts[0], 10) || 1;
+        cleanQ = (parts[1] || '').trim();
+      }
+
+      const exactCodeMatch = products.find(p => String(p.itemCode || '').trim().toLowerCase() === cleanQ);
+      if (exactCodeMatch) {
+        handleItemClick(exactCodeMatch, qty);
+        setSearchQuery('');
+        return;
+      }
+
+      const matchedByName = products.find(p => (p.name || '').toLowerCase().includes(cleanQ));
+      if (matchedByName) {
+        handleItemClick(matchedByName, qty);
+        setSearchQuery('');
+      } else {
+        toast.error("No matching item found!");
+      }
     }
   };
 
@@ -1094,7 +1006,7 @@ export default function BbCafeDesktopPos() {
   };
 
   // Add Item to Cart
-  const handleItemClick = (item: any) => {
+  const handleItemClick = (item: any, quantityToAdd = 1) => {
     triggerBeep('tap');
     const hasItemVariants = item.variants && typeof item.variants === 'object' && Object.keys(item.variants).length > 0;
 
@@ -1117,12 +1029,12 @@ export default function BbCafeDesktopPos() {
         const existingIndex = prev.findIndex((c) => c.cartItemId === cartItemId);
         if (existingIndex > -1) {
           const next = [...prev];
-          next[existingIndex] = { ...next[existingIndex], quantity: next[existingIndex].quantity + 1 };
+          next[existingIndex] = { ...next[existingIndex], quantity: next[existingIndex].quantity + quantityToAdd };
           return next;
         }
-        return [...prev, { cartItemId, id: item.id, name: itemName, price: itemPrice, quantity: 1 }];
+        return [...prev, { cartItemId, id: item.id, name: itemName, price: itemPrice, quantity: quantityToAdd }];
       });
-      toast.success(`जोड़ा गया: ${itemName}!`);
+      toast.success(`जोड़ा गया: ${itemName} x${quantityToAdd}!`);
       setTimeout(() => searchInputRef.current?.focus(), 60);
     }
   };
@@ -1178,7 +1090,7 @@ export default function BbCafeDesktopPos() {
     setTimeout(() => searchInputRef.current?.focus(), 50);
   };
 
-  // ROBUST WINDOW-LEVEL LISTENER FOR VARIATION MODAL (TAB TO SWITCH SIZE, ENTER TO CONFIRM)
+  // WINDOW-LEVEL KEYBOARD LISTENER FOR VARIATION MODAL (TAB / ARROWS / ENTER)
   useEffect(() => {
     if (!isVariationModalOpen || !selectedProductForVariation?.variants) return;
 
@@ -1267,10 +1179,30 @@ export default function BbCafeDesktopPos() {
     return currentTokenSeq;
   };
 
-  // Thermal Printing
-  const handlePrintReceiptDirect = async (orderObj: any, isKot = false): Promise<void> => {
+  // Helper: Pre-load QR image so receipt NEVER prints without QR Code
+  const preloadQrCode = async (upiString: string): Promise<string> => {
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(upiString)}`;
     return new Promise((resolve) => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => resolve(qrUrl);
+      img.onerror = () => resolve(qrUrl); // fallback
+      img.src = qrUrl;
+      // timeout safeguard
+      setTimeout(() => resolve(qrUrl), 1500);
+    });
+  };
+
+  // Thermal Printing with GUARANTEE: QR CODE MUST BE LOADED BEFORE PRINT!
+  const handlePrintReceiptDirect = async (orderObj: any, isKot = false): Promise<void> => {
+    return new Promise(async (resolve) => {
       if (!orderObj || !orderObj.items || orderObj.items.length === 0) return resolve();
+
+      // If customer receipt, guarantee QR code is preloaded
+      if (!isKot) {
+        const upiString = `upi://pay?pa=${orderObj.upiId || upiIdConfig}&pn=BumBumCafe&am=${orderObj.total}&cu=INR&tn=Bill-${orderObj.billNumber || 'Order'}`;
+        await preloadQrCode(upiString);
+      }
 
       const printWindow = window.open('', '_blank', 'width=420,height=700');
       if (!printWindow) {
@@ -1285,6 +1217,7 @@ export default function BbCafeDesktopPos() {
           * { font-family: Verdana, Geneva, Tahoma, sans-serif !important; box-sizing: border-box; }
           html, body { margin: 0 !important; padding: 0 !important; width: 80mm !important; background: #ffffff !important; color: #000000 !important; }
           #print-root { width: 68mm !important; max-width: 68mm !important; margin-left: 2mm !important; padding-right: 2mm !important; }
+          img { display: block !important; margin: 0 auto !important; max-width: 100% !important; }
         </style>
       `);
 
@@ -1304,19 +1237,63 @@ export default function BbCafeDesktopPos() {
           root.render(<PrintCustomerReceipt orderObj={orderObj} currentUser={currentUser} />);
         }
 
-        setTimeout(() => {
-          printWindow.focus();
-          printWindow.print();
-          printWindow.close();
-          resolve();
-        }, 350);
+        if (isKot) {
+          setTimeout(() => {
+            printWindow.focus();
+            printWindow.print();
+            printWindow.close();
+            resolve();
+          }, 250);
+          return;
+        }
+
+        // Customer Bill: STRICT CHECK - DO NOT PRINT WITHOUT QR CODE!
+        const executeGuaranteedPrint = () => {
+          const qrImg = printWindow.document.querySelector('img') as HTMLImageElement | null;
+          if (qrImg) {
+            if (qrImg.complete && qrImg.naturalWidth > 0) {
+              printWindow.focus();
+              printWindow.print();
+              printWindow.close();
+              resolve();
+            } else {
+              qrImg.onload = () => {
+                printWindow.focus();
+                printWindow.print();
+                printWindow.close();
+                resolve();
+              };
+              qrImg.onerror = () => {
+                printWindow.focus();
+                printWindow.print();
+                printWindow.close();
+                resolve();
+              };
+              setTimeout(() => {
+                printWindow.focus();
+                printWindow.print();
+                printWindow.close();
+                resolve();
+              }, 2000);
+            }
+          } else {
+            setTimeout(() => {
+              printWindow.focus();
+              printWindow.print();
+              printWindow.close();
+              resolve();
+            }, 500);
+          }
+        };
+
+        setTimeout(executeGuaranteedPrint, 300);
       } else {
         resolve();
       }
     });
   };
 
-  // Running Table Order: Save & Print ONLY Newly Added Items in KOT (Incremental KOT)
+  // Running Table Order: Save & Print ONLY Newly Added Items in KOT
   const handleSaveTableOrderKotOnly = async () => {
     if (cart.length === 0 || isSubmittingOrder) return;
     setIsSubmittingOrder(true);
@@ -1334,7 +1311,10 @@ export default function BbCafeDesktopPos() {
         
         const newlyAddedKotItems: PosCartItem[] = [];
         cart.forEach((currItem) => {
-          const prevItem = activeEditingOriginalItems.find(p => p.cartItemId === currItem.cartItemId || (p.name === currItem.name && p.size === currItem.size && p.note === currItem.note));
+          const prevItem = activeEditingOriginalItems.find(
+            p => p.cartItemId === currItem.cartItemId || 
+                 (p.name === currItem.name && p.size === currItem.size && p.note === currItem.note)
+          );
           const prevQty = prevItem ? prevItem.quantity : 0;
           const diffQty = currItem.quantity - prevQty;
           if (diffQty > 0) {
@@ -1367,8 +1347,6 @@ export default function BbCafeDesktopPos() {
 
         if (navigator.onLine) {
           await updateDoc(orderRef, updatedOrderObj);
-        } else {
-          toast("Table updated locally (Offline) 💾");
         }
         setLiveOrders(prev => prev.map(o => o.id === activeEditingOrderId ? { ...o, ...updatedOrderObj } : o));
 
@@ -1376,10 +1354,10 @@ export default function BbCafeDesktopPos() {
 
         if (kotEnabled) {
           if (newlyAddedKotItems.length > 0) {
-            toast.success(`Table ${tableNumber} updated! Printing KOT for ${newlyAddedKotItems.length} new items. 🪑`);
+            toast.success(`टेबल ${tableNumber} अपडेट! केवल ${newlyAddedKotItems.length} नए आइटम की KOT प्रिंट हुई। 🪑`);
             await handlePrintReceiptDirect({ ...updatedOrderObj, items: newlyAddedKotItems, billNumber, tokenNumber: token, fulfillmentType: 'table' }, true);
           } else {
-            toast.success(`Table ${tableNumber} updated! No new items to print in KOT.`);
+            toast.success(`टेबल ${tableNumber} अपडेट! कोई नया आइटम नहीं जुड़ा।`);
           }
         }
       } else {
@@ -1419,11 +1397,10 @@ export default function BbCafeDesktopPos() {
           offlineQueue.push(orderObj);
           localStorage.setItem("bb_pos_offline_orders_queue", JSON.stringify(offlineQueue));
           setLiveOrders(prev => [{ id: `offline_${Date.now()}`, ...orderObj }, ...prev]);
-          toast("Table saved locally (Offline) 💾");
         }
 
         triggerBeep('success');
-        toast.success(`Table ${tableNumber} Saved! Running KOT printed. 🪑`);
+        toast.success(`टेबल ${tableNumber} पर बिल सेव हुआ व KOT निकल गई! 🪑`);
 
         if (kotEnabled) {
           await handlePrintReceiptDirect(orderObj, true);
@@ -1433,12 +1410,13 @@ export default function BbCafeDesktopPos() {
       setCart([]); 
       setCustomerPhone(''); 
       setCustomerName(''); 
-      setCustomerInputSearch('');
+      setAddress('');
       setDiscountValue(0); 
       setIsDiscountOpen(false);
       setIsRedeemingPoints(false); 
       setPointsToRedeem(0);
-      setFulfillmentType('pickup'); // Always reset to pickup!
+      setCashTendered('');
+      setFulfillmentType('pickup');
       setTableNumber('Table 1');
       setApplyDeliveryFee(false);
       setActiveEditingOrderId(null);
@@ -1448,14 +1426,13 @@ export default function BbCafeDesktopPos() {
       setTimeout(() => searchInputRef.current?.focus(), 60);
 
     } catch (err) {
-      console.error(err);
       toast.error("Failed to save table order");
     } finally {
       setIsSubmittingOrder(false);
     }
   };
 
-  // Final Checkout & Bill Print: Saved as 'unsettled' until cashier settles it in Daily Bills tab!
+  // Final Checkout & Bill Print: Saved as 'unsettled' until settled in Daily Bills tab!
   const handleFinalCheckoutAndPrintBill = async () => {
     if (cart.length === 0 || isSubmittingOrder) return;
     setIsSubmittingOrder(true);
@@ -1466,7 +1443,7 @@ export default function BbCafeDesktopPos() {
     const token = getDailyTokenNumber();
     const earned = Math.floor(finalTotal / 100);
     const redeemed = isRedeemingPoints ? pointsToRedeem : 0;
-    const cleanPhone = getSanitizedPhone(customerPhone || customerInputSearch);
+    const cleanPhone = getSanitizedPhone(customerPhone);
 
     try {
       let billNumber: number;
@@ -1478,7 +1455,6 @@ export default function BbCafeDesktopPos() {
         const prevPoints = userDoc.exists() ? (Number(userDoc.data().points) || 0) : 0;
         remainingPts = Math.max(0, prevPoints - redeemed) + earned;
         await setDoc(userRef, { name: customerName || "Walk-in Guest", phone: cleanPhone, points: remainingPts, lastActive: new Date() }, { merge: true });
-        saveRecentCustomerLocal({ phone: cleanPhone, name: customerName || "Walk-in Guest", points: remainingPts, address });
       }
 
       billNumber = activeEditingBillNumber || getNextBillNumber();
@@ -1498,7 +1474,7 @@ export default function BbCafeDesktopPos() {
         deliveryFee: getDeliveryCharge(), 
         total: finalTotal, 
         timestamp: new Date(), 
-        status: 'unsettled', // UNSETTLED BY DEFAULT: Requires settlement to count in daily sales!
+        status: 'unsettled', // Saved to Daily Bills for payment settlement
         paymentSettled: false,
         fulfillmentType, 
         deliveryArea: fulfillmentType === "delivery" ? selectedArea.name : "", 
@@ -1534,25 +1510,26 @@ export default function BbCafeDesktopPos() {
 
       triggerBeep('success'); 
 
-      if (kotEnabled) await handlePrintReceiptDirect(orderObj, true);
+      // Print Customer Bill (Guaranteed QR Code verification inside)
       await handlePrintReceiptDirect(orderObj, false);
 
-      toast.success(`बिल #${billNumber} प्रिंट हुआ! (Daily Bills से भुगतान सेटल करें)`);
+      toast.success(`बिल #${billNumber} प्रिंट हुआ! (Daily Bills से सेटल करें)`);
 
-      // AUTOMATIC RESET: ALWAYS REVERTS FULFILLMENT TO 'PICKUP' & CLEARS CART
+      // Reset state & default pickup
       setCart([]); 
       setCustomerPhone(''); 
       setCustomerName(''); 
-      setCustomerInputSearch('');
+      setAddress('');
       setCustomerPoints(0); 
       setDiscountValue(0); 
       setIsDiscountOpen(false);
       setShowNewCustForm(false);
       setIsRedeemingPoints(false); 
       setPointsToRedeem(0);
+      setCashTendered('');
       setAppliedPromoName(null);
       setPromoCouponInput('');
-      setFulfillmentType('pickup'); // Always reset to pickup!
+      setFulfillmentType('pickup');
       setTableNumber('Table 1');
       setApplyDeliveryFee(false);
       setActiveEditingOrderId(null);
@@ -1567,7 +1544,7 @@ export default function BbCafeDesktopPos() {
     }
   };
 
-  // Settle Bill Action (From Daily Bills Settlement Tab)
+  // Quick Settle Action (From Daily Bills Tab)
   const handleQuickSettleOrder = async (orderId: string, pMethod: 'cash' | 'upi' | 'due' | 'split') => {
     triggerBeep('tap');
     const toastId = toast.loading(`Settling bill via ${pMethod.toUpperCase()}...`);
@@ -1591,7 +1568,7 @@ export default function BbCafeDesktopPos() {
 
   // WhatsApp Bill Sender
   const handleSendWhatsAppBill = (targetOrder: any = null) => {
-    const ord = targetOrder || { customerPhone: customerPhone || customerInputSearch, customerName, fulfillmentType, items: cart, total: getTotalBillPrice() };
+    const ord = targetOrder || { customerPhone, customerName, fulfillmentType, items: cart, total: getTotalBillPrice() };
     const clean = getSanitizedPhone(ord.customerPhone || '');
     if (clean.length !== 10) return toast.error("Enter valid 10-digit phone number!");
     if (!ord.items || ord.items.length === 0) return toast.error("No items in cart!");
@@ -1643,7 +1620,7 @@ export default function BbCafeDesktopPos() {
     }
   };
 
-  // Reports Data Fetching: ONLY COUNT SETTLED BILLS!
+  // Reports Data Fetching: ONLY COUNT SETTLED ORDERS!
   const fetchReportData = async () => {
     setIsReportLoading(true);
     try {
@@ -1694,7 +1671,7 @@ export default function BbCafeDesktopPos() {
     if (activeTab === 'reports') fetchReportData();
   }, [activeTab, reportFilter, customReportDate]);
 
-  // Financial Summary: ONLY SETTLED BILLS (status === 'completed') ARE ADDED TO DAILY SALE!
+  // Financial Summary: ONLY COMPLETED / SETTLED BILLS
   const reportSummary = useMemo(() => {
     let totalSale = 0;
     let cashSale = 0;
@@ -1731,7 +1708,7 @@ export default function BbCafeDesktopPos() {
     return { totalSale, cashSale, upiSale, dueSale, totalOrdersCount, totalExpenseAmount, netCashInDrawer, unsettledTotal, unsettledCount };
   }, [reportOrders, dailyExpenses]);
 
-  // Item-wise Sales Report Calculation (Only from Settled/Completed Orders)
+  // Item-wise Sales Report Calculation
   const itemWiseSales = useMemo(() => {
     const map: { [key: string]: { name: string, quantity: number, revenue: number } } = {};
 
@@ -1829,8 +1806,7 @@ export default function BbCafeDesktopPos() {
         setIsCustomerModalOpen(false);
         setIsItemEditorModalOpen(false);
         setIsCatManagerModalOpen(false);
-        setShowCustomerDropdown(false);
-        setIsEditingCustomerProfile(false);
+        setShowNewCustForm(false);
         setTimeout(() => searchInputRef.current?.focus(), 60);
       }
     };
@@ -1857,15 +1833,6 @@ export default function BbCafeDesktopPos() {
       return matchesName || matchesCat || matchesCode;
     });
   }, [products, inventorySearchQuery]);
-
-  const filteredCustomerSuggestions = useMemo(() => {
-    const q = customerInputSearch.trim().toLowerCase();
-    if (!q) return recentCustomersList.slice(0, 10);
-    return recentCustomersList.filter(c => 
-      (c.phone && c.phone.includes(q)) || 
-      (c.name && c.name.toLowerCase().includes(q))
-    ).slice(0, 10);
-  }, [recentCustomersList, customerInputSearch]);
 
   const mainClass = "h-screen w-screen flex font-sans antialiased overflow-hidden " + (themeMode === "dark" ? "dark bg-[#121212] text-neutral-100" : "bg-[#f4f5f7] text-neutral-900");
 
@@ -1930,7 +1897,7 @@ export default function BbCafeDesktopPos() {
                   {!isSidebarCollapsed && (
                     <div className="truncate">
                       <h1 className="text-xs font-black uppercase text-orange-600 dark:text-yellow-500 truncate">Bum Bum Cafe</h1>
-                      <span className="text-[10px] text-neutral-600 dark:text-neutral-400 font-bold">POS Pro v4.3</span>
+                      <span className="text-[10px] text-neutral-600 dark:text-neutral-400 font-bold">POS Pro v4.4</span>
                     </div>
                   )}
                 </div>
@@ -2032,7 +1999,7 @@ export default function BbCafeDesktopPos() {
                       <input 
                         ref={searchInputRef}
                         type="text" 
-                        placeholder="Search item / Type Code (e.g. 1, 101, 201) & hit [Enter]... [F2]" 
+                        placeholder="Search item / Type Code or Qty*Code (e.g. 101 or 3*101) & hit [Enter]... [F2]" 
                         value={searchQuery} 
                         onChange={e => setSearchQuery(e.target.value)}
                         onKeyDown={handleSearchInputKeyDown} 
@@ -2100,7 +2067,6 @@ export default function BbCafeDesktopPos() {
                                 : "opacity-40 bg-neutral-200 dark:bg-neutral-950 pointer-events-none"
                             }`}
                           >
-                            {/* FIXED IMAGE CONTAINER 82PX - NEVER OVERFLOWS OR HIDES DETAILS */}
                             <div className="w-full h-[82px] max-h-[82px] min-h-[82px] bg-neutral-200 dark:bg-neutral-800 relative shrink-0 overflow-hidden flex items-center justify-center">
                               {imgUrl ? (
                                 <img src={imgUrl} alt={displayName} className="w-full h-full object-cover" loading="lazy" />
@@ -2114,7 +2080,6 @@ export default function BbCafeDesktopPos() {
                               )}
                             </div>
 
-                            {/* ITEM NAME & PRICE CONTAINER - GUARANTEED VISIBILITY */}
                             <div className="p-2 flex-1 flex flex-col justify-between w-full bg-white dark:bg-neutral-900 min-h-[65px]">
                               <p className="font-bold text-[11px] line-clamp-2 text-neutral-900 dark:text-white leading-tight">
                                 {displayName}
@@ -2148,128 +2113,109 @@ export default function BbCafeDesktopPos() {
                       <button onClick={() => setCart([])} className="text-red-500 text-xs font-bold hover:underline flex items-center gap-1"><SafeTrash2 size={13} /> Clear [Del]</button>
                     </div>
 
-                    {/* CUSTOMER SEARCH BY PHONE OR NAME + EDIT PROFILE */}
-                    <div ref={customerDropdownRef} className="relative space-y-1.5 bg-neutral-100 dark:bg-neutral-800/40 p-2 rounded-xl border border-neutral-300 dark:border-neutral-700 mb-2 shrink-0">
+                    {/* STRICT 10-DIGIT NUMBER CUSTOMER SEARCH & REDEEM SECTION */}
+                    <div className="bg-neutral-100 dark:bg-neutral-800/60 p-2.5 rounded-xl border border-neutral-300 dark:border-neutral-700 mb-2 shrink-0 space-y-2">
                       <div className="flex gap-1.5">
                         <div className="relative flex-1">
                           <input 
                             ref={phoneInputRef}
-                            type="text" 
-                            placeholder="Customer Name or Mobile No..." 
-                            value={customerInputSearch} 
-                            onFocus={() => setShowCustomerDropdown(true)}
-                            onChange={e => handleCustomerInputChange(e.target.value)} 
-                            onKeyDown={e => {
-                              if (e.key === 'Enter') {
-                                e.preventDefault();
-                                handleCheckLoyaltyWithAutoJump();
-                              }
-                            }}
-                            className="w-full bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 rounded-lg px-2.5 py-1 text-xs text-neutral-900 dark:text-white outline-none font-bold" 
+                            type="tel"
+                            maxLength={10}
+                            placeholder="ग्राहक का 10-अंकों का मोबाइल नंबर..." 
+                            value={customerPhone} 
+                            onChange={e => handleCustomerNumberChange(e.target.value)} 
+                            className="w-full bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 rounded-lg px-2.5 py-1.5 text-xs text-neutral-900 dark:text-white outline-none font-mono font-bold tracking-wider" 
                           />
                         </div>
-                        <button onClick={handleCheckLoyaltyWithAutoJump} className="bg-orange-600 hover:bg-orange-500 text-white px-2 rounded-lg text-xs font-black uppercase">Find</button>
-                        <button onClick={() => handleSendWhatsAppBill()} title="Send WhatsApp Receipt [F7]" className="bg-green-600/15 hover:bg-green-600/25 text-green-600 dark:text-green-400 px-2 rounded-lg text-xs font-bold flex items-center">
+                        <button 
+                          type="button" 
+                          onClick={() => searchCustomerByExactPhone(customerPhone)} 
+                          className="bg-orange-600 hover:bg-orange-500 text-white px-3 rounded-lg text-xs font-black uppercase"
+                        >
+                          खोजें
+                        </button>
+                        <button onClick={() => handleSendWhatsAppBill()} title="Send WhatsApp Receipt [F7]" className="bg-green-600/15 hover:bg-green-600/25 text-green-600 px-2 rounded-lg text-xs font-bold flex items-center">
                           <SafeShare2 size={13} />
                         </button>
                       </div>
 
-                      {/* LAST 10 RECENT CUSTOMERS AUTO-DROPDOWN */}
-                      {showCustomerDropdown && filteredCustomerSuggestions.length > 0 && (
-                        <div className="absolute left-0 right-0 top-12 z-50 bg-white dark:bg-neutral-900 border border-orange-500/50 rounded-xl shadow-2xl overflow-hidden max-h-48 overflow-y-auto">
-                          <div className="p-1.5 bg-neutral-100 dark:bg-neutral-800 text-[10px] font-black uppercase text-neutral-500 flex items-center gap-1 border-b">
-                            <History size={11} /> Last 10 Recent Customers (हाल के ग्राहक)
+                      {/* CUSTOMER FOUND: FULL PROFILE & LOYALTY POINTS REDEEM */}
+                      {customerPhone.length === 10 && customerName && !showNewCustForm && (
+                        <div className="bg-white dark:bg-neutral-900 p-2 rounded-lg border border-neutral-200 dark:border-neutral-700 text-xs space-y-1.5">
+                          <div className="flex justify-between items-center font-bold">
+                            <span className="text-neutral-900 dark:text-white">👤 {customerName}</span>
+                            <span className="text-amber-600 dark:text-amber-400 font-mono font-black">⭐ {customerPoints} Pts</span>
                           </div>
-                          {filteredCustomerSuggestions.map((cust, i) => (
-                            <div 
-                              key={i} 
-                              onClick={() => handleSelectQuickCustomer(cust)}
-                              className="px-3 py-1.5 hover:bg-orange-50 dark:hover:bg-neutral-800 cursor-pointer flex justify-between items-center text-xs border-b"
-                            >
-                              <div>
-                                <span className="font-bold text-neutral-900 dark:text-white">{cust.name || 'Customer'}</span>
-                                <span className="text-[10px] font-mono text-neutral-500 ml-2">({cust.phone})</span>
+                          {address && <p className="text-[10px] text-neutral-500 truncate">📍 {address}</p>}
+
+                          {customerPoints > 0 ? (
+                            <div className="pt-1.5 border-t border-neutral-200 dark:border-neutral-800 flex items-center justify-between">
+                              <span className="text-[10px] font-bold text-amber-700 dark:text-amber-300">
+                                रिडीम पॉइंट्स (1 Pt = ₹1):
+                              </span>
+                              <div className="flex items-center gap-1.5">
+                                <input 
+                                  type="number" 
+                                  min={1} 
+                                  max={customerPoints}
+                                  value={pointsToRedeem || ''}
+                                  onChange={e => setPointsToRedeem(Math.min(Number(e.target.value), customerPoints))}
+                                  placeholder="Pts"
+                                  className="w-14 bg-neutral-100 dark:bg-neutral-800 border rounded p-1 text-center font-mono text-xs font-bold" 
+                                />
+                                <button 
+                                  type="button"
+                                  onClick={() => {
+                                    if (!isRedeemingPoints && pointsToRedeem > 0) {
+                                      setIsRedeemingPoints(true);
+                                      toast.success(`₹${pointsToRedeem} पॉइंट्स छूट लागू हुई!`);
+                                    } else {
+                                      setIsRedeemingPoints(false);
+                                      setPointsToRedeem(0);
+                                    }
+                                  }}
+                                  className={`px-2 py-1 rounded text-[10px] font-black uppercase ${
+                                    isRedeemingPoints ? 'bg-red-500 text-white' : 'bg-amber-500 text-black'
+                                  }`}
+                                >
+                                  {isRedeemingPoints ? 'हटाएं' : 'लागू करें'}
+                                </button>
                               </div>
-                              {cust.points ? (
-                                <span className="text-[10px] text-amber-600 dark:text-amber-400 font-black">⭐ {cust.points} Pts</span>
-                              ) : null}
                             </div>
-                          ))}
+                          ) : (
+                            <p className="text-[10px] text-neutral-400 italic">इस ग्राहक के पास अभी कोई रिडीम पॉइंट नहीं हैं।</p>
+                          )}
                         </div>
                       )}
 
-                      {/* CUSTOMER FOUND DETAILS + EDIT PROFILE */}
-                      {customerName && !showNewCustForm && !isEditingCustomerProfile && (
-                        <div className="flex justify-between items-center text-xs font-black text-amber-600 dark:text-yellow-400 pt-1 border-t">
-                          <span>👤 {customerName} (⭐ {customerPoints} Pts)</span>
-                          <button 
-                            type="button" 
-                            onClick={() => setIsEditingCustomerProfile(true)}
-                            className="text-[10px] text-blue-600 dark:text-blue-400 flex items-center gap-1 hover:underline"
-                          >
-                            <SafeEdit3 size={11} /> Edit Profile
-                          </button>
-                        </div>
-                      )}
-
-                      {/* INLINE EDIT CUSTOMER PROFILE */}
-                      {isEditingCustomerProfile && (
-                        <div className="space-y-1.5 pt-1 border-t">
-                          <p className="text-[9px] font-black uppercase text-blue-600 dark:text-blue-400">Edit Customer Profile:</p>
-                          <input 
-                            type="text" 
-                            value={customerName} 
-                            onChange={e => setCustomerName(e.target.value)} 
-                            placeholder="Customer Name" 
-                            className="w-full bg-white dark:bg-neutral-900 border rounded px-2 py-1 text-xs font-bold"
-                          />
-                          <input 
-                            type="text" 
-                            value={address} 
-                            onChange={e => setAddress(e.target.value)} 
-                            placeholder="Address" 
-                            className="w-full bg-white dark:bg-neutral-900 border rounded px-2 py-1 text-xs"
-                          />
-                          <div className="flex gap-1.5">
-                            <button onClick={handleSaveCustomerProfileInline} className="flex-1 py-1 bg-blue-600 text-white font-black text-[10px] rounded uppercase">Save</button>
-                            <button onClick={() => setIsEditingCustomerProfile(false)} className="px-2 py-1 bg-neutral-300 dark:bg-neutral-700 text-[10px] rounded uppercase">Cancel</button>
-                          </div>
-                        </div>
-                      )}
-
+                      {/* NEW CUSTOMER REGISTRATION FORM */}
                       {showNewCustForm && (
-                        <div className="space-y-1.5 pt-1.5 border-t">
-                          <p className="text-[9px] text-amber-700 dark:text-yellow-400 font-black uppercase">New Customer! Type Name & Press [Enter]:</p>
+                        <div className="space-y-1.5 pt-1 border-t">
+                          <p className="text-[10px] text-amber-600 font-black uppercase">नया ग्राहक! नाम लिखकर [Enter] दबाएँ:</p>
                           <input 
-                            ref={newCustNameRef} 
+                            ref={newCustNameRef}
                             type="text" 
                             placeholder="Customer Name *" 
                             value={newCustNameInput} 
                             onChange={e => setNewCustNameInput(e.target.value)} 
-                            onKeyDown={e => {
-                              if (e.key === 'Enter') {
-                                e.preventDefault();
-                                newCustAddressRef.current?.focus();
-                              }
-                            }}
-                            className="w-full bg-white dark:bg-neutral-900 border rounded-lg px-2 py-1 text-xs outline-none" 
+                            onKeyDown={e => e.key === 'Enter' && newCustAddressRef.current?.focus()}
+                            className="w-full bg-white dark:bg-neutral-900 border rounded px-2 py-1 text-xs outline-none" 
                           />
                           <input 
-                            ref={newCustAddressRef} 
+                            ref={newCustAddressRef}
                             type="text" 
-                            placeholder="Address (Optional) & hit [Enter]" 
+                            placeholder="Address (Optional)" 
                             value={newCustAddressInput} 
                             onChange={e => setNewCustAddressInput(e.target.value)} 
-                            onKeyDown={e => {
-                              if (e.key === 'Enter') {
-                                e.preventDefault();
-                                handleSaveNewCustomerQuick();
-                              }
-                            }}
-                            className="w-full bg-white dark:bg-neutral-900 border rounded-lg px-2 py-1 text-xs outline-none" 
+                            onKeyDown={e => e.key === 'Enter' && handleSaveNewCustomerQuick()}
+                            className="w-full bg-white dark:bg-neutral-900 border rounded px-2 py-1 text-xs outline-none" 
                           />
-                          <button onClick={handleSaveNewCustomerQuick} className="w-full py-1 bg-green-600 hover:bg-green-500 text-white font-black text-xs uppercase rounded-lg flex items-center justify-center gap-1 shadow">
-                            <SafeUserPlus size={13} /> Save Customer [Enter]
+                          <button 
+                            type="button" 
+                            onClick={handleSaveNewCustomerQuick} 
+                            className="w-full py-1 bg-green-600 hover:bg-green-500 text-white font-black text-xs uppercase rounded"
+                          >
+                            Save Customer
                           </button>
                         </div>
                       )}
@@ -2300,7 +2246,7 @@ export default function BbCafeDesktopPos() {
                       )}
                     </div>
 
-                    {/* FULFILLMENT MODE */}
+                    {/* FULFILLMENT MODE & 6 TABLE SELECTOR */}
                     <div className="space-y-1.5 mb-2 shrink-0 border-t border-neutral-300 dark:border-neutral-800 pt-1.5">
                       <div className="grid grid-cols-3 gap-1 bg-neutral-200 dark:bg-neutral-800 p-1 rounded-xl">
                         {(['pickup', 'table', 'delivery'] as const).map((type) => (
@@ -2398,27 +2344,83 @@ export default function BbCafeDesktopPos() {
                       )}
                     </div>
 
+                    {/* CASH CHANGE RETURN CALCULATOR */}
+                    <div className="bg-neutral-100 dark:bg-neutral-800/80 p-2 rounded-xl border border-neutral-300 dark:border-neutral-700 mb-2 shrink-0 space-y-1">
+                      <div className="flex justify-between items-center text-xs">
+                        <span className="font-bold text-neutral-700 dark:text-neutral-300">कैश दिया (Cash Tendered):</span>
+                        <div className="flex items-center gap-1">
+                          <input 
+                            type="number" 
+                            placeholder="₹ नोट" 
+                            value={cashTendered} 
+                            onChange={e => setCashTendered(e.target.value === '' ? '' : Number(e.target.value))}
+                            className="w-20 bg-white dark:bg-neutral-900 border rounded px-2 py-1 text-xs font-mono font-bold outline-none" 
+                          />
+                        </div>
+                      </div>
+                      <div className="flex gap-1">
+                        {[100, 200, 500, 1000].map(val => (
+                          <button 
+                            key={val} 
+                            type="button" 
+                            onClick={() => setCashTendered(val)} 
+                            className="flex-1 py-0.5 bg-white dark:bg-neutral-900 border rounded text-[10px] font-bold text-neutral-700 dark:text-neutral-300"
+                          >
+                            ₹{val}
+                          </button>
+                        ))}
+                      </div>
+                      {cashTendered !== '' && Number(cashTendered) >= getTotalBillPrice() && (
+                        <div className="pt-1 border-t flex justify-between items-center text-xs font-black text-green-600">
+                          <span>वापस दें (Change Return):</span>
+                          <span className="font-mono text-sm">₹{changeReturnAmount}</span>
+                        </div>
+                      )}
+                    </div>
+
                     {/* BILL TOTALS */}
                     <div className="space-y-1 text-xs border-t border-neutral-300 dark:border-neutral-800 pt-1.5 shrink-0 font-bold">
                       <div className="flex justify-between text-neutral-600 dark:text-neutral-400"><span>Subtotal</span><span className="font-mono">₹{getCartSubtotal()}</span></div>
                       {getDeliveryCharge() > 0 && <div className="flex justify-between text-neutral-800 dark:text-neutral-200"><span>Delivery Charge</span><span className="font-mono">+₹{getDeliveryCharge()}</span></div>}
                       {getCalculatedDiscountAmount() > 0 && <div className="flex justify-between text-orange-600 font-bold"><span>Discount {appliedPromoName && `(${appliedPromoName})`}</span><span className="font-mono">-₹{getCalculatedDiscountAmount()}</span></div>}
+                      {isRedeemingPoints && <div className="flex justify-between text-amber-600 font-bold"><span>Points Redeemed</span><span className="font-mono">-₹{getRedemptionDiscount()}</span></div>}
                       <div className="flex justify-between text-sm font-black text-green-600 dark:text-green-500 pt-1 border-t border-dashed border-neutral-400">
                         <span>Grand Total</span><span className="font-mono text-base font-black">₹{getTotalBillPrice()}</span>
                       </div>
                     </div>
 
-                    {/* SINGLE CLEAN ACTION BUTTON: PRINT BILL (SAVED TO SETTLEMENT LIST) */}
-                    <div className="space-y-1.5 pt-2 shrink-0">
-                      <button 
-                        onClick={handleFinalCheckoutAndPrintBill} 
-                        disabled={cart.length === 0 || isSubmittingOrder} 
-                        className="w-full bg-green-600 hover:bg-green-500 text-white font-black py-3 rounded-xl uppercase tracking-wider text-xs flex items-center justify-center gap-2 shadow-xl disabled:opacity-50"
-                      >
-                        {isSubmittingOrder ? <Loader2 className="animate-spin" size={15} /> : <Receipt size={15} />}
-                        <span>Print Bill (₹{getTotalBillPrice()}) [F9]</span>
-                      </button>
-                    </div>
+                    {/* ACTION BUTTONS */}
+                    {fulfillmentType === 'table' ? (
+                      <div className="space-y-1.5 pt-2 shrink-0">
+                        <button 
+                          onClick={handleSaveTableOrderKotOnly} 
+                          disabled={cart.length === 0 || isSubmittingOrder} 
+                          className="w-full bg-amber-500 hover:bg-amber-400 text-black font-black py-2.5 rounded-xl uppercase tracking-wider text-xs flex items-center justify-center gap-2 shadow"
+                        >
+                          <Printer size={15} />
+                          <span>{activeEditingOrderId ? `Update ${tableNumber} (केवल नए आइटम की KOT)` : `Save on ${tableNumber} & Print KOT`}</span>
+                        </button>
+                        <button 
+                          onClick={handleFinalCheckoutAndPrintBill} 
+                          disabled={cart.length === 0 || isSubmittingOrder} 
+                          className="w-full bg-green-600 hover:bg-green-500 text-white font-black py-2.5 rounded-xl uppercase tracking-wider text-xs flex items-center justify-center gap-2 shadow-xl"
+                        >
+                          <Receipt size={15} />
+                          <span>Settle & Print Final Bill (केवल पूरा बिल) [F9]</span>
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="pt-2 shrink-0">
+                        <button 
+                          onClick={handleFinalCheckoutAndPrintBill} 
+                          disabled={cart.length === 0 || isSubmittingOrder} 
+                          className="w-full bg-green-600 hover:bg-green-500 text-white font-black py-3 rounded-xl uppercase tracking-wider text-xs flex items-center justify-center gap-2 shadow-xl"
+                        >
+                          {isSubmittingOrder ? <Loader2 className="animate-spin" size={15} /> : <Receipt size={15} />}
+                          <span>Print Bill (₹{getTotalBillPrice()}) [F9]</span>
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -2485,7 +2487,6 @@ export default function BbCafeDesktopPos() {
                               <span className="font-mono font-black text-base text-green-600 dark:text-green-400">₹{order.total}</span>
                             </div>
 
-                            {/* SETTLEMENT BUTTONS (ONE-CLICK SETTLE) */}
                             {!isSettled ? (
                               <div className="flex gap-1.5">
                                 <button 
@@ -2883,7 +2884,6 @@ export default function BbCafeDesktopPos() {
                                   setCart(order.items || []);
                                   setCustomerName(order.customerName || '');
                                   setCustomerPhone(order.customerPhone || '');
-                                  setCustomerInputSearch(order.customerPhone || order.customerName || '');
                                   setActiveTab('billing');
                                   toast.success(`Loaded ${tName} Bill #${order.billNumber}`);
                                   setTimeout(() => searchInputRef.current?.focus(), 80);
@@ -3036,422 +3036,104 @@ export default function BbCafeDesktopPos() {
         </>
       )}
 
-      {/* POPUP MODAL 1: ADD / EDIT PRODUCT */}
-      <AnimatePresence>
-        {isItemEditorModalOpen && (
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 cursor-pointer" onClick={() => setIsItemEditorModalOpen(false)}>
-            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} onClick={e => e.stopPropagation()} className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 max-w-lg w-full rounded-3xl p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto cursor-default">
-              <div className="flex justify-between items-center border-b pb-3">
-                <h3 className="font-black text-sm uppercase text-orange-600 dark:text-orange-500">{editingItemObj ? 'Edit Food Item' : 'Add New Food Item'}</h3>
-                <button onClick={() => setIsItemEditorModalOpen(false)} className="text-neutral-500 hover:text-black dark:hover:text-white p-1"><SafeX size={18} /></button>
-              </div>
-
-              <form onSubmit={handleSaveItemToFirestore} className="space-y-3 text-xs">
-                <div>
-                  <label className="text-neutral-700 dark:text-neutral-300 uppercase font-bold text-[10px] block mb-1">Item Name *</label>
-                  <input type="text" required placeholder="e.g. Cheese Pizza, Masala Dosa, Paneer Paratha" value={itemNameInput} onChange={e => setItemNameInput(e.target.value)} className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-xl p-2.5 text-neutral-900 dark:text-white outline-none font-bold" autoFocus />
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-neutral-700 dark:text-neutral-300 uppercase font-bold text-[10px] block mb-1">Base Price (₹) *</label>
-                    <input type="number" required min={0} value={itemPriceInput} onChange={e => setItemPriceInput(e.target.value === '' ? '' : Number(e.target.value))} className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-xl p-2.5 text-neutral-900 dark:text-white font-mono font-bold" />
-                  </div>
-                  <div>
-                    <label className="text-neutral-700 dark:text-neutral-300 uppercase font-bold text-[10px] block mb-1">Short Code *</label>
-                    <input type="text" required placeholder="e.g. 1, 101, 201" value={itemCodeInput} onChange={e => setItemCodeInput(e.target.value)} className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-xl p-2.5 text-neutral-900 dark:text-white font-mono font-bold" />
-                  </div>
-                </div>
-
-                <div>
-                  <div className="flex justify-between items-center mb-1">
-                    <label className="text-neutral-700 dark:text-neutral-300 uppercase font-bold text-[10px]">Category Selection *</label>
-                    <button type="button" onClick={() => setIsAddingNewCatInput(!isAddingNewCatInput)} className="text-orange-600 dark:text-orange-400 text-[10px] font-bold underline">
-                      {isAddingNewCatInput ? 'Select Existing Category' : '+ Add New Category'}
-                    </button>
-                  </div>
-                  {isAddingNewCatInput ? (
-                    <input 
-                      type="text" 
-                      placeholder="Type New Category (e.g. Shakes, Paratha, Momos)" 
-                      value={newCustomCategoryName} 
-                      onChange={e => setNewCustomCategoryName(e.target.value)} 
-                      className="w-full bg-neutral-100 dark:bg-neutral-950 border border-orange-500 rounded-xl p-2.5 text-neutral-900 dark:text-white outline-none font-bold" 
-                    />
-                  ) : (
-                    <select 
-                      value={itemCatInput} 
-                      onChange={e => setItemCatInput(e.target.value)} 
-                      className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-xl p-2.5 text-neutral-900 dark:text-white outline-none font-bold" 
-                    >
-                      {categories.filter(c => c !== 'All').map(c => (
-                        <option key={c} value={c}>{c}</option>
-                      ))}
-                    </select>
-                  )}
-                </div>
-
-                <div>
-                  <label className="text-neutral-700 dark:text-neutral-300 uppercase font-bold text-[10px] block mb-1">Image URL (Optional):</label>
-                  <input type="text" placeholder="https://..." value={itemImageInput} onChange={e => setItemImageInput(e.target.value)} className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-xl p-2.5 text-neutral-900 dark:text-white outline-none" />
-                </div>
-
-                <div className="pt-3 border-t border-neutral-300 dark:border-neutral-800 space-y-3">
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <span className="font-black uppercase text-[11px] text-amber-700 dark:text-yellow-400">Multiple Sizes / Variations?</span>
-                      <p className="text-[10px] text-neutral-600 dark:text-neutral-400">Half/Full, Plain/Butter, Small/Medium/Large</p>
-                    </div>
-                    <button type="button" onClick={() => setHasVariants(!hasVariants)} className="text-orange-500">
-                      {hasVariants ? <SafeToggleRight size={30} /> : <SafeToggleLeft size={30} />}
-                    </button>
-                  </div>
-
-                  {hasVariants && (
-                    <div className="bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 p-3 rounded-2xl space-y-3">
-                      <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
-                        <span className="text-[9px] font-bold text-neutral-600 uppercase mr-1">Presets:</span>
-                        <button type="button" onClick={() => handleApplyVariantPreset('half_full')} className="px-2 py-1 bg-white dark:bg-neutral-800 hover:bg-neutral-200 rounded text-[10px] font-bold border border-neutral-300 dark:border-neutral-700">🍲 Half / Full</button>
-                        <button type="button" onClick={() => handleApplyVariantPreset('plain_butter')} className="px-2 py-1 bg-white dark:bg-neutral-800 hover:bg-neutral-200 rounded text-[10px] font-bold border border-neutral-300 dark:border-neutral-700">🧈 Plain / Butter</button>
-                        <button type="button" onClick={() => handleApplyVariantPreset('pizza')} className="px-2 py-1 bg-white dark:bg-neutral-800 hover:bg-neutral-200 rounded text-[10px] font-bold border border-neutral-300 dark:border-neutral-700">🍕 Pizza Sizes</button>
-                      </div>
-
-                      <div className="space-y-1.5">
-                        {Object.entries(itemVariantsList).map(([vName, vPrice]: any) => (
-                          <div key={vName} className="flex justify-between items-center bg-white dark:bg-neutral-900 px-3 py-2 rounded-xl border border-neutral-300 dark:border-neutral-800 font-bold">
-                            <span className="text-neutral-900 dark:text-neutral-200">{vName}</span>
-                            <div className="flex items-center gap-3">
-                              <span className="font-mono text-orange-600 dark:text-orange-400 font-black">₹{vPrice}</span>
-                              <button type="button" onClick={() => handleRemoveVariantRow(vName)} className="text-red-500 hover:text-red-700"><SafeTrash2 size={14} /></button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-
-                      <div className="flex gap-2 pt-1">
-                        <input type="text" placeholder="Size (e.g. Half, Butter)" value={newVariantName} onChange={e => setNewVariantName(e.target.value)} className="flex-1 bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 rounded-xl px-2.5 py-1.5 text-xs text-neutral-900 dark:text-white outline-none font-bold" />
-                        <input type="number" placeholder="Price (₹)" value={newVariantPrice} onChange={e => setNewVariantPrice(e.target.value === '' ? '' : Number(e.target.value))} className="w-24 bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 rounded-xl px-2.5 py-1.5 text-xs text-neutral-900 dark:text-white font-mono outline-none font-bold" />
-                        <button type="button" onClick={handleAddVariantRow} className="bg-orange-600 hover:bg-orange-500 text-white px-3 py-1.5 rounded-xl font-black uppercase text-[10px]">+ Add</button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex gap-2 pt-2 border-t border-neutral-300 dark:border-neutral-800">
-                  {editingItemObj && (
-                    <button 
-                      type="button" 
-                      onClick={() => handleDeleteProduct(editingItemObj.id, editingItemObj.name)} 
-                      className="px-4 py-3 bg-red-600/15 hover:bg-red-600 text-red-600 hover:text-white border border-red-500/30 rounded-xl font-black text-xs uppercase transition-all flex items-center justify-center gap-1"
-                    >
-                      <SafeTrash2 size={14} /> Delete
-                    </button>
-                  )}
-                  <button type="button" onClick={() => setIsItemEditorModalOpen(false)} className="flex-1 py-3 bg-neutral-200 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-300 font-bold uppercase rounded-xl">Cancel</button>
-                  <button type="submit" className="flex-1 py-3 bg-green-600 text-white font-black uppercase rounded-xl shadow-lg">Save Item</button>
-                </div>
-              </form>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* POPUP MODAL: CATEGORY MOVE & MERGE */}
-      <AnimatePresence>
-        {isCatManagerModalOpen && (
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 cursor-pointer" onClick={() => setIsCatManagerModalOpen(false)}>
-            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} onClick={e => e.stopPropagation()} className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 max-w-lg w-full rounded-3xl p-6 shadow-2xl space-y-5 cursor-default">
-              <div className="flex justify-between items-center border-b pb-3">
-                <div className="flex items-center gap-2 text-orange-600 dark:text-orange-400 font-black text-sm uppercase">
-                  <ArrowLeftRight size={18} />
-                  <span>Category Manager (क्रम बदलें व डुप्लीकेट मर्ज करें)</span>
-                </div>
-                <button onClick={() => setIsCatManagerModalOpen(false)} className="text-neutral-500"><SafeX size={18} /></button>
-              </div>
-
-              <div className="space-y-2">
-                <h4 className="text-xs font-black uppercase text-neutral-800 dark:text-neutral-200">1. Move Category Order (क्रम बदलें):</h4>
-                <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
-                  {categories.filter(c => c !== 'All').map((cat, idx, arr) => (
-                    <div key={cat} className="flex justify-between items-center bg-neutral-100 dark:bg-neutral-950 p-2 rounded-xl border border-neutral-300 dark:border-neutral-800">
-                      <span className="font-bold text-xs text-neutral-900 dark:text-white">{cat}</span>
-                      <div className="flex gap-1">
-                        <button 
-                          disabled={idx === 0}
-                          onClick={() => handleMoveCategory(cat, 'left')} 
-                          className="px-2 py-1 bg-white dark:bg-neutral-800 border rounded text-[10px] font-bold disabled:opacity-30"
-                        >
-                          ◀ Move Up
-                        </button>
-                        <button 
-                          disabled={idx === arr.length - 1}
-                          onClick={() => handleMoveCategory(cat, 'right')} 
-                          className="px-2 py-1 bg-white dark:bg-neutral-800 border rounded text-[10px] font-bold disabled:opacity-30"
-                        >
-                          Move Down ▶
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="pt-3 border-t border-neutral-300 dark:border-neutral-800 space-y-3">
-                <h4 className="text-xs font-black uppercase text-amber-600 dark:text-amber-400">2. Merge Duplicate Categories (डुप्लीकेट मर्ज करें):</h4>
-                <p className="text-[11px] text-neutral-500">यदि दो अलग नाम बन गए हैं (जैसे Burger और Burgers) तो उन्हें एक में मिला लें:</p>
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div>
-                    <label className="block text-[10px] font-bold uppercase mb-1">Source (हटाने वाली केटेगरी):</label>
-                    <select value={mergeSourceCat} onChange={e => setMergeSourceCat(e.target.value)} className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-xl p-2 font-bold outline-none">
-                      <option value="">-- चुनें --</option>
-                      {categories.filter(c => c !== 'All').map(c => (
-                        <option key={c} value={c}>{c}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold uppercase mb-1">Target (रखने वाली मुख्य केटेगरी):</label>
-                    <select value={mergeTargetCat} onChange={e => setMergeTargetCat(e.target.value)} className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-xl p-2 font-bold outline-none">
-                      <option value="">-- चुनें --</option>
-                      {categories.filter(c => c !== 'All').map(c => (
-                        <option key={c} value={c}>{c}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-                <button onClick={handleMergeCategories} className="w-full py-2.5 bg-amber-600 hover:bg-amber-500 text-white font-black text-xs uppercase rounded-xl shadow">
-                  Merge into Single Category
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* POPUP MODAL 2: PAST RECEIPT DETAILS */}
-      <AnimatePresence>
-        {isReceiptModalOpen && selectedReceipt && (
-          <div className="fixed inset-0 bg-black/85 backdrop-blur-sm z-50 flex items-center justify-center p-4 cursor-pointer" onClick={() => setIsReceiptModalOpen(false)}>
-            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} onClick={e => e.stopPropagation()} className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 max-w-md w-full rounded-3xl p-6 shadow-2xl space-y-4 text-xs cursor-default">
-              <div className="flex justify-between items-center border-b pb-3">
-                <div>
-                  <h3 className="font-black text-sm uppercase text-orange-600 dark:text-orange-400">Bill Details (#{selectedReceipt.billNumber})</h3>
-                  <p className="text-[10px] text-neutral-500 font-mono">{new Date(selectedReceipt.timestamp?.toDate ? selectedReceipt.timestamp.toDate() : selectedReceipt.timestamp).toLocaleString()}</p>
-                </div>
-                <button onClick={() => setIsReceiptModalOpen(false)} className="text-neutral-500"><SafeX size={18} /></button>
-              </div>
-              <div className="space-y-1 bg-neutral-100 dark:bg-neutral-950 p-3 rounded-2xl border border-neutral-300 dark:border-neutral-800">
-                <p className="font-bold text-neutral-900 dark:text-white">👤 {selectedReceipt.customerName} {selectedReceipt.customerPhone && `(${selectedReceipt.customerPhone})`}</p>
-                <p className="text-[10px] text-neutral-500 uppercase font-mono">Mode: {selectedReceipt.fulfillmentType} • Payment: {selectedReceipt.paymentMethod}</p>
-              </div>
-              <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
-                {selectedReceipt.items?.map((it: any, i: number) => (
-                  <div key={i} className="flex justify-between items-center bg-neutral-100 dark:bg-neutral-950 p-2.5 rounded-xl border border-neutral-300 dark:border-neutral-800 font-bold">
-                    <p className="text-neutral-900 dark:text-white">{it.name}</p>
-                    <p className="font-mono text-orange-600 dark:text-orange-400">{it.quantity} x ₹{it.price}</p>
-                  </div>
-                ))}
-              </div>
-              <div className="border-t border-neutral-300 dark:border-neutral-800 pt-2 font-mono space-y-1 font-bold">
-                <div className="flex justify-between text-neutral-600 dark:text-neutral-400"><span>Subtotal:</span><span>₹{selectedReceipt.subtotal}</span></div>
-                {selectedReceipt.deliveryFee > 0 && <div className="flex justify-between text-neutral-900 dark:text-neutral-200"><span>Delivery Fee:</span><span>+₹{selectedReceipt.deliveryFee}</span></div>}
-                <div className="flex justify-between font-black text-sm text-green-600 dark:text-green-400 pt-1 border-t border-dashed border-neutral-400">
-                  <span>Grand Total:</span><span>₹{selectedReceipt.total}</span>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-2 pt-2 border-t border-neutral-300 dark:border-neutral-800">
-                <button onClick={() => handlePrintReceiptDirect(selectedReceipt, false)} className="py-2.5 bg-green-600 hover:bg-green-500 text-white font-black uppercase text-xs rounded-xl flex items-center justify-center gap-1.5 shadow">
-                  <SafePrinter size={14} /> Print Bill
-                </button>
-                <button onClick={() => handlePrintReceiptDirect(selectedReceipt, true)} className="py-2.5 bg-amber-500 hover:bg-amber-400 text-black font-black uppercase text-xs rounded-xl flex items-center justify-center gap-1.5 shadow">
-                  <SafeFileText size={14} /> Print KOT
-                </button>
-              </div>
-              <button onClick={() => handleSendWhatsAppBill(selectedReceipt)} className="w-full py-2 bg-green-600/15 text-green-700 dark:text-green-400 border border-green-500/30 font-black uppercase text-xs rounded-xl flex items-center justify-center gap-1.5">
-                <SafeShare2 size={14} /> Send WhatsApp Bill
-              </button>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* POPUP MODAL 3: SHORTCUTS GUIDE [F1] */}
-      <AnimatePresence>
-        {isHelpModalOpen && (
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 cursor-pointer" onClick={() => setIsHelpModalOpen(false)}>
-            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} onClick={e => e.stopPropagation()} className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 max-w-lg w-full rounded-3xl p-6 shadow-2xl space-y-4 text-neutral-900 dark:text-neutral-100 cursor-default">
-              <div className="flex justify-between items-center border-b pb-3">
-                <div className="flex items-center gap-2 text-orange-600 dark:text-yellow-500 font-black text-sm uppercase">
-                  <SafeHelpCircle size={18} />
-                  <span>POS Keyboard Shortcuts (F1 - F12)</span>
-                </div>
-                <button onClick={() => setIsHelpModalOpen(false)} className="text-neutral-500"><SafeX size={18} /></button>
-              </div>
-              <div className="space-y-2 text-xs max-h-80 overflow-y-auto pr-1">
-                {[
-                  { key: 'F1', desc: 'Open Shortcuts Guide' },
-                  { key: 'F2', desc: 'Focus Search Bar & hit [Enter] to auto-add item' },
-                  { key: 'F3', desc: 'Park / Hold active cart order' },
-                  { key: 'F4', desc: 'Toggle Payment Mode (Cash / UPI / Split / Udhar)' },
-                  { key: 'F5', desc: 'Recall / Open Held / Parked Carts' },
-                  { key: 'F6', desc: 'Record Daily Drawer Expense' },
-                  { key: 'F7', desc: 'Send WhatsApp Receipt to customer' },
-                  { key: 'F8', desc: 'Toggle Discount & Coupon Box (Hide / Unhide छूट)' },
-                  { key: 'F9', desc: 'Print Bill & Send to Daily Bills Settlement' },
-                  { key: 'F11', desc: 'Open Customer Directory / Loyalty' },
-                  { key: 'F12', desc: 'Toggle Mode (Pickup ➔ Table ➔ Delivery)' },
-                  { key: 'Tab', desc: 'Cycle through Sizes/Portions in Variation Popup' },
-                  { key: 'Enter', desc: 'Confirm size / Add to cart immediately' },
-                  { key: 'Arrows (←/→)', desc: 'Switch portion/variation without mouse' },
-                ].map((s) => (
-                  <div key={s.key} className="flex justify-between items-center p-2 rounded-xl bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 font-bold">
-                    <span className="font-mono font-black text-orange-600 dark:text-orange-400 bg-orange-500/15 px-2.5 py-1 rounded-lg border border-orange-500/30">{s.key}</span>
-                    <span className="text-neutral-800 dark:text-neutral-300">{s.desc}</span>
-                  </div>
-                ))}
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* POPUP MODAL 4: HELD CARTS [F5] */}
-      <AnimatePresence>
-        {isHeldCartsModalOpen && (
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 cursor-pointer" onClick={() => setIsHeldCartsModalOpen(false)}>
-            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} onClick={e => e.stopPropagation()} className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 max-w-lg w-full rounded-3xl p-6 shadow-2xl space-y-4 cursor-default">
-              <div className="flex justify-between items-center border-b pb-3">
-                <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400 font-black text-sm uppercase">
-                  <SafePauseCircle size={18} />
-                  <span>Held Orders ({heldCarts.length}) [F5]</span>
-                </div>
-                <button onClick={() => setIsHeldCartsModalOpen(false)} className="text-neutral-500"><SafeX size={18} /></button>
-              </div>
-              <div className="space-y-2.5 max-h-80 overflow-y-auto pr-1">
-                {heldCarts.length === 0 ? (
-                  <p className="text-xs text-neutral-500 text-center py-10 font-bold">No parked orders.</p>
-                ) : (
-                  heldCarts.map((h) => (
-                    <div key={h.id} className="bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 p-3.5 rounded-2xl flex justify-between items-center font-bold">
-                      <div>
-                        <p className="text-xs text-neutral-900 dark:text-white">{h.customerName} ({h.heldAt})</p>
-                        <p className="text-[10px] text-neutral-500 font-mono">{h.cart.length} items • ₹{h.total}</p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <button onClick={() => handleRestoreHeldCart(h)} className="bg-green-600 text-white px-3 py-1.5 rounded-xl text-xs font-black uppercase flex items-center gap-1 shadow">
-                          <SafePlayCircle size={14} /> Resume
-                        </button>
-                        <button onClick={() => handleDeleteHeldCart(h.id)} className="p-1.5 text-red-500"><SafeTrash2 size={16} /></button>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* POPUP MODAL 5: EXPENSE [F6] */}
-      <AnimatePresence>
-        {isExpenseModalOpen && (
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 cursor-pointer" onClick={() => setIsExpenseModalOpen(false)}>
-            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} onClick={e => e.stopPropagation()} className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 max-w-sm w-full rounded-3xl p-6 shadow-2xl space-y-4 cursor-default">
-              <div className="flex justify-between items-center border-b pb-3">
-                <h3 className="font-black text-sm uppercase text-red-600 flex items-center gap-2"><Receipt size={16} /> Drawer Expense Entry [F6]</h3>
-                <button onClick={() => setIsExpenseModalOpen(false)} className="text-neutral-500"><SafeX size={18} /></button>
-              </div>
-              <form onSubmit={handleSaveExpense} className="space-y-3 text-xs">
-                <div>
-                  <label className="text-neutral-700 dark:text-neutral-300 uppercase font-black text-[10px] block mb-1">Expense Title *</label>
-                  <input type="text" required placeholder="e.g. Milk 5L, Ice cubes" value={expenseTitle} onChange={e => setExpenseTitle(e.target.value)} className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-xl p-2.5 text-neutral-900 dark:text-white outline-none font-bold" autoFocus />
-                </div>
-                <div>
-                  <label className="text-neutral-700 dark:text-neutral-300 uppercase font-black text-[10px] block mb-1">Amount (₹) *</label>
-                  <input type="number" required min={1} placeholder="e.g. 150" value={expenseAmount} onChange={e => setExpenseAmount(e.target.value === '' ? '' : Number(e.target.value))} className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-xl p-2.5 text-neutral-900 dark:text-white font-mono text-sm outline-none font-bold" />
-                </div>
-                <div>
-                  <label className="text-neutral-700 dark:text-neutral-300 uppercase font-black text-[10px] block mb-1">Category</label>
-                  <select value={expenseCategory} onChange={e => setExpenseCategory(e.target.value)} className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-xl p-2.5 text-neutral-900 dark:text-white font-bold">
-                    <option value="Milk / Dairy">Milk / Dairy</option>
-                    <option value="Vegetables">Vegetables / Raw Food</option>
-                    <option value="Staff Snacks">Staff Tea / Snacks</option>
-                    <option value="Gas / Maintenance">Maintenance / Gas</option>
-                    <option value="General">Other / General</option>
-                  </select>
-                </div>
-                <button type="submit" className="w-full py-2.5 bg-red-600 hover:bg-red-500 text-white font-black uppercase text-xs rounded-xl shadow-lg">Save Expense</button>
-              </form>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* POPUP MODAL 6: KEYBOARD-CONTROLLED VARIATION MODAL (TAB TO SELECT, ENTER TO ADD) */}
+      {/* POPUP: KEYBOARD VARIATION MODAL (TAB TO SELECT, ENTER TO ADD) */}
       <AnimatePresence>
         {isVariationModalOpen && selectedProductForVariation && (
-          <div 
-            className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4 cursor-pointer outline-none" 
-            tabIndex={0}
-            autoFocus
-            onClick={() => { setIsVariationModalOpen(false); setTimeout(() => searchInputRef.current?.focus(), 60); }}
-          >
-            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} onClick={e => e.stopPropagation()} className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 max-w-sm w-full rounded-3xl p-6 shadow-2xl space-y-4 cursor-default">
+          <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="bg-white dark:bg-neutral-900 border max-w-sm w-full rounded-3xl p-6 shadow-2xl space-y-4">
               <div className="flex justify-between items-center border-b pb-3">
                 <div>
-                  <h3 className="font-black text-sm uppercase text-orange-600 dark:text-orange-500">{selectedProductForVariation.name}</h3>
-                  <p className="text-[10px] text-neutral-500">तीर कीज़ (←/→) या [Tab] से साइज़ चुनें व [Enter] दबाएँ</p>
+                  <h3 className="font-black text-sm uppercase text-orange-600">{selectedProductForVariation.name}</h3>
+                  <p className="text-[10px] text-neutral-500">[Tab] से साइज़ चुनें व [Enter] दबाएँ</p>
                 </div>
-                <button tabIndex={-1} onClick={() => { setIsVariationModalOpen(false); setTimeout(() => searchInputRef.current?.focus(), 60); }} className="text-neutral-500"><SafeX size={18} /></button>
+                <button onClick={() => setIsVariationModalOpen(false)} className="text-neutral-500"><X size={18} /></button>
               </div>
 
-              <div className="space-y-3">
-                {selectedProductForVariation.variants && (
-                  <div>
-                    <label className="text-xs font-bold uppercase text-neutral-600 dark:text-neutral-400 block mb-1.5">Size / Portion ([Tab] / 1, 2, 3):</label>
-                    <div className="grid grid-cols-2 gap-2">
-                      {Object.entries(selectedProductForVariation.variants).map(([size, price]: any, idx: number) => {
-                        const isSelected = selectedSize.toLowerCase() === size.toLowerCase();
-                        return (
-                          <button 
-                            key={size}
-                            type="button"
-                            onClick={() => { setSelectedVariantIndex(idx); setSelectedSize(size); setSelectedSizePrice(Number(price) || 100); }}
-                            className={`py-2 px-3 rounded-xl text-xs font-black uppercase border transition-all ${
-                              isSelected ? 'bg-orange-600 text-white border-orange-600 shadow-md ring-2 ring-orange-400' : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-900 dark:text-neutral-300 border-neutral-300 dark:border-neutral-700'
-                            }`}
-                          >
-                            <span className="font-mono text-[10px] opacity-70 mr-1">[{idx + 1}]</span>
-                            {size} (₹{price})
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                <div>
-                  <label className="text-xs font-bold uppercase text-neutral-600 dark:text-neutral-400 block mb-1">Cooking Note (Optional):</label>
-                  <div className="flex flex-wrap gap-1.5">
-                    {COOKING_TAGS.map((tag) => (
-                      <button key={tag} type="button" tabIndex={-1} onClick={() => setItemNoteInput(prev => prev ? `${prev}, ${tag}` : tag)} className="px-2 py-1 bg-neutral-100 dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 rounded-lg text-[10px] font-bold text-neutral-800 dark:text-neutral-300">
-                        {tag}
-                      </button>
-                    ))}
+              {selectedProductForVariation.variants && (
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold uppercase text-neutral-500">Size / Portion:</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {Object.entries(selectedProductForVariation.variants).map(([size, price]: any, idx: number) => {
+                      const isSelected = selectedVariantIndex === idx;
+                      return (
+                        <button 
+                          key={size}
+                          type="button"
+                          onClick={() => { setSelectedVariantIndex(idx); setSelectedSize(size); setSelectedSizePrice(Number(price) || 100); }}
+                          className={`py-2 px-3 rounded-xl text-xs font-black uppercase border transition-all ${
+                            isSelected ? 'bg-orange-600 text-white border-orange-600 shadow ring-2 ring-orange-400' : 'bg-neutral-100 dark:bg-neutral-800'
+                          }`}
+                        >
+                          <span className="font-mono text-[10px] opacity-70 mr-1">[{idx + 1}]</span>
+                          {size} (₹{price})
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
+              )}
 
-                <div>
-                  <input type="text" tabIndex={-1} placeholder="Custom Note (Optional)" value={itemNoteInput} onChange={e => setItemNoteInput(e.target.value)} className="w-full bg-neutral-100 dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 rounded-xl px-3 py-2 text-xs outline-none font-bold" />
-                </div>
+              <div>
+                <input 
+                  type="text" 
+                  placeholder="Cooking Note (Optional)" 
+                  value={itemNoteInput} 
+                  onChange={e => setItemNoteInput(e.target.value)} 
+                  className="w-full bg-neutral-100 dark:bg-neutral-800 border rounded-xl px-3 py-2 text-xs outline-none font-bold" 
+                />
               </div>
 
               <div className="flex gap-2 pt-2">
-                <button type="button" tabIndex={-1} onClick={() => { setIsVariationModalOpen(false); setTimeout(() => searchInputRef.current?.focus(), 60); }} className="flex-1 py-3 bg-neutral-200 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-300 font-bold uppercase text-xs rounded-xl">Cancel [Esc]</button>
-                <button type="button" onClick={handleAddCustomizedItemToCart} className="flex-1 bg-green-600 hover:bg-green-500 text-white font-black py-3 rounded-xl text-xs uppercase shadow">
-                  Add to Cart [Enter]
+                <button type="button" onClick={() => setIsVariationModalOpen(false)} className="flex-1 py-2.5 bg-neutral-200 dark:bg-neutral-800 font-bold uppercase text-xs rounded-xl">Cancel [Esc]</button>
+                <button type="button" onClick={handleAddCustomizedItemToCart} className="flex-1 bg-green-600 hover:bg-green-500 text-white font-black py-2.5 rounded-xl text-xs uppercase shadow">
+                  Add [Enter]
                 </button>
               </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* POPUP: ITEM EDITOR MODAL */}
+      <AnimatePresence>
+        {isItemEditorModalOpen && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="bg-white dark:bg-neutral-900 border max-w-lg w-full rounded-3xl p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+              <div className="flex justify-between items-center border-b pb-3">
+                <h3 className="font-black text-sm uppercase text-orange-600">{editingItemObj ? 'Edit Food Item' : 'Add Food Item'}</h3>
+                <button onClick={() => setIsItemEditorModalOpen(false)}><X size={18} /></button>
+              </div>
+              <form onSubmit={handleSaveItemToFirestore} className="space-y-3 text-xs">
+                <input type="text" required placeholder="Item Name *" value={itemNameInput} onChange={e => setItemNameInput(e.target.value)} className="w-full bg-neutral-100 dark:bg-neutral-950 border rounded-xl p-2.5 font-bold" autoFocus />
+                <div className="grid grid-cols-2 gap-3">
+                  <input type="number" required min={0} placeholder="Price (₹) *" value={itemPriceInput} onChange={e => setItemPriceInput(e.target.value === '' ? '' : Number(e.target.value))} className="w-full bg-neutral-100 dark:bg-neutral-950 border rounded-xl p-2.5 font-mono font-bold" />
+                  <input type="text" required placeholder="Short Code *" value={itemCodeInput} onChange={e => setItemCodeInput(e.target.value)} className="w-full bg-neutral-100 dark:bg-neutral-950 border rounded-xl p-2.5 font-mono font-bold" />
+                </div>
+                <input type="text" placeholder="Image URL (Optional)" value={itemImageInput} onChange={e => setItemImageInput(e.target.value)} className="w-full bg-neutral-100 dark:bg-neutral-950 border rounded-xl p-2.5" />
+                <div className="flex gap-2 pt-2">
+                  <button type="button" onClick={() => setIsItemEditorModalOpen(false)} className="flex-1 py-3 bg-neutral-200 dark:bg-neutral-800 font-bold uppercase rounded-xl">Cancel</button>
+                  <button type="submit" className="flex-1 py-3 bg-green-600 text-white font-black uppercase rounded-xl shadow">Save Item</button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* POPUP: DRAWER EXPENSE [F6] */}
+      <AnimatePresence>
+        {isExpenseModalOpen && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="bg-white dark:bg-neutral-900 border max-w-sm w-full rounded-3xl p-6 shadow-2xl space-y-4">
+              <div className="flex justify-between items-center border-b pb-3">
+                <h3 className="font-black text-sm uppercase text-red-600 flex items-center gap-2"><Receipt size={16} /> Drawer Expense [F6]</h3>
+                <button onClick={() => setIsExpenseModalOpen(false)}><X size={18} /></button>
+              </div>
+              <form onSubmit={handleSaveExpense} className="space-y-3 text-xs">
+                <input type="text" required placeholder="Expense Title (e.g. Milk 5L)" value={expenseTitle} onChange={e => setExpenseTitle(e.target.value)} className="w-full bg-neutral-100 dark:bg-neutral-950 border rounded-xl p-2.5 font-bold outline-none" autoFocus />
+                <input type="number" required min={1} placeholder="Amount (₹)" value={expenseAmount} onChange={e => setExpenseAmount(e.target.value === '' ? '' : Number(e.target.value))} className="w-full bg-neutral-100 dark:bg-neutral-950 border rounded-xl p-2.5 font-mono text-sm outline-none font-bold" />
+                <button type="submit" className="w-full py-2.5 bg-red-600 text-white font-black uppercase text-xs rounded-xl shadow">Save Expense</button>
+              </form>
             </motion.div>
           </div>
         )}
@@ -3475,8 +3157,7 @@ export default function BbCafeDesktopPos() {
           setCustomerPhone(cust.phone); 
           setCustomerName(cust.name || ''); 
           setCustomerPoints(cust.points || 0); 
-          setCustomerInputSearch(`${cust.name} (${cust.phone})`);
-          saveRecentCustomerLocal({ phone: cust.phone, name: cust.name, points: cust.points, address: cust.address });
+          setAddress(cust.address || '');
           setIsCustomerModalOpen(false);
           setTimeout(() => searchInputRef.current?.focus(), 60);
         }} 
