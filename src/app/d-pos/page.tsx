@@ -1,5 +1,4 @@
 
-
 'use client';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { db } from '@/lib/firebase'; 
@@ -1179,39 +1178,49 @@ export default function BbCafeDesktopPos() {
     return currentTokenSeq;
   };
 
-  // Helper: Pre-load QR image so receipt NEVER prints without QR Code
   const preloadQrCode = async (upiString: string): Promise<string> => {
     const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(upiString)}`;
     return new Promise((resolve) => {
       const img = new Image();
       img.crossOrigin = 'anonymous';
       img.onload = () => resolve(qrUrl);
-      img.onerror = () => resolve(qrUrl); // fallback
+      img.onerror = () => resolve(qrUrl);
       img.src = qrUrl;
-      // timeout safeguard
       setTimeout(() => resolve(qrUrl), 1500);
     });
   };
 
-  // Thermal Printing with GUARANTEE: QR CODE MUST BE LOADED BEFORE PRINT!
+  // ==========================================
+  // UPDATED: ROBUST IFRAME PRINTING + ALL IMAGES LOAD CHECK
+  // ==========================================
   const handlePrintReceiptDirect = async (orderObj: any, isKot = false): Promise<void> => {
     return new Promise(async (resolve) => {
       if (!orderObj || !orderObj.items || orderObj.items.length === 0) return resolve();
 
-      // If customer receipt, guarantee QR code is preloaded
+      // Preload QR Code for extra safety if you still use external image API
       if (!isKot) {
         const upiString = `upi://pay?pa=${orderObj.upiId || upiIdConfig}&pn=BumBumCafe&am=${orderObj.total}&cu=INR&tn=Bill-${orderObj.billNumber || 'Order'}`;
         await preloadQrCode(upiString);
       }
 
-      const printWindow = window.open('', '_blank', 'width=420,height=700');
-      if (!printWindow) {
-        toast.error("Popup blocked! Allow popups for thermal printing.");
+      // 1. Create a hidden iframe (Stops "Popup Blocked" errors entirely)
+      const iframe = document.createElement('iframe');
+      iframe.style.position = 'fixed';
+      iframe.style.right = '0';
+      iframe.style.bottom = '0';
+      iframe.style.width = '0';
+      iframe.style.height = '0';
+      iframe.style.border = 'none';
+      document.body.appendChild(iframe);
+
+      const printDocument = iframe.contentWindow?.document;
+      if (!printDocument) {
+        toast.error("प्रिंटिंग फ्रेम लोड नहीं हो पाया!");
         return resolve();
       }
 
-      printWindow.document.write('<!DOCTYPE html><html><head><title>Print Receipt</title>');
-      printWindow.document.write(`
+      printDocument.write('<!DOCTYPE html><html><head><title>Print Receipt</title>');
+      printDocument.write(`
         <style>
           @page { size: 80mm auto; margin: 0mm !important; }
           * { font-family: Verdana, Geneva, Tahoma, sans-serif !important; box-sizing: border-box; }
@@ -1221,77 +1230,93 @@ export default function BbCafeDesktopPos() {
         </style>
       `);
 
+      // Inject parent CSS
       Array.from(document.querySelectorAll('link[rel="stylesheet"], style')).forEach((styleTag) => {
-        printWindow.document.write(styleTag.outerHTML);
+        printDocument.write(styleTag.outerHTML);
       });
 
-      printWindow.document.write('</head><body><div id="print-root"></div></body></html>');
-      printWindow.document.close();
+      printDocument.write('</head><body><div id="print-root"></div></body></html>');
+      printDocument.close();
 
-      const container = printWindow.document.getElementById('print-root');
+      const container = printDocument.getElementById('print-root');
       if (container) {
         const root = createRoot(container);
+        
+        // Render React Components into Iframe
         if (isKot) {
           root.render(<PrintKitchenKot orderObj={orderObj} />);
         } else {
           root.render(<PrintCustomerReceipt orderObj={orderObj} currentUser={currentUser} />);
         }
 
-        if (isKot) {
+        // Trigger iframe print & cleanup
+        const triggerPrintAndCleanup = () => {
           setTimeout(() => {
-            printWindow.focus();
-            printWindow.print();
-            printWindow.close();
-            resolve();
-          }, 250);
+            iframe.contentWindow?.focus();
+            iframe.contentWindow?.print();
+            // Cleanup after print dialog closes
+            setTimeout(() => {
+              if (document.body.contains(iframe)) {
+                document.body.removeChild(iframe);
+              }
+              resolve();
+            }, 1000);
+          }, 300); // give dom time to paint
+        };
+
+        if (isKot) {
+          triggerPrintAndCleanup();
           return;
         }
 
-        // Customer Bill: STRICT CHECK - DO NOT PRINT WITHOUT QR CODE!
+        // 2. WAIT FOR ALL IMAGES (Including QR) TO LOAD COMPLETELY
         const executeGuaranteedPrint = () => {
-          const qrImg = printWindow.document.querySelector('img') as HTMLImageElement | null;
-          if (qrImg) {
-            if (qrImg.complete && qrImg.naturalWidth > 0) {
-              printWindow.focus();
-              printWindow.print();
-              printWindow.close();
-              resolve();
-            } else {
-              qrImg.onload = () => {
-                printWindow.focus();
-                printWindow.print();
-                printWindow.close();
-                resolve();
-              };
-              qrImg.onerror = () => {
-                printWindow.focus();
-                printWindow.print();
-                printWindow.close();
-                resolve();
-              };
-              setTimeout(() => {
-                printWindow.focus();
-                printWindow.print();
-                printWindow.close();
-                resolve();
-              }, 2000);
-            }
-          } else {
-            setTimeout(() => {
-              printWindow.focus();
-              printWindow.print();
-              printWindow.close();
-              resolve();
-            }, 500);
+          const images = printDocument.querySelectorAll('img');
+          const totalImages = images.length;
+
+          if (totalImages === 0) {
+            triggerPrintAndCleanup();
+            return;
           }
+
+          let loadedCount = 0;
+          let hasPrinted = false;
+
+          const checkAndPrint = () => {
+            if (hasPrinted) return;
+            hasPrinted = true;
+            triggerPrintAndCleanup();
+          };
+
+          images.forEach((img) => {
+            if (img.complete && img.naturalWidth > 0) {
+              loadedCount++;
+              if (loadedCount === totalImages) checkAndPrint();
+            } else {
+              img.onload = () => {
+                loadedCount++;
+                if (loadedCount === totalImages) checkAndPrint();
+              };
+              img.onerror = () => {
+                loadedCount++; // Ignore errors and continue so print doesn't get stuck
+                if (loadedCount === totalImages) checkAndPrint();
+              };
+            }
+          });
+
+          // Maximum wait time: 2.5 seconds (Fall back to print whatever loaded)
+          setTimeout(checkAndPrint, 2500); 
         };
 
+        // Allow a small delay for React rendering to inject <img> tags into DOM
         setTimeout(executeGuaranteedPrint, 300);
       } else {
+        document.body.removeChild(iframe);
         resolve();
       }
     });
   };
+  // ==========================================
 
   // Running Table Order: Save & Print ONLY Newly Added Items in KOT
   const handleSaveTableOrderKotOnly = async () => {
