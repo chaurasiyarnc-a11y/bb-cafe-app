@@ -132,8 +132,7 @@ export default function BbCafeDesktopPos() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [pinInput, setPinInput] = useState('');
-  const [activeTab, setActiveTab] = useState<'billing' | 'settlement' | 'inventory' | 'receipts' | 'settings' | 'orders' | 'tables' | 'reports'>('billing');
-
+  const [activeTab, setActiveTab] = useState<'billing' | 'settlement' | 'inventory' | 'receipts' | 'settings' | 'orders' | 'tables' | 'reports' | 'udhari'>('billing');
   const [gstEnabled, setGstEnabled] = useState(false);
   const [gstRate, setGstRate] = useState(5);
   const [themeMode, setThemeMode] = useState<'dark' | 'light'>('light');
@@ -234,7 +233,57 @@ export default function BbCafeDesktopPos() {
   const [isReceiptsLoading, setIsReceiptsLoading] = useState(false);
 
   const [isSyncing, setIsSyncing] = useState(false);
+// --- UDHARI BOOK STATES & LOGIC ---
+  const [dueOrders, setDueOrders] = useState<any[]>([]);
+  const [isUdhariLoading, setIsUdhariLoading] = useState(false);
+  const [udhariSearchQuery, setUdhariSearchQuery] = useState('');
 
+  const fetchDueOrders = async () => {
+    setIsUdhariLoading(true);
+    try {
+      if (navigator.onLine) {
+        const q = query(collection(db, "orders"), where("paymentMethod", "==", "due"));
+        const snap = await getDocs(q);
+        const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        // Sort by newest first
+        docs.sort((a: any, b: any) => {
+           const timeA = a.timestamp?.toDate ? a.timestamp.toDate().getTime() : new Date(a.timestamp || 0).getTime();
+           const timeB = b.timestamp?.toDate ? b.timestamp.toDate().getTime() : new Date(b.timestamp || 0).getTime();
+           return timeB - timeA;
+        });
+        setDueOrders(docs);
+      }
+    } catch (e) {
+      toast.error("उधार लोड करने में त्रुटि आई!");
+    } finally {
+      setIsUdhariLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'udhari') fetchDueOrders();
+  }, [activeTab]);
+
+  const handleClearUdhari = async (orderId: string, method: 'cash' | 'upi') => {
+    triggerBeep('tap');
+    const toastId = toast.loading("उधार जमा किया जा रहा है...");
+    try {
+      await updateDoc(doc(db, "orders", orderId), {
+        paymentMethod: method,
+        udhariClearedAt: new Date(),
+        udhariCleared: true
+      });
+      setDueOrders(prev => prev.filter(o => o.id !== orderId));
+      toast.dismiss(toastId);
+      toast.success(`उधार सफलतापूर्वक ${method.toUpperCase()} में जमा हो गया! ✅`);
+      triggerBeep('success');
+    } catch (e) {
+      toast.dismiss(toastId);
+      toast.error("उधार क्लियर करने में त्रुटि आई।");
+    }
+  };
+  // ----------------------------------
+  
   // Cart & Order States
   const [cart, setCart] = useState<PosCartItem[]>([]);
 
@@ -1937,6 +1986,7 @@ export default function BbCafeDesktopPos() {
                   { id: 'tables', label: `Tables (${activeTableOrders.length})`, icon: LayoutGrid },
                   { id: 'orders', label: `Live Orders (${activeLiveOrders.length})`, icon: Clock },
                   { id: 'reports', label: 'Reports & Sales', icon: SafeBarChart3 },
+                  { id: 'udhari', label: 'Udhari (उधार)', icon: SafeFileText },
                   { id: 'settings', label: 'Settings', icon: Settings },
                 ].map((item) => {
                   const Icon = item.icon;
@@ -2993,6 +3043,90 @@ export default function BbCafeDesktopPos() {
               </div>
             )}
 
+            {/* TAB 8: UDHARI BOOK */}
+            {activeTab === 'udhari' && (
+              <div className="flex-1 p-6 h-full flex flex-col overflow-hidden space-y-4">
+                <div className="flex justify-between items-center border-b pb-3 shrink-0">
+                  <div>
+                    <h2 className="text-lg font-black uppercase text-red-600 flex items-center gap-2">
+                      <SafeFileText size={20} /> Udhari Book (खाता / उधार)
+                    </h2>
+                    <p className="text-xs text-neutral-600 dark:text-neutral-400">सभी ग्राहकों के उधार (Due) बिल यहाँ देखें और भुगतान प्राप्त होने पर जमा (Clear) करें।</p>
+                  </div>
+                  <div className="bg-red-500/10 border border-red-500/30 px-4 py-2 rounded-2xl text-right shadow-sm">
+                     <p className="text-[10px] font-black uppercase text-red-600">Total Pending Udhari</p>
+                     <p className="text-xl font-black font-mono text-red-600">
+                       ₹{dueOrders.reduce((acc, o) => acc + Number(o.total || 0), 0)}
+                     </p>
+                  </div>
+                </div>
+
+                <div className="flex gap-3 shrink-0 items-center">
+                   <div className="relative flex-1">
+                     <SafeSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-400" size={16} />
+                     <input 
+                       type="text" 
+                       placeholder="Search by Customer Name, Phone or Bill No..." 
+                       value={udhariSearchQuery} 
+                       onChange={e => setUdhariSearchQuery(e.target.value)} 
+                       className="w-full bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 rounded-xl py-2.5 pl-10 pr-4 text-xs outline-none font-bold" 
+                     />
+                   </div>
+                   <button onClick={fetchDueOrders} disabled={isUdhariLoading} className="bg-neutral-200 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 px-4 py-2.5 rounded-xl text-xs font-black uppercase flex items-center gap-1.5 border border-neutral-300 dark:border-neutral-700">
+                     {isUdhariLoading ? <Loader2 className="animate-spin" size={14} /> : <SafeRefreshCw size={14} />} Refresh
+                   </button>
+                </div>
+
+                <div className="space-y-3 overflow-y-auto flex-1 pr-1">
+                  {isUdhariLoading ? (
+                    <div className="flex justify-center py-20"><Loader2 className="animate-spin text-red-500" size={32} /></div>
+                  ) : dueOrders.filter(o => !udhariSearchQuery || String(o.customerName).toLowerCase().includes(udhariSearchQuery.toLowerCase()) || String(o.customerPhone).includes(udhariSearchQuery) || String(o.billNumber).includes(udhariSearchQuery)).length === 0 ? (
+                    <div className="text-center py-24 text-neutral-500 font-bold text-xs">कोई भी उधार (Due) पेंडिंग नहीं है। 🎉</div>
+                  ) : (
+                    dueOrders.filter(o => !udhariSearchQuery || String(o.customerName).toLowerCase().includes(udhariSearchQuery.toLowerCase()) || String(o.customerPhone).includes(udhariSearchQuery) || String(o.billNumber).includes(udhariSearchQuery)).map(order => {
+                      const orderDate = order.timestamp?.toDate ? order.timestamp.toDate() : new Date(order.timestamp || Date.now());
+                      return (
+                        <div key={order.id} className="bg-white dark:bg-neutral-900 border border-red-200 dark:border-red-900/50 hover:border-red-500 p-4 rounded-2xl flex flex-col md:flex-row justify-between md:items-center gap-4 shadow-sm transition-all">
+                           <div>
+                             <div className="flex items-center gap-2">
+                               <span className="font-mono font-black text-red-600 dark:text-red-400 text-sm">Bill #{order.billNumber}</span>
+                               <span className="text-neutral-400">•</span>
+                               <span className="font-bold text-sm text-neutral-900 dark:text-white">{order.customerName || 'Unknown Guest'}</span>
+                               {order.customerPhone && <span className="text-[11px] text-neutral-500 font-mono">({order.customerPhone})</span>}
+                             </div>
+                             <span className="text-[10px] text-neutral-500 block mt-1 font-bold">
+                               📅 Date: {orderDate.toLocaleString()}
+                             </span>
+                           </div>
+                           <div className="flex items-center gap-4">
+                             <div className="text-right mr-2">
+                               <span className="text-[10px] text-neutral-500 block uppercase font-bold">Pending Amount</span>
+                               <span className="font-mono font-black text-lg text-red-600 dark:text-red-400">₹{order.total}</span>
+                             </div>
+                             <div className="flex gap-2">
+                               <button onClick={() => {
+                                 if(window.confirm(`क्या आप ${order.customerName} का ₹${order.total} का उधार CASH में जमा करना चाहते हैं?`)) {
+                                   handleClearUdhari(order.id, 'cash');
+                                 }
+                               }} className="px-4 py-2 bg-green-600 hover:bg-green-500 text-white rounded-xl text-xs font-black uppercase shadow">
+                                 Receive Cash
+                               </button>
+                               <button onClick={() => {
+                                 if(window.confirm(`क्या आप ${order.customerName} का ₹${order.total} का उधार UPI में जमा करना चाहते हैं?`)) {
+                                   handleClearUdhari(order.id, 'upi');
+                                 }
+                               }} className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-black uppercase shadow">
+                                 Receive UPI
+                               </button>
+                             </div>
+                           </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            )}
             {/* TAB 7: SETTINGS */}
             {activeTab === 'settings' && (
               <div className="flex-1 p-6 h-full overflow-y-auto flex justify-center">
