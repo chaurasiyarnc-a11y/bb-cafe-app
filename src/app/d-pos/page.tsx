@@ -132,7 +132,7 @@ export default function BbCafeDesktopPos() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [pinInput, setPinInput] = useState('');
-  const [activeTab, setActiveTab] = useState<'billing' | 'settlement' | 'inventory' | 'receipts' | 'settings' | 'orders' | 'tables' | 'reports' | 'udhari'>('billing');
+  const [activeTab, setActiveTab] = useState<'billing' | 'settlement' | 'inventory' | 'receipts' | 'settings' | 'orders' | 'tables' | 'reports' | 'udhari' | 'customers'>('billing');
   const [gstEnabled, setGstEnabled] = useState(false);
   const [gstRate, setGstRate] = useState(5);
   const [themeMode, setThemeMode] = useState<'dark' | 'light'>('light');
@@ -283,6 +283,85 @@ export default function BbCafeDesktopPos() {
     }
   };
   // ----------------------------------
+  // --- CUSTOMER DIRECTORY TAB STATES & LOGIC ---
+  const [allCustomers, setAllCustomers] = useState<any[]>([]);
+  const [isCustomersLoading, setIsCustomersLoading] = useState(false);
+  const [customerTabSearch, setCustomerTabSearch] = useState('');
+  
+  const [isAddEditCustModalOpen, setIsAddEditCustModalOpen] = useState(false);
+  const [editingCustProfile, setEditingCustProfile] = useState<any>(null);
+  
+  const [custFormName, setCustFormName] = useState('');
+  const [custFormPhone, setCustFormPhone] = useState('');
+  const [custFormAddress, setCustFormAddress] = useState('');
+  const [custFormPoints, setCustFormPoints] = useState<number | ''>(0);
+
+  const fetchAllCustomers = async () => {
+    setIsCustomersLoading(true);
+    try {
+      if (navigator.onLine) {
+        const q = query(collection(db, "customer_points"), orderBy("lastActive", "desc"), limit(300));
+        const snap = await getDocs(q);
+        setAllCustomers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      }
+    } catch (e) {
+      toast.error("ग्राहक सूची लोड नहीं हो सकी");
+    } finally {
+      setIsCustomersLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'customers') fetchAllCustomers();
+  }, [activeTab]);
+
+  const handleSaveCustomerProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanPhone = getSanitizedPhone(custFormPhone);
+    if (cleanPhone.length !== 10) return toast.error("10-अंकों का सही मोबाइल नंबर डालें!");
+    if (!custFormName.trim()) return toast.error("ग्राहक का नाम डालना अनिवार्य है!");
+
+    const toastId = toast.loading("Saving customer...");
+    try {
+      const userRef = doc(db, "customer_points", cleanPhone);
+      const payload = {
+        name: custFormName.trim(),
+        phone: cleanPhone,
+        address: custFormAddress.trim(),
+        points: Number(custFormPoints) || 0,
+        lastActive: editingCustProfile ? editingCustProfile.lastActive : new Date()
+      };
+      
+      await setDoc(userRef, payload, { merge: true });
+      
+      toast.dismiss(toastId);
+      toast.success("ग्राहक की जानकारी सेव हो गई! ✅");
+      setIsAddEditCustModalOpen(false);
+      fetchAllCustomers();
+    } catch (err) {
+      toast.dismiss(toastId);
+      toast.error("ग्राहक को सेव करने में त्रुटि आई");
+    }
+  };
+
+  const openAddCustomerModal = () => {
+    setEditingCustProfile(null);
+    setCustFormName('');
+    setCustFormPhone('');
+    setCustFormAddress('');
+    setCustFormPoints(0);
+    setIsAddEditCustModalOpen(true);
+  };
+
+  const openEditCustomerModal = (cust: any) => {
+    setEditingCustProfile(cust);
+    setCustFormName(cust.name || '');
+    setCustFormPhone(cust.phone || cust.id || '');
+    setCustFormAddress(cust.address || '');
+    setCustFormPoints(cust.points || 0);
+    setIsAddEditCustModalOpen(true);
+  };
+  // ---------------------------------------------
   
   // Cart & Order States
   const [cart, setCart] = useState<PosCartItem[]>([]);
@@ -1987,6 +2066,7 @@ export default function BbCafeDesktopPos() {
                   { id: 'orders', label: `Live Orders (${activeLiveOrders.length})`, icon: Clock },
                   { id: 'reports', label: 'Reports & Sales', icon: SafeBarChart3 },
                   { id: 'udhari', label: 'Udhari (उधार)', icon: SafeFileText },
+                  { id: 'customers', label: 'Customers Profile', icon: SafeUserPlus },
                   { id: 'settings', label: 'Settings', icon: Settings },
                 ].map((item) => {
                   const Icon = item.icon;
@@ -3127,6 +3207,71 @@ export default function BbCafeDesktopPos() {
                 </div>
               </div>
             )}
+            {/* TAB 9: CUSTOMERS & LOYALTY PROFILE */}
+            {activeTab === 'customers' && (
+              <div className="flex-1 p-6 h-full flex flex-col overflow-hidden space-y-4">
+                <div className="flex justify-between items-center border-b border-neutral-300 dark:border-neutral-800 pb-3 shrink-0">
+                  <div>
+                    <h2 className="text-lg font-black uppercase text-orange-600 flex items-center gap-2">
+                      <SafeUserPlus size={20} /> Customers & Loyalty Directory
+                    </h2>
+                    <p className="text-xs text-neutral-600 dark:text-neutral-400">सभी ग्राहकों की प्रोफाइल देखें, पॉइंट्स मैनेज करें और नए ग्राहक जोड़ें।</p>
+                  </div>
+                  <div className="flex gap-2">
+                     <button onClick={fetchAllCustomers} disabled={isCustomersLoading} className="bg-neutral-200 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 px-4 py-2 rounded-xl text-xs font-black uppercase flex items-center gap-1.5 border border-neutral-300 dark:border-neutral-700">
+                       {isCustomersLoading ? <Loader2 className="animate-spin" size={14} /> : <SafeRefreshCw size={14} />} Refresh
+                     </button>
+                     <button onClick={openAddCustomerModal} className="bg-orange-600 hover:bg-orange-500 text-white px-4 py-2 rounded-xl text-xs font-black uppercase flex items-center gap-1.5 shadow">
+                       <SafeUserPlus size={16} /> + Add Customer
+                     </button>
+                  </div>
+                </div>
+
+                <div className="relative shrink-0">
+                  <SafeSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-400" size={16} />
+                  <input 
+                    type="text" 
+                    placeholder="Search customer by Name, Phone Number or Address..." 
+                    value={customerTabSearch} 
+                    onChange={e => setCustomerTabSearch(e.target.value)} 
+                    className="w-full bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 rounded-xl py-2.5 pl-10 pr-4 text-xs outline-none font-bold shadow-sm" 
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 overflow-y-auto flex-1 pr-1 content-start">
+                  {isCustomersLoading ? (
+                     <div className="col-span-full flex justify-center py-20"><Loader2 className="animate-spin text-orange-500" size={32} /></div>
+                  ) : allCustomers.filter(c => !customerTabSearch || String(c.name).toLowerCase().includes(customerTabSearch.toLowerCase()) || String(c.phone).includes(customerTabSearch) || String(c.address).toLowerCase().includes(customerTabSearch.toLowerCase())).length === 0 ? (
+                     <div className="col-span-full text-center py-24 text-neutral-500 font-bold text-xs">कोई ग्राहक नहीं मिला।</div>
+                  ) : (
+                    allCustomers.filter(c => !customerTabSearch || String(c.name).toLowerCase().includes(customerTabSearch.toLowerCase()) || String(c.phone).includes(customerTabSearch) || String(c.address).toLowerCase().includes(customerTabSearch.toLowerCase())).map(cust => (
+                      <div key={cust.id} className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 p-4 rounded-2xl flex flex-col justify-between shadow-sm hover:border-orange-500 transition-colors gap-3">
+                        <div>
+                          <div className="flex justify-between items-start mb-2">
+                             <div>
+                               <p className="font-black text-sm text-neutral-900 dark:text-white uppercase">{cust.name || 'Valued Guest'}</p>
+                               <p className="text-xs font-mono text-neutral-500 mt-0.5">📞 {cust.phone || cust.id}</p>
+                             </div>
+                             <span className="bg-amber-100 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-500/30 px-2 py-1 rounded-lg text-[10px] font-black uppercase flex items-center gap-1 shadow-sm">
+                               ⭐ {cust.points || 0} Pts
+                             </span>
+                          </div>
+                          {cust.address ? (
+                            <p className="text-[11px] text-neutral-600 dark:text-neutral-400 line-clamp-2">📍 {cust.address}</p>
+                          ) : (
+                            <p className="text-[11px] text-neutral-400 italic">No address provided</p>
+                          )}
+                        </div>
+                        <button onClick={() => openEditCustomerModal(cust)} className="w-full py-2 bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 text-neutral-800 dark:text-white border border-neutral-300 dark:border-neutral-700 rounded-xl text-xs font-black uppercase flex items-center justify-center gap-1.5 transition-colors">
+                           <SafeEdit3 size={14} /> Edit Profile & Points
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+            
             {/* TAB 7: SETTINGS */}
             {activeTab === 'settings' && (
               <div className="flex-1 p-6 h-full overflow-y-auto flex justify-center">
@@ -3347,6 +3492,49 @@ export default function BbCafeDesktopPos() {
                 <div className="flex gap-2 pt-2">
                   <button type="button" onClick={() => setIsItemEditorModalOpen(false)} className="flex-1 py-3 bg-neutral-200 dark:bg-neutral-800 text-neutral-800 dark:text-white font-black uppercase rounded-xl hover:bg-neutral-300 dark:hover:bg-neutral-700">Cancel</button>
                   <button type="submit" className="flex-1 py-3 bg-green-600 hover:bg-green-500 text-white font-black uppercase rounded-xl shadow-lg">Save Item</button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+      {/* POPUP: ADD / EDIT CUSTOMER PROFILE */}
+      <AnimatePresence>
+        {isAddEditCustModalOpen && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 max-w-sm w-full rounded-3xl p-6 shadow-2xl space-y-4">
+              <div className="flex justify-between items-center border-b border-neutral-200 dark:border-neutral-800 pb-3">
+                <h3 className="font-black text-sm uppercase text-orange-600 flex items-center gap-2">
+                  <SafeUserPlus size={18} /> {editingCustProfile ? 'Edit Customer' : 'Add New Customer'}
+                </h3>
+                <button onClick={() => setIsAddEditCustModalOpen(false)} className="text-neutral-500 hover:text-black dark:hover:text-white"><X size={20} /></button>
+              </div>
+              <form onSubmit={handleSaveCustomerProfile} className="space-y-3">
+                
+                <div className="space-y-1">
+                   <label className="text-[10px] font-black uppercase text-neutral-500">Customer Name *</label>
+                   <input type="text" required placeholder="e.g. Rahul Kumar" value={custFormName} onChange={e => setCustFormName(e.target.value)} className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-xl p-2.5 font-bold outline-none focus:border-orange-500 text-xs" autoFocus />
+                </div>
+
+                <div className="space-y-1">
+                   <label className="text-[10px] font-black uppercase text-neutral-500">Phone Number (10 Digits) *</label>
+                   <input type="tel" maxLength={10} required disabled={!!editingCustProfile} placeholder="e.g. 9876543210" value={custFormPhone} onChange={e => setCustFormPhone(e.target.value.replace(/\D/g, ''))} className={`w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-xl p-2.5 font-mono font-bold outline-none text-xs ${editingCustProfile ? 'opacity-60 cursor-not-allowed' : 'focus:border-orange-500'}`} />
+                   {editingCustProfile && <p className="text-[9px] text-red-500 italic">फ़ोन नंबर एडिट नहीं किया जा सकता, क्योंकि यह प्राइमरी ID है।</p>}
+                </div>
+
+                <div className="space-y-1">
+                   <label className="text-[10px] font-black uppercase text-neutral-500">Loyalty Points (Edit/Add)</label>
+                   <input type="number" min={0} placeholder="e.g. 150" value={custFormPoints} onChange={e => setCustFormPoints(e.target.value === '' ? '' : Number(e.target.value))} className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-xl p-2.5 font-mono font-bold outline-none focus:border-orange-500 text-xs" />
+                </div>
+
+                <div className="space-y-1">
+                   <label className="text-[10px] font-black uppercase text-neutral-500">Address (Optional)</label>
+                   <textarea rows={2} placeholder="Full Delivery Address..." value={custFormAddress} onChange={e => setCustFormAddress(e.target.value)} className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-xl p-2.5 font-bold outline-none focus:border-orange-500 text-xs resize-none" />
+                </div>
+
+                <div className="flex gap-2 pt-2">
+                  <button type="button" onClick={() => setIsAddEditCustModalOpen(false)} className="flex-1 py-2.5 bg-neutral-200 dark:bg-neutral-800 text-neutral-800 dark:text-white font-black uppercase text-xs rounded-xl hover:bg-neutral-300 transition-colors">Cancel</button>
+                  <button type="submit" className="flex-1 py-2.5 bg-green-600 hover:bg-green-500 text-white font-black uppercase text-xs rounded-xl shadow-lg">Save Profile</button>
                 </div>
               </form>
             </motion.div>
