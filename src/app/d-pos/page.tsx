@@ -3270,7 +3270,7 @@ export default function BbCafeDesktopPos() {
                   />
                 </div>
 
-                <div <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 overflow-y-auto flex-1 pr-1 content-start">
+                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 overflow-y-auto flex-1 pr-1 content-start">
                   {isCustomersLoading ? (
                      <div className="col-span-full flex justify-center py-20"><Loader2 className="animate-spin text-orange-500" size={32} /></div>
                   ) : allCustomers.filter(c => !customerTabSearch || String(c.name).toLowerCase().includes(customerTabSearch.toLowerCase()) || String(c.phone).includes(customerTabSearch) || String(c.address).toLowerCase().includes(customerTabSearch.toLowerCase())).length === 0 ? (
