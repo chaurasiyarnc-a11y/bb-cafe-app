@@ -3197,10 +3197,7 @@ export default function BbCafeDesktopPos() {
                     })
                   )}
                   )}
-                </div>
-              </div>
-            )}
-
+                
             {/* TAB 4: REPORTS WITH ITEM-WISE SALES */}
             {activeTab === 'reports' && (
               <div className="flex-1 p-6 h-full overflow-y-auto max-w-5xl mx-auto space-y-6">
