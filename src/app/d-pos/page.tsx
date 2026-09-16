@@ -300,7 +300,7 @@ export default function BbCafeDesktopPos() {
   }, [customerTabSearch, customerSortBy]);
 
   // 👉 FIX 2: फ़िल्टर (Sorting) फिक्स कर दिया गया है
-  cconst processedCustomers = useMemo(() => {
+  const processedCustomers = useMemo(() => {
     let filtered = [...allCustomers]; 
     
     if (customerTabSearch) {
