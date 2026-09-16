@@ -1942,6 +1942,42 @@ export default function BbCafeDesktopPos() {
     }
   };
 
+  // Past Bill Re-Edit Logic
+  const handleReEditOrder = (order: any) => {
+    triggerBeep('tap');
+    if (!window.confirm(`क्या आप बिल #${order.billNumber} को फिर से एडिट करना चाहते हैं? (यह बिल वापस काउंटर पर चला जाएगा)`)) return;
+
+    setActiveEditingOrderId(order.id);
+    setActiveEditingBillNumber(order.billNumber);
+    setActiveEditingOriginalItems(order.items ? JSON.parse(JSON.stringify(order.items)) : []);
+    setCart(order.items || []);
+    
+    setCustomerName(order.customerName || '');
+    const cleanPhone = order.customerPhone ? String(order.customerPhone).replace(/\D/g, '').slice(-10) : '';
+    setCustomerPhone(cleanPhone);
+    if (cleanPhone.length === 10) {
+      searchCustomerByExactPhone(cleanPhone); // Fetch latest profile/points
+    }
+    
+    setAddress(order.address || '');
+    setFulfillmentType(order.fulfillmentType || 'pickup');
+    setTableNumber(order.tableNumber || 'Table 1');
+    setPaymentMethod(order.paymentMethod || 'cash');
+
+    if (order.discountValue && order.discountValue > 0) {
+      setDiscountValue(order.discountValue);
+      setDiscountType(order.discountType || 'amount');
+      setIsDiscountOpen(true);
+    } else {
+      setDiscountValue(0);
+      setIsDiscountOpen(false);
+    }
+
+    setActiveTab('billing');
+    toast.success(`Bill #${order.billNumber} एडिट मोड में खुल गया है! 🛒`);
+    setTimeout(() => searchInputRef.current?.focus(), 80);
+  };
+
   // Quick Settle Action (From Daily Bills Tab)
   const handleQuickSettleOrder = async (orderId: string, pMethod: 'cash' | 'upi' | 'due' | 'split') => {
     triggerBeep('tap');
@@ -2934,14 +2970,28 @@ export default function BbCafeDesktopPos() {
                                 >
                                   📕 उधार (Due)
                                 </button>
+                                <button 
+                                  onClick={() => handleReEditOrder(order)} 
+                                  className="px-3 py-2 bg-amber-500 hover:bg-amber-400 text-black rounded-xl text-xs font-black uppercase shadow ml-2 flex items-center gap-1"
+                                >
+                                  <SafeEdit3 size={14} /> Edit
+                                </button>
                               </div>
                             ) : (
-                              <button 
-                                onClick={() => handlePrintReceiptDirect(order, false)} 
-                                className="px-3 py-2 bg-neutral-200 dark:bg-neutral-800 text-neutral-800 dark:text-white rounded-xl text-xs font-bold flex items-center gap-1 border"
-                              >
-                                <SafePrinter size={14} /> Reprint
-                              </button>
+                              <div className="flex gap-2">
+                                <button 
+                                  onClick={() => handleReEditOrder(order)} 
+                                  className="px-3 py-2 bg-amber-500 hover:bg-amber-400 text-black rounded-xl text-xs font-black uppercase flex items-center gap-1 shadow"
+                                >
+                                  <SafeEdit3 size={14} /> Re-Edit
+                                </button>
+                                <button 
+                                  onClick={() => handlePrintReceiptDirect(order, false)} 
+                                  className="px-3 py-2 bg-neutral-200 dark:bg-neutral-800 text-neutral-800 dark:text-white rounded-xl text-xs font-bold flex items-center gap-1 border"
+                                >
+                                  <SafePrinter size={14} /> Reprint
+                                </button>
+                              </div>
                             )}
                           </div>
                         </div>
@@ -3118,18 +3168,30 @@ export default function BbCafeDesktopPos() {
                               {order.paymentMethod || 'cash'}
                             </span>
                             <span className="font-mono font-black text-sm text-green-600 dark:text-green-400">₹{order.total}</span>
-                            <button 
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setSelectedReceipt(order);
-                                setIsReceiptModalOpen(true);
-                              }} 
-                              className="p-2 bg-neutral-200 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 rounded-xl"
-                            >
-                              <SafeEye size={14} />
-                            </button>
+                            <div className="flex gap-1.5">
+                              <button 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleReEditOrder(order);
+                                }} 
+                                className="p-2 bg-amber-500/20 text-amber-600 dark:text-amber-400 hover:bg-amber-500 hover:text-black rounded-xl transition-colors"
+                                title="Edit Bill"
+                              >
+                                <SafeEdit3 size={14} />
+                              </button>
+                              <button 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedReceipt(order);
+                                  setIsReceiptModalOpen(true);
+                                }} 
+                                className="p-2 bg-neutral-200 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 rounded-xl hover:bg-neutral-300 dark:hover:bg-neutral-700 transition-colors"
+                                title="View/Print"
+                              >
+                                <SafeEye size={14} />
+                              </button>
+                            </div>
                           </div>
-                        </div>
                       );
                     })
                   )}
