@@ -1059,6 +1059,26 @@ export default function BbCafeDesktopPos() {
                 </div>
               </div>
             ), { duration: 7000 });
+            // 👉 NEW: ऑनलाइन आर्डर आने पर नंबर अपने-आप Customer List और Recent 10 में सेव करें
+            const cleanOnlinePhone = (newOrd.customerPhone || '').replace(/\D/g, '').slice(-10);
+            if (cleanOnlinePhone.length === 10) {
+              
+              // 1. Recent 10 List में जोड़ें
+              setRecentCartCustomers(prev => {
+                const filtered = prev.filter(c => c.phone !== cleanOnlinePhone);
+                const next = [{ name: newOrd.customerName || "Online Guest", phone: cleanOnlinePhone }, ...filtered].slice(0, 10);
+                localStorage.setItem("bb_pos_recent_customers", JSON.stringify(next));
+                return next;
+              });
+
+              // 2. Main Customer Directory में जोड़ें
+              const userRef = doc(db, "customer_points", cleanOnlinePhone);
+              setDoc(userRef, { 
+                name: newOrd.customerName || "Online Guest", 
+                phone: cleanOnlinePhone,
+                lastActive: new Date()
+              }, { merge: true });
+            }
           }
         }
       });
