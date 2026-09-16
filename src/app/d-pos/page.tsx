@@ -3179,7 +3179,7 @@ export default function BbCafeDesktopPos() {
                               >
                                 <SafeEdit3 size={14} />
                               </button>
-                              <button 
+                             <button 
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   setSelectedReceipt(order);
@@ -3192,6 +3192,7 @@ export default function BbCafeDesktopPos() {
                               </button>
                             </div>
                           </div>
+                        </div> {/* <--- यह </div> डिलीट हो गया था, जिसे मैंने जोड़ दिया है */}
                       );
                     })
                   )}
