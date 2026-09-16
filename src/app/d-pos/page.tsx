@@ -2359,13 +2359,13 @@ export default function BbCafeDesktopPos() {
               )}
             </div>
 
-            <div className="space-y-2 pt-4 border-t border-neutral-300 dark:border-neutral-800">
-              <button onClick={async () => { await syncOfflineAll(); }} disabled={isSyncing} className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-2xl text-xs font-black uppercase text-amber-700 dark:text-yellow-500 bg-amber-500/15">
-                {isSyncing ? <Loader2 className="animate-spin shrink-0" size={16} /> : <SafeRefreshCw size={16} />}
-                {!isSidebarCollapsed && <span className="truncate">Sync Cloud Data</span>}
+            <div className="space-y-1.5 pt-3 border-t border-neutral-300 dark:border-neutral-800">
+              <button onClick={async () => { await syncOfflineAll(); }} disabled={isSyncing} className="w-full flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-xl text-[10px] font-black uppercase text-amber-700 dark:text-yellow-500 bg-amber-500/15 hover:bg-amber-500/25 transition-colors">
+                {isSyncing ? <Loader2 className="animate-spin shrink-0" size={13} /> : <SafeRefreshCw size={13} />}
+                {!isSidebarCollapsed && <span className="truncate">Sync Cloud</span>}
               </button>
-              <button onClick={() => { setIsLoggedIn(false); setCurrentUser(null); localStorage.removeItem("bb_pos_user_pc"); }} className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-2xl text-xs font-black uppercase text-red-600 bg-red-500/15">
-                <SafeLogOut size={16} className="shrink-0" />
+              <button onClick={() => { setIsLoggedIn(false); setCurrentUser(null); localStorage.removeItem("bb_pos_user_pc"); }} className="w-full flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-xl text-[10px] font-black uppercase text-red-600 bg-red-500/15 hover:bg-red-500/25 transition-colors">
+                <SafeLogOut size={13} className="shrink-0" />
                 {!isSidebarCollapsed && <span className="truncate">Lock Terminal</span>}
               </button>
             </div>
