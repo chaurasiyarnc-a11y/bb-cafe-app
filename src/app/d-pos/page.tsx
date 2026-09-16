@@ -150,6 +150,7 @@ export default function BbCafeDesktopPos() {
   const [isSearchingCustomer, setIsSearchingCustomer] = useState(false);
   
   const [customerPhone, setCustomerPhone] = useState('');
+  const [recentCartCustomers, setRecentCartCustomers] = useState<any[]>([]);
   const [customerName, setCustomerName] = useState('');
   const [customerPoints, setCustomerPoints] = useState(0);
   const [address, setAddress] = useState('');
@@ -872,6 +873,10 @@ export default function BbCafeDesktopPos() {
     else document.documentElement.classList.remove('dark');
 
     const savedCart = localStorage.getItem("bb_pos_saved_cart_pc");
+    const savedRecents = localStorage.getItem("bb_pos_recent_customers");
+    if (savedRecents) {
+      try { setRecentCartCustomers(JSON.parse(savedRecents)); } catch (err) {}
+    }
     if (savedCart) { 
       try { setCart(JSON.parse(savedCart)); } catch (err) {} 
     }
@@ -1873,7 +1878,15 @@ export default function BbCafeDesktopPos() {
         }
       }
 
-      triggerBeep('success'); 
+      triggerBeep('success');
+      if (cleanPhone && cleanPhone.length === 10) {
+        setRecentCartCustomers(prev => {
+          const filtered = prev.filter(c => c.phone !== cleanPhone);
+          const next = [{ name: customerName || "Guest", phone: cleanPhone }, ...filtered].slice(0, 10);
+          localStorage.setItem("bb_pos_recent_customers", JSON.stringify(next));
+          return next;
+        });
+      }
 
       // Print Customer Bill (Guaranteed QR Code verification inside)
       await handlePrintReceiptDirect(orderObj, false);
@@ -2505,6 +2518,24 @@ export default function BbCafeDesktopPos() {
                           <SafeShare2 size={13} />
                         </button>
                       </div>
+                      {/* RECENT 10 CUSTOMERS */}
+                      {recentCartCustomers.length > 0 && !customerName && (
+                        <div className="flex gap-1.5 overflow-x-auto pb-1 mt-1 scrollbar-hide">
+                          {recentCartCustomers.map((rc, idx) => (
+                            <button 
+                              key={idx} 
+                              type="button"
+                              onClick={() => {
+                                setCustomerPhone(rc.phone);
+                                searchCustomerByExactPhone(rc.phone);
+                              }}
+                              className="shrink-0 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 px-2.5 py-1 rounded-md text-[10px] font-bold text-neutral-600 dark:text-neutral-400 hover:border-orange-500 hover:text-orange-600 transition-colors"
+                            >
+                              {rc.name.split(' ')[0]} ({rc.phone.slice(-4)})
+                            </button>
+                          ))}
+                        </div>
+                      )}
 
                       {/* CUSTOMER FOUND: FULL PROFILE & LOYALTY POINTS REDEEM */}
                       {customerPhone.length === 10 && customerName && !showNewCustForm && (
@@ -2564,7 +2595,7 @@ export default function BbCafeDesktopPos() {
                             type="text" 
                             placeholder="Customer Name *" 
                             value={newCustNameInput} 
-                            onChange={e => setNewCustNameInput(e.target.value)} 
+                            onChange={e => setNewCustNameInput(e.target.value.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' '))}
                             onKeyDown={e => e.key === 'Enter' && newCustAddressRef.current?.focus()}
                             className="w-full bg-white dark:bg-neutral-900 border rounded px-2 py-1 text-xs outline-none" 
                           />
@@ -3848,7 +3879,7 @@ export default function BbCafeDesktopPos() {
                 
                 <div className="space-y-1">
                    <label className="text-[10px] font-black uppercase text-neutral-500">Customer Name *</label>
-                   <input type="text" required placeholder="e.g. Rahul Kumar" value={custFormName} onChange={e => setCustFormName(e.target.value)} className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-xl p-2.5 font-bold outline-none focus:border-orange-500 text-xs" autoFocus />
+                   <input type="text" required placeholder="e.g. Rahul Kumar" value={custFormName} onChange={e => setCustFormName(e.target.value.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' '))} className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-xl p-2.5 font-bold outline-none focus:border-orange-500 text-xs" autoFocus />
                 </div>
 
                 <div className="space-y-1">
