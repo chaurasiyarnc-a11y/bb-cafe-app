@@ -3192,9 +3192,10 @@ export default function BbCafeDesktopPos() {
                               </button>
                             </div>
                           </div>
-                        </div> {/* <--- यह </div> डिलीट हो गया था, जिसे मैंने जोड़ दिया है */}
+                        </div> {/* 👈 बस यह एक </div> मिसिंग था! */}
                       );
                     })
+                  )}
                   )}
                 </div>
               </div>
