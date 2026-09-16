@@ -300,26 +300,10 @@ export default function BbCafeDesktopPos() {
   }, [customerTabSearch, customerSortBy]);
 
   // 👉 FIX 2: फ़िल्टर (Sorting) फिक्स कर दिया गया है
-  const processedCustomers = useMemo(() => {
-    // [...allCustomers] लिखने से React तुरंत स्क्रीन रिफ्रेश करेगा
+  cconst processedCustomers = useMemo(() => {
     let filtered = [...allCustomers]; 
     
     if (customerTabSearch) {
-       
-        String(c.phone || c.id || '').includes(q) || 
-        String(c.address || '').toLowerCase().includes(q)
-      );
-    }
-    
-   
-      if (customerSortBy === 'spent_high') return (b.totalSpent || 0) - (a.totalSpent || 0);
-      if (customerSortBy === 'points_high') return (b.points || 0) - (a.points || 0);
-      if (customerSortBy === 'points_low') return (a.points || 0) - (b.points || 0);
-      
-      const timeA = a.lastActive?.toDate ? a.lastActive.toDate().getTime() : new Date(a.lastActive || 0).getTime();
-      const timeB = b.lastActive?.toDate ? b.lastActive.toDate().getTime() : new Date(b.lastActive || 0).getTime();
-      return timeB - timeA; // Default: Recent
-    
       const q = customerTabSearch.toLowerCase();
       filtered = filtered.filter(c => 
         String(c.name || '').toLowerCase().includes(q) || 
@@ -327,13 +311,15 @@ export default function BbCafeDesktopPos() {
         String(c.address || '').toLowerCase().includes(q)
       );
     }
+    
     return filtered.sort((a, b) => {
       if (customerSortBy === 'spent_high') return (b.totalSpent || 0) - (a.totalSpent || 0);
       if (customerSortBy === 'points_high') return (b.points || 0) - (a.points || 0);
       if (customerSortBy === 'points_low') return (a.points || 0) - (b.points || 0);
+      
       const timeA = a.lastActive?.toDate ? a.lastActive.toDate().getTime() : new Date(a.lastActive || 0).getTime();
       const timeB = b.lastActive?.toDate ? b.lastActive.toDate().getTime() : new Date(b.lastActive || 0).getTime();
-      return timeB - timeA; 
+      return timeB - timeA; // Default: Recent
     });
   }, [allCustomers, customerTabSearch, customerSortBy]);
 
