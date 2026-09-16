@@ -289,8 +289,17 @@ export default function BbCafeDesktopPos() {
   const [customerTabSearch, setCustomerTabSearch] = useState('');
 // 👉 NEW: CUSTOMER SORTING & FILTERING
   const [customerSortBy, setCustomerSortBy] = useState<'recent' | 'points_high' | 'points_low' | 'spent_high'>('recent');
+  
+  // 👉 NEW: Pagination (पेज) के स्टेट्स (सिर्फ 50 ग्राहक दिखाने के लिए)
+  const [customerCurrentPage, setCustomerCurrentPage] = useState(1);
+  const customersPerPage = 50;
+
+  useEffect(() => {
+    // जब भी कोई सर्च करे या फ़िल्टर बदले, तो पेज वापस 1 पर आ जाए
+    setCustomerCurrentPage(1);
+  }, [customerTabSearch, customerSortBy]);
+
   const processedCustomers = useMemo(() => {
-    // 1. Search (नाम, मोबाइल, या एड्रेस से)
     let filtered = allCustomers;
     if (customerTabSearch) {
       const q = customerTabSearch.toLowerCase();
@@ -300,18 +309,23 @@ export default function BbCafeDesktopPos() {
         String(c.address || '').toLowerCase().includes(q)
       );
     }
-    // 2. Sort (पॉइंट्स के हिसाब से)
     return filtered.sort((a, b) => {
-      if (customerSortBy === 'spent_high') return (b.totalSpent || 0) - (a.totalSpent || 0); // 👉 NEW
+      if (customerSortBy === 'spent_high') return (b.totalSpent || 0) - (a.totalSpent || 0);
       if (customerSortBy === 'points_high') return (b.points || 0) - (a.points || 0);
       if (customerSortBy === 'points_low') return (a.points || 0) - (b.points || 0);
-      
       const timeA = a.lastActive?.toDate ? a.lastActive.toDate().getTime() : new Date(a.lastActive || 0).getTime();
       const timeB = b.lastActive?.toDate ? b.lastActive.toDate().getTime() : new Date(b.lastActive || 0).getTime();
-      return timeB - timeA; // Default: Recent Active
+      return timeB - timeA; 
     });
   }, [allCustomers, customerTabSearch, customerSortBy]);
 
+  // 👉 NEW: 50 ग्राहकों का टुकड़ा (Slice) बनाने का लॉजिक
+  const paginatedCustomers = useMemo(() => {
+    const startIndex = (customerCurrentPage - 1) * customersPerPage;
+    return processedCustomers.slice(startIndex, startIndex + customersPerPage);
+  }, [processedCustomers, customerCurrentPage]);
+
+  const totalCustomerPages = Math.ceil(processedCustomers.length / customersPerPage);
   const totalCustomersCount = allCustomers.length;
   const totalPointsInSystem = allCustomers.reduce((acc, c) => acc + (Number(c.points) || 0), 0);
   
@@ -3468,15 +3482,16 @@ export default function BbCafeDesktopPos() {
                   />
                 </div>
 
-                {/* Customer Grid */}
-                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 overflow-y-auto flex-1 pr-1 content-start pb-20">
-                  {isCustomersLoading ? (
-                     <div className="col-span-full flex justify-center py-20"><Loader2 className="animate-spin text-orange-500" size={32} /></div>
-                  ) : processedCustomers.length === 0 ? (
-                     <div className="col-span-full text-center py-24 text-neutral-500 font-bold text-xs">कोई ग्राहक नहीं मिला।</div>
-                  ) : (
-                    processedCustomers.map(cust => (
-                      <div key={cust.id} className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 p-4 rounded-2xl flex flex-col justify-between shadow-sm hover:border-orange-500 transition-colors gap-3">
+                {/* 👉 NEW: Customer Grid with Pagination */}
+                 <div className="flex-1 overflow-y-auto pr-1 pb-10 flex flex-col space-y-4">
+                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 content-start">
+                    {isCustomersLoading ? (
+                       <div className="col-span-full flex justify-center py-20"><Loader2 className="animate-spin text-orange-500" size={32} /></div>
+                    ) : paginatedCustomers.length === 0 ? (
+                       <div className="col-span-full text-center py-24 text-neutral-500 font-bold text-xs">कोई ग्राहक नहीं मिला।</div>
+                    ) : (
+                      paginatedCustomers.map(cust => (
+                        <div key={cust.id} className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 p-4 rounded-2xl flex flex-col justify-between shadow-sm hover:border-orange-500 transition-colors gap-3">
                         <div>
                           <div className="flex justify-between items-start mb-2">
                              <div>
@@ -3487,13 +3502,13 @@ export default function BbCafeDesktopPos() {
                                ⭐ {cust.points || 0} Pts
                              </span>
                           </div>
+                          
                           {cust.address ? (
                             <p className="text-[11px] text-neutral-600 dark:text-neutral-400 line-clamp-2 mb-2">📍 {cust.address}</p>
                           ) : (
                             <p className="text-[11px] text-neutral-400 italic mb-2">No address provided</p>
                           )}
                           
-                          {/* 👉 NEW: Total Spent & Visits Display */}
                           <div className="flex gap-4 pt-2 border-t border-dashed border-neutral-200 dark:border-neutral-800">
                              <div>
                                <p className="text-[9px] font-black uppercase text-neutral-500">Total Spent</p>
@@ -3506,9 +3521,6 @@ export default function BbCafeDesktopPos() {
                           </div>
                         </div>
                         
-                        {/* CORRECTED BUTTONS BLOCK */}
-                        
-                        {/* CORRECTED BUTTONS BLOCK */}
                         <div className="flex gap-2">
                           <button onClick={() => openEditCustomerModal(cust)} className="flex-1 py-2 bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 text-neutral-800 dark:text-white border border-neutral-300 dark:border-neutral-700 rounded-xl text-xs font-black uppercase flex items-center justify-center gap-1.5 transition-colors">
                              <SafeEdit3 size={14} /> Edit
@@ -3519,11 +3531,35 @@ export default function BbCafeDesktopPos() {
                         </div>
 
                       </div>
-                    ))
+                      ))
+                    )}
+                  </div>
+                  
+                  {/* 👉 NEW: Next / Previous Buttons */}
+                  {!isCustomersLoading && totalCustomerPages > 1 && (
+                    <div className="flex justify-center items-center gap-4 py-4 mt-auto">
+                      <button 
+                        onClick={() => setCustomerCurrentPage(prev => Math.max(1, prev - 1))} 
+                        disabled={customerCurrentPage === 1}
+                        className="px-4 py-2 bg-neutral-200 dark:bg-neutral-800 text-neutral-800 dark:text-white rounded-xl text-xs font-black uppercase shadow disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <SafeChevronLeft size={16} className="inline mr-1" /> Previous
+                      </button>
+                      
+                      <span className="text-xs font-bold text-neutral-600 dark:text-neutral-400">
+                        Page <span className="text-orange-600 dark:text-orange-400 font-black">{customerCurrentPage}</span> of {totalCustomerPages}
+                      </span>
+                      
+                      <button 
+                        onClick={() => setCustomerCurrentPage(prev => Math.min(totalCustomerPages, prev + 1))} 
+                        disabled={customerCurrentPage === totalCustomerPages}
+                        className="px-4 py-2 bg-orange-600 hover:bg-orange-500 text-white rounded-xl text-xs font-black uppercase shadow disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Next <SafeChevronRight size={16} className="inline ml-1" />
+                      </button>
+                    </div>
                   )}
                 </div>
-              </div>
-            )}
             
             {/* TAB 7: SETTINGS */}
             {activeTab === 'settings' && (
