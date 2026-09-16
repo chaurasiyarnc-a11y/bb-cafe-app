@@ -2568,6 +2568,15 @@ export default function BbCafeDesktopPos() {
                     {/* BILL TOTALS */}
                     <div className="space-y-1 text-xs border-t border-neutral-300 dark:border-neutral-800 pt-1.5 shrink-0 font-bold">
                       <div className="flex justify-between text-neutral-600 dark:text-neutral-400"><span>Subtotal</span><span className="font-mono">₹{getCartSubtotal()}</span></div>
+                      
+                      {/* 👉 NEW: GST DISPLAY IN CART */}
+                      {gstEnabled && getGstAmountCalculated() > 0 && (
+                        <div className="flex justify-between text-neutral-800 dark:text-neutral-200">
+                          <span>GST Tax ({gstRate}%)</span>
+                          <span className="font-mono text-red-500">+₹{getGstAmountCalculated()}</span>
+                        </div>
+                      )}
+
                       {getDeliveryCharge() > 0 && <div className="flex justify-between text-neutral-800 dark:text-neutral-200"><span>Delivery Charge</span><span className="font-mono">+₹{getDeliveryCharge()}</span></div>}
                       {getCalculatedDiscountAmount() > 0 && <div className="flex justify-between text-orange-600 font-bold"><span>Discount {appliedPromoName && `(${appliedPromoName})`}</span><span className="font-mono">-₹{getCalculatedDiscountAmount()}</span></div>}
                       {isRedeemingPoints && <div className="flex justify-between text-amber-600 font-bold"><span>Points Redeemed</span><span className="font-mono">-₹{getRedemptionDiscount()}</span></div>}
@@ -3320,6 +3329,39 @@ export default function BbCafeDesktopPos() {
                   
                   <div className="space-y-2 border-b border-neutral-300 dark:border-neutral-800 pb-4">
                     <p className="text-xs font-bold uppercase">Next Bill / Invoice Number:</p>
+                    {/* 👉 NEW: GST Settings */}
+                  <div className="space-y-2 border-b border-neutral-300 dark:border-neutral-800 pb-4">
+                    <div className="flex justify-between items-center">
+                      <p className="text-xs font-bold uppercase">Enable GST (टैक्स):</p>
+                      <button 
+                        onClick={() => {
+                          const newVal = !gstEnabled;
+                          setGstEnabled(newVal);
+                          localStorage.setItem("bb_pos_gst_enabled_pc", String(newVal));
+                          toast.success(newVal ? `GST Enabled (${gstRate}%)!` : "GST Disabled!");
+                        }} 
+                        className={`w-12 h-6 flex items-center rounded-full p-1 transition-colors ${gstEnabled ? 'bg-green-500' : 'bg-neutral-400'}`}
+                      >
+                        <div className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform ${gstEnabled ? 'translate-x-6' : ''}`}></div>
+                      </button>
+                    </div>
+                    {gstEnabled && (
+                      <div className="flex gap-2 pt-2">
+                        <input 
+                          type="number" 
+                          value={gstRate} 
+                          onChange={e => {
+                            const rate = Number(e.target.value);
+                            setGstRate(rate);
+                            localStorage.setItem("bb_pos_gst_rate_pc", String(rate));
+                          }}
+                          placeholder="GST % (e.g. 5)"
+                          className="flex-1 bg-neutral-100 dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 rounded-xl px-3 py-2 text-xs font-mono font-bold outline-none" 
+                        />
+                        <span className="bg-neutral-200 dark:bg-neutral-700 px-4 py-2 rounded-xl text-xs font-black uppercase flex items-center">% Rate (दर)</span>
+                      </div>
+                    )}
+                  </div>
                     <div className="flex gap-2">
                       <input 
                         type="number" 
