@@ -305,15 +305,13 @@ export default function BbCafeDesktopPos() {
     let filtered = [...allCustomers]; 
     
     if (customerTabSearch) {
-      const q = customerTabSearch.toLowerCase();
-      filtered = filtered.filter(c => 
-        String(c.name || '').toLowerCase().includes(q) || 
+       
         String(c.phone || c.id || '').includes(q) || 
         String(c.address || '').toLowerCase().includes(q)
       );
     }
     
-    return filtered.sort((a, b) => {
+   
       if (customerSortBy === 'spent_high') return (b.totalSpent || 0) - (a.totalSpent || 0);
       if (customerSortBy === 'points_high') return (b.points || 0) - (a.points || 0);
       if (customerSortBy === 'points_low') return (a.points || 0) - (b.points || 0);
@@ -321,8 +319,7 @@ export default function BbCafeDesktopPos() {
       const timeA = a.lastActive?.toDate ? a.lastActive.toDate().getTime() : new Date(a.lastActive || 0).getTime();
       const timeB = b.lastActive?.toDate ? b.lastActive.toDate().getTime() : new Date(b.lastActive || 0).getTime();
       return timeB - timeA; // Default: Recent
-    });
-  }, [allCustomers, customerTabSearch, customerSortBy]);
+    
       const q = customerTabSearch.toLowerCase();
       filtered = filtered.filter(c => 
         String(c.name || '').toLowerCase().includes(q) || 
