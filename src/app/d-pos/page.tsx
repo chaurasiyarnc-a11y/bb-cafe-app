@@ -3192,9 +3192,15 @@ export default function BbCafeDesktopPos() {
                               </button>
                             </div>
                           </div>
-                        </div> {/* 👈 बस यह एक </div> मिसिंग था! */}
+                        </div>
                       );
                     })
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* TAB 4: REPORTS WITH ITEM-WISE SALES */}
                   
                 
             {/* TAB 4: REPORTS WITH ITEM-WISE SALES */}
