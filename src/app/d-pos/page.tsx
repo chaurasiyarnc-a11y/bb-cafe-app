@@ -3195,8 +3195,7 @@ export default function BbCafeDesktopPos() {
                         </div> {/* 👈 बस यह एक </div> मिसिंग था! */}
                       );
                     })
-                  )}
-                  )}
+                  
                 
             {/* TAB 4: REPORTS WITH ITEM-WISE SALES */}
             {activeTab === 'reports' && (
