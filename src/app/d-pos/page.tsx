@@ -288,8 +288,7 @@ export default function BbCafeDesktopPos() {
   const [isCustomersLoading, setIsCustomersLoading] = useState(false);
   const [customerTabSearch, setCustomerTabSearch] = useState('');
 // 👉 NEW: CUSTOMER SORTING & FILTERING
-  const [customerSortBy, setCustomerSortBy] = useState<'recent' | 'points_high' | 'points_low'>('recent');
-
+  const [customerSortBy, setCustomerSortBy] = useState<'recent' | 'points_high' | 'points_low' | 'spent_high'>('recent');
   const processedCustomers = useMemo(() => {
     // 1. Search (नाम, मोबाइल, या एड्रेस से)
     let filtered = allCustomers;
@@ -303,6 +302,7 @@ export default function BbCafeDesktopPos() {
     }
     // 2. Sort (पॉइंट्स के हिसाब से)
     return filtered.sort((a, b) => {
+      if (customerSortBy === 'spent_high') return (b.totalSpent || 0) - (a.totalSpent || 0); // 👉 NEW
       if (customerSortBy === 'points_high') return (b.points || 0) - (a.points || 0);
       if (customerSortBy === 'points_low') return (a.points || 0) - (b.points || 0);
       
@@ -402,12 +402,12 @@ export default function BbCafeDesktopPos() {
       toast.error("ग्राहक को सेव करने में त्रुटि आई");
     }
   };
-// 👉 NEW: LOYVERSE CSV IMPORT FUNCTION
+// 👉 NEW: ADVANCED LOYVERSE CSV IMPORT (With Duplicate Merging)
   const handleImportCustomersCSV = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const toastId = toast.loading("Loyverse डेटा इम्पोर्ट हो रहा है, कृपया प्रतीक्षा करें...");
+    const toastId = toast.loading("Loyverse डेटा चेक और मर्ज हो रहा है...");
     const reader = new FileReader();
 
     reader.onload = async (event) => {
@@ -426,15 +426,16 @@ export default function BbCafeDesktopPos() {
         const pointsIdx = headers.findIndex(h => h.includes('points balance') || h.includes('points'));
         const addrIdx = headers.findIndex(h => h === 'address');
         const cityIdx = headers.findIndex(h => h === 'city');
+        const spentIdx = headers.findIndex(h => h.includes('total spent'));
+        const visitsIdx = headers.findIndex(h => h.includes('total visits'));
 
         if (phoneIdx === -1) {
           toast.dismiss(toastId);
           return toast.error("CSV में 'Phone' कॉलम नहीं मिला!");
         }
 
-        let importedCount = 0;
-        let batch = writeBatch(db);
-        let batchCount = 0;
+        // 👉 स्मार्ट डुप्लीकेट चेकर (Excel के अंदर डुप्लीकेट पकड़ने के लिए)
+        const uniqueCustomers = new Map();
 
         for (let i = 1; i < rows.length; i++) {
           const cols = rows[i].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
@@ -444,41 +445,63 @@ export default function BbCafeDesktopPos() {
           if (cleanPhone.length === 10) {
             const name = nameIdx > -1 ? (cols[nameIdx] || 'Walk-in Guest').replace(/"/g, '').trim() : 'Guest';
             const points = pointsIdx > -1 && cols[pointsIdx] ? Math.round(Number(cols[pointsIdx])) : 0;
+            const totalSpent = spentIdx > -1 && cols[spentIdx] ? Math.round(Number(cols[spentIdx])) : 0;
+            const totalVisits = visitsIdx > -1 && cols[visitsIdx] ? Math.round(Number(cols[visitsIdx])) : 0;
             
             let address = addrIdx > -1 ? (cols[addrIdx] || '').replace(/"/g, '').trim() : '';
             const city = cityIdx > -1 ? (cols[cityIdx] || '').replace(/"/g, '').trim() : '';
-            if (city && !address.includes(city)) {
-              address = address ? `${address}, ${city}` : city;
-            }
+            if (city && !address.includes(city)) address = address ? `${address}, ${city}` : city;
 
-            const docRef = doc(db, "customer_points", cleanPhone);
-            batch.set(docRef, {
-              name: name || 'Valued Guest',
-              phone: cleanPhone,
-              points: isNaN(points) ? 0 : points,
-              address: address,
-              lastActive: new Date(),
-              isImported: true,
-              importSource: 'Loyverse'
-            }, { merge: true });
-
-            importedCount++;
-            batchCount++;
-
-            if (batchCount >= 450) {
-              await batch.commit();
-              batch = writeBatch(db);
-              batchCount = 0;
+            // अगर यह नंबर मैप में पहले से है, तो दोनों का डेटा जोड़ (Merge) दें
+            if (uniqueCustomers.has(cleanPhone)) {
+              const existing = uniqueCustomers.get(cleanPhone);
+              existing.points = Math.max(existing.points, points); // जो पॉइंट्स ज्यादा हों, वो रखें
+              existing.totalSpent += totalSpent; // खर्चा जोड़ दें
+              existing.totalVisits += totalVisits; // विजिट्स जोड़ दें
+              if (!existing.address && address) existing.address = address; // एड्रेस खाली हो तो भर दें
+              if (existing.name === 'Guest' || existing.name === 'Walk-in Guest') existing.name = name;
+            } else {
+              // नया नंबर है तो मैप में सेव करें
+              uniqueCustomers.set(cleanPhone, { name, points, totalSpent, totalVisits, address });
             }
           }
         }
+
+        let importedCount = 0;
+        let batch = writeBatch(db);
+        let batchCount = 0;
+
+        // अब बिना डुप्लीकेट वाले इस क्लीन डेटा को Firebase में डालें
+        uniqueCustomers.forEach((data, phone) => {
+          const docRef = doc(db, "customer_points", phone);
+          batch.set(docRef, {
+            name: data.name || 'Valued Guest',
+            phone: phone,
+            points: isNaN(data.points) ? 0 : data.points,
+            totalSpent: isNaN(data.totalSpent) ? 0 : data.totalSpent,
+            totalVisits: isNaN(data.totalVisits) ? 0 : data.totalVisits,
+            address: data.address,
+            lastActive: new Date(),
+            isImported: true,
+            importSource: 'Loyverse'
+          }, { merge: true }); // Merge True = पुराने सेव डेटा को उड़ाएगा नहीं!
+
+          importedCount++;
+          batchCount++;
+
+          if (batchCount >= 450) {
+            batch.commit();
+            batch = writeBatch(db);
+            batchCount = 0;
+          }
+        });
 
         if (batchCount > 0) {
           await batch.commit();
         }
 
         toast.dismiss(toastId);
-        toast.success(`बधाई हो! Loyverse के ${importedCount} ग्राहक सफलतापूर्वक जुड़ गए! 🎉`);
+        toast.success(`डुप्लीकेट्स हटा दिए गए! ${importedCount} ग्राहक सफलतापूर्वक मर्ज और सेव हो गए! 🎉`);
         fetchAllCustomers();
         
       } catch (err) {
@@ -488,7 +511,7 @@ export default function BbCafeDesktopPos() {
       }
     };
     reader.readAsText(file);
-    e.target.value = '';
+    e.target.value = ''; // इनपुट रीसेट
   };
   const openAddCustomerModal = () => {
     setEditingCustProfile(null);
@@ -1751,9 +1774,27 @@ export default function BbCafeDesktopPos() {
       if (cleanPhone.length === 10 && navigator.onLine) {
         const userRef = doc(db, "customer_points", cleanPhone);
         const userDoc = await getDoc(userRef);
-        const prevPoints = userDoc.exists() ? (Number(userDoc.data().points) || 0) : 0;
+        let prevPoints = 0;
+        let prevSpent = 0;
+        let prevVisits = 0;
+        
+        if (userDoc.exists()) {
+          const data = userDoc.data();
+          prevPoints = Number(data.points) || 0;
+          prevSpent = Number(data.totalSpent) || 0;
+          prevVisits = Number(data.totalVisits) || 0;
+        }
+        
         remainingPts = Math.max(0, prevPoints - redeemed) + earned;
-        await setDoc(userRef, { name: customerName || "Walk-in Guest", phone: cleanPhone, points: remainingPts, lastActive: new Date() }, { merge: true });
+        
+        await setDoc(userRef, { 
+          name: customerName || "Walk-in Guest", 
+          phone: cleanPhone, 
+          points: remainingPts, 
+          totalSpent: prevSpent + finalTotal, // 👉 NEW: नया बिल अमाउंट पुराने में जुड़ गया
+          totalVisits: prevVisits + 1,        // 👉 NEW: विजिट काउंट 1 बढ़ गया
+          lastActive: new Date() 
+        }, { merge: true });
       }
 
       billNumber = activeEditingBillNumber || getNextBillNumber();
@@ -3410,8 +3451,8 @@ export default function BbCafeDesktopPos() {
                   
                   <div className="flex bg-white dark:bg-neutral-900 rounded-xl border border-neutral-300 dark:border-neutral-700 p-1 shadow-sm shrink-0">
                     <button onClick={() => setCustomerSortBy('recent')} className={`px-4 py-2 text-[10px] font-black uppercase rounded-lg transition-all ${customerSortBy === 'recent' ? 'bg-orange-600 text-white' : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800'}`}>Recent</button>
-                    <button onClick={() => setCustomerSortBy('points_high')} className={`px-4 py-2 text-[10px] font-black uppercase rounded-lg transition-all ${customerSortBy === 'points_high' ? 'bg-amber-500 text-black' : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800'}`}>High Points (सबसे ज्यादा)</button>
-                    <button onClick={() => setCustomerSortBy('points_low')} className={`px-4 py-2 text-[10px] font-black uppercase rounded-lg transition-all ${customerSortBy === 'points_low' ? 'bg-orange-600 text-white' : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800'}`}>Low Points</button>
+                    <button onClick={() => setCustomerSortBy('spent_high')} className={`px-4 py-2 text-[10px] font-black uppercase rounded-lg transition-all ${customerSortBy === 'spent_high' ? 'bg-green-600 text-white' : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800'}`}>Top Spender (VIP)</button>
+                    <button onClick={() => setCustomerSortBy('points_high')} className={`px-4 py-2 text-[10px] font-black uppercase rounded-lg transition-all ${customerSortBy === 'points_high' ? 'bg-amber-500 text-black' : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800'}`}>High Points</button>
                   </div>
                 </div>
 
@@ -3447,11 +3488,25 @@ export default function BbCafeDesktopPos() {
                              </span>
                           </div>
                           {cust.address ? (
-                            <p className="text-[11px] text-neutral-600 dark:text-neutral-400 line-clamp-2">📍 {cust.address}</p>
+                            <p className="text-[11px] text-neutral-600 dark:text-neutral-400 line-clamp-2 mb-2">📍 {cust.address}</p>
                           ) : (
-                            <p className="text-[11px] text-neutral-400 italic">No address provided</p>
+                            <p className="text-[11px] text-neutral-400 italic mb-2">No address provided</p>
                           )}
+                          
+                          {/* 👉 NEW: Total Spent & Visits Display */}
+                          <div className="flex gap-4 pt-2 border-t border-dashed border-neutral-200 dark:border-neutral-800">
+                             <div>
+                               <p className="text-[9px] font-black uppercase text-neutral-500">Total Spent</p>
+                               <p className="text-sm font-mono font-black text-green-600 dark:text-green-500">₹{cust.totalSpent || 0}</p>
+                             </div>
+                             <div>
+                               <p className="text-[9px] font-black uppercase text-neutral-500">Visits</p>
+                               <p className="text-sm font-mono font-black text-blue-600 dark:text-blue-500">{cust.totalVisits || 0} times</p>
+                             </div>
+                          </div>
                         </div>
+                        
+                        {/* CORRECTED BUTTONS BLOCK */}
                         
                         {/* CORRECTED BUTTONS BLOCK */}
                         <div className="flex gap-2">
