@@ -299,9 +299,30 @@ export default function BbCafeDesktopPos() {
     setCustomerCurrentPage(1);
   }, [customerTabSearch, customerSortBy]);
 
+  // 👉 FIX 2: फ़िल्टर (Sorting) फिक्स कर दिया गया है
   const processedCustomers = useMemo(() => {
-    let filtered = allCustomers;
+    // [...allCustomers] लिखने से React तुरंत स्क्रीन रिफ्रेश करेगा
+    let filtered = [...allCustomers]; 
+    
     if (customerTabSearch) {
+      const q = customerTabSearch.toLowerCase();
+      filtered = filtered.filter(c => 
+        String(c.name || '').toLowerCase().includes(q) || 
+        String(c.phone || c.id || '').includes(q) || 
+        String(c.address || '').toLowerCase().includes(q)
+      );
+    }
+    
+    return filtered.sort((a, b) => {
+      if (customerSortBy === 'spent_high') return (b.totalSpent || 0) - (a.totalSpent || 0);
+      if (customerSortBy === 'points_high') return (b.points || 0) - (a.points || 0);
+      if (customerSortBy === 'points_low') return (a.points || 0) - (b.points || 0);
+      
+      const timeA = a.lastActive?.toDate ? a.lastActive.toDate().getTime() : new Date(a.lastActive || 0).getTime();
+      const timeB = b.lastActive?.toDate ? b.lastActive.toDate().getTime() : new Date(b.lastActive || 0).getTime();
+      return timeB - timeA; // Default: Recent
+    });
+  }, [allCustomers, customerTabSearch, customerSortBy]);
       const q = customerTabSearch.toLowerCase();
       filtered = filtered.filter(c => 
         String(c.name || '').toLowerCase().includes(q) || 
@@ -369,11 +390,13 @@ export default function BbCafeDesktopPos() {
       setIsCustHistoryLoading(false);
     }
   };
+  // 👉 FIX 1: 300 की लिमिट हटा दी गई है, अब सारे ग्राहक आएँगे!
   const fetchAllCustomers = async () => {
     setIsCustomersLoading(true);
     try {
       if (navigator.onLine) {
-        const q = query(collection(db, "customer_points"), orderBy("lastActive", "desc"), limit(300));
+        // limit(300) हटा दिया गया है
+        const q = query(collection(db, "customer_points"), orderBy("lastActive", "desc"));
         const snap = await getDocs(q);
         setAllCustomers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       }
@@ -383,10 +406,6 @@ export default function BbCafeDesktopPos() {
       setIsCustomersLoading(false);
     }
   };
-
-  useEffect(() => {
-    if (activeTab === 'customers') fetchAllCustomers();
-  }, [activeTab]);
 
   const handleSaveCustomerProfile = async (e: React.FormEvent) => {
     e.preventDefault();
