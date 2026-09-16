@@ -5,7 +5,7 @@ import { db } from '@/lib/firebase';
 import { 
   collection, onSnapshot, query, orderBy, limit, doc, 
   updateDoc, addDoc, getDoc, getDocs, where, setDoc,
-  deleteDoc, Timestamp
+  deleteDoc, Timestamp, writeBatch
 } from 'firebase/firestore';
 import { 
   ShoppingBag, Search, X, Loader2, Clock, Printer, Settings, 
@@ -375,7 +375,94 @@ export default function BbCafeDesktopPos() {
       toast.error("ग्राहक को सेव करने में त्रुटि आई");
     }
   };
+// 👉 NEW: LOYVERSE CSV IMPORT FUNCTION
+  const handleImportCustomersCSV = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
 
+    const toastId = toast.loading("Loyverse डेटा इम्पोर्ट हो रहा है, कृपया प्रतीक्षा करें...");
+    const reader = new FileReader();
+
+    reader.onload = async (event) => {
+      try {
+        const text = event.target?.result as string;
+        const rows = text.split(/\r?\n/).filter(row => row.trim() !== '');
+        
+        if (rows.length < 2) {
+          toast.dismiss(toastId);
+          return toast.error("CSV फाइल खाली है या हेडर नहीं है!");
+        }
+
+        const headers = rows[0].toLowerCase().split(',');
+        const nameIdx = headers.findIndex(h => h.includes('customer name') || h.includes('name'));
+        const phoneIdx = headers.findIndex(h => h === 'phone' || h.includes('phone'));
+        const pointsIdx = headers.findIndex(h => h.includes('points balance') || h.includes('points'));
+        const addrIdx = headers.findIndex(h => h === 'address');
+        const cityIdx = headers.findIndex(h => h === 'city');
+
+        if (phoneIdx === -1) {
+          toast.dismiss(toastId);
+          return toast.error("CSV में 'Phone' कॉलम नहीं मिला!");
+        }
+
+        let importedCount = 0;
+        let batch = writeBatch(db);
+        let batchCount = 0;
+
+        for (let i = 1; i < rows.length; i++) {
+          const cols = rows[i].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
+          const rawPhone = cols[phoneIdx] || '';
+          const cleanPhone = rawPhone.replace(/\D/g, '').slice(-10);
+          
+          if (cleanPhone.length === 10) {
+            const name = nameIdx > -1 ? (cols[nameIdx] || 'Walk-in Guest').replace(/"/g, '').trim() : 'Guest';
+            const points = pointsIdx > -1 && cols[pointsIdx] ? Math.round(Number(cols[pointsIdx])) : 0;
+            
+            let address = addrIdx > -1 ? (cols[addrIdx] || '').replace(/"/g, '').trim() : '';
+            const city = cityIdx > -1 ? (cols[cityIdx] || '').replace(/"/g, '').trim() : '';
+            if (city && !address.includes(city)) {
+              address = address ? `${address}, ${city}` : city;
+            }
+
+            const docRef = doc(db, "customer_points", cleanPhone);
+            batch.set(docRef, {
+              name: name || 'Valued Guest',
+              phone: cleanPhone,
+              points: isNaN(points) ? 0 : points,
+              address: address,
+              lastActive: new Date(),
+              isImported: true,
+              importSource: 'Loyverse'
+            }, { merge: true });
+
+            importedCount++;
+            batchCount++;
+
+            if (batchCount >= 450) {
+              await batch.commit();
+              batch = writeBatch(db);
+              batchCount = 0;
+            }
+          }
+        }
+
+        if (batchCount > 0) {
+          await batch.commit();
+        }
+
+        toast.dismiss(toastId);
+        toast.success(`बधाई हो! Loyverse के ${importedCount} ग्राहक सफलतापूर्वक जुड़ गए! 🎉`);
+        fetchAllCustomers();
+        
+      } catch (err) {
+        toast.dismiss(toastId);
+        toast.error("CSV इम्पोर्ट फेल हो गया।");
+        console.error(err);
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  };
   const openAddCustomerModal = () => {
     setEditingCustProfile(null);
     setCustFormName('');
@@ -3262,6 +3349,18 @@ export default function BbCafeDesktopPos() {
                      <button onClick={fetchAllCustomers} disabled={isCustomersLoading} className="bg-neutral-200 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 px-4 py-2 rounded-xl text-xs font-black uppercase flex items-center gap-1.5 border border-neutral-300 dark:border-neutral-700">
                        {isCustomersLoading ? <Loader2 className="animate-spin" size={14} /> : <SafeRefreshCw size={14} />} Refresh
                      </button>
+                     
+                     {/* नया इंपोर्ट बटन */}
+                     <label className="bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded-xl text-xs font-black uppercase flex items-center gap-1.5 shadow cursor-pointer transition-colors">
+                       <SafeFileText size={16} /> Import CSV
+                       <input 
+                         type="file" 
+                         accept=".csv" 
+                         className="hidden" 
+                         onChange={handleImportCustomersCSV} 
+                       />
+                     </label>
+
                      <button onClick={openAddCustomerModal} className="bg-orange-600 hover:bg-orange-500 text-white px-4 py-2 rounded-xl text-xs font-black uppercase flex items-center gap-1.5 shadow">
                        <SafeUserPlus size={16} /> + Add Customer
                      </button>
