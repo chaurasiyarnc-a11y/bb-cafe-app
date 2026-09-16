@@ -374,6 +374,7 @@ export default function BbCafeDesktopPos() {
     }
   };
   // 👉 FIX 1: 300 की लिमिट हटा दी गई है, अब सारे ग्राहक आएँगे!
+ // 👉 FIX 1: 300 की लिमिट हटा दी गई है, अब सारे ग्राहक आएँगे!
   const fetchAllCustomers = async () => {
     setIsCustomersLoading(true);
     try {
@@ -389,6 +390,14 @@ export default function BbCafeDesktopPos() {
       setIsCustomersLoading(false);
     }
   };
+
+  // 👇👇👇 यह नया कोड मैंने यहाँ जोड़ दिया है 👇👇👇
+  useEffect(() => {
+    if (activeTab === 'customers') {
+      fetchAllCustomers();
+    }
+  }, [activeTab]);
+  // 👆👆👆
 
   const handleSaveCustomerProfile = async (e: React.FormEvent) => {
     e.preventDefault();
