@@ -3432,7 +3432,7 @@ export default function BbCafeDesktopPos() {
                        {isCustomersLoading ? <Loader2 className="animate-spin" size={14} /> : <SafeRefreshCw size={14} />} Refresh
                      </button>
                      
-                     {/* नया इंपोर्ट बटन */}
+                     {/* Import CSV Button */}
                      <label className="bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded-xl text-xs font-black uppercase flex items-center gap-1.5 shadow cursor-pointer transition-colors">
                        <SafeFileText size={16} /> Import CSV
                        <input 
@@ -3449,7 +3449,7 @@ export default function BbCafeDesktopPos() {
                   </div>
                 </div>
 
-                {/* 👉 NEW: Stats & Sorting Header */}
+                {/* Stats & Sorting Header */}
                 <div className="flex flex-col lg:flex-row gap-3 justify-between lg:items-center bg-orange-500/10 dark:bg-orange-500/5 border border-orange-500/20 p-3 rounded-2xl shrink-0">
                   <div className="flex gap-6 items-center px-2">
                     <div>
@@ -3467,6 +3467,7 @@ export default function BbCafeDesktopPos() {
                     <button onClick={() => setCustomerSortBy('recent')} className={`px-4 py-2 text-[10px] font-black uppercase rounded-lg transition-all ${customerSortBy === 'recent' ? 'bg-orange-600 text-white' : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800'}`}>Recent</button>
                     <button onClick={() => setCustomerSortBy('spent_high')} className={`px-4 py-2 text-[10px] font-black uppercase rounded-lg transition-all ${customerSortBy === 'spent_high' ? 'bg-green-600 text-white' : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800'}`}>Top Spender (VIP)</button>
                     <button onClick={() => setCustomerSortBy('points_high')} className={`px-4 py-2 text-[10px] font-black uppercase rounded-lg transition-all ${customerSortBy === 'points_high' ? 'bg-amber-500 text-black' : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800'}`}>High Points</button>
+                    <button onClick={() => setCustomerSortBy('points_low')} className={`px-4 py-2 text-[10px] font-black uppercase rounded-lg transition-all ${customerSortBy === 'points_low' ? 'bg-orange-600 text-white' : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800'}`}>Low Points</button>
                   </div>
                 </div>
 
@@ -3482,7 +3483,7 @@ export default function BbCafeDesktopPos() {
                   />
                 </div>
 
-                {/* 👉 NEW: Customer Grid with Pagination */}
+                {/* Customer Grid with Pagination */}
                  <div className="flex-1 overflow-y-auto pr-1 pb-10 flex flex-col space-y-4">
                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 content-start">
                     {isCustomersLoading ? (
@@ -3529,13 +3530,12 @@ export default function BbCafeDesktopPos() {
                              <History size={14} /> History
                           </button>
                         </div>
-
                       </div>
                       ))
                     )}
                   </div>
                   
-                  {/* 👉 NEW: Next / Previous Buttons */}
+                  {/* Next / Previous Buttons */}
                   {!isCustomersLoading && totalCustomerPages > 1 && (
                     <div className="flex justify-center items-center gap-4 py-4 mt-auto">
                       <button 
@@ -3560,6 +3560,8 @@ export default function BbCafeDesktopPos() {
                     </div>
                   )}
                 </div>
+              </div>
+            )}
             
             {/* TAB 7: SETTINGS */}
             {activeTab === 'settings' && (
