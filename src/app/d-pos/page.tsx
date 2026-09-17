@@ -1361,7 +1361,7 @@ export default function BbCafeDesktopPos() {
     savedPop[item.id] = (savedPop[item.id] || 0) + quantityToAdd;
     localStorage.setItem("bb_pos_item_popularity", JSON.stringify(savedPop));
 
-    const hasItemVariants = item.variants && typeof item.variants === 'object' && Object.keys(item.variants).length > 0;
+  
     const hasItemVariants = item.variants && typeof item.variants === 'object' && Object.keys(item.variants).length > 0;
 
     if (hasItemVariants) {
@@ -2277,13 +2277,9 @@ export default function BbCafeDesktopPos() {
     if (selectedCategory === '⭐ Top Items') {
       const savedPop = JSON.parse(localStorage.getItem("bb_pos_item_popularity") || "{}");
       
-      // आइटम्स को उनके बिकने की गिनती के हिसाब से छाँटें (सबसे ज्यादा बिकने वाला ऊपर)
       let topProducts = [...products].sort((a, b) => (savedPop[b.id] || 0) - (savedPop[a.id] || 0));
-      
-      // सिर्फ वो आइटम दिखाएं जो कम से कम 1 बार बिके हों (और टॉप 30 आइटम ही लें)
       topProducts = topProducts.filter(p => (savedPop[p.id] || 0) > 0).slice(0, 30);
       
-      // अगर सिस्टम एकदम नया है और कुछ नहीं बिका है, तो शुरुआत के 24 आइटम दिखा दें
       if (topProducts.length === 0) topProducts = products.slice(0, 24);
 
       return topProducts.filter((p) => {
@@ -2293,7 +2289,6 @@ export default function BbCafeDesktopPos() {
       });
     }
 
-    // बाकी सभी रेगुलर कैटेगरीज का पुराना लॉजिक
     return products.filter((p) => {
       const matchesCategory = selectedCategory === 'All' || p.category?.toLowerCase() === selectedCategory.toLowerCase();
       const matchesName = (p.name || '').toLowerCase().includes(queryStr);
@@ -2302,6 +2297,15 @@ export default function BbCafeDesktopPos() {
     });
   }, [products, selectedCategory, searchQuery]);
 
+  const filteredInventoryProducts = useMemo(() => {
+    const queryStr = inventorySearchQuery.toLowerCase().trim();
+    return products.filter((p) => {
+      const matchesName = (p.name || '').toLowerCase().includes(queryStr);
+      const matchesCat = (p.category || '').toLowerCase().includes(queryStr);
+      const matchesCode = p.itemCode && String(p.itemCode).toLowerCase().includes(queryStr);
+      return matchesName || matchesCat || matchesCode;
+    });
+  }, [products, inventorySearchQuery]);
   const filteredInventoryProducts = useMemo(() => {
     const queryStr = inventorySearchQuery.toLowerCase().trim();
     return products.filter((p) => {
