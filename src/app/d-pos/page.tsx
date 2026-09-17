@@ -2309,6 +2309,15 @@ export default function BbCafeDesktopPos() {
       return matchesCategory && (matchesName || matchesCode);
     });
   }, [products, selectedCategory, searchQuery]);
+
+  const filteredInventoryProducts = useMemo(() => {
+    const queryStr = inventorySearchQuery.toLowerCase().trim();
+    return products.filter((p) => {
+      const matchesName = (p.name || '').toLowerCase().includes(queryStr);
+      const matchesCat = (p.category || '').toLowerCase().includes(queryStr);
+      const matchesCode = p.itemCode && String(p.itemCode).toLowerCase().includes(queryStr);
+      return matchesName || matchesCat || matchesCode;
+    });
   }, [products, inventorySearchQuery]);
 
   const mainClass = "h-screen w-screen flex font-sans antialiased overflow-hidden " + (themeMode === "dark" ? "dark bg-[#121212] text-neutral-100" : "bg-[#f4f5f7] text-neutral-900");
