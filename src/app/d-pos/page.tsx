@@ -2297,7 +2297,7 @@ export default function BbCafeDesktopPos() {
     });
   
   
-  }, [products, inventorySearchQuery]);
+  }, [products, searchQuery, selectedCategory]); 
   const filteredInventoryProducts = useMemo(() => {
     const queryStr = inventorySearchQuery.toLowerCase().trim();
     return products.filter((p) => {
