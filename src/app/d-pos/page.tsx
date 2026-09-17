@@ -2297,14 +2297,7 @@ export default function BbCafeDesktopPos() {
     });
   }, [products, selectedCategory, searchQuery]);
 
-  const filteredInventoryProducts = useMemo(() => {
-    const queryStr = inventorySearchQuery.toLowerCase().trim();
-    return products.filter((p) => {
-      const matchesName = (p.name || '').toLowerCase().includes(queryStr);
-      const matchesCat = (p.category || '').toLowerCase().includes(queryStr);
-      const matchesCode = p.itemCode && String(p.itemCode).toLowerCase().includes(queryStr);
-      return matchesName || matchesCat || matchesCode;
-    });
+  
   }, [products, inventorySearchQuery]);
   const filteredInventoryProducts = useMemo(() => {
     const queryStr = inventorySearchQuery.toLowerCase().trim();
