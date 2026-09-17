@@ -1352,8 +1352,16 @@ export default function BbCafeDesktopPos() {
   };
 
   // Add Item to Cart
-  const handleItemClick = (item: any, quantityToAdd = 1) => {
+
+    const handleItemClick = (item: any, quantityToAdd = 1) => {
     triggerBeep('tap');
+
+    // 👉 NEW: जो आइटम कार्ट में जा रहा है, उसका काउंट बढ़ा दें (ताकि वो Favorites में ऊपर आए)
+    const savedPop = JSON.parse(localStorage.getItem("bb_pos_item_popularity") || "{}");
+    savedPop[item.id] = (savedPop[item.id] || 0) + quantityToAdd;
+    localStorage.setItem("bb_pos_item_popularity", JSON.stringify(savedPop));
+
+    const hasItemVariants = item.variants && typeof item.variants === 'object' && Object.keys(item.variants).length > 0;
     const hasItemVariants = item.variants && typeof item.variants === 'object' && Object.keys(item.variants).length > 0;
 
     if (hasItemVariants) {
@@ -2231,6 +2239,13 @@ export default function BbCafeDesktopPos() {
       if (e.key === 'F7') { e.preventDefault(); handleSendWhatsAppBill(); }
       if (e.key === 'F8') { e.preventDefault(); setIsDiscountOpen(prev => !prev); }
       if (e.key === 'F9') { e.preventDefault(); if (cart.length > 0 && !isSubmittingOrder) handleFinalCheckoutAndPrintBill(); }
+      if (e.key === 'F10') { 
+        e.preventDefault(); 
+        setActiveTab('billing'); 
+        setSelectedCategory('⭐ Top Items'); 
+        toast.success("⭐ टॉप आइटम्स खुल गए!"); 
+        setTimeout(() => searchInputRef.current?.focus(), 80);
+      }
       if (e.key === 'F11') { e.preventDefault(); setIsCustomerModalOpen(prev => !prev); }
       if (e.key === 'F12') { e.preventDefault(); setFulfillmentType(prev => prev === 'pickup' ? 'table' : prev === 'table' ? 'delivery' : 'pickup'); }
       if ((e.key === 'Delete' || (e.shiftKey && e.key === 'Backspace')) && document.activeElement?.tagName !== 'INPUT') {
@@ -2263,14 +2278,37 @@ export default function BbCafeDesktopPos() {
     });
   }, [products, selectedCategory, searchQuery]);
 
-  const filteredInventoryProducts = useMemo(() => {
-    const queryStr = inventorySearchQuery.toLowerCase().trim();
+  const filteredMenu = useMemo(() => {
+    const queryStr = searchQuery.toLowerCase().trim();
+    
+    // 👉 NEW: '⭐ Top Items' (ज्यादा बिकने वाले) का लॉजिक
+    if (selectedCategory === '⭐ Top Items') {
+      const savedPop = JSON.parse(localStorage.getItem("bb_pos_item_popularity") || "{}");
+      
+      // आइटम्स को उनके बिकने की गिनती के हिसाब से छाँटें (सबसे ज्यादा बिकने वाला ऊपर)
+      let topProducts = [...products].sort((a, b) => (savedPop[b.id] || 0) - (savedPop[a.id] || 0));
+      
+      // सिर्फ वो आइटम दिखाएं जो कम से कम 1 बार बिके हों (और टॉप 30 आइटम ही लें)
+      topProducts = topProducts.filter(p => (savedPop[p.id] || 0) > 0).slice(0, 30);
+      
+      // अगर सिस्टम एकदम नया है और कुछ नहीं बिका है, तो शुरुआत के 24 आइटम दिखा दें
+      if (topProducts.length === 0) topProducts = products.slice(0, 24);
+
+      return topProducts.filter((p) => {
+        const matchesName = (p.name || '').toLowerCase().includes(queryStr);
+        const matchesCode = p.itemCode && String(p.itemCode).toLowerCase().includes(queryStr);
+        return matchesName || matchesCode;
+      });
+    }
+
+    // बाकी सभी रेगुलर कैटेगरीज का पुराना लॉजिक
     return products.filter((p) => {
+      const matchesCategory = selectedCategory === 'All' || p.category?.toLowerCase() === selectedCategory.toLowerCase();
       const matchesName = (p.name || '').toLowerCase().includes(queryStr);
-      const matchesCat = (p.category || '').toLowerCase().includes(queryStr);
       const matchesCode = p.itemCode && String(p.itemCode).toLowerCase().includes(queryStr);
-      return matchesName || matchesCat || matchesCode;
+      return matchesCategory && (matchesName || matchesCode);
     });
+  }, [products, selectedCategory, searchQuery]);
   }, [products, inventorySearchQuery]);
 
   const mainClass = "h-screen w-screen flex font-sans antialiased overflow-hidden " + (themeMode === "dark" ? "dark bg-[#121212] text-neutral-100" : "bg-[#f4f5f7] text-neutral-900");
@@ -2464,7 +2502,7 @@ export default function BbCafeDesktopPos() {
 
                   {/* CATEGORIES BAR */}
                   <div className="flex flex-wrap gap-1.5 pb-2 shrink-0 max-h-24 overflow-y-auto pr-1">
-                    {categories.map((cat) => {
+                    {['⭐ Top Items', ...categories].map((cat) => {
                       const isSelected = selectedCategory === cat;
                       const count = cat === 'All' ? products.length : products.filter(p => p.category?.toLowerCase() === cat.toLowerCase()).length;
                       return (
