@@ -2268,15 +2268,7 @@ export default function BbCafeDesktopPos() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isLoggedIn, cart, isSubmittingOrder, paymentMethod, customerName, customerPhone, tableNumber, fulfillmentType, heldCarts]);
 
-  const filteredMenu = useMemo(() => {
-    const queryStr = searchQuery.toLowerCase().trim();
-    return products.filter((p) => {
-      const matchesCategory = selectedCategory === 'All' || p.category?.toLowerCase() === selectedCategory.toLowerCase();
-      const matchesName = (p.name || '').toLowerCase().includes(queryStr);
-      const matchesCode = p.itemCode && String(p.itemCode).toLowerCase().includes(queryStr);
-      return matchesCategory && (matchesName || matchesCode);
-    });
-  }, [products, selectedCategory, searchQuery]);
+ 
 
   const filteredMenu = useMemo(() => {
     const queryStr = searchQuery.toLowerCase().trim();
