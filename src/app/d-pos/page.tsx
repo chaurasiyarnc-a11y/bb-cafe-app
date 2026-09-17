@@ -2295,8 +2295,7 @@ export default function BbCafeDesktopPos() {
       const matchesCode = p.itemCode && String(p.itemCode).toLowerCase().includes(queryStr);
       return matchesCategory && (matchesName || matchesCode);
     });
-  }, [products, selectedCategory, searchQuery]);
-
+  
   
   }, [products, inventorySearchQuery]);
   const filteredInventoryProducts = useMemo(() => {
