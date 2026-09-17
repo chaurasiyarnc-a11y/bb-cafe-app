@@ -1908,11 +1908,16 @@ export default function BbCafeDesktopPos() {
         });
       }
 
-      // Print Customer Bill (Guaranteed QR Code verification inside)
+      // Print Customer Bill 
       await handlePrintReceiptDirect(orderObj, false);
 
-      toast.success(`बिल #${billNumber} प्रिंट हुआ! (Daily Bills से सेटल करें)`);
+      // 👉 NEW: KOT Print Logic for Pickup & Delivery
+      if (kotEnabled && (fulfillmentType === 'pickup' || fulfillmentType === 'delivery')) {
+        toast.success(`Kitchen KOT प्रिंट हो रही है... 🖨️`);
+        await handlePrintReceiptDirect(orderObj, true);
+      }
 
+      toast.success(`बिल #${billNumber} प्रिंट हुआ! (Daily Bills से सेटल करें)`);
       // Reset state & default pickup
       setCart([]); 
       setCustomerPhone(''); 
@@ -2714,16 +2719,29 @@ export default function BbCafeDesktopPos() {
                             <span>Table: {tableNumber}</span>
                           </div>
                           <div className="grid grid-cols-6 gap-1">
-                            {['Table 1', 'Table 2', 'Table 3', 'Table 4', 'Table 5', 'Table 6'].map((tName, idx) => (
-                              <button 
-                                key={tName}
-                                type="button"
-                                onClick={() => { triggerBeep('tap'); setTableNumber(tName); }}
-                                className={`py-1 rounded text-[9px] font-black uppercase border ${tableNumber === tName ? 'bg-amber-500 text-black border-amber-600 shadow' : 'bg-white dark:bg-neutral-800'}`}
-                              >
-                                T{idx + 1}
-                              </button>
-                            ))}
+                          {['Table 1', 'Table 2', 'Table 3', 'Table 4', 'Table 5', 'Table 6'].map((tName, idx) => {
+  // चेक करें कि क्या इस टेबल पर पहले से कोई आर्डर चल रहा है
+   const isTableOccupied = activeTableOrders.some(o => o.tableNumber === tName);
+  
+  return (
+    <button 
+      key={tName}
+      type="button"
+      onClick={() => { 
+        triggerBeep('tap'); 
+        // अगर हम किसी पुराने बिल को एडिट नहीं कर रहे हैं और टेबल भरी हुई है
+        if (isTableOccupied && !activeEditingOrderId) {
+          toast.error(`${tName} पर पहले से एक बिल चल रहा है! कृपया 'Tables' टैब में जाकर उसमें आइटम जोड़ें। 🪑`, { duration: 4000 });
+          return; // यहीं रोक दें, आगे न बढ़ें
+        }
+        setTableNumber(tName); 
+      }}
+      className={`py-1 rounded text-[9px] font-black uppercase border ${tableNumber === tName ? 'bg-amber-500 text-black border-amber-600 shadow' : 'bg-white dark:bg-neutral-800'} ${isTableOccupied && !activeEditingOrderId ? 'opacity-50 cursor-not-allowed border-red-500' : ''}`}
+    >
+      T{idx + 1}
+    </button>
+  );
+})}
                           </div>
                         </div>
                       )}
