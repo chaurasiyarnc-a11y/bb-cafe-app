@@ -2770,47 +2770,7 @@ export default function BbCafeDesktopPos() {
                       )}
                     </div>
 
-                    {/* FULFILLMENT MODE & 6 TABLE SELECTOR */}
-                    <div className="space-y-1.5 mb-2 shrink-0 border-t border-neutral-300 dark:border-neutral-800 pt-1.5">
-                      <div className="grid grid-cols-3 gap-1 bg-neutral-200 dark:bg-neutral-800 p-1 rounded-xl">
-                        {(['pickup', 'table', 'delivery'] as const).map((type) => (
-                          <button key={type} onClick={() => { triggerBeep('tap'); setFulfillmentType(type); }} className={`py-1 rounded-lg text-[10px] font-black uppercase transition-all ${fulfillmentType === type ? "bg-orange-600 text-white shadow" : "text-neutral-700 dark:text-neutral-300"}`}>{type}</button>
-                        ))}
-                      </div>
-
-                      {fulfillmentType === 'table' && (
-                        <div className="bg-amber-500/10 border border-amber-500/30 p-1.5 rounded-xl space-y-1">
-                          <div className="flex justify-between items-center text-[9px] font-black uppercase text-amber-800 dark:text-amber-300">
-                            <span>Table: {tableNumber}</span>
-                          </div>
-                          <div className="grid grid-cols-6 gap-1">
-                          {['Table 1', 'Table 2', 'Table 3', 'Table 4', 'Table 5', 'Table 6'].map((tName, idx) => {
-  // चेक करें कि क्या इस टेबल पर पहले से कोई आर्डर चल रहा है
-   const isTableOccupied = activeTableOrders.some(o => o.tableNumber === tName);
-  
-  return (
-    <button 
-      key={tName}
-      type="button"
-      onClick={() => { 
-        triggerBeep('tap'); 
-        // अगर हम किसी पुराने बिल को एडिट नहीं कर रहे हैं और टेबल भरी हुई है
-        if (isTableOccupied && !activeEditingOrderId) {
-          toast.error(`${tName} पर पहले से एक बिल चल रहा है! कृपया 'Tables' टैब में जाकर उसमें आइटम जोड़ें। 🪑`, { duration: 4000 });
-          return; // यहीं रोक दें, आगे न बढ़ें
-        }
-        setTableNumber(tName); 
-      }}
-      className={`py-1 rounded text-[9px] font-black uppercase border ${tableNumber === tName ? 'bg-amber-500 text-black border-amber-600 shadow' : 'bg-white dark:bg-neutral-800'} ${isTableOccupied && !activeEditingOrderId ? 'opacity-50 cursor-not-allowed border-red-500' : ''}`}
-    >
-      T{idx + 1}
-    </button>
-  );
-})}
-                          </div>
-                        </div>
-                      )}
-                    </div>
+             
 {/* FULFILLMENT MODE & 6 TABLE SELECTOR */}
                     <div className="space-y-1.5 mb-2 shrink-0 border-t border-neutral-300 dark:border-neutral-800 pt-1.5">
                       <div className="grid grid-cols-3 gap-1 bg-neutral-200 dark:bg-neutral-800 p-1 rounded-xl">
