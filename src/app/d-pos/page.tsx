@@ -2860,6 +2860,7 @@ export default function BbCafeDesktopPos() {
                         <span className="font-bold text-neutral-700 dark:text-neutral-300">कैश दिया (Cash Tendered):</span>
                         <div className="flex items-center gap-1">
                           <input 
+                            id="cashTenderedInput"
                             type="number" 
                             placeholder="₹ नोट" 
                             value={cashTendered} 
