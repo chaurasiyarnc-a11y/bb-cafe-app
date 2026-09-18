@@ -2232,25 +2232,52 @@ export default function BbCafeDesktopPos() {
 
       if (e.key === 'F1') { e.preventDefault(); setIsHelpModalOpen(prev => !prev); }
       if (e.key === 'F2') { e.preventDefault(); setActiveTab('billing'); setTimeout(() => searchInputRef.current?.focus(), 80); }
-      if (e.key === 'F3') { e.preventDefault(); handleHoldCurrentCart(); }
-      if (e.key === 'F4') { e.preventDefault(); setPaymentMethod(p => p === 'cash' ? 'upi' : p === 'upi' ? 'split' : p === 'split' ? 'due' : 'cash'); }
-      if (e.key === 'F5') { e.preventDefault(); setIsHeldCartsModalOpen(prev => !prev); }
-      if (e.key === 'F6') { e.preventDefault(); setIsExpenseModalOpen(prev => !prev); }
-      if (e.key === 'F7') { e.preventDefault(); handleSendWhatsAppBill(); }
-      if (e.key === 'F8') { e.preventDefault(); setIsDiscountOpen(prev => !prev); }
-      if (e.key === 'F9') { e.preventDefault(); if (cart.length > 0 && !isSubmittingOrder) handleFinalCheckoutAndPrintBill(); }
-      if (e.key === 'F10') { 
+      
+      // 👉 F3 Smart Hold (होल्ड करें या होल्ड लिस्ट खोलें)
+      if (e.key === 'F3') { 
+        e.preventDefault(); 
+        if (cart.length > 0) { handleHoldCurrentCart(); } 
+        else { setIsHeldCartsModalOpen(prev => !prev); } 
+      }
+      
+      // 👉 F4 Sales Report (बिक्री रिपोर्ट टैब खोलने के लिए)
+      if (e.key === 'F4') { e.preventDefault(); setActiveTab('reports'); }
+      
+      // 👉 F5 Focus Customer Search (कस्टमर नंबर/नाम सर्च पर जाने के लिए)
+      if (e.key === 'F5') { 
         e.preventDefault(); 
         setActiveTab('billing'); 
-        setSelectedCategory('⭐ Top Items'); 
-        toast.success("⭐ टॉप आइटम्स खुल गए!"); 
-        setTimeout(() => searchInputRef.current?.focus(), 80);
+        setTimeout(() => phoneInputRef.current?.focus(), 80); 
       }
-      if (e.key === 'F11') { 
-  e.preventDefault(); 
-  setActiveTab('customers'); 
-}
+      
+      // 👉 F6 Daily Bills (Settlement)
+      if (e.key === 'F6') { e.preventDefault(); setActiveTab('settlement'); }
+      
+      // 👉 F7 Save Table & Print KOT
+      if (e.key === 'F7') { 
+        e.preventDefault(); 
+        if (fulfillmentType === 'table' && cart.length > 0 && !isSubmittingOrder) {
+          handleSaveTableOrderKotOnly();
+        } else if (fulfillmentType !== 'table') {
+          toast.error("यह शॉर्टकट सिर्फ टेबल KOT के लिए है।");
+        }
+      }
+      
+      if (e.key === 'F8') { e.preventDefault(); setIsDiscountOpen(prev => !prev); }
+      if (e.key === 'F9') { e.preventDefault(); if (cart.length > 0 && !isSubmittingOrder) handleFinalCheckoutAndPrintBill(); }
+      
+      // 👉 F10 Cash Tendered Focus
+      if (e.key === 'F10') { 
+        e.preventDefault(); 
+        setActiveTab('billing');
+        setTimeout(() => document.getElementById('cashTenderedInput')?.focus(), 80);
+      }
+      
+      // 👉 F11 Customers Profile
+      if (e.key === 'F11') { e.preventDefault(); setActiveTab('customers'); }
+      
       if (e.key === 'F12') { e.preventDefault(); setFulfillmentType(prev => prev === 'pickup' ? 'table' : prev === 'table' ? 'delivery' : 'pickup'); }
+
       if ((e.key === 'Delete' || (e.shiftKey && e.key === 'Backspace')) && document.activeElement?.tagName !== 'INPUT') {
         if (cart.length > 0) setCart([]);
       }
