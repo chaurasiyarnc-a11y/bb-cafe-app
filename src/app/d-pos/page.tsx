@@ -3704,11 +3704,30 @@ export default function BbCafeDesktopPos() {
                         </div>
                         
                         <div className="flex gap-2">
+                          {/* 1. Edit Button */}
                           <button onClick={() => openEditCustomerModal(cust)} className="flex-1 py-2 bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 text-neutral-800 dark:text-white border border-neutral-300 dark:border-neutral-700 rounded-xl text-xs font-black uppercase flex items-center justify-center gap-1.5 transition-colors">
                              <SafeEdit3 size={14} /> Edit
                           </button>
+                          
+                          {/* 2. History Button */}
                           <button onClick={() => handleViewCustomerHistory(cust)} className="flex-1 py-2 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/40 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-800/30 rounded-xl text-xs font-black uppercase flex items-center justify-center gap-1.5 transition-colors">
                              <History size={14} /> History
+                          </button>
+
+                          {/* 3. New Order Button (नया बटन जो डायरेक्ट कार्ट में ले जाएगा) */}
+                          <button onClick={() => {
+                             triggerBeep('tap');
+                             setCustomerPhone(cust.phone || cust.id);
+                             setCustomerName(cust.name || 'Valued Guest');
+                             setCustomerPoints(cust.points || 0);
+                             setAddress(cust.address || '');
+                             
+                             setActiveTab('billing');
+                             toast.success(`${cust.name} का आर्डर शुरू किया गया! 🛒`);
+                             
+                             setTimeout(() => searchInputRef.current?.focus(), 80);
+                          }} className="flex-1 py-2 bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/40 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-800/30 rounded-xl text-xs font-black uppercase flex items-center justify-center gap-1.5 transition-colors">
+                             <SafeShoppingBag size={14} /> Order
                           </button>
                         </div>
                       </div>
