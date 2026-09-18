@@ -4320,6 +4320,56 @@ export default function BbCafeDesktopPos() {
           </div>
         )}
       </AnimatePresence>
+      {/* POPUP: CATEGORY MANAGER MODAL (REORDER CATS) */}
+      <AnimatePresence>
+        {isCatManagerModalOpen && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 max-w-md w-full rounded-3xl p-6 shadow-2xl space-y-4">
+              <div className="flex justify-between items-center border-b border-neutral-200 dark:border-neutral-800 pb-3">
+                <h3 className="font-black text-sm uppercase text-orange-600 flex items-center gap-2">
+                  <ArrowLeftRight size={18} /> Category Manager
+                </h3>
+                <button onClick={() => setIsCatManagerModalOpen(false)} className="text-neutral-500 hover:text-black dark:hover:text-white transition-colors">
+                  <X size={20} />
+                </button>
+              </div>
+              
+              {/* Reorder Section */}
+              <div className="space-y-2">
+                <p className="text-[10px] font-black uppercase text-neutral-500">Reorder Categories (Left / Right)</p>
+                <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto p-2 bg-neutral-100 dark:bg-neutral-950 rounded-xl border border-neutral-200 dark:border-neutral-800">
+                  {categories.filter(c => c !== 'All' && c !== '⭐ Top Items').map((cat, idx, arr) => (
+                    <div key={cat} className="flex items-center gap-1 bg-white dark:bg-neutral-800 p-1.5 rounded-lg border border-neutral-300 dark:border-neutral-700 shadow-sm">
+                      <button onClick={() => handleMoveCategory(cat, 'left')} disabled={idx === 0} className="p-1 text-neutral-500 hover:text-orange-600 disabled:opacity-30"><SafeChevronLeft size={14} /></button>
+                      <span className="text-xs font-bold px-1">{cat}</span>
+                      <button onClick={() => handleMoveCategory(cat, 'right')} disabled={idx === arr.length - 1} className="p-1 text-neutral-500 hover:text-orange-600 disabled:opacity-30"><SafeChevronRight size={14} /></button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Merge Section */}
+              <div className="space-y-2 pt-3 border-t border-neutral-200 dark:border-neutral-800">
+                <p className="text-[10px] font-black uppercase text-neutral-500">Merge Categories (Combine Items)</p>
+                <div className="flex flex-col gap-2">
+                  <select value={mergeSourceCat} onChange={e => setMergeSourceCat(e.target.value)} className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-xl p-2.5 font-bold outline-none text-xs">
+                    <option value="">Select Source Category (From)</option>
+                    {categories.filter(c => c !== 'All' && c !== '⭐ Top Items').map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                  <div className="flex justify-center text-neutral-400"><ArrowLeftRight size={16} className="rotate-90" /></div>
+                  <select value={mergeTargetCat} onChange={e => setMergeTargetCat(e.target.value)} className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-xl p-2.5 font-bold outline-none text-xs">
+                    <option value="">Select Target Category (To)</option>
+                    {categories.filter(c => c !== 'All' && c !== '⭐ Top Items').map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                  <button onClick={handleMergeCategories} className="w-full py-2.5 bg-orange-600 hover:bg-orange-500 text-white font-black uppercase text-xs rounded-xl shadow-lg mt-1">
+                    Merge Categories
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
       {/* CUSTOMER DIRECTORY MODAL [F11] */}
       <CustomerDirectoryModal 
         isCustomerModalOpen={isCustomerModalOpen} 
