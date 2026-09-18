@@ -45,11 +45,9 @@ export default function PrintCustomerReceipt({ orderObj, currentUser }: PrintRec
             padding: 0 !important;
             height: auto !important;
           }
-          /* किसी भी चीज़ को कटने से रोकेगा */
           * {
             overflow: visible !important;
           }
-          /* आइटम लिस्ट के बीच में पेज ब्रेक नहीं होने देगा */
           .prevent-cut {
             page-break-inside: avoid;
           }
@@ -99,29 +97,43 @@ export default function PrintCustomerReceipt({ orderObj, currentUser }: PrintRec
           {orderObj.tableNumber && <p className="font-black text-[13px] mt-0.5">Table: {orderObj.tableNumber}</p>}
         </div>
 
-        {/* आइटम सूची */}
+        {/* ⭐ आइटम सूची (ITEM | QTY | AMT FORMAT) ⭐ */}
         <div className="py-1.5 border-b border-black">
-          <div className="flex justify-between text-[11px] font-bold uppercase pb-1 border-b-2 border-dotted border-black prevent-cut">
-            <span>ITEM DESCRIPTION</span>
-            <span>TOTAL</span>
+          {/* Table Header */}
+          <div className="flex w-full text-[11px] font-bold uppercase pb-1 border-b-2 border-dotted border-black prevent-cut">
+            <div className="flex-1 text-left">ITEM</div>
+            <div className="w-[35px] text-center">QTY</div>
+            <div className="w-[50px] text-right">AMT</div>
           </div>
 
+          {/* Table Body */}
           <div className="space-y-2 pt-2">
             {orderObj.items?.map((item: any, idx: number) => (
               <div key={idx} className="text-[12px] leading-tight prevent-cut">
-                <div className="flex justify-between font-bold items-start">
-                  <span className="pr-1 break-words flex-1">
-                    {item.quantity} x {item.name}
-                  </span>
-                  <span className="shrink-0 ml-1">₹{item.price * item.quantity}</span>
+                <div className="flex w-full font-bold items-start">
+                  <div className="flex-1 text-left pr-1 break-words">
+                    {item.name}
+                  </div>
+                  <div className="w-[35px] text-center shrink-0">
+                    {item.quantity}
+                  </div>
+                  <div className="w-[50px] text-right shrink-0">
+                    ₹{item.price * item.quantity}
+                  </div>
                 </div>
-                <div className="flex justify-between text-[11px] text-black pl-3 mt-0.5">
-                  <span>Price: ₹{item.price}</span>
-                </div>
+                
+                {/* अगर आइटम की Quantity 1 से ज्यादा है, तो नीचे एक पीस का रेट भी दिखाएंगे */}
+                {item.quantity > 1 && (
+                  <div className="text-[10px] text-black text-left mt-0.5">
+                    @ ₹{item.price} /pc
+                  </div>
+                )}
+                
+                {/* अगर कोई नोट (Note) है */}
                 {item.note && (
-                  <p className="text-[11px] italic pl-3 mt-0.5 font-semibold text-black">
+                  <div className="text-[10px] italic mt-0.5 font-semibold text-black">
                     Note: {item.note}
-                  </p>
+                  </div>
                 )}
               </div>
             ))}
