@@ -22,7 +22,7 @@ export default function PrintCustomerReceipt({ orderObj, currentUser }: PrintRec
   const payeeName = 'Bum Bum Cafe';
   
   const upiString = `upi://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(payeeName)}&am=${totalAmount}&cu=INR`;
-  const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(upiString)}&margin=1`;
+  const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(upiString)}&margin=1`;
 
   // लॉयल्टी पॉइंट्स का सटीक कैलकुलेशन
   const earnedPts = Number(orderObj.pointsEarned ?? Math.floor((orderObj.total || 0) / 100));
@@ -32,64 +32,69 @@ export default function PrintCustomerReceipt({ orderObj, currentUser }: PrintRec
 
   return (
     <div 
-      style={{ fontFamily: 'Verdana, Geneva, Tahoma, sans-serif' }}
-      className="w-[68mm] max-w-[68mm] mx-auto text-black bg-white p-0 pr-1 text-left select-none"
+      style={{ 
+        fontFamily: 'Arial, Helvetica, sans-serif', 
+        color: '#000000',
+        textRendering: 'optimizeLegibility',
+        WebkitFontSmoothing: 'none' 
+      }}
+      className="w-[68mm] max-w-[68mm] mx-auto bg-white p-0 text-left select-none print:m-0 print:p-0"
     >
       {/* हेडर */}
       <div className="text-center pb-2 border-b border-black">
-        <h1 className="text-lg font-black uppercase tracking-wider leading-tight">BUM BUM CAFE</h1>
-        <p className="text-[10px] font-bold mt-1 leading-snug">
+        <h1 className="text-xl font-black uppercase tracking-wider leading-tight">BUM BUM CAFE</h1>
+        <p className="text-[11px] font-bold mt-1 leading-snug">
           न्यू बस स्टैंड मोहंद्रा, पुलिस चौकी के सामने,<br />
           जिला पन्ना, मोहंद्रा, मध्य प्रदेश - 488442
         </p>
-        <p className="text-[11px] font-black mt-1">Mob: 9714293759</p>
+        <p className="text-[12px] font-bold mt-1">Mob: 9714293759</p>
       </div>
 
       {/* इनवॉइस और सर्वर */}
-      <div className="text-[10px] font-bold py-1 border-b border-black flex justify-between pr-1">
+      <div className="text-[11px] font-bold py-1.5 border-b border-black flex justify-between">
         <span>Invoice: #{orderObj.billNumber || 5001}</span>
         <span>Server: {(currentUser?.name || 'YOGESH').toUpperCase()}</span>
       </div>
-      <div className="text-[10px] font-bold pb-1 flex justify-between pr-1">
+      <div className="text-[11px] font-bold pb-1.5 pt-1 border-b border-black flex justify-between">
         <span>Date: {orderDate.toLocaleDateString()}</span>
         <span>Time: {orderDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
       </div>
 
       {/* टोकन नंबर */}
-      <div className="my-1.5 border-2 border-black py-1 text-center bg-white">
-        <p className="text-[9px] font-black uppercase tracking-widest">TOKEN NUMBER</p>
-        <p className="text-2xl font-black">#{orderObj.tokenNumber || '01'}</p>
+      <div className="my-2 border-2 border-black py-1.5 text-center bg-white">
+        <p className="text-[11px] font-bold uppercase tracking-widest">TOKEN NUMBER</p>
+        <p className="text-[28px] font-black leading-none mt-1">#{orderObj.tokenNumber || '01'}</p>
       </div>
 
       {/* कस्टमर विवरण */}
-      <div className="text-[10px] font-bold pb-1.5 border-b border-black">
+      <div className="text-[11px] font-bold pb-1.5 pt-0.5 border-b border-black">
         <p>Customer: {orderObj.customerName || 'Walk-in Guest'}</p>
         {orderObj.customerPhone && <p>Phone: {orderObj.customerPhone}</p>}
         <p className="uppercase">Type: {orderObj.fulfillmentType || 'Counter'}</p>
-        {orderObj.tableNumber && <p className="font-black">Table: {orderObj.tableNumber}</p>}
+        {orderObj.tableNumber && <p className="font-black text-[13px] mt-0.5">Table: {orderObj.tableNumber}</p>}
       </div>
 
       {/* आइटम सूची */}
       <div className="py-1.5 border-b border-black">
-        <div className="flex justify-between text-[10px] font-black uppercase pb-1 border-b border-dashed border-black pr-1">
+        <div className="flex justify-between text-[11px] font-bold uppercase pb-1 border-b-2 border-dotted border-black">
           <span>ITEM DESCRIPTION</span>
           <span>TOTAL</span>
         </div>
 
-        <div className="space-y-1.5 pt-1.5 pr-1">
+        <div className="space-y-2 pt-2">
           {orderObj.items?.map((item: any, idx: number) => (
-            <div key={idx} className="text-[11px] leading-tight">
-              <div className="flex justify-between font-black items-start">
+            <div key={idx} className="text-[12px] leading-tight">
+              <div className="flex justify-between font-bold items-start">
                 <span className="pr-1 break-words flex-1">
                   {item.quantity} x {item.name}
                 </span>
-                <span className="shrink-0 font-bold ml-1">₹{item.price * item.quantity}</span>
+                <span className="shrink-0 ml-1">₹{item.price * item.quantity}</span>
               </div>
-              <div className="flex justify-between text-[9px] font-bold text-black pl-3">
+              <div className="flex justify-between text-[11px] text-black pl-3 mt-0.5">
                 <span>Price: ₹{item.price}</span>
               </div>
               {item.note && (
-                <p className="text-[9px] italic pl-3 font-bold text-black">
+                <p className="text-[11px] italic pl-3 mt-0.5 font-semibold text-black">
                   Note: {item.note}
                 </p>
               )}
@@ -98,8 +103,8 @@ export default function PrintCustomerReceipt({ orderObj, currentUser }: PrintRec
         </div>
       </div>
 
-      {/* बिल टोटल्स (सबटोटल, डिस्काउंट व पॉइंट्स डिस्काउंट) */}
-      <div className="py-1.5 border-b border-black text-[11px] space-y-1 pr-1">
+      {/* बिल टोटल्स */}
+      <div className="py-2 border-b border-black text-[12px] space-y-1">
         <div className="flex justify-between font-bold">
           <span>Subtotal:</span>
           <span>₹{orderObj.subtotal || orderObj.total}</span>
@@ -119,34 +124,34 @@ export default function PrintCustomerReceipt({ orderObj, currentUser }: PrintRec
           </div>
         )}
 
-        <div className="flex justify-between text-sm font-black pt-1 border-t border-black">
+        <div className="flex justify-between text-[14px] font-black pt-1.5 mt-1 border-t-2 border-black">
           <span>GRAND TOTAL:</span>
           <span>₹{orderObj.total}</span>
         </div>
 
-        <div className="flex justify-between text-[10px] font-black uppercase pt-0.5">
+        <div className="flex justify-between text-[11px] font-bold uppercase pt-1">
           <span>Payment Mode:</span>
           <span>{orderObj.paymentMethod || 'CASH'}</span>
         </div>
       </div>
 
-      {/* ⭐ लॉयल्टी पॉइंट्स बॉक्स (Earned, Redeemed & Balance) ⭐ */}
+      {/* ⭐ लॉयल्टी पॉइंट्स बॉक्स ⭐ */}
       {orderObj.customerPhone && (
-        <div style={{ padding: '6px 0', borderBottom: '1px dashed #000', fontSize: '10px', lineHeight: '1.4' }}>
-          <div style={{ textAlign: 'center', fontWeight: '900', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '3px' }}>
+        <div className="py-1.5 border-b-2 border-dotted border-black text-[11px] leading-snug">
+          <div className="text-center font-black uppercase tracking-wider mb-1">
             ⭐ LOYALTY REWARDS ⭐
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold' }}>
+          <div className="flex justify-between font-bold">
             <span>Points Earned this Bill:</span>
             <span>+{earnedPts} Pts</span>
           </div>
           {redeemedPts > 0 && (
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold' }}>
+            <div className="flex justify-between font-bold">
               <span>Points Redeemed:</span>
               <span>-{redeemedPts} Pts</span>
             </div>
           )}
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: '900', borderTop: '1px dotted #000', paddingTop: '3px', marginTop: '2px' }}>
+          <div className="flex justify-between font-black pt-1 border-t border-dotted border-black mt-1">
             <span>Total Balance Points:</span>
             <span>{balancePts} Pts</span>
           </div>
@@ -155,30 +160,33 @@ export default function PrintCustomerReceipt({ orderObj, currentUser }: PrintRec
 
       {/* QR कोड */}
       <div className="py-2 text-center border-b border-black flex flex-col items-center justify-center">
-        <p className="text-[10px] font-black uppercase tracking-wider mb-1">
-          SCAN TO PAY ₹{orderObj.total} VIA UPI
+        <p className="text-[12px] font-black uppercase tracking-wider mb-1">
+          SCAN TO PAY ₹{orderObj.total}
         </p>
         
-        <div className="p-1 bg-white border border-black inline-block rounded">
+        <div className="p-0.5 bg-white border-2 border-black inline-block rounded">
           <img 
             src={qrCodeUrl} 
             alt="UPI QR Code" 
-            className="w-36 h-36 object-contain block mx-auto"
+            className="w-32 h-32 object-contain block mx-auto"
             crossOrigin="anonymous"
+            style={{ imageRendering: 'pixelated', filter: 'grayscale(100%) contrast(150%)' }}
           />
         </div>
 
-        <p className="text-[10px] font-bold mt-1 font-mono text-black">
-          UPI ID: {upiId}
+        <p className="text-[12px] font-bold mt-1.5 font-mono text-black">
+          UPI: {upiId}
         </p>
       </div>
 
-      {/* फुटर */}
-      <div className="pt-2 text-center text-[9px] font-bold space-y-0.5">
-        <p>Online Order Website:</p>
-        <p className="font-black">bb-cafe-app.vercel.app</p>
-        <p className="text-[10px] font-black mt-1">❤ Thank You, Visit Again ❤</p>
-        <p className="text-[8px] text-black mt-0.5">Powered by BumBumCafe POS v3.3</p>
+      {/* फुटर (बिलकुल साफ दिखने के लिए सही किया गया) */}
+      <div className="pt-2 pb-4 text-center flex flex-col items-center justify-center">
+        <p className="text-[11px] font-bold">Online Order Website:</p>
+        <p className="text-[13px] font-black tracking-wide my-0.5">bb-cafe-app.vercel.app</p>
+        <p className="text-[12px] font-bold mt-1">❤ Thank You, Visit Again ❤</p>
+        <p className="text-[10px] font-normal mt-1 border-t border-dotted border-black pt-1 inline-block w-full">
+          Powered by BumBumCafe POS v3.3
+        </p>
       </div>
     </div>
   );
