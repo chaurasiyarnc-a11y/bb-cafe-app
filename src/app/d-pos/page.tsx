@@ -3895,6 +3895,55 @@ export default function BbCafeDesktopPos() {
         </>
       )}
 
+      {/* POPUP: HELP & SHORTCUTS [F1] */}
+      <AnimatePresence>
+        {isHelpModalOpen && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 max-w-2xl w-full rounded-3xl p-6 shadow-2xl space-y-4 max-h-[85vh] flex flex-col">
+              <div className="flex justify-between items-center border-b border-neutral-200 dark:border-neutral-800 pb-3 shrink-0">
+                <h3 className="font-black text-lg uppercase text-orange-600 flex items-center gap-2">
+                  <SafeHelpCircle size={22} /> Keyboard Shortcuts (शॉर्टकट्स)
+                </h3>
+                <button onClick={() => setIsHelpModalOpen(false)} className="text-neutral-500 hover:text-black dark:hover:text-white transition-colors">
+                  <X size={24} />
+                </button>
+              </div>
+              
+              <div className="overflow-y-auto pr-2 space-y-4 text-sm flex-1">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2 bg-neutral-50 dark:bg-neutral-800/50 p-4 rounded-2xl border border-neutral-100 dark:border-neutral-800">
+                    <h4 className="font-black text-neutral-500 uppercase text-[10px] border-b border-neutral-200 dark:border-neutral-700 pb-2 mb-2 tracking-wider">⚡ Navigation & Search</h4>
+                    <p className="flex justify-between"><strong className="text-orange-600">F1</strong> <span>Help / Shortcuts</span></p>
+                    <p className="flex justify-between"><strong className="text-orange-600">F2</strong> <span>Item Search (बिलिंग)</span></p>
+                    <p className="flex justify-between"><strong className="text-orange-600">F4</strong> <span>Sales Report (बिक्री)</span></p>
+                    <p className="flex justify-between"><strong className="text-orange-600">F5</strong> <span>Search Customer (ग्राहक)</span></p>
+                    <p className="flex justify-between"><strong className="text-orange-600">F6</strong> <span>Daily Bills (सेटलमेंट)</span></p>
+                    <p className="flex justify-between"><strong className="text-orange-600">F11</strong> <span>Customers Profile</span></p>
+                  </div>
+                  <div className="space-y-2 bg-neutral-50 dark:bg-neutral-800/50 p-4 rounded-2xl border border-neutral-100 dark:border-neutral-800">
+                    <h4 className="font-black text-neutral-500 uppercase text-[10px] border-b border-neutral-200 dark:border-neutral-700 pb-2 mb-2 tracking-wider">🛒 Billing Actions</h4>
+                    <p className="flex justify-between"><strong className="text-green-600">F3</strong> <span>Smart Hold (होल्ड / लिस्ट)</span></p>
+                    <p className="flex justify-between"><strong className="text-green-600">F7</strong> <span>Save Table & Print KOT</span></p>
+                    <p className="flex justify-between"><strong className="text-green-600">F8</strong> <span>Discount (छूट)</span></p>
+                    <p className="flex justify-between"><strong className="text-green-600">F9</strong> <span>Checkout & Print Bill</span></p>
+                    <p className="flex justify-between"><strong className="text-green-600">F10</strong> <span>Cash Tendered (कैश वापसी)</span></p>
+                    <p className="flex justify-between"><strong className="text-green-600">F12</strong> <span>Order Type (Pickup/Table)</span></p>
+                  </div>
+                </div>
+                <div className="bg-amber-50 dark:bg-amber-500/10 p-4 rounded-2xl border border-amber-200 dark:border-amber-500/30 mt-2">
+                  <h4 className="font-black text-amber-600 dark:text-amber-400 uppercase text-[10px] mb-2 tracking-wider">💡 Smart Tricks</h4>
+                  <ul className="list-disc pl-5 space-y-1.5 text-xs font-bold text-neutral-700 dark:text-neutral-300">
+                    <li><strong className="text-amber-700 dark:text-amber-300">Qty * Code :</strong> आइटम सर्च में <code>3*101</code> टाइप करके Enter दबाएं, 101 कोड वाले 3 आइटम कार्ट में जुड़ जाएंगे।</li>
+                    <li><strong className="text-amber-700 dark:text-amber-300">Delete :</strong> पूरा कार्ट एक झटके में खाली करने के लिए।</li>
+                    <li><strong className="text-amber-700 dark:text-amber-300">Esc :</strong> कोई भी पॉपअप बंद करें और वापस बिलिंग पर जाएं।</li>
+                  </ul>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+      
       {/* POPUP: KEYBOARD VARIATION MODAL (TAB TO SELECT, ENTER TO ADD) */}
       <AnimatePresence>
         {isVariationModalOpen && selectedProductForVariation && (
