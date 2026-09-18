@@ -2246,7 +2246,10 @@ export default function BbCafeDesktopPos() {
         toast.success("⭐ टॉप आइटम्स खुल गए!"); 
         setTimeout(() => searchInputRef.current?.focus(), 80);
       }
-      if (e.key === 'F11') { e.preventDefault(); setIsCustomerModalOpen(prev => !prev); }
+      if (e.key === 'F11') { 
+  e.preventDefault(); 
+  setActiveTab('customers'); 
+}
       if (e.key === 'F12') { e.preventDefault(); setFulfillmentType(prev => prev === 'pickup' ? 'table' : prev === 'table' ? 'delivery' : 'pickup'); }
       if ((e.key === 'Delete' || (e.shiftKey && e.key === 'Backspace')) && document.activeElement?.tagName !== 'INPUT') {
         if (cart.length > 0) setCart([]);
