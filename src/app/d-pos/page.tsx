@@ -2182,41 +2182,63 @@ export default function BbCafeDesktopPos() {
     return Object.values(map).sort((a, b) => b.quantity - a.quantity);
   }, [reportOrders]);
 
-  // 📊 DAILY SALES TREND (ग्राफ़ के लिए डेटा - 100% सही क्रम में)
+ // 📊 DAILY SALES TREND (ग्राफ़ के लिए डायनामिक डेटा - 7 दिन और Custom दोनों के लिए)
   const dailyTrendData = useMemo(() => {
-    // 1. पिछले 7 दिनों का एक खाली ढांचा (Array) बनाएँ
-    const last7DaysMap: { [key: string]: { date: string, total: number, orders: number } } = {};
+    const dateMap: { [key: string]: { date: string, total: number, orders: number } } = {};
     const result = [];
-    
-    const today = new Date();
-    today.setHours(23, 59, 59, 999);
 
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date(today);
-      d.setDate(d.getDate() - i);
-      const dateStr = `${String(d.getDate()).padStart(2, '0')} ${d.toLocaleString('default', { month: 'short' })}`;
-      
-      const dayData = { date: dateStr, total: 0, orders: 0 };
-      last7DaysMap[dateStr] = dayData;
-      result.push(dayData);
+    let start = new Date();
+    let end = new Date();
+
+    // चेक करें कि कौन सा बटन दबाया गया है: 7 दिन या Date Picker?
+    if (reportFilter === 'last7days') {
+      start.setDate(start.getDate() - 6);
+      start.setHours(0, 0, 0, 0);
+      end.setHours(23, 59, 59, 999);
+    } else if (reportFilter === 'custom' && customStartDate && customEndDate) {
+      const sParts = customStartDate.split('-');
+      start = new Date(Number(sParts[0]), Number(sParts[1]) - 1, Number(sParts[2]), 0, 0, 0, 0);
+      const eParts = customEndDate.split('-');
+      end = new Date(Number(eParts[0]), Number(eParts[1]) - 1, Number(eParts[2]), 23, 59, 59, 999);
+    } else if (reportFilter === 'yesterday') {
+      start.setDate(start.getDate() - 1);
+      start.setHours(0, 0, 0, 0);
+      end.setDate(end.getDate() - 1);
+      end.setHours(23, 59, 59, 999);
+    } else {
+      start.setHours(0, 0, 0, 0);
+      end.setHours(23, 59, 59, 999);
     }
-    
-    // 2. ऑर्डर्स का डेटा इस 7 दिन के ढांचे में भरें
+
+    // 1. Start से End तक की हर तारीख का ढांचा बनाएँ
+    const loopStart = new Date(start);
+    let safetyCounter = 0;
+    while (loopStart <= end && safetyCounter < 60) { // अधिकतम 60 दिन तक का ग्राफ़ दिखेगा
+      const dateStr = `${String(loopStart.getDate()).padStart(2, '0')} ${loopStart.toLocaleString('default', { month: 'short' })}`;
+      const dayData = { date: dateStr, total: 0, orders: 0 };
+      dateMap[dateStr] = dayData;
+      result.push(dayData);
+      
+      loopStart.setDate(loopStart.getDate() + 1);
+      safetyCounter++;
+    }
+
+    // 2. ऑर्डर्स का डेटा इस ढांचे में भरें
     reportOrders.forEach(o => {
       if (o.status === 'completed') {
         const d = o.timestamp?.toDate ? o.timestamp.toDate() : new Date(o.timestamp || Date.now());
         const dateStr = `${String(d.getDate()).padStart(2, '0')} ${d.toLocaleString('default', { month: 'short' })}`;
         
-        if (last7DaysMap[dateStr]) {
-          last7DaysMap[dateStr].total += Number(o.total) || 0;
-          last7DaysMap[dateStr].orders += 1;
+        if (dateMap[dateStr]) {
+          dateMap[dateStr].total += Number(o.total) || 0;
+          dateMap[dateStr].orders += 1;
         }
       }
     });
 
-    return result; // यह हमेशा पिछले 7 दिनों को ही रिटर्न करेगा
-  }, [reportOrders]);
-
+    return result; 
+  }, [reportOrders, reportFilter, customStartDate, customEndDate]);
+  
   // Past Receipts Fetching
   const fetchPastReceipts = async () => {
     setIsReceiptsLoading(true);
@@ -3446,9 +3468,11 @@ export default function BbCafeDesktopPos() {
                     <div className="flex justify-between items-center mb-8 relative z-10">
                        <div>
                          <h3 className="text-sm font-black uppercase text-orange-600 dark:text-orange-500 flex items-center gap-2">
-                           <SafeBarChart3 size={18} /> Last 7 Days Trend (पिछले 7 दिनों की बिक्री)
+                           <SafeBarChart3 size={18} /> Sales Trend (बिक्री ग्राफ)
                          </h3>
-                         <p className="text-[10px] text-neutral-500 font-bold mt-1">ग्राफ की लाइनों पर माउस ले जाकर (Hover करके) उस दिन की सेल देखें</p>
+                         <p className="text-[10px] text-neutral-500 font-bold mt-1">
+                           {reportFilter === 'custom' ? 'चुनी गई तारीखों की बिक्री' : 'पिछले 7 दिनों की बिक्री का ग्राफ'}
+                         </p>
                        </div>
                        <div className="text-right">
                          <p className="text-[9px] font-black uppercase text-neutral-500">Highest Sale</p>
@@ -3458,25 +3482,27 @@ export default function BbCafeDesktopPos() {
                        </div>
                     </div>
 
-                    <div className="flex items-end justify-between gap-2 h-48 relative z-10 pt-4 border-b border-neutral-200 dark:border-neutral-800 pb-1">
+                    <div className="flex items-end gap-2 sm:gap-4 h-48 relative z-10 pt-4 border-b border-neutral-200 dark:border-neutral-800 pb-1 overflow-x-auto pb-4 scrollbar-hide">
                       {dailyTrendData.map((day, idx) => {
                         const maxVal = Math.max(...dailyTrendData.map(d => d.total));
-                        // हाइट कैलकुलेट करें, ताकि छोटे अमाउंट भी दिखें (Min 3%)
                         const barHeight = maxVal > 0 && day.total > 0 ? Math.max((day.total / maxVal) * 100, 3) : 0;
-                        const isToday = idx === dailyTrendData.length - 1; // आज का दिन 
+                        
+                        // असली "आज" की तारीख का पता लगाना
+                        const todayDateStr = `${String(new Date().getDate()).padStart(2, '0')} ${new Date().toLocaleString('default', { month: 'short' })}`;
+                        const isToday = day.date === todayDateStr; 
                         
                         return (
-                          <div key={idx} className="flex flex-col items-center flex-1 gap-2 group h-full justify-end">
+                          <div key={idx} className="flex flex-col items-center gap-2 group h-full justify-end min-w-[32px] sm:min-w-[48px]">
                             {/* टूलटिप / अमाउंट (Hover करने पर हवा में दिखेगा) */}
-                            <div className="opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-y-2 group-hover:-translate-y-1 flex flex-col items-center pointer-events-none">
-                              <span className="bg-neutral-900 dark:bg-white text-white dark:text-black text-[10px] font-mono font-black px-2 py-1 rounded-lg shadow-lg">
+                            <div className="opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-y-2 group-hover:-translate-y-1 flex flex-col items-center pointer-events-none absolute -top-8">
+                              <span className="bg-neutral-900 dark:bg-white text-white dark:text-black text-[10px] font-mono font-black px-2 py-1 rounded-lg shadow-lg whitespace-nowrap">
                                 ₹{day.total}
                               </span>
                               <div className="w-2 h-2 bg-neutral-900 dark:bg-white rotate-45 -mt-1.5"></div>
                             </div>
                             
                             {/* बार (Bar Background & Foreground) */}
-                            <div className="w-8 sm:w-12 h-full bg-neutral-100 dark:bg-neutral-800/60 rounded-t-xl relative flex items-end justify-center overflow-hidden border border-neutral-200 dark:border-neutral-700/50">
+                            <div className="w-full h-full bg-neutral-100 dark:bg-neutral-800/60 rounded-t-xl relative flex items-end justify-center overflow-hidden border border-neutral-200 dark:border-neutral-700/50">
                                {day.total > 0 ? (
                                  <div 
                                    className={`w-full rounded-t-lg transition-all duration-1000 ease-out shadow-[inset_0_4px_4px_rgba(255,255,255,0.3)] ${
@@ -3492,7 +3518,7 @@ export default function BbCafeDesktopPos() {
                             </div>
                             
                             {/* तारीख (Date) */}
-                            <span className={`text-[10px] font-bold ${isToday ? 'text-green-600 dark:text-green-400 font-black' : 'text-neutral-600 dark:text-neutral-400'}`}>
+                            <span className={`text-[10px] font-bold whitespace-nowrap ${isToday ? 'text-green-600 dark:text-green-400 font-black' : 'text-neutral-600 dark:text-neutral-400'}`}>
                               {isToday ? 'Today' : day.date}
                             </span>
                           </div>
