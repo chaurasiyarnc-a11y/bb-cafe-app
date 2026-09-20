@@ -1114,6 +1114,30 @@ export default function BbCafeDesktopPos() {
     }
   };
 
+  // 👉 NEW: स्मार्ट नाम और नंबर सर्च लॉजिक
+  const handleCustomerSearchChange = (val: string) => {
+    setCartCustSearchInput(val);
+    setCustomerPhone(val.replace(/\D/g, '').slice(0, 10)); // बैकग्राउंड के लिए सिर्फ नंबर अलग करें
+
+    if (val.length >= 3) {
+      const lowerVal = val.toLowerCase();
+      const matches = allCustomers.filter(c => 
+        (c.phone && c.phone.includes(lowerVal)) || 
+        (c.name && c.name.toLowerCase().includes(lowerVal))
+      ).slice(0, 6);
+      
+      setCustSuggestions(matches);
+      setShowCustDropdown(true);
+    } else {
+      setShowCustDropdown(false);
+      setCustSuggestions([]);
+      setCustomerName('');
+      setCustomerPoints(0);
+      setAddress('');
+      setShowNewCustForm(false);
+    }
+  };
+
   // ड्रॉपडाउन से कस्टमर सेलेक्ट करने पर
   const handleSelectDropdownCustomer = (cust: any) => {
     triggerBeep('tap');
@@ -1127,6 +1151,7 @@ export default function BbCafeDesktopPos() {
     toast.success(`ग्राहक मिला: ${cust.name}`);
     setTimeout(() => searchInputRef.current?.focus(), 80);
   };
+
   const searchCustomerByExactPhone = async (phoneStr: string) => {
     const toastId = toast.loading("ग्राहक खोज रहे हैं...");
     try {
