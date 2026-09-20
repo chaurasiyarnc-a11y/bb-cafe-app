@@ -151,6 +151,10 @@ export default function BbCafeDesktopPos() {
   
   const [customerPhone, setCustomerPhone] = useState('');
   const [recentCartCustomers, setRecentCartCustomers] = useState<any[]>([]);
+  // 👉 NEW: स्मार्ट सर्च ड्रॉपडाउन के स्टेट्स
+  const [cartCustSearchInput, setCartCustSearchInput] = useState('');
+  const [showCustDropdown, setShowCustDropdown] = useState(false);
+  const [custSuggestions, setCustSuggestions] = useState<any[]>([]);
   const [customerName, setCustomerName] = useState('');
   const [customerPoints, setCustomerPoints] = useState(0);
   const [address, setAddress] = useState('');
@@ -393,13 +397,11 @@ export default function BbCafeDesktopPos() {
     }
   };
 
-  // 👇👇👇 यह नया कोड मैंने यहाँ जोड़ दिया है 👇👇👇
   useEffect(() => {
-    if (activeTab === 'customers') {
-      fetchAllCustomers();
+    if (isLoggedIn) {
+      fetchAllCustomers(); // लॉगिन होते ही सारे कस्टमर लोड कर ले ताकि सर्च सुपरफास्ट हो
     }
-  }, [activeTab]);
-  // 👆👆👆
+  }, [isLoggedIn]);
 
   const handleSaveCustomerProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1087,23 +1089,44 @@ export default function BbCafeDesktopPos() {
     return () => unsubscribe();
   }, []);
 
-  // Strict Numeric Phone Search for Customer
-  const handleCustomerNumberChange = (val: string) => {
-    const digits = val.replace(/\D/g, '').slice(0, 10);
-    setCustomerPhone(digits);
+  // 👉 NEW: स्मार्ट नाम और नंबर सर्च लॉजिक
+  const handleCustomerSearchChange = (val: string) => {
+    setCartCustSearchInput(val);
+    setCustomerPhone(val.replace(/\D/g, '').slice(0, 10)); // बैकग्राउंड के लिए सिर्फ नंबर अलग करें
 
-    if (digits.length === 10) {
-      searchCustomerByExactPhone(digits);
+    if (val.length >= 3) {
+      const lowerVal = val.toLowerCase();
+      // नाम या नंबर दोनों में से कुछ भी मैच हो, तो लिस्ट में लाएँ (Top 6)
+      const matches = allCustomers.filter(c => 
+        (c.phone && c.phone.includes(lowerVal)) || 
+        (c.name && c.name.toLowerCase().includes(lowerVal))
+      ).slice(0, 6);
+      
+      setCustSuggestions(matches);
+      setShowCustDropdown(true);
     } else {
+      setShowCustDropdown(false);
+      setCustSuggestions([]);
       setCustomerName('');
       setCustomerPoints(0);
       setAddress('');
-      setIsRedeemingPoints(false);
-      setPointsToRedeem(0);
       setShowNewCustForm(false);
     }
   };
 
+  // ड्रॉपडाउन से कस्टमर सेलेक्ट करने पर
+  const handleSelectDropdownCustomer = (cust: any) => {
+    triggerBeep('tap');
+    setCustomerPhone(cust.phone || cust.id);
+    setCustomerName(cust.name || 'Valued Guest');
+    setCustomerPoints(cust.points || 0);
+    setAddress(cust.address || '');
+    setCartCustSearchInput(`${cust.name} - ${cust.phone || ''}`); // इनपुट बॉक्स में नाम दिखेगा
+    setShowCustDropdown(false);
+    setShowNewCustForm(false);
+    toast.success(`ग्राहक मिला: ${cust.name}`);
+    setTimeout(() => searchInputRef.current?.focus(), 80);
+  };
   const searchCustomerByExactPhone = async (phoneStr: string) => {
     const toastId = toast.loading("ग्राहक खोज रहे हैं...");
     try {
@@ -2683,34 +2706,61 @@ export default function BbCafeDesktopPos() {
                       <button onClick={() => setCart([])} className="text-red-500 text-xs font-bold hover:underline flex items-center gap-1"><SafeTrash2 size={13} /> Clear [Del]</button>
                     </div>
 
-                    {/* STRICT 10-DIGIT NUMBER CUSTOMER SEARCH & REDEEM SECTION */}
-                    <div className="bg-neutral-100 dark:bg-neutral-800/60 p-2.5 rounded-xl border border-neutral-300 dark:border-neutral-700 mb-2 shrink-0 space-y-2">
-                      <div className="flex gap-1.5">
+                 {/* 👉 NEW: DYNAMIC CUSTOMER SEARCH (NAME OR NUMBER) & REDEEM SECTION */}
+                    <div className="bg-neutral-100 dark:bg-neutral-800/60 p-2.5 rounded-xl border border-neutral-300 dark:border-neutral-700 mb-2 shrink-0 space-y-2 relative">
+                      <div className="flex gap-1.5 relative">
                         <div className="relative flex-1">
                           <input 
                             ref={phoneInputRef}
-                            type="tel"
-                            maxLength={10}
-                            placeholder="ग्राहक का 10-अंकों का मोबाइल नंबर..." 
-                            value={customerPhone} 
-                            onChange={e => handleCustomerNumberChange(e.target.value)} 
-                            className="w-full bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 rounded-lg px-2.5 py-1.5 text-xs text-neutral-900 dark:text-white outline-none font-mono font-bold tracking-wider" 
+                            type="text"
+                            placeholder="ग्राहक का नाम या मोबाइल नंबर..." 
+                            value={cartCustSearchInput} 
+                            onChange={e => handleCustomerSearchChange(e.target.value)} 
+                            onFocus={() => { if(custSuggestions.length > 0) setShowCustDropdown(true); }}
+                            className="w-full bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 rounded-lg px-2.5 py-1.5 text-xs text-neutral-900 dark:text-white outline-none font-bold placeholder:font-normal placeholder:text-neutral-400" 
                           />
+                          
+                          {/* कट (X) बटन ताकि नया नाम डाल सकें */}
+                          {cartCustSearchInput && (
+                            <button onClick={() => { setCartCustSearchInput(''); setCustomerPhone(''); setCustomerName(''); setShowCustDropdown(false); setShowNewCustForm(false); }} className="absolute right-2 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-red-500 transition-colors">
+                               <X size={14} />
+                            </button>
+                          )}
+                          
+                          {/* 👉 DROPDOWN LIST (हवा में लटकती हुई) */}
+                          {showCustDropdown && custSuggestions.length > 0 && (
+                             <div className="absolute top-[110%] left-0 w-full bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 rounded-xl shadow-2xl z-[100] max-h-56 overflow-y-auto">
+                                {custSuggestions.map((cust, idx) => (
+                                    <div key={idx} onClick={() => handleSelectDropdownCustomer(cust)} className="p-2.5 border-b border-neutral-100 dark:border-neutral-800 hover:bg-orange-50 dark:hover:bg-orange-500/20 cursor-pointer flex justify-between items-center transition-colors">
+                                        <div>
+                                            <p className="font-black text-xs text-neutral-900 dark:text-white leading-none">{cust.name}</p>
+                                            <p className="font-mono text-[10px] text-neutral-500 mt-1">📞 {cust.phone}</p>
+                                        </div>
+                                        <span className="text-[10px] bg-amber-100 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400 px-1.5 py-1 rounded-md font-black border border-amber-200 dark:border-amber-500/30">
+                                          ⭐ {cust.points || 0}
+                                        </span>
+                                    </div>
+                                ))}
+                             </div>
+                          )}
                         </div>
+                        
+                        {/* अगर लिस्ट में न मिले, तो नया बनाने का बटन */}
                         <button 
                           type="button" 
-                          onClick={() => searchCustomerByExactPhone(customerPhone)} 
-                          className="bg-orange-600 hover:bg-orange-500 text-white px-3 rounded-lg text-xs font-black uppercase"
+                          onClick={() => {
+                             setShowCustDropdown(false);
+                             searchCustomerByExactPhone(customerPhone);
+                          }} 
+                          className="bg-orange-600 hover:bg-orange-500 text-white px-3 rounded-lg text-[10px] font-black uppercase shadow-sm"
                         >
-                          खोजें
+                          नया जोड़ें
                         </button>
-                        <button onClick={() => handleSendWhatsAppBill()} title="Send WhatsApp Receipt [F7]" className="bg-green-600/15 hover:bg-green-600/25 text-green-600 px-2 rounded-lg text-xs font-bold flex items-center">
+                        
+                        <button onClick={() => handleSendWhatsAppBill()} title="Send WhatsApp Receipt [F7]" className="bg-green-600/15 hover:bg-green-600/25 text-green-600 px-2.5 rounded-lg text-xs font-bold flex items-center">
                           <SafeShare2 size={13} />
                         </button>
                       </div>
-                      {/* RECENT 10 CUSTOMERS */}
-                      {recentCartCustomers.length > 0 && !customerName && (
-                        <div className="flex gap-1.5 overflow-x-auto pb-1 mt-1 scrollbar-hide">
                           {recentCartCustomers.map((rc, idx) => (
                             <button 
                               key={idx} 
