@@ -2162,7 +2162,7 @@ export default function BbCafeDesktopPos() {
     return { totalSale, cashSale, upiSale, dueSale, totalOrdersCount, totalExpenseAmount, netCashInDrawer, unsettledTotal, unsettledCount };
   }, [reportOrders, dailyExpenses]);
 
-  // Item-wise Sales Report Calculation
+// Item-wise Sales Report Calculation
   const itemWiseSales = useMemo(() => {
     const map: { [key: string]: { name: string, quantity: number, revenue: number } } = {};
 
@@ -2182,9 +2182,6 @@ export default function BbCafeDesktopPos() {
     return Object.values(map).sort((a, b) => b.quantity - a.quantity);
   }, [reportOrders]);
 
-  }, [reportOrders]); // <-- यह itemWiseSales का अंत है
-
-  // 👇👇 यहाँ पेस्ट करें 👇👇
   // 📊 DAILY SALES TREND (ग्राफ़ के लिए डेटा)
   const dailyTrendData = useMemo(() => {
     const map: { [dateStr: string]: { total: number, orders: number } } = {};
@@ -2204,9 +2201,7 @@ export default function BbCafeDesktopPos() {
       .map(dateStr => ({ date: dateStr, total: map[dateStr].total, orders: map[dateStr].orders }))
       .reverse(); 
   }, [reportOrders]);
-  // 👆👆 यहाँ तक 👆👆
 
- 
   // Past Receipts Fetching
   const fetchPastReceipts = async () => {
     setIsReceiptsLoading(true);
