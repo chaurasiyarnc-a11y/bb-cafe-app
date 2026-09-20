@@ -3482,7 +3482,8 @@ export default function BbCafeDesktopPos() {
                        </div>
                     </div>
 
-                    <div className="flex items-end gap-2 sm:gap-4 h-48 relative z-10 pt-4 border-b border-neutral-200 dark:border-neutral-800 pb-1 overflow-x-auto pb-4 scrollbar-hide">
+                    {/* यहाँ overflow-x-auto लगा दिया गया है, ताकि 15-30 दिन होने पर स्क्रॉल हो सके */}
+                    <div className="flex items-end gap-2 sm:gap-4 h-56 relative z-10 pt-12 border-b border-neutral-200 dark:border-neutral-800 pb-2 overflow-x-auto scrollbar-hide">
                       {dailyTrendData.map((day, idx) => {
                         const maxVal = Math.max(...dailyTrendData.map(d => d.total));
                         const barHeight = maxVal > 0 && day.total > 0 ? Math.max((day.total / maxVal) * 100, 3) : 0;
@@ -3492,9 +3493,12 @@ export default function BbCafeDesktopPos() {
                         const isToday = day.date === todayDateStr; 
                         
                         return (
-                          <div key={idx} className="flex flex-col items-center gap-2 group h-full justify-end min-w-[32px] sm:min-w-[48px]">
+                          // 👇 फिक्स 1: यहाँ 'relative' जोड़ा गया है ताकि अमाउंट खंभे के ठीक ऊपर रहे
+                          <div key={idx} className="flex flex-col items-center gap-2 group h-full justify-end min-w-[32px] sm:min-w-[48px] relative">
+                            
                             {/* टूलटिप / अमाउंट (Hover करने पर हवा में दिखेगा) */}
-                            <div className="opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-y-2 group-hover:-translate-y-1 flex flex-col items-center pointer-events-none absolute -top-8">
+                            {/* 👇 फिक्स 2: z-20 जोड़ा गया है ताकि यह कट न हो */}
+                            <div className="opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-y-2 group-hover:-translate-y-1 flex flex-col items-center pointer-events-none absolute -top-8 z-20">
                               <span className="bg-neutral-900 dark:bg-white text-white dark:text-black text-[10px] font-mono font-black px-2 py-1 rounded-lg shadow-lg whitespace-nowrap">
                                 ₹{day.total}
                               </span>
