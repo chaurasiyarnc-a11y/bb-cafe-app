@@ -179,7 +179,7 @@ export default function BbCafeDesktopPos() {
   const [mergeTargetCat, setMergeTargetCat] = useState('');
 
   // Reports
-  const [reportFilter, setReportFilter] = useState<'today' | 'yesterday' | 'custom'>('today');
+  const [reportFilter, setReportFilter] = useState<'today' | 'yesterday' | 'last7days' | 'custom'>('today');
   const [customStartDate, setCustomStartDate] = useState(new Date().toISOString().split('T')[0]);
   const [customEndDate, setCustomEndDate] = useState(new Date().toISOString().split('T')[0]);
   const [reportOrders, setReportOrders] = useState<any[]>([]);
@@ -2078,10 +2078,15 @@ export default function BbCafeDesktopPos() {
       if (reportFilter === 'today') {
         startTarget.setHours(0, 0, 0, 0);
         endTarget.setHours(23, 59, 59, 999);
-      } else if (reportFilter === 'yesterday') {
+    } else if (reportFilter === 'yesterday') {
         startTarget.setDate(startTarget.getDate() - 1);
         startTarget.setHours(0, 0, 0, 0);
         endTarget.setDate(endTarget.getDate() - 1);
+        endTarget.setHours(23, 59, 59, 999);
+      } else if (reportFilter === 'last7days') {
+        // पिछले 7 दिन का लॉजिक
+        startTarget.setDate(startTarget.getDate() - 6); 
+        startTarget.setHours(0, 0, 0, 0);
         endTarget.setHours(23, 59, 59, 999);
       } else if (reportFilter === 'custom' && customStartDate && customEndDate) {
         const startParts = customStartDate.split('-');
@@ -2092,7 +2097,7 @@ export default function BbCafeDesktopPos() {
       }
 
       if (navigator.onLine) {
-        const qOrders = query(collection(db, "orders"), orderBy("timestamp", "desc"), limit(600));
+        const qOrders = query(collection(db, "orders"), orderBy("timestamp", "desc"), limit(2000));
         const snapOrders = await getDocs(qOrders);
         const filteredOrders = snapOrders.docs.map(d => ({ id: d.id, ...d.data() })).filter((o: any) => {
           const raw = o.timestamp?.toDate ? o.timestamp.toDate() : new Date(o.timestamp || Date.now());
@@ -2177,6 +2182,32 @@ export default function BbCafeDesktopPos() {
     return Object.values(map).sort((a, b) => b.quantity - a.quantity);
   }, [reportOrders]);
 
+  }, [reportOrders]); // <-- यह itemWiseSales का अंत है
+
+  // 👇👇 यहाँ पेस्ट करें 👇👇
+  // 📊 DAILY SALES TREND (ग्राफ़ के लिए डेटा)
+  const dailyTrendData = useMemo(() => {
+    const map: { [dateStr: string]: { total: number, orders: number } } = {};
+    
+    reportOrders.forEach(o => {
+      if (o.status === 'completed') {
+        const d = o.timestamp?.toDate ? o.timestamp.toDate() : new Date(o.timestamp || Date.now());
+        const dateStr = `${String(d.getDate()).padStart(2, '0')} ${d.toLocaleString('default', { month: 'short' })}`;
+        
+        if (!map[dateStr]) map[dateStr] = { total: 0, orders: 0 };
+        map[dateStr].total += Number(o.total) || 0;
+        map[dateStr].orders += 1;
+      }
+    });
+
+    return Object.keys(map)
+      .map(dateStr => ({ date: dateStr, total: map[dateStr].total, orders: map[dateStr].orders }))
+      .reverse(); 
+  }, [reportOrders]);
+  // 👆👆 यहाँ तक 👆👆
+
+  // Past Receipts Fetching
+  const fetchPastReceipts = async () => {
   // Past Receipts Fetching
   const fetchPastReceipts = async () => {
     setIsReceiptsLoading(true);
@@ -3346,7 +3377,7 @@ export default function BbCafeDesktopPos() {
                     </button>
                     <div className="flex bg-neutral-200 dark:bg-neutral-800 p-1 rounded-2xl border">
                       <button onClick={() => setReportFilter('today')} className={`px-3 py-1.5 text-xs font-black uppercase rounded-xl ${reportFilter === 'today' ? 'bg-orange-600 text-white' : 'text-neutral-700 dark:text-neutral-400'}`}>Today</button>
-                      <button onClick={() => setReportFilter('yesterday')} className={`px-3 py-1.5 text-xs font-black uppercase rounded-xl ${reportFilter === 'yesterday' ? 'bg-orange-600 text-white' : 'text-neutral-700 dark:text-neutral-400'}`}>Yesterday</button>
+                      <button onClick={() => setReportFilter('last7days')} className={`px-3 py-1.5 text-xs font-black uppercase rounded-xl ${reportFilter === 'last7days' ? 'bg-orange-600 text-white' : 'text-neutral-700 dark:text-neutral-400'}`}>Last 7 Days</button>
                       <button onClick={() => setReportFilter('custom')} className={`px-3 py-1.5 text-xs font-black uppercase rounded-xl ${reportFilter === 'custom' ? 'bg-orange-600 text-white' : 'text-neutral-700 dark:text-neutral-400'}`}>Date Picker</button>
                     </div>
                     {reportFilter === 'custom' && (
@@ -3397,6 +3428,53 @@ export default function BbCafeDesktopPos() {
                   </div>
                 </div>
 
+                <div className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 p-3.5 rounded-2xl space-y-1 shadow-sm">
+                    <p className="text-[10px] font-black uppercase text-neutral-500">Net in Drawer</p>
+                    <p className="text-xl font-black font-mono text-emerald-600 dark:text-emerald-400">₹{reportSummary.netCashInDrawer}</p>
+                  </div>
+                </div>  {/* <-- यह SUMMARY TILES का आख़िरी </div> है */}
+
+
+                {/* 👇👇 यहाँ पेस्ट करें 👇👇 */}
+                {/* 📊 DAILY SALES GRAPH (दिन-वार बिक्री का ग्राफ़) */}
+                {(reportFilter === 'last7days' || reportFilter === 'custom') && dailyTrendData.length > 0 && (
+                  <div className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 p-5 rounded-3xl shadow-sm mt-6">
+                    <div className="flex justify-between items-center mb-6">
+                       <h3 className="text-xs font-black uppercase text-blue-600 dark:text-blue-400 flex items-center gap-1.5">
+                         📉 Daily Sales Trend (प्रतिदिन की बिक्री)
+                       </h3>
+                       <span className="text-[10px] text-neutral-500 font-bold bg-neutral-100 dark:bg-neutral-800 px-2 py-1 rounded-lg">
+                         Max Sale: ₹{Math.max(...dailyTrendData.map(d => d.total))}
+                       </span>
+                    </div>
+
+                    <div className="flex items-end gap-2 sm:gap-4 h-40">
+                      {dailyTrendData.map((day, idx) => {
+                        const maxVal = Math.max(...dailyTrendData.map(d => d.total));
+                        const barHeight = maxVal > 0 ? (day.total / maxVal) * 100 : 0;
+                        
+                        return (
+                          <div key={idx} className="flex flex-col items-center flex-1 gap-1.5 group">
+                            <span className="text-[9px] sm:text-[10px] font-mono font-black text-neutral-600 dark:text-neutral-400 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                              ₹{day.total}
+                            </span>
+                            <div className="w-full max-w-[40px] bg-blue-100 dark:bg-blue-900/30 rounded-t-lg relative flex items-end justify-center group-hover:bg-blue-200 dark:group-hover:bg-blue-800/50 transition-colors h-full">
+                               <div className="w-full bg-blue-500 dark:bg-blue-600 rounded-t-lg transition-all duration-700 ease-out" style={{ height: `${barHeight}%` }}></div>
+                            </div>
+                            <span className="text-[9px] sm:text-[10px] font-bold text-neutral-800 dark:text-neutral-300">
+                              {day.date}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+                {/* 👆👆 यहाँ तक 👆👆 */}
+
+
+                {/* CASH DRAWER AUDIT */}
+                <div className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 p-5 rounded-3xl space-y-4 shadow-sm">
                 {/* CASH DRAWER AUDIT */}
                 <div className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 p-5 rounded-3xl space-y-4 shadow-sm">
                   <div className="flex justify-between items-center border-b border-neutral-300 dark:border-neutral-800 pb-3">
