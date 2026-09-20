@@ -2206,8 +2206,7 @@ export default function BbCafeDesktopPos() {
   }, [reportOrders]);
   // 👆👆 यहाँ तक 👆👆
 
-  // Past Receipts Fetching
-  const fetchPastReceipts = async () => {
+ 
   // Past Receipts Fetching
   const fetchPastReceipts = async () => {
     setIsReceiptsLoading(true);
