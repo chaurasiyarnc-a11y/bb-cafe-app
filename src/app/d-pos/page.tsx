@@ -2718,7 +2718,7 @@ export default function BbCafeDesktopPos() {
                   )}
                 </div>
 
-                {/* RIGHT CART PANEL */}
+               {/* RIGHT CART PANEL */}
                 <div className="w-96 bg-white dark:bg-neutral-900 border-l border-neutral-300 dark:border-neutral-800 flex flex-col p-3 h-full shadow-2xl justify-between overflow-hidden">
                   <div className="flex flex-col h-full overflow-hidden">
                     <div className="flex items-center justify-between border-b border-neutral-300 dark:border-neutral-800 pb-2 mb-2 shrink-0">
@@ -2728,10 +2728,10 @@ export default function BbCafeDesktopPos() {
                           <SafePauseCircle size={11} /> Hold [F3]
                         </button>
                       </div>
-                      <button onClick={() => setCart([])} className="text-red-500 text-xs font-bold hover:underline flex items-center gap-1"><SafeTrash2 size={13} /> Clear [Del]</button>
+                      <button onClick={() => { setCart([]); setCartCustSearchInput(''); }} className="text-red-500 text-xs font-bold hover:underline flex items-center gap-1"><SafeTrash2 size={13} /> Clear [Del]</button>
                     </div>
 
-                 {/* 👉 NEW: DYNAMIC CUSTOMER SEARCH (NAME OR NUMBER) & REDEEM SECTION */}
+                    {/* 👉 NEW: DYNAMIC CUSTOMER SEARCH (NAME OR NUMBER) & REDEEM SECTION */}
                     <div className="bg-neutral-100 dark:bg-neutral-800/60 p-2.5 rounded-xl border border-neutral-300 dark:border-neutral-700 mb-2 shrink-0 space-y-2 relative">
                       <div className="flex gap-1.5 relative">
                         <div className="relative flex-1">
@@ -2777,30 +2777,15 @@ export default function BbCafeDesktopPos() {
                              setShowCustDropdown(false);
                              searchCustomerByExactPhone(customerPhone);
                           }} 
-                          className="bg-orange-600 hover:bg-orange-500 text-white px-3 rounded-lg text-[10px] font-black uppercase shadow-sm"
+                          className="bg-orange-600 hover:bg-orange-500 text-white px-3 rounded-lg text-[10px] font-black uppercase shadow-sm shrink-0"
                         >
                           नया जोड़ें
                         </button>
                         
-                        <button onClick={() => handleSendWhatsAppBill()} title="Send WhatsApp Receipt [F7]" className="bg-green-600/15 hover:bg-green-600/25 text-green-600 px-2.5 rounded-lg text-xs font-bold flex items-center">
+                        <button onClick={() => handleSendWhatsAppBill()} title="Send WhatsApp Receipt [F7]" className="bg-green-600/15 hover:bg-green-600/25 text-green-600 px-2.5 rounded-lg text-xs font-bold flex items-center shrink-0">
                           <SafeShare2 size={13} />
                         </button>
                       </div>
-                          {recentCartCustomers.map((rc, idx) => (
-                            <button 
-                              key={idx} 
-                              type="button"
-                              onClick={() => {
-                                setCustomerPhone(rc.phone);
-                                searchCustomerByExactPhone(rc.phone);
-                              }}
-                              className="shrink-0 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 px-2.5 py-1 rounded-md text-[10px] font-bold text-neutral-600 dark:text-neutral-400 hover:border-orange-500 hover:text-orange-600 transition-colors"
-                            >
-                              {rc.name.split(' ')[0]} ({rc.phone.slice(-4)})
-                            </button>
-                          ))}
-                        </div>
-                      )}
 
                       {/* CUSTOMER FOUND: FULL PROFILE & LOYALTY POINTS REDEEM */}
                       {customerPhone.length === 10 && customerName && !showNewCustForm && (
@@ -2853,12 +2838,38 @@ export default function BbCafeDesktopPos() {
 
                       {/* NEW CUSTOMER REGISTRATION FORM */}
                       {showNewCustForm && (
-                        <div className="space-y-1.5 pt-1 border-t">
+                        <div className="space-y-1.5 pt-1 border-t border-neutral-200 dark:border-neutral-800">
                           <p className="text-[10px] text-amber-600 font-black uppercase">नया ग्राहक! नाम लिखकर [Enter] दबाएँ:</p>
                           <input 
                             ref={newCustNameRef}
                             type="text" 
                             placeholder="Customer Name *" 
+                            value={newCustNameInput} 
+                            onChange={e => setNewCustNameInput(e.target.value.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' '))}
+                            onKeyDown={e => e.key === 'Enter' && newCustAddressRef.current?.focus()}
+                            className="w-full bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 rounded px-2 py-1.5 text-xs outline-none" 
+                          />
+                          <input 
+                            ref={newCustAddressRef}
+                            type="text" 
+                            placeholder="Address (Optional)" 
+                            value={newCustAddressInput} 
+                            onChange={e => setNewCustAddressInput(e.target.value)} 
+                            onKeyDown={e => e.key === 'Enter' && handleSaveNewCustomerQuick()}
+                            className="w-full bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 rounded px-2 py-1.5 text-xs outline-none" 
+                          />
+                          <button 
+                            type="button" 
+                            onClick={handleSaveNewCustomerQuick} 
+                            className="w-full py-2 bg-green-600 hover:bg-green-500 text-white font-black text-xs uppercase rounded-lg shadow-sm"
+                          >
+                            Save Customer
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* CART ITEMS LIST */}omer Name *" 
                             value={newCustNameInput} 
                             onChange={e => setNewCustNameInput(e.target.value.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' '))}
                             onKeyDown={e => e.key === 'Enter' && newCustAddressRef.current?.focus()}
