@@ -180,7 +180,8 @@ export default function BbCafeDesktopPos() {
 
   // Reports
   const [reportFilter, setReportFilter] = useState<'today' | 'yesterday' | 'custom'>('today');
-  const [customReportDate, setCustomReportDate] = useState(new Date().toISOString().split('T')[0]);
+  const [customStartDate, setCustomStartDate] = useState(new Date().toISOString().split('T')[0]);
+  const [customEndDate, setCustomEndDate] = useState(new Date().toISOString().split('T')[0]);
   const [reportOrders, setReportOrders] = useState<any[]>([]);
   const [dailyExpenses, setDailyExpenses] = useState<any[]>([]);
   const [isReportLoading, setIsReportLoading] = useState(false);
@@ -2082,10 +2083,12 @@ export default function BbCafeDesktopPos() {
         startTarget.setHours(0, 0, 0, 0);
         endTarget.setDate(endTarget.getDate() - 1);
         endTarget.setHours(23, 59, 59, 999);
-      } else if (reportFilter === 'custom' && customReportDate) {
-        const parts = customReportDate.split('-');
-        startTarget = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]), 0, 0, 0, 0);
-        endTarget = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]), 23, 59, 59, 999);
+      } else if (reportFilter === 'custom' && customStartDate && customEndDate) {
+        const startParts = customStartDate.split('-');
+        startTarget = new Date(Number(startParts[0]), Number(startParts[1]) - 1, Number(startParts[2]), 0, 0, 0, 0);
+        
+        const endParts = customEndDate.split('-');
+        endTarget = new Date(Number(endParts[0]), Number(endParts[1]) - 1, Number(endParts[2]), 23, 59, 59, 999);
       }
 
       if (navigator.onLine) {
@@ -2116,8 +2119,7 @@ export default function BbCafeDesktopPos() {
 
   useEffect(() => {
     if (activeTab === 'reports') fetchReportData();
-  }, [activeTab, reportFilter, customReportDate]);
-
+  }, [activeTab, reportFilter, customStartDate, customEndDate]);
   // Financial Summary: ONLY COMPLETED / SETTLED BILLS
   const reportSummary = useMemo(() => {
     let totalSale = 0;
@@ -3348,12 +3350,24 @@ export default function BbCafeDesktopPos() {
                       <button onClick={() => setReportFilter('custom')} className={`px-3 py-1.5 text-xs font-black uppercase rounded-xl ${reportFilter === 'custom' ? 'bg-orange-600 text-white' : 'text-neutral-700 dark:text-neutral-400'}`}>Date Picker</button>
                     </div>
                     {reportFilter === 'custom' && (
-                      <input 
-                        type="date" 
-                        value={customReportDate} 
-                        onChange={e => setCustomReportDate(e.target.value)}
-                        className="bg-white dark:bg-neutral-900 border rounded-xl px-2.5 py-1.5 text-xs font-bold"
-                      />
+                      <div className="flex items-center gap-1.5 bg-neutral-100 dark:bg-neutral-800 p-1 rounded-xl border border-neutral-300 dark:border-neutral-700">
+                        <input 
+                          type="date" 
+                          value={customStartDate} 
+                          onChange={e => setCustomStartDate(e.target.value)}
+                          title="Start Date"
+                          className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 rounded-lg px-2 py-1 text-xs font-bold outline-none cursor-pointer"
+                        />
+                        <span className="text-[10px] font-black uppercase text-neutral-500">To</span>
+                        <input 
+                          type="date" 
+                          value={customEndDate} 
+                          onChange={e => setCustomEndDate(e.target.value)}
+                          min={customStartDate}
+                          title="End Date"
+                          className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 rounded-lg px-2 py-1 text-xs font-bold outline-none cursor-pointer"
+                        />
+                      </div>
                     )}
                   </div>
                 </div>
