@@ -3427,14 +3427,6 @@ export default function BbCafeDesktopPos() {
                   </div>
                 </div>
 
-                <div className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 p-3.5 rounded-2xl space-y-1 shadow-sm">
-                    <p className="text-[10px] font-black uppercase text-neutral-500">Net in Drawer</p>
-                    <p className="text-xl font-black font-mono text-emerald-600 dark:text-emerald-400">₹{reportSummary.netCashInDrawer}</p>
-                  </div>
-                </div>  {/* <-- यह SUMMARY TILES का आख़िरी </div> है */}
-
-
-                {/* 👇👇 यहाँ पेस्ट करें 👇👇 */}
                 {/* 📊 DAILY SALES GRAPH (दिन-वार बिक्री का ग्राफ़) */}
                 {(reportFilter === 'last7days' || reportFilter === 'custom') && dailyTrendData.length > 0 && (
                   <div className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 p-5 rounded-3xl shadow-sm mt-6">
@@ -3469,13 +3461,9 @@ export default function BbCafeDesktopPos() {
                     </div>
                   </div>
                 )}
-                {/* 👆👆 यहाँ तक 👆👆 */}
-
 
                 {/* CASH DRAWER AUDIT */}
-                <div className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 p-5 rounded-3xl space-y-4 shadow-sm">
-                {/* CASH DRAWER AUDIT */}
-                <div className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 p-5 rounded-3xl space-y-4 shadow-sm">
+                <div className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 p-5 rounded-3xl space-y-4 shadow-sm mt-6">
                   <div className="flex justify-between items-center border-b border-neutral-300 dark:border-neutral-800 pb-3">
                     <div>
                       <h3 className="text-xs font-black uppercase text-amber-600 dark:text-yellow-400">Cash Drawer Audit (गल्ला मिलान)</h3>
