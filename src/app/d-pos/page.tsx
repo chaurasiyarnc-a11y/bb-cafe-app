@@ -2717,8 +2717,7 @@ export default function BbCafeDesktopPos() {
                     </div>
                   )}
                 </div>
-
-               {/* RIGHT CART PANEL */}
+{/* RIGHT CART PANEL */}
                 <div className="w-96 bg-white dark:bg-neutral-900 border-l border-neutral-300 dark:border-neutral-800 flex flex-col p-3 h-full shadow-2xl justify-between overflow-hidden">
                   <div className="flex flex-col h-full overflow-hidden">
                     <div className="flex items-center justify-between border-b border-neutral-300 dark:border-neutral-800 pb-2 mb-2 shrink-0">
@@ -2869,31 +2868,7 @@ export default function BbCafeDesktopPos() {
                       )}
                     </div>
 
-                    {/* CART ITEMS LIST */}omer Name *" 
-                            value={newCustNameInput} 
-                            onChange={e => setNewCustNameInput(e.target.value.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' '))}
-                            onKeyDown={e => e.key === 'Enter' && newCustAddressRef.current?.focus()}
-                            className="w-full bg-white dark:bg-neutral-900 border rounded px-2 py-1 text-xs outline-none" 
-                          />
-                          <input 
-                            ref={newCustAddressRef}
-                            type="text" 
-                            placeholder="Address (Optional)" 
-                            value={newCustAddressInput} 
-                            onChange={e => setNewCustAddressInput(e.target.value)} 
-                            onKeyDown={e => e.key === 'Enter' && handleSaveNewCustomerQuick()}
-                            className="w-full bg-white dark:bg-neutral-900 border rounded px-2 py-1 text-xs outline-none" 
-                          />
-                          <button 
-                            type="button" 
-                            onClick={handleSaveNewCustomerQuick} 
-                            className="w-full py-1 bg-green-600 hover:bg-green-500 text-white font-black text-xs uppercase rounded"
-                          >
-                            Save Customer
-                          </button>
-                        </div>
-                      )}
-                    </div>
+                    {/* CART ITEMS LIST */}
 
                     {/* CART ITEMS LIST */}
                     <div className="space-y-1.5 overflow-y-auto flex-1 pr-1 mb-2">
