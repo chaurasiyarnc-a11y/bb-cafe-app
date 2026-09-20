@@ -2182,24 +2182,39 @@ export default function BbCafeDesktopPos() {
     return Object.values(map).sort((a, b) => b.quantity - a.quantity);
   }, [reportOrders]);
 
-  // 📊 DAILY SALES TREND (ग्राफ़ के लिए डेटा)
+  // 📊 DAILY SALES TREND (ग्राफ़ के लिए डेटा - 100% सही क्रम में)
   const dailyTrendData = useMemo(() => {
-    const map: { [dateStr: string]: { total: number, orders: number } } = {};
+    // 1. पिछले 7 दिनों का एक खाली ढांचा (Array) बनाएँ
+    const last7DaysMap: { [key: string]: { date: string, total: number, orders: number } } = {};
+    const result = [];
     
+    const today = new Date();
+    today.setHours(23, 59, 59, 999);
+
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(today);
+      d.setDate(d.getDate() - i);
+      const dateStr = `${String(d.getDate()).padStart(2, '0')} ${d.toLocaleString('default', { month: 'short' })}`;
+      
+      const dayData = { date: dateStr, total: 0, orders: 0 };
+      last7DaysMap[dateStr] = dayData;
+      result.push(dayData);
+    }
+    
+    // 2. ऑर्डर्स का डेटा इस 7 दिन के ढांचे में भरें
     reportOrders.forEach(o => {
       if (o.status === 'completed') {
         const d = o.timestamp?.toDate ? o.timestamp.toDate() : new Date(o.timestamp || Date.now());
         const dateStr = `${String(d.getDate()).padStart(2, '0')} ${d.toLocaleString('default', { month: 'short' })}`;
         
-        if (!map[dateStr]) map[dateStr] = { total: 0, orders: 0 };
-        map[dateStr].total += Number(o.total) || 0;
-        map[dateStr].orders += 1;
+        if (last7DaysMap[dateStr]) {
+          last7DaysMap[dateStr].total += Number(o.total) || 0;
+          last7DaysMap[dateStr].orders += 1;
+        }
       }
     });
 
-    return Object.keys(map)
-      .map(dateStr => ({ date: dateStr, total: map[dateStr].total, orders: map[dateStr].orders }))
-      .reverse(); 
+    return result; // यह हमेशा पिछले 7 दिनों को ही रिटर्न करेगा
   }, [reportOrders]);
 
   // Past Receipts Fetching
@@ -3424,31 +3439,61 @@ export default function BbCafeDesktopPos() {
 
                 {/* 📊 DAILY SALES GRAPH (दिन-वार बिक्री का ग्राफ़) */}
                 {(reportFilter === 'last7days' || reportFilter === 'custom') && dailyTrendData.length > 0 && (
-                  <div className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 p-5 rounded-3xl shadow-sm mt-6">
-                    <div className="flex justify-between items-center mb-6">
-                       <h3 className="text-xs font-black uppercase text-blue-600 dark:text-blue-400 flex items-center gap-1.5">
-                         📉 Daily Sales Trend (प्रतिदिन की बिक्री)
-                       </h3>
-                       <span className="text-[10px] text-neutral-500 font-bold bg-neutral-100 dark:bg-neutral-800 px-2 py-1 rounded-lg">
-                         Max Sale: ₹{Math.max(...dailyTrendData.map(d => d.total))}
-                       </span>
+                  <div className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 p-6 rounded-3xl shadow-sm mt-6 relative overflow-hidden">
+                    {/* ग्राफ़ के पीछे का हल्का संतरी (Orange) ग्लो (चमक) */}
+                    <div className="absolute top-0 right-0 w-64 h-64 bg-orange-500/5 dark:bg-orange-500/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/4 pointer-events-none"></div>
+                    
+                    <div className="flex justify-between items-center mb-8 relative z-10">
+                       <div>
+                         <h3 className="text-sm font-black uppercase text-orange-600 dark:text-orange-500 flex items-center gap-2">
+                           <SafeBarChart3 size={18} /> Last 7 Days Trend (पिछले 7 दिनों की बिक्री)
+                         </h3>
+                         <p className="text-[10px] text-neutral-500 font-bold mt-1">ग्राफ की लाइनों पर माउस ले जाकर (Hover करके) उस दिन की सेल देखें</p>
+                       </div>
+                       <div className="text-right">
+                         <p className="text-[9px] font-black uppercase text-neutral-500">Highest Sale</p>
+                         <span className="text-sm font-mono font-black text-green-600 dark:text-green-400 bg-green-500/10 px-2 py-1 rounded-lg border border-green-500/20 shadow-sm">
+                           ₹{Math.max(...dailyTrendData.map(d => d.total))}
+                         </span>
+                       </div>
                     </div>
 
-                    <div className="flex items-end gap-2 sm:gap-4 h-40">
+                    <div className="flex items-end justify-between gap-2 h-48 relative z-10 pt-4 border-b border-neutral-200 dark:border-neutral-800 pb-1">
                       {dailyTrendData.map((day, idx) => {
                         const maxVal = Math.max(...dailyTrendData.map(d => d.total));
-                        const barHeight = maxVal > 0 ? (day.total / maxVal) * 100 : 0;
+                        // हाइट कैलकुलेट करें, ताकि छोटे अमाउंट भी दिखें (Min 3%)
+                        const barHeight = maxVal > 0 && day.total > 0 ? Math.max((day.total / maxVal) * 100, 3) : 0;
+                        const isToday = idx === dailyTrendData.length - 1; // आज का दिन 
                         
                         return (
-                          <div key={idx} className="flex flex-col items-center flex-1 gap-1.5 group">
-                            <span className="text-[9px] sm:text-[10px] font-mono font-black text-neutral-600 dark:text-neutral-400 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-                              ₹{day.total}
-                            </span>
-                            <div className="w-full max-w-[40px] bg-blue-100 dark:bg-blue-900/30 rounded-t-lg relative flex items-end justify-center group-hover:bg-blue-200 dark:group-hover:bg-blue-800/50 transition-colors h-full">
-                               <div className="w-full bg-blue-500 dark:bg-blue-600 rounded-t-lg transition-all duration-700 ease-out" style={{ height: `${barHeight}%` }}></div>
+                          <div key={idx} className="flex flex-col items-center flex-1 gap-2 group h-full justify-end">
+                            {/* टूलटिप / अमाउंट (Hover करने पर हवा में दिखेगा) */}
+                            <div className="opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-y-2 group-hover:-translate-y-1 flex flex-col items-center pointer-events-none">
+                              <span className="bg-neutral-900 dark:bg-white text-white dark:text-black text-[10px] font-mono font-black px-2 py-1 rounded-lg shadow-lg">
+                                ₹{day.total}
+                              </span>
+                              <div className="w-2 h-2 bg-neutral-900 dark:bg-white rotate-45 -mt-1.5"></div>
                             </div>
-                            <span className="text-[9px] sm:text-[10px] font-bold text-neutral-800 dark:text-neutral-300">
-                              {day.date}
+                            
+                            {/* बार (Bar Background & Foreground) */}
+                            <div className="w-8 sm:w-12 h-full bg-neutral-100 dark:bg-neutral-800/60 rounded-t-xl relative flex items-end justify-center overflow-hidden border border-neutral-200 dark:border-neutral-700/50">
+                               {day.total > 0 ? (
+                                 <div 
+                                   className={`w-full rounded-t-lg transition-all duration-1000 ease-out shadow-[inset_0_4px_4px_rgba(255,255,255,0.3)] ${
+                                     isToday 
+                                       ? 'bg-gradient-to-t from-green-600 to-emerald-400' // आज के लिए हरा रंग 
+                                       : 'bg-gradient-to-t from-orange-600 to-yellow-400' // बाकी दिनों के लिए संतरी रंग
+                                   }`}
+                                   style={{ height: `${barHeight}%` }}
+                                 ></div>
+                               ) : (
+                                 <div className="text-[8px] text-neutral-400 font-bold mb-2">₹0</div>
+                               )}
+                            </div>
+                            
+                            {/* तारीख (Date) */}
+                            <span className={`text-[10px] font-bold ${isToday ? 'text-green-600 dark:text-green-400 font-black' : 'text-neutral-600 dark:text-neutral-400'}`}>
+                              {isToday ? 'Today' : day.date}
                             </span>
                           </div>
                         );
