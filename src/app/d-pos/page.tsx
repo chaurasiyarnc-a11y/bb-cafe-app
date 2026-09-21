@@ -1812,9 +1812,11 @@ export default function BbCafeDesktopPos() {
         }
       }
 
+      // Reset state & default pickup
       setCart([]); 
       setCustomerPhone(''); 
       setCustomerName(''); 
+      setCartCustSearchInput('');  // <--- यह लाइन जोड़ें
       setAddress('');
       setDiscountValue(0); 
       setIsDiscountOpen(false);
