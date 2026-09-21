@@ -4027,10 +4027,60 @@ export default function BbCafeDesktopPos() {
                 <div className="max-w-xl w-full bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 p-6 rounded-3xl shadow-xl space-y-6">
                   <h3 className="text-sm font-black uppercase text-orange-600 dark:text-orange-500">POS & Hardware Settings</h3>
                   
+                 {/* NEXT BILL / INVOICE NUMBER */}
                   <div className="space-y-2 border-b border-neutral-300 dark:border-neutral-800 pb-4">
                     <p className="text-xs font-bold uppercase">Next Bill / Invoice Number:</p>
-                    {/* 👉 NEW: GST Settings */}
+                    <div className="flex gap-2">
+                      <input 
+                        type="number" 
+                        value={manualInvoiceCounterInput} 
+                        onChange={e => setManualInvoiceCounterInput(e.target.value)}
+                        placeholder="e.g. 200"
+                        className="flex-1 bg-neutral-100 dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 rounded-xl px-3 py-2 text-xs font-mono font-bold outline-none" 
+                      />
+                      <button onClick={() => { 
+                        const num = parseInt(manualInvoiceCounterInput, 10);
+                        if (!isNaN(num) && num >= 1) {
+                          localStorage.setItem("bb_pos_local_bill_counter_pc", String(num - 1));
+                          toast.success(`Next Invoice will be #${num}! ✅`);
+                        }
+                      }} className="bg-orange-600 text-white px-4 rounded-xl text-xs font-black uppercase">Set Counter</button>
+                    </div>
+                  </div>
+
+                  {/* 👉 NEW: GST Settings */}
                   <div className="space-y-2 border-b border-neutral-300 dark:border-neutral-800 pb-4">
+                    <div className="flex justify-between items-center">
+                      <p className="text-xs font-bold uppercase">Enable GST (टैक्स):</p>
+                      <button 
+                        onClick={() => {
+                          const newVal = !gstEnabled;
+                          setGstEnabled(newVal);
+                          localStorage.setItem("bb_pos_gst_enabled_pc", String(newVal));
+                          toast.success(newVal ? `GST Enabled (${gstRate}%)!` : "GST Disabled!");
+                        }} 
+                        className={`w-12 h-6 flex items-center rounded-full p-1 transition-colors ${gstEnabled ? 'bg-green-500' : 'bg-neutral-400'}`}
+                      >
+                        <div className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform ${gstEnabled ? 'translate-x-6' : ''}`}></div>
+                      </button>
+                    </div>
+                    {gstEnabled && (
+                      <div className="flex gap-2 pt-2">
+                        <input 
+                          type="number" 
+                          value={gstRate} 
+                          onChange={e => {
+                            const rate = Number(e.target.value);
+                            setGstRate(rate);
+                            localStorage.setItem("bb_pos_gst_rate_pc", String(rate));
+                          }}
+                          placeholder="GST % (e.g. 5)"
+                          className="flex-1 bg-neutral-100 dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 rounded-xl px-3 py-2 text-xs font-mono font-bold outline-none" 
+                        />
+                        <span className="bg-neutral-200 dark:bg-neutral-700 px-4 py-2 rounded-xl text-xs font-black uppercase flex items-center">% Rate (दर)</span>
+                      </div>
+                    )}
+                  </div>
                     <div className="flex justify-between items-center">
                       <p className="text-xs font-bold uppercase">Enable GST (टैक्स):</p>
                       <button 
