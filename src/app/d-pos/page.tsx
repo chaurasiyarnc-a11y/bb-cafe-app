@@ -1942,9 +1942,13 @@ export default function BbCafeDesktopPos() {
           const docRef = await addDoc(collection(db, "orders"), orderObj);
           setLiveOrders(prev => [{ id: docRef.id, ...orderObj }, ...prev]);
         } else {
-          const cachedQueue = JSON.parse(localStorage.getItem("bb_pos_offline_orders_queue") || "[]");
-          cachedQueue.push(orderObj);
-          localStorage.setItem("bb_pos_offline_orders_queue", JSON.stringify(cachedQueue));
+          try {
+            const cachedQueue = JSON.parse(localStorage.getItem("bb_pos_offline_orders_queue") || "[]");
+            cachedQueue.push(orderObj);
+            localStorage.setItem("bb_pos_offline_orders_queue", JSON.stringify(cachedQueue));
+          } catch (e) {
+            toast.error("Offline storage full! Please connect to internet.");
+          }
         }
       }
 
