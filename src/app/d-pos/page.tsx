@@ -1639,6 +1639,7 @@ export default function BbCafeDesktopPos() {
             // Cleanup after print dialog closes
             setTimeout(() => {
               if (document.body.contains(iframe)) {
+                root.unmount(); // <-- FIX: Memory Leak prevented
                 document.body.removeChild(iframe);
               }
               resolve();
