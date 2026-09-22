@@ -1392,7 +1392,12 @@ export default function BbCafeDesktopPos() {
     triggerBeep('tap');
 
     // 👉 NEW: जो आइटम कार्ट में जा रहा है, उसका काउंट बढ़ा दें (ताकि वो Favorites में ऊपर आए)
-    const savedPop = JSON.parse(localStorage.getItem("bb_pos_item_popularity") || "{}");
+    let savedPop = {};
+    try {
+      savedPop = JSON.parse(localStorage.getItem("bb_pos_item_popularity") || "{}");
+    } catch (e) {
+      savedPop = {}; // अगर स्टोरेज करप्ट है, तो खाली ऑब्जेक्ट मान लें
+    }
     savedPop[item.id] = (savedPop[item.id] || 0) + quantityToAdd;
     localStorage.setItem("bb_pos_item_popularity", JSON.stringify(savedPop));
 
