@@ -1416,6 +1416,7 @@ export default function BbCafeDesktopPos() {
       setSelectedSizePrice(firstPrice);
       setSelectedAddons({});
       setItemNoteInput('');
+      setPendingVariantQty(quantityToAdd);
       setIsVariationModalOpen(true);
     } else {
       const itemPrice = Number(item.price) || 100;
