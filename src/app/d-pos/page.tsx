@@ -2425,7 +2425,12 @@ export default function BbCafeDesktopPos() {
     
     // 👉 NEW: '⭐ Top Items' (ज्यादा बिकने वाले) का लॉजिक
     if (selectedCategory === '⭐ Top Items') {
-      const savedPop = JSON.parse(localStorage.getItem("bb_pos_item_popularity") || "{}");
+      let savedPop = {};
+      try {
+        savedPop = JSON.parse(localStorage.getItem("bb_pos_item_popularity") || "{}");
+      } catch (e) {
+        savedPop = {};
+      }
       
       let topProducts = [...products].sort((a, b) => (savedPop[b.id] || 0) - (savedPop[a.id] || 0));
       topProducts = topProducts.filter(p => (savedPop[p.id] || 0) > 0).slice(0, 30);
