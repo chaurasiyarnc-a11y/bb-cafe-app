@@ -22,7 +22,7 @@ import { createRoot } from 'react-dom/client';
 import CustomerDirectoryModal from '@/components/pos/CustomerDirectoryModal';
 import PrintCustomerReceipt from '@/components/d-pos/PrintCustomerReceipt';
 import PrintKitchenKot from '@/components/d-pos/PrintKitchenKot';
-import { createRoot } from 'react-dom/client';
+
 import { flushSync } from 'react-dom'; // 👉 यह नई लाइन यहाँ जोड़ें
 const SafeLock = Lock as any;
 const SafeDatabase = Database as any;
