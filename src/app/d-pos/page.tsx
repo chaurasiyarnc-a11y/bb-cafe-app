@@ -2195,33 +2195,69 @@ export default function BbCafeDesktopPos() {
     if (activeTab === 'reports') fetchReportData();
   }, [activeTab, reportFilter, customStartDate, customEndDate]);
   // Financial Summary: ONLY COMPLETED / SETTLED BILLS
-  const reportSummary = useMemo(() => {
-    let totalSale = 0;
-    let cashSale = 0;
-    let upiSale = 0;
-    let dueSale = 0;
-    let totalOrdersCount = 0;
-    let unsettledTotal = 0;
-    let unsettledCount = 0;
+ const reportSummary = useMemo(() => {
+    let totalSale = 0; let cashSale = 0; let upiSale = 0; let dueSale = 0;
+    let totalOrdersCount = 0; let unsettledTotal = 0; let unsettledCount = 0;
+
+    // तारीख की लिमिट सेट करना
+    let startTarget = new Date(); let endTarget = new Date();
+    if (reportFilter === 'today') { startTarget.setHours(0, 0, 0, 0); endTarget.setHours(23, 59, 59, 999); } 
+    else if (reportFilter === 'yesterday') { startTarget.setDate(startTarget.getDate() - 1); startTarget.setHours(0, 0, 0, 0); endTarget.setDate(endTarget.getDate() - 1); endTarget.setHours(23, 59, 59, 999); } 
+    else if (reportFilter === 'last7days') { startTarget.setDate(startTarget.getDate() - 6); startTarget.setHours(0, 0, 0, 0); endTarget.setHours(23, 59, 59, 999); } 
+    else if (reportFilter === 'custom' && customStartDate && customEndDate) {
+      const sParts = customStartDate.split('-'); startTarget = new Date(Number(sParts[0]), Number(sParts[1]) - 1, Number(sParts[2]), 0, 0, 0, 0);
+      const eParts = customEndDate.split('-'); endTarget = new Date(Number(eParts[0]), Number(eParts[1]) - 1, Number(eParts[2]), 23, 59, 59, 999);
+    }
 
     reportOrders.forEach(o => {
       const amt = Number(o.total) || 0;
+      
+      const orderTime = o.timestamp?.toDate ? o.timestamp.toDate().getTime() : new Date(o.timestamp || Date.now()).getTime();
+      const settledTime = o.settledAt?.toDate ? o.settledAt.toDate().getTime() : (o.settledAt ? new Date(o.settledAt).getTime() : 0);
+      const udhariTime = o.udhariClearedAt?.toDate ? o.udhariClearedAt.toDate().getTime() : (o.udhariClearedAt ? new Date(o.udhariClearedAt).getTime() : 0);
+
+      const isCreated = orderTime >= startTarget.getTime() && orderTime <= endTarget.getTime();
+      const isSettled = settledTime >= startTarget.getTime() && settledTime <= endTarget.getTime();
+      const isUdhariCleared = o.udhariCleared && (udhariTime >= startTarget.getTime() && udhariTime <= endTarget.getTime());
+
       if (o.status === 'completed') {
-        totalOrdersCount++;
-        totalSale += amt;
-        if (o.paymentMethod === 'upi') {
-          upiSale += amt;
-        } else if (o.paymentMethod === 'due') {
-          dueSale += amt;
-        } else if (o.paymentMethod === 'split') {
-          cashSale += Number(o.splitCashAmount || 0);
-          upiSale += Number(o.splitUpiAmount || 0);
-        } else {
-          cashSale += amt;
+        
+        // 1. अगर बिल आज बना है, तो आज की बिक्री (Sales) में जोड़ें
+        if (isCreated) {
+          totalOrdersCount++;
+          totalSale += amt;
+          
+          if (o.paymentMethod === 'upi') upiSale += amt;
+          else if (o.paymentMethod === 'due') dueSale += amt;
+          else if (o.paymentMethod === 'split') { cashSale += Number(o.splitCashAmount || 0); upiSale += Number(o.splitUpiAmount || 0); } 
+          else cashSale += amt;
         }
+
+        // 2. अगर कोई पुराना उधार आज क्लीयर हुआ है, तो उसे सिर्फ आज के कैश/UPI गल्ले में जोड़ें (Sale में नहीं)
+        if (isUdhariCleared) {
+          const clearMethod = o.clearedPaymentMethod || 'cash';
+          if (isCreated) {
+            // अगर आज ही उधार दिया और आज ही क्लीयर हुआ, तो उधार से हटाकर कैश में डाल दें
+            dueSale -= amt;
+            if (clearMethod === 'upi') upiSale += amt; else cashSale += amt;
+          } else {
+            // पुराने दिन का उधार आज मिला (Sale नहीं बढ़ेगी, सिर्फ पैसा बढ़ेगा)
+            if (clearMethod === 'upi') upiSale += amt; else cashSale += amt;
+          }
+        }
+
+        // 3. अगर कोई पेंडिंग डेली बिल (रात 11:55 वाला) आज सुबह (12:05) सेटल हुआ है
+        if (!isCreated && isSettled && !isUdhariCleared) {
+           if (o.paymentMethod === 'upi') upiSale += amt;
+           else if (o.paymentMethod === 'split') { cashSale += Number(o.splitCashAmount || 0); upiSale += Number(o.splitUpiAmount || 0); }
+           else cashSale += amt;
+        }
+
       } else if (o.status === 'unsettled' || (o.status === 'pending' && !o.paymentSettled)) {
-        unsettledTotal += amt;
-        unsettledCount++;
+        if (isCreated) {
+          unsettledTotal += amt;
+          unsettledCount++;
+        }
       }
     });
 
@@ -2229,7 +2265,7 @@ export default function BbCafeDesktopPos() {
     const netCashInDrawer = Math.max(0, cashSale - totalExpenseAmount);
 
     return { totalSale, cashSale, upiSale, dueSale, totalOrdersCount, totalExpenseAmount, netCashInDrawer, unsettledTotal, unsettledCount };
-  }, [reportOrders, dailyExpenses]);
+  }, [reportOrders, dailyExpenses, reportFilter, customStartDate, customEndDate]);
 
 // Item-wise Sales Report Calculation
   const itemWiseSales = useMemo(() => {
