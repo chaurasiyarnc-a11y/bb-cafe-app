@@ -2427,9 +2427,9 @@ export default function BbCafeDesktopPos() {
   const filteredMenu = useMemo(() => {
     const queryStr = searchQuery.toLowerCase().trim();
     
-    // 👉 NEW: '⭐ Top Items' (ज्यादा बिकने वाले) का लॉजिक
+   // 👉 NEW: '⭐ Top Items' (ज्यादा बिकने वाले) का लॉजिक
     if (selectedCategory === '⭐ Top Items') {
-      let savedPop = {};
+      let savedPop: any = {};  // 👉 बस यहाँ : any लगाना है
       try {
         savedPop = JSON.parse(localStorage.getItem("bb_pos_item_popularity") || "{}");
       } catch (e) {
