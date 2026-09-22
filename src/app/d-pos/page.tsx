@@ -22,7 +22,8 @@ import { createRoot } from 'react-dom/client';
 import CustomerDirectoryModal from '@/components/pos/CustomerDirectoryModal';
 import PrintCustomerReceipt from '@/components/d-pos/PrintCustomerReceipt';
 import PrintKitchenKot from '@/components/d-pos/PrintKitchenKot';
-
+import { createRoot } from 'react-dom/client';
+import { flushSync } from 'react-dom'; // 👉 यह नई लाइन यहाँ जोड़ें
 const SafeLock = Lock as any;
 const SafeDatabase = Database as any;
 const SafeLogOut = LogOut as any;
@@ -2389,7 +2390,8 @@ export default function BbCafeDesktopPos() {
       
       if (e.key === 'F12') { e.preventDefault(); setFulfillmentType(prev => prev === 'pickup' ? 'table' : prev === 'table' ? 'delivery' : 'pickup'); }
 
-      if ((e.key === 'Delete' || (e.shiftKey && e.key === 'Backspace')) && document.activeElement?.tagName !== 'INPUT') {
+      const activeTag = document.activeElement?.tagName;
+      if ((e.key === 'Delete' || (e.shiftKey && e.key === 'Backspace')) && activeTag !== 'INPUT' && activeTag !== 'TEXTAREA') {
         if (cart.length > 0) setCart([]);
       }
       
