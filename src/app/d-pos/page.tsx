@@ -714,7 +714,8 @@ export default function BbCafeDesktopPos() {
     try {
       const offlineOrdersStr = localStorage.getItem("bb_pos_offline_orders_queue");
       if (offlineOrdersStr) {
-        const queue: any[] = JSON.parse(offlineOrdersStr);
+        let queue: any[] = JSON.parse(offlineOrdersStr);
+        let remainingQueue = [...queue];
         if (queue.length > 0) {
           for (const ord of queue) {
             await addDoc(collection(db, "orders"), {
@@ -722,14 +723,18 @@ export default function BbCafeDesktopPos() {
               timestamp: ord.timestamp ? new Date(ord.timestamp) : new Date()
             });
             orderCount++;
+            // FIX: Remove synced order immediately to prevent duplicates on internet drop
+            remainingQueue = remainingQueue.filter(o => o.billNumber !== ord.billNumber);
+            localStorage.setItem("bb_pos_offline_orders_queue", JSON.stringify(remainingQueue));
           }
-          localStorage.removeItem("bb_pos_offline_orders_queue");
+          if (remainingQueue.length === 0) localStorage.removeItem("bb_pos_offline_orders_queue");
         }
       }
 
       const offlineExpensesStr = localStorage.getItem("bb_pos_offline_expenses_queue");
       if (offlineExpensesStr) {
-        const expQueue: any[] = JSON.parse(offlineExpensesStr);
+        let expQueue: any[] = JSON.parse(offlineExpensesStr);
+        let remainingExpQueue = [...expQueue];
         if (expQueue.length > 0) {
           for (const exp of expQueue) {
             await addDoc(collection(db, "daily_expenses"), {
@@ -737,8 +742,11 @@ export default function BbCafeDesktopPos() {
               timestamp: exp.timestamp ? new Date(exp.timestamp) : new Date()
             });
             expenseCount++;
+            // FIX: Remove synced expense immediately
+            remainingExpQueue = remainingExpQueue.filter(e => e.title !== exp.title || e.amount !== exp.amount);
+            localStorage.setItem("bb_pos_offline_expenses_queue", JSON.stringify(remainingExpQueue));
           }
-          localStorage.removeItem("bb_pos_offline_expenses_queue");
+          if (remainingExpQueue.length === 0) localStorage.removeItem("bb_pos_offline_expenses_queue");
         }
       }
 
