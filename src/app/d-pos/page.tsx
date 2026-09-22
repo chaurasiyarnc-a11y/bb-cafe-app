@@ -1638,12 +1638,14 @@ export default function BbCafeDesktopPos() {
       if (container) {
         const root = createRoot(container);
         
-        // Render React Components into Iframe
-        if (isKot) {
-          root.render(<PrintKitchenKot orderObj={orderObj} />);
-        } else {
-          root.render(<PrintCustomerReceipt orderObj={orderObj} currentUser={currentUser} />);
-        }
+        /// Render React Components into Iframe (flushSync ensures DOM is updated immediately)
+        flushSync(() => {
+          if (isKot) {
+            root.render(<PrintKitchenKot orderObj={orderObj} />);
+          } else {
+            root.render(<PrintCustomerReceipt orderObj={orderObj} currentUser={currentUser} />);
+          }
+        });
 
         // Trigger iframe print & cleanup
         const triggerPrintAndCleanup = () => {
