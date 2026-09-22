@@ -2154,9 +2154,21 @@ export default function BbCafeDesktopPos() {
         const qOrders = query(collection(db, "orders"), orderBy("timestamp", "desc"), limit(2000));
         const snapOrders = await getDocs(qOrders);
         const filteredOrders = snapOrders.docs.map(d => ({ id: d.id, ...d.data() })).filter((o: any) => {
-          const raw = o.timestamp?.toDate ? o.timestamp.toDate() : new Date(o.timestamp || Date.now());
-          const timeMs = raw.getTime();
-          return timeMs >= startTarget.getTime() && timeMs <= endTarget.getTime();
+          // बिल बनने का समय
+          const orderTime = o.timestamp?.toDate ? o.timestamp.toDate().getTime() : new Date(o.timestamp || Date.now()).getTime();
+          
+          // डेली बिल सेटल होने का समय
+          const settledTime = o.settledAt?.toDate ? o.settledAt.toDate().getTime() : (o.settledAt ? new Date(o.settledAt).getTime() : 0);
+          
+          // उधार जमा होने का समय
+          const udhariTime = o.udhariClearedAt?.toDate ? o.udhariClearedAt.toDate().getTime() : (o.udhariClearedAt ? new Date(o.udhariClearedAt).getTime() : 0);
+          
+          const isCreatedInRange = orderTime >= startTarget.getTime() && orderTime <= endTarget.getTime();
+          const isSettledInRange = settledTime >= startTarget.getTime() && settledTime <= endTarget.getTime();
+          const isUdhariClearedInRange = udhariTime >= startTarget.getTime() && udhariTime <= endTarget.getTime();
+
+          // अगर बिल आज बना है, या आज सेटल हुआ है, या उधार आज जमा हुआ है -> तो रिपोर्ट में दिखाओ
+          return isCreatedInRange || isSettledInRange || isUdhariClearedInRange;
         });
         setReportOrders(filteredOrders);
 
