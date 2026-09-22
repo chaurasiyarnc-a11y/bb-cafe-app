@@ -1178,6 +1178,7 @@ export default function BbCafeDesktopPos() {
       }
 
       setCustomerName(nameTrim);
+      setCartCustSearchInput(`${nameTrim} - ${cleanPhone}`); // 👉 यह लाइन जोड़ें
       setAddress(newCustAddressInput.trim());
       setCustomerPoints(0);
       setShowNewCustForm(false);
