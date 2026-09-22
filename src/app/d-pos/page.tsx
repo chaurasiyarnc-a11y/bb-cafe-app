@@ -1474,7 +1474,7 @@ export default function BbCafeDesktopPos() {
         id: selectedProductForVariation.id, 
         name: fullName, 
         price: finalItemPrice, 
-        quantity: 1, 
+        quantity: pendingVariantQty,
         size: selectedSize,
         note: combinedNote 
       }];
