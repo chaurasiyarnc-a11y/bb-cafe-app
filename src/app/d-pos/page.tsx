@@ -1958,6 +1958,7 @@ export default function BbCafeDesktopPos() {
       setCart([]); 
       setCustomerPhone(''); 
       setCustomerName(''); 
+      setCartCustSearchInput(''); // <--- यह नई लाइन जोड़ें
       setAddress('');
       setCustomerPoints(0); 
       setDiscountValue(0); 
