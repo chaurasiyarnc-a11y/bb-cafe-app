@@ -223,6 +223,7 @@ export default function BbCafeDesktopPos() {
 
   // Variation Modal (Keyboard First!)
   const [isVariationModalOpen, setIsVariationModalOpen] = useState(false);
+  const [pendingVariantQty, setPendingVariantQty] = useState(1);
   const [selectedProductForVariation, setSelectedProductForVariation] = useState<any>(null);
   const [selectedVariantIndex, setSelectedVariantIndex] = useState<number>(0);
   const [selectedSize, setSelectedSize] = useState('');
