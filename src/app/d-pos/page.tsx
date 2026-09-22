@@ -807,6 +807,7 @@ export default function BbCafeDesktopPos() {
     setCart([]);
     setCustomerName('');
     setCustomerPhone('');
+    setCartCustSearchInput(''); // <--- यह नई लाइन यहाँ भी जोड़ें
     setAddress('');
     setDiscountValue(0);
     setIsRedeemingPoints(false);
