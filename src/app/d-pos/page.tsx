@@ -2713,14 +2713,25 @@ export default function BbCafeDesktopPos() {
                       <div className="flex gap-1.5 relative">
                         <div className="relative flex-1">
                           <input 
-                            ref={phoneInputRef}
-                            type="text"
-                            placeholder="ग्राहक का नाम या मोबाइल नंबर..." 
-                            value={cartCustSearchInput} 
-                            onChange={e => handleCustomerSearchChange(e.target.value)} 
-                            onFocus={() => { if(custSuggestions.length > 0) setShowCustDropdown(true); }}
-                            className="w-full bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 rounded-lg px-2.5 py-1.5 text-xs text-neutral-900 dark:text-white outline-none font-bold placeholder:font-normal placeholder:text-neutral-400" 
-                          />
+  ref={phoneInputRef}
+  type="text"
+  placeholder="ग्राहक का नाम या मोबाइल नंबर..." 
+  value={cartCustSearchInput} 
+  onChange={e => handleCustomerSearchChange(e.target.value)} 
+  onFocus={() => { if(custSuggestions.length > 0) setShowCustDropdown(true); }}
+  onKeyDown={(e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (showCustDropdown && custSuggestions.length > 0) {
+        handleSelectDropdownCustomer(custSuggestions[0]); // अगर लिस्ट में है, तो पहला सेलेक्ट कर लेगा
+      } else if (customerPhone.length === 10) {
+        setShowCustDropdown(false);
+        searchCustomerByExactPhone(customerPhone); // सेव नहीं है, तो अपने-आप नाम डालने का बॉक्स खोल देगा
+      }
+    }
+  }}
+  className="w-full bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 rounded-lg px-2.5 py-1.5 text-xs text-neutral-900 dark:text-white outline-none font-bold placeholder:font-normal placeholder:text-neutral-400" 
+/>
                           
                           {/* कट (X) बटन ताकि नया नाम डाल सकें */}
                           {cartCustSearchInput && (
