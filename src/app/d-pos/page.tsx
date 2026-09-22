@@ -277,7 +277,8 @@ export default function BbCafeDesktopPos() {
     const toastId = toast.loading("उधार जमा किया जा रहा है...");
     try {
       await updateDoc(doc(db, "orders", orderId), {
-        paymentMethod: method,
+        // पुराने बिल का paymentMethod 'due' ही रहने दें, सिर्फ नया मेथड 'clearedPaymentMethod' में सेव करें
+        clearedPaymentMethod: method,
         udhariClearedAt: new Date(),
         udhariCleared: true
       });
