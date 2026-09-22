@@ -2335,35 +2335,33 @@ export default function BbCafeDesktopPos() {
     });
   }, [pastReceipts, receiptSearchQuery, receiptFilterDay]);
 
-  // Keyboard Shortcuts Handler
+  // Keyboard Shortcuts Handler - FIXED FOR PERFORMANCE (Latest Ref Pattern)
+  const handleKeyDownRef = useRef<((e: KeyboardEvent) => void) | null>(null);
+
+  // यह वाला useEffect हर बार नया डेटा (State) ref में सेव करेगा, बिना DOM को छेड़े।
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
+    handleKeyDownRef.current = (e: KeyboardEvent) => {
       if (!isLoggedIn) return;
 
       if (e.key === 'F1') { e.preventDefault(); setIsHelpModalOpen(prev => !prev); }
       if (e.key === 'F2') { e.preventDefault(); setActiveTab('billing'); setTimeout(() => searchInputRef.current?.focus(), 80); }
       
-      // 👉 F3 Smart Hold (होल्ड करें या होल्ड लिस्ट खोलें)
       if (e.key === 'F3') { 
         e.preventDefault(); 
         if (cart.length > 0) { handleHoldCurrentCart(); } 
         else { setIsHeldCartsModalOpen(prev => !prev); } 
       }
       
-      // 👉 F4 Sales Report (बिक्री रिपोर्ट टैब खोलने के लिए)
       if (e.key === 'F4') { e.preventDefault(); setActiveTab('reports'); }
       
-      // 👉 F5 Focus Customer Search (कस्टमर नंबर/नाम सर्च पर जाने के लिए)
       if (e.key === 'F5') { 
         e.preventDefault(); 
         setActiveTab('billing'); 
         setTimeout(() => phoneInputRef.current?.focus(), 80); 
       }
       
-      // 👉 F6 Daily Bills (Settlement)
       if (e.key === 'F6') { e.preventDefault(); setActiveTab('settlement'); }
       
-      // 👉 F7 Save Table & Print KOT
       if (e.key === 'F7') { 
         e.preventDefault(); 
         if (fulfillmentType === 'table' && cart.length > 0 && !isSubmittingOrder) {
@@ -2376,14 +2374,12 @@ export default function BbCafeDesktopPos() {
       if (e.key === 'F8') { e.preventDefault(); setIsDiscountOpen(prev => !prev); }
       if (e.key === 'F9') { e.preventDefault(); if (cart.length > 0 && !isSubmittingOrder) handleFinalCheckoutAndPrintBill(); }
       
-      // 👉 F10 Cash Tendered Focus
       if (e.key === 'F10') { 
         e.preventDefault(); 
         setActiveTab('billing');
         setTimeout(() => document.getElementById('cashTenderedInput')?.focus(), 80);
       }
       
-      // 👉 F11 Customers Profile
       if (e.key === 'F11') { e.preventDefault(); setActiveTab('customers'); }
       
       if (e.key === 'F12') { e.preventDefault(); setFulfillmentType(prev => prev === 'pickup' ? 'table' : prev === 'table' ? 'delivery' : 'pickup'); }
@@ -2391,6 +2387,7 @@ export default function BbCafeDesktopPos() {
       if ((e.key === 'Delete' || (e.shiftKey && e.key === 'Backspace')) && document.activeElement?.tagName !== 'INPUT') {
         if (cart.length > 0) setCart([]);
       }
+      
       if (e.key === 'Escape') {
         setIsHelpModalOpen(false);
         setIsHeldCartsModalOpen(false);
@@ -2404,10 +2401,18 @@ export default function BbCafeDesktopPos() {
         setTimeout(() => searchInputRef.current?.focus(), 60);
       }
     };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isLoggedIn, cart, isSubmittingOrder, paymentMethod, customerName, customerPhone, tableNumber, fulfillmentType, heldCarts]);
+  }); // यहाँ कोई ब्रैकेट [] नहीं है, यह जानबूझकर किया है ताकि हमेशा ताज़ा डेटा मिले!
 
+  // यह वाला useEffect सिर्फ़ 1 बार चलेगा और Event Listener (गार्ड) को कंप्यूटर से जोड़ेगा।
+  useEffect(() => {
+    const globalListener = (e: KeyboardEvent) => {
+      if (handleKeyDownRef.current) {
+        handleKeyDownRef.current(e); // यह वॉकी-टॉकी से हमेशा ताज़ा फंक्शन लेगा
+      }
+    };
+    window.addEventListener('keydown', globalListener);
+    return () => window.removeEventListener('keydown', globalListener);
+  }, []); // खाली ब्रैकेट = यह 1 ही बार सेट होगा और कभी नहीं हटेगा!
  
 
   const filteredMenu = useMemo(() => {
