@@ -2,7 +2,13 @@
 
 import React, { useEffect, useRef, useState } from "react";
 
-export default function SpinGame() {
+export default function SecureSpinGame() {
+  // Login States
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [loginError, setLoginError] = useState("");
+
+  // Game States
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [message, setMessage] = useState("Apna Inam Jeetein (Din mein 1 chance)");
   const [timer, setTimer] = useState<string | null>(null);
@@ -11,17 +17,35 @@ export default function SpinGame() {
 
   const prizes = ["Better Luck", "10% OFF", "Free Coffee", "20% OFF", "Free Sandwich", "100% FREE"];
   const colors = ["#e74c3c", "#3498db", "#f1c40f", "#9b59b6", "#e67e22", "#2ecc71"];
-  const probabilities = [35, 30, 20, 10, 4, 1]; // 100% Free ka sirf 1% chance
+  const probabilities = [35, 30, 20, 10, 4, 1]; // 100% Free sirf 1% logo ko milega
 
-  useEffect(() => {
-    // Check if played today
-    const today = new Date().toDateString();
-    if (localStorage.getItem("cafeLastSpin") === today) {
-      setIsDisabled(true);
-      setMessage("Aap aaj ka spin use kar chuke hain. Kal phir aayen!");
+  // --- LOGIN LOGIC ---
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (phoneNumber.length !== 10 || isNaN(Number(phoneNumber))) {
+      setLoginError("Kripya sahi 10-digit mobile number daalein");
+      return;
     }
+    
+    setLoginError("");
+    const today = new Date().toDateString();
+    
+    // Check if this specific phone number played today
+    if (localStorage.getItem(`played_${phoneNumber}`) === today) {
+      setIsDisabled(true);
+      setMessage("Aap is number se aaj ka spin use kar chuke hain. Kal phir aayen!");
+    } else {
+      setIsDisabled(false);
+      setMessage(`Welcome, ${phoneNumber}! Apna Inam Jeetein.`);
+    }
+    
+    setIsLoggedIn(true);
+  };
 
-    // Draw Wheel
+  // --- GAME LOGIC ---
+  useEffect(() => {
+    if (!isLoggedIn) return; // Agar login nahi hai, toh wheel draw mat karo
+
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
@@ -44,13 +68,12 @@ export default function SpinGame() {
         ctx.restore();
         startAngle += arc;
     }
-  }, []);
+  }, [isLoggedIn]); // Jab login hoga tabhi wheel banega
 
   const spinWheel = () => {
     setIsDisabled(true);
     const today = new Date().toDateString();
 
-    // Logic for winner
     let rand = Math.random() * 100;
     let sum = 0;
     let winningIndex = 0;
@@ -68,7 +91,6 @@ export default function SpinGame() {
 
     setRotation(totalDegrees);
 
-    // After spin ends
     setTimeout(() => {
         let wonPrize = prizes[winningIndex];
         if(wonPrize === "Better Luck") {
@@ -77,12 +99,13 @@ export default function SpinGame() {
             setMessage(`🎉 Badhai Ho! Aap jeete hain: ${wonPrize}! Kripya Counter par bill dete waqt yeh timer dikhayen.`);
             startTimer();
         }
-        localStorage.setItem("cafeLastSpin", today);
+        // Save phone number in local storage to prevent cheating
+        localStorage.setItem(`played_${phoneNumber}`, today);
     }, 4000);
   };
 
   const startTimer = () => {
-    let timeLeft = 300; // 5 minutes
+    let timeLeft = 300; 
     const interval = setInterval(() => {
         let m = Math.floor(timeLeft / 60);
         let s = timeLeft % 60;
@@ -98,49 +121,78 @@ export default function SpinGame() {
 
   return (
     <div style={{ fontFamily: 'Arial, sans-serif', textAlign: 'center', backgroundColor: '#111827', color: 'white', minHeight: '100vh', paddingTop: '40px', paddingBottom: '40px' }}>
-      <h1 style={{ color: '#f1c40f', fontSize: '32px', marginBottom: '10px' }}>Spin & Win!</h1>
-      <p style={{ color: '#bdc3c7', fontSize: '16px', padding: '0 20px' }}>{message}</p>
+      <h1 style={{ color: '#f1c40f', fontSize: '32px', marginBottom: '10px' }}>Cafe Spin & Win</h1>
+      
+      {!isLoggedIn ? (
+        // --- LOGIN SCREEN ---
+        <div style={{ marginTop: '50px', padding: '20px' }}>
+          <p style={{ color: '#bdc3c7', fontSize: '18px', marginBottom: '20px' }}>Khelne ke liye apna Mobile Number daalein</p>
+          <form onSubmit={handleLogin}>
+            <input 
+              type="tel" 
+              maxLength={10}
+              placeholder="10-Digit Mobile Number" 
+              value={phoneNumber}
+              onChange={(e) => setPhoneNumber(e.target.value)}
+              style={{ padding: '15px', fontSize: '18px', width: '250px', borderRadius: '10px', border: '2px solid #f1c40f', textAlign: 'center' }}
+            />
+            <br />
+            {loginError && <p style={{ color: '#e74c3c', marginTop: '10px', fontWeight: 'bold' }}>{loginError}</p>}
+            <button 
+              type="submit" 
+              style={{ backgroundColor: '#2ecc71', color: 'white', fontSize: '18px', padding: '12px 30px', border: 'none', borderRadius: '20px', cursor: 'pointer', fontWeight: 'bold', marginTop: '20px' }}
+            >
+              Verify & Play
+            </button>
+          </form>
+        </div>
+      ) : (
+        // --- GAME SCREEN (Shows only after login) ---
+        <div>
+          <p style={{ color: '#bdc3c7', fontSize: '16px', padding: '0 20px', maxWidth: '400px', margin: '0 auto' }}>{message}</p>
 
-      <div style={{ position: 'relative', width: '300px', height: '300px', margin: '30px auto' }}>
-        <div style={{ position: 'absolute', top: '-15px', left: '50%', transform: 'translateX(-50%)', fontSize: '40px', color: '#e74c3c', zIndex: 10 }}>▼</div>
-        <canvas
-          ref={canvasRef}
-          width="300"
-          height="300"
-          style={{
-            borderRadius: '50%',
-            border: '5px solid #fff',
-            boxShadow: '0 0 20px rgba(0,0,0,0.5)',
-            backgroundColor: '#fff',
-            transition: 'transform 4s cubic-bezier(0.1, 0.7, 0.1, 1)',
-            transform: `rotate(${rotation}deg)`
-          }}
-        ></canvas>
-      </div>
-
-      <button
-        onClick={spinWheel}
-        disabled={isDisabled}
-        style={{ 
-            backgroundColor: isDisabled ? '#6b7280' : '#e74c3c', 
-            color: 'white', 
-            fontSize: '20px', 
-            padding: '15px 40px', 
-            border: 'none', 
-            borderRadius: '30px', 
-            cursor: isDisabled ? 'not-allowed' : 'pointer', 
-            fontWeight: 'bold', 
-            marginTop: '10px',
-            boxShadow: isDisabled ? 'none' : '0 4px 6px rgba(231, 76, 60, 0.4)'
-        }}
-      >
-        {isDisabled ? "Aaj Ka Chance Khatam" : "SPIN NOW"}
-      </button>
-
-      {timer && (
-          <div style={{ marginTop: '20px', fontSize: '18px', color: timer === "Offer Expired!" ? '#ef4444' : '#f59e0b', fontWeight: 'bold' }}>
-              {timer}
+          <div style={{ position: 'relative', width: '300px', height: '300px', margin: '30px auto' }}>
+            <div style={{ position: 'absolute', top: '-15px', left: '50%', transform: 'translateX(-50%)', fontSize: '40px', color: '#e74c3c', zIndex: 10 }}>▼</div>
+            <canvas
+              ref={canvasRef}
+              width="300"
+              height="300"
+              style={{
+                borderRadius: '50%',
+                border: '5px solid #fff',
+                boxShadow: '0 0 20px rgba(0,0,0,0.5)',
+                backgroundColor: '#fff',
+                transition: 'transform 4s cubic-bezier(0.1, 0.7, 0.1, 1)',
+                transform: `rotate(${rotation}deg)`
+              }}
+            ></canvas>
           </div>
+
+          <button
+            onClick={spinWheel}
+            disabled={isDisabled}
+            style={{ 
+                backgroundColor: isDisabled ? '#6b7280' : '#e74c3c', 
+                color: 'white', 
+                fontSize: '20px', 
+                padding: '15px 40px', 
+                border: 'none', 
+                borderRadius: '30px', 
+                cursor: isDisabled ? 'not-allowed' : 'pointer', 
+                fontWeight: 'bold', 
+                marginTop: '10px',
+                boxShadow: isDisabled ? 'none' : '0 4px 6px rgba(231, 76, 60, 0.4)'
+            }}
+          >
+            {isDisabled ? "Aaj Ka Chance Khatam" : "SPIN NOW"}
+          </button>
+
+          {timer && (
+              <div style={{ marginTop: '20px', fontSize: '18px', color: timer === "Offer Expired!" ? '#ef4444' : '#f59e0b', fontWeight: 'bold' }}>
+                  {timer}
+              </div>
+          )}
+        </div>
       )}
     </div>
   );
