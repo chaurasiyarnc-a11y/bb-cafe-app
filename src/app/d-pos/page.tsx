@@ -3973,9 +3973,17 @@ export default function BbCafeDesktopPos() {
                         <div>
                           <div className="flex justify-between items-start mb-2">
                              <div>
-                               <p className="font-black text-sm text-neutral-900 dark:text-white uppercase">{cust.name || 'Valued Guest'}</p>
-                               <p className="text-xs font-mono text-neutral-500 mt-0.5">📞 {cust.phone || cust.id}</p>
-                             </div>
+  <div className="flex items-center gap-2">
+    <p className="font-black text-sm text-neutral-900 dark:text-white uppercase">{cust.name || 'Valued Guest'}</p>
+    {/* यह लाइन गेम से आये कस्टमर को 🎰 Game का टैग दे देगी */}
+    {cust.importSource === 'SpinGame' && (
+      <span className="bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-400 border border-purple-300 dark:border-purple-500/30 text-[9px] px-1.5 py-0.5 rounded-md font-black uppercase shadow-sm">
+        🎰 Game
+      </span>
+    )}
+  </div>
+  <p className="text-xs font-mono text-neutral-500 mt-0.5">📞 {cust.phone || cust.id}</p>
+</div>
                              <span className="bg-amber-100 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-500/30 px-2 py-1 rounded-lg text-[10px] font-black uppercase flex items-center gap-1 shadow-sm">
                                ⭐ {cust.points || 0} Pts
                              </span>
