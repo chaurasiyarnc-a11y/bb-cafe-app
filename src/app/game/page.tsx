@@ -15,9 +15,12 @@ export default function SecureSpinGame() {
   const [isDisabled, setIsDisabled] = useState(false);
   const [rotation, setRotation] = useState(0);
 
+  // Prizes aur unke colors
   const prizes = ["Better Luck", "10% OFF", "Free Coffee", "20% OFF", "Free Sandwich", "100% FREE"];
   const colors = ["#e74c3c", "#3498db", "#f1c40f", "#9b59b6", "#e67e22", "#2ecc71"];
-  const probabilities = [35, 30, 20, 10, 4, 1]; // 100% Free sirf 1% logo ko milega
+  
+  // NAYA SETTING: 80% Better Luck, baki 20% me inam (Total = 100)
+  const probabilities = [80, 10, 5, 3, 1.5, 0.5]; 
 
   // --- LOGIN LOGIC ---
   const handleLogin = (e: React.FormEvent) => {
@@ -30,7 +33,7 @@ export default function SecureSpinGame() {
     setLoginError("");
     const today = new Date().toDateString();
     
-    // Check if this specific phone number played today
+    // Check if this phone number played today
     if (localStorage.getItem(`played_${phoneNumber}`) === today) {
       setIsDisabled(true);
       setMessage("Aap is number se aaj ka spin use kar chuke hain. Kal phir aayen!");
@@ -44,7 +47,7 @@ export default function SecureSpinGame() {
 
   // --- GAME LOGIC ---
   useEffect(() => {
-    if (!isLoggedIn) return; // Agar login nahi hai, toh wheel draw mat karo
+    if (!isLoggedIn) return; 
 
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -68,12 +71,13 @@ export default function SecureSpinGame() {
         ctx.restore();
         startAngle += arc;
     }
-  }, [isLoggedIn]); // Jab login hoga tabhi wheel banega
+  }, [isLoggedIn]); 
 
   const spinWheel = () => {
     setIsDisabled(true);
     const today = new Date().toDateString();
 
+    // 80% harne aur 20% jeetne ka logic yahan kaam karega
     let rand = Math.random() * 100;
     let sum = 0;
     let winningIndex = 0;
@@ -99,7 +103,6 @@ export default function SecureSpinGame() {
             setMessage(`🎉 Badhai Ho! Aap jeete hain: ${wonPrize}! Kripya Counter par bill dete waqt yeh timer dikhayen.`);
             startTimer();
         }
-        // Save phone number in local storage to prevent cheating
         localStorage.setItem(`played_${phoneNumber}`, today);
     }, 4000);
   };
@@ -124,7 +127,6 @@ export default function SecureSpinGame() {
       <h1 style={{ color: '#f1c40f', fontSize: '32px', marginBottom: '10px' }}>Cafe Spin & Win</h1>
       
       {!isLoggedIn ? (
-        // --- LOGIN SCREEN ---
         <div style={{ marginTop: '50px', padding: '20px' }}>
           <p style={{ color: '#bdc3c7', fontSize: '18px', marginBottom: '20px' }}>Khelne ke liye apna Mobile Number daalein</p>
           <form onSubmit={handleLogin}>
@@ -147,7 +149,6 @@ export default function SecureSpinGame() {
           </form>
         </div>
       ) : (
-        // --- GAME SCREEN (Shows only after login) ---
         <div>
           <p style={{ color: '#bdc3c7', fontSize: '16px', padding: '0 20px', maxWidth: '400px', margin: '0 auto' }}>{message}</p>
 
