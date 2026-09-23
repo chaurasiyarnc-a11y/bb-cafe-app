@@ -10,23 +10,23 @@ export default function SecureSpinGame() {
 
   // Game States
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const [message, setMessage] = useState("Apna Inam Jeetein (Din mein 1 chance)");
+  const [message, setMessage] = useState("अपना इनाम जीतें (दिन में केवल 1 मौका)");
   const [timer, setTimer] = useState<string | null>(null);
   const [isDisabled, setIsDisabled] = useState(false);
   const [rotation, setRotation] = useState(0);
 
-  // Prizes aur unke colors
+  // Prizes (Chakra ke andar English sahi dikhta hai isliye English rakha hai)
   const prizes = ["Better Luck", "10% OFF", "Free Coffee", "20% OFF", "Free Sandwich", "100% FREE"];
   const colors = ["#e74c3c", "#3498db", "#f1c40f", "#9b59b6", "#e67e22", "#2ecc71"];
   
-  // NAYA SETTING: 80% Better Luck, baki 20% me inam (Total = 100)
+  // 80% Better Luck, baki 20% me inam (Total = 100)
   const probabilities = [80, 10, 5, 3, 1.5, 0.5]; 
 
   // --- LOGIN LOGIC ---
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     if (phoneNumber.length !== 10 || isNaN(Number(phoneNumber))) {
-      setLoginError("Kripya sahi 10-digit mobile number daalein");
+      setLoginError("कृपया सही 10-अंकों का मोबाइल नंबर डालें");
       return;
     }
     
@@ -36,10 +36,10 @@ export default function SecureSpinGame() {
     // Check if this phone number played today
     if (localStorage.getItem(`played_${phoneNumber}`) === today) {
       setIsDisabled(true);
-      setMessage("Aap is number se aaj ka spin use kar chuke hain. Kal phir aayen!");
+      setMessage("आप इस नंबर से आज का गेम खेल चुके हैं। कृपया कल फिर आएं!");
     } else {
       setIsDisabled(false);
-      setMessage(`Welcome, ${phoneNumber}! Apna Inam Jeetein.`);
+      setMessage(`स्वागत है, ${phoneNumber}! अब अपना पहिया घुमाएं।`);
     }
     
     setIsLoggedIn(true);
@@ -77,7 +77,6 @@ export default function SecureSpinGame() {
     setIsDisabled(true);
     const today = new Date().toDateString();
 
-    // 80% harne aur 20% jeetne ka logic yahan kaam karega
     let rand = Math.random() * 100;
     let sum = 0;
     let winningIndex = 0;
@@ -98,9 +97,9 @@ export default function SecureSpinGame() {
     setTimeout(() => {
         let wonPrize = prizes[winningIndex];
         if(wonPrize === "Better Luck") {
-            setMessage("Oops! Koi inam nahi mila. Agli baar zaroor try karein!");
+            setMessage("उफ़! कोई इनाम नहीं मिला। अगली बार ज़रूर प्रयास करें!");
         } else {
-            setMessage(`🎉 Badhai Ho! Aap jeete hain: ${wonPrize}! Kripya Counter par bill dete waqt yeh timer dikhayen.`);
+            setMessage(`🎉 बहुत-बहुत बधाई! आप जीते हैं: ${wonPrize}! कृपया बिल देते समय काउंटर पर यह टाइमर दिखाएं।`);
             startTimer();
         }
         localStorage.setItem(`played_${phoneNumber}`, today);
@@ -113,27 +112,30 @@ export default function SecureSpinGame() {
         let m = Math.floor(timeLeft / 60);
         let s = timeLeft % 60;
         const formattedS = s < 10 ? "0" + s : s.toString();
-        setTimer(`Claim within: ${m}:${formattedS} minutes`);
+        setTimer(`ऑफर समाप्त होने में: ${m}:${formattedS} मिनट`);
         timeLeft--;
         if (timeLeft < 0) {
             clearInterval(interval);
-            setTimer("Offer Expired!");
+            setTimer("ऑफर समाप्त हो गया (Offer Expired)!");
         }
     }, 1000);
   };
 
   return (
     <div style={{ fontFamily: 'Arial, sans-serif', textAlign: 'center', backgroundColor: '#111827', color: 'white', minHeight: '100vh', paddingTop: '40px', paddingBottom: '40px' }}>
-      <h1 style={{ color: '#f1c40f', fontSize: '32px', marginBottom: '10px' }}>Cafe Spin & Win</h1>
+      
+      {/* CAFE KA NAAM YAHAN HAI */}
+      <h1 style={{ color: '#f1c40f', fontSize: '36px', marginBottom: '5px' }}>बम बम कैफे, मोहंद्रा</h1>
+      <h2 style={{ color: '#fff', fontSize: '20px', marginTop: '0', marginBottom: '20px' }}>स्पिन करें और शानदार इनाम जीतें!</h2>
       
       {!isLoggedIn ? (
-        <div style={{ marginTop: '50px', padding: '20px' }}>
-          <p style={{ color: '#bdc3c7', fontSize: '18px', marginBottom: '20px' }}>Khelne ke liye apna Mobile Number daalein</p>
+        <div style={{ marginTop: '30px', padding: '20px' }}>
+          <p style={{ color: '#bdc3c7', fontSize: '18px', marginBottom: '20px' }}>खेलने के लिए अपना मोबाइल नंबर दर्ज करें</p>
           <form onSubmit={handleLogin}>
             <input 
               type="tel" 
               maxLength={10}
-              placeholder="10-Digit Mobile Number" 
+              placeholder="10-अंकों का मोबाइल नंबर" 
               value={phoneNumber}
               onChange={(e) => setPhoneNumber(e.target.value)}
               style={{ padding: '15px', fontSize: '18px', width: '250px', borderRadius: '10px', border: '2px solid #f1c40f', textAlign: 'center' }}
@@ -144,13 +146,13 @@ export default function SecureSpinGame() {
               type="submit" 
               style={{ backgroundColor: '#2ecc71', color: 'white', fontSize: '18px', padding: '12px 30px', border: 'none', borderRadius: '20px', cursor: 'pointer', fontWeight: 'bold', marginTop: '20px' }}
             >
-              Verify & Play
+              वेरीफाई करें और खेलें
             </button>
           </form>
         </div>
       ) : (
         <div>
-          <p style={{ color: '#bdc3c7', fontSize: '16px', padding: '0 20px', maxWidth: '400px', margin: '0 auto' }}>{message}</p>
+          <p style={{ color: '#bdc3c7', fontSize: '16px', padding: '0 20px', maxWidth: '400px', margin: '0 auto', lineHeight: '1.5' }}>{message}</p>
 
           <div style={{ position: 'relative', width: '300px', height: '300px', margin: '30px auto' }}>
             <div style={{ position: 'absolute', top: '-15px', left: '50%', transform: 'translateX(-50%)', fontSize: '40px', color: '#e74c3c', zIndex: 10 }}>▼</div>
@@ -185,11 +187,11 @@ export default function SecureSpinGame() {
                 boxShadow: isDisabled ? 'none' : '0 4px 6px rgba(231, 76, 60, 0.4)'
             }}
           >
-            {isDisabled ? "Aaj Ka Chance Khatam" : "SPIN NOW"}
+            {isDisabled ? "आज का मौका खत्म" : "अभी घुमाएं (SPIN NOW)"}
           </button>
 
           {timer && (
-              <div style={{ marginTop: '20px', fontSize: '18px', color: timer === "Offer Expired!" ? '#ef4444' : '#f59e0b', fontWeight: 'bold' }}>
+              <div style={{ marginTop: '20px', fontSize: '18px', color: timer === "ऑफर समाप्त हो गया (Offer Expired)!" ? '#ef4444' : '#f59e0b', fontWeight: 'bold' }}>
                   {timer}
               </div>
           )}
