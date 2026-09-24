@@ -653,6 +653,10 @@ export default function BbCafeDesktopPos() {
   const [promoCouponInput, setPromoCouponInput] = useState('');
   const [appliedPromoName, setAppliedPromoName] = useState<string | null>(null);
 
+  // 📦 PACKING CHARGE STATE
+  const [applyPackingCharge, setApplyPackingCharge] = useState<boolean>(false);
+  const [packingCharge, setPackingCharge] = useState<number | ''>(10);
+
   const [fulfillmentType, setFulfillmentType] = useState<'delivery' | 'pickup' | 'table'>('pickup');
   const [selectedArea, setSelectedArea] = useState<DeliveryArea>(DELIVERY_AREAS[0]);
   const [applyDeliveryFee, setApplyDeliveryFee] = useState<boolean>(false);
