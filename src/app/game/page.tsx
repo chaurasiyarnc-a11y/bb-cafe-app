@@ -218,9 +218,16 @@ export default function SurpriseArcadeGame() {
               </label>
               <input
                 type="text"
+                autoCapitalize="words"
+                autoComplete="name"
                 placeholder="उदा. राहुल शर्मा"
                 value={name}
-                onChange={(e) => setName(e.target.value)}
+                onChange={(e) => {
+                  // टाइप करते ही हर शब्द का पहला अक्षर कैपिटल (A-Z) हो जाएगा
+                  const val = e.target.value;
+                  const capitalized = val.replace(/(^\w|\s\w)/g, (m) => m.toUpperCase());
+                  setName(capitalized);
+                }}
                 disabled={isLoading}
                 required
                 style={{
@@ -235,6 +242,7 @@ export default function SurpriseArcadeGame() {
                   fontWeight: "bold",
                   textAlign: "center",
                   outline: "none",
+                  textTransform: "capitalize",
                 }}
               />
             </div>
