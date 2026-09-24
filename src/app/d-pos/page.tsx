@@ -3161,6 +3161,47 @@ export default function BbCafeDesktopPos() {
                               <button type="button" onClick={() => { setDiscountValue(0); setAppliedPromoName(null); }} className="text-red-500 text-xs font-black px-1.5 py-1 bg-red-500/10 rounded-lg shrink-0">Clear</button>
                             )}
                           </div>
+
+                          {/* 📦 PACKING CHARGE SECTION (डिस्काउंट के अंदर ही) */}
+                          <div className="pt-2 border-t border-neutral-300 dark:border-neutral-700 flex items-center justify-between">
+                            <div className="flex items-center gap-1.5">
+                              <input 
+                                type="checkbox" 
+                                id="packingChargeCheck" 
+                                checked={applyPackingCharge} 
+                                onChange={e => setApplyPackingCharge(e.target.checked)} 
+                                className="w-3.5 h-3.5 accent-orange-600 cursor-pointer" 
+                              />
+                              <label htmlFor="packingChargeCheck" className="text-[10px] font-black uppercase text-neutral-800 dark:text-neutral-200 cursor-pointer flex items-center gap-1">
+                                📦 Packing Charge (पैकिंग)
+                              </label>
+                            </div>
+
+                            {applyPackingCharge && (
+                              <div className="flex items-center gap-1">
+                                <div className="flex gap-1">
+                                  {[10, 20].map(val => (
+                                    <button 
+                                      key={val} 
+                                      type="button" 
+                                      onClick={() => setPackingCharge(val)} 
+                                      className={`px-1.5 py-0.5 rounded text-[9px] font-bold border ${packingCharge === val ? 'bg-orange-600 text-white border-orange-600' : 'bg-white dark:bg-neutral-800'}`}
+                                    >
+                                      ₹{val}
+                                    </button>
+                                  ))}
+                                </div>
+                                <span className="text-[11px] font-bold text-neutral-500">₹</span>
+                                <input 
+                                  type="number" 
+                                  min={0}
+                                  value={packingCharge} 
+                                  onChange={e => setPackingCharge(e.target.value === '' ? '' : Number(e.target.value))}
+                                  className="w-12 bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 rounded px-1 py-0.5 text-xs font-mono font-bold outline-none text-center" 
+                                />
+                              </div>
+                            )}
+                          </div>
                         </div>
                       )}
                     </div>
