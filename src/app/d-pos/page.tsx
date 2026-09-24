@@ -2795,6 +2795,20 @@ export default function BbCafeDesktopPos() {
                           नया जोड़ें
                         </button>
                         
+                        {/* 🎰 गेम चेक करने का क्विक बटन */}
+                        <button 
+                          type="button"
+                          onClick={() => {
+                            setGameSearchInput(customerPhone || cartCustSearchInput);
+                            if (customerPhone.length === 10) handleVerifyGameCode(customerPhone);
+                            setIsGameVerifyModalOpen(true);
+                          }} 
+                          title="गेम इनाम चेक करें" 
+                          className="bg-purple-600 hover:bg-purple-500 text-white px-2.5 rounded-lg text-xs font-bold flex items-center shrink-0 shadow-sm"
+                        >
+                          🎰
+                        </button>
+
                         <button onClick={() => handleSendWhatsAppBill()} title="Send WhatsApp Receipt [F7]" className="bg-green-600/15 hover:bg-green-600/25 text-green-600 px-2.5 rounded-lg text-xs font-bold flex items-center shrink-0">
                           <SafeShare2 size={13} />
                         </button>
