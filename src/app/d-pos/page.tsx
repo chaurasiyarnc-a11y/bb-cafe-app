@@ -2435,7 +2435,10 @@ export default function BbCafeDesktopPos() {
     const yestEnd = new Date(todayEnd);
     yestEnd.setDate(yestEnd.getDate() - 1);
 
-    return pastReceipts.filter((o) => {
+   return pastReceipts.filter((o) => {
+      // 🚫 रिजेक्टेड बिल पास्ट रसीद में भी नहीं दिखेंगे
+      if (o.status === 'rejected' || o.status === 'cancelled') return false;
+
       const orderDate = o.timestamp?.toDate ? o.timestamp.toDate() : new Date(o.timestamp || Date.now());
       if (receiptFilterDay === 'today') {
         if (orderDate < todayStart || orderDate > todayEnd) return false;
