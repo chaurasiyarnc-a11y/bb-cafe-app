@@ -3966,7 +3966,15 @@ export default function BbCafeDesktopPos() {
                       <div key={order.id} className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 rounded-2xl p-4 flex flex-col justify-between shadow-lg space-y-3">
                         <div>
                           <div className="flex justify-between items-center border-b border-neutral-300 dark:border-neutral-800 pb-2 mb-2">
-                            <span className="font-mono font-black text-amber-600 dark:text-yellow-400">Bill #{order.billNumber}</span>
+                            {order.source !== 'PC_POS' ? (
+                              <span className="font-mono font-black text-xs bg-cyan-500/15 text-cyan-600 dark:text-cyan-400 border border-cyan-500/30 px-2 py-0.5 rounded-lg flex items-center gap-1">
+                                🌐 WEB-{order.billNumber}
+                              </span>
+                            ) : (
+                              <span className="font-mono font-black text-amber-600 dark:text-yellow-400">
+                                Bill #{order.billNumber}
+                              </span>
+                            )}
                             <span className="bg-orange-500/15 text-orange-600 dark:text-orange-400 text-[10px] font-black uppercase px-2 py-0.5 rounded">{order.fulfillmentType}</span>
                           </div>
                           <p className="text-xs font-bold">👤 {order.customerName} ({order.customerPhone || 'Walk-in'})</p>
