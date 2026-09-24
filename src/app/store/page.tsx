@@ -1005,9 +1005,59 @@ export default function StoreStockPage() {
       text += `${idx + 1}. ${item.name} ${orderStr}\n`;
     });
 
-    const encoded = encodeURIComponent(text);
+    cconst encoded = encodeURIComponent(text);
     window.open(`https://api.whatsapp.com/send?text=${encoded}`, '_blank');
   };
+
+  // 🔒 सुरक्षा लॉक: अगर लॉगिन नहीं है तो लॉक स्क्रीन दिखाओ
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-black text-white font-sans">
+        <p className="text-xs font-bold">सुरक्षा जांच की जा रही है...</p>
+      </div>
+    );
+  }
+
+  if (!currentUser) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4 bg-[#0E0E0E] text-white font-sans">
+        <div className="w-full max-w-sm rounded-3xl p-6 bg-[#181818] border border-neutral-800 text-center space-y-4 shadow-2xl">
+          <div className="w-14 h-14 mx-auto rounded-2xl bg-orange-500/10 text-orange-500 flex items-center justify-center text-2xl font-bold">
+            🔒
+          </div>
+          <div>
+            <h2 className="text-base font-black">स्टोर एवं स्टॉक सुरक्षा</h2>
+            <p className="text-xs text-neutral-400 mt-1">गोदाम और स्टॉक खोलने के लिए अपना पिन दर्ज करें।</p>
+          </div>
+          <form onSubmit={handleLoginSubmit} className="space-y-3">
+            <input
+              type="password"
+              maxLength={6}
+              autoFocus
+              placeholder="••••"
+              value={pinInput}
+              onChange={(e) => {
+                setPinInput(e.target.value);
+                setAuthError("");
+              }}
+              className="w-full text-center text-2xl tracking-[0.5em] p-3 rounded-2xl border font-black bg-neutral-900 border-neutral-700 text-white outline-none focus:border-orange-500"
+              required
+            />
+            {authError && <p className="text-xs text-red-500 font-bold">{authError}</p>}
+            <button
+              type="submit"
+              className="w-full py-3.5 bg-orange-500 text-white rounded-2xl text-xs font-black uppercase shadow-lg shadow-orange-500/20"
+            >
+              अनलॉक करें ➔
+            </button>
+          </form>
+          <div className="pt-2 text-[11px] text-neutral-500">
+            <a href="/" className="hover:text-orange-500">होम पेज</a> • <a href="/game" className="hover:text-orange-500">गेम पर जाएं</a>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={`min-h-screen ${isDarkMode ? 'bg-[#0E0E0E]' : 'bg-[#FAFAFA]'} pb-24 font-sans relative ${isDarkMode ? 'text-white' : 'text-neutral-900'}`}>
