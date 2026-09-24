@@ -1959,6 +1959,7 @@ export default function BbCafeDesktopPos() {
       setFulfillmentType('pickup');
       setTableNumber('Table 1');
       setApplyDeliveryFee(false);
+      setApplyPackingCharge(false); // 👈 अगले बिल के लिए पैकिंग चार्ज रीसेट
       setActiveEditingOrderId(null);
       setActiveEditingBillNumber(null);
       setActiveEditingOriginalItems([]);
