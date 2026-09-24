@@ -2030,7 +2030,7 @@ export default function BbCafeDesktopPos() {
                 newVisits = prevVisits + 1;
               }
 
-              await setDoc(userRef, { 
+             await setDoc(userRef, { 
                 name: customerName || "Walk-in Guest", 
                 phone: cleanPhone, 
                 points: remainingPts, 
@@ -2038,9 +2038,9 @@ export default function BbCafeDesktopPos() {
                 totalVisits: newVisits,
                 lastActive: new Date() 
               }, { merge: true });
+      } // 👈 यह ब्रैकेट छूट गया था
 
       billNumber = activeEditingBillNumber || getNextBillNumber();
-
       const orderObj = { 
         billNumber, 
         tokenNumber: token, 
