@@ -796,13 +796,14 @@ export default function BbCafeDesktopPos() {
   const activeLiveOrders = useMemo(() => liveOrders.filter((o) => (o.fulfillmentType === 'delivery' || o.fulfillmentType === 'pickup') && o.status !== 'completed' && o.status !== 'rejected'), [liveOrders]);
   const activeTableOrders = useMemo(() => liveOrders.filter((o) => o.fulfillmentType === 'table' && o.status !== 'completed' && o.status !== 'rejected'), [liveOrders]);
 
-  // Today's orders for Daily Bills
+  // Today's orders for Daily Bills (रिजेक्टेड ऑर्डर्स हटाये गए)
   const todaySettlementOrders = useMemo(() => {
     const today = new Date();
     const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0).getTime();
     return liveOrders.filter((o) => {
       const orderTime = o.timestamp?.toDate ? o.timestamp.toDate().getTime() : new Date(o.timestamp || Date.now()).getTime();
-      return orderTime >= todayStart;
+      // 🚫 रिजेक्टेड या कैंसल ऑर्डर्स डेली बिल्स में नहीं दिखेंगे
+      return orderTime >= todayStart && o.status !== 'rejected' && o.status !== 'cancelled';
     });
   }, [liveOrders]);
 
