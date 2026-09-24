@@ -3973,9 +3973,10 @@ export default function BbCafeDesktopPos() {
                             <Check size={13} /> Done
                           </button>
                           <button onClick={async () => {
-                            if (!window.confirm("Reject order?")) return;
+                            if (!window.confirm("क्या आप सच में यह ऑनलाइन ऑर्डर रिजेक्ट करना चाहते हैं?")) return;
                             await updateDoc(doc(db, "orders", order.id), { status: 'rejected', rejectedAt: new Date() });
-                            toast.success("Rejected.");
+                            setLiveOrders(prev => prev.filter(o => o.id !== order.id));
+                            toast.success("ऑर्डर रिजेक्ट कर दिया गया और हटा दिया गया! 🗑️");
                           }} className="py-2 bg-red-500/15 text-red-600 hover:bg-red-600 hover:text-white rounded-xl text-[10px] font-black uppercase flex items-center justify-center gap-1">
                             <SafeX size={13} /> Reject
                           </button>
