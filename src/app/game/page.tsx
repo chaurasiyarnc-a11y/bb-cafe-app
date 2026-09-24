@@ -378,36 +378,8 @@ export default function SurpriseArcadeGame() {
               )}
             </div>
           ) : (
-            /* नॉर्मल गेम प्ले स्क्रीन */
+            /* नॉर्मल गेम प्ले स्क्रीन (अब यहाँ कोई गेम बदलने वाला टैब नहीं है) */
             <>
-              {/* 🎮 गेम स्विचर टैब्स (1 क्लिक में गेम बदलने के लिए) */}
-              <div style={{ display: "flex", justifyContent: "center", gap: "6px", marginBottom: "15px", flexWrap: "wrap" }}>
-                {[
-                  { id: 1, label: "🎡 लकी पहिया" },
-                  { id: 2, label: "🪙 स्क्रैच कार्ड" },
-                  { id: 3, label: "🎰 777 स्लॉट" },
-                  { id: 4, label: "🎁 मिस्ट्री बॉक्स" },
-                ].map((game) => (
-                  <button
-                    key={game.id}
-                    type="button"
-                    onClick={() => setSelectedGame(game.id)}
-                    style={{
-                      padding: "8px 12px",
-                      borderRadius: "12px",
-                      border: selectedGame === game.id ? "2px solid #f1c40f" : "1px solid #334155",
-                      backgroundColor: selectedGame === game.id ? "#334155" : "#1e293b",
-                      color: selectedGame === game.id ? "#f1c40f" : "#94a3b8",
-                      fontWeight: "bold",
-                      fontSize: "12px",
-                      cursor: "pointer",
-                    }}
-                  >
-                    {game.label}
-                  </button>
-                ))}
-              </div>
-
               {/* कूपन कोड (जीतने पर) */}
               {couponCode && (
                 <div style={{ backgroundColor: "#1e293b", border: "2px dashed #22c55e", padding: "10px 18px", borderRadius: "12px", display: "inline-block", marginBottom: "15px" }}>
@@ -416,7 +388,7 @@ export default function SurpriseArcadeGame() {
                 </div>
               )}
 
-              {/* 4 में से चयनित गेम */}
+              {/* जो 1 गेम सिस्टम ने चुना है, सिर्फ वही दिखेगा */}
               {selectedGame === 1 && <SpinWheelGame onFinish={executeGameResult} onWin={(p, v) => { setCouponCode(v); startTimer(); }} />}
               {selectedGame === 2 && <ScratchCardGame onFinish={executeGameResult} onWin={(p, v) => { setCouponCode(v); startTimer(); }} />}
               {selectedGame === 3 && <SlotMachineGame onFinish={executeGameResult} onWin={(p, v) => { setCouponCode(v); startTimer(); }} />}
@@ -518,13 +490,12 @@ function SpinWheelGame({ onFinish, onWin }: { onFinish: () => Promise<any>; onWi
 }
 
 /* =========================================================================
-   गेम 2: 🪙 लकी स्क्रैच कार्ड (CRITICAL BUG FIXED)
+   गेम 2: 🪙 लकी स्क्रैच कार्ड
 ========================================================================= */
 function ScratchCardGame({ onFinish, onWin }: { onFinish: () => Promise<any>; onWin: (p: string, v: string | null) => void }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [cardPrize, setCardPrize] = useState<string>("?");
   
-  // 🔒 Security Fix: useRef ensures instantaneous locking of state to prevent multiple database updates
   const hasStartedRef = useRef(false); 
   const [hasStartedUI, setHasStartedUI] = useState(false);
 
@@ -555,7 +526,6 @@ function ScratchCardGame({ onFinish, onWin }: { onFinish: () => Promise<any>; on
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    // सिर्फ एक बार कॉल होगा (Immediate lock with useRef)
     if (!hasStartedRef.current) {
       hasStartedRef.current = true;
       setHasStartedUI(true);
@@ -581,7 +551,6 @@ function ScratchCardGame({ onFinish, onWin }: { onFinish: () => Promise<any>; on
       <p style={{ color: "#cbd5e1", fontSize: "14px", marginBottom: "15px" }}>कार्ड को उंगली से रगड़कर अपना इनाम खोलें!</p>
       
       <div style={{ position: "relative", width: "280px", height: "180px", margin: "0 auto 20px", borderRadius: "16px", overflow: "hidden", boxShadow: "0 8px 25px rgba(0,0,0,0.5)" }}>
-        {/* नीचे छिपा हुआ इनाम */}
         <div style={{ position: "absolute", inset: 0, backgroundColor: "#1e293b", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", border: "2px solid #eab308", borderRadius: "16px" }}>
           <span style={{ fontSize: "40px" }}>{cardPrize === "Better Luck" ? "💔" : "🎉"}</span>
           <strong style={{ fontSize: "18px", color: cardPrize === "Better Luck" ? "#94a3b8" : "#22c55e", marginTop: "8px" }}>
@@ -589,7 +558,6 @@ function ScratchCardGame({ onFinish, onWin }: { onFinish: () => Promise<any>; on
           </strong>
         </div>
 
-        {/* ऊपर की सोने वाली स्क्रैच परत */}
         <canvas
           ref={canvasRef}
           width={280}
