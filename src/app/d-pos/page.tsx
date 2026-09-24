@@ -4170,10 +4170,20 @@ export default function BbCafeDesktopPos() {
                           </div>
                         </div>
                         
-                        <div className="flex gap-2">
+                        <div className="flex gap-1.5 items-center">
+                          {/* 🗑️ डिलीट बटन */}
+                          <button 
+                            type="button"
+                            onClick={() => handleDeleteCustomer(cust)} 
+                            className="p-2 bg-red-50 dark:bg-red-950/30 hover:bg-red-600 hover:text-white text-red-600 border border-red-200 dark:border-red-800/40 rounded-xl transition-all shrink-0 shadow-sm"
+                            title="ग्राहक को डिलीट करें"
+                          >
+                             <SafeTrash2 size={14} />
+                          </button>
+
                           {/* 1. Edit Button */}
-                          <button onClick={() => openEditCustomerModal(cust)} className="flex-1 py-2 bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 text-neutral-800 dark:text-white border border-neutral-300 dark:border-neutral-700 rounded-xl text-xs font-black uppercase flex items-center justify-center gap-1.5 transition-colors">
-                             <SafeEdit3 size={14} /> Edit
+                          <button onClick={() => openEditCustomerModal(cust)} className="flex-1 py-2 bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 text-neutral-800 dark:text-white border border-neutral-300 dark:border-neutral-700 rounded-xl text-xs font-black uppercase flex items-center justify-center gap-1 transition-colors">
+                             <SafeEdit3 size={13} /> Edit
                           </button>
                           
                           {/* 2. History Button */}
