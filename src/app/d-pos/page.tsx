@@ -505,7 +505,16 @@ export default function BbCafeDesktopPos() {
       await setDoc(userRef, payload, { merge: true });
       
       toast.dismiss(toastId);
-      // 🗑️ ग्राहक को कन्फर्मेशन लेकर डिलीट करने का फंक्शन
+      toast.success("ग्राहक की जानकारी सेव हो गई! ✅");
+      setIsAddEditCustModalOpen(false);
+      fetchAllCustomers();
+    } catch (err) {
+      toast.dismiss(toastId);
+      toast.error("ग्राहक को सेव करने में त्रुटि आई");
+    }
+  };
+
+  // 🗑️ ग्राहक को कन्फर्मेशन लेकर डिलीट करने का फंक्शन
   const handleDeleteCustomer = async (cust: any) => {
     triggerBeep('tap');
     const cleanPhone = cust.phone || cust.id;
@@ -529,6 +538,7 @@ export default function BbCafeDesktopPos() {
       toast.error("ग्राहक को डिलीट करने में त्रुटि आई!");
     }
   };
+
 // 👉 NEW: ADVANCED LOYVERSE CSV IMPORT (With Duplicate Merging)
   const handleImportCustomersCSV = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
