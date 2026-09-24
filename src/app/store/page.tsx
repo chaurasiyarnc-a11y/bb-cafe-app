@@ -1010,7 +1010,7 @@ export default function StoreStockPage() {
       text += `${idx + 1}. ${item.name} ${orderStr}\n`;
     });
 
-    cconst encoded = encodeURIComponent(text);
+    const encoded = encodeURIComponent(text);
     window.open(`https://api.whatsapp.com/send?text=${encoded}`, '_blank');
   };
 
