@@ -694,7 +694,7 @@ export default function BbCafeDesktopPos() {
   const [activeEditingOrderId, setActiveEditingOrderId] = useState<string | null>(null);
   const [activeEditingBillNumber, setActiveEditingBillNumber] = useState<number | null>(null);
   const [activeEditingOriginalItems, setActiveEditingOriginalItems] = useState<PosCartItem[]>([]);
-
+  const [activeEditingPreviousOrder, setActiveEditingPreviousOrder] = useState<any>(null); // 👈 पुराने बिल का हिसाब याद रखने के लिए
   const [isSubmittingOrder, setIsSubmittingOrder] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'upi' | 'split' | 'due'>('cash');
   const [splitCashAmount, setSplitCashAmount] = useState<number>(0);
