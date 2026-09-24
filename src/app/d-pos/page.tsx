@@ -165,8 +165,90 @@ export default function BbCafeDesktopPos() {
   const [newCustNameInput, setNewCustNameInput] = useState('');
   const [newCustAddressInput, setNewCustAddressInput] = useState('');
 
-  // Cash Change Calculator
+ // Cash Change Calculator
   const [cashTendered, setCashTendered] = useState<number | ''>('');
+
+  // 🎰 GAME VERIFICATION STATES & FUNCTIONS (यह छूट गया था)
+  const [isGameVerifyModalOpen, setIsGameVerifyModalOpen] = useState(false);
+  const [gameSearchInput, setGameSearchInput] = useState('');
+  const [gameVerifyResult, setGameVerifyResult] = useState<any>(null);
+  const [isGameVerifying, setIsGameVerifying] = useState(false);
+  const [isClaimingReward, setIsClaimingReward] = useState(false);
+
+  // गेम कूपन / नंबर चेक करने का फंक्शन
+  const handleVerifyGameCode = async (searchVal: string) => {
+    const term = searchVal.trim();
+    if (!term) return toast.error("मोबाइल नंबर या BOM-XXXX कोड डालें!");
+
+    setIsGameVerifying(true);
+    setGameVerifyResult(null);
+
+    try {
+      let targetDoc: any = null;
+      const cleanPhone = term.replace(/\D/g, '').slice(-10);
+
+      // 1. अगर 10 अंकों का नंबर डाला है
+      if (cleanPhone.length === 10) {
+        const snap = await getDoc(doc(db, "customer_points", cleanPhone));
+        if (snap.exists()) targetDoc = { id: snap.id, ...snap.data() };
+      }
+
+      // 2. अगर कूपन कोड डाला है (उदा. BOM-4821)
+      if (!targetDoc && term.toUpperCase().startsWith("BOM-")) {
+        const q = query(collection(db, "customer_points"), where("voucherCode", "==", term.toUpperCase()), limit(1));
+        const qSnap = await getDocs(q);
+        if (!qSnap.empty) targetDoc = { id: qSnap.docs[0].id, ...qSnap.docs[0].data() };
+      }
+
+      if (!targetDoc) {
+        toast.error("❌ कोई रिकॉर्ड नहीं मिला! (फर्जी नंबर या कोड)");
+        setIsGameVerifying(false);
+        return;
+      }
+
+      const playedAt = targetDoc.lastPlayedAt?.toDate ? targetDoc.lastPlayedAt.toDate() : null;
+      const minutesAgo = playedAt ? Math.floor((Date.now() - playedAt.getTime()) / 60000) : 999;
+
+      setGameVerifyResult({
+        ...targetDoc,
+        minutesAgo
+      });
+
+      if (targetDoc.voucherClaimed) {
+        toast.error("🚫 यह कूपन पहले ही इस्तेमाल हो चुका है!");
+      } else if (targetDoc.lastPrizeWon === "Better Luck") {
+        toast("⚠️ इस ग्राहक को कोई इनाम नहीं मिला था (Better Luck)!", { icon: "ℹ️" });
+      } else {
+        toast.success(`असली इनाम: ${targetDoc.lastPrizeWon} ✅`);
+      }
+    } catch (e) {
+      toast.error("वेरिफाई करने में समस्या आई!");
+    } finally {
+      setIsGameVerifying(false);
+    }
+  };
+
+  // इनाम को इस्तेमाल (Redeem) मार्क करना
+  const handleClaimGameReward = async () => {
+    if (!gameVerifyResult) return;
+    setIsClaimingReward(true);
+
+    try {
+      const phoneId = gameVerifyResult.phone || gameVerifyResult.id;
+      await updateDoc(doc(db, "customer_points", phoneId), {
+        voucherClaimed: true,
+        voucherClaimedAt: new Date()
+      });
+
+      setGameVerifyResult((prev: any) => ({ ...prev, voucherClaimed: true }));
+      toast.success("🎉 इनाम दे दिया गया और सिस्टम में लॉक हो गया!");
+      fetchAllCustomers();
+    } catch (e) {
+      toast.error("स्टेटस अपडेट नहीं हो सका");
+    } finally {
+      setIsClaimingReward(false);
+    }
+  };
 
   // Menu States
   const [liveOrders, setLiveOrders] = useState<any[]>([]);
