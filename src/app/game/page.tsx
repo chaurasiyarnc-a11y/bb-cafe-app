@@ -92,12 +92,39 @@ export default function SurpriseArcadeGame() {
     }
 
     setIsLoading(true);
-    const ONE_HOUR = 60 * 60 * 1000;
+    cconst ONE_HOUR = 60 * 60 * 1000;
     const now = Date.now();
 
+    // 🧪 टेस्टिंग मोड जांचें (अगर URL में ?test=true है या नंबर 9999999999 है, तो 1 घंटे का लॉक हटा दें)
+    const isTestMode =
+      (typeof window !== "undefined" && window.location.search.includes("test=true")) ||
+      cleanPhone === "9999999999";
+
     try {
-      // 1. डेटाबेस से Cooldown चेक
+      // 1. डेटाबेस से Cooldown चेक (टेस्टिंग मोड में यह नहीं चलेगा)
       const userRef = doc(db, "customer_points", cleanPhone);
+      const userSnap = await getDoc(userRef);
+
+      if (!isTestMode && userSnap.exists()) {
+        const data = userSnap.data();
+        if (data?.lastPlayedAt) {
+          const lastPlayedMillis = (data.lastPlayedAt as Timestamp).toMillis();
+          const elapsed = now - lastPlayedMillis;
+          if (elapsed < ONE_HOUR) {
+            const remMin = Math.ceil((ONE_HOUR - elapsed) / 60000);
+            setIsLoading(false);
+            return toast.error(`आप हाल ही में खेल चुके हैं! कृपया ${remMin} मिनट बाद आएं।`, { duration: 5000 });
+          }
+        }
+      }
+
+      // 2. डिवाइस लोकलस्टोरेज चेक
+      const deviceLast = localStorage.getItem("device_last_played");
+      if (!isTestMode && deviceLast && now - parseInt(deviceLast, 10) < ONE_HOUR) {
+        const rem = Math.ceil((ONE_HOUR - (now - parseInt(deviceLast, 10))) / 60000);
+        setIsLoading(false);
+        return toast.error(`इस मोबाइल से खेला जा चुका है! कृपया ${rem} मिनट बाद प्रयास करें।`);
+      }
       const userSnap = await getDoc(userRef);
 
       if (userSnap.exists()) {
