@@ -485,7 +485,7 @@ export default function BbCafeDesktopPos() {
     }
   }, [isLoggedIn]);
 
-  const handleSaveCustomerProfile = async (e: React.FormEvent) => {
+ const handleSaveCustomerProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleanPhone = getSanitizedPhone(custFormPhone);
     if (cleanPhone.length !== 10) return toast.error("10-अंकों का सही मोबाइल नंबर डालें!");
@@ -539,6 +539,7 @@ export default function BbCafeDesktopPos() {
     }
   };
 
+// 👉 NEW: ADVANCED LOYVERSE CSV IMPORT (With Duplicate Merging)
 // 👉 NEW: ADVANCED LOYVERSE CSV IMPORT (With Duplicate Merging)
   const handleImportCustomersCSV = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
