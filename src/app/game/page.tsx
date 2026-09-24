@@ -41,6 +41,7 @@ export default function SurpriseArcadeGame() {
   // 1: Spin, 2: Scratch, 3: Slot, 4: Mystery Box
   const [selectedGame, setSelectedGame] = useState<number>(1);
   const [couponCode, setCouponCode] = useState<string | null>(null);
+  const [alreadyWonPrize, setAlreadyWonPrize] = useState<string | null>(null); // अगर यूज़र रिफ्रेश करता है
   const [timerText, setTimerText] = useState<string | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -92,25 +93,43 @@ export default function SurpriseArcadeGame() {
     const ONE_HOUR = 60 * 60 * 1000;
     const now = Date.now();
 
-    // 🧪 टेस्टिंग मोड (URL में ?test=true या 9999999999 पर नो-लॉक)
+    // 🔒 सिक्योरिटी फिक्स: टेस्ट मोड केवल लोकलहोस्ट (development) पर काम करेगा
     const isTestMode =
-      (typeof window !== "undefined" && window.location.search.includes("test=true")) ||
+      (process.env.NODE_ENV === "development" &&
+        typeof window !== "undefined" &&
+        window.location.search.includes("test=true")) ||
       cleanPhone === "9999999999";
 
     try {
       const userRef = doc(db, "customer_points", cleanPhone);
       const userSnap = await getDoc(userRef);
 
-      // 1. डेटाबेस से Cooldown चेक
+      // 1. डेटाबेस से Cooldown और पुराना कूपन चेक
       if (!isTestMode && userSnap.exists()) {
         const data = userSnap.data();
         if (data?.lastPlayedAt) {
           const lastPlayedMillis = (data.lastPlayedAt as Timestamp).toMillis();
           const elapsed = now - lastPlayedMillis;
+
           if (elapsed < ONE_HOUR) {
+            // 💡 UX फिक्स: अगर यूज़र गलती से रिफ्रेश कर ले, तो उसका कूपन न खोए
+            if (data.voucherCode && !data.voucherClaimed) {
+              setName(data.name || cleanName);
+              setPhoneNumber(cleanPhone);
+              setCouponCode(data.voucherCode);
+              setAlreadyWonPrize(data.lastPrizeWon);
+              setIsLoggedIn(true);
+              startTimer();
+              toast.success("आपका जीता हुआ कूपन अभी भी एक्टिव है!");
+              setIsLoading(false);
+              return; // आगे बढ़ने से रोकें और सीधा कूपन दिखाएं
+            }
+
             const remMin = Math.ceil((ONE_HOUR - elapsed) / 60000);
             setIsLoading(false);
-            return toast.error(`आप हाल ही में खेल चुके हैं! कृपया ${remMin} मिनट बाद आएं।`, { duration: 5000 });
+            return toast.error(`आप हाल ही में खेल चुके हैं! कृपया ${remMin} मिनट बाद आएं।`, {
+              duration: 5000,
+            });
           }
         }
       }
@@ -124,12 +143,16 @@ export default function SurpriseArcadeGame() {
       }
 
       // यूजर डेटा अपडेट
-      await setDoc(userRef, {
-        name: cleanName,
-        phone: cleanPhone,
-        table: tableNo,
-        lastActive: serverTimestamp(),
-      }, { merge: true });
+      await setDoc(
+        userRef,
+        {
+          name: cleanName,
+          phone: cleanPhone,
+          table: tableNo,
+          lastActive: serverTimestamp(),
+        },
+        { merge: true }
+      );
 
       // 🎲 सच्चा रैंडम चुनाव (पिछला खेला गया गेम रिपीट नहीं होगा)
       const lastGame = parseInt(localStorage.getItem("last_selected_game") || "0", 10);
@@ -140,6 +163,7 @@ export default function SurpriseArcadeGame() {
       setSelectedGame(randomGameNum);
       setName(cleanName);
       setPhoneNumber(cleanPhone);
+      setAlreadyWonPrize(null);
       setIsLoggedIn(true);
 
       const gameNames = ["", "लकी स्पिन व्हील 🎡", "लकी स्क्रैच कार्ड 🪙", "777 स्लॉट मशीन 🎰", "मिस्ट्री गिफ्ट बॉक्स 🎁"];
@@ -172,13 +196,17 @@ export default function SurpriseArcadeGame() {
 
     try {
       const userRef = doc(db, "customer_points", phoneNumber);
-      await setDoc(userRef, {
-        lastPlayedAt: serverTimestamp(),
-        lastPrizeWon: prize,
-        voucherCode: voucher,
-        table: tableNo,
-        voucherClaimed: false,
-      }, { merge: true });
+      await setDoc(
+        userRef,
+        {
+          lastPlayedAt: serverTimestamp(),
+          lastPrizeWon: prize,
+          voucherCode: voucher,
+          table: tableNo,
+          voucherClaimed: false,
+        },
+        { merge: true }
+      );
     } catch (e) {
       console.error(e);
     }
@@ -187,25 +215,55 @@ export default function SurpriseArcadeGame() {
   };
 
   return (
-    <div style={{ fontFamily: "system-ui, -apple-system, sans-serif", backgroundColor: "#0b0f19", color: "#ffffff", minHeight: "100vh", textAlign: "center", padding: "25px 15px", boxSizing: "border-box" }}>
+    <div
+      style={{
+        fontFamily: "system-ui, -apple-system, sans-serif",
+        backgroundColor: "#0b0f19",
+        color: "#ffffff",
+        minHeight: "100vh",
+        textAlign: "center",
+        padding: "25px 15px",
+        boxSizing: "border-box",
+      }}
+    >
       <Toaster position="top-center" />
 
       {/* हेडर */}
       <div style={{ marginBottom: "25px" }}>
-        <div style={{ display: "inline-block", backgroundColor: "rgba(241, 196, 15, 0.15)", color: "#f1c40f", padding: "4px 14px", borderRadius: "20px", fontSize: "12px", fontWeight: "bold", marginBottom: "8px", border: "1px solid rgba(241, 196, 15, 0.3)" }}>
+        <div
+          style={{
+            display: "inline-block",
+            backgroundColor: "rgba(241, 196, 15, 0.15)",
+            color: "#f1c40f",
+            padding: "4px 14px",
+            borderRadius: "20px",
+            fontSize: "12px",
+            fontWeight: "bold",
+            marginBottom: "8px",
+            border: "1px solid rgba(241, 196, 15, 0.3)",
+          }}
+        >
           {tableNo}
         </div>
         <h1 style={{ color: "#f1c40f", fontSize: "26px", margin: "0 0 6px 0", fontWeight: "900", letterSpacing: "0.5px" }}>
           बम बम कैफे, मोहंद्रा
         </h1>
-        <p style={{ color: "#94a3b8", fontSize: "14px", margin: 0 }}>
-          किस्मत आजमाएं और जीतें स्वादिष्ट फ्री ट्रीट!
-        </p>
+        <p style={{ color: "#94a3b8", fontSize: "14px", margin: 0 }}>किस्मत आजमाएं और जीतें स्वादिष्ट फ्री ट्रीट!</p>
       </div>
 
       {!isLoggedIn ? (
         /* साफ और स्पष्ट इनपुट फॉर्म */
-        <div style={{ maxWidth: "340px", margin: "0 auto", backgroundColor: "#1e293b", padding: "25px 20px", borderRadius: "20px", border: "1px solid #334155", boxShadow: "0 10px 25px rgba(0,0,0,0.5)" }}>
+        <div
+          style={{
+            maxWidth: "340px",
+            margin: "0 auto",
+            backgroundColor: "#1e293b",
+            padding: "25px 20px",
+            borderRadius: "20px",
+            border: "1px solid #334155",
+            boxShadow: "0 10px 25px rgba(0,0,0,0.5)",
+          }}
+        >
           <div style={{ fontSize: "42px", marginBottom: "8px" }}>🎁</div>
           <h2 style={{ fontSize: "18px", margin: "0 0 16px 0", color: "#38bdf8", fontWeight: "bold" }}>
             खेलने के लिए विवरण दर्ज करें
@@ -223,7 +281,6 @@ export default function SurpriseArcadeGame() {
                 placeholder="उदा. राहुल शर्मा"
                 value={name}
                 onChange={(e) => {
-                  // टाइप करते ही हर शब्द का पहला अक्षर कैपिटल (A-Z) हो जाएगा
                   const val = e.target.value;
                   const capitalized = val.replace(/(^\w|\s\w)/g, (m) => m.toUpperCase());
                   setName(capitalized);
@@ -299,104 +356,79 @@ export default function SurpriseArcadeGame() {
       ) : (
         /* गेम स्क्रीन */
         <div style={{ maxWidth: "420px", margin: "0 auto" }}>
-          {/* 🎮 गेम स्विचर टैब्स (1 क्लिक में गेम बदलने के लिए) */}
-          <div style={{ display: "flex", justifyContent: "center", gap: "6px", marginBottom: "15px", flexWrap: "wrap" }}>
-            <button
-              type="button"
-              onClick={() => setSelectedGame(1)}
-              style={{
-                padding: "8px 12px",
-                borderRadius: "12px",
-                border: selectedGame === 1 ? "2px solid #f1c40f" : "1px solid #334155",
-                backgroundColor: selectedGame === 1 ? "#334155" : "#1e293b",
-                color: selectedGame === 1 ? "#f1c40f" : "#94a3b8",
-                fontWeight: "bold",
-                fontSize: "12px",
-                cursor: "pointer",
-              }}
-            >
-              🎡 लकी पहिया
-            </button>
-            <button
-              type="button"
-              onClick={() => setSelectedGame(2)}
-              style={{
-                padding: "8px 12px",
-                borderRadius: "12px",
-                border: selectedGame === 2 ? "2px solid #f1c40f" : "1px solid #334155",
-                backgroundColor: selectedGame === 2 ? "#334155" : "#1e293b",
-                color: selectedGame === 2 ? "#f1c40f" : "#94a3b8",
-                fontWeight: "bold",
-                fontSize: "12px",
-                cursor: "pointer",
-              }}
-            >
-              🪙 स्क्रैच कार्ड
-            </button>
-            <button
-              type="button"
-              onClick={() => setSelectedGame(3)}
-              style={{
-                padding: "8px 12px",
-                borderRadius: "12px",
-                border: selectedGame === 3 ? "2px solid #f1c40f" : "1px solid #334155",
-                backgroundColor: selectedGame === 3 ? "#334155" : "#1e293b",
-                color: selectedGame === 3 ? "#f1c40f" : "#94a3b8",
-                fontWeight: "bold",
-                fontSize: "12px",
-                cursor: "pointer",
-              }}
-            >
-              🎰 777 स्लॉट
-            </button>
-            <button
-              type="button"
-              onClick={() => setSelectedGame(4)}
-              style={{
-                padding: "8px 12px",
-                borderRadius: "12px",
-                border: selectedGame === 4 ? "2px solid #f1c40f" : "1px solid #334155",
-                backgroundColor: selectedGame === 4 ? "#334155" : "#1e293b",
-                color: selectedGame === 4 ? "#f1c40f" : "#94a3b8",
-                fontWeight: "bold",
-                fontSize: "12px",
-                cursor: "pointer",
-              }}
-            >
-              🎁 मिस्ट्री बॉक्स
-            </button>
-          </div>
-
-          {/* कूपन कोड (जीतने पर) */}
-          {couponCode && (
-            <div style={{ backgroundColor: "#1e293b", border: "2px dashed #22c55e", padding: "10px 18px", borderRadius: "12px", display: "inline-block", marginBottom: "15px" }}>
-              <span style={{ fontSize: "13px", color: "#94a3b8" }}>कूपन कोड: </span>
-              <strong style={{ fontSize: "20px", color: "#22c55e", letterSpacing: "2px" }}>{couponCode}</strong>
+          {alreadyWonPrize ? (
+            /* अगर यूज़र रिफ्रेश के बाद वापस आता है और उसका कूपन बचा है तो यह स्क्रीन दिखेगी */
+            <div style={{ textAlign: "center", padding: "20px", backgroundColor: "#1e293b", borderRadius: "16px", border: "2px solid #22c55e" }}>
+              <h2 style={{ color: "#22c55e", margin: "0 0 10px 0" }}>🎉 आपका एक्टिव इनाम</h2>
+              <p style={{ fontSize: "20px", color: "#f1c40f", fontWeight: "bold" }}>{alreadyWonPrize}</p>
+              
+              <div style={{ backgroundColor: "#0f172a", border: "2px dashed #22c55e", padding: "12px 20px", borderRadius: "12px", display: "inline-block", margin: "15px 0" }}>
+                <span style={{ fontSize: "14px", color: "#94a3b8", display: "block", marginBottom: "5px" }}>कूपन कोड: </span>
+                <strong style={{ fontSize: "24px", color: "#22c55e", letterSpacing: "3px" }}>{couponCode}</strong>
+              </div>
+              
+              <p style={{ color: "#cbd5e1", fontSize: "14px", lineHeight: "1.5" }}>
+                यह स्क्रीन अपने वेटर या काउंटर पर दिखाएं और अपनी ट्रीट प्राप्त करें!
+              </p>
+              
+              {timerText && (
+                <div style={{ marginTop: "18px", fontSize: "15px", color: timerText.includes("Expired") ? "#ef4444" : "#f59e0b", fontWeight: "bold" }}>
+                  {timerText}
+                </div>
+              )}
             </div>
-          )}
+          ) : (
+            /* नॉर्मल गेम प्ले स्क्रीन */
+            <>
+              {/* 🎮 गेम स्विचर टैब्स (1 क्लिक में गेम बदलने के लिए) */}
+              <div style={{ display: "flex", justifyContent: "center", gap: "6px", marginBottom: "15px", flexWrap: "wrap" }}>
+                {[
+                  { id: 1, label: "🎡 लकी पहिया" },
+                  { id: 2, label: "🪙 स्क्रैच कार्ड" },
+                  { id: 3, label: "🎰 777 स्लॉट" },
+                  { id: 4, label: "🎁 मिस्ट्री बॉक्स" },
+                ].map((game) => (
+                  <button
+                    key={game.id}
+                    type="button"
+                    onClick={() => setSelectedGame(game.id)}
+                    style={{
+                      padding: "8px 12px",
+                      borderRadius: "12px",
+                      border: selectedGame === game.id ? "2px solid #f1c40f" : "1px solid #334155",
+                      backgroundColor: selectedGame === game.id ? "#334155" : "#1e293b",
+                      color: selectedGame === game.id ? "#f1c40f" : "#94a3b8",
+                      fontWeight: "bold",
+                      fontSize: "12px",
+                      cursor: "pointer",
+                    }}
+                  >
+                    {game.label}
+                  </button>
+                ))}
+              </div>
 
-          {/* 4 में से चयनित गेम */}
-          {selectedGame === 1 && (
-            <SpinWheelGame onFinish={executeGameResult} onWin={(p, v) => { setCouponCode(v); startTimer(); }} />
-          )}
+              {/* कूपन कोड (जीतने पर) */}
+              {couponCode && (
+                <div style={{ backgroundColor: "#1e293b", border: "2px dashed #22c55e", padding: "10px 18px", borderRadius: "12px", display: "inline-block", marginBottom: "15px" }}>
+                  <span style={{ fontSize: "13px", color: "#94a3b8" }}>कूपन कोड: </span>
+                  <strong style={{ fontSize: "20px", color: "#22c55e", letterSpacing: "2px" }}>{couponCode}</strong>
+                </div>
+              )}
 
-          {selectedGame === 2 && (
-            <ScratchCardGame onFinish={executeGameResult} onWin={(p, v) => { setCouponCode(v); startTimer(); }} />
-          )}
+              {/* 4 में से चयनित गेम */}
+              {selectedGame === 1 && <SpinWheelGame onFinish={executeGameResult} onWin={(p, v) => { setCouponCode(v); startTimer(); }} />}
+              {selectedGame === 2 && <ScratchCardGame onFinish={executeGameResult} onWin={(p, v) => { setCouponCode(v); startTimer(); }} />}
+              {selectedGame === 3 && <SlotMachineGame onFinish={executeGameResult} onWin={(p, v) => { setCouponCode(v); startTimer(); }} />}
+              {selectedGame === 4 && <MysteryBoxGame onFinish={executeGameResult} onWin={(p, v) => { setCouponCode(v); startTimer(); }} />}
 
-          {selectedGame === 3 && (
-            <SlotMachineGame onFinish={executeGameResult} onWin={(p, v) => { setCouponCode(v); startTimer(); }} />
-          )}
-
-          {selectedGame === 4 && (
-            <MysteryBoxGame onFinish={executeGameResult} onWin={(p, v) => { setCouponCode(v); startTimer(); }} />
-          )}
-
-          {/* 5 मिनट का टाइमर */}
-          {timerText && (
-            <div style={{ marginTop: "18px", fontSize: "15px", color: timerText.includes("Expired") ? "#ef4444" : "#f59e0b", fontWeight: "bold" }}>
-              {timerText}
-            </div>
+              {/* 5 मिनट का टाइमर */}
+              {timerText && (
+                <div style={{ marginTop: "18px", fontSize: "15px", color: timerText.includes("Expired") ? "#ef4444" : "#f59e0b", fontWeight: "bold" }}>
+                  {timerText}
+                </div>
+              )}
+            </>
           )}
         </div>
       )}
@@ -486,12 +518,15 @@ function SpinWheelGame({ onFinish, onWin }: { onFinish: () => Promise<any>; onWi
 }
 
 /* =========================================================================
-   गेम 2: 🪙 लकी स्क्रैच कार्ड (Google Pay स्टाइल)
+   गेम 2: 🪙 लकी स्क्रैच कार्ड (CRITICAL BUG FIXED)
 ========================================================================= */
 function ScratchCardGame({ onFinish, onWin }: { onFinish: () => Promise<any>; onWin: (p: string, v: string | null) => void }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [cardPrize, setCardPrize] = useState<string>("?");
-  const [hasStarted, setHasStarted] = useState(false);
+  
+  // 🔒 Security Fix: useRef ensures instantaneous locking of state to prevent multiple database updates
+  const hasStartedRef = useRef(false); 
+  const [hasStartedUI, setHasStartedUI] = useState(false);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -520,8 +555,10 @@ function ScratchCardGame({ onFinish, onWin }: { onFinish: () => Promise<any>; on
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    if (!hasStarted) {
-      setHasStarted(true);
+    // सिर्फ एक बार कॉल होगा (Immediate lock with useRef)
+    if (!hasStartedRef.current) {
+      hasStartedRef.current = true;
+      setHasStartedUI(true);
       const res = await onFinish();
       setCardPrize(res.prize);
       if (res.prize !== "Better Luck") onWin(res.prize, res.voucher);
