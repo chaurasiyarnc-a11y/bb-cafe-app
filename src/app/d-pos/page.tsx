@@ -505,12 +505,28 @@ export default function BbCafeDesktopPos() {
       await setDoc(userRef, payload, { merge: true });
       
       toast.dismiss(toastId);
-      toast.success("ग्राहक की जानकारी सेव हो गई! ✅");
-      setIsAddEditCustModalOpen(false);
-      fetchAllCustomers();
-    } catch (err) {
+      // 🗑️ ग्राहक को कन्फर्मेशन लेकर डिलीट करने का फंक्शन
+  const handleDeleteCustomer = async (cust: any) => {
+    triggerBeep('tap');
+    const cleanPhone = cust.phone || cust.id;
+    const custName = cust.name || 'Valued Guest';
+
+    // पहले यूजर से पूछेंगे (कन्फर्मेशन अलर्ट)
+    const isConfirmed = window.confirm(
+      `⚠️ क्या आप सच में ग्राहक "${custName}" (${cleanPhone}) को डिलीट करना चाहते हैं?\n\nयह डेटाबेस से हमेशा के लिए हट जाएगा!`
+    );
+
+    if (!isConfirmed) return;
+
+    const toastId = toast.loading("ग्राहक डिलीट हो रहा है...");
+    try {
+      await deleteDoc(doc(db, "customer_points", cleanPhone));
+      setAllCustomers(prev => prev.filter(c => (c.phone || c.id) !== cleanPhone));
       toast.dismiss(toastId);
-      toast.error("ग्राहक को सेव करने में त्रुटि आई");
+      toast.success(`"${custName}" सफलतापूर्वक डिलीट कर दिया गया! 🗑️`);
+    } catch (e) {
+      toast.dismiss(toastId);
+      toast.error("ग्राहक को डिलीट करने में त्रुटि आई!");
     }
   };
 // 👉 NEW: ADVANCED LOYVERSE CSV IMPORT (With Duplicate Merging)
