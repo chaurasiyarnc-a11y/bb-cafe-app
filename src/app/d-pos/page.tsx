@@ -753,8 +753,12 @@ export default function BbCafeDesktopPos() {
     }
   };
 
-  const getTotalBillPrice = () => Math.max(0, getCartSubtotal() + getGstAmountCalculated() - getCalculatedDiscountAmount() - getRedemptionDiscount()) + getDeliveryCharge();
+  const getPackingCharge = () => {
+    if (!applyPackingCharge || getCartSubtotal() === 0) return 0;
+    return Number(packingCharge) || 0;
+  };
 
+  const getTotalBillPrice = () => Math.max(0, getCartSubtotal() + getGstAmountCalculated() - getCalculatedDiscountAmount() - getRedemptionDiscount()) + getDeliveryCharge() + getPackingCharge();
   // Change Return Calculation
   const changeReturnAmount = useMemo(() => {
     if (cashTendered === '' || isNaN(Number(cashTendered))) return 0;
