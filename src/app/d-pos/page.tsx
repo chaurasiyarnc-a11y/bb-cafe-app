@@ -3254,6 +3254,7 @@ export default function BbCafeDesktopPos() {
                       )}
 
                       {getDeliveryCharge() > 0 && <div className="flex justify-between text-neutral-800 dark:text-neutral-200"><span>Delivery Charge</span><span className="font-mono">+₹{getDeliveryCharge()}</span></div>}
+                      {getPackingCharge() > 0 && <div className="flex justify-between text-neutral-800 dark:text-neutral-200"><span>Packing Charge (📦)</span><span className="font-mono text-orange-600 dark:text-orange-400">+₹{getPackingCharge()}</span></div>}
                       {getCalculatedDiscountAmount() > 0 && <div className="flex justify-between text-orange-600 font-bold"><span>Discount {appliedPromoName && `(${appliedPromoName})`}</span><span className="font-mono">-₹{getCalculatedDiscountAmount()}</span></div>}
                       {isRedeemingPoints && <div className="flex justify-between text-amber-600 font-bold"><span>Points Redeemed</span><span className="font-mono">-₹{getRedemptionDiscount()}</span></div>}
                       <div className="flex justify-between text-sm font-black text-green-600 dark:text-green-500 pt-1 border-t border-dashed border-neutral-400">
