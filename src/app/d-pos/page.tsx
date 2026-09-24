@@ -2129,6 +2129,7 @@ export default function BbCafeDesktopPos() {
 
     setActiveEditingOrderId(order.id);
     setActiveEditingBillNumber(order.billNumber);
+    setActiveEditingPreviousOrder(order); // 👈 पुराने बिल का डेटा सेव किया
     setActiveEditingOriginalItems(order.items ? JSON.parse(JSON.stringify(order.items)) : []);
     setCart(order.items || []);
     
