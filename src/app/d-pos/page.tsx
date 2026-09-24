@@ -2002,7 +2002,8 @@ export default function BbCafeDesktopPos() {
         gstRate: gstEnabled ? gstRate : 0, 
         gstAmount: getGstAmountCalculated(), 
         deliveryFee: getDeliveryCharge(), 
-        total: finalTotal, 
+        packingCharge: getPackingCharge(), 
+        total: finalTotal,
         timestamp: new Date(), 
         status: 'unsettled', // Saved to Daily Bills for payment settlement
         paymentSettled: false,
