@@ -1963,6 +1963,7 @@ export default function BbCafeDesktopPos() {
       setActiveEditingOrderId(null);
       setActiveEditingBillNumber(null);
       setActiveEditingOriginalItems([]);
+      setActiveEditingPreviousOrder(null); // 👈 रीसेट
       localStorage.removeItem("bb_pos_saved_cart_pc");
       setTimeout(() => searchInputRef.current?.focus(), 60);
 
