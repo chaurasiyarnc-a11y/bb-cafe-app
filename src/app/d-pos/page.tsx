@@ -2133,9 +2133,11 @@ export default function BbCafeDesktopPos() {
       setFulfillmentType('pickup');
       setTableNumber('Table 1');
       setApplyDeliveryFee(false);
+      setApplyPackingCharge(false); // 👈 पैकिंग चार्ज रीसेट
       setActiveEditingOrderId(null);
       setActiveEditingBillNumber(null);
       setActiveEditingOriginalItems([]);
+      setActiveEditingPreviousOrder(null); // 👈 री-एडिट रीसेट
       localStorage.removeItem("bb_pos_saved_cart_pc");
       setTimeout(() => searchInputRef.current?.focus(), 80);
     } catch (err) {
