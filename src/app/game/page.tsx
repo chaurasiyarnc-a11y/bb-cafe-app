@@ -1,10 +1,10 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
-import { db } from "@/lib/firebase";
+import { db } from "@/lib/firebase"; // ध्यान दें: अगर आपका firebase पाथ अलग है तो इसे सही कर लें
 import { doc, getDoc, setDoc, serverTimestamp, Timestamp } from "firebase/firestore";
 import toast, { Toaster } from "react-hot-toast";
-import confetti from "canvas-confetti"; // 🎉 आतिशबाज़ी के लिए
+import confetti from "canvas-confetti"; 
 
 // नाम को सही टाइटल केस में बदलने के लिए
 const formatNameTitleCase = (text: string) => {
@@ -31,8 +31,10 @@ const PRIZES = [
 const PROBABILITIES = [70, 13, 7, 5, 2.5, 1.5, 1];
 const PRIZE_ICONS = ["❌", "💵", "☕", "🏷️", "🥪", "🥟", "🍚"];
 
-// 🎵 साउंड इफेक्ट्स प्ले करने का सुरक्षित फंक्शन
-export const playAudio = (type: "win" | "lose" | "spin" | "scratch") => {
+// 🎵 साउंड इफेक्ट्स प्ले करने का सुरक्षित फंक्शन (SSR Error Fixed)
+export const playAudio = (type: "win" | "lose" | "spin" | "scratch"): HTMLAudioElement | null => {
+  if (typeof window === "undefined") return null; // Next.js Server-Side Rendering Error Fix
+
   let src = "";
   if (type === "win") src = "https://assets.mixkit.co/active_storage/sfx/1435/1435-preview.mp3"; 
   if (type === "lose") src = "https://assets.mixkit.co/active_storage/sfx/1436/1436-preview.mp3"; 
@@ -52,6 +54,8 @@ export const playAudio = (type: "win" | "lose" | "spin" | "scratch") => {
 
 // 🎆 शानदार आतिशबाज़ी (Confetti) का फंक्शन
 export const triggerConfetti = () => {
+  if (typeof window === "undefined") return;
+
   const duration = 3 * 1000;
   const animationEnd = Date.now() + duration;
   const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 0 };
@@ -163,10 +167,12 @@ export default function SurpriseArcadeGame() {
         { merge: true }
       );
 
-      const lastGame = parseInt(localStorage.getItem("last_selected_game") || "0", 10);
+      const lastGame = typeof window !== "undefined" ? parseInt(localStorage.getItem("last_selected_game") || "0", 10) : 0;
       const availableGames = [1, 2, 3, 4].filter((g) => g !== lastGame);
       const randomGameNum = availableGames[Math.floor(Math.random() * availableGames.length)];
-      localStorage.setItem("last_selected_game", randomGameNum.toString());
+      if (typeof window !== "undefined") {
+        localStorage.setItem("last_selected_game", randomGameNum.toString());
+      }
 
       setSelectedGame(randomGameNum);
       setName(cleanName);
@@ -206,7 +212,7 @@ export default function SurpriseArcadeGame() {
         { merge: true }
       );
     } catch (e) {
-      console.error(e);
+      console.error("गेम सेव करते समय त्रुटि:", e);
     }
 
     return { winIdx, prize, voucher };
@@ -300,7 +306,7 @@ export default function SurpriseArcadeGame() {
                   disabled={isLoading}
                   required
                   style={{
-                    width: "100%", padding: "14px", borderRadius: "12px", border: "2px solid #3b82f6", backgroundColor: "#0f172a", color: "#ffffff", fontSize: "16px", fontWeight: "bold", textAlign: "center", outline: "none", textTransform: "capitalize", transition: "border 0.3s"
+                    width: "100%", boxSizing: "border-box", padding: "14px", borderRadius: "12px", border: "2px solid #3b82f6", backgroundColor: "#0f172a", color: "#ffffff", fontSize: "16px", fontWeight: "bold", textAlign: "center", outline: "none", textTransform: "capitalize", transition: "border 0.3s"
                   }}
                 />
               </div>
@@ -316,7 +322,7 @@ export default function SurpriseArcadeGame() {
                   disabled={isLoading}
                   required
                   style={{
-                    width: "100%", padding: "14px", borderRadius: "12px", border: "2px solid #f1c40f", backgroundColor: "#0f172a", color: "#ffffff", fontSize: "16px", fontWeight: "bold", textAlign: "center", outline: "none"
+                    width: "100%", boxSizing: "border-box", padding: "14px", borderRadius: "12px", border: "2px solid #f1c40f", backgroundColor: "#0f172a", color: "#ffffff", fontSize: "16px", fontWeight: "bold", textAlign: "center", outline: "none"
                   }}
                 />
               </div>
@@ -516,7 +522,7 @@ function ScratchCardGame({ onFinish, onEnd }: { onFinish: () => Promise<any>; on
   const handleStartInteraction = () => {
     if (!hasStartedRef.current) {
       hasStartedRef.current = true;
-      playAudio("scratch"); // मोबाइल सफारी के लिए क्लिक/टच पर ही प्ले होना चाहिए
+      playAudio("scratch"); 
       
       onFinish().then((res) => {
         setCardPrize(res.prize);
@@ -527,15 +533,15 @@ function ScratchCardGame({ onFinish, onEnd }: { onFinish: () => Promise<any>; on
     }
   };
 
-  const handleScratch = (e: any) => {
+  const handleScratch = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
     const rect = canvas.getBoundingClientRect();
-    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
     
     // Scale coordinates based on real size vs CSS size
     const scaleX = canvas.width / rect.width / (window.devicePixelRatio || 1);
