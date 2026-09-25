@@ -54,21 +54,21 @@ export const playAudio = (type: "win" | "lose" | "spin" | "scratch"): HTMLAudioE
   }
 };
 
-// 🎆 आतिशबाज़ी (Dynamic Import for Next.js SSR Fix)
-export const triggerConfetti = async () => {
+// 🎆 आतिशबाज़ी (Vercel Build Error Fix - Using CDN directly)
+export const triggerConfetti = () => {
   if (typeof window === "undefined") return;
 
-  try {
-    // Next.js में इसे डायनामिक लोड करने से सर्वर क्रैश नहीं होता
-    const confetti = (await import("canvas-confetti")).default;
-    
+  const runAnimation = () => {
+    const confetti = (window as any).confetti;
+    if (!confetti) return;
+
     const duration = 3 * 1000;
     const animationEnd = Date.now() + duration;
-    const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 0 };
+    const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 9999 };
 
     const randomInRange = (min: number, max: number) => Math.random() * (max - min) + min;
 
-    const interval = setInterval(function () {
+    const interval: any = setInterval(function () {
       const timeLeft = animationEnd - Date.now();
 
       if (timeLeft <= 0) {
@@ -79,13 +79,21 @@ export const triggerConfetti = async () => {
       confetti(Object.assign({}, defaults, { particleCount, origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 } }));
       confetti(Object.assign({}, defaults, { particleCount, origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 } }));
     }, 250);
-  } catch (error) {
-    console.error("Confetti load error:", error);
+  };
+
+  // अगर Confetti स्क्रिप्ट पहले से नहीं है, तो उसे लोड करें (बिना npm install के)
+  if (!(window as any).confetti) {
+    const script = document.createElement("script");
+    script.src = "https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js";
+    script.onload = runAnimation;
+    document.body.appendChild(script);
+  } else {
+    runAnimation();
   }
 };
 
 export default function SurpriseArcadeGame() {
-  const [isMounted, setIsMounted] = useState(false); // Hydration Error Fix
+  const [isMounted, setIsMounted] = useState(false);
   const [name, setName] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [tableNo, setTableNo] = useState<string>("सामान्य टेबल");
@@ -98,7 +106,6 @@ export default function SurpriseArcadeGame() {
   const [timerText, setTimerText] = useState<string | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Next.js Hydration फिक्स: ब्राउज़र रेंडर होने के बाद ही UI दिखाएं
   useEffect(() => {
     setIsMounted(true);
     if (typeof window !== "undefined") {
@@ -241,7 +248,7 @@ export default function SurpriseArcadeGame() {
     }
   };
 
-  if (!isMounted) return null; // Hydration Warning से बचने के लिए
+  if (!isMounted) return null; 
 
   return (
     <>
@@ -527,7 +534,6 @@ function ScratchCardGame({ onFinish, onEnd }: { onFinish: () => Promise<any>; on
     }
   };
 
-  // Typescript Error फिक्स 
   const handleScratch = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
