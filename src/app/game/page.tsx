@@ -5,9 +5,6 @@ import { db } from "@/lib/firebase"; // ध्यान दें: अगर आ
 import { doc, getDoc, setDoc, serverTimestamp, Timestamp } from "firebase/firestore";
 import toast, { Toaster } from "react-hot-toast";
 
-// @ts-ignore (अगर types इनस्टॉल नहीं हैं तो एरर नहीं आएगा)
-import confetti from "canvas-confetti"; 
-
 // नाम को सही टाइटल केस में बदलने के लिए
 const formatNameTitleCase = (text: string) => {
   return text
@@ -33,8 +30,8 @@ const PRIZES = [
 const PROBABILITIES = [70, 13, 7, 5, 2.5, 1.5, 1];
 const PRIZE_ICONS = ["❌", "💵", "☕", "🏷️", "🥪", "🥟", "🍚"];
 
-// 🎵 साउंड इफेक्ट्स प्ले करने का सुरक्षित फंक्शन (SSR & TS Error Fixed)
-export const playAudio = (type: "win" | "lose" | "spin" | "scratch"): any => {
+// 🎵 साउंड इफेक्ट्स (SSR Safe & Type Safe)
+export const playAudio = (type: "win" | "lose" | "spin" | "scratch"): HTMLAudioElement | null => {
   if (typeof window === "undefined") return null; 
 
   let src = "";
@@ -57,30 +54,38 @@ export const playAudio = (type: "win" | "lose" | "spin" | "scratch"): any => {
   }
 };
 
-// 🎆 शानदार आतिशबाज़ी (Confetti) का फंक्शन
-export const triggerConfetti = () => {
+// 🎆 आतिशबाज़ी (Dynamic Import for Next.js SSR Fix)
+export const triggerConfetti = async () => {
   if (typeof window === "undefined") return;
 
-  const duration = 3 * 1000;
-  const animationEnd = Date.now() + duration;
-  const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 0 };
+  try {
+    // Next.js में इसे डायनामिक लोड करने से सर्वर क्रैश नहीं होता
+    const confetti = (await import("canvas-confetti")).default;
+    
+    const duration = 3 * 1000;
+    const animationEnd = Date.now() + duration;
+    const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 0 };
 
-  const randomInRange = (min: number, max: number) => Math.random() * (max - min) + min;
+    const randomInRange = (min: number, max: number) => Math.random() * (max - min) + min;
 
-  const interval: any = setInterval(function () {
-    const timeLeft = animationEnd - Date.now();
+    const interval = setInterval(function () {
+      const timeLeft = animationEnd - Date.now();
 
-    if (timeLeft <= 0) {
-      return clearInterval(interval);
-    }
+      if (timeLeft <= 0) {
+        return clearInterval(interval);
+      }
 
-    const particleCount = 50 * (timeLeft / duration);
-    confetti(Object.assign({}, defaults, { particleCount, origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 } }));
-    confetti(Object.assign({}, defaults, { particleCount, origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 } }));
-  }, 250);
+      const particleCount = 50 * (timeLeft / duration);
+      confetti(Object.assign({}, defaults, { particleCount, origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 } }));
+      confetti(Object.assign({}, defaults, { particleCount, origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 } }));
+    }, 250);
+  } catch (error) {
+    console.error("Confetti load error:", error);
+  }
 };
 
 export default function SurpriseArcadeGame() {
+  const [isMounted, setIsMounted] = useState(false); // Hydration Error Fix
   const [name, setName] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [tableNo, setTableNo] = useState<string>("सामान्य टेबल");
@@ -93,7 +98,9 @@ export default function SurpriseArcadeGame() {
   const [timerText, setTimerText] = useState<string | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Next.js Hydration फिक्स: ब्राउज़र रेंडर होने के बाद ही UI दिखाएं
   useEffect(() => {
+    setIsMounted(true);
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
       const t = params.get("table");
@@ -233,6 +240,8 @@ export default function SurpriseArcadeGame() {
       startTimer();
     }
   };
+
+  if (!isMounted) return null; // Hydration Warning से बचने के लिए
 
   return (
     <>
@@ -389,7 +398,7 @@ function SpinWheelGame({ onFinish, onEnd }: { onFinish: () => Promise<any>; onEn
   const [rotation, setRotation] = useState(0);
   const [isSpinning, setIsSpinning] = useState(false);
   const [message, setMessage] = useState("पहिया घुमाएं और अपना भाग्य देखें!");
-  const audioRef = useRef<any>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const colors = ["#ef4444", "#3b82f6", "#eab308", "#a855f7", "#f97316", "#14b8a6", "#22c55e"];
 
@@ -518,16 +527,23 @@ function ScratchCardGame({ onFinish, onEnd }: { onFinish: () => Promise<any>; on
     }
   };
 
-  // TS एरर बायपास करने के लिए 'any' टाइप दिया गया है
-  const handleScratch = (e: any) => {
+  // Typescript Error फिक्स 
+  const handleScratch = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
     const rect = canvas.getBoundingClientRect();
-    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    
+    let clientX, clientY;
+    if ('touches' in e) {
+      clientX = e.touches[0].clientX;
+      clientY = e.touches[0].clientY;
+    } else {
+      clientX = (e as React.MouseEvent).clientX;
+      clientY = (e as React.MouseEvent).clientY;
+    }
     
     const scaleX = canvas.width / rect.width / (window.devicePixelRatio || 1);
     const scaleY = canvas.height / rect.height / (window.devicePixelRatio || 1);
@@ -575,7 +591,7 @@ function SlotMachineGame({ onFinish, onEnd }: { onFinish: () => Promise<any>; on
   const [reels, setReels] = useState(["☕", "🥪", "🥟"]);
   const [isRolling, setIsRolling] = useState(false);
   const [status, setStatus] = useState("बटन दबाएं और तीनों रील्स मैच करें!");
-  const audioRef = useRef<any>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
     return () => { if (audioRef.current) audioRef.current.pause(); };
