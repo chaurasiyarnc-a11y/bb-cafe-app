@@ -30,8 +30,8 @@ const PRIZES = [
 const PROBABILITIES = [70, 13, 7, 5, 2.5, 1.5, 1];
 const PRIZE_ICONS = ["❌", "💵", "☕", "🏷️", "🥪", "🥟", "🍚"];
 
-// 🎵 साउंड इफेक्ट्स (SSR Safe & Type Safe)
-export const playAudio = (type: "win" | "lose" | "spin" | "scratch"): HTMLAudioElement | null => {
+// 🎵 साउंड इफेक्ट्स (Export हटाया गया ताकि Next.js एरर न दे)
+const playAudio = (type: "win" | "lose" | "spin" | "scratch"): HTMLAudioElement | null => {
   if (typeof window === "undefined") return null; 
 
   let src = "";
@@ -54,8 +54,8 @@ export const playAudio = (type: "win" | "lose" | "spin" | "scratch"): HTMLAudioE
   }
 };
 
-// 🎆 आतिशबाज़ी (Vercel Build Error Fix - Using CDN directly)
-export const triggerConfetti = () => {
+// 🎆 आतिशबाज़ी (Export हटाया गया)
+const triggerConfetti = () => {
   if (typeof window === "undefined") return;
 
   const runAnimation = () => {
@@ -81,7 +81,7 @@ export const triggerConfetti = () => {
     }, 250);
   };
 
-  // अगर Confetti स्क्रिप्ट पहले से नहीं है, तो उसे लोड करें (बिना npm install के)
+  // अगर Confetti स्क्रिप्ट पहले से नहीं है, तो उसे लोड करें
   if (!(window as any).confetti) {
     const script = document.createElement("script");
     script.src = "https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js";
