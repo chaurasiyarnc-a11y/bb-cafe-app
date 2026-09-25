@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
-import { db } from "@/lib/firebase"; // ध्यान दें: अगर आपका firebase पाथ अलग है तो इसे सही कर लें
+import { db } from "@/lib/firebase"; 
 import { doc, getDoc, setDoc, serverTimestamp, Timestamp } from "firebase/firestore";
 import toast, { Toaster } from "react-hot-toast";
 
@@ -30,7 +30,7 @@ const PRIZES = [
 const PROBABILITIES = [70, 13, 7, 5, 2.5, 1.5, 1];
 const PRIZE_ICONS = ["❌", "💵", "☕", "🏷️", "🥪", "🥟", "🍚"];
 
-// 🎵 साउंड इफेक्ट्स (Export हटाया गया ताकि Next.js एरर न दे)
+// 🎵 साउंड इफेक्ट्स 
 const playAudio = (type: "win" | "lose" | "spin" | "scratch"): HTMLAudioElement | null => {
   if (typeof window === "undefined") return null; 
 
@@ -54,7 +54,7 @@ const playAudio = (type: "win" | "lose" | "spin" | "scratch"): HTMLAudioElement 
   }
 };
 
-// 🎆 आतिशबाज़ी (Export हटाया गया)
+// 🎆 आतिशबाज़ी 
 const triggerConfetti = () => {
   if (typeof window === "undefined") return;
 
@@ -81,7 +81,6 @@ const triggerConfetti = () => {
     }, 250);
   };
 
-  // अगर Confetti स्क्रिप्ट पहले से नहीं है, तो उसे लोड करें
   if (!(window as any).confetti) {
     const script = document.createElement("script");
     script.src = "https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js";
@@ -148,11 +147,14 @@ export default function SurpriseArcadeGame() {
     const ONE_HOUR = 60 * 60 * 1000;
     const now = Date.now();
 
-    const isTestMode = (typeof window !== "undefined" && window.location.search.includes("test=true")) || cleanPhone === "9999999999";
+    // टेस्टिंग के लिए "9999999999" नंबर का उपयोग करें 
+    const isTestMode = cleanPhone === "9999999999";
 
     try {
+      // 🛑 स्टेप 1: डेटाबेस (Firebase) में नंबर चेक करें
       const userRef = doc(db, "customer_points", cleanPhone);
       const userSnap = await getDoc(userRef);
+      let hasActiveCoupon = false;
 
       if (!isTestMode && userSnap.exists()) {
         const data = userSnap.data();
@@ -161,6 +163,7 @@ export default function SurpriseArcadeGame() {
           const elapsed = now - lastPlayedMillis;
 
           if (elapsed < ONE_HOUR) {
+            // अगर कूपन बचा है तो खेलने न दें, सीधा कूपन दिखाएं
             if (data.voucherCode && !data.voucherClaimed) {
               setName(data.name || cleanName);
               setPhoneNumber(cleanPhone);
@@ -175,11 +178,35 @@ export default function SurpriseArcadeGame() {
 
             const remMin = Math.ceil((ONE_HOUR - elapsed) / 60000);
             setIsLoading(false);
-            return toast.error(`आप हाल ही में खेल चुके हैं! कृपया ${remMin} मिनट बाद आएं।`, { duration: 5000 });
+            return toast.error(`यह नंबर हाल ही में इस्तेमाल हुआ है! कृपया ${remMin} मिनट बाद आएं।`, { duration: 5000 });
           }
         }
       }
 
+      // 🚨 स्टेप 2: (नया सिक्योरिटी लूपहोल फिक्स) ग्राहक का डिवाइस (फ़ोन) चेक करें 🚨
+      // यह तब काम करेगा जब ग्राहक एक ही फोन से नया (नकली) नंबर डालकर खेलने की कोशिश करेगा
+      if (!isTestMode && typeof window !== "undefined") {
+        const deviceLast = localStorage.getItem("device_last_played");
+        const hasCookie = document.cookie.includes("device_played=true");
+
+        if (deviceLast || hasCookie) {
+          let isDeviceBlocked = hasCookie;
+          
+          if (deviceLast) {
+            const elapsedDevice = now - parseInt(deviceLast, 10);
+            if (elapsedDevice < ONE_HOUR) {
+              isDeviceBlocked = true;
+            }
+          }
+
+          if (isDeviceBlocked) {
+            setIsLoading(false);
+            return toast.error("🚨 आप इस मोबाइल से पहले ही खेल चुके हैं! एक फोन से केवल 1 बार ही खेल सकते हैं।", { duration: 6000 });
+          }
+        }
+      }
+
+      // अगर सब कुछ सही है, तो यूज़र को खेलने दें
       await setDoc(
         userRef,
         { name: cleanName, phone: cleanPhone, table: tableNo, lastActive: serverTimestamp() },
@@ -209,6 +236,12 @@ export default function SurpriseArcadeGame() {
   };
 
   const executeGameResult = async () => {
+    // 🚨 जैसे ही गेम ख़त्म हो, फ़ोन को 1 घंटे के लिए लॉक कर दें (Local Storage + Cookies दोनों में)
+    if (typeof window !== "undefined") {
+      localStorage.setItem("device_last_played", Date.now().toString());
+      document.cookie = `device_played=true; max-age=3600; path=/`; // 3600 seconds = 1 hour
+    }
+
     const rand = Math.random() * 100;
     let sum = 0;
     let winIdx = 0;
