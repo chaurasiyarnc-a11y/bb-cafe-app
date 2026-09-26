@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
-import { db } from "@/lib/firebase"; // सुनिश्चित करें कि यह पथ सही है
+import { db } from "@/lib/firebase"; // सुनिश्चित करें कि यह पथ आपके प्रोजेक्ट के अनुसार सही है
 import { doc, getDoc, setDoc, serverTimestamp, Timestamp } from "firebase/firestore";
 import toast, { Toaster } from "react-hot-toast";
 
@@ -19,7 +19,7 @@ const formatNameTitleCase = (text: string) => {
 // केवल 10 अंकों के भारतीय नंबरों के लिए
 const isValidIndianPhone = (phone: string) => /^[6-9]\d{9}$/.test(phone);
 
-// इनामों की लिस्ट (स्पिन व्हील के सेगमेंट के अनुसार)
+// इनामों की लिस्ट (स्पिन व्हील के 8 सेगमेंट के अनुसार)
 const PRIZE_SEGMENTS = [
     { text: "Better Luck", color: "#7f8c8d", icon: "❌" }, // Gray
     { text: "Free Coffee", color: "#f1c40f", icon: "☕" },  // Gold
@@ -31,7 +31,7 @@ const PRIZE_SEGMENTS = [
     { text: "Manchurian Rice", color: "#c0392b", icon: "🍚" }, // Red
 ];
 
-// 확률/वितरण (कुल 100% होना चाहिए)
+// 확률/वितरण (जीतने की संभावना - कुल 100% होनी चाहिए)
 const PROBABILITIES = [45, 15, 15, 10, 5, 5, 3, 2];
 
 const getPrizeResult = () => {
@@ -198,7 +198,7 @@ export default function SurpriseArcadeGame() {
 
                         const remMin = Math.ceil((ONE_HOUR - elapsed) / 60000);
                         setIsLoading(false);
-                        return toast.error(`यह नंबर हाल ही में इस्तेमाल हुआ है! कृपया ${remMin} मिनट बाद आएं。`, { duration: 5000 });
+                        return toast.error(`यह नंबर हाल ही में इस्तेमाल हुआ है! कृपया ${remMin} मिनट बाद आएं।`, { duration: 5000 });
                     }
                 }
             }
@@ -233,7 +233,7 @@ export default function SurpriseArcadeGame() {
 
         } catch (err) {
             console.error("Login error:", err);
-            toast.error("सर्वर त्रुटि! पुनः प्रयास करें。");
+            toast.error("सर्वर त्रुटि! पुनः प्रयास करें।");
         } finally {
             setIsLoading(false);
         }
@@ -245,16 +245,22 @@ export default function SurpriseArcadeGame() {
         setIsSpinning(true);
         spinAudioRef.current = playAudio("spin");
 
+        // परिणाम निर्धारित करें
         const result = getPrizeResult();
         setWonPrize(result);
 
+        // पूर्ण क्रांतियों की संख्या (5-7)
         const spinRounds = 5 + Math.random() * 2;
+        // प्रति सेगमेंट कोण (360 / 8) = 45 डिग्री
         const segmentAngle = 360 / PRIZE_SEGMENTS.length;
+        // सटीक लक्ष्य कोण (सेगमेंट के केंद्र में रुकने के लिए)
         const targetAngle = 360 - (result.index * segmentAngle) + (segmentAngle / 2);
 
+        // कुल रोटेशन डिग्री
         const finalRotation = currentRotation + (spinRounds * 360) + targetAngle;
-        setCurrentRotation(finalRotation);
+        setCurrentRotation(finalRotation); // अगले स्पिन के लिए सहेजें
 
+        // डिवाइस-विशिष्ट ब्लॉक सेट करें
         if (typeof window !== "undefined") {
             localStorage.setItem("device_last_played", Date.now().toString());
             document.cookie = `device_played=true; max-age=3600; path=/`;
@@ -262,6 +268,7 @@ export default function SurpriseArcadeGame() {
 
         const voucher = result.text !== "Better Luck" ? `BOM-${Date.now().toString().slice(-6)}` : null;
 
+        // DB अपडेट करें
         try {
             const userRef = doc(db, "customer_points", phoneNumber);
             await setDoc(
@@ -273,6 +280,7 @@ export default function SurpriseArcadeGame() {
             console.error("Error saving game result:", e);
         }
 
+        // एनीमेशन के अंत को संभालें
         setTimeout(() => {
             if (spinAudioRef.current) {
                 spinAudioRef.current.pause();
@@ -289,8 +297,8 @@ export default function SurpriseArcadeGame() {
                 startTimer();
             }
             
-            setTimeout(() => setShowResultModal(true), 500);
-        }, 5500);
+            setTimeout(() => setShowResultModal(true), 500); // 500ms बाद परिणाम दिखाएं
+        }, 5500); // CSS संक्रमण अवधि (5.5s) से मेल खाता है
     };
 
     const resetGame = () => {
@@ -306,7 +314,7 @@ export default function SurpriseArcadeGame() {
 
     if (!isMounted) return null;
 
-    // --- Render ---
+    // --- Render (Part 1) ---
 
     return (
         <>
@@ -323,6 +331,7 @@ export default function SurpriseArcadeGame() {
                     padding: 20px 15px;
                     box-sizing: border-box;
                 }
+
                 .glass-card {
                     background: rgba(30, 41, 59, 0.6);
                     backdrop-filter: blur(12px);
@@ -334,6 +343,7 @@ export default function SurpriseArcadeGame() {
                     max-width: 400px;
                     margin: 0 auto;
                 }
+
                 .input-field {
                     width: 100%; box-sizing: border-box; padding: 16px; margin-bottom: 16px;
                     border-radius: 16px; border: 2px solid #334155; background-color: #0f172a;
@@ -342,11 +352,7 @@ export default function SurpriseArcadeGame() {
                 }
                 .input-field:focus { border-color: #38bdf8; box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.2); }
                 .input-label { display: block; text-align: left; font-size: 13px; color: #94a3b8; margin-bottom: 8px; font-weight: 600; }
+
                 .action-btn {
                     width: 100%; padding: 18px; border-radius: 16px; border: none;
-                    font-size: 18px; font-weight: 900; cursor: pointer;
-                    transition: all 0.3s ease; text-transform: uppercase; letter-spacing: 1px;
-                    margin-top: 10px;
-                }
-                .action-btn:active { transform: scale(0.97); }
-                .btn-primary { background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 1
+                    font-size:
