@@ -65,13 +65,12 @@ export default function SurpriseArcadeGame() {
   const [lastPlayedTime, setLastPlayedTime] = useState<number | null>(null);
   const [prizeWon, setPrizeWon] = useState<string | null>(null);
   const [couponCode, setCouponCode] = useState<string | null>(null);
-  const [showGame, setShowGame] = useState(false); // क्या पहिया दिखाना है?
+  const [showGame, setShowGame] = useState(false); 
   
   // टाइमर UI स्टेट्स
   const [activeScreen, setActiveScreen] = useState<"voucher" | "cooldown" | "none">("none");
   const [timerText, setTimerText] = useState<string>("");
 
-  // URL से सुरक्षित टेबल नंबर निकालना (Bug Fixed)
   useEffect(() => {
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
@@ -84,7 +83,6 @@ export default function SurpriseArcadeGame() {
     }
   }, []);
 
-  // मास्टर टाइमर (रिफ्रेश-प्रूफ 5 मिनट और 1-घंटे का टाइमर)
   useEffect(() => {
     if (!isLoggedIn || !lastPlayedTime) return;
 
@@ -95,13 +93,11 @@ export default function SurpriseArcadeGame() {
       const FIVE_MINS = 5 * 60 * 1000;
 
       if (elapsed >= ONE_HOUR) {
-        // 1 घंटा पूरा हो गया, फिर से खेलने दें
         setActiveScreen("none");
         setShowGame(true);
         setLastPlayedTime(null);
         clearInterval(interval);
       } else {
-        // अगर जीतता है और 5 मिनट पूरे नहीं हुए
         if (couponCode && elapsed < FIVE_MINS) {
           setActiveScreen("voucher");
           const left = Math.floor((FIVE_MINS - elapsed) / 1000);
@@ -109,7 +105,6 @@ export default function SurpriseArcadeGame() {
           const s = left % 60;
           setTimerText(`${m}:${s < 10 ? "0" + s : s} मिनट शेष`);
         } else {
-          // हार गया या 5 मिनट का वाउचर टाइम खत्म हो गया (अब 1 घंटे का इंतज़ार)
           setActiveScreen("cooldown");
           setShowGame(false);
           const left = Math.floor((ONE_HOUR - elapsed) / 1000);
@@ -124,7 +119,7 @@ export default function SurpriseArcadeGame() {
   }, [isLoggedIn, lastPlayedTime, couponCode]);
 
 
-  // लॉगिन हैंडलर
+  // 🚀 लॉगिन हैंडलर (यहाँ डिवाइस लॉकिंग जोड़ी गई है)
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleanName = formatNameTitleCase(name.trim());
@@ -136,7 +131,25 @@ export default function SurpriseArcadeGame() {
     const ONE_HOUR = 60 * 60 * 1000;
     const now = Date.now();
 
+    // 🛑 1. DEVICE LOCK CHECK (एक मोबाइल = एक नंबर)
+    const deviceLastPlayed = localStorage.getItem("device_cooldown_time");
+    const lockedPhone = localStorage.getItem("device_locked_phone");
+
+    if (deviceLastPlayed && lockedPhone) {
+      const elapsedDevice = now - parseInt(deviceLastPlayed, 10);
+      
+      // अगर 1 घंटा नहीं हुआ है और यूजर कोई "नया नंबर" डाल रहा है
+      if (elapsedDevice < ONE_HOUR && lockedPhone !== cleanPhone) {
+        setIsLoading(false);
+        return toast.error("🚫 इस फोन से पहले ही खेला जा चुका है! कृपया अपना वही नंबर डालें या 1 घंटे प्रतीक्षा करें।", {
+          duration: 5000,
+          style: { background: "#ef4444", color: "#fff", fontWeight: "bold" }
+        });
+      }
+    }
+
     try {
+      // 2. DATABASE CHECK (नंबर चेकिंग)
       const userRef = doc(db, "customer_points", cleanPhone);
       const userSnap = await getDoc(userRef);
 
@@ -147,27 +160,25 @@ export default function SurpriseArcadeGame() {
           const elapsed = now - playedMillis;
 
           if (elapsed < ONE_HOUR) {
-            // यूज़र ने हाल ही में खेला है
             setLastPlayedTime(playedMillis);
             setCouponCode(data.voucherCode || null);
             setPrizeWon(data.lastPrizeWon || null);
             setName(data.name || cleanName);
             setIsLoggedIn(true);
-            setShowGame(false); // गेम छिपाएं, टाइमर दिखाएं
+            setShowGame(false); 
             setIsLoading(false);
             return;
           }
         }
       }
 
-      // नया यूज़र या 1 घंटा हो गया है, खेलने दें
       await setDoc(userRef, { name: cleanName, phone: cleanPhone, table: tableNo }, { merge: true });
       setName(cleanName);
       setPhoneNumber(cleanPhone);
       setLastPlayedTime(null);
       setCouponCode(null);
       setIsLoggedIn(true);
-      setShowGame(true); // पहिया दिखाएं
+      setShowGame(true); 
       toast.success(`लकी स्पिन व्हील में आपका स्वागत है 🎡`);
 
     } catch {
@@ -177,7 +188,7 @@ export default function SurpriseArcadeGame() {
     }
   };
 
-  // डेटाबेस में रिजल्ट तुरंत सेव करें (हैक-प्रूफ)
+  // डेटाबेस में रिजल्ट सेव करें और डिवाइस लॉक करें
   const generateResultAndSave = async () => {
     const rand = Math.random() * 100;
     let sum = 0, winIdx = 0;
@@ -190,23 +201,28 @@ export default function SurpriseArcadeGame() {
     const voucher = prize !== "Better Luck" ? `BOM-${Math.floor(1000 + Math.random() * 9000)}` : null;
 
     try {
+      // डेटाबेस में सेव
       await setDoc(doc(db, "customer_points", phoneNumber), {
-        lastPlayedAt: serverTimestamp(), // तुरंत समय लॉक कर दिया
+        lastPlayedAt: serverTimestamp(),
         lastPrizeWon: prize,
         voucherCode: voucher,
         table: tableNo,
         voucherClaimed: false,
       }, { merge: true });
+
+      // 🛑 DEVICE LOCKING (इस मोबाइल को इस नंबर के साथ लॉक कर दें)
+      localStorage.setItem("device_cooldown_time", Date.now().toString());
+      localStorage.setItem("device_locked_phone", phoneNumber);
+
     } catch (e) { console.error(e); }
 
     return { winIdx, prize, voucher };
   };
 
-  // पहिया रुकने के बाद (4 सेकंड बाद) UI अपडेट करें
   const handleGameEndUI = (prize: string, voucher: string | null) => {
     setPrizeWon(prize);
     setCouponCode(voucher);
-    setLastPlayedTime(Date.now()); // टाइमर को यहीं से शुरू कर दें
+    setLastPlayedTime(Date.now()); 
 
     if (prize === "Better Luck") {
       playAudio("lose");
@@ -216,15 +232,13 @@ export default function SurpriseArcadeGame() {
       triggerConfetti();
       toast.success("बधाई हो! आप जीत गए हैं!");
     }
-    setShowGame(false); // पहिया हटाकर टाइमर/कूपन स्क्रीन लाएं
+    setShowGame(false); 
   };
-
 
   return (
     <div style={{ fontFamily: "system-ui, -apple-system, sans-serif", backgroundColor: "#0b0f19", color: "#ffffff", minHeight: "100vh", textAlign: "center", padding: "25px 15px", boxSizing: "border-box" }}>
       <Toaster position="top-center" />
 
-      {/* हेडर */}
       <div style={{ marginBottom: "25px" }}>
         <div style={{ display: "inline-block", backgroundColor: "rgba(241, 196, 15, 0.15)", color: "#f1c40f", padding: "4px 14px", borderRadius: "20px", fontSize: "12px", fontWeight: "bold", marginBottom: "8px", border: "1px solid rgba(241, 196, 15, 0.3)" }}>
           {tableNo}
@@ -233,7 +247,6 @@ export default function SurpriseArcadeGame() {
       </div>
 
       {!isLoggedIn ? (
-        // --- लॉगिन फॉर्म ---
         <div style={{ maxWidth: "340px", margin: "0 auto", backgroundColor: "#1e293b", padding: "25px 20px", borderRadius: "20px", boxShadow: "0 10px 25px rgba(0,0,0,0.5)" }}>
           <div style={{ fontSize: "42px", marginBottom: "8px" }}>🎁</div>
           <h2 style={{ fontSize: "18px", margin: "0 0 16px 0", color: "#38bdf8", fontWeight: "bold" }}>खेलने के लिए विवरण दर्ज करें</h2>
@@ -248,12 +261,10 @@ export default function SurpriseArcadeGame() {
       ) : (
         <div style={{ maxWidth: "420px", margin: "0 auto" }}>
           
-          {/* 1. गेम स्क्रीन */}
           {showGame && (
             <SpinWheelGame onFinish={generateResultAndSave} onEndUI={handleGameEndUI} />
           )}
 
-          {/* 2. वाउचर स्क्रीन (जीतने पर 5 मिनट तक दिखेगी) */}
           {activeScreen === "voucher" && (
             <div style={{ backgroundColor: "#1e293b", padding: "25px", borderRadius: "16px", border: "2px solid #22c55e" }}>
               <h2 style={{ color: "#22c55e", margin: "0 0 10px 0" }}>🎉 आपका इनाम</h2>
@@ -267,7 +278,6 @@ export default function SurpriseArcadeGame() {
             </div>
           )}
 
-          {/* 3. एक-घंटे का इंतज़ार (Cooldown) स्क्रीन */}
           {activeScreen === "cooldown" && (
             <div style={{ backgroundColor: "#1e293b", padding: "30px 20px", borderRadius: "16px", border: "2px solid #334155" }}>
               <div style={{ fontSize: "50px", marginBottom: "10px" }}>🕒</div>
@@ -287,14 +297,10 @@ export default function SurpriseArcadeGame() {
   );
 }
 
-/* =========================================================================
-   गेम: 🎡 लकी स्पिन पहिया
-========================================================================= */
 function SpinWheelGame({ onFinish, onEndUI }: { onFinish: () => Promise<any>; onEndUI: (p: string, v: string | null) => void }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [rotation, setRotation] = useState(0);
   const [isSpinning, setIsSpinning] = useState(false);
-
   const colors = ["#ef4444", "#3b82f6", "#eab308", "#a855f7", "#f97316", "#14b8a6", "#22c55e"];
 
   useEffect(() => {
@@ -330,16 +336,13 @@ function SpinWheelGame({ onFinish, onEndUI }: { onFinish: () => Promise<any>; on
     setIsSpinning(true);
     const spinAudio = playAudio("spin");
 
-    // बैकग्राउंड में तुरंत डेटाबेस में रिजल्ट सेव हो गया (हैक प्रूफ)
     const { winIdx, prize, voucher } = await onFinish();
 
-    // पहिया घुमाने का एंगल सेट करना
     const arcDegree = 360 / PRIZES.length;
     const stopAngle = winIdx * arcDegree + arcDegree / 2;
     const targetAngle = ((270 - stopAngle) % 360 + 360) % 360;
     setRotation((prev) => prev + 3600 + targetAngle - (prev % 360));
 
-    // 4 सेकंड बाद (जब पहिया रुक जाए) UI को अपडेट करें
     setTimeout(() => {
       setIsSpinning(false);
       spinAudio.pause();
