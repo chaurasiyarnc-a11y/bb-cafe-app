@@ -31,8 +31,8 @@ const PRIZES = [
 // 70% हार, 30% जीत
 const PROBABILITIES = [70, 13, 7, 5, 2.5, 1.5, 1];
 
-// 🎵 साउंड इफेक्ट्स प्ले करने का फंक्शन
-export const playAudio = (type: "win" | "lose" | "spin") => {
+// 🎵 साउंड इफेक्ट्स प्ले करने का फंक्शन (यहाँ से export हटा दिया गया है)
+const playAudio = (type: "win" | "lose" | "spin") => {
   let src = "";
   if (type === "win") src = "https://assets.mixkit.co/active_storage/sfx/1435/1435-preview.mp3"; // जीतने की आवाज़ (Tada)
   if (type === "lose") src = "https://assets.mixkit.co/active_storage/sfx/1436/1436-preview.mp3"; // हारने की आवाज़ (Womp)
@@ -45,8 +45,8 @@ export const playAudio = (type: "win" | "lose" | "spin") => {
   return audio; // ताकि बाद में इसे रोका जा सके
 };
 
-// 🎆 आतिशबाज़ी (Confetti) का फंक्शन
-export const triggerConfetti = () => {
+// 🎆 आतिशबाज़ी (Confetti) का फंक्शन (यहाँ से export हटा दिया गया है)
+const triggerConfetti = () => {
   const duration = 3 * 1000;
   const end = Date.now() + duration;
 
