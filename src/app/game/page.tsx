@@ -4,7 +4,6 @@ import React, { useEffect, useRef, useState } from "react";
 import { db } from "@/lib/firebase";
 import { doc, getDoc, setDoc, serverTimestamp, Timestamp } from "firebase/firestore";
 import toast, { Toaster } from "react-hot-toast";
-import confetti from "canvas-confetti"; // 🎉 आतिशबाज़ी के लिए
 
 // नाम को सही टाइटल केस में बदलने के लिए
 const formatNameTitleCase = (text: string) => {
@@ -31,48 +30,6 @@ const PRIZES = [
 // 70% हार, 30% जीत
 const PROBABILITIES = [70, 13, 7, 5, 2.5, 1.5, 1];
 const PRIZE_ICONS = ["❌", "💵", "☕", "🏷️", "🥪", "🥟", "🍚"];
-
-// 🎵 साउंड इफेक्ट्स प्ले करने का फंक्शन
-export const playAudio = (type: "win" | "lose" | "spin" | "scratch") => {
-  let src = "";
-  if (type === "win") src = "https://assets.mixkit.co/active_storage/sfx/1435/1435-preview.mp3"; // जीतने की आवाज़ (Tada)
-  if (type === "lose") src = "https://assets.mixkit.co/active_storage/sfx/1436/1436-preview.mp3"; // हारने की आवाज़ (Womp)
-  if (type === "spin") src = "https://assets.mixkit.co/active_storage/sfx/2019/2019-preview.mp3"; // गेम घूमने की आवाज़
-  if (type === "scratch") src = "https://assets.mixkit.co/active_storage/sfx/2020/2020-preview.mp3"; // क्लिक/स्क्रैच आवाज़
-
-  const audio = new Audio(src);
-  if (type === "spin") audio.loop = true; // स्पिन के समय लूप में बजेगा
-  
-  audio.play().catch((e) => console.log("ब्राउज़र ने साउंड ब्लॉक किया:", e));
-  return audio; // ताकि बाद में इसे रोका जा सके
-};
-
-// 🎆 आतिशबाज़ी (Confetti) का फंक्शन
-export const triggerConfetti = () => {
-  const duration = 3 * 1000;
-  const end = Date.now() + duration;
-
-  const frame = () => {
-    confetti({
-      particleCount: 5,
-      angle: 60,
-      spread: 55,
-      origin: { x: 0 },
-      colors: ['#22c55e', '#f1c40f', '#3b82f6', '#ef4444']
-    });
-    confetti({
-      particleCount: 5,
-      angle: 120,
-      spread: 55,
-      origin: { x: 1 },
-      colors: ['#22c55e', '#f1c40f', '#3b82f6', '#ef4444']
-    });
-    if (Date.now() < end) {
-      requestAnimationFrame(frame);
-    }
-  };
-  frame();
-};
 
 export default function SurpriseArcadeGame() {
   const [name, setName] = useState("");
@@ -257,18 +214,6 @@ export default function SurpriseArcadeGame() {
     return { winIdx, prize, voucher };
   };
 
-  // कॉमन हैंडलर जीत/हार और साउंड/आतिशबाज़ी के लिए
-  const handleGameEnd = (prize: string, voucher: string | null) => {
-    if (prize === "Better Luck") {
-      playAudio("lose");
-    } else {
-      playAudio("win");
-      triggerConfetti(); // 🎆 आतिशबाज़ी चालू!
-      setCouponCode(voucher);
-      startTimer();
-    }
-  };
-
   return (
     <div
       style={{
@@ -433,8 +378,36 @@ export default function SurpriseArcadeGame() {
               )}
             </div>
           ) : (
-            /* नॉर्मल गेम प्ले स्क्रीन (अब यहाँ कोई गेम बदलने वाला टैब नहीं है) */
+            /* नॉर्मल गेम प्ले स्क्रीन */
             <>
+              {/* 🎮 गेम स्विचर टैब्स (1 क्लिक में गेम बदलने के लिए) */}
+              <div style={{ display: "flex", justifyContent: "center", gap: "6px", marginBottom: "15px", flexWrap: "wrap" }}>
+                {[
+                  { id: 1, label: "🎡 लकी पहिया" },
+                  { id: 2, label: "🪙 स्क्रैच कार्ड" },
+                  { id: 3, label: "🎰 777 स्लॉट" },
+                  { id: 4, label: "🎁 मिस्ट्री बॉक्स" },
+                ].map((game) => (
+                  <button
+                    key={game.id}
+                    type="button"
+                    onClick={() => setSelectedGame(game.id)}
+                    style={{
+                      padding: "8px 12px",
+                      borderRadius: "12px",
+                      border: selectedGame === game.id ? "2px solid #f1c40f" : "1px solid #334155",
+                      backgroundColor: selectedGame === game.id ? "#334155" : "#1e293b",
+                      color: selectedGame === game.id ? "#f1c40f" : "#94a3b8",
+                      fontWeight: "bold",
+                      fontSize: "12px",
+                      cursor: "pointer",
+                    }}
+                  >
+                    {game.label}
+                  </button>
+                ))}
+              </div>
+
               {/* कूपन कोड (जीतने पर) */}
               {couponCode && (
                 <div style={{ backgroundColor: "#1e293b", border: "2px dashed #22c55e", padding: "10px 18px", borderRadius: "12px", display: "inline-block", marginBottom: "15px" }}>
@@ -443,11 +416,11 @@ export default function SurpriseArcadeGame() {
                 </div>
               )}
 
-              {/* जो 1 गेम सिस्टम ने चुना है, सिर्फ वही दिखेगा */}
-              {selectedGame === 1 && <SpinWheelGame onFinish={executeGameResult} onEnd={handleGameEnd} />}
-              {selectedGame === 2 && <ScratchCardGame onFinish={executeGameResult} onEnd={handleGameEnd} />}
-              {selectedGame === 3 && <SlotMachineGame onFinish={executeGameResult} onEnd={handleGameEnd} />}
-              {selectedGame === 4 && <MysteryBoxGame onFinish={executeGameResult} onEnd={handleGameEnd} />}
+              {/* 4 में से चयनित गेम */}
+              {selectedGame === 1 && <SpinWheelGame onFinish={executeGameResult} onWin={(p, v) => { setCouponCode(v); startTimer(); }} />}
+              {selectedGame === 2 && <ScratchCardGame onFinish={executeGameResult} onWin={(p, v) => { setCouponCode(v); startTimer(); }} />}
+              {selectedGame === 3 && <SlotMachineGame onFinish={executeGameResult} onWin={(p, v) => { setCouponCode(v); startTimer(); }} />}
+              {selectedGame === 4 && <MysteryBoxGame onFinish={executeGameResult} onWin={(p, v) => { setCouponCode(v); startTimer(); }} />}
 
               {/* 5 मिनट का टाइमर */}
               {timerText && (
@@ -466,7 +439,7 @@ export default function SurpriseArcadeGame() {
 /* =========================================================================
    गेम 1: 🎡 लकी स्पिन पहिया
 ========================================================================= */
-function SpinWheelGame({ onFinish, onEnd }: { onFinish: () => Promise<any>; onEnd: (p: string, v: string | null) => void }) {
+function SpinWheelGame({ onFinish, onWin }: { onFinish: () => Promise<any>; onWin: (p: string, v: string | null) => void }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [rotation, setRotation] = useState(0);
   const [isSpinning, setIsSpinning] = useState(false);
@@ -508,9 +481,6 @@ function SpinWheelGame({ onFinish, onEnd }: { onFinish: () => Promise<any>; onEn
   const handleSpin = async () => {
     if (isSpinning) return;
     setIsSpinning(true);
-    
-    // 🎵 स्पिन साउंड शुरू
-    const spinAudio = playAudio("spin");
 
     const { winIdx, prize, voucher } = await onFinish();
 
@@ -521,15 +491,12 @@ function SpinWheelGame({ onFinish, onEnd }: { onFinish: () => Promise<any>; onEn
 
     setTimeout(() => {
       setIsSpinning(false);
-      spinAudio.pause(); // 🎵 स्पिन साउंड बंद
-
       if (prize === "Better Luck") {
         setMessage("उफ़! इस बार कोई इनाम नहीं मिला। 1 घंटे बाद पुनः प्रयास करें!");
       } else {
         setMessage(`🎉 बधाई हो! आप जीते हैं: ${prize}! बिलिंग के समय यह स्क्रीन दिखाएं।`);
+        onWin(prize, voucher);
       }
-      
-      onEnd(prize, voucher); // जीत/हार की आवाज़ और आतिशबाजी
     }, 4000);
   };
 
@@ -551,13 +518,15 @@ function SpinWheelGame({ onFinish, onEnd }: { onFinish: () => Promise<any>; onEn
 }
 
 /* =========================================================================
-   गेम 2: 🪙 लकी स्क्रैच कार्ड
+   गेम 2: 🪙 लकी स्क्रैच कार्ड (CRITICAL BUG FIXED)
 ========================================================================= */
-function ScratchCardGame({ onFinish, onEnd }: { onFinish: () => Promise<any>; onEnd: (p: string, v: string | null) => void }) {
+function ScratchCardGame({ onFinish, onWin }: { onFinish: () => Promise<any>; onWin: (p: string, v: string | null) => void }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [cardPrize, setCardPrize] = useState<string>("?");
   
+  // 🔒 Security Fix: useRef ensures instantaneous locking of state to prevent multiple database updates
   const hasStartedRef = useRef(false); 
+  const [hasStartedUI, setHasStartedUI] = useState(false);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -586,16 +555,13 @@ function ScratchCardGame({ onFinish, onEnd }: { onFinish: () => Promise<any>; on
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
+    // सिर्फ एक बार कॉल होगा (Immediate lock with useRef)
     if (!hasStartedRef.current) {
       hasStartedRef.current = true;
-      playAudio("scratch"); // 🎵 स्क्रैच शुरू करने की आवाज़
-      
+      setHasStartedUI(true);
       const res = await onFinish();
       setCardPrize(res.prize);
-      
-      setTimeout(() => {
-        onEnd(res.prize, res.voucher); // जीत/हार की आवाज़ और आतिशबाजी
-      }, 800); // स्क्रैच करते समय थोड़ा सस्पेंस
+      if (res.prize !== "Better Luck") onWin(res.prize, res.voucher);
     }
 
     const rect = canvas.getBoundingClientRect();
@@ -615,6 +581,7 @@ function ScratchCardGame({ onFinish, onEnd }: { onFinish: () => Promise<any>; on
       <p style={{ color: "#cbd5e1", fontSize: "14px", marginBottom: "15px" }}>कार्ड को उंगली से रगड़कर अपना इनाम खोलें!</p>
       
       <div style={{ position: "relative", width: "280px", height: "180px", margin: "0 auto 20px", borderRadius: "16px", overflow: "hidden", boxShadow: "0 8px 25px rgba(0,0,0,0.5)" }}>
+        {/* नीचे छिपा हुआ इनाम */}
         <div style={{ position: "absolute", inset: 0, backgroundColor: "#1e293b", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", border: "2px solid #eab308", borderRadius: "16px" }}>
           <span style={{ fontSize: "40px" }}>{cardPrize === "Better Luck" ? "💔" : "🎉"}</span>
           <strong style={{ fontSize: "18px", color: cardPrize === "Better Luck" ? "#94a3b8" : "#22c55e", marginTop: "8px" }}>
@@ -622,6 +589,7 @@ function ScratchCardGame({ onFinish, onEnd }: { onFinish: () => Promise<any>; on
           </strong>
         </div>
 
+        {/* ऊपर की सोने वाली स्क्रैच परत */}
         <canvas
           ref={canvasRef}
           width={280}
@@ -638,7 +606,7 @@ function ScratchCardGame({ onFinish, onEnd }: { onFinish: () => Promise<any>; on
 /* =========================================================================
    गेम 3: 🎰 777 जैकपॉट स्लॉट मशीन
 ========================================================================= */
-function SlotMachineGame({ onFinish, onEnd }: { onFinish: () => Promise<any>; onEnd: (p: string, v: string | null) => void }) {
+function SlotMachineGame({ onFinish, onWin }: { onFinish: () => Promise<any>; onWin: (p: string, v: string | null) => void }) {
   const [reels, setReels] = useState(["☕", "🥪", "🍜"]);
   const [isRolling, setIsRolling] = useState(false);
   const [status, setStatus] = useState("बटन दबाएं और तीनों रील्स मैच करें!");
@@ -647,8 +615,6 @@ function SlotMachineGame({ onFinish, onEnd }: { onFinish: () => Promise<any>; on
     if (isRolling) return;
     setIsRolling(true);
     setStatus("स्लॉट घूम रहा है...");
-
-    const rollAudio = playAudio("spin"); // 🎵 रोलिंग साउंड
 
     const interval = setInterval(() => {
       setReels([
@@ -663,7 +629,6 @@ function SlotMachineGame({ onFinish, onEnd }: { onFinish: () => Promise<any>; on
     setTimeout(() => {
       clearInterval(interval);
       setIsRolling(false);
-      rollAudio.pause(); // 🎵 रोलिंग साउंड बंद
 
       if (prize === "Better Luck") {
         setReels(["❌", "☕", "🥪"]);
@@ -672,9 +637,8 @@ function SlotMachineGame({ onFinish, onEnd }: { onFinish: () => Promise<any>; on
         const icon = PRIZE_ICONS[winIdx];
         setReels([icon, icon, icon]);
         setStatus(`🎉 जैकपॉट! आप जीते: ${prize}`);
+        onWin(prize, voucher);
       }
-      
-      onEnd(prize, voucher); // जीत/हार की आवाज़ और आतिशबाजी
     }, 3000);
   };
 
@@ -700,7 +664,7 @@ function SlotMachineGame({ onFinish, onEnd }: { onFinish: () => Promise<any>; on
 /* =========================================================================
    गेम 4: 🎁 मिस्ट्री गिफ्ट बॉक्स
 ========================================================================= */
-function MysteryBoxGame({ onFinish, onEnd }: { onFinish: () => Promise<any>; onEnd: (p: string, v: string | null) => void }) {
+function MysteryBoxGame({ onFinish, onWin }: { onFinish: () => Promise<any>; onWin: (p: string, v: string | null) => void }) {
   const [openedBox, setOpenedBox] = useState<number | null>(null);
   const [boxPrize, setBoxPrize] = useState<string | null>(null);
   const [isOpening, setIsOpening] = useState(false);
@@ -710,14 +674,12 @@ function MysteryBoxGame({ onFinish, onEnd }: { onFinish: () => Promise<any>; onE
     setIsOpening(true);
     setOpenedBox(boxNum);
 
-    playAudio("scratch"); // 🎵 बॉक्स खोलने की आवाज़
-
     const { prize, voucher } = await onFinish();
 
     setTimeout(() => {
       setIsOpening(false);
       setBoxPrize(prize);
-      onEnd(prize, voucher); // जीत/हार की आवाज़ और आतिशबाजी
+      if (prize !== "Better Luck") onWin(prize, voucher);
     }, 1200);
   };
 
