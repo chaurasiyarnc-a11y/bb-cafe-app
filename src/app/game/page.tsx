@@ -7,16 +7,16 @@ import toast, { Toaster } from "react-hot-toast";
 
 // --- Constants & Helpers ---
 
-// नाम को सही टाइटल केस में बदलने के लिए (सुधारा गया)
+// नाम को सही टाइटल केस में बदलने के लिए
 const formatNameTitleCase = (text: string) => {
   return text
     .toLowerCase()
-    .split(/\s+/) // एक से अधिक स्पेस को भी हैंडल करता है
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .split(/\s+/)
+    .map((w) => (w.charAt(0).toUpperCase() + w.slice(1)))
     .join(" ");
 };
 
-// केवल 10 अंकों के भारतीय नंबरों के लिए (कोई +91 नहीं)
+// केवल 10 अंकों के भारतीय नंबरों के लिए
 const isValidIndianPhone = (phone: string) => /^[6-9]\d{9}$/.test(phone);
 
 // इनामों की लिस्ट
@@ -30,7 +30,7 @@ const PRIZES = [
   "Manchurian Rice",
 ];
 
-const PROBABILITIES = [70, 13, 7, 5, 2.5, 1.5, 1]; // कुल 100%
+const PROBABILITIES = [70, 13, 7, 5, 2.5, 1.5, 1];
 const PRIZE_ICONS = ["❌", "💵", "☕", "🏷️", "🥪", "🥟", "🍚"];
 
 // --- Audio & Confetti Helpers ---
@@ -122,8 +122,8 @@ export default function SurpriseArcadeGame() {
 
   const startTimer = () => {
     if (timerRef.current) clearInterval(timerRef.current);
-    let timeLeft = 300; // 5 minutes in seconds
-    
+    let timeLeft = 300; // 5 minutes
+
     const updateDisplay = () => {
       const m = Math.floor(timeLeft / 60);
       const s = timeLeft % 60;
@@ -135,7 +135,7 @@ export default function SurpriseArcadeGame() {
       }
     };
 
-    updateDisplay(); // तुरंत शुरू करें
+    updateDisplay();
     timerRef.current = setInterval(updateDisplay, 1000);
   };
 
@@ -145,7 +145,7 @@ export default function SurpriseArcadeGame() {
     const cleanName = formatNameTitleCase(name.trim());
     if (cleanName.length < 2) return toast.error("कृपया अपना सही नाम दर्ज करें!");
 
-    const cleanPhone = phoneNumber.replace(/\D/g, ""); // केवल अंक रखें
+    const cleanPhone = phoneNumber.replace(/\D/g, "");
     if (!isValidIndianPhone(cleanPhone)) {
       return toast.error("कृपया सही 10-अंकों का मोबाइल नंबर डालें!");
     }
@@ -153,14 +153,12 @@ export default function SurpriseArcadeGame() {
     setIsLoading(true);
     const ONE_HOUR = 60 * 60 * 1000;
     const now = Date.now();
-
     const isTestMode = cleanPhone === "9999999999";
 
     try {
       const userRef = doc(db, "customer_points", cleanPhone);
       const userSnap = await getDoc(userRef);
 
-      // 🛑 स्टेप 1: डेटाबेस (Firebase) में नंबर चेक करें
       if (!isTestMode && userSnap.exists()) {
         const data = userSnap.data();
         if (data?.lastPlayedAt) {
@@ -187,7 +185,6 @@ export default function SurpriseArcadeGame() {
         }
       }
 
-      // 🚨 स्टेप 2: डिवाइस चेक (LocalStorage + Cookies)
       if (!isTestMode && typeof window !== "undefined") {
         const deviceLast = localStorage.getItem("device_last_played");
         const hasCookie = document.cookie.includes("device_played=true");
@@ -198,7 +195,6 @@ export default function SurpriseArcadeGame() {
             const elapsedDevice = now - parseInt(deviceLast, 10);
             if (elapsedDevice < ONE_HOUR) isDeviceBlocked = true;
           }
-
           if (isDeviceBlocked) {
             setIsLoading(false);
             return toast.error("🚨 आप इस मोबाइल से पहले ही खेल चुके हैं! एक फोन से केवल 1 बार ही खेल सकते हैं।", { duration: 6000 });
@@ -212,7 +208,6 @@ export default function SurpriseArcadeGame() {
         { merge: true }
       );
 
-      // गेम्स को शफल करें और एक रैंडम गेम चुनें
       const lastGame = typeof window !== "undefined" ? parseInt(localStorage.getItem("last_selected_game") || "0", 10) : 0;
       const availableGames = [1, 2, 3, 4].filter((g) => g !== lastGame);
       const randomGameNum = availableGames[Math.floor(Math.random() * availableGames.length)];
@@ -237,13 +232,11 @@ export default function SurpriseArcadeGame() {
   };
 
   const executeGameResult = async () => {
-    // 🚨 जैसे ही गेम ख़त्म हो, फ़ोन को 1 घंटे के लिए लॉक कर दें
     if (typeof window !== "undefined") {
       localStorage.setItem("device_last_played", Date.now().toString());
-      document.cookie = `device_played=true; max-age=3600; path=/`; // 1 hour
+      document.cookie = `device_played=true; max-age=3600; path=/`;
     }
 
-    // Probability calculation
     const rand = Math.random() * 100;
     let sum = 0;
     let winIdx = 0;
@@ -362,4 +355,11 @@ export default function SurpriseArcadeGame() {
                   onChange={(e) => setName(e.target.value)}
                   disabled={isLoading}
                   required
-                  style={{ width: "100%", boxSizing: "border-box", padding: "14px", borderRadius: "12px", border: "2px solid #3b82f6", backgroundColor: "#0f172a", color: "#ffffff", fontSize: "16px", fontWeight: "bold", textAlign: "center", outline: "none", textTransform:
+                  style={{ width: "100%", boxSizing: "border-box", padding: "14px", borderRadius: "12px", border: "2px solid #3b82f6", backgroundColor: "#0f172a", color: "#ffffff", fontSize: "16px", fontWeight: "bold", textAlign: "center", outline: "none", textTransform: "capitalize" }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: "block", textAlign: "left", fontSize: "13px", color: "#cbd5e1", marginBottom: "6px", fontWeight: "bold" }}>मोबाइल नंबर (10-अंक)</label>
+                <input
+                  type="
