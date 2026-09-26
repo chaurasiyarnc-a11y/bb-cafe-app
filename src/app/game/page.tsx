@@ -17,21 +17,21 @@ const formatNameTitleCase = (text: string) => {
 
 const isValidIndianPhone = (phone: string) => /^[6-9]\d{9}$/.test(phone);
 
-// 7 इनामों की लिस्ट
+// 🎯 7 इनामों की नई लिस्ट (आपके बताए अनुसार)
 const PRIZES = [
   "Better Luck",
   "₹10 OFF",
-  "Free Coffee",
+  "Free Hot Coffee",
   "₹20 OFF",
   "Free Sandwich",
-  "Free Manchurian",
-  "Manchurian Rice",
+  "Manchurian Half",
+  "Manch. Rice Half",
 ];
 
-// 70% हार, 30% जीत
-const PROBABILITIES = [70, 13, 7, 5, 2.5, 1.5, 1];
+// 🎯 जीतने के नए चांस (Total 100%)
+const PROBABILITIES = [80, 12, 3, 2, 1, 1, 1];
 
-// 🎵 साउंड इफेक्ट्स प्ले करने का फंक्शन (यहाँ से export हटा दिया गया है)
+// 🎵 साउंड इफेक्ट्स प्ले करने का फंक्शन
 const playAudio = (type: "win" | "lose" | "spin") => {
   let src = "";
   if (type === "win") src = "https://assets.mixkit.co/active_storage/sfx/1435/1435-preview.mp3"; // जीतने की आवाज़ (Tada)
@@ -45,7 +45,7 @@ const playAudio = (type: "win" | "lose" | "spin") => {
   return audio; // ताकि बाद में इसे रोका जा सके
 };
 
-// 🎆 आतिशबाज़ी (Confetti) का फंक्शन (यहाँ से export हटा दिया गया है)
+// 🎆 आतिशबाज़ी (Confetti) का फंक्शन
 const triggerConfetti = () => {
   const duration = 3 * 1000;
   const end = Date.now() + duration;
@@ -80,7 +80,7 @@ export default function SurpriseArcadeGame() {
   const [isLoading, setIsLoading] = useState(false);
 
   const [couponCode, setCouponCode] = useState<string | null>(null);
-  const [alreadyWonPrize, setAlreadyWonPrize] = useState<string | null>(null); // अगर यूज़र रिफ्रेश करता है
+  const [alreadyWonPrize, setAlreadyWonPrize] = useState<string | null>(null);
   const [timerText, setTimerText] = useState<string | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -103,7 +103,7 @@ export default function SurpriseArcadeGame() {
   // 5 मिनट का टाइमर
   const startTimer = () => {
     if (timerRef.current) clearInterval(timerRef.current);
-    let timeLeft = 300;
+    let timeLeft = 300; // 5 मिनट
     timerRef.current = setInterval(() => {
       const m = Math.floor(timeLeft / 60);
       const s = timeLeft % 60;
@@ -132,7 +132,7 @@ export default function SurpriseArcadeGame() {
     const ONE_HOUR = 60 * 60 * 1000;
     const now = Date.now();
 
-    // 🔒 सिक्योरिटी फिक्स: टेस्ट मोड केवल लोकलहोस्ट (development) पर काम करेगा
+    // टेस्टिंग मोड (Localhost या 9999999999)
     const isTestMode =
       (process.env.NODE_ENV === "development" &&
         typeof window !== "undefined" &&
@@ -143,7 +143,7 @@ export default function SurpriseArcadeGame() {
       const userRef = doc(db, "customer_points", cleanPhone);
       const userSnap = await getDoc(userRef);
 
-      // 1. डेटाबेस से Cooldown और पुराना कूपन चेक
+      // 1. डेटाबेस से Cooldown चेक
       if (!isTestMode && userSnap.exists()) {
         const data = userSnap.data();
         if (data?.lastPlayedAt) {
@@ -151,7 +151,7 @@ export default function SurpriseArcadeGame() {
           const elapsed = now - lastPlayedMillis;
 
           if (elapsed < ONE_HOUR) {
-            // 💡 UX फिक्स: अगर यूज़र गलती से रिफ्रेश कर ले, तो उसका कूपन न खोए
+            // अगर यूज़र जीता था और कूपन रिफ्रेश हो गया
             if (data.voucherCode && !data.voucherClaimed) {
               setName(data.name || cleanName);
               setPhoneNumber(cleanPhone);
@@ -206,11 +206,11 @@ export default function SurpriseArcadeGame() {
     }
   };
 
-  // रिजल्ट जनरेटर
+  // रिजल्ट जनरेटर (यहाँ नई Probabilities काम करेंगी)
   const executeGameResult = async () => {
     localStorage.setItem("device_last_played", Date.now().toString());
 
-    // 70% हार, 30% जीत
+    // 80% हार, 20% जीत (अलग-अलग इनामों के साथ)
     const rand = Math.random() * 100;
     let sum = 0;
     let winIdx = 0;
@@ -295,7 +295,7 @@ export default function SurpriseArcadeGame() {
       </div>
 
       {!isLoggedIn ? (
-        /* साफ और स्पष्ट इनपुट फॉर्म */
+        /* साफ़ और स्पष्ट इनपुट फॉर्म */
         <div
           style={{
             maxWidth: "340px",
@@ -484,6 +484,7 @@ function SpinWheelGame({ onFinish, onEnd }: { onFinish: () => Promise<any>; onEn
       ctx.rotate(startAngle + arc / 2);
       ctx.fillStyle = "white";
       ctx.font = "bold 12px Arial";
+      // छोटे स्क्रीन पर फिट होने के लिए टेक्स्ट का साइज़ थोड़ा एडजस्ट किया
       ctx.fillText(PRIZES[i], 38, 4);
       ctx.restore();
       startAngle += arc;
