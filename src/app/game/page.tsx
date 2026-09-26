@@ -1,13 +1,12 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
-import { db } from "@/lib/firebase"; // सुनिश्चित करें कि यह आपके फ़ायरबेस कॉन्फ़िगरेशन की ओर इंगित करता है
+import { db } from "@/lib/firebase"; // Ensure this path is correct for your project
 import { doc, getDoc, setDoc, serverTimestamp, Timestamp } from "firebase/firestore";
 import toast, { Toaster } from "react-hot-toast";
 
 // --- Constants & Helpers ---
 
-// नाम को सही टाइटल केस में बदलने के लिए
 const formatNameTitleCase = (text: string) => {
     return text
         .toLowerCase()
@@ -16,22 +15,21 @@ const formatNameTitleCase = (text: string) => {
         .join(" ");
 };
 
-// केवल 10 अंकों के भारतीय नंबरों के लिए
 const isValidIndianPhone = (phone: string) => /^[6-9]\d{9}$/.test(phone);
 
-// इनामों की लिस्ट (स्पिन व्हील के सेगमेंट के अनुसार)
+// Prize List (8 segments for the wheel)
 const PRIZE_SEGMENTS = [
-    { text: "Better Luck", color: "#7f8c8d", icon: "❌" }, // Gray
-    { text: "Free Coffee", color: "#f1c40f", icon: "☕" },  // Gold
-    { text: "₹10 OFF", color: "#3498db", icon: "💵" },   // Blue
-    { text: "Free Sandwich", color: "#2ecc71", icon: "🥪" },// Green
-    { text: "Better Luck", color: "#95a5a6", icon: "❌" }, // Light Gray
-    { text: "₹20 OFF", color: "#9b59b6", icon: "🏷️" },   // Purple
-    { text: "Free Manchurian", color: "#e67e22", icon: "🥟" }, // Orange
-    { text: "Manchurian Rice", color: "#c0392b", icon: "🍚" }, // Red
+    { text: "Better Luck", color: "#7f8c8d", icon: "❌" },
+    { text: "Free Coffee", color: "#f1c40f", icon: "☕" },
+    { text: "₹10 OFF", color: "#3498db", icon: "💵" },
+    { text: "Free Sandwich", color: "#2ecc71", icon: "🥪" },
+    { text: "Better Luck", color: "#95a5a6", icon: "❌" },
+    { text: "₹20 OFF", color: "#9b59b6", icon: "🏷️" },
+    { text: "Free Manchurian", color: "#e67e22", icon: "🥟" },
+    { text: "Manchurian Rice", color: "#c0392b", icon: "🍚" },
 ];
 
-// 확률/वितरण (कुल 100% होना चाहिए)
+// Probabilities (must sum to 100)
 const PROBABILITIES = [45, 15, 15, 10, 5, 5, 3, 2];
 
 const getPrizeResult = () => {
@@ -43,7 +41,7 @@ const getPrizeResult = () => {
             return { index: i, ...PRIZE_SEGMENTS[i] };
         }
     }
-    return { index: 0, ...PRIZE_SEGMENTS[0] }; // डिफ़ॉल्ट
+    return { index: 0, ...PRIZE_SEGMENTS[0] };
 };
 
 // --- Audio & Confetti Helpers ---
@@ -59,7 +57,6 @@ const playAudio = (type: "win" | "lose" | "spin"): HTMLAudioElement | null => {
     try {
         const audio = new Audio(src);
         if (type === "spin") audio.loop = true;
-
         const playPromise = audio.play();
         if (playPromise !== undefined) {
             playPromise.catch((e) => console.warn("Audio block alert:", e));
@@ -72,17 +69,13 @@ const playAudio = (type: "win" | "lose" | "spin"): HTMLAudioElement | null => {
 
 const triggerConfetti = () => {
     if (typeof window === "undefined") return;
-
     const runAnimation = () => {
         const confetti = (window as any).confetti;
         if (!confetti) return;
-
         const duration = 3 * 1000;
         const animationEnd = Date.now() + duration;
         const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 9999 };
-
         const randomInRange = (min: number, max: number) => Math.random() * (max - min) + min;
-
         const interval: any = setInterval(function () {
             const timeLeft = animationEnd - Date.now();
             if (timeLeft <= 0) return clearInterval(interval);
@@ -91,9 +84,7 @@ const triggerConfetti = () => {
             confetti(Object.assign({}, defaults, { particleCount, origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 } }));
         }, 250);
     };
-
     if (!(window as any).confetti) {
-        // डायनामिक रूप से कॉन्फ़ेटी लोड करें
         const script = document.createElement("script");
         script.src = "https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js";
         script.onload = runAnimation;
@@ -122,7 +113,6 @@ export default function SurpriseArcadeGame() {
     const [timerText, setTimerText] = useState<string | null>(null);
 
     const timerRef = useRef<NodeJS.Timeout | null>(null);
-    const wheelRef = useRef<HTMLDivElement>(null);
     const spinAudioRef = useRef<HTMLAudioElement | null>(null);
 
     useEffect(() => {
@@ -154,17 +144,14 @@ export default function SurpriseArcadeGame() {
                 setTimerText("⚠️ ऑफर समाप्त हो गया!");
             }
         };
-
         updateDisplay();
         timerRef.current = setInterval(updateDisplay, 1000);
     };
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
-
         const cleanName = formatNameTitleCase(name.trim());
         if (cleanName.length < 2) return toast.error("कृपया अपना सही नाम दर्ज करें!");
-
         const cleanPhone = phoneNumber.replace(/\D/g, "");
         if (!isValidIndianPhone(cleanPhone)) {
             return toast.error("कृपया सही 10-अंकों का मोबाइल नंबर डालें!");
@@ -184,7 +171,6 @@ export default function SurpriseArcadeGame() {
                 if (data?.lastPlayedAt) {
                     const lastPlayedMillis = (data.lastPlayedAt as Timestamp).toMillis();
                     const elapsed = now - lastPlayedMillis;
-
                     if (elapsed < ONE_HOUR) {
                         if (data.voucherCode && !data.voucherClaimed) {
                             setName(data.name || cleanName);
@@ -197,7 +183,6 @@ export default function SurpriseArcadeGame() {
                             setIsLoading(false);
                             return;
                         }
-
                         const remMin = Math.ceil((ONE_HOUR - elapsed) / 60000);
                         setIsLoading(false);
                         return toast.error(`यह नंबर हाल ही में इस्तेमाल हुआ है! कृपया ${remMin} मिनट बाद आएं।`, { duration: 5000 });
@@ -208,7 +193,6 @@ export default function SurpriseArcadeGame() {
             if (!isTestMode && typeof window !== "undefined") {
                 const deviceLast = localStorage.getItem("device_last_played");
                 const hasCookie = document.cookie.includes("device_played=true");
-
                 if (deviceLast || hasCookie) {
                     let isDeviceBlocked = hasCookie;
                     if (deviceLast) {
@@ -222,17 +206,11 @@ export default function SurpriseArcadeGame() {
                 }
             }
 
-            await setDoc(
-                userRef,
-                { name: cleanName, phone: cleanPhone, table: tableNo, lastActive: serverTimestamp() },
-                { merge: true }
-            );
-
+            await setDoc(userRef, { name: cleanName, phone: cleanPhone, table: tableNo, lastActive: serverTimestamp() }, { merge: true });
             setName(cleanName);
             setPhoneNumber(cleanPhone);
             setIsLoggedIn(true);
             toast.success(`स्वागत है, ${cleanName}! अब अपनी किस्मत आजमाएं।`, { duration: 3000 });
-
         } catch (err) {
             console.error("Login error:", err);
             toast.error("सर्वर त्रुटि! पुनः प्रयास करें।");
@@ -243,26 +221,21 @@ export default function SurpriseArcadeGame() {
 
     const executeSpin = async () => {
         if (isSpinning) return;
-
         setIsSpinning(true);
         spinAudioRef.current = playAudio("spin");
 
-        // परिणाम निर्धारित करें
         const result = getPrizeResult();
         setWonPrize(result);
 
-        // पूर्ण क्रांतियों की संख्या (5-7)
-        const spinRounds = 5 + Math.random() * 2;
-        // प्रति सेगमेंट कोण (360 / 8) = 45 डिग्री
+        const spinRounds = 5 + Math.random() * 2; // 5 to 7 full spins
         const segmentAngle = 360 / PRIZE_SEGMENTS.length;
-        // सटीक लक्ष्य कोण (केंद्र में रुकने के लिए)
-        const targetAngle = 360 - (result.index * segmentAngle) + 22.5; // +22.5 to center it
+        // Calculate angle to center the chosen segment
+        const targetAngle = 360 - (result.index * segmentAngle) + (segmentAngle / 2);
 
-        // कुल रोटेशन डिग्री
         const finalRotation = currentRotation + (spinRounds * 360) + targetAngle;
-        setCurrentRotation(finalRotation); // अगले स्पिन के लिए सहेजें
+        setCurrentRotation(finalRotation);
 
-        // डिवाइस-विशिष्ट ब्लॉक सेट करें
+        // Set blocks
         if (typeof window !== "undefined") {
             localStorage.setItem("device_last_played", Date.now().toString());
             document.cookie = `device_played=true; max-age=3600; path=/`;
@@ -270,26 +243,27 @@ export default function SurpriseArcadeGame() {
 
         const voucher = result.text !== "Better Luck" ? `BOM-${Date.now().toString().slice(-6)}` : null;
 
-        // DB अपडेट करें
+        // Update DB
         try {
             const userRef = doc(db, "customer_points", phoneNumber);
-            await setDoc(
-                userRef,
-                { lastPlayedAt: serverTimestamp(), lastPrizeWon: result.text, voucherCode: voucher, table: tableNo, voucherClaimed: false },
-                { merge: true }
-            );
+            await setDoc(userRef, {
+                lastPlayedAt: serverTimestamp(),
+                lastPrizeWon: result.text,
+                voucherCode: voucher,
+                table: tableNo,
+                voucherClaimed: false
+            }, { merge: true });
         } catch (e) {
             console.error("Error saving game result:", e);
         }
 
-        // एनीमेशन के अंत को संभालें
+        // Handle animation end
         setTimeout(() => {
             if (spinAudioRef.current) {
                 spinAudioRef.current.pause();
                 spinAudioRef.current = null;
             }
             setIsSpinning(false);
-            
             if (result.text === "Better Luck") {
                 playAudio("lose");
             } else {
@@ -298,9 +272,8 @@ export default function SurpriseArcadeGame() {
                 setCouponCode(voucher);
                 startTimer();
             }
-            
-            setTimeout(() => setShowResultModal(true), 500); // 500ms बाद परिणाम दिखाएं
-        }, 5500); // CSS संक्रमण अवधि (5.5s) से मेल खाता है
+            setTimeout(() => setShowResultModal(true), 500);
+        }, 5500); // Matches CSS transition duration
     };
 
     const resetGame = () => {
@@ -333,7 +306,6 @@ export default function SurpriseArcadeGame() {
                     padding: 20px 15px;
                     box-sizing: border-box;
                 }
-
                 .glass-card {
                     background: rgba(30, 41, 59, 0.6);
                     backdrop-filter: blur(12px);
@@ -345,9 +317,20 @@ export default function SurpriseArcadeGame() {
                     max-width: 400px;
                     margin: 0 auto;
                 }
-
                 .input-field {
                     width: 100%; box-sizing: border-box; padding: 16px; margin-bottom: 16px;
                     border-radius: 16px; border: 2px solid #334155; background-color: #0f172a;
                     color: #ffffff; font-size: 16px; font-weight: 600; text-align: center;
                     outline: none; transition: all 0.3s ease;
+                }
+                .input-field:focus { border-color: #38bdf8; box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.2); }
+                .input-label { display: block; text-align: left; font-size: 13px; color: #94a3b8; margin-bottom: 8px; font-weight: 600; }
+                .action-btn {
+                    width: 100%; padding: 18px; border-radius: 16px; border: none;
+                    font-size: 18px; font-weight: 900; cursor: pointer;
+                    transition: all 0.3s ease; text-transform: uppercase; letter-spacing: 1px;
+                    margin-top: 10px;
+                }
+                .action-btn:active { transform: scale(0.97); }
+                .btn-primary { background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); color: white; }
+                .btn-primary:hover { background: linear-gradient(135deg, #60a5fa 0
