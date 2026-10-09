@@ -14,7 +14,7 @@ import StockGodown from '../../components/store/StockGodown';
 import StockAssets from '../../components/store/StockAssets';
 import StockSupplierOrder from '../../components/store/StockSupplierOrder';
 import StockLedger from '../../components/store/StockLedger';
-import StockKitchen from '../../components/store/StockKitchen'; // 🍳 विभाजित और प्रबंधित किचन कंपोनेंट
+import StockKitchen from '../../components/store/StockKitchen';
 
 interface InventoryItem {
   id: string;
@@ -213,7 +213,6 @@ export default function StoreStockPage() {
     setTimeout(() => setToast(null), 3000);
   };
   
-  // --- रीयल-टाइम डेटा सिंक्रोनाइज़ेशन (Real-time Sync) ---
   useEffect(() => {
     const unsubInventory = onSnapshot(collection(db, "godown_inventory"), (snap) => {
       setInventory(snap.docs.map(d => ({ id: d.id, kitchenQty: 0, ...d.data() } as InventoryItem)));
@@ -266,7 +265,6 @@ export default function StoreStockPage() {
   }, [savedOrders, focusedOrderField]);
 
   const verifyPinAndGetDoc = async (pin: string) => {
-    // 7262 मास्टर पिन बैकअप
     if (pin === "7262") {
       return { id: "master_admin", name: "Admin", pin: "7262", role: "admin" } as UserPin;
     }
@@ -457,7 +455,6 @@ export default function StoreStockPage() {
 
   const filteredAssets = useMemo(() => fixedAssets.filter(asset => asset.name.toLowerCase().includes(searchQuery.toLowerCase())), [fixedAssets, searchQuery]);
 
-  // 🧹 वन-क्लिक डुप्लीकेट मर्ज क्लीनअप लॉजिक
   const handleMergeAllExistingDuplicates = async () => {
     triggerHaptic(50);
     try {
@@ -634,6 +631,7 @@ export default function StoreStockPage() {
       batch.set(logRef, { id: logRef.id, itemName: transferItem.name, itemId: transferItem.id, qty, purpose: "Kitchen Use", date: getLocalDateString(0), remarks: "किचन स्थानांतरण", financialLoss: 0 });
       await batch.commit();
       setShowTransferModal(false);
+      setTransferQtyInput(""); // इनपुट को क्लियर करें
       toastMessage("सामग्री किचन में भेज दी गई है!", "success");
     } catch {}
   };
@@ -650,6 +648,8 @@ export default function StoreStockPage() {
       batch.set(logRef, { id: logRef.id, itemName: consumeItem.name, itemId: consumeItem.id, qty, purpose: "Kitchen Use", date: getLocalDateString(0), remarks: consumeRemarksInput || "किचन उपयोग", financialLoss: 0 });
       await batch.commit();
       setShowConsumeModal(false);
+      setConsumeQtyInput(""); // इनपुट को क्लियर करें
+      setConsumeRemarksInput(""); // रिमार्क क्लियर करें
       toastMessage("किचन स्टॉक अपडेट किया गया!", "success");
     } catch {}
   };
@@ -710,7 +710,6 @@ export default function StoreStockPage() {
       if (updateCount > 0) {
         await batch.commit();
         setKitchenClosingInputs({});
-        // सफल सबमिशन पर क्लोजिंग स्टॉक ड्राफ्ट को साफ़ (Clear) करना
         localStorage.removeItem('kitchen_closing_draft');
         toastMessage(`${updateCount} आइटम का क्लोजिंग स्टॉक सहेजा गया! 🍳`, "success");
       }
@@ -766,7 +765,6 @@ export default function StoreStockPage() {
       setKitchenClosingInputs(prev => {
         const copy = { ...prev };
         delete copy[itemId];
-        // सफल व्यक्तिगत सबमिशन पर ड्राफ्ट को लोकल स्टोरेज में भी अपडेट करना
         localStorage.setItem('kitchen_closing_draft', JSON.stringify(copy));
         return copy;
       });
@@ -775,8 +773,6 @@ export default function StoreStockPage() {
       toastMessage("अपडेट फेल हुआ।", "error");
     }
   };
-
-  // --- नए आवश्यक एक्शन हैंडलर्स की परिभाषा (New Required Action Handlers) ---
 
   const handleWasteSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1014,7 +1010,6 @@ export default function StoreStockPage() {
     window.open(`https://api.whatsapp.com/send?text=${encoded}`, '_blank');
   };
 
-  // 🔒 सुरक्षा लॉक: अगर लॉगिन नहीं है तो लॉक स्क्रीन दिखाओ
   if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-black text-white font-sans">
@@ -1216,7 +1211,7 @@ export default function StoreStockPage() {
           </div>
         )}
 
-        {/* Modal: Transfer to kitchen */}
+        {/* Modal: Transfer to kitchen (बदलाव - अगल बगल बॉक्स) */}
         {showTransferModal && transferItem && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <motion.form onSubmit={handleTransferToKitchenSubmit} className={`w-full max-w-sm rounded-[2rem] p-6 space-y-4 border ${isDarkMode ? 'bg-neutral-900 text-white' : 'bg-white text-neutral-900'}`}>
@@ -1224,13 +1219,21 @@ export default function StoreStockPage() {
                 <h3 className="text-xs font-black uppercase text-orange-500">किचन में भेजें - {transferItem.name}</h3>
                 <button type="button" onClick={() => setShowTransferModal(false)} className="p-1.5 bg-neutral-100 dark:bg-neutral-800 rounded-xl text-neutral-500"><X size={14} /></button>
               </div>
-              <input type="number" placeholder="मात्रा (Qty)" value={transferQtyInput} onChange={e => setTransferQtyInput(e.target.value)} className="w-full p-2.5 rounded-xl border dark:bg-neutral-800 text-center" required />
-              <button type="submit" className="w-full py-3 bg-orange-500 text-white rounded-xl text-xs font-black">पुष्टि करें (Confirm)</button>
+              
+              <div className="flex items-center gap-3">
+                <div className="flex flex-col items-center justify-center bg-neutral-100 dark:bg-neutral-800 p-2.5 rounded-xl border border-neutral-200 dark:border-neutral-700 min-w-[80px]">
+                  <span className="text-[9px] text-neutral-400 font-bold uppercase">उपलब्ध है</span>
+                  <span className="text-sm font-black text-neutral-700 dark:text-neutral-200">{transferItem.storeQty} {transferItem.unit}</span>
+                </div>
+                <input type="number" placeholder="भेजने की मात्रा" value={transferQtyInput} onChange={e => setTransferQtyInput(e.target.value)} className="flex-1 p-2.5 rounded-xl border dark:bg-neutral-800 text-center font-bold text-sm" required />
+              </div>
+
+              <button type="submit" className="w-full py-3 bg-orange-500 text-white rounded-xl text-xs font-black mt-2">पुष्टि करें (Confirm)</button>
             </motion.form>
           </div>
         )}
 
-        {/* Modal: Consume Kitchen stock */}
+        {/* Modal: Consume Kitchen stock (बदलाव - अगल बगल बॉक्स) */}
         {showConsumeModal && consumeItem && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <motion.form onSubmit={handleConsumeKitchenSubmit} className={`w-full max-w-sm rounded-[2rem] p-6 space-y-4 border ${isDarkMode ? 'bg-neutral-900 text-white' : 'bg-white text-neutral-900'}`}>
@@ -1238,14 +1241,22 @@ export default function StoreStockPage() {
                 <h3 className="text-xs font-black uppercase text-neutral-400">किचन स्टॉक का उपयोग - {consumeItem.name}</h3>
                 <button type="button" onClick={() => setShowConsumeModal(false)} className="p-1.5 bg-neutral-100 dark:bg-neutral-800 rounded-xl text-neutral-500"><X size={14} /></button>
               </div>
-              <input type="number" placeholder="मात्रा (Qty)" value={consumeQtyInput} onChange={e => setConsumeQtyInput(e.target.value)} className="w-full p-2.5 rounded-xl border dark:bg-neutral-800 text-center" required />
-              <input type="text" placeholder="टिप्पणी (Remarks)" value={consumeRemarksInput} onChange={e => setConsumeRemarksInput(e.target.value)} className="w-full p-2.5 rounded-xl border dark:bg-neutral-800" />
+              
+              <div className="flex items-center gap-3">
+                <div className="flex flex-col items-center justify-center bg-neutral-100 dark:bg-neutral-800 p-2.5 rounded-xl border border-neutral-200 dark:border-neutral-700 min-w-[80px]">
+                  <span className="text-[9px] text-neutral-400 font-bold uppercase">उपलब्ध है</span>
+                  <span className="text-sm font-black text-neutral-700 dark:text-neutral-200">{consumeItem.kitchenQty} {consumeItem.unit}</span>
+                </div>
+                <input type="number" placeholder="उपयोग की मात्रा" value={consumeQtyInput} onChange={e => setConsumeQtyInput(e.target.value)} className="flex-1 p-2.5 rounded-xl border dark:bg-neutral-800 text-center font-bold text-sm" required />
+              </div>
+
+              <input type="text" placeholder="टिप्पणी (Remarks)" value={consumeRemarksInput} onChange={e => setConsumeRemarksInput(e.target.value)} className="w-full p-2.5 rounded-xl border dark:bg-neutral-800 text-sm mt-2" />
               <button type="submit" className="w-full py-3 bg-neutral-800 text-white dark:bg-white dark:text-neutral-900 rounded-xl text-xs font-black">उपयोग सहेजें (Save)</button>
             </motion.form>
           </div>
         )}
 
-        {/* Modal: Log Waste / Damage */}
+        {/* Modal: Log Waste / Damage (बदलाव - अगल बगल बॉक्स) */}
         {showStockOutModal && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <motion.form onSubmit={handleWasteSubmit} className="w-full max-w-sm rounded-3xl p-6 space-y-4 bg-white dark:bg-neutral-900 border">
@@ -1253,16 +1264,31 @@ export default function StoreStockPage() {
                 <h3 className="text-xs font-black text-red-500 uppercase">कचरा / नुकसान दर्ज करें</h3>
                 <button type="button" onClick={() => setShowStockOutModal(false)} className="p-1.5 bg-neutral-100 dark:bg-neutral-800 rounded-xl text-neutral-500"><X size={14} /></button>
               </div>
+              
               <select value={formStockOut.item} onChange={e => setFormStockOut({ ...formStockOut, item: e.target.value })} className="w-full p-2.5 rounded-xl border dark:bg-neutral-800 font-bold text-xs" required>
                 <option value="">सामान चुनें...</option>
-                {inventory.map(i => <option key={i.id} value={i.id}>{i.name} ({i.storeQty} उपलब्ध)</option>)}
+                {inventory.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}
               </select>
-              <input type="number" placeholder="मात्रा (Qty)" value={formStockOut.quantity} onChange={e => setFormStockOut({ ...formStockOut, quantity: e.target.value })} className="w-full p-2.5 rounded-xl border dark:bg-neutral-800 text-xs" required />
-              <select value={formStockOut.purpose} onChange={e => setFormStockOut({ ...formStockOut, purpose: e.target.value as any })} className="w-full p-2.5 rounded-xl border dark:bg-neutral-800 text-xs">
+
+              {formStockOut.item ? (
+                <div className="flex items-center gap-3">
+                  <div className="flex flex-col items-center justify-center bg-neutral-100 dark:bg-neutral-800 p-2.5 rounded-xl border border-neutral-200 dark:border-neutral-700 min-w-[80px]">
+                    <span className="text-[9px] text-neutral-400 font-bold uppercase">उपलब्ध है</span>
+                    <span className="text-sm font-black text-neutral-700 dark:text-neutral-200">
+                      {inventory.find(i => i.id === formStockOut.item)?.storeQty || 0} {inventory.find(i => i.id === formStockOut.item)?.unit}
+                    </span>
+                  </div>
+                  <input type="number" placeholder="नुकसान की मात्रा" value={formStockOut.quantity} onChange={e => setFormStockOut({ ...formStockOut, quantity: e.target.value })} className="flex-1 p-2.5 rounded-xl border dark:bg-neutral-800 text-center font-bold text-sm" required />
+                </div>
+              ) : (
+                <input type="number" placeholder="मात्रा (Qty)" value={formStockOut.quantity} onChange={e => setFormStockOut({ ...formStockOut, quantity: e.target.value })} className="w-full p-2.5 rounded-xl border dark:bg-neutral-800 text-sm font-bold" required disabled />
+              )}
+
+              <select value={formStockOut.purpose} onChange={e => setFormStockOut({ ...formStockOut, purpose: e.target.value as any })} className="w-full p-2.5 rounded-xl border dark:bg-neutral-800 text-xs font-bold">
                 <option value="Waste">Waste (कचरा)</option>
                 <option value="Damage">Damage (नुकसान)</option>
               </select>
-              <input type="text" placeholder="टिप्पणी (Remarks)" value={formStockOut.remarks} onChange={e => setFormStockOut({ ...formStockOut, remarks: e.target.value })} className="w-full p-2.5 rounded-xl border dark:bg-neutral-800 text-xs" />
+              <input type="text" placeholder="टिप्पणी (Remarks)" value={formStockOut.remarks} onChange={e => setFormStockOut({ ...formStockOut, remarks: e.target.value })} className="w-full p-2.5 rounded-xl border dark:bg-neutral-800 text-sm" />
               <button type="submit" className="w-full py-3 bg-red-600 text-white rounded-xl font-bold text-xs uppercase">रिकॉर्ड सहेजें (Save)</button>
             </motion.form>
           </div>
@@ -1578,7 +1604,6 @@ export default function StoreStockPage() {
             <Store size={14} /> <span className="mt-0.5">गोदाम</span>
           </button>
           
-          {/* 🍳 KITCHEN TAB BUTTON */}
           <button onClick={() => { setActiveTab('kitchen'); setIsMultiSelectMode(false); }} className={`flex flex-col items-center justify-center py-1 ${activeTab === 'kitchen' ? 'text-[#FF6B00]' : 'text-neutral-400'}`}>
             <Utensils size={14} /> <span className="mt-0.5">किचन</span>
           </button>
