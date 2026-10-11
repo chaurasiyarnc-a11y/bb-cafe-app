@@ -1240,12 +1240,7 @@ export default function BbCafeDesktopPos() {
     const savedOwnerPhone = localStorage.getItem("bb_pos_owner_phone");
     if (savedOwnerPhone) setOwnerPhoneConfig(savedOwnerPhone);
 
-    const savedStoreName = localStorage.getItem("bb_pos_store_name");
-    if (savedStoreName) setStoreNameConfig(savedStoreName);
-    const savedStoreAddress = localStorage.getItem("bb_pos_store_address");
-    if (savedStoreAddress) setStoreAddressConfig(savedStoreAddress);
-    const savedStorePhone = localStorage.getItem("bb_pos_store_phone");
-    if (savedStorePhone) setStorePhoneConfig(savedStorePhone);
+   
     // 👉 NEW: Load Saved Store Details
     const savedStoreName = localStorage.getItem("bb_pos_store_name");
     if (savedStoreName) setStoreNameConfig(savedStoreName);
