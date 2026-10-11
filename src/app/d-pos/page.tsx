@@ -2307,19 +2307,29 @@ export default function BbCafeDesktopPos() {
           newVisits = prevVisits + 1;
         }
 
-       await setDoc(userRef, { 
+       // 🚀 OFFLINE POINTS SAVE LOGIC
+        const updatedCustomerData = { 
           name: customerName || "Walk-in Guest", 
           phone: cleanPhone, 
           points: remainingPts, 
-          gamePoints: remainingGamePts, // 👉 NEW: बचे हुए गेम पॉइंट्स सेव करें
+          gamePoints: remainingGamePts, 
           totalSpent: newSpent,
           totalVisits: newVisits,
-          lastBillNumber: billNumber, // 👉 NEW: सेव बिल नंबर (ऊपर बना हुआ इस्तेमाल करें)
-          lastBillAmount: finalTotal, // 👉 NEW: सेव अमाउंट
-          lastActive: new Date() 
-        }, { merge: true });
+          lastBillNumber: billNumber, 
+          lastBillAmount: finalTotal, 
+          lastActive: new Date().toISOString()
+        };
+
+        if (navigator.onLine) {
+          await setDoc(userRef, updatedCustomerData, { merge: true });
+        } else {
+          const custQueue = JSON.parse(localStorage.getItem("bb_pos_offline_customers_queue") || "[]");
+          const filtered = custQueue.filter((c: any) => c.phone !== cleanPhone);
+          filtered.push(updatedCustomerData);
+          localStorage.setItem("bb_pos_offline_customers_queue", JSON.stringify(filtered));
+        }
       } else {
-        // ऑफलाइन या बिना मोबाइल वाले ग्राहकों के लिए
+        // बिना मोबाइल वाले ग्राहकों के लिए
         remainingPts = Math.max(0, customerPoints - redeemed) + earned;
       }
 
