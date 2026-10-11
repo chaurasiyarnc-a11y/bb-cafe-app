@@ -1,7 +1,7 @@
 'use client';
 import React from 'react';
 
-// 👉 NEW: यहाँ हमने storeName, storeAddress, storePhone जोड़ दिया है
+// 👉 यहीं पर हमने 'storeName', 'storeAddress' को जोड़ा है ताकि एरर न आए
 interface PrintReceiptProps {
   orderObj: any;
   currentUser?: any;
@@ -14,7 +14,7 @@ export default function PrintCustomerReceipt({
   orderObj, 
   currentUser, 
   storeName = 'BUM BUM CAFE', 
-  storeAddress = 'Address not set', 
+  storeAddress = 'न्यू बस स्टैंड मोहंद्रा', 
   storePhone = '9999999999' 
 }: PrintReceiptProps) {
   if (!orderObj) return null;
@@ -52,7 +52,7 @@ export default function PrintCustomerReceipt({
         }}
         className="w-[68mm] max-w-[68mm] mx-auto bg-white p-0 text-left select-none print:m-0 print:p-0"
       >
-        {/* 👉 डायनामिक हेडर (Settings से आया हुआ) */}
+        {/* 👉 डायनामिक हेडर (Settings से आया हुआ नाम और पता) */}
         <div className="text-center pb-2 border-b border-black prevent-cut">
           <h1 className="text-xl font-black uppercase tracking-wider leading-tight">{storeName}</h1>
           <p className="text-[11px] font-bold mt-1 leading-snug whitespace-pre-wrap">
@@ -115,16 +115,6 @@ export default function PrintCustomerReceipt({
           <div className="flex justify-between text-[14px] font-black pt-1.5 mt-1 border-t-2 border-black"><span>GRAND TOTAL:</span><span>₹{orderObj.total}</span></div>
           <div className="flex justify-between text-[11px] font-bold uppercase pt-1"><span>Payment Mode:</span><span>{orderObj.paymentMethod || 'CASH'}</span></div>
         </div>
-
-        {/* लॉयल्टी पॉइंट्स बॉक्स */}
-        {orderObj.customerPhone && (
-          <div className="py-1.5 border-b-2 border-dotted border-black text-[11px] leading-snug prevent-cut">
-            <div className="text-center font-black uppercase tracking-wider mb-1">⭐ LOYALTY REWARDS ⭐</div>
-            <div className="flex justify-between font-bold"><span>Points Earned this Bill:</span><span>+{earnedPts} Pts</span></div>
-            {redeemedPts > 0 && <div className="flex justify-between font-bold"><span>Points Redeemed:</span><span>-{redeemedPts} Pts</span></div>}
-            <div className="flex justify-between font-black pt-1 border-t border-dotted border-black mt-1"><span>Total Balance Points:</span><span>{balancePts} Pts</span></div>
-          </div>
-        )}
 
         {/* 100% OFFLINE QR कोड */}
         {orderObj.offlineQrUrl && (
