@@ -2929,7 +2929,7 @@ export default function BbCafeDesktopPos() {
     return Object.values(map).sort((a, b) => b.quantity - a.quantity);
   }, [reportOrders]);
 
- // 📊 DAILY SALES TREND (ग्राफ़ के लिए डायनामिक डेटा - 7 दिन और Custom दोनों के लिए)
+// 📊 DAILY SALES TREND (ग्राफ़ के लिए डायनामिक डेटा)
   const dailyTrendData = useMemo(() => {
     const dateMap: { [key: string]: { date: string, total: number, orders: number } } = {};
     const result = [];
@@ -2938,46 +2938,40 @@ export default function BbCafeDesktopPos() {
     let end = new Date();
 
    if (reportFilter === 'last7days') {
-      start.setDate(start.getDate() - 6);
-      start.setHours(0, 0, 0, 0);
-      end.setHours(23, 59, 59, 999);
+      start.setDate(start.getDate() - 6); start.setHours(0, 0, 0, 0); end.setHours(23, 59, 59, 999);
     } else if (reportFilter === 'last30days') {
-      start.setDate(start.getDate() - 29);
-      start.setHours(0, 0, 0, 0);
-      end.setHours(23, 59, 59, 999);
+      start.setDate(start.getDate() - 29); start.setHours(0, 0, 0, 0); end.setHours(23, 59, 59, 999);
     } else if (reportFilter === 'custom' && customStartDate && customEndDate) {
       const sParts = customStartDate.split('-');
       start = new Date(Number(sParts[0]), Number(sParts[1]) - 1, Number(sParts[2]), 0, 0, 0, 0);
       const eParts = customEndDate.split('-');
       end = new Date(Number(eParts[0]), Number(eParts[1]) - 1, Number(eParts[2]), 23, 59, 59, 999);
     } else if (reportFilter === 'yesterday') {
-      start.setDate(start.getDate() - 1);
-      start.setHours(0, 0, 0, 0);
-      end.setDate(end.getDate() - 1);
-      end.setHours(23, 59, 59, 999);
+      start.setDate(start.getDate() - 1); start.setHours(0, 0, 0, 0);
+      end.setDate(end.getDate() - 1); end.setHours(23, 59, 59, 999);
     } else {
-      start.setHours(0, 0, 0, 0);
-      end.setHours(23, 59, 59, 999);
+      start.setHours(0, 0, 0, 0); end.setHours(23, 59, 59, 999);
     }
 
-    // 1. Start से End तक की हर तारीख का ढांचा बनाएँ
     const loopStart = new Date(start);
     let safetyCounter = 0;
-    // ग्राफ़ अब 100 दिनों तक का डेटा आसानी से दिखा सकता है
     while (loopStart <= end && safetyCounter < 100) {
       const dateStr = `${String(loopStart.getDate()).padStart(2, '0')} ${loopStart.toLocaleString('default', { month: 'short' })}`;
       const dayData = { date: dateStr, total: 0, orders: 0 };
       dateMap[dateStr] = dayData;
       result.push(dayData);
-      
       loopStart.setDate(loopStart.getDate() + 1);
       safetyCounter++;
     }
 
-    // 2. ऑर्डर्स का डेटा इस ढांचे में भरें
     reportOrders.forEach(o => {
       if (o.status === 'completed') {
-        const d = o.timestamp?.toDate ? o.timestamp.toDate() : new Date(o.timestamp || Date.now());
+        // 👉 SAFE DATE LOGIC FOR OFFLINE
+        let d: Date;
+        if (o.timestamp?.toDate) { d = o.timestamp.toDate(); }
+        else if (typeof o.timestamp === 'object' && o.timestamp.seconds) { d = new Date(o.timestamp.seconds * 1000); }
+        else { d = new Date(o.timestamp || Date.now()); }
+        
         const dateStr = `${String(d.getDate()).padStart(2, '0')} ${d.toLocaleString('default', { month: 'short' })}`;
         
         if (dateMap[dateStr]) {
