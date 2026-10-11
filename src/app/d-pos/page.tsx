@@ -2037,7 +2037,23 @@ export default function BbCafeDesktopPos() {
           img { display: block !important; margin: 0 auto !important; max-width: 100% !important; }
         </style>
       `);
-      Array.from(document.querySelectorAll('link[rel="stylesheet"], style')).forEach((styleTag) => {
+     // 🚀 OFFLINE CSS INJECTION (डिज़ाइन को बिना इंटरनेट के सीधा मेमोरी से लोड करें)
+      let cssString = '';
+      for (let i = 0; i < document.styleSheets.length; i++) {
+        try {
+          const rules = document.styleSheets[i].cssRules || document.styleSheets[i].rules;
+          if (rules) {
+            for (let j = 0; j < rules.length; j++) {
+              cssString += rules[j].cssText + '\n';
+            }
+          }
+        } catch (e) { /* Ignore CORS errors */ }
+      }
+      
+      printDocument.write(`<style>${cssString}</style>`);
+      
+      // फॉलबैक: अगर कुछ इनलाइन स्टाइल हैं तो उन्हें भी जोड़ लें
+      Array.from(document.querySelectorAll('style')).forEach((styleTag) => {
         printDocument.write(styleTag.outerHTML);
       });
       printDocument.write('</head><body><div id="print-root"></div></body></html>');
