@@ -1049,9 +1049,12 @@ export default function BbCafeDesktopPos() {
     return todaySettlementOrders;
   }, [todaySettlementOrders, settlementFilter]);
 
-  // 🚀 OFFLINE SYNC MANAGER (Orders, Expenses, Customers)
-  const syncOfflineAll = async () => {
-    if (!navigator.onLine) return;
+// 🚀 OFFLINE SYNC MANAGER (Orders, Expenses, Customers)
+  const syncOfflineAll = async (isManual = false) => {
+    if (!navigator.onLine) {
+      if (isManual) toast.error("इंटरनेट कनेक्ट नहीं है! ⚠️");
+      return;
+    }
     setIsSyncing(true);
     let orderCount = 0; let expenseCount = 0; let custCount = 0;
 
@@ -1062,7 +1065,7 @@ export default function BbCafeDesktopPos() {
         let remainingQueue = [...queue];
         if (queue.length > 0) {
           for (const ord of queue) {
-            const { id, offlineQrUrl, ...cleanOrd } = ord; // offlineQrUrl हटा रहे हैं ताकि Firebase न भरे
+            const { id, offlineQrUrl, ...cleanOrd } = ord; 
             await addDoc(collection(db, "orders"), {
               ...cleanOrd,
               timestamp: ord.timestamp ? new Date(ord.timestamp) : new Date()
@@ -1115,9 +1118,18 @@ export default function BbCafeDesktopPos() {
       if (orderCount > 0 || expenseCount > 0 || custCount > 0) {
         toast.success(`Cloud Sync: ${orderCount} Orders, ${custCount} Customers Synced! ☁️✅`);
         if (custCount > 0) fetchAllCustomers(); 
+      } else if (isManual) {
+        // 👉 अगर सब कुछ पहले से ही सेव है
+        toast.success("सभी डेटा पहले से ही क्लाउड पर सुरक्षित है! ☁️✅");
       }
+
+      // 👉 बटन को 3 सेकंड के लिए हरा (Green) करें
+      setSyncSuccess(true);
+      setTimeout(() => setSyncSuccess(false), 3000);
+
     } catch (e) {
       console.error("Offline sync error", e);
+      if (isManual) toast.error("सिंक करने में समस्या आई!");
     } finally {
       setIsSyncing(false);
     }
