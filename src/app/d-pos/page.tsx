@@ -5081,11 +5081,17 @@ export default function BbCafeDesktopPos() {
                     </div>
                   </div>
 
-                  {/* OWNER WHATSAPP SETTING */}
+                 {/* OWNER WHATSAPP SETTING */}
                   <div className="space-y-2 border-b border-neutral-300 dark:border-neutral-800 pb-4">
                     <p className="text-xs font-bold uppercase">Owner WhatsApp Number (for EOD Report):</p>
-                    {/* 👉 NEW: STORE DETAILS SETTING */}
-                  <div className="space-y-3 border-b border-neutral-300 dark:border-neutral-800 pb-4">
+                    <div className="flex gap-2">
+                      <input type="text" value={ownerPhoneConfig} onChange={e => setOwnerPhoneConfig(e.target.value)} placeholder="e.g. 919714293759" className="flex-1 bg-neutral-100 dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 rounded-xl px-3 py-2 text-xs font-mono outline-none" />
+                      <button onClick={() => { localStorage.setItem("bb_pos_owner_phone", ownerPhoneConfig); toast.success("Owner Phone Saved!"); }} className="bg-green-600 text-white px-4 rounded-xl text-xs font-black uppercase">Save</button>
+                    </div>
+                  </div>
+
+                  {/* 👉 NEW: STORE DETAILS SETTING */}
+                  <div className="space-y-3 border-b border-neutral-300 dark:border-neutral-800 pb-4 mt-4">
                     <p className="text-xs font-black uppercase text-orange-600">Store Details (बिल पर छपने वाला नाम व पता):</p>
                     <div className="flex flex-col gap-2">
                       <input type="text" value={storeNameConfig} onChange={e => setStoreNameConfig(e.target.value)} placeholder="Store Name (e.g. BUM BUM CAFE)" className="w-full bg-neutral-100 dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 rounded-xl px-3 py-2 text-sm font-black outline-none" />
@@ -5104,11 +5110,6 @@ export default function BbCafeDesktopPos() {
                           Save Details
                         </button>
                       </div>
-                    </div>
-                  </div>
-                    <div className="flex gap-2">
-                      <input type="text" value={ownerPhoneConfig} onChange={e => setOwnerPhoneConfig(e.target.value)} placeholder="e.g. 919714293759" className="flex-1 bg-neutral-100 dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 rounded-xl px-3 py-2 text-xs font-mono outline-none" />
-                      <button onClick={() => { localStorage.setItem("bb_pos_owner_phone", ownerPhoneConfig); toast.success("Owner Phone Saved!"); }} className="bg-green-600 text-white px-4 rounded-xl text-xs font-black uppercase">Save</button>
                     </div>
                   </div>
 {/* 👉 NEW: ACTIVE GAME SETTING (कस्टमर का गेम बदलें) */}
