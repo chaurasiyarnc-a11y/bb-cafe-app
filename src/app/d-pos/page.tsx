@@ -1985,16 +1985,6 @@ export default function BbCafeDesktopPos() {
     return currentTokenSeq;
   };
 
- // 🚀 OFFLINE QR CODE GENERATOR 
-  const generateOfflineQrCode = async (upiString: string): Promise<string> => {
-    try {
-      if (QRCode && QRCode.toDataURL) {
-        return await QRCode.toDataURL(upiString, { width: 160, margin: 1, color: { dark: '#000000', light: '#ffffff' } });
-      }
-    } catch (e) { console.error("QR Code Error:", e); }
-    return '';
-  };
-
 // 🚀 OFFLINE QR CODE GENERATOR 
   const generateOfflineQrCode = async (upiString: string): Promise<string> => {
     try {
