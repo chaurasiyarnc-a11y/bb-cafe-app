@@ -2779,7 +2779,7 @@ export default function BbCafeDesktopPos() {
       toast.dismiss(toastId);
       toast.error("Failed to record expense");
     }
-  };// 🚀 OFFLINE & ONLINE REPORTS DATA FETCHING
+ // 🚀 OFFLINE & ONLINE REPORTS DATA FETCHING (FIXED DATE ISSUE)
   const fetchReportData = async () => {
     setIsReportLoading(true);
     try {
@@ -2787,20 +2787,15 @@ export default function BbCafeDesktopPos() {
       let endTarget = new Date();
 
       if (reportFilter === 'today') {
-        startTarget.setHours(0, 0, 0, 0);
-        endTarget.setHours(23, 59, 59, 999);
+        startTarget.setHours(0, 0, 0, 0); endTarget.setHours(23, 59, 59, 999);
       } else if (reportFilter === 'yesterday') {
-        startTarget.setDate(startTarget.getDate() - 1);
-        startTarget.setHours(0, 0, 0, 0);
-        endTarget.setDate(endTarget.getDate() - 1);
-        endTarget.setHours(23, 59, 59, 999);
+        startTarget.setDate(startTarget.getDate() - 1); startTarget.setHours(0, 0, 0, 0);
+        endTarget.setDate(endTarget.getDate() - 1); endTarget.setHours(23, 59, 59, 999);
       } else if (reportFilter === 'last7days') {
-        startTarget.setDate(startTarget.getDate() - 6); 
-        startTarget.setHours(0, 0, 0, 0);
+        startTarget.setDate(startTarget.getDate() - 6); startTarget.setHours(0, 0, 0, 0);
         endTarget.setHours(23, 59, 59, 999);
       } else if (reportFilter === 'last30days') {
-        startTarget.setDate(startTarget.getDate() - 29);
-        startTarget.setHours(0, 0, 0, 0);
+        startTarget.setDate(startTarget.getDate() - 29); startTarget.setHours(0, 0, 0, 0);
         endTarget.setHours(23, 59, 59, 999);
       } else if (reportFilter === 'custom' && customStartDate && customEndDate) {
         const startParts = customStartDate.split('-');
@@ -2812,20 +2807,24 @@ export default function BbCafeDesktopPos() {
       let allOrders: any[] = [];
       let allExpenses: any[] = [];
 
-      // 1. अगर ऑनलाइन है तो Firebase से लाएं और लोकल सेव करें
+      // 1. अगर ऑनलाइन है तो Firebase से लाएं और डेट्स को सेफ फॉर्मेट में बदलें
       if (navigator.onLine) {
         const qOrders = query(collection(db, "orders"), orderBy("timestamp", "desc"), limit(2000));
         const snapOrders = await getDocs(qOrders);
-        allOrders = snapOrders.docs.map(d => ({ id: d.id, ...d.data() }));
+        allOrders = snapOrders.docs.map(d => {
+          const data = d.data();
+          return { ...data, id: d.id, timestamp: data.timestamp?.toDate ? data.timestamp.toDate().toISOString() : new Date().toISOString() };
+        });
         localStorage.setItem("bb_pos_cached_report_orders", JSON.stringify(allOrders));
 
         const qExpenses = query(collection(db, "daily_expenses"), orderBy("timestamp", "desc"), limit(200));
         const snapExpenses = await getDocs(qExpenses);
-        allExpenses = snapExpenses.docs.map(d => ({ id: d.id, ...d.data() }));
+        allExpenses = snapExpenses.docs.map(d => {
+          const data = d.data();
+          return { ...data, id: d.id, timestamp: data.timestamp?.toDate ? data.timestamp.toDate().toISOString() : new Date().toISOString() };
+        });
         localStorage.setItem("bb_pos_cached_report_expenses", JSON.stringify(allExpenses));
-      } 
-      // 2. अगर ऑफलाइन है तो लोकल कैशे (Cache) से उठाएं
-      else {
+      } else {
         const cachedOrders = localStorage.getItem("bb_pos_cached_report_orders");
         if (cachedOrders) allOrders = JSON.parse(cachedOrders);
 
@@ -2833,30 +2832,32 @@ export default function BbCafeDesktopPos() {
         if (cachedExpenses) allExpenses = JSON.parse(cachedExpenses);
       }
 
-      // 3. 🚀 OFFLINE QUEUE (जो बिल अभी काटे हैं पर नेट न होने से सिंक नहीं हुए) को भी जोड़ें
       const offlineOrdersQueue = JSON.parse(localStorage.getItem("bb_pos_offline_orders_queue") || "[]");
       const offlineExpensesQueue = JSON.parse(localStorage.getItem("bb_pos_offline_expenses_queue") || "[]");
 
-      // दोनों को मिला दें (Merge)
       const combinedOrders = [...offlineOrdersQueue, ...allOrders];
       const combinedExpenses = [...offlineExpensesQueue, ...allExpenses];
 
-      // डुप्लीकेट ऑर्डर्स हटाएं
       const uniqueOrdersMap = new Map();
       combinedOrders.forEach(o => uniqueOrdersMap.set(o.billNumber || o.id, o));
       const finalOrders = Array.from(uniqueOrdersMap.values());
 
-      // 4. तारीख (Date) के हिसाब से फ़िल्टर करें
+      // 👉 SAFE DATE PARSER (यह टूटी हुई डेट्स को फिक्स करेगा)
+      const getSafeTime = (ts: any) => {
+        if (!ts) return Date.now();
+        if (ts.toDate) return ts.toDate().getTime();
+        if (typeof ts === 'object' && ts.seconds) return ts.seconds * 1000;
+        return new Date(ts).getTime();
+      };
+
       const filteredOrders = finalOrders.filter((o: any) => {
-        const raw = o.timestamp?.toDate ? o.timestamp.toDate() : new Date(o.timestamp || Date.now());
-        const timeMs = raw.getTime();
+        const timeMs = getSafeTime(o.timestamp);
         return timeMs >= startTarget.getTime() && timeMs <= endTarget.getTime();
       });
       setReportOrders(filteredOrders);
 
       const filteredExp = combinedExpenses.filter((exp: any) => {
-        const raw = exp.timestamp?.toDate ? exp.timestamp.toDate() : new Date(exp.timestamp || Date.now());
-        const timeMs = raw.getTime();
+        const timeMs = getSafeTime(exp.timestamp);
         return timeMs >= startTarget.getTime() && timeMs <= endTarget.getTime();
       });
       setDailyExpenses(filteredExp);
