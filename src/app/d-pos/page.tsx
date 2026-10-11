@@ -1985,16 +1985,14 @@ export default function BbCafeDesktopPos() {
     return currentTokenSeq;
   };
 
-  const preloadQrCode = async (upiString: string): Promise<string> => {
-    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(upiString)}`;
-    return new Promise((resolve) => {
-      const img = new Image();
-      img.crossOrigin = 'anonymous';
-      img.onload = () => resolve(qrUrl);
-      img.onerror = () => resolve(qrUrl);
-      img.src = qrUrl;
-      setTimeout(() => resolve(qrUrl), 1500);
-    });
+ // 🚀 OFFLINE QR CODE GENERATOR 
+  const generateOfflineQrCode = async (upiString: string): Promise<string> => {
+    try {
+      if (QRCode && QRCode.toDataURL) {
+        return await QRCode.toDataURL(upiString, { width: 160, margin: 1, color: { dark: '#000000', light: '#ffffff' } });
+      }
+    } catch (e) { console.error("QR Code Error:", e); }
+    return '';
   };
 
   // ==========================================
