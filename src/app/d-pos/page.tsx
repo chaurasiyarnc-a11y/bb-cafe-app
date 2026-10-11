@@ -648,18 +648,23 @@ export default function BbCafeDesktopPos() {
       setIsCustHistoryLoading(false);
     }
   };
- // 👉 FIX 1: 300 की लिमिट हटा दी गई है, अब सारे ग्राहक आएँगे!
+ // 🚀 CUSTOMERS OFFLINE CACHE
   const fetchAllCustomers = async () => {
     setIsCustomersLoading(true);
     try {
       if (navigator.onLine) {
-        // limit(300) हटा दिया गया है
         const q = query(collection(db, "customer_points"), orderBy("lastActive", "desc"));
         const snap = await getDocs(q);
-        setAllCustomers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+        const fetchedCustomers = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        setAllCustomers(fetchedCustomers);
+        localStorage.setItem("bb_pos_cached_customers", JSON.stringify(fetchedCustomers)); 
+      } else {
+        const cached = localStorage.getItem("bb_pos_cached_customers");
+        if (cached) setAllCustomers(JSON.parse(cached));
       }
     } catch (e) {
-      toast.error("ग्राहक सूची लोड नहीं हो सकी");
+      const cached = localStorage.getItem("bb_pos_cached_customers");
+      if (cached) setAllCustomers(JSON.parse(cached));
     } finally {
       setIsCustomersLoading(false);
     }
