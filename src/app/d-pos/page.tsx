@@ -1568,6 +1568,7 @@ export default function BbCafeDesktopPos() {
     }
   };
 
+// 🚀 SAVE NEW CUSTOMER (ONLINE + OFFLINE)
   const handleSaveNewCustomerQuick = async () => {
     const cleanPhone = getSanitizedPhone(customerPhone);
     const nameTrim = newCustNameInput.trim();
@@ -1575,32 +1576,31 @@ export default function BbCafeDesktopPos() {
     if (cleanPhone.length !== 10) return toast.error("Enter valid 10-digit phone!");
 
     const toastId = toast.loading("Saving customer...");
-    try {
-      const userRef = doc(db, "customer_points", cleanPhone);
-      const newCustObj = {
-        name: nameTrim,
-        phone: cleanPhone,
-        address: newCustAddressInput.trim(),
-        points: 0,
-        lastActive: new Date()
-      };
-      if (navigator.onLine) {
-        await setDoc(userRef, newCustObj, { merge: true });
-      }
+    const newCustObj = {
+      name: nameTrim, phone: cleanPhone, address: newCustAddressInput.trim(),
+      points: 0, gamePoints: 0, lastActive: new Date().toISOString()
+    };
 
-      setCustomerName(nameTrim);
-      setCartCustSearchInput(`${nameTrim} - ${cleanPhone}`); 
-      setAddress(newCustAddressInput.trim());
-      setCustomerPoints(0);
-      setShowNewCustForm(false);
-      setNewCustNameInput('');
-      setNewCustAddressInput('');
+    try {
+      if (navigator.onLine) {
+        const userRef = doc(db, "customer_points", cleanPhone);
+        await setDoc(userRef, newCustObj, { merge: true });
+      } else {
+        const custQueue = JSON.parse(localStorage.getItem("bb_pos_offline_customers_queue") || "[]");
+        custQueue.push(newCustObj);
+        localStorage.setItem("bb_pos_offline_customers_queue", JSON.stringify(custQueue));
+      }
+      setAllCustomers(prev => [{ id: cleanPhone, ...newCustObj }, ...prev]);
+      
+      setCustomerName(nameTrim); setCartCustSearchInput(`${nameTrim} - ${cleanPhone}`); 
+      setAddress(newCustAddressInput.trim()); setCustomerPoints(0);
+      setShowNewCustForm(false); setNewCustNameInput(''); setNewCustAddressInput('');
+      
       toast.dismiss(toastId);
-      toast.success("Customer saved & linked! ✅");
+      toast.success(navigator.onLine ? "Customer saved! ✅" : "Customer saved offline! ⚡");
       setTimeout(() => searchInputRef.current?.focus(), 60);
     } catch (err) {
-      toast.dismiss(toastId);
-      toast.error("Failed to save customer");
+      toast.dismiss(toastId); toast.error("Failed to save customer");
     }
   };
 
