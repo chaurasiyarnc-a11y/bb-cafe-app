@@ -18,12 +18,6 @@ export default function PrintCustomerReceipt({ orderObj, currentUser }: PrintRec
     upiId = upiId.replace(/ybl/i, '@ybl');
   }
 
-  const totalAmount = Number(orderObj.total || 0).toFixed(2);
-  const payeeName = 'Bum Bum Cafe';
-  
-  const upiString = `upi://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(payeeName)}&am=${totalAmount}&cu=INR`;
-  const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(upiString)}&margin=1`;
-
   // लॉयल्टी पॉइंट्स
   const earnedPts = Number(orderObj.pointsEarned ?? Math.floor((orderObj.total || 0) / 100));
   const redeemedPts = Number(orderObj.pointsRedeemed || 0);
@@ -195,26 +189,27 @@ export default function PrintCustomerReceipt({ orderObj, currentUser }: PrintRec
           </div>
         )}
 
-        {/* QR कोड */}
-        <div className="py-2 text-center border-b border-black flex flex-col items-center justify-center prevent-cut">
-          <p className="text-[12px] font-black uppercase tracking-wider mb-1">
-            SCAN TO PAY ₹{orderObj.total}
-          </p>
-          
-          <div className="p-0.5 bg-white border-2 border-black inline-block rounded">
-            <img 
-              src={qrCodeUrl} 
-              alt="UPI QR Code" 
-              className="w-32 h-32 object-contain block mx-auto"
-              crossOrigin="anonymous"
-              style={{ imageRendering: 'pixelated', filter: 'grayscale(100%) contrast(150%)' }}
-            />
-          </div>
+        {/* ⭐ 100% OFFLINE QR कोड ⭐ */}
+        {orderObj.offlineQrUrl && (
+          <div className="py-2 text-center border-b border-black flex flex-col items-center justify-center prevent-cut">
+            <p className="text-[12px] font-black uppercase tracking-wider mb-1">
+              SCAN TO PAY ₹{orderObj.total}
+            </p>
+            
+            <div className="p-0.5 bg-white border-2 border-black inline-block rounded">
+              <img 
+                src={orderObj.offlineQrUrl} 
+                alt="UPI QR Code" 
+                className="w-32 h-32 object-contain block mx-auto"
+                style={{ imageRendering: 'pixelated', filter: 'grayscale(100%) contrast(150%)' }}
+              />
+            </div>
 
-          <p className="text-[12px] font-bold mt-1.5 font-mono text-black">
-            UPI: {upiId}
-          </p>
-        </div>
+            <p className="text-[12px] font-bold mt-1.5 font-mono text-black">
+              UPI: {upiId}
+            </p>
+          </div>
+        )}
 
         {/* फुटर */}
         <div className="pt-2 pb-4 text-center flex flex-col items-center justify-center prevent-cut">
