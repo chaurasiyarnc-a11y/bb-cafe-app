@@ -422,7 +422,8 @@ export default function BbCafeDesktopPos() {
   const [receiptsLimit, setReceiptsLimit] = useState(200);
   const [isReceiptsLoading, setIsReceiptsLoading] = useState(false);
 
-  const [isSyncing, setIsSyncing] = useState(false);
+ const [isSyncing, setIsSyncing] = useState(false);
+  const [syncSuccess, setSyncSuccess] = useState(false); // 👉 NEW: हरा रंग दिखाने के लिए
 // --- UDHARI BOOK STATES & LOGIC ---
   const [dueOrders, setDueOrders] = useState<any[]>([]);
   const [isUdhariLoading, setIsUdhariLoading] = useState(false);
