@@ -3367,11 +3367,24 @@ export default function BbCafeDesktopPos() {
                                 : "opacity-40 bg-neutral-200 dark:bg-neutral-950 pointer-events-none"
                             }`}
                           >
-                            <div className="w-full h-[82px] max-h-[82px] min-h-[82px] bg-neutral-200 dark:bg-neutral-800 relative shrink-0 overflow-hidden flex items-center justify-center">
+                           <div className="w-full h-[82px] max-h-[82px] min-h-[82px] bg-neutral-200 dark:bg-neutral-800 relative shrink-0 overflow-hidden flex items-center justify-center">
                               {imgUrl ? (
-                                <img src={imgUrl} alt={displayName} className="w-full h-full object-cover" loading="lazy" />
+                                <>
+                                  <img 
+                                    src={imgUrl} 
+                                    alt={displayName} 
+                                    className="w-full h-full object-cover absolute inset-0 z-10" 
+                                    loading="lazy" 
+                                    onError={(e) => { e.currentTarget.style.display = 'none'; }} 
+                                  />
+                                  <span className="text-neutral-500 text-[10px] font-black uppercase tracking-wider px-2 text-center absolute inset-0 flex items-center justify-center z-0">
+                                    {item.category || "Cafe Item"}
+                                  </span>
+                                </>
                               ) : (
-                                <span className="text-neutral-500 text-[10px] font-black uppercase tracking-wider px-2 text-center">{item.category || "Cafe Item"}</span>
+                                <span className="text-neutral-500 text-[10px] font-black uppercase tracking-wider px-2 text-center absolute inset-0 flex items-center justify-center">
+                                  {item.category || "Cafe Item"}
+                                </span>
                               )}
                               {item.itemCode && (
                                 <span className="absolute top-1 right-1 bg-black/90 text-yellow-400 font-mono text-[9px] font-black px-1.5 py-0.5 rounded border border-yellow-500/50 shadow z-10">
