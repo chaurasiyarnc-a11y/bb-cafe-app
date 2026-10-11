@@ -3236,10 +3236,18 @@ export default function BbCafeDesktopPos() {
             </div>
 
             <div className="space-y-1.5 pt-3 border-t border-neutral-300 dark:border-neutral-800">
-              <button onClick={async () => { await syncOfflineAll(); }} disabled={isSyncing} className="w-full flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-xl text-[10px] font-black uppercase text-amber-700 dark:text-yellow-500 bg-amber-500/15 hover:bg-amber-500/25 transition-colors">
-                {isSyncing ? <Loader2 className="animate-spin shrink-0" size={13} /> : <SafeRefreshCw size={13} />}
-                {!isSidebarCollapsed && <span className="truncate">Sync Cloud</span>}
-              </button>
+             <button 
+  onClick={async () => { await syncOfflineAll(true); }} 
+  disabled={isSyncing} 
+  className={`w-full flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-xl text-[10px] font-black uppercase transition-colors duration-300 ${
+    syncSuccess 
+      ? 'bg-green-500/20 text-green-600 dark:text-green-400' 
+      : 'text-amber-700 dark:text-yellow-500 bg-amber-500/15 hover:bg-amber-500/25'
+  }`}
+>
+  {isSyncing ? <Loader2 className="animate-spin shrink-0" size={13} /> : (syncSuccess ? <Check size={13} /> : <SafeRefreshCw size={13} />)}
+  {!isSidebarCollapsed && <span className="truncate">{syncSuccess ? 'Synced Data ✅' : 'Sync Cloud'}</span>}
+</button>
               <button onClick={() => { setIsLoggedIn(false); setCurrentUser(null); localStorage.removeItem("bb_pos_user_pc"); }} className="w-full flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-xl text-[10px] font-black uppercase text-red-600 bg-red-500/15 hover:bg-red-500/25 transition-colors">
                 <SafeLogOut size={13} className="shrink-0" />
                 {!isSidebarCollapsed && <span className="truncate">Lock Terminal</span>}
