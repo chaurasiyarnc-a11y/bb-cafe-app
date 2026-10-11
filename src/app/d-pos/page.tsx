@@ -144,7 +144,12 @@ export default function BbCafeDesktopPos() {
 
   const [kotEnabled, setKotEnabled] = useState<boolean>(true); 
   const [upiIdConfig, setUpiIdConfig] = useState<string>('Q991347275@ybl');
-  const [ownerPhoneConfig, setOwnerPhoneConfig] = useState<string>('919714293759');
+ const [ownerPhoneConfig, setOwnerPhoneConfig] = useState<string>('919714293759');
+  
+  // 👉 NEW: Store Details Config (बिल पर छपने वाला नाम और पता)
+  const [storeNameConfig, setStoreNameConfig] = useState<string>('BUM BUM CAFE');
+  const [storeAddressConfig, setStoreAddressConfig] = useState<string>('न्यू बस स्टैंड मोहंद्रा, पुलिस चौकी के सामने, जिला पन्ना, मध्य प्रदेश - 488442');
+  const [storePhoneConfig, setStorePhoneConfig] = useState<string>('9714293759');
   const [manualInvoiceCounterInput, setManualInvoiceCounterInput] = useState<string>('200');
 // 👉 NEW: स्मार्ट गेम कंट्रोलर (POS से गेम बदलने के लिए)
   const [activeGameType, setActiveGameType] = useState('SpinGame'); 
