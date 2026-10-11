@@ -2771,6 +2771,7 @@ export default function BbCafeDesktopPos() {
       toast.dismiss(toastId);
       toast.error("Failed to record expense");
     }
+  };
  // 🚀 OFFLINE & ONLINE REPORTS DATA FETCHING (FIXED DATE ISSUE)
   const fetchReportData = async () => {
     setIsReportLoading(true);
