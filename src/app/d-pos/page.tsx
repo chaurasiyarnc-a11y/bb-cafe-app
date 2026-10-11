@@ -1043,27 +1043,26 @@ export default function BbCafeDesktopPos() {
     return todaySettlementOrders;
   }, [todaySettlementOrders, settlementFilter]);
 
-  // Offline / Online Detection & Sync
+  // 🚀 OFFLINE SYNC MANAGER (Orders, Expenses, Customers)
   const syncOfflineAll = async () => {
     if (!navigator.onLine) return;
     setIsSyncing(true);
-    let orderCount = 0;
-    let expenseCount = 0;
+    let orderCount = 0; let expenseCount = 0; let custCount = 0;
 
     try {
       const offlineOrdersStr = localStorage.getItem("bb_pos_offline_orders_queue");
       if (offlineOrdersStr) {
-        let queue: any[] = JSON.parse(offlineOrdersStr);
+        let queue = JSON.parse(offlineOrdersStr);
         let remainingQueue = [...queue];
         if (queue.length > 0) {
           for (const ord of queue) {
+            const { id, offlineQrUrl, ...cleanOrd } = ord; // offlineQrUrl हटा रहे हैं ताकि Firebase न भरे
             await addDoc(collection(db, "orders"), {
-              ...ord,
+              ...cleanOrd,
               timestamp: ord.timestamp ? new Date(ord.timestamp) : new Date()
             });
             orderCount++;
-            // FIX: Remove synced order immediately to prevent duplicates on internet drop
-            remainingQueue = remainingQueue.filter(o => o.billNumber !== ord.billNumber);
+            remainingQueue = remainingQueue.filter((o: any) => o.billNumber !== ord.billNumber);
             localStorage.setItem("bb_pos_offline_orders_queue", JSON.stringify(remainingQueue));
           }
           if (remainingQueue.length === 0) localStorage.removeItem("bb_pos_offline_orders_queue");
@@ -1072,7 +1071,7 @@ export default function BbCafeDesktopPos() {
 
       const offlineExpensesStr = localStorage.getItem("bb_pos_offline_expenses_queue");
       if (offlineExpensesStr) {
-        let expQueue: any[] = JSON.parse(offlineExpensesStr);
+        let expQueue = JSON.parse(offlineExpensesStr);
         let remainingExpQueue = [...expQueue];
         if (expQueue.length > 0) {
           for (const exp of expQueue) {
@@ -1081,16 +1080,35 @@ export default function BbCafeDesktopPos() {
               timestamp: exp.timestamp ? new Date(exp.timestamp) : new Date()
             });
             expenseCount++;
-            // FIX: Remove synced expense immediately
-            remainingExpQueue = remainingExpQueue.filter(e => e.title !== exp.title || e.amount !== exp.amount);
+            remainingExpQueue = remainingExpQueue.filter((e: any) => e.title !== exp.title || e.amount !== exp.amount);
             localStorage.setItem("bb_pos_offline_expenses_queue", JSON.stringify(remainingExpQueue));
           }
           if (remainingExpQueue.length === 0) localStorage.removeItem("bb_pos_offline_expenses_queue");
         }
       }
 
-      if (orderCount > 0 || expenseCount > 0) {
-        toast.success(`Cloud Sync: ${orderCount} Orders & ${expenseCount} Expenses Synced! ✅`);
+      const offlineCustStr = localStorage.getItem("bb_pos_offline_customers_queue");
+      if (offlineCustStr) {
+        let custQueue = JSON.parse(offlineCustStr);
+        let remainingCustQueue = [...custQueue];
+        if (custQueue.length > 0) {
+          for (const cust of custQueue) {
+            const userRef = doc(db, "customer_points", cust.phone);
+            await setDoc(userRef, {
+              ...cust,
+              lastActive: cust.lastActive ? new Date(cust.lastActive) : new Date()
+            }, { merge: true });
+            custCount++;
+            remainingCustQueue = remainingCustQueue.filter((c: any) => c.phone !== cust.phone);
+            localStorage.setItem("bb_pos_offline_customers_queue", JSON.stringify(remainingCustQueue));
+          }
+          if (remainingCustQueue.length === 0) localStorage.removeItem("bb_pos_offline_customers_queue");
+        }
+      }
+
+      if (orderCount > 0 || expenseCount > 0 || custCount > 0) {
+        toast.success(`Cloud Sync: ${orderCount} Orders, ${custCount} Customers Synced! ☁️✅`);
+        if (custCount > 0) fetchAllCustomers(); 
       }
     } catch (e) {
       console.error("Offline sync error", e);
