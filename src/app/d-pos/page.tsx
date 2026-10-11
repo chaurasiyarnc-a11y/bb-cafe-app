@@ -1530,33 +1530,41 @@ export default function BbCafeDesktopPos() {
     setTimeout(() => searchInputRef.current?.focus(), 80);
   };
 
+// 🚀 OFFLINE SMART CUSTOMER SEARCH
   const searchCustomerByExactPhone = async (phoneStr: string) => {
     const toastId = toast.loading("ग्राहक खोज रहे हैं...");
     try {
-      const userRef = doc(db, "customer_points", phoneStr);
-      const snap = await getDoc(userRef);
+      let customerData = null;
+      const offlineQueue = JSON.parse(localStorage.getItem("bb_pos_offline_customers_queue") || "[]");
+      const offlineMatch = offlineQueue.find((c: any) => c.phone === phoneStr);
+      
+      if (offlineMatch) {
+        customerData = offlineMatch;
+      } else if (navigator.onLine) {
+        const userRef = doc(db, "customer_points", phoneStr);
+        const snap = await getDoc(userRef);
+        if (snap.exists()) customerData = snap.data();
+      } else {
+        const cachedMatch = allCustomers.find(c => c.phone === phoneStr || c.id === phoneStr);
+        if (cachedMatch) customerData = cachedMatch;
+      }
       toast.dismiss(toastId);
 
-      if (snap.exists()) {
-        const data = snap.data();
-        setCustomerName(data.name || 'Valued Guest');
-        setCustomerPoints(Number(data.points) || 0);
-        setCustomerGamePoints(Number(data.gamePoints) || 0); // 👉 NEW
-        setAddress(data.address || '');
+      if (customerData) {
+        setCustomerName(customerData.name || 'Valued Guest');
+        setCustomerPoints(Number(customerData.points) || 0);
+        setCustomerGamePoints(Number(customerData.gamePoints) || 0);
+        setAddress(customerData.address || '');
         setShowNewCustForm(false);
-        toast.success(`ग्राहक मिला: ${data.name} (${data.points || 0} Pts)`);
+        toast.success(`ग्राहक मिला: ${customerData.name} (${customerData.points || 0} Pts) ${navigator.onLine ? '🟢' : '⚡'}`);
         setTimeout(() => searchInputRef.current?.focus(), 80);
       } else {
-        setCustomerName('');
-        setCustomerPoints(0);
-        setAddress('');
-        setShowNewCustForm(true);
+        setCustomerName(''); setCustomerPoints(0); setAddress(''); setShowNewCustForm(true);
         toast("नया ग्राहक! नाम दर्ज करें", { icon: '👤' });
         setTimeout(() => newCustNameRef.current?.focus(), 80);
       }
     } catch (e) {
-      toast.dismiss(toastId);
-      toast.error("ग्राहक डेटा लोड नहीं हो सका");
+      toast.dismiss(toastId); toast.error("ग्राहक डेटा लोड नहीं हो सका");
     }
   };
 
