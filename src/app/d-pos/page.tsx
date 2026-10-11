@@ -5113,7 +5113,7 @@ export default function BbCafeDesktopPos() {
                     </div>
                   </div>
 
-                 {/* OWNER WHATSAPP SETTING */}
+                {/* OWNER WHATSAPP SETTING */}
                   <div className="space-y-2 border-b border-neutral-300 dark:border-neutral-800 pb-4">
                     <p className="text-xs font-bold uppercase">Owner WhatsApp Number (for EOD Report):</p>
                     <div className="flex gap-2">
@@ -5122,6 +5122,28 @@ export default function BbCafeDesktopPos() {
                     </div>
                   </div>
 
+                  {/* 👉 NEW: STORE DETAILS SETTING */}
+                  <div className="space-y-3 border-b border-neutral-300 dark:border-neutral-800 pb-4 mt-4">
+                    <p className="text-xs font-black uppercase text-orange-600">Store Details (बिल पर छपने वाला नाम व पता):</p>
+                    <div className="flex flex-col gap-2">
+                      <input type="text" value={storeNameConfig} onChange={e => setStoreNameConfig(e.target.value)} placeholder="Store Name (e.g. BUM BUM CAFE)" className="w-full bg-neutral-100 dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 rounded-xl px-3 py-2 text-sm font-black outline-none" />
+                      
+                      <textarea rows={2} value={storeAddressConfig} onChange={e => setStoreAddressConfig(e.target.value)} placeholder="Store Address (पता)" className="w-full bg-neutral-100 dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 rounded-xl px-3 py-2 text-xs font-bold outline-none resize-none" />
+                      
+                      <div className="flex gap-2">
+                        <input type="text" value={storePhoneConfig} onChange={e => setStorePhoneConfig(e.target.value)} placeholder="Phone Number for Bill" className="flex-1 bg-neutral-100 dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 rounded-xl px-3 py-2 text-xs font-mono font-bold outline-none" />
+                        
+                        <button onClick={() => { 
+                          localStorage.setItem("bb_pos_store_name", storeNameConfig); 
+                          localStorage.setItem("bb_pos_store_address", storeAddressConfig); 
+                          localStorage.setItem("bb_pos_store_phone", storePhoneConfig); 
+                          toast.success("कैफे का नाम और पता सेव हो गया! ✅"); 
+                        }} className="bg-orange-600 hover:bg-orange-500 text-white px-6 rounded-xl text-xs font-black uppercase shadow-md transition-colors">
+                          Save Details
+                        </button>
+                      </div>
+                    </div>
+                  </div>
                   {/* 👉 NEW: STORE DETAILS SETTING */}
                   <div className="space-y-3 border-b border-neutral-300 dark:border-neutral-800 pb-4 mt-4">
                     <p className="text-xs font-black uppercase text-orange-600">Store Details (बिल पर छपने वाला नाम व पता):</p>
