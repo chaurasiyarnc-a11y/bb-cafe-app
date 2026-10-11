@@ -2075,7 +2075,7 @@ export default function BbCafeDesktopPos() {
       if (container) {
         const root = createRoot(container);
         if (isKot) { root.render(<PrintKitchenKot orderObj={orderObj} />); } 
-        else { root.render(<PrintCustomerReceipt orderObj={orderObj} currentUser={currentUser} />); }
+        else { root.render(<PrintCustomerReceipt orderObj={orderObj} currentUser={currentUser} storeName={storeNameConfig} storeAddress={storeAddressConfig} storePhone={storePhoneConfig} />); }
 
         const triggerPrintAndCleanup = () => {
           setTimeout(() => {
