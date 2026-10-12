@@ -4386,7 +4386,7 @@ export default function BbCafeDesktopPos() {
                 </div>
 
                 {/* SUMMARY TILES */}
-                <div className="grid grid-cols-5 gap-3">
+                <div className="grid grid-cols-3 xl:grid-cols-6 gap-3">
                   <div className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 p-3.5 rounded-2xl space-y-1 shadow-sm">
                     <p className="text-[10px] font-black uppercase text-neutral-500">Settled Sales</p>
                     <p className="text-xl font-black font-mono text-green-600 dark:text-green-400">₹{reportSummary.totalSale}</p>
@@ -4404,6 +4404,13 @@ export default function BbCafeDesktopPos() {
                     <p className="text-[10px] font-black uppercase text-neutral-500">उधार (Due)</p>
                     <p className="text-xl font-black font-mono text-red-600 dark:text-red-400">₹{reportSummary.dueSale}</p>
                   </div>
+                  
+                  {/* 👉 NEW: TOTAL DISCOUNT BOX (नया बॉक्स) */}
+                  <div className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 p-3.5 rounded-2xl space-y-1 shadow-sm">
+                    <p className="text-[10px] font-black uppercase text-neutral-500">Total Discount</p>
+                    <p className="text-xl font-black font-mono text-purple-600 dark:text-purple-400">₹{reportSummary.totalDiscount}</p>
+                  </div>
+
                   <div className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 p-3.5 rounded-2xl space-y-1 shadow-sm">
                     <p className="text-[10px] font-black uppercase text-neutral-500">Net in Drawer</p>
                     <p className="text-xl font-black font-mono text-emerald-600 dark:text-emerald-400">₹{reportSummary.netCashInDrawer}</p>
