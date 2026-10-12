@@ -4560,7 +4560,7 @@ export default function BbCafeDesktopPos() {
                 </div>
 
                {/* ITEM-WISE SALES TABLE & PIE CHART */}
-                <div className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 p-5 rounded-3xl shadow-sm">
+                <div className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 p-5 rounded-3xl shadow-sm mt-6">
                   <div className="flex justify-between items-center border-b border-neutral-300 dark:border-neutral-800 pb-3 mb-4">
                     <h3 className="text-xs font-black uppercase text-orange-600 dark:text-orange-500 flex items-center gap-1.5">
                       <Layers size={14} /> आइटम-वाइज़ बिक्री रिपोर्ट और ग्राफ
@@ -4679,7 +4679,6 @@ export default function BbCafeDesktopPos() {
                     </div>
                   </div>
                 </div>
-
             {/* TAB 5: TABLES MANAGER */}
             {activeTab === 'tables' && (
               <div className="flex-1 p-6 h-full overflow-y-auto">
