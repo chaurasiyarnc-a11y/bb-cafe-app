@@ -398,7 +398,7 @@ export default function BbCafeDesktopPos() {
   const [itemImageInput, setItemImageInput] = useState('');
   const [itemIsAvailable, setItemIsAvailable] = useState(true);
   const [hasVariants, setHasVariants] = useState(false);
-  const [itemVariantsList, setItemVariantsList] = useState<{ [key: string]: number }>({});
+  const [itemVariantsList, setItemVariantsList] = useState<any>({});
   const [newVariantName, setNewVariantName] = useState('');
   const [newVariantPrice, setNewVariantPrice] = useState<number | ''>('');
 
