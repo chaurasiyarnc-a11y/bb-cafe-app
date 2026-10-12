@@ -379,6 +379,7 @@ export default function BbCafeDesktopPos() {
   const [dailyExpenses, setDailyExpenses] = useState<any[]>([]);
   const [isReportLoading, setIsReportLoading] = useState(false);
   const [physicalCashInput, setPhysicalCashInput] = useState<number | ''>('');
+  const [reportCategoryFilter, setReportCategoryFilter] = useState('All');
 
   // Modals
   const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
