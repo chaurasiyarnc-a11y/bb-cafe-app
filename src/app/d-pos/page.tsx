@@ -5195,7 +5195,7 @@ export default function BbCafeDesktopPos() {
             
      {/* TAB 7: SETTINGS */}
             {activeTab === 'settings' && (
-              <div className="flex-1 p-6 h-full overflow-y-auto flex justify-center">
+              <div className="flex-1 p-6 h-full overflow-y-auto flex justify-center items-start">
                 <div className="max-w-xl w-full bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 p-6 rounded-3xl shadow-xl space-y-6">
                   <h3 className="text-sm font-black uppercase text-orange-600 dark:text-orange-500">POS & Hardware Settings</h3>
                   
