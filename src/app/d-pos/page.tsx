@@ -2865,12 +2865,13 @@ export default function BbCafeDesktopPos() {
   useEffect(() => {
     if (activeTab === 'reports') fetchReportData();
   }, [activeTab, reportFilter, customStartDate, customEndDate]);
-  // Financial Summary: ONLY COMPLETED / SETTLED BILLS
+ // Financial Summary: ONLY COMPLETED / SETTLED BILLS
   const reportSummary = useMemo(() => {
     let totalSale = 0;
     let cashSale = 0;
     let upiSale = 0;
     let dueSale = 0;
+    let totalDiscount = 0; // 👉 NEW: छूट के लिए नया वेरिएबल
     let totalOrdersCount = 0;
     let unsettledTotal = 0;
     let unsettledCount = 0;
@@ -2880,6 +2881,10 @@ export default function BbCafeDesktopPos() {
       if (o.status === 'completed') {
         totalOrdersCount++;
         totalSale += amt;
+        
+        // 👉 NEW: कूपन डिस्काउंट और पॉइंट्स डिस्काउंट दोनों को जोड़ें
+        totalDiscount += (Number(o.discountAmount) || 0) + (Number(o.pointsRedeemed) || 0);
+
         if (o.paymentMethod === 'upi') {
           upiSale += amt;
         } else if (o.paymentMethod === 'due') {
@@ -2899,7 +2904,7 @@ export default function BbCafeDesktopPos() {
     const totalExpenseAmount = dailyExpenses.reduce((acc, exp) => acc + (Number(exp.amount) || 0), 0);
     const netCashInDrawer = Math.max(0, cashSale - totalExpenseAmount);
 
-    return { totalSale, cashSale, upiSale, dueSale, totalOrdersCount, totalExpenseAmount, netCashInDrawer, unsettledTotal, unsettledCount };
+    return { totalSale, cashSale, upiSale, dueSale, totalDiscount, totalOrdersCount, totalExpenseAmount, netCashInDrawer, unsettledTotal, unsettledCount };
   }, [reportOrders, dailyExpenses]);
 
 // Item-wise Sales Report Calculation
