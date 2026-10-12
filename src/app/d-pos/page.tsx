@@ -5190,148 +5190,154 @@ export default function BbCafeDesktopPos() {
                 </div>
               </div>
             )}
-            
-     {/* TAB 7: SETTINGS */}
+{/* TAB 7: SETTINGS */}
             {activeTab === 'settings' && (
-              <div className="flex-1 p-6 h-full overflow-y-auto flex justify-center">
-                <div className="max-w-xl w-full bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 p-6 rounded-3xl shadow-xl space-y-6">
-                  <h3 className="text-sm font-black uppercase text-orange-600 dark:text-orange-500">POS & Hardware Settings</h3>
+              <div className="flex-1 p-6 h-full overflow-y-auto">
+                <div className="w-full bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 p-8 rounded-3xl shadow-sm space-y-6">
                   
-                  {/* NEXT BILL / INVOICE NUMBER */}
-                  <div className="space-y-2 border-b border-neutral-300 dark:border-neutral-800 pb-4">
-                    <p className="text-xs font-bold uppercase">Next Bill / Invoice Number:</p>
-                    <div className="flex gap-2">
-                      <input type="number" value={manualInvoiceCounterInput} onChange={e => setManualInvoiceCounterInput(e.target.value)} placeholder="e.g. 200" className="flex-1 bg-neutral-100 dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 rounded-xl px-3 py-2 text-xs font-mono font-bold outline-none" />
-                      <button onClick={() => { const num = parseInt(manualInvoiceCounterInput, 10); if (!isNaN(num) && num >= 1) { localStorage.setItem("bb_pos_local_bill_counter_pc", String(num - 1)); toast.success(`Next Invoice will be #${num}! ✅`); } }} className="bg-orange-600 text-white px-4 rounded-xl text-xs font-black uppercase">Set Counter</button>
-                    </div>
+                  <div className="border-b border-neutral-300 dark:border-neutral-800 pb-4">
+                    <h3 className="text-base font-black uppercase text-orange-600 dark:text-orange-500">POS & Hardware Settings</h3>
+                    <p className="text-xs text-neutral-500 mt-1">अपने कैफे की बिलिंग, टैक्स और हार्डवेयर सेटिंग्स यहाँ से मैनेज करें।</p>
                   </div>
-
-                  {/* 👉 GST Settings */}
-                  <div className="space-y-2 border-b border-neutral-300 dark:border-neutral-800 pb-4">
-                    <div className="flex justify-between items-center">
-                      <p className="text-xs font-bold uppercase">Enable GST (टैक्स):</p>
-                      <button onClick={() => { const newVal = !gstEnabled; setGstEnabled(newVal); localStorage.setItem("bb_pos_gst_enabled_pc", String(newVal)); toast.success(newVal ? `GST Enabled (${gstRate}%)!` : "GST Disabled!"); }} className={`w-12 h-6 flex items-center rounded-full p-1 transition-colors ${gstEnabled ? 'bg-green-500' : 'bg-neutral-400'}`}>
-                        <div className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform ${gstEnabled ? 'translate-x-6' : ''}`}></div>
-                      </button>
-                    </div>
-                    {gstEnabled && (
-                      <div className="flex gap-2 pt-2">
-                        <input type="number" value={gstRate} onChange={e => { const rate = Number(e.target.value); setGstRate(rate); localStorage.setItem("bb_pos_gst_rate_pc", String(rate)); }} placeholder="GST % (e.g. 5)" className="flex-1 bg-neutral-100 dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 rounded-xl px-3 py-2 text-xs font-mono font-bold outline-none" />
-                        <span className="bg-neutral-200 dark:bg-neutral-700 px-4 py-2 rounded-xl text-xs font-black uppercase flex items-center">% Rate (दर)</span>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* 👉 NEW: Cash Tendered Settings */}
-                  <div className="space-y-2 border-b border-neutral-300 dark:border-neutral-800 pb-4">
-                    <div className="flex justify-between items-center">
-                      <p className="text-xs font-bold uppercase">Show Cash Change Calculator (कैश वापसी):</p>
-                      <button onClick={() => { const newVal = !cashTenderEnabled; setCashTenderEnabled(newVal); localStorage.setItem("bb_pos_cash_tender_enabled_pc", String(newVal)); toast.success(newVal ? "Cash Calculator ON हो गया!" : "Cash Calculator OFF हो गया!"); }} className={`w-12 h-6 flex items-center rounded-full p-1 transition-colors ${cashTenderEnabled ? 'bg-green-500' : 'bg-neutral-400'}`}>
-                        <div className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform ${cashTenderEnabled ? 'translate-x-6' : ''}`}></div>
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* UPI ID SETTING */}
-                  <div className="space-y-2 border-b border-neutral-300 dark:border-neutral-800 pb-4">
-                    <p className="text-xs font-bold uppercase">Dynamic UPI ID (VPA for QR Code):</p>
-                    <div className="flex gap-2">
-                      <input type="text" value={upiIdConfig} onChange={e => setUpiIdConfig(e.target.value)} placeholder="e.g. Q991347275@ybl" className="flex-1 bg-neutral-100 dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 rounded-xl px-3 py-2 text-xs font-mono outline-none" />
-                      <button onClick={() => { localStorage.setItem("bb_pos_upi_id", upiIdConfig); toast.success("UPI ID Saved!"); }} className="bg-blue-600 text-white px-4 rounded-xl text-xs font-black uppercase">Save</button>
-                    </div>
-                  </div>
-
-                {/* OWNER WHATSAPP SETTING */}
-                  <div className="space-y-2 border-b border-neutral-300 dark:border-neutral-800 pb-4">
-                    <p className="text-xs font-bold uppercase">Owner WhatsApp Number (for EOD Report):</p>
-                    <div className="flex gap-2">
-                      <input type="text" value={ownerPhoneConfig} onChange={e => setOwnerPhoneConfig(e.target.value)} placeholder="e.g. 919714293759" className="flex-1 bg-neutral-100 dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 rounded-xl px-3 py-2 text-xs font-mono outline-none" />
-                      <button onClick={() => { localStorage.setItem("bb_pos_owner_phone", ownerPhoneConfig); toast.success("Owner Phone Saved!"); }} className="bg-green-600 text-white px-4 rounded-xl text-xs font-black uppercase">Save</button>
-                    </div>
-                  </div>
-
-              
-                  {/* 👉 NEW: STORE DETAILS SETTING */}
-                  <div className="space-y-3 border-b border-neutral-300 dark:border-neutral-800 pb-4 mt-4">
-                    <p className="text-xs font-black uppercase text-orange-600">Store Details (बिल पर छपने वाला नाम व पता):</p>
-                    <div className="flex flex-col gap-2">
-                      <input type="text" value={storeNameConfig} onChange={e => setStoreNameConfig(e.target.value)} placeholder="Store Name (e.g. BUM BUM CAFE)" className="w-full bg-neutral-100 dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 rounded-xl px-3 py-2 text-sm font-black outline-none" />
-                      
-                      <textarea rows={2} value={storeAddressConfig} onChange={e => setStoreAddressConfig(e.target.value)} placeholder="Store Address (पता)" className="w-full bg-neutral-100 dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 rounded-xl px-3 py-2 text-xs font-bold outline-none resize-none" />
-                      
+                  
+                  {/* 2-COLUMN GRID LAYOUT (खाली स्पेस भरने के लिए) */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-12 gap-y-6">
+                    
+                    {/* NEXT BILL / INVOICE NUMBER */}
+                    <div className="space-y-2 border-b border-neutral-300 dark:border-neutral-800 pb-4">
+                      <p className="text-xs font-bold uppercase">Next Bill / Invoice Number:</p>
                       <div className="flex gap-2">
-                        <input type="text" value={storePhoneConfig} onChange={e => setStorePhoneConfig(e.target.value)} placeholder="Phone Number for Bill" className="flex-1 bg-neutral-100 dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 rounded-xl px-3 py-2 text-xs font-mono font-bold outline-none" />
-                        
-                        <button onClick={() => { 
-                          localStorage.setItem("bb_pos_store_name", storeNameConfig); 
-                          localStorage.setItem("bb_pos_store_address", storeAddressConfig); 
-                          localStorage.setItem("bb_pos_store_phone", storePhoneConfig); 
-                          toast.success("कैफे का नाम और पता सेव हो गया! ✅"); 
-                        }} className="bg-orange-600 hover:bg-orange-500 text-white px-6 rounded-xl text-xs font-black uppercase shadow-md transition-colors">
-                          Save Details
+                        <input type="number" value={manualInvoiceCounterInput} onChange={e => setManualInvoiceCounterInput(e.target.value)} placeholder="e.g. 200" className="flex-1 bg-neutral-100 dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 rounded-xl px-3 py-2 text-xs font-mono font-bold outline-none focus:border-orange-500 transition-colors" />
+                        <button onClick={() => { const num = parseInt(manualInvoiceCounterInput, 10); if (!isNaN(num) && num >= 1) { localStorage.setItem("bb_pos_local_bill_counter_pc", String(num - 1)); toast.success(`Next Invoice will be #${num}! ✅`); } }} className="bg-orange-600 hover:bg-orange-500 text-white px-4 rounded-xl text-xs font-black uppercase shadow-sm">Set Counter</button>
+                      </div>
+                    </div>
+
+                    {/* 👉 GST Settings */}
+                    <div className="space-y-2 border-b border-neutral-300 dark:border-neutral-800 pb-4">
+                      <div className="flex justify-between items-center">
+                        <p className="text-xs font-bold uppercase">Enable GST (टैक्स):</p>
+                        <button onClick={() => { const newVal = !gstEnabled; setGstEnabled(newVal); localStorage.setItem("bb_pos_gst_enabled_pc", String(newVal)); toast.success(newVal ? `GST Enabled (${gstRate}%)!` : "GST Disabled!"); }} className={`w-12 h-6 flex items-center rounded-full p-1 transition-colors ${gstEnabled ? 'bg-green-500' : 'bg-neutral-400'}`}>
+                          <div className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform ${gstEnabled ? 'translate-x-6' : ''}`}></div>
+                        </button>
+                      </div>
+                      {gstEnabled && (
+                        <div className="flex gap-2 pt-2">
+                          <input type="number" value={gstRate} onChange={e => { const rate = Number(e.target.value); setGstRate(rate); localStorage.setItem("bb_pos_gst_rate_pc", String(rate)); }} placeholder="GST % (e.g. 5)" className="flex-1 bg-neutral-100 dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 rounded-xl px-3 py-2 text-xs font-mono font-bold outline-none focus:border-orange-500" />
+                          <span className="bg-neutral-200 dark:bg-neutral-700 px-4 py-2 rounded-xl text-xs font-black uppercase flex items-center">% Rate (दर)</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* 👉 NEW: Cash Tendered Settings */}
+                    <div className="space-y-2 border-b border-neutral-300 dark:border-neutral-800 pb-4">
+                      <div className="flex justify-between items-center">
+                        <p className="text-xs font-bold uppercase">Show Cash Change Calculator (कैश वापसी):</p>
+                        <button onClick={() => { const newVal = !cashTenderEnabled; setCashTenderEnabled(newVal); localStorage.setItem("bb_pos_cash_tender_enabled_pc", String(newVal)); toast.success(newVal ? "Cash Calculator ON हो गया!" : "Cash Calculator OFF हो गया!"); }} className={`w-12 h-6 flex items-center rounded-full p-1 transition-colors ${cashTenderEnabled ? 'bg-green-500' : 'bg-neutral-400'}`}>
+                          <div className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform ${cashTenderEnabled ? 'translate-x-6' : ''}`}></div>
                         </button>
                       </div>
                     </div>
-                  </div>
-{/* 👉 NEW: ACTIVE GAME SETTING (कस्टमर का गेम बदलें) */}
-                  <div className="space-y-3 border-b border-neutral-300 dark:border-neutral-800 pb-5">
-                    <div>
-                      <p className="text-xs font-black uppercase text-purple-600 dark:text-purple-400 flex items-center gap-1.5"><Gamepad2 size={16}/> 🎮 Active Customer Game (QR Code):</p>
-                      <p className="text-[10px] text-neutral-500 font-bold mt-0.5">टेबल के QR कोड को स्कैन करने पर कस्टमर के फोन में कौन सा गेम खुलेगा, उसे यहाँ से बदलें।</p>
+
+                    {/* UPI ID SETTING */}
+                    <div className="space-y-2 border-b border-neutral-300 dark:border-neutral-800 pb-4">
+                      <p className="text-xs font-bold uppercase">Dynamic UPI ID (VPA for QR Code):</p>
+                      <div className="flex gap-2">
+                        <input type="text" value={upiIdConfig} onChange={e => setUpiIdConfig(e.target.value)} placeholder="e.g. Q991347275@ybl" className="flex-1 bg-neutral-100 dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 rounded-xl px-3 py-2 text-xs font-mono outline-none focus:border-orange-500" />
+                        <button onClick={() => { localStorage.setItem("bb_pos_upi_id", upiIdConfig); toast.success("UPI ID Saved!"); }} className="bg-blue-600 hover:bg-blue-500 text-white px-4 rounded-xl text-xs font-black uppercase shadow-sm">Save</button>
+                      </div>
                     </div>
-                    <div className="flex bg-neutral-200 dark:bg-neutral-800 p-1 rounded-2xl w-full max-w-2xl border border-neutral-300 dark:border-neutral-700 shadow-inner">
-                      <button 
-                        onClick={() => handleToggleGame('SpinGame')} 
-                        className={`flex-1 py-2.5 rounded-xl text-[10px] font-black uppercase flex items-center justify-center gap-1.5 transition-all ${activeGameType === 'SpinGame' ? 'bg-white dark:bg-neutral-900 text-purple-600 shadow-md ring-1 ring-neutral-300 dark:ring-neutral-700' : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-300 dark:hover:bg-neutral-700'}`}
-                      >
-                        🎡 Spin Wheel
-                      </button>
-                      <button 
-                        onClick={() => handleToggleGame('CatchGame')} 
-                        className={`flex-1 py-2.5 rounded-xl text-[10px] font-black uppercase flex items-center justify-center gap-1.5 transition-all ${activeGameType === 'CatchGame' ? 'bg-white dark:bg-neutral-900 text-orange-600 shadow-md ring-1 ring-neutral-300 dark:ring-neutral-700' : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-300 dark:hover:bg-neutral-700'}`}
-                      >
-                        🍔 Catch Game
-                      </button>
-                      <button 
-                        onClick={() => handleToggleGame('FruitNinja')} 
-                        className={`flex-1 py-2.5 rounded-xl text-[10px] font-black uppercase flex items-center justify-center gap-1.5 transition-all ${activeGameType === 'FruitNinja' ? 'bg-white dark:bg-neutral-900 text-green-600 shadow-md ring-1 ring-neutral-300 dark:ring-neutral-700' : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-300 dark:hover:bg-neutral-700'}`}
-                      >
-                        🍉 Fruit Cutter
-                      </button>
-                      <button 
-                        onClick={() => handleToggleGame('MemoryGame')} 
-                        className={`flex-1 py-2.5 rounded-xl text-[10px] font-black uppercase flex items-center justify-center gap-1.5 transition-all ${activeGameType === 'MemoryGame' ? 'bg-white dark:bg-neutral-900 text-cyan-600 shadow-md ring-1 ring-neutral-300 dark:ring-neutral-700' : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-300 dark:hover:bg-neutral-700'}`}
-                      >
-                        🃏 Food Match
-                      </button>
-                       <button 
-                        onClick={() => handleToggleGame('Cafe2048')} 
-                        className={`flex-1 py-2.5 px-2 rounded-xl text-[10px] font-black uppercase flex items-center justify-center gap-1.5 transition-all whitespace-nowrap ${activeGameType === 'Cafe2048' ? 'bg-white dark:bg-neutral-900 text-amber-500 shadow-md ring-1 ring-neutral-300 dark:ring-neutral-700' : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-300 dark:hover:bg-neutral-700'}`}
-                      >
-                        🧩 2048 Puzzle
-                      </button>
-                      <button 
-                        onClick={() => handleToggleGame('HungrySnake')} 
-                        className={`flex-1 py-2.5 px-2 rounded-xl text-[10px] font-black uppercase flex items-center justify-center gap-1.5 transition-all whitespace-nowrap ${activeGameType === 'HungrySnake' ? 'bg-white dark:bg-neutral-900 text-green-500 shadow-md ring-1 ring-neutral-300 dark:ring-neutral-700' : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-300 dark:hover:bg-neutral-700'}`}
-                      >
-                        🐍 Hungry Snake
-                      </button>
+
+                    {/* OWNER WHATSAPP SETTING */}
+                    <div className="space-y-2 border-b border-neutral-300 dark:border-neutral-800 pb-4">
+                      <p className="text-xs font-bold uppercase">Owner WhatsApp Number (for EOD Report):</p>
+                      <div className="flex gap-2">
+                        <input type="text" value={ownerPhoneConfig} onChange={e => setOwnerPhoneConfig(e.target.value)} placeholder="e.g. 919714293759" className="flex-1 bg-neutral-100 dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 rounded-xl px-3 py-2 text-xs font-mono outline-none focus:border-orange-500" />
+                        <button onClick={() => { localStorage.setItem("bb_pos_owner_phone", ownerPhoneConfig); toast.success("Owner Phone Saved!"); }} className="bg-green-600 hover:bg-green-500 text-white px-4 rounded-xl text-xs font-black uppercase shadow-sm">Save</button>
+                      </div>
                     </div>
-                  </div>
-                  {/* THEME SETTING */}
-                  <div className="space-y-2 border-b border-neutral-300 dark:border-neutral-800 pb-4">
-                    <p className="text-xs font-bold uppercase">UI Theme:</p>
-                    <div className="flex bg-neutral-200 dark:bg-neutral-800 p-1 rounded-xl w-48">
-                      <button onClick={() => { setThemeMode('light'); localStorage.setItem("bb_pos_theme_pc", 'light'); document.documentElement.classList.remove('dark'); }} className={`flex-1 py-2 rounded-lg text-xs font-black uppercase ${themeMode === 'light' ? 'bg-white text-orange-600 shadow' : 'text-neutral-700 dark:text-neutral-400'}`}>Light</button>
-                      <button onClick={() => { setThemeMode('dark'); localStorage.setItem("bb_pos_theme_pc", 'dark'); document.documentElement.classList.add('dark'); }} className={`flex-1 py-2 rounded-lg text-xs font-black uppercase ${themeMode === 'dark' ? 'bg-neutral-950 text-amber-400 shadow' : 'text-neutral-700 dark:text-neutral-400'}`}>Dark</button>
+
+                    {/* THEME SETTING */}
+                    <div className="space-y-2 border-b border-neutral-300 dark:border-neutral-800 pb-4">
+                      <p className="text-xs font-bold uppercase">UI Theme (रंग):</p>
+                      <div className="flex bg-neutral-200 dark:bg-neutral-800 p-1 rounded-xl w-full">
+                        <button onClick={() => { setThemeMode('light'); localStorage.setItem("bb_pos_theme_pc", 'light'); document.documentElement.classList.remove('dark'); }} className={`flex-1 py-2 rounded-lg text-xs font-black uppercase ${themeMode === 'light' ? 'bg-white text-orange-600 shadow-sm' : 'text-neutral-700 dark:text-neutral-400 hover:bg-neutral-300'}`}>☀️ Light Mode</button>
+                        <button onClick={() => { setThemeMode('dark'); localStorage.setItem("bb_pos_theme_pc", 'dark'); document.documentElement.classList.add('dark'); }} className={`flex-1 py-2 rounded-lg text-xs font-black uppercase ${themeMode === 'dark' ? 'bg-neutral-950 text-amber-400 shadow-sm' : 'text-neutral-700 dark:text-neutral-400 hover:bg-neutral-700'}`}>🌙 Dark Mode</button>
+                      </div>
                     </div>
+
+                    {/* 👉 NEW: STORE DETAILS SETTING */}
+                    <div className="space-y-3 border-b border-neutral-300 dark:border-neutral-800 pb-4">
+                      <p className="text-xs font-black uppercase text-orange-600">Store Details (बिल पर छपने वाला नाम व पता):</p>
+                      <div className="flex flex-col gap-2">
+                        <input type="text" value={storeNameConfig} onChange={e => setStoreNameConfig(e.target.value)} placeholder="Store Name (e.g. BUM BUM CAFE)" className="w-full bg-neutral-100 dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 rounded-xl px-3 py-2 text-sm font-black outline-none focus:border-orange-500" />
+                        
+                        <textarea rows={2} value={storeAddressConfig} onChange={e => setStoreAddressConfig(e.target.value)} placeholder="Store Address (पता)" className="w-full bg-neutral-100 dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 rounded-xl px-3 py-2 text-xs font-bold outline-none resize-none focus:border-orange-500" />
+                        
+                        <div className="flex gap-2">
+                          <input type="text" value={storePhoneConfig} onChange={e => setStorePhoneConfig(e.target.value)} placeholder="Phone Number for Bill" className="flex-1 bg-neutral-100 dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 rounded-xl px-3 py-2 text-xs font-mono font-bold outline-none focus:border-orange-500" />
+                          
+                          <button onClick={() => { 
+                            localStorage.setItem("bb_pos_store_name", storeNameConfig); 
+                            localStorage.setItem("bb_pos_store_address", storeAddressConfig); 
+                            localStorage.setItem("bb_pos_store_phone", storePhoneConfig); 
+                            toast.success("कैफे का नाम और पता सेव हो गया! ✅"); 
+                          }} className="bg-orange-600 hover:bg-orange-500 text-white px-6 rounded-xl text-xs font-black uppercase shadow-md transition-colors">
+                            Save Details
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* 👉 NEW: ACTIVE GAME SETTING (कस्टमर का गेम बदलें) */}
+                    <div className="space-y-3 border-b border-neutral-300 dark:border-neutral-800 pb-4">
+                      <div>
+                        <p className="text-xs font-black uppercase text-purple-600 dark:text-purple-400 flex items-center gap-1.5"><Gamepad2 size={16}/> 🎮 Active Customer Game (QR Code):</p>
+                        <p className="text-[10px] text-neutral-500 font-bold mt-0.5">टेबल के QR कोड को स्कैन करने पर कस्टमर के फोन में कौन सा गेम खुलेगा, उसे यहाँ से बदलें।</p>
+                      </div>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 bg-neutral-200 dark:bg-neutral-800 p-2 rounded-2xl border border-neutral-300 dark:border-neutral-700 shadow-inner">
+                        <button 
+                          onClick={() => handleToggleGame('SpinGame')} 
+                          className={`py-2 rounded-xl text-[10px] font-black uppercase flex items-center justify-center gap-1.5 transition-all ${activeGameType === 'SpinGame' ? 'bg-white dark:bg-neutral-900 text-purple-600 shadow-md ring-1 ring-neutral-300 dark:ring-neutral-700' : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-300 dark:hover:bg-neutral-700'}`}
+                        >
+                          🎡 Spin Wheel
+                        </button>
+                        <button 
+                          onClick={() => handleToggleGame('CatchGame')} 
+                          className={`py-2 rounded-xl text-[10px] font-black uppercase flex items-center justify-center gap-1.5 transition-all ${activeGameType === 'CatchGame' ? 'bg-white dark:bg-neutral-900 text-orange-600 shadow-md ring-1 ring-neutral-300 dark:ring-neutral-700' : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-300 dark:hover:bg-neutral-700'}`}
+                        >
+                          🍔 Catch Game
+                        </button>
+                        <button 
+                          onClick={() => handleToggleGame('FruitNinja')} 
+                          className={`py-2 rounded-xl text-[10px] font-black uppercase flex items-center justify-center gap-1.5 transition-all ${activeGameType === 'FruitNinja' ? 'bg-white dark:bg-neutral-900 text-green-600 shadow-md ring-1 ring-neutral-300 dark:ring-neutral-700' : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-300 dark:hover:bg-neutral-700'}`}
+                        >
+                          🍉 Fruit Cutter
+                        </button>
+                        <button 
+                          onClick={() => handleToggleGame('MemoryGame')} 
+                          className={`py-2 rounded-xl text-[10px] font-black uppercase flex items-center justify-center gap-1.5 transition-all ${activeGameType === 'MemoryGame' ? 'bg-white dark:bg-neutral-900 text-cyan-600 shadow-md ring-1 ring-neutral-300 dark:ring-neutral-700' : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-300 dark:hover:bg-neutral-700'}`}
+                        >
+                          🃏 Food Match
+                        </button>
+                         <button 
+                          onClick={() => handleToggleGame('Cafe2048')} 
+                          className={`py-2 rounded-xl text-[10px] font-black uppercase flex items-center justify-center gap-1.5 transition-all ${activeGameType === 'Cafe2048' ? 'bg-white dark:bg-neutral-900 text-amber-500 shadow-md ring-1 ring-neutral-300 dark:ring-neutral-700' : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-300 dark:hover:bg-neutral-700'}`}
+                        >
+                          🧩 2048 Puzzle
+                        </button>
+                        <button 
+                          onClick={() => handleToggleGame('HungrySnake')} 
+                          className={`py-2 rounded-xl text-[10px] font-black uppercase flex items-center justify-center gap-1.5 transition-all ${activeGameType === 'HungrySnake' ? 'bg-white dark:bg-neutral-900 text-green-500 shadow-md ring-1 ring-neutral-300 dark:ring-neutral-700' : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-300 dark:hover:bg-neutral-700'}`}
+                        >
+                          🐍 Hungry Snake
+                        </button>
+                      </div>
+                    </div>
+
                   </div>
                 </div>
               </div>
             )}
-          </main>
-        </>
-      )}
 
       {/* POPUP: HELP & SHORTCUTS [F1] */}
       <AnimatePresence>
