@@ -416,7 +416,7 @@ export default function BbCafeDesktopPos() {
   const [selectedVariantIndex, setSelectedVariantIndex] = useState<number>(0);
   const [selectedSize, setSelectedSize] = useState('');
   const [selectedSizePrice, setSelectedSizePrice] = useState(0);
-  const [selectedAddons, setSelectedAddons] = useState<{ [addon: string]: boolean }>({});
+ const [selectedAddons, setSelectedAddons] = useState<any>({});
   const [itemNoteInput, setItemNoteInput] = useState('');
 
   // Past Receipts
