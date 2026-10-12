@@ -2933,11 +2933,42 @@ export default function BbCafeDesktopPos() {
     return Object.values(map).sort((a, b) => b.quantity - a.quantity);
   }, [reportOrders, products]);
 
-  // 👉 NEW: केटेगरी के आधार पर टेबल को फ़िल्टर करने का लॉजिक
+ // 👉 NEW: केटेगरी के आधार पर टेबल को फ़िल्टर करने का लॉजिक
   const filteredItemWiseSales = useMemo(() => {
     if (reportCategoryFilter === 'All') return itemWiseSales;
     return itemWiseSales.filter(item => item.category === reportCategoryFilter);
   }, [itemWiseSales, reportCategoryFilter]);
+
+  // 👉 NEW: गोल चार्ट (Pie/Donut Chart) के लिए डायनामिक डेटा लॉजिक
+  const CHART_COLORS = ['#f97316', '#3b82f6', '#10b981', '#8b5cf6', '#ec4899', '#06b6d4', '#eab308', '#f43f5e', '#14b8a6', '#84cc16'];
+  
+  const chartData = useMemo(() => {
+    let data: any[] = [];
+    if (reportCategoryFilter === 'All') {
+      // 1. अगर 'All' है, तो कैटेगरी के हिसाब से सेल जोड़ें
+      const catMap: any = {};
+      itemWiseSales.forEach(item => {
+        if (!catMap[item.category]) catMap[item.category] = 0;
+        catMap[item.category] += item.revenue;
+      });
+      data = Object.keys(catMap).map(cat => ({ label: cat, value: catMap[cat] }));
+    } else {
+      // 2. अगर कोई कैटेगरी चुनी है, तो आइटम के हिसाब से सेल दिखाएँ
+      data = filteredItemWiseSales.map(item => ({ label: item.name, value: item.revenue }));
+    }
+    
+    // ज्यादा से कम की तरफ सॉर्ट करें
+    data.sort((a, b) => b.value - a.value);
+    
+    // अगर 8 से ज्यादा आइटम हैं, तो बाकियों को "Others" में मिला दें ताकि चार्ट साफ दिखे
+    if (data.length > 8) {
+      const top8 = data.slice(0, 8);
+      const othersVal = data.slice(8).reduce((sum, curr) => sum + curr.value, 0);
+      top8.push({ label: 'Others', value: othersVal });
+      data = top8;
+    }
+    return data;
+  }, [itemWiseSales, filteredItemWiseSales, reportCategoryFilter]);
 
 // 📊 DAILY SALES TREND (ग्राफ़ के लिए डायनामिक डेटा)
   const dailyTrendData = useMemo(() => {
