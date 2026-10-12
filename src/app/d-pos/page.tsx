@@ -5190,11 +5190,9 @@ export default function BbCafeDesktopPos() {
                 </div>
               </div>
             )}
-{/* TAB 7: SETTINGS */}
-            {activeTab === 'settings' && (
-              <div className="flex-1 p-6 h-full overflow-y-auto">
-                <div className="w-full bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 p-8 rounded-3xl shadow-sm space-y-6">
-                  
+{activeTab === 'settings' && (
+  <div className="flex-1 p-6 h-full overflow-y-auto">
+    <div className="w-full bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 p-6 rounded-3xl shadow-xl space-y-6">
                   <div className="border-b border-neutral-300 dark:border-neutral-800 pb-4">
                     <h3 className="text-base font-black uppercase text-orange-600 dark:text-orange-500">POS & Hardware Settings</h3>
                     <p className="text-xs text-neutral-500 mt-1">अपने कैफे की बिलिंग, टैक्स और हार्डवेयर सेटिंग्स यहाँ से मैनेज करें।</p>
