@@ -5338,7 +5338,6 @@ export default function BbCafeDesktopPos() {
                 </div>
               </div>
             )}
-
       {/* POPUP: HELP & SHORTCUTS [F1] */}
       <AnimatePresence>
         {isHelpModalOpen && (
