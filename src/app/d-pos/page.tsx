@@ -4531,31 +4531,50 @@ export default function BbCafeDesktopPos() {
 
                 {/* ITEM-WISE SALES TABLE */}
                 <div className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 p-5 rounded-3xl space-y-3 shadow-sm">
-                  <div className="flex justify-between items-center border-b border-neutral-300 dark:border-neutral-800 pb-2">
+                  <div className="flex justify-between items-center border-b border-neutral-300 dark:border-neutral-800 pb-3">
                     <h3 className="text-xs font-black uppercase text-orange-600 dark:text-orange-500 flex items-center gap-1.5">
-                      <Layers size={14} /> आइटम-वाइज़ बिक्री रिपोर्ट (Item-wise Sales Report)
+                      <Layers size={14} /> आइटम-वाइज़ बिक्री रिपोर्ट
                     </h3>
-                    <span className="text-[10px] text-neutral-500 font-bold">{itemWiseSales.length} items sold</span>
+                    
+                    {/* 👉 NEW: CATEGORY DROPDOWN FILTER */}
+                    <div className="flex items-center gap-3">
+                      <select 
+                        value={reportCategoryFilter} 
+                        onChange={e => setReportCategoryFilter(e.target.value)}
+                        className="bg-neutral-100 dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 text-xs font-bold text-neutral-800 dark:text-neutral-200 rounded-lg px-3 py-1.5 outline-none cursor-pointer"
+                      >
+                        {categories.filter(c => c !== '⭐ Top Items').map(cat => (
+                          <option key={cat} value={cat}>{cat}</option>
+                        ))}
+                      </select>
+                      <span className="text-[10px] text-neutral-500 font-bold bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 px-2 py-1 rounded-lg">
+                        {filteredItemWiseSales.length} items
+                      </span>
+                    </div>
                   </div>
 
-                  {itemWiseSales.length === 0 ? (
-                    <p className="text-xs text-neutral-400 py-6 text-center">No settled items in this date range.</p>
+                  {filteredItemWiseSales.length === 0 ? (
+                    <p className="text-xs text-neutral-400 py-6 text-center">
+                      {reportCategoryFilter === 'All' ? 'No settled items in this date range.' : `No sales found for category "${reportCategoryFilter}".`}
+                    </p>
                   ) : (
                     <div className="max-h-72 overflow-y-auto pr-1">
                       <table className="w-full text-left text-xs">
                         <thead>
-                          <tr className="border-b border-neutral-200 dark:border-neutral-800 text-neutral-500 uppercase text-[10px]">
+                          <tr className="border-b border-neutral-200 dark:border-neutral-800 text-neutral-500 uppercase text-[10px] sticky top-0 bg-white dark:bg-neutral-900">
                             <th className="py-2">Item Name</th>
+                            <th className="py-2">Category</th>
                             <th className="py-2 text-center">Qty Sold</th>
                             <th className="py-2 text-right">Total Revenue (₹)</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800">
-                          {itemWiseSales.map((row, idx) => (
-                            <tr key={idx} className="hover:bg-neutral-50 dark:hover:bg-neutral-800/50">
-                              <td className="py-2 font-bold text-neutral-900 dark:text-neutral-100">{row.name}</td>
-                              <td className="py-2 text-center font-mono font-black text-orange-600">{row.quantity}</td>
-                              <td className="py-2 text-right font-mono font-bold">₹{row.revenue}</td>
+                          {filteredItemWiseSales.map((row, idx) => (
+                            <tr key={idx} className="hover:bg-neutral-50 dark:hover:bg-neutral-800/50 transition-colors">
+                              <td className="py-2.5 font-bold text-neutral-900 dark:text-neutral-100">{row.name}</td>
+                              <td className="py-2.5 text-[10px] text-neutral-500 font-bold">{row.category}</td>
+                              <td className="py-2.5 text-center font-mono font-black text-orange-600 bg-orange-500/5 rounded-lg">{row.quantity}</td>
+                              <td className="py-2.5 text-right font-mono font-bold text-green-600 dark:text-green-400">₹{row.revenue}</td>
                             </tr>
                           ))}
                         </tbody>
