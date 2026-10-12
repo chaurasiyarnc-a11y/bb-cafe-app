@@ -2820,7 +2820,9 @@ export default function BbCafeDesktopPos() {
         const snapExpenses = await getDocs(qExpenses);
         allExpenses = snapExpenses.docs.map(d => {
           const data = d.data();
-          return { ...data, id: d.id, timestamp: data.timestamp?.toDate ? data.timestamp.toDate().toISOString() : new Date().toISOString() };
+          // 👉 FIX: खर्चों के लिए भी तारीख सही की गई
+          const correctTime = data.timestamp?.toDate ? data.timestamp.toDate().toISOString() : (typeof data.timestamp === 'string' ? data.timestamp : new Date(data.timestamp || Date.now()).toISOString());
+          return { ...data, id: d.id, timestamp: correctTime };
         });
         localStorage.setItem("bb_pos_cached_report_expenses", JSON.stringify(allExpenses));
       } else {
