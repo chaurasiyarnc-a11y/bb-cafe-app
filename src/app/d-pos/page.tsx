@@ -4609,7 +4609,7 @@ export default function BbCafeDesktopPos() {
                           >
                             {/* बीच का सफ़ेद हिस्सा (ताकि डोनट जैसा दिखे) */}
                             <div className="w-32 h-32 bg-white dark:bg-neutral-900 rounded-full flex flex-col items-center justify-center shadow-inner">
-                              <span className="text-[10px] text-neutral-500 font-black uppercase">Total Sale</span>
+                              <span className="text-[10px] text-neutral-500 font-black uppercase">Food Items Sale</span>
                               <span className="text-lg font-black text-neutral-900 dark:text-white font-mono">
                                 ₹{chartData.reduce((s, c) => s + c.value, 0)}
                               </span>
