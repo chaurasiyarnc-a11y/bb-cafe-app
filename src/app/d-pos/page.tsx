@@ -2568,6 +2568,7 @@ export default function BbCafeDesktopPos() {
         ["Received via Cash", `Rs. ${reportSummary.cashSale}`],
         ["Received via UPI / Online", `Rs. ${reportSummary.upiSale}`],
         ["Udhar (Due / Unpaid)", `Rs. ${reportSummary.dueSale}`],
+        ["Total Discount Given", `Rs. ${reportSummary.totalDiscount}`], // 👉 NEW
       ],
       theme: 'grid',
       headStyles: { fillColor: [50, 50, 50], textColor: [255, 255, 255] },
