@@ -4671,7 +4671,7 @@ export default function BbCafeDesktopPos() {
                                 <td className="py-3 px-3 text-right font-mono font-black text-green-600 dark:text-green-400 text-sm">
                                   ₹{filteredItemWiseSales.reduce((sum, item) => sum + item.revenue, 0)}
                                 </td>
-                              </tr>
+                         </tr>
                             </tfoot>
                           </table>
                         </div>
@@ -4679,6 +4679,10 @@ export default function BbCafeDesktopPos() {
                     </div>
                   </div>
                 </div>
+              </div>
+            )}
+
+            {/* TAB 5: TABLES MANAGER */}
             {/* TAB 5: TABLES MANAGER */}
             {activeTab === 'tables' && (
               <div className="flex-1 p-6 h-full overflow-y-auto">
