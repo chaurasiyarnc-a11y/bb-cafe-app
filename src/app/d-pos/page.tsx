@@ -379,7 +379,6 @@ export default function BbCafeDesktopPos() {
   const [dailyExpenses, setDailyExpenses] = useState<any[]>([]);
   const [isReportLoading, setIsReportLoading] = useState(false);
   const [physicalCashInput, setPhysicalCashInput] = useState<number | ''>('');
-  const [reportCategoryFilter, setReportCategoryFilter] = useState('All');
 
   // Modals
   const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
@@ -398,7 +397,7 @@ export default function BbCafeDesktopPos() {
   const [itemImageInput, setItemImageInput] = useState('');
   const [itemIsAvailable, setItemIsAvailable] = useState(true);
   const [hasVariants, setHasVariants] = useState(false);
-  const [itemVariantsList, setItemVariantsList] = useState<any>({});
+  const [itemVariantsList, setItemVariantsList] = useState<{ [key: string]: number }>({});
   const [newVariantName, setNewVariantName] = useState('');
   const [newVariantPrice, setNewVariantPrice] = useState<number | ''>('');
 
@@ -416,7 +415,7 @@ export default function BbCafeDesktopPos() {
   const [selectedVariantIndex, setSelectedVariantIndex] = useState<number>(0);
   const [selectedSize, setSelectedSize] = useState('');
   const [selectedSizePrice, setSelectedSizePrice] = useState(0);
- const [selectedAddons, setSelectedAddons] = useState<any>({});
+  const [selectedAddons, setSelectedAddons] = useState<{ [addon: string]: boolean }>({});
   const [itemNoteInput, setItemNoteInput] = useState('');
 
   // Past Receipts
@@ -539,7 +538,7 @@ export default function BbCafeDesktopPos() {
   const [custFormPoints, setCustFormPoints] = useState<number | ''>(0);
   // 👉 NEW CRM STATES (नोट्स और फॅमिली डेट्स के लिए)
   const [custFormNote, setCustFormNote] = useState('');
-  const [custFormSpecialDates, setCustFormSpecialDates] = useState<any[]>([]);
+  const [custFormSpecialDates, setCustFormSpecialDates] = useState<{type: string, date: string, name: string}[]>([]);
 // NEW: CUSTOMER HISTORY STATES & FUNCTION
   const [isCustHistoryModalOpen, setIsCustHistoryModalOpen] = useState(false);
   const [selectedHistoryCust, setSelectedHistoryCust] = useState<any>(null);
@@ -2909,20 +2908,16 @@ export default function BbCafeDesktopPos() {
     return { totalSale, cashSale, upiSale, dueSale, totalDiscount, totalOrdersCount, totalExpenseAmount, netCashInDrawer, unsettledTotal, unsettledCount };
   }, [reportOrders, dailyExpenses]);
 
-// Item-wise Sales Report Calculation (With Category Logic)
+// Item-wise Sales Report Calculation
   const itemWiseSales = useMemo(() => {
-    const map: { [key: string]: { name: string, quantity: number, revenue: number, category: string } } = {};
+    const map: { [key: string]: { name: string, quantity: number, revenue: number } } = {};
 
     reportOrders.forEach((order) => {
       if (order.status === 'completed' && Array.isArray(order.items)) {
         order.items.forEach((item: PosCartItem) => {
           const key = item.name;
           if (!map[key]) {
-            // 👉 प्रोडक्ट लिस्ट से उस आइटम की केटेगरी ढूँढें
-            const matchedProduct = products.find(p => p.id === item.id);
-            const cat = matchedProduct ? matchedProduct.category : 'Uncategorized';
-            
-            map[key] = { name: key, quantity: 0, revenue: 0, category: cat };
+            map[key] = { name: key, quantity: 0, revenue: 0 };
           }
           map[key].quantity += (Number(item.quantity) || 1);
           map[key].revenue += (Number(item.price) || 0) * (Number(item.quantity) || 1);
@@ -2931,44 +2926,7 @@ export default function BbCafeDesktopPos() {
     });
 
     return Object.values(map).sort((a, b) => b.quantity - a.quantity);
-  }, [reportOrders, products]);
-
- // 👉 NEW: केटेगरी के आधार पर टेबल को फ़िल्टर करने का लॉजिक
-  const filteredItemWiseSales = useMemo(() => {
-    if (reportCategoryFilter === 'All') return itemWiseSales;
-    return itemWiseSales.filter(item => item.category === reportCategoryFilter);
-  }, [itemWiseSales, reportCategoryFilter]);
-
-  // 👉 NEW: गोल चार्ट (Pie/Donut Chart) के लिए डायनामिक डेटा लॉजिक
-  const CHART_COLORS = ['#f97316', '#3b82f6', '#10b981', '#8b5cf6', '#ec4899', '#06b6d4', '#eab308', '#f43f5e', '#14b8a6', '#84cc16'];
-  
-  const chartData = useMemo(() => {
-    let data: any[] = [];
-    if (reportCategoryFilter === 'All') {
-      // 1. अगर 'All' है, तो कैटेगरी के हिसाब से सेल जोड़ें
-      const catMap: any = {};
-      itemWiseSales.forEach(item => {
-        if (!catMap[item.category]) catMap[item.category] = 0;
-        catMap[item.category] += item.revenue;
-      });
-      data = Object.keys(catMap).map(cat => ({ label: cat, value: catMap[cat] }));
-    } else {
-      // 2. अगर कोई कैटेगरी चुनी है, तो आइटम के हिसाब से सेल दिखाएँ
-      data = filteredItemWiseSales.map(item => ({ label: item.name, value: item.revenue }));
-    }
-    
-    // ज्यादा से कम की तरफ सॉर्ट करें
-    data.sort((a, b) => b.value - a.value);
-    
-    // अगर 8 से ज्यादा आइटम हैं, तो बाकियों को "Others" में मिला दें ताकि चार्ट साफ दिखे
-    if (data.length > 8) {
-      const top8 = data.slice(0, 8);
-      const othersVal = data.slice(8).reduce((sum, curr) => sum + curr.value, 0);
-      top8.push({ label: 'Others', value: othersVal });
-      data = top8;
-    }
-    return data;
-  }, [itemWiseSales, filteredItemWiseSales, reportCategoryFilter]);
+  }, [reportOrders]);
 
 // 📊 DAILY SALES TREND (ग्राफ़ के लिए डायनामिक डेटा)
   const dailyTrendData = useMemo(() => {
@@ -3079,7 +3037,8 @@ export default function BbCafeDesktopPos() {
   }, [pastReceipts, receiptSearchQuery, receiptFilterDay]);
 
   // Keyboard Shortcuts Handler - FIXED FOR PERFORMANCE (Latest Ref Pattern)
- const handleKeyDownRef = useRef<any>(null);
+  const handleKeyDownRef = useRef<((e: KeyboardEvent) => void) | null>(null);
+
   // यह वाला useEffect हर बार नया डेटा (State) ref में सेव करेगा, बिना DOM को छेड़े।
   useEffect(() => {
     handleKeyDownRef.current = (e: KeyboardEvent) => {
@@ -4375,9 +4334,9 @@ export default function BbCafeDesktopPos() {
                   
                 
             {/* TAB 4: REPORTS WITH ITEM-WISE SALES */}
-{activeTab === 'reports' && (
-  <div className="flex-1 p-6 h-full overflow-y-auto space-y-6 w-full">
-    <div className="flex justify-between items-center border-b pb-4">
+            {activeTab === 'reports' && (
+              <div className="flex-1 p-6 h-full overflow-y-auto max-w-5xl mx-auto space-y-6">
+                <div className="flex justify-between items-center border-b pb-4">
                   <div>
                     <h2 className="text-lg font-black uppercase text-orange-600 dark:text-orange-500 flex items-center gap-2">
                       <SafeBarChart3 size={20} /> Sales & Item-wise Analytics
@@ -4560,125 +4519,39 @@ export default function BbCafeDesktopPos() {
                   </div>
                 </div>
 
-           {/* ITEM-WISE SALES TABLE & PIE CHART */}
-                <div className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 p-5 rounded-3xl shadow-sm mt-6">
-                  <div className="flex justify-between items-center border-b border-neutral-300 dark:border-neutral-800 pb-3 mb-4">
+                {/* ITEM-WISE SALES TABLE */}
+                <div className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 p-5 rounded-3xl space-y-3 shadow-sm">
+                  <div className="flex justify-between items-center border-b border-neutral-300 dark:border-neutral-800 pb-2">
                     <h3 className="text-xs font-black uppercase text-orange-600 dark:text-orange-500 flex items-center gap-1.5">
-                      <Layers size={14} /> आइटम-वाइज़ बिक्री रिपोर्ट और ग्राफ
+                      <Layers size={14} /> आइटम-वाइज़ बिक्री रिपोर्ट (Item-wise Sales Report)
                     </h3>
-                    
-                    {/* CATEGORY DROPDOWN FILTER */}
-                    <div className="flex items-center gap-3">
-                      <select 
-                        value={reportCategoryFilter} 
-                        onChange={e => setReportCategoryFilter(e.target.value)}
-                        className="bg-neutral-100 dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 text-xs font-bold text-neutral-800 dark:text-neutral-200 rounded-lg px-3 py-1.5 outline-none cursor-pointer shadow-sm"
-                      >
-                        {categories.filter(c => c !== '⭐ Top Items').map(cat => (
-                          <option key={cat} value={cat}>{cat}</option>
-                        ))}
-                      </select>
-                      <span className="text-[10px] text-neutral-500 font-bold bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 px-2 py-1 rounded-lg">
-                        {filteredItemWiseSales.length} Items
-                      </span>
-                    </div>
+                    <span className="text-[10px] text-neutral-500 font-bold">{itemWiseSales.length} items sold</span>
                   </div>
 
-                  <div className="flex flex-col lg:flex-row gap-6">
-                    {/* 👉 LEFT SIDE: गोल डोनट चार्ट (Pie Chart) */}
-                    <div className="w-full lg:w-1/3 flex flex-col items-center bg-neutral-50 dark:bg-neutral-800/30 p-4 rounded-2xl border border-neutral-200 dark:border-neutral-800">
-                      {chartData.length === 0 || chartData.reduce((s, c) => s + c.value, 0) === 0 ? (
-                        <div className="h-48 flex items-center justify-center text-xs text-neutral-400 font-bold">चार्ट के लिए कोई डेटा नहीं है</div>
-                      ) : (
-                        <>
-                          <div className="w-48 h-48 rounded-full flex items-center justify-center relative shadow-lg ring-4 ring-white dark:ring-neutral-900" 
-                            style={{ 
-                              background: `conic-gradient(${chartData.map((slice, i, arr) => {
-                                const total = arr.reduce((acc, curr) => acc + curr.value, 0);
-                                const startPercent = arr.slice(0, i).reduce((acc, curr) => acc + curr.value, 0) / total * 100;
-                                const endPercent = startPercent + (slice.value / total * 100);
-                                return `${CHART_COLORS[i % CHART_COLORS.length]} ${startPercent}% ${endPercent}%`;
-                              }).join(', ')})`
-                            }}
-                          >
-                            {/* बीच का सफ़ेद हिस्सा (ताकि डोनट जैसा दिखे) */}
-                            <div className="w-32 h-32 bg-white dark:bg-neutral-900 rounded-full flex flex-col items-center justify-center shadow-inner">
-                              <span className="text-[10px] text-neutral-500 font-black uppercase">Total Sale</span>
-                              <span className="text-lg font-black text-neutral-900 dark:text-white font-mono">
-                                ₹{chartData.reduce((s, c) => s + c.value, 0)}
-                              </span>
-                            </div>
-                          </div>
-
-                          {/* कलर लेजेंड (Legend) */}
-                          <div className="mt-6 w-full max-h-36 overflow-y-auto space-y-2 pr-1 scrollbar-hide">
-                            {chartData.map((slice, i) => {
-                              const total = chartData.reduce((s, c) => s + c.value, 0);
-                              const percentage = ((slice.value / total) * 100).toFixed(1);
-                              return (
-                                <div key={i} className="flex justify-between items-center text-[10px]">
-                                  <div className="flex items-center gap-2 truncate pr-2">
-                                    <span className="w-3 h-3 rounded-full shrink-0 shadow-sm" style={{ backgroundColor: CHART_COLORS[i % CHART_COLORS.length] }}></span>
-                                    <span className="truncate font-bold text-neutral-700 dark:text-neutral-300">
-                                      {slice.label}
-                                    </span>
-                                  </div>
-                                  <div className="text-right shrink-0">
-                                    <span className="font-mono font-black text-neutral-900 dark:text-white mr-2">₹{slice.value}</span>
-                                    <span className="font-bold text-neutral-500 bg-neutral-200 dark:bg-neutral-800 px-1 rounded">{percentage}%</span>
-                                  </div>
-                                </div>
-                              )
-                            })}
-                          </div>
-                        </>
-                      )}
+                  {itemWiseSales.length === 0 ? (
+                    <p className="text-xs text-neutral-400 py-6 text-center">No settled items in this date range.</p>
+                  ) : (
+                    <div className="max-h-72 overflow-y-auto pr-1">
+                      <table className="w-full text-left text-xs">
+                        <thead>
+                          <tr className="border-b border-neutral-200 dark:border-neutral-800 text-neutral-500 uppercase text-[10px]">
+                            <th className="py-2">Item Name</th>
+                            <th className="py-2 text-center">Qty Sold</th>
+                            <th className="py-2 text-right">Total Revenue (₹)</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800">
+                          {itemWiseSales.map((row, idx) => (
+                            <tr key={idx} className="hover:bg-neutral-50 dark:hover:bg-neutral-800/50">
+                              <td className="py-2 font-bold text-neutral-900 dark:text-neutral-100">{row.name}</td>
+                              <td className="py-2 text-center font-mono font-black text-orange-600">{row.quantity}</td>
+                              <td className="py-2 text-right font-mono font-bold">₹{row.revenue}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
-
-                    {/* 👉 RIGHT SIDE: आइटम की टेबल */}
-                    <div className="w-full lg:w-2/3 border border-neutral-200 dark:border-neutral-800 rounded-2xl overflow-hidden flex flex-col">
-                      {filteredItemWiseSales.length === 0 ? (
-                        <p className="text-xs text-neutral-400 py-10 text-center">कोई बिक्री रिकॉर्ड नहीं मिला।</p>
-                      ) : (
-                        <div className="max-h-80 overflow-y-auto pr-1">
-                          <table className="w-full text-left text-xs">
-                            <thead>
-                              <tr className="bg-neutral-100 dark:bg-neutral-800 text-neutral-500 uppercase text-[10px] sticky top-0 z-10">
-                                <th className="py-2.5 px-3 font-black">Item Name</th>
-                                <th className="py-2.5 px-3 font-black">Category</th>
-                                <th className="py-2.5 px-3 font-black text-center">Qty</th>
-                                <th className="py-2.5 px-3 font-black text-right">Revenue (₹)</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800 bg-white dark:bg-neutral-900">
-                              {filteredItemWiseSales.map((row, idx) => (
-                                <tr key={idx} className="hover:bg-orange-50 dark:hover:bg-neutral-800/50 transition-colors">
-                                  <td className="py-2.5 px-3 font-bold text-neutral-900 dark:text-neutral-100">{row.name}</td>
-                                  <td className="py-2.5 px-3 text-[10px] text-neutral-500 font-bold">{row.category}</td>
-                                  <td className="py-2.5 px-3 text-center font-mono font-black text-orange-600 bg-orange-500/5">{row.quantity}</td>
-                                  <td className="py-2.5 px-3 text-right font-mono font-black text-green-600 dark:text-green-400">₹{row.revenue}</td>
-                                </tr>
-                              ))}
-                            </tbody>
-                            {/* TABLE FOOTER TOTAL */}
-                            <tfoot className="sticky bottom-0 bg-neutral-100 dark:bg-neutral-800 border-t-2 border-neutral-300 dark:border-neutral-700 shadow-[0_-5px_10px_-2px_rgba(0,0,0,0.05)]">
-                              <tr>
-                                <td colSpan={2} className="py-3 px-3 font-black text-right uppercase text-neutral-800 dark:text-neutral-200 text-[11px]">
-                                  {reportCategoryFilter === 'All' ? 'कुल बिक्री (All Items) :' : `${reportCategoryFilter} Total :`}
-                                </td>
-                                <td className="py-3 px-3 text-center font-mono font-black text-orange-600 text-sm">
-                                  {filteredItemWiseSales.reduce((sum, item) => sum + item.quantity, 0)}
-                                </td>
-                                <td className="py-3 px-3 text-right font-mono font-black text-green-600 dark:text-green-400 text-sm">
-                                  ₹{filteredItemWiseSales.reduce((sum, item) => sum + item.revenue, 0)}
-                                </td>
-                              </tr>
-                            </tfoot>
-                          </table>
-                        </div>
-                      )}
-                    </div>
-                  </div>
+                  )}
                 </div>
               </div>
             )}
@@ -5189,152 +5062,149 @@ export default function BbCafeDesktopPos() {
                 </div>
               </div>
             )}
-{activeTab === 'settings' && (
-  <div className="flex-1 p-6 h-full overflow-y-auto">
-    <div className="w-full bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 p-6 rounded-3xl shadow-xl space-y-6">
-                  <div className="border-b border-neutral-300 dark:border-neutral-800 pb-4">
-                    <h3 className="text-base font-black uppercase text-orange-600 dark:text-orange-500">POS & Hardware Settings</h3>
-                    <p className="text-xs text-neutral-500 mt-1">अपने कैफे की बिलिंग, टैक्स और हार्डवेयर सेटिंग्स यहाँ से मैनेज करें।</p>
-                  </div>
+            
+     {/* TAB 7: SETTINGS */}
+            {activeTab === 'settings' && (
+              <div className="flex-1 p-6 h-full overflow-y-auto flex justify-center">
+                <div className="max-w-xl w-full bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 p-6 rounded-3xl shadow-xl space-y-6">
+                  <h3 className="text-sm font-black uppercase text-orange-600 dark:text-orange-500">POS & Hardware Settings</h3>
                   
-                  {/* 2-COLUMN GRID LAYOUT (खाली स्पेस भरने के लिए) */}
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-12 gap-y-6">
-                    
-                    {/* NEXT BILL / INVOICE NUMBER */}
-                    <div className="space-y-2 border-b border-neutral-300 dark:border-neutral-800 pb-4">
-                      <p className="text-xs font-bold uppercase">Next Bill / Invoice Number:</p>
+                  {/* NEXT BILL / INVOICE NUMBER */}
+                  <div className="space-y-2 border-b border-neutral-300 dark:border-neutral-800 pb-4">
+                    <p className="text-xs font-bold uppercase">Next Bill / Invoice Number:</p>
+                    <div className="flex gap-2">
+                      <input type="number" value={manualInvoiceCounterInput} onChange={e => setManualInvoiceCounterInput(e.target.value)} placeholder="e.g. 200" className="flex-1 bg-neutral-100 dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 rounded-xl px-3 py-2 text-xs font-mono font-bold outline-none" />
+                      <button onClick={() => { const num = parseInt(manualInvoiceCounterInput, 10); if (!isNaN(num) && num >= 1) { localStorage.setItem("bb_pos_local_bill_counter_pc", String(num - 1)); toast.success(`Next Invoice will be #${num}! ✅`); } }} className="bg-orange-600 text-white px-4 rounded-xl text-xs font-black uppercase">Set Counter</button>
+                    </div>
+                  </div>
+
+                  {/* 👉 GST Settings */}
+                  <div className="space-y-2 border-b border-neutral-300 dark:border-neutral-800 pb-4">
+                    <div className="flex justify-between items-center">
+                      <p className="text-xs font-bold uppercase">Enable GST (टैक्स):</p>
+                      <button onClick={() => { const newVal = !gstEnabled; setGstEnabled(newVal); localStorage.setItem("bb_pos_gst_enabled_pc", String(newVal)); toast.success(newVal ? `GST Enabled (${gstRate}%)!` : "GST Disabled!"); }} className={`w-12 h-6 flex items-center rounded-full p-1 transition-colors ${gstEnabled ? 'bg-green-500' : 'bg-neutral-400'}`}>
+                        <div className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform ${gstEnabled ? 'translate-x-6' : ''}`}></div>
+                      </button>
+                    </div>
+                    {gstEnabled && (
+                      <div className="flex gap-2 pt-2">
+                        <input type="number" value={gstRate} onChange={e => { const rate = Number(e.target.value); setGstRate(rate); localStorage.setItem("bb_pos_gst_rate_pc", String(rate)); }} placeholder="GST % (e.g. 5)" className="flex-1 bg-neutral-100 dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 rounded-xl px-3 py-2 text-xs font-mono font-bold outline-none" />
+                        <span className="bg-neutral-200 dark:bg-neutral-700 px-4 py-2 rounded-xl text-xs font-black uppercase flex items-center">% Rate (दर)</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 👉 NEW: Cash Tendered Settings */}
+                  <div className="space-y-2 border-b border-neutral-300 dark:border-neutral-800 pb-4">
+                    <div className="flex justify-between items-center">
+                      <p className="text-xs font-bold uppercase">Show Cash Change Calculator (कैश वापसी):</p>
+                      <button onClick={() => { const newVal = !cashTenderEnabled; setCashTenderEnabled(newVal); localStorage.setItem("bb_pos_cash_tender_enabled_pc", String(newVal)); toast.success(newVal ? "Cash Calculator ON हो गया!" : "Cash Calculator OFF हो गया!"); }} className={`w-12 h-6 flex items-center rounded-full p-1 transition-colors ${cashTenderEnabled ? 'bg-green-500' : 'bg-neutral-400'}`}>
+                        <div className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform ${cashTenderEnabled ? 'translate-x-6' : ''}`}></div>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* UPI ID SETTING */}
+                  <div className="space-y-2 border-b border-neutral-300 dark:border-neutral-800 pb-4">
+                    <p className="text-xs font-bold uppercase">Dynamic UPI ID (VPA for QR Code):</p>
+                    <div className="flex gap-2">
+                      <input type="text" value={upiIdConfig} onChange={e => setUpiIdConfig(e.target.value)} placeholder="e.g. Q991347275@ybl" className="flex-1 bg-neutral-100 dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 rounded-xl px-3 py-2 text-xs font-mono outline-none" />
+                      <button onClick={() => { localStorage.setItem("bb_pos_upi_id", upiIdConfig); toast.success("UPI ID Saved!"); }} className="bg-blue-600 text-white px-4 rounded-xl text-xs font-black uppercase">Save</button>
+                    </div>
+                  </div>
+
+                {/* OWNER WHATSAPP SETTING */}
+                  <div className="space-y-2 border-b border-neutral-300 dark:border-neutral-800 pb-4">
+                    <p className="text-xs font-bold uppercase">Owner WhatsApp Number (for EOD Report):</p>
+                    <div className="flex gap-2">
+                      <input type="text" value={ownerPhoneConfig} onChange={e => setOwnerPhoneConfig(e.target.value)} placeholder="e.g. 919714293759" className="flex-1 bg-neutral-100 dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 rounded-xl px-3 py-2 text-xs font-mono outline-none" />
+                      <button onClick={() => { localStorage.setItem("bb_pos_owner_phone", ownerPhoneConfig); toast.success("Owner Phone Saved!"); }} className="bg-green-600 text-white px-4 rounded-xl text-xs font-black uppercase">Save</button>
+                    </div>
+                  </div>
+
+              
+                  {/* 👉 NEW: STORE DETAILS SETTING */}
+                  <div className="space-y-3 border-b border-neutral-300 dark:border-neutral-800 pb-4 mt-4">
+                    <p className="text-xs font-black uppercase text-orange-600">Store Details (बिल पर छपने वाला नाम व पता):</p>
+                    <div className="flex flex-col gap-2">
+                      <input type="text" value={storeNameConfig} onChange={e => setStoreNameConfig(e.target.value)} placeholder="Store Name (e.g. BUM BUM CAFE)" className="w-full bg-neutral-100 dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 rounded-xl px-3 py-2 text-sm font-black outline-none" />
+                      
+                      <textarea rows={2} value={storeAddressConfig} onChange={e => setStoreAddressConfig(e.target.value)} placeholder="Store Address (पता)" className="w-full bg-neutral-100 dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 rounded-xl px-3 py-2 text-xs font-bold outline-none resize-none" />
+                      
                       <div className="flex gap-2">
-                        <input type="number" value={manualInvoiceCounterInput} onChange={e => setManualInvoiceCounterInput(e.target.value)} placeholder="e.g. 200" className="flex-1 bg-neutral-100 dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 rounded-xl px-3 py-2 text-xs font-mono font-bold outline-none focus:border-orange-500 transition-colors" />
-                        <button onClick={() => { const num = parseInt(manualInvoiceCounterInput, 10); if (!isNaN(num) && num >= 1) { localStorage.setItem("bb_pos_local_bill_counter_pc", String(num - 1)); toast.success(`Next Invoice will be #${num}! ✅`); } }} className="bg-orange-600 hover:bg-orange-500 text-white px-4 rounded-xl text-xs font-black uppercase shadow-sm">Set Counter</button>
-                      </div>
-                    </div>
-
-                    {/* 👉 GST Settings */}
-                    <div className="space-y-2 border-b border-neutral-300 dark:border-neutral-800 pb-4">
-                      <div className="flex justify-between items-center">
-                        <p className="text-xs font-bold uppercase">Enable GST (टैक्स):</p>
-                        <button onClick={() => { const newVal = !gstEnabled; setGstEnabled(newVal); localStorage.setItem("bb_pos_gst_enabled_pc", String(newVal)); toast.success(newVal ? `GST Enabled (${gstRate}%)!` : "GST Disabled!"); }} className={`w-12 h-6 flex items-center rounded-full p-1 transition-colors ${gstEnabled ? 'bg-green-500' : 'bg-neutral-400'}`}>
-                          <div className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform ${gstEnabled ? 'translate-x-6' : ''}`}></div>
-                        </button>
-                      </div>
-                      {gstEnabled && (
-                        <div className="flex gap-2 pt-2">
-                          <input type="number" value={gstRate} onChange={e => { const rate = Number(e.target.value); setGstRate(rate); localStorage.setItem("bb_pos_gst_rate_pc", String(rate)); }} placeholder="GST % (e.g. 5)" className="flex-1 bg-neutral-100 dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 rounded-xl px-3 py-2 text-xs font-mono font-bold outline-none focus:border-orange-500" />
-                          <span className="bg-neutral-200 dark:bg-neutral-700 px-4 py-2 rounded-xl text-xs font-black uppercase flex items-center">% Rate (दर)</span>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* 👉 NEW: Cash Tendered Settings */}
-                    <div className="space-y-2 border-b border-neutral-300 dark:border-neutral-800 pb-4">
-                      <div className="flex justify-between items-center">
-                        <p className="text-xs font-bold uppercase">Show Cash Change Calculator (कैश वापसी):</p>
-                        <button onClick={() => { const newVal = !cashTenderEnabled; setCashTenderEnabled(newVal); localStorage.setItem("bb_pos_cash_tender_enabled_pc", String(newVal)); toast.success(newVal ? "Cash Calculator ON हो गया!" : "Cash Calculator OFF हो गया!"); }} className={`w-12 h-6 flex items-center rounded-full p-1 transition-colors ${cashTenderEnabled ? 'bg-green-500' : 'bg-neutral-400'}`}>
-                          <div className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform ${cashTenderEnabled ? 'translate-x-6' : ''}`}></div>
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* UPI ID SETTING */}
-                    <div className="space-y-2 border-b border-neutral-300 dark:border-neutral-800 pb-4">
-                      <p className="text-xs font-bold uppercase">Dynamic UPI ID (VPA for QR Code):</p>
-                      <div className="flex gap-2">
-                        <input type="text" value={upiIdConfig} onChange={e => setUpiIdConfig(e.target.value)} placeholder="e.g. Q991347275@ybl" className="flex-1 bg-neutral-100 dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 rounded-xl px-3 py-2 text-xs font-mono outline-none focus:border-orange-500" />
-                        <button onClick={() => { localStorage.setItem("bb_pos_upi_id", upiIdConfig); toast.success("UPI ID Saved!"); }} className="bg-blue-600 hover:bg-blue-500 text-white px-4 rounded-xl text-xs font-black uppercase shadow-sm">Save</button>
-                      </div>
-                    </div>
-
-                    {/* OWNER WHATSAPP SETTING */}
-                    <div className="space-y-2 border-b border-neutral-300 dark:border-neutral-800 pb-4">
-                      <p className="text-xs font-bold uppercase">Owner WhatsApp Number (for EOD Report):</p>
-                      <div className="flex gap-2">
-                        <input type="text" value={ownerPhoneConfig} onChange={e => setOwnerPhoneConfig(e.target.value)} placeholder="e.g. 919714293759" className="flex-1 bg-neutral-100 dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 rounded-xl px-3 py-2 text-xs font-mono outline-none focus:border-orange-500" />
-                        <button onClick={() => { localStorage.setItem("bb_pos_owner_phone", ownerPhoneConfig); toast.success("Owner Phone Saved!"); }} className="bg-green-600 hover:bg-green-500 text-white px-4 rounded-xl text-xs font-black uppercase shadow-sm">Save</button>
-                      </div>
-                    </div>
-
-                    {/* THEME SETTING */}
-                    <div className="space-y-2 border-b border-neutral-300 dark:border-neutral-800 pb-4">
-                      <p className="text-xs font-bold uppercase">UI Theme (रंग):</p>
-                      <div className="flex bg-neutral-200 dark:bg-neutral-800 p-1 rounded-xl w-full">
-                        <button onClick={() => { setThemeMode('light'); localStorage.setItem("bb_pos_theme_pc", 'light'); document.documentElement.classList.remove('dark'); }} className={`flex-1 py-2 rounded-lg text-xs font-black uppercase ${themeMode === 'light' ? 'bg-white text-orange-600 shadow-sm' : 'text-neutral-700 dark:text-neutral-400 hover:bg-neutral-300'}`}>☀️ Light Mode</button>
-                        <button onClick={() => { setThemeMode('dark'); localStorage.setItem("bb_pos_theme_pc", 'dark'); document.documentElement.classList.add('dark'); }} className={`flex-1 py-2 rounded-lg text-xs font-black uppercase ${themeMode === 'dark' ? 'bg-neutral-950 text-amber-400 shadow-sm' : 'text-neutral-700 dark:text-neutral-400 hover:bg-neutral-700'}`}>🌙 Dark Mode</button>
-                      </div>
-                    </div>
-
-                    {/* 👉 NEW: STORE DETAILS SETTING */}
-                    <div className="space-y-3 border-b border-neutral-300 dark:border-neutral-800 pb-4">
-                      <p className="text-xs font-black uppercase text-orange-600">Store Details (बिल पर छपने वाला नाम व पता):</p>
-                      <div className="flex flex-col gap-2">
-                        <input type="text" value={storeNameConfig} onChange={e => setStoreNameConfig(e.target.value)} placeholder="Store Name (e.g. BUM BUM CAFE)" className="w-full bg-neutral-100 dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 rounded-xl px-3 py-2 text-sm font-black outline-none focus:border-orange-500" />
+                        <input type="text" value={storePhoneConfig} onChange={e => setStorePhoneConfig(e.target.value)} placeholder="Phone Number for Bill" className="flex-1 bg-neutral-100 dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 rounded-xl px-3 py-2 text-xs font-mono font-bold outline-none" />
                         
-                        <textarea rows={2} value={storeAddressConfig} onChange={e => setStoreAddressConfig(e.target.value)} placeholder="Store Address (पता)" className="w-full bg-neutral-100 dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 rounded-xl px-3 py-2 text-xs font-bold outline-none resize-none focus:border-orange-500" />
-                        
-                        <div className="flex gap-2">
-                          <input type="text" value={storePhoneConfig} onChange={e => setStorePhoneConfig(e.target.value)} placeholder="Phone Number for Bill" className="flex-1 bg-neutral-100 dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 rounded-xl px-3 py-2 text-xs font-mono font-bold outline-none focus:border-orange-500" />
-                          
-                          <button onClick={() => { 
-                            localStorage.setItem("bb_pos_store_name", storeNameConfig); 
-                            localStorage.setItem("bb_pos_store_address", storeAddressConfig); 
-                            localStorage.setItem("bb_pos_store_phone", storePhoneConfig); 
-                            toast.success("कैफे का नाम और पता सेव हो गया! ✅"); 
-                          }} className="bg-orange-600 hover:bg-orange-500 text-white px-6 rounded-xl text-xs font-black uppercase shadow-md transition-colors">
-                            Save Details
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* 👉 NEW: ACTIVE GAME SETTING (कस्टमर का गेम बदलें) */}
-                    <div className="space-y-3 border-b border-neutral-300 dark:border-neutral-800 pb-4">
-                      <div>
-                        <p className="text-xs font-black uppercase text-purple-600 dark:text-purple-400 flex items-center gap-1.5"><Gamepad2 size={16}/> 🎮 Active Customer Game (QR Code):</p>
-                        <p className="text-[10px] text-neutral-500 font-bold mt-0.5">टेबल के QR कोड को स्कैन करने पर कस्टमर के फोन में कौन सा गेम खुलेगा, उसे यहाँ से बदलें।</p>
-                      </div>
-                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 bg-neutral-200 dark:bg-neutral-800 p-2 rounded-2xl border border-neutral-300 dark:border-neutral-700 shadow-inner">
-                        <button 
-                          onClick={() => handleToggleGame('SpinGame')} 
-                          className={`py-2 rounded-xl text-[10px] font-black uppercase flex items-center justify-center gap-1.5 transition-all ${activeGameType === 'SpinGame' ? 'bg-white dark:bg-neutral-900 text-purple-600 shadow-md ring-1 ring-neutral-300 dark:ring-neutral-700' : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-300 dark:hover:bg-neutral-700'}`}
-                        >
-                          🎡 Spin Wheel
-                        </button>
-                        <button 
-                          onClick={() => handleToggleGame('CatchGame')} 
-                          className={`py-2 rounded-xl text-[10px] font-black uppercase flex items-center justify-center gap-1.5 transition-all ${activeGameType === 'CatchGame' ? 'bg-white dark:bg-neutral-900 text-orange-600 shadow-md ring-1 ring-neutral-300 dark:ring-neutral-700' : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-300 dark:hover:bg-neutral-700'}`}
-                        >
-                          🍔 Catch Game
-                        </button>
-                        <button 
-                          onClick={() => handleToggleGame('FruitNinja')} 
-                          className={`py-2 rounded-xl text-[10px] font-black uppercase flex items-center justify-center gap-1.5 transition-all ${activeGameType === 'FruitNinja' ? 'bg-white dark:bg-neutral-900 text-green-600 shadow-md ring-1 ring-neutral-300 dark:ring-neutral-700' : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-300 dark:hover:bg-neutral-700'}`}
-                        >
-                          🍉 Fruit Cutter
-                        </button>
-                        <button 
-                          onClick={() => handleToggleGame('MemoryGame')} 
-                          className={`py-2 rounded-xl text-[10px] font-black uppercase flex items-center justify-center gap-1.5 transition-all ${activeGameType === 'MemoryGame' ? 'bg-white dark:bg-neutral-900 text-cyan-600 shadow-md ring-1 ring-neutral-300 dark:ring-neutral-700' : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-300 dark:hover:bg-neutral-700'}`}
-                        >
-                          🃏 Food Match
-                        </button>
-                         <button 
-                          onClick={() => handleToggleGame('Cafe2048')} 
-                          className={`py-2 rounded-xl text-[10px] font-black uppercase flex items-center justify-center gap-1.5 transition-all ${activeGameType === 'Cafe2048' ? 'bg-white dark:bg-neutral-900 text-amber-500 shadow-md ring-1 ring-neutral-300 dark:ring-neutral-700' : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-300 dark:hover:bg-neutral-700'}`}
-                        >
-                          🧩 2048 Puzzle
-                        </button>
-                        <button 
-                          onClick={() => handleToggleGame('HungrySnake')} 
-                          className={`py-2 rounded-xl text-[10px] font-black uppercase flex items-center justify-center gap-1.5 transition-all ${activeGameType === 'HungrySnake' ? 'bg-white dark:bg-neutral-900 text-green-500 shadow-md ring-1 ring-neutral-300 dark:ring-neutral-700' : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-300 dark:hover:bg-neutral-700'}`}
-                        >
-                          🐍 Hungry Snake
+                        <button onClick={() => { 
+                          localStorage.setItem("bb_pos_store_name", storeNameConfig); 
+                          localStorage.setItem("bb_pos_store_address", storeAddressConfig); 
+                          localStorage.setItem("bb_pos_store_phone", storePhoneConfig); 
+                          toast.success("कैफे का नाम और पता सेव हो गया! ✅"); 
+                        }} className="bg-orange-600 hover:bg-orange-500 text-white px-6 rounded-xl text-xs font-black uppercase shadow-md transition-colors">
+                          Save Details
                         </button>
                       </div>
                     </div>
-
+                  </div>
+{/* 👉 NEW: ACTIVE GAME SETTING (कस्टमर का गेम बदलें) */}
+                  <div className="space-y-3 border-b border-neutral-300 dark:border-neutral-800 pb-5">
+                    <div>
+                      <p className="text-xs font-black uppercase text-purple-600 dark:text-purple-400 flex items-center gap-1.5"><Gamepad2 size={16}/> 🎮 Active Customer Game (QR Code):</p>
+                      <p className="text-[10px] text-neutral-500 font-bold mt-0.5">टेबल के QR कोड को स्कैन करने पर कस्टमर के फोन में कौन सा गेम खुलेगा, उसे यहाँ से बदलें।</p>
+                    </div>
+                    <div className="flex bg-neutral-200 dark:bg-neutral-800 p-1 rounded-2xl w-full max-w-2xl border border-neutral-300 dark:border-neutral-700 shadow-inner">
+                      <button 
+                        onClick={() => handleToggleGame('SpinGame')} 
+                        className={`flex-1 py-2.5 rounded-xl text-[10px] font-black uppercase flex items-center justify-center gap-1.5 transition-all ${activeGameType === 'SpinGame' ? 'bg-white dark:bg-neutral-900 text-purple-600 shadow-md ring-1 ring-neutral-300 dark:ring-neutral-700' : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-300 dark:hover:bg-neutral-700'}`}
+                      >
+                        🎡 Spin Wheel
+                      </button>
+                      <button 
+                        onClick={() => handleToggleGame('CatchGame')} 
+                        className={`flex-1 py-2.5 rounded-xl text-[10px] font-black uppercase flex items-center justify-center gap-1.5 transition-all ${activeGameType === 'CatchGame' ? 'bg-white dark:bg-neutral-900 text-orange-600 shadow-md ring-1 ring-neutral-300 dark:ring-neutral-700' : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-300 dark:hover:bg-neutral-700'}`}
+                      >
+                        🍔 Catch Game
+                      </button>
+                      <button 
+                        onClick={() => handleToggleGame('FruitNinja')} 
+                        className={`flex-1 py-2.5 rounded-xl text-[10px] font-black uppercase flex items-center justify-center gap-1.5 transition-all ${activeGameType === 'FruitNinja' ? 'bg-white dark:bg-neutral-900 text-green-600 shadow-md ring-1 ring-neutral-300 dark:ring-neutral-700' : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-300 dark:hover:bg-neutral-700'}`}
+                      >
+                        🍉 Fruit Cutter
+                      </button>
+                      <button 
+                        onClick={() => handleToggleGame('MemoryGame')} 
+                        className={`flex-1 py-2.5 rounded-xl text-[10px] font-black uppercase flex items-center justify-center gap-1.5 transition-all ${activeGameType === 'MemoryGame' ? 'bg-white dark:bg-neutral-900 text-cyan-600 shadow-md ring-1 ring-neutral-300 dark:ring-neutral-700' : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-300 dark:hover:bg-neutral-700'}`}
+                      >
+                        🃏 Food Match
+                      </button>
+                       <button 
+                        onClick={() => handleToggleGame('Cafe2048')} 
+                        className={`flex-1 py-2.5 px-2 rounded-xl text-[10px] font-black uppercase flex items-center justify-center gap-1.5 transition-all whitespace-nowrap ${activeGameType === 'Cafe2048' ? 'bg-white dark:bg-neutral-900 text-amber-500 shadow-md ring-1 ring-neutral-300 dark:ring-neutral-700' : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-300 dark:hover:bg-neutral-700'}`}
+                      >
+                        🧩 2048 Puzzle
+                      </button>
+                      <button 
+                        onClick={() => handleToggleGame('HungrySnake')} 
+                        className={`flex-1 py-2.5 px-2 rounded-xl text-[10px] font-black uppercase flex items-center justify-center gap-1.5 transition-all whitespace-nowrap ${activeGameType === 'HungrySnake' ? 'bg-white dark:bg-neutral-900 text-green-500 shadow-md ring-1 ring-neutral-300 dark:ring-neutral-700' : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-300 dark:hover:bg-neutral-700'}`}
+                      >
+                        🐍 Hungry Snake
+                      </button>
+                    </div>
+                  </div>
+                  {/* THEME SETTING */}
+                  <div className="space-y-2 border-b border-neutral-300 dark:border-neutral-800 pb-4">
+                    <p className="text-xs font-bold uppercase">UI Theme:</p>
+                    <div className="flex bg-neutral-200 dark:bg-neutral-800 p-1 rounded-xl w-48">
+                      <button onClick={() => { setThemeMode('light'); localStorage.setItem("bb_pos_theme_pc", 'light'); document.documentElement.classList.remove('dark'); }} className={`flex-1 py-2 rounded-lg text-xs font-black uppercase ${themeMode === 'light' ? 'bg-white text-orange-600 shadow' : 'text-neutral-700 dark:text-neutral-400'}`}>Light</button>
+                      <button onClick={() => { setThemeMode('dark'); localStorage.setItem("bb_pos_theme_pc", 'dark'); document.documentElement.classList.add('dark'); }} className={`flex-1 py-2 rounded-lg text-xs font-black uppercase ${themeMode === 'dark' ? 'bg-neutral-950 text-amber-400 shadow' : 'text-neutral-700 dark:text-neutral-400'}`}>Dark</button>
+                    </div>
                   </div>
                 </div>
               </div>
             )}
+          </main>
+        </>
+      )}
+
       {/* POPUP: HELP & SHORTCUTS [F1] */}
       <AnimatePresence>
         {isHelpModalOpen && (
