@@ -4559,75 +4559,126 @@ export default function BbCafeDesktopPos() {
                   </div>
                 </div>
 
-                {/* ITEM-WISE SALES TABLE */}
-                <div className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 p-5 rounded-3xl space-y-3 shadow-sm">
-                  <div className="flex justify-between items-center border-b border-neutral-300 dark:border-neutral-800 pb-3">
+               {/* ITEM-WISE SALES TABLE & PIE CHART */}
+                <div className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 p-5 rounded-3xl shadow-sm">
+                  <div className="flex justify-between items-center border-b border-neutral-300 dark:border-neutral-800 pb-3 mb-4">
                     <h3 className="text-xs font-black uppercase text-orange-600 dark:text-orange-500 flex items-center gap-1.5">
-                      <Layers size={14} /> आइटम-वाइज़ बिक्री रिपोर्ट
+                      <Layers size={14} /> आइटम-वाइज़ बिक्री रिपोर्ट और ग्राफ
                     </h3>
                     
-                    {/* 👉 NEW: CATEGORY DROPDOWN FILTER */}
+                    {/* CATEGORY DROPDOWN FILTER */}
                     <div className="flex items-center gap-3">
                       <select 
                         value={reportCategoryFilter} 
                         onChange={e => setReportCategoryFilter(e.target.value)}
-                        className="bg-neutral-100 dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 text-xs font-bold text-neutral-800 dark:text-neutral-200 rounded-lg px-3 py-1.5 outline-none cursor-pointer"
+                        className="bg-neutral-100 dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 text-xs font-bold text-neutral-800 dark:text-neutral-200 rounded-lg px-3 py-1.5 outline-none cursor-pointer shadow-sm"
                       >
                         {categories.filter(c => c !== '⭐ Top Items').map(cat => (
                           <option key={cat} value={cat}>{cat}</option>
                         ))}
                       </select>
                       <span className="text-[10px] text-neutral-500 font-bold bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 px-2 py-1 rounded-lg">
-                        {filteredItemWiseSales.length} items
+                        {filteredItemWiseSales.length} Items
                       </span>
                     </div>
                   </div>
 
-                  {filteredItemWiseSales.length === 0 ? (
-                    <p className="text-xs text-neutral-400 py-6 text-center">
-                      {reportCategoryFilter === 'All' ? 'No settled items in this date range.' : `No sales found for category "${reportCategoryFilter}".`}
-                    </p>
-                  ) : (
-                    <div className="max-h-72 overflow-y-auto pr-1">
-                      <table className="w-full text-left text-xs">
-                        <thead>
-                          <tr className="border-b border-neutral-200 dark:border-neutral-800 text-neutral-500 uppercase text-[10px] sticky top-0 bg-white dark:bg-neutral-900">
-                            <th className="py-2">Item Name</th>
-                            <th className="py-2">Category</th>
-                            <th className="py-2 text-center">Qty Sold</th>
-                            <th className="py-2 text-right">Total Revenue (₹)</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800">
-                          {filteredItemWiseSales.map((row, idx) => (
-                            <tr key={idx} className="hover:bg-neutral-50 dark:hover:bg-neutral-800/50 transition-colors">
-                              <td className="py-2.5 font-bold text-neutral-900 dark:text-neutral-100">{row.name}</td>
-                              <td className="py-2.5 text-[10px] text-neutral-500 font-bold">{row.category}</td>
-                              <td className="py-2.5 text-center font-mono font-black text-orange-600 bg-orange-500/5 rounded-lg">{row.quantity}</td>
-                              <td className="py-2.5 text-right font-mono font-bold text-green-600 dark:text-green-400">₹{row.revenue}</td>
-                            </tr>
-                          ))}
-                        <</tbody>
-                        {/* 👉 NEW: CATEGORY TOTAL FOOTER (कुल योग दिखाने के लिए) */}
-                        <tfoot className="sticky bottom-0 bg-neutral-100 dark:bg-neutral-800 border-t-2 border-neutral-300 dark:border-neutral-700 shadow-[0_-5px_10px_-2px_rgba(0,0,0,0.05)]">
-                          <tr>
-                            <td colSpan={2} className="py-3 px-2 font-black text-right uppercase text-neutral-800 dark:text-neutral-200 text-[11px]">
-                              {reportCategoryFilter === 'All' ? 'कुल बिक्री (All Items) :' : `${reportCategoryFilter} Total :`}
-                            </td>
-                            <td className="py-3 text-center font-mono font-black text-orange-600 text-sm">
-                              {filteredItemWiseSales.reduce((sum, item) => sum + item.quantity, 0)}
-                            </td>
-                            <td className="py-3 text-right font-mono font-black text-green-600 dark:text-green-400 text-sm">
-                              ₹{filteredItemWiseSales.reduce((sum, item) => sum + item.revenue, 0)}
-                            </td>
-                          </tr>
-                        </tfoot>
-                      </table>
+                  <div className="flex flex-col lg:flex-row gap-6">
+                    {/* 👉 LEFT SIDE: गोल डोनट चार्ट (Pie Chart) */}
+                    <div className="w-full lg:w-1/3 flex flex-col items-center bg-neutral-50 dark:bg-neutral-800/30 p-4 rounded-2xl border border-neutral-200 dark:border-neutral-800">
+                      {chartData.length === 0 || chartData.reduce((s, c) => s + c.value, 0) === 0 ? (
+                        <div className="h-48 flex items-center justify-center text-xs text-neutral-400 font-bold">चार्ट के लिए कोई डेटा नहीं है</div>
+                      ) : (
+                        <>
+                          <div className="w-48 h-48 rounded-full flex items-center justify-center relative shadow-lg ring-4 ring-white dark:ring-neutral-900" 
+                            style={{ 
+                              background: `conic-gradient(${chartData.map((slice, i, arr) => {
+                                const total = arr.reduce((acc, curr) => acc + curr.value, 0);
+                                const startPercent = arr.slice(0, i).reduce((acc, curr) => acc + curr.value, 0) / total * 100;
+                                const endPercent = startPercent + (slice.value / total * 100);
+                                return `${CHART_COLORS[i % CHART_COLORS.length]} ${startPercent}% ${endPercent}%`;
+                              }).join(', ')})`
+                            }}
+                          >
+                            {/* बीच का सफ़ेद हिस्सा (ताकि डोनट जैसा दिखे) */}
+                            <div className="w-32 h-32 bg-white dark:bg-neutral-900 rounded-full flex flex-col items-center justify-center shadow-inner">
+                              <span className="text-[10px] text-neutral-500 font-black uppercase">Total Sale</span>
+                              <span className="text-lg font-black text-neutral-900 dark:text-white font-mono">
+                                ₹{chartData.reduce((s, c) => s + c.value, 0)}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* कलर लेजेंड (Legend) */}
+                          <div className="mt-6 w-full max-h-36 overflow-y-auto space-y-2 pr-1 scrollbar-hide">
+                            {chartData.map((slice, i) => {
+                              const total = chartData.reduce((s, c) => s + c.value, 0);
+                              const percentage = ((slice.value / total) * 100).toFixed(1);
+                              return (
+                                <div key={i} className="flex justify-between items-center text-[10px]">
+                                  <div className="flex items-center gap-2 truncate pr-2">
+                                    <span className="w-3 h-3 rounded-full shrink-0 shadow-sm" style={{ backgroundColor: CHART_COLORS[i % CHART_COLORS.length] }}></span>
+                                    <span className="truncate font-bold text-neutral-700 dark:text-neutral-300">
+                                      {slice.label}
+                                    </span>
+                                  </div>
+                                  <div className="text-right shrink-0">
+                                    <span className="font-mono font-black text-neutral-900 dark:text-white mr-2">₹{slice.value}</span>
+                                    <span className="font-bold text-neutral-500 bg-neutral-200 dark:bg-neutral-800 px-1 rounded">{percentage}%</span>
+                                  </div>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        </>
+                      )}
                     </div>
-                  )}
+
+                    {/* 👉 RIGHT SIDE: आइटम की टेबल */}
+                    <div className="w-full lg:w-2/3 border border-neutral-200 dark:border-neutral-800 rounded-2xl overflow-hidden flex flex-col">
+                      {filteredItemWiseSales.length === 0 ? (
+                        <p className="text-xs text-neutral-400 py-10 text-center">कोई बिक्री रिकॉर्ड नहीं मिला।</p>
+                      ) : (
+                        <div className="max-h-80 overflow-y-auto pr-1">
+                          <table className="w-full text-left text-xs">
+                            <thead>
+                              <tr className="bg-neutral-100 dark:bg-neutral-800 text-neutral-500 uppercase text-[10px] sticky top-0 z-10">
+                                <th className="py-2.5 px-3 font-black">Item Name</th>
+                                <th className="py-2.5 px-3 font-black">Category</th>
+                                <th className="py-2.5 px-3 font-black text-center">Qty</th>
+                                <th className="py-2.5 px-3 font-black text-right">Revenue (₹)</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800 bg-white dark:bg-neutral-900">
+                              {filteredItemWiseSales.map((row, idx) => (
+                                <tr key={idx} className="hover:bg-orange-50 dark:hover:bg-neutral-800/50 transition-colors">
+                                  <td className="py-2.5 px-3 font-bold text-neutral-900 dark:text-neutral-100">{row.name}</td>
+                                  <td className="py-2.5 px-3 text-[10px] text-neutral-500 font-bold">{row.category}</td>
+                                  <td className="py-2.5 px-3 text-center font-mono font-black text-orange-600 bg-orange-500/5">{row.quantity}</td>
+                                  <td className="py-2.5 px-3 text-right font-mono font-black text-green-600 dark:text-green-400">₹{row.revenue}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                            {/* TABLE FOOTER TOTAL */}
+                            <tfoot className="sticky bottom-0 bg-neutral-100 dark:bg-neutral-800 border-t-2 border-neutral-300 dark:border-neutral-700 shadow-[0_-5px_10px_-2px_rgba(0,0,0,0.05)]">
+                              <tr>
+                                <td colSpan={2} className="py-3 px-3 font-black text-right uppercase text-neutral-800 dark:text-neutral-200 text-[11px]">
+                                  {reportCategoryFilter === 'All' ? 'कुल बिक्री (All Items) :' : `${reportCategoryFilter} Total :`}
+                                </td>
+                                <td className="py-3 px-3 text-center font-mono font-black text-orange-600 text-sm">
+                                  {filteredItemWiseSales.reduce((sum, item) => sum + item.quantity, 0)}
+                                </td>
+                                <td className="py-3 px-3 text-right font-mono font-black text-green-600 dark:text-green-400 text-sm">
+                                  ₹{filteredItemWiseSales.reduce((sum, item) => sum + item.revenue, 0)}
+                                </td>
+                              </tr>
+                            </tfoot>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
-              </div>
-            )}
 
             {/* TAB 5: TABLES MANAGER */}
             {activeTab === 'tables' && (
