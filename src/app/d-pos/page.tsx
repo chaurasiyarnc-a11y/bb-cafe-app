@@ -372,8 +372,11 @@ export default function BbCafeDesktopPos() {
   const [mergeTargetCat, setMergeTargetCat] = useState('');
 
   // Reports
+  // Reports
   const [reportFilter, setReportFilter] = useState<'today' | 'yesterday' | 'last7days' | 'last30days' | 'custom'>('today');
+  const [reportCategoryFilter, setReportCategoryFilter] = useState<string>('All'); // 👈 यह लाइन यहाँ जोड़नी है
   const [customStartDate, setCustomStartDate] = useState(new Date().toISOString().split('T')[0]);
+  
   const [customEndDate, setCustomEndDate] = useState(new Date().toISOString().split('T')[0]);
   const [reportOrders, setReportOrders] = useState<any[]>([]);
   const [dailyExpenses, setDailyExpenses] = useState<any[]>([]);
