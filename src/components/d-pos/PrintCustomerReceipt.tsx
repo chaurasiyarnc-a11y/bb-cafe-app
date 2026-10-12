@@ -1,7 +1,6 @@
 'use client';
 import React from 'react';
 
-// 👉 यहीं पर हमने 'storeName', 'storeAddress' को जोड़ा है ताकि एरर न आए
 interface PrintReceiptProps {
   orderObj: any;
   currentUser?: any;
@@ -28,7 +27,7 @@ export default function PrintCustomerReceipt({
     upiId = upiId.replace(/ybl/i, '@ybl');
   }
 
-  // लॉयल्टी पॉइंट्स
+  // लॉयल्टी पॉइंट्स कैलकुलेशन
   const earnedPts = Number(orderObj.pointsEarned ?? Math.floor((orderObj.total || 0) / 100));
   const redeemedPts = Number(orderObj.pointsRedeemed || 0);
   const balancePts = Number(orderObj.remainingPoints ?? orderObj.customerPoints ?? 0);
@@ -52,7 +51,14 @@ export default function PrintCustomerReceipt({
         }}
         className="w-[68mm] max-w-[68mm] mx-auto bg-white p-0 text-left select-none print:m-0 print:p-0"
       >
-        {/* 👉 डायनामिक हेडर (Settings से आया हुआ नाम और पता) */}
+        
+        {/* ⭐ टोकन नंबर सबसे ऊपर ⭐ */}
+        <div className="mb-2 border-2 border-black py-1.5 text-center bg-white prevent-cut">
+          <p className="text-[11px] font-bold uppercase tracking-widest">TOKEN NUMBER</p>
+          <p className="text-[28px] font-black leading-none mt-1">#{orderObj.tokenNumber || '01'}</p>
+        </div>
+
+        {/* 👉 डायनामिक हेडर */}
         <div className="text-center pb-2 border-b border-black prevent-cut">
           <h1 className="text-xl font-black uppercase tracking-wider leading-tight">{storeName}</h1>
           <p className="text-[11px] font-bold mt-1 leading-snug whitespace-pre-wrap">
@@ -61,28 +67,24 @@ export default function PrintCustomerReceipt({
           <p className="text-[12px] font-bold mt-1">Mob: {storePhone}</p>
         </div>
 
-        {/* इनवॉइस और सर्वर */}
-        <div className="text-[11px] font-bold py-1.5 border-b border-black flex justify-between prevent-cut">
+        {/* इनवॉइस, सर्वर, डेट, टाइम और ऑर्डर टाइप */}
+        <div className="text-[11px] font-bold pt-1.5 flex justify-between prevent-cut">
           <span>Invoice: #{orderObj.billNumber || 5001}</span>
           <span>Server: {(currentUser?.name || 'STAFF').toUpperCase()}</span>
         </div>
-        <div className="text-[11px] font-bold pb-1.5 pt-1 border-b border-black flex justify-between prevent-cut">
+        <div className="text-[11px] font-bold pt-0.5 flex justify-between prevent-cut">
           <span>Date: {orderDate.toLocaleDateString()}</span>
           <span>Time: {orderDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
         </div>
-
-        {/* टोकन नंबर */}
-        <div className="my-2 border-2 border-black py-1.5 text-center bg-white prevent-cut">
-          <p className="text-[11px] font-bold uppercase tracking-widest">TOKEN NUMBER</p>
-          <p className="text-[28px] font-black leading-none mt-1">#{orderObj.tokenNumber || '01'}</p>
+        <div className="text-[11px] font-bold pb-1.5 pt-0.5 border-b border-black flex justify-between prevent-cut">
+          <span className="uppercase">Type: {orderObj.fulfillmentType || 'Counter'}</span>
+          {orderObj.tableNumber && <span className="font-black text-[12px]">Table: {orderObj.tableNumber}</span>}
         </div>
 
         {/* कस्टमर विवरण */}
-        <div className="text-[11px] font-bold pb-1.5 pt-0.5 border-b border-black prevent-cut">
+        <div className="text-[11px] font-bold pb-1.5 pt-1.5 border-b border-black prevent-cut">
           <p>Customer: {orderObj.customerName || 'Walk-in Guest'}</p>
           {orderObj.customerPhone && <p>Phone: {orderObj.customerPhone}</p>}
-          <p className="uppercase">Type: {orderObj.fulfillmentType || 'Counter'}</p>
-          {orderObj.tableNumber && <p className="font-black text-[13px] mt-0.5">Table: {orderObj.tableNumber}</p>}
         </div>
 
         {/* आइटम सूची */}
@@ -115,6 +117,31 @@ export default function PrintCustomerReceipt({
           <div className="flex justify-between text-[14px] font-black pt-1.5 mt-1 border-t-2 border-black"><span>GRAND TOTAL:</span><span>₹{orderObj.total}</span></div>
           <div className="flex justify-between text-[11px] font-bold uppercase pt-1"><span>Payment Mode:</span><span>{orderObj.paymentMethod || 'CASH'}</span></div>
         </div>
+
+        {/* ⭐ LOYALTY POINTS SECTION ⭐ */}
+        {(earnedPts > 0 || redeemedPts > 0 || balancePts > 0) && (
+          <div className="py-2 border-b border-black text-[11px] prevent-cut text-center pb-2">
+            <p className="font-black uppercase mb-1 tracking-wider">⭐ Loyalty Rewards ⭐</p>
+            <div className="flex flex-col gap-0.5 text-left font-bold">
+              {earnedPts > 0 && (
+                <div className="flex justify-between">
+                  <span>Points Earned:</span>
+                  <span>+{earnedPts} Pts</span>
+                </div>
+              )}
+              {redeemedPts > 0 && (
+                <div className="flex justify-between">
+                  <span>Points Redeemed:</span>
+                  <span>-{redeemedPts} Pts</span>
+                </div>
+              )}
+              <div className="flex justify-between text-[12px] font-black border-t border-dotted border-black pt-1 mt-1">
+                <span>Point Balance:</span>
+                <span>{balancePts} Pts</span>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* 100% OFFLINE QR कोड */}
         {orderObj.offlineQrUrl && (
