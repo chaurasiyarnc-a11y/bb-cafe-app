@@ -4577,7 +4577,21 @@ export default function BbCafeDesktopPos() {
                               <td className="py-2.5 text-right font-mono font-bold text-green-600 dark:text-green-400">₹{row.revenue}</td>
                             </tr>
                           ))}
-                        </tbody>
+                        <</tbody>
+                        {/* 👉 NEW: CATEGORY TOTAL FOOTER (कुल योग दिखाने के लिए) */}
+                        <tfoot className="sticky bottom-0 bg-neutral-100 dark:bg-neutral-800 border-t-2 border-neutral-300 dark:border-neutral-700 shadow-[0_-5px_10px_-2px_rgba(0,0,0,0.05)]">
+                          <tr>
+                            <td colSpan={2} className="py-3 px-2 font-black text-right uppercase text-neutral-800 dark:text-neutral-200 text-[11px]">
+                              {reportCategoryFilter === 'All' ? 'कुल बिक्री (All Items) :' : `${reportCategoryFilter} Total :`}
+                            </td>
+                            <td className="py-3 text-center font-mono font-black text-orange-600 text-sm">
+                              {filteredItemWiseSales.reduce((sum, item) => sum + item.quantity, 0)}
+                            </td>
+                            <td className="py-3 text-right font-mono font-black text-green-600 dark:text-green-400 text-sm">
+                              ₹{filteredItemWiseSales.reduce((sum, item) => sum + item.revenue, 0)}
+                            </td>
+                          </tr>
+                        </tfoot>
                       </table>
                     </div>
                   )}
