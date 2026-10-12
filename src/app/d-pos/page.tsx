@@ -2908,16 +2908,20 @@ export default function BbCafeDesktopPos() {
     return { totalSale, cashSale, upiSale, dueSale, totalDiscount, totalOrdersCount, totalExpenseAmount, netCashInDrawer, unsettledTotal, unsettledCount };
   }, [reportOrders, dailyExpenses]);
 
-// Item-wise Sales Report Calculation
+// Item-wise Sales Report Calculation (With Category Logic)
   const itemWiseSales = useMemo(() => {
-    const map: { [key: string]: { name: string, quantity: number, revenue: number } } = {};
+    const map: { [key: string]: { name: string, quantity: number, revenue: number, category: string } } = {};
 
     reportOrders.forEach((order) => {
       if (order.status === 'completed' && Array.isArray(order.items)) {
         order.items.forEach((item: PosCartItem) => {
           const key = item.name;
           if (!map[key]) {
-            map[key] = { name: key, quantity: 0, revenue: 0 };
+            // 👉 प्रोडक्ट लिस्ट से उस आइटम की केटेगरी ढूँढें
+            const matchedProduct = products.find(p => p.id === item.id);
+            const cat = matchedProduct ? matchedProduct.category : 'Uncategorized';
+            
+            map[key] = { name: key, quantity: 0, revenue: 0, category: cat };
           }
           map[key].quantity += (Number(item.quantity) || 1);
           map[key].revenue += (Number(item.price) || 0) * (Number(item.quantity) || 1);
@@ -2926,7 +2930,13 @@ export default function BbCafeDesktopPos() {
     });
 
     return Object.values(map).sort((a, b) => b.quantity - a.quantity);
-  }, [reportOrders]);
+  }, [reportOrders, products]);
+
+  // 👉 NEW: केटेगरी के आधार पर टेबल को फ़िल्टर करने का लॉजिक
+  const filteredItemWiseSales = useMemo(() => {
+    if (reportCategoryFilter === 'All') return itemWiseSales;
+    return itemWiseSales.filter(item => item.category === reportCategoryFilter);
+  }, [itemWiseSales, reportCategoryFilter]);
 
 // 📊 DAILY SALES TREND (ग्राफ़ के लिए डायनामिक डेटा)
   const dailyTrendData = useMemo(() => {
