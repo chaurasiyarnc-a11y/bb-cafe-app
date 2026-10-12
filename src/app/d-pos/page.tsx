@@ -4376,9 +4376,9 @@ export default function BbCafeDesktopPos() {
                   
                 
             {/* TAB 4: REPORTS WITH ITEM-WISE SALES */}
-            {activeTab === 'reports' && (
-              <div className="flex-1 p-6 h-full overflow-y-auto max-w-5xl mx-auto space-y-6">
-                <div className="flex justify-between items-center border-b pb-4">
+{activeTab === 'reports' && (
+  <div className="flex-1 p-6 h-full overflow-y-auto space-y-6 w-full">
+    <div className="flex justify-between items-center border-b pb-4">
                   <div>
                     <h2 className="text-lg font-black uppercase text-orange-600 dark:text-orange-500 flex items-center gap-2">
                       <SafeBarChart3 size={20} /> Sales & Item-wise Analytics
