@@ -67,7 +67,7 @@ export default function PrintCustomerReceipt({
           <p className="text-[12px] font-bold mt-1">Mob: {storePhone}</p>
         </div>
 
-        {/* इनवॉइस, सर्वर, डेट, टाइम और ऑर्डर टाइप */}
+        {/* इनवॉइस, सर्वर, डेट, टाइम और ऑर्डर टाइप (बिना बीच की लाइन के) */}
         <div className="text-[11px] font-bold pt-1.5 flex justify-between prevent-cut">
           <span>Invoice: #{orderObj.billNumber || 5001}</span>
           <span>Server: {(currentUser?.name || 'STAFF').toUpperCase()}</span>
@@ -109,13 +109,61 @@ export default function PrintCustomerReceipt({
           </div>
         </div>
 
-        {/* बिल टोटल्स */}
+        {/* ⭐ स्मार्ट बिल टोटल्स (ADD-ONS: Packing, Delivery, GST, Promo) ⭐ */}
         <div className="py-2 border-b border-black text-[12px] space-y-1 prevent-cut">
-          <div className="flex justify-between font-bold"><span>Subtotal:</span><span>₹{orderObj.subtotal || orderObj.total}</span></div>
-          {orderObj.discountAmount > 0 && <div className="flex justify-between font-bold"><span>Discount:</span><span>-₹{orderObj.discountAmount}</span></div>}
-          {pointsDiscountAmt > 0 && <div className="flex justify-between font-bold"><span>Points Redeemed:</span><span>-₹{pointsDiscountAmt}</span></div>}
-          <div className="flex justify-between text-[14px] font-black pt-1.5 mt-1 border-t-2 border-black"><span>GRAND TOTAL:</span><span>₹{orderObj.total}</span></div>
-          <div className="flex justify-between text-[11px] font-bold uppercase pt-1"><span>Payment Mode:</span><span>{orderObj.paymentMethod || 'CASH'}</span></div>
+          <div className="flex justify-between font-bold">
+            <span>Subtotal:</span>
+            <span>₹{orderObj.subtotal || orderObj.total}</span>
+          </div>
+
+          {/* GST */}
+          {Number(orderObj.gstAmount) > 0 && (
+            <div className="flex justify-between font-bold">
+              <span>GST Tax ({orderObj.gstRate}%):</span>
+              <span>+₹{orderObj.gstAmount}</span>
+            </div>
+          )}
+
+          {/* Packing Charge */}
+          {Number(orderObj.packingCharge) > 0 && (
+            <div className="flex justify-between font-bold">
+              <span>Packing Charge:</span>
+              <span>+₹{orderObj.packingCharge}</span>
+            </div>
+          )}
+
+          {/* Delivery Charge */}
+          {Number(orderObj.deliveryFee) > 0 && (
+            <div className="flex justify-between font-bold">
+              <span>Delivery Charge:</span>
+              <span>+₹{orderObj.deliveryFee}</span>
+            </div>
+          )}
+
+          {/* Discount / Coupon Code */}
+          {Number(orderObj.discountAmount) > 0 && (
+            <div className="flex justify-between font-bold">
+              <span>Discount {orderObj.promoCodeUsed ? `(${orderObj.promoCodeUsed})` : ''}:</span>
+              <span>-₹{orderObj.discountAmount}</span>
+            </div>
+          )}
+
+          {/* Points Redeemed */}
+          {pointsDiscountAmt > 0 && (
+            <div className="flex justify-between font-bold">
+              <span>Points Redeemed:</span>
+              <span>-₹{pointsDiscountAmt}</span>
+            </div>
+          )}
+
+          <div className="flex justify-between text-[14px] font-black pt-1.5 mt-1 border-t-2 border-black">
+            <span>GRAND TOTAL:</span>
+            <span>₹{orderObj.total}</span>
+          </div>
+          <div className="flex justify-between text-[11px] font-bold uppercase pt-1">
+            <span>Payment Mode:</span>
+            <span>{orderObj.paymentMethod || 'CASH'}</span>
+          </div>
         </div>
 
         {/* ⭐ LOYALTY POINTS SECTION ⭐ */}
