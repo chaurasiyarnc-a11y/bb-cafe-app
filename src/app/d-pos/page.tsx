@@ -105,7 +105,7 @@ const PROMO_COUPONS: { [code: string]: { type: 'percent' | 'flat', value: number
   'FLAT100': { type: 'flat', value: 100 }
 };
 
-let globalAudioCtx: AudioContext | null = null;
+let globalAudioCtx: any = null; // 👈 इसे any कर दें ताकि Next.js सर्वर पर क्रैश न हो
 
 const getCategoryBaseCode = (catName: string): number => {
   const c = (catName || '').trim().toLowerCase();
