@@ -2807,10 +2807,12 @@ export default function BbCafeDesktopPos() {
       // 1. अगर ऑनलाइन है तो Firebase से लाएं और डेट्स को सेफ फॉर्मेट में बदलें
       if (navigator.onLine) {
         const qOrders = query(collection(db, "orders"), orderBy("timestamp", "desc"), limit(2000));
-        const snapOrders = await getDocs(qOrders);
+       const snapOrders = await getDocs(qOrders);
         allOrders = snapOrders.docs.map(d => {
           const data = d.data();
-          return { ...data, id: d.id, timestamp: data.timestamp?.toDate ? data.timestamp.toDate().toISOString() : new Date().toISOString() };
+          // 👉 FIX: अगर तारीख String है तो पुरानी तारीख रखेगा, 'अभी' की नहीं करेगा
+          const correctTime = data.timestamp?.toDate ? data.timestamp.toDate().toISOString() : (typeof data.timestamp === 'string' ? data.timestamp : new Date(data.timestamp || Date.now()).toISOString());
+          return { ...data, id: d.id, timestamp: correctTime };
         });
         localStorage.setItem("bb_pos_cached_report_orders", JSON.stringify(allOrders));
 
