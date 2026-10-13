@@ -1447,6 +1447,15 @@ export default function BbCafeDesktopPos() {
     })();
   }, [isLoggedIn]);
 
+ // 👉 NEW: Fetch Raw Materials (कच्चा माल लोड करना)
+  useEffect(() => {
+    if (!isLoggedIn) return;
+    const unsubRaw = onSnapshot(collection(db, "raw_materials"), (snap) => {
+      setRawMaterials(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+    return () => unsubRaw();
+  }, [isLoggedIn]);
+
   // Real-time listener for live orders
   useEffect(() => {
     const q = query(collection(db, "orders"), orderBy("timestamp", "desc"), limit(100));
