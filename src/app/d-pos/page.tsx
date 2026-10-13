@@ -1916,8 +1916,18 @@ export default function BbCafeDesktopPos() {
     }
   };
 
-  const handleAddCustomizedItemToCart = () => {
+ const handleAddCustomizedItemToCart = () => {
     if (!selectedProductForVariation) return;
+
+    // 👉 NEW: Low Stock Warning Check for Customized Items
+    const stockCheck = checkStockAvailability(selectedProductForVariation, 1);
+    if (!stockCheck.isOk) {
+      triggerBeep('alarm');
+      if (!window.confirm(`⚠️ वार्निंग: ${stockCheck.name} का स्टॉक ख़त्म है! (सिर्फ ${stockCheck.stock} ${stockCheck.unit} बचा है)\nक्या फिर भी इसे बिल में जोड़ना है?`)) {
+        return; 
+      }
+    }
+
     triggerBeep('tap');
 
     let finalItemPrice = selectedSizePrice;
