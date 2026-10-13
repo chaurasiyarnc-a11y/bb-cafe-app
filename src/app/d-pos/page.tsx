@@ -403,6 +403,11 @@ export default function BbCafeDesktopPos() {
   const [isTableTransferModalOpen, setIsTableTransferModalOpen] = useState(false);
   const [tableTransferSourceOrder, setTableTransferSourceOrder] = useState<any>(null);
   const [tableTransferTarget, setTableTransferTarget] = useState<string>('');
+
+  // 👉 NEW: Table Merge States (टेबल जोड़ने के लिए)
+  const [isTableMergeModalOpen, setIsTableMergeModalOpen] = useState(false);
+  const [tableMergeSourceOrder, setTableMergeSourceOrder] = useState<any>(null);
+  const [tableMergeTargetOrderId, setTableMergeTargetOrderId] = useState<string>('');
   
   // Dynamic Item Editor
   const [editingItemObj, setEditingItemObj] = useState<any>(null);
