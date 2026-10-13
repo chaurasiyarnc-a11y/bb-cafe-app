@@ -3460,17 +3460,21 @@ export default function BbCafeDesktopPos() {
                     return;
                   }
                 }
-                // 👉 NEW: Admin vs Staff Login Logic
+               // 👉 NEW: Admin vs Staff Login Logic
                 if (pinInput.trim() === '9999') {
+                  const adminUser = { name: 'Admin (Owner)', role: 'admin', pin: '9999' };
                   setIsLoggedIn(true);
-                  setCurrentUser({ name: 'Admin (Owner)', role: 'admin', pin: '9999' });
+                  setCurrentUser(adminUser);
+                  localStorage.setItem("bb_pos_user_pc", JSON.stringify(adminUser)); // 👉 FIX: ब्राउज़र में सेव कर दिया
                   toast.success("Welcome Admin! (Full Access) 👑");
                   setTimeout(() => searchInputRef.current?.focus(), 150);
                   return;
                 }
                 if (pinInput.trim() === '1234' || pinInput.trim() === '0000') {
+                  const staffUser = { name: 'Staff (Cashier)', role: 'cashier', pin: pinInput.trim() };
                   setIsLoggedIn(true);
-                  setCurrentUser({ name: 'Staff (Cashier)', role: 'cashier', pin: pinInput.trim() });
+                  setCurrentUser(staffUser);
+                  localStorage.setItem("bb_pos_user_pc", JSON.stringify(staffUser)); // 👉 FIX: ब्राउज़र में सेव कर दिया
                   toast.success("Unlocked Terminal (Staff Mode)!");
                   setTimeout(() => searchInputRef.current?.focus(), 150);
                   return;
