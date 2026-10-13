@@ -4271,18 +4271,21 @@ export default function BbCafeDesktopPos() {
                           )}
                         </div>
 
-                        <div className="flex gap-2 mt-4 pt-3 border-t border-neutral-300 dark:border-neutral-700">
-                          <button onClick={() => handleOpenItemEditor(item)} className="flex-1 bg-neutral-200 dark:bg-neutral-800 hover:bg-orange-600 hover:text-white py-1.5 rounded-xl text-[10px] font-black uppercase transition-all flex items-center justify-center gap-1">
-                            <SafeEdit3 size={12} /> Edit
-                          </button>
-                          <button 
-                            onClick={() => handleDeleteProduct(item.id, item.name)} 
-                            className="p-1.5 bg-red-500/10 hover:bg-red-500 hover:text-white text-red-600 rounded-xl transition-all"
-                            title="Delete Item Permanently"
-                          >
-                            <SafeTrash2 size={14} />
-                          </button>
-                        </div>
+                        {/* 👉 सिर्फ एडमिन ही आइटम एडिट या डिलीट कर सकता है */}
+                        {currentUser?.role === 'admin' && (
+                          <div className="flex gap-2 mt-4 pt-3 border-t border-neutral-300 dark:border-neutral-700">
+                            <button onClick={() => handleOpenItemEditor(item)} className="flex-1 bg-neutral-200 dark:bg-neutral-800 hover:bg-orange-600 hover:text-white py-1.5 rounded-xl text-[10px] font-black uppercase transition-all flex items-center justify-center gap-1">
+                              <SafeEdit3 size={12} /> Edit
+                            </button>
+                            <button 
+                              onClick={() => handleDeleteProduct(item.id, item.name)} 
+                              className="p-1.5 bg-red-500/10 hover:bg-red-500 hover:text-white text-red-600 rounded-xl transition-all"
+                              title="Delete Item Permanently"
+                            >
+                              <SafeTrash2 size={14} />
+                            </button>
+                          </div>
+                        )}
                       </div>
                     );
                   })}
