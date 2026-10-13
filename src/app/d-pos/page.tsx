@@ -4228,25 +4228,40 @@ export default function BbCafeDesktopPos() {
               <div className="flex-1 p-6 h-full overflow-y-auto space-y-4">
                 <div className="flex justify-between items-center border-b pb-3">
                   <div>
-                    <h2 className="text-sm font-black uppercase text-orange-600 dark:text-orange-500">Menu Items & Stock Manager</h2>
-                    <p className="text-xs text-neutral-600 dark:text-neutral-400">Add food items, edit pricing, manage categories and delete old items.</p>
+                    <h2 className="text-sm font-black uppercase text-orange-600 dark:text-orange-500">Inventory & Stock Manager</h2>
+                    <p className="text-xs text-neutral-600 dark:text-neutral-400">Add food items, manage raw materials and recipes.</p>
                   </div>
-         <div className="flex gap-2">
-                    {/* 👉 सिर्फ एडमिन ही मेनू में आइटम जोड़ या एडिट कर सकता है */}
+                  <div className="flex gap-2">
                     {currentUser?.role === 'admin' && (
                       <>
-                        <button onClick={() => setIsCatManagerModalOpen(true)} className="bg-neutral-200 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 px-3 py-2 rounded-xl text-xs font-black uppercase flex items-center gap-1.5 border border-neutral-300 dark:border-neutral-700">
-                          <ArrowLeftRight size={14} className="text-orange-500" /> Category Manager
-                        </button>
-                        <button onClick={() => handleOpenItemEditor(null)} className="bg-orange-600 hover:bg-orange-500 text-white px-4 py-2 rounded-xl text-xs font-black uppercase flex items-center gap-1.5 shadow">
-                          <SafePackagePlus size={16} /> + Add Item
-                        </button>
+                        {/* सब-टैब बटन (Menu vs Raw) */}
+                        <div className="flex bg-neutral-200 dark:bg-neutral-800 p-1 rounded-xl mr-2 shadow-inner">
+                          <button onClick={() => setInventorySubTab('menu')} className={`px-4 py-1.5 text-xs font-black uppercase rounded-lg transition-all ${inventorySubTab === 'menu' ? 'bg-orange-600 text-white shadow' : 'text-neutral-600 dark:text-neutral-400'}`}>Menu Items</button>
+                          <button onClick={() => setInventorySubTab('raw')} className={`px-4 py-1.5 text-xs font-black uppercase rounded-lg transition-all ${inventorySubTab === 'raw' ? 'bg-orange-600 text-white shadow' : 'text-neutral-600 dark:text-neutral-400'}`}>Raw Materials</button>
+                        </div>
+                        
+                        {inventorySubTab === 'menu' ? (
+                          <>
+                            <button onClick={() => setIsCatManagerModalOpen(true)} className="bg-neutral-200 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 px-3 py-2 rounded-xl text-xs font-black uppercase flex items-center gap-1.5 border border-neutral-300 dark:border-neutral-700">
+                              <ArrowLeftRight size={14} className="text-orange-500" /> Category Manager
+                            </button>
+                            <button onClick={() => handleOpenItemEditor(null)} className="bg-orange-600 hover:bg-orange-500 text-white px-4 py-2 rounded-xl text-xs font-black uppercase flex items-center gap-1.5 shadow">
+                              <SafePackagePlus size={16} /> + Add Item
+                            </button>
+                          </>
+                        ) : (
+                          <button onClick={() => { setEditRawId(null); setRawFormName(''); setRawFormStock(''); setRawFormUnit('Kg'); setRawFormLowAlert(5); setIsRawModalOpen(true); }} className="bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded-xl text-xs font-black uppercase flex items-center gap-1.5 shadow">
+                            <SafePackagePlus size={16} /> + Add Raw Material
+                          </button>
+                        )}
                       </>
                     )}
                   </div>
                 </div>
 
-                <div className="relative">
+                {inventorySubTab === 'menu' ? (
+                  <>
+                    <div className="relative">
                   <SafeSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-500" size={16} />
                   <input 
                     type="text" 
