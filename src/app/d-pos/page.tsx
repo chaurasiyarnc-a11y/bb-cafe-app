@@ -1834,6 +1834,7 @@ export default function BbCafeDesktopPos() {
         image: itemImageInput.trim(),
         variants: cleanVariants,
         isAvailable: itemIsAvailable,
+        recipe: itemRecipe, // 👉 NEW: रेसिपी को डेटाबेस में सेव करें
         updatedAt: new Date()
       };
 
