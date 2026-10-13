@@ -3314,8 +3314,8 @@ export default function BbCafeDesktopPos() {
                   { id: 'reports', label: 'Reports & Sales', icon: SafeBarChart3 },
                   { id: 'udhari', label: 'Udhari (उधार)', icon: SafeFileText },
                   { id: 'customers', label: 'Customers Profile', icon: SafeUserPlus },
-                  { id: 'settings', label: 'Settings', icon: Settings },
-                ].map((item) => {
+                  { id: 'settings', label: 'Settings', icon: Settings, adminOnly: true }, // 👈 सिर्फ एडमिन के लिए
+                ].filter((item: any) => !item.adminOnly || currentUser?.role === 'admin').map((item) => {
                   const Icon = item.icon;
                   const isActive = activeTab === item.id;
                   return (
