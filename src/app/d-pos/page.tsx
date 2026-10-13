@@ -5030,9 +5030,15 @@ export default function BbCafeDesktopPos() {
                           <button onClick={() => handlePrintReceiptDirect(order, false)} className="py-2 bg-neutral-200 dark:bg-neutral-800 text-neutral-800 dark:text-white rounded-xl text-[10px] font-black uppercase flex items-center justify-center gap-1">
                             <SafePrinter size={13} /> Print
                           </button>
-                          <button onClick={async () => {
+                         <button onClick={async () => {
                             await updateDoc(doc(db, "orders", order.id), { status: 'completed', paymentSettled: true, settledAt: new Date() });
-                            toast.success("Order Completed! ✅");
+                            
+                            // 👉 NEW: ऑनलाइन आर्डर पूरा होने पर स्टॉक काटें
+                            if (order.items) {
+                              await deductInventoryForItems(order.items);
+                            }
+                            
+                            toast.success("Order Completed & Stock Updated! ✅");
                           }} className="py-2 bg-green-600 hover:bg-green-500 text-white rounded-xl text-[10px] font-black uppercase flex items-center justify-center gap-1">
                             <Check size={13} /> Done
                           </button>
