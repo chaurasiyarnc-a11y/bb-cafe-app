@@ -4212,13 +4212,18 @@ export default function BbCafeDesktopPos() {
                     <h2 className="text-sm font-black uppercase text-orange-600 dark:text-orange-500">Menu Items & Stock Manager</h2>
                     <p className="text-xs text-neutral-600 dark:text-neutral-400">Add food items, edit pricing, manage categories and delete old items.</p>
                   </div>
-                  <div className="flex gap-2">
-                    <button onClick={() => setIsCatManagerModalOpen(true)} className="bg-neutral-200 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 px-3 py-2 rounded-xl text-xs font-black uppercase flex items-center gap-1.5 border border-neutral-300 dark:border-neutral-700">
-                      <ArrowLeftRight size={14} className="text-orange-500" /> Category Manager
-                    </button>
-                    <button onClick={() => handleOpenItemEditor(null)} className="bg-orange-600 hover:bg-orange-500 text-white px-4 py-2 rounded-xl text-xs font-black uppercase flex items-center gap-1.5 shadow">
-                      <SafePackagePlus size={16} /> + Add Item
-                    </button>
+         <div className="flex gap-2">
+                    {/* 👉 सिर्फ एडमिन ही मेनू में आइटम जोड़ या एडिट कर सकता है */}
+                    {currentUser?.role === 'admin' && (
+                      <>
+                        <button onClick={() => setIsCatManagerModalOpen(true)} className="bg-neutral-200 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 px-3 py-2 rounded-xl text-xs font-black uppercase flex items-center gap-1.5 border border-neutral-300 dark:border-neutral-700">
+                          <ArrowLeftRight size={14} className="text-orange-500" /> Category Manager
+                        </button>
+                        <button onClick={() => handleOpenItemEditor(null)} className="bg-orange-600 hover:bg-orange-500 text-white px-4 py-2 rounded-xl text-xs font-black uppercase flex items-center gap-1.5 shadow">
+                          <SafePackagePlus size={16} /> + Add Item
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
 
