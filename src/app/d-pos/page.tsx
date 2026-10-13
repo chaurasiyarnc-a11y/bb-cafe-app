@@ -2296,6 +2296,73 @@ export default function BbCafeDesktopPos() {
     }
   };
 
+ // 👉 NEW: Stock Checker (चेक करें कि कच्चा माल है या नहीं)
+  const checkStockAvailability = (product: any, qtyToAdd: number) => {
+    if (!product || !product.recipe || !Array.isArray(product.recipe)) return { isOk: true };
+
+    // अभी कार्ट में कितना माल इस्तेमाल हो रहा है, वो जोड़ लें
+    const cartUsage: any = {};
+    cart.forEach(cItem => {
+      const p = products.find(x => x.id === cItem.id);
+      if (p && p.recipe) {
+        p.recipe.forEach((r: any) => {
+          cartUsage[r.rawId] = (cartUsage[r.rawId] || 0) + (r.qty * cItem.quantity);
+        });
+      }
+    });
+
+    // नया आर्डर जोड़ने के बाद क्या स्टॉक माइनस में जाएगा?
+    for (const r of product.recipe) {
+      const rawItem = rawMaterials.find(rm => rm.id === r.rawId);
+      if (rawItem) {
+        const needed = (cartUsage[r.rawId] || 0) + (r.qty * qtyToAdd);
+        if (needed > Number(rawItem.stock)) {
+          return { isOk: false, name: rawItem.name, stock: rawItem.stock, unit: rawItem.unit };
+        }
+      }
+    }
+    return { isOk: true };
+  };
+
+  // 👉 NEW: Merge Table (टेबल जोड़ने का फंक्शन)
+  const handleMergeTableConfirm = async () => {
+    if (!tableMergeSourceOrder || !tableMergeTargetOrderId) return;
+    const targetOrder = activeTableOrders.find(o => o.id === tableMergeTargetOrderId);
+    if (!targetOrder) return;
+
+    const toastId = toast.loading(`टेबल ${tableMergeSourceOrder.tableNumber} को ${targetOrder.tableNumber} में जोड़ा जा रहा है...`);
+    try {
+      const combinedItems = [...targetOrder.items];
+      tableMergeSourceOrder.items.forEach((sItem: any) => {
+        // ID क्लैश न हो इसलिए मर्ज टैग लगा दें
+        combinedItems.push({...sItem, cartItemId: sItem.cartItemId + `_merged_${Date.now()}`});
+      });
+
+      const newSubtotal = combinedItems.reduce((acc, i) => acc + (Number(i.price) * Number(i.quantity)), 0);
+      const newGstAmt = gstEnabled ? Number(((newSubtotal * gstRate) / 100).toFixed(2)) : 0;
+      const newTotal = newSubtotal + newGstAmt - (Number(targetOrder.discountAmount) || 0);
+
+      await updateDoc(doc(db, "orders", targetOrder.id), {
+        items: combinedItems,
+        subtotal: newSubtotal,
+        gstAmount: newGstAmt,
+        total: newTotal,
+        lastUpdated: new Date()
+      });
+
+      await deleteDoc(doc(db, "orders", tableMergeSourceOrder.id));
+
+      toast.dismiss(toastId);
+      toast.success(`दोनों टेबल सफलतापूर्वक मर्ज (Merge) हो गईं! ✅`);
+      setIsTableMergeModalOpen(false);
+      setTableMergeSourceOrder(null);
+      setTableMergeTargetOrderId('');
+    } catch (error) {
+      toast.dismiss(toastId);
+      toast.error("टेबल मर्ज करने में त्रुटि आई!");
+    }
+  };
+
  // 👉 NEW: Table Transfer (टेबल बदलने का फंक्शन)
   const handleTransferTableConfirm = async () => {
     if (!tableTransferSourceOrder || !tableTransferTarget) return;
