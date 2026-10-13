@@ -1867,6 +1867,16 @@ export default function BbCafeDesktopPos() {
   // Add Item to Cart
 
     const handleItemClick = (item: any, quantityToAdd = 1) => {
+    
+    // 👉 NEW: Low Stock Warning Check
+    const stockCheck = checkStockAvailability(item, quantityToAdd);
+    if (!stockCheck.isOk) {
+      triggerBeep('alarm');
+      if (!window.confirm(`⚠️ वार्निंग: ${stockCheck.name} का स्टॉक ख़त्म है! (सिर्फ ${stockCheck.stock} ${stockCheck.unit} बचा है)\nक्या फिर भी इसे बिल में जोड़ना है?`)) {
+        return; // अगर No दबाया, तो आइटम नहीं जुड़ेगा
+      }
+    }
+
     triggerBeep('tap');
 
     // 👉 NEW: जो आइटम कार्ट में जा रहा है, उसका काउंट बढ़ा दें (ताकि वो Favorites में ऊपर आए)
