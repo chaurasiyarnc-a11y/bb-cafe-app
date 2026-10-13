@@ -4500,9 +4500,40 @@ export default function BbCafeDesktopPos() {
                     <p className="text-xl font-black font-mono text-purple-600 dark:text-purple-400">₹{reportSummary.totalDiscount}</p>
                   </div>
 
-                  <div className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 p-3.5 rounded-2xl space-y-1 shadow-sm">
+                 <div className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 p-3.5 rounded-2xl space-y-1 shadow-sm">
                     <p className="text-[10px] font-black uppercase text-neutral-500">Net in Drawer</p>
                     <p className="text-xl font-black font-mono text-emerald-600 dark:text-emerald-400">₹{reportSummary.netCashInDrawer}</p>
+                  </div>
+                </div>
+
+                {/* 👉 NEW: PROFIT & LOSS (P&L) DASHBOARD */}
+                <div className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/10 dark:to-emerald-900/10 border border-green-200 dark:border-green-800/30 p-5 rounded-3xl mt-4 shadow-sm flex flex-col md:flex-row justify-between md:items-center gap-4">
+                  <div>
+                    <h3 className="text-sm font-black uppercase text-green-700 dark:text-green-500 flex items-center gap-1.5">
+                      💰 Profit & Loss Statement (मुनाफ़ा और नुकसान)
+                    </h3>
+                    <p className="text-[10px] text-green-700/70 dark:text-green-400/70 font-bold mt-1">
+                      (कुल बिक्री - आज के कुल खर्चे = आज का शुद्ध मुनाफा)
+                    </p>
+                  </div>
+                  
+                  <div className="flex gap-4 md:gap-6 items-center bg-white dark:bg-neutral-900 p-3 rounded-2xl shadow-sm border border-neutral-100 dark:border-neutral-800 overflow-x-auto no-scrollbar">
+                    <div className="text-center px-2">
+                      <p className="text-[10px] font-black uppercase text-neutral-500">Gross Sales</p>
+                      <p className="text-lg font-black font-mono text-neutral-800 dark:text-neutral-200">₹{reportSummary.totalSale}</p>
+                    </div>
+                    <div className="text-xl font-black text-neutral-300">-</div>
+                    <div className="text-center px-2">
+                      <p className="text-[10px] font-black uppercase text-red-500">Total Expenses</p>
+                      <p className="text-lg font-black font-mono text-red-600">₹{reportSummary.totalExpenseAmount}</p>
+                    </div>
+                    <div className="text-xl font-black text-neutral-300">=</div>
+                    <div className={`text-center px-4 py-1.5 rounded-xl border ${reportSummary.totalSale - reportSummary.totalExpenseAmount >= 0 ? 'bg-green-100 dark:bg-green-900/30 border-green-200 dark:border-green-800/50' : 'bg-red-100 dark:bg-red-900/30 border-red-200 dark:border-red-800/50'}`}>
+                      <p className={`text-[10px] font-black uppercase ${reportSummary.totalSale - reportSummary.totalExpenseAmount >= 0 ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'}`}>Net Profit</p>
+                      <p className={`text-xl font-black font-mono ${reportSummary.totalSale - reportSummary.totalExpenseAmount >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                        {reportSummary.totalSale - reportSummary.totalExpenseAmount >= 0 ? '+' : ''}₹{reportSummary.totalSale - reportSummary.totalExpenseAmount}
+                      </p>
+                    </div>
                   </div>
                 </div>
 
