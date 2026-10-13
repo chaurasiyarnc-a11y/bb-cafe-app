@@ -383,12 +383,17 @@ export default function BbCafeDesktopPos() {
   const [isReportLoading, setIsReportLoading] = useState(false);
   const [physicalCashInput, setPhysicalCashInput] = useState<number | ''>('');
 
-  // Modals
+ // Modals
   const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
   const [isHeldCartsModalOpen, setIsHeldCartsModalOpen] = useState(false);
   const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
   const [isItemEditorModalOpen, setIsItemEditorModalOpen] = useState(false);
-
+  
+  // 👉 NEW: Table Transfer States
+  const [isTableTransferModalOpen, setIsTableTransferModalOpen] = useState(false);
+  const [tableTransferSourceOrder, setTableTransferSourceOrder] = useState<any>(null);
+  const [tableTransferTarget, setTableTransferTarget] = useState<string>('');
+  
   // Dynamic Item Editor
   const [editingItemObj, setEditingItemObj] = useState<any>(null);
   const [itemNameInput, setItemNameInput] = useState('');
