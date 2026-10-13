@@ -2539,7 +2539,9 @@ export default function BbCafeDesktopPos() {
         remainingPoints: remainingPts,
         customerPoints: remainingPts,
         upiId: upiIdConfig,
-        promoCodeUsed: appliedPromoName || null // 👉 NEW: यहाँ सेव होगा कि कौन सा कूपन यूज़ हुआ
+        promoCodeUsed: appliedPromoName || null, // 👉 NEW: यहाँ सेव होगा कि कौन सा कूपन यूज़ हुआ
+        pointsProcessed: true, // 👉 NEW: ताकि दोबारा पॉइंट्स न जुड़ें
+        stockProcessed: true   // 👉 NEW: ताकि दोबारा स्टॉक न कटे
       };
 
       if (activeEditingOrderId) {
