@@ -6287,6 +6287,77 @@ export default function BbCafeDesktopPos() {
           </div>
         )}
       </AnimatePresence>
+            {/* 👉 NEW POPUP: RAW MATERIAL MODAL */}
+      <AnimatePresence>
+        {isRawModalOpen && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 max-w-sm w-full rounded-3xl p-6 shadow-2xl space-y-4">
+              <div className="flex justify-between items-center border-b border-neutral-200 dark:border-neutral-800 pb-3">
+                <h3 className="font-black text-sm uppercase text-green-600 flex items-center gap-2">
+                  <SafePackagePlus size={18} /> {editRawId ? 'Update Stock' : 'Add Raw Material'}
+                </h3>
+                <button onClick={() => setIsRawModalOpen(false)} className="text-neutral-500 hover:text-black dark:hover:text-white"><X size={20} /></button>
+              </div>
+              
+              <form onSubmit={async (e) => {
+                e.preventDefault();
+                const toastId = toast.loading("Saving...");
+                try {
+                  const payload = { 
+                    name: rawFormName, 
+                    unit: rawFormUnit, 
+                    stock: Number(rawFormStock), 
+                    lowAlert: Number(rawFormLowAlert) 
+                  };
+                  if (editRawId) {
+                    await updateDoc(doc(db, "raw_materials", editRawId), payload);
+                  } else {
+                    await addDoc(collection(db, "raw_materials"), payload);
+                  }
+                  toast.dismiss(toastId);
+                  toast.success("Raw Material Saved! ✅");
+                  setIsRawModalOpen(false);
+                } catch (err) {
+                  toast.dismiss(toastId);
+                  toast.error("Failed to save!");
+                }
+              }} className="space-y-4">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-neutral-500">Material Name (e.g. Milk, Pizza Base)</label>
+                  <input type="text" required value={rawFormName} onChange={e=>setRawFormName(e.target.value)} placeholder="Enter material name..." className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-xl px-3 py-2.5 text-xs font-bold outline-none focus:border-green-500" />
+                </div>
+                
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase text-neutral-500">Unit (इकाई)</label>
+                    <select value={rawFormUnit} onChange={e=>setRawFormUnit(e.target.value)} className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-xl px-3 py-2.5 text-xs font-bold outline-none cursor-pointer focus:border-green-500">
+                      <option value="Kg">Kg</option>
+                      <option value="Gram">Gram</option>
+                      <option value="Ltr">Litre (Ltr)</option>
+                      <option value="Pcs">Pieces (Pcs)</option>
+                      <option value="Box">Box</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase text-neutral-500">Current Stock</label>
+                    <input type="number" required min={0} step="0.01" value={rawFormStock} onChange={e=>setRawFormStock(e.target.value === '' ? '' : Number(e.target.value))} placeholder="0.00" className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-xl px-3 py-2.5 text-xs font-mono font-bold outline-none focus:border-green-500" />
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-neutral-500">Low Stock Alert Below:</label>
+                  <input type="number" required min={0} step="0.01" value={rawFormLowAlert} onChange={e=>setRawFormLowAlert(e.target.value === '' ? '' : Number(e.target.value))} placeholder="e.g. 5" className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-xl px-3 py-2.5 text-xs font-mono font-bold outline-none focus:border-red-500" />
+                  <p className="text-[9px] text-neutral-400 mt-1">जब स्टॉक इससे कम होगा, तो सिस्टम आपको वार्निंग देगा।</p>
+                </div>
+                
+                <button type="submit" className="w-full py-3 mt-2 bg-green-600 hover:bg-green-500 text-white font-black uppercase text-xs rounded-xl shadow-lg transition-all">
+                  Save Material
+                </button>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
