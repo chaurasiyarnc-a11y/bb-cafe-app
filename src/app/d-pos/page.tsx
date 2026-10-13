@@ -5046,7 +5046,7 @@ export default function BbCafeDesktopPos() {
                                   <SafeEdit3 size={12} /> Add / Settle
                                 </button>
                                 
-                                {/* 👉 NEW: Table Transfer Button */}
+                               {/* 👉 NEW: Table Transfer Button */}
                                 <button 
                                   onClick={() => {
                                     setTableTransferSourceOrder(order);
@@ -5054,9 +5054,22 @@ export default function BbCafeDesktopPos() {
                                     setIsTableTransferModalOpen(true);
                                   }}
                                   className="bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-100 hover:text-blue-700 border border-blue-200 dark:border-blue-800 px-3 rounded-xl shadow-sm transition-colors flex items-center justify-center"
-                                  title="कस्टमर को दूसरी टेबल पर भेजें"
+                                  title="कस्टमर को दूसरी खाली टेबल पर भेजें"
                                 >
                                   <ArrowLeftRight size={14} />
+                                </button>
+
+                                {/* 👉 NEW: Table Merge Button */}
+                                <button 
+                                  onClick={() => {
+                                    setTableMergeSourceOrder(order);
+                                    setTableMergeTargetOrderId('');
+                                    setIsTableMergeModalOpen(true);
+                                  }}
+                                  className="bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 hover:bg-purple-100 hover:text-purple-700 border border-purple-200 dark:border-purple-800 px-3 rounded-xl shadow-sm transition-colors flex items-center justify-center"
+                                  title="इस टेबल के बिल को दूसरी भरी हुई टेबल में जोड़ें (Merge)"
+                                >
+                                  <Plus size={14} />
                                 </button>
                               </div>
                             </>
