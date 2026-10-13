@@ -5182,14 +5182,52 @@ export default function BbCafeDesktopPos() {
                             <SafePrinter size={13} /> Print
                           </button>
                          <button onClick={async () => {
-                            await updateDoc(doc(db, "orders", order.id), { status: 'completed', paymentSettled: true, settledAt: new Date() });
+                            let extraUpdates: any = {};
                             
-                            // 👉 NEW: ऑनलाइन आर्डर पूरा होने पर स्टॉक काटें
-                            if (order.items) {
+                            // 1. Stock Deduction
+                            if (order.items && !order.stockProcessed) {
                               await deductInventoryForItems(order.items);
+                              extraUpdates.stockProcessed = true;
                             }
-                            
-                            toast.success("Order Completed & Stock Updated! ✅");
+
+                            // 2. 👉 NEW: Loyalty Points
+                            if (order.customerPhone && !order.pointsProcessed) {
+                               const cleanPhone = String(order.customerPhone).replace(/\D/g, '').slice(-10);
+                               if (cleanPhone.length === 10 && navigator.onLine) {
+                                 const userRef = doc(db, "customer_points", cleanPhone);
+                                 const userDoc = await getDoc(userRef);
+                                 let prevPoints = 0; let prevSpent = 0; let prevVisits = 0;
+                                 if (userDoc.exists()) {
+                                   const data = userDoc.data();
+                                   prevPoints = Number(data.points) || 0;
+                                   prevSpent = Number(data.totalSpent) || 0;
+                                   prevVisits = Number(data.totalVisits) || 0;
+                                 }
+                                 const finalTotal = Number(order.total) || 0;
+                                 const newSpent = prevSpent + finalTotal;
+                                 const earned = Math.floor(newSpent / 100) - Math.floor(prevSpent / 100);
+                                 const remainingPts = prevPoints + earned;
+
+                                 await setDoc(userRef, {
+                                   name: order.customerName || "Walk-in Guest",
+                                   phone: cleanPhone,
+                                   points: remainingPts,
+                                   totalSpent: newSpent,
+                                   totalVisits: prevVisits + 1,
+                                   lastBillNumber: order.billNumber,
+                                   lastBillAmount: finalTotal,
+                                   lastActive: new Date().toISOString()
+                                 }, { merge: true });
+
+                                 extraUpdates.pointsEarned = earned;
+                                 extraUpdates.remainingPoints = remainingPts;
+                                 extraUpdates.pointsProcessed = true;
+                                 fetchAllCustomers();
+                               }
+                            }
+
+                            await updateDoc(doc(db, "orders", order.id), { status: 'completed', paymentSettled: true, settledAt: new Date(), ...extraUpdates });
+                            toast.success("Order Completed & Points Added! ✅");
                           }} className="py-2 bg-green-600 hover:bg-green-500 text-white rounded-xl text-[10px] font-black uppercase flex items-center justify-center gap-1">
                             <Check size={13} /> Done
                           </button>
