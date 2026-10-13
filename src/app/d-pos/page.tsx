@@ -6528,7 +6528,63 @@ export default function BbCafeDesktopPos() {
           </div>
         )}
       </AnimatePresence>
-            {/* 👉 NEW POPUP: RAW MATERIAL MODAL */}
+           {/* 👉 NEW POPUP: TABLE MERGE MODAL */}
+      <AnimatePresence>
+        {isTableMergeModalOpen && tableMergeSourceOrder && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 max-w-sm w-full rounded-3xl p-6 shadow-2xl space-y-4">
+              <div className="flex justify-between items-center border-b border-neutral-200 dark:border-neutral-800 pb-3">
+                <h3 className="font-black text-sm uppercase text-purple-600 flex items-center gap-2">
+                  <Plus size={18} /> Merge Tables (बिल मिलाएं)
+                </h3>
+                <button onClick={() => setIsTableMergeModalOpen(false)} className="text-neutral-500 hover:text-black dark:hover:text-white"><X size={20} /></button>
+              </div>
+              
+              <div className="space-y-4">
+                <div className="bg-purple-50 dark:bg-purple-900/20 p-3 rounded-xl border border-purple-100 dark:border-purple-800/50">
+                  <p className="text-[10px] font-black uppercase text-neutral-500">Source Table (यह बिल उठेगा):</p>
+                  <p className="text-xl font-black text-purple-700 dark:text-purple-400 mt-1">🪑 {tableMergeSourceOrder.tableNumber}</p>
+                </div>
+
+                <div>
+                  <p className="text-[10px] font-black uppercase text-neutral-500 mb-2">Select Target Table (किस टेबल में जोड़ना है?):</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {activeTableOrders.map(o => {
+                      if (o.id === tableMergeSourceOrder.id) return null; // खुद को न दिखाएं
+                      return (
+                        <button
+                          key={o.id}
+                          onClick={() => setTableMergeTargetOrderId(o.id)}
+                          className={`py-2 px-2 rounded-xl text-xs font-black uppercase border transition-all ${
+                            tableMergeTargetOrderId === o.id ? 'bg-purple-600 border-purple-600 text-white shadow-md scale-105' : 
+                            'bg-white dark:bg-neutral-900 border-neutral-300 dark:border-neutral-700 hover:border-purple-400 text-neutral-700 dark:text-white'
+                          }`}
+                        >
+                          {o.tableNumber.replace('Table ', 'T')} <br/>
+                          <span className="text-[9px] font-mono opacity-80">(₹{o.total})</span>
+                        </button>
+                      );
+                    })}
+                    {activeTableOrders.length <= 1 && (
+                      <p className="text-xs text-neutral-500 col-span-2 py-2">मर्ज करने के लिए कोई दूसरी टेबल चालू नहीं है।</p>
+                    )}
+                  </div>
+                </div>
+
+                <button 
+                  onClick={handleMergeTableConfirm}
+                  disabled={!tableMergeTargetOrderId}
+                  className="w-full py-3 bg-purple-600 hover:bg-purple-500 disabled:bg-neutral-300 dark:disabled:bg-neutral-800 disabled:text-neutral-500 text-white font-black uppercase text-xs rounded-xl shadow-lg transition-all"
+                >
+                  Merge Bills
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* 👉 NEW POPUP: RAW MATERIAL MODAL */}
       <AnimatePresence>
         {isRawModalOpen && (
           <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
