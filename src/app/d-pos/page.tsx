@@ -3256,10 +3256,18 @@ export default function BbCafeDesktopPos() {
                     return;
                   }
                 }
+                // 👉 NEW: Admin vs Staff Login Logic
+                if (pinInput.trim() === '9999') {
+                  setIsLoggedIn(true);
+                  setCurrentUser({ name: 'Admin (Owner)', role: 'admin', pin: '9999' });
+                  toast.success("Welcome Admin! (Full Access) 👑");
+                  setTimeout(() => searchInputRef.current?.focus(), 150);
+                  return;
+                }
                 if (pinInput.trim() === '1234' || pinInput.trim() === '0000') {
                   setIsLoggedIn(true);
-                  setCurrentUser({ name: 'Staff Offline', role: 'cashier' });
-                  toast.success("Unlocked Terminal (Offline Mode)!");
+                  setCurrentUser({ name: 'Staff (Cashier)', role: 'cashier', pin: pinInput.trim() });
+                  toast.success("Unlocked Terminal (Staff Mode)!");
                   setTimeout(() => searchInputRef.current?.focus(), 150);
                   return;
                 }
