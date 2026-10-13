@@ -2260,6 +2260,26 @@ export default function BbCafeDesktopPos() {
     }
   };
 
+ // 👉 NEW: Table Transfer (टेबल बदलने का फंक्शन)
+  const handleTransferTableConfirm = async () => {
+    if (!tableTransferSourceOrder || !tableTransferTarget) return;
+    const toastId = toast.loading(`टेबल ${tableTransferSourceOrder.tableNumber} से ${tableTransferTarget} पर शिफ़्ट हो रही है...`);
+    try {
+      await updateDoc(doc(db, "orders", tableTransferSourceOrder.id), {
+        tableNumber: tableTransferTarget,
+        lastUpdated: new Date()
+      });
+      toast.dismiss(toastId);
+      toast.success(`टेबल सफलतापूर्वक बदल दी गई! (${tableTransferSourceOrder.tableNumber} ➡️ ${tableTransferTarget}) ✅`);
+      setIsTableTransferModalOpen(false);
+      setTableTransferSourceOrder(null);
+      setTableTransferTarget('');
+    } catch (error) {
+      toast.dismiss(toastId);
+      toast.error("टेबल बदलने में त्रुटि आई!");
+    }
+  };
+
   // Final Checkout & Bill Print: Saved as 'unsettled' until settled in Daily Bills tab!
   const handleFinalCheckoutAndPrintBill = async () => {
     if (cart.length === 0 || isSubmittingOrder) return;
