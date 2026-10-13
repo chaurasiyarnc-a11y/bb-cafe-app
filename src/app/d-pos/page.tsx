@@ -2599,7 +2599,14 @@ export default function BbCafeDesktopPos() {
         paymentMethod: pMethod,
         settledAt: new Date()
       };
-      await updateDoc(doc(db, "orders", orderId), updatePayload);
+     await updateDoc(doc(db, "orders", orderId), updatePayload);
+      
+      // 👉 NEW: Stock Deduction
+      const orderToSettle = liveOrders.find(o => o.id === orderId);
+      if (orderToSettle && orderToSettle.items) {
+        await deductInventoryForItems(orderToSettle.items);
+      }
+
       setLiveOrders(prev => prev.map(o => o.id === orderId ? { ...o, ...updatePayload } : o));
       toast.dismiss(toastId);
       toast.success(`बिल सेटल हुआ [${pMethod.toUpperCase()}] और आज की बिक्री में जुड़ गया! ✅`);
