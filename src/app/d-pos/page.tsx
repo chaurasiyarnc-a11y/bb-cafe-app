@@ -5,7 +5,7 @@ import { db } from '@/lib/firebase';
 import { 
   collection, onSnapshot, query, orderBy, limit, doc, 
   updateDoc, addDoc, getDoc, getDocs, where, setDoc,
-  deleteDoc, Timestamp, writeBatch
+ deleteDoc, Timestamp, writeBatch, increment
 } from 'firebase/firestore';
 import { 
   ShoppingBag, Search, X, Loader2, Clock, Printer, Settings, 
