@@ -2583,6 +2583,7 @@ export default function BbCafeDesktopPos() {
         await handlePrintReceiptDirect(orderObj, true);
       }
 
+     fetchAllCustomers(); // 👉 NEW: पॉइंट्स जुड़ते ही तुरंत UI अपडेट करें
       toast.success(`बिल #${billNumber} प्रिंट हुआ! (Daily Bills से सेटल करें)`);
       // Reset state & default pickup
       setCart([]); 
