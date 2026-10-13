@@ -4759,24 +4759,39 @@ export default function BbCafeDesktopPos() {
                                 <span>Running Bill:</span>
                                 <span className="font-mono text-sm font-black">₹{order.total}</span>
                               </div>
-                              <button 
-                                onClick={() => {
-                                  setActiveEditingOrderId(order.id);
-                                  setActiveEditingBillNumber(order.billNumber);
-                                  setActiveEditingOriginalItems(order.items ? JSON.parse(JSON.stringify(order.items)) : []);
-                                  setTableNumber(order.tableNumber || tName);
-                                  setFulfillmentType('table');
-                                  setCart(order.items || []);
-                                  setCustomerName(order.customerName || '');
-                                  setCustomerPhone(order.customerPhone || '');
-                                  setActiveTab('billing');
-                                  toast.success(`Loaded ${tName} Bill #${order.billNumber}`);
-                                  setTimeout(() => searchInputRef.current?.focus(), 80);
-                                }} 
-                                className="w-full bg-amber-500 hover:bg-amber-400 text-black font-black py-2.5 rounded-xl text-xs uppercase flex items-center justify-center gap-1 shadow"
-                              >
-                                <SafeEdit3 size={14} /> Add Items / Settle
-                              </button>
+<div className="flex gap-2">
+                                <button 
+                                  onClick={() => {
+                                    setActiveEditingOrderId(order.id);
+                                    setActiveEditingBillNumber(order.billNumber);
+                                    setActiveEditingOriginalItems(order.items ? JSON.parse(JSON.stringify(order.items)) : []);
+                                    setTableNumber(order.tableNumber || tName);
+                                    setFulfillmentType('table');
+                                    setCart(order.items || []);
+                                    setCustomerName(order.customerName || '');
+                                    setCustomerPhone(order.customerPhone || '');
+                                    setActiveTab('billing');
+                                    toast.success(`Loaded ${tName} Bill #${order.billNumber}`);
+                                    setTimeout(() => searchInputRef.current?.focus(), 80);
+                                  }} 
+                                  className="flex-1 bg-amber-500 hover:bg-amber-400 text-black font-black py-2.5 rounded-xl text-[10px] uppercase flex items-center justify-center gap-1 shadow"
+                                >
+                                  <SafeEdit3 size={12} /> Add / Settle
+                                </button>
+                                
+                                {/* 👉 NEW: Table Transfer Button */}
+                                <button 
+                                  onClick={() => {
+                                    setTableTransferSourceOrder(order);
+                                    setTableTransferTarget('');
+                                    setIsTableTransferModalOpen(true);
+                                  }}
+                                  className="bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-100 hover:text-blue-700 border border-blue-200 dark:border-blue-800 px-3 rounded-xl shadow-sm transition-colors flex items-center justify-center"
+                                  title="कस्टमर को दूसरी टेबल पर भेजें"
+                                >
+                                  <ArrowLeftRight size={14} />
+                                </button>
+                              </div>
                             </>
                           ) : (
                             <button 
