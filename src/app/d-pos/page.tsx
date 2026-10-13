@@ -6145,6 +6145,64 @@ export default function BbCafeDesktopPos() {
             </motion.div>
           </div>
         )}
+     </AnimatePresence>
+
+      {/* 👉 NEW POPUP: TABLE TRANSFER MODAL */}
+      <AnimatePresence>
+        {isTableTransferModalOpen && tableTransferSourceOrder && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 max-w-sm w-full rounded-3xl p-6 shadow-2xl space-y-4">
+              <div className="flex justify-between items-center border-b border-neutral-200 dark:border-neutral-800 pb-3">
+                <h3 className="font-black text-sm uppercase text-blue-600 flex items-center gap-2">
+                  <ArrowLeftRight size={18} /> Transfer Table
+                </h3>
+                <button onClick={() => setIsTableTransferModalOpen(false)} className="text-neutral-500 hover:text-black dark:hover:text-white"><X size={20} /></button>
+              </div>
+              
+              <div className="space-y-4">
+                <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-xl border border-blue-100 dark:border-blue-800/50">
+                  <p className="text-[10px] font-black uppercase text-neutral-500">Current Table (अभी की टेबल):</p>
+                  <p className="text-xl font-black text-blue-700 dark:text-blue-400 mt-1">🪑 {tableTransferSourceOrder.tableNumber}</p>
+                  <p className="text-xs font-bold text-neutral-600 mt-1">👤 Customer: {tableTransferSourceOrder.customerName || 'Walk-in Guest'}</p>
+                </div>
+
+                <div>
+                  <p className="text-[10px] font-black uppercase text-neutral-500 mb-2">Select New Table (नयी खाली टेबल चुनें):</p>
+                  <div className="grid grid-cols-3 gap-2">
+                    {['Table 1', 'Table 2', 'Table 3', 'Table 4', 'Table 5', 'Table 6'].map(tName => {
+                      const isOccupied = activeTableOrders.some(o => o.tableNumber === tName);
+                      const isCurrent = tName === tableTransferSourceOrder.tableNumber;
+                      
+                      return (
+                        <button
+                          key={tName}
+                          disabled={isOccupied || isCurrent}
+                          onClick={() => setTableTransferTarget(tName)}
+                          className={`py-2 rounded-xl text-xs font-black uppercase border transition-all ${
+                            isCurrent ? 'bg-neutral-200 dark:bg-neutral-800 opacity-50 cursor-not-allowed text-neutral-500' :
+                            isOccupied ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800/50 text-red-500 opacity-50 cursor-not-allowed' :
+                            tableTransferTarget === tName ? 'bg-blue-600 border-blue-600 text-white shadow-md scale-105' : 
+                            'bg-white dark:bg-neutral-900 border-neutral-300 dark:border-neutral-700 hover:border-blue-400'
+                          }`}
+                        >
+                          {tName.replace('Table ', 'T')}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <button 
+                  onClick={handleTransferTableConfirm}
+                  disabled={!tableTransferTarget}
+                  className="w-full py-3 bg-blue-600 hover:bg-blue-500 disabled:bg-neutral-300 dark:disabled:bg-neutral-800 disabled:text-neutral-500 text-white font-black uppercase text-xs rounded-xl shadow-lg transition-all"
+                >
+                  Confirm Transfer
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
       </AnimatePresence>
     </div>
   );
