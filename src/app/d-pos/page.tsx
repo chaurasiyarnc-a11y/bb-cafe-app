@@ -2560,6 +2560,34 @@ export default function BbCafeDesktopPos() {
     setTimeout(() => searchInputRef.current?.focus(), 80);
   };
 
+  // 👉 NEW: Auto-deduct Raw Material Inventory (जब बिल चुकता होता है तो स्टॉक काटें)
+  const deductInventoryForItems = async (itemsToDeduct: any[]) => {
+    if (!navigator.onLine || !itemsToDeduct || itemsToDeduct.length === 0) return;
+    try {
+      const batch = writeBatch(db);
+      const deductMap: any = {};
+      
+      itemsToDeduct.forEach(cartItem => {
+        const prod = products.find(p => p.id === cartItem.id);
+        if (prod && prod.recipe && Array.isArray(prod.recipe)) {
+          prod.recipe.forEach((rec: any) => {
+            if (!deductMap[rec.rawId]) deductMap[rec.rawId] = 0;
+            deductMap[rec.rawId] += rec.qty * cartItem.quantity;
+          });
+        }
+      });
+
+      for (const [rawId, totalQty] of Object.entries(deductMap)) {
+        batch.update(doc(db, "raw_materials", rawId), { 
+          stock: increment(-totalQty) 
+        });
+      }
+      await batch.commit();
+    } catch (e) {
+      console.error("Inventory deduction failed", e);
+    }
+  };
+
   // Quick Settle Action (From Daily Bills Tab)
   const handleQuickSettleOrder = async (orderId: string, pMethod: 'cash' | 'upi' | 'due' | 'split') => {
     triggerBeep('tap');
