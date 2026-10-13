@@ -2683,25 +2683,68 @@ export default function BbCafeDesktopPos() {
     }
   };
 
-  // Quick Settle Action (From Daily Bills Tab)
+ // Quick Settle Action (From Daily Bills Tab)
   const handleQuickSettleOrder = async (orderId: string, pMethod: 'cash' | 'upi' | 'due' | 'split') => {
     triggerBeep('tap');
     const toastId = toast.loading(`Settling bill via ${pMethod.toUpperCase()}...`);
     try {
-      const updatePayload: any = {
+      let updatePayload: any = {
         status: 'completed',
         paymentSettled: true,
         paymentMethod: pMethod,
         settledAt: new Date()
       };
-     await updateDoc(doc(db, "orders", orderId), updatePayload);
       
-      // 👉 NEW: Stock Deduction
       const orderToSettle = liveOrders.find(o => o.id === orderId);
-      if (orderToSettle && orderToSettle.items) {
-        await deductInventoryForItems(orderToSettle.items);
+      
+      if (orderToSettle) {
+        // 1. Stock Deduction
+        if (orderToSettle.items && !orderToSettle.stockProcessed) {
+          await deductInventoryForItems(orderToSettle.items);
+          updatePayload.stockProcessed = true;
+        }
+
+        // 2. 👉 NEW: Loyalty Points Logic (अब यहाँ से भी पॉइंट्स जुड़ेंगे!)
+        if (orderToSettle.customerPhone && !orderToSettle.pointsProcessed) {
+           const cleanPhone = String(orderToSettle.customerPhone).replace(/\D/g, '').slice(-10);
+           if (cleanPhone.length === 10 && navigator.onLine) {
+             const userRef = doc(db, "customer_points", cleanPhone);
+             const userDoc = await getDoc(userRef);
+             
+             let prevPoints = 0; let prevSpent = 0; let prevVisits = 0;
+             if (userDoc.exists()) {
+               const data = userDoc.data();
+               prevPoints = Number(data.points) || 0;
+               prevSpent = Number(data.totalSpent) || 0;
+               prevVisits = Number(data.totalVisits) || 0;
+             }
+
+             const finalTotal = Number(orderToSettle.total) || 0;
+             const newSpent = prevSpent + finalTotal;
+             const earned = Math.floor(newSpent / 100) - Math.floor(prevSpent / 100);
+             const remainingPts = prevPoints + earned;
+
+             await setDoc(userRef, {
+               name: orderToSettle.customerName || "Walk-in Guest",
+               phone: cleanPhone,
+               points: remainingPts,
+               totalSpent: newSpent,
+               totalVisits: prevVisits + 1,
+               lastBillNumber: orderToSettle.billNumber,
+               lastBillAmount: finalTotal,
+               lastActive: new Date().toISOString()
+             }, { merge: true });
+
+             updatePayload.pointsEarned = earned;
+             updatePayload.remainingPoints = remainingPts;
+             updatePayload.pointsProcessed = true;
+             
+             fetchAllCustomers(); // UI Refresh
+           }
+        }
       }
 
+      await updateDoc(doc(db, "orders", orderId), updatePayload);
       setLiveOrders(prev => prev.map(o => o.id === orderId ? { ...o, ...updatePayload } : o));
       toast.dismiss(toastId);
       toast.success(`बिल सेटल हुआ [${pMethod.toUpperCase()}] और आज की बिक्री में जुड़ गया! ✅`);
