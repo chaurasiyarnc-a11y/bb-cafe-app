@@ -4305,7 +4305,7 @@ export default function BbCafeDesktopPos() {
                           )}
                         </div>
 
-                        {/* 👉 सिर्फ एडमिन ही आइटम एडिट या डिलीट कर सकता है */}
+          {/* 👉 सिर्फ एडमिन ही आइटम एडिट या डिलीट कर सकता है */}
                         {currentUser?.role === 'admin' && (
                           <div className="flex gap-2 mt-4 pt-3 border-t border-neutral-300 dark:border-neutral-700">
                             <button onClick={() => handleOpenItemEditor(item)} className="flex-1 bg-neutral-200 dark:bg-neutral-800 hover:bg-orange-600 hover:text-white py-1.5 rounded-xl text-[10px] font-black uppercase transition-all flex items-center justify-center gap-1">
@@ -4324,6 +4324,53 @@ export default function BbCafeDesktopPos() {
                     );
                   })}
                 </div>
+                </>
+              ) : (
+                /* 👉 NEW: RAW MATERIALS UI */
+                <div className="grid grid-cols-3 gap-3">
+                  {rawMaterials.length === 0 ? (
+                    <p className="text-center col-span-3 text-neutral-500 font-bold py-10 text-xs">कोई भी कच्चा माल (Raw Material) ऐड नहीं किया गया है।</p>
+                  ) : (
+                    rawMaterials.map(raw => {
+                      const isLow = Number(raw.stock) <= Number(raw.lowAlert);
+                      return (
+                        <div key={raw.id} className={`bg-white dark:bg-neutral-900 border p-4 rounded-2xl flex flex-col justify-between shadow-sm ${isLow ? 'border-red-500 bg-red-50 dark:bg-red-950/20' : 'border-neutral-300 dark:border-neutral-700'}`}>
+                          <div>
+                            <div className="flex justify-between items-start mb-2">
+                              <p className="font-bold text-sm text-neutral-900 dark:text-neutral-100">{raw.name}</p>
+                              {isLow && <span className="bg-red-500 text-white text-[9px] px-2 py-0.5 rounded font-black uppercase animate-pulse shadow-sm">Low Stock</span>}
+                            </div>
+                            <p className="text-2xl font-black font-mono text-neutral-800 dark:text-neutral-200 mb-1">
+                              {raw.stock} <span className="text-xs text-neutral-500 uppercase">{raw.unit}</span>
+                            </p>
+                            <p className="text-[10px] text-neutral-500 font-bold bg-neutral-100 dark:bg-neutral-800 inline-block px-2 py-1 rounded">Alert below: {raw.lowAlert} {raw.unit}</p>
+                          </div>
+                          <div className="flex gap-2 mt-4 pt-3 border-t border-neutral-300 dark:border-neutral-700">
+                            <button onClick={() => {
+                              setEditRawId(raw.id);
+                              setRawFormName(raw.name);
+                              setRawFormStock(raw.stock);
+                              setRawFormUnit(raw.unit);
+                              setRawFormLowAlert(raw.lowAlert);
+                              setIsRawModalOpen(true);
+                            }} className="flex-1 bg-neutral-200 dark:bg-neutral-800 hover:bg-green-600 hover:text-white py-2 rounded-xl text-[10px] font-black uppercase transition-all flex items-center justify-center gap-1 shadow-sm">
+                              <SafeEdit3 size={12} /> Update Stock
+                            </button>
+                            <button onClick={async () => {
+                              if (window.confirm('Delete this raw material permanently?')) {
+                                await deleteDoc(doc(db, "raw_materials", raw.id));
+                                toast.success("Deleted!");
+                              }
+                            }} className="p-2 bg-red-500/10 hover:bg-red-500 hover:text-white text-red-600 rounded-xl transition-all shadow-sm">
+                              <SafeTrash2 size={15} />
+                            </button>
+                          </div>
+                        </div>
+                      )
+                    })
+                  )}
+                </div>
+              )}
               </div>
             )}
 
