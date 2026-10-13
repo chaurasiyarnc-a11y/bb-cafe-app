@@ -1803,8 +1803,14 @@ export default function BbCafeDesktopPos() {
       setHasVariants(false);
       setItemVariantsList({});
     }
+   // 👉 NEW: पुराने आइटम की रेसिपी लोड करें
+    if (item && item.recipe) setItemRecipe(item.recipe);
+    else setItemRecipe([]);
+
     setNewVariantName('');
     setNewVariantPrice('');
+    setSelectedRawId('');
+    setSelectedRawQty('');
     setIsItemEditorModalOpen(true);
   };
 
