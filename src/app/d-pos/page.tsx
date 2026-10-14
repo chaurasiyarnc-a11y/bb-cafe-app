@@ -1503,7 +1503,7 @@ const [rawActionType, setRawActionType] = useState<'add' | 'reduce' | 'set'>('ad
 
       snapshot.docChanges().forEach((change) => {
         if (change.type === 'added') {
-          const newOrd = change.doc.data();
+          const newOrd: any = change.doc.data();
           if (newOrd.status === 'pending' && newOrd.source !== 'PC_POS') {
             triggerBeep('alarm');
             toast((t) => (
@@ -1540,55 +1540,6 @@ const [rawActionType, setRawActionType] = useState<'add' | 'reduce' | 'set'>('ad
         }
       });
     });
-
-    return () => unsubscribe();
-  }, []);
-        isInitialOrdersLoad.current = false;
-        return;
-      }
-
-      snapshot.docChanges().forEach((change) => {
-        if (change.type === 'added') {
-          const newOrd: any = change.doc.data();
-          if (newOrd.status === 'pending' && newOrd.source !== 'PC_POS') {
-            triggerBeep('alarm');
-            toast((t) => (
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-orange-500 text-white rounded-full animate-bounce">
-                  <BellRing size={20} />
-                </div>
-                <div>
-                  <p className="font-black text-xs uppercase text-orange-600">🔔 नया ऑनलाइन आर्डर आया है!</p>
-                  <p className="text-[11px] font-bold text-neutral-800 dark:text-neutral-200">
-                    {newOrd.customerName || 'Customer'} - ₹{newOrd.total} ({newOrd.fulfillmentType || 'delivery'})
-                  </p>
-                </div>
-              </div>
-            ), { duration: 7000 });
-            // 👉 NEW: ऑनलाइन आर्डर आने पर नंबर अपने-आप Customer List और Recent 10 में सेव करें
-            const cleanOnlinePhone = (newOrd.customerPhone || '').replace(/\D/g, '').slice(-10);
-            if (cleanOnlinePhone.length === 10) {
-              
-              // 1. Recent 10 List में जोड़ें
-              setRecentCartCustomers(prev => {
-                const filtered = prev.filter(c => c.phone !== cleanOnlinePhone);
-                const next = [{ name: newOrd.customerName || "Online Guest", phone: cleanOnlinePhone }, ...filtered].slice(0, 10);
-                localStorage.setItem("bb_pos_recent_customers", JSON.stringify(next));
-                return next;
-              });
-
-              // 2. Main Customer Directory में जोड़ें
-              const userRef = doc(db, "customer_points", cleanOnlinePhone);
-              setDoc(userRef, { 
-                name: newOrd.customerName || "Online Guest", 
-                phone: cleanOnlinePhone,
-                lastActive: new Date()
-              }, { merge: true });
-            }
-          }
-        }
-      });
-});
 
     return () => unsubscribe();
   }, []);
