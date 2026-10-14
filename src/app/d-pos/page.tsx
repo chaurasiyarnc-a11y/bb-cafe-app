@@ -1588,7 +1588,7 @@ const [rawActionType, setRawActionType] = useState<'add' | 'reduce' | 'set'>('ad
           }
         }
       });
-    });
+
     return () => unsubscribe();
   }, []);
 
