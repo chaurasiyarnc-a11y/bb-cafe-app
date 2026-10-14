@@ -4457,7 +4457,18 @@ export default function BbCafeDesktopPos() {
                             </button>
                           </>
                         ) : (
-                          <button onClick={() => { setEditRawId(null); setRawFormName(''); setRawFormStock(''); setRawFormUnit('Kg'); setRawFormLowAlert(5); setIsRawModalOpen(true); }} className="bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded-xl text-xs font-black uppercase flex items-center gap-1.5 shadow">
+                          <button onClick={() => { 
+                            setEditRawId(null); 
+                            setRawFormName(''); 
+                            setRawFormStock(''); 
+                            setRawFormUnit('Kg'); 
+                            setRawFormLowAlert(5); 
+                            setRawActionType('add');
+                            setRawActionQty('');
+                            setRawTotalReceived(0);
+                            setRawTotalConsumed(0);
+                            setIsRawModalOpen(true); 
+                          }} className="bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded-xl text-xs font-black uppercase flex items-center gap-1.5 shadow">
                             <SafePackagePlus size={16} /> + Add Raw Material
                           </button>
                         )}
