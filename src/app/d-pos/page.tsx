@@ -1879,26 +1879,26 @@ const [rawActionType, setRawActionType] = useState<'add' | 'reduce' | 'set'>('ad
 
   // Add Item to Cart
 
-    const handleItemClick = (item: any, quantityToAdd = 1) => {
-    
-    // 👉 NEW: Low Stock Warning Check
-    const stockCheck = checkStockAvailability(item, quantityToAdd);
-    if (!stockCheck.isOk) {
-      triggerBeep('alarm');
-      if (!window.confirm(`⚠️ वार्निंग: ${stockCheck.name} का स्टॉक ख़त्म है! (सिर्फ ${stockCheck.stock} ${stockCheck.unit} बचा है)\nक्या फिर भी इसे बिल में जोड़ना है?`)) {
-        return; // अगर No दबाया, तो आइटम नहीं जुड़ेगा
+  const handleItemClick = (item: any, quantityToAdd = 1) => {
+    const hasItemVariants = item.variants && typeof item.variants === 'object' && Object.keys(item.variants).length > 0;
+
+    // 👉 FIXED: अगर आइटम में variants (Half/Full) हैं, तो हम साइज़ चुनने के बाद ही स्टॉक चेक करेंगे
+    if (!hasItemVariants) {
+      const stockCheck = checkStockAvailability(item, quantityToAdd);
+      if (!stockCheck.isOk) {
+        triggerBeep('alarm');
+        if (!window.confirm(`⚠️ वार्निंग: ${stockCheck.name} का स्टॉक ख़त्म है! (सिर्फ ${stockCheck.stock} ${stockCheck.unit} बचा है)\nक्या फिर भी इसे बिल में जोड़ना है?`)) {
+          return; 
+        }
       }
     }
 
     triggerBeep('tap');
 
-    // 👉 NEW: जो आइटम कार्ट में जा रहा है, उसका काउंट बढ़ा दें (ताकि वो Favorites में ऊपर आए)
+    // 👉 NEW: जो आइटम कार्ट में जा रहा है, उसका काउंट बढ़ा दें
     const savedPop = JSON.parse(localStorage.getItem("bb_pos_item_popularity") || "{}");
     savedPop[item.id] = (savedPop[item.id] || 0) + quantityToAdd;
     localStorage.setItem("bb_pos_item_popularity", JSON.stringify(savedPop));
-
-  
-    const hasItemVariants = item.variants && typeof item.variants === 'object' && Object.keys(item.variants).length > 0;
 
     if (hasItemVariants) {
       setSelectedProductForVariation(item);
