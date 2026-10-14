@@ -382,10 +382,14 @@ export default function BbCafeDesktopPos() {
   const [editRawId, setEditRawId] = useState<string | null>(null);
   
   // 👉 NEW: Raw Material History & Stock Actions
-  const [rawActionType, setRawActionType] = useState<'add' | 'reduce' | 'set'>('add');
+const [rawActionType, setRawActionType] = useState<'add' | 'reduce' | 'set'>('add');
   const [rawActionQty, setRawActionQty] = useState<number | ''>('');
   const [rawTotalReceived, setRawTotalReceived] = useState<number>(0);
   const [rawTotalConsumed, setRawTotalConsumed] = useState<number>(0);
+
+  // 👉 NEW: Excel Import/Export Loading States
+  const [isMenuExcelProcessing, setIsMenuExcelProcessing] = useState(false);
+  const [isRawExcelProcessing, setIsRawExcelProcessing] = useState(false);
 
   // Reports
   // Reports
