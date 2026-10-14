@@ -425,9 +425,11 @@ export default function BbCafeDesktopPos() {
   const [newVariantPrice, setNewVariantPrice] = useState<number | ''>('');
 
   // 👉 NEW: Recipe Mapping States (कच्चा माल लिंक करने के लिए)
-  const [itemRecipe, setItemRecipe] = useState<{rawId: string, name: string, qty: number, unit: string}[]>([]);
+  // 👉 UPDATE: Recipe Mapping में variant जोड़ा गया
+  const [itemRecipe, setItemRecipe] = useState<{rawId: string, name: string, qty: number, unit: string, variant: string}[]>([]);
   const [selectedRawId, setSelectedRawId] = useState('');
   const [selectedRawQty, setSelectedRawQty] = useState<number | ''>('');
+  const [selectedRawVariant, setSelectedRawVariant] = useState('All'); // नया स्टेट: Variant चुनने के लिए
 
   // Expense Form
   const [expenseTitle, setExpenseTitle] = useState('');
