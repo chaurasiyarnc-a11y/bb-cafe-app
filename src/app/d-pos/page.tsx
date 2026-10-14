@@ -6040,18 +6040,35 @@ export default function BbCafeDesktopPos() {
                     </div>
                   )}
 
+                  {/* 👉 UPDATE: Variant चुनने का ड्रॉपडाउन जोड़ा गया */}
                   <div className="flex gap-2">
                     <select value={selectedRawId} onChange={e => setSelectedRawId(e.target.value)} className="flex-1 bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-lg p-2 text-xs font-bold outline-none cursor-pointer focus:border-green-500">
                       <option value="">Select Raw Material...</option>
                       {rawMaterials.map(rm => <option key={rm.id} value={rm.id}>{rm.name} ({rm.unit})</option>)}
                     </select>
+
+                    {/* अगर आइटम में Variants हैं, तो ये ड्रॉपडाउन दिखेगा */}
+                    {hasVariants && Object.keys(itemVariantsList).length > 0 && (
+                      <select value={selectedRawVariant} onChange={e => setSelectedRawVariant(e.target.value)} className="w-24 bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-lg p-2 text-xs font-bold outline-none cursor-pointer focus:border-orange-500">
+                        <option value="All">All Sizes</option>
+                        {Object.keys(itemVariantsList).map(v => <option key={v} value={v}>{v}</option>)}
+                      </select>
+                    )}
+
                     <input type="number" step="0.01" min={0} placeholder="Qty" value={selectedRawQty} onChange={e => setSelectedRawQty(e.target.value === '' ? '' : Number(e.target.value))} className="w-16 bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-lg p-2 text-xs font-mono outline-none focus:border-green-500 text-center" />
+                    
                     <button type="button" onClick={() => {
                       if (!selectedRawId || !selectedRawQty) return toast.error("Select material and quantity");
                       const matched = rawMaterials.find(r => r.id === selectedRawId);
                       if (matched) {
-                        setItemRecipe(prev => [...prev, { rawId: matched.id, name: matched.name, qty: Number(selectedRawQty), unit: matched.unit }]);
-                        setSelectedRawId(''); setSelectedRawQty('');
+                        setItemRecipe(prev => [...prev, { 
+                          rawId: matched.id, 
+                          name: matched.name, 
+                          qty: Number(selectedRawQty), 
+                          unit: matched.unit,
+                          variant: hasVariants ? selectedRawVariant : 'All' // Variant सेव करें
+                        }]);
+                        setSelectedRawId(''); setSelectedRawQty(''); setSelectedRawVariant('All');
                       }
                     }} className="bg-green-600 hover:bg-green-500 text-white px-3 rounded-lg font-black text-[10px] uppercase shadow-sm">Add</button>
                   </div>
