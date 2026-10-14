@@ -2320,27 +2320,31 @@ export default function BbCafeDesktopPos() {
   };
 
  // 👉 NEW: Stock Checker (चेक करें कि कच्चा माल है या नहीं)
-  const checkStockAvailability = (product: any, qtyToAdd: number) => {
+ // 👉 UPDATE: स्टॉक चेकर में Variant को जोड़ा गया (ताकि Half/Full की अलग-अलग वार्निंग आए)
+  const checkStockAvailability = (product: any, qtyToAdd: number, variantSize?: string) => {
     if (!product || !product.recipe || !Array.isArray(product.recipe)) return { isOk: true };
 
-    // अभी कार्ट में कितना माल इस्तेमाल हो रहा है, वो जोड़ लें
     const cartUsage: any = {};
     cart.forEach(cItem => {
       const p = products.find(x => x.id === cItem.id);
       if (p && p.recipe) {
         p.recipe.forEach((r: any) => {
-          cartUsage[r.rawId] = (cartUsage[r.rawId] || 0) + (r.qty * cItem.quantity);
+          if (!r.variant || r.variant === 'All' || r.variant === cItem.size) {
+            cartUsage[r.rawId] = (cartUsage[r.rawId] || 0) + (r.qty * cItem.quantity);
+          }
         });
       }
     });
 
-    // नया आर्डर जोड़ने के बाद क्या स्टॉक माइनस में जाएगा?
     for (const r of product.recipe) {
-      const rawItem = rawMaterials.find(rm => rm.id === r.rawId);
-      if (rawItem) {
-        const needed = (cartUsage[r.rawId] || 0) + (r.qty * qtyToAdd);
-        if (needed > Number(rawItem.stock)) {
-          return { isOk: false, name: rawItem.name, stock: rawItem.stock, unit: rawItem.unit };
+      // अगर हम कोई खास Variant कार्ट में डाल रहे हैं, तो सिर्फ उसी का माल चेक करो
+      if (!r.variant || r.variant === 'All' || r.variant === variantSize) {
+        const rawItem = rawMaterials.find(rm => rm.id === r.rawId);
+        if (rawItem) {
+          const needed = (cartUsage[r.rawId] || 0) + (r.qty * qtyToAdd);
+          if (needed > Number(rawItem.stock)) {
+            return { isOk: false, name: rawItem.name, stock: rawItem.stock, unit: rawItem.unit };
+          }
         }
       }
     }
