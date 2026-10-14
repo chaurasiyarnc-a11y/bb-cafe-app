@@ -3452,6 +3452,169 @@ const [rawActionType, setRawActionType] = useState<'add' | 'reduce' | 'set'>('ad
     });
   }, [products, inventorySearchQuery]);
 
+ // ==========================================
+  // 👉 NEW: EXCEL (CSV) IMPORT & EXPORT LOGIC
+  // ==========================================
+
+  // 1. Raw Materials Export / Template
+  const handleExportRawCSV = () => {
+    const headers = ["Name", "Unit", "CurrentStock", "LowStockAlert"];
+    let csv = headers.join(",") + "\n";
+    
+    if (rawMaterials.length === 0) {
+      // अगर डाटा नहीं है, तो टेम्पलेट के लिए 2 डमी रो (Dummy rows) दें
+      csv += "Milk,Ltr,10,2\nPizza Base,Pcs,50,10\nCheese,Kg,5,1\n";
+    } else {
+      rawMaterials.forEach(r => {
+        csv += `"${r.name}","${r.unit}",${r.stock},${r.lowAlert}\n`;
+      });
+    }
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `Raw_Materials_Template_${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+    toast.success("Excel Template Downloaded! 📥");
+  };
+
+  // 2. Raw Materials Import
+  const handleImportRawCSV = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsRawExcelProcessing(true);
+    const toastId = toast.loading("कच्चा माल अपलोड हो रहा है...");
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const text = event.target?.result as string;
+        const rows = text.split(/\r?\n/).filter(row => row.trim() !== '');
+        
+        if (rows.length < 2) throw new Error("File is empty or missing headers!");
+
+        let batch = writeBatch(db);
+        let updatedCount = 0;
+        let addedCount = 0;
+
+        for (let i = 1; i < rows.length; i++) {
+          const cols = rows[i].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(c => c.replace(/"/g, '').trim());
+          if (cols.length < 4 || !cols[0]) continue;
+
+          const name = cols[0];
+          const unit = cols[1] || 'Kg';
+          const stock = Number(cols[2]) || 0;
+          const lowAlert = Number(cols[3]) || 5;
+
+          // चेक करें कि क्या यह नाम पहले से मौजूद है?
+          const existing = rawMaterials.find(r => r.name.toLowerCase() === name.toLowerCase());
+          
+          if (existing) {
+            batch.update(doc(db, "raw_materials", existing.id), { stock, unit, lowAlert });
+            updatedCount++;
+          } else {
+            const newRef = doc(collection(db, "raw_materials"));
+            batch.set(newRef, { name, unit, stock, lowAlert, totalReceived: stock, totalConsumed: 0 });
+            addedCount++;
+          }
+        }
+
+        await batch.commit();
+        toast.dismiss(toastId);
+        toast.success(`${addedCount} नए जुड़े और ${updatedCount} अपडेट हुए! 🎉`);
+      } catch (err) {
+        toast.dismiss(toastId);
+        toast.error("अपलोड फेल हो गया। कृपया सही फॉर्मेट चेक करें!");
+      } finally {
+        setIsRawExcelProcessing(false);
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = ''; // Reset input
+  };
+
+  // 3. Menu Items Export / Template
+  const handleExportMenuCSV = () => {
+    const headers = ["ItemCode", "ItemName", "Category", "Price", "IsAvailable"];
+    let csv = headers.join(",") + "\n";
+    
+    if (products.length === 0) {
+      csv += "101,Aloo Tikki Burger,Burgers,50,TRUE\n102,Cold Coffee,Beverages,80,TRUE\n";
+    } else {
+      products.forEach(p => {
+        csv += `"${p.itemCode || ''}","${p.name}","${p.category || 'General'}",${p.price},${p.isAvailable !== false ? 'TRUE' : 'FALSE'}\n`;
+      });
+    }
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `Menu_Items_Template_${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+    toast.success("Excel Template Downloaded! 📥");
+  };
+
+  // 4. Menu Items Import
+  const handleImportMenuCSV = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsMenuExcelProcessing(true);
+    const toastId = toast.loading("मेनू आइटम अपलोड हो रहे हैं...");
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const text = event.target?.result as string;
+        const rows = text.split(/\r?\n/).filter(row => row.trim() !== '');
+        if (rows.length < 2) throw new Error("File is empty!");
+
+        let batch = writeBatch(db);
+        let updatedCount = 0;
+        let addedCount = 0;
+
+        for (let i = 1; i < rows.length; i++) {
+          const cols = rows[i].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(c => c.replace(/"/g, '').trim());
+          if (cols.length < 4 || !cols[1]) continue; // Name is mandatory
+
+          const itemCode = cols[0];
+          const name = cols[1];
+          const category = cols[2] || 'General';
+          const price = Number(cols[3]) || 0;
+          const isAvailable = cols[4]?.toUpperCase() !== 'FALSE';
+
+          // चेक करें कि क्या Item Code या Name मौजूद है?
+          const existing = products.find(p => 
+            (itemCode && p.itemCode === itemCode) || 
+            (p.name.toLowerCase() === name.toLowerCase())
+          );
+          
+          if (existing) {
+            batch.update(doc(db, "products", existing.id), { name, category, price, isAvailable, itemCode });
+            updatedCount++;
+          } else {
+            const newRef = doc(collection(db, "products"));
+            batch.set(newRef, { name, itemCode, category, price, isAvailable, updatedAt: new Date() });
+            addedCount++;
+          }
+        }
+
+        await batch.commit();
+        toast.dismiss(toastId);
+        toast.success(`${addedCount} आइटम जुड़े और ${updatedCount} अपडेट हुए! 🎉`);
+      } catch (err) {
+        toast.dismiss(toastId);
+        toast.error("अपलोड फेल हो गया!");
+      } finally {
+        setIsMenuExcelProcessing(false);
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = ''; 
+  };
+
+
   const mainClass = "h-screen w-screen flex font-sans antialiased overflow-hidden " + (themeMode === "dark" ? "dark bg-[#121212] text-neutral-100" : "bg-[#f4f5f7] text-neutral-900");
 
   return (
