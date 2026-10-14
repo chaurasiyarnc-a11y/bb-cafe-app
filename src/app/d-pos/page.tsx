@@ -2691,7 +2691,8 @@ export default function BbCafeDesktopPos() {
 
       for (const [rawId, totalQty] of Object.entries(deductMap)) {
         batch.update(doc(db, "raw_materials", rawId), { 
-          stock: increment(-Number(totalQty)) 
+          stock: increment(-Number(totalQty)),
+          totalConsumed: increment(Number(totalQty)) // 👉 NEW: इस्तेमाल हुए माल का हिसाब रखने के लिए
         });
       }
       await batch.commit();
