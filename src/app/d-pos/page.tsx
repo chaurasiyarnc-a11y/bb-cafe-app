@@ -5503,7 +5503,7 @@ export default function BbCafeDesktopPos() {
                               {/* Layer 2 (Repeat) */}
                               <div className="w-4/5 bg-amber-500/20 border border-amber-500 text-amber-700 dark:text-amber-400 py-3 rounded flex flex-col items-center justify-center relative overflow-hidden group transition-all hover:scale-105">
                                 <span className="text-lg font-black font-mono relative z-10">{repeatCust}</span>
-                                <span className="text-[9px] font-black uppercase relative z-10">Repeat (>1 Visit)</span>
+                                <span className="text-[9px] font-black uppercase relative z-10">Repeat (1 Visit)</span>
                               </div>
                               <div className="text-neutral-300 dark:text-neutral-700 text-xs">▼</div>
 
