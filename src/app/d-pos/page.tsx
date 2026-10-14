@@ -2785,7 +2785,7 @@ const [rawActionType, setRawActionType] = useState<'add' | 'reduce' | 'set'>('ad
     }
   };
 
-  // WhatsApp Bill Sender
+ // 🟢 WhatsApp Bill Sender (With Customer Feedback Links)
   const handleSendWhatsAppBill = (targetOrder: any = null) => {
     const ord = targetOrder || { customerPhone, customerName, fulfillmentType, items: cart, total: getTotalBillPrice() };
     const clean = getSanitizedPhone(ord.customerPhone || '');
@@ -2793,7 +2793,12 @@ const [rawActionType, setRawActionType] = useState<'add' | 'reduce' | 'set'>('ad
     if (!ord.items || ord.items.length === 0) return toast.error("No items in cart!");
 
     const itemsText = ord.items.map((i: any) => `• ${i.name} x${i.quantity} = ₹${i.price * i.quantity}`).join('%0A');
-    const msg = `*☕ BUM BUM CAFE - DIGITAL RECEIPT*%0A------------------------------%0A*Customer:* ${ord.customerName || 'Valued Guest'}%0A*Total Amount:* ₹${ord.total}%0A*Payment:* ${ord.paymentMethod || 'Paid'}%0A------------------------------%0A${itemsText}%0A------------------------------%0A_Thank you for visiting Bum Bum Cafe!_ 💛%0A%0A⭐ *Rate Us on Google:*%0Aअगर आपको हमारा खाना पसंद आया, तो कृपया हमें 5-Star रेटिंग दें 👇%0Ahttps://g.page/r/YOUR_GOOGLE_LINK_HERE`;
+    
+    // 👉 फीडबैक के लिए आपके कैफे के नंबर पर आटोमेटिक रिप्लाई सेट किया गया है
+    const cafeNum = getSanitizedPhone(ownerPhoneConfig || '9714293759');
+    
+    const msg = `*☕ BUM BUM CAFE - DIGITAL RECEIPT*%0A------------------------------%0A*Customer:* ${ord.customerName || 'Valued Guest'}%0A*Total Amount:* ₹${ord.total}%0A*Payment:* ${ord.paymentMethod || 'Paid'}%0A------------------------------%0A${itemsText}%0A------------------------------%0A_Thank you for visiting Bum Bum Cafe!_ 💛%0A%0A⭐ *Share Your Feedback:*%0Aकैसा रहा आपका अनुभव? नीचे क्लिक करें:%0A🟢 Excellent: https://wa.me/91${cafeNum}?text=Feedback:%20Excellent%20⭐%0A🟡 Average: https://wa.me/91${cafeNum}?text=Feedback:%20Average%20👍%0A🔴 Bad: https://wa.me/91${cafeNum}?text=Feedback:%20Bad%20👎`;
+    
     window.open(`https://wa.me/91${clean}?text=${msg}`, '_blank');
   };
 
