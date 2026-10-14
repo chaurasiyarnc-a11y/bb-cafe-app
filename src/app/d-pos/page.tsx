@@ -380,6 +380,12 @@ export default function BbCafeDesktopPos() {
   const [rawFormStock, setRawFormStock] = useState<number | ''>('');
   const [rawFormLowAlert, setRawFormLowAlert] = useState<number | ''>(5);
   const [editRawId, setEditRawId] = useState<string | null>(null);
+  
+  // 👉 NEW: Raw Material History & Stock Actions
+  const [rawActionType, setRawActionType] = useState<'add' | 'reduce' | 'set'>('add');
+  const [rawActionQty, setRawActionQty] = useState<number | ''>('');
+  const [rawTotalReceived, setRawTotalReceived] = useState<number>(0);
+  const [rawTotalConsumed, setRawTotalConsumed] = useState<number>(0);
 
   // Reports
   // Reports
