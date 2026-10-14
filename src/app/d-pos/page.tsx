@@ -1480,8 +1480,7 @@ const [rawActionType, setRawActionType] = useState<'add' | 'reduce' | 'set'>('ad
     return () => unsubRaw();
   }, [isLoggedIn]);
 
-  // Real-time listener for live orders
-  // 🚀 FIXED: Real-time listener for live orders (Offline + Online)
+// Real-time listener for live orders
   useEffect(() => {
     const q = query(collection(db, "orders"), orderBy("timestamp", "desc"), limit(100));
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -1504,7 +1503,7 @@ const [rawActionType, setRawActionType] = useState<'add' | 'reduce' | 'set'>('ad
 
       snapshot.docChanges().forEach((change) => {
         if (change.type === 'added') {
-          const newOrd: any = change.doc.data();
+          const newOrd = change.doc.data();
           if (newOrd.status === 'pending' && newOrd.source !== 'PC_POS') {
             triggerBeep('alarm');
             toast((t) => (
@@ -1541,6 +1540,7 @@ const [rawActionType, setRawActionType] = useState<'add' | 'reduce' | 'set'>('ad
         }
       });
     });
+
     return () => unsubscribe();
   }, []);
         isInitialOrdersLoad.current = false;
