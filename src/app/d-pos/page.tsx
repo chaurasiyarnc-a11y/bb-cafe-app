@@ -3614,7 +3614,103 @@ const [rawActionType, setRawActionType] = useState<'add' | 'reduce' | 'set'>('ad
     reader.readAsText(file);
     e.target.value = ''; 
   };
+// 5. Recipe Mapping Export / Template
+  const handleExportRecipeCSV = () => {
+    const headers = ["Menu_Item_Code", "Menu_Item_Name", "Raw_Material_Name", "Variant_Size", "Qty_Used"];
+    let csv = headers.join(",") + "\n";
+    
+    let hasData = false;
+    products.forEach(p => {
+      if (p.recipe && p.recipe.length > 0) {
+        p.recipe.forEach((r: any) => {
+          csv += `"${p.itemCode || ''}","${p.name}","${r.name}","${r.variant || 'All'}",${r.qty}\n`;
+          hasData = true;
+        });
+      }
+    });
 
+    if (!hasData) {
+      csv += `"101","Aloo Tikki Burger","Potato","All",0.1\n`;
+      csv += `"101","Aloo Tikki Burger","Burger Bun","All",1\n`;
+      csv += `"105","Paneer Pizza","Cheese","Regular",0.05\n`;
+      csv += `"105","Paneer Pizza","Cheese","Large",0.1\n`;
+    }
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `Recipe_Mapping_Template_${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+    toast.success("Recipe Template Downloaded! 📥");
+  };
+
+  // 6. Recipe Mapping Import
+  const handleImportRecipeCSV = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsRecipeExcelProcessing(true);
+    const toastId = toast.loading("रेसिपी (Recipe) अपलोड हो रही है...");
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const text = event.target?.result as string;
+        const rows = text.split(/\r?\n/).filter(row => row.trim() !== '');
+        if (rows.length < 2) throw new Error("File empty");
+
+        const productUpdates: { [prodId: string]: any[] } = {};
+        const rawMap = new Map(rawMaterials.map(rm => [rm.name.toLowerCase(), rm]));
+
+        for (let i = 1; i < rows.length; i++) {
+          const cols = rows[i].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(c => c.replace(/"/g, '').trim());
+          if (cols.length < 5) continue;
+
+          const itemCode = cols[0];
+          const itemName = cols[1];
+          const rawName = cols[2];
+          const variantSize = cols[3] || 'All';
+          const qty = Number(cols[4].replace(/,/g, '')) || 0;
+
+          // मेनू आइटम ढूँढें (Code या Name से)
+          const product = products.find(p => (itemCode && p.itemCode === itemCode) || p.name.toLowerCase() === itemName.toLowerCase());
+          
+          // कच्चा माल ढूँढें
+          const rawItem = rawMap.get(rawName.toLowerCase());
+
+          if (product && rawItem && qty > 0) {
+            if (!productUpdates[product.id]) productUpdates[product.id] = [];
+            productUpdates[product.id].push({
+              rawId: rawItem.id,
+              name: rawItem.name,
+              qty: qty,
+              unit: rawItem.unit,
+              variant: variantSize
+            });
+          }
+        }
+
+        let batch = writeBatch(db);
+        let updatedCount = 0;
+
+        for (const [prodId, recipeArr] of Object.entries(productUpdates)) {
+          batch.update(doc(db, "products", prodId), { recipe: recipeArr });
+          updatedCount++;
+        }
+
+        await batch.commit();
+        toast.dismiss(toastId);
+        toast.success(`${updatedCount} आइटम्स में नई रेसिपी सेट हो गई! 🎉`);
+      } catch(e) {
+        toast.dismiss(toastId);
+        toast.error("रेसिपी अपलोड फेल हो गया! कच्चे माल का नाम चेक करें।");
+      } finally {
+        setIsRecipeExcelProcessing(false);
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  };
 
   const mainClass = "h-screen w-screen flex font-sans antialiased overflow-hidden " + (themeMode === "dark" ? "dark bg-[#121212] text-neutral-100" : "bg-[#f4f5f7] text-neutral-900");
 
