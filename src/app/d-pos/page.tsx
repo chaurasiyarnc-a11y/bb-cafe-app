@@ -4614,30 +4614,43 @@ const [rawActionType, setRawActionType] = useState<'add' | 'reduce' | 'set'>('ad
                           <button onClick={() => setInventorySubTab('raw')} className={`px-4 py-1.5 text-xs font-black uppercase rounded-lg transition-all ${inventorySubTab === 'raw' ? 'bg-orange-600 text-white shadow' : 'text-neutral-600 dark:text-neutral-400'}`}>Raw Materials</button>
                         </div>
                         
-                        {inventorySubTab === 'menu' ? (
+                       {inventorySubTab === 'menu' ? (
                           <>
-                            <button onClick={() => setIsCatManagerModalOpen(true)} className="bg-neutral-200 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 px-3 py-2 rounded-xl text-xs font-black uppercase flex items-center gap-1.5 border border-neutral-300 dark:border-neutral-700">
-                              <ArrowLeftRight size={14} className="text-orange-500" /> Category Manager
+                            {/* 👉 NEW: EXCEL MENU EXPORT / IMPORT */}
+                            <div className="flex gap-1.5 mr-2 border-r border-neutral-300 dark:border-neutral-700 pr-3">
+                               <button onClick={handleExportMenuCSV} title="Excel टेम्पलेट डाउनलोड करें" className="bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800/50 px-3 py-2 rounded-xl text-[10px] font-black uppercase hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors flex items-center gap-1">
+                                 📥 Export
+                               </button>
+                               <label title="Excel फाइल अपलोड करें" className={`bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 border border-green-200 dark:border-green-800/50 px-3 py-2 rounded-xl text-[10px] font-black uppercase hover:bg-green-100 dark:hover:bg-green-900/40 transition-colors flex items-center gap-1 cursor-pointer ${isMenuExcelProcessing ? 'opacity-50 pointer-events-none' : ''}`}>
+                                 {isMenuExcelProcessing ? <Loader2 size={12} className="animate-spin" /> : '📤 Import'}
+                                 <input type="file" accept=".csv" className="hidden" onChange={handleImportMenuCSV} />
+                               </label>
+                            </div>
+
+                            <button onClick={() => setIsCatManagerModalOpen(true)} className="bg-neutral-200 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 px-3 py-2 rounded-xl text-[10px] font-black uppercase flex items-center gap-1.5 border border-neutral-300 dark:border-neutral-700 shadow-sm">
+                              <ArrowLeftRight size={14} className="text-orange-500" /> Category
                             </button>
-                            <button onClick={() => handleOpenItemEditor(null)} className="bg-orange-600 hover:bg-orange-500 text-white px-4 py-2 rounded-xl text-xs font-black uppercase flex items-center gap-1.5 shadow">
+                            <button onClick={() => handleOpenItemEditor(null)} className="bg-orange-600 hover:bg-orange-500 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase flex items-center gap-1.5 shadow">
                               <SafePackagePlus size={16} /> + Add Item
                             </button>
                           </>
                         ) : (
-                          <button onClick={() => { 
-                            setEditRawId(null); 
-                            setRawFormName(''); 
-                            setRawFormStock(''); 
-                            setRawFormUnit('Kg'); 
-                            setRawFormLowAlert(5); 
-                            setRawActionType('add');
-                            setRawActionQty('');
-                            setRawTotalReceived(0);
-                            setRawTotalConsumed(0);
-                            setIsRawModalOpen(true); 
-                          }} className="bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded-xl text-xs font-black uppercase flex items-center gap-1.5 shadow">
-                            <SafePackagePlus size={16} /> + Add Raw Material
-                          </button>
+                          <>
+                            {/* 👉 NEW: EXCEL RAW MATERIAL EXPORT / IMPORT */}
+                            <div className="flex gap-1.5 mr-2 border-r border-neutral-300 dark:border-neutral-700 pr-3">
+                               <button onClick={handleExportRawCSV} title="कच्चे माल का Excel टेम्पलेट डाउनलोड करें" className="bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800/50 px-3 py-2 rounded-xl text-[10px] font-black uppercase hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors flex items-center gap-1">
+                                 📥 Export
+                               </button>
+                               <label title="कच्चे माल की Excel फाइल अपलोड करें" className={`bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 border border-green-200 dark:border-green-800/50 px-3 py-2 rounded-xl text-[10px] font-black uppercase hover:bg-green-100 dark:hover:bg-green-900/40 transition-colors flex items-center gap-1 cursor-pointer ${isRawExcelProcessing ? 'opacity-50 pointer-events-none' : ''}`}>
+                                 {isRawExcelProcessing ? <Loader2 size={12} className="animate-spin" /> : '📤 Import'}
+                                 <input type="file" accept=".csv" className="hidden" onChange={handleImportRawCSV} />
+                               </label>
+                            </div>
+
+                            <button onClick={() => { setEditRawId(null); setRawFormName(''); setRawFormStock(''); setRawFormUnit('Kg'); setRawFormLowAlert(5); setRawActionType('add'); setRawActionQty(''); setRawTotalReceived(0); setRawTotalConsumed(0); setIsRawModalOpen(true); }} className="bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase flex items-center gap-1.5 shadow">
+                              <SafePackagePlus size={16} /> + Add Material
+                            </button>
+                          </>
                         )}
                       </>
                     )}
