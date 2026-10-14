@@ -2097,20 +2097,29 @@ const [rawActionType, setRawActionType] = useState<'add' | 'reduce' | 'set'>('ad
     return '';
   };
 
-  // ==========================================
-  // UPDATED: ROBUST IFRAME PRINTING + FAST OFFLINE QR
+// ==========================================
+  // 🚀 FIXED: ROBUST OFFLINE PRINTING ENGINE
   // ==========================================
   const handlePrintReceiptDirect = async (orderObj: any, isKot = false): Promise<void> => {
     return new Promise(async (resolve) => {
       if (!orderObj || !orderObj.items || orderObj.items.length === 0) return resolve();
 
       if (!isKot) {
-        const upiString = `upi://pay?pa=${orderObj.upiId || upiIdConfig}&pn=BumBumCafe&am=${orderObj.total}&cu=INR&tn=Bill-${orderObj.billNumber || 'Order'}`;
-        orderObj.offlineQrUrl = await generateOfflineQrCode(upiString); 
+        try {
+          const upiString = `upi://pay?pa=${orderObj.upiId || upiIdConfig}&pn=BumBumCafe&am=${orderObj.total}&cu=INR&tn=Bill-${orderObj.billNumber || 'Order'}`;
+          orderObj.offlineQrUrl = await generateOfflineQrCode(upiString); 
+        } catch (e) {
+          console.error("QR Error", e);
+        }
       }
 
       const iframe = document.createElement('iframe');
-      iframe.style.position = 'fixed'; iframe.style.right = '0'; iframe.style.bottom = '0'; iframe.style.width = '0'; iframe.style.height = '0'; iframe.style.border = 'none';
+      iframe.style.position = 'fixed'; 
+      iframe.style.right = '0'; 
+      iframe.style.bottom = '0'; 
+      iframe.style.width = '0'; 
+      iframe.style.height = '0'; 
+      iframe.style.border = 'none';
       document.body.appendChild(iframe);
 
       const printDocument = iframe.contentWindow?.document;
@@ -2126,67 +2135,58 @@ const [rawActionType, setRawActionType] = useState<'add' | 'reduce' | 'set'>('ad
           img { display: block !important; margin: 0 auto !important; max-width: 100% !important; }
         </style>
       `);
-     // 🚀 OFFLINE CSS INJECTION (डिज़ाइन को बिना इंटरनेट के सीधा मेमोरी से लोड करें)
+      
       let cssString = '';
-      for (let i = 0; i < document.styleSheets.length; i++) {
-        try {
+      try {
+        for (let i = 0; i < document.styleSheets.length; i++) {
           const rules = document.styleSheets[i].cssRules || document.styleSheets[i].rules;
           if (rules) {
             for (let j = 0; j < rules.length; j++) {
               cssString += rules[j].cssText + '\n';
             }
           }
-        } catch (e) { /* Ignore CORS errors */ }
-      }
+        }
+      } catch (e) { /* Ignore CORS errors */ }
       
       printDocument.write(`<style>${cssString}</style>`);
-      
-      // फॉलबैक: अगर कुछ इनलाइन स्टाइल हैं तो उन्हें भी जोड़ लें
       Array.from(document.querySelectorAll('style')).forEach((styleTag) => {
         printDocument.write(styleTag.outerHTML);
       });
+      
       printDocument.write('</head><body><div id="print-root"></div></body></html>');
       printDocument.close();
 
       const container = printDocument.getElementById('print-root');
       if (container) {
         const root = createRoot(container);
-        if (isKot) { root.render(<PrintKitchenKot orderObj={orderObj} />); } 
-        else { root.render(<PrintCustomerReceipt orderObj={orderObj} currentUser={currentUser} storeName={storeNameConfig} storeAddress={storeAddressConfig} storePhone={storePhoneConfig} />); }
+        if (isKot) { 
+          root.render(<PrintKitchenKot orderObj={orderObj} />); 
+        } else { 
+          root.render(<PrintCustomerReceipt orderObj={orderObj} currentUser={currentUser} storeName={storeNameConfig} storeAddress={storeAddressConfig} storePhone={storePhoneConfig} />); 
+        }
 
-        const triggerPrintAndCleanup = () => {
+        // 🔥 OFFLINE FIX: इमेजेज का इंतज़ार करने के बजाय, सीधे एक छोटे डिले (Delay) के बाद प्रिंट ट्रिगर कर दें।
+        // अगर नेट है तो 800ms इंतज़ार करेगा, अगर ऑफ़लाइन है तो सिर्फ 500ms में प्रिंट कर देगा, जिससे ये कभी अटकेगा नहीं।
+        setTimeout(() => {
+          try {
+            iframe.contentWindow?.focus(); 
+            iframe.contentWindow?.print();
+          } catch(err) {
+            console.error("Print call failed", err);
+          }
+          
           setTimeout(() => {
-            iframe.contentWindow?.focus(); iframe.contentWindow?.print();
-            setTimeout(() => {
-              if (document.body.contains(iframe)) { root.unmount(); document.body.removeChild(iframe); }
-              resolve();
-            }, 1000);
-          }, 200); 
-        };
-
-        if (isKot) { triggerPrintAndCleanup(); return; }
-
-        const executeGuaranteedPrint = () => {
-          const images = printDocument.querySelectorAll('img');
-          const totalImages = images.length;
-          if (totalImages === 0) { triggerPrintAndCleanup(); return; }
-
-          let loadedCount = 0; let hasPrinted = false;
-          const checkAndPrint = () => { if (hasPrinted) return; hasPrinted = true; triggerPrintAndCleanup(); };
-
-          images.forEach((img) => {
-            if (img.complete && img.naturalWidth > 0) { loadedCount++; if (loadedCount === totalImages) checkAndPrint(); } 
-            else {
-              img.onload = () => { loadedCount++; if (loadedCount === totalImages) checkAndPrint(); };
-              img.onerror = () => { loadedCount++; if (loadedCount === totalImages) checkAndPrint(); };
+            if (document.body.contains(iframe)) { 
+              root.unmount(); 
+              document.body.removeChild(iframe); 
             }
-          });
-          const waitTime = navigator.onLine ? 1000 : 400; 
-          setTimeout(checkAndPrint, waitTime); 
-        };
-        setTimeout(executeGuaranteedPrint, 150);
+            resolve();
+          }, 1000);
+        }, navigator.onLine ? 800 : 500); 
+
       } else {
-        document.body.removeChild(iframe); resolve();
+        document.body.removeChild(iframe); 
+        resolve();
       }
     });
   };
