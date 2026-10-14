@@ -1932,8 +1932,8 @@ const [rawActionType, setRawActionType] = useState<'add' | 'reduce' | 'set'>('ad
  const handleAddCustomizedItemToCart = () => {
     if (!selectedProductForVariation) return;
 
-    // 👉 NEW: Low Stock Warning Check for Customized Items
-    const stockCheck = checkStockAvailability(selectedProductForVariation, 1);
+    // 👉 FIXED: अब यहाँ selectedSize भेजा जा रहा है, ताकि सिर्फ उसी साइज़ (Half/Full) का स्टॉक चेक हो
+    const stockCheck = checkStockAvailability(selectedProductForVariation, 1, selectedSize);
     if (!stockCheck.isOk) {
       triggerBeep('alarm');
       if (!window.confirm(`⚠️ वार्निंग: ${stockCheck.name} का स्टॉक ख़त्म है! (सिर्फ ${stockCheck.stock} ${stockCheck.unit} बचा है)\nक्या फिर भी इसे बिल में जोड़ना है?`)) {
