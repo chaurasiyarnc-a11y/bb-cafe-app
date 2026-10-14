@@ -4713,15 +4713,25 @@ const [rawActionType, setRawActionType] = useState<'add' | 'reduce' | 'set'>('ad
                         
                        {inventorySubTab === 'menu' ? (
                           <>
-                            {/* 👉 NEW: EXCEL MENU EXPORT / IMPORT */}
-                            <div className="flex gap-1.5 mr-2 border-r border-neutral-300 dark:border-neutral-700 pr-3">
-                               <button onClick={handleExportMenuCSV} title="Excel टेम्पलेट डाउनलोड करें" className="bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800/50 px-3 py-2 rounded-xl text-[10px] font-black uppercase hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors flex items-center gap-1">
-                                 📥 Export
-                               </button>
-                               <label title="Excel फाइल अपलोड करें" className={`bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 border border-green-200 dark:border-green-800/50 px-3 py-2 rounded-xl text-[10px] font-black uppercase hover:bg-green-100 dark:hover:bg-green-900/40 transition-colors flex items-center gap-1 cursor-pointer ${isMenuExcelProcessing ? 'opacity-50 pointer-events-none' : ''}`}>
-                                 {isMenuExcelProcessing ? <Loader2 size={12} className="animate-spin" /> : '📤 Import'}
-                                 <input type="file" accept=".csv" className="hidden" onChange={handleImportMenuCSV} />
-                               </label>
+                           {/* 👉 NEW: EXCEL MENU EXPORT / IMPORT */}
+                            <div className="flex flex-col gap-1 mr-2 border-r border-neutral-300 dark:border-neutral-700 pr-3">
+                               <div className="flex items-center gap-1.5">
+                                 <span className="text-[9px] font-black uppercase text-neutral-500 w-12">Menu:</span>
+                                 <button onClick={handleExportMenuCSV} title="मेनू आइटम Export करें" className="bg-blue-50 text-blue-600 px-2 py-1 rounded text-[9px] font-black uppercase hover:bg-blue-100">📥 Exp</button>
+                                 <label className="bg-green-50 text-green-600 px-2 py-1 rounded text-[9px] font-black uppercase hover:bg-green-100 cursor-pointer">
+                                   {isMenuExcelProcessing ? '...' : '📤 Imp'}
+                                   <input type="file" accept=".csv" className="hidden" onChange={handleImportMenuCSV} />
+                                 </label>
+                               </div>
+                               
+                               <div className="flex items-center gap-1.5">
+                                 <span className="text-[9px] font-black uppercase text-neutral-500 w-12">Recipe:</span>
+                                 <button onClick={handleExportRecipeCSV} title="रेसिपी मैपिंग Export करें" className="bg-blue-50 text-blue-600 px-2 py-1 rounded text-[9px] font-black uppercase hover:bg-blue-100">📥 Exp</button>
+                                 <label className="bg-purple-50 text-purple-600 px-2 py-1 rounded text-[9px] font-black uppercase hover:bg-purple-100 cursor-pointer">
+                                   {isRecipeExcelProcessing ? '...' : '📤 Imp'}
+                                   <input type="file" accept=".csv" className="hidden" onChange={handleImportRecipeCSV} />
+                                 </label>
+                               </div>
                             </div>
 
                             <button onClick={() => setIsCatManagerModalOpen(true)} className="bg-neutral-200 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 px-3 py-2 rounded-xl text-[10px] font-black uppercase flex items-center gap-1.5 border border-neutral-300 dark:border-neutral-700 shadow-sm">
