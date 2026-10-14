@@ -5412,7 +5412,7 @@ export default function BbCafeDesktopPos() {
                             <p className="text-2xl font-black font-mono text-neutral-900 dark:text-white mt-1">👑 {vipCust}</p>
                           </div>
                           <div className="bg-gradient-to-br from-red-50 to-red-100 dark:from-red-900/20 dark:to-red-800/20 border border-red-200 dark:border-red-800/50 p-4 rounded-2xl shadow-sm">
-                            <p className="text-[10px] font-black uppercase text-red-600 dark:text-red-400">Sleeping (>30 Days)</p>
+                            <p className="text-[10px] font-black uppercase text-red-600 dark:text-red-400">Sleeping (30 Days)</p>
                             <p className="text-2xl font-black font-mono text-neutral-900 dark:text-white mt-1">😴 {sleepingCust}</p>
                           </div>
                         </div>
