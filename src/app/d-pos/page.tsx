@@ -3658,7 +3658,8 @@ const [rawActionType, setRawActionType] = useState<'add' | 'reduce' | 'set'>('ad
               const matched = p.recipe.find((r: any) => r.rawId === rm.id && (r.variant === vName || r.variant === 'All'));
               if (matched) qty = matched.qty;
             }
-            row.push(qty);
+            // 👉 FIX: qty (नंबर) को String() में लपेट दिया है ताकि TypeScript एरर न दे
+            row.push(String(qty)); 
           });
 
           csv += row.join(",") + "\n";
