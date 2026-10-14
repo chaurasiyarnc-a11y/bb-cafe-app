@@ -3615,42 +3615,72 @@ const [rawActionType, setRawActionType] = useState<'add' | 'reduce' | 'set'>('ad
     e.target.value = ''; 
   };
 // 5. Recipe Mapping Export / Template
-  const handleExportRecipeCSV = () => {
-    const headers = ["Menu_Item_Code", "Menu_Item_Name", "Raw_Material_Name", "Variant_Size", "Qty_Used"];
-    let csv = headers.join(",") + "\n";
-    
-    let hasData = false;
-    products.forEach(p => {
-      if (p.recipe && p.recipe.length > 0) {
-        p.recipe.forEach((r: any) => {
-          csv += `"${p.itemCode || ''}","${p.name}","${r.name}","${r.variant || 'All'}",${r.qty}\n`;
-          hasData = true;
-        });
-      }
-    });
+// ==========================================
+  // 👉 NEW SMART MATRIX RECIPE EXCEL (आसान तरीका)
+  // ==========================================
 
-    if (!hasData) {
-      csv += `"101","Aloo Tikki Burger","Potato","All",0.1\n`;
-      csv += `"101","Aloo Tikki Burger","Burger Bun","All",1\n`;
-      csv += `"105","Paneer Pizza","Cheese","Regular",0.05\n`;
-      csv += `"105","Paneer Pizza","Cheese","Large",0.1\n`;
+  // 5. Recipe Mapping Export (Matrix Format)
+  const handleExportRecipeCSV = () => {
+    if (rawMaterials.length === 0) {
+      return toast.error("पहले कम से कम 1 कच्चा माल (Raw Material) ऐड करें!");
+    }
+
+    // ऊपर की हेडिंग्स (सारे कच्चे माल के नाम)
+    const rawHeaders = rawMaterials.map(rm => `${rm.name} (${rm.unit})`);
+    const baseHeaders = ["Item_Code", "Item_Name", "Variant_Size"];
+    let csv = [...baseHeaders, ...rawHeaders].join(",") + "\n";
+
+    if (products.length === 0) {
+      // डमी रो अगर मेनू खाली है
+      let emptyRow = `"101","Sample Burger","All"`;
+      rawHeaders.forEach(() => emptyRow += `,0`);
+      csv += emptyRow + "\n";
+    } else {
+      products.forEach(p => {
+        // अगर आइटम में साइज़ (Half/Full) हैं, तो हर साइज़ के लिए अलग लाइन बनेगी
+        let variantsToList = ['All'];
+        if (p.variants && Object.keys(p.variants).length > 0) {
+          variantsToList = Object.keys(p.variants);
+        }
+
+        variantsToList.forEach(vName => {
+          let row = [
+            `"${p.itemCode || ''}"`,
+            `"${p.name.replace(/"/g, '""')}"`, // नाम में अगर कोमा/कोटेशन हो तो सेफ करना
+            `"${vName}"`
+          ];
+
+          // हर कच्चे माल के लिए चेक करें कि क्या वो इस आइटम में डला है?
+          rawMaterials.forEach(rm => {
+            let qty = 0;
+            if (p.recipe) {
+              // 'All' वाला माल भी उठाएं और इस खास साइज़ (Half/Full) वाला भी
+              const matched = p.recipe.find((r: any) => r.rawId === rm.id && (r.variant === vName || r.variant === 'All'));
+              if (matched) qty = matched.qty;
+            }
+            row.push(qty);
+          });
+
+          csv += row.join(",") + "\n";
+        });
+      });
     }
 
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `Recipe_Mapping_Template_${new Date().toISOString().split('T')[0]}.csv`;
+    link.download = `Smart_Recipe_Mapping_${new Date().toISOString().split('T')[0]}.csv`;
     link.click();
-    toast.success("Recipe Template Downloaded! 📥");
+    toast.success("आसान Recipe Excel डाउनलोड हो गई! 📥");
   };
 
-  // 6. Recipe Mapping Import
+  // 6. Recipe Mapping Import (Matrix Format)
   const handleImportRecipeCSV = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setIsRecipeExcelProcessing(true);
-    const toastId = toast.loading("रेसिपी (Recipe) अपलोड हो रही है...");
+    const toastId = toast.loading("रेसिपी (Recipe) अपडेट हो रही है...");
 
     const reader = new FileReader();
     reader.onload = async (event) => {
@@ -3659,35 +3689,48 @@ const [rawActionType, setRawActionType] = useState<'add' | 'reduce' | 'set'>('ad
         const rows = text.split(/\r?\n/).filter(row => row.trim() !== '');
         if (rows.length < 2) throw new Error("File empty");
 
+        const headers = rows[0].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(h => h.replace(/"/g, '').trim());
+        
+        // कॉलम नंबर से कच्चा माल (Raw Material) को पहचानें
+        const rawCols: { colIndex: number, rawItem: any }[] = [];
+        for (let c = 3; c < headers.length; c++) {
+          let hName = headers[c];
+          let rawName = hName.split(' (')[0].trim().toLowerCase(); // "Milk (Ltr)" -> "milk"
+          let rawItem = rawMaterials.find(r => r.name.toLowerCase() === rawName);
+          if (rawItem) {
+            rawCols.push({ colIndex: c, rawItem });
+          }
+        }
+
         const productUpdates: { [prodId: string]: any[] } = {};
-        const rawMap = new Map(rawMaterials.map(rm => [rm.name.toLowerCase(), rm]));
 
         for (let i = 1; i < rows.length; i++) {
           const cols = rows[i].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(c => c.replace(/"/g, '').trim());
-          if (cols.length < 5) continue;
-
           const itemCode = cols[0];
           const itemName = cols[1];
-          const rawName = cols[2];
-          const variantSize = cols[3] || 'All';
-          const qty = Number(cols[4].replace(/,/g, '')) || 0;
+          const variantSize = cols[2] || 'All';
 
-          // मेनू आइटम ढूँढें (Code या Name से)
+          // मेनू आइटम ढूँढें
           const product = products.find(p => (itemCode && p.itemCode === itemCode) || p.name.toLowerCase() === itemName.toLowerCase());
-          
-          // कच्चा माल ढूँढें
-          const rawItem = rawMap.get(rawName.toLowerCase());
+          if (!product) continue;
 
-          if (product && rawItem && qty > 0) {
-            if (!productUpdates[product.id]) productUpdates[product.id] = [];
-            productUpdates[product.id].push({
-              rawId: rawItem.id,
-              name: rawItem.name,
-              qty: qty,
-              unit: rawItem.unit,
-              variant: variantSize
-            });
-          }
+          // अगर पहली बार इस प्रोडक्ट की लाइन पढ़ रहे हैं, तो पुरानी रेसिपी डिलीट करने के लिए खाली ऐरे (Array) बनाएँ
+          if (!productUpdates[product.id]) productUpdates[product.id] = [];
+
+          // अब हर कच्चे माल के कॉलम में देखें
+          rawCols.forEach(rc => {
+             let val = Number(cols[rc.colIndex]?.replace(/,/g, '')) || 0;
+             if (val > 0) {
+               // अगर बॉक्स में 0 से ज्यादा कुछ लिखा है, तो उसे रेसिपी में जोड़ दें
+               productUpdates[product.id].push({
+                 rawId: rc.rawItem.id,
+                 name: rc.rawItem.name,
+                 qty: val,
+                 unit: rc.rawItem.unit,
+                 variant: variantSize
+               });
+             }
+          });
         }
 
         let batch = writeBatch(db);
@@ -3703,7 +3746,7 @@ const [rawActionType, setRawActionType] = useState<'add' | 'reduce' | 'set'>('ad
         toast.success(`${updatedCount} आइटम्स में नई रेसिपी सेट हो गई! 🎉`);
       } catch(e) {
         toast.dismiss(toastId);
-        toast.error("रेसिपी अपलोड फेल हो गया! कच्चे माल का नाम चेक करें।");
+        toast.error("अपलोड फेल हो गया! कृपया टेम्पलेट में बदलाव न करें।");
       } finally {
         setIsRecipeExcelProcessing(false);
       }
