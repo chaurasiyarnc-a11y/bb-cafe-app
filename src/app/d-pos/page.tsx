@@ -3511,18 +3511,18 @@ export default function BbCafeDesktopPos() {
                 </div>
               </div>
 
-              <nav className="space-y-1.5">
+             <nav className="space-y-1.5">
                 {[
                   { id: 'billing', label: 'Counter [F2]', icon: ShoppingBag },
+                  { id: 'orders', label: `Live Orders (${activeLiveOrders.length})`, icon: Clock },
                   { id: 'settlement', label: `Daily Bills (${unsettledOrdersCount})`, icon: Receipt },
+                  { id: 'tables', label: `Tables (${activeTableOrders.length})`, icon: LayoutGrid },
+                  { id: 'settings', label: 'Settings', icon: Settings, adminOnly: true }, // 👈 सिर्फ एडमिन के लिए
                   { id: 'inventory', label: 'Menu & Stock', icon: Layers },
                   { id: 'receipts', label: 'Past Receipts', icon: Printer },
-                  { id: 'tables', label: `Tables (${activeTableOrders.length})`, icon: LayoutGrid },
-                  { id: 'orders', label: `Live Orders (${activeLiveOrders.length})`, icon: Clock },
                   { id: 'reports', label: 'Reports & Sales', icon: SafeBarChart3 },
                   { id: 'udhari', label: 'Udhari (उधार)', icon: SafeFileText },
                   { id: 'customers', label: 'Customers Profile', icon: SafeUserPlus },
-                  { id: 'settings', label: 'Settings', icon: Settings, adminOnly: true }, // 👈 सिर्फ एडमिन के लिए
                 ].filter((item: any) => !item.adminOnly || currentUser?.role === 'admin').map((item) => {
                   const Icon = item.icon;
                   const isActive = activeTab === item.id;
