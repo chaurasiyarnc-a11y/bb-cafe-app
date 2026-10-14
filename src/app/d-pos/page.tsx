@@ -390,6 +390,7 @@ const [rawActionType, setRawActionType] = useState<'add' | 'reduce' | 'set'>('ad
   // 👉 NEW: Excel Import/Export Loading States
   const [isMenuExcelProcessing, setIsMenuExcelProcessing] = useState(false);
   const [isRawExcelProcessing, setIsRawExcelProcessing] = useState(false);
+  const [isRecipeExcelProcessing, setIsRecipeExcelProcessing] = useState(false); // 👉 NEW
 
   // Reports
   // Reports
