@@ -511,6 +511,7 @@ export default function BbCafeDesktopPos() {
   
   const [isCustomersLoading, setIsCustomersLoading] = useState(false);
   const [customerTabSearch, setCustomerTabSearch] = useState('');
+   const [customerSubTab, setCustomerSubTab] = useState<'directory' | 'dashboard'>('directory');
 // 👉 NEW: CUSTOMER SORTING & FILTERING
   const [customerSortBy, setCustomerSortBy] = useState<'recent' | 'points_high' | 'points_low' | 'spent_high'>('recent');
   
