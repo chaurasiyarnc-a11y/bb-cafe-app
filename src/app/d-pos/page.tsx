@@ -1481,13 +1481,68 @@ const [rawActionType, setRawActionType] = useState<'add' | 'reduce' | 'set'>('ad
   }, [isLoggedIn]);
 
   // Real-time listener for live orders
+  // 🚀 FIXED: Real-time listener for live orders (Offline + Online)
   useEffect(() => {
     const q = query(collection(db, "orders"), orderBy("timestamp", "desc"), limit(100));
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const ordersList = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-      setLiveOrders(ordersList);
+      const dbOrders = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+      
+      // 🔥 ऑफ़लाइन ऑर्डर्स को लोकल स्टोरेज से निकालकर लाइव ऑर्डर्स में सबसे ऊपर जोड़ें
+      const offlineQueueStr = localStorage.getItem("bb_pos_offline_orders_queue");
+      let offlineOrders = [];
+      if (offlineQueueStr) {
+        try { offlineOrders = JSON.parse(offlineQueueStr); } catch (e) {}
+      }
+      
+      // दोनों लिस्ट को मिला दें (Offline वाले ऊपर दिखेंगे)
+      setLiveOrders([...offlineOrders, ...dbOrders]);
 
       if (isInitialOrdersLoad.current) {
+        isInitialOrdersLoad.current = false;
+        return;
+      }
+
+      snapshot.docChanges().forEach((change) => {
+        if (change.type === 'added') {
+          const newOrd: any = change.doc.data();
+          if (newOrd.status === 'pending' && newOrd.source !== 'PC_POS') {
+            triggerBeep('alarm');
+            toast((t) => (
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-orange-500 text-white rounded-full animate-bounce">
+                  <BellRing size={20} />
+                </div>
+                <div>
+                  <p className="font-black text-xs uppercase text-orange-600">🔔 नया ऑनलाइन आर्डर आया है!</p>
+                  <p className="text-[11px] font-bold text-neutral-800 dark:text-neutral-200">
+                    {newOrd.customerName || 'Customer'} - ₹{newOrd.total} ({newOrd.fulfillmentType || 'delivery'})
+                  </p>
+                </div>
+              </div>
+            ), { duration: 7000 });
+            
+            // ऑनलाइन आर्डर आने पर नंबर सेव करें
+            const cleanOnlinePhone = (newOrd.customerPhone || '').replace(/\D/g, '').slice(-10);
+            if (cleanOnlinePhone.length === 10) {
+              setRecentCartCustomers(prev => {
+                const filtered = prev.filter(c => c.phone !== cleanOnlinePhone);
+                const next = [{ name: newOrd.customerName || "Online Guest", phone: cleanOnlinePhone }, ...filtered].slice(0, 10);
+                localStorage.setItem("bb_pos_recent_customers", JSON.stringify(next));
+                return next;
+              });
+              const userRef = doc(db, "customer_points", cleanOnlinePhone);
+              setDoc(userRef, { 
+                name: newOrd.customerName || "Online Guest", 
+                phone: cleanOnlinePhone,
+                lastActive: new Date()
+              }, { merge: true });
+            }
+          }
+        }
+      });
+    });
+    return () => unsubscribe();
+  }, []);
         isInitialOrdersLoad.current = false;
         return;
       }
