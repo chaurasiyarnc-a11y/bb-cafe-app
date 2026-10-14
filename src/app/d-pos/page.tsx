@@ -6277,11 +6277,17 @@ const [rawActionType, setRawActionType] = useState<'add' | 'reduce' | 'set'>('ad
                 <div className="pt-2 border-t border-neutral-300 dark:border-neutral-800">
                   <label className="font-black uppercase text-green-600 mb-2 block">Recipe Mapping (कच्चा माल)</label>
                   
-                  {itemRecipe.length > 0 && (
+                 {itemRecipe.length > 0 && (
                     <div className="space-y-1.5 mb-2">
                       {itemRecipe.map((rec, idx) => (
                         <div key={idx} className="flex justify-between items-center bg-green-50 dark:bg-green-900/20 p-2 rounded-lg border border-green-200 dark:border-green-800/50">
-                          <span className="text-[10px] font-bold text-green-800 dark:text-green-400">{rec.name}</span>
+                          <div className="flex flex-col">
+                            <span className="text-[10px] font-bold text-green-800 dark:text-green-400">{rec.name}</span>
+                            {/* 👉 NEW: यहाँ साफ़-साफ़ दिखेगा कि यह माल Half के लिए है या Full के लिए */}
+                            <span className="text-[8px] font-black uppercase text-orange-600 bg-orange-100 dark:bg-orange-900/30 px-1 mt-0.5 rounded w-fit border border-orange-200 dark:border-orange-800">
+                              For: {rec.variant && rec.variant !== 'All' ? rec.variant : 'All Sizes (सभी साइज़)'}
+                            </span>
+                          </div>
                           <div className="flex gap-2 items-center">
                             <span className="text-[10px] font-black">{rec.qty} {rec.unit}</span>
                             <button type="button" onClick={() => setItemRecipe(prev => prev.filter((_, i) => i !== idx))} className="text-red-500 hover:text-red-700"><SafeTrash2 size={12} /></button>
