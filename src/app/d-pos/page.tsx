@@ -6546,50 +6546,73 @@ const [rawActionType, setRawActionType] = useState<'add' | 'reduce' | 'set'>('ad
                     </div>
                   )}
 
-        {/* 👉 UPDATE: Variant चुनने का ड्रॉपडाउन जोड़ा गया */}
-                  <div className="flex flex-col gap-2">
-                    {/* 👉 NEW: Search Box for Raw Materials */}
-                    <input 
-                      type="text" 
-                      placeholder="🔍 कच्चा माल ढूँढें (Search Raw Material)..." 
-                      value={recipeSearchTerm}
-                      onChange={e => setRecipeSearchTerm(e.target.value)}
-                      className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-lg p-2 text-xs font-bold outline-none focus:border-green-500"
-                    />
+  {/* 👉 UPDATE: Smart Searchable Dropdown for Raw Materials */}
+                  <div className="flex gap-2">
                     
-                    <div className="flex gap-2">
-                      <select value={selectedRawId} onChange={e => setSelectedRawId(e.target.value)} className="flex-1 bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-lg p-2 text-xs font-bold outline-none cursor-pointer focus:border-green-500">
-                        <option value="">Select Raw Material...</option>
-                        {/* 👉 NEW: Filtered List based on Search */}
-                        {rawMaterials.filter(rm => rm.name.toLowerCase().includes(recipeSearchTerm.toLowerCase())).map(rm => <option key={rm.id} value={rm.id}>{rm.name} ({rm.unit})</option>)}
-                      </select>
-
-                      {/* अगर आइटम में Variants हैं, तो ये ड्रॉपडाउन दिखेगा */}
-                      {hasVariants && Object.keys(itemVariantsList).length > 0 && (
-                        <select value={selectedRawVariant} onChange={e => setSelectedRawVariant(e.target.value)} className="w-24 bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-lg p-2 text-xs font-bold outline-none cursor-pointer focus:border-orange-500">
-                          <option value="All">All Sizes</option>
-                          {Object.keys(itemVariantsList).map(v => <option key={v} value={v}>{v}</option>)}
-                        </select>
-                      )}
-
-                      <input type="number" step="0.01" min={0} placeholder="Qty" value={selectedRawQty} onChange={e => setSelectedRawQty(e.target.value === '' ? '' : Number(e.target.value))} className="w-16 bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-lg p-2 text-xs font-mono outline-none focus:border-green-500 text-center" />
+                    {/* 🔍 Searchable Dropdown Wrapper */}
+                    <div className="relative flex-1">
+                      <input 
+                        type="text" 
+                        placeholder="🔍 कच्चा माल खोजें / चुनें..." 
+                        value={recipeSearchTerm}
+                        onChange={e => {
+                          setRecipeSearchTerm(e.target.value);
+                          setShowRawDropdown(true);
+                          setSelectedRawId(''); // टाइप करने पर पुरानी सेलेक्शन हटा दें
+                        }}
+                        onFocus={() => setShowRawDropdown(true)}
+                        onBlur={() => setTimeout(() => setShowRawDropdown(false), 200)}
+                        className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-lg p-2 text-xs font-bold outline-none focus:border-green-500"
+                      />
                       
-                      <button type="button" onClick={() => {
-                        if (!selectedRawId || !selectedRawQty) return toast.error("Select material and quantity");
-                        const matched = rawMaterials.find(r => r.id === selectedRawId);
-                        if (matched) {
-                          setItemRecipe(prev => [...prev, { 
-                            rawId: matched.id, 
-                            name: matched.name, 
-                            qty: Number(selectedRawQty), 
-                            unit: matched.unit,
-                            variant: hasVariants ? selectedRawVariant : 'All' // Variant सेव करें
-                          }]);
-                          setSelectedRawId(''); setSelectedRawQty(''); setSelectedRawVariant('All');
-                          setRecipeSearchTerm(''); // 👉 Reset Search Box after adding
-                        }
-                      }} className="bg-green-600 hover:bg-green-500 text-white px-3 rounded-lg font-black text-[10px] uppercase shadow-sm">Add</button>
+                      {/* लटकती हुई (Floating) लिस्ट जो टाइप करने पर फ़िल्टर होगी */}
+                      {showRawDropdown && (
+                        <div className="absolute z-50 top-full left-0 right-0 mt-1 max-h-40 overflow-y-auto bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 rounded-lg shadow-xl">
+                          {rawMaterials.filter(rm => rm.name.toLowerCase().includes(recipeSearchTerm.toLowerCase())).map(rm => (
+                            <div 
+                              key={rm.id} 
+                              onClick={() => {
+                                setSelectedRawId(rm.id);
+                                setRecipeSearchTerm(`${rm.name} (${rm.unit})`);
+                                setShowRawDropdown(false);
+                              }}
+                              className="p-2 text-xs border-b border-neutral-100 dark:border-neutral-800 hover:bg-green-50 dark:hover:bg-green-900/30 cursor-pointer text-neutral-800 dark:text-neutral-200"
+                            >
+                              {rm.name} <span className="text-[10px] text-neutral-500">({rm.unit})</span>
+                            </div>
+                          ))}
+                          {rawMaterials.filter(rm => rm.name.toLowerCase().includes(recipeSearchTerm.toLowerCase())).length === 0 && (
+                            <div className="p-2 text-xs text-neutral-500 text-center">कोई आइटम नहीं मिला</div>
+                          )}
+                        </div>
+                      )}
                     </div>
+
+                    {/* अगर आइटम में Variants हैं, तो ये ड्रॉपडाउन दिखेगा */}
+                    {hasVariants && Object.keys(itemVariantsList).length > 0 && (
+                      <select value={selectedRawVariant} onChange={e => setSelectedRawVariant(e.target.value)} className="w-24 bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-lg p-2 text-xs font-bold outline-none cursor-pointer focus:border-orange-500">
+                        <option value="All">All Sizes</option>
+                        {Object.keys(itemVariantsList).map(v => <option key={v} value={v}>{v}</option>)}
+                      </select>
+                    )}
+
+                    <input type="number" step="0.01" min={0} placeholder="Qty" value={selectedRawQty} onChange={e => setSelectedRawQty(e.target.value === '' ? '' : Number(e.target.value))} className="w-16 bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-lg p-2 text-xs font-mono outline-none focus:border-green-500 text-center" />
+                    
+                    <button type="button" onClick={() => {
+                      if (!selectedRawId || !selectedRawQty) return toast.error("कच्चा माल और मात्रा चुनें!");
+                      const matched = rawMaterials.find(r => r.id === selectedRawId);
+                      if (matched) {
+                        setItemRecipe(prev => [...prev, { 
+                          rawId: matched.id, 
+                          name: matched.name, 
+                          qty: Number(selectedRawQty), 
+                          unit: matched.unit,
+                          variant: hasVariants ? selectedRawVariant : 'All' 
+                        }]);
+                        setSelectedRawId(''); setSelectedRawQty(''); setSelectedRawVariant('All');
+                        setRecipeSearchTerm(''); // 👉 Add करने के बाद बॉक्स को खाली कर दें
+                      }
+                    }} className="bg-green-600 hover:bg-green-500 text-white px-3 rounded-lg font-black text-[10px] uppercase shadow-sm">Add</button>
                   </div>
                   <p className="text-[9px] text-neutral-500 mt-1.5 font-bold">यह आइटम बिकने पर, ऊपर चुना गया कच्चा माल स्टॉक से अपने-आप कट जाएगा।</p>
                 </div>
