@@ -2308,8 +2308,14 @@ export default function BbCafeDesktopPos() {
           tableNumber: tableNumber, 
           paymentMethod, 
           source: 'PC_POS', 
-          address: '',
-          upiId: upiIdConfig
+         address: '',
+          upiId: upiIdConfig,
+          guests: {
+            men: Number(guestMen) || 0,
+            women: Number(guestWomen) || 0,
+            kids: Number(guestKids) || 0,
+            total: (Number(guestMen) || 0) + (Number(guestWomen) || 0) + (Number(guestKids) || 0)
+          }
         };
 
         if (navigator.onLine) {
