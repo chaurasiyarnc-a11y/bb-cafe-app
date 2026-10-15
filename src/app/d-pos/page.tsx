@@ -4213,6 +4213,19 @@ export default function BbCafeDesktopPos() {
                           नया जोड़ें
                         </button>
                         
+                        {/* 👉 NEW: 👥 गेस्ट जोड़ने का बटन */}
+                        <button 
+                          type="button" 
+                          onClick={() => setIsGuestModalOpen(true)}
+                          className={`px-3 rounded-lg text-[10px] font-black uppercase shadow-sm shrink-0 flex items-center gap-1 transition-colors ${
+                            (Number(guestMen) || 0) + (Number(guestWomen) || 0) + (Number(guestKids) || 0) > 0 
+                              ? 'bg-blue-600 hover:bg-blue-500 text-white border-blue-600' 
+                              : 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800'
+                          }`}
+                        >
+                          👥 {((Number(guestMen) || 0) + (Number(guestWomen) || 0) + (Number(guestKids) || 0)) || 'Count'}
+                        </button>
+                        
                         {/* 🎰 गेम चेक करने का क्विक बटन */}
                         <button 
                           type="button"
