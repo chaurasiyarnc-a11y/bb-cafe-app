@@ -441,8 +441,9 @@ const [rawActionType, setRawActionType] = useState<'add' | 'reduce' | 'set'>('ad
   const [itemRecipe, setItemRecipe] = useState<{rawId: string, name: string, qty: number, unit: string, variant: string}[]>([]);
   const [selectedRawId, setSelectedRawId] = useState('');
   const [selectedRawQty, setSelectedRawQty] = useState<number | ''>('');
-  const [selectedRawVariant, setSelectedRawVariant] = useState('All'); // नया स्टेट: Variant चुनने के लिए
-  const [recipeSearchTerm, setRecipeSearchTerm] = useState(''); // 👉 NEW: Recipe Search State
+  const [selectedRawVariant, setSelectedRawVariant] = useState('All'); 
+  const [recipeSearchTerm, setRecipeSearchTerm] = useState('');
+  const [showRawDropdown, setShowRawDropdown] = useState(false); // 👉 NEW: Dropdown List State
 
   // Expense Form
   const [expenseTitle, setExpenseTitle] = useState('');
