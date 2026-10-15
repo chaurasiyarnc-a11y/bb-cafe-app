@@ -3456,7 +3456,7 @@ const [rawActionType, setRawActionType] = useState<'add' | 'reduce' | 'set'>('ad
   
   
   }, [products, searchQuery, selectedCategory]); 
-  const filteredInventoryProducts = useMemo(() => {
+ const filteredInventoryProducts = useMemo(() => {
     const queryStr = inventorySearchQuery.toLowerCase().trim();
     return products.filter((p) => {
       const matchesName = (p.name || '').toLowerCase().includes(queryStr);
@@ -3465,6 +3465,13 @@ const [rawActionType, setRawActionType] = useState<'add' | 'reduce' | 'set'>('ad
       return matchesName || matchesCat || matchesCode;
     });
   }, [products, inventorySearchQuery]);
+
+  // 👉 NEW: Filtered Raw Materials for Search
+  const filteredRawMaterials = useMemo(() => {
+    const queryStr = rawSearchQuery.toLowerCase().trim();
+    if (!queryStr) return rawMaterials;
+    return rawMaterials.filter(r => (r.name || '').toLowerCase().includes(queryStr));
+  }, [rawMaterials, rawSearchQuery]);
 
  // ==========================================
   // 👉 NEW: EXCEL (CSV) IMPORT & EXPORT LOGIC
