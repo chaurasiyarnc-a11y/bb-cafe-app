@@ -439,9 +439,10 @@ const [rawActionType, setRawActionType] = useState<'add' | 'reduce' | 'set'>('ad
   // 👉 NEW: Recipe Mapping States (कच्चा माल लिंक करने के लिए)
   // 👉 UPDATE: Recipe Mapping में variant जोड़ा गया
   const [itemRecipe, setItemRecipe] = useState<{rawId: string, name: string, qty: number, unit: string, variant: string}[]>([]);
-  const [selectedRawId, setSelectedRawId] = useState('');
+  cconst [selectedRawId, setSelectedRawId] = useState('');
   const [selectedRawQty, setSelectedRawQty] = useState<number | ''>('');
   const [selectedRawVariant, setSelectedRawVariant] = useState('All'); // नया स्टेट: Variant चुनने के लिए
+  const [recipeSearchTerm, setRecipeSearchTerm] = useState(''); // 👉 NEW: Recipe Search State
 
   // Expense Form
   const [expenseTitle, setExpenseTitle] = useState('');
