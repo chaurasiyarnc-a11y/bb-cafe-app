@@ -7503,7 +7503,7 @@ export default function BbCafeDesktopPos() {
 
                 <div className="space-y-1">
                   <label className="text-[10px] font-black uppercase text-neutral-500">Low Stock Alert Below:</label>
-                  <input type="number" required min={0} step="0.01" value={rawFormLowAlert} onChange={e=>setRawFormLowAlert(e.target.value === '' ? '' : Number(e.target.value))} placeholder="e.g. 5" className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-xl px-3 py-2.5 text-xs font-mono font-bold outline-none focus:border-red-500" />
+                  <input type="number" required min={0} step="0.0001" value={rawFormLowAlert} onChange={e=>setRawFormLowAlert(e.target.value === '' ? '' : Number(e.target.value))} placeholder="e.g. 5" className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-xl px-3 py-2.5 text-xs font-mono font-bold outline-none focus:border-red-500" />
                   <p className="text-[9px] text-neutral-400 mt-1">जब स्टॉक इससे कम होगा, तो सिस्टम आपको लाल रंग में वार्निंग देगा।</p>
                 </div>
                 
