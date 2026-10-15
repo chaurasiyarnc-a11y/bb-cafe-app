@@ -2258,8 +2258,14 @@ export default function BbCafeDesktopPos() {
           upiId: upiIdConfig,
           status: 'unsettled',
           paymentSettled: false,
-          fulfillmentType: 'table',
-          lastUpdated: new Date()
+         fulfillmentType: 'table',
+          lastUpdated: new Date(),
+          guests: {
+            men: Number(guestMen) || 0,
+            women: Number(guestWomen) || 0,
+            kids: Number(guestKids) || 0,
+            total: (Number(guestMen) || 0) + (Number(guestWomen) || 0) + (Number(guestKids) || 0)
+          }
         };
 
         if (navigator.onLine) {
