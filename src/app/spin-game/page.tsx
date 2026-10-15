@@ -5,8 +5,8 @@ import { db } from "@/lib/firebase";
 import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import toast, { Toaster } from "react-hot-toast";
 import GameGuard from "@/components/GameGuard";
-import confetti from "canvas-confetti"; // 🎉 सेलिब्रेशन के लिए
-import { motion, AnimatePresence } from "framer-motion"; // 🎬 स्मूथ एनिमेशन के लिए
+import confetti from "canvas-confetti"; 
+import { motion, AnimatePresence } from "framer-motion"; 
 
 // 🌟 3D Packages Import
 import { Canvas, useFrame } from "@react-three/fiber";
@@ -18,14 +18,14 @@ const formatNameTitleCase = (text: string) => {
 };
 const isValidIndianPhone = (phone: string) => /^[6-9]\d{9}$/.test(phone);
 
-// 🎡 स्पिन व्हील के इनाम 
+// 🎡 स्पिन व्हील के इनाम (रेशियो के साथ)
 const PRIZES = [
-  { label: "Better Luck", points: 0, type: "none", color: "#ef4444" }, // Red
-  { label: "10 Coupon", points: 10, type: "points", color: "#eab308" }, // Yellow
-  { label: "Manchurian Half", points: 0, type: "food", color: "#3b82f6" }, // Blue
-  { label: "20 Coupon", points: 20, type: "points", color: "#22c55e" }, // Green
-  { label: "Manchurian Rice", points: 0, type: "food", color: "#f97316" }, // Orange
-  { label: "Sandwich", points: 0, type: "food", color: "#a855f7" }  // Purple
+  { label: "Better Luck", points: 0, type: "none", color: "#ef4444" }, // 0: Red
+  { label: "10 Coupon", points: 10, type: "points", color: "#eab308" }, // 1: Yellow
+  { label: "Manchurian Half", points: 0, type: "food", color: "#3b82f6" }, // 2: Blue
+  { label: "20 Coupon", points: 20, type: "points", color: "#22c55e" }, // 3: Green
+  { label: "Manchurian Rice", points: 0, type: "food", color: "#f97316" }, // 4: Orange
+  { label: "Sandwich", points: 0, type: "food", color: "#a855f7" }  // 5: Purple
 ];
 
 // 🎵 AUDIO SYSTEM (साउंड इफेक्ट्स के लिए)
@@ -66,19 +66,19 @@ const playSound = (type: 'tick' | 'win' | 'lose') => {
 };
 
 // ==========================================
-// 🎨 3D WHEEL COMPONENT (Real 3D Physics & Visuals)
+// 🎨 3D WHEEL COMPONENT
 // ==========================================
 function Wheel3D({ isSpinning, prizeIndex }: { isSpinning: boolean; prizeIndex: number }) {
   const wheelRef = useRef<THREE.Group>(null);
   const [startRot, setStartRot] = useState(0);
   const [targetRot, setTargetRot] = useState(0);
   const [timeElapsed, setTimeElapsed] = useState(0);
-  const duration = 5.0; // घूमने का समय
+  const duration = 5.0; 
   const lastTickAngle = useRef(0);
 
   useEffect(() => {
     if (isSpinning) {
-      const spins = 6; // 6 बार पूरा घूमेगा (ज्यादा एक्साइटमेंट)
+      const spins = 6; 
       const angle = (Math.PI * 2) / PRIZES.length;
       const target = (spins * Math.PI * 2) + Math.PI - (prizeIndex * angle + angle / 2);
       
@@ -96,12 +96,11 @@ function Wheel3D({ isSpinning, prizeIndex }: { isSpinning: boolean; prizeIndex: 
       setTimeElapsed(newTime);
 
       const t = newTime / duration;
-      const easeOutQuart = 1 - Math.pow(1 - t, 4); // स्मूथ ब्रेक इफ़ेक्ट
+      const easeOutQuart = 1 - Math.pow(1 - t, 4); 
       const currentRot = startRot + (targetRot - startRot) * easeOutQuart;
       
       wheelRef.current.rotation.y = currentRot;
 
-      // टिक-टिक साउंड लॉजिक (हर स्लाइस पर आवाज़)
       const anglePerSlice = (Math.PI * 2) / PRIZES.length;
       if (Math.abs(currentRot - lastTickAngle.current) >= anglePerSlice) {
         playSound('tick');
@@ -123,7 +122,7 @@ function Wheel3D({ isSpinning, prizeIndex }: { isSpinning: boolean; prizeIndex: 
       {/* 🎡 Main Wheel */}
       <group rotation={[Math.PI / 2, 0, 0]} ref={wheelRef}>
         
-        {/* 💍 Golden Outer Ring (प्रीमियम लुक) */}
+        {/* 💍 Golden Outer Ring */}
         <mesh position={[0, 0.1, 0]}>
           <torusGeometry args={[2.9, 0.15, 32, 100]} />
           <meshStandardMaterial color="#fbbf24" emissive="#b45309" emissiveIntensity={0.4} metalness={0.9} roughness={0.1} />
@@ -137,7 +136,6 @@ function Wheel3D({ isSpinning, prizeIndex }: { isSpinning: boolean; prizeIndex: 
               <meshStandardMaterial color={prize.color} metalness={0.2} roughness={0.4} />
             </mesh>
             
-            {/* 3D Text */}
             <group rotation={[0, angle / 2, 0]}>
               <Text
                 position={[0, 0.16, 1.8]} 
@@ -156,7 +154,7 @@ function Wheel3D({ isSpinning, prizeIndex }: { isSpinning: boolean; prizeIndex: 
           </group>
         ))}
 
-        {/* 🔘 Wheel Center Pin */}
+        {/* 🔘 Center Pin */}
         <mesh position={[0, 0.25, 0]}>
           <cylinderGeometry args={[0.5, 0.5, 0.3, 32]} />
           <meshStandardMaterial color="#fbbf24" metalness={0.8} roughness={0.2} />
@@ -180,7 +178,6 @@ export default function SpinGamePage() {
   const [tableNo, setTableNo] = useState<string>("सामान्य टेबल");
   const [isLoading, setIsLoading] = useState(false);
   
-  // स्पिन व्हील स्टेट्स
   const [isSpinning, setIsSpinning] = useState(false);
   const [targetPrizeIdx, setTargetPrizeIdx] = useState(0);
   const [wonPrize, setWonPrize] = useState<any>(null);
@@ -208,7 +205,7 @@ export default function SpinGamePage() {
 
   const handleStartGame = async (e: React.FormEvent) => {
     e.preventDefault();
-    initAudio(); // साउंड सिस्टम रेडी करें
+    initAudio(); 
     playSound('tick');
 
     const cleanName = formatNameTitleCase(name.trim());
@@ -222,9 +219,20 @@ export default function SpinGamePage() {
     const FORTY_MINUTES = 40 * 60 * 1000;
     const now = Date.now();
 
-    const deviceLastPlayed = localStorage.getItem("spin_game_cooldown");
+    // 1. डिवाइस लेवल चेक (LocalStorage + Cookies Fallback for Safari)
+    const getDeviceCooldown = () => {
+      try {
+        let ls = localStorage.getItem("spin_game_cooldown");
+        if (ls) return parseInt(ls, 10);
+      } catch(e) {} 
+      let match = document.cookie.match(new RegExp('(^| )spin_game_cooldown=([^;]+)'));
+      if (match) return parseInt(match[2], 10);
+      return null;
+    };
+
+    const deviceLastPlayed = getDeviceCooldown();
     if (deviceLastPlayed) {
-      const elapsed = now - parseInt(deviceLastPlayed, 10);
+      const elapsed = now - deviceLastPlayed;
       if (elapsed < FORTY_MINUTES) {
         setIsLoading(false);
         const minsLeft = Math.ceil((FORTY_MINUTES - elapsed) / 60000);
@@ -249,11 +257,18 @@ export default function SpinGamePage() {
         }
       }
 
+      // 👉 गेम स्टार्ट करते ही डिवाइस और मोबाइल नंबर दोनों को तुरंत 40 मिनट के लिए लॉक कर दें
+      try {
+        localStorage.setItem("spin_game_cooldown", now.toString());
+      } catch(e) {}
+      document.cookie = `spin_game_cooldown=${now}; max-age=${40 * 60}; path=/`; 
+
       await setDoc(userRef, { 
         name: cleanName, 
         phone: cleanPhone, 
         table: tableNo,
         lastActive: serverTimestamp(),
+        lastPlayedAt: serverTimestamp(), // 👉 यहाँ तुरंत नंबर लॉक हो जाएगा
         importSource: 'SpinGame'
       }, { merge: true });
 
@@ -272,9 +287,9 @@ export default function SpinGamePage() {
   const handleSpinClick = () => {
     if (isSpinning) return;
     initAudio(); 
-    playSound('win'); // शुरुआत का साउंड
+    playSound('win'); 
     
-    // 🎲 विनिंग रेशियो 
+    // 🎲 विनिंग रेशियो लॉजिक (New Winning Ratio)
     const randomChance = Math.random() * 100;
     let pIndex = 0;
 
@@ -288,7 +303,6 @@ export default function SpinGamePage() {
     setTargetPrizeIdx(pIndex);
     setIsSpinning(true);
 
-    // 5 सेकंड बाद गेम ओवर
     setTimeout(() => {
       savePrizeToDatabase(PRIZES[pIndex]);
     }, 5000); 
@@ -343,7 +357,11 @@ export default function SpinGamePage() {
 
       setWonPrize({ ...prize, actualLabel: finalPrizeLabel, isWinner: isWinner });
       setVoucherCode(generatedCode);
-      localStorage.setItem("spin_game_cooldown", Date.now().toString());
+      
+      try {
+        localStorage.setItem("spin_game_cooldown", Date.now().toString());
+      } catch(e) {}
+      document.cookie = `spin_game_cooldown=${Date.now()}; max-age=${40 * 60}; path=/`;
 
       // 🎉 Celebration Effects
       if (isWinner) {
@@ -364,17 +382,15 @@ export default function SpinGamePage() {
 
   return (
     <GameGuard allowedGameName="SpinGame">
-      {/* 🌌 Animated Radial Gradient Background */}
       <div className="min-h-screen bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-900 via-[#0b0f19] to-black text-white font-sans flex flex-col justify-center items-center overflow-hidden relative select-none">
         
-        {/* Decorative Glowing Orbs */}
         <div className="absolute top-[-10%] left-[-10%] w-96 h-96 bg-purple-600/30 rounded-full blur-[100px] pointer-events-none"></div>
         <div className="absolute bottom-[-10%] right-[-10%] w-96 h-96 bg-blue-600/20 rounded-full blur-[100px] pointer-events-none"></div>
         
         <Toaster position="top-center" toastOptions={{ style: { background: '#1e293b', color: '#fff', border: '1px solid #334155' } }} />
         
         <AnimatePresence mode="wait">
-          {/* ---------------- 1. LOGIN SCREEN (Glassmorphism) ---------------- */}
+          {/* ---------------- 1. LOGIN SCREEN ---------------- */}
           {step === "login" && (
             <motion.div 
               key="login"
@@ -390,7 +406,7 @@ export default function SpinGamePage() {
 
               <div className="bg-white/10 backdrop-blur-xl p-6 rounded-3xl border border-white/20 shadow-[0_0_40px_rgba(0,0,0,0.5)] text-center space-y-5">
                 <p className="text-xs text-neutral-200 font-bold leading-relaxed bg-black/40 p-3 rounded-xl border border-white/10 text-left shadow-inner">
-                  ✨ व्हील घुमाएं और शानदार इनाम जीतें!<br/>
+                  ✨ 3D व्हील घुमाएं और शानदार इनाम जीतें!<br/>
                   <span className="text-yellow-400 block mt-2 text-center text-sm font-black drop-shadow-md">
                     कूपन और टेस्टी फूड जीतने का मौका! 🍕🥪
                   </span>
@@ -408,7 +424,7 @@ export default function SpinGamePage() {
             </motion.div>
           )}
 
-          {/* ---------------- 2. PLAYING SCREEN (3D Wheel) ---------------- */}
+          {/* ---------------- 2. PLAYING SCREEN ---------------- */}
           {step === "playing" && (
             <motion.div 
               key="playing"
@@ -419,7 +435,6 @@ export default function SpinGamePage() {
                 Spin To Win
               </h2>
 
-              {/* 🌟 3D Canvas Area */}
               <div className="w-full h-[500px] max-h-[70vh] relative z-0">
                 <Canvas camera={{ position: [0, 0, 7.5], fov: 60 }}>
                   <ambientLight intensity={0.9} />
@@ -429,7 +444,6 @@ export default function SpinGamePage() {
                 </Canvas>
               </div>
 
-              {/* 🔘 Juicy 3D Button */}
               <div className="absolute bottom-16 z-10 flex flex-col items-center">
                 <button 
                   onClick={handleSpinClick}
