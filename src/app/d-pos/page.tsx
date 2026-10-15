@@ -2599,9 +2599,15 @@ export default function BbCafeDesktopPos() {
         remainingPoints: remainingPts,
         customerPoints: remainingPts,
        upiId: upiIdConfig,
-        promoCodeUsed: appliedPromoName || null, // 👉 NEW: यहाँ सेव होगा कि कौन सा कूपन यूज़ हुआ
-        pointsProcessed: true, // 👉 NEW: ताकि दोबारा पॉइंट्स न जुड़ें
-        stockProcessed: false  // 👉 FIX: इसे false करना होगा, ताकि बिल सेटल (चुकाने) पर स्टॉक कटे!
+       promoCodeUsed: appliedPromoName || null,
+        pointsProcessed: true,
+        stockProcessed: false,
+        guests: {
+          men: Number(guestMen) || 0,
+          women: Number(guestWomen) || 0,
+          kids: Number(guestKids) || 0,
+          total: (Number(guestMen) || 0) + (Number(guestWomen) || 0) + (Number(guestKids) || 0)
+        }
       };
 
       if (activeEditingOrderId) {
