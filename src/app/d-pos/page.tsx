@@ -4109,7 +4109,7 @@ export default function BbCafeDesktopPos() {
                           <SafePauseCircle size={11} /> Hold [F3]
                         </button>
                       </div>
-                      <button onClick={() => { setCart([]); setCartCustSearchInput(''); }} className="text-red-500 text-xs font-bold hover:underline flex items-center gap-1"><SafeTrash2 size={13} /> Clear [Del]</button>
+                      <button onClick={() => { setCart([]); setCartCustSearchInput(''); setGuestMen(''); setGuestWomen(''); setGuestKids(''); }} className="text-red-500 text-xs font-bold hover:underline flex items-center gap-1"><SafeTrash2 size={13} /> Clear [Del]</button>
                     </div>
 
                     {/* 👉 NEW: DYNAMIC CUSTOMER SEARCH (NAME OR NUMBER) & REDEEM SECTION */}
