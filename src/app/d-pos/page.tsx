@@ -7505,6 +7505,111 @@ export default function BbCafeDesktopPos() {
                 
                 <button type="submit" className="w-full py-3 mt-2 bg-green-600 hover:bg-green-500 text-white font-black uppercase text-xs rounded-xl shadow-lg transition-all">
                   Save Material
+               Save Material
+                </button>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* 👉 NEW POPUP: PURCHASE ENTRY (माल की एंट्री) */}
+      <AnimatePresence>
+        {isPurchaseModalOpen && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 max-w-sm w-full rounded-3xl p-6 shadow-2xl space-y-4">
+              <div className="flex justify-between items-center border-b border-neutral-200 dark:border-neutral-800 pb-3">
+                <h3 className="font-black text-sm uppercase text-blue-600 flex items-center gap-2">
+                  <SafeFileText size={18} /> Purchase Entry (नया माल)
+                </h3>
+                <button onClick={() => setIsPurchaseModalOpen(false)} className="text-neutral-500 hover:text-black dark:hover:text-white"><X size={20} /></button>
+              </div>
+              
+              <form onSubmit={async (e) => {
+                e.preventDefault();
+                if (!purchaseItemId || !purchaseQty || !purchaseRate) return toast.error("सभी जानकारी भरना अनिवार्य है!");
+                
+                const toastId = toast.loading("माल चढ़ाया जा रहा है...");
+                try {
+                  const selectedMaterial = rawMaterials.find(r => r.id === purchaseItemId);
+                  const amount = Number(purchaseQty) * Number(purchaseRate);
+
+                  // 1. स्टॉक अपडेट करें
+                  const newStock = Number(selectedMaterial.stock || 0) + Number(purchaseQty);
+                  const newReceived = Number(selectedMaterial.totalReceived || 0) + Number(purchaseQty);
+                  await updateDoc(doc(db, "raw_materials", purchaseItemId), {
+                    stock: newStock,
+                    totalReceived: newReceived
+                  });
+
+                  // 2. परचेस हिस्ट्री सेव करें
+                  await addDoc(collection(db, "raw_purchases"), {
+                    rawId: purchaseItemId,
+                    name: selectedMaterial.name,
+                    unit: selectedMaterial.unit,
+                    qty: Number(purchaseQty),
+                    rate: Number(purchaseRate),
+                    amount: amount,
+                    date: purchaseDate,
+                    timestamp: new Date()
+                  });
+
+                  // 3. गल्ले के खर्चे (Expense) में जोड़ें
+                  if (window.confirm(`क्या इस बिल (₹${amount.toFixed(2)}) को आज के गल्ले के खर्च (Daily Expense) में भी जोड़ना है?`)) {
+                     await addDoc(collection(db, "daily_expenses"), {
+                        title: `Purchase: ${selectedMaterial.name} (${purchaseQty}${selectedMaterial.unit})`,
+                        amount: amount,
+                        category: 'Raw Material',
+                        timestamp: new Date(),
+                        enteredBy: currentUser?.name || 'Staff'
+                     });
+                     toast.success("खर्च (Expense) में भी जुड़ गया!");
+                  }
+
+                  toast.dismiss(toastId);
+                  toast.success(`माल सफलतापूर्वक स्टॉक में जुड़ गया! ✅`);
+                  setIsPurchaseModalOpen(false);
+                } catch (err) {
+                  toast.dismiss(toastId);
+                  toast.error("एंट्री सेव करने में समस्या आई!");
+                }
+              }} className="space-y-4">
+                
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-neutral-500">Date (तारीख)</label>
+                  <input type="date" required value={purchaseDate} onChange={e=>setPurchaseDate(e.target.value)} className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-xl px-3 py-2.5 text-xs font-bold outline-none focus:border-blue-500 cursor-pointer" />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-neutral-500">Item (कच्चा माल)</label>
+                  <select required value={purchaseItemId} onChange={e=>setPurchaseItemId(e.target.value)} className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-xl px-3 py-2.5 text-xs font-bold outline-none focus:border-blue-500 cursor-pointer">
+                    <option value="">-- माल चुनें --</option>
+                    {rawMaterials.map(rm => (
+                      <option key={rm.id} value={rm.id}>{rm.name} ({rm.unit})</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase text-neutral-500">Qty (मात्रा)</label>
+                    <input type="number" step="0.01" required min={0.01} value={purchaseQty} onChange={e=>setPurchaseQty(e.target.value === '' ? '' : Number(e.target.value))} placeholder="e.g. 10" className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-xl px-3 py-2.5 text-xs font-mono font-bold outline-none focus:border-blue-500" />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase text-neutral-500">Rate (भाव / ₹)</label>
+                    <input type="number" step="0.01" required min={0} value={purchaseRate} onChange={e=>setPurchaseRate(e.target.value === '' ? '' : Number(e.target.value))} placeholder="e.g. 50" className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-xl px-3 py-2.5 text-xs font-mono font-bold outline-none focus:border-blue-500" />
+                  </div>
+                </div>
+
+                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 p-3 rounded-xl flex justify-between items-center">
+                  <span className="text-xs font-black uppercase text-blue-700 dark:text-blue-400">Total Amount:</span>
+                  <span className="text-lg font-black font-mono text-blue-700 dark:text-blue-400">
+                    ₹{((Number(purchaseQty) || 0) * (Number(purchaseRate) || 0)).toFixed(2)}
+                  </span>
+                </div>
+
+                <button type="submit" className="w-full py-3 mt-2 bg-blue-600 hover:bg-blue-500 text-white font-black uppercase text-xs rounded-xl shadow-lg transition-all">
+                  Save Entry (चढ़ाएं)
                 </button>
               </form>
             </motion.div>
