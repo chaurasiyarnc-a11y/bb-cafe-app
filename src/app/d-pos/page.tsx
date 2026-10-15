@@ -6633,7 +6633,7 @@ export default function BbCafeDesktopPos() {
                       </select>
                     )}
 
-                    <input type="number" step="0.01" min={0} placeholder="Qty" value={selectedRawQty} onChange={e => setSelectedRawQty(e.target.value === '' ? '' : Number(e.target.value))} className="w-16 bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-lg p-2 text-xs font-mono outline-none focus:border-green-500 text-center" />
+                    <input type="number" step="0.0001" min={0} placeholder="Qty" value={selectedRawQty} onChange={e => setSelectedRawQty(e.target.value === '' ? '' : Number(e.target.value))} className="w-16 bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-lg p-2 text-xs font-mono outline-none focus:border-green-500 text-center" />
                     
                     <button type="button" onClick={() => {
                       if (!selectedRawId || !selectedRawQty) return toast.error("कच्चा माल और मात्रा चुनें!");
