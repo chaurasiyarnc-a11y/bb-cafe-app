@@ -6865,7 +6865,43 @@ export default function BbCafeDesktopPos() {
           </div>
         )}
       </AnimatePresence>
+{/* 👉 NEW POPUP: GUEST COUNT MODAL */}
+      <AnimatePresence>
+        {isGuestModalOpen && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 max-w-sm w-full rounded-3xl p-6 shadow-2xl space-y-4">
+              <div className="flex justify-between items-center border-b border-neutral-200 dark:border-neutral-800 pb-3">
+                <h3 className="font-black text-sm uppercase text-blue-600 flex items-center gap-2">
+                  👥 Guest Count (कितने लोग आए?)
+                </h3>
+                <button onClick={() => setIsGuestModalOpen(false)} className="text-neutral-500 hover:text-black dark:hover:text-white"><X size={20} /></button>
+              </div>
+              
+              <div className="flex gap-3">
+                <div className="flex-1 flex flex-col items-center bg-neutral-50 dark:bg-neutral-800/50 border border-neutral-200 dark:border-neutral-700 rounded-xl p-3">
+                   <span className="text-2xl mb-2">👨</span>
+                   <p className="text-[10px] font-black uppercase text-neutral-500 mb-1">Men (आदमी)</p>
+                   <input type="number" min={0} value={guestMen} onChange={e => setGuestMen(e.target.value === '' ? '' : Number(e.target.value))} className="w-full text-center text-sm font-bold bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 rounded-lg py-1.5 outline-none focus:border-blue-500" />
+                </div>
+                <div className="flex-1 flex flex-col items-center bg-neutral-50 dark:bg-neutral-800/50 border border-neutral-200 dark:border-neutral-700 rounded-xl p-3">
+                   <span className="text-2xl mb-2">👩</span>
+                   <p className="text-[10px] font-black uppercase text-neutral-500 mb-1">Women (औरत)</p>
+                   <input type="number" min={0} value={guestWomen} onChange={e => setGuestWomen(e.target.value === '' ? '' : Number(e.target.value))} className="w-full text-center text-sm font-bold bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 rounded-lg py-1.5 outline-none focus:border-blue-500" />
+                </div>
+                <div className="flex-1 flex flex-col items-center bg-neutral-50 dark:bg-neutral-800/50 border border-neutral-200 dark:border-neutral-700 rounded-xl p-3">
+                   <span className="text-2xl mb-2">👶</span>
+                   <p className="text-[10px] font-black uppercase text-neutral-500 mb-1">Kids (बच्चे)</p>
+                   <input type="number" min={0} value={guestKids} onChange={e => setGuestKids(e.target.value === '' ? '' : Number(e.target.value))} className="w-full text-center text-sm font-bold bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 rounded-lg py-1.5 outline-none focus:border-blue-500" />
+                </div>
+              </div>
 
+              <button onClick={() => setIsGuestModalOpen(false)} className="w-full py-3 mt-2 bg-blue-600 hover:bg-blue-500 text-white font-black uppercase text-xs rounded-xl shadow-lg transition-all">
+                Save & Close (सेव करें)
+              </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
       {/* POPUP: DRAWER EXPENSE [F6] */}
       <AnimatePresence>
         {isExpenseModalOpen && (
