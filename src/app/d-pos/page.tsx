@@ -4937,44 +4937,59 @@ const [rawActionType, setRawActionType] = useState<'add' | 'reduce' | 'set'>('ad
                     </div>
                   </div>
 
-                 {/* कच्चे माल की लिस्ट */}
-                  <div className="grid grid-cols-3 gap-4">
+ {/* कच्चे माल की लिस्ट (List View) */}
+                  <div className="flex flex-col gap-2 pb-10">
+                    {/* List Header */}
+                    <div className="hidden lg:flex justify-between items-center px-4 py-2.5 bg-neutral-100 dark:bg-neutral-800 rounded-xl text-[10px] font-black uppercase text-neutral-500 shadow-sm">
+                       <div className="w-1/3">Material Name (कच्चा माल)</div>
+                       <div className="w-1/5 text-left">Current Stock</div>
+                       <div className="w-1/4 text-center">In / Out Stats</div>
+                       <div className="w-1/5 text-right">Actions</div>
+                    </div>
+
                     {filteredRawMaterials.length === 0 ? (
-                      <p className="text-center col-span-3 text-neutral-500 font-bold py-10 text-xs">कोई भी कच्चा माल (Raw Material) नहीं मिला।</p>
+                      <p className="text-center text-neutral-500 font-bold py-10 text-xs">कोई भी कच्चा माल (Raw Material) नहीं मिला।</p>
                     ) : (
                       filteredRawMaterials.map(raw => {
                         const isLow = Number(raw.stock) <= Number(raw.lowAlert);
                         return (
-                          <div key={raw.id} className={`bg-white dark:bg-neutral-900 border p-4 rounded-2xl flex flex-col justify-between shadow-sm ${isLow ? 'border-red-500 bg-red-50 dark:bg-red-950/20' : 'border-neutral-300 dark:border-neutral-700'}`}>
-                            <div>
-                              <div className="flex justify-between items-start mb-2">
+                          <div key={raw.id} className={`flex flex-col lg:flex-row justify-between items-start lg:items-center p-3 rounded-xl border shadow-sm transition-all hover:shadow-md gap-3 lg:gap-0 ${isLow ? 'border-red-400 bg-red-50 dark:bg-red-900/10' : 'bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800'}`}>
+                            
+                            {/* Material Name & Alert */}
+                            <div className="w-full lg:w-1/3 flex flex-col">
+                              <div className="flex items-center gap-2">
                                 <p className="font-bold text-sm text-neutral-900 dark:text-neutral-100">{raw.name}</p>
-                                {isLow && <span className="bg-red-500 text-white text-[9px] px-2 py-0.5 rounded font-black uppercase animate-pulse shadow-sm">Low Stock</span>}
+                                {isLow && <span className="bg-red-500 text-white text-[9px] px-1.5 py-0.5 rounded font-black uppercase animate-pulse shadow-sm">Low Stock</span>}
                               </div>
-                              <p className="text-2xl font-black font-mono text-neutral-800 dark:text-neutral-200 mb-1">
-                                {Number(raw.stock).toFixed(2).replace(/\.00$/, '')} <span className="text-xs text-neutral-500 uppercase">{raw.unit}</span>
-                              </p>
-                              <p className="text-[10px] text-neutral-500 font-bold bg-neutral-100 dark:bg-neutral-800 inline-block px-2 py-1 rounded">Alert below: {raw.lowAlert} {raw.unit}</p>
-                              
-                              {/* 👉 NEW: In / Out Stats in Card */}
-                              <div className="flex justify-between items-center mt-3 bg-neutral-50 dark:bg-neutral-800/50 p-2 rounded-xl border border-neutral-100 dark:border-neutral-700">
-                                <div className="text-center flex-1">
-                                  <p className="text-[9px] font-black uppercase text-neutral-500">कुल आया (Total In)</p>
-                                  <p className="text-xs font-bold text-green-600 dark:text-green-400">{Number(raw.totalReceived || 0).toFixed(2).replace(/\.00$/, '')} {raw.unit}</p>
-                                </div>
-                                <div className="w-px h-6 bg-neutral-200 dark:bg-neutral-700 mx-1"></div>
-                                <div className="text-center flex-1">
-                                  <p className="text-[9px] font-black uppercase text-neutral-500">इस्तेमाल (Consumed)</p>
-                                  <p className="text-xs font-bold text-orange-600 dark:text-orange-400">{Number(raw.totalConsumed || 0).toFixed(2).replace(/\.00$/, '')} {raw.unit}</p>
-                                </div>
-                              </div>
+                              <p className="text-[10px] text-neutral-500 font-bold mt-0.5">Alert below: {raw.lowAlert} {raw.unit}</p>
                             </div>
-
-                            <div className="flex gap-2 mt-4 pt-3 border-t border-neutral-300 dark:border-neutral-700">
+                            
+                            {/* Current Stock */}
+                            <div className="w-full lg:w-1/5 flex lg:justify-start items-center">
+                              <p className={`text-lg font-black font-mono ${isLow ? 'text-red-600' : 'text-neutral-800 dark:text-neutral-200'}`}>
+                                {Number(raw.stock).toFixed(2).replace(/\.00$/, '')} <span className="text-[10px] text-neutral-500 uppercase">{raw.unit}</span>
+                              </p>
+                            </div>
+                            
+                            {/* In / Out Stats */}
+                            <div className="w-full lg:w-1/4 flex gap-4 lg:justify-center items-center text-[10px]">
+                               <div className="text-center">
+                                  <p className="font-black uppercase text-neutral-400">Total In</p>
+                                  <p className="font-bold text-green-600 dark:text-green-400">{Number(raw.totalReceived || 0).toFixed(2).replace(/\.00$/, '')}</p>
+                               </div>
+                               <div className="w-px h-6 bg-neutral-200 dark:bg-neutral-700"></div>
+                               <div className="text-center">
+                                  <p className="font-black uppercase text-neutral-400">Consumed</p>
+                                  <p className="font-bold text-orange-600 dark:text-orange-400">{Number(raw.totalConsumed || 0).toFixed(2).replace(/\.00$/, '')}</p>
+                               </div>
+                            </div>
+                            
+                            {/* Actions */}
+                            <div className="w-full lg:w-1/5 flex lg:justify-end gap-2">
                               <button onClick={() => {
                                 setEditRawId(raw.id);
                                 setRawFormName(raw.name);
-                                setRawFormStock(raw.stock); // Base Stock
+                                setRawFormStock(raw.stock);
                                 setRawFormUnit(raw.unit);
                                 setRawFormLowAlert(raw.lowAlert);
                                 setRawActionType('add');
@@ -4982,16 +4997,16 @@ const [rawActionType, setRawActionType] = useState<'add' | 'reduce' | 'set'>('ad
                                 setRawTotalReceived(raw.totalReceived || 0);
                                 setRawTotalConsumed(raw.totalConsumed || 0);
                                 setIsRawModalOpen(true);
-                              }} className="flex-1 bg-neutral-200 dark:bg-neutral-800 hover:bg-green-600 hover:text-white py-2 rounded-xl text-[10px] font-black uppercase transition-all flex items-center justify-center gap-1 shadow-sm">
-                                <SafeEdit3 size={12} /> Update Stock
+                              }} className="flex-1 lg:flex-none px-4 py-2 bg-neutral-100 dark:bg-neutral-800 hover:bg-green-600 hover:text-white rounded-lg text-[10px] font-black uppercase transition-all flex items-center justify-center gap-1 border border-neutral-200 dark:border-neutral-700 shadow-sm">
+                                <SafeEdit3 size={12} /> Update
                               </button>
                               <button onClick={async () => {
                                 if (window.confirm('Delete this raw material permanently?')) {
                                   await deleteDoc(doc(db, "raw_materials", raw.id));
                                   toast.success("Deleted!");
                                 }
-                              }} className="p-2 bg-red-500/10 hover:bg-red-500 hover:text-white text-red-600 rounded-xl transition-all shadow-sm">
-                                <SafeTrash2 size={15} />
+                              }} className="px-3 py-2 bg-red-50 dark:bg-red-900/20 hover:bg-red-500 hover:text-white text-red-600 rounded-lg transition-all border border-red-100 dark:border-red-800 shadow-sm">
+                                <SafeTrash2 size={14} />
                               </button>
                             </div>
                           </div>
