@@ -4934,12 +4934,12 @@ const [rawActionType, setRawActionType] = useState<'add' | 'reduce' | 'set'>('ad
                     </div>
                   </div>
 
-                  {/* कच्चे माल की लिस्ट */}
+                 {/* कच्चे माल की लिस्ट */}
                   <div className="grid grid-cols-3 gap-4">
-                    {rawMaterials.length === 0 ? (
-                      <p className="text-center col-span-3 text-neutral-500 font-bold py-10 text-xs">कोई भी कच्चा माल (Raw Material) ऐड नहीं किया गया है।</p>
+                    {filteredRawMaterials.length === 0 ? (
+                      <p className="text-center col-span-3 text-neutral-500 font-bold py-10 text-xs">कोई भी कच्चा माल (Raw Material) नहीं मिला।</p>
                     ) : (
-                      rawMaterials.map(raw => {
+                      filteredRawMaterials.map(raw => {
                         const isLow = Number(raw.stock) <= Number(raw.lowAlert);
                         return (
                           <div key={raw.id} className={`bg-white dark:bg-neutral-900 border p-4 rounded-2xl flex flex-col justify-between shadow-sm ${isLow ? 'border-red-500 bg-red-50 dark:bg-red-950/20' : 'border-neutral-300 dark:border-neutral-700'}`}>
