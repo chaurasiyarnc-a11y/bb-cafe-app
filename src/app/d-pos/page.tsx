@@ -5939,7 +5939,20 @@ export default function BbCafeDesktopPos() {
                     const aov = totalAOV_Visits > 0 ? Math.round(totalAOV_Revenue / totalAOV_Visits) : 0;
                     const gamerRetentionPct = gamersCount > 0 ? Math.round((returningGamersCount / gamersCount) * 100) : 0;
                     fomoCustomers.sort((a, b) => ((b.points || 0) + (b.gamePoints || 0)) - ((a.points || 0) + (a.gamePoints || 0)));
+// 👉 NEW: Guest Demographics & Footfall
+                    let totalMen = 0; let totalWomen = 0; let totalKids = 0; let totalGuests = 0;
+                    let totalGuestRevenue = 0;
 
+                    pastReceipts.forEach(o => {
+                      if (o.status === 'completed' && o.guests && o.guests.total > 0) {
+                        totalMen += (o.guests.men || 0);
+                        totalWomen += (o.guests.women || 0);
+                        totalKids += (o.guests.kids || 0);
+                        totalGuests += (o.guests.total || 0);
+                        totalGuestRevenue += (Number(o.total) || 0);
+                      }
+                    });
+                    const avgPerHead = totalGuests > 0 ? Math.round(totalGuestRevenue / totalGuests) : 0;
                     // Peak Hours Calculation (Using Past Receipts)
                     const hourCounts: { [key: number]: number } = {};
                     pastReceipts.forEach(o => {
