@@ -7584,14 +7584,46 @@ export default function BbCafeDesktopPos() {
                   <input type="date" required value={purchaseDate} onChange={e=>setPurchaseDate(e.target.value)} className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-xl px-3 py-2.5 text-xs font-bold outline-none focus:border-blue-500 cursor-pointer" />
                 </div>
 
-                <div className="space-y-1">
+               {/* 👉 NEW: Smart Searchable Dropdown */}
+                <div className="space-y-1 relative">
                   <label className="text-[10px] font-black uppercase text-neutral-500">Item (कच्चा माल)</label>
-                  <select required value={purchaseItemId} onChange={e=>setPurchaseItemId(e.target.value)} className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-xl px-3 py-2.5 text-xs font-bold outline-none focus:border-blue-500 cursor-pointer">
-                    <option value="">-- माल चुनें --</option>
-                    {rawMaterials.map(rm => (
-                      <option key={rm.id} value={rm.id}>{rm.name} ({rm.unit})</option>
-                    ))}
-                  </select>
+                  <div className="relative">
+                    <input 
+                      type="text" 
+                      placeholder="🔍 कच्चा माल खोजें / चुनें..." 
+                      value={purchaseSearchTerm}
+                      onChange={e => {
+                        setPurchaseSearchTerm(e.target.value);
+                        setShowPurchaseDropdown(true);
+                        setPurchaseItemId(''); // टाइप करने पर पुराना चुनाव हट जाएगा
+                      }}
+                      onFocus={() => setShowPurchaseDropdown(true)}
+                      onBlur={() => setTimeout(() => setShowPurchaseDropdown(false), 200)}
+                      className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-xl px-3 py-2.5 text-xs font-bold outline-none focus:border-blue-500 cursor-text"
+                    />
+                    
+                    {/* लटकती हुई (Floating) लिस्ट जो टाइप करने पर फ़िल्टर होगी */}
+                    {showPurchaseDropdown && (
+                      <div className="absolute z-50 top-full left-0 right-0 mt-1 max-h-40 overflow-y-auto bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 rounded-xl shadow-xl">
+                        {rawMaterials.filter(rm => rm.name.toLowerCase().includes(purchaseSearchTerm.toLowerCase())).map(rm => (
+                          <div 
+                            key={rm.id} 
+                            onClick={() => {
+                              setPurchaseItemId(rm.id);
+                              setPurchaseSearchTerm(`${rm.name} (${rm.unit})`);
+                              setShowPurchaseDropdown(false);
+                            }}
+                            className="p-2.5 text-xs border-b border-neutral-100 dark:border-neutral-800 hover:bg-blue-50 dark:hover:bg-blue-900/30 cursor-pointer text-neutral-800 dark:text-neutral-200 transition-colors"
+                          >
+                            {rm.name} <span className="text-[10px] text-neutral-500">({rm.unit})</span>
+                          </div>
+                        ))}
+                        {rawMaterials.filter(rm => rm.name.toLowerCase().includes(purchaseSearchTerm.toLowerCase())).length === 0 && (
+                          <div className="p-2.5 text-xs text-neutral-500 text-center">कोई आइटम नहीं मिला</div>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
