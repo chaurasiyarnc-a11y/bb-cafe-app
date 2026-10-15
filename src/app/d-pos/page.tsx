@@ -1839,6 +1839,7 @@ const [rawActionType, setRawActionType] = useState<'add' | 'reduce' | 'set'>('ad
     setNewVariantPrice('');
     setSelectedRawId('');
     setSelectedRawQty('');
+    setRecipeSearchTerm(''); // 👉 NEW: Reset Search
     setIsItemEditorModalOpen(true);
   };
 
