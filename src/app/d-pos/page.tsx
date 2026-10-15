@@ -7497,7 +7497,7 @@ export default function BbCafeDesktopPos() {
                 ) : (
                   <div className="space-y-1">
                     <label className="text-[10px] font-black uppercase text-neutral-500">Initial Stock (शुरुआती स्टॉक)</label>
-                    <input type="number" required min={0} step="0.01" value={rawFormStock} onChange={e=>setRawFormStock(e.target.value === '' ? '' : Number(e.target.value))} placeholder="0.00" className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-xl px-3 py-2.5 text-xs font-mono font-bold outline-none focus:border-green-500" />
+                    <input type="number" required min={0} step="0.0001" value={rawFormStock} onChange={e=>setRawFormStock(e.target.value === '' ? '' : Number(e.target.value))} placeholder="0.00" className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-xl px-3 py-2.5 text-xs font-mono font-bold outline-none focus:border-green-500" />
                   </div>
                 )}
 
