@@ -1253,6 +1253,9 @@ export default function BbCafeDesktopPos() {
     setCart([]);
     setCustomerName('');
     setCustomerPhone('');
+    setGuestMen('');
+    setGuestWomen('');
+    setGuestKids('');
     setCartCustSearchInput(''); // <--- यह नई लाइन यहाँ भी जोड़ें
     setAddress('');
     setDiscountValue(0);
