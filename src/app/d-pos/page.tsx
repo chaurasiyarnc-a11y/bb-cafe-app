@@ -380,10 +380,17 @@ export default function BbCafeDesktopPos() {
   const [rawFormUnit, setRawFormUnit] = useState('Kg');
   const [rawFormStock, setRawFormStock] = useState<number | ''>('');
   const [rawFormLowAlert, setRawFormLowAlert] = useState<number | ''>(5);
-  const [editRawId, setEditRawId] = useState<string | null>(null);
+ const [editRawId, setEditRawId] = useState<string | null>(null);
+  
+  // 👉 NEW: Purchase Entry (माल चढ़ाने के लिए)
+  const [isPurchaseModalOpen, setIsPurchaseModalOpen] = useState(false);
+  const [purchaseDate, setPurchaseDate] = useState(new Date().toISOString().split('T')[0]);
+  const [purchaseItemId, setPurchaseItemId] = useState('');
+  const [purchaseQty, setPurchaseQty] = useState<number | ''>('');
+  const [purchaseRate, setPurchaseRate] = useState<number | ''>('');
   
   // 👉 NEW: Raw Material History & Stock Actions
-const [rawActionType, setRawActionType] = useState<'add' | 'reduce' | 'set'>('add');
+  const [rawActionType, setRawActionType] = useState<'add' | 'reduce' | 'set'>('add');
   const [rawActionQty, setRawActionQty] = useState<number | ''>('');
   const [rawTotalReceived, setRawTotalReceived] = useState<number>(0);
   const [rawTotalConsumed, setRawTotalConsumed] = useState<number>(0);
