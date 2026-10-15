@@ -7487,7 +7487,7 @@ export default function BbCafeDesktopPos() {
                     <input 
                       type="number" 
                       min={0} 
-                      step="0.01" 
+                      step="0.0001" 
                       value={rawActionQty} 
                       onChange={e=>setRawActionQty(e.target.value === '' ? '' : Number(e.target.value))} 
                       placeholder={rawActionType === 'add' ? `कितना ${rawFormUnit} नया आया?` : rawActionType === 'reduce' ? `कितना ${rawFormUnit} खराब/वेस्ट हुआ?` : 'नया स्टॉक बिलकुल सीधा लिखें...'} 
