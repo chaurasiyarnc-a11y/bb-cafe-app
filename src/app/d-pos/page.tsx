@@ -2343,6 +2343,9 @@ export default function BbCafeDesktopPos() {
       // Reset state & default pickup
       setCart([]); 
       setCustomerPhone(''); 
+      setGuestMen('');
+      setGuestWomen('');
+      setGuestKids('');
       setCustomerName(''); 
       setCartCustSearchInput('');  // <--- यह लाइन जोड़ें
       setAddress('');
