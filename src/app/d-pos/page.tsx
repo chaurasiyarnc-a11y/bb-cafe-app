@@ -7629,7 +7629,7 @@ export default function BbCafeDesktopPos() {
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
                     <label className="text-[10px] font-black uppercase text-neutral-500">Qty (मात्रा)</label>
-                    <input type="number" step="0.01" required min={0.01} value={purchaseQty} onChange={e=>setPurchaseQty(e.target.value === '' ? '' : Number(e.target.value))} placeholder="e.g. 10" className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-xl px-3 py-2.5 text-xs font-mono font-bold outline-none focus:border-blue-500" />
+                    <input type="number" step="0.0001" required min={0.0001} value={purchaseQty} onChange={e=>setPurchaseQty(e.target.value === '' ? '' : Number(e.target.value))} placeholder="e.g. 10" className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-xl px-3 py-2.5 text-xs font-mono font-bold outline-none focus:border-blue-500" />
                   </div>
                   <div className="space-y-1">
                     <label className="text-[10px] font-black uppercase text-neutral-500">Rate (भाव / ₹)</label>
