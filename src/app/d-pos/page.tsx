@@ -7319,12 +7319,22 @@ const [rawActionType, setRawActionType] = useState<'add' | 'reduce' | 'set'>('ad
                 <button onClick={() => setIsRawModalOpen(false)} className="text-neutral-500 hover:text-black dark:hover:text-white"><X size={20} /></button>
               </div>
               
-            <form onSubmit={async (e) => {
+           <form onSubmit={async (e) => {
                 e.preventDefault();
+                
+                const trimmedName = rawFormName.trim();
+                if (!trimmedName) return toast.error("नाम डालना अनिवार्य है!");
+
+                // 👉 NEW: Duplicate Check (एक ही नाम का माल दोबारा न बने)
+                const isDuplicate = rawMaterials.some(r => r.name.toLowerCase() === trimmedName.toLowerCase() && r.id !== editRawId);
+                if (isDuplicate) {
+                  return toast.error(`"${trimmedName}" नाम का माल पहले से मौजूद है! कृपया कोई दूसरा नाम दें।`);
+                }
+
                 const toastId = toast.loading("Saving...");
                 try {
                   let payload: any = { 
-                    name: rawFormName, 
+                    name: trimmedName, 
                     unit: rawFormUnit, 
                     lowAlert: Number(rawFormLowAlert) 
                   };
