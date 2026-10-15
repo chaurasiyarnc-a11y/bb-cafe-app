@@ -4830,12 +4830,14 @@ export default function BbCafeDesktopPos() {
                                </label>
                             </div>
 
-                            {/* 👉 NEW: Purchase Entry Button */}
+{/* 👉 NEW: Purchase Entry Button */}
                             <button onClick={() => { 
                               setPurchaseDate(new Date().toISOString().split('T')[0]);
                               setPurchaseItemId('');
                               setPurchaseQty('');
                               setPurchaseRate('');
+                              setPurchaseSearchTerm(''); // 👉 NEW: Reset search
+                              setShowPurchaseDropdown(false); // 👉 NEW: Close dropdown
                               setIsPurchaseModalOpen(true); 
                             }} className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase flex items-center gap-1.5 shadow">
                               <SafeFileText size={16} /> Purchase Entry (माल चढ़ाएं)
