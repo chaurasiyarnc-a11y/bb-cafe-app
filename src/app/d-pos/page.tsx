@@ -388,6 +388,8 @@ export default function BbCafeDesktopPos() {
   const [purchaseItemId, setPurchaseItemId] = useState('');
   const [purchaseQty, setPurchaseQty] = useState<number | ''>('');
   const [purchaseRate, setPurchaseRate] = useState<number | ''>('');
+  const [purchaseSearchTerm, setPurchaseSearchTerm] = useState(''); // 👉 NEW: Search state
+  const [showPurchaseDropdown, setShowPurchaseDropdown] = useState(false); // 👉 NEW: Dropdown visibility
   
   // 👉 NEW: Raw Material History & Stock Actions
   const [rawActionType, setRawActionType] = useState<'add' | 'reduce' | 'set'>('add');
