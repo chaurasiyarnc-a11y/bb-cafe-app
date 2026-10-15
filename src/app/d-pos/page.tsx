@@ -4895,8 +4895,21 @@ const [rawActionType, setRawActionType] = useState<'add' | 'reduce' | 'set'>('ad
                 </div>
                 </>
               ) : (
-                /* 👉 NEW: RAW MATERIALS DASHBOARD & UI */
+               /* 👉 NEW: RAW MATERIALS DASHBOARD & UI */
                 <div className="space-y-4">
+                  
+                  {/* 👉 NEW: Raw Material Search Bar */}
+                  <div className="relative">
+                    <SafeSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-500" size={16} />
+                    <input 
+                      type="text" 
+                      placeholder="कच्चा माल ढूँढें (Search by name)..." 
+                      value={rawSearchQuery}
+                      onChange={e => setRawSearchQuery(e.target.value)}
+                      className="w-full bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 rounded-xl py-2.5 pl-10 pr-4 text-xs font-bold outline-none"
+                    />
+                  </div>
+
                   {/* डैशबोर्ड समरी (Dashboard Summary) */}
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="bg-white dark:bg-neutral-900 p-4 rounded-2xl border border-neutral-300 dark:border-neutral-800 shadow-sm flex flex-col justify-center">
