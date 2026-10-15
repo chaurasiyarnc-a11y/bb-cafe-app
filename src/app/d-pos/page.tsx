@@ -4989,7 +4989,7 @@ export default function BbCafeDesktopPos() {
                             {/* Current Stock */}
                             <div className="w-full lg:w-1/5 flex lg:justify-start items-center">
                               <p className={`text-lg font-black font-mono ${isLow ? 'text-red-600' : 'text-neutral-800 dark:text-neutral-200'}`}>
-                                {Number(raw.stock).toFixed(2).replace(/\.00$/, '')} <span className="text-[10px] text-neutral-500 uppercase">{raw.unit}</span>
+                                {Number(raw.stock).toFixed(4).replace(/\.?0+$/, '')} <span className="text-[10px] text-neutral-500 uppercase">{raw.unit}</span>
                               </p>
                             </div>
                             
@@ -4997,12 +4997,12 @@ export default function BbCafeDesktopPos() {
                             <div className="w-full lg:w-1/4 flex gap-4 lg:justify-center items-center text-[10px]">
                                <div className="text-center">
                                   <p className="font-black uppercase text-neutral-400">Total In</p>
-                                  <p className="font-bold text-green-600 dark:text-green-400">{Number(raw.totalReceived || 0).toFixed(2).replace(/\.00$/, '')}</p>
+                                  <p className="font-bold text-green-600 dark:text-green-400">{Number(raw.totalReceived || 0).toFixed(4).replace(/\.?0+$/, '')}</p>
                                </div>
                                <div className="w-px h-6 bg-neutral-200 dark:bg-neutral-700"></div>
                                <div className="text-center">
                                   <p className="font-black uppercase text-neutral-400">Consumed</p>
-                                  <p className="font-bold text-orange-600 dark:text-orange-400">{Number(raw.totalConsumed || 0).toFixed(2).replace(/\.00$/, '')}</p>
+                                  <p className="font-bold text-orange-600 dark:text-orange-400">{Number(raw.totalConsumed || 0).toFixed(4).replace(/\.?0+$/, '')}</p>
                                </div>
                             </div>
                             
