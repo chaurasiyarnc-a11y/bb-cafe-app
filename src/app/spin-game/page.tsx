@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { db } from "@/lib/firebase";
-import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
+// 👉 NEW: getDocFromServer जोड़ा गया है ताकि सफारी Cache इस्तेमाल न कर सके
+import { doc, getDoc, getDocFromServer, setDoc, serverTimestamp } from "firebase/firestore";
 import toast, { Toaster } from "react-hot-toast";
 import GameGuard from "@/components/GameGuard";
 import confetti from "canvas-confetti"; 
@@ -18,7 +19,7 @@ const formatNameTitleCase = (text: string) => {
 };
 const isValidIndianPhone = (phone: string) => /^[6-9]\d{9}$/.test(phone);
 
-// 🎡 स्पिन व्हील के इनाम (रेशियो के साथ)
+// 🎡 स्पिन व्हील के इनाम 
 const PRIZES = [
   { label: "Better Luck", points: 0, type: "none", color: "#ef4444" }, // 0: Red
   { label: "10 Coupon", points: 10, type: "points", color: "#eab308" }, // 1: Yellow
@@ -28,7 +29,7 @@ const PRIZES = [
   { label: "Sandwich", points: 0, type: "food", color: "#a855f7" }  // 5: Purple
 ];
 
-// 🎵 AUDIO SYSTEM (साउंड इफेक्ट्स के लिए)
+// 🎵 AUDIO SYSTEM 
 let globalAudioCtx: AudioContext | null = null;
 const initAudio = () => {
   if (!globalAudioCtx) {
@@ -113,29 +114,23 @@ function Wheel3D({ isSpinning, prizeIndex }: { isSpinning: boolean; prizeIndex: 
 
   return (
     <group>
-      {/* 📍 Pointer (Glowing Neon Pointer) */}
       <mesh position={[0, 3.4, 0]} rotation={[0, 0, Math.PI]}>
         <coneGeometry args={[0.35, 0.8, 4]} />
         <meshStandardMaterial color="#fcd34d" emissive="#d97706" emissiveIntensity={1} metalness={0.8} roughness={0.2} />
       </mesh>
 
-      {/* 🎡 Main Wheel */}
       <group rotation={[Math.PI / 2, 0, 0]} ref={wheelRef}>
-        
-        {/* 💍 Golden Outer Ring */}
         <mesh position={[0, 0.1, 0]}>
           <torusGeometry args={[2.9, 0.15, 32, 100]} />
           <meshStandardMaterial color="#fbbf24" emissive="#b45309" emissiveIntensity={0.4} metalness={0.9} roughness={0.1} />
         </mesh>
 
-        {/* 🍕 Slices */}
         {PRIZES.map((prize, idx) => (
           <group key={idx} rotation={[0, idx * angle, 0]}>
             <mesh>
               <cylinderGeometry args={[2.8, 2.8, 0.3, 32, 1, false, 0, angle]} />
               <meshStandardMaterial color={prize.color} metalness={0.2} roughness={0.4} />
             </mesh>
-            
             <group rotation={[0, angle / 2, 0]}>
               <Text
                 position={[0, 0.16, 1.8]} 
@@ -154,7 +149,6 @@ function Wheel3D({ isSpinning, prizeIndex }: { isSpinning: boolean; prizeIndex: 
           </group>
         ))}
 
-        {/* 🔘 Center Pin */}
         <mesh position={[0, 0.25, 0]}>
           <cylinderGeometry args={[0.5, 0.5, 0.3, 32]} />
           <meshStandardMaterial color="#fbbf24" metalness={0.8} roughness={0.2} />
@@ -182,6 +176,17 @@ export default function SpinGamePage() {
   const [targetPrizeIdx, setTargetPrizeIdx] = useState(0);
   const [wonPrize, setWonPrize] = useState<any>(null);
   const [voucherCode, setVoucherCode] = useState("");
+
+  // 👉 NEW: Safari Back-Forward Cache (BF-Cache) Fix
+  useEffect(() => {
+    const handlePageShow = (e: PageTransitionEvent) => {
+      if (e.persisted) {
+        window.location.reload(); // अगर सफारी बैक बटन से मेमोरी से पेज लोड करे तो उसे ज़बरदस्ती रिफ्रेश करो
+      }
+    };
+    window.addEventListener("pageshow", handlePageShow);
+    return () => window.removeEventListener("pageshow", handlePageShow);
+  }, []);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -219,7 +224,6 @@ export default function SpinGamePage() {
     const FORTY_MINUTES = 40 * 60 * 1000;
     const now = Date.now();
 
-    // 1. डिवाइस लेवल चेक (LocalStorage + Cookies Fallback for Safari)
     const getDeviceCooldown = () => {
       try {
         let ls = localStorage.getItem("spin_game_cooldown");
@@ -242,12 +246,21 @@ export default function SpinGamePage() {
 
     try {
       const userRef = doc(db, "customer_points", cleanPhone);
-      const userSnap = await getDoc(userRef);
+      // 👉 FIX 1: getDocFromServer का इस्तेमाल ताकि सफारी अपना Cache इस्तेमाल न कर सके
+      const userSnap = await getDocFromServer(userRef);
 
       if (userSnap.exists()) {
         const data = userSnap.data();
-        if (data.lastPlayedAt && typeof data.lastPlayedAt.toDate === 'function') {
-          const lastPlayedTime = data.lastPlayedAt.toDate().getTime();
+        
+        // 👉 FIX 2: सफारी के लिए Robust Date Parser
+        let lastPlayedTime = 0;
+        if (data.lastPlayedAt) {
+          if (typeof data.lastPlayedAt.toDate === 'function') lastPlayedTime = data.lastPlayedAt.toDate().getTime();
+          else if (data.lastPlayedAt.seconds) lastPlayedTime = data.lastPlayedAt.seconds * 1000;
+          else lastPlayedTime = new Date(data.lastPlayedAt).getTime();
+        }
+
+        if (lastPlayedTime > 0) {
           const elapsedDb = now - lastPlayedTime;
           if (elapsedDb < FORTY_MINUTES) {
             setIsLoading(false);
@@ -257,7 +270,6 @@ export default function SpinGamePage() {
         }
       }
 
-      // 👉 गेम स्टार्ट करते ही डिवाइस और मोबाइल नंबर दोनों को तुरंत 40 मिनट के लिए लॉक कर दें
       try {
         localStorage.setItem("spin_game_cooldown", now.toString());
       } catch(e) {}
@@ -268,7 +280,7 @@ export default function SpinGamePage() {
         phone: cleanPhone, 
         table: tableNo,
         lastActive: serverTimestamp(),
-        lastPlayedAt: serverTimestamp(), // 👉 यहाँ तुरंत नंबर लॉक हो जाएगा
+        lastPlayedAt: serverTimestamp(), 
         importSource: 'SpinGame'
       }, { merge: true });
 
@@ -278,7 +290,7 @@ export default function SpinGamePage() {
       toast.success("Ready to Spin! 🎰", { icon: '✨' });
 
     } catch (err) {
-      toast.error("सर्वर त्रुटि! पुनः प्रयास करें।");
+      toast.error("सर्वर से कनेक्ट होने में समस्या आई। पुनः प्रयास करें!");
     } finally {
       setIsLoading(false);
     }
@@ -289,16 +301,15 @@ export default function SpinGamePage() {
     initAudio(); 
     playSound('win'); 
     
-    // 🎲 विनिंग रेशियो लॉजिक (New Winning Ratio)
     const randomChance = Math.random() * 100;
     let pIndex = 0;
 
-    if (randomChance < 70) pIndex = 0;      // 70% Better Luck
-    else if (randomChance < 92) pIndex = 1; // 22% 10 Coupon
-    else if (randomChance < 94) pIndex = 2; // 2% Manchurian Half
-    else if (randomChance < 97) pIndex = 3; // 3% 20 Coupon
-    else if (randomChance < 99) pIndex = 4; // 2% Manchurian Rice
-    else pIndex = 5;                        // 1% Sandwich
+    if (randomChance < 70) pIndex = 0;      
+    else if (randomChance < 92) pIndex = 1; 
+    else if (randomChance < 94) pIndex = 2; 
+    else if (randomChance < 97) pIndex = 3; 
+    else if (randomChance < 99) pIndex = 4; 
+    else pIndex = 5;                        
 
     setTargetPrizeIdx(pIndex);
     setIsSpinning(true);
@@ -311,7 +322,8 @@ export default function SpinGamePage() {
   const savePrizeToDatabase = async (prize: any) => {
     try {
       const userRef = doc(db, "customer_points", phone);
-      const userSnap = await getDoc(userRef);
+      // यहाँ भी getDocFromServer इस्तेमाल किया गया है
+      const userSnap = await getDocFromServer(userRef);
       
       let prevGamePoints = 0; 
       let todayGamePoints = 0;
@@ -363,7 +375,6 @@ export default function SpinGamePage() {
       } catch(e) {}
       document.cookie = `spin_game_cooldown=${Date.now()}; max-age=${40 * 60}; path=/`;
 
-      // 🎉 Celebration Effects
       if (isWinner) {
         playSound('win');
         confetti({ particleCount: 150, spread: 80, origin: { y: 0.6 }, colors: ['#a855f7', '#fbbf24', '#22c55e'] });
