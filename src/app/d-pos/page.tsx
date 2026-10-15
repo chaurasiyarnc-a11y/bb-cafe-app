@@ -461,7 +461,11 @@ export default function BbCafeDesktopPos() {
 
   // Held Carts Storage
   const [heldCarts, setHeldCarts] = useState<HeldCart[]>([]);
-
+// 👉 NEW: Guest Counter States
+  const [isGuestModalOpen, setIsGuestModalOpen] = useState(false);
+  const [guestMen, setGuestMen] = useState<number | ''>('');
+  const [guestWomen, setGuestWomen] = useState<number | ''>('');
+  const [guestKids, setGuestKids] = useState<number | ''>('');
   // Variation Modal (Keyboard First!)
   const [isVariationModalOpen, setIsVariationModalOpen] = useState(false);
   const [selectedProductForVariation, setSelectedProductForVariation] = useState<any>(null);
