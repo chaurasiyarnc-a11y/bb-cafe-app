@@ -15,21 +15,18 @@ const isValidIndianPhone = (phone: string) => /^[6-9]\d{9}$/.test(phone);
 
 // 🎡 स्पिन व्हील के इनाम (6 हिस्से) 
 const PRIZES = [
-  { label: "Better Luck", points: 0, type: "none", color: "#ef4444" }, // 0: Red (70%)
-  { label: "10 कूपन", points: 10, type: "points", color: "#eab308" }, // 1: Yellow (20%)
-  { label: "Manchurian Half", points: 0, type: "food", color: "#3b82f6" }, // 2: Blue (3%)
-  { label: "20 कूपन", points: 20, type: "points", color: "#22c55e" }, // 3: Green (3%)
-  { label: "Manchurian Rice", points: 0, type: "food", color: "#f97316" }, // 4: Orange (3%)
-  { label: "Sandwich", points: 0, type: "food", color: "#a855f7" }  // 5: Purple (1%)
+  { label: "Better Luck", points: 0, type: "none", color: "#ef4444" }, // 0: Red 
+  { label: "10 कूपन", points: 10, type: "points", color: "#eab308" }, // 1: Yellow 
+  { label: "Manchurian Half", points: 0, type: "food", color: "#3b82f6" }, // 2: Blue 
+  { label: "20 कूपन", points: 20, type: "points", color: "#22c55e" }, // 3: Green 
+  { label: "Manchurian Rice", points: 0, type: "food", color: "#f97316" }, // 4: Orange 
+  { label: "Sandwich", points: 0, type: "food", color: "#a855f7" }  // 5: Purple 
 ];
 
 export default function SpinGamePage() {
   const [step, setStep] = useState<"login" | "playing" | "gameover">("login");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
-  
-  const [birthDay, setBirthDay] = useState(""); 
-  const [birthMonth, setBirthMonth] = useState(""); 
   
   const [tableNo, setTableNo] = useState<string>("सामान्य टेबल");
   const [isLoading, setIsLoading] = useState(false);
@@ -59,21 +56,9 @@ export default function SpinGamePage() {
             setName(data.name); 
             setIsReturningUser(true);
           }
-          if (data.specialDates && Array.isArray(data.specialDates)) {
-            const bdayEntry = data.specialDates.find((d: any) => d.type === 'Birthday');
-            if (bdayEntry && bdayEntry.date) {
-              const parts = bdayEntry.date.split("-"); 
-              if (parts.length === 3) {
-                setBirthMonth(parts[1]);
-                setBirthDay(parts[2]);
-              }
-            }
-          }
         } else {
           setIsReturningUser(false); 
           setName("");
-          setBirthMonth("");
-          setBirthDay("");
         }
       });
     } else {
@@ -88,7 +73,6 @@ export default function SpinGamePage() {
     
     if (cleanName.length < 2) return toast.error("कृपया सही नाम दर्ज करें!");
     if (!isValidIndianPhone(cleanPhone)) return toast.error("सही 10-अंकों का नंबर डालें!");
-    if (!birthDay || !birthMonth) return toast.error("कृपया अपने जन्मदिन की तारीख और महीना चुनें!");
 
     setIsLoading(true);
     
@@ -110,7 +94,6 @@ export default function SpinGamePage() {
     try {
       const userRef = doc(db, "customer_points", cleanPhone);
       const userSnap = await getDoc(userRef);
-      let existingSpecialDates: any[] = [];
 
       if (userSnap.exists()) {
         const data = userSnap.data();
@@ -126,27 +109,16 @@ export default function SpinGamePage() {
           }
         }
 
-        existingSpecialDates = data.specialDates || [];
         const todayStr = new Date().toDateString();
         if (data.lastGameDate === todayStr && data.todayGamePoints >= 50) {
           toast("⚠️ आप आज के कूपन की लिमिट पार कर चुके हैं, लेकिन खाने के इनाम जीत सकते हैं!", { icon: '🎡' });
         }
       }
 
-      const formattedDate = `2000-${birthMonth}-${birthDay}`;
-      const bdayIndex = existingSpecialDates.findIndex((d: any) => d.type === 'Birthday' && d.name === cleanName);
-      
-      if (bdayIndex > -1) {
-        existingSpecialDates[bdayIndex].date = formattedDate; 
-      } else {
-        existingSpecialDates.push({ type: 'Birthday', date: formattedDate, name: cleanName }); 
-      }
-
       await setDoc(userRef, { 
         name: cleanName, 
         phone: cleanPhone, 
         table: tableNo,
-        specialDates: existingSpecialDates, 
         lastActive: serverTimestamp(),
         importSource: 'SpinGame'
       }, { merge: true });
@@ -168,15 +140,16 @@ export default function SpinGamePage() {
     if (isSpinning) return;
     setIsSpinning(true);
     
+    // 👇 यहाँ से आप जीतने का रेशियो बदल सकते हैं (Updated Ratios)
     const randomChance = Math.random() * 100;
     let prizeIndex = 0;
 
-    if (randomChance < 70) prizeIndex = 0; 
-    else if (randomChance < 90) prizeIndex = 1; 
-    else if (randomChance < 93) prizeIndex = 2; 
-    else if (randomChance < 96) prizeIndex = 3; 
-    else if (randomChance < 99) prizeIndex = 4; 
-    else prizeIndex = 5; 
+    if (randomChance < 70) prizeIndex = 0;      // 70% Better Luck
+    else if (randomChance < 92) prizeIndex = 1; // 22% 10 कूपन
+    else if (randomChance < 94) prizeIndex = 2; // 2% Manchurian Half
+    else if (randomChance < 97) prizeIndex = 3; // 3% 20 कूपन
+    else if (randomChance < 99) prizeIndex = 4; // 2% Manchurian Rice
+    else prizeIndex = 5;                        // 1% Sandwich
 
     const spins = 5; 
     const degreesPerSlice = 360 / PRIZES.length;
@@ -279,29 +252,10 @@ export default function SpinGamePage() {
                 </span>
               </p>
               
-              <form onSubmit={handleStartGame} className="space-y-3 pt-2">
-                <input type="tel" maxLength={10} placeholder="10-अंकों का মোবাইল नंबर" value={phone} onChange={e => setPhone(e.target.value.replace(/\D/g, ""))} required className="w-full bg-[#0f172a] border-2 border-purple-500 text-center py-3 rounded-xl outline-none text-white focus:border-purple-400 font-mono" />
+              <form onSubmit={handleStartGame} className="space-y-4 pt-2">
+                <input type="tel" maxLength={10} placeholder="10-अंकों का मोबाइल नंबर" value={phone} onChange={e => setPhone(e.target.value.replace(/\D/g, ""))} required className="w-full bg-[#0f172a] border-2 border-purple-500 text-center py-3 rounded-xl outline-none text-white focus:border-purple-400 font-mono" />
                 <input type="text" placeholder="आपका नाम" value={name} onChange={(e) => setName(formatNameTitleCase(e.target.value))} required className="w-full bg-[#0f172a] border-2 border-purple-500 text-center py-3 rounded-xl outline-none text-white focus:border-purple-400 font-bold" />
                 
-                <div className="mt-3 pt-3 border-t border-[#334155] space-y-2">
-                  <p className="text-[11px] font-bold text-pink-400 text-left leading-tight">
-                    🎂 अपना या अपने बच्चे का असली जन्मदिन (Birth Date) चुनें <span className="text-white">(अनिवार्य)</span>:
-                  </p>
-                  <div className="flex gap-2">
-                    <select value={birthDay} onChange={(e) => setBirthDay(e.target.value)} required className={`w-1/2 bg-[#0f172a] border-2 text-center text-sm py-3 rounded-xl outline-none appearance-none ${birthDay ? "border-green-500 text-green-400 font-bold" : "border-pink-500 text-white"}`}>
-                      <option value="" disabled>तारीख *</option>
-                      {Array.from({ length: 31 }, (_, i) => <option key={i+1} value={String(i+1).padStart(2, '0')}>{i+1}</option>)}
-                    </select>
-                    <select value={birthMonth} onChange={(e) => setBirthMonth(e.target.value)} required className={`w-1/2 bg-[#0f172a] border-2 text-center text-sm py-3 rounded-xl outline-none appearance-none ${birthMonth ? "border-green-500 text-green-400 font-bold" : "border-pink-500 text-white"}`}>
-                      <option value="" disabled>महीना *</option>
-                      {["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"].map((m, i) => <option key={m} value={m}>{new Date(0, i).toLocaleString('en', {month:'short'})}</option>)}
-                    </select>
-                  </div>
-                  <p className="text-[10px] text-yellow-400 font-bold text-left bg-yellow-900/20 p-2 rounded-lg border border-yellow-500/30">
-                    ⚠️ कृपया आज की तारीख न चुनें। अपना असली जन्मदिन ही डालें ताकि आपको आपके जन्मदिन पर स्पेशल गिफ्ट मिल सके!
-                  </p>
-                </div>
-
                 <button type="submit" disabled={isLoading} className="w-full py-4 bg-purple-600 hover:bg-purple-500 text-white font-black text-sm rounded-xl uppercase tracking-wider shadow-lg disabled:opacity-50 mt-4">
                   {isLoading ? "प्रतीक्षा करें..." : "▶ व्हील के पास जाएँ"}
                 </button>
