@@ -6007,7 +6007,42 @@ export default function BbCafeDesktopPos() {
                             <p className="text-[9px] text-emerald-700 dark:text-emerald-300 font-bold mt-1">पिछले 7 दिनों में पहली बार आए</p>
                           </div>
                         </div>
-
+{/* 👉 NEW: GUEST DEMOGRAPHICS BOX */}
+                        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/10 dark:to-indigo-900/10 border border-blue-200 dark:border-blue-800/30 p-5 rounded-3xl mt-4 mb-4 shadow-sm flex flex-col md:flex-row justify-between md:items-center gap-4">
+                          <div>
+                            <h3 className="text-sm font-black uppercase text-blue-700 dark:text-blue-500 flex items-center gap-1.5">
+                              👥 Guest Demographics & Footfall
+                            </h3>
+                            <p className="text-[10px] text-blue-700/70 dark:text-blue-400/70 font-bold mt-1">
+                              कैफे में आने वाले लोगों का रिकॉर्ड
+                            </p>
+                          </div>
+                          
+                          <div className="flex gap-2 sm:gap-4 items-center bg-white dark:bg-neutral-900 p-3 rounded-2xl shadow-sm border border-neutral-100 dark:border-neutral-800 overflow-x-auto no-scrollbar">
+                            <div className="text-center px-2 border-r border-neutral-200 dark:border-neutral-700">
+                              <p className="text-[10px] font-black uppercase text-neutral-500">👨 Men</p>
+                              <p className="text-lg font-black font-mono text-neutral-800 dark:text-neutral-200">{totalMen}</p>
+                            </div>
+                            <div className="text-center px-2 border-r border-neutral-200 dark:border-neutral-700">
+                              <p className="text-[10px] font-black uppercase text-neutral-500">👩 Women</p>
+                              <p className="text-lg font-black font-mono text-neutral-800 dark:text-neutral-200">{totalWomen}</p>
+                            </div>
+                            <div className="text-center px-2 border-r border-neutral-200 dark:border-neutral-700">
+                              <p className="text-[10px] font-black uppercase text-neutral-500">👶 Kids</p>
+                              <p className="text-lg font-black font-mono text-neutral-800 dark:text-neutral-200">{totalKids}</p>
+                            </div>
+                            <div className="text-center px-2">
+                              <p className="text-[10px] font-black uppercase text-blue-600">Total</p>
+                              <p className="text-lg font-black font-mono text-blue-600">{totalGuests}</p>
+                            </div>
+                            <div className="bg-blue-100 dark:bg-blue-900/30 px-3 py-1.5 rounded-xl border border-blue-200 dark:border-blue-800/50 text-center ml-2">
+                              <p className="text-[10px] font-black uppercase text-blue-700 dark:text-blue-400">Avg / Head</p>
+                              <p className="text-lg font-black font-mono text-blue-600 dark:text-blue-400">
+                                ₹{avgPerHead}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
                         {/* 📈 ROW 2: CHARTS & ACQUISITION TREND */}
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                           
