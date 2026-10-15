@@ -2564,10 +2564,10 @@ const [rawActionType, setRawActionType] = useState<'add' | 'reduce' | 'set'>('ad
         pointsDiscount: redeemed,
         remainingPoints: remainingPts,
         customerPoints: remainingPts,
-        upiId: upiIdConfig,
+       upiId: upiIdConfig,
         promoCodeUsed: appliedPromoName || null, // 👉 NEW: यहाँ सेव होगा कि कौन सा कूपन यूज़ हुआ
         pointsProcessed: true, // 👉 NEW: ताकि दोबारा पॉइंट्स न जुड़ें
-        stockProcessed: true   // 👉 NEW: ताकि दोबारा स्टॉक न कटे
+        stockProcessed: false  // 👉 FIX: इसे false करना होगा, ताकि बिल सेटल (चुकाने) पर स्टॉक कटे!
       };
 
       if (activeEditingOrderId) {
