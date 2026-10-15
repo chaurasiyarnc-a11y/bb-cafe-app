@@ -371,8 +371,9 @@ export default function BbCafeDesktopPos() {
   const [mergeSourceCat, setMergeSourceCat] = useState('');
   const [mergeTargetCat, setMergeTargetCat] = useState('');
 
-  // 👉 NEW: Raw Material States (कच्चे माल के लिए)
+ // 👉 NEW: Raw Material States (कच्चे माल के लिए)
   const [rawMaterials, setRawMaterials] = useState<any[]>([]);
+  const [rawSearchQuery, setRawSearchQuery] = useState(''); // 👉 NEW: Raw Search
   const [inventorySubTab, setInventorySubTab] = useState<'menu' | 'raw'>('menu');
   const [isRawModalOpen, setIsRawModalOpen] = useState(false);
   const [rawFormName, setRawFormName] = useState('');
