@@ -6735,14 +6735,20 @@ export default function BbCafeDesktopPos() {
                         </div>
                       )}
                     </div>
-
-                    {/* अगर आइटम में Variants हैं, तो ये ड्रॉपडाउन दिखेगा */}
+{/* अगर आइटम में Variants हैं, तो ये ड्रॉपडाउन दिखेगा */}
                     {hasVariants && Object.keys(itemVariantsList).length > 0 && (
-                      <select value={selectedRawVariant} onChange={e => setSelectedRawVariant(e.target.value)} className="w-24 bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-lg p-2 text-xs font-bold outline-none cursor-pointer focus:border-orange-500">
-                        <option value="All">All Sizes</option>
+                      <select value={selectedRawVariant} onChange={e => setSelectedRawVariant(e.target.value)} className="w-20 bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-lg p-2 text-xs font-bold outline-none cursor-pointer focus:border-orange-500">
+                        <option value="All">All Size</option>
                         {Object.keys(itemVariantsList).map(v => <option key={v} value={v}>{v}</option>)}
                       </select>
                     )}
+
+                    {/* 👉 NEW: Dine-in / Parcel Selector */}
+                    <select value={selectedRawOrderType} onChange={e => setSelectedRawOrderType(e.target.value)} className="w-20 bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-lg p-2 text-xs font-bold outline-none cursor-pointer focus:border-blue-500">
+                      <option value="All">All Type</option>
+                      <option value="Parcel">Parcel</option>
+                      <option value="Table">Dine-in</option>
+                    </select>
 
                     <input type="number" step="0.0001" min={0} placeholder="Qty" value={selectedRawQty} onChange={e => setSelectedRawQty(e.target.value === '' ? '' : Number(e.target.value))} className="w-16 bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-lg p-2 text-xs font-mono outline-none focus:border-green-500 text-center" />
                     
@@ -6755,10 +6761,11 @@ export default function BbCafeDesktopPos() {
                           name: matched.name, 
                           qty: Number(selectedRawQty), 
                           unit: matched.unit,
-                          variant: hasVariants ? selectedRawVariant : 'All' 
+                          variant: hasVariants ? selectedRawVariant : 'All',
+                          orderType: selectedRawOrderType // 👉 NEW: Save Parcel/Table logic
                         }]);
-                        setSelectedRawId(''); setSelectedRawQty(''); setSelectedRawVariant('All');
-                        setRecipeSearchTerm(''); // 👉 Add करने के बाद बॉक्स को खाली कर दें
+                        setSelectedRawId(''); setSelectedRawQty(''); setSelectedRawVariant('All'); setSelectedRawOrderType('All');
+                        setRecipeSearchTerm(''); 
                       }
                     }} className="bg-green-600 hover:bg-green-500 text-white px-3 rounded-lg font-black text-[10px] uppercase shadow-sm">Add</button>
                   </div>
