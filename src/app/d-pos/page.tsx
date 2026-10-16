@@ -392,16 +392,19 @@ export default function BbCafeDesktopPos() {
   const [showPurchaseDropdown, setShowPurchaseDropdown] = useState(false); // 👉 NEW: Dropdown visibility
   const [purchaseItemList, setPurchaseItemList] = useState<any[]>([]); // 👉 NEW: Bulk लिस्ट के लिए
   // 👉 NEW: Purchase History States & Function (माल का खाता)
-  const [isPurchaseHistoryModalOpen, setIsPurchaseHistoryModalOpen] = useState(false);
+const [isPurchaseHistoryModalOpen, setIsPurchaseHistoryModalOpen] = useState(false);
   const [purchaseHistoryList, setPurchaseHistoryList] = useState<any[]>([]);
   const [isPurchaseHistoryLoading, setIsPurchaseHistoryLoading] = useState(false);
+  
+  // 👉 NEW: Custom Dates for Purchase History
+  const [phStartDate, setPhStartDate] = useState(new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0]);
+  const [phEndDate, setPhEndDate] = useState(new Date().toISOString().split('T')[0]);
 
   const handleOpenPurchaseHistory = async () => {
     setIsPurchaseHistoryModalOpen(true);
     setIsPurchaseHistoryLoading(true);
     try {
-      // फायरबेस से सारा खरीदा हुआ माल मंगा रहे हैं (सबसे नया पहले)
-      const q = query(collection(db, "raw_purchases"), orderBy("timestamp", "desc"), limit(200));
+      const q = query(collection(db, "raw_purchases"), orderBy("timestamp", "desc"), limit(500));
       const snap = await getDocs(q);
       setPurchaseHistoryList(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     } catch (e) {
@@ -410,20 +413,22 @@ export default function BbCafeDesktopPos() {
       setIsPurchaseHistoryLoading(false);
     }
   };
-  // 👉 NEW: Month End Stock Report States & Function
+
+  // 👉 NEW: Month End Stock Report States & Functions
   const [isStockReportModalOpen, setIsStockReportModalOpen] = useState(false);
   
- const handleDownloadStockReport = () => {
+  const handleDownloadStockReport = () => {
     let csv = "Item Name (माल का नाम),Opening Stock (प्रारंभिक),Received/Purchase (नई खरीद),Total Available (कुल उपलब्ध),Consumed/Used (खपत),Closing Stock (अंतिम स्टॉक),Physical Stock (असली गोदाम स्टॉक),Rate (भाव),Total Amount (कुल कीमत)\n";
     rawMaterials.forEach(r => {
+      const opening = Number(r.openingStock) || 0; 
       const totalIn = Number(r.totalReceived) || 0;
       const totalOut = Number(r.totalConsumed) || 0;
-      const expected = totalIn - totalOut;
+      const expected = opening + totalIn - totalOut;
       const actual = Number(r.stock) || 0;
-      const rate = Number(r.lastRate) || 0; // 👉 NEW: भाव निकाला
-      const amount = actual * rate;         // 👉 NEW: स्टॉक x भाव = कीमत
+      const rate = Number(r.lastRate) || 0; 
+      const amount = actual * rate;         
       
-      csv += `"${r.name}","0 ${r.unit}",${totalIn} ${r.unit},${totalIn} ${r.unit},${totalOut} ${r.unit},${expected} ${r.unit},${actual} ${r.unit},Rs.${rate},Rs.${amount.toFixed(2)}\n`;
+      csv += `"${r.name}","${opening} ${r.unit}",${totalIn} ${r.unit},${(opening + totalIn)} ${r.unit},${totalOut} ${r.unit},${expected} ${r.unit},${actual} ${r.unit},Rs.${rate},Rs.${amount.toFixed(2)}\n`;
     });
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement("a");
@@ -431,6 +436,36 @@ export default function BbCafeDesktopPos() {
     link.download = `Month_End_Stock_Report_${new Date().toISOString().split('T')[0]}.csv`;
     link.click();
     toast.success("स्टॉक रिपोर्ट डाउनलोड हो गई! 📥");
+  };
+
+  // 👉 NEW: Close Month Function (महीना बंद करने का कोड)
+  const handleCloseMonth = async () => {
+    if (!window.confirm("⚠️ चेतावनी: क्या आपने गोदाम में सारा असली माल गिन लिया है और उसे 'Update' बटन से 'सीधा लिखें' कर दिया है?\n\nयह बटन दबाने से 'मिसमैच (Mismatch)' ख़त्म हो जाएगा और आज का बचा हुआ माल (Physical Stock) अगले महीने का 'प्रारंभिक (Opening) स्टॉक' बन जाएगा। क्या आप सच में इस महीने का खाता क्लोज करना चाहते हैं?")) return;
+    
+    const toastId = toast.loading("इस महीने का खाता क्लोज हो रहा है...");
+    try {
+      let batch = writeBatch(db);
+      let count = 0;
+      
+      rawMaterials.forEach(r => {
+        const rawRef = doc(db, "raw_materials", r.id);
+        const currentPhysicalStock = Number(r.stock) || 0;
+        
+        batch.update(rawRef, {
+          openingStock: currentPhysicalStock, 
+          totalReceived: 0,                   
+          totalConsumed: 0                    
+        });
+        count++;
+      });
+      
+      await batch.commit();
+      toast.dismiss(toastId);
+      toast.success(`खाता क्लोज्ड! 🎉 सभी ${count} आइटम्स का नया महीना शुरू हो गया!`);
+    } catch (error) {
+      toast.dismiss(toastId);
+      toast.error("महीना क्लोज करने में समस्या आई!");
+    }
   };
   // 👉 NEW: Raw Material History & Stock Actions
   const [rawActionType, setRawActionType] = useState<'add' | 'reduce' | 'set'>('add');
