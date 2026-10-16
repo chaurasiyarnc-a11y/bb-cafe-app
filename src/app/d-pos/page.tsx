@@ -8071,48 +8071,125 @@ export default function BbCafeDesktopPos() {
                 </div>
               </div>
 
-              <div className="flex-1 overflow-y-auto border border-neutral-200 dark:border-neutral-800 rounded-xl bg-neutral-50 dark:bg-neutral-900/50">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-neutral-200 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 sticky top-0">
+              {/* 👉 NEW: TOTALS SUMMARY CARDS (टेबल के ऊपर) */}
+              {(() => {
+                const totalExpectedVal = rawMaterials.reduce((sum, r) => sum + ((Number(r.totalReceived) || 0) - (Number(r.totalConsumed) || 0)) * (Number(r.lastRate) || 0), 0);
+                const totalActualVal = rawMaterials.reduce((sum, r) => sum + ((Number(r.stock) || 0) * (Number(r.lastRate) || 0)), 0);
+                const diffVal = totalExpectedVal - totalActualVal;
+                
+                return (
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 shrink-0">
+                    <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-xl border border-blue-200 dark:border-blue-800/50">
+                      <p className="text-[10px] font-black uppercase text-blue-600">कुल प्रकार का माल</p>
+                      <p className="text-lg font-black font-mono text-blue-700 dark:text-blue-400">{rawMaterials.length} Items</p>
+                    </div>
+                    <div className="bg-purple-50 dark:bg-purple-900/20 p-3 rounded-xl border border-purple-200 dark:border-purple-800/50">
+                      <p className="text-[10px] font-black uppercase text-purple-600">सिस्टम में माल (Expected)</p>
+                      <p className="text-lg font-black font-mono text-purple-700 dark:text-purple-400">₹{totalExpectedVal.toFixed(2)}</p>
+                    </div>
+                    <div className="bg-green-50 dark:bg-green-900/20 p-3 rounded-xl border border-green-200 dark:border-green-800/50">
+                      <p className="text-[10px] font-black uppercase text-green-600">असली गोदाम माल (Actual)</p>
+                      <p className="text-lg font-black font-mono text-green-700 dark:text-green-400">₹{totalActualVal.toFixed(2)}</p>
+                    </div>
+                    <div className={`p-3 rounded-xl border ${Math.abs(diffVal) > 0.1 ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800/50' : 'bg-neutral-50 dark:bg-neutral-800/50 border-neutral-200 dark:border-neutral-700'}`}>
+                      <p className={`text-[10px] font-black uppercase ${Math.abs(diffVal) > 0.1 ? 'text-red-600' : 'text-neutral-500'}`}>स्टॉक गड़बड़ी (Mismatch)</p>
+                      <p className={`text-lg font-black font-mono ${Math.abs(diffVal) > 0.1 ? 'text-red-600' : 'text-neutral-700 dark:text-neutral-300'}`}>
+                        {diffVal > 0.1 ? `-₹${diffVal.toFixed(2)}` : diffVal < -0.1 ? `+₹${Math.abs(diffVal).toFixed(2)}` : '₹0.00'}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              <div className="flex-1 overflow-y-auto rounded-xl shadow-inner border border-blue-600">
+                <table className="w-full text-left text-xs whitespace-nowrap">
+                  <thead className="bg-[#0070c0] text-white sticky top-0 shadow-md z-20">
                     <tr>
-                      <th className="py-2.5 px-3 font-black">Item Name (माल का नाम)</th>
-                      <th className="py-2.5 px-3 font-black text-center text-blue-600">Total IN (कुल आया)</th>
-                      <th className="py-2.5 px-3 font-black text-center text-red-600">Total OUT (खर्च हुआ)</th>
-                      <th className="py-2.5 px-3 font-black text-center text-purple-600 bg-purple-500/10">Expected (बचना चाहिए)</th>
-                      <th className="py-2.5 px-3 font-black text-right text-green-600">Current Stock (असली स्टॉक)</th>
+                      <th className="py-3 px-3 font-black border-r border-blue-400/50">Item Name <br/><span className="text-[9px] font-normal opacity-90">(माल का नाम)</span></th>
+                      <th className="py-3 px-3 font-black text-center border-r border-blue-400/50">प्रारंभिक स्टॉक <br/><span className="text-[9px] font-normal opacity-90">(Opening)</span></th>
+                      <th className="py-3 px-3 font-black text-center border-r border-blue-400/50">नई खरीद/आवक <br/><span className="text-[9px] font-normal opacity-90">(Received)</span></th>
+                      <th className="py-3 px-3 font-black text-center border-r border-blue-400/50">कुल उपलब्ध <br/><span className="text-[9px] font-normal opacity-90">(Available)</span></th>
+                      <th className="py-3 px-3 font-black text-center border-r border-blue-400/50">खपत/इस्तेमाल <br/><span className="text-[9px] font-normal opacity-90">(Consumed)</span></th>
+                      <th className="py-3 px-3 font-black text-center border-r border-blue-400/50">अंतिम स्टॉक <br/><span className="text-[9px] font-normal opacity-90">(Closing)</span></th>
+                      <th className="py-3 px-3 font-black text-center border-r border-blue-400/50 bg-blue-800">गोदाम गिनती <br/><span className="text-[9px] font-normal opacity-90">(Physical)</span></th>
+                      <th className="py-3 px-3 font-black text-center border-r border-blue-400/50">भाव (Rate) <br/><span className="text-[9px] font-normal opacity-90">Last Buy</span></th>
+                      <th className="py-3 px-3 font-black text-right bg-green-600">कुल कीमत <br/><span className="text-[9px] font-normal opacity-90">(Amount)</span></th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-neutral-200 dark:divide-neutral-800">
                     {rawMaterials.length === 0 ? (
-                      <tr><td colSpan={5} className="py-10 text-center text-neutral-400 font-bold">कोई माल नहीं है।</td></tr>
+                      <tr><td colSpan={9} className="py-10 text-center text-neutral-400 font-bold">कोई माल नहीं है।</td></tr>
                     ) : (
-                      rawMaterials.map((r) => {
-                        const totalIn = Number(r.totalReceived) || 0;
-                        const totalOut = Number(r.totalConsumed) || 0;
-                        const expected = totalIn - totalOut;
-                        const actual = Number(r.stock) || 0;
-                        // अगर असली स्टॉक और बचना चाहिए वाले स्टॉक में फर्क है, तो वार्निंग (लाल रंग)
-                        const isMismatch = Math.abs(expected - actual) > 0.1; 
+                      <>
+                        {/* 👉 NEW: GRAND TOTAL ROW INSIDE TABLE (टेबल के अंदर सबसे ऊपर की लाइन) */}
+                        <tr className="bg-yellow-100 dark:bg-yellow-900/30 font-black text-neutral-900 dark:text-white sticky top-[45px] z-10 shadow-sm border-b-2 border-yellow-300 dark:border-yellow-700">
+                          <td className="py-2.5 px-3 border-r border-yellow-300 dark:border-yellow-700/50">GRAND TOTAL (कुल)</td>
+                          <td className="py-2.5 px-3 text-center text-neutral-400 border-r border-yellow-300 dark:border-yellow-700/50" title="अलग-अलग यूनिट्स (Kg, Ltr, Pcs) को जोड़ा नहीं जा सकता">--</td>
+                          <td className="py-2.5 px-3 text-center text-neutral-400 border-r border-yellow-300 dark:border-yellow-700/50" title="अलग-अलग यूनिट्स (Kg, Ltr, Pcs) को जोड़ा नहीं जा सकता">--</td>
+                          <td className="py-2.5 px-3 text-center text-neutral-400 border-r border-yellow-300 dark:border-yellow-700/50" title="अलग-अलग यूनिट्स (Kg, Ltr, Pcs) को जोड़ा नहीं जा सकता">--</td>
+                          <td className="py-2.5 px-3 text-center text-neutral-400 border-r border-yellow-300 dark:border-yellow-700/50" title="अलग-अलग यूनिट्स (Kg, Ltr, Pcs) को जोड़ा नहीं जा सकता">--</td>
+                          <td className="py-2.5 px-3 text-center text-purple-700 dark:text-purple-400 border-r border-yellow-300 dark:border-yellow-700/50">
+                            ₹{rawMaterials.reduce((sum, r) => sum + ((Number(r.totalReceived || 0) - Number(r.totalConsumed || 0)) * (Number(r.lastRate) || 0)), 0).toFixed(2)}
+                          </td>
+                          <td className="py-2.5 px-3 text-center text-neutral-400 border-r border-yellow-300 dark:border-yellow-700/50" title="अलग-अलग यूनिट्स (Kg, Ltr, Pcs) को जोड़ा नहीं जा सकता">--</td>
+                          <td className="py-2.5 px-3 text-center text-neutral-400 border-r border-yellow-300 dark:border-yellow-700/50">--</td>
+                          <td className="py-2.5 px-3 text-right text-green-700 dark:text-green-400 bg-green-500/10">
+                            ₹{rawMaterials.reduce((sum, r) => sum + ((Number(r.stock) || 0) * (Number(r.lastRate) || 0)), 0).toFixed(2)}
+                          </td>
+                        </tr>
+                        
+                        {/* MAP ROWS */}
+                        {rawMaterials.map((r) => {
+                          const totalIn = Number(r.totalReceived) || 0;
+                          const totalOut = Number(r.totalConsumed) || 0;
+                          const expected = totalIn - totalOut; 
+                          const actual = Number(r.stock) || 0;
+                          const rate = Number(r.lastRate) || 0; // 👉 NEW: भाव 
+                          const amount = actual * rate;         // 👉 NEW: कुल कीमत 
+                          const isMismatch = Math.abs(expected - actual) > 0.1; 
 
-                        return (
-                          <tr key={r.id} className="bg-white dark:bg-neutral-900 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors">
-                            <td className="py-2.5 px-3 font-bold text-neutral-900 dark:text-neutral-100">{r.name}</td>
-                            <td className="py-2.5 px-3 text-center font-mono font-bold text-blue-600">
-                              {totalIn.toFixed(2)} <span className="text-[9px] text-neutral-500">{r.unit}</span>
-                            </td>
-                            <td className="py-2.5 px-3 text-center font-mono font-bold text-red-500">
-                              - {totalOut.toFixed(2)} <span className="text-[9px] text-neutral-500">{r.unit}</span>
-                            </td>
-                            <td className="py-2.5 px-3 text-center font-mono font-black text-purple-700 dark:text-purple-400 bg-purple-500/5">
-                              {expected.toFixed(2)} <span className="text-[9px] text-purple-400">{r.unit}</span>
-                            </td>
-                            <td className={`py-2.5 px-3 text-right font-mono font-black ${isMismatch ? 'text-red-600 bg-red-500/10' : 'text-green-600'}`}>
-                              {actual.toFixed(2)} <span className="text-[9px] text-neutral-500">{r.unit}</span>
-                              {isMismatch && <span className="block text-[8px] text-red-500 mt-0.5">⚠️ Mismatch</span>}
-                            </td>
-                          </tr>
-                        );
-                      })
+                          return (
+                            <tr key={r.id} className="bg-white dark:bg-neutral-900 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors">
+                              <td className="py-3 px-3 font-bold text-neutral-900 dark:text-neutral-100 border-r border-neutral-100 dark:border-neutral-800">{r.name}</td>
+                              
+                              <td className="py-3 px-3 text-center font-mono font-bold text-neutral-400 border-r border-neutral-100 dark:border-neutral-800">
+                                0.00 <span className="text-[9px]">{r.unit}</span>
+                              </td>
+                              
+                              <td className="py-3 px-3 text-center font-mono font-bold text-blue-600 border-r border-neutral-100 dark:border-neutral-800">
+                                + {totalIn.toFixed(2)} <span className="text-[9px] text-neutral-500">{r.unit}</span>
+                              </td>
+
+                              <td className="py-3 px-3 text-center font-mono font-black text-neutral-800 dark:text-neutral-200 bg-neutral-50 dark:bg-neutral-800/50 border-r border-neutral-100 dark:border-neutral-800">
+                                {totalIn.toFixed(2)} <span className="text-[9px] text-neutral-500">{r.unit}</span>
+                              </td>
+
+                              <td className="py-3 px-3 text-center font-mono font-bold text-red-500 border-r border-neutral-100 dark:border-neutral-800">
+                                - {totalOut.toFixed(2)} <span className="text-[9px] text-neutral-500">{r.unit}</span>
+                              </td>
+
+                              <td className="py-3 px-3 text-center font-mono font-black text-purple-700 dark:text-purple-400 bg-purple-500/5 border-r border-neutral-100 dark:border-neutral-800">
+                                {expected.toFixed(2)} <span className="text-[9px] text-purple-400">{r.unit}</span>
+                              </td>
+
+                              <td className={`py-3 px-3 text-center font-mono font-black border-r border-neutral-100 dark:border-neutral-800 ${isMismatch ? 'text-red-600 bg-red-500/10' : 'text-green-600'}`}>
+                                {actual.toFixed(2)} <span className="text-[9px] text-neutral-500">{r.unit}</span>
+                                {isMismatch && <span className="block text-[8px] text-red-500 mt-0.5">⚠️ Mismatch</span>}
+                              </td>
+
+                              {/* 👉 NEW: Rate Column */}
+                              <td className="py-3 px-3 text-center font-mono font-bold text-neutral-600 dark:text-neutral-400 border-r border-neutral-100 dark:border-neutral-800">
+                                ₹{rate} <span className="text-[9px] text-neutral-400">/{r.unit}</span>
+                              </td>
+
+                              {/* 👉 NEW: Amount Column */}
+                              <td className="py-3 px-3 text-right font-mono font-black text-green-700 dark:text-green-400 bg-green-500/10">
+                                ₹{amount.toFixed(2)}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </>
                     )}
                   </tbody>
                 </table>
