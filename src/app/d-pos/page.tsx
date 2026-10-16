@@ -413,11 +413,17 @@ export default function BbCafeDesktopPos() {
   // 👉 NEW: Month End Stock Report States & Function
   const [isStockReportModalOpen, setIsStockReportModalOpen] = useState(false);
   
-  const handleDownloadStockReport = () => {
-    let csv = "Item Name,Unit,Total Received (कुल आया),Total Consumed (कुल खर्च),Expected Stock (बचना चाहिए),Current Stock (असली स्टॉक)\n";
+ const handleDownloadStockReport = () => {
+    let csv = "Item Name (माल का नाम),Opening Stock (प्रारंभिक),Received/Purchase (नई खरीद),Total Available (कुल उपलब्ध),Consumed/Used (खपत),Closing Stock (अंतिम स्टॉक),Physical Stock (असली गोदाम स्टॉक),Rate (भाव),Total Amount (कुल कीमत)\n";
     rawMaterials.forEach(r => {
-      const expected = (Number(r.totalReceived) || 0) - (Number(r.totalConsumed) || 0);
-      csv += `"${r.name}","${r.unit}",${r.totalReceived || 0},${r.totalConsumed || 0},${expected},${r.stock || 0}\n`;
+      const totalIn = Number(r.totalReceived) || 0;
+      const totalOut = Number(r.totalConsumed) || 0;
+      const expected = totalIn - totalOut;
+      const actual = Number(r.stock) || 0;
+      const rate = Number(r.lastRate) || 0; // 👉 NEW: भाव निकाला
+      const amount = actual * rate;         // 👉 NEW: स्टॉक x भाव = कीमत
+      
+      csv += `"${r.name}","0 ${r.unit}",${totalIn} ${r.unit},${totalIn} ${r.unit},${totalOut} ${r.unit},${expected} ${r.unit},${actual} ${r.unit},Rs.${rate},Rs.${amount.toFixed(2)}\n`;
     });
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement("a");
