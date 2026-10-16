@@ -4906,6 +4906,10 @@ export default function BbCafeDesktopPos() {
                                    {isRecipeExcelProcessing ? '...' : '📤 Imp'}
                                    <input type="file" accept=".csv" className="hidden" onChange={handleImportRecipeCSV} />
                                  </label>
+                                 {/* 👉 NEW: कचरा साफ़ करने का बटन */}
+                                 <button onClick={handleClearAllRecipes} title="सभी पुरानी रेसिपी डिलीट करें" className="bg-red-50 text-red-600 border border-red-200 px-2 py-1 rounded text-[9px] font-black uppercase hover:bg-red-100 ml-2 flex items-center gap-1">
+                                   <SafeTrash2 size={10} /> Clear SOP
+                                 </button>
                                </div>
                             </div>
 
