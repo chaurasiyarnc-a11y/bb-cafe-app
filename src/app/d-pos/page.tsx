@@ -2787,7 +2787,7 @@ export default function BbCafeDesktopPos() {
       if (orderToSettle) {
         // 1. Stock Deduction
         if (orderToSettle.items && !orderToSettle.stockProcessed) {
-          await deductInventoryForItems(orderToSettle.items);
+          await deductInventoryForItems(orderToSettle.items, orderToSettle.fulfillmentType);
           updatePayload.stockProcessed = true;
         }
 
