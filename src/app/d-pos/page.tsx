@@ -451,6 +451,7 @@ export default function BbCafeDesktopPos() {
   const [selectedRawId, setSelectedRawId] = useState('');
   const [selectedRawQty, setSelectedRawQty] = useState<number | ''>('');
   const [selectedRawVariant, setSelectedRawVariant] = useState('All'); 
+  const [selectedRawOrderType, setSelectedRawOrderType] = useState('All'); // 👉 NEW: Parcel / Dine-in
   const [recipeSearchTerm, setRecipeSearchTerm] = useState('');
   const [showRawDropdown, setShowRawDropdown] = useState(false); // 👉 NEW: Dropdown List State
 
