@@ -391,6 +391,25 @@ export default function BbCafeDesktopPos() {
   const [purchaseSearchTerm, setPurchaseSearchTerm] = useState(''); // 👉 NEW: Search state
   const [showPurchaseDropdown, setShowPurchaseDropdown] = useState(false); // 👉 NEW: Dropdown visibility
   const [purchaseItemList, setPurchaseItemList] = useState<any[]>([]); // 👉 NEW: Bulk लिस्ट के लिए
+  // 👉 NEW: Purchase History States & Function (माल का खाता)
+  const [isPurchaseHistoryModalOpen, setIsPurchaseHistoryModalOpen] = useState(false);
+  const [purchaseHistoryList, setPurchaseHistoryList] = useState<any[]>([]);
+  const [isPurchaseHistoryLoading, setIsPurchaseHistoryLoading] = useState(false);
+
+  const handleOpenPurchaseHistory = async () => {
+    setIsPurchaseHistoryModalOpen(true);
+    setIsPurchaseHistoryLoading(true);
+    try {
+      // फायरबेस से सारा खरीदा हुआ माल मंगा रहे हैं (सबसे नया पहले)
+      const q = query(collection(db, "raw_purchases"), orderBy("timestamp", "desc"), limit(200));
+      const snap = await getDocs(q);
+      setPurchaseHistoryList(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    } catch (e) {
+      toast.error("हिस्ट्री लोड करने में समस्या आई!");
+    } finally {
+      setIsPurchaseHistoryLoading(false);
+    }
+  };
   // 👉 NEW: Raw Material History & Stock Actions
   const [rawActionType, setRawActionType] = useState<'add' | 'reduce' | 'set'>('add');
   const [rawActionQty, setRawActionQty] = useState<number | ''>('');
