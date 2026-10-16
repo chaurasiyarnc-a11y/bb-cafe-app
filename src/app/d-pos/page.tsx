@@ -390,7 +390,7 @@ export default function BbCafeDesktopPos() {
   const [purchaseRate, setPurchaseRate] = useState<number | ''>('');
   const [purchaseSearchTerm, setPurchaseSearchTerm] = useState(''); // 👉 NEW: Search state
   const [showPurchaseDropdown, setShowPurchaseDropdown] = useState(false); // 👉 NEW: Dropdown visibility
-  
+  const [purchaseItemList, setPurchaseItemList] = useState<any[]>([]); // 👉 NEW: Bulk लिस्ट के लिए
   // 👉 NEW: Raw Material History & Stock Actions
   const [rawActionType, setRawActionType] = useState<'add' | 'reduce' | 'set'>('add');
   const [rawActionQty, setRawActionQty] = useState<number | ''>('');
