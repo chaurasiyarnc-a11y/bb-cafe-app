@@ -3694,7 +3694,33 @@ export default function BbCafeDesktopPos() {
 // ==========================================
   // 👉 NEW SMART MATRIX RECIPE EXCEL (आसान तरीका)
   // ==========================================
-
+// 👉 NEW: Delete ALL Recipes (SOP) from Firebase
+  const handleClearAllRecipes = async () => {
+    if (!window.confirm("⚠️ क्या आप सच में सभी आइटम्स की रेसिपी (SOP) डिलीट करना चाहते हैं? \n\n(मेनू आइटम और कच्चा माल डिलीट नहीं होगा, सिर्फ जुड़ी हुई रेसिपी हटेगी)")) return;
+    
+    const toastId = toast.loading("सभी रेसिपी डिलीट की जा रही हैं...");
+    try {
+      const snap = await getDocs(collection(db, "products"));
+      let batch = writeBatch(db);
+      let count = 0;
+      
+      snap.docs.forEach((d) => {
+        batch.update(doc(db, "products", d.id), { recipe: [] }); // रेसिपी को खाली (Empty) कर रहे हैं
+        count++;
+      });
+      
+      await batch.commit();
+      
+      // Local state भी तुरंत अपडेट कर दें
+      setProducts(prev => prev.map(p => ({ ...p, recipe: [] })));
+      
+      toast.dismiss(toastId);
+      toast.success(`सभी ${count} आइटम्स से पुरानी रेसिपी पूरी तरह डिलीट हो गई है! 🗑️✨`);
+    } catch (err) {
+      toast.dismiss(toastId);
+      toast.error("रेसिपी डिलीट करने में समस्या आई!");
+    }
+  };
   // 5. Recipe Mapping Export (Matrix Format)
   const handleExportRecipeCSV = () => {
     if (rawMaterials.length === 0) {
