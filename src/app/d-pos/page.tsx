@@ -1913,7 +1913,7 @@ export default function BbCafeDesktopPos() {
 
     // 👉 FIXED: अगर आइटम में variants (Half/Full) हैं, तो हम साइज़ चुनने के बाद ही स्टॉक चेक करेंगे
     if (!hasItemVariants) {
-      const stockCheck = checkStockAvailability(item, quantityToAdd);
+      const stockCheck = checkStockAvailability(item, quantityToAdd, undefined, fulfillmentType);
       if (!stockCheck.isOk) {
         triggerBeep('alarm');
         if (!window.confirm(`⚠️ वार्निंग: ${stockCheck.name} का स्टॉक ख़त्म है! (सिर्फ ${stockCheck.stock} ${stockCheck.unit} बचा है)\nक्या फिर भी इसे बिल में जोड़ना है?`)) {
