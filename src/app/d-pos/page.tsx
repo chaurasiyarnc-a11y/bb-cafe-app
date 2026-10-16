@@ -7912,14 +7912,14 @@ export default function BbCafeDesktopPos() {
                       // Firebase Batch का इस्तेमाल (ताकि 25 आइटम एक ही सेकंड में सेव हो जाएँ)
                       const batch = writeBatch(db);
 
-                      purchaseItemList.forEach((item) => {
+                     purchaseItemList.forEach((item) => {
                          // 1. स्टॉक अपडेट करें (increment का इस्तेमाल ताकि पुराना स्टॉक अपने आप जुड़ जाए)
                          const rawRef = doc(db, "raw_materials", item.rawId);
                          batch.update(rawRef, {
                            stock: increment(item.qty),
-                           totalReceived: increment(item.qty)
+                           totalReceived: increment(item.qty),
+                           lastRate: Number(item.rate) // 👉 NEW: सिस्टम अब भाव (Rate) भी याद रखेगा!
                          });
-
                          // 2. परचेस हिस्ट्री सेव करें
                          const purchaseRef = doc(collection(db, "raw_purchases"));
                          batch.set(purchaseRef, {
