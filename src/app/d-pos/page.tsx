@@ -410,6 +410,22 @@ export default function BbCafeDesktopPos() {
       setIsPurchaseHistoryLoading(false);
     }
   };
+  // 👉 NEW: Month End Stock Report States & Function
+  const [isStockReportModalOpen, setIsStockReportModalOpen] = useState(false);
+  
+  const handleDownloadStockReport = () => {
+    let csv = "Item Name,Unit,Total Received (कुल आया),Total Consumed (कुल खर्च),Expected Stock (बचना चाहिए),Current Stock (असली स्टॉक)\n";
+    rawMaterials.forEach(r => {
+      const expected = (Number(r.totalReceived) || 0) - (Number(r.totalConsumed) || 0);
+      csv += `"${r.name}","${r.unit}",${r.totalReceived || 0},${r.totalConsumed || 0},${expected},${r.stock || 0}\n`;
+    });
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = `Month_End_Stock_Report_${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+    toast.success("स्टॉक रिपोर्ट डाउनलोड हो गई! 📥");
+  };
   // 👉 NEW: Raw Material History & Stock Actions
   const [rawActionType, setRawActionType] = useState<'add' | 'reduce' | 'set'>('add');
   const [rawActionQty, setRawActionQty] = useState<number | ''>('');
