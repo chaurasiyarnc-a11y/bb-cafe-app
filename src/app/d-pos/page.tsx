@@ -2735,7 +2735,7 @@ export default function BbCafeDesktopPos() {
 
   // 👉 NEW: Auto-deduct Raw Material Inventory (जब बिल चुकता होता है तो स्टॉक काटें)
  // 👉 UPDATE: अब स्टॉक Variant (Half/Full) के हिसाब से कटेगा
-  const deductInventoryForItems = async (itemsToDeduct: any[]) => {
+  const deductInventoryForItems = async (itemsToDeduct: any[], orderFulfillmentType?: string) => {
     if (!navigator.onLine || !itemsToDeduct || itemsToDeduct.length === 0) return;
     try {
       const batch = writeBatch(db);
@@ -2745,8 +2745,12 @@ export default function BbCafeDesktopPos() {
         const prod = products.find(p => p.id === cartItem.id);
         if (prod && prod.recipe && Array.isArray(prod.recipe)) {
           prod.recipe.forEach((rec: any) => {
-            // चेक करें कि क्या यह कच्चा माल 'All' के लिए है या कस्टमर के चुने हुए Size (e.g. 'Half') के लिए है
             if (!rec.variant || rec.variant === 'All' || rec.variant === cartItem.size) {
+              
+              // 👉 NEW: Parcel/Table चेक (माल घटाते समय)
+              if (rec.orderType === 'Parcel' && orderFulfillmentType === 'table') return;
+              if (rec.orderType === 'Table' && orderFulfillmentType !== 'table') return;
+
               if (!deductMap[rec.rawId]) deductMap[rec.rawId] = 0;
               deductMap[rec.rawId] += rec.qty * cartItem.quantity;
             }
