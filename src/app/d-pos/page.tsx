@@ -3751,13 +3751,12 @@ export default function BbCafeDesktopPos() {
     link.click();
     toast.success("आसान Recipe Excel डाउनलोड हो गई! 📥");
   };
-
-  // 6. Recipe Mapping Import (Matrix Format)
+// 6. Recipe Mapping Import - ✨ AUTO ADD & DUPLICATE CLEANER
   const handleImportRecipeCSV = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setIsRecipeExcelProcessing(true);
-    const toastId = toast.loading("रेसिपी (Recipe) अपडेट हो रही है...");
+    const toastId = toast.loading("रेसिपी क्लीन और अपडेट हो रही है...");
 
     const reader = new FileReader();
     reader.onload = async (event) => {
@@ -3768,14 +3767,27 @@ export default function BbCafeDesktopPos() {
 
         const headers = rows[0].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(h => h.replace(/"/g, '').trim());
         
-        // कॉलम नंबर से कच्चा माल (Raw Material) को पहचानें
+        let batch = writeBatch(db);
+        let newRawAddedCount = 0;
+        
         const rawCols: { colIndex: number, rawItem: any }[] = [];
         for (let c = 3; c < headers.length; c++) {
           let hName = headers[c];
-          let rawName = hName.split(' (')[0].trim().toLowerCase(); // "Milk (Ltr)" -> "milk"
-          let rawItem = rawMaterials.find(r => r.name.toLowerCase() === rawName);
+          let rawName = hName.split(' (')[0].trim(); 
+          let rawUnit = hName.includes('(') ? hName.split('(')[1].replace(')', '').trim() : 'Kg';
+
+          let rawItem = rawMaterials.find(r => r.name.toLowerCase() === rawName.toLowerCase());
+          
           if (rawItem) {
             rawCols.push({ colIndex: c, rawItem });
+          } else {
+            const newRawRef = doc(collection(db, "raw_materials"));
+            const newRawObj = {
+              id: newRawRef.id, name: rawName, unit: rawUnit, stock: 0, lowAlert: 5, totalReceived: 0, totalConsumed: 0
+            };
+            batch.set(newRawRef, newRawObj);
+            rawCols.push({ colIndex: c, rawItem: newRawObj });
+            newRawAddedCount++;
           }
         }
 
@@ -3787,43 +3799,47 @@ export default function BbCafeDesktopPos() {
           const itemName = cols[1];
           const variantSize = cols[2] || 'All';
 
-          // मेनू आइटम ढूँढें
           const product = products.find(p => (itemCode && p.itemCode === itemCode) || p.name.toLowerCase() === itemName.toLowerCase());
           if (!product) continue;
 
-          // अगर पहली बार इस प्रोडक्ट की लाइन पढ़ रहे हैं, तो पुरानी रेसिपी डिलीट करने के लिए खाली ऐरे (Array) बनाएँ
           if (!productUpdates[product.id]) productUpdates[product.id] = [];
 
-          // अब हर कच्चे माल के कॉलम में देखें
           rawCols.forEach(rc => {
              let val = Number(cols[rc.colIndex]?.replace(/,/g, '')) || 0;
              if (val > 0) {
-               // अगर बॉक्स में 0 से ज्यादा कुछ लिखा है, तो उसे रेसिपी में जोड़ दें
-               productUpdates[product.id].push({
-                 rawId: rc.rawItem.id,
-                 name: rc.rawItem.name,
-                 qty: val,
-                 unit: rc.rawItem.unit,
-                 variant: variantSize
-               });
+               // 🔥 MAGIC: DUPLICATE CHECKER (यह एक ही चीज़ को दोबारा नहीं जुड़ने देगा)
+               const existingIndex = productUpdates[product.id].findIndex(r => r.rawId === rc.rawItem.id && r.variant === variantSize);
+               
+               if (existingIndex > -1) {
+                  productUpdates[product.id][existingIndex].qty = val; 
+               } else {
+                  productUpdates[product.id].push({
+                    rawId: rc.rawItem.id,
+                    name: rc.rawItem.name,
+                    qty: val,
+                    unit: rc.rawItem.unit,
+                    variant: variantSize,
+                    orderType: 'All'
+                  });
+               }
              }
           });
         }
 
-        let batch = writeBatch(db);
         let updatedCount = 0;
-
         for (const [prodId, recipeArr] of Object.entries(productUpdates)) {
-          batch.update(doc(db, "products", prodId), { recipe: recipeArr });
+          // 👉 यह लाइन फायरबेस के पुराने सारे कचरे को मिटाकर सिर्फ नई सही लिस्ट डाल देगी!
+          batch.update(doc(db, "products", prodId), { recipe: recipeArr }); 
           updatedCount++;
         }
 
         await batch.commit();
         toast.dismiss(toastId);
-        toast.success(`${updatedCount} आइटम्स में नई रेसिपी सेट हो गई! 🎉`);
+        toast.success(`डुप्लीकेट कचरा साफ हो गया! ${updatedCount} रेसिपी सही से सेट हो गईं! 🎉`);
+        
       } catch(e) {
         toast.dismiss(toastId);
-        toast.error("अपलोड फेल हो गया! कृपया टेम्पलेट में बदलाव न करें।");
+        toast.error("अपलोड फेल हो गया!");
       } finally {
         setIsRecipeExcelProcessing(false);
       }
