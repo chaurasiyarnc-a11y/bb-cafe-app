@@ -7663,77 +7663,33 @@ export default function BbCafeDesktopPos() {
         )}
       </AnimatePresence>
 
-      {/* 👉 NEW POPUP: PURCHASE ENTRY (माल की एंट्री) */}
+    {/* 👉 NEW BULK POPUP: PURCHASE ENTRY (एक साथ सारा माल चढ़ाएं) */}
       <AnimatePresence>
         {isPurchaseModalOpen && (
           <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 max-w-sm w-full rounded-3xl p-6 shadow-2xl space-y-4">
-              <div className="flex justify-between items-center border-b border-neutral-200 dark:border-neutral-800 pb-3">
-                <h3 className="font-black text-sm uppercase text-blue-600 flex items-center gap-2">
-                  <SafeFileText size={18} /> Purchase Entry (नया माल)
-                </h3>
-                <button onClick={() => setIsPurchaseModalOpen(false)} className="text-neutral-500 hover:text-black dark:hover:text-white"><X size={20} /></button>
+            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 max-w-3xl w-full rounded-3xl p-6 shadow-2xl space-y-4 max-h-[90vh] flex flex-col">
+              
+              <div className="flex justify-between items-center border-b border-neutral-200 dark:border-neutral-800 pb-3 shrink-0">
+                <div>
+                  <h3 className="font-black text-sm uppercase text-blue-600 flex items-center gap-2">
+                    <SafeFileText size={18} /> Bulk Purchase Entry (एक साथ सारा माल चढ़ाएं)
+                  </h3>
+                  <p className="text-[10px] text-neutral-500 font-bold mt-1">आइटम चुनें, लिस्ट में जोड़ें और फिर एक साथ सेव करें।</p>
+                </div>
+                <button onClick={() => setIsPurchaseModalOpen(false)} className="text-neutral-500 hover:text-black dark:hover:text-white bg-neutral-100 dark:bg-neutral-800 p-1.5 rounded-full"><X size={20} /></button>
               </div>
               
-              <form onSubmit={async (e) => {
-                e.preventDefault();
-                if (!purchaseItemId || !purchaseQty || !purchaseRate) return toast.error("सभी जानकारी भरना अनिवार्य है!");
-                
-                const toastId = toast.loading("माल चढ़ाया जा रहा है...");
-                try {
-                  const selectedMaterial = rawMaterials.find(r => r.id === purchaseItemId);
-                  const amount = Number(purchaseQty) * Number(purchaseRate);
-
-                  // 1. स्टॉक अपडेट करें
-                  const newStock = Number(selectedMaterial.stock || 0) + Number(purchaseQty);
-                  const newReceived = Number(selectedMaterial.totalReceived || 0) + Number(purchaseQty);
-                  await updateDoc(doc(db, "raw_materials", purchaseItemId), {
-                    stock: newStock,
-                    totalReceived: newReceived
-                  });
-
-                  // 2. परचेस हिस्ट्री सेव करें
-                  await addDoc(collection(db, "raw_purchases"), {
-                    rawId: purchaseItemId,
-                    name: selectedMaterial.name,
-                    unit: selectedMaterial.unit,
-                    qty: Number(purchaseQty),
-                    rate: Number(purchaseRate),
-                    amount: amount,
-                    date: purchaseDate,
-                    timestamp: new Date()
-                  });
-
-                  // 3. गल्ले के खर्चे (Expense) में जोड़ें
-                  if (window.confirm(`क्या इस बिल (₹${amount.toFixed(2)}) को आज के गल्ले के खर्च (Daily Expense) में भी जोड़ना है?`)) {
-                     await addDoc(collection(db, "daily_expenses"), {
-                        title: `Purchase: ${selectedMaterial.name} (${purchaseQty}${selectedMaterial.unit})`,
-                        amount: amount,
-                        category: 'Raw Material',
-                        timestamp: new Date(),
-                        enteredBy: currentUser?.name || 'Staff'
-                     });
-                     toast.success("खर्च (Expense) में भी जुड़ गया!");
-                  }
-
-                  toast.dismiss(toastId);
-                  toast.success(`माल सफलतापूर्वक स्टॉक में जुड़ गया! ✅`);
-                  setIsPurchaseModalOpen(false);
-                } catch (err) {
-                  toast.dismiss(toastId);
-                  toast.error("एंट्री सेव करने में समस्या आई!");
-                }
-              }} className="space-y-4">
-                
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase text-neutral-500">Date (तारीख)</label>
-                  <input type="date" required value={purchaseDate} onChange={e=>setPurchaseDate(e.target.value)} className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-xl px-3 py-2.5 text-xs font-bold outline-none focus:border-blue-500 cursor-pointer" />
-                </div>
-
-               {/* 👉 NEW: Smart Searchable Dropdown */}
-                <div className="space-y-1 relative">
-                  <label className="text-[10px] font-black uppercase text-neutral-500">Item (कच्चा माल)</label>
-                  <div className="relative">
+              {/* TOP: Input Section */}
+              <div className="bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-800/50 p-3 rounded-2xl shrink-0 space-y-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-1/4">
+                    <label className="text-[10px] font-black uppercase text-blue-600">Date (तारीख)</label>
+                    <input type="date" value={purchaseDate} onChange={e=>setPurchaseDate(e.target.value)} className="w-full bg-white dark:bg-neutral-900 border border-blue-200 dark:border-blue-700/50 rounded-xl px-2 py-2 text-xs font-bold outline-none focus:border-blue-500 cursor-pointer" />
+                  </div>
+                  
+                  {/* Smart Searchable Dropdown */}
+                  <div className="w-2/4 relative">
+                    <label className="text-[10px] font-black uppercase text-blue-600">Item (कच्चा माल)</label>
                     <input 
                       type="text" 
                       placeholder="🔍 कच्चा माल खोजें / चुनें..." 
@@ -7741,59 +7697,172 @@ export default function BbCafeDesktopPos() {
                       onChange={e => {
                         setPurchaseSearchTerm(e.target.value);
                         setShowPurchaseDropdown(true);
-                        setPurchaseItemId(''); // टाइप करने पर पुराना चुनाव हट जाएगा
+                        setPurchaseItemId(''); 
                       }}
                       onFocus={() => setShowPurchaseDropdown(true)}
                       onBlur={() => setTimeout(() => setShowPurchaseDropdown(false), 200)}
-                      className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-xl px-3 py-2.5 text-xs font-bold outline-none focus:border-blue-500 cursor-text"
+                      className="w-full bg-white dark:bg-neutral-900 border border-blue-200 dark:border-blue-700/50 rounded-xl px-3 py-2 text-xs font-bold outline-none focus:border-blue-500"
                     />
-                    
-                    {/* लटकती हुई (Floating) लिस्ट जो टाइप करने पर फ़िल्टर होगी */}
                     {showPurchaseDropdown && (
                       <div className="absolute z-50 top-full left-0 right-0 mt-1 max-h-40 overflow-y-auto bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 rounded-xl shadow-xl">
                         {rawMaterials.filter(rm => rm.name.toLowerCase().includes(purchaseSearchTerm.toLowerCase())).map(rm => (
-                          <div 
-                            key={rm.id} 
-                            onClick={() => {
-                              setPurchaseItemId(rm.id);
-                              setPurchaseSearchTerm(`${rm.name} (${rm.unit})`);
-                              setShowPurchaseDropdown(false);
-                            }}
-                            className="p-2.5 text-xs border-b border-neutral-100 dark:border-neutral-800 hover:bg-blue-50 dark:hover:bg-blue-900/30 cursor-pointer text-neutral-800 dark:text-neutral-200 transition-colors"
-                          >
+                          <div key={rm.id} onClick={() => { setPurchaseItemId(rm.id); setPurchaseSearchTerm(`${rm.name} (${rm.unit})`); setShowPurchaseDropdown(false); }} className="p-2.5 text-xs border-b border-neutral-100 dark:border-neutral-800 hover:bg-blue-50 dark:hover:bg-blue-900/30 cursor-pointer text-neutral-800 dark:text-neutral-200">
                             {rm.name} <span className="text-[10px] text-neutral-500">({rm.unit})</span>
                           </div>
                         ))}
-                        {rawMaterials.filter(rm => rm.name.toLowerCase().includes(purchaseSearchTerm.toLowerCase())).length === 0 && (
-                          <div className="p-2.5 text-xs text-neutral-500 text-center">कोई आइटम नहीं मिला</div>
-                        )}
                       </div>
                     )}
                   </div>
-                </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black uppercase text-neutral-500">Qty (मात्रा)</label>
-                    <input type="number" step="0.0001" required min={0.0001} value={purchaseQty} onChange={e=>setPurchaseQty(e.target.value === '' ? '' : Number(e.target.value))} placeholder="e.g. 10" className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-xl px-3 py-2.5 text-xs font-mono font-bold outline-none focus:border-blue-500" />
+                  <div className="w-1/4">
+                    <label className="text-[10px] font-black uppercase text-blue-600">Qty (मात्रा)</label>
+                    <input type="number" step="0.0001" min={0.0001} value={purchaseQty} onChange={e=>setPurchaseQty(e.target.value === '' ? '' : Number(e.target.value))} placeholder="e.g. 10" className="w-full bg-white dark:bg-neutral-900 border border-blue-200 dark:border-blue-700/50 rounded-xl px-2 py-2 text-xs font-mono font-bold outline-none focus:border-blue-500" />
                   </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black uppercase text-neutral-500">Rate (भाव / ₹)</label>
-                    <input type="number" step="0.01" required min={0} value={purchaseRate} onChange={e=>setPurchaseRate(e.target.value === '' ? '' : Number(e.target.value))} placeholder="e.g. 50" className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-xl px-3 py-2.5 text-xs font-mono font-bold outline-none focus:border-blue-500" />
+
+                  <div className="w-1/4">
+                    <label className="text-[10px] font-black uppercase text-blue-600">Rate (भाव)</label>
+                    <input type="number" step="0.01" min={0} value={purchaseRate} onChange={e=>setPurchaseRate(e.target.value === '' ? '' : Number(e.target.value))} placeholder="₹" className="w-full bg-white dark:bg-neutral-900 border border-blue-200 dark:border-blue-700/50 rounded-xl px-2 py-2 text-xs font-mono font-bold outline-none focus:border-blue-500" />
+                  </div>
+
+                  <div className="w-auto pt-4">
+                    <button type="button" onClick={() => {
+                       if (!purchaseItemId || !purchaseQty || !purchaseRate) return toast.error("माल, मात्रा और भाव भरना अनिवार्य है!");
+                       const selectedMaterial = rawMaterials.find(r => r.id === purchaseItemId);
+                       const amount = Number(purchaseQty) * Number(purchaseRate);
+                       
+                       setPurchaseItemList(prev => [...prev, {
+                         rawId: purchaseItemId,
+                         name: selectedMaterial.name,
+                         unit: selectedMaterial.unit,
+                         qty: Number(purchaseQty),
+                         rate: Number(purchaseRate),
+                         amount: amount
+                       }]);
+                       
+                       // Reset Inputs for next item
+                       setPurchaseItemId('');
+                       setPurchaseSearchTerm('');
+                       setPurchaseQty('');
+                       setPurchaseRate('');
+                       toast.success(`${selectedMaterial.name} लिस्ट में जुड़ गया!`);
+                    }} className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-xl text-xs font-black uppercase shadow shrink-0">
+                      + Add
+                    </button>
                   </div>
                 </div>
+              </div>
 
-                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 p-3 rounded-xl flex justify-between items-center">
-                  <span className="text-xs font-black uppercase text-blue-700 dark:text-blue-400">Total Amount:</span>
-                  <span className="text-lg font-black font-mono text-blue-700 dark:text-blue-400">
-                    ₹{((Number(purchaseQty) || 0) * (Number(purchaseRate) || 0)).toFixed(2)}
-                  </span>
+              {/* MIDDLE: List of Added Items */}
+              <div className="flex-1 overflow-y-auto border border-neutral-200 dark:border-neutral-800 rounded-xl bg-neutral-50 dark:bg-neutral-900/50">
+                {purchaseItemList.length === 0 ? (
+                  <div className="flex items-center justify-center h-32 text-neutral-400 text-xs font-bold uppercase">
+                    लिस्ट खाली है। ऊपर से आइटम जोड़ें।
+                  </div>
+                ) : (
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-neutral-200 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 sticky top-0">
+                      <tr>
+                        <th className="py-2 px-3 font-black">Item Name</th>
+                        <th className="py-2 px-3 font-black text-center">Qty</th>
+                        <th className="py-2 px-3 font-black text-right">Rate</th>
+                        <th className="py-2 px-3 font-black text-right">Amount</th>
+                        <th className="py-2 px-3 font-black text-center">🗑️</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-neutral-200 dark:divide-neutral-800">
+                      {purchaseItemList.map((item, idx) => (
+                        <tr key={idx} className="bg-white dark:bg-neutral-900">
+                          <td className="py-2 px-3 font-bold">{item.name}</td>
+                          <td className="py-2 px-3 text-center font-mono">{item.qty} <span className="text-[10px] text-neutral-500">{item.unit}</span></td>
+                          <td className="py-2 px-3 text-right font-mono text-neutral-500">₹{item.rate}</td>
+                          <td className="py-2 px-3 text-right font-mono font-black text-blue-600 dark:text-blue-400">₹{item.amount.toFixed(2)}</td>
+                          <td className="py-2 px-3 text-center">
+                            <button onClick={() => setPurchaseItemList(prev => prev.filter((_, i) => i !== idx))} className="text-red-500 hover:bg-red-100 p-1 rounded"><SafeTrash2 size={14}/></button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+
+              {/* BOTTOM: Grand Total & Save */}
+              <div className="flex justify-between items-center pt-2 border-t border-neutral-200 dark:border-neutral-800 shrink-0">
+                <div>
+                  <p className="text-[10px] font-black uppercase text-neutral-500">Grand Total ({purchaseItemList.length} Items)</p>
+                  <p className="text-xl font-black font-mono text-blue-700 dark:text-blue-400">
+                    ₹{purchaseItemList.reduce((sum, item) => sum + item.amount, 0).toFixed(2)}
+                  </p>
                 </div>
 
-                <button type="submit" className="w-full py-3 mt-2 bg-blue-600 hover:bg-blue-500 text-white font-black uppercase text-xs rounded-xl shadow-lg transition-all">
-                  Save Entry (चढ़ाएं)
+                <button 
+                  onClick={async () => {
+                    if (purchaseItemList.length === 0) return toast.error("सेव करने के लिए लिस्ट में कम से कम 1 आइटम होना चाहिए!");
+                    
+                    const grandTotal = purchaseItemList.reduce((sum, item) => sum + item.amount, 0);
+                    const toastId = toast.loading("सारा माल डेटाबेस में चढ़ाया जा रहा है...");
+                    
+                    try {
+                      // Firebase Batch का इस्तेमाल (ताकि 25 आइटम एक ही सेकंड में सेव हो जाएँ)
+                      const batch = writeBatch(db);
+
+                      purchaseItemList.forEach((item) => {
+                         // 1. स्टॉक अपडेट करें (increment का इस्तेमाल ताकि पुराना स्टॉक अपने आप जुड़ जाए)
+                         const rawRef = doc(db, "raw_materials", item.rawId);
+                         batch.update(rawRef, {
+                           stock: increment(item.qty),
+                           totalReceived: increment(item.qty)
+                         });
+
+                         // 2. परचेस हिस्ट्री सेव करें
+                         const purchaseRef = doc(collection(db, "raw_purchases"));
+                         batch.set(purchaseRef, {
+                           rawId: item.rawId,
+                           name: item.name,
+                           unit: item.unit,
+                           qty: item.qty,
+                           rate: item.rate,
+                           amount: item.amount,
+                           date: purchaseDate,
+                           timestamp: new Date()
+                         });
+                      });
+
+                      // 3. गल्ले के खर्चे (Expense) में जोड़ें (पूरे बिल का एक खर्चा)
+                      if (window.confirm(`क्या पूरे बिल (₹${grandTotal.toFixed(2)}) को आज के गल्ले के खर्च (Daily Expense) में भी जोड़ना है?`)) {
+                         const expenseRef = doc(collection(db, "daily_expenses"));
+                         batch.set(expenseRef, {
+                            title: `Bulk Purchase Invoice (${purchaseItemList.length} Items)`,
+                            amount: grandTotal,
+                            category: 'Raw Material',
+                            timestamp: new Date(),
+                            enteredBy: currentUser?.name || 'Staff'
+                         });
+                      }
+
+                      // सब कुछ एक साथ फायरबेस में भेजें
+                      await batch.commit();
+
+                      toast.dismiss(toastId);
+                      toast.success(`सभी ${purchaseItemList.length} आइटम सफलतापूर्वक जुड़ गए! ✅`);
+                      
+                      // फॉर्म क्लियर करें
+                      setPurchaseItemList([]);
+                      setIsPurchaseModalOpen(false);
+                      
+                    } catch (err) {
+                      toast.dismiss(toastId);
+                      toast.error("एंट्री सेव करने में समस्या आई!");
+                      console.error(err);
+                    }
+                  }} 
+                  disabled={purchaseItemList.length === 0}
+                  className="py-3 px-8 bg-blue-600 hover:bg-blue-500 disabled:bg-neutral-400 text-white font-black uppercase text-sm rounded-xl shadow-lg transition-all"
+                >
+                  Save All Invoice (सारा माल सेव करें)
                 </button>
-              </form>
+              </div>
+
             </motion.div>
           </div>
         )}
