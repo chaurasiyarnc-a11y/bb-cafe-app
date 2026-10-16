@@ -4984,6 +4984,10 @@ export default function BbCafeDesktopPos() {
                             <button onClick={handleOpenPurchaseHistory} className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase flex items-center gap-1.5 shadow">
                               <History size={16} /> Purchase History (माल का खाता)
                             </button>
+                            {/* 👉 NEW: Month End Stock Report Button */}
+                            <button onClick={() => setIsStockReportModalOpen(true)} className="bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase flex items-center gap-1.5 shadow">
+                              <SafeBarChart3 size={16} /> Stock Report
+                            </button>
                             <button onClick={() => { setEditRawId(null); setRawFormName(''); setRawFormStock(''); setRawFormUnit('Kg'); setRawFormLowAlert(5); setRawActionType('add'); setRawActionQty(''); setRawTotalReceived(0); setRawTotalConsumed(0); setIsRawModalOpen(true); }} className="bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase flex items-center gap-1.5 shadow">
                               <SafePackagePlus size={16} /> + New Material
                             </button>
