@@ -7637,7 +7637,7 @@ export default function BbCafeDesktopPos() {
         )}
       </AnimatePresence>
 
-      {/* 👉 NEW POPUP: RAW MATERIAL MODAL */}
+    {/* 👉 NEW POPUP: RAW MATERIAL MODAL */}
       <AnimatePresence>
         {isRawModalOpen && (
           <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -7655,7 +7655,6 @@ export default function BbCafeDesktopPos() {
                 const trimmedName = rawFormName.trim();
                 if (!trimmedName) return toast.error("नाम डालना अनिवार्य है!");
 
-                // 👉 NEW: Duplicate Check (एक ही नाम का माल दोबारा न बने)
                 const isDuplicate = rawMaterials.some(r => r.name.toLowerCase() === trimmedName.toLowerCase() && r.id !== editRawId);
                 if (isDuplicate) {
                   return toast.error(`"${trimmedName}" नाम का माल पहले से मौजूद है! कृपया कोई दूसरा नाम दें।`);
@@ -7666,16 +7665,17 @@ export default function BbCafeDesktopPos() {
                   let payload: any = { 
                     name: trimmedName, 
                     unit: rawFormUnit, 
-                    lowAlert: Number(rawFormLowAlert) 
+                    lowAlert: Number(rawFormLowAlert) || 0
                   };
 
                   if (editRawId) {
-                    let finalStock = Number(rawFormStock);
+                    let finalStock = Number(rawFormStock) || 0;
                     let finalRec = Number(rawTotalReceived) || 0;
                     let finalCons = Number(rawTotalConsumed) || 0;
                     let actQty = Number(rawActionQty);
 
-                    if (actQty > 0) {
+                    // 👉 FIX: यहाँ चेक किया गया है कि Qty सही से अपडेट हो
+                    if (!isNaN(actQty) && rawActionQty !== '') {
                       if (rawActionType === 'add') {
                          finalStock += actQty;
                          finalRec += actQty;
@@ -7693,8 +7693,8 @@ export default function BbCafeDesktopPos() {
 
                     await updateDoc(doc(db, "raw_materials", editRawId), payload);
                   } else {
-                    payload.stock = Number(rawFormStock);
-                    payload.totalReceived = Number(rawFormStock); // पहली बार डाला गया स्टॉक, आया हुआ माना जायेगा
+                    payload.stock = Number(rawFormStock) || 0;
+                    payload.totalReceived = Number(rawFormStock) || 0;
                     payload.totalConsumed = 0;
                     await addDoc(collection(db, "raw_materials"), payload);
                   }
@@ -7725,7 +7725,6 @@ export default function BbCafeDesktopPos() {
                   </div>
                 </div>
 
-                {/* 👉 NEW: Smart Update Options */}
                 {editRawId ? (
                   <div className="space-y-2 p-3 bg-neutral-50 dark:bg-neutral-800/50 rounded-xl border border-neutral-200 dark:border-neutral-700">
                     <div className="flex justify-between items-center mb-1 border-b border-neutral-200 dark:border-neutral-700 pb-2">
@@ -7738,12 +7737,13 @@ export default function BbCafeDesktopPos() {
                       <button type="button" onClick={() => setRawActionType('reduce')} className={`flex-1 py-1.5 text-[10px] font-black uppercase rounded transition-colors ${rawActionType==='reduce' ? 'bg-orange-600 text-white shadow' : 'text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-800'}`}>- खराब हुआ</button>
                       <button type="button" onClick={() => setRawActionType('set')} className={`flex-1 py-1.5 text-[10px] font-black uppercase rounded transition-colors ${rawActionType==='set' ? 'bg-blue-600 text-white shadow' : 'text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-800'}`}>= सीधा लिखें</button>
                     </div>
+                    {/* 👉 FIX: Number() हटाया गया है ताकि पॉइंट (decimal) वाले नंबर आसानी से टाइप हो सकें */}
                     <input 
                       type="number" 
                       min={0} 
                       step="0.0001" 
                       value={rawActionQty} 
-                      onChange={e=>setRawActionQty(e.target.value === '' ? '' : Number(e.target.value))} 
+                      onChange={e=>setRawActionQty(e.target.value)} 
                       placeholder={rawActionType === 'add' ? `कितना ${rawFormUnit} नया आया?` : rawActionType === 'reduce' ? `कितना ${rawFormUnit} खराब/वेस्ट हुआ?` : 'नया स्टॉक बिलकुल सीधा लिखें...'} 
                       className={`w-full bg-white dark:bg-neutral-950 border rounded-lg px-3 py-2.5 text-xs font-mono font-bold outline-none mt-2 transition-colors ${rawActionType === 'add' ? 'border-green-500' : rawActionType === 'reduce' ? 'border-orange-500' : 'border-blue-500'}`} 
                     />
@@ -7751,19 +7751,18 @@ export default function BbCafeDesktopPos() {
                 ) : (
                   <div className="space-y-1">
                     <label className="text-[10px] font-black uppercase text-neutral-500">Initial Stock (शुरुआती स्टॉक)</label>
-                    <input type="number" required min={0} step="0.0001" value={rawFormStock} onChange={e=>setRawFormStock(e.target.value === '' ? '' : Number(e.target.value))} placeholder="0.00" className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-xl px-3 py-2.5 text-xs font-mono font-bold outline-none focus:border-green-500" />
+                    <input type="number" required min={0} step="0.0001" value={rawFormStock} onChange={e=>setRawFormStock(e.target.value)} placeholder="0.00" className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-xl px-3 py-2.5 text-xs font-mono font-bold outline-none focus:border-green-500" />
                   </div>
                 )}
 
                 <div className="space-y-1">
                   <label className="text-[10px] font-black uppercase text-neutral-500">Low Stock Alert Below:</label>
-                  <input type="number" required min={0} step="0.0001" value={rawFormLowAlert} onChange={e=>setRawFormLowAlert(e.target.value === '' ? '' : Number(e.target.value))} placeholder="e.g. 5" className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-xl px-3 py-2.5 text-xs font-mono font-bold outline-none focus:border-red-500" />
+                  <input type="number" required min={0} step="0.0001" value={rawFormLowAlert} onChange={e=>setRawFormLowAlert(e.target.value)} placeholder="e.g. 5" className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-xl px-3 py-2.5 text-xs font-mono font-bold outline-none focus:border-red-500" />
                   <p className="text-[9px] text-neutral-400 mt-1">जब स्टॉक इससे कम होगा, तो सिस्टम आपको लाल रंग में वार्निंग देगा।</p>
                 </div>
                 
                 <button type="submit" className="w-full py-3 mt-2 bg-green-600 hover:bg-green-500 text-white font-black uppercase text-xs rounded-xl shadow-lg transition-all">
                   Save Material
-               Save Material
                 </button>
               </form>
             </motion.div>
