@@ -8046,6 +8046,84 @@ export default function BbCafeDesktopPos() {
           </div>
         )}
       </AnimatePresence>
+      {/* 👉 NEW POPUP: MONTH END STOCK REPORT MODAL */}
+      <AnimatePresence>
+        {isStockReportModalOpen && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 max-w-4xl w-full rounded-3xl p-6 shadow-2xl space-y-4 max-h-[90vh] flex flex-col">
+              
+              <div className="flex justify-between items-center border-b border-neutral-200 dark:border-neutral-800 pb-3 shrink-0">
+                <div>
+                  <h3 className="font-black text-sm uppercase text-purple-600 flex items-center gap-2">
+                    <SafeBarChart3 size={18} /> Month-End Stock Report (महीने का स्टॉक)
+                  </h3>
+                  <p className="text-[10px] text-neutral-500 font-bold mt-1">कितना माल आया, कितना खर्च हुआ और सिस्टम में कितना बचना चाहिए!</p>
+                </div>
+                <div className="flex gap-2 items-center">
+                  <button onClick={handleDownloadStockReport} className="bg-green-600 hover:bg-green-500 text-white px-3 py-1.5 rounded-lg text-[10px] font-black uppercase flex items-center gap-1 shadow-sm">
+                    📥 Download Excel
+                  </button>
+                  <button onClick={() => setIsStockReportModalOpen(false)} className="text-neutral-500 hover:text-black dark:hover:text-white bg-neutral-100 dark:bg-neutral-800 p-1.5 rounded-full"><X size={20} /></button>
+                </div>
+              </div>
+
+              <div className="flex-1 overflow-y-auto border border-neutral-200 dark:border-neutral-800 rounded-xl bg-neutral-50 dark:bg-neutral-900/50">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-neutral-200 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 sticky top-0">
+                    <tr>
+                      <th className="py-2.5 px-3 font-black">Item Name (माल का नाम)</th>
+                      <th className="py-2.5 px-3 font-black text-center text-blue-600">Total IN (कुल आया)</th>
+                      <th className="py-2.5 px-3 font-black text-center text-red-600">Total OUT (खर्च हुआ)</th>
+                      <th className="py-2.5 px-3 font-black text-center text-purple-600 bg-purple-500/10">Expected (बचना चाहिए)</th>
+                      <th className="py-2.5 px-3 font-black text-right text-green-600">Current Stock (असली स्टॉक)</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-neutral-200 dark:divide-neutral-800">
+                    {rawMaterials.length === 0 ? (
+                      <tr><td colSpan={5} className="py-10 text-center text-neutral-400 font-bold">कोई माल नहीं है।</td></tr>
+                    ) : (
+                      rawMaterials.map((r) => {
+                        const totalIn = Number(r.totalReceived) || 0;
+                        const totalOut = Number(r.totalConsumed) || 0;
+                        const expected = totalIn - totalOut;
+                        const actual = Number(r.stock) || 0;
+                        // अगर असली स्टॉक और बचना चाहिए वाले स्टॉक में फर्क है, तो वार्निंग (लाल रंग)
+                        const isMismatch = Math.abs(expected - actual) > 0.1; 
+
+                        return (
+                          <tr key={r.id} className="bg-white dark:bg-neutral-900 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors">
+                            <td className="py-2.5 px-3 font-bold text-neutral-900 dark:text-neutral-100">{r.name}</td>
+                            <td className="py-2.5 px-3 text-center font-mono font-bold text-blue-600">
+                              {totalIn.toFixed(2)} <span className="text-[9px] text-neutral-500">{r.unit}</span>
+                            </td>
+                            <td className="py-2.5 px-3 text-center font-mono font-bold text-red-500">
+                              - {totalOut.toFixed(2)} <span className="text-[9px] text-neutral-500">{r.unit}</span>
+                            </td>
+                            <td className="py-2.5 px-3 text-center font-mono font-black text-purple-700 dark:text-purple-400 bg-purple-500/5">
+                              {expected.toFixed(2)} <span className="text-[9px] text-purple-400">{r.unit}</span>
+                            </td>
+                            <td className={`py-2.5 px-3 text-right font-mono font-black ${isMismatch ? 'text-red-600 bg-red-500/10' : 'text-green-600'}`}>
+                              {actual.toFixed(2)} <span className="text-[9px] text-neutral-500">{r.unit}</span>
+                              {isMismatch && <span className="block text-[8px] text-red-500 mt-0.5">⚠️ Mismatch</span>}
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+              
+              <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 p-3 rounded-xl shrink-0">
+                <p className="text-[10px] font-bold text-yellow-800 dark:text-yellow-400">
+                  💡 <strong>टिप:</strong> महीने के आख़िर में "Download Excel" बटन दबाएं। फिर उस कागज़ को लेकर गोदाम में जाएँ और असली माल गिनें। अगर 'Expected (बचना चाहिए)' और असलियत में फर्क है, तो इसका मतलब कहीं वेस्टेज (Wastage) या गड़बड़ी हुई है!
+                </p>
+              </div>
+
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
