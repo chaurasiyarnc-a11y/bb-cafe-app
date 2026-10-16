@@ -2375,7 +2375,8 @@ export default function BbCafeDesktopPos() {
 
  // 👉 NEW: Stock Checker (चेक करें कि कच्चा माल है या नहीं)
  // 👉 UPDATE: स्टॉक चेकर में Variant को जोड़ा गया (ताकि Half/Full की अलग-अलग वार्निंग आए)
-  const checkStockAvailability = (product: any, qtyToAdd: number, variantSize?: string) => {
+ // 👉 UPDATE: स्टॉक चेकर में Fulfillment Type (Table/Parcel) को जोड़ा गया 
+  const checkStockAvailability = (product: any, qtyToAdd: number, variantSize?: string, currentFulfillmentType?: string) => {
     if (!product || !product.recipe || !Array.isArray(product.recipe)) return { isOk: true };
 
     const cartUsage: any = {};
@@ -2384,6 +2385,10 @@ export default function BbCafeDesktopPos() {
       if (p && p.recipe) {
         p.recipe.forEach((r: any) => {
           if (!r.variant || r.variant === 'All' || r.variant === cItem.size) {
+            // 👉 NEW: Parcel/Table चेक (कार्ट में मौजूद आइटम के लिए)
+            if (r.orderType === 'Parcel' && currentFulfillmentType === 'table') return;
+            if (r.orderType === 'Table' && currentFulfillmentType !== 'table') return;
+
             cartUsage[r.rawId] = (cartUsage[r.rawId] || 0) + (r.qty * cItem.quantity);
           }
         });
@@ -2391,8 +2396,11 @@ export default function BbCafeDesktopPos() {
     });
 
     for (const r of product.recipe) {
-      // अगर हम कोई खास Variant कार्ट में डाल रहे हैं, तो सिर्फ उसी का माल चेक करो
       if (!r.variant || r.variant === 'All' || r.variant === variantSize) {
+        // 👉 NEW: Parcel/Table चेक (नये जुड़ने वाले आइटम के लिए)
+        if (r.orderType === 'Parcel' && currentFulfillmentType === 'table') continue;
+        if (r.orderType === 'Table' && currentFulfillmentType !== 'table') continue;
+
         const rawItem = rawMaterials.find(rm => rm.id === r.rawId);
         if (rawItem) {
           const needed = (cartUsage[r.rawId] || 0) + (r.qty * qtyToAdd);
